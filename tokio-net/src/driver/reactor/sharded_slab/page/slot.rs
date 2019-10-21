@@ -69,7 +69,7 @@ impl Slot {
     }
 
     #[inline]
-    pub(super) fn insert(&self) -> Generation {
+    pub(super) fn alloc(&self) -> Generation {
         Generation::from_usize(self.gen.load(Ordering::Acquire))
     }
 

@@ -45,8 +45,8 @@ fn remove_remote_and_reuse() {
         test_println!("\n --- iteration ---\n");
         let slab = Arc::new(Slab::new());
 
-        let idx1 = slab.insert(1).expect("insert");
-        let idx2 = slab.insert(2).expect("insert");
+        let idx1 = slab.alloc(1).expect("alloc");
+        let idx2 = slab.alloc(2).expect("alloc");
 
         assert_eq!(slab.get_guard(idx1), Some(1), "slab: {:#?}", slab);
         assert_eq!(slab.get_guard(idx2), Some(2), "slab: {:#?}", slab);
@@ -62,7 +62,7 @@ fn remove_remote_and_reuse() {
             assert!(value == None || value == Some(3));
         });
 
-        let idx3 = slab.insert(3).expect("insert");
+        let idx3 = slab.alloc(3).expect("alloc");
         t1.join().expect("thread 1 should not panic");
 
         assert_eq!(slab.get_guard(idx3), Some(3), "slab: {:#?}", slab);
@@ -79,7 +79,7 @@ fn custom_page_sz() {
 
         for i in 0..1024 {
             test_println!("{}", i);
-            let k = slab.insert(i).expect("insert");
+            let k = slab.alloc(i).expect("alloc");
             assert_eq!(
                 slab.get_guard(k).expect("get_guard"),
                 i,

@@ -10,11 +10,11 @@ fn local_remove() {
 
         let s = slab.clone();
         let t1 = thread::spawn(move || {
-            let idx = s.insert(1).expect("insert");
+            let idx = s.alloc(1).expect("alloc");
             assert_eq!(s.get_guard(idx), Some(1));
             s.remove(idx);
             assert_eq!(s.get_guard(idx), None);
-            let idx = s.insert(2).expect("insert");
+            let idx = s.alloc(2).expect("alloc");
             assert_eq!(s.get_guard(idx), Some(2));
             s.remove(idx);
             assert_eq!(s.get_guard(idx), None);
@@ -22,19 +22,19 @@ fn local_remove() {
 
         let s = slab.clone();
         let t2 = thread::spawn(move || {
-            let idx = s.insert(3).expect("insert");
+            let idx = s.alloc(3).expect("alloc");
             assert_eq!(s.get_guard(idx), Some(3));
             s.remove(idx);
             assert_eq!(s.get_guard(idx), None);
-            let idx = s.insert(4).expect("insert");
+            let idx = s.alloc(4).expect("alloc");
             s.remove(idx);
             assert_eq!(s.get_guard(idx), None);
         });
 
         let s = slab;
-        let idx1 = s.insert(5).expect("insert");
+        let idx1 = s.alloc(5).expect("alloc");
         assert_eq!(s.get_guard(idx1), Some(5));
-        let idx2 = s.insert(6).expect("insert");
+        let idx2 = s.alloc(6).expect("alloc");
         assert_eq!(s.get_guard(idx2), Some(6));
         s.remove(idx1);
         assert_eq!(s.get_guard(idx1), None);
@@ -52,13 +52,13 @@ fn remove_remote() {
     loom::model(|| {
         let slab = Arc::new(SingleShard::new());
 
-        let idx1 = slab.insert(1).expect("insert");
+        let idx1 = slab.alloc(1).expect("alloc");
         assert_eq!(slab.get_guard(idx1), Some(1));
 
-        let idx2 = slab.insert(2).expect("insert");
+        let idx2 = slab.alloc(2).expect("alloc");
         assert_eq!(slab.get_guard(idx2), Some(2));
 
-        let idx3 = slab.insert(3).expect("insert");
+        let idx3 = slab.alloc(3).expect("alloc");
         assert_eq!(slab.get_guard(idx3), Some(3));
 
         let s = slab.clone();
@@ -85,7 +85,7 @@ fn remove_remote() {
 }
 
 #[test]
-fn concurrent_insert_remove() {
+fn concurrent_alloc_remove() {
     loom::model(|| {
         let slab = Arc::new(SingleShard::new());
         let pair = Arc::new((Mutex::new(None), Condvar::new()));
@@ -109,8 +109,8 @@ fn concurrent_insert_remove() {
 
         let (lock, cvar) = &*pair;
         for i in 0..2 {
-            test_println!("--- inserter i={} ---", i);
-            let key = slab.insert(i).expect("insert");
+            test_println!("--- allocer i={} ---", i);
+            let key = slab.alloc(i).expect("alloc");
 
             let mut next = lock.lock().unwrap();
             *next = Some(key);
@@ -135,14 +135,14 @@ fn unique_iter() {
 
         let s = slab.clone();
         let t1 = thread::spawn(move || {
-            s.insert(1).expect("insert");
-            s.insert(2).expect("insert");
+            s.alloc(1).expect("alloc");
+            s.alloc(2).expect("alloc");
         });
 
         let s = slab.clone();
         let t2 = thread::spawn(move || {
-            s.insert(3).expect("insert");
-            s.insert(4).expect("insert");
+            s.alloc(3).expect("alloc");
+            s.alloc(4).expect("alloc");
         });
 
         t1.join().expect("thread 1 should not panic");

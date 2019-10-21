@@ -369,7 +369,7 @@ impl Inner {
     /// The registration token is returned.
     pub(super) fn add_source(&self, source: &dyn Evented) -> io::Result<usize> {
         let aba_guard = self.next_aba_guard.fetch_add(1 << TOKEN_SHIFT, Relaxed);
-        let index = self.io_dispatch.insert(aba_guard).ok_or_else(|| {
+        let index = self.io_dispatch.alloc(aba_guard).ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::Other,
                 "reactor at max registered I/O resources",

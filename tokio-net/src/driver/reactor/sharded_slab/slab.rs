@@ -67,18 +67,18 @@ impl Slab {
         Self { shards }
     }
 
-    /// Inserts a value into the slab, returning a key that can be used to
+    /// allocs a value into the slab, returning a key that can be used to
     /// access it.
     ///
     /// If this function returns `None`, then the shard for the current thread
     /// is full and no items can be added until some are removed, or the maximum
     /// number of shards has been reached.
-    pub(crate) fn insert(&self, aba_guard: usize) -> Option<usize> {
+    pub(crate) fn alloc(&self, aba_guard: usize) -> Option<usize> {
         let tid = Tid::current();
         #[cfg(test)]
-        test_println!("insert {:?}", tid);
+        test_println!("alloc {:?}", tid);
         self.shards[tid.as_usize()]
-            .insert(aba_guard)
+            .alloc(aba_guard)
             .map(|idx| tid.pack(idx))
     }
 
@@ -144,18 +144,18 @@ impl SingleShard {
         }
     }
 
-    /// Inserts a value into the slab, returning a key that can be used to
+    /// allocs a value into the slab, returning a key that can be used to
     /// access it.
     ///
     /// If this function returns `None`, then the shard for the current thread
     /// is full and no items can be added until some are removed, or the maximum
     /// number of shards has been reached.
-    pub(crate) fn insert(&self, aba_guard: usize) -> Option<usize> {
-        // we must lock the slab to insert an item.
+    pub(crate) fn alloc(&self, aba_guard: usize) -> Option<usize> {
+        // we must lock the slab to alloc an item.
         let local = self.local.lock().unwrap();
         #[cfg(test)]
-        test_println!("insert");
-        self.shard.insert(aba_guard)
+        test_println!("alloc");
+        self.shard.alloc(aba_guard)
     }
 
     /// Removes the value associated with the given key from the slab.
@@ -226,14 +226,14 @@ impl Shard {
         }
     }
 
-    fn insert(&self, aba_guard: usize) -> Option<usize> {
+    fn alloc(&self, aba_guard: usize) -> Option<usize> {
         // Can we fit the value into an existing page?
         for (page_idx, page) in self.shared.iter().enumerate() {
             let local = self.local(page_idx);
             #[cfg(test)]
             test_println!("-> page {}; {:?}; {:?}", page_idx, local, page);
 
-            if let Some(page_offset) = page.insert(local, aba_guard) {
+            if let Some(page_offset) = page.alloc(local, aba_guard) {
                 return Some(page_offset);
             }
         }

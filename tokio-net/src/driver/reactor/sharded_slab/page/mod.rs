@@ -124,7 +124,7 @@ impl Shared {
     }
 
     #[inline]
-    pub(crate) fn insert(&self, local: &Local, aba_guard: usize) -> Option<usize> {
+    pub(crate) fn alloc(&self, local: &Local, aba_guard: usize) -> Option<usize> {
         let head = local.head();
         #[cfg(test)]
         test_println!("-> local head {:?}", head);
@@ -155,15 +155,15 @@ impl Shared {
         self.slab.with(|slab| {
             let slab = unsafe { &*(slab) }
                 .as_ref()
-                .expect("page must have been allocated to insert!");
+                .expect("page must have been allocated to alloc!");
             let slot = &slab[head];
-            slot.insert(aba_guard);
+            slot.alloc(aba_guard);
             local.set_head(slot.next());
         });
 
         let index = head + self.prev_sz;
         #[cfg(test)]
-        test_println!("insert at offset: {}", index);
+        test_println!("alloc at offset: {}", index);
         Some(index)
     }
 
