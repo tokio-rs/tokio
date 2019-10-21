@@ -119,39 +119,6 @@ project.
 
 [guide]: CONTRIBUTING.md
 
-## Project layout
-
-The `tokio` crate, found at the root, is primarily intended for use by
-application developers.  Library authors should depend on the sub crates, which
-have greater guarantees of stability.
-
-The crates included as part of Tokio are:
-
-* [`tokio-executor`]: Task executors and related utilities. Includes a
-  single-threaded executor and a multi-threaded, work-stealing, executor.
-
-* [`tokio-fs`]: Filesystem (and standard in / out) APIs.
-
-* [`tokio-codec`]: Utilities for encoding and decoding protocol frames.
-
-* [`tokio-io`]: Asynchronous I/O related traits and utilities.
-
-* [`tokio-macros`]: Macros for usage with Tokio.
-
-* [`tokio-net`]: Event loop that drives I/O resources as well as TCP, UDP, and
-  unix domain socket apis.
-
-* [ `tokio-timer`]: Time related APIs.
-
-[`tokio-codec`]: tokio-codec
-[`tokio-current-thread`]: tokio-current-thread
-[`tokio-executor`]: tokio-executor
-[`tokio-fs`]: tokio-fs
-[`tokio-io`]: tokio-io
-[`tokio-macros`]: tokio-macros
-[`tokio-net`]: tokio-net
-[`tokio-timer`]: tokio-timer
-
 ## Related Projects
 
 In addition to the crates in this repository, the Tokio project also maintains

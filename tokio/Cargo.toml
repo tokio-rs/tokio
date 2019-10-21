@@ -37,7 +37,7 @@ default = [
 ]
 
 codec = ["io", "tokio-codec", "bytes"]
-fs = ["tokio-fs"]
+fs = []
 io = ["tokio-io"]
 macros = ["tokio-macros"]
 net = ["tcp", "udp", "uds"]
@@ -77,7 +77,6 @@ num_cpus = { version = "1.8.0", optional = true }
 # Backs `DelayQueue`
 slab = { version = "0.4.1", optional = true }
 tokio-codec = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-codec" }
-tokio-fs = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-fs" }
 tokio-io = { version = "=0.2.0-alpha.6", optional = true, features = ["util"], path = "../tokio-io" }
 tokio-executor = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-executor" }
 tokio-macros = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-macros" }
@@ -103,6 +102,7 @@ libc = "0.2"
 num_cpus = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+tempfile = "3.1.0"
 time = "0.1"
 
 [package.metadata.docs.rs]

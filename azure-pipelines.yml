@@ -47,7 +47,6 @@ jobs:
     cross: true
     rust: beta
     crates:
-      tokio-fs: []
       tokio-net:
         - process
         - signal

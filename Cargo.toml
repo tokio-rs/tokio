@@ -4,7 +4,6 @@ members = [
   "tokio",
   "tokio-codec",
   "tokio-executor",
-  "tokio-fs",
   "tokio-io",
   "tokio-macros",
   "tokio-net",
