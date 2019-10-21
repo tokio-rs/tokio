@@ -1,8 +1,8 @@
 #![warn(rust_2018_idioms)]
 
+use tokio::timer::*;
 use tokio_test::task::MockTask;
 use tokio_test::{assert_pending, assert_ready_eq, clock};
-use tokio_timer::*;
 
 use std::time::Duration;
 

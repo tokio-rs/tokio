@@ -10,10 +10,6 @@
 //! `Clone`, `Send`, and `Sync`. This type is used to create instances of
 //! [`Delay`].
 //!
-//! The [`Now`] trait describes how to get an [`Instant`] representing the
-//! current moment in time. [`SystemNow`] is the default implementation, where
-//! [`Now::now`] is implemented by calling [`Instant::now`].
-//!
 //! [`Timer`] is generic over [`Now`]. This allows the source of time to be
 //! customized. This ability is especially useful in tests and any environment
 //! where determinism is necessary.
@@ -26,39 +22,38 @@
 //! [`Delay`]: Delay
 //! [`Now`]: clock::Now
 //! [`Now::now`]: clock::Now::now
-//! [`SystemNow`]: struct.SystemNow.html
 //! [`Instant`]: std::time::Instant
 //! [`Instant::now`]: std::time::Instant::now
 
-// This allows the usage of the old `Now` trait.
-#![allow(deprecated)]
-
 mod atomic_stack;
-mod entry;
-mod handle;
-mod now;
-mod registration;
-mod stack;
-
 use self::atomic_stack::AtomicStack;
-use self::entry::Entry;
-use self::stack::Stack;
 
+mod entry;
+use self::entry::Entry;
+
+mod handle;
 pub(crate) use self::handle::HandlePriv;
 pub use self::handle::{set_default, Handle};
-pub use self::now::{Now, SystemNow};
+
+mod registration;
 pub(crate) use self::registration::Registration;
 
-use crate::atomic::AtomicU64;
-use crate::wheel;
-use crate::Error;
+mod stack;
+use self::stack::Stack;
+
+use crate::timer::atomic::AtomicU64;
+use crate::timer::clock::Clock;
+use crate::timer::wheel;
+use crate::timer::Error;
+
+use tokio_executor::park::{Park, ParkThread, Unpark};
+
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use std::usize;
 use std::{cmp, fmt};
-use tokio_executor::park::{Park, ParkThread, Unpark};
 
 /// Timer implementation that drives [`Delay`], [`Interval`], and [`Timeout`].
 ///
@@ -124,7 +119,7 @@ use tokio_executor::park::{Park, ParkThread, Unpark};
 /// [`turn`]: #method.turn
 /// [Handle.struct]: struct.Handle.html
 #[derive(Debug)]
-pub struct Timer<T, N = SystemNow> {
+pub struct Timer<T> {
     /// Shared state
     inner: Arc<Inner>,
 
@@ -135,7 +130,7 @@ pub struct Timer<T, N = SystemNow> {
     park: T,
 
     /// Source of "now" instances
-    now: N,
+    clock: Clock,
 }
 
 /// Return value from the `turn` method on `Timer`.
@@ -183,11 +178,11 @@ where
     ///
     /// [`handle`]: #method.handle
     pub fn new(park: T) -> Self {
-        Timer::new_with_now(park, SystemNow::new())
+        Timer::new_with_clock(park, Clock::new())
     }
 }
 
-impl<T, N> Timer<T, N> {
+impl<T> Timer<T> {
     /// Returns a reference to the underlying `Park` instance.
     pub fn get_park(&self) -> &T {
         &self.park
@@ -199,23 +194,22 @@ impl<T, N> Timer<T, N> {
     }
 }
 
-impl<T, N> Timer<T, N>
+impl<T> Timer<T>
 where
     T: Park,
-    N: Now,
 {
     /// Create a new `Timer` instance that uses `park` to block the current
     /// thread and `now` to get the current `Instant`.
     ///
     /// Specifying the source of time is useful when testing.
-    pub fn new_with_now(park: T, mut now: N) -> Self {
+    pub fn new_with_clock(park: T, clock: Clock) -> Self {
         let unpark = Box::new(park.unpark());
 
         Timer {
-            inner: Arc::new(Inner::new(now.now(), unpark)),
+            inner: Arc::new(Inner::new(clock.now(), unpark)),
             wheel: wheel::Wheel::new(),
             park,
-            now,
+            clock,
         }
     }
 
@@ -264,7 +258,10 @@ where
 
     /// Run timer related logic
     fn process(&mut self) {
-        let now = crate::ms(self.now.now() - self.inner.start, crate::Round::Down);
+        let now = crate::timer::ms(
+            self.clock.now() - self.inner.start,
+            crate::timer::Round::Down,
+        );
         let mut poll = wheel::Poll::new(now);
 
         while let Some(entry) = self.wheel.poll(&mut poll, &mut ()) {
@@ -315,7 +312,7 @@ where
     ///
     /// Returns `None` if the entry was fired.
     fn add_entry(&mut self, entry: Arc<Entry>, when: u64) {
-        use crate::wheel::InsertError;
+        use crate::timer::wheel::InsertError;
 
         entry.set_when_internal(Some(when));
 
@@ -337,16 +334,15 @@ where
     }
 }
 
-impl Default for Timer<ParkThread, SystemNow> {
+impl Default for Timer<ParkThread> {
     fn default() -> Self {
         Timer::new(ParkThread::new())
     }
 }
 
-impl<T, N> Park for Timer<T, N>
+impl<T> Park for Timer<T>
 where
     T: Park,
-    N: Now,
 {
     type Unpark = T::Unpark;
     type Error = T::Error;
@@ -360,7 +356,7 @@ where
 
         match self.wheel.poll_at() {
             Some(when) => {
-                let now = self.now.now();
+                let now = self.clock.now();
                 let deadline = self.expiration_instant(when);
 
                 if deadline > now {
@@ -384,7 +380,7 @@ where
 
         match self.wheel.poll_at() {
             Some(when) => {
-                let now = self.now.now();
+                let now = self.clock.now();
                 let deadline = self.expiration_instant(when);
 
                 if deadline > now {
@@ -404,7 +400,7 @@ where
     }
 }
 
-impl<T, N> Drop for Timer<T, N> {
+impl<T> Drop for Timer<T> {
     fn drop(&mut self) {
         use std::u64;
 
@@ -477,7 +473,7 @@ impl Inner {
             return 0;
         }
 
-        crate::ms(deadline - self.start, crate::Round::Up)
+        crate::timer::ms(deadline - self.start, crate::timer::Round::Up)
     }
 }
 

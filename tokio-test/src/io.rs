@@ -16,17 +16,17 @@
 //! [`AsyncRead`]: tokio_io::AsyncRead
 //! [`AsyncWrite`]: tokio_io::AsyncWrite
 
+use tokio::timer::{clock, timer, Delay};
+use tokio_io::{AsyncRead, AsyncWrite, Buf};
+use tokio_sync::mpsc;
+
+use futures_core::ready;
 use std::collections::VecDeque;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{self, Poll, Waker};
 use std::time::{Duration, Instant};
 use std::{cmp, io};
-
-use futures_core::ready;
-use tokio_io::{AsyncRead, AsyncWrite, Buf};
-use tokio_sync::mpsc;
-use tokio_timer::{clock, timer, Delay};
 
 /// An I/O object that follows a predefined script.
 ///
@@ -267,42 +267,6 @@ impl Inner {
         self.actions.front_mut()
     }
 }
-
-/*
-impl io::Read for Mock {
-    fn read(&mut self, dst: &mut [u8]) -> io::Result<usize> {
-        if self.is_async() {
-            tokio::async_read(self, dst)
-        } else {
-            self.sync_read(dst)
-        }
-    }
-}
-
-impl io::Write for Mock {
-    fn write(&mut self, src: &[u8]) -> io::Result<usize> {
-        if self.is_async() {
-            tokio::async_write(self, src)
-        } else {
-            self.sync_write(src)
-        }
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-}
-*/
-
-/*
-use self::futures::{Future, Stream, Poll, Async};
-use self::futures::sync::mpsc;
-use self::futures::task::{self, Task};
-use self::tokio_io::{AsyncRead, AsyncWrite};
-use self::tokio_timer::{Timer, Sleep};
-
-use std::io;
-*/
 
 // ===== impl Inner =====
 

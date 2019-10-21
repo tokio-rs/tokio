@@ -9,7 +9,6 @@ members = [
   "tokio-net",
   "tokio-sync",
   "tokio-test",
-  "tokio-timer",
   "tokio-tls",
   "build-tests",
 ]

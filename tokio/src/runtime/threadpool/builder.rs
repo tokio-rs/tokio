@@ -1,9 +1,9 @@
 use super::{Inner, Runtime};
+use crate::timer::clock::{self, Clock};
+use crate::timer::timer::{self, Timer};
 
 use tokio_executor::thread_pool;
 use tokio_net::driver::{self, Reactor};
-use tokio_timer::clock::{self, Clock};
-use tokio_timer::timer::{self, Timer};
 
 use tracing_core as trace;
 use std::{fmt, io};
@@ -26,7 +26,7 @@ use std::sync::{Arc, Mutex};
 ///
 /// ```
 /// use tokio::runtime::Builder;
-/// use tokio_timer::clock::Clock;
+/// use tokio::timer::clock::Clock;
 ///
 /// fn main() {
 ///     // build Runtime
@@ -233,7 +233,7 @@ impl Builder {
             reactor_handles.push(reactor.handle());
 
             // Create a new timer.
-            let timer = Timer::new_with_now(reactor, self.clock.clone());
+            let timer = Timer::new_with_clock(reactor, self.clock.clone());
             timer_handles.push(timer.handle());
             timers.push(Mutex::new(Some(timer)));
         }

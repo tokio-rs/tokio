@@ -1,6 +1,9 @@
-use crate::atomic::AtomicU64;
-use crate::timer::{HandlePriv, Inner};
-use crate::Error;
+use crate::timer::atomic::AtomicU64;
+use crate::timer::timer::{HandlePriv, Inner};
+use crate::timer::Error;
+
+use tokio_sync::AtomicWaker;
+
 use crossbeam_utils::CachePadded;
 use std::cell::UnsafeCell;
 use std::ptr;
@@ -10,7 +13,6 @@ use std::sync::{Arc, Weak};
 use std::task::{self, Poll};
 use std::time::{Duration, Instant};
 use std::u64;
-use tokio_sync::AtomicWaker;
 
 /// Internal state shared between a `Delay` instance and the timer.
 ///

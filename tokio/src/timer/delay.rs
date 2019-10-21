@@ -1,4 +1,5 @@
-use crate::timer::{HandlePriv, Registration};
+use crate::timer::timer::{HandlePriv, Registration};
+
 use futures_core::ready;
 use std::future::Future;
 use std::pin::Pin;
@@ -78,8 +79,6 @@ impl Delay {
         self.registration.reset(deadline);
     }
 
-    // Used by `Timeout<Stream>`
-    #[cfg(feature = "async-traits")]
     pub(crate) fn reset_timeout(&mut self) {
         self.registration.reset_timeout();
     }

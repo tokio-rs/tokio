@@ -70,8 +70,6 @@ jobs:
       tokio-sync:
         - async-traits
       tokio-macros: []
-      tokio-timer:
-        - async-traits
       tokio-test: []
 
 # Test compilation failure

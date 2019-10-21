@@ -74,6 +74,75 @@
 //! [Interval]: struct.Interval.html
 //! [`DelayQueue`]: struct.DelayQueue.html
 
-pub use tokio_timer::{
-    delay, delay_for, delay_queue, timeout, Delay, DelayQueue, Error, Interval, Timeout,
-};
+pub mod clock;
+
+pub mod delay_queue;
+#[doc(inline)]
+pub use self::delay_queue::DelayQueue;
+
+pub mod throttle;
+
+// TODO: clean this up
+#[allow(clippy::module_inception)]
+pub mod timer;
+pub use timer::{set_default, Timer};
+
+pub mod timeout;
+#[doc(inline)]
+pub use timeout::Timeout;
+
+mod atomic;
+
+mod delay;
+pub use self::delay::Delay;
+
+mod error;
+pub use error::Error;
+
+mod interval;
+pub use interval::Interval;
+
+mod wheel;
+
+use std::time::{Duration, Instant};
+
+/// Create a Future that completes at `deadline`.
+pub fn delay(deadline: Instant) -> Delay {
+    Delay::new(deadline)
+}
+
+/// Create a Future that completes in `duration` from now.
+///
+/// Equivalent to `delay(tokio::timer::clock::now() + duration)`. Analogous to `std::thread::sleep`.
+pub fn delay_for(duration: Duration) -> Delay {
+    delay(clock::now() + duration)
+}
+
+// ===== Internal utils =====
+
+enum Round {
+    Up,
+    Down,
+}
+
+/// Convert a `Duration` to milliseconds, rounding up and saturating at
+/// `u64::MAX`.
+///
+/// The saturating is fine because `u64::MAX` milliseconds are still many
+/// million years.
+#[inline]
+fn ms(duration: Duration, round: Round) -> u64 {
+    const NANOS_PER_MILLI: u32 = 1_000_000;
+    const MILLIS_PER_SEC: u64 = 1_000;
+
+    // Round up.
+    let millis = match round {
+        Round::Up => (duration.subsec_nanos() + NANOS_PER_MILLI - 1) / NANOS_PER_MILLI,
+        Round::Down => duration.subsec_millis(),
+    };
+
+    duration
+        .as_secs()
+        .saturating_mul(MILLIS_PER_SEC)
+        .saturating_add(u64::from(millis))
+}

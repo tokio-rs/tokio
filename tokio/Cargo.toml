@@ -59,7 +59,7 @@ rt-full = [
 signal = ["tokio-net/signal"]
 sync = ["tokio-sync"]
 tcp = ["io", "tokio-net/tcp"]
-timer = ["tokio-timer"]
+timer = ["crossbeam-utils", "slab"]
 tracing = ["tracing-core"]
 udp = ["io", "tokio-net/udp"]
 uds = ["io", "tokio-net/uds"]
@@ -72,14 +72,16 @@ futures-util-preview = { version = "=0.3.0-alpha.19", features = ["sink"] }
 
 # Everything else is optional...
 bytes = { version = "0.4", optional = true }
+crossbeam-utils = { version = "0.6.0", optional = true }
 num_cpus = { version = "1.8.0", optional = true }
+# Backs `DelayQueue`
+slab = { version = "0.4.1", optional = true }
 tokio-codec = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-codec" }
 tokio-io = { version = "=0.2.0-alpha.6", optional = true, features = ["util"], path = "../tokio-io" }
 tokio-executor = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-executor" }
 tokio-macros = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-macros" }
 tokio-net = { version = "=0.2.0-alpha.6", optional = true, features = ["async-traits"], path = "../tokio-net" }
 tokio-sync = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-sync", features = ["async-traits"] }
-tokio-timer = { version = "=0.3.0-alpha.6", optional = true, path = "../tokio-timer", features = ["async-traits"] }
 tracing-core = { version = "0.1", optional = true }
 
 [target.'cfg(feature = "tracing")'.dependencies]
@@ -98,6 +100,7 @@ http = "0.1"
 httparse = "1.0"
 libc = "0.2"
 num_cpus = "1.0"
+rand = "0.7.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tempfile = "3.1.0"

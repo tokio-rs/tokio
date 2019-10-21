@@ -1,5 +1,6 @@
-use crate::timer::{Entry, HandlePriv};
-use crate::Error;
+use crate::timer::timer::{Entry, HandlePriv};
+use crate::timer::Error;
+
 use std::sync::Arc;
 use std::task::{self, Poll};
 use std::time::{Duration, Instant};
@@ -45,7 +46,6 @@ impl Registration {
     }
 
     // Used by `Timeout<Stream>`
-    #[cfg(feature = "async-traits")]
     pub(crate) fn reset_timeout(&mut self) {
         let deadline = crate::clock::now() + self.entry.time_ref().duration;
         unsafe {

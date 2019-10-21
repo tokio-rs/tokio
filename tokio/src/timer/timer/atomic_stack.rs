@@ -1,5 +1,6 @@
 use super::Entry;
-use crate::Error;
+use crate::timer::Error;
+
 use std::ptr;
 use std::sync::atomic::AtomicPtr;
 use std::sync::atomic::Ordering::SeqCst;
