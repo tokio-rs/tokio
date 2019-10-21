@@ -1,0 +1,98 @@
+//! Asynchronous file and standard stream adaptation.
+//!
+//! This module contains utility methods and adapter types for input/output to
+//! files or standard streams (`Stdin`, `Stdout`, `Stderr`), and
+//! filesystem manipulation, for use within (and only within) a Tokio runtime.
+//!
+//! Tasks run by *worker* threads should not block, as this could delay
+//! servicing reactor events. Portable filesystem operations are blocking,
+//! however. This module offers adapters which use a [`blocking`] annotation
+//! to inform the runtime that a blocking operation is required. When
+//! necessary, this allows the runtime to convert the current thread from a
+//! *worker* to a *backup* thread, where blocking is acceptable.
+//!
+//! ## Usage
+//!
+//! Where possible, users should prefer the provided asynchronous-specific
+//! traits such as [`AsyncRead`], or methods returning a `Future` or `Poll`
+//! type. Adaptions also extend to traits like `std::io::Read` where methods
+//! return `std::io::Result`.  Be warned that these adapted methods may return
+//! `std::io::ErrorKind::WouldBlock` if a *worker* thread can not be converted
+//! to a *backup* thread immediately. See [tokio-executor] for more details
+//! of the threading model and [`blocking`].
+//!
+//! [`blocking`]: https://docs.rs/tokio-executor/0.2.0-alpha.2/tokio_executor/threadpool/fn.blocking.html
+//! [`AsyncRead`]: https://docs.rs/tokio-io/0.1/tokio_io/trait.AsyncRead.html
+//! [tokio-executor]: https://docs.rs/tokio-executor/0.2.0-alpha.2/tokio_executor/threadpool/index.html
+
+pub(crate) mod blocking;
+
+mod create_dir;
+pub use self::create_dir::create_dir;
+
+mod create_dir_all;
+pub use self::create_dir_all::create_dir_all;
+
+mod file;
+pub use self::file::File;
+
+mod hard_link;
+pub use self::hard_link::hard_link;
+
+mod metadata;
+pub use self::metadata::metadata;
+
+mod open_options;
+pub use self::open_options::OpenOptions;
+
+pub mod os;
+
+mod read;
+pub use self::read::read;
+
+mod read_dir;
+pub use self::read_dir::{read_dir, DirEntry, ReadDir};
+
+mod read_link;
+pub use self::read_link::read_link;
+
+mod read_to_string;
+pub use self::read_to_string::read_to_string;
+
+mod remove_dir;
+pub use self::remove_dir::remove_dir;
+
+mod remove_dir_all;
+pub use self::remove_dir_all::remove_dir_all;
+
+mod remove_file;
+pub use self::remove_file::remove_file;
+
+mod rename;
+pub use self::rename::rename;
+
+mod set_permissions;
+pub use self::set_permissions::set_permissions;
+
+mod symlink_metadata;
+pub use self::symlink_metadata::symlink_metadata;
+
+mod write;
+pub use self::write::write;
+
+use std::io;
+
+pub(crate) async fn asyncify<F, T>(f: F) -> io::Result<T>
+where
+    F: FnOnce() -> io::Result<T> + Send + 'static,
+    T: Send + 'static,
+{
+    sys::run(f).await
+}
+
+/// Types in this module can be mocked out in tests.
+mod sys {
+    pub(crate) use std::fs::File;
+
+    pub(crate) use tokio_executor::blocking::{run, Blocking};
+}
