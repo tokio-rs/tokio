@@ -1,5 +1,5 @@
-use super::framed::Fuse;
-use super::Decoder;
+use crate::codec::framed::Fuse;
+use crate::codec::Decoder;
 
 use tokio_io::AsyncRead;
 

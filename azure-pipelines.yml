@@ -62,7 +62,6 @@ jobs:
     displayName: Test sub crates -
     rust: beta
     crates:
-      tokio-codec: []
       tokio-executor:
         - current-thread
         - thread-pool
@@ -74,6 +73,7 @@ jobs:
       tokio-timer:
         - async-traits
       tokio-test: []
+      tokio-util: []
 
 # Test compilation failure
 - template: ci/azure-test-stable.yml

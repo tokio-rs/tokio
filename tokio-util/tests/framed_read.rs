@@ -1,9 +1,9 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::prelude::*;
-use tokio_codec::{Decoder, FramedRead};
 use tokio_test::assert_ready;
 use tokio_test::task::MockTask;
+use tokio_util::codec::{Decoder, FramedRead};
 
 use bytes::{Buf, BytesMut, IntoBuf};
 use std::collections::VecDeque;

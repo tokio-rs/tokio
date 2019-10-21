@@ -62,7 +62,6 @@ uds = [
 log = ["tracing/log"]
 
 [dependencies]
-tokio-codec = { version = "=0.2.0-alpha.6", path = "../tokio-codec" }
 tokio-executor = { version = "=0.2.0-alpha.6", features = ["blocking"], path = "../tokio-executor" }
 tokio-io = { version = "=0.2.0-alpha.6", path = "../tokio-io" }
 tokio-sync = { version = "=0.2.0-alpha.6", path = "../tokio-sync" }

@@ -1,4 +1,4 @@
-# tokio-codec
+# tokio-util
 
 Utilities for encoding and decoding frames.
 

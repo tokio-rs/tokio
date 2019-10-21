@@ -1,5 +1,5 @@
 [package]
-name = "tokio-codec"
+name = "tokio-util"
 # When releasing to crates.io:
 # - Remove path dependencies
 # - Update html_root_url.
@@ -13,14 +13,15 @@ authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-codec/0.2.0-alpha.6/tokio_codec"
+documentation = "https://docs.rs/tokio-util/0.2.0-alpha.6/tokio_util"
 description = """
-Utilities for encoding and decoding frames.
+Additional utilities for working with Tokio.
 """
 categories = ["asynchronous"]
 
 [dependencies]
 tokio-io = { version = "=0.2.0-alpha.6", path = "../tokio-io" }
+tokio = { version = "=0.2.0-alpha.6", path = "../tokio" }
 
 bytes = "0.4.7"
 futures-core-preview = "=0.3.0-alpha.19"

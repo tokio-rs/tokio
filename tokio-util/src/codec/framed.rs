@@ -1,9 +1,7 @@
-#![allow(deprecated)]
-
-use crate::decoder::Decoder;
-use crate::encoder::Encoder;
-use crate::framed_read::{framed_read2, framed_read2_with_buffer, FramedRead2};
-use crate::framed_write::{framed_write2, framed_write2_with_buffer, FramedWrite2};
+use crate::codec::decoder::Decoder;
+use crate::codec::encoder::Encoder;
+use crate::codec::framed_read::{framed_read2, framed_read2_with_buffer, FramedRead2};
+use crate::codec::framed_write::{framed_write2, framed_write2_with_buffer, FramedWrite2};
 
 use tokio_io::{AsyncBufRead, AsyncRead, AsyncWrite};
 

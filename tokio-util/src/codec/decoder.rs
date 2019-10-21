@@ -1,10 +1,10 @@
-use bytes::BytesMut;
-use std::io;
+use crate::codec::encoder::Encoder;
+use crate::codec::Framed;
+
 use tokio_io::{AsyncRead, AsyncWrite};
 
-use super::encoder::Encoder;
-
-use super::Framed;
+use bytes::BytesMut;
+use std::io;
 
 /// Decoding of frames via buffers.
 ///
@@ -75,7 +75,7 @@ pub trait Decoder {
     /// # use std::io;
     /// #
     /// # use bytes::BytesMut;
-    /// # use tokio_codec::Decoder;
+    /// # use tokio_util::codec::Decoder;
     /// #
     /// # struct MyCodec;
     /// #

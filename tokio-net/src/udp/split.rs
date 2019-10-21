@@ -86,7 +86,7 @@ impl UdpSocketRecvHalf {
     /// to hold the message bytes. If a message is too long to fit in the supplied
     /// buffer, excess bytes may be discarded.
     pub async fn recv_from(&mut self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        poll_fn(|cx| self.0.poll_recv_from_priv(cx, buf)).await
+        poll_fn(|cx| self.0.poll_recv_from(cx, buf)).await
     }
 
     /// Returns a future that receives a single datagram message on the socket from
@@ -102,7 +102,7 @@ impl UdpSocketRecvHalf {
     ///
     /// [`connect`]: super::UdpSocket::connect
     pub async fn recv(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        poll_fn(|cx| self.0.poll_recv_priv(cx, buf)).await
+        poll_fn(|cx| self.0.poll_recv(cx, buf)).await
     }
 }
 
@@ -120,7 +120,7 @@ impl UdpSocketSendHalf {
     /// The future will resolve to an error if the IP version of the socket does
     /// not match that of `target`.
     pub async fn send_to(&mut self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
-        poll_fn(|cx| self.0.poll_send_to_priv(cx, buf, target)).await
+        poll_fn(|cx| self.0.poll_send_to(cx, buf, target)).await
     }
 
     /// Returns a future that sends data on the socket to the remote address to which it is connected.
@@ -131,7 +131,7 @@ impl UdpSocketSendHalf {
     ///
     /// [`connect`]: super::UdpSocket::connect
     pub async fn send(&mut self, buf: &[u8]) -> io::Result<usize> {
-        poll_fn(|cx| self.0.poll_send_priv(cx, buf)).await
+        poll_fn(|cx| self.0.poll_send(cx, buf)).await
     }
 }
 

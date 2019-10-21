@@ -1,8 +1,6 @@
-#![allow(deprecated)]
-
-use super::framed::Fuse;
-use crate::decoder::Decoder;
-use crate::encoder::Encoder;
+use crate::codec::decoder::Decoder;
+use crate::codec::encoder::Encoder;
+use crate::codec::framed::Fuse;
 
 use tokio_io::{AsyncBufRead, AsyncRead, AsyncWrite};
 
