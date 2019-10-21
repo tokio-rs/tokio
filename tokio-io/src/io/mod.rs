@@ -43,6 +43,8 @@ pub use self::empty::{empty, Empty};
 pub use self::repeat::{repeat, Repeat};
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::sink::{sink, Sink};
+#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
+pub use self::take::Take;
 
 // used by `BufReader` and `BufWriter`
 // https://github.com/rust-lang/rust/blob/master/src/libstd/sys_common/io.rs#L1
