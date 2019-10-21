@@ -167,16 +167,15 @@ where
 {
     /// Creates a new `PollEvented` associated with the default reactor.
     pub fn new(io: E) -> io::Result<Self> {
-        let mut pe = Self {
+        let registration = Registration::new(&io)?;
+        Ok(Self {
             io: Some(io),
             inner: Inner {
-                registration: Registration::default(),
+                registration,
                 read_readiness: AtomicUsize::new(0),
                 write_readiness: AtomicUsize::new(0),
             },
-        };
-        pe.register()?;
-        Ok(pe)
+        })
     }
 
     /// Returns a shared reference to the underlying I/O object this readiness
@@ -327,11 +326,6 @@ where
         }
 
         Ok(())
-    }
-
-    /// Ensure that the I/O resource is registered with the current reactor.
-    fn register(&mut self) -> io::Result<()> {
-        self.inner.registration.register(self.io.as_ref().unwrap())
     }
 }
 

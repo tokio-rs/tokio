@@ -3,7 +3,7 @@ use super::reactor::{Direction, Handle};
 
 use mio::{self, Evented};
 use std::sync::atomic::Ordering::SeqCst;
-use std::task::{Context, Poll, Waker};
+use std::task::{Context, Poll};
 use std::{io, usize};
 
 /// Associates an I/O resource with the reactor instance that drives it.
@@ -12,10 +12,9 @@ use std::{io, usize};
 /// that it will receive task notifications on readiness. This is the lowest
 /// level API for integrating with a reactor.
 ///
-/// The association between an I/O resource is made by calling [`register`].
-/// Once the association is established, it remains established until the
-/// registration instance is dropped. Subsequent calls to [`register`] are
-/// no-ops.
+/// The association between an I/O resource is made by calling [`new`]. Once
+/// the association is established, it remains established until the
+/// registration instance is dropped.
 ///
 /// A registration instance represents two separate readiness streams. One for
 /// the read readiness and one for write readiness. These streams are
@@ -34,16 +33,11 @@ use std::{io, usize};
 /// These events are included as part of the read readiness event stream. The
 /// write readiness event stream is only for `Ready::writable()` events.
 ///
-/// [`register`]: #method.register
+/// [`new`]: #method.new
 /// [`poll_read_ready`]: #method.poll_read_ready`]
 /// [`poll_write_ready`]: #method.poll_write_ready`]
-#[derive(Debug, Default)]
-pub struct Registration {
-    inner: Option<Inner>,
-}
-
 #[derive(Debug)]
-struct Inner {
+pub struct Registration {
     handle: Handle,
     token: usize,
 }
@@ -53,24 +47,24 @@ struct Inner {
 impl Registration {
     /// Register the I/O resource with the default reactor.
     ///
-    /// This function is safe to call concurrently and repeatedly. However, only
-    /// the first call will establish the registration. Subsequent calls will be
-    /// no-ops.
-    ///
     /// # Return
     ///
     /// - `Ok` if the registration happened successfully
     /// - `Err` if an error was encountered during registration
-    pub fn register<T>(&mut self, io: &T) -> io::Result<()>
+    pub fn new<T>(io: &T) -> io::Result<Self>
     where
         T: Evented,
     {
-        if self.inner.is_none() {
-            let handle = Handle::current();
-            let inner = Inner::add_source(io, handle)?;
-            self.inner = Some(inner);
-        }
-        Ok(())
+        let handle = Handle::current();
+        let token = if let Some(inner) = handle.inner() {
+            inner.add_source(io)?
+        } else {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "failed to find event loop",
+            ));
+        };
+        Ok(Self { handle, token })
     }
 
     /// Deregister the I/O resource from the reactor it is associated with.
@@ -93,10 +87,11 @@ impl Registration {
     where
         T: Evented,
     {
-        if let Some(inner) = self.inner.as_ref() {
-            inner.deregister(io)?
-        }
-        Ok(())
+        let inner = match self.handle.inner() {
+            Some(inner) => inner,
+            None => return Err(io::Error::new(io::ErrorKind::Other, "reactor gone")),
+        };
+        inner.deregister_source(io)
     }
 
     /// Poll for events on the I/O resource's read readiness stream.
@@ -210,68 +205,16 @@ impl Registration {
         direction: Direction,
         cx: Option<&mut Context<'_>>,
     ) -> io::Result<Option<mio::Ready>> {
-        let inner = self.inner.as_ref().ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::Other,
-                "I/O resource has not been registered to a reactor",
-            )
-        })?;
+        let inner = match self.handle.inner() {
+            Some(inner) => inner,
+            None => return Err(io::Error::new(io::ErrorKind::Other, "reactor gone")),
+        };
+
+        // If the task should be notified about new events, ensure that it has
+        // been registered
         if let Some(ref cx) = cx {
-            inner.register(direction, cx.waker().clone());
+            inner.register(self.token, direction, cx.waker().clone())
         }
-        inner.poll_ready(direction, cx)
-    }
-}
-
-unsafe impl Send for Registration {}
-unsafe impl Sync for Registration {}
-
-// ===== impl Inner =====
-
-impl Inner {
-    fn add_source<E>(io: &E, handle: Handle) -> io::Result<Self>
-    where
-        E: Evented,
-    {
-        let token = if let Some(inner) = handle.inner() {
-            inner.add_source(io)?
-        } else {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "failed to find event loop",
-            ));
-        };
-        Ok(Self { handle, token })
-    }
-
-    fn register(&self, direction: Direction, waker: Waker) {
-        let inner = match self.handle.inner() {
-            Some(inner) => inner,
-            None => {
-                waker.wake();
-                return;
-            }
-        };
-        inner.register(self.token, direction, waker);
-    }
-
-    fn deregister<E: Evented>(&self, io: &E) -> io::Result<()> {
-        let inner = match self.handle.inner() {
-            Some(inner) => inner,
-            None => return Err(io::Error::new(io::ErrorKind::Other, "reactor gone")),
-        };
-        inner.deregister_source(io)
-    }
-
-    fn poll_ready(
-        &self,
-        direction: Direction,
-        cx: Option<&mut Context<'_>>,
-    ) -> io::Result<Option<mio::Ready>> {
-        let inner = match self.handle.inner() {
-            Some(inner) => inner,
-            None => return Err(io::Error::new(io::ErrorKind::Other, "reactor gone")),
-        };
 
         let mask = direction.mask();
         let mask_no_hup = (mask - platform::hup()).as_usize();
@@ -313,7 +256,10 @@ impl Inner {
     }
 }
 
-impl Drop for Inner {
+unsafe impl Send for Registration {}
+unsafe impl Sync for Registration {}
+
+impl Drop for Registration {
     fn drop(&mut self) {
         let inner = match self.handle.inner() {
             Some(inner) => inner,
