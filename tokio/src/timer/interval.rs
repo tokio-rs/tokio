@@ -1,5 +1,4 @@
-use crate::clock;
-use crate::Delay;
+use crate::timer::{clock, Delay};
 
 use futures_core::ready;
 use futures_util::future::poll_fn;
@@ -40,7 +39,7 @@ impl Interval {
 
     /// Creates new `Interval` that yields with interval of `duration`.
     ///
-    /// The function is shortcut for `Interval::new(tokio_timer::clock::now() + duration, duration)`.
+    /// The function is shortcut for `Interval::new(tokio::timer::clock::now() + duration, duration)`.
     ///
     /// The `duration` argument must be a non-zero duration.
     ///
@@ -98,14 +97,12 @@ impl Interval {
     }
 }
 
-#[cfg(feature = "async-traits")]
 impl futures_core::FusedStream for Interval {
     fn is_terminated(&self) -> bool {
         false
     }
 }
 
-#[cfg(feature = "async-traits")]
 impl futures_core::Stream for Interval {
     type Item = Instant;
 

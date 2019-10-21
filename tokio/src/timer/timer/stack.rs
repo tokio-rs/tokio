@@ -1,5 +1,6 @@
-use super::Entry;
-use crate::wheel;
+use crate::timer::timer::Entry;
+use crate::timer::wheel;
+
 use std::ptr;
 use std::sync::Arc;
 

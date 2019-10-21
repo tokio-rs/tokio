@@ -9,9 +9,10 @@ pub use self::spawner::Spawner;
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use tokio_executor::thread_pool::JoinHandle;
 
+use crate::timer::timer;
+
 use tokio_executor::thread_pool::ThreadPool;
 use tokio_net::driver;
-use tokio_timer::timer;
 
 use tracing_core as trace;
 use std::future::Future;

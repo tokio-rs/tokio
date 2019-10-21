@@ -20,7 +20,6 @@ mod now;
 
 pub use self::now::Now;
 
-use crate::timer;
 use std::cell::Cell;
 use std::fmt;
 use std::sync::Arc;
@@ -57,7 +56,7 @@ thread_local! {
 /// # Examples
 ///
 /// ```
-/// # use tokio_timer::clock;
+/// # use tokio::timer::clock;
 /// let now = clock::now();
 /// ```
 pub fn now() -> Instant {
@@ -99,13 +98,6 @@ impl Clock {
             Some(ref now) => now.now(),
             None => Instant::now(),
         }
-    }
-}
-
-#[allow(deprecated)]
-impl timer::Now for Clock {
-    fn now(&mut self) -> Instant {
-        Clock::now(self)
     }
 }
 

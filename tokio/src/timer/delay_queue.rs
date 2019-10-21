@@ -4,10 +4,10 @@
 //!
 //! [`DelayQueue`]: struct.DelayQueue.html
 
-use crate::clock::now;
-use crate::timer::Handle;
-use crate::wheel::{self, Wheel};
-use crate::{Delay, Error};
+use crate::timer::clock::now;
+use crate::timer::timer::Handle;
+use crate::timer::wheel::{self, Wheel};
+use crate::timer::{Delay, Error};
 
 use futures_core::ready;
 use slab::Slab;
@@ -217,7 +217,7 @@ impl<T> DelayQueue<T> {
     /// # Examples
     ///
     /// ```rust
-    /// # use tokio_timer::DelayQueue;
+    /// # use tokio::timer::DelayQueue;
     /// let delay_queue: DelayQueue<u32> = DelayQueue::new();
     /// ```
     pub fn new() -> DelayQueue<T> {
@@ -231,8 +231,8 @@ impl<T> DelayQueue<T> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// # use tokio_timer::DelayQueue;
-    /// use tokio_timer::timer::Handle;
+    /// # use tokio::timer::DelayQueue;
+    /// use tokio::timer::timer::Handle;
     ///
     /// let handle = Handle::default();
     /// let delay_queue: DelayQueue<u32> = DelayQueue::with_capacity_and_handle(0, &handle);
@@ -258,7 +258,7 @@ impl<T> DelayQueue<T> {
     /// # Examples
     ///
     /// ```rust
-    /// # use tokio_timer::DelayQueue;
+    /// # use tokio::timer::DelayQueue;
     /// # use std::time::Duration;
     /// let mut delay_queue = DelayQueue::with_capacity(10);
     ///
@@ -464,7 +464,7 @@ impl<T> DelayQueue<T> {
     /// assert_eq!(*item.get_ref(), "foo");
     /// ```
     pub fn remove(&mut self, key: &Key) -> Expired<T> {
-        use crate::wheel::Stack;
+        use crate::timer::wheel::Stack;
 
         // Special case the `expired` queue
         if self.slab[key.index].expired {
@@ -607,7 +607,7 @@ impl<T> DelayQueue<T> {
     /// # Examples
     ///
     /// ```rust
-    /// use tokio_timer::DelayQueue;
+    /// use tokio::timer::DelayQueue;
     ///
     /// let delay_queue: DelayQueue<i32> = DelayQueue::with_capacity(10);
     /// assert_eq!(delay_queue.capacity(), 10);
@@ -636,7 +636,7 @@ impl<T> DelayQueue<T> {
     /// # Examples
     ///
     /// ```
-    /// use tokio_timer::DelayQueue;
+    /// use tokio::timer::DelayQueue;
     /// use std::time::Duration;
     ///
     /// let mut delay_queue = DelayQueue::new();
@@ -658,7 +658,7 @@ impl<T> DelayQueue<T> {
     /// # Examples
     ///
     /// ```
-    /// use tokio_timer::DelayQueue;
+    /// use tokio::timer::DelayQueue;
     /// use std::time::Duration;
     ///
     /// let mut delay_queue = DelayQueue::new();
@@ -690,7 +690,8 @@ impl<T> DelayQueue<T> {
                     ready!(Pin::new(&mut *delay).poll(cx));
                 }
 
-                let now = crate::ms(delay.deadline() - self.start, crate::Round::Down);
+                let now =
+                    crate::timer::ms(delay.deadline() - self.start, crate::timer::Round::Down);
 
                 self.poll = wheel::Poll::new(now);
             }
@@ -713,7 +714,7 @@ impl<T> DelayQueue<T> {
         let when = if when < self.start {
             0
         } else {
-            crate::ms(when - self.start, crate::Round::Up)
+            crate::timer::ms(when - self.start, crate::timer::Round::Up)
         };
 
         cmp::max(when, self.wheel.elapsed())
@@ -723,7 +724,6 @@ impl<T> DelayQueue<T> {
 // We never put `T` in a `Pin`...
 impl<T> Unpin for DelayQueue<T> {}
 
-#[cfg(feature = "async-traits")]
 impl<T> futures_core::Stream for DelayQueue<T> {
     // DelayQueue seems much more specific, where a user may care that it
     // has reached capacity, so return those errors instead of panicking.

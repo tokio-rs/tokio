@@ -20,7 +20,7 @@
 //!
 //! * Spawn a background thread running a [`Reactor`] instance.
 //! * Start a [`ThreadPool`] for executing futures.
-//! * Run an instance of [`Timer`] **per** thread pool worker thread.
+//! * Run an instance of `Timer` **per** thread pool worker thread.
 //!
 //! The thread pool uses a work-stealing strategy and is configured to start a
 //! worker thread for each CPU core available on the system. This tends to be
@@ -127,7 +127,6 @@
 //! [`ThreadPool`]: https://docs.rs/tokio-executor/0.2.0-alpha.2/tokio_executor/threadpool/struct.ThreadPool.html
 //! [`run`]: fn.run.html
 //! [`tokio::spawn`]: ../executor/fn.spawn.html
-//! [`Timer`]: https://docs.rs/tokio-timer/0.2/tokio_timer/timer/struct.Timer.html
 //! [`tokio::main`]: ../../tokio_macros/attr.main.html
 
 pub mod current_thread;

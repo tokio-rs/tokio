@@ -16,17 +16,17 @@
 //! [`AsyncRead`]: tokio_io::AsyncRead
 //! [`AsyncWrite`]: tokio_io::AsyncWrite
 
+use tokio::timer::{clock, timer, Delay};
+use tokio_io::{AsyncRead, AsyncWrite, Buf};
+use tokio_sync::mpsc;
+
+use futures_core::ready;
 use std::collections::VecDeque;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{self, Poll, Waker};
 use std::time::{Duration, Instant};
 use std::{cmp, io};
-
-use futures_core::ready;
-use tokio_io::{AsyncRead, AsyncWrite, Buf};
-use tokio_sync::mpsc;
-use tokio_timer::{clock, timer, Delay};
 
 /// An I/O object that follows a predefined script.
 ///

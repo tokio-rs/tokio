@@ -1,8 +1,8 @@
 mod level;
-mod stack;
-
 pub(crate) use self::level::Expiration;
 use self::level::Level;
+
+mod stack;
 pub(crate) use self::stack::Stack;
 
 use std::borrow::Borrow;

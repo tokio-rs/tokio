@@ -1,7 +1,7 @@
 //! Asynchronous values.
 
 #[cfg(feature = "timer")]
-use tokio_timer::Timeout;
+use crate::timer::Timeout;
 
 #[cfg(feature = "timer")]
 use std::time::Duration;

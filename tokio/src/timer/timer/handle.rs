@@ -1,6 +1,7 @@
-use crate::clock::now;
-use crate::timer::Inner;
-use crate::{Delay, Error, /*Interval,*/ Timeout};
+use crate::timer::clock::now;
+use crate::timer::timer::Inner;
+use crate::timer::{Delay, Error, Timeout};
+
 use std::cell::RefCell;
 use std::fmt;
 use std::marker::PhantomData;

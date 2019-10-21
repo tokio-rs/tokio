@@ -1,4 +1,5 @@
-use crate::wheel::Stack;
+use crate::timer::wheel::Stack;
+
 use std::fmt;
 
 /// Wheel for a single level in the timer. This wheel contains 64 slots.
