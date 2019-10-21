@@ -16,6 +16,8 @@ use std::time::Duration;
 
 /// Builds Tokio Runtime with custom configuration values.
 ///
+/// This Runtime will provide compatibility with both current tokio, and `tokio-0.1` code.
+///
 /// Methods can be chained in order to set the configuration values. The
 /// Runtime is constructed by calling [`build`].
 ///
