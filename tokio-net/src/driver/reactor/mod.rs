@@ -58,9 +58,6 @@ pub struct Turn {
 }
 
 pub(super) struct Inner {
-    /// ABA guard counter
-    next_aba_guard: AtomicUsize,
-
     /// The underlying system event queue.
     io: mio::Poll,
 
@@ -155,7 +152,6 @@ impl Reactor {
             events: mio::Events::with_capacity(1024),
             _wakeup_registration: wakeup_pair.0,
             inner: Arc::new(Inner {
-                next_aba_guard: AtomicUsize::new(0),
                 io,
                 io_dispatch: Slab::new(),
                 n_sources: AtomicUsize::new(0),
@@ -368,14 +364,12 @@ impl Inner {
     ///
     /// The registration token is returned.
     pub(super) fn add_source(&self, source: &dyn Evented) -> io::Result<usize> {
-        let aba_guard = self.next_aba_guard.fetch_add(1 << TOKEN_SHIFT, Relaxed);
-        let index = self.io_dispatch.alloc(aba_guard).ok_or_else(|| {
+        let token = self.io_dispatch.alloc().ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::Other,
                 "reactor at max registered I/O resources",
             )
         })?;
-        let token = aba_guard | index;
         let _n_sources = self.n_sources.fetch_add(1, SeqCst);
         debug!(message = "adding I/O source", token, sources = _n_sources);
 

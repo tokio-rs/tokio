@@ -1,13 +1,13 @@
-use super::super::{RESERVED_BITS, WIDTH};
+use super::super::{Pack, Tid, RESERVED_BITS, WIDTH};
 use super::ScheduledIo;
 use crate::sync::{
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicUsize, Ordering},
     CausalCell,
 };
 
 #[derive(Debug)]
 pub(crate) struct Slot {
-    empty: AtomicBool,
+    gen: AtomicUsize,
     /// The offset of the next item on the free list.
     next: CausalCell<usize>,
     /// The data stored in the slot.
@@ -48,14 +48,14 @@ impl Generation {
 impl Slot {
     pub(super) fn new(next: usize) -> Self {
         Self {
-            empty: AtomicBool::new(true),
+            gen: AtomicUsize::new(0),
             item: ScheduledIo::default(),
             next: CausalCell::new(next),
         }
     }
 
     #[inline(always)]
-    pub(super) fn get(&self, gen: Generation) -> Option<&T> {
+    pub(super) fn get(&self, gen: Generation) -> Option<&ScheduledIo> {
         let current = self.gen.load(Ordering::Acquire);
         test_println!("-> get {:?}; current={:?}", gen, current);
 
@@ -65,6 +65,11 @@ impl Slot {
             return None;
         }
 
+        Some(&self.item)
+    }
+
+    #[inline(always)]
+    pub(in crate::driver::reactor::sharded_slab) fn value(&self) -> Option<&ScheduledIo> {
         Some(&self.item)
     }
 
@@ -81,11 +86,9 @@ impl Slot {
     #[inline]
     pub(super) fn reset(&self, gen: Generation) -> bool {
         let next = (gen.value + 1) % Generation::BITS;
-        let actual = self
-            .generation
-            .compare_and_swap(gen.value, next, Ordering::AcqRel);
+        let actual = self.gen.compare_and_swap(gen.value, next, Ordering::AcqRel);
         test_println!("-> remove {:?}; next={:?}; actual={:?}", gen, next, actual);
-        if actual != gen {
+        if actual != gen.value {
             return false;
         };
 

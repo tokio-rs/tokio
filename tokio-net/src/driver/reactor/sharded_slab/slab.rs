@@ -73,13 +73,11 @@ impl Slab {
     /// If this function returns `None`, then the shard for the current thread
     /// is full and no items can be added until some are removed, or the maximum
     /// number of shards has been reached.
-    pub(crate) fn alloc(&self, aba_guard: usize) -> Option<usize> {
+    pub(crate) fn alloc(&self) -> Option<usize> {
         let tid = Tid::current();
         #[cfg(test)]
         test_println!("alloc {:?}", tid);
-        self.shards[tid.as_usize()]
-            .alloc(aba_guard)
-            .map(|idx| tid.pack(idx))
+        self.shards[tid.as_usize()].alloc().map(|idx| tid.pack(idx))
     }
 
     /// Removes the value associated with the given key from the slab.
@@ -100,25 +98,10 @@ impl Slab {
     /// If the slab does not contain a value for the given key, `None` is
     /// returned instead.
     pub(in crate::driver) fn get(&self, token: usize) -> Option<&ScheduledIo> {
-        let idx = token & MAX_SOURCES;
-        let s = self.get2(idx)?;
-        let guard = token & !MAX_SOURCES;
-        if s.aba_guard.load(Ordering::Acquire) != guard {
-            return None;
-        }
-        Some(s)
-    }
-
-    fn get2(&self, key: usize) -> Option<&ScheduledIo> {
-        let tid = Tid::from_packed(key);
+        let tid = Tid::from_packed(token);
         #[cfg(test)]
-        test_println!("get {:?}", tid);
-        self.shards.get(tid.as_usize())?.get(key)
-    }
-
-    #[cfg(test)]
-    pub(super) fn get_guard(&self, idx: usize) -> Option<usize> {
-        self.get2(idx).map(|s| s.aba_guard.load(Ordering::Acquire))
+        test_println!("get {:#x}; tid={:?}", token, tid);
+        self.shards.get(tid.as_usize())?.get(token)
     }
 
     /// Returns an iterator over all the items in the slab.
@@ -150,12 +133,12 @@ impl SingleShard {
     /// If this function returns `None`, then the shard for the current thread
     /// is full and no items can be added until some are removed, or the maximum
     /// number of shards has been reached.
-    pub(crate) fn alloc(&self, aba_guard: usize) -> Option<usize> {
+    pub(crate) fn alloc(&self) -> Option<usize> {
         // we must lock the slab to alloc an item.
         let local = self.local.lock().unwrap();
         #[cfg(test)]
         test_println!("alloc");
-        self.shard.alloc(aba_guard)
+        self.shard.alloc()
     }
 
     /// Removes the value associated with the given key from the slab.
@@ -177,24 +160,9 @@ impl SingleShard {
     /// If the slab does not contain a value for the given key, `None` is
     /// returned instead.
     pub(in crate::driver) fn get(&self, token: usize) -> Option<&ScheduledIo> {
-        let idx = token & MAX_SOURCES;
-        let s = self.get2(idx)?;
-        let guard = token & !MAX_SOURCES;
-        if s.aba_guard.load(Ordering::Acquire) != guard {
-            return None;
-        }
-        Some(s)
-    }
-
-    fn get2(&self, key: usize) -> Option<&ScheduledIo> {
         #[cfg(test)]
-        test_println!("get {:#x}", key);
-        self.shard.get(key)
-    }
-
-    #[cfg(test)]
-    pub(super) fn get_guard(&self, idx: usize) -> Option<usize> {
-        self.get2(idx).map(|s| s.aba_guard.load(Ordering::Acquire))
+        test_println!("get {:#x}", token);
+        self.shard.get(token)
     }
 
     /// Returns an iterator over all the items in the slab.
@@ -226,14 +194,14 @@ impl Shard {
         }
     }
 
-    fn alloc(&self, aba_guard: usize) -> Option<usize> {
+    fn alloc(&self) -> Option<usize> {
         // Can we fit the value into an existing page?
         for (page_idx, page) in self.shared.iter().enumerate() {
             let local = self.local(page_idx);
             #[cfg(test)]
             test_println!("-> page {}; {:?}; {:?}", page_idx, local, page);
 
-            if let Some(page_offset) = page.alloc(local, aba_guard) {
+            if let Some(page_offset) = page.alloc(local) {
                 return Some(page_offset);
             }
         }
@@ -252,7 +220,7 @@ impl Shard {
         if i > self.shared.len() {
             return None;
         }
-        self.shared[i].get(addr)
+        self.shared[i].get(addr, idx)
     }
 
     /// Remove an item on the shard's local thread.
@@ -265,7 +233,7 @@ impl Shard {
         test_println!("-> remove_local {:?}; page {:?}", addr, page_idx);
 
         if let Some(page) = self.shared.get(page_idx) {
-            page.remove_local(self.local(page_idx), addr);
+            page.remove_local(self.local(page_idx), addr, idx);
         }
     }
 
@@ -280,7 +248,7 @@ impl Shard {
         test_println!("-> remove_remote {:?}; page {:?}", addr, page_idx);
 
         if let Some(page) = self.shared.get(page_idx) {
-            page.remove_remote(addr);
+            page.remove_remote(addr, idx);
         }
     }
 

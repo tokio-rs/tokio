@@ -124,7 +124,7 @@ impl Shared {
     }
 
     #[inline]
-    pub(crate) fn alloc(&self, local: &Local, aba_guard: usize) -> Option<usize> {
+    pub(crate) fn alloc(&self, local: &Local) -> Option<usize> {
         let head = local.head();
         #[cfg(test)]
         test_println!("-> local head {:?}", head);
@@ -152,36 +152,39 @@ impl Shared {
             self.fill();
         }
 
-        self.slab.with(|slab| {
+        let gen = self.slab.with(|slab| {
             let slab = unsafe { &*(slab) }
                 .as_ref()
                 .expect("page must have been allocated to alloc!");
             let slot = &slab[head];
-            slot.alloc(aba_guard);
             local.set_head(slot.next());
+            slot.alloc()
         });
 
         let index = head + self.prev_sz;
         #[cfg(test)]
-        test_println!("alloc at offset: {}", index);
-        Some(index)
+        test_println!("alloc at offset: {}; gen={:?}", index, gen);
+        Some(gen.pack(index))
     }
 
     #[inline]
-    pub(in crate::driver) fn get(&self, addr: Addr) -> Option<&ScheduledIo> {
+    pub(in crate::driver) fn get(&self, addr: Addr, idx: usize) -> Option<&ScheduledIo> {
         let page_offset = addr.offset() - self.prev_sz;
         #[cfg(test)]
         test_println!("-> offset {:?}", page_offset);
 
-        let value = self
-            .slab
-            .with(|slab| unsafe { &*slab }.as_ref()?.get(page_offset)?.value());
+        let value = self.slab.with(|slab| {
+            unsafe { &*slab }
+                .as_ref()?
+                .get(page_offset)?
+                .get(slot::Generation::from_packed(idx))
+        });
         #[cfg(test)]
         test_println!("-> offset {:?}; value={:?}", page_offset, value);
         value
     }
 
-    pub(crate) fn remove_local(&self, local: &Local, addr: Addr) {
+    pub(crate) fn remove_local(&self, local: &Local, addr: Addr, idx: usize) {
         let offset = addr.offset() - self.prev_sz;
 
         #[cfg(test)]
@@ -194,14 +197,14 @@ impl Shared {
                 } else {
                     return;
                 };
-            if slot.reset() {
+            if slot.reset(slot::Generation::from_packed(idx)) {
                 slot.set_next(local.head());
                 local.set_head(offset);
             }
         })
     }
 
-    pub(crate) fn remove_remote(&self, addr: Addr) {
+    pub(crate) fn remove_remote(&self, addr: Addr, idx: usize) {
         let offset = addr.offset() - self.prev_sz;
 
         #[cfg(test)]
@@ -214,7 +217,7 @@ impl Shared {
                 } else {
                     return;
                 };
-            if !slot.reset() {
+            if !slot.reset(slot::Generation::from_packed(idx)) {
                 return;
             }
 
