@@ -75,7 +75,6 @@ pub(super) struct Inner {
 
 #[derive(Debug)]
 pub(super) struct ScheduledIo {
-    aba_guard: AtomicUsize,
     pub(super) readiness: AtomicUsize,
     pub(super) reader: AtomicWaker,
     pub(super) writer: AtomicWaker,
@@ -442,13 +441,8 @@ impl Direction {
 }
 
 impl ScheduledIo {
-    fn insert(&self, aba_guard: usize) {
-        self.aba_guard.store(aba_guard, Release);
-    }
-
     fn reset(&self) {
         self.readiness.store(0, Release);
-        self.aba_guard.store(1, Release);
         drop(self.reader.take_waker());
         drop(self.writer.take_waker());
     }
@@ -457,7 +451,6 @@ impl ScheduledIo {
 impl Default for ScheduledIo {
     fn default() -> Self {
         Self {
-            aba_guard: AtomicUsize::new(1),
             readiness: AtomicUsize::new(0),
             reader: AtomicWaker::new(),
             writer: AtomicWaker::new(),
