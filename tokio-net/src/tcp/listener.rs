@@ -1,7 +1,6 @@
 #[cfg(feature = "async-traits")]
 use super::incoming::Incoming;
 use super::TcpStream;
-use crate::driver::Handle;
 use crate::util::PollEvented;
 use crate::ToSocketAddrs;
 
@@ -96,7 +95,7 @@ impl TcpListener {
 
     fn bind_addr(addr: SocketAddr) -> io::Result<TcpListener> {
         let listener = mio::net::TcpListener::bind(&addr)?;
-        Ok(TcpListener::new(listener))
+        TcpListener::new(listener)
     }
 
     /// Accept a new incoming connection from this listener.
@@ -137,7 +136,7 @@ impl TcpListener {
         let (io, addr) = ready!(self.poll_accept_std(cx))?;
 
         let io = mio::net::TcpStream::from_stream(io)?;
-        let io = TcpStream::new(io);
+        let io = TcpStream::new(io)?;
 
         Poll::Ready(Ok((io, addr)))
     }
@@ -173,10 +172,6 @@ impl TcpListener {
     /// bound to and the listener will only be guaranteed to accept connections
     /// of the same address type currently.
     ///
-    /// Finally, the `handle` argument is the event loop that this listener will
-    /// be bound to.
-    /// Use [`Handle::default()`] to lazily bind to an event loop, just like `bind` does.
-    ///
     /// The platform specific behavior of this function looks like:
     ///
     /// * On Unix, the socket is placed into nonblocking mode and connections
@@ -187,29 +182,28 @@ impl TcpListener {
     ///   `addr` is an IPv4 address then all sockets accepted will be IPv4 as
     ///   well (same for IPv6).
     ///
-    /// [`Handle::default()`]: ../reactor/struct.Handle.html
     /// # Examples
     ///
-    /// ```no_run
+    /// ```rust,no_run
+    /// use std::error::Error;
     /// use tokio::net::TcpListener;
-    /// use tokio_net::driver::Handle;
     ///
-    /// use std::net::TcpListener as StdTcpListener;
-    ///
-    /// let std_listener = StdTcpListener::bind("127.0.0.1:0")?;
-    /// let listener = TcpListener::from_std(std_listener, &Handle::default())?;
-    /// # let _ = listener;
-    /// # Ok::<_, Box<dyn std::error::Error>>(())
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let std_listener = std::net::TcpListener::bind("127.0.0.1:0")?;
+    ///     let listener = TcpListener::from_std(std_listener)?;
+    ///     Ok(())
+    /// }
     /// ```
-    pub fn from_std(listener: net::TcpListener, handle: &Handle) -> io::Result<TcpListener> {
+    pub fn from_std(listener: net::TcpListener) -> io::Result<TcpListener> {
         let io = mio::net::TcpListener::from_std(listener)?;
-        let io = PollEvented::new_with_handle(io, handle)?;
+        let io = PollEvented::new(io)?;
         Ok(TcpListener { io })
     }
 
-    fn new(listener: mio::net::TcpListener) -> TcpListener {
-        let io = PollEvented::new(listener);
-        TcpListener { io }
+    fn new(listener: mio::net::TcpListener) -> io::Result<TcpListener> {
+        let io = PollEvented::new(listener)?;
+        Ok(TcpListener { io })
     }
 
     /// Returns the local address that this listener is bound to.
@@ -219,7 +213,7 @@ impl TcpListener {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust,no_run
     /// use tokio::net::TcpListener;
     ///
     /// use std::io;
@@ -329,9 +323,9 @@ impl TryFrom<net::TcpListener> for TcpListener {
     /// Consumes stream, returning the tokio I/O object.
     ///
     /// This is equivalent to
-    /// [`TcpListener::from_std(stream, &Handle::default())`](TcpListener::from_std).
+    /// [`TcpListener::from_std(stream)`](TcpListener::from_std).
     fn try_from(stream: net::TcpListener) -> Result<Self, Self::Error> {
-        Self::from_std(stream, &Handle::default())
+        Self::from_std(stream)
     }
 }
 

@@ -1,5 +1,4 @@
 use super::split::{split, UdpSocketRecvHalf, UdpSocketSendHalf};
-use crate::driver::Handle;
 use crate::util::PollEvented;
 use crate::ToSocketAddrs;
 
@@ -40,12 +39,13 @@ impl UdpSocket {
     }
 
     fn bind_addr(addr: SocketAddr) -> io::Result<UdpSocket> {
-        mio::net::UdpSocket::bind(&addr).map(UdpSocket::new)
+        let sys = mio::net::UdpSocket::bind(&addr)?;
+        UdpSocket::new(sys)
     }
 
-    fn new(socket: mio::net::UdpSocket) -> UdpSocket {
-        let io = PollEvented::new(socket);
-        UdpSocket { io }
+    fn new(socket: mio::net::UdpSocket) -> io::Result<UdpSocket> {
+        let io = PollEvented::new(socket)?;
+        Ok(UdpSocket { io })
     }
 
     /// Creates a new `UdpSocket` from the previously bound socket provided.
@@ -57,11 +57,9 @@ impl UdpSocket {
     /// This can be used in conjunction with net2's `UdpBuilder` interface to
     /// configure a socket before it's handed off, such as setting options like
     /// `reuse_address` or binding to multiple addresses.
-    ///
-    /// Use `Handle::default()` to lazily bind to an event loop, just like `bind` does.
-    pub fn from_std(socket: net::UdpSocket, handle: &Handle) -> io::Result<UdpSocket> {
+    pub fn from_std(socket: net::UdpSocket) -> io::Result<UdpSocket> {
         let io = mio::net::UdpSocket::from_socket(socket)?;
-        let io = PollEvented::new_with_handle(io, handle)?;
+        let io = PollEvented::new(io)?;
         Ok(UdpSocket { io })
     }
 
@@ -386,9 +384,9 @@ impl TryFrom<net::UdpSocket> for UdpSocket {
     /// Consumes stream, returning the tokio I/O object.
     ///
     /// This is equivalent to
-    /// [`UdpSocket::from_std(stream, &Handle::default())`](UdpSocket::from_std).
+    /// [`UdpSocket::from_std(stream)`](UdpSocket::from_std).
     fn try_from(stream: net::UdpSocket) -> Result<Self, Self::Error> {
-        Self::from_std(stream, &Handle::default())
+        Self::from_std(stream)
     }
 }
 

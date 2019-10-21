@@ -1,5 +1,4 @@
 use super::UnixStream;
-use crate::driver::Handle;
 use crate::util::PollEvented;
 
 use futures_core::ready;
@@ -26,7 +25,7 @@ impl UnixListener {
         P: AsRef<Path>,
     {
         let listener = mio_uds::UnixListener::bind(path)?;
-        let io = PollEvented::new(listener);
+        let io = PollEvented::new(listener)?;
         Ok(UnixListener { io })
     }
 
@@ -35,9 +34,9 @@ impl UnixListener {
     ///
     /// The returned listener will be associated with the given event loop
     /// specified by `handle` and is ready to perform I/O.
-    pub fn from_std(listener: net::UnixListener, handle: &Handle) -> io::Result<UnixListener> {
+    pub fn from_std(listener: net::UnixListener) -> io::Result<UnixListener> {
         let listener = mio_uds::UnixListener::from_listener(listener)?;
-        let io = PollEvented::new_with_handle(listener, handle)?;
+        let io = PollEvented::new(listener)?;
         Ok(UnixListener { io })
     }
 
@@ -63,7 +62,7 @@ impl UnixListener {
         let (io, addr) = ready!(self.poll_accept_std(cx))?;
 
         let io = mio_uds::UnixStream::from_stream(io)?;
-        Ok((UnixStream::new(io), addr)).into()
+        Ok((UnixStream::new(io)?, addr)).into()
     }
 
     fn poll_accept_std(
@@ -117,9 +116,9 @@ impl TryFrom<net::UnixListener> for UnixListener {
     /// Consumes stream, returning the tokio I/O object.
     ///
     /// This is equivalent to
-    /// [`UnixListener::from_std(stream, &Handle::default())`](UnixListener::from_std).
+    /// [`UnixListener::from_std(stream)`](UnixListener::from_std).
     fn try_from(stream: net::UnixListener) -> io::Result<Self> {
-        Self::from_std(stream, &Handle::default())
+        Self::from_std(stream)
     }
 }
 

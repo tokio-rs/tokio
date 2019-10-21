@@ -157,12 +157,12 @@ pub(crate) mod impl_solaris {
 #[cfg(not(target_os = "dragonfly"))]
 #[cfg(test)]
 mod test {
-    use crate::uds::UnixStream;
+    use tokio::net::UnixStream;
 
     use libc::getegid;
     use libc::geteuid;
 
-    #[test]
+    #[tokio::test]
     #[cfg_attr(
         target_os = "freebsd",
         ignore = "Requires FreeBSD 12.0 or later. https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=176419"
@@ -171,7 +171,7 @@ mod test {
         target_os = "netbsd",
         ignore = "NetBSD does not support getpeereid() for sockets created by socketpair()"
     )]
-    fn test_socket_pair() {
+    async fn test_socket_pair() {
         let (a, b) = UnixStream::pair().unwrap();
         let cred_a = a.peer_cred().unwrap();
         let cred_b = b.peer_cred().unwrap();
