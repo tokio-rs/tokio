@@ -65,7 +65,12 @@ impl Registration {
     where
         T: Evented,
     {
-        self.register2(io, Handle::current())
+        if self.inner.is_none() {
+            let handle = Handle::current();
+            let inner = Inner::add_source(io, handle)?;
+            self.inner = Some(inner);
+        }
+        Ok(())
     }
 
     /// Deregister the I/O resource from the reactor it is associated with.
@@ -90,37 +95,6 @@ impl Registration {
     {
         if let Some(inner) = self.inner.as_ref() {
             inner.deregister(io)?
-        }
-        Ok(())
-    }
-
-    /// Register the I/O resource with the specified reactor.
-    ///
-    /// This function is safe to call concurrently and repeatedly. However, only
-    /// the first call will establish the registration. Subsequent calls will be
-    /// no-ops.
-    ///
-    /// If the registration happened successfully, `Ok` is returned.
-    ///
-    /// If an error is encountered during registration, `Err` is returned.
-    pub fn register_with<T>(&mut self, io: &T, handle: Handle) -> io::Result<()>
-    where
-        T: Evented,
-    {
-        self.register2(io, handle)
-    }
-
-    /// Register an I/O resource with a reactor.
-    ///
-    /// Once the association is established, it remains established until the
-    /// registration instance is dropped.
-    fn register2<T>(&mut self, io: &T, handle: Handle) -> io::Result<()>
-    where
-        T: Evented,
-    {
-        if self.inner.is_none() {
-            let inner = Inner::add_source(io, handle)?;
-            self.inner = Some(inner);
         }
         Ok(())
     }

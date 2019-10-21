@@ -330,7 +330,7 @@ impl Handle {
     /// # Panics
     ///
     /// This function panics if there is no current reactor set.
-    pub(crate) fn current() -> Self {
+    pub(super) fn current() -> Self {
         CURRENT_REACTOR.with(|current| match *current.borrow() {
             Some(ref handle) => handle.clone(),
             None => panic!("no current reactor"),

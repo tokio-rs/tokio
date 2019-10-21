@@ -57,12 +57,6 @@ impl UdpSocket {
     /// This can be used in conjunction with net2's `UdpBuilder` interface to
     /// configure a socket before it's handed off, such as setting options like
     /// `reuse_address` or binding to multiple addresses.
-    ///
-    /// The `handle` argument is the event loop that this listener will be
-    /// bound to.
-    /// Use [`Handle::current()`] to bind to the current event loop.
-    ///
-    /// [`Handle::current()`]: ../reactor/struct.Handle.html
     pub fn from_std(socket: net::UdpSocket) -> io::Result<UdpSocket> {
         let io = mio::net::UdpSocket::from_socket(socket)?;
         let io = PollEvented::new(io)?;
@@ -390,7 +384,7 @@ impl TryFrom<net::UdpSocket> for UdpSocket {
     /// Consumes stream, returning the tokio I/O object.
     ///
     /// This is equivalent to
-    /// [`UdpSocket::from_std(stream, &Handle::current())`](UdpSocket::from_std).
+    /// [`UdpSocket::from_std(stream)`](UdpSocket::from_std).
     fn try_from(stream: net::UdpSocket) -> Result<Self, Self::Error> {
         Self::from_std(stream)
     }

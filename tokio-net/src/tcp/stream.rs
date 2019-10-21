@@ -1,5 +1,4 @@
 use super::split::{split, ReadHalf, WriteHalf};
-use crate::driver::Handle;
 use crate::util::PollEvented;
 use crate::ToSocketAddrs;
 
@@ -128,23 +127,16 @@ impl TcpStream {
     /// This function will convert a TCP stream created by the standard library
     /// to a TCP stream ready to be used with the provided event loop handle.
     ///
-    /// The `handle` argument is the event loop that this listener will be
-    /// bound to.
-    /// Use [`Handle::current()`] to bind to the current event loop.
-    ///
-    /// [`Handle::current()`]: ../reactor/struct.Handle.html
-    ///
     /// # Examples
     ///
     /// ```rust,no_run
     /// use std::error::Error;
     /// use tokio::net::TcpStream;
-    /// use tokio_net::driver::Handle;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     let std_stream = std::net::TcpStream::connect("127.0.0.1:34254")?;
-    ///     let stream = TcpStream::from_std(std_stream, &Handle::current()?)?;
+    ///     let stream = TcpStream::from_std(std_stream)?;
     ///     Ok(())
     /// }
     /// ```
@@ -158,13 +150,9 @@ impl TcpStream {
     //
     // This should be removed in favor of some in-crate TcpSocket builder API.
     #[doc(hidden)]
-    pub async fn connect_std(
-        stream: net::TcpStream,
-        addr: &SocketAddr,
-        handle: Handle,
-    ) -> io::Result<TcpStream> {
+    pub async fn connect_std(stream: net::TcpStream, addr: &SocketAddr) -> io::Result<TcpStream> {
         let io = mio::net::TcpStream::connect_stream(stream, addr)?;
-        let io = PollEvented::new_with_handle(io, handle)?;
+        let io = PollEvented::new(io)?;
         let stream = TcpStream { io };
 
         // Once we've connected, wait for the stream to be writable as
@@ -749,7 +737,7 @@ impl TryFrom<net::TcpStream> for TcpStream {
     /// Consumes stream, returning the tokio I/O object.
     ///
     /// This is equivalent to
-    /// [`TcpStream::from_std(stream, &Handle::current())`](TcpStream::from_std).
+    /// [`TcpStream::from_std(stream)`](TcpStream::from_std).
     fn try_from(stream: net::TcpStream) -> Result<Self, Self::Error> {
         Self::from_std(stream)
     }

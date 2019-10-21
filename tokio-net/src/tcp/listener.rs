@@ -172,10 +172,6 @@ impl TcpListener {
     /// bound to and the listener will only be guaranteed to accept connections
     /// of the same address type currently.
     ///
-    /// The `handle` argument is the event loop that this listener will be
-    /// bound to.
-    /// Use [`Handle::current()`] to bind to the current event loop.
-    ///
     /// The platform specific behavior of this function looks like:
     ///
     /// * On Unix, the socket is placed into nonblocking mode and connections
@@ -186,19 +182,16 @@ impl TcpListener {
     ///   `addr` is an IPv4 address then all sockets accepted will be IPv4 as
     ///   well (same for IPv6).
     ///
-    /// [`Handle::current()`]: ../reactor/struct.Handle.html
-    ///
     /// # Examples
     ///
     /// ```rust,no_run
     /// use std::error::Error;
     /// use tokio::net::TcpListener;
-    /// use tokio_net::driver::Handle;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     let std_listener = std::net::TcpListener::bind("127.0.0.1:0")?;
-    ///     let listener = TcpListener::from_std(std_listener, &Handle::current()?)?;
+    ///     let listener = TcpListener::from_std(std_listener)?;
     ///     Ok(())
     /// }
     /// ```
@@ -330,7 +323,7 @@ impl TryFrom<net::TcpListener> for TcpListener {
     /// Consumes stream, returning the tokio I/O object.
     ///
     /// This is equivalent to
-    /// [`TcpListener::from_std(stream, &Handle::current())`](TcpListener::from_std).
+    /// [`TcpListener::from_std(stream)`](TcpListener::from_std).
     fn try_from(stream: net::TcpListener) -> Result<Self, Self::Error> {
         Self::from_std(stream)
     }

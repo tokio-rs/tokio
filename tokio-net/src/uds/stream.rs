@@ -133,7 +133,7 @@ impl TryFrom<net::UnixStream> for UnixStream {
     /// Consumes stream, returning the tokio I/O object.
     ///
     /// This is equivalent to
-    /// [`UnixStream::from_std(stream, &Handle::current())`](UnixStream::from_std).
+    /// [`UnixStream::from_std(stream)`](UnixStream::from_std).
     fn try_from(stream: net::UnixStream) -> io::Result<Self> {
         Self::from_std(stream)
     }

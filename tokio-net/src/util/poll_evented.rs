@@ -1,4 +1,4 @@
-use crate::driver::{platform, Handle, Registration};
+use crate::driver::{platform, Registration};
 
 use tokio_io::{AsyncRead, AsyncWrite};
 
@@ -167,12 +167,16 @@ where
 {
     /// Creates a new `PollEvented` associated with the default reactor.
     pub fn new(io: E) -> io::Result<Self> {
-        Self::new2(io, None)
-    }
-
-    /// Creates a new `PollEvented` associated with the specified reactor.
-    pub fn new_with_handle(io: E, handle: Handle) -> io::Result<Self> {
-        Self::new2(io, Some(handle))
+        let mut pe = Self {
+            io: Some(io),
+            inner: Inner {
+                registration: Registration::default(),
+                read_readiness: AtomicUsize::new(0),
+                write_readiness: AtomicUsize::new(0),
+            },
+        };
+        pe.register()?;
+        Ok(pe)
     }
 
     /// Returns a shared reference to the underlying I/O object this readiness
@@ -325,33 +329,9 @@ where
         Ok(())
     }
 
-    fn new2(io: E, handle: Option<Handle>) -> io::Result<Self> {
-        let mut pe = Self {
-            io: Some(io),
-            inner: Inner {
-                registration: Registration::default(),
-                read_readiness: AtomicUsize::new(0),
-                write_readiness: AtomicUsize::new(0),
-            },
-        };
-        pe.register(handle)?;
-        Ok(pe)
-    }
-
-    /// Ensure that the I/O resource is registered with the reactor.
-    ///
-    /// # Panics
-    ///
-    /// This function panics if `handle` is `Some` but fails to reference a
-    /// reactor.
-    fn register(&mut self, handle: Option<Handle>) -> io::Result<()> {
-        match handle {
-            Some(handle) => self
-                .inner
-                .registration
-                .register_with(self.io.as_ref().unwrap(), handle),
-            None => self.inner.registration.register(self.io.as_ref().unwrap()),
-        }
+    /// Ensure that the I/O resource is registered with the current reactor.
+    fn register(&mut self) -> io::Result<()> {
+        self.inner.registration.register(self.io.as_ref().unwrap())
     }
 }
 

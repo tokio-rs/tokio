@@ -7,12 +7,16 @@ use std::convert::TryFrom;
 use std::net;
 use support::*;
 use tokio::net::TcpListener;
-use tokio_test::assert_err;
 
 #[test]
-fn no_runtime_fails_to_bind_resource() {
+#[should_panic]
+fn no_runtime_panics_binding_net_tcp_listener() {
     let listener = net::TcpListener::bind("127.0.0.1:0").expect("failed to bind listener");
-    assert_err!(TcpListener::try_from(listener));
+    let _ = TcpListener::try_from(listener);
+}
 
-    assert_err!(signal(SignalKind::hangup()));
+#[test]
+#[should_panic]
+fn no_runtime_panics_creating_signals() {
+    let _ = signal(SignalKind::hangup());
 }
