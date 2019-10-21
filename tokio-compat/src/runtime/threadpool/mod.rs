@@ -59,7 +59,8 @@ struct CompatSender<S>(S);
 
 // ===== impl Runtime =====
 
-/// Start the Tokio runtime using the supplied future to bootstrap execution.
+/// Start the Tokio runtime using the supplied `futures` 0.1 future to bootstrap
+/// execution.
 ///
 /// This function is used to bootstrap the execution of a Tokio application. It
 /// does the following:
@@ -109,7 +110,8 @@ where
     run_std(future.compat().map(|_| ()))
 }
 
-/// Start the Tokio runtime using the supplied `std::future` future to bootstrap execution.
+/// Start the Tokio runtime using the supplied `std::future` future to bootstrap
+/// execution.
 ///
 /// This function is used to bootstrap the execution of a Tokio application. It
 /// does the following:

@@ -7,7 +7,8 @@ use tokio_timer::timer::Timer;
 
 use std::io;
 
-/// Builds a Single-threaded runtime with custom configuration values.
+/// Builds a single-threaded compatibility runtime with custom configuration
+/// values.
 ///
 /// Methods can be chained in order to set the configuration values. The
 /// Runtime is constructed by calling [`build`].
@@ -42,8 +43,8 @@ pub struct Builder {
 }
 
 impl Builder {
-    /// Returns a new runtime builder initialized with default configuration
-    /// values.
+    /// Returns a new compatibility runtime builder initialized with default
+    /// configuration values.
     ///
     /// Configuration methods can be chained on the return value.
     pub fn new() -> Builder {

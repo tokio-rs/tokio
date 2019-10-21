@@ -14,9 +14,10 @@ use std::io;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
-/// Builds Tokio Runtime with custom configuration values.
+/// Builds a compatibility runtime with custom configuration values.
 ///
-/// This Runtime will provide compatibility with both current tokio, and `tokio-0.1` code.
+/// This runtime is compatible with code using both the current release version
+/// of `tokio` (0.1) and with legacy code using `tokio` 0.1.
 ///
 /// Methods can be chained in order to set the configuration values. The
 /// Runtime is constructed by calling [`build`].

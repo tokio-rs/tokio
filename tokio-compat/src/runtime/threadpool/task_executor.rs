@@ -37,7 +37,7 @@ impl TaskExecutor {
     /// let rt = Runtime::new().unwrap();
     /// let executor = rt.executor();
     ///
-    /// // Spawn a future onto the runtime
+    /// // Spawn a `futures` 0.1 future onto the runtime
     /// executor.spawn(futures_01::future::lazy(|| {
     ///     println!("now running on a worker thread");
     ///     Ok(())
@@ -77,7 +77,7 @@ impl TaskExecutor {
     /// let rt = Runtime::new().unwrap();
     /// let executor = rt.executor();
     ///
-    /// // Spawn a future onto the runtime
+    /// // Spawn a `std::future` future onto the runtime
     /// executor.spawn_std(async {
     ///     println!("now running on a worker thread");
     /// });
