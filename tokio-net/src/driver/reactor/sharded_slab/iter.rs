@@ -29,7 +29,7 @@ impl<'a> Iterator for UniqueIter<'a> {
 }
 
 pub(in crate::driver::reactor) struct ShardIter<'a> {
-    pub(super) lock: crate::sync::MutexGuard<'a, ()>,
+    pub(super) _lock: crate::sync::MutexGuard<'a, ()>,
     pub(super) pages: slice::Iter<'a, page::Shared>,
     pub(super) slots: Option<page::Iter<'a>>,
 }

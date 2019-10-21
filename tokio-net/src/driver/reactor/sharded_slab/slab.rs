@@ -9,6 +9,8 @@ pub(crate) struct Slab {
 }
 
 /// A slab implemented with a single shard.
+/// TODO(eliza): once worker threads are available, this type will be
+/// unnecessary and can be removed.
 #[derive(Debug)]
 pub(crate) struct SingleShard {
     shard: Shard,
@@ -34,7 +36,7 @@ pub(crate) struct SingleShard {
 //                      │XXXXXXXX│
 //                      └────────┘
 //                         ...
-pub(crate) struct Shard {
+pub(super) struct Shard {
     #[cfg(debug_assertions)]
     tid: usize,
     /// The local free list for each page.
@@ -135,7 +137,7 @@ impl SingleShard {
     /// number of shards has been reached.
     pub(crate) fn alloc(&self) -> Option<usize> {
         // we must lock the slab to alloc an item.
-        let local = self.local.lock().unwrap();
+        let _local = self.local.lock().unwrap();
         #[cfg(test)]
         test_println!("alloc");
         self.shard.alloc()
@@ -145,10 +147,12 @@ impl SingleShard {
     pub(crate) fn remove(&self, idx: usize) {
         // try to lock the slab so that we can use `remove_local`.
         let lock = self.local.try_lock();
-        let local = lock.is_ok();
-        test_println!("rm {:#x}; local={}", idx, local);
+        // if we were able to lock the slab, we are "local" and can use the fast
+        // path; otherwise, we will use `remove_remote`.
+        let is_local = lock.is_ok();
+        test_println!("rm {:#x}; is_local={}", idx, is_local);
 
-        if local {
+        if is_local {
             self.shard.remove_local(idx)
         } else {
             self.shard.remove_remote(idx)
@@ -167,10 +171,14 @@ impl SingleShard {
 
     /// Returns an iterator over all the items in the slab.
     pub(in crate::driver::reactor) fn unique_iter(&self) -> iter::ShardIter<'_> {
-        let lock = self.local.lock().unwrap();
+        let _lock = self.local.lock().unwrap();
         let mut pages = self.shard.iter();
         let slots = pages.next().and_then(page::Shared::iter);
-        iter::ShardIter { lock, slots, pages }
+        iter::ShardIter {
+            _lock,
+            slots,
+            pages,
+        }
     }
 }
 
