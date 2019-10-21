@@ -36,14 +36,21 @@
 //! [`ErrorKind`]: enum.ErrorKind.html
 //! [`Result`]: type.Result.html
 
+// TODO: These should not be guarded by `fs`
 
+#[cfg(feature = "fs")]
 mod stderr;
+#[cfg(feature = "fs")]
 pub use self::stderr::{stderr, Stderr};
 
+#[cfg(feature = "fs")]
 mod stdin;
+#[cfg(feature = "fs")]
 pub use self::stdin::{stdin, Stdin};
 
+#[cfg(feature = "fs")]
 mod stdout;
+#[cfg(feature = "fs")]
 pub use self::stdout::{stdout, Stdout};
 
 pub use tokio_io::split::split;

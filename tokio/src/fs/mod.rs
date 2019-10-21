@@ -74,7 +74,6 @@ pub use self::rename::rename;
 mod set_permissions;
 pub use self::set_permissions::set_permissions;
 
-
 mod symlink_metadata;
 pub use self::symlink_metadata::symlink_metadata;
 
