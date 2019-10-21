@@ -1,7 +1,7 @@
 use super::*;
 use std::fmt;
 
-use crate::sync::{atomic::Ordering, Mutex};
+use crate::sync::Mutex;
 
 /// A sharded slab.
 pub(crate) struct Slab {
@@ -63,7 +63,7 @@ impl Slab {
         // Round the max number of threads to the next power of two and clamp to
         // the maximum representable number.
         let max = max_threads.next_power_of_two().min(MAX_THREADS);
-        let shards = (0..MAX_THREADS).map(Shard::new).collect();
+        let shards = (0..max).map(Shard::new).collect();
         Self { shards }
     }
 
