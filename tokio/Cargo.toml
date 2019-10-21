@@ -100,6 +100,7 @@ http = "0.1"
 httparse = "1.0"
 libc = "0.2"
 num_cpus = "1.0"
+rand = "0.7.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tempfile = "3.1.0"

@@ -1,11 +1,11 @@
-//! A mocked clock for use with `tokio_timer` based futures.
+//! A mocked clock for use with `tokio::timer` based futures.
 //!
 //! # Example
 //!
 //! ```
 //! use tokio::clock;
+//! use tokio::timer::delay;
 //! use tokio_test::{assert_ready, assert_pending, task};
-//! use tokio_timer::delay;
 //!
 //! use std::time::Duration;
 //!

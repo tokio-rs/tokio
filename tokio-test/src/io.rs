@@ -268,42 +268,6 @@ impl Inner {
     }
 }
 
-/*
-impl io::Read for Mock {
-    fn read(&mut self, dst: &mut [u8]) -> io::Result<usize> {
-        if self.is_async() {
-            tokio::async_read(self, dst)
-        } else {
-            self.sync_read(dst)
-        }
-    }
-}
-
-impl io::Write for Mock {
-    fn write(&mut self, src: &[u8]) -> io::Result<usize> {
-        if self.is_async() {
-            tokio::async_write(self, src)
-        } else {
-            self.sync_write(src)
-        }
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-}
-*/
-
-/*
-use self::futures::{Future, Stream, Poll, Async};
-use self::futures::sync::mpsc;
-use self::futures::task::{self, Task};
-use self::tokio_io::{AsyncRead, AsyncWrite};
-use self::tokio_timer::{Timer, Sleep};
-
-use std::io;
-*/
-
 // ===== impl Inner =====
 
 impl Mock {

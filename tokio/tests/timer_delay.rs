@@ -1,11 +1,11 @@
 #![warn(rust_2018_idioms)]
 
-use std::time::{Duration, Instant};
-
+use tokio::timer::delay;
+use tokio::timer::timer::Handle;
 use tokio_test::task::MockTask;
 use tokio_test::{assert_pending, assert_ready, clock};
-use tokio_timer::delay;
-use tokio_timer::timer::Handle;
+
+use std::time::{Duration, Instant};
 
 #[test]
 fn immediate_delay() {

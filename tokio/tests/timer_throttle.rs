@@ -1,10 +1,9 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "async-traits")]
 
-use tokio_sync::mpsc;
+use tokio::sync::mpsc;
+use tokio::timer::throttle::Throttle;
 use tokio_test::task::MockTask;
 use tokio_test::{assert_pending, assert_ready_eq, clock};
-use tokio_timer::throttle::Throttle;
 
 use futures_core::Stream;
 use std::time::Duration;

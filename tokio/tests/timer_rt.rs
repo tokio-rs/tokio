@@ -1,5 +1,4 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "default")]
 
 use tokio::prelude::*;
 use tokio::timer::*;

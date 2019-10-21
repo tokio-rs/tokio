@@ -1,12 +1,11 @@
-#![cfg(feature = "broken")]
 #![warn(rust_2018_idioms)]
 
-use futures::Future;
-use std::time::{Duration, Instant};
+use tokio::timer::delay;
 use tokio_test::clock::MockClock;
-use tokio_test::task::MockTask;
-use tokio_test::{assert_not_ready, assert_ready};
-use tokio_timer::delay;
+use tokio_test::task;
+use tokio_test::{assert_pending, assert_ready};
+
+use std::time::{Duration, Instant};
 
 #[test]
 fn clock() {
@@ -14,30 +13,13 @@ fn clock() {
 
     mock.enter(|handle| {
         let deadline = Instant::now() + Duration::from_secs(1);
-        let mut delay = delay(deadline);
+        let mut delay = task::spawn(delay(deadline));
 
-        assert_not_ready!(delay.poll());
+        assert_pending!(delay.poll());
 
         handle.advance(Duration::from_secs(2));
 
-        assert_ready!(delay.poll());
-    });
-}
-
-#[test]
-fn notify() {
-    let deadline = Instant::now() + Duration::from_secs(1);
-    let mut mock = MockClock::new();
-    let mut task = MockTask::new();
-
-    mock.enter(|handle| {
-        let mut delay = delay(deadline);
-
-        task.enter(|| assert_not_ready!(delay.poll()));
-
-        handle.advance(Duration::from_secs(1));
-
-        assert!(task.is_notified());
+        assert!(delay.is_woken());
         assert_ready!(delay.poll());
     });
 }

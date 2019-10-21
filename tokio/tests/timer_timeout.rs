@@ -1,11 +1,11 @@
 #![warn(rust_2018_idioms)]
 
-use tokio_sync::oneshot;
+use tokio::sync::oneshot;
+use tokio::timer::*;
 use tokio_test::task::MockTask;
 use tokio_test::{
     assert_err, assert_pending, assert_ready, assert_ready_err, assert_ready_ok, clock,
 };
-use tokio_timer::*;
 
 use std::time::Duration;
 
