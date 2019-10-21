@@ -171,7 +171,7 @@ where
     }
 
     /// Creates a new `PollEvented` associated with the specified reactor.
-    pub fn new_with_handle(io: E, handle: &Handle) -> io::Result<Self> {
+    pub fn new_with_handle(io: E, handle: Handle) -> io::Result<Self> {
         Self::new2(io, Some(handle))
     }
 
@@ -325,7 +325,7 @@ where
         Ok(())
     }
 
-    fn new2(io: E, handle: Option<&Handle>) -> io::Result<Self> {
+    fn new2(io: E, handle: Option<Handle>) -> io::Result<Self> {
         let mut pe = Self {
             io: Some(io),
             inner: Inner {
@@ -344,16 +344,12 @@ where
     ///
     /// This function panics if `handle` is `Some` but fails to reference a
     /// reactor.
-    fn register(&mut self, handle: Option<&Handle>) -> io::Result<()> {
+    fn register(&mut self, handle: Option<Handle>) -> io::Result<()> {
         match handle {
-            Some(handle) => {
-                let handle = handle
-                    .as_priv()
-                    .expect("failed to find reference to reactor");
-                self.inner
-                    .registration
-                    .register_with_priv(self.io.as_ref().unwrap(), handle)
-            }
+            Some(handle) => self
+                .inner
+                .registration
+                .register_with(self.io.as_ref().unwrap(), handle),
             None => self.inner.registration.register(self.io.as_ref().unwrap()),
         }
     }

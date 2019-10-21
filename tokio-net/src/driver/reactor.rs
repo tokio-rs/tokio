@@ -41,12 +41,6 @@ pub struct Reactor {
 /// and will instead use the default reactor for the execution context.
 #[derive(Clone)]
 pub struct Handle {
-    inner: HandlePriv,
-}
-
-/// Like `Handle`, but never `None`.
-#[derive(Clone)]
-pub(crate) struct HandlePriv {
     inner: Weak<Inner>,
 }
 
@@ -57,12 +51,6 @@ pub(crate) struct HandlePriv {
 #[derive(Debug)]
 pub struct Turn {
     _priv: (),
-}
-
-#[test]
-fn test_handle_size() {
-    use std::mem;
-    assert_eq!(mem::size_of::<Handle>(), mem::size_of::<HandlePriv>());
 }
 
 pub(super) struct Inner {
@@ -94,7 +82,7 @@ pub(super) enum Direction {
 
 thread_local! {
     /// Tracks the reactor for the current execution context.
-    static CURRENT_REACTOR: RefCell<Option<HandlePriv>> = RefCell::new(None)
+    static CURRENT_REACTOR: RefCell<Option<Handle>> = RefCell::new(None)
 }
 
 const TOKEN_SHIFT: usize = 22;
@@ -112,7 +100,7 @@ fn _assert_kinds() {
 // ===== impl Reactor =====
 
 #[derive(Debug)]
-///Guard that resets current reactor on drop.
+/// Guard that resets current reactor on drop.
 pub struct DefaultGuard<'a> {
     _lifetime: PhantomData<&'a u8>,
 }
@@ -126,7 +114,7 @@ impl Drop for DefaultGuard<'_> {
     }
 }
 
-///Sets handle for a default reactor, returning guard that unsets it on drop.
+/// Sets handle for a default reactor, returning guard that unsets it on drop.
 pub fn set_default(handle: &Handle) -> DefaultGuard<'_> {
     CURRENT_REACTOR.with(|current| {
         let mut current = current.borrow_mut();
@@ -137,7 +125,7 @@ pub fn set_default(handle: &Handle) -> DefaultGuard<'_> {
              for execution context"
         );
 
-        *current = Some(handle.as_priv().clone());
+        *current = Some(handle.clone());
     });
 
     DefaultGuard {
@@ -179,9 +167,7 @@ impl Reactor {
     /// to bind them to this event loop.
     pub fn handle(&self) -> Handle {
         Handle {
-            inner: HandlePriv {
-                inner: Arc::downgrade(&self.inner),
-            },
+            inner: Arc::downgrade(&self.inner),
         }
     }
 
@@ -339,44 +325,15 @@ impl fmt::Debug for Reactor {
 // ===== impl Handle =====
 
 impl Handle {
-    /// Get a handle to the current reactor.
+    /// Returns a handle to the current reactor
     ///
-    /// # Returns
+    /// # Panics
     ///
-    /// - `Ok<Handle>` if there is reactor set for the current thread
-    /// - `Err` if there is no reactor set for the current thread
-    pub fn current() -> io::Result<Handle> {
-        let inner = HandlePriv::try_current()?;
-        Ok(Handle { inner })
-    }
-
-    pub(crate) fn as_priv(&self) -> &HandlePriv {
-        self.inner.as_ref()
-    }
-}
-
-impl Unpark for Handle {
-    fn unpark(&self) {
-        self.inner.wakeup();
-    }
-}
-
-impl fmt::Debug for Handle {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Handle")
-    }
-}
-
-// ===== impl HandlePriv =====
-
-impl HandlePriv {
-    /// Try to get a handle to the current reactor.
-    ///
-    /// Returns `Err` if no handle is found.
-    pub(super) fn try_current() -> io::Result<HandlePriv> {
+    /// This function panics if there is no current reactor set.
+    pub(crate) fn current() -> Self {
         CURRENT_REACTOR.with(|current| match *current.borrow() {
-            Some(ref handle) => Ok(handle.clone()),
-            None => Err(io::Error::new(io::ErrorKind::Other, "no current reactor")),
+            Some(ref handle) => handle.clone(),
+            None => panic!("no current reactor"),
         })
     }
 
@@ -400,15 +357,15 @@ impl HandlePriv {
     }
 }
 
-impl fmt::Debug for HandlePriv {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "HandlePriv")
+impl Unpark for Handle {
+    fn unpark(&self) {
+        self.wakeup();
     }
 }
 
-impl AsRef<HandlePriv> for HandlePriv {
-    fn as_ref(&self) -> &Self {
-        &self
+impl fmt::Debug for Handle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Handle")
     }
 }
 

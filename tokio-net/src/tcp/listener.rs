@@ -1,7 +1,6 @@
 #[cfg(feature = "async-traits")]
 use super::incoming::Incoming;
 use super::TcpStream;
-use crate::driver::Handle;
 use crate::util::PollEvented;
 use crate::ToSocketAddrs;
 
@@ -203,9 +202,9 @@ impl TcpListener {
     ///     Ok(())
     /// }
     /// ```
-    pub fn from_std(listener: net::TcpListener, handle: &Handle) -> io::Result<TcpListener> {
+    pub fn from_std(listener: net::TcpListener) -> io::Result<TcpListener> {
         let io = mio::net::TcpListener::from_std(listener)?;
-        let io = PollEvented::new_with_handle(io, handle)?;
+        let io = PollEvented::new(io)?;
         Ok(TcpListener { io })
     }
 
@@ -333,7 +332,7 @@ impl TryFrom<net::TcpListener> for TcpListener {
     /// This is equivalent to
     /// [`TcpListener::from_std(stream, &Handle::current())`](TcpListener::from_std).
     fn try_from(stream: net::TcpListener) -> Result<Self, Self::Error> {
-        Self::from_std(stream, &Handle::current()?)
+        Self::from_std(stream)
     }
 }
 

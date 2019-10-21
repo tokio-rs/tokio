@@ -1,6 +1,5 @@
 use super::split::{split, ReadHalf, WriteHalf};
 use super::ucred::{self, UCred};
-use crate::driver::Handle;
 use crate::util::PollEvented;
 
 use tokio_io::{AsyncRead, AsyncWrite};
@@ -50,9 +49,9 @@ impl UnixStream {
     ///
     /// The returned stream will be associated with the given event loop
     /// specified by `handle` and is ready to perform I/O.
-    pub fn from_std(stream: net::UnixStream, handle: &Handle) -> io::Result<UnixStream> {
+    pub fn from_std(stream: net::UnixStream) -> io::Result<UnixStream> {
         let stream = mio_uds::UnixStream::from_stream(stream)?;
-        let io = PollEvented::new_with_handle(stream, handle)?;
+        let io = PollEvented::new(stream)?;
 
         Ok(UnixStream { io })
     }
@@ -136,7 +135,7 @@ impl TryFrom<net::UnixStream> for UnixStream {
     /// This is equivalent to
     /// [`UnixStream::from_std(stream, &Handle::current())`](UnixStream::from_std).
     fn try_from(stream: net::UnixStream) -> io::Result<Self> {
-        Self::from_std(stream, &Handle::current()?)
+        Self::from_std(stream)
     }
 }
 

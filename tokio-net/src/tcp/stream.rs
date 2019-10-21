@@ -148,9 +148,9 @@ impl TcpStream {
     ///     Ok(())
     /// }
     /// ```
-    pub fn from_std(stream: net::TcpStream, handle: &Handle) -> io::Result<TcpStream> {
+    pub fn from_std(stream: net::TcpStream) -> io::Result<TcpStream> {
         let io = mio::net::TcpStream::from_stream(stream)?;
-        let io = PollEvented::new_with_handle(io, handle)?;
+        let io = PollEvented::new(io)?;
         Ok(TcpStream { io })
     }
 
@@ -161,7 +161,7 @@ impl TcpStream {
     pub async fn connect_std(
         stream: net::TcpStream,
         addr: &SocketAddr,
-        handle: &Handle,
+        handle: Handle,
     ) -> io::Result<TcpStream> {
         let io = mio::net::TcpStream::connect_stream(stream, addr)?;
         let io = PollEvented::new_with_handle(io, handle)?;
@@ -751,7 +751,7 @@ impl TryFrom<net::TcpStream> for TcpStream {
     /// This is equivalent to
     /// [`TcpStream::from_std(stream, &Handle::current())`](TcpStream::from_std).
     fn try_from(stream: net::TcpStream) -> Result<Self, Self::Error> {
-        Self::from_std(stream, &Handle::current()?)
+        Self::from_std(stream)
     }
 }
 

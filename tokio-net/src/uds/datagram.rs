@@ -1,4 +1,3 @@
-use crate::driver::Handle;
 use crate::util::PollEvented;
 
 use futures_core::ready;
@@ -46,9 +45,9 @@ impl UnixDatagram {
     ///
     /// The returned datagram will be associated with the given event loop
     /// specified by `handle` and is ready to perform I/O.
-    pub fn from_std(datagram: net::UnixDatagram, handle: &Handle) -> io::Result<UnixDatagram> {
+    pub fn from_std(datagram: net::UnixDatagram) -> io::Result<UnixDatagram> {
         let socket = mio_uds::UnixDatagram::from_datagram(datagram)?;
-        let io = PollEvented::new_with_handle(socket, handle)?;
+        let io = PollEvented::new(socket)?;
         Ok(UnixDatagram { io })
     }
 
@@ -218,7 +217,7 @@ impl TryFrom<net::UnixDatagram> for UnixDatagram {
     /// This is equivalent to
     /// [`UnixDatagram::from_std(stream, &Handle::current())`](UnixDatagram::from_std).
     fn try_from(stream: net::UnixDatagram) -> Result<Self, Self::Error> {
-        Self::from_std(stream, &Handle::current()?)
+        Self::from_std(stream)
     }
 }
 

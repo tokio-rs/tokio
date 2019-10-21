@@ -1,5 +1,5 @@
 use super::platform;
-use super::reactor::{Direction, Handle, HandlePriv};
+use super::reactor::{Direction, Handle};
 
 use mio::{self, Evented};
 use std::sync::atomic::Ordering::SeqCst;
@@ -44,7 +44,7 @@ pub struct Registration {
 
 #[derive(Debug)]
 struct Inner {
-    handle: HandlePriv,
+    handle: Handle,
     token: usize,
 }
 
@@ -65,7 +65,7 @@ impl Registration {
     where
         T: Evented,
     {
-        self.register2(io, HandlePriv::try_current)
+        self.register2(io, Handle::current())
     }
 
     /// Deregister the I/O resource from the reactor it is associated with.
@@ -103,34 +103,22 @@ impl Registration {
     /// If the registration happened successfully, `Ok` is returned.
     ///
     /// If an error is encountered during registration, `Err` is returned.
-    pub fn register_with<T>(&mut self, io: &T, handle: &Handle) -> io::Result<()>
+    pub fn register_with<T>(&mut self, io: &T, handle: Handle) -> io::Result<()>
     where
         T: Evented,
     {
-        self.register2(io, || match handle.as_priv() {
-            Some(handle) => Ok(handle.clone()),
-            None => HandlePriv::try_current(),
-        })
-    }
-
-    pub(crate) fn register_with_priv<T>(&mut self, io: &T, handle: &HandlePriv) -> io::Result<()>
-    where
-        T: Evented,
-    {
-        self.register2(io, || Ok(handle.clone()))
+        self.register2(io, handle)
     }
 
     /// Register an I/O resource with a reactor.
     ///
     /// Once the association is established, it remains established until the
     /// registration instance is dropped.
-    fn register2<T, F>(&mut self, io: &T, f: F) -> io::Result<()>
+    fn register2<T>(&mut self, io: &T, handle: Handle) -> io::Result<()>
     where
         T: Evented,
-        F: Fn() -> io::Result<HandlePriv>,
     {
         if self.inner.is_none() {
-            let handle = f()?;
             let inner = Inner::add_source(io, handle)?;
             self.inner = Some(inner);
         }
@@ -267,7 +255,7 @@ unsafe impl Sync for Registration {}
 // ===== impl Inner =====
 
 impl Inner {
-    fn add_source<E>(io: &E, handle: HandlePriv) -> io::Result<Self>
+    fn add_source<E>(io: &E, handle: Handle) -> io::Result<Self>
     where
         E: Evented,
     {

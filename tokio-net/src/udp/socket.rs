@@ -1,5 +1,4 @@
 use super::split::{split, UdpSocketRecvHalf, UdpSocketSendHalf};
-use crate::driver::Handle;
 use crate::util::PollEvented;
 use crate::ToSocketAddrs;
 
@@ -64,9 +63,9 @@ impl UdpSocket {
     /// Use [`Handle::current()`] to bind to the current event loop.
     ///
     /// [`Handle::current()`]: ../reactor/struct.Handle.html
-    pub fn from_std(socket: net::UdpSocket, handle: &Handle) -> io::Result<UdpSocket> {
+    pub fn from_std(socket: net::UdpSocket) -> io::Result<UdpSocket> {
         let io = mio::net::UdpSocket::from_socket(socket)?;
-        let io = PollEvented::new_with_handle(io, handle)?;
+        let io = PollEvented::new(io)?;
         Ok(UdpSocket { io })
     }
 
@@ -393,7 +392,7 @@ impl TryFrom<net::UdpSocket> for UdpSocket {
     /// This is equivalent to
     /// [`UdpSocket::from_std(stream, &Handle::current())`](UdpSocket::from_std).
     fn try_from(stream: net::UdpSocket) -> Result<Self, Self::Error> {
-        Self::from_std(stream, &Handle::current()?)
+        Self::from_std(stream)
     }
 }
 
