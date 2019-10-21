@@ -2,10 +2,6 @@
 
 use tokio_net::udp::UdpSocket;
 
-use bytes::{BufMut, BytesMut};
-use futures_util::{future::FutureExt, sink::SinkExt, stream::StreamExt, try_future::try_join};
-use std::io;
-
 #[tokio::test]
 async fn send_recv() -> std::io::Result<()> {
     let mut sender = UdpSocket::bind("127.0.0.1:0").await?;
