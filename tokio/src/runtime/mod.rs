@@ -14,7 +14,7 @@
 //! boilerplate to run a Tokio application.
 //!
 //! Most applications wont need to use [`Runtime`] directly. Instead, they will
-//! use the [`run`] function, which uses [`Runtime`] under the hood.
+//! use the [`tokio::main`] attribute macro, which uses [`Runtime`] under the hood.
 //!
 //! Creating a [`Runtime`] does the following:
 //!
