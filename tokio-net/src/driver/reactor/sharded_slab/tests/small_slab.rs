@@ -95,7 +95,7 @@ fn remove_remote_and_reuse() {
             assert!(value == None || value == Some(3));
         });
 
-        let idx3 = store_val(&slab, 3);
+        let idx3 = store_when_free(&slab, 3);
         t1.join().expect("thread 1 should not panic");
 
         assert_eq!(get_val(&slab, idx3), Some(3), "slab: {:#?}", slab);
