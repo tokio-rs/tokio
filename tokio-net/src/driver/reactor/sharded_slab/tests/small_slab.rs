@@ -9,13 +9,13 @@ use tid::Tid;
 
 // Overridden for tests
 const INITIAL_PAGE_SIZE: usize = 2;
+const MAX_PAGES: usize = 1;
 
 // Constants not overridden
 #[cfg(target_pointer_width = "64")]
 const MAX_THREADS: usize = 4096;
 #[cfg(target_pointer_width = "32")]
 const MAX_THREADS: usize = 2048;
-const MAX_PAGES: usize = WIDTH / 4;
 const RESERVED_BITS: usize = 5;
 
 #[path = "../page/mod.rs"]
@@ -39,8 +39,25 @@ mod slab;
 mod tid;
 
 fn store_val(slab: &Arc<Slab>, readiness: usize) -> usize {
-    println!("store: {}", readiness);
+    test_println!("store: {}", readiness);
     let key = slab.alloc().expect("allocate slot");
+    if let Some(slot) = slab.get(key) {
+        slot.readiness.store(readiness, Ordering::Release);
+    } else {
+        panic!("slab did not contain a value for {:#x}", key);
+    }
+    key
+}
+
+fn store_when_free(slab: &Arc<Slab>, readiness: usize) -> usize {
+    test_println!("store: {}", readiness);
+    let key = loop {
+        if let Some(key) = slab.alloc() {
+            break key;
+        }
+        test_println!("-> full; retry");
+        thread::yield_now();
+    };
     if let Some(slot) = slab.get(key) {
         slot.readiness.store(readiness, Ordering::Release);
     } else {
@@ -87,16 +104,56 @@ fn remove_remote_and_reuse() {
 }
 
 #[test]
-fn custom_page_sz() {
+fn concurrent_remove_remote_and_reuse() {
     let mut model = loom::model::Builder::new();
     model.max_branches = 100000;
-    model.check(|| {
+    model.preemption_bound = 2; // otherwise this will run *forever*...
+    let iter = std::sync::atomic::AtomicUsize::new(1);
+    model.check(move || {
+        println!(
+            "\n --- iteration {} ---\n",
+            iter.fetch_add(1, Ordering::Relaxed)
+        );
+
         let slab = Arc::new(Slab::new());
 
-        for i in 0..1024 {
-            test_println!("{}", i);
-            let k = store_val(&slab, i);
-            assert_eq!(get_val(&slab, k), Some(i), "slab: {:#?}", slab);
-        }
+        let idx1 = store_val(&slab, 1);
+        let idx2 = store_val(&slab, 2);
+
+        assert_eq!(get_val(&slab, idx1), Some(1), "slab: {:#?}", slab);
+        assert_eq!(get_val(&slab, idx2), Some(2), "slab: {:#?}", slab);
+
+        let s = slab.clone();
+        let s2 = slab.clone();
+        let t1 = thread::spawn(move || {
+            s.remove(idx1);
+        });
+
+        let t2 = thread::spawn(move || {
+            s2.remove(idx2);
+        });
+
+        let idx3 = store_when_free(&slab, 3);
+        t1.join().expect("thread 1 should not panic");
+        t2.join().expect("thread 1 should not panic");
+
+        assert!(get_val(&slab, idx1).is_none(), "slab: {:#?}", slab);
+        assert!(get_val(&slab, idx2).is_none(), "slab: {:#?}", slab);
+        assert_eq!(get_val(&slab, idx3), Some(3), "slab: {:#?}", slab);
     });
 }
+
+// #[test]
+// fn custom_page_sz() {
+//     let mut model = loom::model::Builder::new();
+//     model.max_branches = 100000;
+//     model.check(|| {
+//         let slab = Arc::new(Slab::new());
+
+//         for i in 0..1024 {
+//             test_println!("{}", i);
+//             let k = store_val(&slab, i);
+//             assert_eq!(get_val(&slab, k), Some(i), "slab: {:#?}", slab);
+//         }
+//     });
+// }
