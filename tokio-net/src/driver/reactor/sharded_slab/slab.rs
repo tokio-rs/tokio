@@ -171,12 +171,11 @@ impl SingleShard {
     }
 
     /// Returns an iterator over all the items in the slab.
-    pub(in crate::driver::reactor) fn unique_iter(&self) -> iter::ShardIter<'_> {
-        let _lock = self.local.lock().unwrap();
+    pub(in crate::driver::reactor) fn unique_iter(&mut self) -> iter::ShardIter<'_> {
         let mut pages = self.shard.iter();
         let slots = pages.next().and_then(page::Shared::iter);
         iter::ShardIter {
-            _lock,
+            _slab: self,
             slots,
             pages,
         }
