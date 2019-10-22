@@ -129,6 +129,11 @@ impl Shared {
         });
     }
 
+    #[inline(always)]
+    fn prev_sz(&self) -> usize {
+        self.size >> 1
+    }
+
     #[inline]
     pub(crate) fn alloc(&self, local: &Local) -> Option<usize> {
         let head = local.head();
@@ -167,8 +172,7 @@ impl Shared {
             slot.alloc()
         });
 
-        let prev_sz = self.size >> 1;
-        let index = head + prev_sz;
+        let index = head + self.prev_sz();
         test_println!("alloc at offset: {}; gen={:?}", index, gen);
 
         Some(gen.pack(index))
@@ -176,7 +180,7 @@ impl Shared {
 
     #[inline]
     pub(in crate::driver) fn get(&self, addr: Addr, idx: usize) -> Option<&ScheduledIo> {
-        let page_offset = addr.offset() - self.prev_sz;
+        let page_offset = addr.offset() - self.prev_sz();
         #[cfg(test)]
         test_println!("-> offset {:?}", page_offset);
 
@@ -192,7 +196,7 @@ impl Shared {
     }
 
     pub(crate) fn remove_local(&self, local: &Local, addr: Addr, idx: usize) {
-        let offset = addr.offset() - self.prev_sz;
+        let offset = addr.offset() - self.prev_sz();
 
         #[cfg(test)]
         test_println!("-> offset {:?}", offset);
@@ -212,7 +216,7 @@ impl Shared {
     }
 
     pub(crate) fn remove_remote(&self, addr: Addr, idx: usize) {
-        let offset = addr.offset() - self.prev_sz;
+        let offset = addr.offset() - self.prev_sz();
 
         #[cfg(test)]
         test_println!("-> offset {:?}", offset);
