@@ -146,7 +146,7 @@ impl Shared {
             // if the local free list is empty, pop all the items on the remote
             // free list onto the local free list.
             let remote = self.remote.pop_all();
-            test_println!("-> took remote head {:#x}", remote);
+            test_println!("-> took remote head {:?}", remote);
             remote?
         };
 
