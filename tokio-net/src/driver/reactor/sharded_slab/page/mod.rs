@@ -109,7 +109,7 @@ impl Shared {
     /// actually used, but requiring it ensures that this is only called when
     /// local access is held.
     #[cold]
-    fn fill(&self, _: &Local) {
+    fn alloc_page(&self, _: &Local) {
         #[cfg(test)]
         test_println!("-> alloc new page ({})", self.size);
 
@@ -155,7 +155,7 @@ impl Shared {
         // do we need to allocate storage for this page?
         let page_needs_alloc = self.slab.with(|s| unsafe { (*s).is_none() });
         if page_needs_alloc {
-            self.fill(local);
+            self.alloc_page(local);
         }
 
         let gen = self.slab.with(|slab| {
