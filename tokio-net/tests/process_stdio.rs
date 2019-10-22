@@ -4,7 +4,7 @@
 #[macro_use]
 extern crate tracing;
 
-use tokio::io::{AsyncWriteExt, AsyncBufReadExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio_net::process::{Child, Command};
 
 use futures_util::future;
