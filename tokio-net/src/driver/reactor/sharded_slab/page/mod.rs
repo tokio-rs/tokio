@@ -100,8 +100,16 @@ impl Shared {
         }
     }
 
+    /// Allocates storage for this page if it does not allready exist.
+    ///
+    /// This requires unique access to the page (e.g. it is called from the
+    /// thread that owns the page, or, in the case of `SingleShard`, while the
+    /// lock is held). In order to indicate this, a reference to the page's
+    /// `Local` data is taken by this function; the `Local` argument is not
+    /// actually used, but requiring it ensures that this is only called when
+    /// local access is held.
     #[cold]
-    fn fill(&self) {
+    fn fill(&self, _: &Local) {
         #[cfg(test)]
         test_println!("-> alloc new page ({})", self.size);
 
@@ -145,9 +153,9 @@ impl Shared {
         }
 
         // do we need to allocate storage for this page?
-        let page_exists = self.slab.with(|s| unsafe { (*s).is_none() });
-        if page_exists {
-            self.fill();
+        let page_needs_alloc = self.slab.with(|s| unsafe { (*s).is_none() });
+        if page_needs_alloc {
+            self.fill(local);
         }
 
         let gen = self.slab.with(|slab| {
