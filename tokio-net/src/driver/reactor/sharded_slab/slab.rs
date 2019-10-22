@@ -172,13 +172,9 @@ impl SingleShard {
 
     /// Returns an iterator over all the items in the slab.
     pub(in crate::driver::reactor) fn unique_iter(&mut self) -> iter::ShardIter<'_> {
-        let mut pages = self.shard.iter();
-        let slots = pages.next().and_then(page::Shared::iter);
-        iter::ShardIter {
-            _slab: self,
-            slots,
-            pages,
-        }
+        let mut pages = self.shard.iter_mut();
+        let slots = pages.next().and_then(|pg| pg.iter());
+        iter::ShardIter { slots, pages }
     }
 }
 
@@ -272,6 +268,10 @@ impl Shard {
 
     pub(super) fn iter<'a>(&'a self) -> std::slice::Iter<'a, page::Shared> {
         self.shared.iter()
+    }
+
+    fn iter_mut<'a>(&'a mut self) -> std::slice::IterMut<'a, page::Shared> {
+        self.shared.iter_mut()
     }
 }
 
