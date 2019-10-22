@@ -5,7 +5,9 @@ use crate::sync::{
 };
 
 pub(crate) mod slot;
+mod stack;
 use self::slot::Slot;
+use self::stack::TransferStack;
 use std::fmt;
 
 /// A page address encodes the location of a slot within a shard (the page
@@ -64,7 +66,7 @@ pub(crate) struct Local {
 }
 
 pub(crate) struct Shared {
-    remote_head: AtomicUsize,
+    remote: TransferStack,
     size: usize,
     prev_sz: usize,
     slab: CausalCell<Option<Box<[Slot]>>>,
@@ -97,7 +99,7 @@ impl Shared {
         Self {
             prev_sz,
             size,
-            remote_head: AtomicUsize::new(Self::NULL),
+            remote: TransferStack::new(),
             slab: CausalCell::new(None),
         }
     }
@@ -135,7 +137,7 @@ impl Shared {
     pub(crate) fn alloc(&self, local: &Local) -> Option<usize> {
         let head = local.head();
         #[cfg(test)]
-        test_println!("-> local head {:?}", head);
+        test_println!("-> local head {:#x}", head);
 
         // are there any items on the local free list? (fast path)
         let head = if head < self.size {
@@ -143,7 +145,9 @@ impl Shared {
         } else {
             // if the local free list is empty, pop all the items on the remote
             // free list onto the local free list.
-            self.remote_head.swap(Self::NULL, Ordering::Acquire)
+            let remote = self.remote.pop_all();
+            test_println!("-> took remote head {:#x}", remote);
+            remote?
         };
 
         // if the head is still null, both the local and remote free lists are
@@ -199,12 +203,12 @@ impl Shared {
         test_println!("-> offset {:?}", offset);
 
         self.slab.with(|slab| {
-            let slot =
-                if let Some(slot) = unsafe { &*slab }.as_ref().and_then(|slab| slab.get(offset)) {
-                    slot
-                } else {
-                    return;
-                };
+            let slab = unsafe { &*slab }.as_ref();
+            let slot = if let Some(slot) = slab.and_then(|slab| slab.get(offset)) {
+                slot
+            } else {
+                return;
+            };
             if slot.reset(slot::Generation::from_packed(idx)) {
                 slot.set_next(local.head());
                 local.set_head(offset);
@@ -219,34 +223,16 @@ impl Shared {
         test_println!("-> offset {:?}", offset);
 
         self.slab.with(|slab| {
-            let slot =
-                if let Some(slot) = unsafe { &*slab }.as_ref().and_then(|slab| slab.get(offset)) {
-                    slot
-                } else {
-                    return;
-                };
+            let slab = unsafe { &*slab }.as_ref();
+            let slot = if let Some(slot) = slab.and_then(|slab| slab.get(offset)) {
+                slot
+            } else {
+                return;
+            };
             if !slot.reset(slot::Generation::from_packed(idx)) {
                 return;
             }
-
-            let mut next = self.remote_head.load(Ordering::Relaxed);
-            loop {
-                #[cfg(test)]
-                test_println!("-> next={:?}", next);
-
-                slot.set_next(next);
-
-                let res = self.remote_head.compare_exchange(
-                    next,
-                    offset,
-                    Ordering::AcqRel,
-                    Ordering::Acquire,
-                );
-                match res {
-                    Ok(_) => return,
-                    Err(actual) => next = actual,
-                }
-            }
+            self.remote.push(offset, |next| slot.set_next(next));
         })
     }
 
@@ -270,10 +256,7 @@ impl fmt::Debug for Local {
 impl fmt::Debug for Shared {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Shared")
-            .field(
-                "remote_head",
-                &format_args!("{:#0x}", &self.remote_head.load(Ordering::Relaxed)),
-            )
+            .field("remote", &self.remote)
             .field("prev_sz", &self.prev_sz)
             .field("size", &self.size)
             // .field("slab", &self.slab)
