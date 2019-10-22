@@ -21,6 +21,8 @@ mod tid;
 use super::ScheduledIo;
 use pack::{Pack, WIDTH};
 use slab::Shard;
+#[cfg(test)]
+pub(crate) use slab::Slab;
 pub(crate) use slab::{SingleShard, MAX_SOURCES};
 use tid::Tid;
 
