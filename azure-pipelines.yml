@@ -71,6 +71,7 @@ jobs:
       tokio-macros: []
       tokio-test: []
       tokio-util: []
+      examples: []
 
 # Test compilation failure
 - template: ci/azure-test-stable.yml

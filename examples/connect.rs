@@ -16,13 +16,14 @@
 
 #![warn(rust_2018_idioms)]
 
+use tokio::io;
+use tokio::sync::{mpsc, oneshot};
+use tokio_util::codec::{FramedRead, FramedWrite};
+
 use futures::{SinkExt, Stream};
-use std::{env, error::Error, net::SocketAddr};
-use tokio::{
-    codec::{FramedRead, FramedWrite},
-    io,
-    sync::{mpsc, oneshot},
-};
+use std::env;
+use std::error::Error;
+use std::net::SocketAddr;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -83,10 +84,8 @@ mod tcp {
     use super::codec;
     use futures::{future, Sink, SinkExt, Stream, StreamExt};
     use std::{error::Error, io, net::SocketAddr};
-    use tokio::{
-        codec::{FramedRead, FramedWrite},
-        net::TcpStream,
-    };
+    use tokio::net::TcpStream;
+    use tokio_util::codec::{FramedRead, FramedWrite};
 
     pub async fn connect(
         addr: &SocketAddr,
@@ -171,7 +170,7 @@ mod udp {
 mod codec {
     use bytes::{BufMut, BytesMut};
     use std::io;
-    use tokio::codec::{Decoder, Encoder};
+    use tokio_util::codec::{Decoder, Encoder};
 
     /// A simple `Codec` implementation that just ships bytes around.
     ///

@@ -11,6 +11,7 @@ members = [
   "tokio-tls",
   "tokio-util",
 
-  # Crates used by tests
+  # Internal
+  "examples",
   "build-tests",
 ]
