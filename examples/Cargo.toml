@@ -1,0 +1,52 @@
+[package]
+name = "examples"
+version = "0.0.0"
+publish = false
+edition = "2018"
+
+[dev-dependencies]
+tokio = { version = "=0.2.0-alpha.6", path = "../tokio" }
+tokio-util = { version = "=0.2.0-alpha.6", path = "../tokio-util" }
+
+bytes = "0.4.12"
+futures-preview = "=0.3.0-alpha.19"
+
+[[example]]
+name = "chat"
+path = "chat.rs"
+
+[[example]]
+name = "connect"
+path = "connect.rs"
+
+[[example]]
+name = "echo-udp"
+path = "echo-udp.rs"
+
+[[example]]
+name = "echo"
+path = "echo.rs"
+
+[[example]]
+name = "hello_world"
+path = "hello_world.rs"
+
+[[example]]
+name = "print_each_packet"
+path = "print_each_packet.rs"
+
+[[example]]
+name = "proxy"
+path = "proxy.rs"
+
+[[example]]
+name = "tinydb"
+path = "tinydb.rs"
+
+[[example]]
+name = "udp-client"
+path = "udp-client.rs"
+
+[[example]]
+name = "udp-codec"
+path = "udp-codec.rs"

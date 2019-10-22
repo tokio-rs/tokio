@@ -41,16 +41,14 @@
 
 #![warn(rust_2018_idioms)]
 
+use tokio::net::TcpListener;
+use tokio_util::codec::{Framed, LinesCodec};
+
+use futures::{SinkExt, StreamExt};
 use std::collections::HashMap;
 use std::env;
 use std::error::Error;
 use std::sync::{Arc, Mutex};
-
-use tokio;
-use tokio::codec::{Framed, LinesCodec};
-use tokio::net::TcpListener;
-
-use futures::{SinkExt, StreamExt};
 
 /// The in-memory database shared amongst all clients.
 ///

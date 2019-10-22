@@ -25,7 +25,6 @@ keywords = ["io", "async", "non-blocking", "futures"]
 
 [features]
 default = [
-  "codec",
   "fs",
   "io",
   "net",
@@ -36,7 +35,6 @@ default = [
   "timer",
 ]
 
-codec = ["io", "tokio-codec", "bytes"]
 fs = []
 io = ["tokio-io"]
 macros = ["tokio-macros"]
@@ -71,12 +69,10 @@ futures-sink-preview = "=0.3.0-alpha.19"
 futures-util-preview = { version = "=0.3.0-alpha.19", features = ["sink"] }
 
 # Everything else is optional...
-bytes = { version = "0.4", optional = true }
 crossbeam-utils = { version = "0.6.0", optional = true }
 num_cpus = { version = "1.8.0", optional = true }
 # Backs `DelayQueue`
 slab = { version = "0.4.1", optional = true }
-tokio-codec = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-codec" }
 tokio-io = { version = "=0.2.0-alpha.6", optional = true, features = ["util"], path = "../tokio-io" }
 tokio-executor = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-executor" }
 tokio-macros = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-macros" }
@@ -90,6 +86,7 @@ tokio-executor = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio
 
 [dev-dependencies]
 tokio-test = { version = "=0.2.0-alpha.6", path = "../tokio-test" }
+tokio-util = { version = "=0.2.0-alpha.6", path = "../tokio-util" }
 
 futures-preview = "=0.3.0-alpha.19"
 futures-util-preview = "=0.3.0-alpha.19"

@@ -1,8 +1,8 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::prelude::*;
-use tokio_codec::{Decoder, Encoder, Framed, FramedParts};
 use tokio_test::assert_ok;
+use tokio_util::codec::{Decoder, Encoder, Framed, FramedParts};
 
 use bytes::{Buf, BufMut, BytesMut, IntoBuf};
 use std::io::{self, Read};

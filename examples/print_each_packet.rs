@@ -54,10 +54,9 @@
 
 #![warn(rust_2018_idioms)]
 
-use tokio;
-use tokio::codec::{BytesCodec, Decoder};
 use tokio::net::TcpListener;
 use tokio::prelude::*;
+use tokio_util::codec::{BytesCodec, Decoder};
 
 use std::env;
 

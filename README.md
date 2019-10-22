@@ -94,7 +94,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ```
 
-More examples can be found [here](tokio/examples). Note that the `master` branch
+More examples can be found [here](examples). Note that the `master` branch
 is currently being updated to use `async` / `await`.  The examples are
 not fully ported. Examples for stable Tokio can be found
 [here](https://github.com/tokio-rs/tokio/tree/v0.1.x/tokio/examples).

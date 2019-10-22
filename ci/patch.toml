@@ -2,10 +2,10 @@
 # repository.
 [patch.crates-io]
 tokio = { path = "tokio" }
-tokio-codec = { path = "tokio-codec" }
 tokio-executor = { path = "tokio-executor" }
 tokio-io = { path = "tokio-io" }
 tokio-macros = { path = "tokio-macros" }
 tokio-net = { path = "tokio-net" }
 tokio-sync = { path = "tokio-sync" }
 tokio-tls = { path = "tokio-tls" }
+tokio-util = { path = "tokio-util" }

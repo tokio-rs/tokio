@@ -4,16 +4,15 @@
 #[macro_use]
 extern crate tracing;
 
-use std::env;
-use std::io;
-use std::process::{ExitStatus, Stdio};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio_net::process::{Child, Command};
 
 use futures_util::future;
 use futures_util::future::FutureExt;
 use futures_util::stream::StreamExt;
-use tokio::codec::{FramedRead, LinesCodec};
-use tokio::io::AsyncWriteExt;
-use tokio_net::process::{Child, Command};
+use std::env;
+use std::io;
+use std::process::{ExitStatus, Stdio};
 
 mod support;
 use support::*;
@@ -51,7 +50,7 @@ async fn feed_cat(mut cat: Child, n: usize) -> io::Result<ExitStatus> {
     };
 
     let read = async {
-        let mut reader = FramedRead::new(stdout, LinesCodec::new());
+        let mut reader = BufReader::new(stdout).lines();
         let mut num_lines = 0;
 
         // Try to read `n + 1` lines, ensuring the last one is empty

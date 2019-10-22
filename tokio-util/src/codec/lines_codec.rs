@@ -1,5 +1,6 @@
-use crate::decoder::Decoder;
-use crate::encoder::Encoder;
+use crate::codec::decoder::Decoder;
+use crate::codec::encoder::Encoder;
+
 use bytes::{BufMut, BytesMut};
 use std::{cmp, fmt, io, str, usize};
 
@@ -70,13 +71,13 @@ impl LinesCodec {
     ///
     /// ```
     /// use std::usize;
-    /// use tokio_codec::LinesCodec;
+    /// use tokio_util::codec::LinesCodec;
     ///
     /// let codec = LinesCodec::new();
     /// assert_eq!(codec.max_length(), usize::MAX);
     /// ```
     /// ```
-    /// use tokio_codec::LinesCodec;
+    /// use tokio_util::codec::LinesCodec;
     ///
     /// let codec = LinesCodec::new_with_max_length(256);
     /// assert_eq!(codec.max_length(), 256);

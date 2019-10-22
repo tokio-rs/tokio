@@ -26,17 +26,19 @@
 
 #![warn(rust_2018_idioms)]
 
+use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::{mpsc, Mutex};
+use tokio_util::codec::{Framed, LinesCodec, LinesCodecError};
+
 use futures::{Poll, SinkExt, Stream, StreamExt};
-use std::{
-    collections::HashMap, env, error::Error, io, net::SocketAddr, pin::Pin, sync::Arc,
-    task::Context,
-};
-use tokio::{
-    self,
-    codec::{Framed, LinesCodec, LinesCodecError},
-    net::{TcpListener, TcpStream},
-    sync::{mpsc, Mutex},
-};
+use std::collections::HashMap;
+use std::env;
+use std::error::Error;
+use std::io;
+use std::net::SocketAddr;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::Context;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {

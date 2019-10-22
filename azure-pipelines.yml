@@ -26,7 +26,6 @@ jobs:
     cross: true
     crates:
       tokio:
-        - codec
         - fs
         - io
         - net
@@ -61,7 +60,6 @@ jobs:
     displayName: Test sub crates -
     rust: beta
     crates:
-      tokio-codec: []
       tokio-executor:
         - current-thread
         - thread-pool
@@ -71,6 +69,8 @@ jobs:
         - async-traits
       tokio-macros: []
       tokio-test: []
+      tokio-util: []
+      examples: []
 
 # Test compilation failure
 - template: ci/azure-test-stable.yml

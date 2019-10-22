@@ -1,7 +1,8 @@
 #![warn(rust_2018_idioms)]
 
+use tokio_util::codec::{BytesCodec, Decoder, Encoder, LinesCodec};
+
 use bytes::{BufMut, Bytes, BytesMut};
-use tokio_codec::{BytesCodec, Decoder, Encoder, LinesCodec};
 
 #[test]
 fn bytes_decoder() {

@@ -2,7 +2,6 @@
 
 members = [
   "tokio",
-  "tokio-codec",
   "tokio-executor",
   "tokio-io",
   "tokio-macros",
@@ -10,5 +9,9 @@ members = [
   "tokio-sync",
   "tokio-test",
   "tokio-tls",
+  "tokio-util",
+
+  # Internal
+  "examples",
   "build-tests",
 ]
