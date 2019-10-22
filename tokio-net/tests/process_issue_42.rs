@@ -4,7 +4,6 @@
 
 use futures_util::future::FutureExt;
 use futures_util::stream::FuturesOrdered;
-use futures_util::stream::StreamExt;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -21,24 +20,23 @@ fn run_test() {
     let finished_clone = finished.clone();
 
     thread::spawn(move || {
-        let mut futures = FuturesOrdered::new();
-        for i in 0..2 {
-            futures.push(
-                Command::new("echo")
-                    .arg(format!("I am spawned process #{}", i))
-                    .stdin(Stdio::null())
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .spawn()
-                    .unwrap()
-                    .boxed(),
-            )
-        }
-
         let mut rt = current_thread::Runtime::new().expect("failed to get runtime");
-        rt.block_on(with_timeout(futures.collect::<Vec<_>>()));
+        let mut futures = FuturesOrdered::new();
+        run_with_timeout(&mut rt, async {
+            for i in 0..2 {
+                futures.push(
+                    Command::new("echo")
+                        .arg(format!("I am spawned process #{}", i))
+                        .stdin(Stdio::null())
+                        .stdout(Stdio::null())
+                        .stderr(Stdio::null())
+                        .spawn()
+                        .unwrap()
+                        .boxed(),
+                )
+            }
+        });
         drop(rt);
-
         finished_clone.store(true, Ordering::SeqCst);
     });
 

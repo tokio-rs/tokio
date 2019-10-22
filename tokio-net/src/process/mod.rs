@@ -55,10 +55,11 @@
 //! We can also read input line by line.
 //!
 //! ```no_run
+//! use tokio::io::{BufReader, AsyncBufReadExt};
+//! use tokio::process::Command;
+//!
 //! use futures_util::stream::StreamExt;
-//! use std::process::{Stdio};
-//! use tokio::codec::{FramedRead, LinesCodec};
-//! use tokio_net::process::Command;
+//! use std::process::Stdio;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -77,7 +78,7 @@
 //!     let stdout = child.stdout().take()
 //!         .expect("child did not have a handle to stdout");
 //!
-//!     let mut reader = FramedRead::new(stdout, LinesCodec::new());
+//!     let mut reader = BufReader::new(stdout).lines();
 //!
 //!     // Ensure the child process is spawned in the runtime so it can
 //!     // make progress on its own while we await for any output.

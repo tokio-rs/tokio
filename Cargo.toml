@@ -2,16 +2,17 @@
 
 members = [
   "tokio",
-  "tokio-codec",
   "tokio-compat",
   "tokio-executor",
-  "tokio-fs",
   "tokio-io",
   "tokio-macros",
   "tokio-net",
   "tokio-sync",
   "tokio-test",
-  "tokio-timer",
   "tokio-tls",
+  "tokio-util",
+
+  # Internal
+  "examples",
   "build-tests",
 ]

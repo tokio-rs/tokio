@@ -1,0 +1,38 @@
+[package]
+name = "tokio-util"
+# When releasing to crates.io:
+# - Remove path dependencies
+# - Update html_root_url.
+# - Update doc url
+#   - Cargo.toml
+# - Update CHANGELOG.md.
+# - Create "v0.2.x" git tag.
+version = "0.2.0-alpha.6"
+edition = "2018"
+authors = ["Tokio Contributors <team@tokio.rs>"]
+license = "MIT"
+repository = "https://github.com/tokio-rs/tokio"
+homepage = "https://tokio.rs"
+documentation = "https://docs.rs/tokio-util/0.2.0-alpha.6/tokio_util"
+description = """
+Additional utilities for working with Tokio.
+"""
+categories = ["asynchronous"]
+
+[dependencies]
+tokio-io = { version = "=0.2.0-alpha.6", path = "../tokio-io" }
+tokio = { version = "=0.2.0-alpha.6", path = "../tokio" }
+
+bytes = "0.4.7"
+futures-core-preview = "=0.3.0-alpha.19"
+futures-sink-preview = "=0.3.0-alpha.19"
+log = "0.4"
+
+[dev-dependencies]
+tokio = { version = "=0.2.0-alpha.6", path = "../tokio" }
+tokio-test = { version = "=0.2.0-alpha.6", path = "../tokio-test" }
+
+futures-util-preview = "=0.3.0-alpha.19"
+
+[package.metadata.docs.rs]
+all-features = true

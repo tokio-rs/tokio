@@ -24,6 +24,8 @@
 //! use tokio::net::TcpStream;
 //!
 //! # async fn process<T>(_t: T) {}
+//!
+//! # #[tokio::main]
 //! # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
 //! let stream = TcpStream::connect("93.184.216.34:9243").await?;
 //!
@@ -56,19 +58,15 @@
 //! the task to run on one of its worker threads. This results in the `and_then`
 //! closure to get executed.
 //!
-//! ## Lazy registration
+//! ## Eager registration
 //!
-//! Notice how the snippet above does not explicitly reference a reactor. When
-//! [`TcpStream::connect`] is called, it registers the socket with a reactor,
-//! but no reactor is specified. This works because the registration process
-//! mentioned above is actually lazy. It doesn't *actually* happen in the
-//! [`connect`] function. Instead, the registration is established the first
-//! time that the task is polled (again, see [runtime model]).
-//!
-//! A reactor instance is automatically made available when using the Tokio
-//! [runtime], which is done using [`tokio::run`]. The Tokio runtime's executor
-//! sets a thread-local variable referencing the associated [`Reactor`] instance
-//! and [`Handle::current`] (used by [`Registration`]) returns the reference.
+//! Notice how the snippet does not explicitly reference a reactor. When
+//! [`TcpStream::connect`] is called, it registers the socket with the current
+//! reactor, but no reactor is specified. This works because a reactor
+//! instance is automatically made available when using the Tokio [runtime],
+//! which is done using [`tokio::main`]. The Tokio runtime's executor sets a
+//! thread-local variable referencing the associated [`Reactor`] instance and
+//! [`Handle::current`] (used by [`Registration`]) returns the reference.
 //!
 //! ## Implementation
 //!

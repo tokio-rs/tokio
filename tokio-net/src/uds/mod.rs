@@ -3,16 +3,19 @@
 //! This crate provides APIs for using Unix Domain Sockets with Tokio.
 
 mod datagram;
-// mod frame;
-mod incoming;
-mod listener;
-pub mod split;
-mod stream;
-mod ucred;
-
 pub use self::datagram::UnixDatagram;
+
+mod incoming;
 #[cfg(feature = "async-traits")]
 pub use self::incoming::Incoming;
+
+mod listener;
 pub use self::listener::UnixListener;
+
+pub mod split;
+
+mod stream;
 pub use self::stream::UnixStream;
+
+mod ucred;
 pub use self::ucred::UCred;

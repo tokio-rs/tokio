@@ -1,4 +1,5 @@
 #![warn(rust_2018_idioms)]
+#![cfg(not(miri))]
 
 use tokio::sync::oneshot;
 use tokio_executor::current_thread::{self, block_on_all, CurrentThread, TaskExecutor};
@@ -141,6 +142,7 @@ mod from_block_on_future {
 mod outstanding_tasks_are_dropped_when_executor_is_dropped {
     use super::*;
 
+    #[allow(unreachable_code)] // TODO: remove this when https://github.com/rust-lang/rust/issues/64636 fixed.
     async fn never(_rc: Rc<()>) {
         loop {
             yield_once().await;
@@ -241,6 +243,7 @@ mod run_in_future {
 fn tick_on_infini_future() {
     let num = Rc::new(Cell::new(0));
 
+    #[allow(unreachable_code)] // TODO: remove this when https://github.com/rust-lang/rust/issues/64636 fixed.
     async fn infini(num: Rc<Cell<usize>>) {
         loop {
             num.set(1 + num.get());
@@ -259,6 +262,7 @@ fn tick_on_infini_future() {
 mod tasks_are_scheduled_fairly {
     use super::*;
 
+    #[allow(unreachable_code)] // TODO: remove this when https://github.com/rust-lang/rust/issues/64636 fixed.
     async fn spin(state: Rc<RefCell<[i32; 2]>>, idx: usize) {
         loop {
             // borrow_mut scope

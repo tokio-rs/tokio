@@ -1,9 +1,9 @@
 use crate::runtime::current_thread::Runtime;
+use crate::timer::clock::Clock;
+use crate::timer::timer::Timer;
 
 use tokio_executor::current_thread::CurrentThread;
 use tokio_net::driver::Reactor;
-use tokio_timer::clock::Clock;
-use tokio_timer::timer::Timer;
 
 use std::io;
 
@@ -24,7 +24,7 @@ use std::io;
 ///
 /// ```
 /// use tokio::runtime::current_thread::Builder;
-/// use tokio_timer::clock::Clock;
+/// use tokio::timer::clock::Clock;
 ///
 /// # pub fn main() {
 /// // build Runtime
@@ -66,7 +66,7 @@ impl Builder {
 
         // Place a timer wheel on top of the reactor. If there are no timeouts to fire, it'll let the
         // reactor pick up some new external events.
-        let timer = Timer::new_with_now(reactor, self.clock.clone());
+        let timer = Timer::new_with_clock(reactor, self.clock.clone());
         let timer_handle = timer.handle();
 
         // And now put a single-threaded executor on top of the timer. When there are no futures ready

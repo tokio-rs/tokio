@@ -14,13 +14,13 @@
 //! boilerplate to run a Tokio application.
 //!
 //! Most applications wont need to use [`Runtime`] directly. Instead, they will
-//! use the [`run`] function, which uses [`Runtime`] under the hood.
+//! use the [`tokio::main`] attribute macro, which uses [`Runtime`] under the hood.
 //!
 //! Creating a [`Runtime`] does the following:
 //!
 //! * Spawn a background thread running a [`Reactor`] instance.
 //! * Start a [`ThreadPool`] for executing futures.
-//! * Run an instance of [`Timer`] **per** thread pool worker thread.
+//! * Run an instance of `Timer` **per** thread pool worker thread.
 //!
 //! The thread pool uses a work-stealing strategy and is configured to start a
 //! worker thread for each CPU core available on the system. This tends to be
@@ -69,9 +69,6 @@
 //!     }
 //! }
 //! ```
-//!
-//! In this function, the `run` function blocks until the runtime becomes idle.
-//! See [`shutdown_on_idle`][idle] for more shutdown details.
 //!
 //! From within the context of the runtime, additional tasks are spawned using
 //! the [`tokio::spawn`] function. Futures spawned using this function will be
@@ -129,9 +126,7 @@
 //! [`Reactor`]: ../reactor/struct.Reactor.html
 //! [`ThreadPool`]: https://docs.rs/tokio-executor/0.2.0-alpha.2/tokio_executor/threadpool/struct.ThreadPool.html
 //! [`run`]: fn.run.html
-//! [idle]: struct.Runtime.html#method.shutdown_on_idle
 //! [`tokio::spawn`]: ../executor/fn.spawn.html
-//! [`Timer`]: https://docs.rs/tokio-timer/0.2/tokio_timer/timer/struct.Timer.html
 //! [`tokio::main`]: ../../tokio_macros/attr.main.html
 
 pub mod current_thread;
@@ -141,8 +136,9 @@ mod threadpool;
 #[cfg(feature = "rt-full")]
 pub use self::threadpool::{
     Builder,
+    JoinHandle,
     Runtime,
-    TaskExecutor,
+    Spawner,
 };
 
 // Internal export, don't use.

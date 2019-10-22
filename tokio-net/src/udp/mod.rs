@@ -7,9 +7,7 @@
 //!
 //! [`UdpSocket`]: struct.UdpSocket
 
-mod frame;
 mod socket;
 pub mod split;
 
-pub use self::frame::UdpFramed;
 pub use self::socket::UdpSocket;
