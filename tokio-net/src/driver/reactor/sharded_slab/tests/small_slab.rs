@@ -107,7 +107,8 @@ fn remove_remote_and_reuse() {
 fn concurrent_remove_remote_and_reuse() {
     let mut model = loom::model::Builder::new();
     model.max_branches = 100000;
-    model.preemption_bound = 2; // otherwise this will run *forever*...
+    // set a preemption bound, or else this will run for a *really* long time.
+    model.preemption_bound = Some(4); // chosen arbitrarily.
     let iter = std::sync::atomic::AtomicUsize::new(1);
     model.check(move || {
         println!(
