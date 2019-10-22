@@ -26,7 +26,6 @@ jobs:
     cross: true
     crates:
       tokio:
-        - codec
         - fs
         - io
         - net
