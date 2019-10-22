@@ -66,7 +66,6 @@ pub(crate) struct Local {
 pub(crate) struct Shared {
     remote_head: AtomicUsize,
     size: usize,
-    prev_sz: usize,
     slab: CausalCell<Option<Box<[Slot]>>>,
 }
 
@@ -93,9 +92,8 @@ impl Local {
 impl Shared {
     const NULL: usize = Addr::NULL;
 
-    pub(crate) fn new(size: usize, prev_sz: usize) -> Self {
+    pub(crate) fn new(size: usize) -> Self {
         Self {
-            prev_sz,
             size,
             remote_head: AtomicUsize::new(Self::NULL),
             slab: CausalCell::new(None),
@@ -161,9 +159,10 @@ impl Shared {
             slot.alloc()
         });
 
-        let index = head + self.prev_sz;
-        #[cfg(test)]
+        let prev_sz = self.size >> 1;
+        let index = head + prev_sz;
         test_println!("alloc at offset: {}; gen={:?}", index, gen);
+
         Some(gen.pack(index))
     }
 
@@ -266,7 +265,6 @@ impl fmt::Debug for Shared {
                 "remote_head",
                 &format_args!("{:#0x}", &self.remote_head.load(Ordering::Relaxed)),
             )
-            .field("prev_sz", &self.prev_sz)
             .field("size", &self.size)
             // .field("slab", &self.slab)
             .finish()

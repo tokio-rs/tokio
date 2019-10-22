@@ -188,9 +188,8 @@ impl Shard {
         let shared = (0..MAX_PAGES)
             .map(|page_num| {
                 let sz = page::size(page_num);
-                let prev_sz = total_sz;
                 total_sz += sz;
-                page::Shared::new(sz, prev_sz)
+                page::Shared::new(sz)
             })
             .collect();
         let local = (0..MAX_PAGES).map(|_| page::Local::new()).collect();
