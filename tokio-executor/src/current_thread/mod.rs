@@ -17,7 +17,7 @@
 
 mod scheduler;
 
-use self::scheduler::Scheduler;
+use self::scheduler::{Scheduler, TickArgs};
 use crate::park::{Park, ParkThread, Unpark};
 use crate::{EnterError, Executor, SpawnError, TypedExecutor};
 
@@ -51,6 +51,10 @@ pub struct CurrentThread<P: Park = ParkThread> {
 
     /// Receiver for futures spawned from other threads
     spawn_receiver: crossbeam_channel::Receiver<Pin<Box<dyn Future<Output = ()> + Send + 'static>>>,
+
+    /// Handle to pool for handling blocking tasks
+    #[cfg(feature = "blocking")]
+    blocking: Arc<crate::blocking::Pool>,
 
     /// The thread-local ID assigned to this executor.
     id: u64,
@@ -150,9 +154,16 @@ impl<T: fmt::Debug> Error for BlockError<T> {}
 
 /// This is mostly split out to make the borrow checker happy.
 struct Borrow<'a, U> {
+    spawner: BorrowSpawner<'a, U>,
+    #[cfg(feature = "blocking")]
+    blocking: &'a Arc<crate::blocking::Pool>,
+}
+
+/// As is this.
+struct BorrowSpawner<'a, U> {
     id: u64,
-    scheduler: &'a mut Scheduler<U>,
     num_futures: &'a atomic::AtomicUsize,
+    scheduler: &'a mut Scheduler<U>,
 }
 
 trait SpawnLocal {
@@ -269,6 +280,9 @@ impl<P: Park> CurrentThread<P> {
                 id,
             },
             spawn_receiver,
+
+            #[cfg(feature = "blocking")]
+            blocking: Arc::new(crate::blocking::Pool::default()),
         }
     }
 
@@ -289,7 +303,7 @@ impl<P: Park> CurrentThread<P> {
     where
         F: Future<Output = ()> + 'static,
     {
-        self.borrow().spawn_local(Box::pin(future), false);
+        self.borrow().spawner.spawn_local(Box::pin(future), false);
         self
     }
 
@@ -353,9 +367,13 @@ impl<P: Park> CurrentThread<P> {
 
     fn borrow(&mut self) -> Borrow<'_, P::Unpark> {
         Borrow {
-            id: self.id,
-            scheduler: &mut self.scheduler,
-            num_futures: &*self.num_futures,
+            spawner: BorrowSpawner {
+                id: self.id,
+                scheduler: &mut self.scheduler,
+                num_futures: &*self.num_futures,
+            },
+            #[cfg(feature = "blocking")]
+            blocking: &self.blocking,
         }
     }
 
@@ -391,7 +409,7 @@ impl Executor for CurrentThread {
         &mut self,
         future: Pin<Box<dyn Future<Output = ()> + Send>>,
     ) -> Result<(), SpawnError> {
-        self.borrow().spawn_local(future, false);
+        self.borrow().spawner.spawn_local(future, false);
         Ok(())
     }
 }
@@ -401,7 +419,7 @@ where
     T: Future<Output = ()> + 'static,
 {
     fn spawn(&mut self, future: T) -> Result<(), SpawnError> {
-        self.borrow().spawn_local(Box::pin(future), false);
+        self.borrow().spawner.spawn_local(Box::pin(future), false);
         Ok(())
     }
 }
@@ -434,7 +452,10 @@ impl<P: Park> Entered<'_, P> {
     where
         F: Future<Output = ()> + 'static,
     {
-        self.executor.borrow().spawn_local(Box::pin(future), false);
+        self.executor
+            .borrow()
+            .spawner
+            .spawn_local(Box::pin(future), false);
         self
     }
 
@@ -574,19 +595,28 @@ impl<P: Park> Entered<'_, P> {
         // FIXME: Slightly ugly but needed to make the borrow checker happy
         let (mut borrow, spawn_receiver) = (
             Borrow {
-                id: self.executor.id,
-                scheduler: &mut self.executor.scheduler,
-                num_futures: &*self.executor.num_futures,
+                spawner: BorrowSpawner {
+                    id: self.executor.id,
+                    scheduler: &mut self.executor.scheduler,
+                    num_futures: &*self.executor.num_futures,
+                },
+                #[cfg(feature = "blocking")]
+                blocking: &self.executor.blocking,
             },
             &mut self.executor.spawn_receiver,
         );
 
         while let Ok(future) = spawn_receiver.try_recv() {
-            borrow.spawn_local(future, true);
+            borrow.spawner.spawn_local(future, true);
         }
 
         // After any pending futures were scheduled, do the actual tick
-        borrow.scheduler.tick(borrow.id, borrow.num_futures)
+        borrow.spawner.scheduler.tick(TickArgs {
+            id: borrow.spawner.id,
+            num_futures: borrow.spawner.num_futures,
+            #[cfg(feature = "blocking")]
+            blocking: borrow.blocking,
+        })
     }
 }
 
@@ -741,13 +771,26 @@ impl<U: Unpark> Borrow<'_, U> {
         F: FnOnce() -> R,
     {
         CURRENT.with(|current| {
-            current.id.set(Some(self.id));
-            current.set_spawn(self, || f())
+            current.id.set(Some(self.spawner.id));
+
+            let Borrow {
+                ref mut spawner,
+                #[cfg(feature = "blocking")]
+                ref blocking,
+            } = self;
+
+            current.set_spawn(spawner, || {
+                #[cfg(feature = "blocking")]
+                let res = crate::blocking::with_pool(blocking, || f());
+                #[cfg(not(feature = "blocking"))]
+                let res = f();
+                res
+            })
         })
     }
 }
 
-impl<U: Unpark> SpawnLocal for Borrow<'_, U> {
+impl<U: Unpark> SpawnLocal for BorrowSpawner<'_, U> {
     fn spawn_local(&mut self, future: Pin<Box<dyn Future<Output = ()>>>, already_counted: bool) {
         if !already_counted {
             // NOTE: we have a borrow of the Runtime, so we know that it isn't shut down.

@@ -13,7 +13,7 @@ pub(crate) struct Worker<P: Park + 'static> {
     entry: Entry<P::Unpark>,
 
     /// Park the thread
-    park: P,
+    park: Box<P>,
 }
 
 struct Entry<P: 'static> {
@@ -24,15 +24,16 @@ struct Entry<P: 'static> {
 pub(crate) fn create_set<F, P>(
     pool_size: usize,
     mk_park: F,
+    blocking: Arc<crate::blocking::Pool>,
 ) -> (Arc<Set<P::Unpark>>, Vec<Worker<P>>)
 where
-    P: Park,
-    F: FnMut(usize) -> P,
+    P: Send + Park,
+    F: FnMut(usize) -> Box<P>,
 {
     // Create the parks...
     let parks: Vec<_> = (0..pool_size).map(mk_park).collect();
 
-    let mut pool = Arc::new(Set::new(pool_size, |i| parks[i].unpark()));
+    let mut pool = Arc::new(Set::new(pool_size, |i| parks[i].unpark(), blocking));
 
     // Establish the circular link between the individual worker state
     // structure and the container.
@@ -56,28 +57,34 @@ const GLOBAL_POLL_INTERVAL: u16 = 61;
 
 impl<P> Worker<P>
 where
-    P: Park + 'static,
+    P: Send + Park,
 {
-    pub(super) fn new(pool: Arc<Set<P::Unpark>>, index: usize, park: P) -> Self {
+    pub(super) fn new(pool: Arc<Set<P::Unpark>>, index: usize, park: Box<P>) -> Self {
         Worker {
             entry: Entry { pool, index },
             park,
         }
     }
 
-    pub(super) fn run(&mut self) {
+    pub(super) fn run(mut self) {
         let mut executor = &*self.entry.pool;
         let entry = &self.entry;
-        let park = &mut self.park;
+        let park = &mut *self.park;
+
+        let blocking = &executor.blocking;
 
         // Track the current worker
         current::set(&entry.pool, entry.index, || {
             let _enter = crate::enter().expect("executor already running on thread");
 
             crate::with_default(&mut executor, || {
-                entry.run(park);
+                crate::blocking::with_pool(blocking, || entry.run(park))
             })
-        })
+        });
+    }
+
+    pub(super) fn id(&self) -> usize {
+        self.entry.index
     }
 
     #[cfg(test)]
