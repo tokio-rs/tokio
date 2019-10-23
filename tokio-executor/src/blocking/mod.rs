@@ -12,6 +12,7 @@ use std::task::{Context, Poll};
 use std::thread;
 use std::time::Duration;
 
+#[cfg(feature = "thread-pool")]
 mod builder;
 
 #[cfg(feature = "thread-pool")]
