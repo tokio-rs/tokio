@@ -1,6 +1,5 @@
 use super::split::{split, ReadHalf, WriteHalf};
 use super::ucred::{self, UCred};
-use crate::driver::Handle;
 use crate::util::PollEvented;
 
 use tokio_io::{AsyncRead, AsyncWrite};
@@ -39,7 +38,7 @@ impl UnixStream {
         P: AsRef<Path>,
     {
         let stream = mio_uds::UnixStream::connect(path)?;
-        let stream = UnixStream::new(stream);
+        let stream = UnixStream::new(stream)?;
 
         poll_fn(|cx| stream.io.poll_write_ready(cx)).await?;
         Ok(stream)
@@ -50,9 +49,9 @@ impl UnixStream {
     ///
     /// The returned stream will be associated with the given event loop
     /// specified by `handle` and is ready to perform I/O.
-    pub fn from_std(stream: net::UnixStream, handle: &Handle) -> io::Result<UnixStream> {
+    pub fn from_std(stream: net::UnixStream) -> io::Result<UnixStream> {
         let stream = mio_uds::UnixStream::from_stream(stream)?;
-        let io = PollEvented::new_with_handle(stream, handle)?;
+        let io = PollEvented::new(stream)?;
 
         Ok(UnixStream { io })
     }
@@ -64,15 +63,15 @@ impl UnixStream {
     /// be associated with the default event loop's handle.
     pub fn pair() -> io::Result<(UnixStream, UnixStream)> {
         let (a, b) = mio_uds::UnixStream::pair()?;
-        let a = UnixStream::new(a);
-        let b = UnixStream::new(b);
+        let a = UnixStream::new(a)?;
+        let b = UnixStream::new(b)?;
 
         Ok((a, b))
     }
 
-    pub(crate) fn new(stream: mio_uds::UnixStream) -> UnixStream {
-        let io = PollEvented::new(stream);
-        UnixStream { io }
+    pub(crate) fn new(stream: mio_uds::UnixStream) -> io::Result<UnixStream> {
+        let io = PollEvented::new(stream)?;
+        Ok(UnixStream { io })
     }
 
     /// Returns the socket address of the local half of this connection.
@@ -134,9 +133,9 @@ impl TryFrom<net::UnixStream> for UnixStream {
     /// Consumes stream, returning the tokio I/O object.
     ///
     /// This is equivalent to
-    /// [`UnixStream::from_std(stream, &Handle::default())`](UnixStream::from_std).
+    /// [`UnixStream::from_std(stream)`](UnixStream::from_std).
     fn try_from(stream: net::UnixStream) -> io::Result<Self> {
-        Self::from_std(stream, &Handle::default())
+        Self::from_std(stream)
     }
 }
 

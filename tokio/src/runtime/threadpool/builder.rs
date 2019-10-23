@@ -1,13 +1,12 @@
 use super::{Inner, Runtime};
+use crate::timer::clock::{self, Clock};
+use crate::timer::timer::{self, Timer};
 
 use tokio_executor::thread_pool;
 use tokio_net::driver::{self, Reactor};
-use tokio_timer::clock::{self, Clock};
-use tokio_timer::timer::{self, Timer};
 
 use std::sync::{Arc, Mutex};
 use std::{fmt, io};
-use tracing_core as trace;
 
 /// Builds Tokio Runtime with custom configuration values.
 ///
@@ -26,7 +25,7 @@ use tracing_core as trace;
 ///
 /// ```
 /// use tokio::runtime::Builder;
-/// use tokio_timer::clock::Clock;
+/// use tokio::timer::clock::Clock;
 ///
 /// fn main() {
 ///     // build Runtime
@@ -231,20 +230,13 @@ impl Builder {
             reactor_handles.push(reactor.handle());
 
             // Create a new timer.
-            let timer = Timer::new_with_now(reactor, self.clock.clone());
+            let timer = Timer::new_with_clock(reactor, self.clock.clone());
             timer_handles.push(timer.handle());
             timers.push(Mutex::new(Some(timer)));
         }
 
         // Get a handle to the clock for the runtime.
         let clock = self.clock.clone();
-
-        // Get the current trace dispatcher.
-        // TODO(eliza): when `tokio-trace-core` is stable enough to take a
-        // public API dependency, we should allow users to set a custom
-        // subscriber for the runtime.
-        let dispatch = trace::dispatcher::get_default(trace::Dispatch::clone);
-        let trace = dispatch.clone();
 
         let around_reactor_handles = reactor_handles.clone();
         let around_timer_handles = timer_handles.clone();
@@ -258,17 +250,15 @@ impl Builder {
                 let _reactor = driver::set_default(&around_reactor_handles[index]);
                 clock::with_default(&clock, || {
                     let _timer = timer::set_default(&around_timer_handles[index]);
-                    trace::dispatcher::with_default(&dispatch, || {
-                        if let Some(after_start) = after_start.as_ref() {
-                            after_start();
-                        }
+                    if let Some(after_start) = after_start.as_ref() {
+                        after_start();
+                    }
 
-                        next();
+                    next();
 
-                        if let Some(before_stop) = before_stop.as_ref() {
-                            before_stop();
-                        }
-                    })
+                    if let Some(before_stop) = before_stop.as_ref() {
+                        before_stop();
+                    }
                 })
             })
             .build_with_park(move |index| timers[index].lock().unwrap().take().unwrap());
@@ -278,7 +268,6 @@ impl Builder {
                 pool,
                 reactor_handles,
                 timer_handles,
-                trace,
             }),
         })
     }

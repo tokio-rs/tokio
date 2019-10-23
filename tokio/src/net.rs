@@ -52,10 +52,10 @@ pub mod udp {
     //! The main struct for UDP is the [`UdpSocket`], which represents a UDP socket.
     //!
     //! [`UdpSocket`]: struct.UdpSocket.html
-    pub use tokio_net::udp::{split, UdpFramed, UdpSocket};
+    pub use tokio_net::udp::{split, UdpSocket};
 }
 #[cfg(feature = "udp")]
-pub use self::udp::{UdpFramed, UdpSocket};
+pub use self::udp::UdpSocket;
 
 #[cfg(all(unix, feature = "uds"))]
 pub mod unix {

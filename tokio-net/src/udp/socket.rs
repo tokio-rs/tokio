@@ -1,5 +1,4 @@
 use super::split::{split, UdpSocketRecvHalf, UdpSocketSendHalf};
-use crate::driver::Handle;
 use crate::util::PollEvented;
 use crate::ToSocketAddrs;
 
@@ -40,12 +39,13 @@ impl UdpSocket {
     }
 
     fn bind_addr(addr: SocketAddr) -> io::Result<UdpSocket> {
-        mio::net::UdpSocket::bind(&addr).map(UdpSocket::new)
+        let sys = mio::net::UdpSocket::bind(&addr)?;
+        UdpSocket::new(sys)
     }
 
-    fn new(socket: mio::net::UdpSocket) -> UdpSocket {
-        let io = PollEvented::new(socket);
-        UdpSocket { io }
+    fn new(socket: mio::net::UdpSocket) -> io::Result<UdpSocket> {
+        let io = PollEvented::new(socket)?;
+        Ok(UdpSocket { io })
     }
 
     /// Creates a new `UdpSocket` from the previously bound socket provided.
@@ -57,11 +57,9 @@ impl UdpSocket {
     /// This can be used in conjunction with net2's `UdpBuilder` interface to
     /// configure a socket before it's handed off, such as setting options like
     /// `reuse_address` or binding to multiple addresses.
-    ///
-    /// Use `Handle::default()` to lazily bind to an event loop, just like `bind` does.
-    pub fn from_std(socket: net::UdpSocket, handle: &Handle) -> io::Result<UdpSocket> {
+    pub fn from_std(socket: net::UdpSocket) -> io::Result<UdpSocket> {
         let io = mio::net::UdpSocket::from_socket(socket)?;
-        let io = PollEvented::new_with_handle(io, handle)?;
+        let io = PollEvented::new(io)?;
         Ok(UdpSocket { io })
     }
 
@@ -110,7 +108,7 @@ impl UdpSocket {
     ///
     /// [`connect`]: #method.connect
     pub async fn send(&mut self, buf: &[u8]) -> io::Result<usize> {
-        poll_fn(|cx| self.poll_send_priv(cx, buf)).await
+        poll_fn(|cx| self.poll_send(cx, buf)).await
     }
 
     // Poll IO functions that takes `&self` are provided for the split API.
@@ -123,11 +121,8 @@ impl UdpSocket {
     // While violating this requirement is "safe" from a Rust memory model point
     // of view, it will result in unexpected behavior in the form of lost
     // notifications and tasks hanging.
-    pub(crate) fn poll_send_priv(
-        &self,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
+    #[doc(hidden)]
+    pub fn poll_send(&self, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         ready!(self.io.poll_write_ready(cx))?;
 
         match self.io.get_ref().send(buf) {
@@ -152,14 +147,11 @@ impl UdpSocket {
     ///
     /// [`connect`]: #method.connect
     pub async fn recv(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        poll_fn(|cx| self.poll_recv_priv(cx, buf)).await
+        poll_fn(|cx| self.poll_recv(cx, buf)).await
     }
 
-    pub(crate) fn poll_recv_priv(
-        &self,
-        cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+    #[doc(hidden)]
+    pub fn poll_recv(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
 
         match self.io.get_ref().recv(buf) {
@@ -180,7 +172,7 @@ impl UdpSocket {
         let mut addrs = target.to_socket_addrs().await?;
 
         match addrs.next() {
-            Some(target) => poll_fn(|cx| self.poll_send_to_priv(cx, buf, &target)).await,
+            Some(target) => poll_fn(|cx| self.poll_send_to(cx, buf, &target)).await,
             None => Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "no addresses to send data to",
@@ -188,7 +180,9 @@ impl UdpSocket {
         }
     }
 
-    pub(crate) fn poll_send_to_priv(
+    // TODO: Public or not?
+    #[doc(hidden)]
+    pub fn poll_send_to(
         &self,
         cx: &mut Context<'_>,
         buf: &[u8],
@@ -212,10 +206,11 @@ impl UdpSocket {
     /// to hold the message bytes. If a message is too long to fit in the supplied
     /// buffer, excess bytes may be discarded.
     pub async fn recv_from(&mut self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        poll_fn(|cx| self.poll_recv_from_priv(cx, buf)).await
+        poll_fn(|cx| self.poll_recv_from(cx, buf)).await
     }
 
-    pub(crate) fn poll_recv_from_priv(
+    #[doc(hidden)]
+    pub fn poll_recv_from(
         &self,
         cx: &mut Context<'_>,
         buf: &mut [u8],
@@ -386,9 +381,9 @@ impl TryFrom<net::UdpSocket> for UdpSocket {
     /// Consumes stream, returning the tokio I/O object.
     ///
     /// This is equivalent to
-    /// [`UdpSocket::from_std(stream, &Handle::default())`](UdpSocket::from_std).
+    /// [`UdpSocket::from_std(stream)`](UdpSocket::from_std).
     fn try_from(stream: net::UdpSocket) -> Result<Self, Self::Error> {
-        Self::from_std(stream, &Handle::default())
+        Self::from_std(stream)
     }
 }
 
