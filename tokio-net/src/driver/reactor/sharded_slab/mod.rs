@@ -18,6 +18,9 @@ mod page;
 mod slab;
 mod tid;
 
+#[cfg(test)]
+// this is used by sub-modules
+use self::tests::test_util;
 use super::ScheduledIo;
 use pack::{Pack, WIDTH};
 use slab::Shard;

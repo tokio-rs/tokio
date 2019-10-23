@@ -48,6 +48,7 @@ impl TransferStack {
 
 #[cfg(test)]
 mod test {
+    use super::super::super::test_util;
     use super::*;
     use crate::sync::CausalCell;
     use loom::thread;

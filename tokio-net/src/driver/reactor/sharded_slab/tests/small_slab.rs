@@ -1,4 +1,5 @@
 use super::super::ScheduledIo;
+use super::test_util;
 use loom::sync::{atomic::Ordering, Arc};
 use loom::thread;
 
@@ -74,8 +75,7 @@ fn get_val(slab: &Arc<Slab>, key: usize) -> Option<usize> {
 fn remove_remote_and_reuse() {
     let mut model = loom::model::Builder::new();
     model.max_branches = 100000;
-    model.check(|| {
-        test_println!("\n --- iteration ---\n");
+    test_util::run_builder("remove_remote_and_reuse", model, || {
         let slab = Arc::new(Slab::new());
 
         let idx1 = store_val(&slab, 1);
@@ -109,13 +109,7 @@ fn concurrent_remove_remote_and_reuse() {
     model.max_branches = 100000;
     // set a preemption bound, or else this will run for a *really* long time.
     model.preemption_bound = Some(2); // chosen arbitrarily.
-    let iter = std::sync::atomic::AtomicUsize::new(1);
-    model.check(move || {
-        println!(
-            "\n --- iteration {} ---\n",
-            iter.fetch_add(1, Ordering::Relaxed)
-        );
-
+    test_util::run_builder("concurrent_remove_remote_and_reuse", model, || {
         let slab = Arc::new(Slab::new());
 
         let idx1 = store_val(&slab, 1);

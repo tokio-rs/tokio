@@ -28,6 +28,31 @@ mod idx {
         }
     }
 }
+use self::test_util::*;
+pub(super) mod test_util {
+    use super::*;
+
+    pub(crate) fn run_model(name: &'static str, f: impl Fn() + Sync + Send + 'static) {
+        run_builder(name, loom::model::Builder::new(), f)
+    }
+
+    pub(crate) fn run_builder(
+        name: &'static str,
+        builder: loom::model::Builder,
+        f: impl Fn() + Sync + Send + 'static,
+    ) {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let iters = AtomicUsize::new(1);
+        builder.check(move || {
+            println!(
+                "\n------------ running test {}; iteration {} ------------\n",
+                name,
+                iters.fetch_add(1, Ordering::SeqCst)
+            );
+            f()
+        });
+    }
+}
 
 fn store_val(slab: &Arc<Slab>, readiness: usize) -> usize {
     println!("store: {}", readiness);
@@ -49,7 +74,7 @@ mod small_slab;
 
 #[test]
 fn local_remove() {
-    loom::model(|| {
+    run_model("local_remove", || {
         let slab = Arc::new(Slab::new());
 
         let s = slab.clone();
@@ -93,7 +118,7 @@ fn local_remove() {
 
 #[test]
 fn remove_remote() {
-    loom::model(|| {
+    run_model("remove_remote", || {
         let slab = Arc::new(Slab::new());
 
         let idx1 = store_val(&slab, 1);
@@ -130,7 +155,7 @@ fn remove_remote() {
 
 #[test]
 fn concurrent_alloc_remove() {
-    loom::model(|| {
+    run_model("concurrent_alloc_remove", || {
         let slab = Arc::new(Slab::new());
         let pair = Arc::new((Mutex::new(None), Condvar::new()));
 
@@ -153,7 +178,7 @@ fn concurrent_alloc_remove() {
 
         let (lock, cvar) = &*pair;
         for i in 0..2 {
-            test_println!("--- allocer i={} ---", i);
+            test_println!("--- allocator i={} ---", i);
             let key = store_val(&slab, i);
 
             let mut next = lock.lock().unwrap();
@@ -174,7 +199,7 @@ fn concurrent_alloc_remove() {
 
 #[test]
 fn unique_iter() {
-    loom::model(|| {
+    run_model("unique_iter", || {
         let mut slab = Arc::new(Slab::new());
 
         let s = slab.clone();

@@ -1,4 +1,5 @@
 use super::super::SingleShard;
+use super::test_util;
 use crate::sync::atomic::Ordering;
 use loom::sync::{Arc, Condvar, Mutex};
 use loom::thread;
@@ -20,7 +21,7 @@ fn get_val(slab: &Arc<SingleShard>, key: usize) -> Option<usize> {
 
 #[test]
 fn local_remove() {
-    loom::model(|| {
+    test_util::run_model("single_shard::local_remove", || {
         let slab = Arc::new(SingleShard::new());
 
         let s = slab.clone();
@@ -64,7 +65,7 @@ fn local_remove() {
 
 #[test]
 fn remove_remote() {
-    loom::model(|| {
+    test_util::run_model("single_shard::remove_remote", || {
         let slab = Arc::new(SingleShard::new());
 
         let idx1 = store_val(&slab, 1);
@@ -101,7 +102,7 @@ fn remove_remote() {
 
 #[test]
 fn concurrent_alloc_remove() {
-    loom::model(|| {
+    test_util::run_model("single_shard::concurrent_alloc_remove", || {
         let slab = Arc::new(SingleShard::new());
         let pair = Arc::new((Mutex::new(None), Condvar::new()));
 
@@ -124,7 +125,7 @@ fn concurrent_alloc_remove() {
 
         let (lock, cvar) = &*pair;
         for i in 0..2 {
-            test_println!("--- allocer i={} ---", i);
+            test_println!("--- allocator i={} ---", i);
             let key = store_val(&slab, i);
 
             let mut next = lock.lock().unwrap();
@@ -145,7 +146,7 @@ fn concurrent_alloc_remove() {
 
 #[test]
 fn unique_iter() {
-    loom::model(|| {
+    test_util::run_model("single_shard::unique_iter", || {
         let mut slab = Arc::new(SingleShard::new());
 
         let s = slab.clone();
