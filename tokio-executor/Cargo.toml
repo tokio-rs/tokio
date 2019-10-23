@@ -29,8 +29,6 @@ thread-pool = ["num_cpus"]
 futures-util-preview = { version = "=0.3.0-alpha.19", features = ["channel"] }
 tokio-sync = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-sync" }
 
-tracing = { version = "0.1.5", optional = true }
-
 # current-thread dependencies
 crossbeam-channel = { version = "0.3.8", optional = true }
 

@@ -69,12 +69,11 @@ impl<T: Wait> OrphanQueue<T> for AtomicOrphanQueue<T> {
         while let Ok(mut orphan) = self.queue.pop() {
             match orphan.try_wait() {
                 Ok(Some(_)) => {}
-                Err(e) => error!(
-                    message = "leaking orphaned process due to try_wait() error",
-                    orphan.id =orphan.id(),
-                    error = %e,
-                ),
-
+                Err(_) => {
+                    // TODO: bubble up error some how. Is this an internal bug?
+                    // Shoudl we panic? Is it OK for this to be silently
+                    // dropped?
+                }
                 // Still not done yet, we need to put it back in the queue
                 // when were done draining it, so that we don't get stuck
                 // in an infinite loop here
