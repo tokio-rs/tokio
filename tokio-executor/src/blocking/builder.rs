@@ -29,7 +29,7 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// use tokio_executor::thread_pool::Builder;
+    /// use tokio_executor::blocking::Builder;
     ///
     /// let thread_pool = Builder::new()
     ///     .name("my-pool")
@@ -51,7 +51,7 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// use tokio_executor::thread_pool::Builder;
+    /// use tokio_executor::blocking::Builder;
     ///
     /// let thread_pool = Builder::new()
     ///     .stack_size(32 * 1024)

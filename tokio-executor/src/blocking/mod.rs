@@ -13,6 +13,8 @@ use std::thread;
 use std::time::Duration;
 
 mod builder;
+
+#[cfg(feature = "thread-pool")]
 pub(crate) use builder::Builder;
 
 #[derive(Clone, Copy)]
