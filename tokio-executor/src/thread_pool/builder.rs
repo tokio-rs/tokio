@@ -195,7 +195,7 @@ impl Builder {
 
         let (pool, workers) = worker::create_set::<_, BoxedPark<P>>(
             self.pool_size,
-            |i| Box::new(BoxedPark::new(build_park(i))),
+            |i| BoxedPark::new(build_park(i)),
             blocking.clone(),
         );
 

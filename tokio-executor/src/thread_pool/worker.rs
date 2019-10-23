@@ -13,7 +13,7 @@ pub(crate) struct Worker<P: Park + 'static> {
     entry: Entry<P::Unpark>,
 
     /// Park the thread
-    park: Box<P>,
+    park: P,
 }
 
 struct Entry<P: 'static> {
@@ -28,7 +28,7 @@ pub(crate) fn create_set<F, P>(
 ) -> (Arc<Set<P::Unpark>>, Vec<Worker<P>>)
 where
     P: Send + Park,
-    F: FnMut(usize) -> Box<P>,
+    F: FnMut(usize) -> P,
 {
     // Create the parks...
     let parks: Vec<_> = (0..pool_size).map(mk_park).collect();
@@ -59,7 +59,7 @@ impl<P> Worker<P>
 where
     P: Send + Park,
 {
-    pub(super) fn new(pool: Arc<Set<P::Unpark>>, index: usize, park: Box<P>) -> Self {
+    pub(super) fn new(pool: Arc<Set<P::Unpark>>, index: usize, park: P) -> Self {
         Worker {
             entry: Entry { pool, index },
             park,
@@ -69,7 +69,7 @@ where
     pub(super) fn run(mut self) {
         let mut executor = &*self.entry.pool;
         let entry = &self.entry;
-        let park = &mut *self.park;
+        let park = &mut self.park;
 
         let blocking = &executor.blocking;
 
