@@ -19,8 +19,10 @@ pub struct Builder {
     stack_size: Option<usize>,
 
     /// Around worker callback
-    around_worker: Option<Arc<dyn Fn(usize, &mut dyn FnMut()) + Send + Sync>>,
+    around_worker: Option<Callback>,
 }
+
+type Callback = Arc<dyn Fn(usize, &mut dyn FnMut()) + Send + Sync>;
 
 impl Builder {
     /// Returns a new thread pool builder initialized with default configuration
