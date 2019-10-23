@@ -23,7 +23,7 @@ impl TransferStack {
     }
 
     pub(super) fn push(&self, value: usize, before: impl Fn(usize)) {
-        let mut next = self.head.load(Ordering::Acquire);
+        let mut next = self.head.load(Ordering::Relaxed);
         loop {
             test_println!("-> next {:#x}", next);
             before(next);
