@@ -235,7 +235,6 @@ impl Registration {
 
         if ready.is_empty() {
             if let Some(cx) = cx {
-                debug!(message = "scheduling", ?direction, token = self.token);
                 // Update the task info
                 match direction {
                     Direction::Read => sched.reader.register_by_ref(cx.waker()),

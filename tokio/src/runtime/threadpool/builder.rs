@@ -5,7 +5,6 @@ use crate::timer::timer::{self, Timer};
 use tokio_executor::thread_pool;
 use tokio_net::driver::{self, Reactor};
 
-use tracing_core as trace;
 use std::{fmt, io};
 use std::sync::{Arc, Mutex};
 
@@ -241,13 +240,6 @@ impl Builder {
         // Get a handle to the clock for the runtime.
         let clock = self.clock.clone();
 
-        // Get the current trace dispatcher.
-        // TODO(eliza): when `tokio-trace-core` is stable enough to take a
-        // public API dependency, we should allow users to set a custom
-        // subscriber for the runtime.
-        let dispatch = trace::dispatcher::get_default(trace::Dispatch::clone);
-        let trace = dispatch.clone();
-
         let around_reactor_handles = reactor_handles.clone();
         let around_timer_handles = timer_handles.clone();
 
@@ -260,17 +252,15 @@ impl Builder {
                 let _reactor = driver::set_default(&around_reactor_handles[index]);
                 clock::with_default(&clock, || {
                     let _timer = timer::set_default(&around_timer_handles[index]);
-                    trace::dispatcher::with_default(&dispatch, || {
-                        if let Some(after_start) = after_start.as_ref() {
-                            after_start();
-                        }
+                    if let Some(after_start) = after_start.as_ref() {
+                        after_start();
+                    }
 
-                        next();
+                    next();
 
-                        if let Some(before_stop) = before_stop.as_ref() {
-                            before_stop();
-                        }
-                    })
+                    if let Some(before_stop) = before_stop.as_ref() {
+                        before_stop();
+                    }
                 })
             })
             .build_with_park(move |index| {
@@ -286,7 +276,6 @@ impl Builder {
                 pool,
                 reactor_handles,
                 timer_handles,
-                trace,
             }),
         })
     }

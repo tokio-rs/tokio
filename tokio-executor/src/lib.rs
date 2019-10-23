@@ -71,10 +71,6 @@ macro_rules! thread_local {
 #[macro_use]
 mod tests;
 
-#[cfg(any(feature = "current-thread", feature = "threadpool"))]
-#[macro_use]
-mod tracing;
-
 mod enter;
 mod error;
 mod executor;

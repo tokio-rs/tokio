@@ -210,7 +210,6 @@ impl Reactor {
         self.inner.io_dispatch.read().is_empty()
     }
 
-    #[cfg_attr(feature = "tracing", tracing::instrument(level = "debug"))]
     fn poll(&mut self, max_wait: Option<Duration>) -> io::Result<()> {
         // Block waiting for an event to happen, peeling out how many events
         // happened.
@@ -221,17 +220,8 @@ impl Reactor {
 
         // Process all the events that came in, dispatching appropriately
 
-        // event count is only used for  tracing instrumentation.
-        #[cfg(feature = "tracing")]
-        let mut events = 0;
-
         for event in self.events.iter() {
-            #[cfg(feature = "tracing")]
-            {
-                events += 1;
-            }
             let token = event.token();
-            trace!(event.readiness = ?event.readiness(), event.token = ?token);
 
             if token == TOKEN_WAKEUP {
                 self.inner
@@ -242,8 +232,6 @@ impl Reactor {
                 self.dispatch(token, event.readiness());
             }
         }
-
-        trace!(message = "loop process", events);
 
         Ok(())
     }
@@ -400,7 +388,6 @@ impl Inner {
         };
 
         let token = aba_guard | key;
-        debug!(message = "adding I/O source", token);
 
         self.io.register(
             source,
@@ -418,13 +405,11 @@ impl Inner {
     }
 
     pub(super) fn drop_source(&self, token: usize) {
-        debug!(message = "dropping I/O source", token);
         self.io_dispatch.write().remove(token);
     }
 
     /// Registers interest in the I/O resource associated with `token`.
     pub(super) fn register(&self, token: usize, dir: Direction, w: Waker) {
-        debug!(message = "scheduling", direction = ?dir, token);
         let io_dispatch = self.io_dispatch.read();
         let sched = io_dispatch.get(token).unwrap();
 

@@ -1,9 +1,6 @@
 #![cfg(feature = "process")]
 #![warn(rust_2018_idioms)]
 
-#[macro_use]
-extern crate tracing;
-
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio_net::process::{Child, Command};
 
