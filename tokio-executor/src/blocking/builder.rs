@@ -25,16 +25,6 @@ impl Builder {
     ///
     /// If this configuration is not set, then the thread will use the system
     /// default naming scheme.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio_executor::blocking::Builder;
-    ///
-    /// let thread_pool = Builder::new()
-    ///     .name("my-pool")
-    ///     .build();
-    /// ```
     pub(crate) fn name<S: Into<String>>(&mut self, val: S) -> &mut Self {
         self.name = val.into();
         self
@@ -47,16 +37,6 @@ impl Builder {
     ///
     /// The default stack size for spawned threads is 2 MiB, though this
     /// particular stack size is subject to change in the future.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio_executor::blocking::Builder;
-    ///
-    /// let thread_pool = Builder::new()
-    ///     .stack_size(32 * 1024)
-    ///     .build();
-    /// ```
     pub(crate) fn stack_size(&mut self, val: usize) -> &mut Self {
         self.stack_size = Some(val);
         self
