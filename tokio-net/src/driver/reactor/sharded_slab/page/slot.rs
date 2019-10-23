@@ -56,7 +56,7 @@ impl Slot {
 
     #[inline(always)]
     pub(super) fn get(&self, gen: Generation) -> Option<&ScheduledIo> {
-        let current = self.gen.load(Ordering::Acquire);
+        let current = self.gen.load(Ordering::SeqCst);
         test_println!("-> get {:?}; current={:?}", gen, current);
 
         // Is the index's generation the same as the current generation? If not,
@@ -75,7 +75,7 @@ impl Slot {
 
     #[inline]
     pub(super) fn alloc(&self) -> Generation {
-        Generation::from_usize(self.gen.load(Ordering::Acquire))
+        Generation::from_usize(self.gen.load(Ordering::SeqCst))
     }
 
     #[inline(always)]
@@ -86,7 +86,7 @@ impl Slot {
     #[inline]
     pub(super) fn reset(&self, gen: Generation) -> bool {
         let next = (gen.value + 1) % Generation::BITS;
-        let actual = self.gen.compare_and_swap(gen.value, next, Ordering::AcqRel);
+        let actual = self.gen.compare_and_swap(gen.value, next, Ordering::SeqCst);
         test_println!("-> remove {:?}; next={:?}; actual={:?}", gen, next, actual);
         if actual != gen.value {
             return false;
