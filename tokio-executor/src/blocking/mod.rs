@@ -1,5 +1,7 @@
 //! Thread pool for blocking operations
 
+use crate::loom::sync::{Arc, Condvar, Mutex};
+use crate::loom::thread;
 use tokio_sync::oneshot;
 
 use std::cell::Cell;
@@ -7,9 +9,7 @@ use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{Arc, Condvar, Mutex};
 use std::task::{Context, Poll};
-use std::thread;
 use std::time::Duration;
 
 #[cfg(feature = "thread-pool")]

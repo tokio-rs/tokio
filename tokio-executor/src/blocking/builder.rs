@@ -1,5 +1,5 @@
 use super::Pool;
-use std::thread;
+use crate::loom::thread;
 use std::usize;
 
 /// Builds a blocking thread pool with custom configuration values.

@@ -3,6 +3,7 @@
 //! - Attempt to spin.
 
 use crate::loom::rand::seed;
+use crate::loom::sync::Arc;
 use crate::park::Unpark;
 use crate::task::{self, Task};
 use crate::thread_pool::{current, queue, BoxFuture, Idle, JoinHandle, Owned, Shared};
@@ -11,7 +12,6 @@ use crate::{Executor, SpawnError};
 
 use std::cell::UnsafeCell;
 use std::future::Future;
-use std::sync::Arc;
 
 pub(crate) struct Set<P>
 where
