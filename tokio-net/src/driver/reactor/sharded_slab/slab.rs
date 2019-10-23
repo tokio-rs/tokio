@@ -267,11 +267,11 @@ impl Shard {
         &self.local[i]
     }
 
-    pub(super) fn iter<'a>(&'a self) -> std::slice::Iter<'a, page::Shared> {
+    pub(super) fn iter(&self) -> std::slice::Iter<'_, page::Shared> {
         self.shared.iter()
     }
 
-    fn iter_mut<'a>(&'a mut self) -> std::slice::IterMut<'a, page::Shared> {
+    fn iter_mut(&mut self) -> std::slice::IterMut<'_, page::Shared> {
         self.shared.iter_mut()
     }
 }

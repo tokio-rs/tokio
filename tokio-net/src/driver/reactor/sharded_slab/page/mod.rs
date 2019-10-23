@@ -111,7 +111,6 @@ impl Shared {
     /// local access is held.
     #[cold]
     fn alloc_page(&self, _: &Local) {
-        #[cfg(test)]
         test_println!("-> alloc new page ({})", self.size);
 
         debug_assert!(self.slab.with(|s| unsafe { (*s).is_none() }));
@@ -133,7 +132,6 @@ impl Shared {
     #[inline]
     pub(crate) fn alloc(&self, local: &Local) -> Option<usize> {
         let head = local.head();
-        #[cfg(test)]
         test_println!("-> local head {:#x}", head);
 
         // are there any items on the local free list? (fast path)
@@ -150,7 +148,6 @@ impl Shared {
         // if the head is still null, both the local and remote free lists are
         // empty --- we can't fit any more items on this page.
         if head == Self::NULL {
-            #[cfg(test)]
             test_println!("-> NULL! {:?}", head);
             return None;
         }
@@ -179,24 +176,21 @@ impl Shared {
     #[inline]
     pub(in crate::driver) fn get(&self, addr: Addr, idx: usize) -> Option<&ScheduledIo> {
         let page_offset = addr.offset() - self.prev_sz;
-        #[cfg(test)]
         test_println!("-> offset {:?}", page_offset);
 
+        #[allow(clippy::let_and_return)] // clippy doesn't know about the test_println!
         let value = self.slab.with(|slab| {
             unsafe { &*slab }
                 .as_ref()?
                 .get(page_offset)?
                 .get(slot::Generation::from_packed(idx))
         });
-        #[cfg(test)]
         test_println!("-> offset {:?}; value={:?}", page_offset, value);
         value
     }
 
     pub(crate) fn remove_local(&self, local: &Local, addr: Addr, idx: usize) {
         let offset = addr.offset() - self.prev_sz;
-
-        #[cfg(test)]
         test_println!("-> offset {:?}", offset);
 
         self.slab.with(|slab| {
@@ -215,8 +209,6 @@ impl Shared {
 
     pub(crate) fn remove_remote(&self, addr: Addr, idx: usize) {
         let offset = addr.offset() - self.prev_sz;
-
-        #[cfg(test)]
         test_println!("-> offset {:?}", offset);
 
         self.slab.with(|slab| {
