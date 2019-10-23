@@ -1,6 +1,6 @@
 use crate::sync::atomic::{AtomicUsize, Ordering};
+use std::fmt;
 
-#[derive(Debug)]
 pub(super) struct TransferStack {
     head: AtomicUsize,
 }
@@ -43,6 +43,19 @@ impl TransferStack {
                 }
             }
         }
+    }
+}
+
+impl fmt::Debug for TransferStack {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Loom likes to dump all its internal state in `fmt::Debug` impls, so
+        // we override this to just print the current value in tests.
+        f.debug_struct("TransferStack")
+            .field(
+                "head",
+                &format_args!("{:#x}", self.head.load(Ordering::Relaxed)),
+            )
+            .finish()
     }
 }
 
