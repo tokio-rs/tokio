@@ -14,7 +14,6 @@ use crate::timer::timer;
 use tokio_executor::thread_pool::ThreadPool;
 use tokio_net::driver;
 
-use tracing_core as trace;
 use std::future::Future;
 use std::io;
 
@@ -47,9 +46,6 @@ struct Inner {
 
     /// Timer handles
     timer_handles: Vec<timer::Handle>,
-
-    /// Tracing dispatcher
-    trace: trace::Dispatch,
 }
 
 // ===== impl Runtime =====
@@ -137,14 +133,10 @@ impl Runtime {
     where
         F: Future,
     {
-        let trace = &self.inner().trace;
-
         let _reactor = driver::set_default(&self.inner().reactor_handles[0]);
         let _timer = timer::set_default(&self.inner().timer_handles[0]);
 
-        trace::dispatcher::with_default(trace, || {
-            self.inner().pool.block_on(future)
-        })
+        self.inner().pool.block_on(future)
     }
 
     /// Return a handle to the runtime's spawner.

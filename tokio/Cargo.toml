@@ -52,13 +52,11 @@ rt-full = [
   "timer",
   "tokio-executor/current-thread",
   "tokio-executor/thread-pool",
-  "tracing-core",
 ]
 signal = ["tokio-net/signal"]
 sync = ["tokio-sync"]
 tcp = ["io", "tokio-net/tcp"]
 timer = ["crossbeam-utils", "slab"]
-tracing = ["tracing-core"]
 udp = ["io", "tokio-net/udp"]
 uds = ["io", "tokio-net/uds"]
 process = ["io", "tokio-net/process"]
@@ -78,11 +76,6 @@ tokio-executor = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio
 tokio-macros = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-macros" }
 tokio-net = { version = "=0.2.0-alpha.6", optional = true, features = ["async-traits"], path = "../tokio-net" }
 tokio-sync = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-sync", features = ["async-traits"] }
-tracing-core = { version = "0.1", optional = true }
-
-[target.'cfg(feature = "tracing")'.dependencies]
-tokio-net = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-net", features = ["tracing", "async-traits"] }
-tokio-executor = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-executor", features = ["tracing"] }
 
 [dev-dependencies]
 tokio-test = { version = "=0.2.0-alpha.6", path = "../tokio-test" }

@@ -39,8 +39,6 @@
 //! [`Registration`]: struct.Registration.html
 //! [`PollEvented`]: struct.PollEvented.html
 //! [reactor module]: https://docs.rs/tokio/0.1/tokio/reactor/index.html
-#[macro_use]
-mod tracing;
 
 #[cfg(test)]
 macro_rules! thread_local {
