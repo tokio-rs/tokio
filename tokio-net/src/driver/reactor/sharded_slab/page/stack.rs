@@ -1,4 +1,4 @@
-use crate::sync::atomic::{spin_loop_hint, AtomicUsize, Ordering};
+use crate::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Debug)]
 pub(super) struct TransferStack {

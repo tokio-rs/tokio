@@ -1,8 +1,5 @@
 use super::{Pack, ScheduledIo, INITIAL_PAGE_SIZE, WIDTH};
-use crate::sync::{
-    atomic::{AtomicUsize, Ordering},
-    CausalCell,
-};
+use crate::sync::CausalCell;
 
 pub(crate) mod slot;
 mod stack;
