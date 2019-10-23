@@ -22,7 +22,9 @@ pub struct Builder {
     around_worker: Option<Callback>,
 }
 
-type Callback = Arc<dyn Fn(usize, &mut dyn FnMut()) + Send + Sync>;
+// The Arc<Box<_>> is needed because loom doesn't support Arc<T> where T: !Sized
+// loom doesn't support that because it requires CoerceUnsized, which is unstable
+type Callback = Arc<Box<dyn Fn(usize, &mut dyn FnMut()) + Send + Sync>>;
 
 impl Builder {
     /// Returns a new thread pool builder initialized with default configuration
@@ -121,7 +123,7 @@ impl Builder {
     where
         F: Fn(usize, &mut dyn FnMut()) + Send + Sync + 'static,
     {
-        self.around_worker = Some(Arc::new(f));
+        self.around_worker = Some(Arc::new(Box::new(f)));
         self
     }
 
