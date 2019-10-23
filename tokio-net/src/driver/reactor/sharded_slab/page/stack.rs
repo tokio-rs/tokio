@@ -23,14 +23,14 @@ impl TransferStack {
     }
 
     pub(super) fn push(&self, value: usize, before: impl Fn(usize)) {
-        let mut next = self.head.load(Ordering::Relaxed);
+        let mut next = self.head.load(Ordering::Acquire);
         loop {
             test_println!("-> next {:#x}", next);
             before(next);
 
             match self
                 .head
-                .compare_exchange(next, value, Ordering::Release, Ordering::Relaxed)
+                .compare_exchange(next, value, Ordering::AcqRel, Ordering::Acquire)
             {
                 // lost the race!
                 Err(actual) => {
