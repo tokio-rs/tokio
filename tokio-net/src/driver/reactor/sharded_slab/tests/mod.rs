@@ -30,7 +30,7 @@ mod idx {
 }
 use self::test_util::*;
 pub(super) mod test_util {
-    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     pub(crate) fn run_model(name: &'static str, f: impl Fn() + Sync + Send + 'static) {
         run_builder(name, loom::model::Builder::new(), f)
@@ -41,7 +41,6 @@ pub(super) mod test_util {
         builder: loom::model::Builder,
         f: impl Fn() + Sync + Send + 'static,
     ) {
-        use std::sync::atomic::{AtomicUsize, Ordering};
         let iters = AtomicUsize::new(1);
         builder.check(move || {
             println!(
