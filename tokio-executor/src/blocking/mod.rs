@@ -33,6 +33,7 @@ thread_local! {
 ///
 /// If a blocking pool is already set, it will be restored when the closure returns or if it
 /// panics.
+#[allow(dead_code)] // we allow dead code since this won't be called if no executors are enabled
 pub(crate) fn with_pool<F, R>(pool: &Arc<Pool>, f: F) -> R
 where
     F: FnOnce() -> R,
