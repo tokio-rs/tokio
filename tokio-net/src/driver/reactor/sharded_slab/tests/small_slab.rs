@@ -138,6 +138,110 @@ fn concurrent_remove_remote_and_reuse() {
     });
 }
 
+mod single_shard {
+    use super::slab::SingleShard;
+    use super::*;
+
+    fn store_val(slab: &Arc<SingleShard>, readiness: usize) -> usize {
+        test_println!("store: {}", readiness);
+        let key = slab.alloc().expect("allocate slot");
+        if let Some(slot) = slab.get(key) {
+            slot.readiness.store(readiness, Ordering::Release);
+        } else {
+            panic!("slab did not contain a value for {:#x}", key);
+        }
+        key
+    }
+
+    fn store_when_free(slab: &Arc<SingleShard>, readiness: usize) -> usize {
+        test_println!("store: {}", readiness);
+        let key = loop {
+            if let Some(key) = slab.alloc() {
+                break key;
+            }
+            test_println!("-> full; retry");
+            thread::yield_now();
+        };
+        if let Some(slot) = slab.get(key) {
+            slot.readiness.store(readiness, Ordering::Release);
+        } else {
+            panic!("slab did not contain a value for {:#x}", key);
+        }
+        key
+    }
+
+    fn get_val(slab: &Arc<SingleShard>, key: usize) -> Option<usize> {
+        slab.get(key).map(|s| s.readiness.load(Ordering::Acquire))
+    }
+
+    #[test]
+    fn remove_remote_and_reuse() {
+        let mut model = loom::model::Builder::new();
+        model.max_branches = 100000;
+        test_util::run_builder("single_shard::remove_remote_and_reuse", model, || {
+            let slab = Arc::new(SingleShard::new());
+
+            let idx1 = store_val(&slab, 1);
+            let idx2 = store_val(&slab, 2);
+
+            assert_eq!(get_val(&slab, idx1), Some(1), "slab: {:#?}", slab);
+            assert_eq!(get_val(&slab, idx2), Some(2), "slab: {:#?}", slab);
+
+            let s = slab.clone();
+            let t1 = thread::spawn(move || {
+                s.remove(idx1);
+                let value = get_val(&s, idx1);
+
+                // We may or may not see the new value yet, depending on when
+                // this occurs, but we must either  see the new value or `None`;
+                // the old value has been removed!
+                assert!(value == None || value == Some(3));
+            });
+
+            let idx3 = store_when_free(&slab, 3);
+            t1.join().expect("thread 1 should not panic");
+
+            assert_eq!(get_val(&slab, idx3), Some(3), "slab: {:#?}", slab);
+            assert_eq!(get_val(&slab, idx2), Some(2), "slab: {:#?}", slab);
+        });
+    }
+
+    #[test]
+    fn concurrent_remove_remote_and_reuse() {
+        let mut model = loom::model::Builder::new();
+        model.max_branches = 100000;
+        // set a preemption bound, or else this will run for a *really* long time.
+        model.preemption_bound = Some(2); // chosen arbitrarily.
+        test_util::run_builder("single_shard::remove_remote_and_reuse", model, || {
+            let slab = Arc::new(SingleShard::new());
+
+            let idx1 = store_val(&slab, 1);
+            let idx2 = store_val(&slab, 2);
+
+            assert_eq!(get_val(&slab, idx1), Some(1), "slab: {:#?}", slab);
+            assert_eq!(get_val(&slab, idx2), Some(2), "slab: {:#?}", slab);
+
+            let s = slab.clone();
+            let s2 = slab.clone();
+            let t1 = thread::spawn(move || {
+                s.remove(idx1);
+            });
+
+            let t2 = thread::spawn(move || {
+                s2.remove(idx2);
+            });
+
+            let idx3 = store_when_free(&slab, 3);
+            t1.join().expect("thread 1 should not panic");
+            t2.join().expect("thread 1 should not panic");
+
+            assert!(get_val(&slab, idx1).is_none(), "slab: {:#?}", slab);
+            assert!(get_val(&slab, idx2).is_none(), "slab: {:#?}", slab);
+            assert_eq!(get_val(&slab, idx3), Some(3), "slab: {:#?}", slab);
+        });
+    }
+}
+
 // #[test]
 // fn custom_page_sz() {
 //     let mut model = loom::model::Builder::new();
