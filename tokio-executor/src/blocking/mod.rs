@@ -123,27 +123,28 @@ impl Pool {
         };
 
         if should_spawn {
-            Arc::clone(this).spawn_thread((this.new_thread)());
+            Pool::spawn_thread(Arc::clone(this), (this.new_thread)());
         }
     }
 
-    fn spawn_thread(self: Arc<Self>, builder: thread::Builder) {
+    // NOTE: we cannot use self here w/o arbitrary_self_types since Arc is loom::Arc
+    fn spawn_thread(this: Arc<Self>, builder: thread::Builder) {
         builder
             .spawn(move || {
-                let mut shared = self.shared.lock().unwrap();
+                let mut shared = this.shared.lock().unwrap();
                 loop {
                     // BUSY
                     while let Some(task) = shared.queue.pop_front() {
                         drop(shared);
                         run_task(task);
-                        shared = self.shared.lock().unwrap();
+                        shared = this.shared.lock().unwrap();
                     }
 
                     // IDLE
                     shared.num_idle += 1;
 
                     loop {
-                        let lock_result = self.condvar.wait_timeout(shared, KEEP_ALIVE).unwrap();
+                        let lock_result = this.condvar.wait_timeout(shared, KEEP_ALIVE).unwrap();
                         shared = lock_result.0;
                         let timeout_result = lock_result.1;
 
