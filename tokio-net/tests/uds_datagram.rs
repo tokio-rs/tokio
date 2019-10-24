@@ -68,3 +68,15 @@ async fn echo() -> io::Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn should_shutdown() -> io::Result<()> {
+    let (mut dgram1, dgram2) = UnixDatagram::pair()?;
+
+    dgram2.shutdown(std::net::Shutdown::Write)?;
+    let mut recv_buf = [0u8; 16];
+    let res = dgram1.recv(&mut recv_buf[..]).await.unwrap();
+    assert_eq!(res, 0);
+
+    Ok(())
+}
