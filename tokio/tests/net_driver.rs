@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 
-use tokio::net::TcpListener;
 use tokio::net::driver::Reactor;
+use tokio::net::TcpListener;
 use tokio_test::{assert_ok, assert_pending};
 
 use futures_util::task::{waker_ref, ArcWake};

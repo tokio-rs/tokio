@@ -16,8 +16,8 @@
 //! from then on out.
 
 use crate::net::util::PollEvented;
-use crate::process::SpawnedChild;
 use crate::process::kill::Kill;
+use crate::process::SpawnedChild;
 use crate::sync::oneshot;
 
 use futures_util::future::Fuse;

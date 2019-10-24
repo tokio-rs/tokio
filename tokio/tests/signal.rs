@@ -14,7 +14,10 @@ use std::thread;
 
 #[tokio::test]
 async fn signal_usr1() {
-    let signal = assert_ok!(signal(SignalKind::user_defined1()), "failed to create signal");
+    let signal = assert_ok!(
+        signal(SignalKind::user_defined1()),
+        "failed to create signal"
+    );
 
     send_signal(libc::SIGUSR1);
 
@@ -78,7 +81,9 @@ fn dropping_loops_does_not_cause_starvation() {
 
     send_signal(libc::SIGUSR1);
 
-    first_rt.block_on(first_signal.next()).expect("failed to await first signal");
+    first_rt
+        .block_on(first_signal.next())
+        .expect("failed to await first signal");
 
     drop(first_rt);
     drop(first_signal);

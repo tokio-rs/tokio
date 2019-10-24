@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 
-use tokio::net::TcpListener;
 use tokio::net::driver::{self, Reactor};
+use tokio::net::TcpListener;
 use tokio_test::{assert_err, assert_pending, assert_ready, task};
 
 #[test]

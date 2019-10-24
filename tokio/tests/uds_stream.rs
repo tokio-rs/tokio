@@ -8,7 +8,10 @@ use futures::future::try_join;
 
 #[tokio::test]
 async fn accept_read_write() -> std::io::Result<()> {
-    let dir = tempfile::Builder::new().prefix("tokio-uds-tests").tempdir().unwrap();
+    let dir = tempfile::Builder::new()
+        .prefix("tokio-uds-tests")
+        .tempdir()
+        .unwrap();
     let sock_path = dir.path().join("connect.sock");
 
     let mut listener = UnixListener::bind(&sock_path)?;
