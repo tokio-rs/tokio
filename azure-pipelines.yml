@@ -39,21 +39,6 @@ jobs:
         - uds
       tests-integration: []
 
-# Test crates that are platform specific
-- template: ci/azure-test-stable.yml
-  parameters:
-    name: test_sub_cross
-    displayName: Test sub crates (cross) -
-    cross: true
-    rust: beta
-    crates:
-      tokio-net:
-        - process
-        - signal
-        - tcp
-        - udp
-        - uds
-
 # Test crates that are NOT platform specific
 - template: ci/azure-test-stable.yml
   parameters:
@@ -82,15 +67,15 @@ jobs:
     crates:
       tests-build:
         - tokio-executor
-        - tokio-net
+        # - tokio-net
         - executor-without-current-thread
-        - macros-invalid-input
-        - net-no-features
-        - net-with-tcp
-        - net-with-udp
-        - net-with-uds
-        - tokio-no-features
-        - tokio-with-net
+        # - macros-invalid-input
+        # - net-no-features
+        # - net-with-tcp
+        # - net-with-udp
+        # - net-with-uds
+        # - tokio-no-features
+        # - tokio-with-net
 
 # Run loom tests
 - template: ci/azure-loom.yml
