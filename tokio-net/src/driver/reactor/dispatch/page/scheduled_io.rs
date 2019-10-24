@@ -77,7 +77,7 @@ impl ScheduledIo {
         let mut current = self.readiness.load(Ordering::Acquire);
         loop {
             let current_gen = Generation::from_packed(current);
-            test_println!("-> reset gen={:?}; current={:?};", gen, current,);
+            test_println!("-> reset gen={:?}; current={:?};", gen, current);
             if current_gen != gen {
                 return false;
             }
@@ -166,11 +166,10 @@ impl ScheduledIo {
                     return Ok(new);
                 }
                 Err(actual) => {
-                    let actual_gen = actual & Generation::MASK;
                     test_println!(
                         "--> set_readiness failed; actual={:#x}; actual_gen={:#x}; gen={:#x}",
                         actual,
-                        actual_gen,
+                        actual & Generation::MASK;,
                         gen
                     );
                     current = actual
