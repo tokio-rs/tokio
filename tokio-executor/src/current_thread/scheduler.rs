@@ -1,4 +1,4 @@
-use super::Borrow;
+use super::{Borrow, BorrowSpawner};
 use crate::park::Unpark;
 
 use std::cell::UnsafeCell;
@@ -124,6 +124,13 @@ pub(crate) struct Scheduled<'a, U> {
     done: &'a mut bool,
 }
 
+pub(super) struct TickArgs<'a> {
+    pub(super) id: u64,
+    pub(super) num_futures: &'a AtomicUsize,
+    #[cfg(feature = "blocking")]
+    pub(super) blocking: &'a crate::blocking::PoolWaiter,
+}
+
 impl<U> Scheduler<U>
 where
     U: Unpark,
@@ -199,7 +206,7 @@ where
     ///
     /// This function should be called whenever the caller is notified via a
     /// wakeup.
-    pub(crate) fn tick(&mut self, eid: u64, num_futures: &AtomicUsize) -> bool {
+    pub(super) fn tick(&mut self, args: TickArgs<'_>) -> bool {
         let mut ret = false;
         let tick = self.inner.tick_num.fetch_add(1, SeqCst).wrapping_add(1);
 
@@ -265,9 +272,13 @@ where
                 let node = self.nodes.remove(node);
 
                 let mut borrow = Borrow {
-                    id: eid,
-                    scheduler: self,
-                    num_futures,
+                    spawner: BorrowSpawner {
+                        id: args.id,
+                        scheduler: self,
+                        num_futures: args.num_futures,
+                    },
+                    #[cfg(feature = "blocking")]
+                    blocking: args.blocking,
                 };
 
                 let mut bomb = Bomb {
@@ -315,7 +326,7 @@ where
 
                     if borrow.enter(|| scheduled.tick()) {
                         // we have a borrow of the Runtime, so we know it's not shut down
-                        borrow.num_futures.fetch_sub(2, SeqCst);
+                        borrow.spawner.num_futures.fetch_sub(2, SeqCst);
                     }
                 }
 
@@ -323,7 +334,7 @@ where
                     // The future is not done, push it back into the "all
                     // node" list.
                     let node = bomb.node.take().unwrap();
-                    bomb.borrow.scheduler.nodes.push_back(node);
+                    bomb.borrow.spawner.scheduler.nodes.push_back(node);
                 }
             }
         }

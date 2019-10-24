@@ -10,7 +10,9 @@ macro_rules! pool {
     }};
     (! $n:expr) => {{
         let mut mock_park = crate::tests::mock_park::MockPark::new();
-        let (pool, workers) = thread_pool::create_pool($n, |index| mock_park.mk_park(index));
+        let blocking = std::sync::Arc::new(crate::blocking::Pool::default());
+        let (pool, workers) =
+            thread_pool::create_pool($n, |index| mock_park.mk_park(index), blocking);
         (pool, workers, mock_park)
     }};
 }

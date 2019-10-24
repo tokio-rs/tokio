@@ -1,3 +1,4 @@
+use crate::blocking::PoolWaiter;
 use crate::thread_pool::{shutdown, Builder, JoinHandle, Spawner};
 use crate::Executor;
 
@@ -10,6 +11,9 @@ pub struct ThreadPool {
 
     /// Shutdown waiter
     shutdown_rx: shutdown::Receiver,
+
+    /// Shutdown valve for Pool
+    blocking: PoolWaiter,
 }
 
 impl ThreadPool {
@@ -18,10 +22,15 @@ impl ThreadPool {
         Builder::new().build()
     }
 
-    pub(super) fn from_parts(spawner: Spawner, shutdown_rx: shutdown::Receiver) -> ThreadPool {
+    pub(super) fn from_parts(
+        spawner: Spawner,
+        shutdown_rx: shutdown::Receiver,
+        blocking: PoolWaiter,
+    ) -> ThreadPool {
         ThreadPool {
             spawner,
             shutdown_rx,
+            blocking,
         }
     }
 
@@ -60,7 +69,7 @@ impl ThreadPool {
     {
         crate::global::with_threadpool(self, || {
             let mut enter = crate::enter().expect("attempting to block while on a Tokio executor");
-            enter.block_on(future)
+            crate::blocking::with_pool(self.spawner.blocking_pool(), || enter.block_on(future))
         })
     }
 
@@ -69,6 +78,7 @@ impl ThreadPool {
         if self.spawner.workers().close() {
             self.shutdown_rx.wait();
         }
+        self.blocking.shutdown();
     }
 }
 

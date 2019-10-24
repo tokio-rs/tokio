@@ -16,23 +16,19 @@ pub(crate) struct Worker<P: Park + 'static> {
     park: P,
 }
 
-struct Entry<P: 'static> {
-    pool: Arc<Set<P>>,
-    index: usize,
-}
-
 pub(crate) fn create_set<F, P>(
     pool_size: usize,
     mk_park: F,
+    blocking: Arc<crate::blocking::Pool>,
 ) -> (Arc<Set<P::Unpark>>, Vec<Worker<P>>)
 where
-    P: Park,
+    P: Send + Park,
     F: FnMut(usize) -> P,
 {
     // Create the parks...
     let parks: Vec<_> = (0..pool_size).map(mk_park).collect();
 
-    let mut pool = Arc::new(Set::new(pool_size, |i| parks[i].unpark()));
+    let mut pool = Arc::new(Set::new(pool_size, |i| parks[i].unpark(), blocking));
 
     // Establish the circular link between the individual worker state
     // structure and the container.
@@ -42,7 +38,10 @@ where
     let workers = parks
         .into_iter()
         .enumerate()
-        .map(|(index, park)| Worker::new(pool.clone(), index, park))
+        .map(|(index, park)| {
+            // unsafe is safe because we call Worker::new only once with each index in the pool
+            unsafe { Worker::new(pool.clone(), index, park) }
+        })
         .collect();
 
     (pool, workers)
@@ -56,28 +55,39 @@ const GLOBAL_POLL_INTERVAL: u16 = 61;
 
 impl<P> Worker<P>
 where
-    P: Park + 'static,
+    P: Send + Park,
 {
-    pub(super) fn new(pool: Arc<Set<P::Unpark>>, index: usize, park: P) -> Self {
+    // unsafe because new may only be called once for each index in pool's set
+    pub(super) unsafe fn new(pool: Arc<Set<P::Unpark>>, index: usize, park: P) -> Self {
         Worker {
-            entry: Entry { pool, index },
+            entry: Entry::new(pool, index),
             park,
         }
     }
 
-    pub(super) fn run(&mut self) {
-        let mut executor = &*self.entry.pool;
-        let entry = &self.entry;
+    pub(super) fn run(mut self) {
+        let pool = Arc::clone(&self.entry.pool);
+        let pool = &pool;
+        let index = self.entry.index;
+
+        let mut executor = &**pool;
+        let entry = &mut self.entry;
         let park = &mut self.park;
 
+        let blocking = &executor.blocking;
+
         // Track the current worker
-        current::set(&entry.pool, entry.index, || {
+        current::set(&pool, index, || {
             let _enter = crate::enter().expect("executor already running on thread");
 
             crate::with_default(&mut executor, || {
-                entry.run(park);
+                crate::blocking::with_pool(blocking, || entry.run(park))
             })
-        })
+        });
+    }
+
+    pub(super) fn id(&self) -> usize {
+        self.entry.index
     }
 
     #[cfg(test)]
@@ -96,11 +106,21 @@ where
     }
 }
 
+struct Entry<P: 'static> {
+    pool: Arc<Set<P>>,
+    index: usize,
+}
+
 impl<P> Entry<P>
 where
     P: Unpark,
 {
-    fn run(&self, park: &mut impl Park<Unpark = P>) {
+    // unsafe because Entry::owned assumes there is only one instance of the Entry
+    unsafe fn new(pool: Arc<Set<P>>, index: usize) -> Self {
+        Entry { pool, index }
+    }
+
+    fn run(&mut self, park: &mut impl Park<Unpark = P>) {
         while self.is_running() {
             if self.tick(park) {
                 self.park(park);
@@ -110,12 +130,12 @@ where
         self.shutdown(park);
     }
 
-    fn is_running(&self) -> bool {
+    fn is_running(&mut self) -> bool {
         self.owned().is_running.get()
     }
 
     /// Returns `true` if the worker needs to park
-    fn tick(&self, park: &mut impl Park<Unpark = P>) -> bool {
+    fn tick(&mut self, park: &mut impl Park<Unpark = P>) -> bool {
         // Process all pending tasks in the local queue.
         if !self.process_local_queue(park) {
             return false;
@@ -140,7 +160,7 @@ where
     ///
     /// Returns `false` if processing was interrupted due to the pool shutting
     /// down.
-    fn process_local_queue(&self, park: &mut impl Park<Unpark = P>) -> bool {
+    fn process_local_queue(&mut self, park: &mut impl Park<Unpark = P>) -> bool {
         debug_assert!(self.is_running());
 
         loop {
@@ -171,7 +191,7 @@ where
         }
     }
 
-    fn steal_work(&self) -> Option<Task<Shared<P>>> {
+    fn steal_work(&mut self) -> Option<Task<Shared<P>>> {
         let num_workers = self.pool.len();
         let start = self.owned().rand.fastrand_n(num_workers as u32);
 
@@ -185,17 +205,16 @@ where
 
     /// Runs maintenance work such as free pending tasks and check the pool's
     /// state.
-    fn maintenance(&self) {
+    fn maintenance(&mut self) {
         // Free any completed tasks
         self.drain_tasks_pending_drop();
 
         // Update the pool state cache
-        self.owned()
-            .is_running
-            .set(!self.owned().work_queue.is_closed());
+        let closed = self.owned().work_queue.is_closed();
+        self.owned().is_running.set(!closed)
     }
 
-    fn search_for_work(&self) -> bool {
+    fn search_for_work(&mut self) -> bool {
         debug_assert!(self.is_searching());
 
         if let Some(task) = self.steal_work() {
@@ -208,7 +227,7 @@ where
         }
     }
 
-    fn transition_to_searching(&self) -> bool {
+    fn transition_to_searching(&mut self) -> bool {
         if self.is_searching() {
             return true;
         }
@@ -218,7 +237,7 @@ where
         ret
     }
 
-    fn transition_from_searching(&self) {
+    fn transition_from_searching(&mut self) {
         debug_assert!(self.is_searching());
 
         self.owned().is_searching.set(false);
@@ -231,11 +250,13 @@ where
     }
 
     /// Returns `true` if the worker must check for any work.
-    fn transition_to_parked(&self) -> bool {
+    fn transition_to_parked(&mut self) -> bool {
+        let idx = self.index;
+        let is_searching = self.is_searching();
         let ret = self
             .set()
             .idle()
-            .transition_worker_to_parked(self.index, self.is_searching());
+            .transition_worker_to_parked(idx, is_searching);
 
         // The worker is no longer searching. Setting this is the local cache
         // only.
@@ -249,7 +270,7 @@ where
     }
 
     /// Returns `true` if the transition happened.
-    fn transition_from_parked(&self) -> bool {
+    fn transition_from_parked(&mut self) -> bool {
         if self.owned().did_submit_task.get() || !self.is_running() {
             // Remove the worker from the sleep set.
             self.set().idle().unpark_worker_by_id(self.index);
@@ -270,7 +291,7 @@ where
         }
     }
 
-    fn run_task(&self, task: Task<Shared<P>>) {
+    fn run_task(&mut self, task: Task<Shared<P>>) {
         if self.is_searching() {
             self.transition_from_searching();
         }
@@ -281,13 +302,13 @@ where
         }
     }
 
-    fn final_work_sweep(&self) {
+    fn final_work_sweep(&mut self) {
         if !self.owned().work_queue.is_empty() {
             self.set().notify_work();
         }
     }
 
-    fn park(&self, park: &mut impl Park<Unpark = P>) {
+    fn park(&mut self, park: &mut impl Park<Unpark = P>) {
         if self.transition_to_parked() {
             // We are the final searching worker, check if any work arrived
             // before parking
@@ -309,7 +330,7 @@ where
         }
     }
 
-    fn park_light(&self, park: &mut impl Park<Unpark = P>) {
+    fn park_light(&mut self, park: &mut impl Park<Unpark = P>) {
         // When tasks are submitted locally (from the parker), defer any
         // notifications in hopes that the curent worker will grab those tasks.
         self.owned().defer_notification.set(true);
@@ -326,7 +347,7 @@ where
         }
     }
 
-    fn drain_tasks_pending_drop(&self) {
+    fn drain_tasks_pending_drop(&mut self) {
         for task in self.shared().pending_drop.drain() {
             unsafe {
                 let owned = &mut *self.set().owned()[self.index].get();
@@ -340,7 +361,7 @@ where
     ///
     /// Once the shutdown flag has been observed, it is guaranteed that no
     /// further tasks may be pushed into the global queue.
-    fn shutdown(&self, park: &mut impl Park<Unpark = P>) {
+    fn shutdown(&mut self, park: &mut impl Park<Unpark = P>) {
         // Transition all tasks owned by the worker to canceled.
         self.owned().owned_tasks.shutdown();
 
@@ -369,13 +390,13 @@ where
     }
 
     /// Increment the tick, returning the value from before the increment.
-    fn tick_fetch_inc(&self) -> u16 {
+    fn tick_fetch_inc(&mut self) -> u16 {
         let tick = self.owned().tick.get();
         self.owned().tick.set(tick.wrapping_add(1));
         tick
     }
 
-    fn is_searching(&self) -> bool {
+    fn is_searching(&mut self) -> bool {
         self.owned().is_searching.get()
     }
 
@@ -387,7 +408,7 @@ where
         &self.set().shared()[self.index]
     }
 
-    fn owned(&self) -> &Owned<P> {
+    fn owned(&mut self) -> &Owned<P> {
         // safety: we own the slot
         unsafe { &*self.set().owned()[self.index].get() }
     }

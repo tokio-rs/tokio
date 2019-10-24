@@ -5,8 +5,8 @@ use crate::timer::timer::{self, Timer};
 use tokio_executor::thread_pool;
 use tokio_net::driver::{self, Reactor};
 
-use std::{fmt, io};
 use std::sync::{Arc, Mutex};
+use std::{fmt, io};
 
 /// Builds Tokio Runtime with custom configuration values.
 ///
@@ -32,7 +32,7 @@ use std::sync::{Arc, Mutex};
 ///     let runtime = Builder::new()
 ///         .clock(Clock::system())
 ///         .num_threads(4)
-///         .name_prefix("my-custom-name-")
+///         .name("my-custom-name")
 ///         .stack_size(3 * 1024 * 1024)
 ///         .build()
 ///         .unwrap();
@@ -67,7 +67,7 @@ impl Builder {
 
         let mut thread_pool_builder = thread_pool::Builder::new();
         thread_pool_builder
-            .name_prefix("tokio-runtime-worker-")
+            .name("tokio-runtime-worker")
             .num_threads(num_threads);
 
         Builder {
@@ -110,13 +110,9 @@ impl Builder {
         self
     }
 
-    /// Set name prefix of threads spawned by the `Runtime`'s thread pool.
+    /// Set name of threads spawned by the `Runtime`'s thread pool.
     ///
-    /// Thread name prefix is used for generating thread names. For example, if
-    /// prefix is `my-pool-`, then threads in the pool will get names like
-    /// `my-pool-1` etc.
-    ///
-    /// The default prefix is "tokio-runtime-worker-".
+    /// The default name is "tokio-runtime-worker".
     ///
     /// # Examples
     ///
@@ -125,12 +121,12 @@ impl Builder {
     ///
     /// # pub fn main() {
     /// let rt = runtime::Builder::new()
-    ///     .name_prefix("my-pool-")
+    ///     .name("my-pool")
     ///     .build();
     /// # }
     /// ```
-    pub fn name_prefix<S: Into<String>>(&mut self, val: S) -> &mut Self {
-        self.thread_pool_builder.name_prefix(val);
+    pub fn name<S: Into<String>>(&mut self, val: S) -> &mut Self {
+        self.thread_pool_builder.name(val);
         self
     }
 
@@ -177,7 +173,8 @@ impl Builder {
     /// # }
     /// ```
     pub fn after_start<F>(&mut self, f: F) -> &mut Self
-        where F: Fn() + Send + Sync + 'static
+    where
+        F: Fn() + Send + Sync + 'static,
     {
         self.after_start = Some(Arc::new(f));
         self
@@ -201,7 +198,8 @@ impl Builder {
     /// # }
     /// ```
     pub fn before_stop<F>(&mut self, f: F) -> &mut Self
-        where F: Fn() + Send + Sync + 'static
+    where
+        F: Fn() + Send + Sync + 'static,
     {
         self.before_stop = Some(Arc::new(f));
         self
@@ -263,13 +261,7 @@ impl Builder {
                     }
                 })
             })
-            .build_with_park(move |index| {
-                timers[index]
-                    .lock()
-                    .unwrap()
-                    .take()
-                    .unwrap()
-            });
+            .build_with_park(move |index| timers[index].lock().unwrap().take().unwrap());
 
         Ok(Runtime {
             inner: Some(Inner {
