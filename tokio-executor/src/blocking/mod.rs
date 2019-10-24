@@ -8,6 +8,7 @@ use std::cell::Cell;
 use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
+use std::ops::Deref;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -80,6 +81,7 @@ struct Shared {
     num_th: u32,
     num_idle: u32,
     num_notify: u32,
+    shutdown: bool,
 }
 
 const MAX_THREADS: u32 = 1_000;
@@ -96,6 +98,11 @@ impl Pool {
     pub(crate) fn spawn(this: &Arc<Self>, f: Box<dyn FnOnce() + Send + 'static>) {
         let should_spawn = {
             let mut shared = this.shared.lock().unwrap();
+
+            if shared.shutdown {
+                // no need to even push this task; it would never get picked up
+                return;
+            }
 
             shared.queue.push_back(f);
 
@@ -132,18 +139,21 @@ impl Pool {
         builder
             .spawn(move || {
                 let mut shared = this.shared.lock().unwrap();
-                loop {
+                'main: loop {
                     // BUSY
                     while let Some(task) = shared.queue.pop_front() {
                         drop(shared);
                         run_task(task);
                         shared = this.shared.lock().unwrap();
+                        if shared.shutdown {
+                            break; // Need to increment idle before we exit
+                        }
                     }
 
                     // IDLE
                     shared.num_idle += 1;
 
-                    loop {
+                    while !shared.shutdown {
                         let lock_result = this.condvar.wait_timeout(shared, KEEP_ALIVE).unwrap();
                         shared = lock_result.0;
                         let timeout_result = lock_result.1;
@@ -157,24 +167,79 @@ impl Pool {
                         }
 
                         if timeout_result.timed_out() {
-                            // Thread exit
-                            shared.num_th -= 1;
-
-                            // num_idle should now be tracked exactly, panic
-                            // with a descriptive message if it is not the
-                            // case.
-                            shared.num_idle = shared
-                                .num_idle
-                                .checked_sub(1)
-                                .expect("num_idle underflowed on thread exit");
-                            return;
+                            break 'main;
                         }
 
                         // Spurious wakeup detected, go back to sleep.
                     }
+
+                    if shared.shutdown {
+                        // Work was produced, and we "took" it (by decrementing num_notify).
+                        // This means that num_idle was decremented once for our wakeup.
+                        // But, since we are exiting, we need to "undo" that, as we'll stay idle.
+                        shared.num_idle += 1;
+                        // NOTE: Technically we should also do num_notify++ and notify again,
+                        // but since we're shutting down anyway, that won't be necessary.
+                        break;
+                    }
+                }
+
+                // Thread exit
+                shared.num_th -= 1;
+
+                // num_idle should now be tracked exactly, panic
+                // with a descriptive message if it is not the
+                // case.
+                shared.num_idle = shared
+                    .num_idle
+                    .checked_sub(1)
+                    .expect("num_idle underflowed on thread exit");
+
+                if shared.shutdown && shared.num_th == 0 {
+                    this.condvar.notify_one();
                 }
             })
             .unwrap();
+    }
+
+    /// Shut down all workers in the pool the next time they are idle.
+    ///
+    /// Blocks until all threads have exited.
+    pub(crate) fn shutdown(&self) {
+        let mut shared = self.shared.lock().unwrap();
+        shared.shutdown = true;
+        self.condvar.notify_all();
+
+        while shared.num_th > 0 {
+            shared = self.condvar.wait(shared).unwrap();
+        }
+    }
+}
+
+pub(crate) struct PoolWaiter(Arc<Pool>);
+
+impl From<Pool> for PoolWaiter {
+    fn from(p: Pool) -> Self {
+        Self::from(Arc::new(p))
+    }
+}
+
+impl From<Arc<Pool>> for PoolWaiter {
+    fn from(p: Arc<Pool>) -> Self {
+        Self(p)
+    }
+}
+
+impl Deref for PoolWaiter {
+    type Target = Arc<Pool>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Drop for PoolWaiter {
+    fn drop(&mut self) {
+        self.0.shutdown();
     }
 }
 
@@ -249,6 +314,7 @@ impl Default for Pool {
                 num_th: 0,
                 num_idle: 0,
                 num_notify: 0,
+                shutdown: false,
             }),
             condvar: Condvar::new(),
             new_thread: Box::new(|| {

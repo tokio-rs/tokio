@@ -18,6 +18,8 @@
 mod scheduler;
 
 use self::scheduler::{Scheduler, TickArgs};
+#[cfg(feature = "blocking")]
+use crate::blocking::{Pool, PoolWaiter};
 use crate::park::{Park, ParkThread, Unpark};
 use crate::{EnterError, Executor, SpawnError, TypedExecutor};
 
@@ -54,7 +56,7 @@ pub struct CurrentThread<P: Park = ParkThread> {
 
     /// Handle to pool for handling blocking tasks
     #[cfg(feature = "blocking")]
-    blocking: Arc<crate::blocking::Pool>,
+    blocking: PoolWaiter,
 
     /// The thread-local ID assigned to this executor.
     id: u64,
@@ -156,7 +158,7 @@ impl<T: fmt::Debug> Error for BlockError<T> {}
 struct Borrow<'a, U> {
     spawner: BorrowSpawner<'a, U>,
     #[cfg(feature = "blocking")]
-    blocking: &'a Arc<crate::blocking::Pool>,
+    blocking: &'a PoolWaiter,
 }
 
 /// As is this.
@@ -282,7 +284,7 @@ impl<P: Park> CurrentThread<P> {
             spawn_receiver,
 
             #[cfg(feature = "blocking")]
-            blocking: Arc::new(crate::blocking::Pool::default()),
+            blocking: PoolWaiter::from(Pool::default()),
         }
     }
 
@@ -401,6 +403,8 @@ impl<P: Park> Drop for CurrentThread<P> {
         // which sets LSB (as above) do make Handle::spawn stop working, and then runs until
         // num_futures.load() == 1.
         let _ = pending;
+
+        // We will wait for any blocking ops by virtue of dropping `blocking`.
     }
 }
 

@@ -128,7 +128,7 @@ pub(super) struct TickArgs<'a> {
     pub(super) id: u64,
     pub(super) num_futures: &'a AtomicUsize,
     #[cfg(feature = "blocking")]
-    pub(super) blocking: &'a Arc<crate::blocking::Pool>,
+    pub(super) blocking: &'a crate::blocking::PoolWaiter,
 }
 
 impl<U> Scheduler<U>

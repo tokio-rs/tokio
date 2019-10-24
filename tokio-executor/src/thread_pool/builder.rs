@@ -207,7 +207,8 @@ impl Builder {
         }
 
         let spawner = Spawner::new(pool);
-        ThreadPool::from_parts(spawner, shutdown_rx)
+        let blocking = crate::blocking::PoolWaiter::from(blocking);
+        ThreadPool::from_parts(spawner, shutdown_rx, blocking)
     }
 }
 
