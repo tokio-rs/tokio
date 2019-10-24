@@ -80,6 +80,7 @@ jobs:
 # Run loom tests
 - template: ci/azure-loom.yml
   parameters:
+    name: loom
     rust: beta
     crates:
       - tokio-executor
@@ -114,9 +115,9 @@ jobs:
       - rustfmt
       - clippy
       - test_tokio
-      - test_sub_cross
       - test_linux
       - test_features
+      - loom
 #      - test_nightly
       - cross
 #      - minrust
