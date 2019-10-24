@@ -780,9 +780,9 @@ impl<U: Unpark> Borrow<'_, U> {
             } = self;
 
             current.set_spawn(spawner, || {
-                #[cfg(feature = "blocking")]
+                #[cfg(all(feature = "blocking", not(loom)))]
                 let res = crate::blocking::with_pool(blocking, || f());
-                #[cfg(not(feature = "blocking"))]
+                #[cfg(any(not(feature = "blocking"), loom))]
                 let res = f();
                 res
             })
