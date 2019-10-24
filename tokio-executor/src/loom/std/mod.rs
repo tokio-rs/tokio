@@ -73,4 +73,5 @@ pub(crate) mod sys {
     }
 }
 
+#[cfg(any(feature = "blocking", feature = "thread-pool"))]
 pub(crate) use std::thread;

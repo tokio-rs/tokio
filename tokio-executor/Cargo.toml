@@ -21,13 +21,13 @@ keywords = ["futures", "tokio"]
 categories = ["concurrency", "asynchronous"]
 
 [features]
-blocking = ["tokio-sync", "lazy_static"]
+blocking = ["lazy_static"]
 current-thread = ["crossbeam-channel"]
 thread-pool = ["num_cpus"]
 
 [dependencies]
 futures-util-preview = { version = "=0.3.0-alpha.19", features = ["channel"] }
-tokio-sync = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-sync" }
+tokio-sync = { version = "=0.2.0-alpha.6", path = "../tokio-sync" }
 
 # current-thread dependencies
 crossbeam-channel = { version = "0.3.8", optional = true }

@@ -20,6 +20,8 @@ pub(crate) mod std {
     }
 }
 
+pub(crate) use self::std::sync;
+#[cfg(any(feature = "blocking", feature = "thread-pool"))]
+pub(crate) use self::std::thread;
 #[cfg(feature = "thread-pool")]
 pub(crate) use self::std::{alloc, cell, rand, sys};
-pub(crate) use self::std::{sync, thread};
