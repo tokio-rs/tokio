@@ -92,7 +92,7 @@ impl ScheduledIo {
             match self.readiness.compare_exchange(
                 current,
                 next,
-                Ordering::SeqCst,
+                Ordering::Release,
                 Ordering::Acquire,
             ) {
                 Ok(_) => {
@@ -119,7 +119,7 @@ impl ScheduledIo {
 
     pub(in crate::driver) fn get_readiness(&self, token: usize) -> Option<usize> {
         let gen = token & Generation::MASK;
-        let ready = self.readiness.load(Ordering::SeqCst);
+        let ready = self.readiness.load(Ordering::Acquire);
         test_println!("--> get_readiness: gen={:#x}; ready={:#x};", gen, ready);
         let actual_gen = ready & Generation::MASK;
         if actual_gen != gen {
@@ -140,18 +140,41 @@ impl ScheduledIo {
     ) -> Result<usize, ()> {
         let gen = token & Generation::MASK;
         let mut current = self.readiness.load(Ordering::Acquire);
+        test_println!(
+            "set_readiness: token={:#x}; gen={:#x}; current={:#x};",
+            token,
+            gen,
+            current
+        );
+
         loop {
+            let current_gen = current & Generation::MASK;
+            if current_gen != gen {
+                test_println!("--> wrong generation {:#x}", current_gen);
+                return Err(());
+            }
             let new = f(current & mio::Ready::all().as_usize());
             debug_assert!(new < Generation::ONE);
-            match self.readiness.compare_exchange(
-                current,
-                new | gen,
-                Ordering::SeqCst,
-                Ordering::Acquire,
-            ) {
-                Ok(_) => return Ok(new),
-                Err(actual) if actual & Generation::MASK != gen => return Err(()),
-                Err(actual) => current = actual,
+            let new = new | gen;
+            match self
+                .readiness
+                .compare_exchange(current, new, Ordering::AcqRel, Ordering::Acquire)
+            {
+                Ok(_actual) => {
+                    debug_assert_eq!(_actual, current);
+                    test_println!("--> set readiness {:#x};", new);
+                    return Ok(new);
+                }
+                Err(actual) => {
+                    let actual_gen = actual & Generation::MASK;
+                    test_println!(
+                        "--> set_readiness failed; actual={:#x}; actual_gen={:#x}; gen={:#x}",
+                        actual,
+                        actual_gen,
+                        gen
+                    );
+                    current = actual
+                }
             }
         }
     }
