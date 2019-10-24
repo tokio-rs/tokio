@@ -3,39 +3,39 @@
 #[test]
 #[cfg(feature = "tokio-net")]
 fn net_default() {
-    use build_tests::tokio_net::driver::{set_default, Handle, Reactor, Registration};
-    use build_tests::tokio_net::util::PollEvented;
+    use tests_build::tokio_net::driver::{set_default, Handle, Reactor, Registration};
+    use tests_build::tokio_net::util::PollEvented;
 }
 
 #[test]
 #[cfg(feature = "net-with-tcp")]
 fn net_with_tcp() {
-    use build_tests::tokio_net::tcp;
+    use tests_build::tokio_net::tcp;
 }
 
 #[test]
 #[cfg(feature = "net-with-udp")]
 fn net_with_udp() {
-    use build_tests::tokio_net::udp;
+    use tests_build::tokio_net::udp;
 }
 
 #[test]
 #[cfg(feature = "net-with-uds")]
 fn net_with_uds() {
-    use build_tests::tokio_net::uds;
+    use tests_build::tokio_net::uds;
 }
 
 #[test]
 #[cfg(feature = "net-with-process")]
 fn net_with_process() {
-    use build_tests::tokio_net::process;
+    use tests_build::tokio_net::process;
 }
 
 #[test]
 #[cfg(feature = "tokio-with-net")]
 fn tokio_with_net() {
     // net is present
-    use build_tests::tokio::net;
+    use tests_build::tokio::net;
 }
 
 #[test]

@@ -1,3 +1,3 @@
-use build_tests::tokio::net;
+use tests_build::tokio::net;
 
 fn main() {}

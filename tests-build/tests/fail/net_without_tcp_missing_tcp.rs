@@ -1,4 +1,4 @@
-use build_tests::tokio_net::tcp;
+use tests_build::tokio_net::tcp;
 
 fn main() {}
 

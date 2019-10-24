@@ -1,4 +1,4 @@
-use build_tests::tokio;
+use tests_build::tokio;
 
 #[tokio::main]
 fn main_is_not_async() {}

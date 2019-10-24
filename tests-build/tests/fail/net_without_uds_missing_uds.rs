@@ -1,4 +1,4 @@
-use build_tests::tokio_net::uds;
+use tests_build::tokio_net::uds;
 
 fn main() {}
 
