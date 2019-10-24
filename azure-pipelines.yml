@@ -28,7 +28,7 @@ jobs:
       tokio:
         - fs
         - io
-        - net
+        - net-driver
         - process
         - rt-full
         - signal
