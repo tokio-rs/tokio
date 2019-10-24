@@ -41,7 +41,7 @@
 //! [reactor module]: https://docs.rs/tokio/0.1/tokio/reactor/index.html
 
 mod addr;
-pub use addr::ToSocketAddrs;
+pub use addr::{resolve_host, ToSocketAddrs};
 
 pub mod driver;
 pub mod util;

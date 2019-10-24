@@ -31,6 +31,18 @@ impl sealed::ToSocketAddrsPriv for SocketAddr {
     }
 }
 
+/// `resolve_host` takes `ToSocketAddrs` and returns the first entry it resolves.
+pub async fn resolve_host<T: ToSocketAddrs>(source: T) -> Result<SocketAddr, io::Error> {
+    let mut socket_addrs = source.to_socket_addrs().await?;
+    match socket_addrs.next() {
+        Some(addr) => Ok(addr),
+        None => Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            "domain could be resolved",
+        )),
+    }
+}
+
 // ===== impl str =====
 
 impl ToSocketAddrs for str {}
