@@ -23,7 +23,7 @@ categories = ["concurrency", "asynchronous"]
 [features]
 blocking = ["lazy_static"]
 current-thread = ["crossbeam-channel"]
-thread-pool = ["num_cpus", "tokio-sync"]
+thread-pool = ["num_cpus"]
 
 [dependencies]
 futures-util-preview = { version = "=0.3.0-alpha.19", features = ["channel"] }
