@@ -100,7 +100,7 @@ impl Slab {
     ///
     /// If the slab does not contain a value for the given key, `None` is
     /// returned instead.
-    pub(in crate::driver) fn get(&self, token: usize) -> Option<&page::Slot> {
+    pub(in crate::driver) fn get(&self, token: usize) -> Option<&page::ScheduledIo> {
         let tid = Tid::from_packed(token);
         #[cfg(test)]
         test_println!("get {:#x}; tid={:?}", token, tid);
@@ -164,7 +164,7 @@ impl SingleShard {
     ///
     /// If the slab does not contain a value for the given key, `None` is
     /// returned instead.
-    pub(in crate::driver) fn get(&self, token: usize) -> Option<&page::Slot> {
+    pub(in crate::driver) fn get(&self, token: usize) -> Option<&page::ScheduledIo> {
         #[cfg(test)]
         test_println!("get {:#x}", token);
         self.shard.get(token)
@@ -214,7 +214,7 @@ impl Shard {
     }
 
     #[inline(always)]
-    fn get(&self, idx: usize) -> Option<&page::Slot> {
+    fn get(&self, idx: usize) -> Option<&page::ScheduledIo> {
         debug_assert_eq!(Tid::from_packed(idx).as_usize(), self.tid);
 
         let addr = page::Addr::from_packed(idx);
@@ -224,7 +224,7 @@ impl Shard {
         if i > self.shared.len() {
             return None;
         }
-        self.shared[i].get(addr, idx)
+        self.shared[i].get(addr)
     }
 
     /// Remove an item on the shard's local thread.

@@ -1,59 +1,9 @@
-use super::Slab;
-use crate::sync::atomic::Ordering;
+use super::super::SingleShard;
+use super::test_util;
 use loom::sync::{Arc, Condvar, Mutex};
 use loom::thread;
 
-mod idx {
-    use super::super::{page, Pack, Tid};
-    use proptest::prelude::*;
-
-    proptest! {
-        #[test]
-        fn tid_roundtrips(tid in 0usize..Tid::BITS) {
-            let tid = Tid::from_usize(tid);
-            let packed = tid.pack(0);
-            assert_eq!(tid, Tid::from_packed(packed));
-        }
-
-        #[test]
-        fn idx_roundtrips(
-            tid in 0usize..Tid::BITS,
-            addr in 0usize..page::Addr::BITS,
-        ) {
-            let tid = Tid::from_usize(tid);
-            let addr = page::Addr::from_usize(addr);
-            let packed = tid.pack(addr.pack(0));
-            assert_eq!(addr, page::Addr::from_packed(packed));
-            assert_eq!(tid, Tid::from_packed(packed));
-        }
-    }
-}
-use self::test_util::*;
-pub(super) mod test_util {
-    use std::sync::atomic::{AtomicUsize, Ordering};
-
-    pub(crate) fn run_model(name: &'static str, f: impl Fn() + Sync + Send + 'static) {
-        run_builder(name, loom::model::Builder::new(), f)
-    }
-
-    pub(crate) fn run_builder(
-        name: &'static str,
-        builder: loom::model::Builder,
-        f: impl Fn() + Sync + Send + 'static,
-    ) {
-        let iters = AtomicUsize::new(1);
-        builder.check(move || {
-            println!(
-                "\n------------ running test {}; iteration {} ------------\n",
-                name,
-                iters.fetch_add(1, Ordering::SeqCst)
-            );
-            f()
-        });
-    }
-}
-
-fn store_val(slab: &Arc<Slab>, readiness: usize) -> usize {
+fn store_val(slab: &Arc<SingleShard>, readiness: usize) -> usize {
     println!("store: {}", readiness);
     let key = slab.alloc().expect("allocate slot");
     if let Some(slot) = slab.get(key) {
@@ -65,17 +15,18 @@ fn store_val(slab: &Arc<Slab>, readiness: usize) -> usize {
     key
 }
 
-fn get_val(slab: &Arc<Slab>, key: usize) -> Option<usize> {
-    slab.get(key).and_then(|s| s.get_readiness(key))
+fn get_val(slab: &Arc<SingleShard>, key: usize) -> Option<usize> {
+    slab.get(key).and_then(|s| {
+        let rdy = s.get_readiness(key);
+        test_println!("--> got readiness {:?} with key {:#x}", rdy, key);
+        rdy
+    })
 }
-
-mod single_shard;
-mod small_slab;
 
 #[test]
 fn local_remove() {
-    run_model("local_remove", || {
-        let slab = Arc::new(Slab::new());
+    test_util::run_model("single_shard::local_remove", || {
+        let slab = Arc::new(SingleShard::new());
 
         let s = slab.clone();
         let t1 = thread::spawn(move || {
@@ -118,8 +69,8 @@ fn local_remove() {
 
 #[test]
 fn remove_remote() {
-    run_model("remove_remote", || {
-        let slab = Arc::new(Slab::new());
+    test_util::run_model("single_shard::remove_remote", || {
+        let slab = Arc::new(SingleShard::new());
 
         let idx1 = store_val(&slab, 1);
         assert_eq!(get_val(&slab, idx1), Some(1));
@@ -155,8 +106,8 @@ fn remove_remote() {
 
 #[test]
 fn concurrent_alloc_remove() {
-    run_model("concurrent_alloc_remove", || {
-        let slab = Arc::new(Slab::new());
+    test_util::run_model("single_shard::concurrent_alloc_remove", || {
+        let slab = Arc::new(SingleShard::new());
         let pair = Arc::new((Mutex::new(None), Condvar::new()));
 
         let slab2 = slab.clone();
@@ -197,34 +148,34 @@ fn concurrent_alloc_remove() {
     })
 }
 
-#[test]
-fn unique_iter() {
-    run_model("unique_iter", || {
-        let mut slab = Arc::new(Slab::new());
+// #[test]
+// fn unique_iter() {
+//     test_util::run_model("single_shard::unique_iter", || {
+//         let mut slab = Arc::new(SingleShard::new());
 
-        let s = slab.clone();
-        let t1 = thread::spawn(move || {
-            store_val(&s, 1);
-            store_val(&s, 2);
-        });
+//         let s = slab.clone();
+//         let t1 = thread::spawn(move || {
+//             store_val(&s, 1);
+//             store_val(&s, 2);
+//         });
 
-        let s = slab.clone();
-        let t2 = thread::spawn(move || {
-            store_val(&s, 3);
-            store_val(&s, 4);
-        });
+//         let s = slab.clone();
+//         let t2 = thread::spawn(move || {
+//             store_val(&s, 3);
+//             store_val(&s, 4);
+//         });
 
-        t1.join().expect("thread 1 should not panic");
-        t2.join().expect("thread 2 should not panic");
+//         t1.join().expect("thread 1 should not panic");
+//         t2.join().expect("thread 2 should not panic");
 
-        let slab = Arc::get_mut(&mut slab).expect("other arcs should be dropped");
-        let items: Vec<_> = slab
-            .unique_iter()
-            .map(|i| i.readiness.load(Ordering::Acquire))
-            .collect();
-        assert!(items.contains(&1), "items: {:?}", items);
-        assert!(items.contains(&2), "items: {:?}", items);
-        assert!(items.contains(&3), "items: {:?}", items);
-        assert!(items.contains(&4), "items: {:?}", items);
-    });
-}
+//         let slab = Arc::get_mut(&mut slab).expect("other arcs should be dropped");
+//         let items: Vec<_> = slab
+//             .unique_iter()
+//             .map(|i| i.readiness.load(Ordering::Acquire))
+//             .collect();
+//         assert!(items.contains(&1), "items: {:?}", items);
+//         assert!(items.contains(&2), "items: {:?}", items);
+//         assert!(items.contains(&3), "items: {:?}", items);
+//         assert!(items.contains(&4), "items: {:?}", items);
+//     });
+// }

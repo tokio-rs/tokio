@@ -1,9 +1,9 @@
-use super::{Pack, ScheduledIo, INITIAL_PAGE_SIZE, WIDTH};
+use super::{Pack, INITIAL_PAGE_SIZE, WIDTH};
 use crate::sync::CausalCell;
 
-pub(crate) mod slot;
+pub(crate) mod scheduled_io;
 mod stack;
-pub(crate) use self::slot::Slot;
+pub(crate) use self::scheduled_io::ScheduledIo;
 use self::stack::TransferStack;
 use std::fmt;
 
@@ -55,8 +55,7 @@ impl Pack for Addr {
     }
 }
 
-pub(in crate::driver) type Iter<'a> =
-    std::iter::FilterMap<std::slice::Iter<'a, Slot>, fn(&'a Slot) -> Option<&'a ScheduledIo>>;
+pub(in crate::driver) type Iter<'a> = std::slice::Iter<'a, ScheduledIo>;
 
 pub(crate) struct Local {
     head: CausalCell<usize>,
@@ -66,7 +65,7 @@ pub(crate) struct Shared {
     remote: TransferStack,
     size: usize,
     prev_sz: usize,
-    slab: CausalCell<Option<Box<[Slot]>>>,
+    slab: CausalCell<Option<Box<[ScheduledIo]>>>,
 }
 
 impl Local {
@@ -116,8 +115,8 @@ impl Shared {
         debug_assert!(self.slab.with(|s| unsafe { (*s).is_none() }));
 
         let mut slab = Vec::with_capacity(self.size);
-        slab.extend((1..self.size).map(Slot::new));
-        slab.push(Slot::new(Self::NULL));
+        slab.extend((1..self.size).map(ScheduledIo::new));
+        slab.push(ScheduledIo::new(Self::NULL));
         self.slab.with_mut(|s| {
             // this mut access is safe — it only occurs to initially
             // allocate the page, which only happens on this thread; if the
@@ -174,7 +173,7 @@ impl Shared {
     }
 
     #[inline]
-    pub(in crate::driver) fn get(&self, addr: Addr, idx: usize) -> Option<&Slot> {
+    pub(in crate::driver) fn get(&self, addr: Addr) -> Option<&ScheduledIo> {
         let page_offset = addr.offset() - self.prev_sz;
         test_println!("-> offset {:?}", page_offset);
 
@@ -197,7 +196,7 @@ impl Shared {
             } else {
                 return;
             };
-            if slot.reset(slot::Generation::from_packed(idx)) {
+            if slot.reset(scheduled_io::Generation::from_packed(idx)) {
                 slot.set_next(local.head());
                 local.set_head(offset);
             }
@@ -215,7 +214,7 @@ impl Shared {
             } else {
                 return;
             };
-            if !slot.reset(slot::Generation::from_packed(idx)) {
+            if !slot.reset(scheduled_io::Generation::from_packed(idx)) {
                 return;
             }
             self.remote.push(offset, |next| slot.set_next(next));
@@ -224,7 +223,7 @@ impl Shared {
 
     pub(in crate::driver) fn iter(&self) -> Option<Iter<'_>> {
         let slab = self.slab.with(|slab| unsafe { (&*slab).as_ref() });
-        slab.map(|slab| slab.iter().filter_map(Slot::value as fn(_) -> _))
+        slab.map(|slab| slab.iter())
     }
 }
 

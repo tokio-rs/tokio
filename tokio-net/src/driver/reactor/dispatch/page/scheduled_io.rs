@@ -1,17 +1,18 @@
 use super::super::{Pack, Tid, RESERVED_BITS, WIDTH};
-use super::ScheduledIo;
 use crate::sync::{
     atomic::{AtomicUsize, Ordering},
     CausalCell,
 };
 
+use tokio_sync::AtomicWaker;
+
 #[derive(Debug)]
-pub(crate) struct Slot {
-    gen: AtomicUsize,
+pub(crate) struct ScheduledIo {
     /// The offset of the next item on the free list.
     next: CausalCell<usize>,
-    /// The data stored in the slot.
-    item: ScheduledIo,
+    readiness: AtomicUsize,
+    pub(in crate::driver) reader: AtomicWaker,
+    pub(in crate::driver) writer: AtomicWaker,
 }
 
 #[repr(transparent)]
@@ -40,33 +41,30 @@ impl Pack for Generation {
 }
 
 impl Generation {
-    pub(crate) const ONE: usize = 1 << Self::SHIFT;
+    const ONE: usize = 1 << Self::SHIFT;
+
     fn new(value: usize) -> Self {
         Self { value }
     }
 
-    pub(crate) fn next(self) -> Self {
+    fn next(self) -> Self {
         Self::from_usize((self.value + 1) % Self::BITS)
     }
 }
 
-impl Slot {
+impl ScheduledIo {
     pub(super) fn new(next: usize) -> Self {
         Self {
-            gen: AtomicUsize::new(0),
-            item: ScheduledIo::default(),
             next: CausalCell::new(next),
+            readiness: AtomicUsize::new(0),
+            reader: AtomicWaker::new(),
+            writer: AtomicWaker::new(),
         }
-    }
-
-    #[inline(always)]
-    pub(in crate::driver::reactor::sharded_slab) fn value(&self) -> Option<&ScheduledIo> {
-        Some(&self.item)
     }
 
     #[inline]
     pub(super) fn alloc(&self) -> Generation {
-        Generation::from_packed(self.item.readiness.load(Ordering::SeqCst))
+        Generation::from_packed(self.readiness.load(Ordering::SeqCst))
     }
 
     #[inline(always)]
@@ -76,12 +74,7 @@ impl Slot {
 
     #[inline]
     pub(super) fn reset(&self, gen: Generation) -> bool {
-        test_println!(
-            "dump gen\n\tGEN_MASK={:#b};\n\tGEN_BITS={:#b};",
-            Generation::MASK,
-            Generation::BITS
-        );
-        let mut current = self.item.readiness.load(Ordering::Acquire);
+        let mut current = self.readiness.load(Ordering::Acquire);
         loop {
             let current_gen = Generation::from_packed(current);
             test_println!("-> reset gen={:?}; current={:?};", gen, current,);
@@ -96,7 +89,7 @@ impl Slot {
                 next_gen,
                 next
             );
-            match self.item.readiness.compare_exchange(
+            match self.readiness.compare_exchange(
                 current,
                 next,
                 Ordering::SeqCst,
@@ -112,8 +105,8 @@ impl Slot {
                 }
             }
         }
-        drop(self.item.reader.take_waker());
-        drop(self.item.writer.take_waker());
+        drop(self.reader.take_waker());
+        drop(self.writer.take_waker());
         true
     }
 
@@ -126,14 +119,15 @@ impl Slot {
 
     pub(in crate::driver) fn get_readiness(&self, token: usize) -> Option<usize> {
         let gen = token & Generation::MASK;
-        let ready = self.item.readiness.load(Ordering::SeqCst);
-        test_println!(
-            "get_readiness:\n\tMASK= {:#064b}\n\tGEN = {:#064b}\n\tRDY = {:#064b}",
-            Generation::MASK,
-            gen,
-            ready
-        );
-        if ready & Generation::MASK != gen {
+        let ready = self.readiness.load(Ordering::SeqCst);
+        test_println!("--> get_readiness: gen={:#x}; ready={:#x};", gen, ready);
+        let actual_gen = ready & Generation::MASK;
+        if actual_gen != gen {
+            test_println!(
+                "--> get_readiness: wrong generation {:#x}; expected={:x};",
+                actual_gen,
+                gen
+            );
             return None;
         }
         Some(ready & (!Generation::MASK))
@@ -145,11 +139,11 @@ impl Slot {
         f: impl Fn(usize) -> usize,
     ) -> Result<usize, ()> {
         let gen = token & Generation::MASK;
-        let mut current = self.item.readiness.load(Ordering::Acquire);
+        let mut current = self.readiness.load(Ordering::Acquire);
         loop {
             let new = f(current & mio::Ready::all().as_usize());
             debug_assert!(new < Generation::ONE);
-            match self.item.readiness.compare_exchange(
+            match self.readiness.compare_exchange(
                 current,
                 new | gen,
                 Ordering::SeqCst,
@@ -160,9 +154,5 @@ impl Slot {
                 Err(actual) => current = actual,
             }
         }
-    }
-
-    pub(in crate::driver) fn io(&self) -> &ScheduledIo {
-        &self.item
     }
 }

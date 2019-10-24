@@ -1,15 +1,9 @@
 use super::platform;
-use crate::sync::atomic::{
-    AtomicUsize,
-    Ordering::{AcqRel, Acquire, Relaxed, Release, SeqCst},
-};
+use crate::sync::atomic::{AtomicUsize, Ordering::SeqCst};
 
-mod sharded_slab;
-pub(crate) use sharded_slab::MAX_SOURCES;
-use sharded_slab::{Pack, SingleShard};
-
-use tokio_executor::park::{Park, Unpark};
-use tokio_sync::AtomicWaker;
+mod dispatch;
+use dispatch::SingleShard;
+pub(crate) use dispatch::MAX_SOURCES;
 
 use mio::event::Evented;
 use std::cell::RefCell;
@@ -21,6 +15,7 @@ use std::sync::{Arc, Weak};
 use std::task::Waker;
 use std::time::Duration;
 use std::{fmt, usize};
+use tokio_executor::park::{Park, Unpark};
 
 /// The core reactor, or event loop.
 ///
@@ -71,13 +66,6 @@ pub(super) struct Inner {
 
     /// Used to wake up the reactor from a call to `turn`
     wakeup: mio::SetReadiness,
-}
-
-#[derive(Debug)]
-pub(super) struct ScheduledIo {
-    readiness: AtomicUsize,
-    pub(super) reader: AtomicWaker,
-    pub(super) writer: AtomicWaker,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
@@ -256,11 +244,11 @@ impl Reactor {
         }
 
         if ready.is_writable() || platform::is_hup(ready) {
-            wr = io.io().writer.take_waker();
+            wr = io.writer.take_waker();
         }
 
         if !(ready & (!mio::Ready::writable())).is_empty() {
-            rd = io.io().reader.take_waker();
+            rd = io.reader.take_waker();
         }
 
         if let Some(w) = rd {
@@ -397,8 +385,8 @@ impl Inner {
             .unwrap_or_else(|| panic!("IO resource for token {} does not exist!", token));
 
         let (waker, ready) = match dir {
-            Direction::Read => (&sched.io().reader, !mio::Ready::writable()),
-            Direction::Write => (&sched.io().writer, mio::Ready::writable()),
+            Direction::Read => (&sched.reader, !mio::Ready::writable()),
+            Direction::Write => (&sched.writer, mio::Ready::writable()),
         };
 
         waker.register(w);
@@ -428,16 +416,6 @@ impl Direction {
                 mio::Ready::all() - mio::Ready::writable()
             }
             Direction::Write => mio::Ready::writable() | platform::hup(),
-        }
-    }
-}
-
-impl Default for ScheduledIo {
-    fn default() -> Self {
-        Self {
-            readiness: AtomicUsize::new(0),
-            reader: AtomicWaker::new(),
-            writer: AtomicWaker::new(),
         }
     }
 }

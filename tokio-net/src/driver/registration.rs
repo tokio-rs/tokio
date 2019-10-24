@@ -2,7 +2,6 @@ use super::platform;
 use super::reactor::{Direction, Handle};
 
 use mio::{self, Evented};
-use std::sync::atomic::Ordering::SeqCst;
 use std::task::{Context, Poll};
 use std::{io, usize};
 
@@ -238,8 +237,8 @@ impl Registration {
             if let Some(cx) = cx {
                 // Update the task info
                 match direction {
-                    Direction::Read => sched.io().reader.register_by_ref(cx.waker()),
-                    Direction::Write => sched.io().writer.register_by_ref(cx.waker()),
+                    Direction::Read => sched.reader.register_by_ref(cx.waker()),
+                    Direction::Write => sched.writer.register_by_ref(cx.waker()),
                 }
 
                 let curr_ready = sched

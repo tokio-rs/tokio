@@ -1,4 +1,7 @@
-use super::{page, ScheduledIo, Shard};
+use super::{
+    page::{self, ScheduledIo},
+    Shard,
+};
 use std::slice;
 
 pub(in crate::driver::reactor) struct UniqueIter<'a> {

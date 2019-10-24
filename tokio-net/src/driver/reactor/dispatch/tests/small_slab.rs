@@ -1,6 +1,5 @@
-use super::super::ScheduledIo;
 use super::test_util;
-use loom::sync::{atomic::Ordering, Arc, Condvar, Mutex};
+use loom::sync::{Arc, Condvar, Mutex};
 use loom::thread;
 
 use pack::{Pack, WIDTH};
@@ -255,7 +254,7 @@ mod single_shard {
 
     #[test]
     fn alloc_remove_get() {
-        test_util::run_model("alloc_remove_get", || {
+        test_util::run_model("single_shard::alloc_remove_get", || {
             let slab = Arc::new(SingleShard::new());
             let pair = Arc::new((Mutex::new(None), Condvar::new()));
 
@@ -264,24 +263,31 @@ mod single_shard {
             let t1 = thread::spawn(move || {
                 let slab = slab2;
                 let (lock, cvar) = &*pair2;
-                let key1 = store_val(&slab, 0);
+                // allocate one entry just so that we have to use the final one for
+                // all future allocations.
+                let _key0 = store_val(&slab, 0);
                 let key = store_val(&slab, 1);
 
                 let mut next = lock.lock().unwrap();
                 *next = Some(key);
                 cvar.notify_one();
-
+                // remove the second entry
                 slab.remove(key);
+                // store a new readiness at the same location (since the slab
+                // already has an entry in slot 0)
                 store_val(&slab, 2);
             });
 
             let (lock, cvar) = &*pair;
+            // wait for the second entry to be stored...
             let mut next = lock.lock().unwrap();
             while next.is_none() {
                 next = cvar.wait(next).unwrap();
             }
             let key = next.unwrap();
 
+            // our generation will be stale when the second store occurs at that
+            // index, we must not see the value of that store.
             let val = get_val(&slab, key);
             assert_ne!(val, Some(2), "generation must have advanced!");
 
@@ -291,7 +297,7 @@ mod single_shard {
 
     #[test]
     fn alloc_remove_set() {
-        test_util::run_model("alloc_remove_set", || {
+        test_util::run_model("single_shard::alloc_remove_set", || {
             let slab = Arc::new(SingleShard::new());
             let pair = Arc::new((Mutex::new(None), Condvar::new()));
 
@@ -300,7 +306,9 @@ mod single_shard {
             let t1 = thread::spawn(move || {
                 let slab = slab2;
                 let (lock, cvar) = &*pair2;
-                let key1 = store_val(&slab, 0);
+                // allocate one entry just so that we have to use the final one for
+                // all future allocations.
+                let _key0 = store_val(&slab, 0);
                 let key = store_val(&slab, 1);
 
                 let mut next = lock.lock().unwrap();
@@ -308,23 +316,41 @@ mod single_shard {
                 cvar.notify_one();
 
                 slab.remove(key);
-                let key2 = slab.alloc().expect("allocate slot");
-                assert_ne!(
-                    get_val(&slab, key2),
-                    Some(2),
-                    "stale set must not have happened"
+                // remove the old entry and insert a new one, with a new generation.
+                let key2 = slab.alloc().expect("store key 2");
+                // after the remove, we must not see the value written with the
+                // stale index.
+                assert_eq!(
+                    get_val(&slab, key),
+                    None,
+                    "stale set must no longer be visible"
                 );
+                assert_eq!(get_val(&slab, key2), Some(0));
+                key2
             });
 
             let (lock, cvar) = &*pair;
+
+            // wait for the second entry to be stored. the index we get from the
+            // other thread may become stale after a write.
             let mut next = lock.lock().unwrap();
             while next.is_none() {
                 next = cvar.wait(next).unwrap();
             }
             let key = next.unwrap();
-            let val = slab.get(key).map(|val| val.set_readiness(key, |_| 2));
 
-            t1.join().unwrap();
+            // try to write to the index with our generation
+            slab.get(key).map(|val| val.set_readiness(key, |_| 2));
+
+            let key2 = t1.join().unwrap();
+            // after the remove, we must not see the value written with the
+            // stale index either.
+            assert_eq!(
+                get_val(&slab, key),
+                None,
+                "stale set must no longer be visible"
+            );
+            assert_eq!(get_val(&slab, key2), Some(0));
         })
     }
 }
@@ -340,24 +366,31 @@ fn alloc_remove_get() {
         let t1 = thread::spawn(move || {
             let slab = slab2;
             let (lock, cvar) = &*pair2;
-            let key1 = store_val(&slab, 0);
+            // allocate one entry just so that we have to use the final one for
+            // all future allocations.
+            let _key0 = store_val(&slab, 0);
             let key = store_val(&slab, 1);
 
             let mut next = lock.lock().unwrap();
             *next = Some(key);
             cvar.notify_one();
-
+            // remove the second entry
             slab.remove(key);
+            // store a new readiness at the same location (since the slab
+            // already has an entry in slot 0)
             store_val(&slab, 2);
         });
 
         let (lock, cvar) = &*pair;
+        // wait for the second entry to be stored...
         let mut next = lock.lock().unwrap();
         while next.is_none() {
             next = cvar.wait(next).unwrap();
         }
         let key = next.unwrap();
 
+        // our generation will be stale when the second store occurs at that
+        // index, we must not see the value of that store.
         let val = get_val(&slab, key);
         assert_ne!(val, Some(2), "generation must have advanced!");
 
@@ -376,7 +409,9 @@ fn alloc_remove_set() {
         let t1 = thread::spawn(move || {
             let slab = slab2;
             let (lock, cvar) = &*pair2;
-            let key1 = store_val(&slab, 0);
+            // allocate one entry just so that we have to use the final one for
+            // all future allocations.
+            let _key0 = store_val(&slab, 0);
             let key = store_val(&slab, 1);
 
             let mut next = lock.lock().unwrap();
@@ -384,23 +419,41 @@ fn alloc_remove_set() {
             cvar.notify_one();
 
             slab.remove(key);
-            let key2 = slab.alloc().expect("allocate slot");
-            assert_ne!(
-                get_val(&slab, key2),
-                Some(2),
-                "stale set must not have happened"
+            // remove the old entry and insert a new one, with a new generation.
+            let key2 = slab.alloc().expect("store key 2");
+            // after the remove, we must not see the value written with the
+            // stale index.
+            assert_eq!(
+                get_val(&slab, key),
+                None,
+                "stale set must no longer be visible"
             );
+            assert_eq!(get_val(&slab, key2), Some(0));
+            key2
         });
 
         let (lock, cvar) = &*pair;
+
+        // wait for the second entry to be stored. the index we get from the
+        // other thread may become stale after a write.
         let mut next = lock.lock().unwrap();
         while next.is_none() {
             next = cvar.wait(next).unwrap();
         }
         let key = next.unwrap();
-        let val = slab.get(key).map(|val| val.set_readiness(key, |_| 2));
 
-        t1.join().unwrap();
+        // try to write to the index with our generation
+        slab.get(key).map(|val| val.set_readiness(key, |_| 2));
+
+        let key2 = t1.join().unwrap();
+        // after the remove, we must not see the value written with the
+        // stale index either.
+        assert_eq!(
+            get_val(&slab, key),
+            None,
+            "stale set must no longer be visible"
+        );
+        assert_eq!(get_val(&slab, key2), Some(0));
     })
 }
 
