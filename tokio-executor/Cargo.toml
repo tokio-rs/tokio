@@ -45,8 +45,7 @@ tokio-sync = { version = "=0.2.0-alpha.6", path = "../tokio-sync" }
 tokio-test = { version = "=0.2.0-alpha.6", path = "../tokio-test" }
 
 futures-core-preview = "=0.3.0-alpha.19"
-# loom = { version = "0.2.9", features = ["futures", "checkpoint"] }
-loom = { git = "https://github.com/tokio-rs/loom.git", features = ["futures", "checkpoint"] }
+loom = { version = "0.2.11", features = ["futures", "checkpoint"] }
 rand = "0.7"
 
 [package.metadata.docs.rs]
