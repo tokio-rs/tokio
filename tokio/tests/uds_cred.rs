@@ -1,3 +1,4 @@
+#![cfg(unix)]
 #![cfg(not(target_os = "dragonfly"))]
 
 use tokio::net::UnixStream;
