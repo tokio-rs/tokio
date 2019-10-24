@@ -779,8 +779,9 @@ impl<U: Unpark> Borrow<'_, U> {
 
             let Borrow {
                 ref mut spawner,
-                #[cfg(feature = "blocking")]
+                #[cfg(all(feature = "blocking", not(loom)))]
                 ref blocking,
+                ..
             } = self;
 
             current.set_spawn(spawner, || {
