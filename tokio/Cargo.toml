@@ -39,7 +39,7 @@ fs = ["tokio-executor/blocking"]
 io = ["tokio-io", "bytes", "iovec"]
 macros = ["tokio-macros"]
 net-full = ["tcp", "udp", "uds"]
-net-driver = ["mio"]
+net-driver = ["mio", "tokio-executor/blocking"]
 rt-current-thread = [
   "timer",
   "tokio-executor/current-thread",
@@ -64,7 +64,7 @@ sync = ["tokio-sync"]
 tcp = ["io", "net-driver"]
 timer = ["crossbeam-utils", "slab"]
 udp = ["io", "net-driver"]
-uds = ["io", "net-driver"]
+uds = ["io", "net-driver", "mio-uds", "libc"]
 process = [
   "crossbeam-queue",
   "io",
