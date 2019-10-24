@@ -220,5 +220,3 @@ unsafe fn hide_lt<'a>(p: *mut (dyn Executor + 'a)) -> *mut (dyn Executor + 'stat
     #[allow(clippy::transmute_ptr_to_ptr)]
     mem::transmute(p)
 }
-
-
