@@ -40,14 +40,23 @@ mod slab;
 mod tid;
 
 fn store_val(slab: &Arc<Slab>, readiness: usize) -> usize {
-    test_println!("store: {}", readiness);
+    println!("store: {}", readiness);
     let key = slab.alloc().expect("allocate slot");
     if let Some(slot) = slab.get(key) {
-        slot.readiness.store(readiness, Ordering::Release);
+        slot.set_readiness(key, |_| readiness)
+            .expect("generation should still be valid!");
     } else {
         panic!("slab did not contain a value for {:#x}", key);
     }
     key
+}
+
+fn get_val(slab: &Arc<Slab>, key: usize) -> Option<usize> {
+    slab.get(key).and_then(|s| {
+        let rdy = s.get_readiness(key);
+        test_println!("--> got readiness {:?} with key {:#x}", rdy, key);
+        rdy
+    })
 }
 
 fn store_when_free(slab: &Arc<Slab>, readiness: usize) -> usize {
@@ -60,15 +69,12 @@ fn store_when_free(slab: &Arc<Slab>, readiness: usize) -> usize {
         thread::yield_now();
     };
     if let Some(slot) = slab.get(key) {
-        slot.readiness.store(readiness, Ordering::Release);
+        slot.set_readiness(key, |_| readiness)
+            .expect("generation should still be valid!");
     } else {
         panic!("slab did not contain a value for {:#x}", key);
     }
     key
-}
-
-fn get_val(slab: &Arc<Slab>, key: usize) -> Option<usize> {
-    slab.get(key).map(|s| s.readiness.load(Ordering::Acquire))
 }
 
 #[test]
@@ -81,8 +87,8 @@ fn remove_remote_and_reuse() {
         let idx1 = store_val(&slab, 1);
         let idx2 = store_val(&slab, 2);
 
-        assert_eq!(get_val(&slab, idx1), Some(1), "slab: {:#?}", slab);
-        assert_eq!(get_val(&slab, idx2), Some(2), "slab: {:#?}", slab);
+        assert_eq!(get_val(&slab, idx1), Some(1));
+        assert_eq!(get_val(&slab, idx2), Some(2));
 
         let s = slab.clone();
         let t1 = thread::spawn(move || {
@@ -98,8 +104,8 @@ fn remove_remote_and_reuse() {
         let idx3 = store_when_free(&slab, 3);
         t1.join().expect("thread 1 should not panic");
 
-        assert_eq!(get_val(&slab, idx3), Some(3), "slab: {:#?}", slab);
-        assert_eq!(get_val(&slab, idx2), Some(2), "slab: {:#?}", slab);
+        assert_eq!(get_val(&slab, idx3), Some(3));
+        assert_eq!(get_val(&slab, idx2), Some(2));
     });
 }
 
@@ -115,8 +121,8 @@ fn concurrent_remove_remote_and_reuse() {
         let idx1 = store_val(&slab, 1);
         let idx2 = store_val(&slab, 2);
 
-        assert_eq!(get_val(&slab, idx1), Some(1), "slab: {:#?}", slab);
-        assert_eq!(get_val(&slab, idx2), Some(2), "slab: {:#?}", slab);
+        assert_eq!(get_val(&slab, idx1), Some(1));
+        assert_eq!(get_val(&slab, idx2), Some(2));
 
         let s = slab.clone();
         let s2 = slab.clone();
@@ -132,9 +138,9 @@ fn concurrent_remove_remote_and_reuse() {
         t1.join().expect("thread 1 should not panic");
         t2.join().expect("thread 1 should not panic");
 
-        assert!(get_val(&slab, idx1).is_none(), "slab: {:#?}", slab);
-        assert!(get_val(&slab, idx2).is_none(), "slab: {:#?}", slab);
-        assert_eq!(get_val(&slab, idx3), Some(3), "slab: {:#?}", slab);
+        assert!(get_val(&slab, idx1).is_none());
+        assert!(get_val(&slab, idx2).is_none());
+        assert_eq!(get_val(&slab, idx3), Some(3));
     });
 }
 
@@ -143,14 +149,23 @@ mod single_shard {
     use super::*;
 
     fn store_val(slab: &Arc<SingleShard>, readiness: usize) -> usize {
-        test_println!("store: {}", readiness);
+        println!("store: {}", readiness);
         let key = slab.alloc().expect("allocate slot");
         if let Some(slot) = slab.get(key) {
-            slot.readiness.store(readiness, Ordering::Release);
+            slot.set_readiness(key, |_| readiness)
+                .expect("generation should still be valid!");
         } else {
             panic!("slab did not contain a value for {:#x}", key);
         }
         key
+    }
+
+    fn get_val(slab: &Arc<SingleShard>, key: usize) -> Option<usize> {
+        slab.get(key).and_then(|s| {
+            let rdy = s.get_readiness(key);
+            test_println!("--> got readiness {:?} with key {:#x}", rdy, key);
+            rdy
+        })
     }
 
     fn store_when_free(slab: &Arc<SingleShard>, readiness: usize) -> usize {
@@ -163,15 +178,12 @@ mod single_shard {
             thread::yield_now();
         };
         if let Some(slot) = slab.get(key) {
-            slot.readiness.store(readiness, Ordering::Release);
+            slot.set_readiness(key, |_| readiness)
+                .expect("generation should still be valid!");
         } else {
             panic!("slab did not contain a value for {:#x}", key);
         }
         key
-    }
-
-    fn get_val(slab: &Arc<SingleShard>, key: usize) -> Option<usize> {
-        slab.get(key).map(|s| s.readiness.load(Ordering::Acquire))
     }
 
     #[test]
@@ -184,8 +196,8 @@ mod single_shard {
             let idx1 = store_val(&slab, 1);
             let idx2 = store_val(&slab, 2);
 
-            assert_eq!(get_val(&slab, idx1), Some(1), "slab: {:#?}", slab);
-            assert_eq!(get_val(&slab, idx2), Some(2), "slab: {:#?}", slab);
+            assert_eq!(get_val(&slab, idx1), Some(1));
+            assert_eq!(get_val(&slab, idx2), Some(2));
 
             let s = slab.clone();
             let t1 = thread::spawn(move || {
@@ -201,8 +213,8 @@ mod single_shard {
             let idx3 = store_when_free(&slab, 3);
             t1.join().expect("thread 1 should not panic");
 
-            assert_eq!(get_val(&slab, idx3), Some(3), "slab: {:#?}", slab);
-            assert_eq!(get_val(&slab, idx2), Some(2), "slab: {:#?}", slab);
+            assert_eq!(get_val(&slab, idx3), Some(3));
+            assert_eq!(get_val(&slab, idx2), Some(2));
         });
     }
 
@@ -218,8 +230,8 @@ mod single_shard {
             let idx1 = store_val(&slab, 1);
             let idx2 = store_val(&slab, 2);
 
-            assert_eq!(get_val(&slab, idx1), Some(1), "slab: {:#?}", slab);
-            assert_eq!(get_val(&slab, idx2), Some(2), "slab: {:#?}", slab);
+            assert_eq!(get_val(&slab, idx1), Some(1));
+            assert_eq!(get_val(&slab, idx2), Some(2));
 
             let s = slab.clone();
             let s2 = slab.clone();
@@ -235,16 +247,16 @@ mod single_shard {
             t1.join().expect("thread 1 should not panic");
             t2.join().expect("thread 1 should not panic");
 
-            assert!(get_val(&slab, idx1).is_none(), "slab: {:#?}", slab);
-            assert!(get_val(&slab, idx2).is_none(), "slab: {:#?}", slab);
-            assert_eq!(get_val(&slab, idx3), Some(3), "slab: {:#?}", slab);
+            assert!(get_val(&slab, idx1).is_none());
+            assert!(get_val(&slab, idx2).is_none());
+            assert_eq!(get_val(&slab, idx3), Some(3));
         });
     }
 
     #[test]
     fn alloc_remove_get() {
         test_util::run_model("alloc_remove_get", || {
-            let slab = Arc::new(Slab::new());
+            let slab = Arc::new(SingleShard::new());
             let pair = Arc::new((Mutex::new(None), Condvar::new()));
 
             let slab2 = slab.clone();
@@ -280,7 +292,7 @@ mod single_shard {
     #[test]
     fn alloc_remove_set() {
         test_util::run_model("alloc_remove_set", || {
-            let slab = Arc::new(Slab::new());
+            let slab = Arc::new(SingleShard::new());
             let pair = Arc::new((Mutex::new(None), Condvar::new()));
 
             let slab2 = slab.clone();
@@ -310,9 +322,7 @@ mod single_shard {
                 next = cvar.wait(next).unwrap();
             }
             let key = next.unwrap();
-            let val = slab
-                .get(key)
-                .map(|val| val.readiness.store(2, Ordering::Release));
+            let val = slab.get(key).map(|val| val.set_readiness(key, |_| 2));
 
             t1.join().unwrap();
         })
@@ -388,9 +398,7 @@ fn alloc_remove_set() {
             next = cvar.wait(next).unwrap();
         }
         let key = next.unwrap();
-        let val = slab
-            .get(key)
-            .map(|val| val.readiness.store(2, Ordering::Release));
+        let val = slab.get(key).map(|val| val.set_readiness(key, |_| 2));
 
         t1.join().unwrap();
     })
@@ -406,7 +414,7 @@ fn alloc_remove_set() {
 //         for i in 0..1024 {
 //             test_println!("{}", i);
 //             let k = store_val(&slab, i);
-//             assert_eq!(get_val(&slab, k), Some(i), "slab: {:#?}", slab);
+//             assert_eq!(get_val(&slab, k), Some(i));
 //         }
 //     });
 // }

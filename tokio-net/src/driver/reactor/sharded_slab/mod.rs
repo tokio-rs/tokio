@@ -22,7 +22,9 @@ mod tid;
 // this is used by sub-modules
 use self::tests::test_util;
 use super::ScheduledIo;
-use pack::{Pack, WIDTH};
+pub(super) use pack::Pack;
+use pack::WIDTH;
+pub(super) use page::slot::Generation;
 use slab::Shard;
 #[cfg(test)]
 pub(crate) use slab::Slab;

@@ -8,15 +8,20 @@ fn store_val(slab: &Arc<SingleShard>, readiness: usize) -> usize {
     println!("store: {}", readiness);
     let key = slab.alloc().expect("allocate slot");
     if let Some(slot) = slab.get(key) {
-        slot.readiness.store(readiness, Ordering::Release);
+        slot.set_readiness(key, |_| readiness)
+            .expect("generation should still be valid!");
     } else {
-        panic!("slab did not contain {:#x}", key);
+        panic!("slab did not contain a value for {:#x}", key);
     }
     key
 }
 
 fn get_val(slab: &Arc<SingleShard>, key: usize) -> Option<usize> {
-    slab.get(key).map(|s| s.readiness.load(Ordering::Acquire))
+    slab.get(key).and_then(|s| {
+        let rdy = s.get_readiness(key);
+        test_println!("--> got readiness {:?} with key {:#x}", rdy, key);
+        rdy
+    })
 }
 
 #[test]

@@ -3,7 +3,7 @@ use crate::sync::CausalCell;
 
 pub(crate) mod slot;
 mod stack;
-use self::slot::Slot;
+pub(crate) use self::slot::Slot;
 use self::stack::TransferStack;
 use std::fmt;
 
@@ -174,17 +174,14 @@ impl Shared {
     }
 
     #[inline]
-    pub(in crate::driver) fn get(&self, addr: Addr, idx: usize) -> Option<&ScheduledIo> {
+    pub(in crate::driver) fn get(&self, addr: Addr, idx: usize) -> Option<&Slot> {
         let page_offset = addr.offset() - self.prev_sz;
         test_println!("-> offset {:?}", page_offset);
 
         #[allow(clippy::let_and_return)] // clippy doesn't know about the test_println!
-        let value = self.slab.with(|slab| {
-            unsafe { &*slab }
-                .as_ref()?
-                .get(page_offset)?
-                .get(slot::Generation::from_packed(idx))
-        });
+        let value = self
+            .slab
+            .with(|slab| unsafe { &*slab }.as_ref()?.get(page_offset));
         test_println!("-> offset {:?}; value={:?}", page_offset, value);
         value
     }

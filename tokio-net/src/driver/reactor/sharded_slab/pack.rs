@@ -4,7 +4,7 @@ pub(super) const WIDTH: usize = std::mem::size_of::<usize>() * 8;
 ///
 /// This allows us to avoid manually repeating some calculations when packing
 /// and unpacking indices.
-pub(super) trait Pack: Sized {
+pub(crate) trait Pack: Sized {
     // ====== provided by each implementation =================================
 
     /// The number of bits occupied by this type when packed into a usize.

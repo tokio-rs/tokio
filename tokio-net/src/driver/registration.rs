@@ -229,20 +229,24 @@ impl Registration {
         // If HUP were to be cleared when `direction` is `Read`, then when
         // `poll_ready` is called again with a _`direction` of `Write`, the HUP
         // state would not be visible.
-        let mut ready =
-            mask & mio::Ready::from_usize(sched.readiness.fetch_and(!mask_no_hup, SeqCst));
+        let curr_ready = sched
+            .set_readiness(self.token, |curr| curr & (!mask_no_hup))
+            .expect("token no longer in io dispatch!");
+        let mut ready = mask & mio::Ready::from_usize(curr_ready);
 
         if ready.is_empty() {
             if let Some(cx) = cx {
                 // Update the task info
                 match direction {
-                    Direction::Read => sched.reader.register_by_ref(cx.waker()),
-                    Direction::Write => sched.writer.register_by_ref(cx.waker()),
+                    Direction::Read => sched.io().reader.register_by_ref(cx.waker()),
+                    Direction::Write => sched.io().writer.register_by_ref(cx.waker()),
                 }
 
+                let curr_ready = sched
+                    .set_readiness(self.token, |curr| curr & (!mask_no_hup))
+                    .expect("token no longer in io dispatch!");
                 // Try again
-                ready =
-                    mask & mio::Ready::from_usize(sched.readiness.fetch_and(!mask_no_hup, SeqCst));
+                ready = mask & mio::Ready::from_usize(curr_ready);
             }
         }
 

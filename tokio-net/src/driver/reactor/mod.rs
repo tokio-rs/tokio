@@ -1,12 +1,12 @@
 use super::platform;
 use crate::sync::atomic::{
     AtomicUsize,
-    Ordering::{Relaxed, Release, SeqCst},
+    Ordering::{AcqRel, Acquire, Relaxed, Release, SeqCst},
 };
 
 mod sharded_slab;
-use sharded_slab::SingleShard;
 pub(crate) use sharded_slab::MAX_SOURCES;
+use sharded_slab::{Pack, SingleShard};
 
 use tokio_executor::park::{Park, Unpark};
 use tokio_sync::AtomicWaker;
@@ -75,7 +75,7 @@ pub(super) struct Inner {
 
 #[derive(Debug)]
 pub(super) struct ScheduledIo {
-    pub(super) readiness: AtomicUsize,
+    readiness: AtomicUsize,
     pub(super) reader: AtomicWaker,
     pub(super) writer: AtomicWaker,
 }
@@ -247,14 +247,20 @@ impl Reactor {
             None => return,
         };
 
-        io.readiness.fetch_or(ready.as_usize(), Relaxed);
+        if io
+            .set_readiness(token.0, |curr| curr | ready.as_usize())
+            .is_err()
+        {
+            // token no longer valid!
+            return;
+        }
 
         if ready.is_writable() || platform::is_hup(ready) {
-            wr = io.writer.take_waker();
+            wr = io.io().writer.take_waker();
         }
 
         if !(ready & (!mio::Ready::writable())).is_empty() {
-            rd = io.reader.take_waker();
+            rd = io.io().reader.take_waker();
         }
 
         if let Some(w) = rd {
@@ -386,15 +392,17 @@ impl Inner {
             .io_dispatch
             .get(token)
             .unwrap_or_else(|| panic!("IO resource for token {} does not exist!", token));
+        let readiness = sched
+            .get_readiness(token)
+            .unwrap_or_else(|| panic!("IO resource for token {} does not exist!", token));
 
         let (waker, ready) = match dir {
-            Direction::Read => (&sched.reader, !mio::Ready::writable()),
-            Direction::Write => (&sched.writer, mio::Ready::writable()),
+            Direction::Read => (&sched.io().reader, !mio::Ready::writable()),
+            Direction::Write => (&sched.io().writer, mio::Ready::writable()),
         };
 
         waker.register(w);
-
-        if sched.readiness.load(SeqCst) & ready.as_usize() != 0 {
+        if readiness & ready.as_usize() != 0 {
             waker.wake();
         }
     }
@@ -421,14 +429,6 @@ impl Direction {
             }
             Direction::Write => mio::Ready::writable() | platform::hup(),
         }
-    }
-}
-
-impl ScheduledIo {
-    fn reset(&self) {
-        self.readiness.store(0, Release);
-        drop(self.reader.take_waker());
-        drop(self.writer.take_waker());
     }
 }
 
