@@ -26,7 +26,7 @@
 //!
 //! Guide level documentation is found on the [website].
 //!
-//! [driver]: tokio_net::driver
+//! [driver]: tokio::net::driver
 //! [website]: https://tokio.rs/docs/
 //!
 //! # Examples
@@ -82,23 +82,34 @@ macro_rules! if_runtime {
 
 #[cfg(feature = "timer")]
 pub mod clock;
+
 #[cfg(feature = "codec")]
 pub mod codec;
+
 #[cfg(feature = "fs")]
 pub mod fs;
+
 pub mod future;
+
 #[cfg(feature = "io")]
 pub mod io;
-#[cfg(any(feature = "tcp", feature = "udp", feature = "uds"))]
+
+#[cfg(feature = "net-driver")]
 pub mod net;
+
 pub mod prelude;
+
 #[cfg(feature = "process")]
 pub mod process;
+
 #[cfg(feature = "signal")]
 pub mod signal;
+
 pub mod stream;
+
 #[cfg(feature = "sync")]
 pub mod sync;
+
 #[cfg(feature = "timer")]
 pub mod timer;
 
@@ -113,6 +124,7 @@ if_runtime! {
     #[cfg(feature = "macros")]
     #[doc(inline)]
     pub use tokio_macros::main;
+
     #[cfg(feature = "macros")]
     #[doc(inline)]
     pub use tokio_macros::test;

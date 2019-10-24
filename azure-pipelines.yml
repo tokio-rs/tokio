@@ -37,6 +37,7 @@ jobs:
         - timer
         - udp
         - uds
+      tests-integration: []
 
 # Test crates that are platform specific
 - template: ci/azure-test-stable.yml
@@ -79,7 +80,7 @@ jobs:
     displayName: Test feature flags
     rust: beta
     crates:
-      build-tests:
+      tests-build:
         - tokio-executor
         - tokio-net
         - executor-without-current-thread

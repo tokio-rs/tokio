@@ -9,10 +9,10 @@ pub use self::spawner::Spawner;
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use tokio_executor::thread_pool::JoinHandle;
 
+use crate::net::driver;
 use crate::timer::timer;
 
 use tokio_executor::thread_pool::ThreadPool;
-use tokio_net::driver;
 
 use std::future::Future;
 use std::io;
@@ -42,7 +42,7 @@ struct Inner {
     pool: ThreadPool,
 
     /// Reactor handles
-    reactor_handles: Vec<tokio_net::driver::Handle>,
+    reactor_handles: Vec<crate::net::driver::Handle>,
 
     /// Timer handles
     timer_handles: Vec<timer::Handle>,
