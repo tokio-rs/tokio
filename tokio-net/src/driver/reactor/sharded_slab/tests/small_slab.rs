@@ -1,6 +1,6 @@
 use super::super::ScheduledIo;
 use super::test_util;
-use loom::sync::{atomic::Ordering, Arc};
+use loom::sync::{atomic::Ordering, Arc, Condvar, Mutex};
 use loom::thread;
 
 use pack::{Pack, WIDTH};
@@ -240,6 +240,160 @@ mod single_shard {
             assert_eq!(get_val(&slab, idx3), Some(3), "slab: {:#?}", slab);
         });
     }
+
+    #[test]
+    fn alloc_remove_get() {
+        test_util::run_model("alloc_remove_get", || {
+            let slab = Arc::new(Slab::new());
+            let pair = Arc::new((Mutex::new(None), Condvar::new()));
+
+            let slab2 = slab.clone();
+            let pair2 = pair.clone();
+            let t1 = thread::spawn(move || {
+                let slab = slab2;
+                let (lock, cvar) = &*pair2;
+                let key1 = store_val(&slab, 0);
+                let key = store_val(&slab, 1);
+
+                let mut next = lock.lock().unwrap();
+                *next = Some(key);
+                cvar.notify_one();
+
+                slab.remove(key);
+                store_val(&slab, 2);
+            });
+
+            let (lock, cvar) = &*pair;
+            let mut next = lock.lock().unwrap();
+            while next.is_none() {
+                next = cvar.wait(next).unwrap();
+            }
+            let key = next.unwrap();
+
+            let val = get_val(&slab, key);
+            assert_ne!(val, Some(2), "generation must have advanced!");
+
+            t1.join().unwrap();
+        })
+    }
+
+    #[test]
+    fn alloc_remove_set() {
+        test_util::run_model("alloc_remove_set", || {
+            let slab = Arc::new(Slab::new());
+            let pair = Arc::new((Mutex::new(None), Condvar::new()));
+
+            let slab2 = slab.clone();
+            let pair2 = pair.clone();
+            let t1 = thread::spawn(move || {
+                let slab = slab2;
+                let (lock, cvar) = &*pair2;
+                let key1 = store_val(&slab, 0);
+                let key = store_val(&slab, 1);
+
+                let mut next = lock.lock().unwrap();
+                *next = Some(key);
+                cvar.notify_one();
+
+                slab.remove(key);
+                let key2 = slab.alloc().expect("allocate slot");
+                assert_ne!(
+                    get_val(&slab, key2),
+                    Some(2),
+                    "stale set must not have happened"
+                );
+            });
+
+            let (lock, cvar) = &*pair;
+            let mut next = lock.lock().unwrap();
+            while next.is_none() {
+                next = cvar.wait(next).unwrap();
+            }
+            let key = next.unwrap();
+            let val = slab
+                .get(key)
+                .map(|val| val.readiness.store(2, Ordering::Release));
+
+            t1.join().unwrap();
+        })
+    }
+}
+
+#[test]
+fn alloc_remove_get() {
+    test_util::run_model("alloc_remove_get", || {
+        let slab = Arc::new(Slab::new());
+        let pair = Arc::new((Mutex::new(None), Condvar::new()));
+
+        let slab2 = slab.clone();
+        let pair2 = pair.clone();
+        let t1 = thread::spawn(move || {
+            let slab = slab2;
+            let (lock, cvar) = &*pair2;
+            let key1 = store_val(&slab, 0);
+            let key = store_val(&slab, 1);
+
+            let mut next = lock.lock().unwrap();
+            *next = Some(key);
+            cvar.notify_one();
+
+            slab.remove(key);
+            store_val(&slab, 2);
+        });
+
+        let (lock, cvar) = &*pair;
+        let mut next = lock.lock().unwrap();
+        while next.is_none() {
+            next = cvar.wait(next).unwrap();
+        }
+        let key = next.unwrap();
+
+        let val = get_val(&slab, key);
+        assert_ne!(val, Some(2), "generation must have advanced!");
+
+        t1.join().unwrap();
+    })
+}
+
+#[test]
+fn alloc_remove_set() {
+    test_util::run_model("alloc_remove_set", || {
+        let slab = Arc::new(Slab::new());
+        let pair = Arc::new((Mutex::new(None), Condvar::new()));
+
+        let slab2 = slab.clone();
+        let pair2 = pair.clone();
+        let t1 = thread::spawn(move || {
+            let slab = slab2;
+            let (lock, cvar) = &*pair2;
+            let key1 = store_val(&slab, 0);
+            let key = store_val(&slab, 1);
+
+            let mut next = lock.lock().unwrap();
+            *next = Some(key);
+            cvar.notify_one();
+
+            slab.remove(key);
+            let key2 = slab.alloc().expect("allocate slot");
+            assert_ne!(
+                get_val(&slab, key2),
+                Some(2),
+                "stale set must not have happened"
+            );
+        });
+
+        let (lock, cvar) = &*pair;
+        let mut next = lock.lock().unwrap();
+        while next.is_none() {
+            next = cvar.wait(next).unwrap();
+        }
+        let key = next.unwrap();
+        let val = slab
+            .get(key)
+            .map(|val| val.readiness.store(2, Ordering::Release));
+
+        t1.join().unwrap();
+    })
 }
 
 // #[test]
