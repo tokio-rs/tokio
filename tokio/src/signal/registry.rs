@@ -175,60 +175,62 @@ where
     GLOBALS.as_ref()
 }
 
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_util::{future, StreamExt};
-    use tokio_sync::mpsc::channel;
-    use tokio_sync::oneshot;
+    use crate::runtime::current_thread::Runtime;
+    use crate::sync::{mpsc, oneshot};
+    use futures::{future, StreamExt};
 
-    #[tokio::test]
-    async fn smoke() {
-        let registry = Registry::new(vec![
-            EventInfo::default(),
-            EventInfo::default(),
-            EventInfo::default(),
-        ]);
+    #[test]
+    fn smoke() {
+        let mut rt = Runtime::new().unwrap();
+        rt.block_on(async move {
+            let registry = Registry::new(vec![
+                EventInfo::default(),
+                EventInfo::default(),
+                EventInfo::default(),
+            ]);
 
-        let (first_tx, first_rx) = channel(3);
-        let (second_tx, second_rx) = channel(3);
-        let (third_tx, third_rx) = channel(3);
+            let (first_tx, first_rx) = mpsc::channel(3);
+            let (second_tx, second_rx) = mpsc::channel(3);
+            let (third_tx, third_rx) = mpsc::channel(3);
 
-        registry.register_listener(0, first_tx);
-        registry.register_listener(1, second_tx);
-        registry.register_listener(2, third_tx);
+            registry.register_listener(0, first_tx);
+            registry.register_listener(1, second_tx);
+            registry.register_listener(2, third_tx);
 
-        let (fire, wait) = oneshot::channel();
+            let (fire, wait) = oneshot::channel();
 
-        tokio::spawn(async {
-            wait.await.expect("wait failed");
+            crate::spawn(async {
+                wait.await.expect("wait failed");
 
-            // Record some events which should get coalesced
-            registry.record_event(0);
-            registry.record_event(0);
-            registry.record_event(1);
-            registry.record_event(1);
-            registry.broadcast();
+                // Record some events which should get coalesced
+                registry.record_event(0);
+                registry.record_event(0);
+                registry.record_event(1);
+                registry.record_event(1);
+                registry.broadcast();
 
-            // Send subsequent signal
-            registry.record_event(0);
-            registry.broadcast();
+                // Send subsequent signal
+                registry.record_event(0);
+                registry.broadcast();
 
-            drop(registry);
+                drop(registry);
+            });
+
+            let _ = fire.send(());
+            let all = future::join3(
+                first_rx.collect::<Vec<_>>(),
+                second_rx.collect::<Vec<_>>(),
+                third_rx.collect::<Vec<_>>(),
+            );
+
+            let (first_results, second_results, third_results) = all.await;
+            assert_eq!(2, first_results.len());
+            assert_eq!(1, second_results.len());
+            assert_eq!(0, third_results.len());
         });
-
-        let _ = fire.send(());
-        let all = future::join3(
-            first_rx.collect::<Vec<_>>(),
-            second_rx.collect::<Vec<_>>(),
-            third_rx.collect::<Vec<_>>(),
-        );
-
-        let (first_results, second_results, third_results) = all.await;
-        assert_eq!(2, first_results.len());
-        assert_eq!(1, second_results.len());
-        assert_eq!(0, third_results.len());
     }
 
     #[test]
@@ -236,7 +238,7 @@ mod tests {
     fn register_panics_on_invalid_input() {
         let registry = Registry::new(vec![EventInfo::default()]);
 
-        let (tx, _) = channel(1);
+        let (tx, _) = mpsc::channel(1);
         registry.register_listener(1, tx);
     }
 
@@ -246,37 +248,41 @@ mod tests {
         registry.record_event(42);
     }
 
-    #[tokio::test]
-    async fn broadcast_cleans_up_disconnected_listeners() {
-        let registry = Registry::new(vec![EventInfo::default()]);
+    #[test]
+    fn broadcast_cleans_up_disconnected_listeners() {
+        let mut rt = Runtime::new().unwrap();
 
-        let (first_tx, first_rx) = channel(1);
-        let (second_tx, second_rx) = channel(1);
-        let (third_tx, third_rx) = channel(1);
+        rt.block_on(async {
+            let registry = Registry::new(vec![EventInfo::default()]);
 
-        registry.register_listener(0, first_tx);
-        registry.register_listener(0, second_tx);
-        registry.register_listener(0, third_tx);
+            let (first_tx, first_rx) = mpsc::channel(1);
+            let (second_tx, second_rx) = mpsc::channel(1);
+            let (third_tx, third_rx) = mpsc::channel(1);
 
-        drop(first_rx);
-        drop(second_rx);
+            registry.register_listener(0, first_tx);
+            registry.register_listener(0, second_tx);
+            registry.register_listener(0, third_tx);
 
-        let (fire, wait) = oneshot::channel();
+            drop(first_rx);
+            drop(second_rx);
 
-        tokio::spawn(async {
-            wait.await.expect("wait failed");
+            let (fire, wait) = oneshot::channel();
 
-            registry.record_event(0);
-            registry.broadcast();
+            crate::spawn(async {
+                wait.await.expect("wait failed");
 
-            assert_eq!(1, registry.storage[0].recipients.lock().unwrap().len());
-            drop(registry);
+                registry.record_event(0);
+                registry.broadcast();
+
+                assert_eq!(1, registry.storage[0].recipients.lock().unwrap().len());
+                drop(registry);
+            });
+
+            let _ = fire.send(());
+            let results: Vec<()> = third_rx.collect().await;
+
+            assert_eq!(1, results.len());
         });
-
-        let _ = fire.send(());
-        let results: Vec<()> = third_rx.collect().await;
-
-        assert_eq!(1, results.len());
     }
 
     #[test]
@@ -286,8 +292,8 @@ mod tests {
         registry.record_event(0);
         assert_eq!(false, registry.broadcast());
 
-        let (first_tx, first_rx) = channel(1);
-        let (second_tx, second_rx) = channel(1);
+        let (first_tx, first_rx) = mpsc::channel(1);
+        let (second_tx, second_rx) = mpsc::channel(1);
 
         registry.register_listener(0, first_tx);
         registry.register_listener(0, second_tx);
@@ -302,4 +308,3 @@ mod tests {
         drop(second_rx);
     }
 }
-*/
