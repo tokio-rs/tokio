@@ -146,6 +146,14 @@ impl UnixDatagram {
         }
     }
 
+    /// Try to send a datagram to the target from the socket without blocking.
+    pub fn try_send_to<P>(&mut self, buf: &[u8], target: P) -> io::Result<usize>
+    where
+        P: AsRef<Path>,
+    {
+        self.io.get_ref().send_to(buf, target)
+    }
+
     /// Receives data from the socket.
     pub async fn recv_from(&mut self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         poll_fn(|cx| self.poll_recv_from_priv(cx, buf)).await
@@ -165,6 +173,11 @@ impl UnixDatagram {
             }
             x => Poll::Ready(x),
         }
+    }
+
+    /// Try to recv a datagram from the socket without blocking.
+    pub fn try_recv_from(&mut self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+        self.io.get_ref().recv_from(buf)
     }
 
     /// Returns the local address that this socket is bound to.
