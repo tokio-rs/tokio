@@ -234,7 +234,7 @@ fn slot_for(duration: u64, level: usize) -> usize {
 }
 
 /*
-#[cfg(test)]
+#[cfg(all(test, not(loom)))]
 mod test {
     use super::*;
 

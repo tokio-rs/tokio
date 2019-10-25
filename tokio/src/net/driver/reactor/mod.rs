@@ -1,12 +1,12 @@
 use super::platform;
 use crate::loom::atomic::{AtomicUsize, Ordering::SeqCst};
 
-#[cfg(test)]
+#[cfg(all(test, loom))]
 macro_rules! loom_thread_local {
     ($($tts:tt)+) => { loom::thread_local!{ $($tts)+ } }
 }
 
-#[cfg(not(test))]
+#[cfg(not(loom))]
 macro_rules! loom_thread_local {
     ($($tts:tt)+) => { std::thread_local!{ $($tts)+ } }
 }
@@ -430,7 +430,7 @@ impl Direction {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(loom)))]
 mod tests {
     use super::*;
     use loom::thread;

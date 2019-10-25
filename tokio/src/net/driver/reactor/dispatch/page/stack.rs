@@ -51,7 +51,7 @@ impl fmt::Debug for TransferStack {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, loom))]
 mod test {
     use super::super::super::test_util;
     use super::*;

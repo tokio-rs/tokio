@@ -18,15 +18,15 @@ const MAX_THREADS: usize = 4096;
 const MAX_THREADS: usize = 2048;
 const RESERVED_BITS: usize = 5;
 
-#[path = "../page/mod.rs"]
+#[path = "../../page/mod.rs"]
 #[allow(dead_code)]
 mod page;
 
-#[path = "../pack.rs"]
+#[path = "../../pack.rs"]
 #[allow(dead_code)]
 mod pack;
 
-#[path = "../iter.rs"]
+#[path = "../../iter.rs"]
 #[allow(dead_code)]
 mod iter;
 
@@ -34,7 +34,7 @@ mod iter;
 #[allow(dead_code)]
 mod sharded_slab;
 
-#[path = "../tid.rs"]
+#[path = "../../tid.rs"]
 #[allow(dead_code)]
 mod tid;
 

@@ -2,7 +2,7 @@
 //! are running tests or not.
 pub(crate) use self::inner::*;
 
-#[cfg(test)]
+#[cfg(all(test, loom))]
 mod inner {
     pub(crate) use loom::sync::CausalCell;
     pub(crate) use loom::sync::Mutex;
@@ -12,7 +12,7 @@ mod inner {
     }
 }
 
-#[cfg(not(test))]
+#[cfg(not(all(test, loom)))]
 mod inner {
     use std::cell::UnsafeCell;
     pub(crate) use std::sync::atomic;

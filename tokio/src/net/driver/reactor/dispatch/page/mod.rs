@@ -241,7 +241,7 @@ impl fmt::Debug for Addr {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(loom)))]
 mod test {
     use super::*;
     use proptest::prelude::*;

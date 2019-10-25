@@ -172,7 +172,7 @@ impl Stream for CtrlBreak {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(loom)))]
 mod tests {
     use super::*;
     use crate::runtime::current_thread::Runtime;
