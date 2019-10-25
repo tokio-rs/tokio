@@ -164,10 +164,7 @@ impl Runtime {
     ///
     /// The caller is responsible for ensuring that other spawned futures
     /// complete execution by calling `block_on` or `run`.
-    pub fn block_on<F>(&mut self, f: F) -> F::Output
-    where
-        F: Future,
-    {
+    pub fn block_on<F: Future>(&mut self, f: F) -> F::Output {
         self.enter(|executor| {
             // Run the provided future
             executor.block_on(f)

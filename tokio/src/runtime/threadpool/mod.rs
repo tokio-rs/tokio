@@ -111,7 +111,8 @@ impl Runtime {
     /// This function panics if the spawn fails. Failure occurs if the executor
     /// is currently at capacity and is unable to spawn a new future.
     pub fn spawn<F>(&self, future: F) -> &Self
-    where F: Future<Output = ()> + Send + 'static,
+    where
+        F: Future<Output = ()> + Send + 'static,
     {
         self.inner().pool.spawn(future);
         self
@@ -129,10 +130,7 @@ impl Runtime {
     ///
     /// This function panics if the executor is at capacity, if the provided
     /// future panics, or if called within an asynchronous execution context.
-    pub fn block_on<F>(&self, future: F) -> F::Output
-    where
-        F: Future,
-    {
+    pub fn block_on<F: Future>(&self, future: F) -> F::Output {
         let _reactor = driver::set_default(&self.inner().reactor_handles[0]);
         let _timer = timer::set_default(&self.inner().timer_handles[0]);
 
