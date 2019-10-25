@@ -5,7 +5,6 @@ members = [
   "tokio-executor",
   "tokio-io",
   "tokio-macros",
-  "tokio-net",
   "tokio-sync",
   "tokio-test",
   "tokio-tls",
@@ -13,5 +12,6 @@ members = [
 
   # Internal
   "examples",
-  "build-tests",
+  "tests-build",
+  "tests-integration",
 ]

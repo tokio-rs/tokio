@@ -28,7 +28,7 @@ jobs:
       tokio:
         - fs
         - io
-        - net
+        - net-driver
         - process
         - rt-full
         - signal
@@ -37,21 +37,7 @@ jobs:
         - timer
         - udp
         - uds
-
-# Test crates that are platform specific
-- template: ci/azure-test-stable.yml
-  parameters:
-    name: test_sub_cross
-    displayName: Test sub crates (cross) -
-    cross: true
-    rust: beta
-    crates:
-      tokio-net:
-        - process
-        - signal
-        - tcp
-        - udp
-        - uds
+      tests-integration: []
 
 # Test crates that are NOT platform specific
 - template: ci/azure-test-stable.yml
@@ -79,21 +65,21 @@ jobs:
     displayName: Test feature flags
     rust: beta
     crates:
-      build-tests:
+      tests-build:
         - tokio-executor
-        - tokio-net
         - executor-without-current-thread
-        - macros-invalid-input
-        - net-no-features
-        - net-with-tcp
-        - net-with-udp
-        - net-with-uds
-        - tokio-no-features
-        - tokio-with-net
+        # - macros-invalid-input
+        # - net-no-features
+        # - net-with-tcp
+        # - net-with-udp
+        # - net-with-uds
+        # - tokio-no-features
+        # - tokio-with-net
 
 # Run loom tests
 - template: ci/azure-loom.yml
   parameters:
+    name: loom
     rust: beta
     crates:
       - tokio-executor
@@ -128,9 +114,9 @@ jobs:
       - rustfmt
       - clippy
       - test_tokio
-      - test_sub_cross
       - test_linux
       - test_features
+      - loom
 #      - test_nightly
       - cross
 #      - minrust

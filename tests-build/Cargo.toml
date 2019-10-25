@@ -1,0 +1,26 @@
+[package]
+name = "tests-build"
+version = "0.1.0"
+authors = ["Tokio Contributors <team@tokio.rs>"]
+edition = "2018"
+publish = false
+
+[features]
+executor-without-current-thread = ["tokio-executor"]
+# macros-invalid-input = ["tokio/rt-full"]
+# net-no-features = ["tokio-net"]
+# net-with-tcp = ["tokio-net/tcp"]
+# net-with-udp = ["tokio-net/udp"]
+# net-with-uds = ["tokio-net/uds"]
+# net-with-process = ["tokio-net/process"]
+# tokio-no-features = ["tokio"]
+# tokio-with-net = ["tokio/net-full"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio-executor = { path = "../tokio-executor", optional = true }
+# tokio = { path = "../tokio", optional = true, default-features = false }
+
+[dev-dependencies]
+trybuild = "1.0"

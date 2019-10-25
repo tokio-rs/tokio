@@ -27,7 +27,7 @@ keywords = ["io", "async", "non-blocking", "futures"]
 default = [
   "fs",
   "io",
-  "net",
+  "net-full",
   "process",
   "rt-full",
   "signal",
@@ -35,31 +35,47 @@ default = [
   "timer",
 ]
 
-fs = []
-io = ["tokio-io"]
+fs = ["tokio-executor/blocking"]
+io = ["tokio-io", "bytes", "iovec"]
 macros = ["tokio-macros"]
-net = ["tcp", "udp", "uds"]
+net-full = ["tcp", "udp", "uds"]
+net-driver = ["mio", "tokio-executor/blocking"]
 rt-current-thread = [
   "timer",
-  "tokio-net",
   "tokio-executor/current-thread",
 ]
 rt-full = [
   "macros",
   "num_cpus",
-  "net",
+  "net-full",
   "sync",
   "timer",
   "tokio-executor/current-thread",
   "tokio-executor/thread-pool",
 ]
-signal = ["tokio-net/signal"]
+signal = [
+  "lazy_static",
+  "libc",
+  "mio-uds",
+  "net-driver",
+  "signal-hook-registry"
+]
 sync = ["tokio-sync"]
-tcp = ["io", "tokio-net/tcp"]
+tcp = ["io", "net-driver"]
 timer = ["crossbeam-utils", "slab"]
-udp = ["io", "tokio-net/udp"]
-uds = ["io", "tokio-net/uds"]
-process = ["io", "tokio-net/process"]
+udp = ["io", "net-driver"]
+uds = ["io", "net-driver", "mio-uds", "libc"]
+process = [
+  "crossbeam-queue",
+  "io",
+  "libc",
+  "mio-named-pipes",
+  "signal",
+  "winapi/consoleapi",
+  "winapi/minwindef",
+  "winapi/threadpoollegacyapiset",
+  "winapi/winerror",
+]
 
 [dependencies]
 futures-core-preview = "=0.3.0-alpha.19"
@@ -67,23 +83,38 @@ futures-sink-preview = "=0.3.0-alpha.19"
 futures-util-preview = { version = "=0.3.0-alpha.19", features = ["sink"] }
 
 # Everything else is optional...
+bytes = { version = "0.4", optional = true }
 crossbeam-utils = { version = "0.6.0", optional = true }
+iovec = { version = "0.1", optional = true }
+lazy_static = { version = "1.0.2", optional = true }
+mio = { version = "0.6.14", optional = true }
 num_cpus = { version = "1.8.0", optional = true }
 # Backs `DelayQueue`
 slab = { version = "0.4.1", optional = true }
 tokio-io = { version = "=0.2.0-alpha.6", optional = true, features = ["util"], path = "../tokio-io" }
 tokio-executor = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-executor" }
 tokio-macros = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-macros" }
-tokio-net = { version = "=0.2.0-alpha.6", optional = true, features = ["async-traits"], path = "../tokio-net" }
 tokio-sync = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-sync", features = ["async-traits"] }
+
+[target.'cfg(unix)'.dependencies]
+crossbeam-queue = { version = "0.1.2", optional = true }
+mio-uds = { version = "0.6.5", optional = true }
+libc = { version = "0.2.42", optional = true }
+signal-hook-registry = { version = "1.1.1", optional = true }
+
+[target.'cfg(windows)'.dependencies]
+mio-named-pipes = { version = "0.1.6", optional = true }
+
+[target.'cfg(windows)'.dependencies.winapi]
+version = "0.3.8"
+default-features = false
+optional = true
 
 [dev-dependencies]
 tokio-test = { version = "=0.2.0-alpha.6", path = "../tokio-test" }
 tokio-util = { version = "=0.2.0-alpha.6", path = "../tokio-util" }
 
-futures-preview = "=0.3.0-alpha.19"
-futures-util-preview = "=0.3.0-alpha.19"
-pin-utils = "=0.1.0-alpha.4"
+futures-preview = { version = "=0.3.0-alpha.19", features = ["async-await"] }
 env_logger = { version = "0.6", default-features = false }
 flate2 = { version = "1", features = ["tokio"] }
 http = "0.1"

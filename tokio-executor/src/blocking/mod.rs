@@ -2,14 +2,18 @@
 
 use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::loom::thread;
+#[cfg(feature = "blocking")]
 use tokio_sync::oneshot;
 
 use std::cell::Cell;
 use std::collections::VecDeque;
 use std::fmt;
+#[cfg(feature = "blocking")]
 use std::future::Future;
 use std::ops::Deref;
+#[cfg(feature = "blocking")]
 use std::pin::Pin;
+#[cfg(feature = "blocking")]
 use std::task::{Context, Poll};
 use std::time::Duration;
 
@@ -88,6 +92,7 @@ const MAX_THREADS: u32 = 1_000;
 const KEEP_ALIVE: Duration = Duration::from_secs(10);
 
 /// Result of a blocking operation running on the blocking thread pool.
+#[cfg(feature = "blocking")]
 #[derive(Debug)]
 pub struct Blocking<T> {
     rx: oneshot::Receiver<T>,
@@ -259,6 +264,7 @@ impl Drop for PoolWaiter {
 /// }).await;
 /// # }
 /// ```
+#[cfg(feature = "blocking")]
 pub fn run<F, R>(f: F) -> Blocking<R>
 where
     F: FnOnce() -> R + Send + 'static,
@@ -283,6 +289,7 @@ where
     Blocking { rx }
 }
 
+#[cfg(feature = "blocking")]
 impl<T> Future for Blocking<T> {
     type Output = T;
 
