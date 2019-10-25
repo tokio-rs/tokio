@@ -4,7 +4,7 @@ use super::{
 };
 use std::slice;
 
-pub(in crate::driver::reactor) struct UniqueIter<'a> {
+pub(in crate::net::driver::reactor) struct UniqueIter<'a> {
     pub(super) shards: slice::IterMut<'a, Shard>,
     pub(super) pages: slice::Iter<'a, page::Shared>,
     pub(super) slots: Option<page::Iter<'a>>,
@@ -31,7 +31,7 @@ impl<'a> Iterator for UniqueIter<'a> {
     }
 }
 
-pub(in crate::driver::reactor) struct ShardIter<'a> {
+pub(in crate::net::driver::reactor) struct ShardIter<'a> {
     pub(super) pages: slice::IterMut<'a, page::Shared>,
     pub(super) slots: Option<page::Iter<'a>>,
 }

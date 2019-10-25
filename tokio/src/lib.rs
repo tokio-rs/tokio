@@ -70,6 +70,16 @@
 //! }
 //! ```
 
+#[cfg(all(test, feature = "net-driver"))]
+macro_rules! loom_thread_local {
+    ($($tts:tt)+) => { loom::thread_local!{ $($tts)+ } }
+}
+
+#[cfg(all(not(test), feature = "net-driver"))]
+macro_rules! loom_thread_local {
+    ($($tts:tt)+) => { std::thread_local!{ $($tts)+ } }
+}
+
 macro_rules! if_runtime {
     ($($i:item)*) => ($(
         #[cfg(any(
@@ -96,6 +106,9 @@ pub mod io;
 
 #[cfg(feature = "net-driver")]
 pub mod net;
+
+#[cfg(feature = "net-driver")]
+mod loom;
 
 pub mod prelude;
 

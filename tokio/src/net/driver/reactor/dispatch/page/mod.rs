@@ -55,7 +55,7 @@ impl Pack for Addr {
     }
 }
 
-pub(in crate::driver) type Iter<'a> = std::slice::Iter<'a, ScheduledIo>;
+pub(in crate::net::driver) type Iter<'a> = std::slice::Iter<'a, ScheduledIo>;
 
 pub(crate) struct Local {
     head: CausalCell<usize>,
@@ -173,7 +173,7 @@ impl Shared {
     }
 
     #[inline]
-    pub(in crate::driver) fn get(&self, addr: Addr) -> Option<&ScheduledIo> {
+    pub(in crate::net::driver) fn get(&self, addr: Addr) -> Option<&ScheduledIo> {
         let page_offset = addr.offset() - self.prev_sz;
         test_println!("-> offset {:?}", page_offset);
 
@@ -221,7 +221,7 @@ impl Shared {
         })
     }
 
-    pub(in crate::driver) fn iter(&self) -> Option<Iter<'_>> {
+    pub(in crate::net::driver) fn iter(&self) -> Option<Iter<'_>> {
         let slab = self.slab.with(|slab| unsafe { (&*slab).as_ref() });
         slab.map(|slab| slab.iter())
     }

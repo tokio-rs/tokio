@@ -11,8 +11,8 @@ pub(crate) struct ScheduledIo {
     /// The offset of the next item on the free list.
     next: CausalCell<usize>,
     readiness: AtomicUsize,
-    pub(in crate::driver) reader: AtomicWaker,
-    pub(in crate::driver) writer: AtomicWaker,
+    pub(in crate::net::driver) reader: AtomicWaker,
+    pub(in crate::net::driver) writer: AtomicWaker,
 }
 
 #[repr(transparent)]
@@ -117,7 +117,7 @@ impl ScheduledIo {
         })
     }
 
-    pub(in crate::driver) fn get_readiness(&self, token: usize) -> Option<usize> {
+    pub(in crate::net::driver) fn get_readiness(&self, token: usize) -> Option<usize> {
         let gen = token & Generation::MASK;
         let ready = self.readiness.load(Ordering::Acquire);
         test_println!("--> get_readiness: gen={:#x}; ready={:#x};", gen, ready);
@@ -133,7 +133,7 @@ impl ScheduledIo {
         Some(ready & (!Generation::MASK))
     }
 
-    pub(in crate::driver) fn set_readiness(
+    pub(in crate::net::driver) fn set_readiness(
         &self,
         token: usize,
         f: impl Fn(usize) -> usize,

@@ -100,7 +100,7 @@ impl Slab {
     ///
     /// If the slab does not contain a value for the given key, `None` is
     /// returned instead.
-    pub(in crate::driver) fn get(&self, token: usize) -> Option<&page::ScheduledIo> {
+    pub(in crate::net::driver) fn get(&self, token: usize) -> Option<&page::ScheduledIo> {
         let tid = Tid::from_packed(token);
         #[cfg(test)]
         test_println!("get {:#x}; tid={:?}", token, tid);
@@ -108,7 +108,7 @@ impl Slab {
     }
 
     /// Returns an iterator over all the items in the slab.
-    pub(in crate::driver::reactor) fn unique_iter(&mut self) -> iter::UniqueIter<'_> {
+    pub(in crate::net::driver::reactor) fn unique_iter(&mut self) -> iter::UniqueIter<'_> {
         let mut shards = self.shards.iter_mut();
         let shard = shards.next().expect("must be at least 1 shard");
         let mut pages = shard.iter();
@@ -164,14 +164,14 @@ impl SingleShard {
     ///
     /// If the slab does not contain a value for the given key, `None` is
     /// returned instead.
-    pub(in crate::driver) fn get(&self, token: usize) -> Option<&page::ScheduledIo> {
+    pub(in crate::net::driver) fn get(&self, token: usize) -> Option<&page::ScheduledIo> {
         #[cfg(test)]
         test_println!("get {:#x}", token);
         self.shard.get(token)
     }
 
     /// Returns an iterator over all the items in the slab.
-    pub(in crate::driver::reactor) fn unique_iter(&mut self) -> iter::ShardIter<'_> {
+    pub(in crate::net::driver::reactor) fn unique_iter(&mut self) -> iter::ShardIter<'_> {
         let mut pages = self.shard.iter_mut();
         let slots = pages.next().and_then(|pg| pg.iter());
         iter::ShardIter { slots, pages }

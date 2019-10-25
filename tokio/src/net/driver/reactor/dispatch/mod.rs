@@ -3,7 +3,7 @@
 #[cfg(test)]
 macro_rules! test_println {
     ($($arg:tt)*) => {
-        println!("{:?} {}", crate::driver::reactor::dispatch::Tid::current(), format_args!($($arg)*))
+        println!("{:?} {}", crate::net::driver::reactor::dispatch::Tid::current(), format_args!($($arg)*))
     }
 }
 
@@ -15,18 +15,17 @@ macro_rules! test_println {
 mod iter;
 mod pack;
 mod page;
-mod slab;
+mod sharded_slab;
 mod tid;
 
 #[cfg(test)]
 // this is used by sub-modules
 use self::tests::test_util;
 use pack::{Pack, WIDTH};
-// pub(in crate::driver) use page::scheduled_io::ScheduledIo;
-use slab::Shard;
+use sharded_slab::Shard;
 #[cfg(test)]
-pub(crate) use slab::Slab;
-pub(crate) use slab::{SingleShard, MAX_SOURCES};
+pub(crate) use sharded_slab::Slab;
+pub(crate) use sharded_slab::{SingleShard, MAX_SOURCES};
 use tid::Tid;
 
 #[cfg(target_pointer_width = "64")]

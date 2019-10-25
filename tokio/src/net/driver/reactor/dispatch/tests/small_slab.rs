@@ -3,8 +3,8 @@ use loom::sync::{Arc, Condvar, Mutex};
 use loom::thread;
 
 use pack::{Pack, WIDTH};
-use slab::Shard;
-use slab::Slab;
+use sharded_slab::Shard;
+use sharded_slab::Slab;
 use tid::Tid;
 
 // Overridden for tests
@@ -30,9 +30,9 @@ mod pack;
 #[allow(dead_code)]
 mod iter;
 
-#[path = "../slab.rs"]
+#[path = "../sharded_slab.rs"]
 #[allow(dead_code)]
-mod slab;
+mod sharded_slab;
 
 #[path = "../tid.rs"]
 #[allow(dead_code)]
@@ -144,7 +144,7 @@ fn concurrent_remove_remote_and_reuse() {
 }
 
 mod single_shard {
-    use super::slab::SingleShard;
+    use super::sharded_slab::SingleShard;
     use super::*;
 
     fn store_val(slab: &Arc<SingleShard>, readiness: usize) -> usize {
