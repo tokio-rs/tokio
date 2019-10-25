@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 
 use tokio_executor::park::{Park, Unpark};
-use tokio_executor::thread_pool::*;
+use tokio_executor::thread_pool::{self, *};
 
 use futures_util::future::poll_fn;
 use std::cell::Cell;
@@ -123,6 +123,59 @@ fn drop_threadpool_drops_futures() {
         // Assert that the future was dropped
         let c = num_drop.load(Relaxed);
         assert_eq!(c, 1);
+    }
+}
+
+#[test]
+fn blocking() {
+    // used for notifying the main thread
+    const NUM: usize = 10_000;
+
+    for _ in 0..50 {
+        let (tx, rx) = mpsc::channel();
+
+        let mut pool = new_pool();
+        let cnt = Arc::new(AtomicUsize::new(0));
+
+        eprintln!("FOO");
+
+        // there are four workers in the pool
+        // so, if we run 4 blocking tasks, we know that handoff must have happened
+        let block = Arc::new(std::sync::Barrier::new(5));
+        for i in 0..4 {
+            eprintln!("FOO{}", i);
+            let block = block.clone();
+            pool.spawn(async move {
+                thread_pool::blocking(move || {
+                    block.wait();
+                    block.wait();
+                })
+            });
+        }
+        eprintln!("ENDFOO");
+        block.wait();
+        eprintln!("RUN");
+
+        for _ in 0..NUM {
+            let cnt = cnt.clone();
+            let tx = tx.clone();
+
+            pool.spawn(async move {
+                let num = cnt.fetch_add(1, Relaxed) + 1;
+
+                if num == NUM {
+                    tx.send(()).unwrap();
+                }
+            });
+        }
+
+        rx.recv().unwrap();
+
+        // Wait for the pool to shutdown
+        eprintln!("WAIT");
+        block.wait();
+        eprintln!("WAITED");
+        pool.shutdown_now();
     }
 }
 
