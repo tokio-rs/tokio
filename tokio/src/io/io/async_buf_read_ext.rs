@@ -1,3 +1,4 @@
+use crate::io::io::fill_buf::{fill_buf, FillBuf};
 use crate::io::io::lines::{lines, Lines};
 use crate::io::io::read_line::{read_line, ReadLine};
 use crate::io::io::read_until::{read_until, ReadUntil};
@@ -6,6 +7,29 @@ use crate::io::AsyncBufRead;
 
 /// An extension trait which adds utility methods to `AsyncBufRead` types.
 pub trait AsyncBufReadExt: AsyncBufRead {
+    /// Creates a future which returns the contents of the internal buffer, filling it with more data
+    /// from the inner reader if it is empty.
+    ///
+    /// This function is a lower-level call. It needs to be paired with the
+    /// [`consume`] method to function properly. When calling this
+    /// method, none of the contents will be "read" in the sense that later
+    /// calling [`read`] may return the same contents. As such, [`consume`] must
+    /// be called with the number of bytes that are consumed from this buffer to
+    /// ensure that the bytes are never returned twice.
+    ///
+    /// An empty buffer returned indicates that the stream has reached EOF.
+    /// In the case of an error the buffer and the object will be discarded, with
+    /// the error yielded.
+    ///
+    /// [`read`]: AsyncReadExt::read
+    /// [`consume`]: AsyncBufRead::consume
+    fn fill_buf<'a>(&'a mut self) -> FillBuf<'a, Self>
+    where
+        Self: Unpin,
+    {
+        fill_buf(self)
+    }
+
     /// Creates a future which will read all the bytes associated with this I/O
     /// object into `buf` until the delimiter `byte` or EOF is reached.
     /// This method is the async equivalent to [`BufRead::read_until`](std::io::BufRead::read_until).

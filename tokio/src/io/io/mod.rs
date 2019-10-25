@@ -7,6 +7,7 @@ mod buf_writer;
 mod chain;
 mod copy;
 mod empty;
+mod fill_buf;
 mod flush;
 mod lines;
 mod read;
