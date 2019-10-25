@@ -82,8 +82,8 @@ impl ScheduledIo {
             let next_gen = gen.next().pack(0);
             match self.readiness.compare_exchange(
                 current,
-                Ordering::Release,
                 next_gen,
+                Ordering::AcqRel,
                 Ordering::Acquire,
             ) {
                 Ok(_) => break,
