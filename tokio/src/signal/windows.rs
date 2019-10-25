@@ -175,43 +175,46 @@ impl Stream for CtrlBreak {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use tokio::timer::Timeout;
+    use crate::runtime::current_thread::Runtime;
 
     use futures_util::future::FutureExt;
     use futures_util::stream::StreamExt;
     use std::future::Future;
     use std::time::Duration;
 
-    fn with_timeout<F: Future>(future: F) -> impl Future<Output = F::Output> {
-        Timeout::new(future, Duration::from_secs(1)).map(|result| result.expect("timed out"))
+    #[test]
+    fn ctrl_c() {
+        let mut rt = Runtime::new().unwrap();
+
+        rt.block_on(async {
+            let ctrl_c = crate::signal::ctrl_c().expect("failed to create CtrlC");
+
+            // Windows doesn't have a good programmatic way of sending events
+            // like sending signals on Unix, so we'll stub out the actual OS
+            // integration and test that our handling works.
+            unsafe {
+                super::handler(CTRL_C_EVENT);
+            }
+
+            let _ = ctrl_c.into_future().await;
+        });
     }
 
-    #[tokio::test]
-    async fn ctrl_c() {
-        let ctrl_c = crate::signal::ctrl_c().expect("failed to create CtrlC");
+    #[test]
+    fn ctrl_break() {
+        let mut rt = Runtime::new().unwrap();
 
-        // Windows doesn't have a good programmatic way of sending events
-        // like sending signals on Unix, so we'll stub out the actual OS
-        // integration and test that our handling works.
-        unsafe {
-            super::handler(CTRL_C_EVENT);
-        }
+        rt.block_on(async {
+            let ctrl_break = super::ctrl_break().expect("failed to create CtrlC");
 
-        let _ = with_timeout(ctrl_c.into_future()).await;
-    }
+            // Windows doesn't have a good programmatic way of sending events
+            // like sending signals on Unix, so we'll stub out the actual OS
+            // integration and test that our handling works.
+            unsafe {
+                super::handler(CTRL_BREAK_EVENT);
+            }
 
-    #[tokio::test]
-    async fn ctrl_break() {
-        let ctrl_break = super::ctrl_break().expect("failed to create CtrlC");
-
-        // Windows doesn't have a good programmatic way of sending events
-        // like sending signals on Unix, so we'll stub out the actual OS
-        // integration and test that our handling works.
-        unsafe {
-            super::handler(CTRL_BREAK_EVENT);
-        }
-
-        let _ = with_timeout(ctrl_break.into_future()).await;
+            let _ = ctrl_break.into_future().await;
+        });
     }
 }
