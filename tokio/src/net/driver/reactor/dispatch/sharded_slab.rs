@@ -78,16 +78,12 @@ impl Slab {
     /// number of shards has been reached.
     pub(crate) fn alloc(&self) -> Option<usize> {
         let tid = Tid::current();
-        #[cfg(test)]
-        test_println!("alloc {:?}", tid);
         self.shards[tid.as_usize()].alloc().map(|idx| tid.pack(idx))
     }
 
     /// Removes the value associated with the given key from the slab.
     pub(crate) fn remove(&self, idx: usize) {
         let tid = Tid::from_packed(idx);
-        #[cfg(test)]
-        test_println!("rm {:?}", tid);
         let shard = &self.shards[tid.as_usize()];
         if tid.is_current() {
             shard.remove_local(idx)
@@ -102,8 +98,6 @@ impl Slab {
     /// returned instead.
     pub(in crate::net::driver) fn get(&self, token: usize) -> Option<&page::ScheduledIo> {
         let tid = Tid::from_packed(token);
-        #[cfg(test)]
-        test_println!("get {:#x}; tid={:?}", token, tid);
         self.shards.get(tid.as_usize())?.get(token)
     }
 
@@ -139,8 +133,6 @@ impl SingleShard {
     pub(crate) fn alloc(&self) -> Option<usize> {
         // we must lock the slab to alloc an item.
         let _local = self.local.lock().unwrap();
-        #[cfg(test)]
-        test_println!("alloc");
         self.shard.alloc()
     }
 
@@ -150,10 +142,7 @@ impl SingleShard {
         let lock = self.local.try_lock();
         // if we were able to lock the slab, we are "local" and can use the fast
         // path; otherwise, we will use `remove_remote`.
-        let is_local = lock.is_ok();
-        test_println!("rm {:#x}; is_local={}", idx, is_local);
-
-        if is_local {
+        if lock.is_ok() {
             self.shard.remove_local(idx)
         } else {
             self.shard.remove_remote(idx)
@@ -165,8 +154,6 @@ impl SingleShard {
     /// If the slab does not contain a value for the given key, `None` is
     /// returned instead.
     pub(in crate::net::driver) fn get(&self, token: usize) -> Option<&page::ScheduledIo> {
-        #[cfg(test)]
-        test_println!("get {:#x}", token);
         self.shard.get(token)
     }
 
@@ -202,9 +189,6 @@ impl Shard {
         // Can we fit the value into an existing page?
         for (page_idx, page) in self.shared.iter().enumerate() {
             let local = self.local(page_idx);
-            #[cfg(test)]
-            test_println!("-> page {}; {:?}; {:?}", page_idx, local, page);
-
             if let Some(page_offset) = page.alloc(local) {
                 return Some(page_offset);
             }
@@ -219,8 +203,7 @@ impl Shard {
 
         let addr = page::Addr::from_packed(idx);
         let i = addr.index();
-        #[cfg(test)]
-        test_println!("-> {:?}; idx {:?}", addr, i);
+
         if i > self.shared.len() {
             return None;
         }
@@ -233,9 +216,6 @@ impl Shard {
         let addr = page::Addr::from_packed(idx);
         let page_idx = addr.index();
 
-        #[cfg(test)]
-        test_println!("-> remove_local {:?}; page {:?}", addr, page_idx);
-
         if let Some(page) = self.shared.get(page_idx) {
             page.remove_local(self.local(page_idx), addr, idx);
         }
@@ -244,12 +224,8 @@ impl Shard {
     /// Remove an item, while on a different thread from the shard's local thread.
     fn remove_remote(&self, idx: usize) {
         debug_assert_eq!(Tid::from_packed(idx).as_usize(), self.tid);
-        // debug_assert!(Tid::current().as_usize() != self.tid);
         let addr = page::Addr::from_packed(idx);
         let page_idx = addr.index();
-
-        #[cfg(test)]
-        test_println!("-> remove_remote {:?}; page {:?}", addr, page_idx);
 
         if let Some(page) = self.shared.get(page_idx) {
             page.remove_remote(addr, idx);
@@ -258,12 +234,6 @@ impl Shard {
 
     #[inline(always)]
     fn local(&self, i: usize) -> &page::Local {
-        // debug_assert_eq!(
-        //     Tid::current().as_usize(),
-        //     self.tid,
-        //     "tried to access local data from another thread!"
-        // );
-
         &self.local[i]
     }
 

@@ -7,11 +7,6 @@ macro_rules! test_println {
     }
 }
 
-#[cfg(not(test))]
-macro_rules! test_println {
-    ($($arg:tt)*) => {};
-}
-
 mod iter;
 mod pack;
 mod page;

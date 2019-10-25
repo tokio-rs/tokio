@@ -76,33 +76,18 @@ impl ScheduledIo {
     pub(super) fn reset(&self, gen: Generation) -> bool {
         let mut current = self.readiness.load(Ordering::Acquire);
         loop {
-            let current_gen = Generation::from_packed(current);
-            test_println!("-> reset gen={:?}; current={:?};", gen, current);
-            if current_gen != gen {
+            if Generation::from_packed(current) != gen {
                 return false;
             }
-            let next_gen = gen.next();
-            let next = next_gen.pack(0);
-            test_println!(
-                "-> reset current={:#x}; next={:?}; packed={:#x};",
-                current,
-                next_gen,
-                next
-            );
+            let next_gen = gen.next().pack(0);
             match self.readiness.compare_exchange(
                 current,
-                next,
                 Ordering::Release,
+                next_gen,
                 Ordering::Acquire,
             ) {
-                Ok(_) => {
-                    test_println!("-> reset!");
-                    break;
-                }
-                Err(actual) => {
-                    test_println!("-> retry");
-                    current = actual;
-                }
+                Ok(_) => break,
+                Err(actual) => current = actual,
             }
         }
         drop(self.reader.take_waker());
@@ -120,14 +105,7 @@ impl ScheduledIo {
     pub(in crate::net::driver) fn get_readiness(&self, token: usize) -> Option<usize> {
         let gen = token & Generation::MASK;
         let ready = self.readiness.load(Ordering::Acquire);
-        test_println!("--> get_readiness: gen={:#x}; ready={:#x};", gen, ready);
-        let actual_gen = ready & Generation::MASK;
-        if actual_gen != gen {
-            test_println!(
-                "--> get_readiness: wrong generation {:#x}; expected={:x};",
-                actual_gen,
-                gen
-            );
+        if ready & Generation::MASK != gen {
             return None;
         }
         Some(ready & (!Generation::MASK))
@@ -140,40 +118,23 @@ impl ScheduledIo {
     ) -> Result<usize, ()> {
         let gen = token & Generation::MASK;
         let mut current = self.readiness.load(Ordering::Acquire);
-        test_println!(
-            "set_readiness: token={:#x}; gen={:#x}; current={:#x};",
-            token,
-            gen,
-            current
-        );
-
         loop {
-            let current_gen = current & Generation::MASK;
-            if current_gen != gen {
-                test_println!("--> wrong generation {:#x}", current_gen);
+            if current & Generation::MASK != gen {
                 return Err(());
             }
             let new = f(current & mio::Ready::all().as_usize());
             debug_assert!(new < Generation::ONE);
-            let new = new | gen;
-            match self
-                .readiness
-                .compare_exchange(current, new, Ordering::AcqRel, Ordering::Acquire)
-            {
+            match self.readiness.compare_exchange(
+                current,
+                new | gen,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            ) {
                 Ok(_actual) => {
                     debug_assert_eq!(_actual, current);
-                    test_println!("--> set readiness {:#x};", new);
                     return Ok(new);
                 }
-                Err(actual) => {
-                    test_println!(
-                        "--> set_readiness failed; actual={:#x}; actual_gen={:#x}; gen={:#x}",
-                        actual,
-                        actual & Generation::MASK,
-                        gen
-                    );
-                    current = actual
-                }
+                Err(actual) => current = actual,
             }
         }
     }

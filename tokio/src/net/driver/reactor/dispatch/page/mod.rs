@@ -110,8 +110,6 @@ impl Shared {
     /// local access is held.
     #[cold]
     fn alloc_page(&self, _: &Local) {
-        test_println!("-> alloc new page ({})", self.size);
-
         debug_assert!(self.slab.with(|s| unsafe { (*s).is_none() }));
 
         let mut slab = Vec::with_capacity(self.size);
@@ -131,7 +129,6 @@ impl Shared {
     #[inline]
     pub(crate) fn alloc(&self, local: &Local) -> Option<usize> {
         let head = local.head();
-        test_println!("-> local head {:#x}", head);
 
         // are there any items on the local free list? (fast path)
         let head = if head < self.size {
@@ -139,15 +136,12 @@ impl Shared {
         } else {
             // if the local free list is empty, pop all the items on the remote
             // free list onto the local free list.
-            let remote = self.remote.pop_all();
-            test_println!("-> took remote head {:?}", remote);
-            remote?
+            self.remote.pop_all()?
         };
 
         // if the head is still null, both the local and remote free lists are
         // empty --- we can't fit any more items on this page.
         if head == Self::NULL {
-            test_println!("-> NULL! {:?}", head);
             return None;
         }
 
@@ -167,28 +161,18 @@ impl Shared {
         });
 
         let index = head + self.prev_sz;
-        test_println!("alloc at offset: {}; gen={:?}", index, gen);
-
         Some(gen.pack(index))
     }
 
     #[inline]
     pub(in crate::net::driver) fn get(&self, addr: Addr) -> Option<&ScheduledIo> {
         let page_offset = addr.offset() - self.prev_sz;
-        test_println!("-> offset {:?}", page_offset);
-
-        #[allow(clippy::let_and_return)] // clippy doesn't know about the test_println!
-        let value = self
-            .slab
-            .with(|slab| unsafe { &*slab }.as_ref()?.get(page_offset));
-        test_println!("-> offset {:?}; value={:?}", page_offset, value);
-        value
+        self.slab
+            .with(|slab| unsafe { &*slab }.as_ref()?.get(page_offset))
     }
 
     pub(crate) fn remove_local(&self, local: &Local, addr: Addr, idx: usize) {
         let offset = addr.offset() - self.prev_sz;
-        test_println!("-> offset {:?}", offset);
-
         self.slab.with(|slab| {
             let slab = unsafe { &*slab }.as_ref();
             let slot = if let Some(slot) = slab.and_then(|slab| slab.get(offset)) {
@@ -205,8 +189,6 @@ impl Shared {
 
     pub(crate) fn remove_remote(&self, addr: Addr, idx: usize) {
         let offset = addr.offset() - self.prev_sz;
-        test_println!("-> offset {:?}", offset);
-
         self.slab.with(|slab| {
             let slab = unsafe { &*slab }.as_ref();
             let slot = if let Some(slot) = slab.and_then(|slab| slab.get(offset)) {

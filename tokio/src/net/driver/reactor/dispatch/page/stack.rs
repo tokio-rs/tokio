@@ -14,7 +14,6 @@ impl TransferStack {
 
     pub(super) fn pop_all(&self) -> Option<usize> {
         let val = self.head.swap(super::Addr::NULL, Ordering::Acquire);
-        test_println!("-> pop_all; head={:#x}", val);
         if val == super::Addr::NULL {
             None
         } else {
@@ -25,7 +24,6 @@ impl TransferStack {
     pub(super) fn push(&self, value: usize, before: impl Fn(usize)) {
         let mut next = self.head.load(Ordering::Relaxed);
         loop {
-            test_println!("-> next {:#x}", next);
             before(next);
 
             match self
@@ -33,14 +31,8 @@ impl TransferStack {
                 .compare_exchange(next, value, Ordering::AcqRel, Ordering::Acquire)
             {
                 // lost the race!
-                Err(actual) => {
-                    test_println!("-> retry!");
-                    next = actual;
-                }
-                Ok(_) => {
-                    test_println!("-> successful; next={:#x}", next);
-                    return;
-                }
+                Err(actual) => next = actual,
+                Ok(_) => return,
             }
         }
     }
