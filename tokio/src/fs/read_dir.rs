@@ -17,10 +17,7 @@ use std::task::Poll;
 /// Returns a stream over the entries within a directory.
 ///
 /// This is an async version of [`std::fs::read_dir`](std::fs::read_dir)
-pub async fn read_dir<P>(path: P) -> io::Result<ReadDir>
-where
-    P: AsRef<Path>,
-{
+pub async fn read_dir(path: impl AsRef<Path>) -> io::Result<ReadDir> {
     let path = path.as_ref().to_owned();
     let std = asyncify(|| std::fs::read_dir(path)).await?;
 
