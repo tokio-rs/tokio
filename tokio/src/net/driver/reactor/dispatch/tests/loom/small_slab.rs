@@ -30,7 +30,7 @@ mod pack;
 #[allow(dead_code)]
 mod iter;
 
-#[path = "../sharded_slab.rs"]
+#[path = "../../sharded_slab.rs"]
 #[allow(dead_code)]
 mod sharded_slab;
 

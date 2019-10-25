@@ -1,4 +1,4 @@
-use super::super::SingleShard;
+use super::super::super::SingleShard;
 use super::test_util;
 use loom::sync::{Arc, Condvar, Mutex};
 use loom::thread;

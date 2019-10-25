@@ -32,5 +32,5 @@ const MAX_PAGES: usize = WIDTH / 4;
 // Chosen arbitrarily.
 const RESERVED_BITS: usize = 5;
 
-#[cfg(all(test, not(loom)))]
+#[cfg(test)]
 mod tests;

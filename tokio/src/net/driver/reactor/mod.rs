@@ -1,16 +1,6 @@
 use super::platform;
 use crate::loom::atomic::{AtomicUsize, Ordering::SeqCst};
 
-#[cfg(all(test, loom))]
-macro_rules! loom_thread_local {
-    ($($tts:tt)+) => { loom::thread_local!{ $($tts)+ } }
-}
-
-#[cfg(not(loom))]
-macro_rules! loom_thread_local {
-    ($($tts:tt)+) => { std::thread_local!{ $($tts)+ } }
-}
-
 mod dispatch;
 use dispatch::SingleShard;
 pub(crate) use dispatch::MAX_SOURCES;
@@ -430,7 +420,7 @@ impl Direction {
     }
 }
 
-#[cfg(all(test, not(loom)))]
+#[cfg(all(test, loom))]
 mod tests {
     use super::*;
     use loom::thread;

@@ -3,7 +3,7 @@ use super::super::Slab;
 use loom::sync::{Arc, Condvar, Mutex};
 use loom::thread;
 
-pub(super) mod test_util {
+pub(crate) mod test_util {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     pub(crate) fn run_model(name: &'static str, f: impl Fn() + Sync + Send + 'static) {

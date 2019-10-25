@@ -27,4 +27,4 @@ mod idx {
 #[cfg(loom)]
 mod loom;
 #[cfg(loom)]
-use self::loom::test_util;
+pub(super) use self::loom::test_util;
