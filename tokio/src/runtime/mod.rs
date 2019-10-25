@@ -119,7 +119,7 @@
 //! }
 //! ```
 //!
-//! [driver]: tokio_net::driver
+//! [driver]: tokio::net::driver
 //! [executor]: https://tokio.rs/docs/internals/runtime-model/#executors
 //! [timer]: ../timer/index.html
 //! [`Runtime`]: struct.Runtime.html

@@ -83,6 +83,8 @@ mod typed;
 #[cfg(feature = "thread-pool")]
 mod util;
 
+#[cfg(all(not(feature = "blocking"), feature = "thread-pool"))]
+mod blocking;
 #[cfg(feature = "blocking")]
 pub mod blocking;
 

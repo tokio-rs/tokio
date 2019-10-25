@@ -3,26 +3,28 @@ use crate::loom::sys::num_cpus;
 use crate::loom::thread;
 use crate::park::Park;
 use crate::thread_pool::park::DefaultPark;
-use crate::thread_pool::{shutdown, worker, Spawner, ThreadPool};
+use crate::thread_pool::{shutdown, worker, worker::Worker, Spawner, ThreadPool};
 
 use std::{fmt, usize};
 
 /// Builds a thread pool with custom configuration values.
 pub struct Builder {
-    /// Number of threads to spawn
+    /// Number of worker threads to spawn
     pool_size: usize,
 
-    /// Thread name prefix
-    name_prefix: String,
+    /// Thread name
+    name: String,
 
     /// Thread stack size
     stack_size: Option<usize>,
 
     /// Around worker callback
-    around_worker: Option<Arc<Callback>>,
+    around_worker: Option<Callback>,
 }
 
-type Callback = Box<dyn Fn(usize, &mut dyn FnMut()) + Send + Sync>;
+// The Arc<Box<_>> is needed because loom doesn't support Arc<T> where T: !Sized
+// loom doesn't support that because it requires CoerceUnsized, which is unstable
+type Callback = Arc<Box<dyn Fn(usize, &mut dyn FnMut()) + Send + Sync>>;
 
 impl Builder {
     /// Returns a new thread pool builder initialized with default configuration
@@ -30,7 +32,7 @@ impl Builder {
     pub fn new() -> Builder {
         Builder {
             pool_size: num_cpus(),
-            name_prefix: "tokio-runtime-worker-".to_string(),
+            name: "tokio-runtime-worker".to_string(),
             stack_size: None,
             around_worker: None,
         }
@@ -57,11 +59,7 @@ impl Builder {
         self
     }
 
-    /// Set name prefix of threads spawned by the scheduler
-    ///
-    /// Thread name prefix is used for generating thread names. For example, if
-    /// prefix is `my-pool-`, then threads in the pool will get names like
-    /// `my-pool-1` etc.
+    /// Set name of threads spawned by the scheduler
     ///
     /// If this configuration is not set, then the thread will use the system
     /// default naming scheme.
@@ -72,11 +70,11 @@ impl Builder {
     /// use tokio_executor::thread_pool::Builder;
     ///
     /// let thread_pool = Builder::new()
-    ///     .name_prefix("my-pool-")
+    ///     .name("my-pool")
     ///     .build();
     /// ```
-    pub fn name_prefix<S: Into<String>>(&mut self, val: S) -> &mut Self {
-        self.name_prefix = val.into();
+    pub fn name<S: Into<String>>(&mut self, val: S) -> &mut Self {
+        self.name = val.into();
         self
     }
 
@@ -156,20 +154,11 @@ impl Builder {
     {
         let (shutdown_tx, shutdown_rx) = shutdown::channel();
 
-        let (pool, workers) = worker::create_set(self.pool_size, |i| BoxedPark::new(build_park(i)));
-
-        // Spawn threads for each worker
-        for (idx, mut worker) in workers.into_iter().enumerate() {
-            let around_worker = self.around_worker.clone();
+        let around_worker = self.around_worker.as_ref().map(Arc::clone);
+        let launch_worker = move |worker: Worker<BoxedPark<P>>| {
             let shutdown_tx = shutdown_tx.clone();
-
-            let mut th = thread::Builder::new().name(format!("{}{}", self.name_prefix, idx));
-
-            if let Some(stack) = self.stack_size {
-                th = th.stack_size(stack);
-            }
-
-            let res = th.spawn(move || {
+            let around_worker = around_worker.as_ref().map(Arc::clone);
+            Box::new(move || {
                 struct AbortOnPanic;
 
                 impl Drop for AbortOnPanic {
@@ -182,27 +171,44 @@ impl Builder {
                 }
 
                 let _abort_on_panic = AbortOnPanic;
-
-                if let Some(cb) = around_worker {
-                    cb(idx, &mut || worker.run());
+                if let Some(cb) = around_worker.as_ref() {
+                    let idx = worker.id();
+                    let mut f = Some(move || worker.run());
+                    cb(idx, &mut || {
+                        (f.take()
+                            .expect("around_thread callback called closure twice"))(
+                        )
+                    })
                 } else {
-                    worker.run();
+                    worker.run()
                 }
-
-                // Worker must be dropped before the `shutdown_tx`
-                drop(worker);
 
                 // Dropping the handle must happen __after__ the callback
                 drop(shutdown_tx);
-            });
+            }) as Box<dyn FnOnce() + Send + 'static>
+        };
 
-            if let Err(err) = res {
-                panic!("failed to spawn worker thread: {:?}", err);
-            }
+        let mut blocking = crate::blocking::Builder::default();
+        blocking.name(self.name.clone());
+        if let Some(ss) = self.stack_size {
+            blocking.stack_size(ss);
+        }
+        let blocking = Arc::new(blocking.build());
+
+        let (pool, workers) = worker::create_set::<_, BoxedPark<P>>(
+            self.pool_size,
+            |i| BoxedPark::new(build_park(i)),
+            blocking.clone(),
+        );
+
+        // Spawn threads for each worker
+        for worker in workers {
+            crate::blocking::Pool::spawn(&blocking, launch_worker(worker))
         }
 
         let spawner = Spawner::new(pool);
-        ThreadPool::from_parts(spawner, shutdown_rx)
+        let blocking = crate::blocking::PoolWaiter::from(blocking);
+        ThreadPool::from_parts(spawner, shutdown_rx, blocking)
     }
 }
 
@@ -216,7 +222,7 @@ impl fmt::Debug for Builder {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Builder")
             .field("pool_size", &self.pool_size)
-            .field("name_prefix", &self.name_prefix)
+            .field("name", &self.name)
             .field("stack_size", &self.stack_size)
             .finish()
     }

@@ -3,6 +3,7 @@
 //! - Attempt to spin.
 
 use crate::loom::rand::seed;
+use crate::loom::sync::Arc;
 use crate::park::Unpark;
 use crate::task::{self, Task};
 use crate::thread_pool::{current, queue, BoxFuture, Idle, JoinHandle, Owned, Shared};
@@ -27,6 +28,9 @@ where
 
     /// Coordinates idle workers
     idle: Idle,
+
+    /// Pool where blocking tasks should be spawned.
+    pub(crate) blocking: Arc<crate::blocking::Pool>,
 }
 
 unsafe impl<P: Unpark> Send for Set<P> {}
@@ -37,7 +41,11 @@ where
     P: Unpark,
 {
     /// Create a new worker set using the provided queues.
-    pub(crate) fn new<F>(num_workers: usize, mut mk_unpark: F) -> Self
+    pub(crate) fn new<F>(
+        num_workers: usize,
+        mut mk_unpark: F,
+        blocking: Arc<crate::blocking::Pool>,
+    ) -> Self
     where
         F: FnMut(usize) -> P,
     {
@@ -62,6 +70,7 @@ where
             owned: owned.into_boxed_slice(),
             inject,
             idle: Idle::new(num_workers),
+            blocking,
         }
     }
 
@@ -102,6 +111,10 @@ where
     {
         let task = task::background(future);
         self.schedule(task);
+    }
+
+    pub(super) fn blocking_pool(&self) -> &Arc<crate::blocking::Pool> {
+        &self.blocking
     }
 
     pub(crate) fn schedule(&self, task: Task<Shared<P>>) {
