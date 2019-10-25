@@ -169,7 +169,7 @@ impl ScheduledIo {
                     test_println!(
                         "--> set_readiness failed; actual={:#x}; actual_gen={:#x}; gen={:#x}",
                         actual,
-                        actual & Generation::MASK;,
+                        actual & Generation::MASK,
                         gen
                     );
                     current = actual
