@@ -9,7 +9,6 @@ use support::signal::send_signal;
 use tokio::prelude::*;
 use tokio::signal::unix::{signal, SignalKind};
 
-
 #[tokio::test]
 async fn twice() {
     let kind = SignalKind::user_defined1();
