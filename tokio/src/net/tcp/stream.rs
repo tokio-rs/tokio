@@ -1,8 +1,7 @@
+use crate::io::{AsyncRead, AsyncWrite};
 use crate::net::tcp::split::{split, ReadHalf, WriteHalf};
 use crate::net::util::PollEvented;
 use crate::net::ToSocketAddrs;
-
-use tokio_io::{AsyncRead, AsyncWrite};
 
 use bytes::{Buf, BufMut};
 use futures_core::ready;

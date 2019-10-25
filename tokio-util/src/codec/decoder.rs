@@ -1,7 +1,7 @@
 use crate::codec::encoder::Encoder;
 use crate::codec::Framed;
 
-use tokio_io::{AsyncRead, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncWrite};
 
 use bytes::BytesMut;
 use std::io;

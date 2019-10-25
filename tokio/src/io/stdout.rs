@@ -1,6 +1,5 @@
 use crate::fs::blocking::Blocking;
-
-use tokio_io::AsyncWrite;
+use crate::io::AsyncWrite;
 
 use std::io;
 use std::pin::Pin;

@@ -20,7 +20,6 @@ Additional utilities for working with Tokio.
 categories = ["asynchronous"]
 
 [dependencies]
-tokio-io = { version = "=0.2.0-alpha.6", path = "../tokio-io" }
 tokio = { version = "=0.2.0-alpha.6", path = "../tokio" }
 
 bytes = "0.4.7"

@@ -5,10 +5,10 @@
 
 #![cfg(unix)]
 
-use super::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
+use crate::io::AsyncRead;
 use crate::net::util::PollEvented;
+use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
 
-use tokio_io::AsyncRead;
 use tokio_sync::mpsc::{channel, Receiver};
 
 use futures_core::stream::Stream;

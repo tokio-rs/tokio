@@ -1,7 +1,7 @@
 use crate::codec::framed::Fuse;
 use crate::codec::Decoder;
 
-use tokio_io::AsyncRead;
+use tokio::io::AsyncRead;
 
 use bytes::BytesMut;
 use futures_core::Stream;

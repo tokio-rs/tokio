@@ -8,9 +8,8 @@
 //! split has no associated overhead and enforces all invariants at the type
 //! level.
 
-use super::UnixStream;
-
-use tokio_io::{AsyncRead, AsyncWrite};
+use crate::io::{AsyncRead, AsyncWrite};
+use crate::net::UnixStream;
 
 use bytes::{Buf, BufMut};
 use std::io;

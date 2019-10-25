@@ -107,6 +107,21 @@
 //! `tokio::process::Child` is dropped. The behavior of the standard library can
 //! be regained with the [`Child::forget`](crate::process::Child::forget) method.
 
+#[path = "unix/mod.rs"]
+#[cfg(unix)]
+mod imp;
+
+#[path = "windows.rs"]
+#[cfg(windows)]
+mod imp;
+
+mod kill;
+
+use crate::io::{AsyncRead, AsyncReadExt, AsyncWrite};
+use crate::process::kill::Kill;
+
+use futures_core::TryFuture;
+use futures_util::try_future::try_join3;
 use std::ffi::OsStr;
 use std::future::Future;
 use std::io;
@@ -119,21 +134,6 @@ use std::pin::Pin;
 use std::process::{Command as StdCommand, ExitStatus, Output, Stdio};
 use std::task::Context;
 use std::task::Poll;
-
-use self::kill::Kill;
-use futures_core::TryFuture;
-use futures_util::try_future::try_join3;
-use tokio_io::{AsyncRead, AsyncReadExt, AsyncWrite};
-
-#[path = "unix/mod.rs"]
-#[cfg(unix)]
-mod imp;
-
-#[path = "windows.rs"]
-#[cfg(windows)]
-mod imp;
-
-mod kill;
 
 /// This structure mimics the API of [`std::process::Command`] found in the standard library, but
 /// replaces functions that create a process with an asynchronous variant. The main provided
