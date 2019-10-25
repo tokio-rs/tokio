@@ -66,7 +66,7 @@ pub(crate) struct Worker<P: Park + 'static> {
     launch_worker: LaunchWorker<P>,
 
     /// To indicate that the Worker has been given away and should no longer be used
-    stolen: Cell<bool>,
+    gone: Cell<bool>,
 }
 
 pub(crate) fn create_set<F, P>(
@@ -122,7 +122,7 @@ where
             entry: Entry::new(pool, index),
             park,
             launch_worker,
-            stolen: Cell::new(false),
+            gone: Cell::new(false),
         }
     }
 
@@ -136,9 +136,9 @@ where
         let launch_worker = &self.launch_worker;
 
         let blocking = &executor.blocking;
-        let stolen = &self.stolen;
+        let gone = &self.gone;
 
-        let mut park = DropNotStolen::new(self.park, stolen);
+        let mut park = DropNotGone::new(self.park, gone);
 
         // Track the current worker
         current::set(&pool, index, || {
@@ -162,7 +162,7 @@ where
                         let park_ptr = &mut **park as *mut _;
                         let mut allow_blocking = move || {
                             // If our Worker has already been given away, then blocking is fine!
-                            if stolen.get() {
+                            if gone.get() {
                                 return;
                             }
 
@@ -203,7 +203,7 @@ where
                             // We know that the code we're about to execute (inside
                             // Entry::run_task) has no way to reach the park passed to entry.run.
                             // therefore, it's fine for us to take ownership of it here _as long as
-                            // we don't drop `park` later_! The DropNotStolen wrapper around `park`
+                            // we don't drop `park` later_! The DropNotGone wrapper around `park`
                             // takes care of that.
                             let park = unsafe { Box::from_raw(park_ptr) };
                             let worker = Worker {
@@ -219,7 +219,7 @@ where
                                 },
                                 park,
                                 launch_worker: Arc::clone(launch_worker),
-                                stolen: Cell::new(false),
+                                gone: Cell::new(false),
                             };
 
                             // give away the worker
@@ -230,7 +230,7 @@ where
 
                             // and make sure that when Entry finishes running the current task,
                             // it immediately returns all the way up to the worker.
-                            stolen.set(true);
+                            gone.set(true);
                         };
                         let allow_blocking: &mut dyn FnMut() = &mut allow_blocking;
 
@@ -242,7 +242,7 @@ where
                             std::mem::transmute::<_, *mut dyn FnMut()>(allow_blocking)
                         }));
 
-                        let _ = entry.run(&mut **park, stolen);
+                        let _ = entry.run(&mut **park, gone);
 
                         // Ensure that we reset ob before allow_blocking is dropped.
                         drop(_reset);
@@ -268,7 +268,7 @@ where
     #[cfg(test)]
     #[allow(warnings)]
     pub(crate) fn tick(&mut self) {
-        self.entry.tick(&mut *self.park, &self.stolen);
+        self.entry.tick(&mut *self.park, &self.gone);
     }
 }
 
@@ -291,10 +291,10 @@ where
     fn run(
         &mut self,
         park: &mut impl Park<Unpark = P>,
-        stolen: &Cell<bool>,
+        gone: &Cell<bool>,
     ) -> Result<(), WorkerGone> {
         while self.is_running() {
-            if self.tick(park, stolen)? {
+            if self.tick(park, gone)? {
                 self.park(park);
             }
         }
@@ -311,10 +311,10 @@ where
     fn tick(
         &mut self,
         park: &mut impl Park<Unpark = P>,
-        stolen: &Cell<bool>,
+        gone: &Cell<bool>,
     ) -> Result<bool, WorkerGone> {
         // Process all pending tasks in the local queue.
-        if !self.process_local_queue(park, stolen)? {
+        if !self.process_local_queue(park, gone)? {
             return Ok(false);
         }
 
@@ -324,7 +324,7 @@ where
         // On `false`, the worker has entered the parked state
         if self.transition_to_searching() {
             // If `true` then work was found
-            if self.search_for_work(stolen)? {
+            if self.search_for_work(gone)? {
                 return Ok(false);
             }
         }
@@ -340,7 +340,7 @@ where
     fn process_local_queue(
         &mut self,
         park: &mut impl Park<Unpark = P>,
-        stolen: &Cell<bool>,
+        gone: &Cell<bool>,
     ) -> Result<bool, WorkerGone> {
         debug_assert!(self.is_running());
 
@@ -365,7 +365,7 @@ where
             };
 
             if let Some(task) = task {
-                self.run_task(task, stolen)?;
+                self.run_task(task, gone)?;
             } else {
                 return Ok(true);
             }
@@ -395,11 +395,11 @@ where
         self.owned().is_running.set(!closed)
     }
 
-    fn search_for_work(&mut self, stolen: &Cell<bool>) -> Result<bool, WorkerGone> {
+    fn search_for_work(&mut self, gone: &Cell<bool>) -> Result<bool, WorkerGone> {
         debug_assert!(self.is_searching());
 
         if let Some(task) = self.steal_work() {
-            self.run_task(task, stolen)?;
+            self.run_task(task, gone)?;
             Ok(true)
         } else {
             // Perform some routine work
@@ -472,13 +472,13 @@ where
         }
     }
 
-    fn run_task(&mut self, task: Task<Shared<P>>, stolen: &Cell<bool>) -> Result<(), WorkerGone> {
+    fn run_task(&mut self, task: Task<Shared<P>>, gone: &Cell<bool>) -> Result<(), WorkerGone> {
         if self.is_searching() {
             self.transition_from_searching();
         }
 
         let task = task.run(self.shared().into());
-        if stolen.get() {
+        if gone.get() {
             // The Worker disappeared from under us.
             // We need to return, because we no longer own all of our state!
             // Make sure the task gets picked up again eventually.
@@ -607,37 +607,37 @@ where
     }
 }
 
-struct DropNotStolen<'a, T> {
-    stolen: &'a Cell<bool>,
+struct DropNotGone<'a, T> {
+    gone: &'a Cell<bool>,
     inner: Option<T>,
 }
 
-impl<'a, T> DropNotStolen<'a, T> {
-    fn new(inner: T, stolen: &'a Cell<bool>) -> Self {
-        DropNotStolen {
-            stolen,
+impl<'a, T> DropNotGone<'a, T> {
+    fn new(inner: T, gone: &'a Cell<bool>) -> Self {
+        DropNotGone {
+            gone,
             inner: Some(inner),
         }
     }
 }
 
-impl<'a, T> Drop for DropNotStolen<'a, T> {
+impl<'a, T> Drop for DropNotGone<'a, T> {
     fn drop(&mut self) {
-        if self.stolen.get() {
+        if self.gone.get() {
             let inner = self.inner.take().unwrap();
             std::mem::forget(inner);
         }
     }
 }
 
-impl<'a, T> Deref for DropNotStolen<'a, T> {
+impl<'a, T> Deref for DropNotGone<'a, T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
         self.inner.as_ref().unwrap()
     }
 }
 
-impl<'a, T> DerefMut for DropNotStolen<'a, T> {
+impl<'a, T> DerefMut for DropNotGone<'a, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.inner.as_mut().unwrap()
     }
