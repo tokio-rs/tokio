@@ -193,6 +193,15 @@ impl UnixDatagram {
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         self.io.get_ref().shutdown(how)
     }
+
+    /// Creates a new independently owned handle to the underlying socket.
+    ///
+    /// The returned `UnixDatagram` is a reference to the same socket that this
+    /// object references.
+    pub fn try_clone(&self) -> io::Result<Self> {
+        let io = PollEvented::new(self.io.get_ref().try_clone()?)?;
+        Ok(Self { io })
+    }
 }
 
 impl TryFrom<UnixDatagram> for mio_uds::UnixDatagram {

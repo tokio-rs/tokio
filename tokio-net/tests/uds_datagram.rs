@@ -68,3 +68,30 @@ async fn echo() -> io::Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn try_clone_duplicates_socket() -> io::Result<()> {
+    let (mut dgram1, mut dgram2) = UnixDatagram::pair()?;
+    let payload = b"ok";
+    let mut buf = vec![0u8; 8];
+
+    dgram1.send(payload).await?;
+    dgram1.send(payload).await?;
+
+    let mut dgram3 = dgram2.try_clone()?;
+
+    let len = dgram2.recv(&mut buf).await?;
+    assert_eq!(&buf[0..len], payload);
+    let len = dgram3.recv(&mut buf).await?;
+    assert_eq!(&buf[0..len], payload);
+
+    dgram2.send(payload).await?;
+    dgram3.send(payload).await?;
+
+    let len = dgram1.recv(&mut buf).await?;
+    assert_eq!(&buf[0..len], payload);
+    let len = dgram1.recv(&mut buf).await?;
+    assert_eq!(&buf[0..len], payload);
+
+    Ok(())
+}
