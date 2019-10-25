@@ -177,10 +177,7 @@ mod tests {
     use super::*;
     use crate::runtime::current_thread::Runtime;
 
-    use futures_util::future::FutureExt;
     use futures_util::stream::StreamExt;
-    use std::future::Future;
-    use std::time::Duration;
 
     #[test]
     fn ctrl_c() {
