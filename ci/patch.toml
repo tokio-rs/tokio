@@ -3,7 +3,6 @@
 [patch.crates-io]
 tokio = { path = "tokio" }
 tokio-executor = { path = "tokio-executor" }
-tokio-io = { path = "tokio-io" }
 tokio-macros = { path = "tokio-macros" }
 tokio-sync = { path = "tokio-sync" }
 tokio-tls = { path = "tokio-tls" }
