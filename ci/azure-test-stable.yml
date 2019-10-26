@@ -43,14 +43,6 @@ jobs:
   - template: azure-patch-crates.yml
 
   - ${{ each crate in parameters.crates }}:
-    # Run with all crate features
-    - script: cargo test --all-features
-      env:
-        LOOM_MAX_PREEMPTIONS: 2
-        CI: 'True'
-      displayName: ${{ crate.key }} - cargo test --all-features
-      workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
-
     # Run with default crate features
     - script: cargo test
       env:
@@ -58,6 +50,15 @@ jobs:
         CI: 'True'
       displayName: ${{ crate.key }} - cargo test
       workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
+
+    # Run with each specified feature
+    - ${{ each feature in crate.value }}:
+      - script: cargo test --no-default-features --features ${{ feature }}
+        env:
+          LOOM_MAX_PREEMPTIONS: 2
+          CI: 'True'
+        displayName: ${{ crate.key }} - cargo test --features ${{ feature }}
+        workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
 
   # Remove all dev-dependencies to avoid https://github.com/rust-lang/cargo/issues/4866.
   - script: cargo run --manifest-path ci/remove-dev-dependencies/Cargo.toml ./*/Cargo.toml
