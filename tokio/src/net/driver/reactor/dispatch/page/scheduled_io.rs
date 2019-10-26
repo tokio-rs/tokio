@@ -130,9 +130,9 @@ impl ScheduledIo {
                 Ordering::AcqRel,
                 Ordering::Acquire,
             ) {
-                Ok(_actual) => {
-                    debug_assert_eq!(_actual, current);
-                    return Ok(new);
+                Ok(actual) => {
+                    debug_assert_eq!(actual, current);
+                    return Ok(actual);
                 }
                 Err(actual) => current = actual,
             }
