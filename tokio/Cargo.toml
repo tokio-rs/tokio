@@ -41,7 +41,13 @@ io-util = ["io-traits", "pin-project", "memchr"]
 io = ["io-traits", "io-util"]
 macros = ["tokio-macros"]
 net-full = ["tcp", "udp", "uds"]
-net-driver = ["mio", "tokio-executor/blocking"]
+net-driver = [
+  "io-traits",
+  "mio",
+  "slab",
+  "sync",
+  "tokio-executor/blocking",
+]
 rt-current-thread = [
   "timer",
   "tokio-executor/current-thread",
