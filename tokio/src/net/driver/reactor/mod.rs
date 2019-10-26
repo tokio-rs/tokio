@@ -382,7 +382,7 @@ impl Inner {
             .unwrap_or_else(|| panic!("IO resource for token {} does not exist!", token));
         let readiness = sched
             .get_readiness(token)
-            .unwrap_or_else(|| panic!("IO resource for token {} does not exist!", token));
+            .unwrap_or_else(|| panic!("token {} no longer valid!", token));
 
         let (waker, ready) = match dir {
             Direction::Read => (&sched.reader, !mio::Ready::writable()),

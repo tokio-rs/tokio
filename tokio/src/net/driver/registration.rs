@@ -230,8 +230,8 @@ impl Registration {
         // state would not be visible.
         let curr_ready = sched
             .set_readiness(self.token, |curr| curr & (!mask_no_hup))
-            .expect("token no longer in io dispatch!");
-        let mut ready = mask & mio::Ready::from_usize(curr_ready);
+            .unwrap_or_else(|| panic!("token {} no longer valid!", self.token));
+        let mut ready = mask & mio::Ready::from_usize(ready);
 
         if ready.is_empty() {
             if let Some(cx) = cx {
@@ -241,10 +241,10 @@ impl Registration {
                     Direction::Write => sched.writer.register_by_ref(cx.waker()),
                 }
 
+                // Try again
                 let curr_ready = sched
                     .set_readiness(self.token, |curr| curr & (!mask_no_hup))
-                    .expect("token no longer in io dispatch!");
-                // Try again
+                    .unwrap_or_else(|| panic!("token {} no longer valid!", self.token));
                 ready = mask & mio::Ready::from_usize(curr_ready);
             }
         }
