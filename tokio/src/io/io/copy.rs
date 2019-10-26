@@ -44,7 +44,7 @@ pub struct Copy<'a, R: ?Sized, W: ?Sized> {
 /// # Examples
 ///
 /// ```
-/// use tokio_io as io;
+/// use tokio::io;
 ///
 /// # async fn dox() -> std::io::Result<()> {
 /// let mut reader: &[u8] = b"hello";
