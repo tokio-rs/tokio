@@ -35,7 +35,7 @@ default = [
   "timer",
 ]
 
-fs = ["tokio-executor/blocking"]
+fs = ["io-traits", "tokio-executor/blocking"]
 io-traits = ["bytes", "iovec"]
 io-util = ["io-traits", "pin-project", "memchr"]
 io = ["io-traits", "io-util"]

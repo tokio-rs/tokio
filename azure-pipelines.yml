@@ -28,6 +28,7 @@ jobs:
       tokio:
         - fs
         - io
+        - io-traits
         - io-util
         - net-driver
         - process

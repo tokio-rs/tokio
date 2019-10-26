@@ -91,7 +91,7 @@ pub mod fs;
 
 pub mod future;
 
-#[cfg(feature = "io")]
+#[cfg(feature = "io-traits")]
 pub mod io;
 
 #[cfg(feature = "net-driver")]
