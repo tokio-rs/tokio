@@ -45,6 +45,7 @@ pub use self::async_read::AsyncRead;
 mod async_write;
 pub use self::async_write::AsyncWrite;
 
+#[allow(clippy::module_inception)] // TODO: remove
 #[cfg(feature = "io-util")]
 mod io;
 #[cfg(feature = "io-util")]
