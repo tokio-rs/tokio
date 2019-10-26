@@ -223,6 +223,14 @@ where
                             };
 
                             // give away the worker
+                            //
+                            // TODO: it would be _really_ nice if we had a way to _not_ spawn a
+                            // thread and hand off the worker if the blocking routine ran only for
+                            // a short amount of time. maybe push the Worker onto a "stealing
+                            // queue" somehow? or maybe keep a shared "active" AtomicBool in both
+                            // instances of the Worker, and compare_exchange it to true afterwards
+                            // in an attempt to take it back. if it succeeds, we just resume where
+                            // we were. if it fails, another thread has already stolen the Worker.
                             crate::blocking::Pool::spawn(&pool.blocking, launch_worker(worker));
 
                             // make sure no subsequent code thinks that it is on a worker

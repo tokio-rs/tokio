@@ -112,6 +112,11 @@ where
 
                 let res = guard.core.poll(header);
 
+                // TODO: if pool is blocking, executor may no longer point to the right Executor
+                // any more. we need to detect and fix that. or alternatively get rid of executor
+                // altogether and find some other way to detect whether a task is local. perhaps by
+                // adding a Schedule::is_local fn?
+
                 // prevent the guard from dropping the future
                 guard.polled = true;
 
