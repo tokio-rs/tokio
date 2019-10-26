@@ -66,7 +66,9 @@ signal = [
   "libc",
   "mio-uds",
   "net-driver",
-  "signal-hook-registry"
+  "signal-hook-registry",
+  "winapi/consoleapi",
+  "winapi/minwindef",
 ]
 sync = ["tokio-sync"]
 tcp = ["io", "net-driver"]
