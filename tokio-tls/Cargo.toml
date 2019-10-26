@@ -26,7 +26,7 @@ travis-ci = { repository = "tokio-rs/tokio-tls" }
 
 [dependencies]
 native-tls = "0.2"
-tokio-io = { version = "=0.2.0-alpha.6", path = "../tokio-io" }
+tokio = { version = "=0.2.0-alpha.6", path = "../tokio", features = ["io-traits"] }
 
 [dev-dependencies]
 tokio = { version = "=0.2.0-alpha.6", path = "../tokio" }

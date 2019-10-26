@@ -28,6 +28,7 @@ jobs:
       tokio:
         - fs
         - io
+        - io-util
         - net-driver
         - process
         - rt-full
@@ -49,8 +50,6 @@ jobs:
       tokio-executor:
         - current-thread
         - thread-pool
-      tokio-io:
-        - util
       tokio-sync:
         - async-traits
       tokio-macros: []

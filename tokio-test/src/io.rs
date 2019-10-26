@@ -16,10 +16,11 @@
 //! [`AsyncRead`]: tokio_io::AsyncRead
 //! [`AsyncWrite`]: tokio_io::AsyncWrite
 
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::sync::mpsc;
 use tokio::timer::{clock, timer, Delay};
-use tokio_io::{AsyncRead, AsyncWrite, Buf};
-use tokio_sync::mpsc;
 
+use bytes::Buf;
 use futures_core::ready;
 use std::collections::VecDeque;
 use std::future::Future;

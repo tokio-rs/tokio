@@ -5,8 +5,7 @@
 use self::State::*;
 use crate::fs::blocking::Buf;
 use crate::fs::{asyncify, sys};
-
-use tokio_io::{AsyncRead, AsyncWrite};
+use crate::io::{AsyncRead, AsyncWrite};
 
 use futures_core::ready;
 use std::fmt;

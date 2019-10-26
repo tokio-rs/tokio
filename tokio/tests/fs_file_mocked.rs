@@ -30,6 +30,7 @@ pub(crate) mod fs {
 }
 use fs::sys;
 
+use tokio::io;
 use tokio::prelude::*;
 use tokio_test::{assert_pending, assert_ready, assert_ready_err, assert_ready_ok, task};
 

@@ -1,9 +1,7 @@
+use crate::io::{AsyncRead, AsyncWrite};
 use crate::net::driver::{platform, Registration};
 
-use tokio_io::{AsyncRead, AsyncWrite};
-
 use futures_core::ready;
-use mio;
 use mio::event::Evented;
 use std::fmt;
 use std::io::{self, Read, Write};

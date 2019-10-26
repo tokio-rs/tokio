@@ -1,8 +1,7 @@
+use crate::io::{AsyncRead, AsyncWrite};
 use crate::net::unix::split::{split, ReadHalf, WriteHalf};
 use crate::net::unix::ucred::{self, UCred};
 use crate::net::util::PollEvented;
-
-use tokio_io::{AsyncRead, AsyncWrite};
 
 use bytes::{Buf, BufMut};
 use futures_core::ready;

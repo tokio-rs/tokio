@@ -129,3 +129,7 @@ if_runtime! {
     #[doc(inline)]
     pub use tokio_macros::test;
 }
+
+#[cfg(feature = "io-util")]
+#[cfg(test)]
+fn is_unpin<T: Unpin>() {}
