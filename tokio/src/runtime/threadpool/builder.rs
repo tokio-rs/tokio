@@ -125,7 +125,7 @@ impl Builder {
     ///     .build();
     /// # }
     /// ```
-    pub fn name<S: Into<String>>(&mut self, val: S) -> &mut Self {
+    pub fn name(&mut self, val: impl Into<String>) -> &mut Self {
         self.thread_pool_builder.name(val);
         self
     }

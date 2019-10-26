@@ -115,10 +115,7 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn open<P>(path: P) -> io::Result<File>
-    where
-        P: AsRef<Path>,
-    {
+    pub async fn open(path: impl AsRef<Path>) -> io::Result<File> {
         let path = path.as_ref().to_owned();
         let std = asyncify(|| sys::File::open(path)).await?;
 
@@ -153,10 +150,7 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn create<P>(path: P) -> io::Result<File>
-    where
-        P: AsRef<Path>,
-    {
+    pub async fn create(path: impl AsRef<Path>) -> io::Result<File> {
         let path = path.as_ref().to_owned();
         let std_file = asyncify(move || sys::File::create(path)).await?;
         Ok(File::from_std(std_file))
