@@ -61,7 +61,7 @@ jobs:
         workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
 
   # Remove all dev-dependencies to avoid https://github.com/rust-lang/cargo/issues/4866.
-  - script: cargo run --manifest-path ci/remove-dev-dependencies/Cargo.toml ./*/Cargo.toml
+  - bash: cargo run --manifest-path ci/remove-dev-dependencies/Cargo.toml ./*/Cargo.toml
     displayName: Remove dev-dependencies
 
   # Check each specified feature works properly
