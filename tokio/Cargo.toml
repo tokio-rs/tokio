@@ -70,7 +70,12 @@ signal = [
 ]
 sync = ["tokio-sync"]
 tcp = ["io", "net-driver"]
-timer = ["crossbeam-utils", "slab"]
+timer = [
+  "crossbeam-utils",
+  "slab",
+  "sync",
+  "tokio-executor",
+]
 udp = ["io", "net-driver"]
 uds = ["io", "net-driver", "mio-uds", "libc"]
 process = [
