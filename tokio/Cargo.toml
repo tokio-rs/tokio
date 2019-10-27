@@ -39,7 +39,7 @@ fs = ["tokio-executor/blocking"]
 io = ["tokio-io", "bytes", "iovec"]
 macros = ["tokio-macros"]
 net-full = ["tcp", "udp", "uds"]
-net-driver = ["mio", "tokio-executor/blocking"]
+net-driver = ["mio", "tokio-executor/blocking", "lazy_static"]
 rt-current-thread = [
   "timer",
   "tokio-executor/current-thread",
