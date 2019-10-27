@@ -86,6 +86,10 @@ fn pool_shutdown() {
             gated2(true).await;
         });
 
+        pool.spawn(async move {
+            gated2(false).await;
+        });
+
         drop(pool);
     });
 }
