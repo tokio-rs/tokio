@@ -36,8 +36,8 @@ pub async fn read_dir(path: impl AsRef<Path>) -> io::Result<ReadDir> {
 /// This [`Stream`] will return an [`Err`] if there's some sort of intermittent
 /// IO error during iteration.
 ///
-/// [`read_dir`]: fn.read_dir.html
-/// [`DirEntry`]: struct.DirEntry.html
+/// [`read_dir`]: read_dir
+/// [`DirEntry`]: DirEntry
 /// [`Stream`]: Stream
 /// [`Err`]: std::result::Result::Err
 #[derive(Debug)]
@@ -81,7 +81,7 @@ impl Stream for ReadDir {
 ///
 /// [`ReadDir`]: struct.ReadDir.html
 ///
-/// This is a specialized version of [`std::fs::DirEntry`](std::fs::DirEntry) for usage from the
+/// This is a specialized version of [`std::fs::DirEntry`] for usage from the
 /// Tokio runtime.
 ///
 /// An instance of `DirEntry` represents an entry inside of a directory on the
