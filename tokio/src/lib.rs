@@ -69,16 +69,6 @@
 //!     }
 //! }
 //! ```
-
-#[cfg(all(test, loom))]
-macro_rules! loom_thread_local {
-    ($($tts:tt)+) => { loom::thread_local!{ $($tts)+ } }
-}
-
-#[cfg(not(loom))]
-macro_rules! loom_thread_local {
-    ($($tts:tt)+) => { std::thread_local!{ $($tts)+ } }
-}
 macro_rules! if_runtime {
     ($($i:item)*) => ($(
         #[cfg(any(
