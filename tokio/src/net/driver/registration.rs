@@ -230,8 +230,8 @@ impl Registration {
         // state would not be visible.
         let curr_ready = sched
             .set_readiness(self.token, |curr| curr & (!mask_no_hup))
-            .unwrap_or_else(|| panic!("token {} no longer valid!", self.token));
-        let mut ready = mask & mio::Ready::from_usize(ready);
+            .unwrap_or_else(|_| panic!("token {} no longer valid!", self.token));
+        let mut ready = mask & mio::Ready::from_usize(curr_ready);
 
         if ready.is_empty() {
             if let Some(cx) = cx {
@@ -244,7 +244,7 @@ impl Registration {
                 // Try again
                 let curr_ready = sched
                     .set_readiness(self.token, |curr| curr & (!mask_no_hup))
-                    .unwrap_or_else(|| panic!("token {} no longer valid!", self.token));
+                    .unwrap_or_else(|_| panic!("token {} no longer valid!", self.token));
                 ready = mask & mio::Ready::from_usize(curr_ready);
             }
         }
