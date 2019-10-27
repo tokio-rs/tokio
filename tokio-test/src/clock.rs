@@ -22,9 +22,9 @@
 //! });
 //! ```
 
+use tokio::executor::park::{Park, Unpark};
 use tokio::timer::clock::{Clock, Now};
 use tokio::timer::Timer;
-use tokio_executor::park::{Park, Unpark};
 
 use std::marker::PhantomData;
 use std::rc::Rc;

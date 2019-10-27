@@ -1,6 +1,6 @@
 use super::platform;
 
-use tokio_executor::park::{Park, Unpark};
+use crate::executor::park::{Park, Unpark};
 use tokio_sync::AtomicWaker;
 
 use mio::event::Evented;

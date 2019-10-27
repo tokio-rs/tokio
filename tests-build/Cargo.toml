@@ -6,7 +6,7 @@ edition = "2018"
 publish = false
 
 [features]
-executor-without-current-thread = ["tokio-executor"]
+# executor-without-current-thread = ["tokio-executor"]
 # macros-invalid-input = ["tokio/rt-full"]
 # net-no-features = ["tokio-net"]
 # net-with-tcp = ["tokio-net/tcp"]
@@ -19,7 +19,6 @@ executor-without-current-thread = ["tokio-executor"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio-executor = { path = "../tokio-executor", optional = true }
 # tokio = { path = "../tokio", optional = true, default-features = false }
 
 [dev-dependencies]

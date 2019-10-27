@@ -5,8 +5,6 @@ jobs:
     matrix:
       Timer:
         cmd: cargo test -p tokio-timer --test hammer
-      Threadpool:
-        cmd: cargo test -p tokio-executor --tests --features threadpool
   pool:
     vmImage: ubuntu-16.04
   steps:

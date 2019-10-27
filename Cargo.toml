@@ -2,7 +2,6 @@
 
 members = [
   "tokio",
-  "tokio-executor",
   "tokio-macros",
   "tokio-sync",
   "tokio-test",

@@ -7,12 +7,12 @@ mod spawner;
 pub use self::spawner::Spawner;
 
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
-pub use tokio_executor::thread_pool::JoinHandle;
+pub use crate::executor::thread_pool::JoinHandle;
 
 use crate::net::driver;
 use crate::timer::timer;
 
-use tokio_executor::thread_pool::ThreadPool;
+use crate::executor::thread_pool::ThreadPool;
 
 use std::future::Future;
 use std::io;

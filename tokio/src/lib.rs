@@ -80,6 +80,11 @@ macro_rules! if_runtime {
     )*)
 }
 
+#[cfg(all(loom, test))]
+macro_rules! thread_local {
+    ($($tts:tt)+) => { loom::thread_local!{ $($tts)+ } }
+}
+
 #[cfg(feature = "timer")]
 pub mod clock;
 
@@ -100,9 +105,11 @@ pub mod net;
 pub mod prelude;
 
 #[cfg(feature = "process")]
+#[cfg(not(loom))]
 pub mod process;
 
 #[cfg(feature = "signal")]
+#[cfg(not(loom))]
 pub mod signal;
 
 pub mod stream;

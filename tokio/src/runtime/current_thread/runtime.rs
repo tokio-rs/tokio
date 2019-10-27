@@ -1,10 +1,9 @@
+use crate::executor::current_thread::Handle as ExecutorHandle;
+use crate::executor::current_thread::{self, CurrentThread};
 use crate::net::driver::{self, Reactor};
 use crate::runtime::current_thread::Builder;
 use crate::timer::clock::{self, Clock};
 use crate::timer::timer::{self, Timer};
-
-use tokio_executor::current_thread::Handle as ExecutorHandle;
-use tokio_executor::current_thread::{self, CurrentThread};
 
 use std::error::Error;
 use std::fmt;
@@ -38,7 +37,7 @@ impl Handle {
     ///
     /// This function panics if the spawn fails. Failure occurs if the `CurrentThread`
     /// instance of the `Handle` does not exist anymore.
-    pub fn spawn<F>(&self, future: F) -> Result<(), tokio_executor::SpawnError>
+    pub fn spawn<F>(&self, future: F) -> Result<(), crate::executor::SpawnError>
     where
         F: Future<Output = ()> + Send + 'static,
     {
@@ -54,7 +53,7 @@ impl Handle {
     ///
     /// This allows a caller to avoid creating the task if the call to `spawn`
     /// has a high likelihood of failing.
-    pub fn status(&self) -> Result<(), tokio_executor::SpawnError> {
+    pub fn status(&self) -> Result<(), crate::executor::SpawnError> {
         self.0.status()
     }
 }
@@ -201,7 +200,7 @@ impl Runtime {
             // to run the provided future, another to install as the default
             // one). We use the fake one here as the default one.
             let mut default_executor = current_thread::TaskExecutor::current();
-            tokio_executor::with_default(&mut default_executor, || f(executor))
+            crate::executor::with_default(&mut default_executor, || f(executor))
         })
     }
 }

@@ -41,12 +41,11 @@ pub(crate) use self::registration::Registration;
 mod stack;
 use self::stack::Stack;
 
+use crate::executor::park::{Park, ParkThread, Unpark};
 use crate::timer::atomic::AtomicU64;
 use crate::timer::clock::Clock;
 use crate::timer::wheel;
 use crate::timer::Error;
-
-use tokio_executor::park::{Park, ParkThread, Unpark};
 
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
