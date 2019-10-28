@@ -110,7 +110,7 @@ version = "0.3.8"
 default-features = false
 optional = true
 
-[target.cfg'(loom)'.dependencies]
+[target.'cfg(loom)'.dependencies]
 # play nice with loom tests in other crates.
 loom = "0.2.11"
 
