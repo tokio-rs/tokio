@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 
-use tokio_executor::park::{Park, Unpark};
-use tokio_executor::thread_pool::*;
+use tokio::executor::park::{Park, Unpark};
+use tokio::executor::thread_pool::*;
 
 use futures_util::future::poll_fn;
 use std::cell::Cell;
@@ -210,7 +210,7 @@ fn many_multishot_futures() {
         }
 
         {
-            let mut e = tokio_executor::enter().unwrap();
+            let mut e = tokio::executor::enter().unwrap();
 
             e.block_on(async move {
                 for mut start_tx in start_txs {
@@ -232,7 +232,7 @@ fn global_executor_is_configured() {
     let (signal_tx, signal_rx) = mpsc::channel();
 
     pool.spawn(async move {
-        tokio_executor::spawn(async move {
+        tokio::executor::spawn(async move {
             signal_tx.send(()).unwrap();
         });
     });

@@ -1,9 +1,9 @@
 #![warn(rust_2018_idioms)]
 #![cfg(not(miri))]
 
+use tokio::executor::current_thread::{self, block_on_all, CurrentThread, TaskExecutor};
+use tokio::executor::TypedExecutor;
 use tokio::sync::oneshot;
-use tokio_executor::current_thread::{self, block_on_all, CurrentThread, TaskExecutor};
-use tokio_executor::TypedExecutor;
 
 use std::any::Any;
 use std::cell::{Cell, RefCell};
@@ -100,7 +100,7 @@ mod does_not_set_global_executor_by_default {
 
     #[test]
     fn spawn() {
-        test(|f| tokio_executor::DefaultExecutor::current().spawn(f))
+        test(|f| tokio::executor::DefaultExecutor::current().spawn(f))
     }
 }
 
@@ -547,7 +547,7 @@ struct MyPark {
 
 struct MyUnpark;
 
-impl tokio_executor::park::Park for MyPark {
+impl tokio::executor::park::Park for MyPark {
     type Unpark = MyUnpark;
     type Error = ();
 
@@ -569,7 +569,7 @@ impl tokio_executor::park::Park for MyPark {
     }
 }
 
-impl tokio_executor::park::Unpark for MyUnpark {
+impl tokio::executor::park::Unpark for MyUnpark {
     fn unpark(&self) {}
 }
 

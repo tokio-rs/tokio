@@ -1,4 +1,4 @@
-use tokio_executor::{with_default, DefaultExecutor};
+use tokio::executor::{with_default, DefaultExecutor};
 
 #[test]
 fn default_executor_is_send_and_sync() {
@@ -10,7 +10,7 @@ fn default_executor_is_send_and_sync() {
 #[test]
 #[should_panic]
 fn nested_default_executor_status() {
-    let _enter = tokio_executor::enter().unwrap();
+    let _enter = tokio::executor::enter().unwrap();
     let mut executor = DefaultExecutor::current();
 
     let _result = with_default(&mut executor, || ());

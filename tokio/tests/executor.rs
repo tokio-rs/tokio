@@ -1,13 +1,13 @@
 #![warn(rust_2018_idioms)]
 
-use tokio_executor::{self, DefaultExecutor};
+use tokio::executor::{self, DefaultExecutor};
 
 use std::future::Future;
 use std::pin::Pin;
 
 mod out_of_executor_context {
     use super::*;
-    use tokio_executor::Executor;
+    use tokio::executor::Executor;
 
     fn test<F, E>(spawn: F)
     where
