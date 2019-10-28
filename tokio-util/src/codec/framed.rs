@@ -232,8 +232,12 @@ impl<T: AsyncRead + Unpin, U: Unpin> AsyncRead for Fuse<T, U> {
 }
 
 impl<T: AsyncBufRead + Unpin, U: Unpin> AsyncBufRead for Fuse<T, U> {
-    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
-        pin!(self.get_mut().0).poll_fill_buf(cx)
+    fn poll_read_into_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<usize>> {
+        pin!(self.get_mut().0).poll_read_into_buf(cx)
+    }
+
+    fn get_buf(self: Pin<&mut Self>) -> &[u8] {
+        pin!(self.get_mut().0).get_buf()
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {
