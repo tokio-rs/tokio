@@ -137,13 +137,10 @@ fn blocking() {
         let mut pool = new_pool();
         let cnt = Arc::new(AtomicUsize::new(0));
 
-        eprintln!("FOO");
-
         // there are four workers in the pool
         // so, if we run 4 blocking tasks, we know that handoff must have happened
         let block = Arc::new(std::sync::Barrier::new(5));
         for i in 0..4 {
-            eprintln!("FOO{}", i);
             let block = block.clone();
             pool.spawn(async move {
                 thread_pool::blocking(move || {
@@ -152,9 +149,7 @@ fn blocking() {
                 })
             });
         }
-        eprintln!("ENDFOO");
         block.wait();
-        eprintln!("RUN");
 
         for _ in 0..NUM {
             let cnt = cnt.clone();
@@ -172,9 +167,7 @@ fn blocking() {
         rx.recv().unwrap();
 
         // Wait for the pool to shutdown
-        eprintln!("WAIT");
         block.wait();
-        eprintln!("WAITED");
         pool.shutdown_now();
     }
 }
