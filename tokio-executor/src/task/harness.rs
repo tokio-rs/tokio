@@ -51,7 +51,7 @@ where
     /// Panics raised while polling the future are handled.
     ///
     /// Returns `true` if the task needs to be scheduled again
-    pub(super) fn poll(mut self, executor: NonNull<S>) -> bool {
+    pub(super) fn poll(mut self, executor: &mut dyn FnMut() -> Option<NonNull<S>>) -> bool {
         use std::panic;
 
         // Transition the task to the running state.
@@ -81,6 +81,7 @@ where
                 // own the task here.
                 let task = ManuallyDrop::new(Task::from_raw(header.into()));
                 // Call the scheduler's bind callback
+                let executor = executor().expect("first poll must happen from an executor");
                 executor.as_ref().bind(&task);
                 header.executor.with_mut(|ptr| *ptr = Some(executor));
             }
@@ -111,11 +112,6 @@ where
                 };
 
                 let res = guard.core.poll(header);
-
-                // TODO: if pool is blocking, executor may no longer point to the right Executor
-                // any more. we need to detect and fix that. or alternatively get rid of executor
-                // altogether and find some other way to detect whether a task is local. perhaps by
-                // adding a Schedule::is_local fn?
 
                 // prevent the guard from dropping the future
                 guard.polled = true;
@@ -398,7 +394,7 @@ where
 
     fn complete(
         mut self,
-        executor: NonNull<S>,
+        executor: &mut dyn FnMut() -> Option<NonNull<S>>,
         join_interest: bool,
         output: super::Result<T::Output>,
     ) {
@@ -407,15 +403,16 @@ where
             self.core().store_output(output);
         }
 
+        let executor = executor();
         let bound_executor = unsafe { self.header().executor.with(|ptr| *ptr) };
 
         // Handle releasing the task. First, check if the current
         // executor is the one that is bound to the task:
-        if Some(executor) == bound_executor {
+        if executor.is_some() && executor == bound_executor {
             unsafe {
                 // perform a local release
                 let task = ManuallyDrop::new(self.to_task());
-                executor.as_ref().release_local(&task);
+                executor.as_ref().unwrap().as_ref().release_local(&task);
 
                 if self.transition_to_released(join_interest).is_final_ref() {
                     self.dealloc();

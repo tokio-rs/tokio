@@ -487,7 +487,14 @@ where
             self.transition_from_searching();
         }
 
-        let task = task.run(self.shared().into());
+        let executor = self.shared();
+        let task = task.run(&mut || {
+            if gone.get() {
+                None
+            } else {
+                Some(executor.into())
+            }
+        });
         if gone.get() {
             // The Worker disappeared from under us.
             // We need to return, because we no longer own all of our state!
