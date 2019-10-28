@@ -130,10 +130,7 @@ impl<R: AsyncRead> AsyncBufRead for BufReader<R> {
     fn poll_read_into_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<usize>> {
         #[project]
         let BufReader {
-            inner,
-            buf,
-            cap,
-            pos: _,
+            inner, buf, cap, ..
         } = self.project();
 
         if *cap < buf.len() {
@@ -148,12 +145,7 @@ impl<R: AsyncRead> AsyncBufRead for BufReader<R> {
     #[project]
     fn get_buf(self: Pin<&mut Self>) -> &[u8] {
         #[project]
-        let BufReader {
-            inner: _,
-            buf,
-            cap,
-            pos,
-        } = self.project();
+        let BufReader { buf, cap, pos, .. } = self.project();
         &buf[*pos..*cap]
     }
 

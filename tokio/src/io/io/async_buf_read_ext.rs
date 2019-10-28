@@ -24,7 +24,7 @@ pub trait AsyncBufReadExt: AsyncBufRead {
     ///
     /// [`read`]: AsyncReadExt::read
     /// [`consume`]: AsyncBufRead::consume
-    fn fill_buf<'a>(&'a mut self) -> FillBuf<'a, Self>
+    fn fill_buf(&mut self) -> FillBuf<'_, Self>
     where
         Self: Unpin,
     {
@@ -47,7 +47,7 @@ pub trait AsyncBufReadExt: AsyncBufRead {
     /// [`poll_read`]: AsyncRead::poll_read
     /// [`get_buf`]: AsyncBufRead::get_buf
     /// [`consume`]: AsyncBufRead::consume
-    fn read_into_buf<'a>(&'a mut self) -> ReadIntoBuf<'a, Self>
+    fn read_into_buf(&mut self) -> ReadIntoBuf<'_, Self>
     where
         Self: Unpin,
     {

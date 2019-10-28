@@ -11,13 +11,11 @@ pub struct ReadIntoBuf<'a, R: ?Sized> {
     reader: &'a mut R,
 }
 
-pub(crate) fn read_into_buf<'a, R>(reader: &'a mut R) -> ReadIntoBuf<'a, R>
+pub(crate) fn read_into_buf<R>(reader: &mut R) -> ReadIntoBuf<'_, R>
 where
     R: AsyncBufRead + ?Sized + Unpin,
 {
-    ReadIntoBuf {
-        reader,
-    }
+    ReadIntoBuf { reader }
 }
 
 impl<R: AsyncBufRead + ?Sized + Unpin> Future for ReadIntoBuf<'_, R> {

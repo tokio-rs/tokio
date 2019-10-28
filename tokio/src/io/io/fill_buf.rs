@@ -11,7 +11,7 @@ pub struct FillBuf<'a, R: ?Sized> {
     reader: Option<&'a mut R>,
 }
 
-pub(crate) fn fill_buf<'a, R>(reader: &'a mut R) -> FillBuf<'a, R>
+pub(crate) fn fill_buf<R>(reader: &mut R) -> FillBuf<'_, R>
 where
     R: AsyncBufRead + ?Sized + Unpin,
 {
@@ -28,7 +28,7 @@ impl<'a, R: AsyncBufRead + ?Sized + Unpin> Future for FillBuf<'a, R> {
         match reader.as_mut().poll_read_into_buf(cx) {
             Poll::Pending => {
                 self.reader = Some(reader.get_mut());
-                return Poll::Pending
+                return Poll::Pending;
             }
             Poll::Ready(result) => {
                 result?;
