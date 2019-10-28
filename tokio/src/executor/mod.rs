@@ -50,6 +50,7 @@ pub use self::enter::{enter, exit, Enter, EnterError};
 mod error;
 pub use self::error::SpawnError;
 
+#[allow(clippy::module_inception)]
 mod executor;
 pub use self::executor::Executor;
 

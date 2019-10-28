@@ -1,6 +1,6 @@
 #![warn(rust_2018_idioms)]
 
-use tokio::executor::{self, DefaultExecutor};
+use tokio::executor::DefaultExecutor;
 
 use std::future::Future;
 use std::pin::Pin;
