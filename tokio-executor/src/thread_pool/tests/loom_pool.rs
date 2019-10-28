@@ -43,34 +43,32 @@ fn pool_multi_spawn() {
 
 #[test]
 fn blocking() {
-    const NUM: usize = 10;
+    const NUM: usize = 5;
     loom::model(|| {
-        let (tx, rx) = oneshot::channel::<()>();
-        let tx = Arc::new(tx);
-
         let mut pool = ThreadPool::new();
         let cnt = Arc::new(AtomicUsize::new(0));
 
-        for _ in 0..2 {
-            pool.spawn(async move {
-                thread_pool::blocking(move || {
-                    crate::loom::thread::yield_now();
-                })
-            });
-        }
+        let (done_tx, done_rx) = oneshot::channel();
+        let done_tx = Arc::new(Mutex::new(Some(done_tx)));
+
+        pool.spawn(async move {
+            thread_pool::blocking(move || {
+                crate::loom::thread::yield_now();
+            })
+        });
 
         for _ in 0..NUM {
             let cnt = cnt.clone();
-            let tx = tx.clone();
+            let done_tx = done_tx.clone();
 
             pool.spawn(async move {
-                cnt.fetch_add(1, Relaxed);
-                drop(tx);
+                if NUM == cnt.fetch_add(1, Relaxed) {
+                    done_tx.lock().unwrap().take().unwrap().send(());
+                }
             });
         }
 
-        drop(tx);
-        rx.recv();
+        done_rx.recv();
 
         pool.shutdown_now();
     });
