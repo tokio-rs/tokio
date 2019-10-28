@@ -249,6 +249,7 @@ where
                             // _also_ erasing the lifetime of these pointers. That is safe here,
                             // because we know that ob will set back to None before allow_blocking
                             // is dropped.
+                            #[allow(clippy::useless_transmute)]
                             std::mem::transmute::<_, *mut dyn FnMut()>(allow_blocking)
                         }));
 
