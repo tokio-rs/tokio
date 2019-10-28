@@ -1,6 +1,6 @@
 use super::platform;
-use crate::loom::atomic::{AtomicUsize, Ordering::SeqCst};
 use crate::executor::park::{Park, Unpark};
+use crate::loom::atomic::{AtomicUsize, Ordering::SeqCst};
 
 mod dispatch;
 use dispatch::SingleShard;
