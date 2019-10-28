@@ -208,7 +208,7 @@ where
                             // we don't drop `park` later_! The DropNotGone wrapper around `park`
                             // takes care of that.
                             let park = unsafe { Box::from_raw(park_ptr) };
-                            let worker = Worker {
+                            let mut worker = Worker {
                                 entry: unsafe {
                                     // The same argument applies here. Since we unset `current`,
                                     // the task's execution won't assume that it owns a worker any
@@ -223,6 +223,12 @@ where
                                 launch_worker: Arc::clone(launch_worker),
                                 gone: Cell::new(false),
                             };
+
+                            // If we got this task by searching, and then give away the Worker,
+                            // that worker will _not_ be starting in searching mode.
+                            if worker.entry.is_searching() {
+                                worker.entry.transition_from_searching();
+                            }
 
                             // give away the worker
                             //
