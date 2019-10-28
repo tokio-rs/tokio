@@ -112,7 +112,7 @@ jobs:
       - clippy
       - test_tokio
       - test_linux
-      - test_features
+      # - test_features
       - loom
 #      - test_nightly
       - cross
