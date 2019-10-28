@@ -1,5 +1,6 @@
 use crate::io::io::fill_buf::{fill_buf, FillBuf};
 use crate::io::io::lines::{lines, Lines};
+use crate::io::io::read_into_buf::{read_into_buf, ReadIntoBuf};
 use crate::io::io::read_line::{read_line, ReadLine};
 use crate::io::io::read_until::{read_until, ReadUntil};
 use crate::io::io::split::{split, Split};
@@ -28,6 +29,29 @@ pub trait AsyncBufReadExt: AsyncBufRead {
         Self: Unpin,
     {
         fill_buf(self)
+    }
+
+    /// Creates a future which reads more data into the internal buffer by reading from the
+    /// inner reader. When the future returns the data can then be retrieved via
+    /// [`get_buf`][].
+    ///
+    /// This function is a lower-level call. It needs to be paired with the
+    /// [`consume`] method to function properly. When calling this
+    /// method, none of the contents will be "read" in the sense that later
+    /// calling [`poll_read`] may return the same contents. As such, [`consume`] must
+    /// be called with the number of bytes that are consumed from this buffer to
+    /// ensure that the bytes are never returned twice.
+    ///
+    /// A zero returned indicates that the stream has reached EOF.
+    ///
+    /// [`poll_read`]: AsyncRead::poll_read
+    /// [`get_buf`]: AsyncBufRead::get_buf
+    /// [`consume`]: AsyncBufRead::consume
+    fn read_into_buf<'a>(&'a mut self) -> ReadIntoBuf<'a, Self>
+    where
+        Self: Unpin,
+    {
+        read_into_buf(self)
     }
 
     /// Creates a future which will read all the bytes associated with this I/O

@@ -12,6 +12,7 @@ mod flush;
 mod lines;
 mod read;
 mod read_exact;
+mod read_into_buf;
 mod read_line;
 mod read_to_end;
 mod read_to_string;
