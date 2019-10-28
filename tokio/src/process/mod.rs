@@ -1,6 +1,6 @@
 //! An implementation of asynchronous process management for Tokio.
 //!
-//! This module provides a [`Command`](crate::process::Command) struct that imitates the interface of the
+//! This module provides a [`Command`] struct that imitates the interface of the
 //! [`std::process::Command`] type in the standard library, but provides asynchronous versions of
 //! functions that create processes. These functions (`spawn`, `status`, `output` and their
 //! variants) return "future aware" types that interoperate with Tokio. The asynchronous process
@@ -102,7 +102,7 @@
 //! While similar to the standard library, this crate's `Child` type differs
 //! importantly in the behavior of `drop`. In the standard library, a child
 //! process will continue running after the instance of [`std::process::Child`]
-//! is dropped. In this crate, however, because [`tokio::process::Child`](crate::process::Child) is a
+//! is dropped. In this crate, however, because [`tokio::process::Child`] is a
 //! future of the child's `ExitStatus`, a child process is terminated if
 //! `tokio::process::Child` is dropped. The behavior of the standard library can
 //! be regained with the [`Child::forget`](crate::process::Child::forget) method.
