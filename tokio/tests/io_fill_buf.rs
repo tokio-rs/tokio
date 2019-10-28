@@ -2,7 +2,7 @@
 
 use std::pin::Pin;
 
-use tokio_io::{AsyncBufRead, AsyncBufReadExt, BufReader};
+use tokio::io::{AsyncBufRead, AsyncBufReadExt, BufReader};
 use tokio_test::assert_ok;
 
 #[tokio::test]

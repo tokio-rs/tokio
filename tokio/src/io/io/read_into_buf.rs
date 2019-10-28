@@ -1,4 +1,4 @@
-use crate::AsyncBufRead;
+use crate::io::AsyncBufRead;
 use std::future::Future;
 use std::io;
 use std::pin::Pin;
