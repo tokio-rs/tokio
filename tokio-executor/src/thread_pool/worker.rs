@@ -7,7 +7,9 @@ use std::cell::Cell;
 use std::ops::{Deref, DerefMut};
 use std::time::Duration;
 
-type LaunchWorker<P> = Arc<dyn Fn(Worker<P>) -> Box<dyn FnOnce() + Send> + Send + Sync>;
+// The Arc<Box<_>> is needed because loom doesn't support Arc<T> where T: !Sized
+// loom doesn't support that because it requires CoerceUnsized, which is unstable
+type LaunchWorker<P> = Arc<Box<dyn Fn(Worker<P>) -> Box<dyn FnOnce() + Send> + Send + Sync>>;
 
 thread_local! {
     /// Thread-local tracking the current executor
@@ -72,7 +74,7 @@ pub(crate) struct Worker<P: Park + 'static> {
 pub(crate) fn create_set<F, P>(
     pool_size: usize,
     mk_park: F,
-    launch_worker: Arc<dyn Fn(Worker<P>) -> Box<dyn FnOnce() + Send> + Send + Sync>,
+    launch_worker: LaunchWorker<P>,
     blocking: Arc<crate::blocking::Pool>,
 ) -> (Arc<Set<P::Unpark>>, Vec<Worker<P>>)
 where

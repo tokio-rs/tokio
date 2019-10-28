@@ -16,7 +16,9 @@ macro_rules! pool {
         let (pool, workers) = thread_pool::create_pool(
             $n,
             |index| Box::new(mock_park.mk_park(index)),
-            Arc::new(|_| unreachable!("attempted to move worker during non-blocking test")),
+            Arc::new(Box::new(|_| {
+                unreachable!("attempted to move worker during non-blocking test")
+            })),
             blocking,
         );
         (pool, workers, mock_park)

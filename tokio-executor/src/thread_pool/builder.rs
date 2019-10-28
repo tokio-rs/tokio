@@ -155,7 +155,7 @@ impl Builder {
         let (shutdown_tx, shutdown_rx) = shutdown::channel();
 
         let around_worker = self.around_worker.as_ref().map(Arc::clone);
-        let launch_worker = Arc::new(move |worker: Worker<BoxedPark<P>>| {
+        let launch_worker = Arc::new(Box::new(move |worker: Worker<BoxedPark<P>>| {
             // NOTE: It might seem like the shutdown_tx that's moved into this Arc is never
             // dropped, and that shutdown_rx will therefore never see EOF, but that is not actually
             // the case. Only `build_with_park` and each worker hold onto a copy of this Arc.
@@ -194,9 +194,7 @@ impl Builder {
                 drop(shutdown_tx);
             }) as Box<dyn FnOnce() + Send + 'static>
         })
-            as Arc<
-                dyn Fn(Worker<BoxedPark<P>>) -> Box<dyn FnOnce() + Send + 'static> + Send + Sync,
-            >;
+            as Box<dyn Fn(Worker<BoxedPark<P>>) -> Box<dyn FnOnce() + Send> + Send + Sync>);
 
         let mut blocking = crate::blocking::Builder::default();
         blocking.name(self.name.clone());
