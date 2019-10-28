@@ -199,6 +199,7 @@ impl Shard {
 
     #[inline(always)]
     fn get(&self, idx: usize) -> Option<&page::ScheduledIo> {
+        #[cfg(debug_assertions)]
         debug_assert_eq!(Tid::from_packed(idx).as_usize(), self.tid);
 
         let addr = page::Addr::from_packed(idx);
@@ -212,6 +213,7 @@ impl Shard {
 
     /// Remove an item on the shard's local thread.
     fn remove_local(&self, idx: usize) {
+        #[cfg(debug_assertions)]
         debug_assert_eq!(Tid::from_packed(idx).as_usize(), self.tid);
         let addr = page::Addr::from_packed(idx);
         let page_idx = addr.index();
@@ -223,6 +225,7 @@ impl Shard {
 
     /// Remove an item, while on a different thread from the shard's local thread.
     fn remove_remote(&self, idx: usize) {
+        #[cfg(debug_assertions)]
         debug_assert_eq!(Tid::from_packed(idx).as_usize(), self.tid);
         let addr = page::Addr::from_packed(idx);
         let page_idx = addr.index();
