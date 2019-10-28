@@ -2,7 +2,7 @@
 
 extern crate test;
 
-use tokio_executor::thread_pool::{Builder, Spawner, ThreadPool};
+use tokio::executor::thread_pool::{Builder, Spawner};
 use tokio_sync::oneshot;
 
 use std::future::Future;
