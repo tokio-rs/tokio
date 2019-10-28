@@ -140,7 +140,7 @@ fn blocking() {
         // there are four workers in the pool
         // so, if we run 4 blocking tasks, we know that handoff must have happened
         let block = Arc::new(std::sync::Barrier::new(5));
-        for i in 0..4 {
+        for _ in 0..4 {
             let block = block.clone();
             pool.spawn(async move {
                 thread_pool::blocking(move || {
