@@ -97,18 +97,28 @@ impl<R: AsyncRead> AsyncRead for Take<R> {
 
 impl<R: AsyncBufRead> AsyncBufRead for Take<R> {
     #[project]
-    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
+    fn poll_read_into_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<usize>> {
         #[project]
         let Take { inner, limit_ } = self.project();
 
         // Don't call into inner reader at all at EOF because it may still block
         if *limit_ == 0 {
-            return Poll::Ready(Ok(&[]));
+            return Poll::Ready(Ok(0));
         }
 
         let buf = ready!(inner.poll_fill_buf(cx)?);
         let cap = cmp::min(buf.len() as u64, *limit_) as usize;
-        Poll::Ready(Ok(&buf[..cap]))
+        Poll::Ready(Ok(cap))
+    }
+
+    #[project]
+    fn get_buf(self: Pin<&mut Self>) -> &[u8] {
+        #[project]
+        let Take { inner, limit_ } = self.project();
+
+        let buf = inner.get_buf();
+        let cap = cmp::min(buf.len() as u64, *limit_) as usize;
+        &buf[..cap]
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {

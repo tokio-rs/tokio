@@ -164,8 +164,12 @@ impl<W: AsyncWrite + AsyncRead> AsyncRead for BufWriter<W> {
 }
 
 impl<W: AsyncWrite + AsyncBufRead> AsyncBufRead for BufWriter<W> {
-    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
-        self.get_pin_mut().poll_fill_buf(cx)
+    fn poll_read_into_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<usize>> {
+        self.get_pin_mut().poll_read_into_buf(cx)
+    }
+
+    fn get_buf(self: Pin<&mut Self>) -> &[u8] {
+        self.get_pin_mut().get_buf()
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {

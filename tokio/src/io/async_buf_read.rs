@@ -5,6 +5,8 @@ use std::ops::DerefMut;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+use futures_core::ready;
+
 /// Read bytes asynchronously.
 ///
 /// This trait inherits from `std::io::BufRead` and indicates that an I/O object is
@@ -32,7 +34,38 @@ pub trait AsyncBufRead: AsyncRead {
     ///
     /// [`poll_read`]: AsyncRead::poll_read
     /// [`consume`]: AsyncBufRead::consume
-    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>>;
+    fn poll_fill_buf(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
+        if self.as_mut().get_buf().is_empty() {
+            ready!(self.as_mut().poll_read_into_buf(cx))?;
+        }
+        Ok(self.get_buf()).into()
+    }
+
+    /// Attempt to read more data into the the internal buffer by reading from the
+    /// inner reader.
+    ///
+    /// On success, returns `Poll::Ready(Ok(read_bytes))`.
+    ///
+    /// If no data is available for reading, the method returns
+    /// `Poll::Pending` and arranges for the current task (via
+    /// `cx.waker().wake_by_ref()`) to receive a notification when the object becomes
+    /// readable or is closed.
+    ///
+    /// This function is a lower-level call. It needs to be paired with the
+    /// [`consume`] method to function properly. When calling this
+    /// method, none of the contents will be "read" in the sense that later
+    /// calling [`poll_read`] may return the same contents. As such, [`consume`] must
+    /// be called with the number of bytes that are consumed from this buffer to
+    /// ensure that the bytes are never returned twice.
+    ///
+    /// A zero returned indicates that the stream has reached EOF.
+    ///
+    /// [`poll_read`]: AsyncRead::poll_read
+    /// [`consume`]: AsyncBufRead::consume
+    fn poll_read_into_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<usize>>;
+
+    /// Returns the data currently read into the internal buffer.
+    fn get_buf(self: Pin<&mut Self>) -> &[u8];
 
     /// Tells this buffer that `amt` bytes have been consumed from the buffer,
     /// so they should no longer be returned in calls to [`poll_read`].
@@ -54,10 +87,14 @@ pub trait AsyncBufRead: AsyncRead {
 
 macro_rules! deref_async_buf_read {
     () => {
-        fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>)
-            -> Poll<io::Result<&[u8]>>
+        fn poll_read_into_buf(self: Pin<&mut Self>, cx: &mut Context<'_>)
+            -> Poll<io::Result<usize>>
         {
-            Pin::new(&mut **self.get_mut()).poll_fill_buf(cx)
+            Pin::new(&mut **self.get_mut()).poll_read_into_buf(cx)
+        }
+
+        fn get_buf(self: Pin<&mut Self>) -> &[u8] {
+            Pin::new(&mut **self.get_mut()).get_buf()
         }
 
         fn consume(mut self: Pin<&mut Self>, amt: usize) {
@@ -79,8 +116,12 @@ where
     P: DerefMut + Unpin,
     P::Target: AsyncBufRead,
 {
-    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
-        self.get_mut().as_mut().poll_fill_buf(cx)
+    fn poll_read_into_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<usize>> {
+        self.get_mut().as_mut().poll_read_into_buf(cx)
+    }
+
+    fn get_buf(self: Pin<&mut Self>) -> &[u8] {
+        self.get_mut().as_mut().get_buf()
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {
@@ -89,8 +130,12 @@ where
 }
 
 impl AsyncBufRead for &[u8] {
-    fn poll_fill_buf(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
-        Poll::Ready(Ok(*self))
+    fn poll_read_into_buf(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<usize>> {
+        Poll::Ready(Ok(self.len()))
+    }
+
+    fn get_buf(self: Pin<&mut Self>) -> &[u8] {
+        *self
     }
 
     fn consume(mut self: Pin<&mut Self>, amt: usize) {
@@ -99,8 +144,13 @@ impl AsyncBufRead for &[u8] {
 }
 
 impl<T: AsRef<[u8]> + Unpin> AsyncBufRead for io::Cursor<T> {
-    fn poll_fill_buf(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
-        Poll::Ready(io::BufRead::fill_buf(self.get_mut()))
+    fn poll_read_into_buf(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<usize>> {
+        Poll::Ready(io::BufRead::fill_buf(self.get_mut()).map(|buf| buf.len()))
+    }
+
+    fn get_buf(self: Pin<&mut Self>) -> &[u8] {
+        // Reading from a cursor never fails and is always ready
+        io::BufRead::fill_buf(self.get_mut()).unwrap()
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {

@@ -106,7 +106,7 @@ where
     U: AsyncBufRead,
 {
     #[project]
-    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
+    fn poll_read_into_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<usize>> {
         #[project]
         let Chain {
             first,
@@ -115,14 +115,31 @@ where
         } = self.project();
 
         if !*done_first {
-            match ready!(first.poll_fill_buf(cx)?) {
-                buf if buf.is_empty() => {
+            match ready!(first.poll_read_into_buf(cx)?) {
+                0 => {
                     *done_first = true;
                 }
-                buf => return Poll::Ready(Ok(buf)),
+                len => return Poll::Ready(Ok(len)),
             }
         }
-        second.poll_fill_buf(cx)
+        second.poll_read_into_buf(cx)
+    }
+
+    #[inline]
+    #[project]
+    fn get_buf(self: Pin<&mut Self>) -> &[u8] {
+        #[project]
+        let Chain {
+            first,
+            second,
+            done_first,
+        } = self.project();
+
+        if !*done_first {
+            first.get_buf()
+        } else {
+            second.get_buf()
+        }
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {

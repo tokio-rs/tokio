@@ -55,8 +55,13 @@ impl AsyncRead for Empty {
 
 impl AsyncBufRead for Empty {
     #[inline]
-    fn poll_fill_buf(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
-        Poll::Ready(Ok(&[]))
+    fn poll_read_into_buf(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<usize>> {
+        Poll::Ready(Ok(0))
+    }
+
+    #[inline]
+    fn get_buf(self: Pin<&mut Self>) -> &[u8] {
+        &[]
     }
 
     #[inline]

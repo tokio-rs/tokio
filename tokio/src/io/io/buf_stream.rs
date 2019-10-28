@@ -124,8 +124,12 @@ impl<RW: AsyncRead + AsyncWrite> AsyncRead for BufStream<RW> {
 }
 
 impl<RW: AsyncBufRead + AsyncRead + AsyncWrite> AsyncBufRead for BufStream<RW> {
-    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
-        self.project().0.poll_fill_buf(cx)
+    fn poll_read_into_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<usize>> {
+        self.project().0.poll_read_into_buf(cx)
+    }
+
+    fn get_buf(self: Pin<&mut Self>) -> &[u8] {
+        self.project().0.get_buf()
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {

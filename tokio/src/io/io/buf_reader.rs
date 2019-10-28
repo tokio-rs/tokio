@@ -127,30 +127,43 @@ impl<R: AsyncRead> AsyncRead for BufReader<R> {
 
 impl<R: AsyncRead> AsyncBufRead for BufReader<R> {
     #[project]
-    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
+    fn poll_read_into_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<usize>> {
         #[project]
         let BufReader {
             inner,
             buf,
             cap,
-            pos,
+            pos: _,
         } = self.project();
 
-        // If we've reached the end of our internal buffer then we need to fetch
-        // some more data from the underlying reader.
-        // Branch using `>=` instead of the more correct `==`
-        // to tell the compiler that the pos..cap slice is always valid.
-        if *pos >= *cap {
-            debug_assert!(*pos == *cap);
-            *cap = ready!(inner.poll_read(cx, buf))?;
-            *pos = 0;
+        if *cap < buf.len() {
+            let read = ready!(inner.poll_read(cx, &mut buf[*cap..]))?;
+            *cap += read;
+            Poll::Ready(Ok(read))
+        } else {
+            Poll::Ready(Ok(0))
         }
-        Poll::Ready(Ok(&buf[*pos..*cap]))
+    }
+
+    #[project]
+    fn get_buf(self: Pin<&mut Self>) -> &[u8] {
+        #[project]
+        let BufReader {
+            inner: _,
+            buf,
+            cap,
+            pos,
+        } = self.project();
+        &buf[*pos..*cap]
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {
         let me = self.project();
         *me.pos = cmp::min(*me.pos + amt, *me.cap);
+        if *me.pos == me.buf.len() {
+            *me.cap = 0;
+            *me.pos = 0;
+        }
     }
 }
 
