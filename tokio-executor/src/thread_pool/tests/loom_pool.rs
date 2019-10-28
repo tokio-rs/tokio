@@ -3,7 +3,7 @@ use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
 use crate::loom::sync::{Arc, Mutex};
 use crate::spawn;
 use crate::tests::loom_oneshot as oneshot;
-use crate::thread_pool::ThreadPool;
+use crate::thread_pool::{self, ThreadPool};
 
 use std::future::Future;
 
@@ -38,6 +38,41 @@ fn pool_multi_spawn() {
         });
 
         rx.recv();
+    });
+}
+
+#[test]
+fn blocking() {
+    const NUM: usize = 10;
+    loom::model(|| {
+        let (tx, rx) = oneshot::channel::<()>();
+        let tx = Arc::new(tx);
+
+        let mut pool = ThreadPool::new();
+        let cnt = Arc::new(AtomicUsize::new(0));
+
+        for _ in 0..2 {
+            pool.spawn(async move {
+                thread_pool::blocking(move || {
+                    crate::loom::thread::yield_now();
+                })
+            });
+        }
+
+        for _ in 0..NUM {
+            let cnt = cnt.clone();
+            let tx = tx.clone();
+
+            pool.spawn(async move {
+                cnt.fetch_add(1, Relaxed);
+                drop(tx);
+            });
+        }
+
+        drop(tx);
+        rx.recv();
+
+        pool.shutdown_now();
     });
 }
 
