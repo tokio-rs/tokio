@@ -150,6 +150,10 @@ where
         }
     }
 
+    pub(crate) fn is_closed(&self) -> bool {
+        self.inject.is_closed()
+    }
+
     pub(crate) fn len(&self) -> usize {
         self.shared.len()
     }

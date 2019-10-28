@@ -260,6 +260,15 @@ where
                 })
             })
         });
+
+        if gone.get() && pool.is_closed() {
+            // If the pool is shutting down, some other thread may be waiting to clean up after the
+            // task that we were holding on to. If we completed that task, we did nothing (because
+            // task.run() returned None), and so crucially we did not wait up any such thread.
+            //
+            // So, we have to do that here.
+            pool.notify_all();
+        }
     }
 
     pub(super) fn id(&self) -> usize {
