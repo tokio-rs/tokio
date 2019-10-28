@@ -41,7 +41,7 @@ io-util = ["io-traits", "pin-project", "memchr"]
 io = ["io-traits", "io-util"]
 macros = ["tokio-macros"]
 net-full = ["tcp", "udp", "uds"]
-net-driver = ["mio", "tokio-executor/blocking"]
+net-driver = ["mio", "tokio-executor/blocking", "lazy_static"]
 rt-current-thread = [
   "timer",
   "tokio-executor/current-thread",
@@ -113,6 +113,10 @@ version = "0.3.8"
 default-features = false
 optional = true
 
+[target.'cfg(loom)'.dependencies]
+# play nice with loom tests in other crates.
+loom = "0.2.11"
+
 [dev-dependencies]
 tokio-test = { version = "=0.2.0-alpha.6", path = "../tokio-test" }
 tokio-util = { version = "=0.2.0-alpha.6", path = "../tokio-util" }
@@ -129,6 +133,10 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tempfile = "3.1.0"
 time = "0.1"
+
+# sharded slab tests
+loom = "0.2.11"
+proptest = "0.9.4"
 
 [package.metadata.docs.rs]
 all-features = true

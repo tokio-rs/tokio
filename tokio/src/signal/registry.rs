@@ -175,7 +175,7 @@ where
     GLOBALS.as_ref()
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(loom)))]
 mod tests {
     use super::*;
     use crate::runtime::current_thread::Runtime;

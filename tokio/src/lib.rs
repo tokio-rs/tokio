@@ -69,7 +69,6 @@
 //!     }
 //! }
 //! ```
-
 macro_rules! if_runtime {
     ($($i:item)*) => ($(
         #[cfg(any(
@@ -96,6 +95,9 @@ pub mod io;
 
 #[cfg(feature = "net-driver")]
 pub mod net;
+
+#[cfg(feature = "net-driver")]
+mod loom;
 
 pub mod prelude;
 

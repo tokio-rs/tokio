@@ -124,7 +124,15 @@
 //! [`PollEvented`]: struct.PollEvented.html
 //! [`std::io::Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
 //! [`std::io::Write`]: https://doc.rust-lang.org/std/io/trait.Write.html
+#[cfg(loom)]
+macro_rules! loom_thread_local {
+    ($($tts:tt)+) => { loom::thread_local!{ $($tts)+ } }
+}
 
+#[cfg(not(loom))]
+macro_rules! loom_thread_local {
+    ($($tts:tt)+) => { std::thread_local!{ $($tts)+ } }
+}
 pub(crate) mod platform;
 mod reactor;
 mod registration;
