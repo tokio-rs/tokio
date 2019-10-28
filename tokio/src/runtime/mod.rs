@@ -19,7 +19,7 @@
 //! Creating a [`Runtime`] does the following:
 //!
 //! * Spawn a background thread running a [`Reactor`] instance.
-//! * Start a `ThreadPool` for executing futures.
+//! * Start a thread pool for executing futures.
 //! * Run an instance of `Timer` **per** thread pool worker thread.
 //!
 //! The thread pool uses a work-stealing strategy and is configured to start a

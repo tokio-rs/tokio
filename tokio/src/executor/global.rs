@@ -15,7 +15,7 @@ use std::pin::Pin;
 /// executor (usually itself) that is used to spawn new tasks.
 ///
 /// The current `DefaultExecutor` reference is tracked using a thread-local
-/// variable and is set using `crate::executor::with_default`
+/// variable and is set using `tokio::executor::with_default`
 #[derive(Debug, Clone)]
 pub struct DefaultExecutor {
     _dummy: (),

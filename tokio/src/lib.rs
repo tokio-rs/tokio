@@ -106,8 +106,7 @@ mod loom;
 
 pub mod prelude;
 
-#[cfg(feature = "process")]
-#[cfg(not(loom))]
+#[cfg(all(feature = "process", not(loom)))]
 pub mod process;
 
 #[cfg(feature = "signal")]

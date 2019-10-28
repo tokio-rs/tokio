@@ -20,7 +20,6 @@
 //! `std::io::ErrorKind::WouldBlock` if a *worker* thread can not be converted
 //! to a *backup* thread immediately.
 //!
-//! [`blocking`]: #
 //! [`AsyncRead`]: https://docs.rs/tokio-io/0.1/tokio_io/trait.AsyncRead.html
 
 pub(crate) mod blocking;
