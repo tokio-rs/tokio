@@ -938,7 +938,7 @@ mod sys {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(loom)))]
 mod test {
     use std::future::Future;
     use std::io;

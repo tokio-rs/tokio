@@ -87,7 +87,7 @@ impl<T: Wait> OrphanQueue<T> for AtomicOrphanQueue<T> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(loom)))]
 mod test {
     use super::Wait;
     use super::{AtomicOrphanQueue, OrphanQueue};

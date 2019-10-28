@@ -43,7 +43,7 @@ io-util = ["io-traits", "pin-project", "memchr"]
 io = ["io-traits", "io-util"]
 macros = ["tokio-macros"]
 net-full = ["tcp", "udp", "uds"]
-net-driver = ["mio", "blocking"]
+net-driver = ["mio", "blocking", "lazy_static"]
 rt-current-thread = [
   "crossbeam-channel",
   "timer",
@@ -131,6 +131,9 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tempfile = "3.1.0"
 time = "0.1"
+
+# sharded slab tests
+proptest = "0.9.4"
 
 [package.metadata.docs.rs]
 all-features = true
