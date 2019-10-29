@@ -77,7 +77,7 @@ fn blocking_and_regular() {
             let done_tx = done_tx.clone();
 
             pool.spawn(async move {
-                if NUM == cnt.fetch_add(1, Relaxed) {
+                if NUM == cnt.fetch_add(1, Relaxed) + 1 {
                     done_tx.lock().unwrap().take().unwrap().send(());
                 }
             });
