@@ -24,11 +24,13 @@ macro_rules! debug {
 macro_rules! if_loom {
     ($($t:tt)*) => {{
         #[cfg(loom)]
-        let is_loom = true;
+        const LOOM: bool = true;
         #[cfg(not(loom))]
-        let is_loom = true;
+        const LOOM: bool = false;
 
-        if is_loom { $($t)* }
+        if LOOM {
+            $($t)*
+        }
     }}
 }
 
