@@ -42,7 +42,22 @@ fn pool_multi_spawn() {
 }
 
 #[test]
-fn blocking() {
+fn only_blocking() {
+    loom::model(|| {
+        let mut pool = ThreadPool::new();
+
+        pool.spawn(async move {
+            thread_pool::blocking(move || {
+                crate::executor::loom::thread::yield_now();
+            })
+        });
+
+        pool.shutdown_now();
+    });
+}
+
+#[test]
+fn blocking_and_regular() {
     const NUM: usize = 5;
     loom::model(|| {
         let mut pool = ThreadPool::new();
