@@ -21,6 +21,17 @@ macro_rules! debug {
     }
 }
 
+macro_rules! if_loom {
+    ($($t:tt)*) => {{
+        #[cfg(loom)]
+        let is_loom = true;
+        #[cfg(not(loom))]
+        let is_loom = true;
+
+        if is_loom { $($t)* }
+    }}
+}
+
 mod barrier;
 pub use barrier::{Barrier, BarrierWaitResult};
 
