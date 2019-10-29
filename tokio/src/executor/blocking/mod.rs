@@ -3,7 +3,7 @@
 use crate::executor::loom::sync::{Arc, Condvar, Mutex};
 use crate::executor::loom::thread;
 #[cfg(feature = "blocking")]
-use tokio_sync::oneshot;
+use crate::sync::oneshot;
 
 use std::cell::Cell;
 use std::collections::VecDeque;

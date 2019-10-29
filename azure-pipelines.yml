@@ -47,8 +47,6 @@ jobs:
     displayName: Test sub crates -
     rust: beta
     crates:
-      tokio-sync:
-        - async-traits
       tokio-macros: []
       tokio-test: []
       tokio-util: []

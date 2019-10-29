@@ -6,7 +6,6 @@ mod datagram;
 pub use self::datagram::UnixDatagram;
 
 mod incoming;
-#[cfg(feature = "async-traits")]
 pub use self::incoming::Incoming;
 
 mod listener;

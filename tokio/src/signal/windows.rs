@@ -7,9 +7,8 @@
 
 #![cfg(windows)]
 
-use super::registry::{globals, EventId, EventInfo, Init, Storage};
-
-use tokio_sync::mpsc::{channel, Receiver};
+use crate::signal::registry::{globals, EventId, EventInfo, Init, Storage};
+use crate::sync::mpsc::{channel, Receiver};
 
 use futures_core::stream::Stream;
 use std::convert::TryFrom;
