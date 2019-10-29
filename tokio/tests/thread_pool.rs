@@ -274,7 +274,7 @@ fn panic_in_task() {
 
 #[test]
 fn multi_threadpool() {
-    use tokio_sync::oneshot;
+    use tokio::sync::oneshot;
 
     let pool1 = new_pool();
     let pool2 = new_pool();

@@ -1,8 +1,7 @@
+use crate::sync::AtomicWaker;
 use crate::timer::atomic::AtomicU64;
 use crate::timer::timer::{HandlePriv, Inner};
 use crate::timer::Error;
-
-use tokio_sync::AtomicWaker;
 
 use crossbeam_utils::CachePadded;
 use std::cell::UnsafeCell;

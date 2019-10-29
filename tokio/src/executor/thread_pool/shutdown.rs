@@ -4,8 +4,7 @@
 //! dropped, the `Receiver` receives a notification.
 
 use crate::executor::loom::sync::Arc;
-
-use tokio_sync::oneshot;
+use crate::sync::oneshot;
 
 #[derive(Debug, Clone)]
 pub(super) struct Sender {

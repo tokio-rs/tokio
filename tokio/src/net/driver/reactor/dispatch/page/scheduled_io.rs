@@ -3,8 +3,7 @@ use crate::loom::{
     atomic::{AtomicUsize, Ordering},
     CausalCell,
 };
-
-use tokio_sync::AtomicWaker;
+use crate::sync::AtomicWaker;
 
 #[derive(Debug)]
 pub(crate) struct ScheduledIo {

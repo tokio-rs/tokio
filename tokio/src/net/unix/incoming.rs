@@ -1,5 +1,3 @@
-#![cfg(feature = "async-traits")]
-
 use super::{UnixListener, UnixStream};
 
 use futures_core::ready;

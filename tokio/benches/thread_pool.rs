@@ -3,7 +3,7 @@
 extern crate test;
 
 use tokio::executor::thread_pool::{Builder, Spawner};
-use tokio_sync::oneshot;
+use tokio::sync::oneshot;
 
 use std::future::Future;
 use std::pin::Pin;

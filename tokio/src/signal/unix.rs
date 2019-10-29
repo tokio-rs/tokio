@@ -8,8 +8,7 @@
 use crate::io::AsyncRead;
 use crate::net::util::PollEvented;
 use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
-
-use tokio_sync::mpsc::{channel, Receiver};
+use crate::sync::mpsc::{channel, Receiver};
 
 use futures_core::stream::Stream;
 use libc::c_int;
