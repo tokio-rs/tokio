@@ -58,7 +58,7 @@ fn only_blocking() {
 
 #[test]
 fn blocking_and_regular() {
-    const NUM: usize = 1;
+    const NUM: usize = 3;
     loom::model(|| {
         let mut pool = Builder::new().num_threads(1).build();
         let cnt = Arc::new(AtomicUsize::new(0));
