@@ -179,10 +179,19 @@ where
     }
 }
 
+impl<P: 'static> Set<P> {
+    /// Wait for all locks on the injection queue to drop.
+    ///
+    /// This is done by locking w/o doing anything.
+    pub(super) fn wait_for_unlocked(&self) {
+        self.inject.wait_for_unlocked();
+    }
+}
+
 impl<P: 'static> Drop for Set<P> {
     fn drop(&mut self) {
         // Before proceeding, wait for all concurrent wakers to exit
-        self.inject.wait_for_unlocked();
+        self.wait_for_unlocked();
     }
 }
 
