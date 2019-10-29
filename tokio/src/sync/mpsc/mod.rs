@@ -34,14 +34,14 @@
 //! [`Sender`]: struct.Sender.html
 //! [`Receiver`]: struct.Receiver.html
 
-mod block;
+pub(super) mod block;
 
 mod bounded;
 pub use self::bounded::{channel, Receiver, Sender};
 
 mod chan;
 
-mod list;
+pub(super) mod list;
 
 mod unbounded;
 pub use self::unbounded::{unbounded_channel, UnboundedReceiver, UnboundedSender};
@@ -57,8 +57,11 @@ pub mod error {
 ///
 /// This value must be a power of 2. It also must be smaller than the number of
 /// bits in `usize`.
-#[cfg(target_pointer_width = "64")]
+#[cfg(all(target_pointer_width = "64", not(loom)))]
 const BLOCK_CAP: usize = 32;
 
-#[cfg(not(target_pointer_width = "64"))]
+#[cfg(all(not(target_pointer_width = "64"), not(loom)))]
 const BLOCK_CAP: usize = 16;
+
+#[cfg(loom)]
+const BLOCK_CAP: usize = 2;

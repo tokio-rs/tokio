@@ -1,16 +1,4 @@
-#![cfg(broken)]
-#![warn(rust_2018_idioms)]
-
-#[macro_use]
-extern crate loom;
-
-/*
-#[path = "../src/semaphore.rs"]
-#[allow(warnings)]
-mod semaphore;
-*/
-
-use crate::semaphore::*;
+use crate::sync::semaphore::*;
 
 use futures_core::ready;
 use futures_util::future::poll_fn;

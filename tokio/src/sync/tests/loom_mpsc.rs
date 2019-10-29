@@ -1,24 +1,4 @@
-#![cfg(broken)]
-#![warn(rust_2018_idioms)]
-
-#[macro_use]
-extern crate loom;
-
-macro_rules! if_fuzz {
-    ($($t:tt)*) => {
-        $($t)*
-    }
-}
-
-/*
-#[path = "../src/mpsc/mod.rs"]
-#[allow(warnings)]
-mod mpsc;
-
-#[path = "../src/semaphore.rs"]
-#[allow(warnings)]
-mod semaphore;
-*/
+use crate::sync::mpsc;
 
 use futures_util::future::poll_fn;
 use loom::future::block_on;

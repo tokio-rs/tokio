@@ -21,12 +21,6 @@ macro_rules! debug {
     }
 }
 
-macro_rules! if_fuzz {
-    ($($t:tt)*) => {{
-        if false { $($t)* }
-    }}
-}
-
 mod barrier;
 pub use barrier::{Barrier, BarrierWaitResult};
 

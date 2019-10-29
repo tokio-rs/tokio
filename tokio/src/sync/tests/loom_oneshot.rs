@@ -1,17 +1,8 @@
-#![cfg(broken)]
-#![warn(rust_2018_idioms)]
-
-/*
-#[path = "../src/oneshot.rs"]
-#[allow(warnings)]
-mod oneshot;
-*/
-
-use loom;
-use loom::future::block_on;
-use loom::thread;
+use crate::sync::oneshot;
 
 use futures_util::future::poll_fn;
+use loom::future::block_on;
+use loom::thread;
 use std::task::Poll::{Pending, Ready};
 
 #[test]

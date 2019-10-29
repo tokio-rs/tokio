@@ -1,33 +1,11 @@
-#![cfg(broken)]
-#![warn(rust_2018_idioms)]
-
-#[macro_use]
-extern crate loom;
-
-macro_rules! if_fuzz {
-    ($($t:tt)*) => {
-        $($t)*
-    }
-}
-/*
-
-#[path = "../src/mpsc/list.rs"]
-#[allow(warnings)]
-mod list;
-
-#[path = "../src/mpsc/block.rs"]
-#[allow(warnings)]
-mod block;
-*/
-
-const BLOCK_CAP: usize = 2;
+use crate::sync::mpsc::list;
 
 use loom::thread;
 use std::sync::Arc;
 
 #[test]
 fn smoke() {
-    use crate::block::Read::*;
+    use crate::sync::mpsc::block::Read::*;
 
     const NUM_TX: usize = 2;
     const NUM_MSG: usize = 2;
