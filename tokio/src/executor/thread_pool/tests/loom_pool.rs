@@ -44,14 +44,16 @@ fn pool_multi_spawn() {
 #[test]
 fn only_blocking() {
     loom::model(|| {
-        let mut pool = ThreadPool::new();
+        let mut pool = Builder::new().num_threads(1).build();
+        let (block_tx, block_rx) = oneshot::channel();
 
         pool.spawn(async move {
             thread_pool::blocking(move || {
-                crate::executor::loom::thread::yield_now();
+                block_tx.send(());
             })
         });
 
+        block_rx.recv();
         pool.shutdown_now();
     });
 }
@@ -63,12 +65,13 @@ fn blocking_and_regular() {
         let mut pool = Builder::new().num_threads(1).build();
         let cnt = Arc::new(AtomicUsize::new(0));
 
+        let (block_tx, block_rx) = oneshot::channel();
         let (done_tx, done_rx) = oneshot::channel();
         let done_tx = Arc::new(Mutex::new(Some(done_tx)));
 
         pool.spawn(async move {
             thread_pool::blocking(move || {
-                crate::executor::loom::thread::yield_now();
+                block_tx.send(());
             })
         });
 
@@ -84,6 +87,7 @@ fn blocking_and_regular() {
         }
 
         done_rx.recv();
+        block_rx.recv();
 
         pool.shutdown_now();
     });
