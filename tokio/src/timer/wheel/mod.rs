@@ -257,7 +257,7 @@ impl Poll {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(loom)))]
 mod test {
     use super::*;
 

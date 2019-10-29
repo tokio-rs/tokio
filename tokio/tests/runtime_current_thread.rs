@@ -1,5 +1,4 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "default")]
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -133,6 +132,6 @@ fn racy() {
     // wait for runtime thread to exit
     jh.join().unwrap();
 
-    let mut e = tokio_executor::enter().unwrap();
+    let mut e = tokio::executor::enter().unwrap();
     e.block_on(rx).unwrap();
 }

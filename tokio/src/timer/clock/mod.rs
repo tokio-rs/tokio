@@ -77,7 +77,7 @@ impl Clock {
     }
 
     /// Return a new `Clock` instance that uses `now` as the source of time.
-    pub fn new_with_now<T: Now>(now: T) -> Clock {
+    pub fn new_with_now(now: impl Now) -> Clock {
         Clock {
             now: Some(Arc::new(now)),
         }

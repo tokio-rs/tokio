@@ -1,6 +1,6 @@
 #![warn(rust_2018_idioms)]
 
-use tokio_io::AsyncWrite;
+use tokio::io::AsyncWrite;
 use tokio_test::assert_ready;
 use tokio_test::task::MockTask;
 use tokio_util::codec::{Encoder, FramedWrite};

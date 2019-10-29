@@ -1,6 +1,5 @@
+use crate::executor::thread_pool;
 use crate::runtime::JoinHandle;
-
-use tokio_executor::thread_pool;
 
 use std::future::Future;
 

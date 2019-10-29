@@ -17,10 +17,7 @@ use std::{io, path::Path};
 /// # Ok(())
 /// # }
 /// ```
-pub async fn write<P, C: AsRef<[u8]> + Unpin>(path: P, contents: C) -> io::Result<()>
-where
-    P: AsRef<Path>,
-{
+pub async fn write<C: AsRef<[u8]> + Unpin>(path: impl AsRef<Path>, contents: C) -> io::Result<()> {
     let path = path.as_ref().to_owned();
     let contents = contents.as_ref().to_owned();
 

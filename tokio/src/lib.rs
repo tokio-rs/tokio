@@ -26,7 +26,7 @@
 //!
 //! Guide level documentation is found on the [website].
 //!
-//! [driver]: tokio_net::driver
+//! [driver]: tokio::net::driver
 //! [website]: https://tokio.rs/docs/
 //!
 //! # Examples
@@ -69,7 +69,6 @@
 //!     }
 //! }
 //! ```
-
 macro_rules! if_runtime {
     ($($i:item)*) => ($(
         #[cfg(any(
@@ -80,25 +79,45 @@ macro_rules! if_runtime {
     )*)
 }
 
+#[cfg(all(loom, test))]
+macro_rules! thread_local {
+    ($($tts:tt)+) => { loom::thread_local!{ $($tts)+ } }
+}
+
 #[cfg(feature = "timer")]
 pub mod clock;
+
 #[cfg(feature = "codec")]
 pub mod codec;
+
 #[cfg(feature = "fs")]
 pub mod fs;
+
 pub mod future;
+
 #[cfg(feature = "io")]
 pub mod io;
-#[cfg(any(feature = "tcp", feature = "udp", feature = "uds"))]
+
+#[cfg(feature = "net-driver")]
 pub mod net;
+
+#[cfg(feature = "net-driver")]
+mod loom;
+
 pub mod prelude;
-#[cfg(feature = "process")]
+
+#[cfg(all(feature = "process", not(loom)))]
 pub mod process;
+
 #[cfg(feature = "signal")]
+#[cfg(not(loom))]
 pub mod signal;
+
 pub mod stream;
+
 #[cfg(feature = "sync")]
 pub mod sync;
+
 #[cfg(feature = "timer")]
 pub mod timer;
 
@@ -113,7 +132,12 @@ if_runtime! {
     #[cfg(feature = "macros")]
     #[doc(inline)]
     pub use tokio_macros::main;
+
     #[cfg(feature = "macros")]
     #[doc(inline)]
     pub use tokio_macros::test;
 }
+
+#[cfg(feature = "io-util")]
+#[cfg(test)]
+fn is_unpin<T: Unpin>() {}

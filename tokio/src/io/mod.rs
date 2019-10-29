@@ -36,6 +36,29 @@
 //! [`ErrorKind`]: enum.ErrorKind.html
 //! [`Result`]: type.Result.html
 
+mod async_buf_read;
+pub use self::async_buf_read::AsyncBufRead;
+
+mod async_read;
+pub use self::async_read::AsyncRead;
+
+mod async_write;
+pub use self::async_write::AsyncWrite;
+
+#[allow(clippy::module_inception)] // TODO: remove
+#[cfg(feature = "io-util")]
+mod io;
+#[cfg(feature = "io-util")]
+pub use self::io::{
+    copy, empty, repeat, sink, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufStream,
+    BufWriter, Copy, Empty, Repeat, Sink, Take,
+};
+
+#[cfg(feature = "io-util")]
+pub mod split;
+#[cfg(feature = "io-util")]
+pub use self::split::split;
+
 // TODO: These should not be guarded by `fs`
 
 #[cfg(feature = "fs")]
@@ -53,12 +76,7 @@ mod stdout;
 #[cfg(feature = "fs")]
 pub use self::stdout::{stdout, Stdout};
 
-pub use tokio_io::split::split;
-pub use tokio_io::{
-    empty, repeat, sink, AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite,
-    AsyncWriteExt, BufReader, BufWriter, Empty, Repeat, Sink, Take,
-};
-
 // Re-export io::Error so that users don't have to deal
 // with conflicts when `use`ing `tokio::io` and `std::io`.
+#[cfg(feature = "io-util")]
 pub use std::io::{Error, ErrorKind, Result};

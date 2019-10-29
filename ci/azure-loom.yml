@@ -1,5 +1,5 @@
 jobs:
-- job: loom
+- job: ${{ parameters.name }}
   displayName: Loom tests
   pool:
     vmImage: ubuntu-16.04

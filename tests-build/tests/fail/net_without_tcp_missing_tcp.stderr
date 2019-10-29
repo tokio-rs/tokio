@@ -1,0 +1,7 @@
+error[E0432]: unresolved import `tests_build::tokio_net::tcp`
+ --> $DIR/net_without_tcp_missing_tcp.rs:1:5
+  |
+1 | use tests_build::tokio_net::tcp;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `tcp` in `tokio_net`
+
+For more information about this error, try `rustc --explain E0432`.
