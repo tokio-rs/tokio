@@ -21,7 +21,6 @@ categories = ["asynchronous", "testing"]
 
 [dependencies]
 tokio = { version = "=0.2.0-alpha.6", path = "../tokio" }
-tokio-executor = { version = "=0.2.0-alpha.6", path = "../tokio-executor" }
 tokio-sync = { version = "=0.2.0-alpha.6", path = "../tokio-sync" }
 
 bytes = "0.4"

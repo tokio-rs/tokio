@@ -1,6 +1,6 @@
 //! Futures task based helpers
 
-use tokio_executor::enter;
+use tokio::executor::enter;
 
 use pin_convert::AsPinMut;
 use std::future::Future;

@@ -1,9 +1,8 @@
+use crate::executor::thread_pool;
 use crate::net::driver::{self, Reactor};
 use crate::runtime::threadpool::{Inner, Runtime};
 use crate::timer::clock::{self, Clock};
 use crate::timer::timer::{self, Timer};
-
-use tokio_executor::thread_pool;
 
 use std::sync::{Arc, Mutex};
 use std::{fmt, io};

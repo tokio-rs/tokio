@@ -1,11 +1,9 @@
 #![warn(rust_2018_idioms)]
 
+use tokio::executor::current_thread::CurrentThread;
+use tokio::executor::park::{Park, Unpark, UnparkThread};
 use tokio::timer::{Delay, Timer};
 
-use tokio_executor::current_thread::CurrentThread;
-use tokio_executor::park::{Park, Unpark, UnparkThread};
-
-use rand;
 use rand::Rng;
 use std::cmp;
 use std::future::Future;

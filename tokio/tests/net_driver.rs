@@ -61,7 +61,7 @@ fn test_drop_on_notify() {
         }
     }));
 
-    let _enter = tokio_executor::enter().unwrap();
+    let _enter = tokio::executor::enter().unwrap();
 
     {
         let handle = reactor.handle();

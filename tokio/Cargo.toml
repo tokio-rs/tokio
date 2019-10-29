@@ -25,6 +25,7 @@ keywords = ["io", "async", "non-blocking", "futures"]
 
 [features]
 default = [
+  "blocking",
   "fs",
   "io",
   "net-full",
@@ -35,25 +36,25 @@ default = [
   "timer",
 ]
 
-fs = ["tokio-executor/blocking"]
+blocking = []
+fs = ["blocking"]
 io-traits = ["bytes", "iovec"]
 io-util = ["io-traits", "pin-project", "memchr"]
 io = ["io-traits", "io-util"]
 macros = ["tokio-macros"]
 net-full = ["tcp", "udp", "uds"]
-net-driver = ["mio", "tokio-executor/blocking", "lazy_static"]
+net-driver = ["mio", "blocking", "lazy_static"]
 rt-current-thread = [
+  "crossbeam-channel",
   "timer",
-  "tokio-executor/current-thread",
 ]
 rt-full = [
   "macros",
   "num_cpus",
   "net-full",
+  "rt-current-thread",
   "sync",
   "timer",
-  "tokio-executor/current-thread",
-  "tokio-executor/thread-pool",
 ]
 signal = [
   "lazy_static",
@@ -82,10 +83,11 @@ process = [
 [dependencies]
 futures-core-preview = "=0.3.0-alpha.19"
 futures-sink-preview = "=0.3.0-alpha.19"
-futures-util-preview = { version = "=0.3.0-alpha.19", features = ["sink"] }
+futures-util-preview = { version = "=0.3.0-alpha.19", features = ["sink", "channel"] }
 
 # Everything else is optional...
 bytes = { version = "0.4", optional = true }
+crossbeam-channel = { version = "0.3.8", optional = true }
 crossbeam-utils = { version = "0.6.0", optional = true }
 iovec = { version = "0.1", optional = true }
 lazy_static = { version = "1.0.2", optional = true }
@@ -95,7 +97,6 @@ num_cpus = { version = "1.8.0", optional = true }
 pin-project = { version = "0.4", optional = true }
 # Backs `DelayQueue`
 slab = { version = "0.4.1", optional = true }
-tokio-executor = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-executor" }
 tokio-macros = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-macros" }
 tokio-sync = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-sync", features = ["async-traits"] }
 
@@ -113,10 +114,6 @@ version = "0.3.8"
 default-features = false
 optional = true
 
-[target.'cfg(loom)'.dependencies]
-# play nice with loom tests in other crates.
-loom = "0.2.11"
-
 [dev-dependencies]
 tokio-test = { version = "=0.2.0-alpha.6", path = "../tokio-test" }
 tokio-util = { version = "=0.2.0-alpha.6", path = "../tokio-util" }
@@ -127,6 +124,7 @@ flate2 = { version = "1", features = ["tokio"] }
 http = "0.1"
 httparse = "1.0"
 libc = "0.2"
+loom = { version = "0.2.11", features = ["futures", "checkpoint"] }
 num_cpus = "1.0"
 rand = "0.7.2"
 serde = { version = "1.0", features = ["derive"] }
@@ -135,7 +133,6 @@ tempfile = "3.1.0"
 time = "0.1"
 
 # sharded slab tests
-loom = "0.2.11"
 proptest = "0.9.4"
 
 [package.metadata.docs.rs]

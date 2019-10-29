@@ -1,4 +1,5 @@
 use super::platform;
+use crate::executor::park::{Park, Unpark};
 use crate::loom::atomic::{AtomicUsize, Ordering::SeqCst};
 
 mod dispatch;
@@ -15,7 +16,6 @@ use std::sync::{Arc, Weak};
 use std::task::Waker;
 use std::time::Duration;
 use std::{fmt, usize};
-use tokio_executor::park::{Park, Unpark};
 
 /// The core reactor, or event loop.
 ///

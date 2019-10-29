@@ -18,12 +18,9 @@
 //! type. Adaptions also extend to traits like `std::io::Read` where methods
 //! return `std::io::Result`.  Be warned that these adapted methods may return
 //! `std::io::ErrorKind::WouldBlock` if a *worker* thread can not be converted
-//! to a *backup* thread immediately. See [tokio-executor] for more details
-//! of the threading model and [`blocking`].
+//! to a *backup* thread immediately.
 //!
-//! [`blocking`]: https://docs.rs/tokio-executor/0.2.0-alpha.2/tokio_executor/threadpool/fn.blocking.html
 //! [`AsyncRead`]: https://docs.rs/tokio-io/0.1/tokio_io/trait.AsyncRead.html
-//! [tokio-executor]: https://docs.rs/tokio-executor/0.2.0-alpha.2/tokio_executor/threadpool/index.html
 
 pub(crate) mod blocking;
 
@@ -94,5 +91,5 @@ where
 mod sys {
     pub(crate) use std::fs::File;
 
-    pub(crate) use tokio_executor::blocking::{run, Blocking};
+    pub(crate) use crate::executor::blocking::{run, Blocking};
 }

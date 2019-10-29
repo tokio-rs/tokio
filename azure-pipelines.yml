@@ -47,9 +47,6 @@ jobs:
     displayName: Test sub crates -
     rust: beta
     crates:
-      tokio-executor:
-        - current-thread
-        - thread-pool
       tokio-sync:
         - async-traits
       tokio-macros: []
@@ -58,22 +55,23 @@ jobs:
       examples: []
 
 # Test compilation failure
-- template: ci/azure-test-stable.yml
-  parameters:
-    name: test_features
-    displayName: Test feature flags
-    rust: beta
-    crates:
-      tests-build:
-        - tokio-executor
-        - executor-without-current-thread
-        # - macros-invalid-input
-        # - net-no-features
-        # - net-with-tcp
-        # - net-with-udp
-        # - net-with-uds
-        # - tokio-no-features
-        # - tokio-with-net
+# Disable pending: https://github.com/tokio-rs/tokio/pull/1695#issuecomment-547045383
+# - template: ci/azure-test-stable.yml
+#   parameters:
+#     name: test_features
+#     displayName: Test feature flags
+#     rust: beta
+#     crates:
+#       tests-build:
+#         # - tokio-executor
+#         # - executor-without-current-thread
+#         # - macros-invalid-input
+#         # - net-no-features
+#         # - net-with-tcp
+#         # - net-with-udp
+#         # - net-with-uds
+#         # - tokio-no-features
+#         # - tokio-with-net
 
 # Run loom tests
 - template: ci/azure-loom.yml
@@ -81,7 +79,6 @@ jobs:
     name: loom
     rust: beta
     crates:
-      - tokio-executor
       - tokio
 
 # Try cross compiling
@@ -115,7 +112,7 @@ jobs:
       - clippy
       - test_tokio
       - test_linux
-      - test_features
+      # - test_features
       - loom
 #      - test_nightly
       - cross
