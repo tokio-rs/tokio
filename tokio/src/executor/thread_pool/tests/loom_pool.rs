@@ -53,7 +53,7 @@ fn blocking() {
 
         pool.spawn(async move {
             thread_pool::blocking(move || {
-                crate::loom::thread::yield_now();
+                crate::executor::loom::thread::yield_now();
             })
         });
 
