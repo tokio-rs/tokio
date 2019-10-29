@@ -28,7 +28,7 @@ thread_local! {
 ///
 /// ```
 /// # async fn docs() {
-/// tokio_executor::thread_pool::blocking(move || {
+/// tokio::executor::thread_pool::blocking(move || {
 ///     // do some compute-heavy work or call synchronous code
 /// });
 /// # }
