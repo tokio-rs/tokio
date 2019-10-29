@@ -38,8 +38,8 @@ pub fn blocking<F, R>(f: F) -> R
 where
     F: FnOnce() -> R,
 {
-    // TODO: explain the trick we're about to pull
-
+    // Make the current worker give away its Worker to another thread so that we can safely block
+    // this one without preventing progress on other futures the worker owns.
     ON_BLOCK.with(|ob| {
         let allow_blocking = ob
             .get()
