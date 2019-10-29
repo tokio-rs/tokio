@@ -124,12 +124,12 @@
 //! [`PollEvented`]: struct.PollEvented.html
 //! [`std::io::Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
 //! [`std::io::Write`]: https://doc.rust-lang.org/std/io/trait.Write.html
-#[cfg(loom)]
+#[cfg(all(loom, test))]
 macro_rules! loom_thread_local {
     ($($tts:tt)+) => { loom::thread_local!{ $($tts)+ } }
 }
 
-#[cfg(not(loom))]
+#[cfg(any(not(loom), not(test)))]
 macro_rules! loom_thread_local {
     ($($tts:tt)+) => { std::thread_local!{ $($tts)+ } }
 }
