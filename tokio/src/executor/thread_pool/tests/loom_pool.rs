@@ -2,7 +2,7 @@ use crate::executor::loom::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 use crate::executor::loom::sync::atomic::{AtomicBool, AtomicUsize};
 use crate::executor::loom::sync::{Arc, Mutex};
 use crate::executor::tests::loom_oneshot as oneshot;
-use crate::executor::thread_pool::{self, ThreadPool};
+use crate::executor::thread_pool::{self, Builder, ThreadPool};
 use crate::spawn;
 
 use std::future::Future;
@@ -58,9 +58,9 @@ fn only_blocking() {
 
 #[test]
 fn blocking_and_regular() {
-    const NUM: usize = 5;
+    const NUM: usize = 1;
     loom::model(|| {
-        let mut pool = ThreadPool::new();
+        let mut pool = Builder::new().num_threads(1).build();
         let cnt = Arc::new(AtomicUsize::new(0));
 
         let (done_tx, done_rx) = oneshot::channel();
