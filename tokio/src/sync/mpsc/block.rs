@@ -370,8 +370,7 @@ impl<T> Values<T> {
         {
             let p = vals.as_mut_ptr() as *mut CausalCell<MaybeUninit<T>>;
             for i in 0..BLOCK_CAP {
-                p.add(i)
-                    .write(CausalCell::new(MaybeUninit::uninit()));
+                p.add(i).write(CausalCell::new(MaybeUninit::uninit()));
             }
         }
 
