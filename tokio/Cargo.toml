@@ -124,7 +124,7 @@ flate2 = { version = "1", features = ["tokio"] }
 http = "0.1"
 httparse = "1.0"
 libc = "0.2"
-loom = { git = "https://github.com/tokio-rs/loom.git", features = ["futures", "checkpoint"] }
+loom = { version = "0.2.12", features = ["futures", "checkpoint"] }
 num_cpus = "1.0"
 rand = "0.7.2"
 serde = { version = "1.0", features = ["derive"] }
