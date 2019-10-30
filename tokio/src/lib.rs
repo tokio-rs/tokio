@@ -121,11 +121,7 @@ pub mod sync;
 #[cfg(feature = "timer")]
 pub mod timer;
 
-#[cfg(any(
-    feature = "rt-full",
-    feature = "rt-current-thread",
-    feature = "blocking"
-))]
+#[cfg(feature = "executor-core")]
 pub mod executor;
 
 if_runtime! {
