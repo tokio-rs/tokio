@@ -36,8 +36,8 @@ default = [
   "timer",
 ]
 
-blocking = []
-fs = ["blocking"]
+blocking = ["sync"]
+fs = ["blocking", "io-traits"]
 io-traits = ["bytes", "iovec"]
 io-util = ["io-traits", "pin-project", "memchr"]
 io = ["io-traits", "io-util"]
