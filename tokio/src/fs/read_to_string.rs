@@ -18,10 +18,7 @@ use std::{io, path::Path};
 /// # Ok(())
 /// # }
 /// ```
-pub async fn read_to_string<P>(path: P) -> io::Result<String>
-where
-    P: AsRef<Path>,
-{
+pub async fn read_to_string(path: impl AsRef<Path>) -> io::Result<String> {
     let path = path.as_ref().to_owned();
     asyncify(move || std::fs::read_to_string(path)).await
 }

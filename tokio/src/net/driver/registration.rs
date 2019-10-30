@@ -2,7 +2,6 @@ use super::platform;
 use super::reactor::{Direction, Handle};
 
 use mio::{self, Evented};
-use std::sync::atomic::Ordering::SeqCst;
 use std::task::{Context, Poll};
 use std::{io, usize};
 
@@ -219,8 +218,7 @@ impl Registration {
         let mask = direction.mask();
         let mask_no_hup = (mask - platform::hup()).as_usize();
 
-        let io_dispatch = inner.io_dispatch.read().unwrap();
-        let sched = &io_dispatch[self.token];
+        let sched = inner.io_dispatch.get(self.token).unwrap();
 
         // This consumes the current readiness state **except** for HUP. HUP is
         // excluded because a) it is a final state and never transitions out of
@@ -230,8 +228,10 @@ impl Registration {
         // If HUP were to be cleared when `direction` is `Read`, then when
         // `poll_ready` is called again with a _`direction` of `Write`, the HUP
         // state would not be visible.
-        let mut ready =
-            mask & mio::Ready::from_usize(sched.readiness.fetch_and(!mask_no_hup, SeqCst));
+        let curr_ready = sched
+            .set_readiness(self.token, |curr| curr & (!mask_no_hup))
+            .unwrap_or_else(|_| panic!("token {} no longer valid!", self.token));
+        let mut ready = mask & mio::Ready::from_usize(curr_ready);
 
         if ready.is_empty() {
             if let Some(cx) = cx {
@@ -242,8 +242,10 @@ impl Registration {
                 }
 
                 // Try again
-                ready =
-                    mask & mio::Ready::from_usize(sched.readiness.fetch_and(!mask_no_hup, SeqCst));
+                let curr_ready = sched
+                    .set_readiness(self.token, |curr| curr & (!mask_no_hup))
+                    .unwrap_or_else(|_| panic!("token {} no longer valid!", self.token));
+                ready = mask & mio::Ready::from_usize(curr_ready);
             }
         }
 

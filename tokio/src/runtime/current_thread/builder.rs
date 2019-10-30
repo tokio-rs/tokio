@@ -1,9 +1,8 @@
+use crate::executor::current_thread::CurrentThread;
 use crate::net::driver::Reactor;
 use crate::runtime::current_thread::Runtime;
 use crate::timer::clock::Clock;
 use crate::timer::timer::Timer;
-
-use tokio_executor::current_thread::CurrentThread;
 
 use std::io;
 

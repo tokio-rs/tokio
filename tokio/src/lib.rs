@@ -69,7 +69,6 @@
 //!     }
 //! }
 //! ```
-
 macro_rules! if_runtime {
     ($($i:item)*) => ($(
         #[cfg(any(
@@ -78,6 +77,11 @@ macro_rules! if_runtime {
         ))]
         $i
     )*)
+}
+
+#[cfg(all(loom, test))]
+macro_rules! thread_local {
+    ($($tts:tt)+) => { loom::thread_local!{ $($tts)+ } }
 }
 
 #[cfg(feature = "timer")]
@@ -97,12 +101,16 @@ pub mod io;
 #[cfg(feature = "net-driver")]
 pub mod net;
 
+#[cfg(feature = "net-driver")]
+mod loom;
+
 pub mod prelude;
 
-#[cfg(feature = "process")]
+#[cfg(all(feature = "process", not(loom)))]
 pub mod process;
 
 #[cfg(feature = "signal")]
+#[cfg(not(loom))]
 pub mod signal;
 
 pub mod stream;

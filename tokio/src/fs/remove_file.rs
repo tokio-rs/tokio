@@ -12,7 +12,7 @@ use std::path::Path;
 /// This is an async version of [`std::fs::remove_file`][std]
 ///
 /// [std]: https://doc.rust-lang.org/std/fs/fn.remove_file.html
-pub async fn remove_file<P: AsRef<Path>>(path: P) -> io::Result<()> {
+pub async fn remove_file(path: impl AsRef<Path>) -> io::Result<()> {
     let path = path.as_ref().to_owned();
     asyncify(move || std::fs::remove_file(path)).await
 }

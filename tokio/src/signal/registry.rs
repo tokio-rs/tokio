@@ -1,6 +1,6 @@
 use crate::signal::os::{OsExtraData, OsStorage};
 
-use tokio_sync::mpsc::Sender;
+use crate::sync::mpsc::Sender;
 
 use lazy_static::lazy_static;
 use std::ops;
@@ -175,7 +175,7 @@ where
     GLOBALS.as_ref()
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(loom)))]
 mod tests {
     use super::*;
     use crate::runtime::current_thread::Runtime;

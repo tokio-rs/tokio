@@ -88,10 +88,7 @@ impl OpenOptions {
     /// Tokio runtime or if the underlying [`open`] call results in an error.
     ///
     /// [`open`]: https://doc.rust-lang.org/std/fs/struct.OpenOptions.html#method.open
-    pub async fn open<P>(&self, path: P) -> io::Result<File>
-    where
-        P: AsRef<Path>,
-    {
+    pub async fn open(&self, path: impl AsRef<Path>) -> io::Result<File> {
         let path = path.as_ref().to_owned();
         let opts = self.0.clone();
 

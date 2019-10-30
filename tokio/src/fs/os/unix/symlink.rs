@@ -10,7 +10,7 @@ use std::path::Path;
 /// This is an async version of [`std::os::unix::fs::symlink`][std]
 ///
 /// [std]: https://doc.rust-lang.org/std/os/unix/fs/fn.symlink.html
-pub async fn symlink<P: AsRef<Path>, Q: AsRef<Path>>(src: P, dst: Q) -> io::Result<()> {
+pub async fn symlink(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<()> {
     let src = src.as_ref().to_owned();
     let dst = dst.as_ref().to_owned();
 

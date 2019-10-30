@@ -1,7 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "default")]
 
-use tokio;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime::Runtime;
@@ -9,7 +7,6 @@ use tokio::sync::oneshot;
 use tokio::timer::delay;
 use tokio_test::{assert_err, assert_ok};
 
-use env_logger;
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -146,7 +143,7 @@ fn nested_enter() {
 
     let rt = Runtime::new().unwrap();
     rt.block_on(async {
-        assert_err!(tokio_executor::enter());
+        assert_err!(tokio::executor::enter());
 
         let res = panic::catch_unwind(move || {
             let rt = Runtime::new().unwrap();

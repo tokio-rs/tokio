@@ -19,7 +19,7 @@
 //! Creating a [`Runtime`] does the following:
 //!
 //! * Spawn a background thread running a [`Reactor`] instance.
-//! * Start a [`ThreadPool`] for executing futures.
+//! * Start a thread pool for executing futures.
 //! * Run an instance of `Timer` **per** thread pool worker thread.
 //!
 //! The thread pool uses a work-stealing strategy and is configured to start a
@@ -124,12 +124,12 @@
 //! [timer]: ../timer/index.html
 //! [`Runtime`]: struct.Runtime.html
 //! [`Reactor`]: ../reactor/struct.Reactor.html
-//! [`ThreadPool`]: https://docs.rs/tokio-executor/0.2.0-alpha.2/tokio_executor/threadpool/struct.ThreadPool.html
 //! [`run`]: fn.run.html
 //! [`tokio::spawn`]: ../executor/fn.spawn.html
 //! [`tokio::main`]: ../../tokio_macros/attr.main.html
 
 pub mod current_thread;
+
 #[cfg(feature = "rt-full")]
 mod threadpool;
 
