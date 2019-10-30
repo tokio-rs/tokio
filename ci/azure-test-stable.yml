@@ -25,6 +25,8 @@ jobs:
       cargo install cargo-hack --path cargo-hack
       rm -rf cargo-hack
     displayName: Install cargo-hack
+    # FIXME(taiki-e): many features of current cargo-hack are not available on windows: https://github.com/taiki-e/cargo-hack/issues/3
+    condition: not(eq(variables['Agent.OS'], 'Windows_NT'))
 
   - template: azure-is-release.yml
 
@@ -54,6 +56,8 @@ jobs:
         CI: 'True'
       displayName: ${{ crate }} - cargo hack check --each-feature
       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
+      # FIXME(taiki-e): many features of current cargo-hack are not available on windows: https://github.com/taiki-e/cargo-hack/issues/3
+      condition: not(eq(variables['Agent.OS'], 'Windows_NT'))
 
   - template: azure-patch-crates.yml
 
@@ -83,3 +87,5 @@ jobs:
         CI: 'True'
       displayName: ${{ crate }} - cargo hack check --each-feature
       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
+      # FIXME(taiki-e): many features of current cargo-hack are not available on windows: https://github.com/taiki-e/cargo-hack/issues/3
+      condition: not(eq(variables['Agent.OS'], 'Windows_NT'))
