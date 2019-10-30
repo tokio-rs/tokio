@@ -257,6 +257,7 @@ cfg_macros! {
 }
 
 // Tests
+mod dual;
 #[cfg(test)]
 mod tests;
 

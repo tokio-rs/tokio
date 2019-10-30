@@ -6,6 +6,7 @@
 
 use crate::io::{AsyncRead, AsyncWrite};
 
+use crate::dual::Dual;
 use bytes::{Buf, BufMut};
 use std::cell::UnsafeCell;
 use std::fmt;
@@ -13,17 +14,16 @@ use std::io;
 use std::pin::Pin;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::{Acquire, Release};
-use std::sync::Arc;
 use std::task::{Context, Poll};
 
 /// The readable half of a value returned from `split`.
 pub struct ReadHalf<T> {
-    inner: Arc<Inner<T>>,
+    inner: Dual<Inner<T>>,
 }
 
 /// The writable half of a value returned from `split`.
 pub struct WriteHalf<T> {
-    inner: Arc<Inner<T>>,
+    inner: Dual<Inner<T>>,
 }
 
 struct Inner<T> {
@@ -44,16 +44,14 @@ pub fn split<T>(stream: T) -> (ReadHalf<T>, WriteHalf<T>)
 where
     T: AsyncRead + AsyncWrite,
 {
-    let inner = Arc::new(Inner {
+    let (inner1, inner2) = Dual::new(Inner {
         locked: AtomicBool::new(false),
         stream: UnsafeCell::new(stream),
     });
 
-    let rd = ReadHalf {
-        inner: inner.clone(),
-    };
+    let rd = ReadHalf { inner: inner1 };
 
-    let wr = WriteHalf { inner };
+    let wr = WriteHalf { inner: inner2 };
 
     (rd, wr)
 }
@@ -66,14 +64,8 @@ impl<T> ReadHalf<T> {
     /// If this `ReadHalf` and the given `WriteHalf` do not originate from the
     /// same `split` operation this method will panic.
     pub fn unsplit(self, wr: WriteHalf<T>) -> T {
-        if Arc::ptr_eq(&self.inner, &wr.inner) {
-            drop(wr);
-
-            let inner = Arc::try_unwrap(self.inner)
-                .ok()
-                .expect("Arc::try_unwrap failed");
-
-            inner.stream.into_inner()
+        if let Ok(v) = Dual::join(self.inner, wr.inner) {
+            v.stream.into_inner()
         } else {
             panic!("Unrelated `split::Write` passed to `split::Read::unsplit`.")
         }

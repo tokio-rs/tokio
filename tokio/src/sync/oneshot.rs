@@ -2,6 +2,7 @@
 
 //! A channel for sending a single message between asynchronous tasks.
 
+use crate::dual::Dual;
 use crate::loom::cell::CausalCell;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Arc;
@@ -19,7 +20,7 @@ use std::task::{Context, Poll, Waker};
 /// Instances are created by the [`channel`](fn.channel.html) function.
 #[derive(Debug)]
 pub struct Sender<T> {
-    inner: Option<Arc<Inner<T>>>,
+    inner: Option<Dual<Inner<T>>>,
 }
 
 /// Receive a value from the associated `Sender`.
@@ -27,7 +28,7 @@ pub struct Sender<T> {
 /// Instances are created by the [`channel`](fn.channel.html) function.
 #[derive(Debug)]
 pub struct Receiver<T> {
-    inner: Option<Arc<Inner<T>>>,
+    inner: Option<Dual<Inner<T>>>,
 }
 
 pub mod error {
@@ -116,7 +117,7 @@ struct State(usize);
 /// ```
 pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
     #[allow(deprecated)]
-    let inner = Arc::new(Inner {
+    let (inner1, inner2) = Dual::new(Inner {
         state: AtomicUsize::new(State::new().as_usize()),
         value: CausalCell::new(None),
         tx_task: CausalCell::new(MaybeUninit::uninit()),
@@ -124,9 +125,11 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
     });
 
     let tx = Sender {
-        inner: Some(inner.clone()),
+        inner: Some(inner1),
     };
-    let rx = Receiver { inner: Some(inner) };
+    let rx = Receiver {
+        inner: Some(inner2),
+    };
 
     (tx, rx)
 }

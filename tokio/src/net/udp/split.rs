@@ -19,26 +19,25 @@ use std::error::Error;
 use std::fmt;
 use std::io;
 use std::net::SocketAddr;
-use std::sync::Arc;
+
+use crate::dual::Dual;
 
 /// The send half after [`split`](super::UdpSocket::split).
 ///
 /// Use [`send_to`](#method.send_to) or [`send`](#method.send) to send
 /// datagrams.
 #[derive(Debug)]
-pub struct SendHalf(Arc<UdpSocket>);
+pub struct SendHalf(Dual<UdpSocket>);
 
 /// The recv half after [`split`](super::UdpSocket::split).
 ///
 /// Use [`recv_from`](#method.recv_from) or [`recv`](#method.recv) to receive
 /// datagrams.
 #[derive(Debug)]
-pub struct RecvHalf(Arc<UdpSocket>);
+pub struct RecvHalf(Dual<UdpSocket>);
 
 pub(crate) fn split(socket: UdpSocket) -> (RecvHalf, SendHalf) {
-    let shared = Arc::new(socket);
-    let send = shared.clone();
-    let recv = shared;
+    let (recv, send) = Dual::new(socket);
     (RecvHalf(recv), SendHalf(send))
 }
 
@@ -59,16 +58,7 @@ impl fmt::Display for ReuniteError {
 impl Error for ReuniteError {}
 
 fn reunite(s: SendHalf, r: RecvHalf) -> Result<UdpSocket, ReuniteError> {
-    if Arc::ptr_eq(&s.0, &r.0) {
-        drop(r);
-        // Only two instances of the `Arc` are ever created, one for the
-        // receiver and one for the sender, and those `Arc`s are never exposed
-        // externally. And so when we drop one here, the other one must be the
-        // only remaining one.
-        Ok(Arc::try_unwrap(s.0).expect("udp: try_unwrap failed in reunite"))
-    } else {
-        Err(ReuniteError(s, r))
-    }
+    Dual::join(s.0, r.0).map_err(|(s, r)| ReuniteError(SendHalf(s), RecvHalf(r)))
 }
 
 impl RecvHalf {
