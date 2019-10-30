@@ -20,6 +20,12 @@ jobs:
       # rust_version: stable
       rust_version: ${{ parameters.rust }}
 
+  - script: |
+      git clone https://github.com/taiki-e/cargo-hack
+      cargo install cargo-hack --path cargo-hack
+      rm -rf cargo-hack
+    displayName: Install cargo-hack
+
   - template: azure-is-release.yml
 
   - ${{ each crate in parameters.crates }}:
@@ -28,17 +34,26 @@ jobs:
       env:
         LOOM_MAX_PREEMPTIONS: 2
         CI: 'True'
-      displayName: ${{ crate.key }} - cargo test
-      workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
+      displayName: ${{ crate }} - cargo test
+      workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
 
-    # Run with each specified feature
-    - ${{ each feature in crate.value }}:
-      - script: cargo test --no-default-features --features ${{ feature }}
-        env:
-          LOOM_MAX_PREEMPTIONS: 2
-          CI: 'True'
-        displayName: ${{ crate.key }} - cargo test --features ${{ feature }}
-        workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
+    # Run with all crate features
+    - script: cargo test --all-features
+      env:
+        LOOM_MAX_PREEMPTIONS: 2
+        CI: 'True'
+      displayName: ${{ crate }} - cargo test --features ${{ feature }}
+      workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
+
+    # Check each specified feature works properly
+    # * --each-feature - run for each feature which includes --no-default-features and default features of package
+    # * --no-dev-deps - build without dev-dependencies to avoid https://github.com/rust-lang/cargo/issues/4866
+    - script: cargo hack check --each-feature --no-dev-deps
+      env:
+        LOOM_MAX_PREEMPTIONS: 2
+        CI: 'True'
+      displayName: ${{ crate }} - cargo hack check --each-feature
+      workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
 
   - template: azure-patch-crates.yml
 
@@ -48,29 +63,23 @@ jobs:
       env:
         LOOM_MAX_PREEMPTIONS: 2
         CI: 'True'
-      displayName: ${{ crate.key }} - cargo test
-      workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
+      displayName: ${{ crate }} - cargo test
+      workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
 
-    # Run with each specified feature
-    - ${{ each feature in crate.value }}:
-      - script: cargo test --no-default-features --features ${{ feature }}
-        env:
-          LOOM_MAX_PREEMPTIONS: 2
-          CI: 'True'
-        displayName: ${{ crate.key }} - cargo test --features ${{ feature }}
-        workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
+    # Run with all crate features
+    - script: cargo test --all-features
+      env:
+        LOOM_MAX_PREEMPTIONS: 2
+        CI: 'True'
+      displayName: ${{ crate }} - cargo test --all-features
+      workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
 
-  # Remove all dev-dependencies to avoid https://github.com/rust-lang/cargo/issues/4866.
-  - bash: cargo run --manifest-path ci/remove-dev-dependencies/Cargo.toml ./*/Cargo.toml
-    displayName: Remove dev-dependencies
-
-  # Check each specified feature works properly
-  - ${{ each crate in parameters.crates }}:
-    # Run with each specified feature
-    - ${{ each feature in crate.value }}:
-      - script: cargo check --no-default-features --features ${{ feature }}
-        env:
-          LOOM_MAX_PREEMPTIONS: 2
-          CI: 'True'
-        displayName: ${{ crate.key }} - cargo check --features ${{ feature }}
-        workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
+    # Check each specified feature works properly
+    # * --each-feature - run for each feature which includes --no-default-features and default features of package
+    # * --no-dev-deps - build without dev-dependencies to avoid https://github.com/rust-lang/cargo/issues/4866
+    - script: cargo hack check --each-feature --no-dev-deps
+      env:
+        LOOM_MAX_PREEMPTIONS: 2
+        CI: 'True'
+      displayName: ${{ crate }} - cargo hack check --each-feature
+      workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
