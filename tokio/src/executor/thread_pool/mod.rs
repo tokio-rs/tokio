@@ -37,6 +37,9 @@ mod worker;
 #[cfg(test)]
 mod tests;
 
+#[cfg(feature = "blocking")]
+pub use worker::blocking;
+
 // Re-export `task::Error`
 pub use crate::executor::task::Error;
 

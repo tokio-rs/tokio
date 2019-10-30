@@ -15,7 +15,7 @@ fn create_drop_join_handle() {
         let (task, join_handle) = task::joinable(async { "hello" });
 
         let schedule = LoomSchedule::new();
-        let schedule = From::from(&schedule);
+        let schedule = &mut || Some(From::from(&schedule));
 
         let th = thread::spawn(move || {
             drop(join_handle);
@@ -37,7 +37,7 @@ fn poll_drop_handle_then_drop() {
         let (task, mut join_handle) = task::joinable(async { "hello" });
 
         let schedule = LoomSchedule::new();
-        let schedule = From::from(&schedule);
+        let schedule = &mut || Some(From::from(&schedule));
 
         let th = thread::spawn(move || {
             block_on(poll_fn(|cx| {
@@ -58,7 +58,7 @@ fn join_output() {
         let (task, join_handle) = task::joinable(async { "hello world" });
 
         let schedule = LoomSchedule::new();
-        let schedule = From::from(&schedule);
+        let schedule = &mut || Some(From::from(&schedule));
 
         let th = thread::spawn(move || {
             let out = assert_ok!(block_on(join_handle));
@@ -115,12 +115,12 @@ fn release_remote() {
         // Join handle
         let th = join_one_task(join_handle);
 
-        let task = match task.run(From::from(&s1)) {
+        let task = match task.run(&mut || Some(From::from(&s1))) {
             Some(task) => task,
             None => s1.recv().expect("released!"),
         };
 
-        assert_none!(task.run(From::from(&s2)));
+        assert_none!(task.run(&mut || Some(From::from(&s2))));
         assert_none!(s1.recv());
 
         assert_ok!(th.join().unwrap());
@@ -152,7 +152,7 @@ fn shutdown_from_list_after_poll() {
         // Join handle
         let th = join_two_tasks(join_handle);
 
-        match task.run(From::from(&s1)) {
+        match task.run(&mut || Some(From::from(&s1))) {
             Some(task) => {
                 // always drain the list before calling shutdown on tasks
                 list.shutdown();
@@ -184,7 +184,7 @@ fn shutdown_from_queue_after_poll() {
         // Join handle
         let th = join_two_tasks(join_handle);
 
-        let task = match task.run(From::from(&s1)) {
+        let task = match task.run(&mut || Some(From::from(&s1))) {
             Some(task) => task,
             None => assert_some!(s1.recv()),
         };
@@ -239,7 +239,7 @@ fn work(schedule: &LoomSchedule) {
         let mut task = Some(task);
 
         while let Some(t) = task.take() {
-            task = t.run(From::from(schedule));
+            task = t.run(&mut || Some(From::from(schedule)));
         }
     }
 }

@@ -3,6 +3,8 @@ use crate::executor::thread_pool;
 
 use tokio_test::assert_ok;
 
+use std::sync::Arc;
+
 macro_rules! pool {
     (2) => {{
         let (pool, mut w, mock_park) = pool!(!2);
@@ -11,8 +13,14 @@ macro_rules! pool {
     (! $n:expr) => {{
         let mut mock_park = crate::executor::tests::mock_park::MockPark::new();
         let blocking = std::sync::Arc::new(crate::executor::blocking::Pool::default());
-        let (pool, workers) =
-            thread_pool::create_pool($n, |index| mock_park.mk_park(index), blocking);
+        let (pool, workers) = thread_pool::create_pool(
+            $n,
+            |index| Box::new(mock_park.mk_park(index)),
+            Arc::new(Box::new(|_| {
+                unreachable!("attempted to move worker during non-blocking test")
+            })),
+            blocking,
+        );
         (pool, workers, mock_park)
     }};
 }

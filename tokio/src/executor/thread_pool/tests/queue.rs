@@ -252,7 +252,7 @@ fn num(task: Task<Noop>) -> u32 {
     use std::task::Context;
     use std::task::Poll::*;
 
-    assert!(task.run(From::from(&NOOP_SCHEDULE)).is_none());
+    assert!(task.run(&mut || Some(From::from(&NOOP_SCHEDULE))).is_none());
 
     // Find the task that completed
     TASKS.with(|c| {
