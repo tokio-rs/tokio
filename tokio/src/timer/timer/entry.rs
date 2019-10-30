@@ -3,7 +3,6 @@ use crate::timer::atomic::AtomicU64;
 use crate::timer::timer::{HandlePriv, Inner};
 use crate::timer::Error;
 
-use crossbeam_utils::CachePadded;
 use std::cell::UnsafeCell;
 use std::ptr;
 use std::sync::atomic::AtomicBool;
@@ -108,7 +107,7 @@ const ERROR: u64 = u64::MAX;
 impl Entry {
     pub(crate) fn new(deadline: Instant, duration: Duration) -> Entry {
         Entry {
-            time: CachePadded::new(UnsafeCell::new(Time { deadline, duration })),
+            time: CachePadded(UnsafeCell::new(Time { deadline, duration })),
             inner: None,
             waker: AtomicWaker::new(),
             state: AtomicU64::new(0),
@@ -122,13 +121,13 @@ impl Entry {
 
     /// Only called by `Registration`
     pub(crate) fn time_ref(&self) -> &Time {
-        unsafe { &*self.time.get() }
+        unsafe { &*self.time.0.get() }
     }
 
     /// Only called by `Registration`
     #[allow(clippy::mut_from_ref)] // https://github.com/rust-lang/rust-clippy/issues/4281
     pub(crate) unsafe fn time_mut(&self) -> &mut Time {
-        &mut *self.time.get()
+        &mut *self.time.0.get()
     }
 
     /// Returns `true` if the `Entry` is currently associated with a timer
@@ -390,3 +389,8 @@ impl Drop for Entry {
 
 unsafe impl Send for Entry {}
 unsafe impl Sync for Entry {}
+
+#[cfg_attr(target_arch = "x86_64", repr(align(128)))]
+#[cfg_attr(not(target_arch = "x86_64"), repr(align(64)))]
+#[derive(Debug)]
+struct CachePadded<T>(T);
