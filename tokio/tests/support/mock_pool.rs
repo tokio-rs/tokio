@@ -1,4 +1,4 @@
-use tokio_sync::oneshot;
+use tokio::sync::oneshot;
 
 use std::cell::RefCell;
 use std::collections::VecDeque;

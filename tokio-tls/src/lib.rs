@@ -28,6 +28,8 @@
 //! built. Configuration of TLS parameters is still primarily done through the
 //! `native-tls` crate.
 
+use tokio::io::{AsyncRead, AsyncWrite};
+
 use native_tls::{Error, HandshakeError, MidHandshakeTlsStream};
 use std::fmt;
 use std::future::Future;
@@ -36,7 +38,6 @@ use std::marker::Unpin;
 use std::pin::Pin;
 use std::ptr::null_mut;
 use std::task::{Context, Poll};
-use tokio_io::{AsyncRead, AsyncWrite};
 
 #[derive(Debug)]
 struct AllowStd<S> {

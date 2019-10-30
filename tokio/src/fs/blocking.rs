@@ -1,6 +1,5 @@
 use crate::fs::sys;
-
-use tokio_io::{AsyncRead, AsyncWrite};
+use crate::io::{AsyncRead, AsyncWrite};
 
 use futures_core::ready;
 use std::cmp;

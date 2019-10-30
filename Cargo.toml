@@ -1,18 +1,14 @@
 [workspace]
 
 members = [
-  "tokio",
   "tokio-compat",
-  "tokio-executor",
-  "tokio-io",
   "tokio-macros",
-  "tokio-net",
-  "tokio-sync",
   "tokio-test",
   "tokio-tls",
   "tokio-util",
 
   # Internal
   "examples",
-  "build-tests",
+  "tests-build",
+  "tests-integration",
 ]

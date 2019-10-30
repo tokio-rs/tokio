@@ -7,14 +7,13 @@ mod spawner;
 pub use self::spawner::Spawner;
 
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
-pub use tokio_executor::thread_pool::JoinHandle;
+pub use crate::executor::thread_pool::JoinHandle;
 
+use crate::net::driver;
 use crate::timer::timer;
 
-use tokio_executor::thread_pool::ThreadPool;
-use tokio_net::driver;
+use crate::executor::thread_pool::ThreadPool;
 
-use tracing_core as trace;
 use std::future::Future;
 use std::io;
 
@@ -43,13 +42,10 @@ struct Inner {
     pool: ThreadPool,
 
     /// Reactor handles
-    reactor_handles: Vec<tokio_net::driver::Handle>,
+    reactor_handles: Vec<crate::net::driver::Handle>,
 
     /// Timer handles
     timer_handles: Vec<timer::Handle>,
-
-    /// Tracing dispatcher
-    trace: trace::Dispatch,
 }
 
 // ===== impl Runtime =====
@@ -115,7 +111,8 @@ impl Runtime {
     /// This function panics if the spawn fails. Failure occurs if the executor
     /// is currently at capacity and is unable to spawn a new future.
     pub fn spawn<F>(&self, future: F) -> &Self
-    where F: Future<Output = ()> + Send + 'static,
+    where
+        F: Future<Output = ()> + Send + 'static,
     {
         self.inner().pool.spawn(future);
         self
@@ -133,18 +130,11 @@ impl Runtime {
     ///
     /// This function panics if the executor is at capacity, if the provided
     /// future panics, or if called within an asynchronous execution context.
-    pub fn block_on<F>(&self, future: F) -> F::Output
-    where
-        F: Future,
-    {
-        let trace = &self.inner().trace;
-
+    pub fn block_on<F: Future>(&self, future: F) -> F::Output {
         let _reactor = driver::set_default(&self.inner().reactor_handles[0]);
         let _timer = timer::set_default(&self.inner().timer_handles[0]);
 
-        trace::dispatcher::with_default(trace, || {
-            self.inner().pool.block_on(future)
-        })
+        self.inner().pool.block_on(future)
     }
 
     /// Return a handle to the runtime's spawner.
