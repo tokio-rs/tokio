@@ -48,7 +48,7 @@ jobs:
     # Check each specified feature works properly
     # * --each-feature - run for each feature which includes --no-default-features and default features of package
     # * --no-dev-deps - build without dev-dependencies to avoid https://github.com/rust-lang/cargo/issues/4866
-    - bash: cargo hack check --each-feature --no-dev-deps
+    - script: cargo hack check --each-feature --no-dev-deps
       env:
         LOOM_MAX_PREEMPTIONS: 2
         CI: 'True'
@@ -77,7 +77,7 @@ jobs:
     # Check each specified feature works properly
     # * --each-feature - run for each feature which includes --no-default-features and default features of package
     # * --no-dev-deps - build without dev-dependencies to avoid https://github.com/rust-lang/cargo/issues/4866
-    - bash: cargo hack check --each-feature --no-dev-deps
+    - script: cargo hack check --each-feature --no-dev-deps
       env:
         LOOM_MAX_PREEMPTIONS: 2
         CI: 'True'
