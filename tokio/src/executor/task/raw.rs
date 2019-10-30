@@ -9,13 +9,13 @@ use std::ptr::NonNull;
 use std::task::Waker;
 
 /// Raw task handle
-pub(super) struct RawTask<S: 'static> {
-    ptr: NonNull<Header<S>>,
+pub(super) struct RawTask {
+    ptr: NonNull<Header>,
 }
 
-pub(super) struct Vtable<S: 'static> {
+pub(super) struct Vtable {
     /// Poll the future
-    pub(super) poll: unsafe fn(*mut (), &mut dyn FnMut() -> Option<NonNull<S>>) -> bool,
+    pub(super) poll: unsafe fn(*mut (), &mut dyn FnMut() -> Option<NonNull<()>>) -> bool,
 
     /// The task handle has been dropped and the join waker needs to be dropped
     /// or the task struct needs to be deallocated
@@ -42,7 +42,7 @@ pub(super) struct Vtable<S: 'static> {
 }
 
 /// Get the vtable for the requested `T` and `S` generics.
-pub(super) fn vtable<T: Future, S: Schedule>() -> &'static Vtable<S> {
+pub(super) fn vtable<T: Future, S: Schedule>() -> &'static Vtable {
     &Vtable {
         poll: poll::<T, S>,
         drop_task: drop_task::<T, S>,
@@ -54,54 +54,54 @@ pub(super) fn vtable<T: Future, S: Schedule>() -> &'static Vtable<S> {
     }
 }
 
-impl<S> RawTask<S> {
-    pub(super) fn new_background<T>(task: T) -> RawTask<S>
+impl RawTask {
+    pub(super) fn new_background<T, S>(task: T) -> RawTask
     where
         T: Future + Send + 'static,
         S: Schedule,
     {
-        RawTask::new(task, State::new_background())
+        RawTask::new::<_, S>(task, State::new_background())
     }
 
-    pub(super) fn new_joinable<T>(task: T) -> RawTask<S>
+    pub(super) fn new_joinable<T, S>(task: T) -> RawTask
     where
         T: Future + Send + 'static,
         S: Schedule,
     {
-        RawTask::new(task, State::new_joinable())
+        RawTask::new::<_, S>(task, State::new_joinable())
     }
 
-    fn new<T>(task: T, state: State) -> RawTask<S>
+    fn new<T, S>(task: T, state: State) -> RawTask
     where
         T: Future + Send + 'static,
         S: Schedule,
     {
-        let ptr = Box::into_raw(Cell::<T, S>::new(task, state));
-        let ptr = unsafe { NonNull::new_unchecked(ptr as *mut Header<S>) };
+        let ptr = Box::into_raw(Cell::new::<S>(task, state));
+        let ptr = unsafe { NonNull::new_unchecked(ptr as *mut Header) };
 
         RawTask { ptr }
     }
 
-    pub(super) unsafe fn from_raw(ptr: NonNull<Header<S>>) -> RawTask<S> {
+    pub(super) unsafe fn from_raw(ptr: NonNull<Header>) -> RawTask {
         RawTask { ptr }
     }
 
     /// Returns a reference to the task's meta structure.
     ///
     /// Safe as `Header` is `Sync`.
-    pub(super) fn header(&self) -> &Header<S> {
+    pub(super) fn header(&self) -> &Header {
         unsafe { self.ptr.as_ref() }
     }
 
     /// Returns a raw pointer to the task's meta structure.
-    pub(super) fn into_raw(self) -> NonNull<Header<S>> {
+    pub(super) fn into_raw(self) -> NonNull<Header> {
         self.ptr
     }
 
     /// Safety: mutual exclusion is required to call this function.
     ///
     /// Returns `true` if the task needs to be scheduled again.
-    pub(super) unsafe fn poll(self, executor: &mut dyn FnMut() -> Option<NonNull<S>>) -> bool {
+    pub(super) unsafe fn poll(self, executor: &mut dyn FnMut() -> Option<NonNull<()>>) -> bool {
         // Get the vtable without holding a ref to the meta struct. This is done
         // because a mutable reference to the task is passed into the poll fn.
         let vtable = self.header().vtable;
@@ -142,17 +142,17 @@ impl<S> RawTask<S> {
     }
 }
 
-impl<S: 'static> Clone for RawTask<S> {
+impl Clone for RawTask {
     fn clone(&self) -> Self {
         RawTask { ptr: self.ptr }
     }
 }
 
-impl<S: 'static> Copy for RawTask<S> {}
+impl Copy for RawTask {}
 
 unsafe fn poll<T: Future, S: Schedule>(
     ptr: *mut (),
-    executor: &mut dyn FnMut() -> Option<NonNull<S>>,
+    executor: &mut dyn FnMut() -> Option<NonNull<()>>,
 ) -> bool {
     let harness = Harness::<T, S>::from_raw(ptr);
     harness.poll(executor)

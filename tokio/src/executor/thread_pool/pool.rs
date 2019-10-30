@@ -1,5 +1,6 @@
 use crate::executor::blocking::PoolWaiter;
-use crate::executor::thread_pool::{shutdown, Builder, JoinHandle, Spawner};
+use crate::executor::task::JoinHandle;
+use crate::executor::thread_pool::{shutdown, Builder, Spawner};
 use crate::executor::Executor;
 
 use std::fmt;

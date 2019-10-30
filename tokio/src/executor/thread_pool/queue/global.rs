@@ -2,24 +2,27 @@ use crate::executor::loom::sync::atomic::AtomicUsize;
 use crate::executor::loom::sync::Mutex;
 use crate::executor::task::{Header, Task};
 
+use std::marker::PhantomData;
 use std::ptr::{self, NonNull};
 use std::sync::atomic::Ordering::{Acquire, Release};
 use std::usize;
 
 pub(super) struct Queue<T: 'static> {
     /// Pointers to the head and tail of the queue
-    pointers: Mutex<Pointers<T>>,
+    pointers: Mutex<Pointers>,
 
     /// Number of pending tasks in the queue. This helps prevent unnecessary
     /// locking in the hot path.
     ///
     /// The LSB is a flag tracking whether or not the queue is open or not.
     len: AtomicUsize,
+
+    _p: PhantomData<T>,
 }
 
-struct Pointers<T: 'static> {
-    head: *const Header<T>,
-    tail: *const Header<T>,
+struct Pointers {
+    head: *const Header,
+    tail: *const Header,
 }
 
 const CLOSED: usize = 1;
@@ -33,6 +36,7 @@ impl<T: 'static> Queue<T> {
                 tail: ptr::null(),
             }),
             len: AtomicUsize::new(0),
+            _p: PhantomData,
         }
     }
 
@@ -186,10 +190,10 @@ impl<T: 'static> Queue<T> {
     }
 }
 
-unsafe fn get_next<T>(meta: NonNull<Header<T>>) -> *const Header<T> {
+unsafe fn get_next(meta: NonNull<Header>) -> *const Header {
     *meta.as_ref().queue_next.get()
 }
 
-unsafe fn set_next<T>(meta: NonNull<Header<T>>, val: *const Header<T>) {
+unsafe fn set_next(meta: NonNull<Header>, val: *const Header) {
     *meta.as_ref().queue_next.get() = val;
 }

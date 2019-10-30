@@ -7,7 +7,7 @@ pub use self::error::Error;
 mod harness;
 
 mod join;
-pub(crate) use self::join::JoinHandle;
+pub use self::join::JoinHandle;
 
 mod list;
 pub(crate) use self::list::OwnedList;
@@ -27,12 +27,14 @@ mod tests;
 use self::raw::RawTask;
 
 use std::future::Future;
+use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::{fmt, mem};
 
 /// An owned handle to the task, tracked by ref count
 pub(crate) struct Task<S: 'static> {
-    raw: RawTask<S>,
+    raw: RawTask,
+    _p: PhantomData<S>,
 }
 
 unsafe impl<S: Send + Sync + 'static> Send for Task<S> {}
@@ -63,34 +65,43 @@ where
     T: Future + Send + 'static,
     S: Schedule,
 {
-    let raw = RawTask::new_background(task);
-    Task { raw }
+    Task {
+        raw: RawTask::new_background::<_, S>(task),
+        _p: PhantomData,
+    }
 }
 
 /// Create a new task with an associated join handle
-pub(crate) fn joinable<T, S>(task: T) -> (Task<S>, JoinHandle<T::Output, S>)
+pub(crate) fn joinable<T, S>(task: T) -> (Task<S>, JoinHandle<T::Output>)
 where
     T: Future + Send + 'static,
     S: Schedule,
 {
-    let raw = RawTask::new_joinable(task);
-    let task = Task { raw };
+    let raw = RawTask::new_joinable::<_, S>(task);
+
+    let task = Task {
+        raw,
+        _p: PhantomData,
+    };
+
     let join = JoinHandle::new(raw);
 
     (task, join)
 }
 
 impl<S: 'static> Task<S> {
-    pub(crate) unsafe fn from_raw(ptr: NonNull<Header<S>>) -> Task<S> {
-        let raw = RawTask::from_raw(ptr);
-        Task { raw }
+    pub(crate) unsafe fn from_raw(ptr: NonNull<Header>) -> Task<S> {
+        Task {
+            raw: RawTask::from_raw(ptr),
+            _p: PhantomData,
+        }
     }
 
-    pub(crate) fn header(&self) -> &Header<S> {
+    pub(crate) fn header(&self) -> &Header {
         self.raw.header()
     }
 
-    pub(crate) fn into_raw(self) -> NonNull<Header<S>> {
+    pub(crate) fn into_raw(self) -> NonNull<Header> {
         let raw = self.raw.into_raw();
         mem::forget(self);
         raw
@@ -99,7 +110,7 @@ impl<S: 'static> Task<S> {
 
 impl<S: Schedule> Task<S> {
     /// Returns `self` when the task needs to be immediately re-scheduled
-    pub(crate) fn run(self, executor: &mut dyn FnMut() -> Option<NonNull<S>>) -> Option<Self> {
+    pub(crate) fn run(self, executor: &mut dyn FnMut() -> Option<NonNull<()>>) -> Option<Self> {
         if unsafe { self.raw.poll(executor) } {
             Some(self)
         } else {

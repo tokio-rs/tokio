@@ -7,7 +7,7 @@ mod support {
 use support::signal::send_signal;
 
 use tokio::prelude::*;
-use tokio::runtime::current_thread::Runtime;
+use tokio::runtime::Runtime;
 use tokio::signal::unix::{signal, SignalKind};
 
 use std::sync::mpsc::channel;
@@ -24,7 +24,7 @@ fn multi_loop() {
             .map(|_| {
                 let sender = sender.clone();
                 thread::spawn(move || {
-                    let mut rt = Runtime::new().unwrap();
+                    let mut rt = rt();
                     let _ = rt.block_on(async {
                         let signal = signal(SignalKind::hangup()).unwrap();
                         sender.send(()).unwrap();
@@ -44,4 +44,11 @@ fn multi_loop() {
             t.join().unwrap();
         }
     }
+}
+
+fn rt() -> Runtime {
+    tokio::runtime::Builder::new()
+        .current_thread()
+        .build()
+        .unwrap()
 }

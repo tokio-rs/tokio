@@ -8,9 +8,6 @@ mod current;
 mod idle;
 use self::idle::Idle;
 
-mod join;
-pub use self::join::JoinHandle;
-
 mod owned;
 use self::owned::Owned;
 

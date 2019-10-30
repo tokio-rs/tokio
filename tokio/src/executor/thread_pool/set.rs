@@ -5,8 +5,8 @@
 use crate::executor::loom::rand::seed;
 use crate::executor::loom::sync::Arc;
 use crate::executor::park::Unpark;
-use crate::executor::task::{self, Task};
-use crate::executor::thread_pool::{current, queue, BoxFuture, Idle, JoinHandle, Owned, Shared};
+use crate::executor::task::{self, JoinHandle, Task};
+use crate::executor::thread_pool::{current, queue, BoxFuture, Idle, Owned, Shared};
 use crate::executor::util::{CachePadded, FastRand};
 use crate::executor::{Executor, SpawnError};
 
@@ -203,7 +203,7 @@ impl Set<Box<dyn Unpark>> {
     {
         let (task, handle) = task::joinable(future);
         self.schedule(task);
-        JoinHandle::new(handle)
+        handle
     }
 }
 

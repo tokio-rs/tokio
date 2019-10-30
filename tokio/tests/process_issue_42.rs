@@ -3,7 +3,7 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::process::Command;
-use tokio::runtime::current_thread;
+use tokio::runtime;
 
 use futures_util::future::FutureExt;
 use futures_util::stream::FuturesOrdered;
@@ -18,7 +18,8 @@ fn run_test() {
     let finished_clone = finished.clone();
 
     thread::spawn(move || {
-        let mut rt = current_thread::Runtime::new().expect("failed to get runtime");
+        let mut rt = runtime::Builder::new().current_thread().build().unwrap();
+
         let mut futures = FuturesOrdered::new();
         rt.block_on(async {
             for i in 0..2 {

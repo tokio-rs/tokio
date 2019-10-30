@@ -4,6 +4,7 @@ use crate::executor::task::core::{Cell, Core, Header, Trailer};
 use crate::executor::task::state::Snapshot;
 use crate::executor::task::{Error, Schedule, Task};
 
+use std::marker::PhantomData;
 use std::future::Future;
 use std::mem::{ManuallyDrop, MaybeUninit};
 use std::ptr::NonNull;
@@ -11,7 +12,8 @@ use std::task::{Poll, Waker};
 
 /// Typed raw task handle
 pub(super) struct Harness<T: Future, S: 'static> {
-    cell: NonNull<Cell<T, S>>,
+    cell: NonNull<Cell<T>>,
+    _p: PhantomData<S>,
 }
 
 impl<T, S> Harness<T, S>
@@ -22,11 +24,13 @@ where
     pub(super) unsafe fn from_raw(ptr: *mut ()) -> Harness<T, S> {
         debug_assert!(!ptr.is_null());
 
-        let cell = NonNull::new_unchecked(ptr as *mut Cell<T, S>);
-        Harness { cell }
+        Harness {
+            cell: NonNull::new_unchecked(ptr as *mut Cell<T>),
+            _p: PhantomData,
+        }
     }
 
-    fn header(&self) -> &Header<S> {
+    fn header(&self) -> &Header {
         unsafe { &self.cell.as_ref().header }
     }
 
@@ -51,7 +55,7 @@ where
     /// Panics raised while polling the future are handled.
     ///
     /// Returns `true` if the task needs to be scheduled again
-    pub(super) fn poll(mut self, executor: &mut dyn FnMut() -> Option<NonNull<S>>) -> bool {
+    pub(super) fn poll(mut self, executor: &mut dyn FnMut() -> Option<NonNull<()>>) -> bool {
         use std::panic;
 
         // Transition the task to the running state.
@@ -82,8 +86,8 @@ where
                 let task = ManuallyDrop::new(Task::from_raw(header.into()));
                 // Call the scheduler's bind callback
                 let executor = executor().expect("first poll must happen from an executor");
-                executor.as_ref().bind(&task);
-                header.executor.with_mut(|ptr| *ptr = Some(executor));
+                executor.cast::<S>().as_ref().bind(&task);
+                header.executor.with_mut(|ptr| *ptr = Some(executor.cast()));
             }
         }
 
@@ -111,7 +115,7 @@ where
                     polled: false,
                 };
 
-                let res = guard.core.poll(header);
+                let res = guard.core.poll::<S>(header);
 
                 // prevent the guard from dropping the future
                 guard.polled = true;
@@ -306,7 +310,7 @@ where
                     None => panic!("executor should be set"),
                 };
 
-                S::schedule(executor.as_ref(), self.to_task());
+                S::schedule(executor.cast().as_ref(), self.to_task());
             }
         }
     }
@@ -382,7 +386,7 @@ where
             let task = self.to_task();
 
             if let Some(executor) = bound_executor {
-                executor.as_ref().release(task);
+                executor.cast::<S>().as_ref().release(task);
             } else {
                 // Just drop the task. This will release / deallocate memory.
                 drop(task);
@@ -394,7 +398,7 @@ where
 
     fn complete(
         mut self,
-        executor: &mut dyn FnMut() -> Option<NonNull<S>>,
+        executor: &mut dyn FnMut() -> Option<NonNull<()>>,
         join_interest: bool,
         output: super::Result<T::Output>,
     ) {
@@ -412,7 +416,7 @@ where
             unsafe {
                 // perform a local release
                 let task = ManuallyDrop::new(self.to_task());
-                executor.as_ref().unwrap().as_ref().release_local(&task);
+                executor.as_ref().unwrap().cast::<S>().as_ref().release_local(&task);
 
                 if self.transition_to_released(join_interest).is_final_ref() {
                     self.dealloc();
@@ -438,7 +442,7 @@ where
                     None => panic!("executor should be set"),
                 };
 
-                executor.as_ref().release(task);
+                executor.cast::<S>().as_ref().release(task);
             }
         }
     }
@@ -542,7 +546,7 @@ where
     }
 
     unsafe fn to_task(&self) -> Task<S> {
-        let ptr = self.cell.as_ptr() as *mut Header<S>;
+        let ptr = self.cell.as_ptr() as *mut Header;
         Task::from_raw(NonNull::new_unchecked(ptr))
     }
 }

@@ -1,18 +1,20 @@
 use crate::executor::loom::alloc::Track;
 use crate::executor::task::raw::RawTask;
 
+use std::fmt;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-pub(crate) struct JoinHandle<T, S: 'static> {
-    raw: Option<RawTask<S>>,
+/// An owned permission to join on a task (await its termination).
+pub struct JoinHandle<T> {
+    raw: Option<RawTask>,
     _p: PhantomData<T>,
 }
 
-impl<T, S: 'static> JoinHandle<T, S> {
-    pub(super) fn new(raw: RawTask<S>) -> JoinHandle<T, S> {
+impl<T> JoinHandle<T> {
+    pub(super) fn new(raw: RawTask) -> JoinHandle<T> {
         JoinHandle {
             raw: Some(raw),
             _p: PhantomData,
@@ -20,9 +22,9 @@ impl<T, S: 'static> JoinHandle<T, S> {
     }
 }
 
-impl<T, S: 'static> Unpin for JoinHandle<T, S> {}
+impl<T> Unpin for JoinHandle<T> {}
 
-impl<T, S: 'static> Future for JoinHandle<T, S> {
+impl<T> Future for JoinHandle<T> {
     type Output = super::Result<T>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -61,7 +63,7 @@ impl<T, S: 'static> Future for JoinHandle<T, S> {
     }
 }
 
-impl<T, S: 'static> Drop for JoinHandle<T, S> {
+impl<T> Drop for JoinHandle<T> {
     fn drop(&mut self) {
         if let Some(raw) = self.raw.take() {
             if raw.header().state.drop_join_handle_fast() {
@@ -70,5 +72,14 @@ impl<T, S: 'static> Drop for JoinHandle<T, S> {
 
             raw.drop_join_handle_slow();
         }
+    }
+}
+
+impl<T> fmt::Debug for JoinHandle<T>
+where
+    T: fmt::Debug,
+{
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("JoinHandle").finish()
     }
 }

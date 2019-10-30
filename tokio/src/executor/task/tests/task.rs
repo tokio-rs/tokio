@@ -8,13 +8,14 @@ use tokio_test::task::spawn;
 use tokio_test::{assert_pending, assert_ready_err, assert_ready_ok};
 
 use futures_util::future::poll_fn;
+use std::ptr::NonNull;
 use std::sync::mpsc;
 
 #[test]
 fn header_lte_cache_line() {
     use std::mem::size_of;
 
-    assert!(size_of::<Header<()>>() <= 8 * size_of::<*const ()>());
+    assert!(size_of::<Header>() <= 8 * size_of::<*const ()>());
 }
 
 #[test]
@@ -28,7 +29,7 @@ fn create_complete_drop() {
     let task = task::background(task);
 
     let mock = mock().bind(&task).release_local();
-    let mock = &mut || Some(From::from(&mock));
+    let mock = &mut || Some(NonNull::from(&mock).cast::<()>());
 
     // Nothing is returned
     assert!(task.run(mock).is_none());
@@ -53,7 +54,7 @@ fn create_yield_complete_drop() {
     let task = task::background(task);
 
     let mock = mock().bind(&task).release_local();
-    let mock = &mut || Some(From::from(&mock));
+    let mock = &mut || Some(NonNull::from(&mock).cast::<()>());
 
     // Task is returned
     let task = assert_some!(task.run(mock));
@@ -83,7 +84,7 @@ fn create_clone_yield_complete_drop() {
     let task = task::background(task);
 
     let mock = mock().bind(&task).release_local();
-    let mock = &mut || Some(From::from(&mock));
+    let mock = &mut || Some(NonNull::from(&mock).cast::<()>());
 
     // Task is returned
     let task = assert_some!(task.run(mock));
@@ -111,7 +112,7 @@ fn create_wake_drop() {
 
     let mock = mock().bind(&task).schedule().release_local();
 
-    assert_none!(task.run(&mut || Some(From::from(&mock))));
+    assert_none!(task.run(&mut || Some(NonNull::from(&mock).cast::<()>())));
     assert_none!(mock.next_pending_run());
 
     // The future was **not** dropped.
@@ -121,7 +122,7 @@ fn create_wake_drop() {
 
     let task = assert_some!(mock.next_pending_run());
 
-    assert_none!(task.run(&mut || Some(From::from(&mock))));
+    assert_none!(task.run(&mut || Some(NonNull::from(&mock).cast::<()>())));
 
     // The future was dropped.
     assert!(did_drop.did_drop_future());
@@ -143,7 +144,7 @@ fn notify_complete() {
     let task = task::background(task);
 
     let mock = mock().bind(&task).release_local();
-    let mock = &mut || Some(From::from(&mock));
+    let mock = &mut || Some(NonNull::from(&mock).cast::<()>());
 
     assert_none!(task.run(mock));
     assert!(did_drop.did_drop_future());
@@ -165,9 +166,9 @@ fn complete_on_second_schedule_obj() {
     let mock2 = mock().bind(&task).release();
 
     // Task is returned
-    let task = assert_some!(task.run(&mut || Some(From::from(&mock2))));
+    let task = assert_some!(task.run(&mut || Some(NonNull::from(&mock2).cast::<()>())));
 
-    assert_none!(task.run(&mut || Some(From::from(&mock1))));
+    assert_none!(task.run(&mut || Some(NonNull::from(&mock1).cast::<()>())));
 
     // The message was sent
     assert!(rx.try_recv().is_ok());
@@ -187,7 +188,7 @@ fn join_task_immediate_drop_handle() {
 
     let mock = mock().bind(&task).release_local();
 
-    assert!(task.run(&mut || Some(From::from(&mock))).is_none());
+    assert!(task.run(&mut || Some(NonNull::from(&mock).cast::<()>())).is_none());
 
     assert!(did_drop.did_drop_future());
     assert!(did_drop.did_drop_output());
@@ -202,7 +203,7 @@ fn join_task_immediate_complete_1() {
 
     let mock = mock().bind(&task).release_local();
 
-    assert!(task.run(&mut || Some(From::from(&mock))).is_none());
+    assert!(task.run(&mut || Some(NonNull::from(&mock).cast::<()>())).is_none());
 
     assert!(did_drop.did_drop_future());
     assert!(!did_drop.did_drop_output());
@@ -227,7 +228,7 @@ fn join_task_immediate_complete_2() {
 
     assert_pending!(handle.poll());
 
-    assert!(task.run(&mut || Some(From::from(&mock))).is_none());
+    assert!(task.run(&mut || Some(NonNull::from(&mock).cast::<()>())).is_none());
 
     assert!(did_drop.did_drop_future());
     assert!(!did_drop.did_drop_output());
@@ -253,14 +254,14 @@ fn join_task_complete_later() {
 
     let mock = mock().bind(&task).release_local();
 
-    let task = assert_some!(task.run(&mut || Some(From::from(&mock))));
+    let task = assert_some!(task.run(&mut || Some(NonNull::from(&mock).cast::<()>())));
 
     assert!(!did_drop.did_drop_future());
     assert!(!did_drop.did_drop_output());
 
     assert_pending!(handle.poll());
 
-    assert_none!(task.run(&mut || Some(From::from(&mock))));
+    assert_none!(task.run(&mut || Some(NonNull::from(&mock).cast::<()>())));
     assert!(handle.is_woken());
 
     let out = assert_ready_ok!(handle.poll());
@@ -288,12 +289,12 @@ fn drop_join_after_poll() {
     assert_pending!(handle.poll());
     drop(handle);
 
-    let task = assert_some!(task.run(&mut || Some(From::from(&mock))));
+    let task = assert_some!(task.run(&mut || Some(NonNull::from(&mock).cast::<()>())));
 
     assert!(!did_drop.did_drop_future());
     assert!(!did_drop.did_drop_output());
 
-    assert_none!(task.run(&mut || Some(From::from(&mock))));
+    assert_none!(task.run(&mut || Some(NonNull::from(&mock).cast::<()>())));
 
     assert!(did_drop.did_drop_future());
     assert!(did_drop.did_drop_output());
@@ -317,7 +318,7 @@ fn join_handle_change_task_complete() {
     assert_pending!(t1.poll());
     drop(t1);
 
-    let task = assert_some!(task.run(&mut || Some(From::from(&mock))));
+    let task = assert_some!(task.run(&mut || Some(NonNull::from(&mock).cast::<()>())));
 
     let mut t2 = spawn(poll_fn(|cx| Pin::new(&mut handle).poll(cx)));
     assert_pending!(t2.poll());
@@ -325,7 +326,7 @@ fn join_handle_change_task_complete() {
     assert!(!did_drop.did_drop_future());
     assert!(!did_drop.did_drop_output());
 
-    assert_none!(task.run(&mut || Some(From::from(&mock))));
+    assert_none!(task.run(&mut || Some(NonNull::from(&mock).cast::<()>())));
 
     assert!(t2.is_woken());
 
@@ -347,7 +348,7 @@ fn drop_handle_after_complete() {
 
     let mock = mock().bind(&task).release_local();
 
-    assert!(task.run(&mut || Some(From::from(&mock))).is_none());
+    assert!(task.run(&mut || Some(NonNull::from(&mock).cast::<()>())).is_none());
 
     assert!(did_drop.did_drop_future());
     assert!(!did_drop.did_drop_output());
@@ -370,7 +371,7 @@ fn non_initial_task_state_drop_join_handle_without_polling() {
 
     let mock = mock().bind(&task).schedule().release_local();
 
-    assert_none!(task.run(&mut || Some(From::from(&mock))));
+    assert_none!(task.run(&mut || Some(NonNull::from(&mock).cast::<()>())));
 
     drop(handle);
 
@@ -380,7 +381,7 @@ fn non_initial_task_state_drop_join_handle_without_polling() {
     tx.send(()).unwrap();
     let task = assert_some!(mock.next_pending_run());
 
-    assert!(task.run(&mut || Some(From::from(&mock))).is_none());
+    assert!(task.run(&mut || Some(NonNull::from(&mock).cast::<()>())).is_none());
 
     assert!(did_drop.did_drop_future());
     assert!(did_drop.did_drop_output());
@@ -400,7 +401,7 @@ fn task_panic_background() {
 
     let mock = mock().bind(&task).release_local();
 
-    assert!(task.run(&mut || Some(From::from(&mock))).is_none());
+    assert!(task.run(&mut || Some(NonNull::from(&mock).cast::<()>())).is_none());
 
     assert!(did_drop.did_drop_future());
 }
@@ -422,7 +423,7 @@ fn task_panic_join() {
 
     assert_pending!(handle.poll());
 
-    assert!(task.run(&mut || Some(From::from(&mock))).is_none());
+    assert!(task.run(&mut || Some(NonNull::from(&mock).cast::<()>())).is_none());
     assert!(did_drop.did_drop_future());
     assert!(handle.is_woken());
 
@@ -443,12 +444,12 @@ fn complete_second_schedule_obj_before_join() {
 
     assert_pending!(handle.poll());
 
-    assert_none!(task.run(&mut || Some(From::from(&mock2))));
+    assert_none!(task.run(&mut || Some(NonNull::from(&mock2).cast::<()>())));
 
     tx.send("hello").unwrap();
 
     let task = assert_some!(mock2.next_pending_run());
-    assert_none!(task.run(&mut || Some(From::from(&mock1))));
+    assert_none!(task.run(&mut || Some(NonNull::from(&mock1).cast::<()>())));
     assert!(did_drop.did_drop_future());
 
     // The join handle was notified
@@ -476,12 +477,12 @@ fn complete_second_schedule_obj_after_join() {
 
     assert_pending!(handle.poll());
 
-    assert_none!(task.run(&mut || Some(From::from(&mock2))));
+    assert_none!(task.run(&mut || Some(NonNull::from(&mock2).cast::<()>())));
 
     tx.send("hello").unwrap();
 
     let task = assert_some!(mock2.next_pending_run());
-    assert_none!(task.run(&mut || Some(From::from(&mock1))));
+    assert_none!(task.run(&mut || Some(NonNull::from(&mock1).cast::<()>())));
     assert!(did_drop.did_drop_future());
 
     // The join handle was notified
@@ -512,7 +513,7 @@ fn shutdown_from_list_before_notified() {
     let mock = mock().bind(&task).release();
 
     assert_pending!(handle.poll());
-    assert_none!(task.run(&mut || Some(From::from(&mock))));
+    assert_none!(task.run(&mut || Some(NonNull::from(&mock).cast::<()>())));
 
     list.shutdown();
     assert!(did_drop.did_drop_future());
@@ -542,7 +543,7 @@ fn shutdown_from_list_after_notified() {
     let mock = mock().bind(&task).schedule().release();
 
     assert_pending!(handle.poll());
-    assert_none!(task.run(&mut || Some(From::from(&mock))));
+    assert_none!(task.run(&mut || Some(NonNull::from(&mock).cast::<()>())));
 
     tx.send(()).unwrap();
 
@@ -552,7 +553,7 @@ fn shutdown_from_list_after_notified() {
 
     assert_none!(mock.next_pending_drop());
 
-    assert_none!(task.run(&mut || Some(From::from(&mock))));
+    assert_none!(task.run(&mut || Some(NonNull::from(&mock).cast::<()>())));
     assert!(did_drop.did_drop_future());
     assert!(handle.is_woken());
 
@@ -580,8 +581,8 @@ fn shutdown_from_list_after_complete() {
     let m2 = mock();
 
     assert_pending!(handle.poll());
-    let task = assert_some!(task.run(&mut || Some(From::from(&m1))));
-    assert_none!(task.run(&mut || Some(From::from(&m2))));
+    let task = assert_some!(task.run(&mut || Some(NonNull::from(&m1).cast::<()>())));
+    assert_none!(task.run(&mut || Some(NonNull::from(&m2).cast::<()>())));
     assert!(did_drop.did_drop_future());
     assert!(handle.is_woken());
 
@@ -626,7 +627,7 @@ fn shutdown_from_task_after_notified() {
     let mock = mock().bind(&task).schedule().release();
 
     assert_pending!(handle.poll());
-    assert_none!(task.run(&mut || Some(From::from(&mock))));
+    assert_none!(task.run(&mut || Some(NonNull::from(&mock).cast::<()>())));
 
     tx.send(()).unwrap();
 

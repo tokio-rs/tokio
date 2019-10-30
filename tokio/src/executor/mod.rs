@@ -61,8 +61,10 @@ mod loom;
 
 pub mod park;
 
-#[cfg(feature = "rt-full")]
+#[cfg(any(feature = "rt-current-thread", feature = "rt-full"))]
 mod task;
+#[cfg(any(feature = "rt-current-thread", feature = "rt-full"))]
+pub use self::task::JoinHandle;
 
 mod typed;
 pub use self::typed::TypedExecutor;
@@ -76,7 +78,7 @@ mod blocking;
 pub mod blocking;
 
 #[cfg(feature = "rt-current-thread")]
-pub mod current_thread;
+pub(crate) mod current_thread;
 
 #[cfg(feature = "rt-full")]
 pub mod thread_pool;

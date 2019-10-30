@@ -17,9 +17,9 @@ use std::task::{Context, Poll, Waker};
 /// It is critical for `Header` to be the first field as the task structure will
 /// be referenced by both *mut Cell and *mut Header.
 #[repr(C)]
-pub(super) struct Cell<T: Future, S: 'static> {
+pub(super) struct Cell<T: Future> {
     /// Hot task state data
-    pub(super) header: Header<S>,
+    pub(super) header: Header,
 
     /// Either the future or output, depending on the execution stage.
     pub(super) core: Core<T>,
@@ -37,24 +37,24 @@ pub(super) struct Core<T: Future> {
 
 /// Crate public as this is also needed by the pool.
 #[repr(C)]
-pub(crate) struct Header<S: 'static> {
+pub(crate) struct Header {
     /// Task state
     pub(super) state: State,
 
     /// Pointer to the executor owned by the task
-    pub(super) executor: CausalCell<Option<NonNull<S>>>,
+    pub(super) executor: CausalCell<Option<NonNull<()>>>,
 
     /// Pointer to next task, used for misc task linked lists.
-    pub(crate) queue_next: UnsafeCell<*const Header<S>>,
+    pub(crate) queue_next: UnsafeCell<*const Header>,
 
     /// Pointer to the next task in the ownership list.
-    pub(crate) owned_next: UnsafeCell<Option<NonNull<Header<S>>>>,
+    pub(crate) owned_next: UnsafeCell<Option<NonNull<Header>>>,
 
     /// Pointer to the previous task in the ownership list.
-    pub(crate) owned_prev: UnsafeCell<Option<NonNull<Header<S>>>>,
+    pub(crate) owned_prev: UnsafeCell<Option<NonNull<Header>>>,
 
     /// Table of function pointers for executing actions on the task.
-    pub(super) vtable: &'static Vtable<S>,
+    pub(super) vtable: &'static Vtable,
 
     /// Used by loom to track the causality of the future. Without loom, this is
     /// unit.
@@ -74,10 +74,13 @@ enum Stage<T: Future> {
     Consumed,
 }
 
-impl<T: Future, S: Schedule> Cell<T, S> {
+impl<T: Future> Cell<T> {
     /// Allocate a new task cell, containing the header, trailer, and core
     /// structures.
-    pub(super) fn new(future: T, state: State) -> Box<Cell<T, S>> {
+    pub(super) fn new<S>(future: T, state: State) -> Box<Cell<T>>
+    where
+        S: Schedule,
+    {
         Box::new(Cell {
             header: Header {
                 state,
@@ -103,7 +106,7 @@ impl<T: Future> Core<T> {
         self.stage = Stage::Consumed
     }
 
-    pub(super) fn poll<S>(&mut self, header: &Header<S>) -> Poll<T::Output>
+    pub(super) fn poll<S>(&mut self, header: &Header) -> Poll<T::Output>
     where
         S: Schedule,
     {
@@ -146,8 +149,8 @@ impl<T: Future> Core<T> {
     }
 }
 
-impl<S> Header<S> {
-    pub(super) fn executor(&self) -> Option<NonNull<S>> {
+impl Header {
+    pub(super) fn executor(&self) -> Option<NonNull<()>> {
         unsafe { self.executor.with(|ptr| *ptr) }
     }
 }
