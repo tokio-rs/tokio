@@ -65,7 +65,7 @@ signal = [
 ]
 sync = ["fnv"]
 tcp = ["io", "net-driver"]
-timer = ["crossbeam-utils", "slab"]
+timer = ["slab"]
 udp = ["io", "net-driver"]
 uds = ["io", "net-driver", "mio-uds", "libc"]
 process = [
@@ -90,7 +90,6 @@ futures-util-preview = { version = "=0.3.0-alpha.19", features = ["sink", "chann
 # Everything else is optional...
 bytes = { version = "0.4", optional = true }
 crossbeam-channel = { version = "0.3.8", optional = true }
-crossbeam-utils = { version = "0.6.0", optional = true }
 fnv = { version = "1.0.6", optional = true }
 iovec = { version = "0.1", optional = true }
 lazy_static = { version = "1.0.2", optional = true }
