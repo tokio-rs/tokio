@@ -50,6 +50,10 @@ where
     })
 }
 
+pub(super) fn clear() {
+    CURRENT_WORKER.with(|cell| cell.set(Inner::new()))
+}
+
 pub(super) fn get<F, R>(f: F) -> R
 where
     F: FnOnce(&Current) -> R,
