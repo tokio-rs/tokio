@@ -69,7 +69,6 @@ timer = ["slab"]
 udp = ["io", "net-driver"]
 uds = ["io", "net-driver", "mio-uds", "libc"]
 process = [
-  "crossbeam-queue",
   "io",
   "libc",
   "mio-named-pipes",
@@ -101,7 +100,6 @@ pin-project = { version = "0.4", optional = true }
 slab = { version = "0.4.1", optional = true }
 
 [target.'cfg(unix)'.dependencies]
-crossbeam-queue = { version = "0.1.2", optional = true }
 mio-uds = { version = "0.6.5", optional = true }
 libc = { version = "0.2.42", optional = true }
 signal-hook-registry = { version = "1.1.1", optional = true }

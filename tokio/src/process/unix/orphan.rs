@@ -1,6 +1,6 @@
-use crossbeam_queue::SegQueue;
 use std::io;
 use std::process::ExitStatus;
+use std::sync::Mutex;
 
 /// An interface for waiting on a process to exit.
 pub(crate) trait Wait {
@@ -39,50 +39,51 @@ impl<T, O: OrphanQueue<T>> OrphanQueue<T> for &O {
     }
 }
 
-/// An atomic implementation of `OrphanQueue`.
+/// An implementation of `OrphanQueue`.
 #[derive(Debug)]
-pub(crate) struct AtomicOrphanQueue<T> {
-    queue: SegQueue<T>,
+pub(crate) struct OrphanQueueImpl<T> {
+    queue: Mutex<Vec<T>>,
 }
 
-impl<T> AtomicOrphanQueue<T> {
+impl<T> OrphanQueueImpl<T> {
     pub(crate) fn new() -> Self {
         Self {
-            queue: SegQueue::new(),
+            queue: Mutex::new(Vec::new()),
         }
+    }
+
+    #[cfg(test)]
+    fn len(&self) -> usize {
+        self.queue.lock().unwrap().len()
     }
 }
 
-impl<T: Wait> OrphanQueue<T> for AtomicOrphanQueue<T> {
+impl<T: Wait> OrphanQueue<T> for OrphanQueueImpl<T> {
     fn push_orphan(&self, orphan: T) {
-        self.queue.push(orphan)
+        self.queue.lock().unwrap().push(orphan)
     }
 
     fn reap_orphans(&self) {
-        let len = self.queue.len();
+        let mut queue = self.queue.lock().unwrap();
+        let queue = &mut *queue;
 
-        if len == 0 {
-            return;
-        }
-
-        let mut orphans = Vec::with_capacity(len);
-        while let Ok(mut orphan) = self.queue.pop() {
-            match orphan.try_wait() {
+        let mut i = 0;
+        while i < queue.len() {
+            match queue[i].try_wait() {
                 Ok(Some(_)) => {}
                 Err(_) => {
                     // TODO: bubble up error some how. Is this an internal bug?
                     // Shoudl we panic? Is it OK for this to be silently
                     // dropped?
                 }
-                // Still not done yet, we need to put it back in the queue
-                // when were done draining it, so that we don't get stuck
-                // in an infinite loop here
-                Ok(None) => orphans.push(orphan),
+                // Still not done yet
+                Ok(None) => {
+                    i += 1;
+                    continue;
+                }
             }
-        }
 
-        for orphan in orphans {
-            self.queue.push(orphan);
+            queue.remove(i);
         }
     }
 }
@@ -90,7 +91,7 @@ impl<T: Wait> OrphanQueue<T> for AtomicOrphanQueue<T> {
 #[cfg(all(test, not(loom)))]
 mod test {
     use super::Wait;
-    use super::{AtomicOrphanQueue, OrphanQueue};
+    use super::{OrphanQueue, OrphanQueueImpl};
     use std::cell::Cell;
     use std::io;
     use std::os::unix::process::ExitStatusExt;
@@ -156,30 +157,30 @@ mod test {
         let third_waits = third_orphan.total_waits.clone();
         let fourth_waits = fourth_orphan.total_waits.clone();
 
-        let orphanage = AtomicOrphanQueue::new();
+        let orphanage = OrphanQueueImpl::new();
         orphanage.push_orphan(first_orphan);
         orphanage.push_orphan(third_orphan);
         orphanage.push_orphan(second_orphan);
         orphanage.push_orphan(fourth_orphan);
 
-        assert_eq!(orphanage.queue.len(), 4);
+        assert_eq!(orphanage.len(), 4);
 
         orphanage.reap_orphans();
-        assert_eq!(orphanage.queue.len(), 2);
+        assert_eq!(orphanage.len(), 2);
         assert_eq!(first_waits.get(), 1);
         assert_eq!(second_waits.get(), 1);
         assert_eq!(third_waits.get(), 1);
         assert_eq!(fourth_waits.get(), 1);
 
         orphanage.reap_orphans();
-        assert_eq!(orphanage.queue.len(), 1);
+        assert_eq!(orphanage.len(), 1);
         assert_eq!(first_waits.get(), 1);
         assert_eq!(second_waits.get(), 2);
         assert_eq!(third_waits.get(), 2);
         assert_eq!(fourth_waits.get(), 1);
 
         orphanage.reap_orphans();
-        assert_eq!(orphanage.queue.len(), 0);
+        assert_eq!(orphanage.len(), 0);
         assert_eq!(first_waits.get(), 1);
         assert_eq!(second_waits.get(), 2);
         assert_eq!(third_waits.get(), 3);
