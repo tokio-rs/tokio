@@ -39,8 +39,8 @@ fn execute_single_task() {
 
 #[test]
 fn task_migrates() {
-    use std::sync::mpsc;
     use crate::sync::oneshot;
+    use std::sync::mpsc;
 
     let (p, mut w0, mut w1, ..) = pool!(2);
     let (tx1, rx1) = oneshot::channel();

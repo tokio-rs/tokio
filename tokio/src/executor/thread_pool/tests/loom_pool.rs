@@ -1,9 +1,9 @@
-use crate::spawn;
 use crate::executor::loom::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 use crate::executor::loom::sync::atomic::{AtomicBool, AtomicUsize};
 use crate::executor::loom::sync::{Arc, Mutex};
 use crate::executor::tests::loom_oneshot as oneshot;
 use crate::executor::thread_pool::ThreadPool;
+use crate::spawn;
 
 use std::future::Future;
 
