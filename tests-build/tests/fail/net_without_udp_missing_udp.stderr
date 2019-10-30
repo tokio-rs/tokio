@@ -1,7 +1,0 @@
-error[E0432]: unresolved import `tests_build::tokio_net::udp`
- --> $DIR/net_without_udp_missing_udp.rs:1:5
-  |
-1 | use tests_build::tokio_net::udp;
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `udp` in `tokio_net`
-
-For more information about this error, try `rustc --explain E0432`.
