@@ -42,7 +42,7 @@ jobs:
       env:
         LOOM_MAX_PREEMPTIONS: 2
         CI: 'True'
-      displayName: ${{ crate }} - cargo test --features ${{ feature }}
+      displayName: ${{ crate }} - cargo test --all-features
       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
 
     # Check each specified feature works properly
