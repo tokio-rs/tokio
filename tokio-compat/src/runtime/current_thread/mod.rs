@@ -84,5 +84,62 @@ pub use self::runtime::{Handle, RunError, Runtime};
 pub use tokio_02::executor::current_thread::TaskExecutor;
 // pub use tokio_executor_01::current_thread::run;
 
+use futures_01::future::Future as Future01;
+use futures_util::{compat::Future01CompatExt, FutureExt};
+use std::future::Future;
+
+/// Run the provided `futures` 0.1 future to completion using a runtime running on the current thread.
+///
+/// This first creates a new [`Runtime`], and calls [`Runtime::block_on`] with the provided future,
+/// which blocks the current thread until the provided future completes. It then calls
+/// [`Runtime::run`] to wait for any other spawned futures to resolve.
+pub fn block_on_all<F>(future: F) -> Result<F::Item, F::Error>
+where
+    F: Future01,
+{
+    block_on_all_std(future.compat())
+}
+
+/// Run the provided `std::future` future to completion using a runtime running on the current thread.
+///
+/// This first creates a new [`Runtime`], and calls [`Runtime::block_on`] with the provided future,
+/// which blocks the current thread until the provided future completes. It then calls
+/// [`Runtime::run`] to wait for any other spawned futures to resolve.
+pub fn block_on_all_std<F>(future: F) -> F::Output
+where
+    F: Future,
+{
+    let mut r = Runtime::new().expect("failed to start runtime on current thread");
+    let v = r.block_on_std(future);
+    r.run().expect("failed to resolve remaining futures");
+    v
+}
+
+/// Start a current-thread runtime using the supplied `futures` 0.1 future to bootstrap execution.
+///
+/// # Panics
+///
+/// This function panics if called from the context of an executor.
+pub fn run<F>(future: F)
+where
+    F: Future01<Item = (), Error = ()> + 'static,
+{
+    run_std(future.compat().map(|_| ()))
+}
+
+/// Start a current-thread runtime using the supplied `std::future` ture to bootstrap execution.
+///
+/// # Panics
+///
+/// This function panics if called from the context of an executor.
+pub fn run_std<F>(future: F)
+where
+    F: Future<Output = ()> + 'static,
+{
+    let mut r = Runtime::new().expect("failed to start runtime on current thread");
+    r.spawn_std(future);
+    r.run().expect("failed to resolve remaining futures");
+}
+
 #[cfg(test)]
 mod tests;
