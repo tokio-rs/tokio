@@ -78,11 +78,11 @@ use super::compat;
 
 mod builder;
 mod runtime;
+mod task_executor;
 
 pub use self::builder::Builder;
 pub use self::runtime::{Handle, RunError, Runtime};
-pub use tokio_02::executor::current_thread::TaskExecutor;
-// pub use tokio_executor_01::current_thread::run;
+pub use self::task_executor::TaskExecutor;
 
 use futures_01::future::Future as Future01;
 use futures_util::{compat::Future01CompatExt, FutureExt};
