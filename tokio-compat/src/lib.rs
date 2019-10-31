@@ -55,6 +55,12 @@
 //!     println!("20 ms have elapsed");
 //! });
 //! ```
+//!
+//! ## Feature Flags
+//!
+//! - `rt-current-thread`: enables the `current_thread` compatibilty runtime
+//! - `rt-full`: enables the `current_thread` and threadpool compatibility
+//!   runtimes (enabled by default)
 #[cfg(any(feature = "rt-current-thread", feature = "rt-full"))]
 pub mod runtime;
 #[cfg(feature = "rt-full")]
