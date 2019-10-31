@@ -109,4 +109,4 @@ pub mod current_thread;
 mod threadpool;
 
 #[cfg(feature = "rt-full")]
-pub use threadpool::{run, run_std, Builder, Runtime};
+pub use threadpool::{run, run_std, Builder, Runtime, TaskExecutor};
