@@ -59,9 +59,12 @@ fn tokio_01_timers_work() {
     let ran = future1_ran.clone();
     let future1 = futures_01::future::lazy(|| {
         let when = Instant::now() + Duration::from_millis(15);
-        tokio_01::timer::Delay::new(when)
+        tokio_01::timer::Delay::new(when).map(move |_| when)
     })
-    .map(move |_| ran.store(true, Ordering::SeqCst))
+    .map(move |when| {
+        ran.store(true, Ordering::SeqCst);
+        assert!(Instant::now() >= when);
+    })
     .map_err(|_| panic!("timer should work"));
 
     let future2_ran = Arc::new(AtomicBool::new(false));
@@ -70,6 +73,7 @@ fn tokio_01_timers_work() {
         let when = Instant::now() + Duration::from_millis(10);
         tokio_01::timer::Delay::new(when).compat().await.unwrap();
         ran.store(true, Ordering::SeqCst);
+        assert!(Instant::now() >= when);
     };
 
     let mut rt = Runtime::new().unwrap();

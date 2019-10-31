@@ -271,6 +271,7 @@ impl Builder {
             idle,
         };
 
+        // Set the tokio 0.1 executor to be used by the worker threads.
         let (compat_sender, sender_ready) = &*compat_sender;
         *compat_sender.write().unwrap() = Some(runtime.spawner());
         sender_ready.wait();
