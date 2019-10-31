@@ -6,8 +6,8 @@ use std::{
     io, thread,
     time::{Duration, Instant},
 };
-use tokio_executor::{current_thread::CurrentThread, park};
-use tokio_sync::oneshot;
+use tokio_02::executor::{current_thread::CurrentThread, park};
+use tokio_02::sync::oneshot;
 
 #[derive(Debug)]
 pub(super) struct Background {
@@ -29,7 +29,7 @@ pub(super) struct Now<N>(N);
 struct CompatPark<P>(P);
 
 impl Compat {
-    pub(super) fn spawn(clock: &tokio_timer::clock::Clock) -> io::Result<Self> {
+    pub(super) fn spawn(clock: &tokio_02::timer::clock::Clock) -> io::Result<Self> {
         let clock = clock_02::Clock::new_with_now(Now(clock.clone()));
 
         let reactor = reactor_01::Reactor::new()?;
@@ -65,7 +65,7 @@ impl Drop for Background {
     }
 }
 
-pub(super) fn spawn_err(new: tokio_executor::SpawnError) -> executor_01::SpawnError {
+pub(super) fn spawn_err(new: tokio_02::executor::SpawnError) -> executor_01::SpawnError {
     match new {
         _ if new.is_shutdown() => executor_01::SpawnError::shutdown(),
         _ if new.is_at_capacity() => executor_01::SpawnError::at_capacity(),
@@ -105,7 +105,7 @@ where
     }
 }
 
-impl clock_02::Now for Now<tokio_timer::clock::Clock> {
+impl clock_02::Now for Now<tokio_02::timer::clock::Clock> {
     fn now(&self) -> Instant {
         self.0.now()
     }

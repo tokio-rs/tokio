@@ -1,4 +1,4 @@
-use tokio_executor::{threadpool::Sender, Executor};
+use tokio_02::executor::{thread_pool::Spawner, Executor};
 use tokio_executor_01::{self as executor_01, Executor as Executor01};
 
 use futures_01::future::Future as Future01;
@@ -14,7 +14,7 @@ use std::pin::Pin;
 /// For more details, see the [module level](index.html) documentation.
 #[derive(Debug, Clone)]
 pub struct TaskExecutor {
-    pub(super) inner: super::CompatSender<Sender>,
+    pub(super) inner: super::CompatSpawner<Spawner>,
 }
 
 impl TaskExecutor {
@@ -53,8 +53,7 @@ impl TaskExecutor {
     where
         F: Future01<Item = (), Error = ()> + Send + 'static,
     {
-        let future = Box::pin(future.compat().map(|_| ()));
-        self.inner.0.spawn(future).unwrap();
+        self.spawn_std(Box::pin(future.compat().map(|_| ())));
     }
 
     /// Spawn a `std::future` future onto the Tokio runtime.
@@ -92,7 +91,8 @@ impl TaskExecutor {
     where
         F: Future<Output = ()> + Send + 'static,
     {
-        self.inner.0.spawn(future).unwrap();
+        let idle = self.inner.idle.reserve();
+        self.inner.inner.spawn(idle.with(future));
     }
 }
 
@@ -100,25 +100,17 @@ impl Executor for TaskExecutor {
     fn spawn(
         &mut self,
         future: Pin<Box<dyn Future<Output = ()> + Send>>,
-    ) -> Result<(), tokio_executor::SpawnError> {
-        self.inner.0.spawn(future)
-    }
-
-    fn status(&self) -> Result<(), tokio_executor::SpawnError> {
-        self.inner.0.status()
+    ) -> Result<(), tokio_02::executor::SpawnError> {
+        Executor::spawn(&mut self.inner, future)
     }
 }
 
-impl<T> tokio_executor::TypedExecutor<T> for TaskExecutor
+impl<T> tokio_02::executor::TypedExecutor<T> for TaskExecutor
 where
     T: Future<Output = ()> + Send + 'static,
 {
-    fn spawn(&mut self, future: T) -> Result<(), tokio_executor::SpawnError> {
-        self.inner.0.spawn(Box::pin(future))
-    }
-
-    fn status(&self) -> Result<(), tokio_executor::SpawnError> {
-        Executor::status(&self.inner.0)
+    fn spawn(&mut self, future: T) -> Result<(), tokio_02::executor::SpawnError> {
+        Executor::spawn(&mut self.inner, Box::pin(future))
     }
 }
 
@@ -127,11 +119,7 @@ impl Executor01 for TaskExecutor {
         &mut self,
         future: Box<dyn Future01<Item = (), Error = ()> + Send>,
     ) -> Result<(), executor_01::SpawnError> {
-        self.inner.spawn(future)
-    }
-
-    fn status(&self) -> Result<(), executor_01::SpawnError> {
-        self.inner.status()
+        Executor01::spawn(&mut self.inner, future)
     }
 }
 
@@ -141,9 +129,5 @@ where
 {
     fn spawn(&mut self, future: T) -> Result<(), executor_01::SpawnError> {
         executor_01::TypedExecutor::spawn(&mut self.inner, future)
-    }
-
-    fn status(&self) -> Result<(), executor_01::SpawnError> {
-        Executor01::status(&self.inner)
     }
 }

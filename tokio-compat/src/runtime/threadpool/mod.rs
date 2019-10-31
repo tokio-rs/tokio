@@ -1,5 +1,6 @@
 mod background;
 mod builder;
+mod idle;
 mod task_executor;
 pub use builder::Builder;
 pub use task_executor::TaskExecutor;
@@ -9,12 +10,12 @@ use background::Background;
 
 use futures_01::future::Future as Future01;
 use futures_util::{compat::Future01CompatExt, future::FutureExt};
-use std::{future::Future, io};
-use tokio_executor::enter;
-use tokio_executor::threadpool::{Sender, ThreadPool};
+use std::{future::Future, io, pin::Pin};
+use tokio_02::executor::enter;
+use tokio_02::executor::thread_pool::{Spawner, ThreadPool};
+use tokio_02::net::driver;
+use tokio_02::timer::timer;
 use tokio_executor_01 as executor_01;
-use tokio_net::driver;
-use tokio_timer::timer;
 
 /// A thread pool runtime that can run tasks that use both `tokio` 0.1 and
 /// `tokio` 0.2 APIs.
@@ -29,6 +30,8 @@ use tokio_timer::timer;
 #[derive(Debug)]
 pub struct Runtime {
     inner: Option<Inner>,
+    idle: idle::Idle,
+    idle_rx: tokio_02::sync::mpsc::Receiver<()>,
 }
 
 #[derive(Debug)]
@@ -55,7 +58,10 @@ struct Inner {
 }
 
 #[derive(Clone, Debug)]
-struct CompatSender<S>(S);
+struct CompatSpawner<S> {
+    inner: S,
+    idle: idle::Idle,
+}
 
 // ===== impl Runtime =====
 
@@ -212,7 +218,7 @@ impl Runtime {
     /// // use `executor_handle`
     /// ```
     pub fn executor(&self) -> TaskExecutor {
-        let inner = CompatSender(self.inner().pool.sender().clone());
+        let inner = self.spawner();
         TaskExecutor { inner }
     }
 
@@ -241,7 +247,7 @@ impl Runtime {
     ///        Ok(())
     ///    }));
     ///
-    ///    rt.shutdown_on_idle();
+    ///     rt.shutdown_on_idle();
     /// }
     /// ```
     ///
@@ -253,8 +259,7 @@ impl Runtime {
     where
         F: Future01<Item = (), Error = ()> + Send + 'static,
     {
-        self.inner().pool.spawn(future.compat().map(|_| ()));
-        self
+        self.spawn_std(future.compat().map(|_| ()))
     }
 
     /// Spawn a `std::future` future onto the Tokio runtime.
@@ -281,7 +286,7 @@ impl Runtime {
     ///        println!("now running on a worker thread");
     ///    });
     ///
-    ///    rt.shutdown_on_idle();
+    ///     rt.shutdown_on_idle();
     /// }
     /// ```
     ///
@@ -293,7 +298,8 @@ impl Runtime {
     where
         F: Future<Output = ()> + Send + 'static,
     {
-        self.inner().pool.spawn(future);
+        let idle = self.idle.reserve();
+        self.inner().pool.spawn(idle.with(future));
         self
     }
 
@@ -337,16 +343,12 @@ impl Runtime {
         let bg = &self.inner().background;
         let trace = &self.inner().trace;
 
-        tokio_executor::with_default(&mut self.inner().pool.sender(), || {
-            executor_01::with_default(
-                &mut CompatSender(self.inner().pool.sender()),
-                &mut old_entered,
-                |_old_entered| {
-                    let _reactor = driver::set_default(bg.reactor());
-                    let _timer = timer::set_default(bg.timer());
-                    tracing_core::dispatcher::with_default(trace, || entered.block_on(future))
-                },
-            )
+        tokio_02::executor::with_default(&mut self.spawner_ref(), || {
+            executor_01::with_default(&mut self.spawner_ref(), &mut old_entered, |_old_entered| {
+                let _reactor = driver::set_default(bg.reactor());
+                let _timer = timer::set_default(bg.timer());
+                tracing_core::dispatcher::with_default(trace, || entered.block_on(future))
+            })
         })
     }
 
@@ -372,6 +374,7 @@ impl Runtime {
     ///     .unwrap();
     ///
     /// // Use the runtime...
+    /// # rt.spawn_std(async {});
     ///
     /// // Shutdown the runtime
     /// rt.shutdown_on_idle();
@@ -379,10 +382,24 @@ impl Runtime {
     ///
     /// [mod]: index.html
     pub fn shutdown_on_idle(mut self) {
-        let mut e = tokio_executor::enter().unwrap();
+        use futures_util::stream::StreamExt;
+        let mut e = tokio_02::executor::enter().unwrap();
 
-        let inner = self.inner.take().unwrap();
-        e.block_on(inner.pool.shutdown_on_idle());
+        e.block_on(self.idle_rx.next());
+    }
+
+    fn spawner(&self) -> CompatSpawner<Spawner> {
+        CompatSpawner {
+            inner: self.inner().pool.spawner().clone(),
+            idle: self.idle.clone(),
+        }
+    }
+
+    fn spawner_ref(&self) -> CompatSpawner<&'_ Spawner> {
+        CompatSpawner {
+            inner: self.inner().pool.spawner(),
+            idle: self.idle.clone(),
+        }
     }
 
     fn inner(&self) -> &Inner {
@@ -390,58 +407,64 @@ impl Runtime {
     }
 }
 
-fn translate_spawn_err(new: tokio_executor::SpawnError) -> executor_01::SpawnError {
-    match new {
-        _ if new.is_shutdown() => executor_01::SpawnError::shutdown(),
-        _ if new.is_at_capacity() => executor_01::SpawnError::at_capacity(),
-        e => unreachable!("weird spawn error {:?}", e),
+impl tokio_02::executor::Executor for CompatSpawner<&'_ Spawner> {
+    fn spawn(
+        &mut self,
+        future: Pin<Box<dyn Future<Output = ()> + Send>>,
+    ) -> Result<(), tokio_02::executor::SpawnError> {
+        let idle = self.idle.reserve();
+        self.inner.spawn(idle.with(future));
+        Ok(())
     }
 }
 
-impl executor_01::Executor for CompatSender<&'_ Sender> {
+impl executor_01::Executor for CompatSpawner<&'_ Spawner> {
     fn spawn(
         &mut self,
         future: Box<dyn futures_01::Future<Item = (), Error = ()> + Send>,
     ) -> Result<(), executor_01::SpawnError> {
-        self.0
-            .spawn(future.compat().map(|_| ()))
-            .map_err(translate_spawn_err)
-    }
-
-    fn status(&self) -> Result<(), executor_01::SpawnError> {
-        tokio_executor::Executor::status(&self.0).map_err(translate_spawn_err)
+        let future = future.compat().map(|_| ());
+        let idle = self.idle.reserve();
+        self.inner.spawn(idle.with(future));
+        Ok(())
     }
 }
 
-impl executor_01::Executor for CompatSender<Sender> {
+impl tokio_02::executor::Executor for CompatSpawner<Spawner> {
+    fn spawn(
+        &mut self,
+        future: Pin<Box<dyn Future<Output = ()> + Send>>,
+    ) -> Result<(), tokio_02::executor::SpawnError> {
+        let idle = self.idle.reserve();
+        self.inner.spawn(idle.with(future));
+        Ok(())
+    }
+}
+
+impl executor_01::Executor for CompatSpawner<Spawner> {
     fn spawn(
         &mut self,
         future: Box<dyn futures_01::Future<Item = (), Error = ()> + Send>,
     ) -> Result<(), executor_01::SpawnError> {
-        self.0
-            .spawn(future.compat().map(|_| ()))
-            .map_err(translate_spawn_err)
-    }
-
-    fn status(&self) -> Result<(), executor_01::SpawnError> {
-        tokio_executor::Executor::status(&self.0).map_err(translate_spawn_err)
+        let future = future.compat().map(|_| ());
+        let idle = self.idle.reserve();
+        self.inner.spawn(idle.with(future));
+        Ok(())
     }
 }
 
-impl<T> executor_01::TypedExecutor<T> for CompatSender<Sender>
+impl<T> executor_01::TypedExecutor<T> for CompatSpawner<Spawner>
 where
     T: Future01<Item = (), Error = ()> + Send + 'static,
 {
     fn spawn(&mut self, future: T) -> Result<(), executor_01::SpawnError> {
-        let future = Box::pin(future.compat().map(|_| ()));
+        let idle = self.idle.reserve();
+        let future = Box::pin(idle.with(future.compat().map(|_| ())));
         // Use the `tokio` 0.2 `TypedExecutor` impl so we don't have to box the
         // future twice (once to spawn it using `Executor01::spawn` and a second
         // time to pin the compat future).
-        self.0.spawn(future).map_err(compat::spawn_err)
-    }
-
-    fn status(&self) -> Result<(), executor_01::SpawnError> {
-        executor_01::Executor::status(self)
+        self.inner.spawn(future);
+        Ok(())
     }
 }
 

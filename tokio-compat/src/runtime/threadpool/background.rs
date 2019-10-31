@@ -1,11 +1,11 @@
 //! Temporary reactor + timer that runs on a background thread. This it to make
 //! `block_on` work.
 
-use tokio_executor::current_thread::CurrentThread;
-use tokio_net::driver::{self, Reactor};
-use tokio_sync::oneshot;
-use tokio_timer::clock::Clock;
-use tokio_timer::timer::{self, Timer};
+use tokio_02::executor::current_thread::CurrentThread;
+use tokio_02::net::driver::{self, Reactor};
+use tokio_02::sync::oneshot;
+use tokio_02::timer::clock::Clock;
+use tokio_02::timer::timer::{self, Timer};
 
 use std::{io, thread};
 
@@ -23,7 +23,7 @@ pub(crate) fn spawn(clock: &Clock) -> io::Result<Background> {
     let reactor = Reactor::new()?;
     let reactor_handle = reactor.handle();
 
-    let timer = Timer::new_with_now(reactor, clock);
+    let timer = Timer::new_with_clock(reactor, clock);
     let timer_handle = timer.handle();
 
     let (shutdown_tx, shutdown_rx) = oneshot::channel();

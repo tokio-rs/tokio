@@ -3,13 +3,13 @@ use super::{
     Builder,
 };
 
-use tokio_executor::current_thread::Handle as ExecutorHandle;
-use tokio_executor::current_thread::{self, CurrentThread};
+use tokio_02::executor::current_thread::Handle as ExecutorHandle;
+use tokio_02::executor::current_thread::{self, CurrentThread};
+use tokio_02::net::driver::{self, Reactor};
+use tokio_02::timer::clock::{self, Clock};
+use tokio_02::timer::timer::{self, Timer};
 use tokio_executor_01 as executor_01;
-use tokio_net::driver::{self, Reactor};
 use tokio_reactor_01 as reactor_01;
-use tokio_timer::clock::{self, Clock};
-use tokio_timer::timer::{self, Timer};
 use tokio_timer_02 as timer_02;
 
 use futures_01::future::Future as Future01;
@@ -69,7 +69,7 @@ impl Handle {
     ///
     /// This function panics if the spawn fails. Failure occurs if the `CurrentThread`
     /// instance of the `Handle` does not exist anymore.
-    pub fn spawn_std<F>(&self, future: F) -> Result<(), tokio_executor::SpawnError>
+    pub fn spawn_std<F>(&self, future: F) -> Result<(), tokio_02::executor::SpawnError>
     where
         F: Future<Output = ()> + Send + 'static,
     {
@@ -89,11 +89,11 @@ impl Handle {
     }
 }
 
-impl<T> tokio_executor::TypedExecutor<T> for Handle
+impl<T> tokio_02::executor::TypedExecutor<T> for Handle
 where
     T: Future<Output = ()> + Send + 'static,
 {
-    fn spawn(&mut self, future: T) -> Result<(), tokio_executor::SpawnError> {
+    fn spawn(&mut self, future: T) -> Result<(), tokio_02::executor::SpawnError> {
         Handle::spawn_std(self, future)
     }
 }
@@ -325,7 +325,7 @@ impl Runtime {
                         // to run the provided future, another to install as the default
                         // one). We use the fake one here as the default one.
                         let mut default_executor = current_thread::TaskExecutor::current();
-                        tokio_executor::with_default(&mut default_executor, || f(executor))
+                        tokio_02::executor::with_default(&mut default_executor, || f(executor))
                     })
                 })
             })
@@ -339,11 +339,11 @@ impl executor_01::Executor for CompatExec {
         future: Box<dyn futures_01::Future<Item = (), Error = ()> + Send>,
     ) -> Result<(), executor_01::SpawnError> {
         let future = future.compat().map(|_| ());
-        tokio_executor::Executor::spawn(&mut self.inner, Box::pin(future))
+        tokio_02::executor::Executor::spawn(&mut self.inner, Box::pin(future))
             .map_err(compat::spawn_err)
     }
 
     fn status(&self) -> Result<(), executor_01::SpawnError> {
-        tokio_executor::Executor::status(&self.inner).map_err(compat::spawn_err)
+        tokio_02::executor::Executor::status(&self.inner).map_err(compat::spawn_err)
     }
 }

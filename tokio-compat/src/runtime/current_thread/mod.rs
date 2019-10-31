@@ -81,8 +81,8 @@ mod runtime;
 
 pub use self::builder::Builder;
 pub use self::runtime::{Handle, RunError, Runtime};
-pub use tokio_executor::current_thread::spawn;
-pub use tokio_executor::current_thread::TaskExecutor;
+pub use tokio_02::executor::current_thread::TaskExecutor;
+// pub use tokio_executor_01::current_thread::run;
 
 #[cfg(test)]
 mod tests;
