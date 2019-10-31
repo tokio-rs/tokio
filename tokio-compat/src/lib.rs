@@ -36,7 +36,6 @@
 //!
 //! ```rust
 //! use std::time::{Duration, Instant};
-//! use futures_01::future::lazy;
 //! use tokio_compat::prelude::*;
 //!
 //! tokio_compat::run_std(async {
