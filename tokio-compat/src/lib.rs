@@ -61,6 +61,17 @@
 //! - `rt-current-thread`: enables the `current_thread` compatibilty runtime
 //! - `rt-full`: enables the `current_thread` and threadpool compatibility
 //!   runtimes (enabled by default)
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    rust_2018_idioms,
+    unreachable_pub
+)]
+#![deny(intra_doc_link_resolution_failure)]
+#![doc(test(
+    no_crate_inject,
+    attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
+))]
 #[cfg(any(feature = "rt-current-thread", feature = "rt-full"))]
 pub mod runtime;
 #[cfg(feature = "rt-full")]

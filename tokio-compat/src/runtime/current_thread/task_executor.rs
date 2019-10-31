@@ -38,6 +38,7 @@ impl TaskExecutor {
         self.spawn_local_std(future).map_err(map_spawn_err)
     }
 
+    /// Spawn a `std::future` future onto the current `CurrentThread` instance.
     pub fn spawn_local_std(
         &mut self,
         future: Pin<Box<dyn Future<Output = ()>>>,

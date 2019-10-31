@@ -2,7 +2,10 @@ mod background;
 mod builder;
 mod idle;
 mod task_executor;
+
+#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use builder::Builder;
+#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use task_executor::TaskExecutor;
 
 use super::compat;
@@ -86,7 +89,7 @@ struct CompatSpawner<S> {
 /// use futures_01::{Future as Future01, Stream as Stream01};
 /// use tokio_01::net::TcpListener;
 ///
-/// # fn process<T>(_: T) -> Box<Future01<Item = (), Error = ()> + Send> {
+/// # fn process<T>(_: T) -> Box<dyn Future01<Item = (), Error = ()> + Send> {
 /// # unimplemented!();
 /// # }
 /// # fn dox() {
@@ -137,7 +140,7 @@ where
 /// use futures_01::{Future as Future01, Stream as Stream01};
 /// use tokio_01::net::TcpListener;
 ///
-/// # fn process<T>(_: T) -> Box<Future01<Item = (), Error = ()> + Send> {
+/// # fn process<T>(_: T) -> Box<dyn Future01<Item = (), Error = ()> + Send> {
 /// # unimplemented!();
 /// # }
 /// # fn dox() {
