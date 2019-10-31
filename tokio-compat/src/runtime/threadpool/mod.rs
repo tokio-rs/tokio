@@ -391,6 +391,44 @@ impl Runtime {
         e.block_on(self.idle_rx.next());
     }
 
+    /// Signals the runtime to shutdown immediately.
+    ///
+    /// Blocks the current thread until the shutdown operation has completed.
+    /// This function will forcibly shutdown the runtime, causing any
+    /// in-progress work to become canceled.
+    ///
+    /// The shutdown steps are:
+    ///
+    /// * Drain any scheduled work queues.
+    /// * Drop any futures that have not yet completed.
+    /// * Drop the reactor.
+    ///
+    /// Once the reactor has dropped, any outstanding I/O resources bound to
+    /// that reactor will no longer function. Calling any method on them will
+    /// result in an error.
+    ///
+    /// See [module level][mod] documentation for more details.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio_compat::runtime::Runtime;
+    ///
+    /// let rt = Runtime::new()
+    ///     .unwrap();
+    ///
+    /// // Use the runtime...
+    ///
+    /// // Shutdown the runtime
+    /// rt.shutdown_now();
+    /// ```
+    ///
+    /// [mod]: index.html
+    #[allow(warnings)]
+    pub fn shutdown_now(mut self) {
+        self.inner.unwrap().pool.shutdown_now();
+    }
+
     fn spawner(&self) -> CompatSpawner<Spawner> {
         CompatSpawner {
             inner: self.inner().pool.spawner().clone(),
