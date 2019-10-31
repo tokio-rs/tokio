@@ -175,7 +175,10 @@ where
         #[cfg(feature = "rt-current-thread")]
         State::CurrentThread(current_thread_ptr) => {
             let current_thread = unsafe { &*current_thread_ptr };
-            current_thread.spawn_background(future);
+
+            // Safety: The `CurrentThread` value set the thread-local (same
+            // thread).
+            unsafe { current_thread.spawn_background(future); }
         }
         State::Empty => panic!("must be called from the context of Tokio runtime"),
     })

@@ -222,12 +222,16 @@ impl Scheduler {
         }
     }
 
-    pub(crate) fn spawn_background<F>(&self, future: F)
+    /// # Safety
+    ///
+    /// Must be called from the same thread that holds the `CurrentThread`
+    /// value.
+    pub(super) unsafe fn spawn_background<F>(&self, future: F)
     where
         F: Future<Output = ()> + Send + 'static,
     {
         let task = task::background(future);
-        unsafe { self.schedule_local(task); }
+        self.schedule_local(task);
     }
 
     unsafe fn schedule_local(&self, task: Task<Self>) {
@@ -299,7 +303,11 @@ impl Executor for &Scheduler {
         &mut self,
         future: std::pin::Pin<Box<dyn Future<Output = ()> + Send>>,
     ) -> Result<(), crate::executor::SpawnError> {
-        Scheduler::spawn_background(self, future);
+        // Safety: This implementation should only be called by `global.rs` from
+        // the thread local.
+        //
+        // TODO: Delete this implementation.
+        unsafe { Scheduler::spawn_background(self, future); }
         Ok(())
     }
 }
