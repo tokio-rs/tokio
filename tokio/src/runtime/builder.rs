@@ -33,8 +33,8 @@ use std::{fmt, io};
 ///     let runtime = Builder::new()
 ///         .clock(Clock::system())
 ///         .num_threads(4)
-///         .name("my-custom-name")
-///         .stack_size(3 * 1024 * 1024)
+///         .thread_name("my-custom-name")
+///         .thread_stack_size(3 * 1024 * 1024)
 ///         .build()
 ///         .unwrap();
 ///
@@ -162,7 +162,7 @@ impl Builder {
     ///
     /// # pub fn main() {
     /// let rt = runtime::Builder::new()
-    ///     .stack_size(32 * 1024)
+    ///     .thread_stack_size(32 * 1024)
     ///     .build();
     /// # }
     /// ```
@@ -237,7 +237,7 @@ impl Builder {
     /// ```
     /// use tokio::runtime::Builder;
     ///
-    /// let rt = Builder::new().build().unwrap();
+    /// let mut rt = Builder::new().build().unwrap();
     ///
     /// rt.block_on(async {
     ///     println!("Hello from the Tokio runtime");

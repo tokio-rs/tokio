@@ -83,7 +83,7 @@
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Create the runtime
-//!     let rt = Runtime::new()?;
+//!     let mut rt = Runtime::new()?;
 //!
 //!     // Spawn the root task
 //!     rt.block_on(async {
