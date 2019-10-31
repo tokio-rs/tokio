@@ -7,7 +7,6 @@ use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
 use std::mem::ManuallyDrop;
-use std::ptr::NonNull;
 use std::sync::{Arc, Mutex};
 use std::task::{RawWaker, RawWakerVTable, Waker};
 use std::time::Duration;
@@ -204,8 +203,7 @@ impl Scheduler {
                 }
             };
 
-            let executor = NonNull::from(self).cast::<()>();
-            if let Some(task) = task.run(&mut || Some(executor)) {
+            if let Some(task) = task.run(&mut || Some(self.into())) {
                 unsafe { self.schedule_local(task); }
             }
         }

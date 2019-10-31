@@ -2,8 +2,6 @@ use crate::executor::task::{self, Task};
 use crate::executor::tests::mock_schedule::{Noop, NOOP_SCHEDULE};
 use crate::executor::thread_pool::{queue, LOCAL_QUEUE_CAPACITY};
 
-use std::ptr::NonNull;
-
 macro_rules! assert_pop {
     ($q:expr, $expect:expr) => {
         assert_eq!(
@@ -254,7 +252,7 @@ fn num(task: Task<Noop>) -> u32 {
     use std::task::Context;
     use std::task::Poll::*;
 
-    assert!(task.run(&mut || Some(NonNull::from(&NOOP_SCHEDULE).cast::<()>())).is_none());
+    assert!(task.run(&mut || Some(From::from(&NOOP_SCHEDULE))).is_none());
 
     // Find the task that completed
     TASKS.with(|c| {

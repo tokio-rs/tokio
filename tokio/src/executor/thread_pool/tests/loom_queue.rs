@@ -5,7 +5,6 @@ use crate::executor::thread_pool::queue;
 use loom::thread;
 
 use std::cell::Cell;
-use std::ptr::NonNull;
 use std::rc::Rc;
 
 #[test]
@@ -26,7 +25,7 @@ fn multi_worker() {
 
             // Try to work
             while let Some(task) = q.pop_local_first() {
-                assert!(task.run(&mut || Some(NonNull::from(&NOOP_SCHEDULE).cast::<()>())).is_none());
+                assert!(task.run(&mut || Some(From::from(&NOOP_SCHEDULE))).is_none());
                 let r = rem.get();
                 assert!(r > 0);
                 rem.set(r - 1);
@@ -34,7 +33,7 @@ fn multi_worker() {
 
             // Try to steal
             if let Some(task) = q.steal(0) {
-                assert!(task.run(&mut || Some(NonNull::from(&NOOP_SCHEDULE).cast::<()>())).is_none());
+                assert!(task.run(&mut || Some(From::from(&NOOP_SCHEDULE))).is_none());
                 let r = rem.get();
                 assert!(r > 0);
                 rem.set(r - 1);

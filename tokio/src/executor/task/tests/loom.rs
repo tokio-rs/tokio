@@ -8,15 +8,14 @@ use loom::sync::atomic::AtomicBool;
 use loom::sync::atomic::Ordering::{Acquire, Release};
 use loom::thread;
 use std::future::Future;
-use std::ptr::NonNull;
 
 #[test]
 fn create_drop_join_handle() {
     loom::model(|| {
-        let (task, join_handle) = task::joinable::<_, LoomSchedule>(async { "hello" });
+        let (task, join_handle) = task::joinable(async { "hello" });
 
         let schedule = LoomSchedule::new();
-        let schedule = &mut || Some(NonNull::from(&schedule).cast::<()>());
+        let schedule = &mut || Some(From::from(&schedule));
 
         let th = thread::spawn(move || {
             drop(join_handle);
@@ -35,10 +34,10 @@ fn poll_drop_handle_then_drop() {
     use std::task::Poll;
 
     loom::model(|| {
-        let (task, mut join_handle) = task::joinable::<_, LoomSchedule>(async { "hello" });
+        let (task, mut join_handle) = task::joinable(async { "hello" });
 
         let schedule = LoomSchedule::new();
-        let schedule = &mut || Some(NonNull::from(&schedule).cast::<()>());
+        let schedule = &mut || Some(From::from(&schedule));
 
         let th = thread::spawn(move || {
             block_on(poll_fn(|cx| {
@@ -56,10 +55,10 @@ fn poll_drop_handle_then_drop() {
 #[test]
 fn join_output() {
     loom::model(|| {
-        let (task, join_handle) = task::joinable::<_, LoomSchedule>(async { "hello world" });
+        let (task, join_handle) = task::joinable(async { "hello world" });
 
         let schedule = LoomSchedule::new();
-        let schedule = &mut || Some(NonNull::from(&schedule).cast::<()>());
+        let schedule = &mut || Some(From::from(&schedule));
 
         let th = thread::spawn(move || {
             let out = assert_ok!(block_on(join_handle));
@@ -74,7 +73,7 @@ fn join_output() {
 #[test]
 fn wake_by_ref() {
     loom::model(|| {
-        let (task, join_handle) = task::joinable::<_, LoomSchedule>(gated(2, true, false));
+        let (task, join_handle) = task::joinable(gated(2, true, false));
 
         let schedule = LoomSchedule::new();
         let schedule = &schedule;
@@ -91,7 +90,7 @@ fn wake_by_ref() {
 #[test]
 fn wake_by_val() {
     loom::model(|| {
-        let (task, join_handle) = task::joinable::<_, LoomSchedule>(gated(2, true, true));
+        let (task, join_handle) = task::joinable(gated(2, true, true));
 
         let schedule = LoomSchedule::new();
         let schedule = &schedule;
@@ -108,7 +107,7 @@ fn wake_by_val() {
 #[test]
 fn release_remote() {
     loom::model(|| {
-        let (task, join_handle) = task::joinable::<_, LoomSchedule>(gated(1, false, true));
+        let (task, join_handle) = task::joinable(gated(1, false, true));
 
         let s1 = LoomSchedule::new();
         let s2 = LoomSchedule::new();
@@ -116,12 +115,12 @@ fn release_remote() {
         // Join handle
         let th = join_one_task(join_handle);
 
-        let task = match task.run(&mut || Some(NonNull::from(&s1).cast::<()>())) {
+        let task = match task.run(&mut || Some(From::from(&s1))) {
             Some(task) => task,
             None => s1.recv().expect("released!"),
         };
 
-        assert_none!(task.run(&mut || Some(NonNull::from(&s2).cast::<()>())));
+        assert_none!(task.run(&mut || Some(From::from(&s2))));
         assert_none!(s1.recv());
 
         assert_ok!(th.join().unwrap());
@@ -143,7 +142,7 @@ fn shutdown_task_before_poll() {
 #[test]
 fn shutdown_from_list_after_poll() {
     loom::model(|| {
-        let (task, join_handle) = task::joinable::<_, LoomSchedule>(gated(1, false, false));
+        let (task, join_handle) = task::joinable(gated(1, false, false));
 
         let s1 = LoomSchedule::new();
 
@@ -153,7 +152,7 @@ fn shutdown_from_list_after_poll() {
         // Join handle
         let th = join_two_tasks(join_handle);
 
-        match task.run(&mut || Some(NonNull::from(&s1).cast::<()>())) {
+        match task.run(&mut || Some(From::from(&s1))) {
             Some(task) => {
                 // always drain the list before calling shutdown on tasks
                 list.shutdown();
@@ -178,14 +177,14 @@ fn shutdown_from_list_after_poll() {
 #[test]
 fn shutdown_from_queue_after_poll() {
     loom::model(|| {
-        let (task, join_handle) = task::joinable::<_, LoomSchedule>(gated(1, false, false));
+        let (task, join_handle) = task::joinable(gated(1, false, false));
 
         let s1 = LoomSchedule::new();
 
         // Join handle
         let th = join_two_tasks(join_handle);
 
-        let task = match task.run(&mut || Some(NonNull::from(&s1).cast::<()>())) {
+        let task = match task.run(&mut || Some(From::from(&s1))) {
             Some(task) => task,
             None => assert_some!(s1.recv()),
         };
@@ -240,7 +239,7 @@ fn work(schedule: &LoomSchedule) {
         let mut task = Some(task);
 
         while let Some(t) = task.take() {
-            task = t.run(&mut || Some(NonNull::from(schedule).cast::<()>()));
+            task = t.run(&mut || Some(From::from(schedule)));
         }
     }
 }

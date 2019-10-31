@@ -5,7 +5,6 @@ use crate::executor::thread_pool::{current, Owned, Shared};
 
 use std::cell::Cell;
 use std::ops::{Deref, DerefMut};
-use std::ptr::NonNull;
 use std::time::Duration;
 
 // The Arc<Box<_>> is needed because loom doesn't support Arc<T> where T: !Sized
@@ -511,7 +510,7 @@ where
             if gone.get() {
                 None
             } else {
-                Some(NonNull::from(executor).cast::<()>())
+                Some(executor.into())
             }
         });
         if gone.get() {
