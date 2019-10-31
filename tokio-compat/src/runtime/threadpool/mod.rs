@@ -426,7 +426,7 @@ impl Runtime {
     /// [mod]: index.html
     #[allow(warnings)]
     pub fn shutdown_now(mut self) {
-        self.inner.unwrap().pool.shutdown_now();
+        self.inner.take().unwrap().pool.shutdown_now();
     }
 
     fn spawner(&self) -> CompatSpawner<Spawner> {
