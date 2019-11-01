@@ -15,7 +15,6 @@ use std::time::Duration;
 
 thread_local!(static FOO: Cell<u32> = Cell::new(0));
 
-
 #[test]
 fn single_thread() {
     // No panic when starting a runtime w/ a single thread
