@@ -20,6 +20,11 @@ jobs:
       # rust_version: stable
       rust_version: ${{ parameters.rust }}
 
+  - script: cargo install cargo-hack
+    displayName: Install cargo-hack
+    # FIXME(taiki-e): many features of current cargo-hack are not available on windows: https://github.com/taiki-e/cargo-hack/issues/3
+    condition: not(eq(variables['Agent.OS'], 'Windows_NT'))
+
   - template: azure-is-release.yml
 
   - ${{ each crate in parameters.crates }}:
@@ -28,17 +33,28 @@ jobs:
       env:
         LOOM_MAX_PREEMPTIONS: 2
         CI: 'True'
-      displayName: ${{ crate.key }} - cargo test
-      workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
+      displayName: ${{ crate }} - cargo test
+      workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
 
-    # Run with each specified feature
-    - ${{ each feature in crate.value }}:
-      - script: cargo test --no-default-features --features ${{ feature }}
-        env:
-          LOOM_MAX_PREEMPTIONS: 2
-          CI: 'True'
-        displayName: ${{ crate.key }} - cargo test --features ${{ feature }}
-        workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
+    # Run with all crate features
+    - script: cargo test --all-features
+      env:
+        LOOM_MAX_PREEMPTIONS: 2
+        CI: 'True'
+      displayName: ${{ crate }} - cargo test --all-features
+      workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
+
+    # Check each specified feature works properly
+    # * --each-feature - run for each feature which includes --no-default-features and default features of package
+    # * --no-dev-deps - build without dev-dependencies to avoid https://github.com/rust-lang/cargo/issues/4866
+    - script: cargo hack check --each-feature --no-dev-deps
+      env:
+        LOOM_MAX_PREEMPTIONS: 2
+        CI: 'True'
+      displayName: ${{ crate }} - cargo hack check --each-feature
+      workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
+      # FIXME(taiki-e): many features of current cargo-hack are not available on windows: https://github.com/taiki-e/cargo-hack/issues/3
+      condition: not(eq(variables['Agent.OS'], 'Windows_NT'))
 
   - template: azure-patch-crates.yml
 
@@ -48,14 +64,25 @@ jobs:
       env:
         LOOM_MAX_PREEMPTIONS: 2
         CI: 'True'
-      displayName: ${{ crate.key }} - cargo test
-      workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
+      displayName: ${{ crate }} - cargo test
+      workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
 
-    # Run with each specified feature
-    - ${{ each feature in crate.value }}:
-      - script: cargo test --no-default-features --features ${{ feature }}
-        env:
-          LOOM_MAX_PREEMPTIONS: 2
-          CI: 'True'
-        displayName: ${{ crate.key }} - cargo test --features ${{ feature }}
-        workingDirectory: $(Build.SourcesDirectory)/${{ crate.key }}
+    # Run with all crate features
+    - script: cargo test --all-features
+      env:
+        LOOM_MAX_PREEMPTIONS: 2
+        CI: 'True'
+      displayName: ${{ crate }} - cargo test --all-features
+      workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
+
+    # Check each specified feature works properly
+    # * --each-feature - run for each feature which includes --no-default-features and default features of package
+    # * --no-dev-deps - build without dev-dependencies to avoid https://github.com/rust-lang/cargo/issues/4866
+    - script: cargo hack check --each-feature --no-dev-deps
+      env:
+        LOOM_MAX_PREEMPTIONS: 2
+        CI: 'True'
+      displayName: ${{ crate }} - cargo hack check --each-feature
+      workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
+      # FIXME(taiki-e): many features of current cargo-hack are not available on windows: https://github.com/taiki-e/cargo-hack/issues/3
+      condition: not(eq(variables['Agent.OS'], 'Windows_NT'))

@@ -36,19 +36,24 @@ default = [
   "timer",
 ]
 
-blocking = []
-fs = ["blocking"]
+executor-core = []
+blocking = ["executor-core", "sync"]
+fs = ["blocking", "io-traits"]
 io-traits = ["bytes", "iovec"]
 io-util = ["io-traits", "pin-project", "memchr"]
 io = ["io-traits", "io-util"]
 macros = ["tokio-macros"]
 net-full = ["tcp", "udp", "uds"]
-net-driver = ["mio", "blocking", "lazy_static"]
+net-driver = ["io-traits", "mio", "blocking", "lazy_static"]
 rt-current-thread = [
+  "executor-core",
   "crossbeam-channel",
   "timer",
+  "sync",
+  "net-driver",
 ]
 rt-full = [
+  "executor-core",
   "macros",
   "num_cpus",
   "net-full",
@@ -61,11 +66,13 @@ signal = [
   "libc",
   "mio-uds",
   "net-driver",
-  "signal-hook-registry"
+  "signal-hook-registry",
+  "winapi/consoleapi",
+  "winapi/minwindef",
 ]
 sync = ["fnv"]
 tcp = ["io", "net-driver"]
-timer = ["slab"]
+timer = ["executor-core", "sync", "slab"]
 udp = ["io", "net-driver"]
 uds = ["io", "net-driver", "mio-uds", "libc"]
 process = [
