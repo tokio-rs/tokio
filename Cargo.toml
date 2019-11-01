@@ -1,6 +1,7 @@
 [workspace]
 
 members = [
+  "tokio",
   "tokio-compat",
   "tokio-macros",
   "tokio-test",
