@@ -3,6 +3,7 @@ use super::{Enter, Executor, SpawnError};
 use futures::{future, Future};
 
 use std::cell::Cell;
+use std::marker::PhantomData;
 
 /// Executes futures on the default executor for the current execution context.
 ///
@@ -17,6 +18,13 @@ use std::cell::Cell;
 #[derive(Debug, Clone)]
 pub struct DefaultExecutor {
     _dummy: (),
+}
+
+/// Ensures that the executor is removed from the thread-local context
+/// when leaving the scope. This handles cases that involve panicking.
+#[derive(Debug)]
+pub struct DefaultGuard<'a> {
+    _lifetime: PhantomData<&'a ()>,
 }
 
 impl DefaultExecutor {
@@ -175,6 +183,20 @@ where
     T: Executor,
     F: FnOnce(&mut Enter) -> R,
 {
+    let _guard = set_default(executor);
+    f(enter)
+}
+
+/// Sets `executor` as the default executor, returning a guard that unsets it when
+/// dropped.
+///
+/// # Panics
+///
+/// This function panics if there already is a default executor set.
+pub fn set_default<T>(executor: &mut T) -> DefaultGuard<'_>
+where
+    T: Executor,
+{
     EXECUTOR.with(|cell| {
         match cell.get() {
             State::Ready(_) | State::Active => {
@@ -182,18 +204,6 @@ where
             }
             _ => {}
         }
-
-        // Ensure that the executor is removed from the thread-local context
-        // when leaving the scope. This handles cases that involve panicking.
-        struct Reset<'a>(&'a Cell<State>);
-
-        impl<'a> Drop for Reset<'a> {
-            fn drop(&mut self) {
-                self.0.set(State::Empty);
-            }
-        }
-
-        let _reset = Reset(cell);
 
         // While scary, this is safe. The function takes a
         // `&mut Executor`, which guarantees that the reference lives for the
@@ -205,14 +215,24 @@ where
         let executor = unsafe { hide_lt(executor as &mut _ as *mut _) };
 
         cell.set(State::Ready(executor));
+    });
 
-        f(enter)
-    })
+    DefaultGuard {
+        _lifetime: PhantomData,
+    }
 }
 
 unsafe fn hide_lt<'a>(p: *mut (dyn Executor + 'a)) -> *mut (dyn Executor + 'static) {
     use std::mem;
     mem::transmute(p)
+}
+
+impl<'a> Drop for DefaultGuard<'a> {
+    fn drop(&mut self) {
+        EXECUTOR.with(|cell| {
+            cell.set(State::Empty);
+        })
+    }
 }
 
 #[cfg(test)]
