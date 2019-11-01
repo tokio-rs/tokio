@@ -1,6 +1,6 @@
 use worker::Worker;
 
-use futures::Poll;
+use futures::{Async, Poll};
 use tokio_executor;
 
 use std::error::Error;
@@ -18,20 +18,19 @@ pub struct BlockingError {
 }
 
 pub trait Blocking {
-    fn enter_blocking(&self) -> Poll<(), BlockingError>;
-    fn exit_blocking(&self);
+    fn run_blocking<'a>(&self, f: &'a mut (dyn FnMut() + 'a)) -> Poll<(), BlockingError>;
 }
 
 struct DefaultBlocking;
 static DEFAULT_BLOCKING: DefaultBlocking = DefaultBlocking;
 
 impl Blocking for DefaultBlocking {
-    fn enter_blocking(&self) -> Poll<(), BlockingError> {
-        Worker::with_current(|worker| {
+    fn run_blocking<'a>(&self, f: &'a mut (dyn FnMut() + 'a)) -> Poll<(), BlockingError> {
+        let res = Worker::with_current(|worker| {
             let worker = match worker {
                 Some(worker) => worker,
                 None => {
-                    return Err(BlockingError { _p: () });
+                    return Err(BlockingError::new());
                 }
             };
 
@@ -39,16 +38,32 @@ impl Blocking for DefaultBlocking {
             // with `NotReady` if the pool does not have enough capacity to enter
             // blocking mode.
             worker.transition_to_blocking()
-        })
-    }
+        });
 
-    fn exit_blocking(&self) {
+        // If the transition cannot happen, exit early
+        try_ready!(res);
+
+        // Currently in blocking mode, so call the inner closure.
+        //
+        // "Exit" the current executor in case the blocking function wants
+        // to call a different executor.
+        tokio_executor::exit(move || (f)());
+
         // Try to transition out of blocking mode. This is a fast path that takes
         // back ownership of the worker if the worker handoff didn't complete yet.
         Worker::with_current(|worker| {
             // Worker must be set since it was above.
             worker.unwrap().transition_from_blocking();
         });
+
+        Ok(Async::Ready(()))
+    }
+}
+
+impl BlockingError {
+    #[doc(hidden)]
+    pub fn new() -> Self {
+        Self { _p: () }
     }
 }
 

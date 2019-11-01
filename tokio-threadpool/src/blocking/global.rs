@@ -17,11 +17,6 @@ where
     B: Blocking,
     F: FnOnce(&mut Enter) -> R,
 {
-    unsafe fn hide_lt<'a>(p: *const (dyn Blocking + 'a)) -> *const (dyn Blocking + 'static) {
-        use std::mem;
-        mem::transmute(p)
-    }
-
     CURRENT.with(|cell| {
         struct Reset<'a> {
             cell: &'a Cell<*const dyn Blocking>,
@@ -32,6 +27,11 @@ where
             fn drop(&mut self) {
                 self.cell.set(self.prior);
             }
+        }
+
+        unsafe fn hide_lt<'a>(p: *const (dyn Blocking + 'a)) -> *const (dyn Blocking + 'static) {
+            use std::mem;
+            mem::transmute(p)
         }
 
         // While scary, this is safe. The function takes a
@@ -167,20 +167,30 @@ where
 {
     CURRENT.with(|cell| {
         let blocking = unsafe { &*(cell.get()) };
-        let res = blocking.enter_blocking();
 
-        // If the transition cannot happen, exit early
-        try_ready!(res);
+        // Object-safety workaround: the `Blocking` trait must be object-safe,
+        // since we use a trait object in the thread-local. However, a blocking
+        // _operation_ will be generic over the return type of the blocking
+        // function. Therefore, rather than passing a function with a return
+        // type to `Blocking::run_blocking`, we pass a _new_ closure which
+        // doesn't have a return value. That closure invokes the blocking
+        // function and assigns its value to `ret`, which we then unpack when
+        // the blocking call finishes.
+        let mut f = Some(f);
+        let mut ret = None;
+        let ret2 = &mut ret;
+        let mut run = move || {
+            let f = f
+                .take()
+                .expect("blocking closure invoked twice; this is a bug!");
+            *ret2 = Some((f)());
+        };
 
-        // Currently in blocking mode, so call the inner closure.
-        //
-        // "Exit" the current executor in case the blocking function wants
-        // to call a different executor.
-        let ret = tokio_executor::exit(move || f());
-
-        blocking.exit_blocking();
+        try_ready!(blocking.run_blocking(&mut run));
 
         // Return the result
+        let ret =
+            ret.expect("blocking function finished, but return value was unset; this is a bug!");
         Ok(ret.into())
     })
 }
