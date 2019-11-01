@@ -44,5 +44,6 @@ impl<T> CausalCell<T> {
 impl CausalCheck {
     pub(crate) fn check(self) {}
 
+    #[cfg(feature = "rt-full")]
     pub(crate) fn join(&mut self, _other: CausalCheck) {}
 }

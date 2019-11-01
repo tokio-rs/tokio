@@ -27,12 +27,12 @@ fn timer_with_threaded_runtime() {
 
 #[test]
 fn timer_with_current_thread_runtime() {
-    use tokio::runtime::current_thread::Runtime;
+    use tokio::runtime::Builder;
 
-    let mut rt = Runtime::new().unwrap();
+    let mut rt = Builder::new().current_thread().build().unwrap();
     let (tx, rx) = mpsc::channel();
 
-    rt.spawn(async move {
+    rt.block_on(async move {
         let when = Instant::now() + Duration::from_millis(100);
 
         tokio::timer::delay(when).await;
@@ -41,7 +41,6 @@ fn timer_with_current_thread_runtime() {
         tx.send(()).unwrap();
     });
 
-    rt.run().unwrap();
     rx.recv().unwrap();
 }
 

@@ -221,6 +221,7 @@ impl Pool {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct PoolWaiter(Arc<Pool>);
 
 impl From<Pool> for PoolWaiter {

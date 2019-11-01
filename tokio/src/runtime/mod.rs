@@ -83,7 +83,7 @@
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Create the runtime
-//!     let rt = Runtime::new()?;
+//!     let mut rt = Runtime::new()?;
 //!
 //!     // Spawn the root task
 //!     rt.block_on(async {
@@ -128,27 +128,193 @@
 //! [`tokio::spawn`]: ../executor/fn.spawn.html
 //! [`tokio::main`]: ../../tokio_macros/attr.main.html
 
-pub mod current_thread;
+mod builder;
+pub use self::builder::Builder;
 
+mod spawner;
+pub use self::spawner::Spawner;
+
+#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
+pub use crate::executor::{JoinError, JoinHandle};
+
+use crate::executor::blocking::{self, PoolWaiter};
+use crate::executor::current_thread::CurrentThread;
 #[cfg(feature = "rt-full")]
-mod threadpool;
+use crate::executor::thread_pool::ThreadPool;
+use crate::net::{self, driver};
+use crate::timer::timer;
 
-#[cfg(feature = "rt-full")]
-pub use self::threadpool::{
-    Builder,
-    JoinHandle,
-    Runtime,
-    Spawner,
-};
+use std::future::Future;
+use std::io;
 
-// Internal export, don't use.
-// This exists to support "auto" runtime selection when using the
-// #[tokio::main] attribute.
-#[doc(hidden)]
-pub mod __main {
+/// The Tokio runtime, includes a reactor as well as an executor for running
+/// tasks.
+///
+/// Instances of `Runtime` can be created using [`new`] or [`Builder`]. However,
+/// most users will use the `#[tokio::main]` annotation on their entry point.
+///
+/// See [module level][mod] documentation for more details.
+///
+/// # Shutdown
+///
+/// Shutting down the runtime is done by dropping the value. The current thread
+/// will block until the shut down operation has completed.
+///
+/// * Drain any scheduled work queues.
+/// * Drop any futures that have not yet completed.
+/// * Drop the reactor.
+///
+/// Once the reactor has dropped, any outstanding I/O resources bound to
+/// that reactor will no longer function. Calling any method on them will
+/// result in an error.
+///
+/// [mod]: index.html
+/// [`new`]: #method.new
+/// [`Builder`]: struct.Builder.html
+/// [`tokio::run`]: fn.run.html
+#[derive(Debug)]
+pub struct Runtime {
+    /// Task executor
+    kind: Kind,
+
+    /// Handles to the network drivers
+    net_handles: Vec<net::driver::Handle>,
+
+    /// Timer handles
+    timer_handles: Vec<timer::Handle>,
+
+    /// Blocking pool handle
+    blocking_pool: PoolWaiter,
+}
+
+/// The runtime executor is either a thread-pool or a current-thread executor.
+#[derive(Debug)]
+enum Kind {
     #[cfg(feature = "rt-full")]
-    pub use super::Runtime;
+    ThreadPool(ThreadPool),
+    CurrentThread(CurrentThread<timer::Timer<net::driver::Reactor>>),
+}
 
-    #[cfg(not(feature = "rt-full"))]
-    pub use super::current_thread::Runtime;
+impl Runtime {
+    /// Create a new runtime instance with default configuration values.
+    ///
+    /// This results in a reactor, thread pool, and timer being initialized. The
+    /// thread pool will not spawn any worker threads until it needs to, i.e.
+    /// tasks are scheduled to run.
+    ///
+    /// Most users will not need to call this function directly, instead they
+    /// will use [`tokio::run`](fn.run.html).
+    ///
+    /// See [module level][mod] documentation for more details.
+    ///
+    /// # Examples
+    ///
+    /// Creating a new `Runtime` with default configuration values.
+    ///
+    /// ```
+    /// use tokio::runtime::Runtime;
+    ///
+    /// let rt = Runtime::new()
+    ///     .unwrap();
+    ///
+    /// // Use the runtime...
+    /// ```
+    ///
+    /// [mod]: index.html
+    pub fn new() -> io::Result<Self> {
+        Builder::new().build()
+    }
+
+    /// Spawn a future onto the Tokio runtime.
+    ///
+    /// This spawns the given future onto the runtime's executor, usually a
+    /// thread pool. The thread pool is then responsible for polling the future
+    /// until it completes.
+    ///
+    /// See [module level][mod] documentation for more details.
+    ///
+    /// [mod]: index.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Runtime;
+    ///
+    /// # fn dox() {
+    /// // Create the runtime
+    /// let rt = Runtime::new().unwrap();
+    ///
+    /// // Spawn a future onto the runtime
+    /// rt.spawn(async {
+    ///     println!("now running on a worker thread");
+    /// });
+    /// # }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the spawn fails. Failure occurs if the executor
+    /// is currently at capacity and is unable to spawn a new future.
+    pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
+    where
+        F: Future<Output = ()> + Send + 'static,
+    {
+        match &self.kind {
+            #[cfg(feature = "rt-full")]
+            Kind::ThreadPool(exec) => exec.spawn(future),
+            Kind::CurrentThread(exec) => exec.spawn(future),
+        }
+    }
+
+    /// Run a future to completion on the Tokio runtime. This is the runtime's
+    /// entry point.
+    ///
+    /// This runs the given future on the runtime, blocking until it is
+    /// complete, and yielding its resolved result. Any tasks or timers which
+    /// the future spawns internally will be executed on the runtime.
+    ///
+    /// This method should not be called from an asynchronous context.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the executor is at capacity, if the provided
+    /// future panics, or if called within an asynchronous execution context.
+    pub fn block_on<F: Future>(&mut self, future: F) -> F::Output {
+        let _net = driver::set_default(&self.net_handles[0]);
+        let _timer = timer::set_default(&self.timer_handles[0]);
+
+        let kind = &mut self.kind;
+
+        blocking::with_pool(&self.blocking_pool, || {
+            match kind {
+                #[cfg(feature = "rt-full")]
+                Kind::ThreadPool(exec) => exec.block_on(future),
+                Kind::CurrentThread(exec) => exec.block_on(future),
+            }
+        })
+    }
+
+    /// Return a handle to the runtime's spawner.
+    ///
+    /// The returned handle can be used to spawn tasks that run on this runtime.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Runtime;
+    ///
+    /// let rt = Runtime::new()
+    ///     .unwrap();
+    ///
+    /// let spawner = rt.spawner();
+    ///
+    /// spawner.spawn(async { println!("hello"); });
+    /// ```
+    pub fn spawner(&self) -> Spawner {
+        match &self.kind {
+            #[cfg(feature = "rt-full")]
+            Kind::ThreadPool(exec) => Spawner::thread_pool(exec.spawner().clone()),
+            Kind::CurrentThread(exec) => Spawner::current_thread(exec.spawner()),
+        }
+    }
 }

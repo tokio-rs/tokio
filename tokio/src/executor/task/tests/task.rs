@@ -14,7 +14,7 @@ use std::sync::mpsc;
 fn header_lte_cache_line() {
     use std::mem::size_of;
 
-    assert!(size_of::<Header<()>>() <= 8 * size_of::<*const ()>());
+    assert!(size_of::<Header>() <= 8 * size_of::<*const ()>());
 }
 
 #[test]
@@ -53,7 +53,7 @@ fn create_yield_complete_drop() {
     let task = task::background(task);
 
     let mock = mock().bind(&task).release_local();
-    let mock = &mut || Some(From::from(&mock));
+    let mock = || Some(From::from(&mock));
 
     // Task is returned
     let task = assert_some!(task.run(mock));
@@ -83,7 +83,7 @@ fn create_clone_yield_complete_drop() {
     let task = task::background(task);
 
     let mock = mock().bind(&task).release_local();
-    let mock = &mut || Some(From::from(&mock));
+    let mock = || Some(From::from(&mock));
 
     // Task is returned
     let task = assert_some!(task.run(mock));

@@ -1,6 +1,6 @@
 #![warn(rust_2018_idioms)]
 
-use tokio::runtime::{self, current_thread};
+use tokio::runtime;
 use tokio::timer::clock::Clock;
 use tokio::timer::*;
 
@@ -20,14 +20,16 @@ fn clock_and_timer_concurrent() {
     let when = Instant::now() + Duration::from_millis(5_000);
     let clock = Clock::new_with_now(MockNow(when));
 
-    let rt = runtime::Builder::new().clock(clock).build().unwrap();
+    let mut rt = runtime::Builder::new().clock(clock).build().unwrap();
 
     let (tx, rx) = mpsc::channel();
 
-    rt.spawn(async move {
-        delay(when).await;
-        assert!(Instant::now() < when);
-        tx.send(()).unwrap();
+    rt.block_on(async move {
+        tokio::spawn(async move {
+            delay(when).await;
+            assert!(Instant::now() < when);
+            tx.send(()).unwrap();
+        })
     });
 
     rx.recv().unwrap();
@@ -38,7 +40,11 @@ fn clock_and_timer_single_threaded() {
     let when = Instant::now() + Duration::from_millis(5_000);
     let clock = Clock::new_with_now(MockNow(when));
 
-    let mut rt = current_thread::Builder::new().clock(clock).build().unwrap();
+    let mut rt = runtime::Builder::new()
+        .current_thread()
+        .clock(clock)
+        .build()
+        .unwrap();
 
     rt.block_on(async move {
         delay(when).await;

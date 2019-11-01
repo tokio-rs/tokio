@@ -1,15 +1,20 @@
 use crate::executor::task::{Header, Task};
 
 use std::fmt;
+use std::marker::PhantomData;
 use std::ptr::NonNull;
 
 pub(crate) struct OwnedList<T: 'static> {
-    head: Option<NonNull<Header<T>>>,
+    head: Option<NonNull<Header>>,
+    _p: PhantomData<T>,
 }
 
 impl<T: 'static> OwnedList<T> {
     pub(crate) fn new() -> OwnedList<T> {
-        OwnedList { head: None }
+        OwnedList {
+            head: None,
+            _p: PhantomData,
+        }
     }
 
     pub(crate) fn insert(&mut self, task: &Task<T>) {

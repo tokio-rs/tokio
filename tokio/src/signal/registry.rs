@@ -178,13 +178,13 @@ where
 #[cfg(all(test, not(loom)))]
 mod tests {
     use super::*;
-    use crate::runtime::current_thread::Runtime;
+    use crate::runtime::{self, Runtime};
     use crate::sync::{mpsc, oneshot};
     use futures::{future, StreamExt};
 
     #[test]
     fn smoke() {
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = rt();
         rt.block_on(async move {
             let registry = Registry::new(vec![
                 EventInfo::default(),
@@ -306,5 +306,9 @@ mod tests {
         assert_eq!(false, registry.broadcast());
 
         drop(second_rx);
+    }
+
+    fn rt() -> Runtime {
+        runtime::Builder::new().current_thread().build().unwrap()
     }
 }

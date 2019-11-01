@@ -20,8 +20,10 @@ pub(crate) mod std {
     }
 }
 
+#[cfg(feature = "rt-full")]
+pub(crate) use self::std::rand;
 pub(crate) use self::std::sync;
 #[cfg(any(feature = "blocking", feature = "rt-full"))]
 pub(crate) use self::std::thread;
-#[cfg(feature = "rt-full")]
-pub(crate) use self::std::{alloc, cell, rand, sys};
+#[cfg(feature = "rt-current-thread")]
+pub(crate) use self::std::{alloc, cell, sys};

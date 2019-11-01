@@ -1,7 +1,8 @@
 #![warn(rust_2018_idioms)]
+#![cfg(broken)]
 
-use tokio::executor::current_thread::CurrentThread;
 use tokio::executor::park::{Park, Unpark, UnparkThread};
+use tokio::runtime;
 use tokio::timer::{Delay, Timer};
 
 use rand::Rng;
@@ -44,7 +45,7 @@ fn hammer_complete() {
             let done = done.clone();
 
             thread::spawn(move || {
-                let mut exec = CurrentThread::new();
+                let mut exec = rt();
                 let mut rng = rand::thread_rng();
 
                 barrier.wait();
@@ -101,7 +102,7 @@ fn hammer_cancel() {
             let done = done.clone();
 
             thread::spawn(move || {
-                let mut exec = CurrentThread::new();
+                let mut exec = rt();
                 let mut rng = rand::thread_rng();
 
                 barrier.wait();
@@ -162,7 +163,7 @@ fn hammer_reset() {
             let done = done.clone();
 
             thread::spawn(move || {
-                let mut exec = CurrentThread::new();
+                let mut exec = rt();
                 let mut rng = rand::thread_rng();
 
                 barrier.wait();
@@ -238,4 +239,8 @@ fn hammer_reset() {
             timer.turn(None).unwrap();
         }
     }
+}
+
+fn rt() -> runtime::Runtime {
+    runtime::Builder::new().current_thread().build().unwrap()
 }

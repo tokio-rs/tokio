@@ -57,12 +57,14 @@ pub use self::executor::Executor;
 mod global;
 pub use self::global::{spawn, with_default, DefaultExecutor};
 
-mod loom;
+pub(crate) mod loom;
 
 pub mod park;
 
-#[cfg(feature = "rt-full")]
+#[cfg(feature = "rt-current-thread")]
 mod task;
+#[cfg(feature = "rt-current-thread")]
+pub use self::task::{JoinError, JoinHandle};
 
 mod typed;
 pub use self::typed::TypedExecutor;
@@ -76,7 +78,7 @@ mod blocking;
 pub mod blocking;
 
 #[cfg(feature = "rt-current-thread")]
-pub mod current_thread;
+pub(crate) mod current_thread;
 
 #[cfg(feature = "rt-full")]
 pub mod thread_pool;

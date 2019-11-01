@@ -47,7 +47,6 @@ net-full = ["tcp", "udp", "uds"]
 net-driver = ["io-traits", "mio", "blocking", "lazy_static"]
 rt-current-thread = [
   "executor-core",
-  "crossbeam-channel",
   "timer",
   "sync",
   "net-driver",
@@ -95,7 +94,6 @@ futures-util-preview = { version = "=0.3.0-alpha.19", features = ["sink", "chann
 
 # Everything else is optional...
 bytes = { version = "0.4", optional = true }
-crossbeam-channel = { version = "0.3.8", optional = true }
 fnv = { version = "1.0.6", optional = true }
 iovec = { version = "0.1", optional = true }
 lazy_static = { version = "1.0.2", optional = true }

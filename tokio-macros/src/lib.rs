@@ -98,7 +98,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     }
 
     let result = match runtime {
-        RuntimeType::Multi => quote! {
+        RuntimeType::Multi | RuntimeType::Auto => quote! {
             #(#attrs)*
             fn #name(#inputs) #ret {
                 tokio::runtime::Runtime::new().unwrap().block_on(async { #body })
@@ -107,14 +107,11 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
         RuntimeType::Single => quote! {
             #(#attrs)*
             fn #name(#inputs) #ret {
-                tokio::runtime::current_thread::Runtime::new().unwrap().block_on(async { #body })
-            }
-        },
-        RuntimeType::Auto => quote! {
-            #(#attrs)*
-            fn #name() #ret {
-                let mut rt = tokio::runtime::__main::Runtime::new().unwrap();
-                rt.block_on(async { #body })
+                tokio::runtime::Builder::new()
+                    .current_thread()
+                    .build()
+                    .unwrap()
+                    .block_on(async { #body })
             }
         },
     };
@@ -211,7 +208,11 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
             #[test]
             #(#attrs)*
             fn #name() #ret {
-                tokio::runtime::current_thread::Runtime::new().unwrap().block_on(async { #body })
+                tokio::runtime::Builder::new()
+                    .current_thread()
+                    .build()
+                    .unwrap()
+                    .block_on(async { #body })
             }
         },
     };

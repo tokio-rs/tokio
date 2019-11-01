@@ -8,9 +8,6 @@ mod current;
 mod idle;
 use self::idle::Idle;
 
-mod join;
-pub use self::join::JoinHandle;
-
 mod owned;
 use self::owned::Owned;
 
@@ -39,9 +36,6 @@ mod tests;
 
 #[cfg(feature = "blocking")]
 pub use worker::blocking;
-
-// Re-export `task::Error`
-pub use crate::executor::task::Error;
 
 // These exports are used in tests
 #[cfg(test)]

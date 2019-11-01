@@ -1,10 +1,12 @@
+// rt-full implies rt-current-thread
+
 #[cfg(feature = "rt-full")]
 mod atomic_u32;
 mod atomic_usize;
-#[cfg(feature = "rt-full")]
+#[cfg(feature = "rt-current-thread")]
 mod causal_cell;
 
-#[cfg(feature = "rt-full")]
+#[cfg(feature = "rt-current-thread")]
 pub(crate) mod alloc {
     #[derive(Debug)]
     pub(crate) struct Track<T> {
@@ -26,7 +28,7 @@ pub(crate) mod alloc {
     }
 }
 
-#[cfg(feature = "rt-full")]
+#[cfg(feature = "rt-current-thread")]
 pub(crate) mod cell {
     pub(crate) use super::causal_cell::{CausalCell, CausalCheck};
 }
@@ -62,14 +64,22 @@ pub(crate) mod sync {
         pub(crate) use crate::executor::loom::std::atomic_usize::AtomicUsize;
 
         #[cfg(feature = "rt-full")]
-        pub(crate) use std::sync::atomic::{fence, spin_loop_hint, AtomicPtr};
+        pub(crate) use std::sync::atomic::spin_loop_hint;
+        #[cfg(feature = "rt-current-thread")]
+        pub(crate) use std::sync::atomic::{fence, AtomicPtr};
     }
 }
 
-#[cfg(feature = "rt-full")]
+#[cfg(feature = "rt-current-thread")]
 pub(crate) mod sys {
+    #[cfg(feature = "rt-full")]
     pub(crate) fn num_cpus() -> usize {
         usize::max(1, num_cpus::get_physical())
+    }
+
+    #[cfg(not(feature = "rt-full"))]
+    pub(crate) fn num_cpus() -> usize {
+        1
     }
 }
 

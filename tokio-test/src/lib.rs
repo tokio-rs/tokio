@@ -26,15 +26,9 @@ pub mod task;
 ///
 /// [runtime-block-on]: https://docs.rs/tokio/0.2.0-alpha.2/tokio/runtime/current_thread/struct.Runtime.html#method.block_on
 pub fn block_on<F: std::future::Future>(future: F) -> F::Output {
-    let mut rt = tokio::runtime::current_thread::Runtime::new().unwrap();
+    use tokio::runtime;
+
+    let mut rt = runtime::Builder::new().current_thread().build().unwrap();
+
     rt.block_on(future)
 }
-
-/*
-#[doc(hidden)]
-pub mod codegen {
-    pub mod futures {
-        pub use futures::*;
-    }
-}
-*/

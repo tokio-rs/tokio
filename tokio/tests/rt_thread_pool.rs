@@ -36,13 +36,22 @@ async fn client_server(tx: mpsc::Sender<()>) {
 }
 
 #[test]
+fn send_sync_bound() {
+    fn is_send<T: Send + Sync>() {}
+
+    is_send::<Runtime>();
+}
+
+#[test]
 fn spawn_shutdown() {
     let _ = env_logger::try_init();
 
-    let rt = Runtime::new().unwrap();
+    let mut rt = Runtime::new().unwrap();
     let (tx, rx) = mpsc::channel();
 
-    rt.spawn(client_server(tx.clone()));
+    rt.block_on(async {
+        tokio::spawn(client_server(tx.clone()));
+    });
 
     // Use spawner
     rt.spawner().spawn(client_server(tx));
@@ -50,13 +59,13 @@ fn spawn_shutdown() {
     assert_ok!(rx.recv());
     assert_ok!(rx.recv());
 
-    rt.shutdown_now();
+    drop(rt);
     assert_err!(rx.try_recv());
 }
 
 #[test]
 fn block_on_timer() {
-    let rt = Runtime::new().unwrap();
+    let mut rt = Runtime::new().unwrap();
 
     let v = rt.block_on(async move {
         delay(Instant::now() + Duration::from_millis(100)).await;
@@ -68,7 +77,7 @@ fn block_on_timer() {
 
 #[test]
 fn block_on_socket() {
-    let rt = Runtime::new().unwrap();
+    let mut rt = Runtime::new().unwrap();
 
     rt.block_on(async move {
         let (tx, rx) = oneshot::channel();
@@ -98,7 +107,7 @@ fn block_waits() {
         a_tx.send(()).unwrap();
     });
 
-    let rt = Runtime::new().unwrap();
+    let mut rt = Runtime::new().unwrap();
     rt.block_on(async move {
         a_rx.await.unwrap();
         b_tx.send(()).unwrap();
@@ -111,7 +120,7 @@ fn block_waits() {
 fn spawn_many() {
     const ITER: usize = 200;
 
-    let rt = Runtime::new().unwrap();
+    let mut rt = Runtime::new().unwrap();
 
     let cnt = Arc::new(Mutex::new(0));
     let (tx, rx) = mpsc::channel();
@@ -141,12 +150,12 @@ fn spawn_many() {
 fn nested_enter() {
     use std::panic;
 
-    let rt = Runtime::new().unwrap();
+    let mut rt = Runtime::new().unwrap();
     rt.block_on(async {
         assert_err!(tokio::executor::enter());
 
         let res = panic::catch_unwind(move || {
-            let rt = Runtime::new().unwrap();
+            let mut rt = Runtime::new().unwrap();
             rt.block_on(async {});
         });
 
@@ -165,7 +174,7 @@ fn after_start_and_before_stop_is_called() {
 
     let after_inner = after_start.clone();
     let before_inner = before_stop.clone();
-    let rt = tokio::runtime::Builder::new()
+    let mut rt = tokio::runtime::Builder::new()
         .after_start(move || {
             after_inner.clone().fetch_add(1, Ordering::Relaxed);
         })

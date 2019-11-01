@@ -8,12 +8,12 @@ use std::task::{RawWaker, RawWakerVTable, Waker};
 
 pub(super) struct WakerRef<'a, S: 'static> {
     waker: Waker,
-    _p: PhantomData<&'a Header<S>>,
+    _p: PhantomData<(&'a Header, S)>,
 }
 
 /// Returns a `WakerRef` which avoids having to pre-emptively increase the
 /// refcount if there is no need to do so.
-pub(super) fn waker_ref<T, S>(meta: &Header<S>) -> WakerRef<'_, S>
+pub(super) fn waker_ref<T, S>(meta: &Header) -> WakerRef<'_, S>
 where
     T: Future,
     S: Schedule,
@@ -48,7 +48,7 @@ where
     T: Future,
     S: Schedule,
 {
-    let meta = ptr as *const Header<S>;
+    let meta = ptr as *const Header;
     (*meta).state.ref_inc();
 
     let vtable = &RawWakerVTable::new(

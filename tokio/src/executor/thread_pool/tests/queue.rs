@@ -235,7 +235,7 @@ fn queues_2() -> (queue::Worker<Noop>, queue::Worker<Noop>) {
 use std::cell::RefCell;
 use std::collections::HashMap;
 thread_local! {
-    static TASKS: RefCell<HashMap<u32, task::JoinHandle<u32, Noop>>> = RefCell::new(HashMap::new())
+    static TASKS: RefCell<HashMap<u32, task::JoinHandle<u32>>> = RefCell::new(HashMap::new())
 }
 
 fn val(num: u32) -> Task<Noop> {

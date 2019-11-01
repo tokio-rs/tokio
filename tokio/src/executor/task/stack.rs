@@ -1,19 +1,22 @@
 use crate::executor::loom::sync::atomic::AtomicPtr;
 use crate::executor::task::{Header, Task};
 
+use std::marker::PhantomData;
 use std::ptr::{self, NonNull};
 use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 
 /// Concurrent stack of tasks, used to pass ownership of a task from one worker
 /// to another.
 pub(crate) struct TransferStack<T: 'static> {
-    head: AtomicPtr<Header<T>>,
+    head: AtomicPtr<Header>,
+    _p: PhantomData<T>,
 }
 
 impl<T: 'static> TransferStack<T> {
     pub(crate) fn new() -> TransferStack<T> {
         TransferStack {
             head: AtomicPtr::new(ptr::null_mut()),
+            _p: PhantomData,
         }
     }
 
@@ -49,7 +52,7 @@ impl<T: 'static> TransferStack<T> {
     }
 
     pub(crate) fn drain(&self) -> impl Iterator<Item = Task<T>> {
-        struct Iter<T: 'static>(*mut Header<T>);
+        struct Iter<T: 'static>(*mut Header, PhantomData<T>);
 
         impl<T: 'static> Iterator for Iter<T> {
             type Item = Task<T>;
@@ -80,6 +83,6 @@ impl<T: 'static> TransferStack<T> {
         }
 
         let ptr = self.head.swap(ptr::null_mut(), Acquire);
-        Iter(ptr)
+        Iter(ptr, PhantomData)
     }
 }

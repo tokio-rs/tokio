@@ -174,13 +174,13 @@ impl Stream for CtrlBreak {
 #[cfg(all(test, not(loom)))]
 mod tests {
     use super::*;
-    use crate::runtime::current_thread::Runtime;
+    use crate::runtime::Runtime;
 
     use futures_util::stream::StreamExt;
 
     #[test]
     fn ctrl_c() {
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = rt();
 
         rt.block_on(async {
             let ctrl_c = crate::signal::ctrl_c().expect("failed to create CtrlC");
@@ -198,7 +198,7 @@ mod tests {
 
     #[test]
     fn ctrl_break() {
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = rt();
 
         rt.block_on(async {
             let ctrl_break = super::ctrl_break().expect("failed to create CtrlC");
@@ -212,5 +212,12 @@ mod tests {
 
             let _ = ctrl_break.into_future().await;
         });
+    }
+
+    fn rt() -> Runtime {
+        crate::runtime::Builder::new()
+            .current_thread()
+            .build()
+            .unwrap()
     }
 }

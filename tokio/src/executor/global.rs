@@ -1,3 +1,6 @@
+#[cfg(feature = "rt-current-thread")]
+use crate::executor::current_thread;
+
 #[cfg(feature = "rt-full")]
 use crate::executor::thread_pool::ThreadPool;
 use crate::executor::{Executor, SpawnError};
@@ -50,6 +53,11 @@ impl DefaultExecutor {
                 let mut thread_pool = unsafe { &*threadpool_ptr };
                 Some(f(&mut thread_pool))
             }
+            #[cfg(feature = "rt-current-thread")]
+            State::CurrentThread(current_thread_ptr) => {
+                let mut current_thread = unsafe { &*current_thread_ptr };
+                Some(f(&mut current_thread))
+            }
             State::Empty => None,
         })
     }
@@ -63,6 +71,10 @@ enum State {
     // default executor is a thread pool instance.
     #[cfg(feature = "rt-full")]
     ThreadPool(*const ThreadPool),
+
+    // Current-thread executor
+    #[cfg(feature = "rt-current-thread")]
+    CurrentThread(*const current_thread::Scheduler),
 
     // default executor is set to a custom executor.
     Ready(*mut dyn Executor),
@@ -160,12 +172,41 @@ where
             let thread_pool = unsafe { &*threadpool_ptr };
             thread_pool.spawn_background(future);
         }
+        #[cfg(feature = "rt-current-thread")]
+        State::CurrentThread(current_thread_ptr) => {
+            let current_thread = unsafe { &*current_thread_ptr };
+
+            // Safety: The `CurrentThread` value set the thread-local (same
+            // thread).
+            unsafe {
+                current_thread.spawn_background(future);
+            }
+        }
         State::Empty => panic!("must be called from the context of Tokio runtime"),
     })
 }
 
+#[cfg(feature = "rt-current-thread")]
+pub(super) fn with_current_thread<F, R>(current_thread: &current_thread::Scheduler, f: F) -> R
+where
+    F: FnOnce() -> R,
+{
+    with_state(
+        State::CurrentThread(current_thread as *const current_thread::Scheduler),
+        f,
+    )
+}
+
+#[cfg(feature = "rt-current-thread")]
+pub(super) fn current_thread_is_current(current_thread: &current_thread::Scheduler) -> bool {
+    EXECUTOR.with(|current_executor| match current_executor.get() {
+        State::CurrentThread(ptr) => ptr == current_thread as *const _,
+        _ => false,
+    })
+}
+
 #[cfg(feature = "rt-full")]
-pub(crate) fn with_threadpool<F, R>(thread_pool: &ThreadPool, f: F) -> R
+pub(super) fn with_threadpool<F, R>(thread_pool: &ThreadPool, f: F) -> R
 where
     F: FnOnce() -> R,
 {

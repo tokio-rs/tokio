@@ -24,7 +24,7 @@ unsafe impl Sync for Inner {}
 
 #[derive(Debug, Eq, PartialEq)]
 enum Call {
-    Bind(*const Header<Mock>),
+    Bind(*const Header),
     Release,
     ReleaseLocal,
     Schedule,
