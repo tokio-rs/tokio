@@ -110,7 +110,7 @@ impl<S: 'static> Task<S> {
 
 impl<S: Schedule> Task<S> {
     /// Returns `self` when the task needs to be immediately re-scheduled
-    pub(crate) fn run<F>(self, executor: &mut F) -> Option<Self>
+    pub(crate) fn run<F>(self, mut executor: F) -> Option<Self>
     where
         F: FnMut() -> Option<NonNull<S>>,
     {

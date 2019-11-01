@@ -55,7 +55,11 @@ where
     /// Panics raised while polling the future are handled.
     ///
     /// Returns `true` if the task needs to be scheduled again
-    pub(super) fn poll(mut self, executor: &mut dyn FnMut() -> Option<NonNull<()>>) -> bool {
+    ///
+    /// # Safety
+    ///
+    /// The pointer returned by the `executor` fn must be castable to `*mut S`
+    pub(super) unsafe fn poll(mut self, executor: &mut dyn FnMut() -> Option<NonNull<()>>) -> bool {
         use std::panic;
 
         // Transition the task to the running state.
@@ -71,7 +75,7 @@ where
         debug_assert!(join_interest || !res.has_join_waker());
 
         // Get the cell components
-        let cell = unsafe { &mut self.cell.as_mut() };
+        let cell = &mut self.cell.as_mut();
         let header = &cell.header;
         let core = &mut cell.core;
 
@@ -80,15 +84,13 @@ where
         // point, there are no outstanding wakers which might access the
         // field concurrently.
         if header.executor().is_none() {
-            unsafe {
-                // We don't want the destructor to run because we don't really
-                // own the task here.
-                let task = ManuallyDrop::new(Task::from_raw(header.into()));
-                // Call the scheduler's bind callback
-                let executor = executor().expect("first poll must happen from an executor");
-                executor.cast::<S>().as_ref().bind(&task);
-                header.executor.with_mut(|ptr| *ptr = Some(executor.cast()));
-            }
+            // We don't want the destructor to run because we don't really
+            // own the task here.
+            let task = ManuallyDrop::new(Task::from_raw(header.into()));
+            // Call the scheduler's bind callback
+            let executor = executor().expect("first poll must happen from an executor");
+            executor.cast::<S>().as_ref().bind(&task);
+            header.executor.with_mut(|ptr| *ptr = Some(executor.cast()));
         }
 
         // The transition to `Running` done above ensures that a lock on the
