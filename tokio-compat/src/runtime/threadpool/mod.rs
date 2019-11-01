@@ -19,6 +19,8 @@ use tokio_02::executor::thread_pool::{Spawner, ThreadPool};
 use tokio_02::net::driver;
 use tokio_02::timer::timer;
 use tokio_executor_01 as executor_01;
+use tokio_reactor_01 as reactor_01;
+use tokio_timer_02 as timer_02;
 
 /// A thread pool runtime that can run tasks that use both `tokio` 0.1 and
 /// `tokio` 0.2 APIs.
@@ -57,7 +59,7 @@ struct Inner {
     ///
     /// This maintains a `tokio` 0.1 timer and reactor to support running
     /// futures that use older tokio APIs.
-    compat_bg: compat::Background,
+    compat_bg: compat::Compat,
 }
 
 #[derive(Clone, Debug)]
@@ -345,13 +347,35 @@ impl Runtime {
         let mut old_entered = executor_01::enter().expect("nested block_on");
         let bg = &self.inner().background;
         let trace = &self.inner().trace;
+        let compat = &self.inner().compat_bg;
 
         tokio_02::executor::with_default(&mut self.spawner_ref(), || {
-            executor_01::with_default(&mut self.spawner_ref(), &mut old_entered, |_old_entered| {
-                let _reactor = driver::set_default(bg.reactor());
-                let _timer = timer::set_default(bg.timer());
-                tracing_core::dispatcher::with_default(trace, || entered.block_on(future))
-            })
+            executor_01::with_default(
+                &mut self.spawner_ref(),
+                &mut old_entered,
+                |mut old_entered| {
+                    let _reactor = driver::set_default(bg.reactor());
+                    let _timer = timer::set_default(bg.timer());
+                    // Set up a default timer for tokio 0.1 compat.
+                    reactor_01::with_default(
+                        compat.reactor(),
+                        &mut old_entered,
+                        |mut old_entered| {
+                            // Set the default tokio 0.2 reactor to this worker thread's
+                            // reactor.
+                            timer_02::with_default(
+                                compat.timer(),
+                                &mut old_entered,
+                                |_old_entered| {
+                                    tracing_core::dispatcher::with_default(trace, || {
+                                        entered.block_on(future)
+                                    })
+                                },
+                            )
+                        },
+                    )
+                },
+            )
         })
     }
 

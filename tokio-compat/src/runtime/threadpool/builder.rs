@@ -198,11 +198,9 @@ impl Builder {
         let trace = dispatch.clone();
 
         let background = background::spawn(&clock)?;
-        let Compat {
-            compat_reactor,
-            compat_timer,
-            compat_bg,
-        } = Compat::spawn(&clock)?;
+        let compat_bg = Compat::spawn(&clock)?;
+        let compat_reactor = compat_bg.compat_reactor.clone();
+        let compat_timer = compat_bg.compat_timer.clone();
 
         // The `tokio` 0.2 default executor for the worker threads will be set
         // by the threadpool itself, but in order to set a default executor for

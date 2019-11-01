@@ -56,6 +56,14 @@ impl Compat {
             },
         })
     }
+
+    pub(super) fn reactor(&self) -> &reactor_01::Handle {
+        &self.compat_reactor
+    }
+
+    pub(super) fn timer(&self) -> &timer_02::Handle {
+        &self.compat_timer
+    }
 }
 
 impl Drop for Background {
