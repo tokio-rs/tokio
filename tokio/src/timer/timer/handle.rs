@@ -128,7 +128,7 @@ impl Handle {
     fn delay_timeout(&self, deadline: Instant, duration: Duration) -> Delay {
         match self.inner {
             Some(ref handle_priv) => {
-                Delay::new_with_handle(deadline, Duration::from_secs(0), handle_priv.clone())
+                Delay::new_with_handle(deadline, duration, handle_priv.clone())
             }
             None => Delay::new_timeout(deadline, duration),
         }
