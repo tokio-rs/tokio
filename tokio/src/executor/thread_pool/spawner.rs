@@ -38,7 +38,7 @@ impl Spawner {
     }
 
     /// Spawn a task in the background
-    pub(super) fn spawn_background<F>(&self, future: F)
+    pub(crate) fn spawn_background<F>(&self, future: F)
     where
         F: Future<Output = ()> + Send + 'static,
     {

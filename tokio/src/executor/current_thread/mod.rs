@@ -1,6 +1,5 @@
 use crate::executor::park::{Park, Unpark};
 use crate::executor::task::{self, JoinHandle, Schedule, Task};
-use crate::executor::Executor;
 
 use std::cell::UnsafeCell;
 use std::collections::VecDeque;
@@ -291,22 +290,6 @@ impl Schedule for Scheduler {
 
             drop(lock);
         }
-    }
-}
-
-impl Executor for &Scheduler {
-    fn spawn(
-        &mut self,
-        future: std::pin::Pin<Box<dyn Future<Output = ()> + Send>>,
-    ) -> Result<(), crate::executor::SpawnError> {
-        // Safety: This implementation should only be called by `global.rs` from
-        // the thread local.
-        //
-        // TODO: Delete this implementation.
-        unsafe {
-            Scheduler::spawn_background(self, future);
-        }
-        Ok(())
     }
 }
 
