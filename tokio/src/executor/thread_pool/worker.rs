@@ -129,7 +129,8 @@ where
     }
 
     pub(super) fn run(mut self)
-    where P: Park<Unpark = Box<dyn Unpark>>,
+    where
+        P: Park<Unpark = Box<dyn Unpark>>,
     {
         let pool = Arc::clone(&self.entry.pool);
         let pool = &pool;
