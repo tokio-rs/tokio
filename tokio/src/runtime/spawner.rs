@@ -1,4 +1,6 @@
-use crate::executor::{current_thread, thread_pool};
+use crate::executor::current_thread;
+#[cfg(feature = "rt-full")]
+use crate::executor::thread_pool;
 use crate::runtime::JoinHandle;
 
 use std::future::Future;
@@ -16,11 +18,13 @@ pub struct Spawner {
 
 #[derive(Debug, Clone)]
 enum Kind {
+    #[cfg(feature = "rt-full")]
     ThreadPool(thread_pool::Spawner),
     CurrentThread(current_thread::Spawner),
 }
 
 impl Spawner {
+    #[cfg(feature = "rt-full")]
     pub(super) fn thread_pool(spawner: thread_pool::Spawner) -> Spawner {
         Spawner { kind: Kind::ThreadPool(spawner) }
     }
@@ -65,6 +69,7 @@ impl Spawner {
         F: Future<Output = ()> + Send + 'static,
     {
         match &self.kind {
+            #[cfg(feature = "rt-full")]
             Kind::ThreadPool(spawner) => spawner.spawn(future),
             Kind::CurrentThread(spawner) => spawner.spawn(future),
         }

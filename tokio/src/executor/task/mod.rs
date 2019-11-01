@@ -2,11 +2,14 @@ mod core;
 pub(crate) use self::core::Header;
 
 mod error;
-pub use self::error::Error;
+#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
+pub use self::error::JoinError;
 
 mod harness;
 
 mod join;
+#[cfg(any(feature = "rt-current-thread", feature = "rt-full"))]
+#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::join::JoinHandle;
 
 mod list;
@@ -40,7 +43,7 @@ pub(crate) struct Task<S: 'static> {
 unsafe impl<S: Send + Sync + 'static> Send for Task<S> {}
 
 /// Task result sent back
-pub(crate) type Result<T> = std::result::Result<T, Error>;
+pub(crate) type Result<T> = std::result::Result<T, JoinError>;
 
 pub(crate) trait Schedule: Send + Sync + Sized + 'static {
     /// Bind a task to the executor.

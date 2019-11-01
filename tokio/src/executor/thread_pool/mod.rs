@@ -37,9 +37,6 @@ mod tests;
 #[cfg(feature = "blocking")]
 pub use worker::blocking;
 
-// Re-export `task::Error`
-pub use crate::executor::task::Error;
-
 // These exports are used in tests
 #[cfg(test)]
 #[allow(warnings)]

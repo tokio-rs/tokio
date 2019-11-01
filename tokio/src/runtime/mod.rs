@@ -135,10 +135,11 @@ mod spawner;
 pub use self::spawner::Spawner;
 
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
-pub use crate::executor::JoinHandle;
+pub use crate::executor::{JoinError, JoinHandle};
 
 use crate::executor::blocking::{self, PoolWaiter};
 use crate::executor::current_thread::CurrentThread;
+#[cfg(feature = "rt-full")]
 use crate::executor::thread_pool::ThreadPool;
 use crate::net::{self, driver};
 use crate::timer::timer;
@@ -189,6 +190,7 @@ pub struct Runtime {
 /// The runtime executor is either a thread-pool or a current-thread executor.
 #[derive(Debug)]
 enum Kind {
+    #[cfg(feature = "rt-full")]
     ThreadPool(ThreadPool),
     CurrentThread(CurrentThread<timer::Timer<net::driver::Reactor>>),
 }
@@ -258,6 +260,7 @@ impl Runtime {
         F: Future<Output = ()> + Send + 'static,
     {
         match &self.kind {
+            #[cfg(feature = "rt-full")]
             Kind::ThreadPool(exec) => exec.spawn(future),
             Kind::CurrentThread(exec) => exec.spawn(future),
         }
@@ -284,6 +287,7 @@ impl Runtime {
 
         blocking::with_pool(&self.blocking_pool, || {
             match kind {
+                #[cfg(feature = "rt-full")]
                 Kind::ThreadPool(exec) => exec.block_on(future),
                 Kind::CurrentThread(exec) => exec.block_on(future),
             }
@@ -308,6 +312,7 @@ impl Runtime {
     /// ```
     pub fn spawner(&self) -> Spawner {
         match &self.kind {
+            #[cfg(feature = "rt-full")]
             Kind::ThreadPool(exec) => Spawner::thread_pool(exec.spawner().clone()),
             Kind::CurrentThread(exec) => Spawner::current_thread(exec.spawner()),
         }

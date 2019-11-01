@@ -2,7 +2,7 @@ use crate::executor::loom::alloc::Track;
 use crate::executor::loom::cell::CausalCheck;
 use crate::executor::task::core::{Cell, Core, Header, Trailer};
 use crate::executor::task::state::Snapshot;
-use crate::executor::task::{Error, Schedule, Task};
+use crate::executor::task::{JoinError, Schedule, Task};
 
 use std::future::Future;
 use std::marker::PhantomData;
@@ -142,7 +142,7 @@ where
                 }
             }
             Err(err) => {
-                self.complete(executor, join_interest, Err(Error::panic(err)));
+                self.complete(executor, join_interest, Err(JoinError::panic(err)));
                 false
             }
         }
@@ -192,7 +192,7 @@ where
         state: Snapshot,
     ) {
         if state.is_canceled() {
-            dst.write(Track::new(Err(Error::cancelled())));
+            dst.write(Track::new(Err(JoinError::cancelled())));
         } else {
             self.core().read_output(dst);
         }

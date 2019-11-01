@@ -1,12 +1,13 @@
 use crate::executor::blocking::{Pool, PoolWaiter};
 use crate::executor::current_thread::CurrentThread;
+#[cfg(feature = "rt-full")]
 use crate::executor::thread_pool;
-use crate::net::driver::{self, Reactor};
+use crate::net::driver::Reactor;
 use crate::runtime::{Runtime, Kind};
-use crate::timer::clock::{self, Clock};
-use crate::timer::timer::{self, Timer};
+use crate::timer::clock::Clock;
+use crate::timer::timer::Timer;
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::{fmt, io};
 
 /// Builds Tokio Runtime with custom configuration values.
@@ -77,7 +78,7 @@ impl Builder {
             current_thread: false,
 
             // Default to use an equal number of threads to number of CPU cores
-            num_threads: num_cpus::get().max(1),
+            num_threads: crate::executor::loom::sys::num_cpus(),
 
             // Default thread name
             thread_name: "tokio-runtime-worker".into(),
@@ -276,7 +277,18 @@ impl Builder {
         })
     }
 
+    // Without rt-full, the "threadpool" variant just uses current-thread
+    #[cfg(not(feature = "rt-full"))]
     fn build_threadpool(&mut self) -> io::Result<Runtime> {
+        self.build_current_thread()
+    }
+
+    #[cfg(feature = "rt-full")]
+    fn build_threadpool(&mut self) -> io::Result<Runtime> {
+        use crate::net::driver;
+        use crate::timer::{clock, timer};
+        use std::sync::Mutex;
+
         let mut net_handles = Vec::new();
         let mut timer_handles = Vec::new();
         let mut timers = Vec::new();

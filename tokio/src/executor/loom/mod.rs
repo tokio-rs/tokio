@@ -21,7 +21,9 @@ pub(crate) mod std {
 }
 
 pub(crate) use self::std::sync;
+#[cfg(feature = "rt-current-thread")]
+pub(crate) use self::std::{alloc, cell, sys};
 #[cfg(any(feature = "blocking", feature = "rt-full"))]
 pub(crate) use self::std::thread;
 #[cfg(feature = "rt-full")]
-pub(crate) use self::std::{alloc, cell, rand, sys};
+pub(crate) use self::std::rand;

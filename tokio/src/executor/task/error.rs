@@ -2,7 +2,7 @@ use std::any::Any;
 use std::fmt;
 
 /// Task failed to execute to completion.
-pub struct Error {
+pub struct JoinError {
     repr: Repr,
 }
 
@@ -11,23 +11,23 @@ enum Repr {
     Panic(Box<dyn Any + Send + 'static>),
 }
 
-impl Error {
+impl JoinError {
     /// Create a new `cancelled` error
-    pub fn cancelled() -> Error {
-        Error {
+    pub fn cancelled() -> JoinError {
+        JoinError {
             repr: Repr::Cancelled,
         }
     }
 
     /// Create a new `panic` error
-    pub fn panic(err: Box<dyn Any + Send + 'static>) -> Error {
-        Error {
+    pub fn panic(err: Box<dyn Any + Send + 'static>) -> JoinError {
+        JoinError {
             repr: Repr::Panic(err),
         }
     }
 }
 
-impl fmt::Display for Error {
+impl fmt::Display for JoinError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.repr {
             Repr::Cancelled => write!(fmt, "cancelled"),
@@ -36,13 +36,13 @@ impl fmt::Display for Error {
     }
 }
 
-impl fmt::Debug for Error {
+impl fmt::Debug for JoinError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.repr {
-            Repr::Cancelled => write!(fmt, "task::Error::Cancelled"),
-            Repr::Panic(_) => write!(fmt, "task::Error::Panic(...)"),
+            Repr::Cancelled => write!(fmt, "JoinError::Cancelled"),
+            Repr::Panic(_) => write!(fmt, "JoinError::Panic(...)"),
         }
     }
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for JoinError {}
