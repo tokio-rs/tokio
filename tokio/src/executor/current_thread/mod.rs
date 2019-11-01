@@ -18,10 +18,10 @@
 mod scheduler;
 use self::scheduler::{Scheduler, TickArgs};
 
-use crate::executor::{EnterError, Executor, SpawnError, TypedExecutor};
 #[cfg(feature = "blocking")]
 use crate::executor::blocking::{Pool, PoolWaiter};
 use crate::executor::park::{Park, ParkThread, Unpark};
+use crate::executor::{EnterError, Executor, SpawnError, TypedExecutor};
 
 use std::cell::Cell;
 use std::error::Error;

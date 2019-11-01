@@ -79,6 +79,11 @@ impl<T, D> FramedRead<T, D> {
     pub fn decoder_mut(&mut self) -> &mut D {
         &mut self.inner.inner.1
     }
+
+    /// Returns a reference to the read buffer.
+    pub fn read_buffer(&self) -> &BytesMut {
+        &self.inner.buffer
+    }
 }
 
 impl<T, D> Stream for FramedRead<T, D>
@@ -173,6 +178,10 @@ impl<T> FramedRead2<T> {
 
     pub(crate) fn get_mut(&mut self) -> &mut T {
         &mut self.inner
+    }
+
+    pub(crate) fn buffer(&self) -> &BytesMut {
+        &self.buffer
     }
 }
 

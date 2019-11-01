@@ -15,7 +15,7 @@ pub(super) struct RawTask<S: 'static> {
 
 pub(super) struct Vtable<S: 'static> {
     /// Poll the future
-    pub(super) poll: unsafe fn(*mut (), NonNull<S>) -> bool,
+    pub(super) poll: unsafe fn(*mut (), &mut dyn FnMut() -> Option<NonNull<S>>) -> bool,
 
     /// The task handle has been dropped and the join waker needs to be dropped
     /// or the task struct needs to be deallocated
@@ -101,7 +101,7 @@ impl<S> RawTask<S> {
     /// Safety: mutual exclusion is required to call this function.
     ///
     /// Returns `true` if the task needs to be scheduled again.
-    pub(super) unsafe fn poll(self, executor: NonNull<S>) -> bool {
+    pub(super) unsafe fn poll(self, executor: &mut dyn FnMut() -> Option<NonNull<S>>) -> bool {
         // Get the vtable without holding a ref to the meta struct. This is done
         // because a mutable reference to the task is passed into the poll fn.
         let vtable = self.header().vtable;
@@ -150,7 +150,10 @@ impl<S: 'static> Clone for RawTask<S> {
 
 impl<S: 'static> Copy for RawTask<S> {}
 
-unsafe fn poll<T: Future, S: Schedule>(ptr: *mut (), executor: NonNull<S>) -> bool {
+unsafe fn poll<T: Future, S: Schedule>(
+    ptr: *mut (),
+    executor: &mut dyn FnMut() -> Option<NonNull<S>>,
+) -> bool {
     let harness = Harness::<T, S>::from_raw(ptr);
     harness.poll(executor)
 }

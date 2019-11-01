@@ -1,7 +1,0 @@
-error[E0432]: unresolved import `tests_build::tokio_net::uds`
- --> $DIR/net_without_uds_missing_uds.rs:1:5
-  |
-1 | use tests_build::tokio_net::uds;
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `uds` in `tokio_net`
-
-For more information about this error, try `rustc --explain E0432`.

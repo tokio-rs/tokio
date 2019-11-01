@@ -19,6 +19,11 @@ impl<T: 'static> Inject<T> {
         self.cluster.global.push(task, f)
     }
 
+    /// Check if the queue has been closed
+    pub(crate) fn is_closed(&self) -> bool {
+        self.cluster.global.is_closed()
+    }
+
     /// Close the queue
     ///
     /// Returns `true` if the channel was closed. `false` indicates the pool was

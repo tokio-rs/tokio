@@ -21,6 +21,7 @@ use std::time::{Duration, Instant};
 ///
 /// [`new`]: #method.new
 #[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct Delay {
     /// The link between the `Delay` instance at the timer that drives it.
     ///

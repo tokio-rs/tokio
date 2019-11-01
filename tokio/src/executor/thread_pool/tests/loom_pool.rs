@@ -1,9 +1,9 @@
-use crate::spawn;
 use crate::executor::loom::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 use crate::executor::loom::sync::atomic::{AtomicBool, AtomicUsize};
 use crate::executor::loom::sync::{Arc, Mutex};
 use crate::executor::tests::loom_oneshot as oneshot;
-use crate::executor::thread_pool::ThreadPool;
+use crate::executor::thread_pool::{self, Builder, ThreadPool};
+use crate::spawn;
 
 use std::future::Future;
 
@@ -38,6 +38,58 @@ fn pool_multi_spawn() {
         });
 
         rx.recv();
+    });
+}
+
+#[test]
+fn only_blocking() {
+    loom::model(|| {
+        let mut pool = Builder::new().num_threads(1).build();
+        let (block_tx, block_rx) = oneshot::channel();
+
+        pool.spawn(async move {
+            thread_pool::blocking(move || {
+                block_tx.send(());
+            })
+        });
+
+        block_rx.recv();
+        pool.shutdown_now();
+    });
+}
+
+#[test]
+fn blocking_and_regular() {
+    const NUM: usize = 3;
+    loom::model(|| {
+        let mut pool = Builder::new().num_threads(1).build();
+        let cnt = Arc::new(AtomicUsize::new(0));
+
+        let (block_tx, block_rx) = oneshot::channel();
+        let (done_tx, done_rx) = oneshot::channel();
+        let done_tx = Arc::new(Mutex::new(Some(done_tx)));
+
+        pool.spawn(async move {
+            thread_pool::blocking(move || {
+                block_tx.send(());
+            })
+        });
+
+        for _ in 0..NUM {
+            let cnt = cnt.clone();
+            let done_tx = done_tx.clone();
+
+            pool.spawn(async move {
+                if NUM == cnt.fetch_add(1, Relaxed) + 1 {
+                    done_tx.lock().unwrap().take().unwrap().send(());
+                }
+            });
+        }
+
+        done_rx.recv();
+        block_rx.recv();
+
+        pool.shutdown_now();
     });
 }
 

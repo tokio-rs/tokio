@@ -24,7 +24,7 @@
 mod orphan;
 mod reap;
 
-use self::orphan::{AtomicOrphanQueue, OrphanQueue, Wait};
+use self::orphan::{OrphanQueue, OrphanQueueImpl, Wait};
 use self::reap::Reaper;
 use super::SpawnedChild;
 use crate::net::util::PollEvented;
@@ -59,7 +59,7 @@ impl Kill for process::Child {
 }
 
 lazy_static::lazy_static! {
-    static ref ORPHAN_QUEUE: AtomicOrphanQueue<process::Child> = AtomicOrphanQueue::new();
+    static ref ORPHAN_QUEUE: OrphanQueueImpl<process::Child> = OrphanQueueImpl::new();
 }
 
 struct GlobalOrphanQueue;

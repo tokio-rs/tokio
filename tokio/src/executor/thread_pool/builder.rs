@@ -155,7 +155,14 @@ impl Builder {
         let (shutdown_tx, shutdown_rx) = shutdown::channel();
 
         let around_worker = self.around_worker.as_ref().map(Arc::clone);
-        let launch_worker = move |worker: Worker<BoxedPark<P>>| {
+        let launch_worker = Arc::new(Box::new(move |worker: Worker<BoxedPark<P>>| {
+            // NOTE: It might seem like the shutdown_tx that's moved into this Arc is never
+            // dropped, and that shutdown_rx will therefore never see EOF, but that is not actually
+            // the case. Only `build_with_park` and each worker hold onto a copy of this Arc.
+            // `build_with_park` drops it immediately, and the workers drop theirs when their `run`
+            // method returns (and their copy of the Arc are dropped). In fact, we don't actually
+            // _need_ a copy of `shutdown_tx` for each worker thread; having them all hold onto
+            // this Arc, which in turn holds the last `shutdown_tx` would have been sufficient.
             let shutdown_tx = shutdown_tx.clone();
             let around_worker = around_worker.as_ref().map(Arc::clone);
             Box::new(move || {
@@ -186,7 +193,8 @@ impl Builder {
                 // Dropping the handle must happen __after__ the callback
                 drop(shutdown_tx);
             }) as Box<dyn FnOnce() + Send + 'static>
-        };
+        })
+            as Box<dyn Fn(Worker<BoxedPark<P>>) -> Box<dyn FnOnce() + Send> + Send + Sync>);
 
         let mut blocking = crate::executor::blocking::Builder::default();
         blocking.name(self.name.clone());
@@ -197,7 +205,8 @@ impl Builder {
 
         let (pool, workers) = worker::create_set::<_, BoxedPark<P>>(
             self.pool_size,
-            |i| BoxedPark::new(build_park(i)),
+            |i| Box::new(BoxedPark::new(build_park(i))),
+            Arc::clone(&launch_worker),
             blocking.clone(),
         );
 

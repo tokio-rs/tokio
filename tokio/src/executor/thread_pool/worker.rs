@@ -3,7 +3,56 @@ use crate::executor::park::{Park, Unpark};
 use crate::executor::task::Task;
 use crate::executor::thread_pool::{current, Owned, Shared};
 
+use std::cell::Cell;
+use std::ops::{Deref, DerefMut};
 use std::time::Duration;
+
+// The Arc<Box<_>> is needed because loom doesn't support Arc<T> where T: !Sized
+// loom doesn't support that because it requires CoerceUnsized, which is unstable
+type LaunchWorker<P> = Arc<Box<dyn Fn(Worker<P>) -> Box<dyn FnOnce() + Send> + Send + Sync>>;
+
+thread_local! {
+    /// Thread-local tracking the current executor
+    static ON_BLOCK: Cell<Option<*mut dyn FnMut()>> = Cell::new(None)
+}
+
+/// Run the provided blocking function without blocking the executor.
+///
+/// In general, issuing a blocking call or performing a lot of compute in a future without
+/// yielding is not okay, as it may prevent the executor from driving other futures forward.
+/// If you run a closure through this method, the current executor thread will relegate all its
+/// executor duties to another (possibly new) thread, and only then poll the task. Note that this
+/// requires additional synchronization.
+///
+/// # Examples
+///
+/// ```
+/// # async fn docs() {
+/// tokio::executor::thread_pool::blocking(move || {
+///     // do some compute-heavy work or call synchronous code
+/// });
+/// # }
+/// ```
+#[cfg(feature = "blocking")]
+pub fn blocking<F, R>(f: F) -> R
+where
+    F: FnOnce() -> R,
+{
+    // Make the current worker give away its Worker to another thread so that we can safely block
+    // this one without preventing progress on other futures the worker owns.
+    ON_BLOCK.with(|ob| {
+        let allow_blocking = ob
+            .get()
+            .expect("can only call blocking when on Tokio runtime");
+
+        // This is safe, because ON_BLOCK was set from an &mut dyn FnMut in the worker that wraps
+        // the worker's operation, and is unset just prior to when the FnMut is dropped.
+        let allow_blocking = unsafe { &mut *allow_blocking };
+
+        allow_blocking();
+        f()
+    })
+}
 
 // TODO: remove this re-export
 pub(super) use crate::executor::thread_pool::set::Set;
@@ -13,17 +62,24 @@ pub(crate) struct Worker<P: Park + 'static> {
     entry: Entry<P::Unpark>,
 
     /// Park the thread
-    park: P,
+    park: Box<P>,
+
+    /// Fn for launching another Worker should we need it
+    launch_worker: LaunchWorker<P>,
+
+    /// To indicate that the Worker has been given away and should no longer be used
+    gone: Cell<bool>,
 }
 
 pub(crate) fn create_set<F, P>(
     pool_size: usize,
     mk_park: F,
+    launch_worker: LaunchWorker<P>,
     blocking: Arc<crate::executor::blocking::Pool>,
 ) -> (Arc<Set<P::Unpark>>, Vec<Worker<P>>)
 where
     P: Send + Park,
-    F: FnMut(usize) -> P,
+    F: FnMut(usize) -> Box<P>,
 {
     // Create the parks...
     let parks: Vec<_> = (0..pool_size).map(mk_park).collect();
@@ -40,7 +96,7 @@ where
         .enumerate()
         .map(|(index, park)| {
             // unsafe is safe because we call Worker::new only once with each index in the pool
-            unsafe { Worker::new(pool.clone(), index, park) }
+            unsafe { Worker::new(pool.clone(), index, park, Arc::clone(&launch_worker)) }
         })
         .collect();
 
@@ -58,10 +114,17 @@ where
     P: Send + Park,
 {
     // unsafe because new may only be called once for each index in pool's set
-    pub(super) unsafe fn new(pool: Arc<Set<P::Unpark>>, index: usize, park: P) -> Self {
+    pub(super) unsafe fn new(
+        pool: Arc<Set<P::Unpark>>,
+        index: usize,
+        park: Box<P>,
+        launch_worker: LaunchWorker<P>,
+    ) -> Self {
         Worker {
             entry: Entry::new(pool, index),
             park,
+            launch_worker,
+            gone: Cell::new(false),
         }
     }
 
@@ -72,18 +135,149 @@ where
 
         let mut executor = &**pool;
         let entry = &mut self.entry;
-        let park = &mut self.park;
+        let launch_worker = &self.launch_worker;
 
         let blocking = &executor.blocking;
+        let gone = &self.gone;
+
+        let mut park = DropNotGone::new(self.park, gone);
 
         // Track the current worker
         current::set(&pool, index, || {
             let _enter = crate::executor::enter().expect("executor already running on thread");
 
             crate::executor::with_default(&mut executor, || {
-                crate::executor::blocking::with_pool(blocking, || entry.run(park))
+                crate::executor::blocking::with_pool(blocking, || {
+                    ON_BLOCK.with(|ob| {
+                        // Ensure that the ON_BLOCK is removed from the thread-local context
+                        // when leaving the scope. This handles cases that involve panicking.
+                        struct Reset<'a>(&'a Cell<Option<*mut dyn FnMut()>>);
+
+                        impl<'a> Drop for Reset<'a> {
+                            fn drop(&mut self) {
+                                self.0.set(None);
+                            }
+                        }
+
+                        let _reset = Reset(ob);
+
+                        let park_ptr = &mut **park as *mut _;
+                        let mut allow_blocking = move || {
+                            // If our Worker has already been given away, then blocking is fine!
+                            if gone.get() {
+                                return;
+                            }
+
+                            // If this method is called, we need to move the entire worker onto a
+                            // separate (blocking) thread before returning. Once we return, the
+                            // caller is going to execute some blocking code which would otherwise
+                            // block our reactor from making progress. Since we are _in the middle_
+                            // of running a task, this isn't trivial, as the Worker is "active".
+                            // We do have the luxury of knowing that we are on the worker thread,
+                            // so we can assert exclusive access to any Worker-specific state.
+                            //
+                            // More specifically, the caller is _currently_ "stuck" in
+                            // Entry::run_task at:
+                            //
+                            //   if let Some(task) = task.run(self.shared().into()) {
+                            //
+                            // And _we_ get to decide when it continues (specifically, by choosing
+                            // when we return from the second callback (i.e., after the FnOnce
+                            // passed to blocking has returned).
+                            //
+                            // Here's what we'll have to do:
+                            //
+                            //  - Reconstruct our `Worker` struct
+                            //    - Notably, this includes `park`, which we're passing in below.
+                            //  - Spawn the reconstructed `Worker` on another blocking thread
+                            //  - Clear any state indicating what worker we are on, since at this
+                            //    point we are effectively no longer "on" that worker.
+                            //  - Allow the caller of `blocking` to continue.
+                            //
+                            // TODO: should we also undo the enter()?
+                            //
+                            // Once the caller completes the blocking operations, we need to ensure
+                            // that async code can continue running in that context. Luckily, since
+                            // `Arc<Set>` has a fallback for when current::get() is None, we can
+                            // just let the task run until it yields, and then put it back into the
+                            // pool.
+
+                            // We know that the code we're about to execute (inside
+                            // Entry::run_task) has no way to reach the park passed to entry.run.
+                            // therefore, it's fine for us to take ownership of it here _as long as
+                            // we don't drop `park` later_! The DropNotGone wrapper around `park`
+                            // takes care of that.
+                            let park = unsafe { Box::from_raw(park_ptr) };
+                            let worker = Worker {
+                                entry: unsafe {
+                                    // The same argument applies here. Since we unset `current`,
+                                    // the task's execution won't assume that it owns a worker any
+                                    // more. When the task yields, entry will use its `Arc<Set>`
+                                    // (which is fine and safe), and then immediately return,
+                                    // without calling any code that assumes there is only one
+                                    // Entry with the given index (namely it won't call
+                                    // Entry::owned).
+                                    Entry::new(Arc::clone(&pool), index)
+                                },
+                                park,
+                                launch_worker: Arc::clone(launch_worker),
+                                gone: Cell::new(false),
+                            };
+
+                            // Give away the worker
+                            //
+                            // TODO: it would be _really_ nice if we had a way to _not_ spawn a
+                            // thread and hand off the worker if the blocking routine ran only for
+                            // a short amount of time. maybe push the Worker onto a "stealing
+                            // queue" somehow? or maybe keep a shared "active" AtomicBool in both
+                            // instances of the Worker, and compare_exchange it to true afterwards
+                            // in an attempt to take it back. if it succeeds, we just resume where
+                            // we were. if it fails, another thread has already stolen the Worker.
+                            crate::executor::blocking::Pool::spawn(
+                                &pool.blocking,
+                                launch_worker(worker),
+                            );
+
+                            // make sure no subsequent code thinks that it is on a worker
+                            current::clear();
+
+                            // and make sure that when Entry finishes running the current task,
+                            // it immediately returns all the way up to the worker.
+                            gone.set(true);
+                        };
+                        let allow_blocking: &mut dyn FnMut() = &mut allow_blocking;
+
+                        ob.set(Some(unsafe {
+                            // NOTE: We cannot use a safe cast to raw pointer here, since we are
+                            // _also_ erasing the lifetime of these pointers. That is safe here,
+                            // because we know that ob will set back to None before allow_blocking
+                            // is dropped.
+                            #[allow(clippy::useless_transmute)]
+                            std::mem::transmute::<_, *mut dyn FnMut()>(allow_blocking)
+                        }));
+
+                        let _ = entry.run(&mut **park, gone);
+
+                        // Ensure that we reset ob before allow_blocking is dropped.
+                        drop(_reset);
+                    });
+                })
             })
         });
+
+        if gone.get() {
+            // Synchronize with the pool for load(Acquire) in is_closed to get up-to-date value.
+            pool.wait_for_unlocked();
+            if pool.is_closed() {
+                // If the pool is shutting down, some other thread may be waiting to clean up after
+                // the task that we were holding on to. If we completed that task, we did nothing
+                // (because task.run() returned None), and so crucially we did not wait up any such
+                // thread.
+                //
+                // So, we have to do that here.
+                pool.notify_all();
+            }
+        }
     }
 
     pub(super) fn id(&self) -> usize {
@@ -102,9 +296,11 @@ where
     #[cfg(test)]
     #[allow(warnings)]
     pub(crate) fn tick(&mut self) {
-        self.entry.tick(&mut self.park);
+        self.entry.tick(&mut *self.park, &self.gone);
     }
 }
+
+struct WorkerGone;
 
 struct Entry<P: 'static> {
     pool: Arc<Set<P>>,
@@ -120,14 +316,19 @@ where
         Entry { pool, index }
     }
 
-    fn run(&mut self, park: &mut impl Park<Unpark = P>) {
+    fn run(
+        &mut self,
+        park: &mut impl Park<Unpark = P>,
+        gone: &Cell<bool>,
+    ) -> Result<(), WorkerGone> {
         while self.is_running() {
-            if self.tick(park) {
+            if self.tick(park, gone)? {
                 self.park(park);
             }
         }
 
         self.shutdown(park);
+        Ok(())
     }
 
     fn is_running(&mut self) -> bool {
@@ -135,10 +336,14 @@ where
     }
 
     /// Returns `true` if the worker needs to park
-    fn tick(&mut self, park: &mut impl Park<Unpark = P>) -> bool {
+    fn tick(
+        &mut self,
+        park: &mut impl Park<Unpark = P>,
+        gone: &Cell<bool>,
+    ) -> Result<bool, WorkerGone> {
         // Process all pending tasks in the local queue.
-        if !self.process_local_queue(park) {
-            return false;
+        if !self.process_local_queue(park, gone)? {
+            return Ok(false);
         }
 
         // No more **local** work to process, try transitioning to searching
@@ -147,12 +352,12 @@ where
         // On `false`, the worker has entered the parked state
         if self.transition_to_searching() {
             // If `true` then work was found
-            if self.search_for_work() {
-                return false;
+            if self.search_for_work(gone)? {
+                return Ok(false);
             }
         }
 
-        true
+        Ok(true)
     }
 
     /// Process all pending tasks in the local queue, occasionally checking the
@@ -160,7 +365,11 @@ where
     ///
     /// Returns `false` if processing was interrupted due to the pool shutting
     /// down.
-    fn process_local_queue(&mut self, park: &mut impl Park<Unpark = P>) -> bool {
+    fn process_local_queue(
+        &mut self,
+        park: &mut impl Park<Unpark = P>,
+        gone: &Cell<bool>,
+    ) -> Result<bool, WorkerGone> {
         debug_assert!(self.is_running());
 
         loop {
@@ -174,7 +383,7 @@ where
                 self.maintenance();
 
                 if !self.is_running() {
-                    return false;
+                    return Ok(false);
                 }
 
                 // Check the global queue
@@ -184,9 +393,9 @@ where
             };
 
             if let Some(task) = task {
-                self.run_task(task);
+                self.run_task(task, gone)?;
             } else {
-                return true;
+                return Ok(true);
             }
         }
     }
@@ -214,16 +423,16 @@ where
         self.owned().is_running.set(!closed)
     }
 
-    fn search_for_work(&mut self) -> bool {
+    fn search_for_work(&mut self, gone: &Cell<bool>) -> Result<bool, WorkerGone> {
         debug_assert!(self.is_searching());
 
         if let Some(task) = self.steal_work() {
-            self.run_task(task);
-            true
+            self.run_task(task, gone)?;
+            Ok(true)
         } else {
             // Perform some routine work
             self.drain_tasks_pending_drop();
-            false
+            Ok(false)
         }
     }
 
@@ -291,15 +500,34 @@ where
         }
     }
 
-    fn run_task(&mut self, task: Task<Shared<P>>) {
+    fn run_task(&mut self, task: Task<Shared<P>>, gone: &Cell<bool>) -> Result<(), WorkerGone> {
         if self.is_searching() {
             self.transition_from_searching();
         }
 
-        if let Some(task) = task.run(self.shared().into()) {
+        let executor = self.shared();
+        let task = task.run(&mut || {
+            if gone.get() {
+                None
+            } else {
+                Some(executor.into())
+            }
+        });
+        if gone.get() {
+            // The Worker disappeared from under us.
+            // We need to return, because we no longer own all of our state!
+            // Make sure the task gets picked up again eventually.
+            if let Some(task) = task {
+                self.pool.schedule(task);
+            }
+            return Err(WorkerGone);
+        }
+
+        if let Some(task) = task {
             self.owned().submit_local_yield(task);
             self.set().notify_work();
         }
+        Ok(())
     }
 
     fn final_work_sweep(&mut self) {
@@ -411,5 +639,41 @@ where
     fn owned(&mut self) -> &Owned<P> {
         // safety: we own the slot
         unsafe { &*self.set().owned()[self.index].get() }
+    }
+}
+
+struct DropNotGone<'a, T> {
+    gone: &'a Cell<bool>,
+    inner: Option<T>,
+}
+
+impl<'a, T> DropNotGone<'a, T> {
+    fn new(inner: T, gone: &'a Cell<bool>) -> Self {
+        DropNotGone {
+            gone,
+            inner: Some(inner),
+        }
+    }
+}
+
+impl<'a, T> Drop for DropNotGone<'a, T> {
+    fn drop(&mut self) {
+        if self.gone.get() {
+            let inner = self.inner.take().unwrap();
+            std::mem::forget(inner);
+        }
+    }
+}
+
+impl<'a, T> Deref for DropNotGone<'a, T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        self.inner.as_ref().unwrap()
+    }
+}
+
+impl<'a, T> DerefMut for DropNotGone<'a, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.inner.as_mut().unwrap()
     }
 }

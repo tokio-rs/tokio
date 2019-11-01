@@ -95,7 +95,7 @@ pub mod fs;
 
 pub mod future;
 
-#[cfg(feature = "io")]
+#[cfg(feature = "io-traits")]
 pub mod io;
 
 #[cfg(feature = "net-driver")]
@@ -121,8 +121,10 @@ pub mod sync;
 #[cfg(feature = "timer")]
 pub mod timer;
 
+#[cfg(feature = "executor-core")]
+pub mod executor;
+
 if_runtime! {
-    pub mod executor;
     pub mod runtime;
 
     #[doc(inline)]
