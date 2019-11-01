@@ -1,7 +1,6 @@
 use crate::executor::blocking::PoolWaiter;
 use crate::executor::task::JoinHandle;
 use crate::executor::thread_pool::{shutdown, Builder, Spawner};
-use crate::executor::Executor;
 
 use std::fmt;
 use std::future::Future;
@@ -52,14 +51,6 @@ impl ThreadPool {
         self.spawner.spawn(future)
     }
 
-    /// Spawn a task in the background
-    pub(crate) fn spawn_background<F>(&self, future: F)
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        self.spawner.spawn_background(future);
-    }
-
     /// Block the current thread waiting for the future to complete.
     ///
     /// The future will execute on the current thread, but all spawned tasks
@@ -68,7 +59,7 @@ impl ThreadPool {
     where
         F: Future,
     {
-        crate::executor::global::with_threadpool(self, || {
+        crate::executor::global::with_thread_pool(self.spawner(), || {
             let mut enter =
                 crate::executor::enter().expect("attempting to block while on a Tokio executor");
             crate::executor::blocking::with_pool(self.spawner.blocking_pool(), || {
@@ -89,16 +80,6 @@ impl ThreadPool {
 impl Default for ThreadPool {
     fn default() -> ThreadPool {
         ThreadPool::new()
-    }
-}
-
-impl Executor for &ThreadPool {
-    fn spawn(
-        &mut self,
-        future: std::pin::Pin<Box<dyn Future<Output = ()> + Send>>,
-    ) -> Result<(), crate::executor::SpawnError> {
-        ThreadPool::spawn_background(self, future);
-        Ok(())
     }
 }
 

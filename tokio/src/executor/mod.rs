@@ -47,15 +47,8 @@ mod tests;
 mod enter;
 pub use self::enter::{enter, exit, Enter, EnterError};
 
-mod error;
-pub use self::error::SpawnError;
-
-#[allow(clippy::module_inception)]
-mod executor;
-pub use self::executor::Executor;
-
 mod global;
-pub use self::global::{spawn, with_default, DefaultExecutor};
+pub use self::global::spawn;
 
 pub(crate) mod loom;
 
@@ -65,9 +58,6 @@ pub mod park;
 mod task;
 #[cfg(feature = "rt-current-thread")]
 pub use self::task::{JoinError, JoinHandle};
-
-mod typed;
-pub use self::typed::TypedExecutor;
 
 #[cfg(feature = "rt-full")]
 mod util;

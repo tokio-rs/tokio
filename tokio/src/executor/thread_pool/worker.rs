@@ -1,7 +1,7 @@
 use crate::executor::loom::sync::Arc;
 use crate::executor::park::{Park, Unpark};
 use crate::executor::task::Task;
-use crate::executor::thread_pool::{current, Owned, Shared};
+use crate::executor::thread_pool::{current, Owned, Shared, Spawner};
 
 use std::cell::Cell;
 use std::ops::{Deref, DerefMut};
@@ -71,7 +71,7 @@ pub(crate) struct Worker<P: Park + 'static> {
     gone: Cell<bool>,
 }
 
-pub(crate) fn create_set<F, P>(
+pub(super) fn create_set<F, P>(
     pool_size: usize,
     mk_park: F,
     launch_worker: LaunchWorker<P>,
@@ -128,12 +128,16 @@ where
         }
     }
 
-    pub(super) fn run(mut self) {
+    pub(super) fn run(mut self)
+    where
+        P: Park<Unpark = Box<dyn Unpark>>,
+    {
         let pool = Arc::clone(&self.entry.pool);
         let pool = &pool;
         let index = self.entry.index;
 
-        let mut executor = &**pool;
+        let executor = &**pool;
+        let spawner = Spawner::new(pool.clone());
         let entry = &mut self.entry;
         let launch_worker = &self.launch_worker;
 
@@ -146,7 +150,7 @@ where
         current::set(&pool, index, || {
             let _enter = crate::executor::enter().expect("executor already running on thread");
 
-            crate::executor::with_default(&mut executor, || {
+            crate::executor::global::with_thread_pool(&spawner, || {
                 crate::executor::blocking::with_pool(blocking, || {
                     ON_BLOCK.with(|ob| {
                         // Ensure that the ON_BLOCK is removed from the thread-local context

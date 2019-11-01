@@ -37,14 +37,6 @@ mod tests;
 #[cfg(feature = "blocking")]
 pub use worker::blocking;
 
-// These exports are used in tests
-#[cfg(test)]
-#[allow(warnings)]
-pub(crate) use self::worker::create_set as create_pool;
-
-pub(crate) type BoxFuture =
-    std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + 'static>>;
-
 #[cfg(not(loom))]
 const LOCAL_QUEUE_CAPACITY: usize = 256;
 

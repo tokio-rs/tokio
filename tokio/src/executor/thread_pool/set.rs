@@ -6,14 +6,13 @@ use crate::executor::loom::rand::seed;
 use crate::executor::loom::sync::Arc;
 use crate::executor::park::Unpark;
 use crate::executor::task::{self, JoinHandle, Task};
-use crate::executor::thread_pool::{current, queue, BoxFuture, Idle, Owned, Shared};
+use crate::executor::thread_pool::{current, queue, Idle, Owned, Shared};
 use crate::executor::util::{CachePadded, FastRand};
-use crate::executor::{Executor, SpawnError};
 
 use std::cell::UnsafeCell;
 use std::future::Future;
 
-pub(crate) struct Set<P>
+pub(super) struct Set<P>
 where
     P: 'static,
 {
@@ -204,19 +203,5 @@ impl Set<Box<dyn Unpark>> {
         let (task, handle) = task::joinable(future);
         self.schedule(task);
         handle
-    }
-}
-
-impl<P> Executor for &Set<P>
-where
-    P: Unpark,
-{
-    fn spawn(&mut self, future: BoxFuture) -> Result<(), SpawnError> {
-        self.spawn_background(future);
-        Ok(())
-    }
-
-    fn status(&self) -> Result<(), SpawnError> {
-        Ok(())
     }
 }
