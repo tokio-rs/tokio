@@ -59,7 +59,7 @@ struct Inner {
     ///
     /// This maintains a `tokio` 0.1 timer and reactor to support running
     /// futures that use older tokio APIs.
-    compat_bg: compat::Compat,
+    compat_bg: compat::Background,
 }
 
 #[derive(Clone, Debug)]

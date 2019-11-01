@@ -1,4 +1,4 @@
-use super::{background, compat::Compat, Inner, Runtime};
+use super::{background, compat, Inner, Runtime};
 
 use tokio_02::executor::thread_pool;
 use tokio_02::net::driver::{self, Reactor};
@@ -198,9 +198,9 @@ impl Builder {
         let trace = dispatch.clone();
 
         let background = background::spawn(&clock)?;
-        let compat_bg = Compat::spawn(&clock)?;
-        let compat_reactor = compat_bg.compat_reactor.clone();
-        let compat_timer = compat_bg.compat_timer.clone();
+        let compat_bg = compat::Background::spawn(&clock)?;
+        let compat_reactor = compat_bg.reactor().clone();
+        let compat_timer = compat_bg.timer().clone();
 
         // The `tokio` 0.2 default executor for the worker threads will be set
         // by the threadpool itself, but in order to set a default executor for

@@ -11,15 +11,10 @@ use tokio_02::sync::oneshot;
 
 #[derive(Debug)]
 pub(super) struct Background {
+    reactor_handle: reactor_01::Handle,
+    timer_handle: timer_02::Handle,
     shutdown_tx: Option<oneshot::Sender<()>>,
     thread: Option<thread::JoinHandle<()>>,
-}
-
-#[derive(Debug)]
-pub(super) struct Compat {
-    pub(super) compat_reactor: reactor_01::Handle,
-    pub(super) compat_timer: timer_02::Handle,
-    pub(super) compat_bg: Background,
 }
 
 #[derive(Debug)]
@@ -28,7 +23,7 @@ pub(super) struct Now<N>(N);
 #[derive(Debug)]
 struct CompatPark<P>(P);
 
-impl Compat {
+impl Background {
     pub(super) fn spawn(clock: &tokio_02::timer::clock::Clock) -> io::Result<Self> {
         let clock = clock_02::Clock::new_with_now(Now(clock.clone()));
 
@@ -48,21 +43,19 @@ impl Compat {
         let thread = Some(thread);
 
         Ok(Self {
-            compat_reactor: reactor_handle,
-            compat_timer: timer_handle,
-            compat_bg: Background {
-                thread,
-                shutdown_tx,
-            },
+            reactor_handle,
+            timer_handle,
+            thread,
+            shutdown_tx,
         })
     }
 
     pub(super) fn reactor(&self) -> &reactor_01::Handle {
-        &self.compat_reactor
+        &self.reactor_handle
     }
 
     pub(super) fn timer(&self) -> &timer_02::Handle {
-        &self.compat_timer
+        &self.timer_handle
     }
 }
 

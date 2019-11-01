@@ -1,7 +1,4 @@
-use super::{
-    compat::{self, Compat},
-    Builder,
-};
+use super::{compat, Builder};
 
 use tokio_02::executor::current_thread::Handle as ExecutorHandle;
 use tokio_02::executor::current_thread::{self, CurrentThread};
@@ -36,7 +33,7 @@ pub struct Runtime {
     ///
     /// This maintains a `tokio` 0.1 timer and reactor to support running
     /// futures that use older tokio APIs.
-    compat: Compat,
+    compat: compat::Background,
 }
 
 pub(super) type Parker = Timer<Reactor>;
@@ -141,7 +138,7 @@ impl Runtime {
         clock: Clock,
         executor: CurrentThread<Parker>,
     ) -> io::Result<Runtime> {
-        let compat = Compat::spawn(&clock)?;
+        let compat = compat::Background::spawn(&clock)?;
         Ok(Runtime {
             reactor_handle,
             timer_handle,
@@ -296,23 +293,18 @@ impl Runtime {
             ref timer_handle,
             ref clock,
             ref mut executor,
-            compat:
-                Compat {
-                    ref compat_timer,
-                    ref compat_reactor,
-                    ..
-                },
+            ref compat,
         } = *self;
 
         let mut enter = executor_01::enter().unwrap();
         // Set the default tokio 0.1 reactor to the background compat reactor.
-        reactor_01::with_default(compat_reactor, &mut enter, |enter| {
+        reactor_01::with_default(compat.reactor(), &mut enter, |enter| {
             // This will set the default handle and timer to use inside the closure
             // and run the future.
             let _reactor = driver::set_default(&reactor_handle);
             clock::with_default(clock, || {
                 // Set up a default timer for tokio 0.1 compat.
-                timer_02::with_default(&compat_timer, enter, |enter| {
+                timer_02::with_default(compat.timer(), enter, |enter| {
                     let _timer = timer::set_default(&timer_handle);
                     // Set default executor for tokio 0.1 futures.
                     let mut compat_exec = CompatExec {
