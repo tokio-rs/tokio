@@ -77,3 +77,21 @@ fn tokio_01_timers_work() {
     assert!(future1_ran.load(Ordering::SeqCst));
     assert!(future2_ran.load(Ordering::SeqCst));
 }
+
+#[test]
+fn block_on_01_timer() {
+    let mut rt = super::Runtime::new().unwrap();
+    let when = Instant::now() + Duration::from_millis(10);
+    rt.block_on(tokio_01::timer::Delay::new(when)).unwrap();
+    assert!(Instant::now() >= when);
+}
+
+#[test]
+fn block_on_01_timer_std() {
+    let mut rt = super::Runtime::new().unwrap();
+    let when = Instant::now() + Duration::from_millis(10);
+    rt.block_on_std(async move {
+        tokio_01::timer::Delay::new(when).compat().await.unwrap();
+    });
+    assert!(Instant::now() >= when);
+}
