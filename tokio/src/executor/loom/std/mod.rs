@@ -63,10 +63,10 @@ pub(crate) mod sync {
         pub(crate) use crate::executor::loom::std::atomic_u32::AtomicU32;
         pub(crate) use crate::executor::loom::std::atomic_usize::AtomicUsize;
 
-        #[cfg(feature = "rt-current-thread")]
-        pub(crate) use std::sync::atomic::{fence, AtomicPtr};
         #[cfg(feature = "rt-full")]
         pub(crate) use std::sync::atomic::spin_loop_hint;
+        #[cfg(feature = "rt-current-thread")]
+        pub(crate) use std::sync::atomic::{fence, AtomicPtr};
     }
 }
 

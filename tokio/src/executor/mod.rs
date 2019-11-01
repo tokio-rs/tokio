@@ -64,7 +64,7 @@ pub mod park;
 #[cfg(feature = "rt-current-thread")]
 mod task;
 #[cfg(feature = "rt-current-thread")]
-pub use self::task::{JoinHandle, JoinError};
+pub use self::task::{JoinError, JoinHandle};
 
 mod typed;
 pub use self::typed::TypedExecutor;
