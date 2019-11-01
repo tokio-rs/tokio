@@ -142,13 +142,13 @@ extern crate log;
 //
 // [Treiber stack]: https://en.wikipedia.org/wiki/Treiber_Stack
 
-pub mod park;
-
-mod blocking;
+#[doc(hidden)]
+pub mod blocking;
 mod builder;
 mod callback;
 mod config;
 mod notifier;
+pub mod park;
 mod pool;
 mod sender;
 mod shutdown;

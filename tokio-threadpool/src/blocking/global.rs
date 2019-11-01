@@ -1,14 +1,53 @@
-use worker::Worker;
-
+use super::{Blocking, BlockingError, DEFAULT_BLOCKING};
 use futures::Poll;
-use tokio_executor;
+use std::cell::Cell;
+use tokio_executor::Enter;
 
-use std::error::Error;
-use std::fmt;
+thread_local! {
+    static CURRENT: Cell<*const dyn Blocking> = Cell::new(&DEFAULT_BLOCKING as *const _);
+}
 
-/// Error raised by `blocking`.
-pub struct BlockingError {
-    _p: (),
+/// Set the default executor for the duration of the closure
+///
+/// # Panics
+///
+/// This function panics if there already is a default executor set.
+pub fn with_default<B, F, R>(blocking: &B, enter: &mut Enter, f: F) -> R
+where
+    B: Blocking,
+    F: FnOnce(&mut Enter) -> R,
+{
+    unsafe fn hide_lt<'a>(p: *const (dyn Blocking + 'a)) -> *const (dyn Blocking + 'static) {
+        use std::mem;
+        mem::transmute(p)
+    }
+
+    CURRENT.with(|cell| {
+        struct Reset<'a> {
+            cell: &'a Cell<*const dyn Blocking>,
+            prior: *const dyn Blocking,
+        };
+
+        impl<'a> Drop for Reset<'a> {
+            fn drop(&mut self) {
+                self.cell.set(self.prior);
+            }
+        }
+
+        // While scary, this is safe. The function takes a
+        // `&mut Executor`, which guarantees that the reference lives for the
+        // duration of `with_default`.
+        //
+        // Because we are always clearing the TLS value at the end of the
+        // function, we can cast the reference to 'static which thread-local
+        // cells require.
+        let blocking = unsafe { hide_lt(blocking as &_ as *const _) };
+
+        let prior = cell.replace(blocking);
+        let _reset = Reset { cell, prior };
+
+        f(enter)
+    })
 }
 
 /// Enter a blocking section of code.
@@ -126,56 +165,22 @@ pub fn blocking<F, T>(f: F) -> Poll<T, BlockingError>
 where
     F: FnOnce() -> T,
 {
-    let res = Worker::with_current(|worker| {
-        let worker = match worker {
-            Some(worker) => worker,
-            None => {
-                return Err(BlockingError { _p: () });
-            }
-        };
+    CURRENT.with(|cell| {
+        let blocking = unsafe { &*(cell.get()) };
+        let res = blocking.enter_blocking();
 
-        // Transition the worker state to blocking. This will exit the fn early
-        // with `NotReady` if the pool does not have enough capacity to enter
-        // blocking mode.
-        worker.transition_to_blocking()
-    });
+        // If the transition cannot happen, exit early
+        try_ready!(res);
 
-    // If the transition cannot happen, exit early
-    try_ready!(res);
+        // Currently in blocking mode, so call the inner closure.
+        //
+        // "Exit" the current executor in case the blocking function wants
+        // to call a different executor.
+        let ret = tokio_executor::exit(move || f());
 
-    // Currently in blocking mode, so call the inner closure.
-    //
-    // "Exit" the current executor in case the blocking function wants
-    // to call a different executor.
-    let ret = tokio_executor::exit(move || f());
+        blocking.exit_blocking();
 
-    // Try to transition out of blocking mode. This is a fast path that takes
-    // back ownership of the worker if the worker handoff didn't complete yet.
-    Worker::with_current(|worker| {
-        // Worker must be set since it was above.
-        worker.unwrap().transition_from_blocking();
-    });
-
-    // Return the result
-    Ok(ret.into())
-}
-
-impl fmt::Display for BlockingError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "{}", self.description())
-    }
-}
-
-impl fmt::Debug for BlockingError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("BlockingError")
-            .field("reason", &self.description())
-            .finish()
-    }
-}
-
-impl Error for BlockingError {
-    fn description(&self) -> &str {
-        "`blocking` annotation used from outside the context of a thread pool"
-    }
+        // Return the result
+        Ok(ret.into())
+    })
 }
