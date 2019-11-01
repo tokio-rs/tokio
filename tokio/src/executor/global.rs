@@ -178,7 +178,9 @@ where
 
             // Safety: The `CurrentThread` value set the thread-local (same
             // thread).
-            unsafe { current_thread.spawn_background(future); }
+            unsafe {
+                current_thread.spawn_background(future);
+            }
         }
         State::Empty => panic!("must be called from the context of Tokio runtime"),
     })
@@ -189,15 +191,16 @@ pub(super) fn with_current_thread<F, R>(current_thread: &current_thread::Schedul
 where
     F: FnOnce() -> R,
 {
-    with_state(State::CurrentThread(current_thread as *const current_thread::Scheduler), f)
+    with_state(
+        State::CurrentThread(current_thread as *const current_thread::Scheduler),
+        f,
+    )
 }
 
 #[cfg(feature = "rt-current-thread")]
 pub(super) fn current_thread_is_current(current_thread: &current_thread::Scheduler) -> bool {
     EXECUTOR.with(|current_executor| match current_executor.get() {
-        State::CurrentThread(ptr) => {
-            ptr == current_thread as *const _
-        }
+        State::CurrentThread(ptr) => ptr == current_thread as *const _,
         _ => false,
     })
 }

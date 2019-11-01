@@ -4,8 +4,8 @@ use crate::executor::task::core::{Cell, Core, Header, Trailer};
 use crate::executor::task::state::Snapshot;
 use crate::executor::task::{Error, Schedule, Task};
 
-use std::marker::PhantomData;
 use std::future::Future;
+use std::marker::PhantomData;
 use std::mem::{ManuallyDrop, MaybeUninit};
 use std::ptr::NonNull;
 use std::task::{Poll, Waker};
@@ -416,7 +416,12 @@ where
             unsafe {
                 // perform a local release
                 let task = ManuallyDrop::new(self.to_task());
-                executor.as_ref().unwrap().cast::<S>().as_ref().release_local(&task);
+                executor
+                    .as_ref()
+                    .unwrap()
+                    .cast::<S>()
+                    .as_ref()
+                    .release_local(&task);
 
                 if self.transition_to_released(join_interest).is_final_ref() {
                     self.dealloc();

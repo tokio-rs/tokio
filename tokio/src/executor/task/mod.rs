@@ -112,9 +112,12 @@ impl<S: Schedule> Task<S> {
     /// Returns `self` when the task needs to be immediately re-scheduled
     pub(crate) fn run<F>(self, executor: &mut F) -> Option<Self>
     where
-        F: FnMut() -> Option<NonNull<S>>
+        F: FnMut() -> Option<NonNull<S>>,
     {
-        if unsafe { self.raw.poll(&mut || executor().map(|ptr| ptr.cast::<()>())) } {
+        if unsafe {
+            self.raw
+                .poll(&mut || executor().map(|ptr| ptr.cast::<()>()))
+        } {
             Some(self)
         } else {
             // Cleaning up the `Task` instance is done from within the poll

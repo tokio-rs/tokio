@@ -1,6 +1,6 @@
-use crate::executor::Executor;
 use crate::executor::park::{Park, Unpark};
-use crate::executor::task::{self, JoinHandle, Task, Schedule};
+use crate::executor::task::{self, JoinHandle, Schedule, Task};
+use crate::executor::Executor;
 
 use std::cell::UnsafeCell;
 use std::collections::VecDeque;
@@ -106,15 +106,14 @@ where
                 pending_drop: task::TransferStack::new(),
                 unpark: Box::new(unpark),
             }),
-            local: Local {
-                tick: 0,
-                park,
-            },
+            local: Local { tick: 0, park },
         }
     }
 
     pub(crate) fn spawner(&self) -> Spawner {
-        Spawner { scheduler: self.scheduler.clone() }
+        Spawner {
+            scheduler: self.scheduler.clone(),
+        }
     }
 
     /// Spawn a future onto the thread pool
@@ -140,16 +139,13 @@ where
         let scheduler = &*self.scheduler;
 
         crate::executor::global::with_current_thread(scheduler, || {
-            let mut _enter = crate::executor::enter()
-                .expect("attempting to block while on a Tokio executor");
+            let mut _enter =
+                crate::executor::enter().expect("attempting to block while on a Tokio executor");
 
             let raw_waker = RawWaker::new(
                 scheduler as *const Scheduler as *const (),
-                &RawWakerVTable::new(
-                    sched_clone_waker,
-                    sched_noop,
-                    sched_wake_by_ref,
-                    sched_noop));
+                &RawWakerVTable::new(sched_clone_waker, sched_noop, sched_wake_by_ref, sched_noop),
+            );
 
             let waker = ManuallyDrop::new(unsafe { Waker::from_raw(raw_waker) });
             let mut cx = Context::from_waker(&waker);
@@ -204,11 +200,17 @@ impl Scheduler {
             };
 
             if let Some(task) = task.run(&mut || Some(self.into())) {
-                unsafe { self.schedule_local(task); }
+                unsafe {
+                    self.schedule_local(task);
+                }
             }
         }
 
-        local.park.park_timeout(Duration::from_millis(0)).ok().expect("failed to park");
+        local
+            .park
+            .park_timeout(Duration::from_millis(0))
+            .ok()
+            .expect("failed to park");
     }
 
     fn drain_pending_drop(&self) {
@@ -238,18 +240,14 @@ impl Scheduler {
 
     fn next_task(&self, tick: u8) -> Option<Task<Self>> {
         if 0 == tick % CHECK_REMOTE_INTERVAL {
-            self.next_remote_task()
-                .or_else(|| self.next_local_task())
+            self.next_remote_task().or_else(|| self.next_local_task())
         } else {
-            self.next_local_task()
-                .or_else(|| self.next_remote_task())
+            self.next_local_task().or_else(|| self.next_remote_task())
         }
     }
 
     fn next_local_task(&self) -> Option<Task<Self>> {
-        unsafe {
-            (*self.local_queue.get()).pop_front()
-        }
+        unsafe { (*self.local_queue.get()).pop_front() }
     }
 
     fn next_remote_task(&self) -> Option<Task<Self>> {
@@ -305,7 +303,9 @@ impl Executor for &Scheduler {
         // the thread local.
         //
         // TODO: Delete this implementation.
-        unsafe { Scheduler::spawn_background(self, future); }
+        unsafe {
+            Scheduler::spawn_background(self, future);
+        }
         Ok(())
     }
 }
@@ -331,7 +331,9 @@ where
         }
 
         // Release owned tasks
-        unsafe { (*self.scheduler.owned_tasks.get()).shutdown(); }
+        unsafe {
+            (*self.scheduler.owned_tasks.get()).shutdown();
+        }
 
         self.scheduler.drain_pending_drop();
 
@@ -345,8 +347,7 @@ where
 
 impl fmt::Debug for Scheduler {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("Scheduler")
-            .finish()
+        fmt.debug_struct("Scheduler").finish()
     }
 }
 
@@ -356,11 +357,8 @@ unsafe fn sched_clone_waker(ptr: *const ()) -> RawWaker {
 
     RawWaker::new(
         &**s2 as *const Scheduler as *const (),
-        &RawWakerVTable::new(
-            sched_clone_waker,
-            sched_wake,
-            sched_wake_by_ref,
-            sched_drop))
+        &RawWakerVTable::new(sched_clone_waker, sched_wake, sched_wake_by_ref, sched_drop),
+    )
 }
 
 unsafe fn sched_wake(ptr: *const ()) {

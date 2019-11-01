@@ -1,7 +1,7 @@
 use crate::executor::task::{Header, Task};
 
-use std::marker::PhantomData;
 use std::fmt;
+use std::marker::PhantomData;
 use std::ptr::NonNull;
 
 pub(crate) struct OwnedList<T: 'static> {
