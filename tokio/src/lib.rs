@@ -87,9 +87,6 @@ macro_rules! thread_local {
 #[cfg(feature = "timer")]
 pub mod clock;
 
-#[cfg(feature = "codec")]
-pub mod codec;
-
 #[cfg(feature = "fs")]
 pub mod fs;
 

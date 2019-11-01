@@ -16,6 +16,12 @@ use std::time::Duration;
 thread_local!(static FOO: Cell<u32> = Cell::new(0));
 
 #[test]
+fn single_thread() {
+    // No panic when starting a runtime w/ a single thread
+    let _ = Builder::new().num_threads(1).build();
+}
+
+#[test]
 fn shutdown_drops_futures() {
     for _ in 0..1_000 {
         let num_inc = Arc::new(AtomicUsize::new(0));
