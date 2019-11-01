@@ -86,11 +86,30 @@ fn block_on_01_timer() {
 }
 
 #[test]
-fn block_on_01_timer_std() {
+fn block_on_std_01_timer() {
     let rt = super::Runtime::new().unwrap();
     let when = Instant::now() + Duration::from_millis(10);
     rt.block_on_std(async move {
         tokio_01::timer::Delay::new(when).compat().await.unwrap();
     });
     assert!(Instant::now() >= when);
+}
+
+#[test]
+fn block_on_01_spawn() {
+    let rt = super::Runtime::new().unwrap();
+    // other tests assert that spawned 0.1 tasks actually *run*, all we care
+    // is that we're able to spawn it successfully.
+    rt.block_on(futures_01::future::lazy(|| {
+        tokio_01::spawn(futures_01::future::lazy(|| Ok(())))
+    }))
+    .unwrap();
+}
+
+#[test]
+fn block_on_std_01_spawn() {
+    let rt = super::Runtime::new().unwrap();
+    // other tests assert that spawned 0.1 tasks actually *run*, all we care
+    // is that we're able to spawn it successfully.
+    rt.block_on_std(async { tokio_01::spawn(futures_01::future::lazy(|| Ok(()))) });
 }
