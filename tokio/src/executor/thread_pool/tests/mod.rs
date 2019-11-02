@@ -5,6 +5,9 @@ mod loom_pool;
 mod loom_queue;
 
 #[cfg(not(loom))]
+mod pool;
+
+#[cfg(not(loom))]
 mod queue;
 
 #[cfg(not(loom))]
