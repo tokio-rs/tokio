@@ -44,6 +44,9 @@ pub mod mpsc;
 mod mutex;
 pub use mutex::{Mutex, MutexGuard};
 
+mod rwlock;
+pub use rwlock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+
 pub mod oneshot;
 
 pub mod semaphore;
