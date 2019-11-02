@@ -119,24 +119,10 @@ optional = true
 
 [dev-dependencies]
 tokio-test = { version = "=0.2.0-alpha.6", path = "../tokio-test" }
-tokio-util = { version = "=0.2.0-alpha.6", path = "../tokio-util" }
-
 futures-preview = { version = "=0.3.0-alpha.19", features = ["async-await"] }
-env_logger = { version = "0.6", default-features = false }
-flate2 = { version = "1", features = ["tokio"] }
-http = "0.1"
-httparse = "1.0"
-libc = "0.2"
 loom = { version = "0.2.12", features = ["futures", "checkpoint"] }
-num_cpus = "1.0"
-rand = "0.7.2"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-tempfile = "3.1.0"
-time = "0.1"
-
-# sharded slab tests
 proptest = "0.9.4"
+tempfile = "3.1.0"
 
 [package.metadata.docs.rs]
 all-features = true
