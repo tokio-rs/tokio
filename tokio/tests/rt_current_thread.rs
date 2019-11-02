@@ -282,8 +282,6 @@ fn delay_in_spawn() {
 
 #[test]
 fn client_server_block_on() {
-    let _ = env_logger::try_init();
-
     let mut rt = rt();
     let (tx, rx) = mpsc::channel();
 

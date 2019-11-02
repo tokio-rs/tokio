@@ -44,8 +44,6 @@ fn send_sync_bound() {
 
 #[test]
 fn spawn_shutdown() {
-    let _ = env_logger::try_init();
-
     let mut rt = Runtime::new().unwrap();
     let (tx, rx) = mpsc::channel();
 
@@ -166,8 +164,6 @@ fn nested_enter() {
 #[test]
 fn after_start_and_before_stop_is_called() {
     use std::sync::atomic::{AtomicUsize, Ordering};
-
-    let _ = env_logger::try_init();
 
     let after_start = Arc::new(AtomicUsize::new(0));
     let before_stop = Arc::new(AtomicUsize::new(0));
