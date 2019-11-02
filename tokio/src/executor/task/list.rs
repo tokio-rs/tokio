@@ -80,7 +80,9 @@ impl<T: 'static> OwnedList<T> {
                 return true;
             }
 
-            unsafe { curr = *p.as_ref().owned_next.get(); }
+            unsafe {
+                curr = *p.as_ref().owned_next.get();
+            }
         }
 
         false

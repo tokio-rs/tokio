@@ -4,8 +4,8 @@ use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
 use tokio_test::{assert_err, assert_ok};
 
-use std::time::Duration;
 use std::thread;
+use std::time::Duration;
 
 #[test]
 fn spawned_task_does_not_progress_without_block_on() {
@@ -21,9 +21,7 @@ fn spawned_task_does_not_progress_without_block_on() {
 
     assert_err!(rx.try_recv());
 
-    let out = rt.block_on(async {
-        assert_ok!(rx.await)
-    });
+    let out = rt.block_on(async { assert_ok!(rx.await) });
 
     assert_eq!(out, "hello");
 }

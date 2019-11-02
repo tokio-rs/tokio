@@ -8,9 +8,9 @@ use tokio_test::{assert_err, assert_ok};
 
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{mpsc, Arc};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
+use std::sync::{mpsc, Arc};
 use std::task::{Context, Poll};
 
 #[test]
