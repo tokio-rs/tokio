@@ -199,8 +199,10 @@ impl State {
             // Use the running flag to signal cancellation
             if prev.is_running() {
                 next.0 -= RUNNING;
+                next.0 |= NOTIFIED;
             } else if prev.is_notified() {
                 next.0 += RUNNING;
+                next.0 |= NOTIFIED;
             } else {
                 next.0 |= CANCELLED;
             }
