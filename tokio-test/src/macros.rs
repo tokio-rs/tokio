@@ -13,16 +13,11 @@
 /// # Examples
 ///
 /// ```
-/// use std::future::Future;
-/// use futures_util::{future, pin_mut};
+/// use futures_util::future;
 /// use tokio_test::{assert_ready, task};
 ///
-/// task::mock(|cx| {
-///     let fut = future::ready(());
-///
-///     pin_mut!(fut);
-///     assert_ready!(fut.poll(cx));
-/// })
+/// let mut fut = task::spawn(future::ready(()));
+/// assert_ready!(fut.poll());
 /// ```
 #[macro_export]
 macro_rules! assert_ready {
@@ -57,16 +52,11 @@ macro_rules! assert_ready {
 /// # Examples
 ///
 /// ```
-/// use std::future::Future;
-/// use futures_util::{future, pin_mut};
+/// use futures_util::future;
 /// use tokio_test::{assert_ready_ok, task};
 ///
-/// task::mock(|cx| {
-///     let fut = future::ok::<_, ()>(());
-///
-///     pin_mut!(fut);
-///     assert_ready_ok!(fut.poll(cx));
-/// })
+/// let mut fut = task::spawn(future::ok::<_, ()>(()));
+/// assert_ready_ok!(fut.poll());
 /// ```
 #[macro_export]
 macro_rules! assert_ready_ok {
@@ -95,16 +85,11 @@ macro_rules! assert_ready_ok {
 /// # Examples
 ///
 /// ```
-/// use std::future::Future;
-/// use futures_util::{future, pin_mut};
+/// use futures_util::future;
 /// use tokio_test::{assert_ready_err, task};
 ///
-/// task::mock(|cx| {
-///     let fut = future::err::<(), _>(());
-///
-///     pin_mut!(fut);
-///     assert_ready_err!(fut.poll(cx));
-/// })
+/// let mut fut = task::spawn(future::err::<(), _>(()));
+/// assert_ready_err!(fut.poll());
 /// ```
 #[macro_export]
 macro_rules! assert_ready_err {
@@ -133,16 +118,11 @@ macro_rules! assert_ready_err {
 /// # Examples
 ///
 /// ```
-/// use std::future::Future;
-/// use futures_util::{future, pin_mut};
+/// use futures_util::future;
 /// use tokio_test::{assert_pending, task};
 ///
-/// task::mock(|cx| {
-///     let fut = future::pending::<()>();
-///
-///     pin_mut!(fut);
-///     assert_pending!(fut.poll(cx));
-/// })
+/// let mut fut = task::spawn(future::pending::<()>());
+/// assert_pending!(fut.poll());
 /// ```
 #[macro_export]
 macro_rules! assert_pending {
@@ -177,16 +157,11 @@ macro_rules! assert_pending {
 /// # Examples
 ///
 /// ```
-/// use std::future::Future;
-/// use futures_util::{future, pin_mut};
+/// use futures_util::future;
 /// use tokio_test::{assert_ready_eq, task};
 ///
-/// task::mock(|cx| {
-///     let fut = future::ready(42);
-///
-///     pin_mut!(fut);
-///     assert_ready_eq!(fut.poll(cx), 42);
-/// })
+/// let mut fut = task::spawn(future::ready(42));
+/// assert_ready_eq!(fut.poll(), 42);
 /// ```
 #[macro_export]
 macro_rules! assert_ready_eq {

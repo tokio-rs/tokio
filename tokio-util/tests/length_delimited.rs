@@ -2,7 +2,7 @@
 
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::prelude::*;
-use tokio_test::task::MockTask;
+use tokio_test::task;
 use tokio_test::{
     assert_err, assert_ok, assert_pending, assert_ready, assert_ready_err, assert_ready_ok,
 };
@@ -26,7 +26,7 @@ macro_rules! mock {
 
 macro_rules! assert_next_eq {
     ($io:ident, $expect:expr) => {{
-        MockTask::new().enter(|cx| {
+        task::spawn(()).enter(|cx, _| {
             let res = assert_ready!($io.as_mut().poll_next(cx));
             match res {
                 Some(Ok(v)) => assert_eq!(v, $expect.as_ref()),
@@ -39,7 +39,7 @@ macro_rules! assert_next_eq {
 
 macro_rules! assert_next_pending {
     ($io:ident) => {{
-        MockTask::new().enter(|cx| match $io.as_mut().poll_next(cx) {
+        task::spawn(()).enter(|cx, _| match $io.as_mut().poll_next(cx) {
             Ready(Some(Ok(v))) => panic!("value = {:?}", v),
             Ready(Some(Err(e))) => panic!("error = {:?}", e),
             Ready(None) => panic!("done"),
@@ -50,7 +50,7 @@ macro_rules! assert_next_pending {
 
 macro_rules! assert_next_err {
     ($io:ident) => {{
-        MockTask::new().enter(|cx| match $io.as_mut().poll_next(cx) {
+        task::spawn(()).enter(|cx, _| match $io.as_mut().poll_next(cx) {
             Ready(Some(Ok(v))) => panic!("value = {:?}", v),
             Ready(Some(Err(_))) => {}
             Ready(None) => panic!("done"),
@@ -61,7 +61,7 @@ macro_rules! assert_next_err {
 
 macro_rules! assert_done {
     ($io:ident) => {{
-        MockTask::new().enter(|cx| {
+        task::spawn(()).enter(|cx, _| {
             let res = assert_ready!($io.as_mut().poll_next(cx));
             match res {
                 Some(Ok(v)) => panic!("value = {:?}", v),
@@ -405,7 +405,7 @@ fn write_single_frame_length_adjusted() {
         });
     pin_mut!(io);
 
-    MockTask::new().enter(|cx| {
+    task::spawn(()).enter(|cx, _| {
         assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
         assert_ready_ok!(io.as_mut().poll_flush(cx));
@@ -418,7 +418,7 @@ fn write_nothing_yields_nothing() {
     let io = FramedWrite::new(mock!(), LengthDelimitedCodec::new());
     pin_mut!(io);
 
-    MockTask::new().enter(|cx| {
+    task::spawn(()).enter(|cx, _| {
         assert_ready_ok!(io.poll_flush(cx));
     });
 }
@@ -435,7 +435,7 @@ fn write_single_frame_one_packet() {
     );
     pin_mut!(io);
 
-    MockTask::new().enter(|cx| {
+    task::spawn(()).enter(|cx, _| {
         assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
         assert_ready_ok!(io.as_mut().poll_flush(cx));
@@ -459,7 +459,7 @@ fn write_single_multi_frame_one_packet() {
     );
     pin_mut!(io);
 
-    MockTask::new().enter(|cx| {
+    task::spawn(()).enter(|cx, _| {
         assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
 
@@ -492,7 +492,7 @@ fn write_single_multi_frame_multi_packet() {
     );
     pin_mut!(io);
 
-    MockTask::new().enter(|cx| {
+    task::spawn(()).enter(|cx, _| {
         assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
 
@@ -526,7 +526,7 @@ fn write_single_frame_would_block() {
     );
     pin_mut!(io);
 
-    MockTask::new().enter(|cx| {
+    task::spawn(()).enter(|cx, _| {
         assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
 
@@ -549,7 +549,7 @@ fn write_single_frame_little_endian() {
         });
     pin_mut!(io);
 
-    MockTask::new().enter(|cx| {
+    task::spawn(()).enter(|cx, _| {
         assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
 
@@ -569,7 +569,7 @@ fn write_single_frame_with_short_length_field() {
         });
     pin_mut!(io);
 
-    MockTask::new().enter(|cx| {
+    task::spawn(()).enter(|cx, _| {
         assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
 
@@ -586,7 +586,7 @@ fn write_max_frame_len() {
         .new_write(mock! {});
     pin_mut!(io);
 
-    MockTask::new().enter(|cx| {
+    task::spawn(()).enter(|cx, _| {
         assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_err!(io.as_mut().start_send(Bytes::from("abcdef")));
 
@@ -603,7 +603,7 @@ fn write_update_max_frame_len_at_rest() {
     });
     pin_mut!(io);
 
-    MockTask::new().enter(|cx| {
+    task::spawn(()).enter(|cx, _| {
         assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdef")));
 
@@ -628,7 +628,7 @@ fn write_update_max_frame_len_in_flight() {
     });
     pin_mut!(io);
 
-    MockTask::new().enter(|cx| {
+    task::spawn(()).enter(|cx, _| {
         assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdef")));
 
@@ -648,7 +648,7 @@ fn write_zero() {
     let io = length_delimited::Builder::new().new_write(mock! {});
     pin_mut!(io);
 
-    MockTask::new().enter(|cx| {
+    task::spawn(()).enter(|cx, _| {
         assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdef")));
 

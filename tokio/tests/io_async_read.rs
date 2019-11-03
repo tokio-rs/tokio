@@ -1,9 +1,8 @@
 use tokio::io::AsyncRead;
-use tokio_test::task::MockTask;
+use tokio_test::task;
 use tokio_test::{assert_ready_err, assert_ready_ok};
 
 use bytes::{BufMut, BytesMut};
-use futures_util::pin_mut;
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -30,12 +29,8 @@ fn read_buf_success() {
     }
 
     let mut buf = BytesMut::with_capacity(65);
-    let mut task = MockTask::new();
 
-    task.enter(|cx| {
-        let rd = Rd;
-        pin_mut!(rd);
-
+    task::spawn(Rd).enter(|cx, rd| {
         let n = assert_ready_ok!(rd.poll_read_buf(cx, &mut buf));
 
         assert_eq!(11, n);
@@ -59,12 +54,8 @@ fn read_buf_error() {
     }
 
     let mut buf = BytesMut::with_capacity(65);
-    let mut task = MockTask::new();
 
-    task.enter(|cx| {
-        let rd = Rd;
-        pin_mut!(rd);
-
+    task::spawn(Rd).enter(|cx, rd| {
         let err = assert_ready_err!(rd.poll_read_buf(cx, &mut buf));
         assert_eq!(err.kind(), io::ErrorKind::Other);
     });
@@ -86,14 +77,9 @@ fn read_buf_no_capacity() {
 
     // Can't create BytesMut w/ zero capacity, so fill it up
     let mut buf = BytesMut::with_capacity(64);
-    let mut task = MockTask::new();
-
     buf.put(&[0; 64][..]);
 
-    task.enter(|cx| {
-        let rd = Rd;
-        pin_mut!(rd);
-
+    task::spawn(Rd).enter(|cx, rd| {
         let n = assert_ready_ok!(rd.poll_read_buf(cx, &mut buf));
         assert_eq!(0, n);
     });
@@ -118,12 +104,8 @@ fn read_buf_no_uninitialized() {
     }
 
     let mut buf = BytesMut::with_capacity(64);
-    let mut task = MockTask::new();
 
-    task.enter(|cx| {
-        let rd = Rd;
-        pin_mut!(rd);
-
+    task::spawn(Rd).enter(|cx, rd| {
         let n = assert_ready_ok!(rd.poll_read_buf(cx, &mut buf));
         assert_eq!(0, n);
     });
@@ -150,16 +132,12 @@ fn read_buf_uninitialized_ok() {
 
     // Can't create BytesMut w/ zero capacity, so fill it up
     let mut buf = BytesMut::with_capacity(64);
-    let mut task = MockTask::new();
 
     unsafe {
         buf.bytes_mut()[0..11].copy_from_slice(b"hello world");
     }
 
-    task.enter(|cx| {
-        let rd = Rd;
-        pin_mut!(rd);
-
+    task::spawn(Rd).enter(|cx, rd| {
         let n = assert_ready_ok!(rd.poll_read_buf(cx, &mut buf));
         assert_eq!(0, n);
     });

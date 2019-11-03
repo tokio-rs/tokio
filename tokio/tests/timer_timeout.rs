@@ -2,7 +2,7 @@
 
 use tokio::sync::oneshot;
 use tokio::timer::*;
-use tokio_test::task::MockTask;
+use tokio_test::task;
 use tokio_test::{
     assert_err, assert_pending, assert_ready, assert_ready_err, assert_ready_ok, clock,
 };
@@ -11,79 +11,70 @@ use std::time::Duration;
 
 #[test]
 fn simultaneous_deadline_future_completion() {
-    let mut t = MockTask::new();
-
     clock::mock(|clock| {
         // Create a future that is immediately ready
-        let fut = Box::pin(Timeout::new_at(async {}, clock.now()));
+        let mut fut = task::spawn(Timeout::new_at(async {}, clock.now()));
 
         // Ready!
-        assert_ready_ok!(t.poll(fut));
+        assert_ready_ok!(fut.poll());
     });
 }
 
 #[test]
 fn completed_future_past_deadline() {
-    let mut t = MockTask::new();
-
     clock::mock(|clock| {
         // Wrap it with a deadline
-        let fut = Timeout::new_at(async {}, clock.now() - ms(1000));
-        let fut = Box::pin(fut);
+        let mut fut = task::spawn(Timeout::new_at(async {}, clock.now() - ms(1000)));
 
         // Ready!
-        assert_ready_ok!(t.poll(fut));
+        assert_ready_ok!(fut.poll());
     });
 }
 
 #[test]
 fn future_and_deadline_in_future() {
-    let mut t = MockTask::new();
-
     clock::mock(|clock| {
         // Not yet complete
         let (tx, rx) = oneshot::channel();
 
         // Wrap it with a deadline
-        let mut fut = Timeout::new_at(rx, clock.now() + ms(100));
+        let mut fut = task::spawn(Timeout::new_at(rx, clock.now() + ms(100)));
 
-        assert_pending!(t.poll(&mut fut));
+        assert_pending!(fut.poll());
 
         // Turn the timer, it runs for the elapsed time
         clock.advance(ms(90));
 
-        assert_pending!(t.poll(&mut fut));
+        assert_pending!(fut.poll());
 
         // Complete the future
         tx.send(()).unwrap();
 
-        assert_ready_ok!(t.poll(&mut fut)).unwrap();
+        assert_ready_ok!(fut.poll()).unwrap();
     });
 }
 
 #[test]
 fn future_and_timeout_in_future() {
-    let mut t = MockTask::new();
-
     clock::mock(|clock| {
         // Not yet complete
         let (tx, rx) = oneshot::channel();
 
         // Wrap it with a deadline
-        let mut fut = Timeout::new(rx, ms(100));
+        let mut fut = task::spawn(Timeout::new(rx, ms(100)));
 
         // Ready!
-        assert_pending!(t.poll(&mut fut));
+        assert_pending!(fut.poll());
 
         // Turn the timer, it runs for the elapsed time
         clock.advance(ms(90));
 
-        assert_pending!(t.poll(&mut fut));
+        assert_pending!(fut.poll());
 
         // Complete the future
         tx.send(()).unwrap();
 
-        assert_ready_ok!(t.poll(&mut fut)).unwrap();
+        assert_ready_ok!(fut.poll()).unwrap();
     });
 }
 
@@ -103,64 +94,51 @@ impl Future for Empty {
 
 #[test]
 fn deadline_now_elapses() {
-    let mut t = MockTask::new();
-
     clock::mock(|clock| {
         // Wrap it with a deadline
-        let mut fut = Timeout::new_at(Empty, clock.now());
+        let mut fut = task::spawn(Timeout::new_at(Empty, clock.now()));
 
-        assert_ready_err!(t.poll(&mut fut));
+        assert_ready_err!(fut.poll());
     });
 }
 
 #[test]
 fn deadline_future_elapses() {
-    let mut t = MockTask::new();
-
     clock::mock(|clock| {
         // Wrap it with a deadline
-        let mut fut = Timeout::new_at(Empty, clock.now() + ms(300));
+        let mut fut = task::spawn(Timeout::new_at(Empty, clock.now() + ms(300)));
 
-        assert_pending!(t.poll(&mut fut));
+        assert_pending!(fut.poll());
 
         clock.advance(ms(300));
 
-        assert_ready_err!(t.poll(&mut fut));
+        assert_ready_err!(fut.poll());
     });
-}
-
-macro_rules! poll {
-    ($task:ident, $stream:ident) => {{
-        use futures_core::Stream;
-        $task.enter(|cx| Pin::new(&mut $stream).poll_next(cx))
-    }};
 }
 
 #[test]
 fn stream_and_timeout_in_future() {
     use tokio::sync::mpsc;
 
-    let mut t = MockTask::new();
-
     clock::mock(|clock| {
         // Not yet complete
         let (mut tx, rx) = mpsc::unbounded_channel();
 
         // Wrap it with a deadline
-        let mut stream = Timeout::new(rx, ms(100));
+        let mut stream = task::spawn(Timeout::new(rx, ms(100)));
 
         // Not ready
-        assert_pending!(poll!(t, stream));
+        assert_pending!(stream.poll_next());
 
         // Turn the timer, it runs for the elapsed time
         clock.advance(ms(90));
 
-        assert_pending!(poll!(t, stream));
+        assert_pending!(stream.poll_next());
 
         // Complete the future
         tx.try_send(()).unwrap();
 
-        let item = assert_ready!(poll!(t, stream));
+        let item = assert_ready!(stream.poll_next());
         assert!(item.is_some());
     });
 }
@@ -169,30 +147,28 @@ fn stream_and_timeout_in_future() {
 fn idle_stream_timesout_periodically() {
     use tokio::sync::mpsc;
 
-    let mut t = MockTask::new();
-
     clock::mock(|clock| {
         // Not yet complete
         let (_tx, rx) = mpsc::unbounded_channel::<()>();
 
         // Wrap it with a deadline
-        let mut stream = Timeout::new(rx, ms(100));
+        let mut stream = task::spawn(Timeout::new(rx, ms(100)));
 
         // Not ready
-        assert_pending!(poll!(t, stream));
+        assert_pending!(stream.poll_next());
 
         // Turn the timer, it runs for the elapsed time
         clock.advance(ms(100));
 
-        let v = assert_ready!(poll!(t, stream)).unwrap();
+        let v = assert_ready!(stream.poll_next()).unwrap();
         assert_err!(v);
 
         // Stream's timeout should reset
-        assert_pending!(poll!(t, stream));
+        assert_pending!(stream.poll_next());
 
         // Turn the timer, it runs for the elapsed time
         clock.advance(ms(100));
-        let v = assert_ready!(poll!(t, stream)).unwrap();
+        let v = assert_ready!(stream.poll_next()).unwrap();
         assert_err!(v)
     });
 }

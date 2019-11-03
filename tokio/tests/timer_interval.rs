@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::timer::*;
-use tokio_test::task::MockTask;
+use tokio_test::task;
 use tokio_test::{assert_pending, assert_ready_eq, clock};
 
 use std::time::Duration;
@@ -16,36 +16,28 @@ fn interval_zero_duration() {
 
 #[test]
 fn usage() {
-    let mut task = MockTask::new();
-
     clock::mock(|clock| {
         let start = clock.now();
-        let mut int = Interval::new(start, ms(300));
+        let mut int = task::spawn(Interval::new(start, ms(300)));
 
-        macro_rules! poll {
-            () => {
-                task.enter(|cx| int.poll_next(cx))
-            };
-        }
-
-        assert_ready_eq!(poll!(), Some(start));
-        assert_pending!(poll!());
+        assert_ready_eq!(int.poll_next(), Some(start));
+        assert_pending!(int.poll_next());
 
         clock.advance(ms(100));
-        assert_pending!(poll!());
+        assert_pending!(int.poll_next());
 
         clock.advance(ms(200));
-        assert_ready_eq!(poll!(), Some(start + ms(300)));
-        assert_pending!(poll!());
+        assert_ready_eq!(int.poll_next(), Some(start + ms(300)));
+        assert_pending!(int.poll_next());
 
         clock.advance(ms(400));
-        assert_ready_eq!(poll!(), Some(start + ms(600)));
-        assert_pending!(poll!());
+        assert_ready_eq!(int.poll_next(), Some(start + ms(600)));
+        assert_pending!(int.poll_next());
 
         clock.advance(ms(500));
-        assert_ready_eq!(poll!(), Some(start + ms(900)));
-        assert_ready_eq!(poll!(), Some(start + ms(1200)));
-        assert_pending!(poll!());
+        assert_ready_eq!(int.poll_next(), Some(start + ms(900)));
+        assert_ready_eq!(int.poll_next(), Some(start + ms(1200)));
+        assert_pending!(int.poll_next());
     });
 }
 
