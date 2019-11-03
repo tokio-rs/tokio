@@ -44,3 +44,14 @@ async fn write() {
     assert_eq!(n, 4);
     assert_eq!(wr.buf, b"hell"[..]);
 }
+
+#[tokio::test]
+async fn write_cursor() {
+    use std::io::Cursor;
+
+    let mut wr = Cursor::new(Vec::new());
+
+    let n = assert_ok!(wr.write(b"hello world").await);
+    assert_eq!(n, 11);
+    assert_eq!(wr.get_ref().as_slice(), &b"hello world"[..]);
+}
