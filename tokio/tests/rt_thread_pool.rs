@@ -2,14 +2,139 @@
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::runtime::Runtime;
+use tokio::runtime::{self, Runtime};
 use tokio::sync::oneshot;
-use tokio::timer::delay;
 use tokio_test::{assert_err, assert_ok};
 
-use std::sync::{mpsc, Arc, Mutex};
-use std::thread;
-use std::time::{Duration, Instant};
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::Relaxed;
+use std::sync::{mpsc, Arc};
+use std::task::{Context, Poll};
+
+#[test]
+fn single_thread() {
+    // No panic when starting a runtime w/ a single thread
+    let _ = runtime::Builder::new().num_threads(1).build();
+}
+
+#[test]
+fn many_oneshot_futures() {
+    // used for notifying the main thread
+    const NUM: usize = 1_000;
+
+    for _ in 0..5 {
+        let (tx, rx) = mpsc::channel();
+
+        let rt = rt();
+        let cnt = Arc::new(AtomicUsize::new(0));
+
+        for _ in 0..NUM {
+            let cnt = cnt.clone();
+            let tx = tx.clone();
+
+            rt.spawn(async move {
+                let num = cnt.fetch_add(1, Relaxed) + 1;
+
+                if num == NUM {
+                    tx.send(()).unwrap();
+                }
+            });
+        }
+
+        rx.recv().unwrap();
+
+        // Wait for the pool to shutdown
+        drop(rt);
+    }
+}
+#[test]
+fn many_multishot_futures() {
+    use tokio::sync::mpsc;
+
+    const CHAIN: usize = 200;
+    const CYCLES: usize = 5;
+    const TRACKS: usize = 50;
+
+    for _ in 0..50 {
+        let rt = rt();
+        let mut start_txs = Vec::with_capacity(TRACKS);
+        let mut final_rxs = Vec::with_capacity(TRACKS);
+
+        for _ in 0..TRACKS {
+            let (start_tx, mut chain_rx) = mpsc::channel(10);
+
+            for _ in 0..CHAIN {
+                let (mut next_tx, next_rx) = mpsc::channel(10);
+
+                // Forward all the messages
+                rt.spawn(async move {
+                    while let Some(v) = chain_rx.recv().await {
+                        next_tx.send(v).await.unwrap();
+                    }
+                });
+
+                chain_rx = next_rx;
+            }
+
+            // This final task cycles if needed
+            let (mut final_tx, final_rx) = mpsc::channel(10);
+            let mut cycle_tx = start_tx.clone();
+            let mut rem = CYCLES;
+
+            rt.spawn(async move {
+                for _ in 0..CYCLES {
+                    let msg = chain_rx.recv().await.unwrap();
+
+                    rem -= 1;
+
+                    if rem == 0 {
+                        final_tx.send(msg).await.unwrap();
+                    } else {
+                        cycle_tx.send(msg).await.unwrap();
+                    }
+                }
+            });
+
+            start_txs.push(start_tx);
+            final_rxs.push(final_rx);
+        }
+
+        {
+            let mut e = tokio::executor::enter().unwrap();
+
+            e.block_on(async move {
+                for mut start_tx in start_txs {
+                    start_tx.send("ping").await.unwrap();
+                }
+
+                for mut final_rx in final_rxs {
+                    final_rx.recv().await.unwrap();
+                }
+            });
+        }
+    }
+}
+
+#[test]
+fn spawn_shutdown() {
+    let mut rt = rt();
+    let (tx, rx) = mpsc::channel();
+
+    rt.block_on(async {
+        tokio::spawn(client_server(tx.clone()));
+    });
+
+    // Use spawner
+    rt.spawn(client_server(tx));
+
+    assert_ok!(rx.recv());
+    assert_ok!(rx.recv());
+
+    drop(rt);
+    assert_err!(rx.try_recv());
+}
 
 async fn client_server(tx: mpsc::Sender<()>) {
     let mut server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
@@ -36,129 +161,58 @@ async fn client_server(tx: mpsc::Sender<()>) {
 }
 
 #[test]
-fn send_sync_bound() {
-    fn is_send<T: Send + Sync>() {}
+fn drop_threadpool_drops_futures() {
+    for _ in 0..1_000 {
+        let num_inc = Arc::new(AtomicUsize::new(0));
+        let num_dec = Arc::new(AtomicUsize::new(0));
+        let num_drop = Arc::new(AtomicUsize::new(0));
 
-    is_send::<Runtime>();
-}
+        struct Never(Arc<AtomicUsize>);
 
-#[test]
-fn spawn_shutdown() {
-    let mut rt = Runtime::new().unwrap();
-    let (tx, rx) = mpsc::channel();
+        impl Future for Never {
+            type Output = ();
 
-    rt.block_on(async {
-        tokio::spawn(client_server(tx.clone()));
-    });
-
-    // Use spawner
-    rt.spawner().spawn(client_server(tx));
-
-    assert_ok!(rx.recv());
-    assert_ok!(rx.recv());
-
-    drop(rt);
-    assert_err!(rx.try_recv());
-}
-
-#[test]
-fn block_on_timer() {
-    let mut rt = Runtime::new().unwrap();
-
-    let v = rt.block_on(async move {
-        delay(Instant::now() + Duration::from_millis(100)).await;
-        42
-    });
-
-    assert_eq!(v, 42);
-}
-
-#[test]
-fn block_on_socket() {
-    let mut rt = Runtime::new().unwrap();
-
-    rt.block_on(async move {
-        let (tx, rx) = oneshot::channel();
-
-        let mut listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
-
-        tokio::spawn(async move {
-            let _ = listener.accept().await;
-            tx.send(()).unwrap();
-        });
-
-        TcpStream::connect(&addr).await.unwrap();
-        rx.await.unwrap();
-    });
-}
-
-#[test]
-fn block_waits() {
-    let (a_tx, a_rx) = oneshot::channel();
-    let (b_tx, b_rx) = mpsc::channel();
-
-    thread::spawn(|| {
-        use std::time::Duration;
-
-        thread::sleep(Duration::from_millis(1000));
-        a_tx.send(()).unwrap();
-    });
-
-    let mut rt = Runtime::new().unwrap();
-    rt.block_on(async move {
-        a_rx.await.unwrap();
-        b_tx.send(()).unwrap();
-    });
-
-    assert_ok!(b_rx.try_recv());
-}
-
-#[test]
-fn spawn_many() {
-    const ITER: usize = 200;
-
-    let mut rt = Runtime::new().unwrap();
-
-    let cnt = Arc::new(Mutex::new(0));
-    let (tx, rx) = mpsc::channel();
-    let tx = Arc::new(Mutex::new(tx));
-
-    let c = cnt.clone();
-    rt.block_on(async move {
-        for _ in 0..ITER {
-            let c = c.clone();
-            let tx = tx.clone();
-            tokio::spawn(async move {
-                let mut x = c.lock().unwrap();
-                *x = 1 + *x;
-
-                if *x == ITER {
-                    tx.lock().unwrap().send(()).unwrap();
-                }
-            });
+            fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<()> {
+                Poll::Pending
+            }
         }
-    });
 
-    rx.recv().unwrap();
-    assert_eq!(ITER, *cnt.lock().unwrap());
-}
+        impl Drop for Never {
+            fn drop(&mut self) {
+                self.0.fetch_add(1, Relaxed);
+            }
+        }
 
-#[test]
-fn nested_enter() {
-    use std::panic;
+        let a = num_inc.clone();
+        let b = num_dec.clone();
 
-    let mut rt = Runtime::new().unwrap();
-    rt.block_on(async {
-        assert_err!(tokio::executor::enter());
+        let rt = runtime::Builder::new()
+            .after_start(move || {
+                a.fetch_add(1, Relaxed);
+            })
+            .before_stop(move || {
+                b.fetch_add(1, Relaxed);
+            })
+            .build()
+            .unwrap();
 
-        let res = panic::catch_unwind(move || {
-            let mut rt = Runtime::new().unwrap();
-            rt.block_on(async {});
-        });
+        rt.spawn(Never(num_drop.clone()));
 
-        assert_err!(res);
-    });
+        // Wait for the pool to shutdown
+        drop(rt);
+
+        // Assert that only a single thread was spawned.
+        let a = num_inc.load(Relaxed);
+        assert!(a >= 1);
+
+        // Assert that all threads shutdown
+        let b = num_dec.load(Relaxed);
+        assert_eq!(a, b);
+
+        // Assert that the future was dropped
+        let c = num_drop.load(Relaxed);
+        assert_eq!(c, 1);
+    }
 }
 
 #[test]
@@ -180,14 +234,87 @@ fn after_start_and_before_stop_is_called() {
         .build()
         .unwrap();
 
-    let (tx, rx) = mpsc::channel();
+    let (tx, rx) = oneshot::channel();
 
-    rt.block_on(client_server(tx));
+    rt.spawn(async move {
+        assert_ok!(tx.send(()));
+    });
+
+    assert_ok!(rt.block_on(rx));
 
     drop(rt);
 
-    assert_ok!(rx.try_recv());
-
     assert!(after_start.load(Ordering::Relaxed) > 0);
     assert!(before_stop.load(Ordering::Relaxed) > 0);
+}
+
+#[test]
+fn blocking() {
+    // used for notifying the main thread
+    const NUM: usize = 1_000;
+
+    for _ in 0..10 {
+        let (tx, rx) = mpsc::channel();
+
+        let rt = rt();
+        let cnt = Arc::new(AtomicUsize::new(0));
+
+        // there are four workers in the pool
+        // so, if we run 4 blocking tasks, we know that handoff must have happened
+        let block = Arc::new(std::sync::Barrier::new(5));
+        for _ in 0..4 {
+            let block = block.clone();
+            rt.spawn(async move {
+                tokio::executor::thread_pool::blocking(move || {
+                    block.wait();
+                    block.wait();
+                })
+            });
+        }
+        block.wait();
+
+        for _ in 0..NUM {
+            let cnt = cnt.clone();
+            let tx = tx.clone();
+
+            rt.spawn(async move {
+                let num = cnt.fetch_add(1, Relaxed) + 1;
+
+                if num == NUM {
+                    tx.send(()).unwrap();
+                }
+            });
+        }
+
+        rx.recv().unwrap();
+
+        // Wait for the pool to shutdown
+        block.wait();
+    }
+}
+
+#[test]
+fn multi_threadpool() {
+    use tokio::sync::oneshot;
+
+    let rt1 = rt();
+    let rt2 = rt();
+
+    let (tx, rx) = oneshot::channel();
+    let (done_tx, done_rx) = mpsc::channel();
+
+    rt2.spawn(async move {
+        rx.await.unwrap();
+        done_tx.send(()).unwrap();
+    });
+
+    rt1.spawn(async move {
+        tx.send(()).unwrap();
+    });
+
+    done_rx.recv().unwrap();
+}
+
+fn rt() -> Runtime {
+    Runtime::new().unwrap()
 }

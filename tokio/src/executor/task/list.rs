@@ -18,6 +18,8 @@ impl<T: 'static> OwnedList<T> {
     }
 
     pub(crate) fn insert(&mut self, task: &Task<T>) {
+        debug_assert!(!self.contains(task));
+
         unsafe {
             debug_assert!((*task.header().owned_next.get()).is_none());
             debug_assert!((*task.header().owned_prev.get()).is_none());
@@ -35,6 +37,8 @@ impl<T: 'static> OwnedList<T> {
     }
 
     pub(crate) fn remove(&mut self, task: &Task<T>) {
+        debug_assert!(self.head.is_some());
+
         unsafe {
             if let Some(next) = *task.header().owned_next.get() {
                 *next.as_ref().owned_prev.get() = *task.header().owned_prev.get();
@@ -65,6 +69,23 @@ impl<T: 'static> OwnedList<T> {
                 curr = *task.as_ref().owned_next.get();
             }
         }
+    }
+
+    /// Only used by debug assertions
+    fn contains(&self, task: &Task<T>) -> bool {
+        let mut curr = self.head;
+
+        while let Some(p) = curr {
+            if p == task.header().into() {
+                return true;
+            }
+
+            unsafe {
+                curr = *p.as_ref().owned_next.get();
+            }
+        }
+
+        false
     }
 }
 

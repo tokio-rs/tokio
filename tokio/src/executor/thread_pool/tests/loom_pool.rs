@@ -146,6 +146,41 @@ fn pool_shutdown() {
     });
 }
 
+#[test]
+fn complete_block_on_under_load() {
+    loom::model(|| {
+        let pool = ThreadPool::new();
+
+        pool.block_on(async {
+            // Spin hard
+            crate::spawn(async {
+                for _ in 0..2 {
+                    yield_once().await;
+                }
+            });
+
+            gated2(true).await
+        });
+    });
+}
+
+use futures::future::poll_fn;
+use std::task::Poll;
+async fn yield_once() {
+    let mut yielded = false;
+    poll_fn(|cx| {
+        if yielded {
+            Poll::Ready(())
+        } else {
+            loom::thread::yield_now();
+            yielded = true;
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
+    })
+    .await
+}
+
 fn gated() -> impl Future<Output = &'static str> {
     gated2(false)
 }
