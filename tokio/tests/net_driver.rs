@@ -61,8 +61,6 @@ fn test_drop_on_notify() {
         }
     }));
 
-    let _enter = tokio::executor::enter().unwrap();
-
     {
         let handle = reactor.handle();
         let _reactor = tokio::net::driver::set_default(&handle);

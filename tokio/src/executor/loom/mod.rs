@@ -22,6 +22,7 @@ pub(crate) mod std {
 
 #[cfg(feature = "rt-full")]
 pub(crate) use self::std::rand;
+#[cfg(any(feature = "blocking", feature = "rt-current-thread"))]
 pub(crate) use self::std::sync;
 #[cfg(any(feature = "blocking", feature = "rt-full"))]
 pub(crate) use self::std::thread;

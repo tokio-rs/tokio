@@ -1,7 +1,7 @@
 //! Threadpool
 
 mod builder;
-pub use self::builder::Builder;
+pub(crate) use self::builder::Builder;
 
 mod current;
 
@@ -11,15 +11,13 @@ use self::idle::Idle;
 mod owned;
 use self::owned::Owned;
 
-mod park;
-
 mod pool;
-pub use self::pool::ThreadPool;
+pub(crate) use self::pool::ThreadPool;
 
 mod queue;
 
 mod spawner;
-pub use self::spawner::Spawner;
+pub(crate) use self::spawner::Spawner;
 
 mod set;
 
@@ -29,13 +27,12 @@ use self::shared::Shared;
 mod shutdown;
 
 mod worker;
+#[cfg(feature = "blocking")]
+pub(crate) use worker::blocking;
 
 /// Unit tests
 #[cfg(test)]
 mod tests;
-
-#[cfg(feature = "blocking")]
-pub use worker::blocking;
 
 #[cfg(not(loom))]
 const LOCAL_QUEUE_CAPACITY: usize = 256;

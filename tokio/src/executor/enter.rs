@@ -1,6 +1,7 @@
 use std::cell::{Cell, RefCell};
 use std::error::Error;
 use std::fmt;
+#[cfg(feature = "rt-full")]
 use std::future::Future;
 use std::marker::PhantomData;
 
@@ -9,13 +10,13 @@ thread_local!(static ENTERED: Cell<bool> = Cell::new(false));
 /// Represents an executor context.
 ///
 /// For more details, see [`enter` documentation](fn.enter.html)
-pub struct Enter {
+pub(crate) struct Enter {
     _p: PhantomData<RefCell<()>>,
 }
 
 /// An error returned by `enter` if an execution scope has already been
 /// entered.
-pub struct EnterError {
+pub(crate) struct EnterError {
     _a: (),
 }
 
@@ -49,7 +50,7 @@ impl Error for EnterError {}
 /// # Error
 ///
 /// Returns an error if the current thread is already marked
-pub fn enter() -> Result<Enter, EnterError> {
+pub(crate) fn enter() -> Result<Enter, EnterError> {
     ENTERED.with(|c| {
         if c.get() {
             Err(EnterError { _a: () })
@@ -68,8 +69,8 @@ pub fn enter() -> Result<Enter, EnterError> {
 //
 // This is hidden for a reason. Do not use without fully understanding
 // executors. Misuing can easily cause your program to deadlock.
-#[doc(hidden)]
-pub fn exit<F: FnOnce() -> R, R>(f: F) -> R {
+#[cfg(feature = "rt-full")]
+pub(crate) fn exit<F: FnOnce() -> R, R>(f: F) -> R {
     // Reset in case the closure panics
     struct Reset;
     impl Drop for Reset {
@@ -100,7 +101,8 @@ pub fn exit<F: FnOnce() -> R, R>(f: F) -> R {
 impl Enter {
     /// Blocks the thread on the specified future, returning the value with
     /// which that future completes.
-    pub fn block_on<F: Future>(&mut self, mut f: F) -> F::Output {
+    #[cfg(feature = "rt-full")]
+    pub(crate) fn block_on<F: Future>(&mut self, mut f: F) -> F::Output {
         use crate::executor::park::{Park, ParkThread};
         use std::pin::Pin;
         use std::task::Context;

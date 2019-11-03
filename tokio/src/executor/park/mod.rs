@@ -44,8 +44,10 @@
 //! [up]: trait.Unpark.html
 //! [mio]: https://docs.rs/mio/0.6/mio/struct.Poll.html
 
+#[cfg(feature = "rt-full")]
 mod thread;
-pub use self::thread::{ParkError, ParkThread, UnparkThread};
+#[cfg(feature = "rt-full")]
+pub(crate) use self::thread::ParkThread;
 
 use std::sync::Arc;
 use std::time::Duration;

@@ -2,13 +2,12 @@ use crate::executor::loom::sync::Arc;
 use crate::executor::loom::sys::num_cpus;
 use crate::executor::loom::thread;
 use crate::executor::park::Park;
-use crate::executor::thread_pool::park::DefaultPark;
 use crate::executor::thread_pool::{shutdown, worker, worker::Worker, Spawner, ThreadPool};
 
 use std::{fmt, usize};
 
 /// Builds a thread pool with custom configuration values.
-pub struct Builder {
+pub(crate) struct Builder {
     /// Number of worker threads to spawn
     pool_size: usize,
 
@@ -29,7 +28,7 @@ type Callback = Arc<Box<dyn Fn(usize, &mut dyn FnMut()) + Send + Sync>>;
 impl Builder {
     /// Returns a new thread pool builder initialized with default configuration
     /// values.
-    pub fn new() -> Builder {
+    pub(crate) fn new() -> Builder {
         Builder {
             pool_size: num_cpus(),
             name: "tokio-runtime-worker".to_string(),
@@ -44,17 +43,7 @@ impl Builder {
     /// this value on the smaller side.
     ///
     /// The default value is the number of cores available to the system.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio::executor::thread_pool::Builder;
-    ///
-    /// let thread_pool = Builder::new()
-    ///     .num_threads(4)
-    ///     .build();
-    /// ```
-    pub fn num_threads(&mut self, value: usize) -> &mut Self {
+    pub(crate) fn num_threads(&mut self, value: usize) -> &mut Self {
         self.pool_size = value;
         self
     }
@@ -63,17 +52,7 @@ impl Builder {
     ///
     /// If this configuration is not set, then the thread will use the system
     /// default naming scheme.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio::executor::thread_pool::Builder;
-    ///
-    /// let thread_pool = Builder::new()
-    ///     .name("my-pool")
-    ///     .build();
-    /// ```
-    pub fn name<S: Into<String>>(&mut self, val: S) -> &mut Self {
+    pub(crate) fn name<S: Into<String>>(&mut self, val: S) -> &mut Self {
         self.name = val.into();
         self
     }
@@ -85,17 +64,7 @@ impl Builder {
     ///
     /// The default stack size for spawned threads is 2 MiB, though this
     /// particular stack size is subject to change in the future.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio::executor::thread_pool::Builder;
-    ///
-    /// let thread_pool = Builder::new()
-    ///     .stack_size(32 * 1024)
-    ///     .build();
-    /// ```
-    pub fn stack_size(&mut self, val: usize) -> &mut Self {
+    pub(crate) fn stack_size(&mut self, val: usize) -> &mut Self {
         self.stack_size = Some(val);
         self
     }
@@ -105,21 +74,7 @@ impl Builder {
     /// This function is provided a function that executes the worker and is
     /// expected to call it, otherwise the worker thread will shutdown without
     /// doing any work.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio::executor::thread_pool::Builder;
-    ///
-    /// let thread_pool = Builder::new()
-    ///     .around_worker(|index, work| {
-    ///         println!("worker {} is starting up", index);
-    ///         work();
-    ///         println!("worker {} is shutting down", index);
-    ///     })
-    ///     .build();
-    /// ```
-    pub fn around_worker<F>(&mut self, f: F) -> &mut Self
+    pub(crate) fn around_worker<F>(&mut self, f: F) -> &mut Self
     where
         F: Fn(usize, &mut dyn FnMut()) + Send + Sync + 'static,
     {
@@ -127,27 +82,11 @@ impl Builder {
         self
     }
 
-    /// Create the configured `ThreadPool`.
-    ///
-    /// The returned `ThreadPool` instance is ready to spawn tasks.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio::executor::thread_pool::Builder;
-    ///
-    /// let thread_pool = Builder::new()
-    ///     .build();
-    /// ```
-    pub fn build(&self) -> ThreadPool {
-        self.build_with_park(|_| DefaultPark::new())
-    }
-
     /// Create the configured `ThreadPool` with a custom `park` instances.
     ///
     /// The provided closure `build_park` is called once per worker and returns
     /// a `Park` instance that is used by the worker to put itself to sleep.
-    pub fn build_with_park<F, P>(&self, mut build_park: F) -> ThreadPool
+    pub(crate) fn build<F, P>(&self, mut build_park: F) -> ThreadPool
     where
         F: FnMut(usize) -> P,
         P: Park + Send + 'static,

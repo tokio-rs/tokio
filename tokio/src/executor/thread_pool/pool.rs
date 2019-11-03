@@ -1,12 +1,12 @@
 use crate::executor::blocking::PoolWaiter;
 use crate::executor::task::JoinHandle;
-use crate::executor::thread_pool::{shutdown, Builder, Spawner};
+use crate::executor::thread_pool::{shutdown, Spawner};
 
 use std::fmt;
 use std::future::Future;
 
 /// Work-stealing based thread pool for executing futures.
-pub struct ThreadPool {
+pub(crate) struct ThreadPool {
     spawner: Spawner,
 
     /// Shutdown waiter
@@ -17,11 +17,6 @@ pub struct ThreadPool {
 }
 
 impl ThreadPool {
-    /// Create a new ThreadPool with default configuration
-    pub fn new() -> ThreadPool {
-        Builder::new().build()
-    }
-
     pub(super) fn from_parts(
         spawner: Spawner,
         shutdown_rx: shutdown::Receiver,
@@ -38,12 +33,12 @@ impl ThreadPool {
     ///
     /// The `Spawner` handle can be cloned and enables spawning tasks from other
     /// threads.
-    pub fn spawner(&self) -> &Spawner {
+    pub(crate) fn spawner(&self) -> &Spawner {
         &self.spawner
     }
 
     /// Spawn a task
-    pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
+    pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
         F::Output: Send + 'static,
@@ -55,7 +50,7 @@ impl ThreadPool {
     ///
     /// The future will execute on the current thread, but all spawned tasks
     /// will be executed on the thread pool.
-    pub fn block_on<F>(&self, future: F) -> F::Output
+    pub(crate) fn block_on<F>(&self, future: F) -> F::Output
     where
         F: Future,
     {
@@ -69,17 +64,11 @@ impl ThreadPool {
     }
 
     /// Shutdown the thread pool.
-    pub fn shutdown_now(&mut self) {
+    pub(crate) fn shutdown_now(&mut self) {
         if self.spawner.workers().close() {
             self.shutdown_rx.wait();
         }
         self.blocking.shutdown();
-    }
-}
-
-impl Default for ThreadPool {
-    fn default() -> ThreadPool {
-        ThreadPool::new()
     }
 }
 

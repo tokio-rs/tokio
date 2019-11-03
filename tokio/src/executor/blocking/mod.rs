@@ -249,6 +249,34 @@ impl Drop for PoolWaiter {
     }
 }
 
+/// Run the provided blocking function without blocking the executor.
+///
+/// In general, issuing a blocking call or performing a lot of compute in a
+/// future without yielding is not okay, as it may prevent the executor from
+/// driving other futures forward.  If you run a closure through this method,
+/// the current executor thread will relegate all its executor duties to another
+/// (possibly new) thread, and only then poll the task. Note that this requires
+/// additional synchronization.
+///
+/// # Examples
+///
+/// ```
+/// # async fn docs() {
+/// tokio::executor::blocking::in_place(move || {
+///     // do some compute-heavy work or call synchronous code
+/// });
+/// # }
+/// ```
+#[cfg(feature = "rt-full")]
+pub fn in_place<F, R>(f: F) -> R
+where
+    F: FnOnce() -> R,
+{
+    use crate::executor;
+
+    executor::enter::exit(|| executor::thread_pool::blocking(f))
+}
+
 /// Run the provided closure on a thread where blocking is acceptable.
 ///
 /// In general, issuing a blocking call or performing a lot of compute in a future without

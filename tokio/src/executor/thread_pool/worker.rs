@@ -16,25 +16,8 @@ thread_local! {
     static ON_BLOCK: Cell<Option<*mut dyn FnMut()>> = Cell::new(None)
 }
 
-/// Run the provided blocking function without blocking the executor.
-///
-/// In general, issuing a blocking call or performing a lot of compute in a future without
-/// yielding is not okay, as it may prevent the executor from driving other futures forward.
-/// If you run a closure through this method, the current executor thread will relegate all its
-/// executor duties to another (possibly new) thread, and only then poll the task. Note that this
-/// requires additional synchronization.
-///
-/// # Examples
-///
-/// ```
-/// # async fn docs() {
-/// tokio::executor::thread_pool::blocking(move || {
-///     // do some compute-heavy work or call synchronous code
-/// });
-/// # }
-/// ```
 #[cfg(feature = "blocking")]
-pub fn blocking<F, R>(f: F) -> R
+pub(crate) fn blocking<F, R>(f: F) -> R
 where
     F: FnOnce() -> R,
 {

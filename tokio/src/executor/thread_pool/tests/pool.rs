@@ -65,7 +65,7 @@ fn eagerly_drops_futures() {
 
     let pool = thread_pool::Builder::new()
         .num_threads(4)
-        .build_with_park(move |_| {
+        .build(move |_| {
             let (tx, rx) = mpsc::channel();
             MyPark {
                 tx: Mutex::new(tx),
@@ -166,7 +166,7 @@ fn park_called_at_interval() {
     // Use 1 thread to ensure the worker stays busy.
     let pool = thread_pool::Builder::new()
         .num_threads(1)
-        .build_with_park(move |idx| {
+        .build(move |idx| {
             assert_eq!(idx, 0);
             MyPark {
                 park_light: park_light_2.clone(),
