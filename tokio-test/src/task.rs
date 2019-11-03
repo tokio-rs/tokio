@@ -47,7 +47,7 @@ impl<T> Spawn<T> {
     /// Consume `self` returning the inner value
     pub fn into_inner(mut self) -> T
     where
-        T: Unpin
+        T: Unpin,
     {
         drop(self.task);
 
@@ -78,7 +78,7 @@ impl<T> Spawn<T> {
     /// Enter the task context
     pub fn enter<F, R>(&mut self, f: F) -> R
     where
-        F: FnOnce(&mut Context<'_>, Pin<&mut T>) -> R
+        F: FnOnce(&mut Context<'_>, Pin<&mut T>) -> R,
     {
         let fut = self.future.as_mut();
         self.task.enter(|cx| f(cx, fut))
