@@ -2,7 +2,7 @@
 
 use tokio::prelude::*;
 use tokio_test::assert_ready;
-use tokio_test::task::MockTask;
+use tokio_test::task;
 use tokio_util::codec::{Decoder, FramedRead};
 
 use bytes::{Buf, BytesMut, IntoBuf};
@@ -51,13 +51,13 @@ impl Decoder for U32Decoder {
 
 #[test]
 fn read_multi_frame_in_packet() {
-    let mut task = MockTask::new();
+    let mut task = task::spawn(());
     let mock = mock! {
         Ok(b"\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x02".to_vec()),
     };
     let mut framed = FramedRead::new(mock, U32Decoder);
 
-    task.enter(|cx| {
+    task.enter(|cx, _| {
         assert_read!(pin!(framed).poll_next(cx), 0);
         assert_read!(pin!(framed).poll_next(cx), 1);
         assert_read!(pin!(framed).poll_next(cx), 2);
@@ -67,7 +67,7 @@ fn read_multi_frame_in_packet() {
 
 #[test]
 fn read_multi_frame_across_packets() {
-    let mut task = MockTask::new();
+    let mut task = task::spawn(());
     let mock = mock! {
         Ok(b"\x00\x00\x00\x00".to_vec()),
         Ok(b"\x00\x00\x00\x01".to_vec()),
@@ -75,7 +75,7 @@ fn read_multi_frame_across_packets() {
     };
     let mut framed = FramedRead::new(mock, U32Decoder);
 
-    task.enter(|cx| {
+    task.enter(|cx, _| {
         assert_read!(pin!(framed).poll_next(cx), 0);
         assert_read!(pin!(framed).poll_next(cx), 1);
         assert_read!(pin!(framed).poll_next(cx), 2);
@@ -85,7 +85,7 @@ fn read_multi_frame_across_packets() {
 
 #[test]
 fn read_not_ready() {
-    let mut task = MockTask::new();
+    let mut task = task::spawn(());
     let mock = mock! {
         Err(io::Error::new(io::ErrorKind::WouldBlock, "")),
         Ok(b"\x00\x00\x00\x00".to_vec()),
@@ -93,7 +93,7 @@ fn read_not_ready() {
     };
     let mut framed = FramedRead::new(mock, U32Decoder);
 
-    task.enter(|cx| {
+    task.enter(|cx, _| {
         assert!(pin!(framed).poll_next(cx).is_pending());
         assert_read!(pin!(framed).poll_next(cx), 0);
         assert_read!(pin!(framed).poll_next(cx), 1);
@@ -103,7 +103,7 @@ fn read_not_ready() {
 
 #[test]
 fn read_partial_then_not_ready() {
-    let mut task = MockTask::new();
+    let mut task = task::spawn(());
     let mock = mock! {
         Ok(b"\x00\x00".to_vec()),
         Err(io::Error::new(io::ErrorKind::WouldBlock, "")),
@@ -111,7 +111,7 @@ fn read_partial_then_not_ready() {
     };
     let mut framed = FramedRead::new(mock, U32Decoder);
 
-    task.enter(|cx| {
+    task.enter(|cx, _| {
         assert!(pin!(framed).poll_next(cx).is_pending());
         assert_read!(pin!(framed).poll_next(cx), 0);
         assert_read!(pin!(framed).poll_next(cx), 1);
@@ -122,13 +122,13 @@ fn read_partial_then_not_ready() {
 
 #[test]
 fn read_err() {
-    let mut task = MockTask::new();
+    let mut task = task::spawn(());
     let mock = mock! {
         Err(io::Error::new(io::ErrorKind::Other, "")),
     };
     let mut framed = FramedRead::new(mock, U32Decoder);
 
-    task.enter(|cx| {
+    task.enter(|cx, _| {
         assert_eq!(
             io::ErrorKind::Other,
             assert_ready!(pin!(framed).poll_next(cx))
@@ -141,14 +141,14 @@ fn read_err() {
 
 #[test]
 fn read_partial_then_err() {
-    let mut task = MockTask::new();
+    let mut task = task::spawn(());
     let mock = mock! {
         Ok(b"\x00\x00".to_vec()),
         Err(io::Error::new(io::ErrorKind::Other, "")),
     };
     let mut framed = FramedRead::new(mock, U32Decoder);
 
-    task.enter(|cx| {
+    task.enter(|cx, _| {
         assert_eq!(
             io::ErrorKind::Other,
             assert_ready!(pin!(framed).poll_next(cx))
@@ -161,7 +161,7 @@ fn read_partial_then_err() {
 
 #[test]
 fn read_partial_would_block_then_err() {
-    let mut task = MockTask::new();
+    let mut task = task::spawn(());
     let mock = mock! {
         Ok(b"\x00\x00".to_vec()),
         Err(io::Error::new(io::ErrorKind::WouldBlock, "")),
@@ -169,7 +169,7 @@ fn read_partial_would_block_then_err() {
     };
     let mut framed = FramedRead::new(mock, U32Decoder);
 
-    task.enter(|cx| {
+    task.enter(|cx, _| {
         assert!(pin!(framed).poll_next(cx).is_pending());
         assert_eq!(
             io::ErrorKind::Other,
@@ -183,11 +183,11 @@ fn read_partial_would_block_then_err() {
 
 #[test]
 fn huge_size() {
-    let mut task = MockTask::new();
+    let mut task = task::spawn(());
     let data = [0; 32 * 1024];
     let mut framed = FramedRead::new(Slice(&data[..]), BigDecoder);
 
-    task.enter(|cx| {
+    task.enter(|cx, _| {
         assert_read!(pin!(framed).poll_next(cx), 0);
         assert!(assert_ready!(pin!(framed).poll_next(cx)).is_none());
     });
@@ -210,11 +210,11 @@ fn huge_size() {
 
 #[test]
 fn data_remaining_is_error() {
-    let mut task = MockTask::new();
+    let mut task = task::spawn(());
     let slice = Slice(&[0; 5]);
     let mut framed = FramedRead::new(slice, U32Decoder);
 
-    task.enter(|cx| {
+    task.enter(|cx, _| {
         assert_read!(pin!(framed).poll_next(cx), 0);
         assert!(assert_ready!(pin!(framed).poll_next(cx)).unwrap().is_err());
     });
@@ -222,7 +222,7 @@ fn data_remaining_is_error() {
 
 #[test]
 fn multi_frames_on_eof() {
-    let mut task = MockTask::new();
+    let mut task = task::spawn(());
     struct MyDecoder(Vec<u32>);
 
     impl Decoder for MyDecoder {
@@ -244,7 +244,7 @@ fn multi_frames_on_eof() {
 
     let mut framed = FramedRead::new(mock!(), MyDecoder(vec![0, 1, 2, 3]));
 
-    task.enter(|cx| {
+    task.enter(|cx, _| {
         assert_read!(pin!(framed).poll_next(cx), 0);
         assert_read!(pin!(framed).poll_next(cx), 1);
         assert_read!(pin!(framed).poll_next(cx), 2);

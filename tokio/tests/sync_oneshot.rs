@@ -1,8 +1,10 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::sync::oneshot;
-use tokio_test::task::MockTask;
 use tokio_test::*;
+
+use std::future::Future;
+use std::pin::Pin;
 
 trait AssertSend: Send {}
 impl AssertSend for oneshot::Sender<i32> {}
@@ -10,16 +12,16 @@ impl AssertSend for oneshot::Receiver<i32> {}
 
 #[test]
 fn send_recv() {
-    let (tx, mut rx) = oneshot::channel();
-    let mut task = MockTask::new();
+    let (tx, rx) = oneshot::channel();
+    let mut rx = task::spawn(rx);
 
-    assert_pending!(task.poll(&mut rx));
+    assert_pending!(rx.poll());
 
     assert_ok!(tx.send(1));
 
-    assert!(task.is_woken());
+    assert!(rx.is_woken());
 
-    let val = assert_ready_ok!(task.poll(&mut rx));
+    let val = assert_ready_ok!(rx.poll());
     assert_eq!(val, 1);
 }
 
@@ -33,15 +35,15 @@ async fn async_send_recv() {
 
 #[test]
 fn close_tx() {
-    let (tx, mut rx) = oneshot::channel::<i32>();
-    let mut task = MockTask::new();
+    let (tx, rx) = oneshot::channel::<i32>();
+    let mut rx = task::spawn(rx);
 
-    assert_pending!(task.poll(&mut rx));
+    assert_pending!(rx.poll());
 
     drop(tx);
 
-    assert!(task.is_woken());
-    assert_ready_err!(task.poll(&mut rx));
+    assert!(rx.is_woken());
+    assert_ready_err!(rx.poll());
 }
 
 #[test]
@@ -54,18 +56,18 @@ fn close_rx() {
 
     // Second, via poll_closed();
 
-    let (mut tx, rx) = oneshot::channel();
-    let mut task = MockTask::new();
+    let (tx, rx) = oneshot::channel();
+    let mut tx = task::spawn(tx);
 
-    assert_pending!(task.enter(|cx| tx.poll_closed(cx)));
+    assert_pending!(tx.enter(|cx, mut tx| tx.poll_closed(cx)));
 
     drop(rx);
 
-    assert!(task.is_woken());
+    assert!(tx.is_woken());
     assert!(tx.is_closed());
-    assert_ready!(task.enter(|cx| tx.poll_closed(cx)));
+    assert_ready!(tx.enter(|cx, mut tx| tx.poll_closed(cx)));
 
-    assert_err!(tx.send(1));
+    assert_err!(tx.into_inner().send(1));
 }
 
 #[tokio::test]
@@ -82,43 +84,46 @@ async fn async_rx_closed() {
 #[test]
 fn explicit_close_poll() {
     // First, with message sent
-    let (tx, mut rx) = oneshot::channel();
-    let mut task = MockTask::new();
+    let (tx, rx) = oneshot::channel();
+    let mut rx = task::spawn(rx);
 
     assert_ok!(tx.send(1));
 
     rx.close();
 
-    let value = assert_ready_ok!(task.poll(&mut rx));
+    let value = assert_ready_ok!(rx.poll());
     assert_eq!(value, 1);
 
     // Second, without the message sent
-    let (mut tx, mut rx) = oneshot::channel::<i32>();
+    let (tx, rx) = oneshot::channel::<i32>();
+    let mut tx = task::spawn(tx);
+    let mut rx = task::spawn(rx);
 
-    assert_pending!(task.enter(|cx| tx.poll_closed(cx)));
+    assert_pending!(tx.enter(|cx, mut tx| tx.poll_closed(cx)));
 
     rx.close();
 
-    assert!(task.is_woken());
+    assert!(tx.is_woken());
     assert!(tx.is_closed());
-    assert_ready!(task.enter(|cx| tx.poll_closed(cx)));
+    assert_ready!(tx.enter(|cx, mut tx| tx.poll_closed(cx)));
 
-    assert_err!(tx.send(1));
-    assert_ready_err!(task.poll(&mut rx));
+    assert_err!(tx.into_inner().send(1));
+    assert_ready_err!(rx.poll());
 
     // Again, but without sending the value this time
-    let (mut tx, mut rx) = oneshot::channel::<i32>();
-    let mut task = MockTask::new();
+    let (tx, rx) = oneshot::channel::<i32>();
+    let mut tx = task::spawn(tx);
+    let mut rx = task::spawn(rx);
 
-    assert_pending!(task.enter(|cx| tx.poll_closed(cx)));
+    assert_pending!(tx.enter(|cx, mut tx| tx.poll_closed(cx)));
 
     rx.close();
 
-    assert!(task.is_woken());
+    assert!(tx.is_woken());
     assert!(tx.is_closed());
-    assert_ready!(task.enter(|cx| tx.poll_closed(cx)));
+    assert_ready!(tx.enter(|cx, mut tx| tx.poll_closed(cx)));
 
-    assert_ready_err!(task.poll(&mut rx));
+    assert_ready_err!(rx.poll());
 }
 
 #[test]
@@ -134,16 +139,16 @@ fn explicit_close_try_recv() {
     assert_eq!(1, val);
 
     // Second, without the message sent
-    let (mut tx, mut rx) = oneshot::channel::<i32>();
-    let mut task = MockTask::new();
+    let (tx, mut rx) = oneshot::channel::<i32>();
+    let mut tx = task::spawn(tx);
 
-    assert_pending!(task.enter(|cx| tx.poll_closed(cx)));
+    assert_pending!(tx.enter(|cx, mut tx| tx.poll_closed(cx)));
 
     rx.close();
 
-    assert!(task.is_woken());
+    assert!(tx.is_woken());
     assert!(tx.is_closed());
-    assert_ready!(task.enter(|cx| tx.poll_closed(cx)));
+    assert_ready!(tx.enter(|cx, mut tx| tx.poll_closed(cx)));
 
     assert_err!(rx.try_recv());
 }
@@ -151,24 +156,24 @@ fn explicit_close_try_recv() {
 #[test]
 #[should_panic]
 fn close_try_recv_poll() {
-    let (_tx, mut rx) = oneshot::channel::<i32>();
-    let mut task = MockTask::new();
+    let (_tx, rx) = oneshot::channel::<i32>();
+    let mut rx = task::spawn(rx);
 
     rx.close();
 
     assert_err!(rx.try_recv());
 
-    let _ = task.poll(&mut rx);
+    let _ = rx.poll();
 }
 
 #[test]
 fn drops_tasks() {
     let (mut tx, mut rx) = oneshot::channel::<i32>();
-    let mut tx_task = MockTask::new();
-    let mut rx_task = MockTask::new();
+    let mut tx_task = task::spawn(());
+    let mut rx_task = task::spawn(());
 
-    assert_pending!(tx_task.enter(|cx| tx.poll_closed(cx)));
-    assert_pending!(rx_task.poll(&mut rx));
+    assert_pending!(tx_task.enter(|cx, _| tx.poll_closed(cx)));
+    assert_pending!(rx_task.enter(|cx, _| Pin::new(&mut rx).poll(cx)));
 
     drop(tx);
     drop(rx);
@@ -181,15 +186,15 @@ fn drops_tasks() {
 fn receiver_changes_task() {
     let (tx, mut rx) = oneshot::channel();
 
-    let mut task1 = MockTask::new();
-    let mut task2 = MockTask::new();
+    let mut task1 = task::spawn(());
+    let mut task2 = task::spawn(());
 
-    assert_pending!(task1.poll(&mut rx));
+    assert_pending!(task1.enter(|cx, _| Pin::new(&mut rx).poll(cx)));
 
     assert_eq!(2, task1.waker_ref_count());
     assert_eq!(1, task2.waker_ref_count());
 
-    assert_pending!(task2.poll(&mut rx));
+    assert_pending!(task2.enter(|cx, _| Pin::new(&mut rx).poll(cx)));
 
     assert_eq!(1, task1.waker_ref_count());
     assert_eq!(2, task2.waker_ref_count());
@@ -199,22 +204,22 @@ fn receiver_changes_task() {
     assert!(!task1.is_woken());
     assert!(task2.is_woken());
 
-    assert_ready_ok!(task2.poll(&mut rx));
+    assert_ready_ok!(task2.enter(|cx, _| Pin::new(&mut rx).poll(cx)));
 }
 
 #[test]
 fn sender_changes_task() {
     let (mut tx, rx) = oneshot::channel::<i32>();
 
-    let mut task1 = MockTask::new();
-    let mut task2 = MockTask::new();
+    let mut task1 = task::spawn(());
+    let mut task2 = task::spawn(());
 
-    assert_pending!(task1.enter(|cx| tx.poll_closed(cx)));
+    assert_pending!(task1.enter(|cx, _| tx.poll_closed(cx)));
 
     assert_eq!(2, task1.waker_ref_count());
     assert_eq!(1, task2.waker_ref_count());
 
-    assert_pending!(task2.enter(|cx| tx.poll_closed(cx)));
+    assert_pending!(task2.enter(|cx, _| tx.poll_closed(cx)));
 
     assert_eq!(1, task1.waker_ref_count());
     assert_eq!(2, task2.waker_ref_count());
@@ -224,5 +229,5 @@ fn sender_changes_task() {
     assert!(!task1.is_woken());
     assert!(task2.is_woken());
 
-    assert_ready!(task2.enter(|cx| tx.poll_closed(cx)));
+    assert_ready!(task2.enter(|cx, _| tx.poll_closed(cx)));
 }
