@@ -1,7 +1,5 @@
 //! Futures task based helpers
 
-use tokio::executor::enter;
-
 use futures_core::Stream;
 use std::future::Future;
 use std::mem;
@@ -131,8 +129,6 @@ impl MockTask {
     where
         F: FnOnce(&mut Context<'_>) -> R,
     {
-        let _enter = enter().unwrap();
-
         self.waker.clear();
         let waker = self.waker();
         let mut cx = Context::from_waker(&waker);
