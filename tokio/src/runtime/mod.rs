@@ -154,6 +154,8 @@ pub use self::global::spawn;
 
 mod io;
 
+pub mod local;
+
 mod park;
 pub use self::park::{Park, Unpark};
 
