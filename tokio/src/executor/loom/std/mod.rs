@@ -56,11 +56,13 @@ pub(crate) mod rand {
 }
 
 pub(crate) mod sync {
+    #[cfg(any(feature = "blocking", feature = "rt-current-thread"))]
     pub(crate) use std::sync::{Arc, Condvar, Mutex};
 
     pub(crate) mod atomic {
         #[cfg(feature = "rt-full")]
         pub(crate) use crate::executor::loom::std::atomic_u32::AtomicU32;
+        #[cfg(feature = "rt-current-thread")]
         pub(crate) use crate::executor::loom::std::atomic_usize::AtomicUsize;
 
         #[cfg(feature = "rt-full")]

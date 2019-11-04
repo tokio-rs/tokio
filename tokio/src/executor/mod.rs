@@ -44,8 +44,10 @@
 #[macro_use]
 mod tests;
 
+#[cfg(feature = "rt-current-thread")]
 mod enter;
-pub use self::enter::{enter, exit, Enter, EnterError};
+#[cfg(feature = "rt-current-thread")]
+pub(crate) use self::enter::enter;
 
 mod global;
 pub use self::global::spawn;
@@ -71,6 +73,4 @@ pub mod blocking;
 pub(crate) mod current_thread;
 
 #[cfg(feature = "rt-full")]
-pub mod thread_pool;
-
-pub use futures_util::future::RemoteHandle;
+pub(crate) mod thread_pool;

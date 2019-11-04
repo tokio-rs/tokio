@@ -41,7 +41,7 @@ pub(crate) use self::registration::Registration;
 mod stack;
 use self::stack::Stack;
 
-use crate::executor::park::{Park, ParkThread, Unpark};
+use crate::executor::park::{Park, Unpark};
 use crate::timer::atomic::AtomicU64;
 use crate::timer::clock::Clock;
 use crate::timer::wheel;
@@ -330,12 +330,6 @@ where
                 entry.error();
             }
         }
-    }
-}
-
-impl Default for Timer<ParkThread> {
-    fn default() -> Self {
-        Timer::new(ParkThread::new())
     }
 }
 

@@ -58,7 +58,7 @@ fn many_multishot_futures() {
     const TRACKS: usize = 50;
 
     for _ in 0..50 {
-        let rt = rt();
+        let mut rt = rt();
         let mut start_txs = Vec::with_capacity(TRACKS);
         let mut final_rxs = Vec::with_capacity(TRACKS);
 
@@ -102,9 +102,7 @@ fn many_multishot_futures() {
         }
 
         {
-            let mut e = tokio::executor::enter().unwrap();
-
-            e.block_on(async move {
+            rt.block_on(async move {
                 for mut start_tx in start_txs {
                     start_tx.send("ping").await.unwrap();
                 }
@@ -265,7 +263,7 @@ fn blocking() {
         for _ in 0..4 {
             let block = block.clone();
             rt.spawn(async move {
-                tokio::executor::thread_pool::blocking(move || {
+                tokio::executor::blocking::in_place(move || {
                     block.wait();
                     block.wait();
                 })

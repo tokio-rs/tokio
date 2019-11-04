@@ -19,7 +19,7 @@ use std::future::Future;
 ///
 /// [`ThreadPool::spawner`]: struct.ThreadPool.html#method.spawner
 #[derive(Clone)]
-pub struct Spawner {
+pub(crate) struct Spawner {
     workers: Arc<worker::Set<Box<dyn Unpark>>>,
 }
 
@@ -29,7 +29,7 @@ impl Spawner {
     }
 
     /// Spawn a future onto the thread pool
-    pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
+    pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
         F::Output: Send + 'static,

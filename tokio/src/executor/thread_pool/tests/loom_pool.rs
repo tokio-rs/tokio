@@ -1,16 +1,20 @@
 use crate::executor::loom::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 use crate::executor::loom::sync::atomic::{AtomicBool, AtomicUsize};
 use crate::executor::loom::sync::{Arc, Mutex};
+use crate::executor::park::{Park, Unpark};
 use crate::executor::tests::loom_oneshot as oneshot;
-use crate::executor::thread_pool::{self, Builder, ThreadPool};
+use crate::executor::thread_pool::{self, Builder};
 use crate::spawn;
 
+use loom::sync::Notify;
+
 use std::future::Future;
+use std::time::Duration;
 
 #[test]
 fn pool_multi_spawn() {
     loom::model(|| {
-        let pool = ThreadPool::new();
+        let pool = Builder::new().build(|_| LoomPark::new());
 
         let c1 = Arc::new(AtomicUsize::new(0));
 
@@ -44,7 +48,7 @@ fn pool_multi_spawn() {
 #[test]
 fn only_blocking() {
     loom::model(|| {
-        let mut pool = Builder::new().num_threads(1).build();
+        let mut pool = Builder::new().num_threads(1).build(|_| LoomPark::new());
         let (block_tx, block_rx) = oneshot::channel();
 
         pool.spawn(async move {
@@ -62,7 +66,7 @@ fn only_blocking() {
 fn blocking_and_regular() {
     const NUM: usize = 3;
     loom::model(|| {
-        let mut pool = Builder::new().num_threads(1).build();
+        let mut pool = Builder::new().num_threads(1).build(|_| LoomPark::new());
         let cnt = Arc::new(AtomicUsize::new(0));
 
         let (block_tx, block_rx) = oneshot::channel();
@@ -96,7 +100,7 @@ fn blocking_and_regular() {
 #[test]
 fn pool_multi_notify() {
     loom::model(|| {
-        let pool = ThreadPool::new();
+        let pool = Builder::new().build(|_| LoomPark::new());
 
         let c1 = Arc::new(AtomicUsize::new(0));
 
@@ -132,7 +136,7 @@ fn pool_multi_notify() {
 #[test]
 fn pool_shutdown() {
     loom::model(|| {
-        let pool = ThreadPool::new();
+        let pool = Builder::new().build(|_| LoomPark::new());
 
         pool.spawn(async move {
             gated2(true).await;
@@ -149,7 +153,7 @@ fn pool_shutdown() {
 #[test]
 fn complete_block_on_under_load() {
     loom::model(|| {
-        let pool = ThreadPool::new();
+        let pool = Builder::new().build(|_| LoomPark::new());
 
         pool.block_on(async {
             // Spin hard
@@ -187,9 +191,7 @@ fn gated() -> impl Future<Output = &'static str> {
 
 fn gated2(thread: bool) -> impl Future<Output = &'static str> {
     use crate::executor::loom::thread;
-    use futures_util::future::poll_fn;
     use std::sync::Arc;
-    use std::task::Poll;
 
     let gate = Arc::new(AtomicBool::new(false));
     let mut fired = false;
@@ -222,4 +224,47 @@ fn gated2(thread: bool) -> impl Future<Output = &'static str> {
             Poll::Pending
         }
     })
+}
+
+struct LoomPark {
+    notify: Arc<Notify>,
+}
+
+struct LoomUnpark {
+    notify: Arc<Notify>,
+}
+
+impl LoomPark {
+    fn new() -> LoomPark {
+        LoomPark {
+            notify: Arc::new(Notify::new()),
+        }
+    }
+}
+
+impl Park for LoomPark {
+    type Unpark = LoomUnpark;
+
+    type Error = ();
+
+    fn unpark(&self) -> LoomUnpark {
+        let notify = self.notify.clone();
+        LoomUnpark { notify }
+    }
+
+    fn park(&mut self) -> Result<(), Self::Error> {
+        self.notify.wait();
+        Ok(())
+    }
+
+    fn park_timeout(&mut self, _duration: Duration) -> Result<(), Self::Error> {
+        self.notify.wait();
+        Ok(())
+    }
+}
+
+impl Unpark for LoomUnpark {
+    fn unpark(&self) {
+        self.notify.notify();
+    }
 }

@@ -349,7 +349,7 @@ impl Builder {
                         }
                     })
                 })
-                .build_with_park(move |index| timers[index].lock().unwrap().take().unwrap())
+                .build(move |index| timers[index].lock().unwrap().take().unwrap())
         };
 
         Ok(Runtime {
