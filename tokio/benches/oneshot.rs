@@ -1,65 +1,62 @@
-#![feature(test)]
 #![warn(rust_2018_idioms)]
 
-extern crate test;
+use std::{marker::Unpin, pin::Pin};
 
 use tokio::sync::oneshot;
 
-use futures::{future, Async, Future};
+use criterion_bencher_compat as test;
+
+use futures::{executor::block_on, future, task, Future, Poll};
 use test::Bencher;
 
-#[bench]
-fn new(b: &mut Bencher) {
+fn new(b: &mut Bencher<'_, '_>) {
     b.iter(|| {
-        let _ = ::test::black_box(&oneshot::channel::<i32>());
+        let _ = test::black_box(&oneshot::channel::<i32>());
     })
 }
 
-#[bench]
-fn same_thread_send_recv(b: &mut Bencher) {
-    b.iter(|| {
-        let (tx, mut rx) = oneshot::channel();
-
-        let _ = tx.send(1);
-
-        assert_eq!(Async::Ready(1), rx.poll().unwrap());
-    });
-}
-
-#[bench]
-fn same_thread_recv_multi_send_recv(b: &mut Bencher) {
-    b.iter(|| {
-        let (tx, mut rx) = oneshot::channel();
-
-        future::lazy(|| {
-            let _ = rx.poll();
-            let _ = rx.poll();
-            let _ = rx.poll();
-            let _ = rx.poll();
+fn same_thread_send_recv(b: &mut Bencher<'_, '_>) {
+    block_on(future::lazy(|cx| {
+        b.iter(|| {
+            let (tx, mut rx) = oneshot::channel();
 
             let _ = tx.send(1);
-            assert_eq!(Async::Ready(1), rx.poll().unwrap());
 
-            Ok::<_, ()>(())
-        })
-        .wait()
-        .unwrap();
+            assert_eq!(
+                Poll::Ready(Ok(1)),
+                Pin::new(&mut rx).poll(cx).map_err(|_| ())
+            );
+        });
+    }));
+}
+
+fn same_thread_recv_multi_send_recv(b: &mut Bencher<'_, '_>) {
+    b.iter(|| {
+        let (tx, mut rx) = oneshot::channel();
+        let mut rx = Pin::new(&mut rx);
+
+        block_on(future::lazy(|cx| {
+            let _ = rx.as_mut().poll(cx);
+            let _ = rx.as_mut().poll(cx);
+            let _ = rx.as_mut().poll(cx);
+            let _ = rx.as_mut().poll(cx);
+
+            let _ = tx.send(1);
+            assert_eq!(Poll::Ready(Ok(1)), rx.poll(cx).map_err(|_| ()));
+        }));
     });
 }
 
-#[bench]
-fn multi_thread_send_recv(b: &mut Bencher) {
+fn multi_thread_send_recv(b: &mut Bencher<'_, '_>) {
     const MAX: usize = 10_000_000;
 
     use std::thread;
 
-    fn spin<F: Future>(mut f: F) -> Result<F::Item, F::Error> {
-        use futures::Async::Ready;
+    fn spin<F: Future + Unpin>(cx: &mut task::Context<'_>, mut f: F) -> F::Output {
         loop {
-            match f.poll() {
-                Ok(Ready(v)) => return Ok(v),
-                Ok(_) => {}
-                Err(e) => return Err(e),
+            match Pin::new(&mut f).poll(cx) {
+                Poll::Ready(v) => return v,
+                Poll::Pending => {}
             }
         }
     }
@@ -82,25 +79,21 @@ fn multi_thread_send_recv(b: &mut Bencher) {
     }
 
     thread::spawn(move || {
-        future::lazy(|| {
+        block_on(future::lazy(|cx| {
             for i in 0..MAX {
                 let ping_rx = ping_rxs[i].take().unwrap();
                 let pong_tx = pong_txs[i].take().unwrap();
 
-                if spin(ping_rx).is_err() {
-                    return Ok(());
+                if spin(cx, ping_rx).is_err() {
+                    return;
                 }
 
                 pong_tx.send(()).unwrap();
             }
-
-            Ok::<(), ()>(())
-        })
-        .wait()
-        .unwrap();
+        }));
     });
 
-    future::lazy(|| {
+    block_on(future::lazy(|cx| {
         let mut i = 0;
 
         b.iter(|| {
@@ -108,13 +101,18 @@ fn multi_thread_send_recv(b: &mut Bencher) {
             let pong_rx = pong_rxs[i].take().unwrap();
 
             ping_tx.send(()).unwrap();
-            spin(pong_rx).unwrap();
+            spin(cx, pong_rx).unwrap();
 
             i += 1;
         });
-
-        Ok::<(), ()>(())
-    })
-    .wait()
-    .unwrap();
+    }))
 }
+
+criterion_bencher_compat::benchmark_group!(
+    oneshot,
+    new,
+    same_thread_recv_multi_send_recv,
+    same_thread_send_recv,
+    multi_thread_send_recv
+);
+criterion_bencher_compat::benchmark_main!(oneshot);

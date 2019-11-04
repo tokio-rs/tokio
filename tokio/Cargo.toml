@@ -119,10 +119,15 @@ optional = true
 
 [dev-dependencies]
 tokio-test = { version = "=0.2.0-alpha.6", path = "../tokio-test" }
+criterion_bencher_compat = "0.3"
 futures = { version = "0.3.0", features = ["async-await"] }
 loom = { version = "0.2.13", features = ["futures", "checkpoint"] }
 proptest = "0.9.4"
 tempfile = "3.1.0"
+
+[[bench]]
+name = "oneshot"
+harness = false
 
 [package.metadata.docs.rs]
 all-features = true
