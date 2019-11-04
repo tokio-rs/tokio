@@ -1,6 +1,8 @@
-use super::platform;
 use crate::executor::park::{Park, Unpark};
-use crate::loom::atomic::{AtomicUsize, Ordering::SeqCst};
+use crate::loom::sync::atomic::AtomicUsize;
+use crate::net::driver::platform;
+
+use std::sync::atomic::Ordering::SeqCst;
 
 mod dispatch;
 use dispatch::SingleShard;

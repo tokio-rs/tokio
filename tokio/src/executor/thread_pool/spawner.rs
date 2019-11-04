@@ -1,7 +1,7 @@
-use crate::executor::loom::sync::Arc;
 use crate::executor::park::Unpark;
 use crate::executor::task::JoinHandle;
 use crate::executor::thread_pool::worker;
+use crate::loom::sync::Arc;
 
 use std::fmt;
 use std::future::Future;

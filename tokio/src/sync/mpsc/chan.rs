@@ -1,8 +1,4 @@
-use crate::sync::loom::{
-    future::AtomicWaker,
-    sync::atomic::AtomicUsize,
-    sync::{Arc, CausalCell},
-};
+use crate::loom::{cell::CausalCell, future::AtomicWaker, sync::atomic::AtomicUsize, sync::Arc};
 use crate::sync::mpsc::list;
 
 use std::fmt;

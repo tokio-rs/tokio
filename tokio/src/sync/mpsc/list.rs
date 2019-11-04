@@ -1,6 +1,6 @@
 //! A concurrent, lock-free, FIFO list.
 
-use crate::sync::loom::{
+use crate::loom::{
     sync::atomic::{AtomicPtr, AtomicUsize},
     thread,
 };

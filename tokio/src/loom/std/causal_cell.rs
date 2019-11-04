@@ -1,5 +1,6 @@
 use std::cell::UnsafeCell;
 
+#[derive(Debug)]
 pub(crate) struct CausalCell<T>(UnsafeCell<T>);
 
 #[derive(Default)]

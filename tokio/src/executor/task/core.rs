@@ -1,9 +1,9 @@
-use crate::executor::loom::alloc::Track;
-use crate::executor::loom::cell::CausalCell;
 use crate::executor::task::raw::{self, Vtable};
 use crate::executor::task::state::State;
 use crate::executor::task::waker::waker_ref;
 use crate::executor::task::Schedule;
+use crate::loom::alloc::Track;
+use crate::loom::cell::CausalCell;
 
 use std::cell::UnsafeCell;
 use std::future::Future;

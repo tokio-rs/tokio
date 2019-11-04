@@ -1,6 +1,6 @@
 use std::cell::UnsafeCell;
 use std::fmt;
-use std::ops::Deref;
+use std::ops;
 
 /// `AtomicUsize` providing an additional `load_unsync` function.
 pub(crate) struct AtomicUsize {
@@ -29,7 +29,7 @@ impl AtomicUsize {
     }
 }
 
-impl Deref for AtomicUsize {
+impl ops::Deref for AtomicUsize {
     type Target = std::sync::atomic::AtomicUsize;
 
     fn deref(&self) -> &Self::Target {
@@ -39,8 +39,15 @@ impl Deref for AtomicUsize {
     }
 }
 
+impl ops::DerefMut for AtomicUsize {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        // safety: we hold `&mut self`
+        unsafe { &mut *self.inner.get() }
+    }
+}
+
 impl fmt::Debug for AtomicUsize {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.deref().fmt(fmt)
+        (**self).fmt(fmt)
     }
 }

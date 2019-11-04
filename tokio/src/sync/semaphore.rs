@@ -8,12 +8,10 @@
 //! section. If no permits are available, then acquiring the semaphore returns
 //! `Pending`. The task is woken once a permit becomes available.
 
-use crate::sync::loom::{
+use crate::loom::{
+    cell::CausalCell,
     future::AtomicWaker,
-    sync::{
-        atomic::{AtomicPtr, AtomicUsize},
-        CausalCell,
-    },
+    sync::atomic::{AtomicPtr, AtomicUsize},
     thread,
 };
 

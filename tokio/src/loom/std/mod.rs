@@ -7,30 +7,15 @@ mod atomic_usize;
 mod causal_cell;
 
 #[cfg(feature = "rt-current-thread")]
-pub(crate) mod alloc {
-    #[derive(Debug)]
-    pub(crate) struct Track<T> {
-        value: T,
-    }
-
-    impl<T> Track<T> {
-        pub(crate) fn new(value: T) -> Track<T> {
-            Track { value }
-        }
-
-        pub(crate) fn get_mut(&mut self) -> &mut T {
-            &mut self.value
-        }
-
-        pub(crate) fn into_inner(self) -> T {
-            self.value
-        }
-    }
-}
+pub(crate) mod alloc;
 
 #[cfg(feature = "rt-current-thread")]
 pub(crate) mod cell {
     pub(crate) use super::causal_cell::{CausalCell, CausalCheck};
+}
+
+pub(crate) mod future {
+    pub(crate) use crate::sync::AtomicWaker;
 }
 
 #[cfg(feature = "rt-full")]
@@ -56,14 +41,14 @@ pub(crate) mod rand {
 }
 
 pub(crate) mod sync {
-    #[cfg(any(feature = "blocking", feature = "rt-current-thread"))]
-    pub(crate) use std::sync::{Arc, Condvar, Mutex};
+    // #[cfg(any(feature = "blocking", feature = "rt-current-thread"))]
+    pub(crate) use std::sync::*;
 
     pub(crate) mod atomic {
         #[cfg(feature = "rt-full")]
-        pub(crate) use crate::executor::loom::std::atomic_u32::AtomicU32;
+        pub(crate) use crate::loom::std::atomic_u32::AtomicU32;
         #[cfg(feature = "rt-current-thread")]
-        pub(crate) use crate::executor::loom::std::atomic_usize::AtomicUsize;
+        pub(crate) use crate::loom::std::atomic_usize::AtomicUsize;
 
         #[cfg(feature = "rt-full")]
         pub(crate) use std::sync::atomic::spin_loop_hint;

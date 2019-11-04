@@ -78,7 +78,7 @@ impl Builder {
             current_thread: false,
 
             // Default to use an equal number of threads to number of CPU cores
-            num_threads: crate::executor::loom::sys::num_cpus(),
+            num_threads: crate::loom::sys::num_cpus(),
 
             // Default thread name
             thread_name: "tokio-runtime-worker".into(),

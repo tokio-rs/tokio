@@ -1,14 +1,13 @@
-use crate::executor::loom::sync::atomic::Ordering::{Acquire, Relaxed, Release};
-use crate::executor::loom::sync::atomic::{AtomicBool, AtomicUsize};
-use crate::executor::loom::sync::{Arc, Mutex};
 use crate::executor::park::{Park, Unpark};
 use crate::executor::tests::loom_oneshot as oneshot;
 use crate::executor::thread_pool::{self, Builder};
 use crate::spawn;
 
-use loom::sync::Notify;
+use loom::sync::atomic::{AtomicBool, AtomicUsize};
+use loom::sync::{Arc, Mutex, Notify};
 
 use std::future::Future;
+use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 use std::time::Duration;
 
 #[test]
@@ -190,7 +189,7 @@ fn gated() -> impl Future<Output = &'static str> {
 }
 
 fn gated2(thread: bool) -> impl Future<Output = &'static str> {
-    use crate::executor::loom::thread;
+    use loom::thread;
     use std::sync::Arc;
 
     let gate = Arc::new(AtomicBool::new(false));

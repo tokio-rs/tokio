@@ -1,7 +1,7 @@
 //! Coordinates idling workers
 
-use crate::executor::loom::sync::atomic::AtomicUsize;
-use crate::executor::loom::sync::Mutex;
+use crate::loom::sync::atomic::AtomicUsize;
+use crate::loom::sync::Mutex;
 
 use std::fmt;
 use std::sync::atomic::Ordering::{self, AcqRel, Relaxed, SeqCst};

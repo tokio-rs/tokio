@@ -1,7 +1,7 @@
 //! Thread pool for blocking operations
 
-use crate::executor::loom::sync::{Arc, Condvar, Mutex};
-use crate::executor::loom::thread;
+use crate::loom::sync::{Arc, Condvar, Mutex};
+use crate::loom::thread;
 #[cfg(feature = "blocking")]
 use crate::sync::oneshot;
 
