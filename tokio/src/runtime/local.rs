@@ -1,29 +1,28 @@
 //! Groups a set of tasks that execute on the same thread.
-use crate::executor::park::{Park, Unpark};
 use crate::executor::task::{self, JoinHandle, Schedule, Task};
 
-use std::cell::UnsafeCell;
+use std::cell::{Cell, UnsafeCell};
 use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
-use std::mem::ManuallyDrop;
+use std::marker::PhantomData;
+use std::pin::Pin;
 use std::ptr::{self, NonNull};
-use std::sync::{Arc, Mutex};
-use std::task::Poll;
-use std::time::Duration;
+use std::task::{Context, Poll};
 
-use pin_project::{pin_project, project};
+use pin_project::pin_project;
 
 /// A group of tasks which are executed on the same thread.
 ///
 /// These tasks need not implement `Send`; a local task set provides the
 /// capacity to execute `!Send` futures.
-#[derive(Debug)]
 #[pin_project]
+#[derive(Debug)]
 pub struct TaskSet<F> {
     scheduler: Scheduler,
     #[pin]
     future: F,
+    _not_send_or_sync: PhantomData<*const ()>,
 }
 
 struct Scheduler {
@@ -57,7 +56,7 @@ where
     F: Future + 'static,
     F::Output: 'static,
 {
-    TaskSet::new(f)
+    TaskSet::new(future)
 }
 
 /// Spawns a `!Send` future on the local task set.
@@ -66,20 +65,53 @@ where
 /// This may only be called from the context of a local task set.
 ///
 /// # Panics
+///
 /// - This function panics if called outside of a local task set.
+///
+/// # Examples
+///
+/// ```rust
+/// # use tokio::runtime::Runtime;
+/// use std::rc::Rc;
+/// use tokio::executor::local;
+/// let unsync_data = Rc::new("my unsync data...");
+///
+/// let mut rt = Runtime::new().unwrap();
+/// rt.block_on(local::task_set(async move {
+///     let more_unsync_data = unsync_data.clone();
+///     local::spawn_local(async move {
+///         println!("{}", more_unsync_data);
+///         // ...
+///     }).await.unwrap();
+/// }));
+/// ```
 pub fn spawn_local<F>(future: F) -> JoinHandle<F::Output>
 where
     F: Future + 'static,
     F::Output: 'static,
 {
+    /// EXTREMELY UNSAFE type for pretending a task is Send. Don't use this elsewhere.
+    #[pin_project]
+    struct Unsend<T>(#[pin] T);
+
+    unsafe impl<F> Send for Unsend<F> {}
+
+    impl<F: Future> Future for Unsend<F> {
+        type Output = F::Output;
+
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            let this = self.project();
+            this.0.poll(cx)
+        }
+    }
+
     CURRENT_TASK_SET.with(|current| {
         let current = current
             .get()
             .expect("`local::spawn` called from outside of a local::TaskSet!");
         unsafe {
-            let scheduler = scheduler.as_ref();
-            let (task, handle) = task::joinable_unsend(future);
-            set.schedule(task);
+            let (task, handle) = task::joinable(Unsend(future));
+            current.as_ref().schedule(task);
             handle
         }
     })
@@ -98,6 +130,7 @@ where
         Self {
             scheduler: Scheduler::new(),
             future,
+            _not_send_or_sync: PhantomData,
         }
     }
 }
@@ -106,18 +139,17 @@ impl<F: Future> Future for TaskSet<F> {
     type Output = F::Output;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let TaskSet { scheduler, future } = self.project();
+        let this = self.project();
+        let scheduler = this.scheduler;
+        let future = this.future;
+
         scheduler.with(|| {
-            if let Poll::Ready(v) = future.poll(&mut cx) {
-                return Poll::Ready(v);
-            }
+            scheduler.tick();
 
-            scheduler.tick(local);
-
-            match future.poll(&mut cx) {
+            match future.poll(cx) {
                 Poll::Ready(v) => Poll::Ready(v),
                 Poll::Pending => {
-                    cx.waker().wake();
+                    cx.waker().wake_by_ref();
                     Poll::Pending
                 }
             }
@@ -162,7 +194,7 @@ impl Scheduler {
         }
     }
 
-    fn with<F>(&mut self, f: impl FnOnce() -> F) -> F {
+    fn with<F>(&self, f: impl FnOnce() -> F) -> F {
         struct Entered<'a> {
             current: &'a Cell<Option<NonNull<Scheduler>>>,
         }
@@ -192,7 +224,7 @@ impl Scheduler {
     }
 
     fn next_task(&self) -> Option<Task<Self>> {
-        unsafe { (*self.task.get()).pop_front() }
+        unsafe { (*self.queue.get()).pop_front() }
     }
 
     fn tick(&self) {
@@ -203,16 +235,114 @@ impl Scheduler {
             };
 
             if let Some(task) = task.run(&mut || Some(self.into())) {
-                unsafe {
-                    self.schedule_local(task);
-                }
+                self.schedule(task);
             }
         }
     }
 }
 
+unsafe impl Send for Scheduler {}
+unsafe impl Sync for Scheduler {}
+
 impl fmt::Debug for Scheduler {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Scheduler { .. }").finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::runtime;
+
+    #[test]
+    fn local_current_thread() {
+        let mut rt = runtime::Builder::new().current_thread().build().unwrap();
+        let task_set = task_set(async {
+            spawn_local(async {}).await.unwrap();
+        });
+        rt.block_on(task_set);
+    }
+
+    #[test]
+    fn local_threadpool() {
+        thread_local! {
+            static ON_RT_THREAD: Cell<bool> = Cell::new(false);
+        }
+
+        ON_RT_THREAD.with(|cell| cell.set(true));
+
+        let mut rt = runtime::Runtime::new().unwrap();
+        let task_set = task_set(async {
+            assert!(ON_RT_THREAD.with(|cell| cell.get()));
+            spawn_local(async {
+                assert!(ON_RT_THREAD.with(|cell| cell.get()));
+            })
+            .await
+            .unwrap();
+        });
+        rt.block_on(task_set);
+    }
+
+    #[test]
+    fn all_spawn_locals_are_local() {
+        use futures_util::future;
+
+        thread_local! {
+            static ON_RT_THREAD: Cell<bool> = Cell::new(false);
+        }
+
+        ON_RT_THREAD.with(|cell| cell.set(true));
+
+        let mut rt = runtime::Runtime::new().unwrap();
+        let task_set = task_set(async {
+            assert!(ON_RT_THREAD.with(|cell| cell.get()));
+            let handles = (0..128)
+                .map(|_| {
+                    spawn_local(async {
+                        assert!(ON_RT_THREAD.with(|cell| cell.get()));
+                    })
+                })
+                .collect::<Vec<_>>();
+            for result in future::join_all(handles).await {
+                result.unwrap();
+            }
+        });
+        rt.block_on(task_set);
+    }
+
+    #[test]
+    fn nested_spawn_local_is_local() {
+        thread_local! {
+            static ON_RT_THREAD: Cell<bool> = Cell::new(false);
+        }
+
+        ON_RT_THREAD.with(|cell| cell.set(true));
+
+        let mut rt = runtime::Runtime::new().unwrap();
+        let task_set = task_set(async {
+            assert!(ON_RT_THREAD.with(|cell| cell.get()));
+            spawn_local(async {
+                assert!(ON_RT_THREAD.with(|cell| cell.get()));
+                spawn_local(async {
+                    assert!(ON_RT_THREAD.with(|cell| cell.get()));
+                    spawn_local(async {
+                        assert!(ON_RT_THREAD.with(|cell| cell.get()));
+                        spawn_local(async {
+                            assert!(ON_RT_THREAD.with(|cell| cell.get()));
+                        })
+                        .await
+                        .unwrap();
+                    })
+                    .await
+                    .unwrap();
+                })
+                .await
+                .unwrap();
+            })
+            .await
+            .unwrap();
+        });
+        rt.block_on(task_set);
     }
 }

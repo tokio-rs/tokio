@@ -95,46 +95,6 @@ where
     (task, join)
 }
 
-/// Create a new `!Send` task without an associated join handle
-///
-/// # Safety
-///
-/// The returned `Task` will implement `Send`, even though it was constructed
-/// from an `!Send` future. Thus, it may not be sent between threads!
-pub(super) unsafe fn background_unsend<T, S>(task: T) -> Task<S>
-where
-    T: Future + 'static,
-    S: Schedule,
-{
-    Task {
-        raw: RawTask::new_background::<_, S>(task),
-        _p: PhantomData,
-    }
-}
-
-/// Create a new `!Send` task with an associated join handle
-///
-/// # Safety
-///
-/// The returned `Task` will implement `Send`, even though it was constructed
-/// from an `!Send` future. Thus, it may not be sent between threads!
-pub(super) unsafe fn joinable_unsend<T, S>(task: T) -> (Task<S>, JoinHandle<T::Output>)
-where
-    T: Future + 'static,
-    S: Schedule,
-{
-    let raw = RawTask::new_joinable::<_, S>(task);
-
-    let task = Task {
-        raw,
-        _p: PhantomData,
-    };
-
-    let join = JoinHandle::new(raw);
-
-    (task, join)
-}
-
 impl<S: 'static> Task<S> {
     pub(crate) unsafe fn from_raw(ptr: NonNull<Header>) -> Task<S> {
         Task {
