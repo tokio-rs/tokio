@@ -14,8 +14,7 @@ use std::time::Duration;
 #[test]
 fn pool_multi_spawn() {
     loom::model(|| {
-        let pool = Builder::new()
-            .build(|_| LoomPark::new());
+        let pool = Builder::new().build(|_| LoomPark::new());
 
         let c1 = Arc::new(AtomicUsize::new(0));
 
@@ -137,8 +136,7 @@ fn pool_multi_notify() {
 #[test]
 fn pool_shutdown() {
     loom::model(|| {
-        let pool = Builder::new()
-            .build(|_| LoomPark::new());
+        let pool = Builder::new().build(|_| LoomPark::new());
 
         pool.spawn(async move {
             gated2(true).await;
@@ -155,8 +153,7 @@ fn pool_shutdown() {
 #[test]
 fn complete_block_on_under_load() {
     loom::model(|| {
-        let pool = Builder::new()
-            .build(|_| LoomPark::new());
+        let pool = Builder::new().build(|_| LoomPark::new());
 
         pool.block_on(async {
             // Spin hard
