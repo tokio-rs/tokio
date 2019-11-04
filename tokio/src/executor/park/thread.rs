@@ -212,8 +212,8 @@ impl Unpark for UnparkThread {
 
 #[cfg(feature = "rt-full")]
 mod waker {
-    use crate::executor::loom::sync::Arc;
     use super::{Inner, UnparkThread};
+    use crate::executor::loom::sync::Arc;
 
     use std::mem;
     use std::task::{RawWaker, RawWakerVTable, Waker};
@@ -241,7 +241,8 @@ mod waker {
     unsafe fn unparker_to_raw_waker(unparker: Arc<Inner>) -> RawWaker {
         RawWaker::new(
             Inner::into_raw(unparker),
-            &RawWakerVTable::new(clone, wake, wake_by_ref, drop_waker))
+            &RawWakerVTable::new(clone, wake, wake_by_ref, drop_waker),
+        )
     }
 
     unsafe fn clone(raw: *const ()) -> RawWaker {
