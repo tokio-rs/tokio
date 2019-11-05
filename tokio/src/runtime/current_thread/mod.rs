@@ -35,7 +35,7 @@ pub(super) struct Scheduler {
     /// # Safety
     ///
     /// Must only be accessed from the primary thread
-    owned_tasks: UnsafeCell<task::OwnedList<Self>>,
+    owned_tasks: UnsafeCell<task::OwnedList<Self, task::SendMarker>>,
 
     /// Local run queue.
     ///
@@ -254,7 +254,7 @@ impl Scheduler {
     }
 }
 
-impl Schedule for Scheduler {
+impl Schedule<task::SendMarker> for Scheduler {
     fn bind(&self, task: &Task<Self>) {
         unsafe {
             (*self.owned_tasks.get()).insert(task);

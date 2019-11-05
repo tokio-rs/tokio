@@ -38,38 +38,52 @@ use std::ptr::NonNull;
 use std::{fmt, mem};
 
 /// An owned handle to the task, tracked by ref count
-pub(crate) struct Task<S: 'static> {
+pub(crate) struct Task<S: 'static, M = SendMarker> {
     raw: RawTask,
-    _p: PhantomData<S>,
+    _p: PhantomData<(S, M)>,
 }
 
-unsafe impl<S: Send + Sync + 'static> Send for Task<S> {}
+/// An owned handle to a `!Send` task, tracked by ref count.
+pub(crate) type UnsendTask<S> = Task<S, UnsendMarker>;
+
+/// Marker type indicating that a `Task` was constructed from a future that
+/// implements `Send`.
+#[derive(Debug)]
+pub(crate) struct SendMarker {}
+
+/// Marker type indicating that a `Task` was constructed from a future that
+/// does not implement `Send`, and may only be scheduled by a scheduler that is
+/// capable of scheduling `!Send` tasks.
+#[derive(Debug)]
+pub(crate) struct UnsendMarker {}
+
+unsafe impl<S: Send + Sync + 'static> Send for Task<S, SendMarker> {}
 
 /// Task result sent back
 pub(crate) type Result<T> = std::result::Result<T, JoinError>;
 
-pub(crate) trait Schedule: Send + Sync + Sized + 'static {
+pub(crate) trait Schedule<M>: Send + Sync + Sized + 'static {
     /// Bind a task to the executor.
     ///
     /// Guaranteed to be called from the thread that called `poll` on the task.
-    fn bind(&self, task: &Task<Self>);
+    fn bind(&self, task: &Task<Self, M>);
 
     /// The task has completed work and is ready to be released. The scheduler
     /// is free to drop it whenever.
-    fn release(&self, task: Task<Self>);
+    fn release(&self, task: Task<Self, M>);
 
     /// The has been completed by the executor it was bound to.
-    fn release_local(&self, task: &Task<Self>);
+    fn release_local(&self, task: &Task<Self, M>);
 
     /// Schedule the task
-    fn schedule(&self, task: Task<Self>);
+    fn schedule(&self, task: Task<Self, M>);
 }
 
 /// Create a new task without an associated join handle
 pub(crate) fn background<T, S>(task: T) -> Task<S>
 where
     T: Future + Send + 'static,
-    S: Schedule,
+    S: Schedule<SendMarker>,
 {
     Task {
         raw: RawTask::new_background::<_, S>(task),
@@ -81,7 +95,7 @@ where
 pub(crate) fn joinable<T, S>(task: T) -> (Task<S>, JoinHandle<T::Output>)
 where
     T: Future + Send + 'static,
-    S: Schedule,
+    S: Schedule<SendMarker>,
 {
     let raw = RawTask::new_joinable::<_, S>(task);
 
@@ -95,8 +109,26 @@ where
     (task, join)
 }
 
-impl<S: 'static> Task<S> {
-    pub(crate) unsafe fn from_raw(ptr: NonNull<Header>) -> Task<S> {
+/// Create a new `!Send` task with an associated join handle
+pub(crate) fn joinable_unsend<T, S>(task: T) -> (UnsendTask<S>, JoinHandle<T::Output>)
+where
+    T: Future + 'static,
+    S: Schedule<UnsendMarker>,
+{
+    let raw = RawTask::new_joinable_unsend::<_, S>(task);
+
+    let task = Task {
+        raw,
+        _p: PhantomData,
+    };
+
+    let join = JoinHandle::new(raw);
+
+    (task, join)
+}
+
+impl<S: 'static, M> Task<S, M> {
+    pub(crate) unsafe fn from_raw(ptr: NonNull<Header>) -> Task<S, M> {
         Task {
             raw: RawTask::from_raw(ptr),
             _p: PhantomData,
@@ -114,7 +146,7 @@ impl<S: 'static> Task<S> {
     }
 }
 
-impl<S: Schedule> Task<S> {
+impl<S: Schedule<M>, M> Task<S, M> {
     /// Returns `self` when the task needs to be immediately re-scheduled
     pub(crate) fn run<F>(self, mut executor: F) -> Option<Self>
     where
@@ -140,13 +172,13 @@ impl<S: Schedule> Task<S> {
     }
 }
 
-impl<S: 'static> Drop for Task<S> {
+impl<S: 'static, M> Drop for Task<S, M> {
     fn drop(&mut self) {
         self.raw.drop_task();
     }
 }
 
-impl<S> fmt::Debug for Task<S> {
+impl<S, M> fmt::Debug for Task<S, M> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Task").finish()
     }

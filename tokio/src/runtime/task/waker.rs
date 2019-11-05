@@ -13,17 +13,17 @@ pub(super) struct WakerRef<'a, S: 'static> {
 
 /// Returns a `WakerRef` which avoids having to pre-emptively increase the
 /// refcount if there is no need to do so.
-pub(super) fn waker_ref<T, S>(meta: &Header) -> WakerRef<'_, S>
+pub(super) fn waker_ref<T, S, M>(meta: &Header) -> WakerRef<'_, S>
 where
     T: Future,
-    S: Schedule,
+    S: Schedule<M>,
 {
     let ptr = meta as *const _ as *const ();
 
     let vtable = &RawWakerVTable::new(
-        clone_waker::<T, S>,
+        clone_waker::<T, S, M>,
         wake_unreachable,
-        wake_by_local_ref::<T, S>,
+        wake_by_local_ref::<T, S, M>,
         noop,
     );
 
@@ -43,30 +43,30 @@ impl<S> ops::Deref for WakerRef<'_, S> {
     }
 }
 
-unsafe fn clone_waker<T, S>(ptr: *const ()) -> RawWaker
+unsafe fn clone_waker<T, S, M>(ptr: *const ()) -> RawWaker
 where
     T: Future,
-    S: Schedule,
+    S: Schedule<M>,
 {
     let meta = ptr as *const Header;
     (*meta).state.ref_inc();
 
     let vtable = &RawWakerVTable::new(
-        clone_waker::<T, S>,
-        wake_by_val::<T, S>,
-        wake_by_ref::<T, S>,
-        drop_waker::<T, S>,
+        clone_waker::<T, S, M>,
+        wake_by_val::<T, S, M>,
+        wake_by_ref::<T, S, M>,
+        drop_waker::<T, S, M>,
     );
 
     RawWaker::new(ptr, vtable)
 }
 
-unsafe fn drop_waker<T, S>(ptr: *const ())
+unsafe fn drop_waker<T, S, M>(ptr: *const ())
 where
     T: Future,
-    S: Schedule,
+    S: Schedule<M>,
 {
-    let harness = Harness::<T, S>::from_raw(ptr as *mut _);
+    let harness = Harness::<T, S, M>::from_raw(ptr as *mut _);
     harness.drop_waker();
 }
 
@@ -75,32 +75,32 @@ unsafe fn wake_unreachable(_data: *const ()) {
     unreachable!();
 }
 
-unsafe fn wake_by_val<T, S>(ptr: *const ())
+unsafe fn wake_by_val<T, S, M>(ptr: *const ())
 where
     T: Future,
-    S: Schedule,
+    S: Schedule<M>,
 {
-    let harness = Harness::<T, S>::from_raw(ptr as *mut _);
+    let harness = Harness::<T, S, M>::from_raw(ptr as *mut _);
     harness.wake_by_val();
 }
 
 // This function can only be called when on the runtime.
-unsafe fn wake_by_local_ref<T, S>(ptr: *const ())
+unsafe fn wake_by_local_ref<T, S, M>(ptr: *const ())
 where
     T: Future,
-    S: Schedule,
+    S: Schedule<M>,
 {
-    let harness = Harness::<T, S>::from_raw(ptr as *mut _);
+    let harness = Harness::<T, S, M>::from_raw(ptr as *mut _);
     harness.wake_by_local_ref();
 }
 
 // Wake without consuming the waker
-unsafe fn wake_by_ref<T, S>(ptr: *const ())
+unsafe fn wake_by_ref<T, S, M>(ptr: *const ())
 where
     T: Future,
-    S: Schedule,
+    S: Schedule<M>,
 {
-    let harness = Harness::<T, S>::from_raw(ptr as *mut _);
+    let harness = Harness::<T, S, M>::from_raw(ptr as *mut _);
     harness.wake_by_ref();
 }
 

@@ -1,6 +1,5 @@
 #![allow(warnings)]
-
-use crate::runtime::task::{Header, Schedule, Task};
+use crate::runtime::task::{Header, Schedule, SendMarker, Task};
 
 use std::collections::VecDeque;
 use std::sync::Mutex;
@@ -83,7 +82,7 @@ impl Mock {
     }
 }
 
-impl Schedule for Mock {
+impl Schedule<SendMarker> for Mock {
     fn bind(&self, task: &Task<Self>) {
         match self.next("bind") {
             Call::Bind(ptr) => {
@@ -120,7 +119,7 @@ impl Drop for Mock {
     }
 }
 
-impl Schedule for Noop {
+impl Schedule<SendMarker> for Noop {
     fn bind(&self, _task: &Task<Self>) {}
 
     fn release(&self, _task: Task<Self>) {}

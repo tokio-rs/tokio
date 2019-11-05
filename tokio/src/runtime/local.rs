@@ -1,5 +1,5 @@
 //! Groups a set of tasks that execute on the same thread.
-use crate::executor::task::{self, JoinHandle, Schedule, Task};
+use crate::runtime::task::{self, JoinHandle, Schedule, UnsendMarker, UnsendTask};
 
 use std::cell::{Cell, UnsafeCell};
 use std::collections::VecDeque;
@@ -29,7 +29,7 @@ struct Scheduler {
     /// # Safety
     ///
     /// Must only be accessed from the primary thread
-    owned_tasks: UnsafeCell<task::OwnedList<Scheduler>>,
+    tasks: UnsafeCell<task::OwnedList<Scheduler, UnsendMarker>>,
 
     /// Local run queue.
     ///
@@ -39,7 +39,7 @@ struct Scheduler {
     ///
     /// References should not be handed out. Only call `push` / `pop` functions.
     /// Only call from the owning thread.
-    queue: UnsafeCell<VecDeque<Task<Scheduler>>>,
+    queue: UnsafeCell<VecDeque<UnsendTask<Scheduler>>>,
 }
 
 #[pin_project]
@@ -89,25 +89,11 @@ where
             .get()
             .expect("`local::spawn` called from outside of a local::TaskSet!");
         unsafe {
-            let (task, handle) = task::joinable(Unsend(future));
+            let (task, handle) = task::joinable_unsend(future);
             current.as_ref().schedule(task);
             handle
         }
     })
-}
-/// EXTREMELY UNSAFE type for pretending a task is Send. Don't use this elsewhere.
-#[pin_project]
-struct Unsend<T>(#[pin] T);
-
-unsafe impl<F> Send for Unsend<F> {}
-
-impl<F: Future> Future for Unsend<F> {
-    type Output = F::Output;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.project();
-        this.0.poll(cx)
-    }
 }
 
 /// Max number of tasks to poll per tick.
@@ -127,7 +113,7 @@ impl TaskSet {
         F: Future + 'static,
         F::Output: 'static,
     {
-        let (task, handle) = task::joinable(Unsend(future));
+        let (task, handle) = task::joinable_unsend(future);
         self.scheduler.schedule(task);
         handle
     }
@@ -166,26 +152,26 @@ impl<F: Future> Future for LocalFuture<F> {
 
 // === impl Scheduler ===
 
-impl Schedule for Scheduler {
-    fn bind(&self, task: &Task<Self>) {
+impl Schedule<UnsendMarker> for Scheduler {
+    fn bind(&self, task: &UnsendTask<Self>) {
         assert!(self.is_current());
         unsafe {
-            (*self.owned_tasks.get()).insert(task);
+            (*self.tasks.get()).insert(task);
         }
     }
 
-    fn release(&self, _: Task<Self>) {
+    fn release(&self, _: UnsendTask<Self>) {
         unreachable!("tasks should only be completed locally")
     }
 
-    fn release_local(&self, task: &Task<Self>) {
+    fn release_local(&self, task: &UnsendTask<Self>) {
         assert!(self.is_current());
         unsafe {
-            (*self.owned_tasks.get()).remove(task);
+            (*self.tasks.get()).remove(task);
         }
     }
 
-    fn schedule(&self, task: Task<Self>) {
+    fn schedule(&self, task: UnsendTask<Self>) {
         assert!(self.is_current());
         unsafe {
             (*self.queue.get()).push_front(task);
@@ -196,7 +182,7 @@ impl Schedule for Scheduler {
 impl Scheduler {
     fn new() -> Self {
         Self {
-            owned_tasks: UnsafeCell::new(task::OwnedList::new()),
+            tasks: UnsafeCell::new(task::OwnedList::new()),
             queue: UnsafeCell::new(VecDeque::with_capacity(64)),
         }
     }
@@ -230,7 +216,7 @@ impl Scheduler {
             .unwrap_or(false)
     }
 
-    fn next_task(&self) -> Option<Task<Self>> {
+    fn next_task(&self) -> Option<UnsendTask<Self>> {
         unsafe { (*self.queue.get()).pop_front() }
     }
 

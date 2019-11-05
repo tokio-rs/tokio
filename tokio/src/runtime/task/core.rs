@@ -7,6 +7,7 @@ use crate::runtime::task::Schedule;
 
 use std::cell::UnsafeCell;
 use std::future::Future;
+use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::ptr::{self, NonNull};
@@ -17,12 +18,12 @@ use std::task::{Context, Poll, Waker};
 /// It is critical for `Header` to be the first field as the task structure will
 /// be referenced by both *mut Cell and *mut Header.
 #[repr(C)]
-pub(super) struct Cell<T: Future> {
+pub(super) struct Cell<T: Future, M> {
     /// Hot task state data
     pub(super) header: Header,
 
     /// Either the future or output, depending on the execution stage.
-    pub(super) core: Core<T>,
+    pub(super) core: Core<T, M>,
 
     /// Cold data
     pub(super) trailer: Trailer,
@@ -31,8 +32,9 @@ pub(super) struct Cell<T: Future> {
 /// The core of the task.
 ///
 /// Holds the future or output, depending on the stage of execution.
-pub(super) struct Core<T: Future> {
+pub(super) struct Core<T: Future, M> {
     stage: Stage<T>,
+    _marker: PhantomData<M>,
 }
 
 /// Crate public as this is also needed by the pool.
@@ -74,12 +76,12 @@ enum Stage<T: Future> {
     Consumed,
 }
 
-impl<T: Future> Cell<T> {
+impl<T: Future, M> Cell<T, M> {
     /// Allocate a new task cell, containing the header, trailer, and core
     /// structures.
-    pub(super) fn new<S>(future: T, state: State) -> Box<Cell<T>>
+    pub(super) fn new<S>(future: T, state: State) -> Box<Cell<T, M>>
     where
-        S: Schedule,
+        S: Schedule<M>,
     {
         Box::new(Cell {
             header: Header {
@@ -88,11 +90,12 @@ impl<T: Future> Cell<T> {
                 queue_next: UnsafeCell::new(ptr::null()),
                 owned_next: UnsafeCell::new(None),
                 owned_prev: UnsafeCell::new(None),
-                vtable: raw::vtable::<T, S>(),
+                vtable: raw::vtable::<T, S, M>(),
                 future_causality: CausalCell::new(()),
             },
             core: Core {
                 stage: Stage::Running(Track::new(future)),
+                _marker: PhantomData,
             },
             trailer: Trailer {
                 waker: CausalCell::new(MaybeUninit::new(None)),
@@ -101,14 +104,14 @@ impl<T: Future> Cell<T> {
     }
 }
 
-impl<T: Future> Core<T> {
+impl<T: Future, M> Core<T, M> {
     pub(super) fn transition_to_consumed(&mut self) {
         self.stage = Stage::Consumed
     }
 
     pub(super) fn poll<S>(&mut self, header: &Header) -> Poll<T::Output>
     where
-        S: Schedule,
+        S: Schedule<M>,
     {
         let res = {
             let future = match &mut self.stage {
@@ -122,7 +125,7 @@ impl<T: Future> Core<T> {
 
             // The waker passed into the `poll` function does not require a ref
             // count increment.
-            let waker_ref = waker_ref::<T, S>(header);
+            let waker_ref = waker_ref::<T, S, M>(header);
             let mut cx = Context::from_waker(&*waker_ref);
 
             future.poll(&mut cx)
