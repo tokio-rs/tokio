@@ -152,6 +152,12 @@ impl TaskSet {
     }
 }
 
+impl Default for TaskSet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<F: Future> Future for LocalFuture<F> {
     type Output = F::Output;
 
