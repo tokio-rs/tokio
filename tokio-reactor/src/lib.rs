@@ -748,7 +748,7 @@ impl Direction {
 
 impl<'a> Drop for DefaultGuard<'a> {
     fn drop(&mut self) {
-        CURRENT_REACTOR.with(|current| {
+        let _ = CURRENT_REACTOR.try_with(|current| {
             let mut current = current.borrow_mut();
             *current = None;
         });

@@ -229,9 +229,9 @@ unsafe fn hide_lt<'a>(p: *mut (dyn Executor + 'a)) -> *mut (dyn Executor + 'stat
 
 impl<'a> Drop for DefaultGuard<'a> {
     fn drop(&mut self) {
-        EXECUTOR.with(|cell| {
+        let _ = EXECUTOR.try_with(|cell| {
             cell.set(State::Empty);
-        })
+        });
     }
 }
 

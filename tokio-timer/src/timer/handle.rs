@@ -196,7 +196,7 @@ impl fmt::Debug for HandlePriv {
 
 impl<'a> Drop for DefaultGuard<'a> {
     fn drop(&mut self) {
-        CURRENT_TIMER.with(|current| {
+        let _ = CURRENT_TIMER.try_with(|current| {
             let mut current = current.borrow_mut();
             *current = None;
         });
