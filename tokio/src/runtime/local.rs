@@ -67,14 +67,14 @@ thread_local! {
 /// ```rust
 /// # use tokio::runtime::Runtime;
 /// use std::rc::Rc;
-/// use tokio::executor::local;
+/// use tokio::local;
 /// let unsync_data = Rc::new("my unsync data...");
 ///
 /// let mut rt = Runtime::new().unwrap();
 /// let task_set = local::TaskSet::new();
 /// let local_task = task_set.spawn(async move {
 ///     let more_unsync_data = unsync_data.clone();
-///     local::spawn_local(async move {
+///     tokio::spawn_local(async move {
 ///         println!("{}", more_unsync_data);
 ///         // ...
 ///     }).await.unwrap();
