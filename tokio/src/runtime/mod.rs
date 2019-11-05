@@ -264,7 +264,16 @@ impl Runtime {
     ///
     /// [mod]: index.html
     pub fn new() -> io::Result<Self> {
-        Builder::new().thread_pool().build()
+        #[cfg(feature = "rt-full")]
+        let ret = Builder::new().thread_pool().build();
+
+        #[cfg(all(not(feature = "rt-full"), feature = "rt-current-thread"))]
+        let ret = Builder::new().current_thread().build();
+
+        #[cfg(not(feature = "rt-current-thread"))]
+        let ret = Builder::new().build();
+
+        ret
     }
 
     /// Spawn a future onto the Tokio runtime.
