@@ -178,7 +178,6 @@ impl<F: Future> Future for LocalFuture<F> {
 
 impl Schedule<UnsendMarker> for Scheduler {
     fn bind(&self, task: &UnsendTask<Self>) {
-        assert!(self.is_current());
         unsafe {
             (*self.tasks.get()).insert(task);
         }
@@ -189,14 +188,12 @@ impl Schedule<UnsendMarker> for Scheduler {
     }
 
     fn release_local(&self, task: &UnsendTask<Self>) {
-        assert!(self.is_current());
         unsafe {
             (*self.tasks.get()).remove(task);
         }
     }
 
     fn schedule(&self, task: UnsendTask<Self>) {
-        assert!(self.is_current());
         unsafe {
             (*self.queue.get()).push_front(task);
         }
@@ -245,6 +242,7 @@ impl Scheduler {
     }
 
     fn tick(&self) {
+        assert!(self.is_current());
         for _ in 0..MAX_TASKS_PER_TICK {
             let task = match self.next_task() {
                 Some(task) => task,
