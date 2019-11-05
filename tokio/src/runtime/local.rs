@@ -1,4 +1,4 @@
-//! Groups a set of tasks that execute on the same thread.
+//! Utilities for running `!Send` futures on the current thread.
 use crate::runtime::task::{self, JoinHandle, Schedule, UnsendMarker, UnsendTask};
 
 use std::cell::{Cell, UnsafeCell};
@@ -71,12 +71,16 @@ thread_local! {
 /// let unsync_data = Rc::new("my unsync data...");
 ///
 /// let mut rt = Runtime::new().unwrap();
-/// rt.block_on(local::task_set(async move {
+/// let task_set = local::TaskSet::new();
+/// let local_task = task_set.spawn(async move {
 ///     let more_unsync_data = unsync_data.clone();
 ///     local::spawn_local(async move {
 ///         println!("{}", more_unsync_data);
 ///         // ...
 ///     }).await.unwrap();
+/// });
+/// rt.block_on(local::task_set(async move {
+///     local_task.await.unwrap();
 /// }));
 /// ```
 pub fn spawn_local<F>(future: F) -> JoinHandle<F::Output>
@@ -108,7 +112,10 @@ impl TaskSet {
         }
     }
 
-    pub fn spawn_local<F>(&self, future: F) -> JoinHandle<F::Output>
+    /// Spawns a `!Send` task onto the local task set.
+    ///
+    /// This task is guaranteed to be run on the current thread.
+    pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + 'static,
         F::Output: 'static,
@@ -118,6 +125,23 @@ impl TaskSet {
         handle
     }
 
+    /// Run a future to completion on the provided runtime, driving any local
+    /// futures spawned on this task set on the current thread.
+    ///
+    /// This runs the given future on the runtime, blocking until it is
+    /// complete, and yielding its resolved result. Any tasks or timers which
+    /// the future spawns internally will be executed on the runtime. The future
+    /// may also call [`spawn_local`] to spawn additional local futures on the
+    /// current thread.
+    ///
+    /// This method should not be called from an asynchronous context.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the executor is at capacity, if the provided
+    /// future panics, or if called within an asynchronous execution context.
+    ///
+    /// [`spawn_local`]: ../fn.spawn_local.html
     pub fn block_on<F>(&self, rt: &mut crate::runtime::Runtime, future: F) -> F::Output
     where
         F: Future + 'static,
