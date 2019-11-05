@@ -45,10 +45,12 @@ pub(crate) struct HandlePriv {
     inner: Weak<Inner>,
 }
 
+/// A guard that resets the current timer to `None` when dropped.
 #[derive(Debug)]
 pub struct DefaultGuard<'a> {
     _lifetime: PhantomData<&'a ()>,
 }
+
 thread_local! {
     /// Tracks the timer for the current execution context.
     static CURRENT_TIMER: RefCell<Option<HandlePriv>> = RefCell::new(None)
