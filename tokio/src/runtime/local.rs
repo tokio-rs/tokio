@@ -256,6 +256,19 @@ impl fmt::Debug for Scheduler {
         fmt.debug_struct("Scheduler { .. }").finish()
     }
 }
+impl Drop for Scheduler {
+    fn drop(&mut self) {
+        // Drain all local tasks
+        while let Some(task) = self.next_task() {
+            task.shutdown();
+        }
+
+        // Release owned tasks
+        unsafe {
+            (*self.tasks.get()).shutdown();
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -287,7 +300,6 @@ mod tests {
             .await
             .unwrap();
         });
-        rt.block_on(task_set);
     }
 
     #[test]
