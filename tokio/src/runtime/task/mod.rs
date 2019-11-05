@@ -44,6 +44,7 @@ pub(crate) struct Task<S: 'static, M = SendMarker> {
 }
 
 /// An owned handle to a `!Send` task, tracked by ref count.
+#[cfg(feature = "local")]
 pub(crate) type UnsendTask<S> = Task<S, UnsendMarker>;
 
 /// Marker type indicating that a `Task` was constructed from a future that
@@ -55,6 +56,7 @@ pub(crate) struct SendMarker {}
 /// does not implement `Send`, and may only be scheduled by a scheduler that is
 /// capable of scheduling `!Send` tasks.
 #[derive(Debug)]
+#[cfg(feature = "local")]
 pub(crate) struct UnsendMarker {}
 
 unsafe impl<S: Send + Sync + 'static> Send for Task<S, SendMarker> {}
@@ -110,6 +112,7 @@ where
 }
 
 /// Create a new `!Send` task with an associated join handle
+#[cfg(feature = "local")]
 pub(crate) fn joinable_unsend<T, S>(task: T) -> (UnsendTask<S>, JoinHandle<T::Output>)
 where
     T: Future + 'static,
