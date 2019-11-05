@@ -133,8 +133,6 @@ where
 /// This function panics if there already is a default clock set.
 pub fn set_default(clock: &Clock) -> DefaultGuard<'_> {
     CLOCK.with(|cell| {
-        let mut current = current.borrow_mut();
-
         assert!(
             cell.get().is_none(),
             "default clock already set for execution context"
