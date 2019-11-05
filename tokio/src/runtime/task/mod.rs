@@ -184,7 +184,7 @@ impl<S: 'static, M> Drop for Task<S, M> {
 impl<S, M> fmt::Debug for Task<S, M> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Task")
-            .field("send", format_args!("{}", std::any::type_name::<M>()))
+            .field("send", &format_args!("{}", std::any::type_name::<M>()))
             .finish()
     }
 }
