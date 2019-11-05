@@ -22,7 +22,9 @@ fn clock_and_timer_concurrent() {
 
     let mut rt = runtime::Builder::new()
         .thread_pool()
-        .clock(clock).build().unwrap();
+        .clock(clock)
+        .build()
+        .unwrap();
 
     let (tx, rx) = mpsc::channel();
 

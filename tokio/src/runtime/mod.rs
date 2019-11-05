@@ -264,9 +264,7 @@ impl Runtime {
     ///
     /// [mod]: index.html
     pub fn new() -> io::Result<Self> {
-        Builder::new()
-            .thread_pool()
-            .build()
+        Builder::new().thread_pool().build()
     }
 
     /// Spawn a future onto the Tokio runtime.

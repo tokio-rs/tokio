@@ -16,10 +16,7 @@ use std::task::{Context, Poll};
 #[test]
 fn single_thread() {
     // No panic when starting a runtime w/ a single thread
-    let _ = runtime::Builder::new()
-        .thread_pool()
-        .num_threads(1)
-        .build();
+    let _ = runtime::Builder::new().thread_pool().num_threads(1).build();
 }
 
 #[test]
