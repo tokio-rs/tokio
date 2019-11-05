@@ -1,6 +1,6 @@
-use crate::executor::park::{Park, Unpark};
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::net::driver::platform;
+use crate::runtime::{Park, Unpark};
 
 use std::sync::atomic::Ordering::SeqCst;
 
