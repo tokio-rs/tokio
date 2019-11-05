@@ -1,7 +1,9 @@
 use crate::loom::alloc::Track;
 use crate::runtime::task::Cell;
 use crate::runtime::task::Harness;
-use crate::runtime::task::{Header, Schedule, SendMarker, UnsendMarker};
+#[cfg(feature = "local")]
+use crate::runtime::task::UnsendMarker;
+use crate::runtime::task::{Header, Schedule, SendMarker};
 use crate::runtime::task::{Snapshot, State};
 
 use std::future::Future;
@@ -71,6 +73,7 @@ impl RawTask {
         RawTask::new::<_, S, SendMarker>(task, State::new_joinable())
     }
 
+    #[cfg(feature = "local")]
     pub(super) fn new_joinable_unsend<T, S>(task: T) -> RawTask
     where
         T: Future + 'static,
