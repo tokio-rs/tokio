@@ -11,7 +11,6 @@ unsafe impl Send for AtomicUsize {}
 unsafe impl Sync for AtomicUsize {}
 
 impl AtomicUsize {
-    #[cfg(feature = "rt-current-thread")]
     pub(crate) fn new(val: usize) -> AtomicUsize {
         let inner = UnsafeCell::new(std::sync::atomic::AtomicUsize::new(val));
         AtomicUsize { inner }
@@ -23,7 +22,6 @@ impl AtomicUsize {
     ///
     /// All mutations must have happened before the unsynchronized load.
     /// Additionally, there must be no concurrent mutations.
-    #[cfg(feature = "rt-full")]
     pub(crate) unsafe fn unsync_load(&self) -> usize {
         *(*self.inner.get()).get_mut()
     }
