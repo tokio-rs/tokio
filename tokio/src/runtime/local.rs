@@ -8,6 +8,7 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::ptr::{self, NonNull};
+use std::rc::Rc;
 use std::task::{Context, Poll};
 
 use pin_project::pin_project;
@@ -16,12 +17,9 @@ use pin_project::pin_project;
 ///
 /// These tasks need not implement `Send`; a local task set provides the
 /// capacity to execute `!Send` futures.
-#[pin_project]
 #[derive(Debug)]
-pub struct TaskSet<F> {
-    scheduler: Scheduler,
-    #[pin]
-    future: F,
+pub struct TaskSet {
+    scheduler: Rc<Scheduler>,
     _not_send_or_sync: PhantomData<*const ()>,
 }
 
@@ -44,19 +42,15 @@ struct Scheduler {
     queue: UnsafeCell<VecDeque<Task<Scheduler>>>,
 }
 
-thread_local! {
-    static CURRENT_TASK_SET: Cell<Option<NonNull<Scheduler>>> = Cell::new(None);
+#[pin_project]
+struct LocalFuture<F> {
+    scheduler: Rc<Scheduler>,
+    #[pin]
+    future: F,
 }
 
-/// Returns a local task set for the given future.
-///
-/// The provided future may call `spawn_local`.
-pub fn task_set<F>(future: F) -> TaskSet<F>
-where
-    F: Future + 'static,
-    F::Output: 'static,
-{
-    TaskSet::new(future)
+thread_local! {
+    static CURRENT_TASK_SET: Cell<Option<NonNull<Scheduler>>> = Cell::new(None);
 }
 
 /// Spawns a `!Send` future on the local task set.
@@ -90,21 +84,6 @@ where
     F: Future + 'static,
     F::Output: 'static,
 {
-    /// EXTREMELY UNSAFE type for pretending a task is Send. Don't use this elsewhere.
-    #[pin_project]
-    struct Unsend<T>(#[pin] T);
-
-    unsafe impl<F> Send for Unsend<F> {}
-
-    impl<F: Future> Future for Unsend<F> {
-        type Output = F::Output;
-
-        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            let this = self.project();
-            this.0.poll(cx)
-        }
-    }
-
     CURRENT_TASK_SET.with(|current| {
         let current = current
             .get()
@@ -116,26 +95,54 @@ where
         }
     })
 }
+/// EXTREMELY UNSAFE type for pretending a task is Send. Don't use this elsewhere.
+#[pin_project]
+struct Unsend<T>(#[pin] T);
+
+unsafe impl<F> Send for Unsend<F> {}
+
+impl<F: Future> Future for Unsend<F> {
+    type Output = F::Output;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+        this.0.poll(cx)
+    }
+}
 
 /// Max number of tasks to poll per tick.
 const MAX_TASKS_PER_TICK: usize = 61;
 
-impl<F> TaskSet<F>
-where
-    F: Future + 'static,
-    F::Output: 'static,
-{
+impl TaskSet {
     /// Returns a new local task set for the given future.
-    pub fn new(future: F) -> Self {
+    pub fn new() -> Self {
         Self {
-            scheduler: Scheduler::new(),
-            future,
+            scheduler: Rc::new(Scheduler::new()),
             _not_send_or_sync: PhantomData,
         }
     }
+
+    pub fn spawn_local<F>(&self, future: F) -> JoinHandle<F::Output>
+    where
+        F: Future + 'static,
+        F::Output: 'static,
+    {
+        let (task, handle) = task::joinable(Unsend(future));
+        self.scheduler.schedule(task);
+        handle
+    }
+
+    pub fn block_on<F>(&self, rt: &mut crate::runtime::Runtime, future: F) -> F::Output
+    where
+        F: Future + 'static,
+        F::Output: 'static,
+    {
+        let scheduler = self.scheduler.clone();
+        rt.block_on(LocalFuture { scheduler, future })
+    }
 }
 
-impl<F: Future> Future for TaskSet<F> {
+impl<F: Future> Future for LocalFuture<F> {
     type Output = F::Output;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -258,10 +265,9 @@ mod tests {
     #[test]
     fn local_current_thread() {
         let mut rt = runtime::Builder::new().current_thread().build().unwrap();
-        let task_set = task_set(async {
+        TaskSet::new().block_on(&mut rt, async {
             spawn_local(async {}).await.unwrap();
         });
-        rt.block_on(task_set);
     }
 
     #[test]
@@ -273,7 +279,7 @@ mod tests {
         ON_RT_THREAD.with(|cell| cell.set(true));
 
         let mut rt = runtime::Runtime::new().unwrap();
-        let task_set = task_set(async {
+        TaskSet::new().block_on(&mut rt, async {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
             spawn_local(async {
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
@@ -295,7 +301,7 @@ mod tests {
         ON_RT_THREAD.with(|cell| cell.set(true));
 
         let mut rt = runtime::Runtime::new().unwrap();
-        let task_set = task_set(async {
+        TaskSet::new().block_on(&mut rt, async {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
             let handles = (0..128)
                 .map(|_| {
@@ -307,8 +313,7 @@ mod tests {
             for result in future::join_all(handles).await {
                 result.unwrap();
             }
-        });
-        rt.block_on(task_set);
+        })
     }
 
     #[test]
@@ -320,7 +325,7 @@ mod tests {
         ON_RT_THREAD.with(|cell| cell.set(true));
 
         let mut rt = runtime::Runtime::new().unwrap();
-        let task_set = task_set(async {
+        TaskSet::new().block_on(&mut rt, async {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
             spawn_local(async {
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
@@ -342,7 +347,6 @@ mod tests {
             })
             .await
             .unwrap();
-        });
-        rt.block_on(task_set);
+        })
     }
 }
