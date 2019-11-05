@@ -1,6 +1,6 @@
-use crate::executor::task::{self, Task};
-use crate::executor::tests::mock_schedule::{Noop, NOOP_SCHEDULE};
-use crate::executor::thread_pool::{queue, LOCAL_QUEUE_CAPACITY};
+use crate::runtime::task::{self, Task};
+use crate::runtime::tests::mock_schedule::{Noop, NOOP_SCHEDULE};
+use crate::runtime::thread_pool::{queue, LOCAL_QUEUE_CAPACITY};
 
 macro_rules! assert_pop {
     ($q:expr, $expect:expr) => {

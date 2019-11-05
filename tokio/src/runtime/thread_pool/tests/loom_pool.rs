@@ -1,6 +1,6 @@
-use crate::executor::park::{Park, Unpark};
-use crate::executor::tests::loom_oneshot as oneshot;
-use crate::executor::thread_pool::{self, Builder};
+use crate::runtime::tests::loom_oneshot as oneshot;
+use crate::runtime::thread_pool::{self, Builder};
+use crate::runtime::{Park, Unpark};
 use crate::spawn;
 
 use loom::sync::atomic::{AtomicBool, AtomicUsize};

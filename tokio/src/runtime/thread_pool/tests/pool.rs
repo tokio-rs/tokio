@@ -1,7 +1,6 @@
 #![warn(rust_2018_idioms)]
 
-use crate::executor::park::{Park, Unpark};
-use crate::executor::thread_pool;
+use crate::runtime::{thread_pool, Park, Unpark};
 
 use futures_util::future::poll_fn;
 use std::future::Future;

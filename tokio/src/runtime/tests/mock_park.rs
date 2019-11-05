@@ -1,6 +1,6 @@
 #![allow(warnings)]
 
-use crate::executor::park::{Park, Unpark};
+use crate::runtime::{Park, Unpark};
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering::SeqCst};

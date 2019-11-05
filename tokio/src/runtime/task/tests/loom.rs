@@ -1,5 +1,5 @@
-use crate::executor::task;
-use crate::executor::tests::loom_schedule::LoomSchedule;
+use crate::runtime::task;
+use crate::runtime::tests::loom_schedule::LoomSchedule;
 
 use tokio_test::{assert_err, assert_ok};
 

@@ -1,4 +1,4 @@
-use crate::executor::task::{Schedule, Task};
+use crate::runtime::task::{Schedule, Task};
 
 use loom::sync::Notify;
 use std::collections::VecDeque;

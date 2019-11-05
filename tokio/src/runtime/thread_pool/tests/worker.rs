@@ -1,5 +1,5 @@
-use crate::executor::tests::track_drop::track_drop;
-use crate::executor::thread_pool;
+use crate::runtime::tests::track_drop::track_drop;
+use crate::runtime::thread_pool;
 
 use tokio_test::assert_ok;
 
@@ -11,8 +11,8 @@ macro_rules! pool {
         (pool, w.remove(0), w.remove(0), mock_park)
     }};
     (! $n:expr) => {{
-        let mut mock_park = crate::executor::tests::mock_park::MockPark::new();
-        let blocking = std::sync::Arc::new(crate::executor::blocking::Pool::default());
+        let mut mock_park = crate::runtime::tests::mock_park::MockPark::new();
+        let blocking = std::sync::Arc::new(crate::runtime::blocking::Pool::default());
         let (pool, workers) = thread_pool::worker::create_set(
             $n,
             |index| Box::new(mock_park.mk_park(index)),

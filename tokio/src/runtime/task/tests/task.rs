@@ -1,7 +1,7 @@
-use crate::executor::task::{self, Header};
-use crate::executor::tests::backoff::*;
-use crate::executor::tests::mock_schedule::{mock, Mock};
-use crate::executor::tests::track_drop::track_drop;
+use crate::runtime::task::{self, Header};
+use crate::runtime::tests::backoff::*;
+use crate::runtime::tests::mock_schedule::{mock, Mock};
+use crate::runtime::tests::track_drop::track_drop;
 use crate::sync::oneshot;
 
 use tokio_test::task::spawn;
