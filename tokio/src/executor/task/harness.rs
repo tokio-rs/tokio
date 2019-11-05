@@ -1,8 +1,8 @@
-use crate::executor::loom::alloc::Track;
-use crate::executor::loom::cell::CausalCheck;
 use crate::executor::task::core::{Cell, Core, Header, Trailer};
 use crate::executor::task::state::Snapshot;
 use crate::executor::task::{JoinError, Schedule, Task};
+use crate::loom::alloc::Track;
+use crate::loom::cell::CausalCheck;
 
 use std::future::Future;
 use std::marker::PhantomData;

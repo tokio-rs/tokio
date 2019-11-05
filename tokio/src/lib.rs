@@ -98,7 +98,7 @@ pub mod io;
 #[cfg(feature = "net-driver")]
 pub mod net;
 
-#[cfg(feature = "net-driver")]
+#[cfg(any(feature = "sync", feature = "blocking", feature = "rt-current-thread"))]
 mod loom;
 
 pub mod prelude;

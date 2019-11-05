@@ -1,8 +1,7 @@
-use crate::executor::loom::sync::Arc;
-use crate::executor::loom::sys::num_cpus;
-use crate::executor::loom::thread;
 use crate::executor::park::Park;
 use crate::executor::thread_pool::{shutdown, worker, worker::Worker, Spawner, ThreadPool};
+use crate::loom::sync::Arc;
+use crate::loom::sys::num_cpus;
 
 use std::{fmt, usize};
 
@@ -109,7 +108,7 @@ impl Builder {
 
                 impl Drop for AbortOnPanic {
                     fn drop(&mut self) {
-                        if thread::panicking() {
+                        if std::thread::panicking() {
                             eprintln!("[ERROR] unhandled panic in Tokio scheduler. This is a bug and should be reported.");
                             std::process::abort();
                         }

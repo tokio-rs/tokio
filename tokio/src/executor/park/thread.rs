@@ -1,6 +1,6 @@
-use crate::executor::loom::sync::atomic::AtomicUsize;
-use crate::executor::loom::sync::{Arc, Condvar, Mutex};
 use crate::executor::park::{Park, Unpark};
+use crate::loom::sync::atomic::AtomicUsize;
+use crate::loom::sync::{Arc, Condvar, Mutex};
 
 use std::marker::PhantomData;
 use std::rc::Rc;
@@ -213,7 +213,7 @@ impl Unpark for UnparkThread {
 #[cfg(feature = "rt-full")]
 mod waker {
     use super::{Inner, UnparkThread};
-    use crate::executor::loom::sync::Arc;
+    use crate::loom::sync::Arc;
 
     use std::mem;
     use std::task::{RawWaker, RawWakerVTable, Waker};

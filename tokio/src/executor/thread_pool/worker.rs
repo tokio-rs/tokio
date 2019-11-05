@@ -1,7 +1,7 @@
-use crate::executor::loom::sync::Arc;
 use crate::executor::park::{Park, Unpark};
 use crate::executor::task::Task;
 use crate::executor::thread_pool::{current, Owned, Shared, Spawner};
+use crate::loom::sync::Arc;
 
 use std::cell::Cell;
 use std::ops::{Deref, DerefMut};

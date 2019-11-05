@@ -1,4 +1,4 @@
-use crate::sync::loom::sync::atomic::AtomicUsize;
+use crate::loom::sync::atomic::AtomicUsize;
 use crate::sync::mpsc::chan;
 
 use std::fmt;

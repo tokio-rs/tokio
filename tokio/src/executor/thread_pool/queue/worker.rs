@@ -1,6 +1,6 @@
-use crate::executor::loom::sync::Arc;
 use crate::executor::task::Task;
 use crate::executor::thread_pool::queue::{local, Cluster, Inject};
+use crate::loom::sync::Arc;
 
 use std::cell::Cell;
 use std::fmt;

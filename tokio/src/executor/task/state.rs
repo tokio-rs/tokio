@@ -1,4 +1,4 @@
-use crate::executor::loom::sync::atomic::AtomicUsize;
+use crate::loom::sync::atomic::AtomicUsize;
 
 use std::fmt;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
@@ -224,7 +224,7 @@ impl State {
     ///
     /// Returns a snapshot of the state **after** the transition.
     pub(super) fn release_task(&self) -> Snapshot {
-        use crate::executor::loom::sync::atomic;
+        use crate::loom::sync::atomic;
 
         const DELTA: usize = RELEASED;
 
@@ -283,7 +283,7 @@ impl State {
     ///
     /// Returns a snapshot of the state **after** the transition.
     pub(super) fn complete_join_handle(&self) -> Snapshot {
-        use crate::executor::loom::sync::atomic;
+        use crate::loom::sync::atomic;
 
         const DELTA: usize = JOIN_INTEREST;
 
@@ -337,7 +337,7 @@ impl State {
 
     /// Store the join waker.
     pub(super) fn store_join_waker(&self) -> Snapshot {
-        use crate::executor::loom::sync::atomic;
+        use crate::loom::sync::atomic;
 
         const DELTA: usize = JOIN_WAKER;
 
@@ -407,7 +407,7 @@ impl State {
 
     /// Returns `true` if the task should be released.
     pub(super) fn ref_dec(&self) -> bool {
-        use crate::executor::loom::sync::atomic;
+        use crate::loom::sync::atomic;
 
         let prev = self.val.fetch_sub(WAKER_ONE, Release);
         let next = Snapshot(prev - WAKER_ONE);

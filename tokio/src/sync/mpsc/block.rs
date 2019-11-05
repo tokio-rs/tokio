@@ -1,6 +1,6 @@
-use crate::sync::loom::{
+use crate::loom::{
+    cell::CausalCell,
     sync::atomic::{AtomicPtr, AtomicUsize},
-    sync::CausalCell,
     thread,
 };
 

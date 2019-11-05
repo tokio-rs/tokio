@@ -1,6 +1,6 @@
 use std::cell::UnsafeCell;
 use std::fmt;
-use std::ops::Deref;
+use std::ops;
 
 /// `AtomicUsize` providing an additional `load_unsync` function.
 pub(crate) struct AtomicUsize {
@@ -11,7 +11,6 @@ unsafe impl Send for AtomicUsize {}
 unsafe impl Sync for AtomicUsize {}
 
 impl AtomicUsize {
-    #[cfg(feature = "rt-current-thread")]
     pub(crate) fn new(val: usize) -> AtomicUsize {
         let inner = UnsafeCell::new(std::sync::atomic::AtomicUsize::new(val));
         AtomicUsize { inner }
@@ -23,13 +22,12 @@ impl AtomicUsize {
     ///
     /// All mutations must have happened before the unsynchronized load.
     /// Additionally, there must be no concurrent mutations.
-    #[cfg(feature = "rt-full")]
     pub(crate) unsafe fn unsync_load(&self) -> usize {
         *(*self.inner.get()).get_mut()
     }
 }
 
-impl Deref for AtomicUsize {
+impl ops::Deref for AtomicUsize {
     type Target = std::sync::atomic::AtomicUsize;
 
     fn deref(&self) -> &Self::Target {
@@ -39,8 +37,15 @@ impl Deref for AtomicUsize {
     }
 }
 
+impl ops::DerefMut for AtomicUsize {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        // safety: we hold `&mut self`
+        unsafe { &mut *self.inner.get() }
+    }
+}
+
 impl fmt::Debug for AtomicUsize {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.deref().fmt(fmt)
+        (**self).fmt(fmt)
     }
 }

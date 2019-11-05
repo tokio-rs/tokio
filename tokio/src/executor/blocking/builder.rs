@@ -1,5 +1,5 @@
 use crate::executor::blocking::Pool;
-use crate::executor::loom::thread;
+use crate::loom::thread;
 
 use std::usize;
 
