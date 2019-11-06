@@ -98,7 +98,6 @@ jobs:
       - test_sub_cross
       - test_linux
       - features
-      - test_nightly
       - cross_32bit_linux
       - minrust
       - tsan
