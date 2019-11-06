@@ -5,6 +5,7 @@ use tokio_executor::Enter;
 
 use std::cell::Cell;
 use std::fmt;
+use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -18,6 +19,12 @@ use std::time::Instant;
 #[derive(Default, Clone)]
 pub struct Clock {
     now: Option<Arc<dyn Now>>,
+}
+
+/// A guard that resets the current `Clock` to `None` when dropped.
+#[derive(Debug)]
+pub struct DefaultGuard<'a> {
+    _lifetime: PhantomData<&'a ()>,
 }
 
 thread_local! {
@@ -114,26 +121,35 @@ pub fn with_default<F, R>(clock: &Clock, enter: &mut Enter, f: F) -> R
 where
     F: FnOnce(&mut Enter) -> R,
 {
+    let _guard = set_default(clock);
+
+    f(enter)
+}
+
+/// Sets `clock` as the default clock, returning a guard that unsets it on drop.
+///
+/// # Panics
+///
+/// This function panics if there already is a default clock set.
+pub fn set_default(clock: &Clock) -> DefaultGuard<'_> {
     CLOCK.with(|cell| {
         assert!(
             cell.get().is_none(),
             "default clock already set for execution context"
         );
 
-        // Ensure that the clock is removed from the thread-local context
-        // when leaving the scope. This handles cases that involve panicking.
-        struct Reset<'a>(&'a Cell<Option<*const Clock>>);
-
-        impl<'a> Drop for Reset<'a> {
-            fn drop(&mut self) {
-                self.0.set(None);
-            }
-        }
-
-        let _reset = Reset(cell);
-
         cell.set(Some(clock as *const Clock));
 
-        f(enter)
+        DefaultGuard {
+            _lifetime: PhantomData,
+        }
     })
+}
+
+impl<'a> Drop for DefaultGuard<'a> {
+    fn drop(&mut self) {
+        let _ = CLOCK.try_with(|cell| {
+            cell.set(None);
+        });
+    }
 }

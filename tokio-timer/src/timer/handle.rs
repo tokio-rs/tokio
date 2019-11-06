@@ -5,6 +5,7 @@ use tokio_executor::Enter;
 
 use std::cell::RefCell;
 use std::fmt;
+use std::marker::PhantomData;
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 
@@ -44,6 +45,12 @@ pub(crate) struct HandlePriv {
     inner: Weak<Inner>,
 }
 
+/// A guard that resets the current timer to `None` when dropped.
+#[derive(Debug)]
+pub struct DefaultGuard<'a> {
+    _lifetime: PhantomData<&'a ()>,
+}
+
 thread_local! {
     /// Tracks the timer for the current execution context.
     static CURRENT_TIMER: RefCell<Option<HandlePriv>> = RefCell::new(None)
@@ -64,42 +71,34 @@ pub fn with_default<F, R>(handle: &Handle, enter: &mut Enter, f: F) -> R
 where
     F: FnOnce(&mut Enter) -> R,
 {
-    // Ensure that the timer is removed from the thread-local context
-    // when leaving the scope. This handles cases that involve panicking.
-    struct Reset;
+    let _guard = set_default(handle);
+    f(enter)
+}
 
-    impl Drop for Reset {
-        fn drop(&mut self) {
-            CURRENT_TIMER.with(|current| {
-                let mut current = current.borrow_mut();
-                *current = None;
-            });
-        }
-    }
-
-    // This ensures the value for the current timer gets reset even if there is
-    // a panic.
-    let _r = Reset;
-
+/// Sets `handle` as the default timer, returning a guard that unsets it on drop.
+///
+/// # Panics
+///
+/// This function panics if there already is a default timer set.
+pub fn set_default(handle: &Handle) -> DefaultGuard<'_> {
     CURRENT_TIMER.with(|current| {
-        {
-            let mut current = current.borrow_mut();
+        let mut current = current.borrow_mut();
 
-            assert!(
-                current.is_none(),
-                "default Tokio timer already set \
-                 for execution context"
-            );
+        assert!(
+            current.is_none(),
+            "default Tokio timer already set \
+             for execution context"
+        );
 
-            let handle = handle
-                .as_priv()
-                .unwrap_or_else(|| panic!("`handle` does not reference a timer"));
+        let handle = handle
+            .as_priv()
+            .unwrap_or_else(|| panic!("`handle` does not reference a timer"));
 
-            *current = Some(handle.clone());
-        }
-
-        f(enter)
-    })
+        *current = Some(handle.clone());
+    });
+    DefaultGuard {
+        _lifetime: PhantomData,
+    }
 }
 
 impl Handle {
@@ -192,5 +191,14 @@ impl HandlePriv {
 impl fmt::Debug for HandlePriv {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "HandlePriv")
+    }
+}
+
+impl<'a> Drop for DefaultGuard<'a> {
+    fn drop(&mut self) {
+        let _ = CURRENT_TIMER.try_with(|current| {
+            let mut current = current.borrow_mut();
+            *current = None;
+        });
     }
 }

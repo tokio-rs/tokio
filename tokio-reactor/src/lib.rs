@@ -68,6 +68,7 @@ use tokio_sync::task::AtomicTask;
 use std::cell::RefCell;
 use std::error::Error;
 use std::io;
+use std::marker::PhantomData;
 use std::mem;
 #[cfg(all(unix, not(target_os = "fuchsia")))]
 use std::os::unix::io::{AsRawFd, RawFd};
@@ -133,6 +134,13 @@ pub struct SetFallbackError(());
 #[doc(hidden)]
 pub type SetDefaultError = SetFallbackError;
 
+/// Ensure that the default reactor is removed from the thread-local context
+/// when leaving the scope. This handles cases that involve panicking.
+#[derive(Debug)]
+pub struct DefaultGuard<'a> {
+    _lifetime: PhantomData<&'a ()>,
+}
+
 #[test]
 fn test_handle_size() {
     use std::mem;
@@ -197,45 +205,40 @@ pub fn with_default<F, R>(handle: &Handle, enter: &mut Enter, f: F) -> R
 where
     F: FnOnce(&mut Enter) -> R,
 {
-    // Ensure that the executor is removed from the thread-local context
-    // when leaving the scope. This handles cases that involve panicking.
-    struct Reset;
-
-    impl Drop for Reset {
-        fn drop(&mut self) {
-            CURRENT_REACTOR.with(|current| {
-                let mut current = current.borrow_mut();
-                *current = None;
-            });
-        }
-    }
-
     // This ensures the value for the current reactor gets reset even if there
     // is a panic.
-    let _r = Reset;
+    let _guard = set_default(handle);
+    f(enter)
+}
 
+/// Sets `handle` as the default reactor, returning a guard that unsets it when
+/// dropped.
+///
+/// # Panics
+///
+/// This function panics if there already is a default reactor set.
+pub fn set_default(handle: &Handle) -> DefaultGuard<'_> {
     CURRENT_REACTOR.with(|current| {
-        {
-            let mut current = current.borrow_mut();
+        let mut current = current.borrow_mut();
 
-            assert!(
-                current.is_none(),
-                "default Tokio reactor already set \
-                 for execution context"
-            );
+        assert!(
+            current.is_none(),
+            "default Tokio reactor already set \
+             for execution context"
+        );
 
-            let handle = match handle.as_priv() {
-                Some(handle) => handle,
-                None => {
-                    panic!("`handle` does not reference a reactor");
-                }
-            };
+        let handle = match handle.as_priv() {
+            Some(handle) => handle,
+            None => {
+                panic!("`handle` does not reference a reactor");
+            }
+        };
 
-            *current = Some(handle.clone());
-        }
-
-        f(enter)
-    })
+        *current = Some(handle.clone());
+    });
+    DefaultGuard {
+        _lifetime: PhantomData,
+    }
 }
 
 impl Reactor {
@@ -740,6 +743,15 @@ impl Direction {
             }
             Direction::Write => mio::Ready::writable() | platform::hup(),
         }
+    }
+}
+
+impl<'a> Drop for DefaultGuard<'a> {
+    fn drop(&mut self) {
+        let _ = CURRENT_REACTOR.try_with(|current| {
+            let mut current = current.borrow_mut();
+            *current = None;
+        });
     }
 }
 
