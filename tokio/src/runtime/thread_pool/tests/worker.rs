@@ -1,3 +1,4 @@
+use crate::runtime::blocking;
 use crate::runtime::tests::track_drop::track_drop;
 use crate::runtime::thread_pool;
 
@@ -12,7 +13,7 @@ macro_rules! pool {
     }};
     (! $n:expr) => {{
         let mut mock_park = crate::runtime::tests::mock_park::MockPark::new();
-        let blocking = std::sync::Arc::new(crate::runtime::blocking::Pool::default());
+        let blocking = blocking::Pool::new("test".into(), None);
         let (pool, workers) = thread_pool::worker::create_set(
             $n,
             |index| Box::new(mock_park.mk_park(index)),

@@ -1,6 +1,7 @@
 #![warn(rust_2018_idioms)]
 
-use crate::runtime::{thread_pool, Park, Unpark};
+use crate::runtime::thread_pool::ThreadPool;
+use crate::runtime::{blocking, Park, Unpark};
 
 use futures_util::future::poll_fn;
 use std::future::Future;
@@ -62,15 +63,20 @@ fn eagerly_drops_futures() {
     let (park_tx, park_rx) = mpsc::sync_channel(0);
     let (unpark_tx, unpark_rx) = mpsc::sync_channel(0);
 
-    let pool = thread_pool::Builder::new().num_threads(4).build(move |_| {
-        let (tx, rx) = mpsc::channel();
-        MyPark {
-            tx: Mutex::new(tx),
-            rx,
-            park_tx: park_tx.clone(),
-            unpark_tx: unpark_tx.clone(),
-        }
-    });
+    let pool = ThreadPool::new(
+        4,
+        blocking::Pool::new("test".into(), None),
+        Arc::new(Box::new(|_, next| next())),
+        move |_| {
+            let (tx, rx) = mpsc::channel();
+            MyPark {
+                tx: Mutex::new(tx),
+                rx,
+                park_tx: park_tx.clone(),
+                unpark_tx: unpark_tx.clone(),
+            }
+        },
+    );
 
     struct MyTask {
         task_tx: Option<mpsc::Sender<Waker>>,
@@ -160,15 +166,17 @@ fn park_called_at_interval() {
 
     let (done_tx, done_rx) = mpsc::channel();
 
-    // Use 1 thread to ensure the worker stays busy.
-    let pool = thread_pool::Builder::new()
-        .num_threads(1)
-        .build(move |idx| {
+    let pool = ThreadPool::new(
+        1,
+        blocking::Pool::new("test".into(), None),
+        Arc::new(Box::new(|_, next| next())),
+        move |idx| {
             assert_eq!(idx, 0);
             MyPark {
                 park_light: park_light_2.clone(),
             }
-        });
+        },
+    );
 
     let mut cnt = 0;
 

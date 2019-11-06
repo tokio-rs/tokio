@@ -1,5 +1,5 @@
 use crate::runtime::tests::loom_oneshot as oneshot;
-use crate::runtime::thread_pool::{self, Builder};
+use crate::runtime::thread_pool::{self, ThreadPool};
 use crate::runtime::{Park, Unpark};
 use crate::spawn;
 
@@ -13,8 +13,7 @@ use std::time::Duration;
 #[test]
 fn pool_multi_spawn() {
     loom::model(|| {
-        let pool = Builder::new().build(|_| LoomPark::new());
-
+        let pool = mk_pool(2);
         let c1 = Arc::new(AtomicUsize::new(0));
 
         let (tx, rx) = oneshot::channel();
@@ -47,7 +46,7 @@ fn pool_multi_spawn() {
 #[test]
 fn only_blocking() {
     loom::model(|| {
-        let mut pool = Builder::new().num_threads(1).build(|_| LoomPark::new());
+        let mut pool = mk_pool(1);
         let (block_tx, block_rx) = oneshot::channel();
 
         pool.spawn(async move {
@@ -65,7 +64,7 @@ fn only_blocking() {
 fn blocking_and_regular() {
     const NUM: usize = 3;
     loom::model(|| {
-        let mut pool = Builder::new().num_threads(1).build(|_| LoomPark::new());
+        let mut pool = mk_pool(1);
         let cnt = Arc::new(AtomicUsize::new(0));
 
         let (block_tx, block_rx) = oneshot::channel();
@@ -99,7 +98,7 @@ fn blocking_and_regular() {
 #[test]
 fn pool_multi_notify() {
     loom::model(|| {
-        let pool = Builder::new().build(|_| LoomPark::new());
+        let pool = mk_pool(2);
 
         let c1 = Arc::new(AtomicUsize::new(0));
 
@@ -135,7 +134,7 @@ fn pool_multi_notify() {
 #[test]
 fn pool_shutdown() {
     loom::model(|| {
-        let pool = Builder::new().build(|_| LoomPark::new());
+        let pool = mk_pool(2);
 
         pool.spawn(async move {
             gated2(true).await;
@@ -152,7 +151,7 @@ fn pool_shutdown() {
 #[test]
 fn complete_block_on_under_load() {
     loom::model(|| {
-        let pool = Builder::new().build(|_| LoomPark::new());
+        let pool = mk_pool(2);
 
         pool.block_on(async {
             // Spin hard
@@ -165,6 +164,17 @@ fn complete_block_on_under_load() {
             gated2(true).await
         });
     });
+}
+
+fn mk_pool(num_threads: usize) -> ThreadPool {
+    use crate::runtime::blocking;
+
+    ThreadPool::new(
+        num_threads,
+        blocking::Pool::new("test".into(), None),
+        Arc::new(Box::new(|_, next| next())),
+        move |_| LoomPark::new(),
+    )
 }
 
 use futures::future::poll_fn;
