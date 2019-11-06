@@ -20,7 +20,7 @@ use tokio::io;
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::codec::{FramedRead, FramedWrite};
 
-use futures::{SinkExt, Stream};
+use futures::{SinkExt, Stream, StreamExt};
 use std::env;
 use std::error::Error;
 use std::net::SocketAddr;
@@ -69,7 +69,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
 
 // Temporary work around for stdin blocking the stream
 fn stdin() -> impl Stream<Item = Result<Vec<u8>, io::Error>> + Unpin {
-    let mut stdin = FramedRead::new(io::stdin(), codec::Bytes);
+    let mut stdin = FramedRead::new(io::stdin(), codec::Bytes).map(Ok);
 
     let (mut tx, rx) = mpsc::unbounded_channel();
 
@@ -95,13 +95,15 @@ mod tcp {
         let mut stream = TcpStream::connect(addr).await?;
         let (r, w) = stream.split();
         let sink = FramedWrite::new(w, codec::Bytes);
-        let mut stream = FramedRead::new(r, codec::Bytes).filter_map(|i| match i {
-            Ok(i) => future::ready(Some(i)),
-            Err(e) => {
-                println!("failed to read from socket; error={}", e);
-                future::ready(None)
-            }
-        });
+        let mut stream = FramedRead::new(r, codec::Bytes)
+            .filter_map(|i| match i {
+                Ok(i) => future::ready(Some(i)),
+                Err(e) => {
+                    println!("failed to read from socket; error={}", e);
+                    future::ready(None)
+                }
+            })
+            .map(Ok);
 
         match future::join(stdin.forward(sink), stdout.send_all(&mut stream)).await {
             (Err(e), _) | (_, Err(e)) => Err(e.into()),

@@ -9,7 +9,7 @@ tokio = { version = "=0.2.0-alpha.6", path = "../tokio" }
 tokio-util = { version = "=0.2.0-alpha.6", path = "../tokio-util" }
 
 bytes = "0.4.12"
-futures-preview = "=0.3.0-alpha.19"
+futures = "0.3.0"
 
 [[example]]
 name = "chat"

@@ -4,7 +4,7 @@ use tokio::fs;
 use tokio_test::assert_ok;
 
 use futures_util::future;
-use futures_util::try_stream::TryStreamExt;
+use futures_util::stream::TryStreamExt;
 use std::sync::{Arc, Mutex};
 use tempfile::tempdir;
 

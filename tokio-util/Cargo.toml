@@ -23,15 +23,15 @@ categories = ["asynchronous"]
 tokio = { version = "=0.2.0-alpha.6", path = "../tokio" }
 
 bytes = "0.4.7"
-futures-core-preview = "=0.3.0-alpha.19"
-futures-sink-preview = "=0.3.0-alpha.19"
+futures-core = "0.3.0"
+futures-sink = "0.3.0"
 log = "0.4"
 
 [dev-dependencies]
 tokio = { version = "=0.2.0-alpha.6", path = "../tokio" }
 tokio-test = { version = "=0.2.0-alpha.6", path = "../tokio-test" }
 
-futures-util-preview = "=0.3.0-alpha.19"
+futures-util = "0.3.0"
 
 [package.metadata.docs.rs]
 all-features = true

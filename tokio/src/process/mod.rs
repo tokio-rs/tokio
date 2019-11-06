@@ -121,7 +121,7 @@ use crate::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 use crate::process::kill::Kill;
 
 use futures_core::TryFuture;
-use futures_util::try_future::try_join3;
+use futures_util::future::try_join3;
 use std::ffi::OsStr;
 use std::future::Future;
 use std::io;

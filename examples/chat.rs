@@ -30,7 +30,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, Mutex};
 use tokio_util::codec::{Framed, LinesCodec, LinesCodecError};
 
-use futures::{Poll, SinkExt, Stream, StreamExt};
+use futures::{SinkExt, Stream, StreamExt};
 use std::collections::HashMap;
 use std::env;
 use std::error::Error;
@@ -38,7 +38,7 @@ use std::io;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::Context;
+use std::task::{Context, Poll};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
