@@ -82,7 +82,7 @@ thread_local! {
 ///
 /// task_set.block_on(&mut rt, async move {
 ///     local_task.await.unwrap();
-/// }));
+/// });
 /// ```
 pub fn spawn_local<F>(future: F) -> JoinHandle<F::Output>
 where
