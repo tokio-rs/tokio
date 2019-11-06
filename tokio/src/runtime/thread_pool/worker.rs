@@ -131,8 +131,7 @@ where
 
         // Track the current worker
         current::set(&pool, index, || {
-            let _enter =
-                crate::runtime::enter::enter().expect("executor already running on thread");
+            let _enter = crate::runtime::enter();
 
             crate::runtime::global::with_thread_pool(&spawner, || {
                 crate::runtime::blocking::with_pool(blocking, || {
