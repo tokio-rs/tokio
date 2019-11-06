@@ -79,7 +79,8 @@ thread_local! {
 ///         // ...
 ///     }).await.unwrap();
 /// });
-/// rt.block_on(local::task_set(async move {
+///
+/// task_set.block_on(&mut rt, async move {
 ///     local_task.await.unwrap();
 /// }));
 /// ```
