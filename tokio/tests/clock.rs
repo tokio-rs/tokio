@@ -20,7 +20,11 @@ fn clock_and_timer_concurrent() {
     let when = Instant::now() + Duration::from_millis(5_000);
     let clock = Clock::new_with_now(MockNow(when));
 
-    let mut rt = runtime::Builder::new().clock(clock).build().unwrap();
+    let mut rt = runtime::Builder::new()
+        .thread_pool()
+        .clock(clock)
+        .build()
+        .unwrap();
 
     let (tx, rx) = mpsc::channel();
 

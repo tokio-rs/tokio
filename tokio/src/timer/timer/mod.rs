@@ -33,7 +33,7 @@ use self::entry::Entry;
 
 mod handle;
 pub(crate) use self::handle::HandlePriv;
-pub use self::handle::{set_default, Handle};
+pub use self::handle::{set_default, DefaultGuard, Handle};
 
 mod registration;
 pub(crate) use self::registration::Registration;
@@ -41,7 +41,7 @@ pub(crate) use self::registration::Registration;
 mod stack;
 use self::stack::Stack;
 
-use crate::executor::park::{Park, Unpark};
+use crate::runtime::{Park, Unpark};
 use crate::timer::atomic::AtomicU64;
 use crate::timer::clock::Clock;
 use crate::timer::wheel;

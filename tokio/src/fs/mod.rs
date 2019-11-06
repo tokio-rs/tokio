@@ -91,5 +91,5 @@ where
 mod sys {
     pub(crate) use std::fs::File;
 
-    pub(crate) use crate::executor::blocking::{run, Blocking};
+    pub(crate) use crate::runtime::blocking::{run, Blocking};
 }

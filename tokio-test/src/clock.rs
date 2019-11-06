@@ -22,7 +22,7 @@
 //! });
 //! ```
 
-use tokio::executor::park::{Park, Unpark};
+use tokio::runtime::{Park, Unpark};
 use tokio::timer::clock::{Clock, Now};
 use tokio::timer::Timer;
 

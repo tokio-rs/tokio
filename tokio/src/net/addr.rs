@@ -1,4 +1,4 @@
-use crate::executor::blocking;
+use crate::runtime::blocking;
 
 use futures_util::future;
 use std::io;
@@ -143,7 +143,7 @@ pub(crate) mod sealed {
     //! part of the `ToSocketAddrs` public API. The details will change over
     //! time.
 
-    use crate::executor::blocking::Blocking;
+    use crate::runtime::blocking::Blocking;
 
     use futures_core::ready;
     use std::future::Future;

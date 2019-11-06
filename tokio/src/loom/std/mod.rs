@@ -12,6 +12,7 @@ pub(crate) mod cell {
     pub(crate) use super::causal_cell::{CausalCell, CausalCheck};
 }
 
+#[cfg(feature = "sync")]
 pub(crate) mod future {
     pub(crate) use crate::sync::AtomicWaker;
 }

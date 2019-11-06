@@ -72,6 +72,7 @@
 macro_rules! if_runtime {
     ($($i:item)*) => ($(
         #[cfg(any(
+            feature = "blocking",
             feature = "rt-full",
             feature = "rt-current-thread",
         ))]
@@ -98,13 +99,14 @@ pub mod io;
 #[cfg(feature = "net-driver")]
 pub mod net;
 
-#[cfg(any(feature = "sync", feature = "blocking", feature = "rt-current-thread"))]
 mod loom;
 
 pub mod prelude;
 
 #[cfg(all(feature = "process", not(loom)))]
 pub mod process;
+
+pub mod runtime;
 
 #[cfg(feature = "signal")]
 #[cfg(not(loom))]
@@ -118,14 +120,13 @@ pub mod sync;
 #[cfg(feature = "timer")]
 pub mod timer;
 
-#[cfg(feature = "executor-core")]
-pub mod executor;
+#[cfg(feature = "rt-full")]
+mod util;
 
 if_runtime! {
-    pub mod runtime;
 
     #[doc(inline)]
-    pub use crate::executor::spawn;
+    pub use crate::runtime::spawn;
 
     #[cfg(not(test))] // Work around for rust-lang/rust#62127
     #[cfg(feature = "macros")]

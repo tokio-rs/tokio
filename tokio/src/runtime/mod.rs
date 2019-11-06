@@ -128,24 +128,57 @@
 //! [`tokio::spawn`]: ../executor/fn.spawn.html
 //! [`tokio::main`]: ../../tokio_macros/attr.main.html
 
+// At the top due to macros
+#[cfg(test)]
+#[macro_use]
+mod tests;
+
+#[cfg(all(not(feature = "blocking"), feature = "rt-full"))]
+mod blocking;
+#[cfg(feature = "blocking")]
+pub mod blocking;
+
 mod builder;
 pub use self::builder::Builder;
 
+#[cfg(feature = "rt-current-thread")]
+mod current_thread;
+
+#[cfg(feature = "blocking")]
+mod enter;
+
+mod global;
+pub use self::global::spawn;
+
+mod io;
+
+mod park;
+pub use self::park::{Park, Unpark};
+
+#[cfg(feature = "rt-current-thread")]
 mod spawner;
+#[cfg(feature = "rt-current-thread")]
 pub use self::spawner::Spawner;
 
-#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
-pub use crate::executor::{JoinError, JoinHandle};
+#[cfg(feature = "rt-current-thread")]
+mod task;
+#[cfg(feature = "rt-current-thread")]
+pub use self::task::{JoinError, JoinHandle};
 
-use crate::executor::blocking::{self, PoolWaiter};
-use crate::executor::current_thread::CurrentThread;
+mod timer;
+
 #[cfg(feature = "rt-full")]
-use crate::executor::thread_pool::ThreadPool;
-use crate::net::{self, driver};
-use crate::timer::timer;
+pub(crate) mod thread_pool;
 
+#[cfg(feature = "blocking")]
+use crate::runtime::blocking::PoolWaiter;
+#[cfg(feature = "rt-current-thread")]
+use crate::runtime::current_thread::CurrentThread;
+#[cfg(feature = "rt-full")]
+use crate::runtime::thread_pool::ThreadPool;
+
+#[cfg(feature = "blocking")]
 use std::future::Future;
-use std::io;
 
 /// The Tokio runtime, includes a reactor as well as an executor for running
 /// tasks.
@@ -178,21 +211,30 @@ pub struct Runtime {
     kind: Kind,
 
     /// Handles to the network drivers
-    net_handles: Vec<net::driver::Handle>,
+    net_handles: Vec<io::Handle>,
 
     /// Timer handles
     timer_handles: Vec<timer::Handle>,
 
     /// Blocking pool handle
+    #[cfg(feature = "blocking")]
     blocking_pool: PoolWaiter,
 }
 
 /// The runtime executor is either a thread-pool or a current-thread executor.
 #[derive(Debug)]
 enum Kind {
+    /// Not able to execute concurrent tasks. This variant is mostly used to get
+    /// access to the driver handles.
+    Shell,
+
+    /// Execute all tasks on the current-thread.
+    #[cfg(feature = "rt-current-thread")]
+    CurrentThread(CurrentThread<timer::Driver>),
+
+    /// Execute tasks across multiple threads.
     #[cfg(feature = "rt-full")]
     ThreadPool(ThreadPool),
-    CurrentThread(CurrentThread<timer::Timer<net::driver::Reactor>>),
 }
 
 impl Runtime {
@@ -222,7 +264,16 @@ impl Runtime {
     ///
     /// [mod]: index.html
     pub fn new() -> io::Result<Self> {
-        Builder::new().build()
+        #[cfg(feature = "rt-full")]
+        let ret = Builder::new().thread_pool().build();
+
+        #[cfg(all(not(feature = "rt-full"), feature = "rt-current-thread"))]
+        let ret = Builder::new().current_thread().build();
+
+        #[cfg(not(feature = "rt-current-thread"))]
+        let ret = Builder::new().build();
+
+        ret
     }
 
     /// Spawn a future onto the Tokio runtime.
@@ -255,11 +306,13 @@ impl Runtime {
     ///
     /// This function panics if the spawn fails. Failure occurs if the executor
     /// is currently at capacity and is unable to spawn a new future.
+    #[cfg(feature = "rt-current-thread")]
     pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future<Output = ()> + Send + 'static,
     {
         match &self.kind {
+            Kind::Shell => panic!("task execution disabled"),
             #[cfg(feature = "rt-full")]
             Kind::ThreadPool(exec) => exec.spawn(future),
             Kind::CurrentThread(exec) => exec.spawn(future),
@@ -279,18 +332,22 @@ impl Runtime {
     ///
     /// This function panics if the executor is at capacity, if the provided
     /// future panics, or if called within an asynchronous execution context.
+    #[cfg(feature = "blocking")] // TODO: remove this
     pub fn block_on<F: Future>(&mut self, future: F) -> F::Output {
-        let _net = driver::set_default(&self.net_handles[0]);
+        let _net = io::set_default(&self.net_handles[0]);
         let _timer = timer::set_default(&self.timer_handles[0]);
 
         let kind = &mut self.kind;
 
-        blocking::with_pool(&self.blocking_pool, || {
-            match kind {
-                #[cfg(feature = "rt-full")]
-                Kind::ThreadPool(exec) => exec.block_on(future),
-                Kind::CurrentThread(exec) => exec.block_on(future),
+        blocking::with_pool(&self.blocking_pool, || match kind {
+            Kind::Shell => {
+                let mut enter = enter::enter().unwrap();
+                enter.block_on(future)
             }
+            #[cfg(feature = "rt-current-thread")]
+            Kind::CurrentThread(exec) => exec.block_on(future),
+            #[cfg(feature = "rt-full")]
+            Kind::ThreadPool(exec) => exec.block_on(future),
         })
     }
 
@@ -310,11 +367,14 @@ impl Runtime {
     ///
     /// spawner.spawn(async { println!("hello"); });
     /// ```
+    #[cfg(feature = "rt-current-thread")]
     pub fn spawner(&self) -> Spawner {
         match &self.kind {
+            Kind::Shell => Spawner::shell(),
+            #[cfg(feature = "rt-current-thread")]
+            Kind::CurrentThread(exec) => Spawner::current_thread(exec.spawner()),
             #[cfg(feature = "rt-full")]
             Kind::ThreadPool(exec) => Spawner::thread_pool(exec.spawner().clone()),
-            Kind::CurrentThread(exec) => Spawner::current_thread(exec.spawner()),
         }
     }
 }

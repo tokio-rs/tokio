@@ -1,6 +1,6 @@
-use crate::executor::current_thread;
+use crate::runtime::current_thread;
 #[cfg(feature = "rt-full")]
-use crate::executor::thread_pool;
+use crate::runtime::thread_pool;
 use crate::runtime::JoinHandle;
 
 use std::future::Future;
@@ -13,24 +13,33 @@ use std::future::Future;
 /// For more details, see the [module level](index.html) documentation.
 #[derive(Debug, Clone)]
 pub struct Spawner {
-    kind: Kind
+    kind: Kind,
 }
 
 #[derive(Debug, Clone)]
 enum Kind {
+    Shell,
     #[cfg(feature = "rt-full")]
     ThreadPool(thread_pool::Spawner),
     CurrentThread(current_thread::Spawner),
 }
 
 impl Spawner {
+    pub(super) fn shell() -> Spawner {
+        Spawner { kind: Kind::Shell }
+    }
+
     #[cfg(feature = "rt-full")]
     pub(super) fn thread_pool(spawner: thread_pool::Spawner) -> Spawner {
-        Spawner { kind: Kind::ThreadPool(spawner) }
+        Spawner {
+            kind: Kind::ThreadPool(spawner),
+        }
     }
 
     pub(super) fn current_thread(spawner: current_thread::Spawner) -> Spawner {
-        Spawner { kind: Kind::CurrentThread(spawner) }
+        Spawner {
+            kind: Kind::CurrentThread(spawner),
+        }
     }
 
     /// Spawn a future onto the Tokio runtime.
@@ -69,6 +78,7 @@ impl Spawner {
         F: Future<Output = ()> + Send + 'static,
     {
         match &self.kind {
+            Kind::Shell => panic!("spawning not enabled for runtime"),
             #[cfg(feature = "rt-full")]
             Kind::ThreadPool(spawner) => spawner.spawn(future),
             Kind::CurrentThread(spawner) => spawner.spawn(future),
