@@ -38,28 +38,28 @@ use std::ptr::NonNull;
 use std::{fmt, mem};
 
 /// An owned handle to the task, tracked by ref count
-pub(crate) struct Task<S: 'static, M = SendMarker> {
+pub(crate) struct Task<S: 'static, M = Sendable> {
     raw: RawTask,
     _p: PhantomData<(S, M)>,
 }
 
 /// An owned handle to a `!Send` task, tracked by ref count.
 #[cfg(feature = "local")]
-pub(crate) type UnsendTask<S> = Task<S, UnsendMarker>;
+pub(crate) type UnsendTask<S> = Task<S, Unsendable>;
 
 /// Marker type indicating that a `Task` was constructed from a future that
 /// implements `Send`.
 #[derive(Debug)]
-pub(crate) struct SendMarker {}
+pub(crate) struct Sendable {}
 
 /// Marker type indicating that a `Task` was constructed from a future that
 /// does not implement `Send`, and may only be scheduled by a scheduler that is
 /// capable of scheduling `!Send` tasks.
 #[derive(Debug)]
 #[cfg(feature = "local")]
-pub(crate) struct UnsendMarker {}
+pub(crate) struct Unsendable {}
 
-unsafe impl<S: Send + Sync + 'static> Send for Task<S, SendMarker> {}
+unsafe impl<S: Send + Sync + 'static> Send for Task<S, Sendable> {}
 
 /// Task result sent back
 pub(crate) type Result<T> = std::result::Result<T, JoinError>;
@@ -85,7 +85,7 @@ pub(crate) trait Schedule<M>: Send + Sync + Sized + 'static {
 pub(crate) fn background<T, S>(task: T) -> Task<S>
 where
     T: Future + Send + 'static,
-    S: Schedule<SendMarker>,
+    S: Schedule<Sendable>,
 {
     Task {
         raw: RawTask::new_background::<_, S>(task),
@@ -97,7 +97,7 @@ where
 pub(crate) fn joinable<T, S>(task: T) -> (Task<S>, JoinHandle<T::Output>)
 where
     T: Future + Send + 'static,
-    S: Schedule<SendMarker>,
+    S: Schedule<Sendable>,
 {
     let raw = RawTask::new_joinable::<_, S>(task);
 
@@ -116,7 +116,7 @@ where
 pub(crate) fn joinable_unsend<T, S>(task: T) -> (UnsendTask<S>, JoinHandle<T::Output>)
 where
     T: Future + 'static,
-    S: Schedule<UnsendMarker>,
+    S: Schedule<Unsendable>,
 {
     let raw = RawTask::new_joinable_unsend::<_, S>(task);
 

@@ -2,8 +2,8 @@ use crate::loom::alloc::Track;
 use crate::runtime::task::Cell;
 use crate::runtime::task::Harness;
 #[cfg(feature = "local")]
-use crate::runtime::task::UnsendMarker;
-use crate::runtime::task::{Header, Schedule, SendMarker};
+use crate::runtime::task::Unsendable;
+use crate::runtime::task::{Header, Schedule, Sendable};
 use crate::runtime::task::{Snapshot, State};
 
 use std::future::Future;
@@ -60,26 +60,26 @@ impl RawTask {
     pub(super) fn new_background<T, S>(task: T) -> RawTask
     where
         T: Future + Send + 'static,
-        S: Schedule<SendMarker>,
+        S: Schedule<Sendable>,
     {
-        RawTask::new::<_, S, SendMarker>(task, State::new_background())
+        RawTask::new::<_, S, Sendable>(task, State::new_background())
     }
 
     pub(super) fn new_joinable<T, S>(task: T) -> RawTask
     where
         T: Future + Send + 'static,
-        S: Schedule<SendMarker>,
+        S: Schedule<Sendable>,
     {
-        RawTask::new::<_, S, SendMarker>(task, State::new_joinable())
+        RawTask::new::<_, S, Sendable>(task, State::new_joinable())
     }
 
     #[cfg(feature = "local")]
     pub(super) fn new_joinable_unsend<T, S>(task: T) -> RawTask
     where
         T: Future + 'static,
-        S: Schedule<UnsendMarker>,
+        S: Schedule<Unsendable>,
     {
-        RawTask::new::<_, S, UnsendMarker>(task, State::new_joinable())
+        RawTask::new::<_, S, Unsendable>(task, State::new_joinable())
     }
 
     fn new<T, S, M>(task: T, state: State) -> RawTask

@@ -1,5 +1,5 @@
 //! Utilities for running `!Send` futures on the current thread.
-use crate::runtime::task::{self, JoinHandle, Schedule, UnsendMarker, UnsendTask};
+use crate::runtime::task::{self, JoinHandle, Schedule, UnsendTask, Unsendable};
 
 use std::cell::{Cell, UnsafeCell};
 use std::collections::VecDeque;
@@ -29,7 +29,7 @@ struct Scheduler {
     /// # Safety
     ///
     /// Must only be accessed from the primary thread
-    tasks: UnsafeCell<task::OwnedList<Scheduler, UnsendMarker>>,
+    tasks: UnsafeCell<task::OwnedList<Scheduler, Unsendable>>,
 
     /// Local run queue.
     ///
@@ -182,7 +182,7 @@ impl<F: Future> Future for LocalFuture<F> {
 
 // === impl Scheduler ===
 
-impl Schedule<UnsendMarker> for Scheduler {
+impl Schedule<Unsendable> for Scheduler {
     fn bind(&self, task: &UnsendTask<Self>) {
         assert!(self.is_current());
         unsafe {

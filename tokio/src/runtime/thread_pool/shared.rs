@@ -1,5 +1,5 @@
 use crate::runtime::park::Unpark;
-use crate::runtime::task::{self, Schedule, SendMarker, Task};
+use crate::runtime::task::{self, Schedule, Sendable, Task};
 use crate::runtime::thread_pool::worker;
 
 use std::ptr;
@@ -65,7 +65,7 @@ where
     }
 }
 
-impl<P> Schedule<SendMarker> for Shared<P>
+impl<P> Schedule<Sendable> for Shared<P>
 where
     P: Unpark,
 {
