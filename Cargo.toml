@@ -11,7 +11,3 @@ members = [
   "examples",
   "tests-integration",
 ]
-
-[patch.crates-io]
-
-loom = { git = "https://github.com/tokio-rs/loom" }
