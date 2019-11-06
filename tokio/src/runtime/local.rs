@@ -328,7 +328,7 @@ impl Drop for Scheduler {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(loom)))]
 mod tests {
     use super::*;
     use crate::runtime;
