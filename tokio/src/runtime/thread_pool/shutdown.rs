@@ -27,7 +27,7 @@ pub(super) fn channel() -> (Sender, Receiver) {
 impl Receiver {
     /// Block the current thread until all `Sender` handles drop.
     pub(crate) fn wait(&mut self) {
-        use crate::runtime::{enter, try_enter};
+        use crate::runtime::enter::{enter, try_enter};
 
         let mut e = if std::thread::panicking() {
             match try_enter() {

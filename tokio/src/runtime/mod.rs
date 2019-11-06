@@ -147,7 +147,7 @@ mod current_thread;
 #[cfg(feature = "blocking")]
 mod enter;
 #[cfg(feature = "blocking")]
-pub(crate) use self::enter::{enter, try_enter};
+pub(crate) use self::enter::enter;
 
 mod global;
 pub use self::global::spawn;
