@@ -141,7 +141,50 @@ impl TaskSet {
     /// This function panics if the executor is at capacity, if the provided
     /// future panics, or if called within an asynchronous execution context.
     ///
-    /// [`spawn_local`]: ../fn.spawn_local.html
+    /// # Notes
+    ///
+    /// Since this function internally calls [`Runtime::block_on`], and drives
+    /// futures in the local task set inside that call to `block_on`, the local
+    /// futures may not use [in-place blocking]. If a blocking call needs to be
+    /// issued from a local task, the [`blocking::run`] API may be used instead.
+    ///
+    /// For example, this will panic:
+    /// ```should_panic
+    /// use tokio::runtime::{Runtime, local, blocking};
+    ///
+    /// let mut rt = Runtime::new().unwrap();
+    /// let local = local::TaskSet::new();
+    /// local.block_on(&mut rt, async {
+    ///     let join = tokio::spawn_local(async {
+    ///         let blocking_result = blocking::in_place(|| {
+    ///             // ...
+    ///         });
+    ///         // ...
+    ///     });
+    ///     join.await.unwrap();
+    /// })
+    /// ```
+    /// This, however, will not panic:
+    /// ```
+    /// use tokio::runtime::{Runtime, local, blocking};
+    ///
+    /// let mut rt = Runtime::new().unwrap();
+    /// let local = local::TaskSet::new();
+    /// local.block_on(&mut rt, async {
+    ///     let join = tokio::spawn_local(async {
+    ///         let blocking_result = blocking::run(|| {
+    ///             // ...
+    ///         }).await;
+    ///         // ...
+    ///     });
+    ///     join.await.unwrap();
+    /// })
+    /// ```
+    ///
+    /// [`spawn_local`]: fn.spawn_local.html
+    /// [`Runtime::block_on`]: ../struct.Runtime.html#method.block_on
+    /// [in-place blocking]: ../blocking/fn.in_place.html
+    /// [`blocking::run`]: ../blocking/fn.run.html
     pub fn block_on<F>(&self, rt: &mut crate::runtime::Runtime, future: F) -> F::Output
     where
         F: Future + 'static,
@@ -333,6 +376,55 @@ mod tests {
             let join = spawn_local(async move {
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
                 crate::timer::delay_for(Duration::from_millis(10)).await;
+                assert!(ON_RT_THREAD.with(|cell| cell.get()));
+            });
+            join.await.unwrap();
+        });
+    }
+
+    #[test]
+    // This will panic, since the thread that calls `block_on` cannot use
+    // in-place blocking inside of `block_on`.
+    #[should_panic]
+    fn local_threadpool_blocking_in_place() {
+        thread_local! {
+            static ON_RT_THREAD: Cell<bool> = Cell::new(false);
+        }
+
+        ON_RT_THREAD.with(|cell| cell.set(true));
+
+        let mut rt = runtime::Runtime::new().unwrap();
+        TaskSet::new().block_on(&mut rt, async {
+            assert!(ON_RT_THREAD.with(|cell| cell.get()));
+            let join = spawn_local(async move {
+                assert!(ON_RT_THREAD.with(|cell| cell.get()));
+                runtime::blocking::in_place(|| {});
+                assert!(ON_RT_THREAD.with(|cell| cell.get()));
+            });
+            join.await.unwrap();
+        });
+    }
+
+    #[test]
+    fn local_threadpool_blocking_run() {
+        thread_local! {
+            static ON_RT_THREAD: Cell<bool> = Cell::new(false);
+        }
+
+        ON_RT_THREAD.with(|cell| cell.set(true));
+
+        let mut rt = runtime::Runtime::new().unwrap();
+        TaskSet::new().block_on(&mut rt, async {
+            assert!(ON_RT_THREAD.with(|cell| cell.get()));
+            let join = spawn_local(async move {
+                assert!(ON_RT_THREAD.with(|cell| cell.get()));
+                runtime::blocking::run(|| {
+                    assert!(
+                        !ON_RT_THREAD.with(|cell| cell.get()),
+                        "blocking must not run on the local task set's thread"
+                    );
+                })
+                .await;
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
             });
             join.await.unwrap();
