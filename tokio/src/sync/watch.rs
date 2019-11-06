@@ -298,7 +298,6 @@ impl<T: Clone> Receiver<T> {
 impl<T: Clone> futures_core::Stream for Receiver<T> {
     type Item = T;
 
-    #[allow(clippy::map_clone)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3274
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
         use std::future::Future;
 
@@ -306,7 +305,7 @@ impl<T: Clone> futures_core::Stream for Receiver<T> {
         pin_mut!(fut);
 
         let item = ready!(fut.poll(cx));
-        Ready(item.map(|v_ref| v_ref.clone()))
+        Ready(item.map(|v_ref| v_ref))
     }
 }
 
