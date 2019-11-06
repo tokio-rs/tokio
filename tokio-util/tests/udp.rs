@@ -3,10 +3,10 @@ use tokio_util::codec::{Decoder, Encoder};
 use tokio_util::udp::UdpFramed;
 
 use bytes::{BufMut, BytesMut};
+use futures_util::future::try_join;
 use futures_util::future::FutureExt;
 use futures_util::sink::SinkExt;
 use futures_util::stream::StreamExt;
-use futures_util::try_future::try_join;
 use std::io;
 
 #[tokio::test]
