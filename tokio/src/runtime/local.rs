@@ -317,6 +317,29 @@ mod tests {
     }
 
     #[test]
+    fn local_threadpool_timer() {
+        // This test ensures that runtime services like the timer are properly
+        // set for the local task set.
+        use std::time::Duration;
+        thread_local! {
+            static ON_RT_THREAD: Cell<bool> = Cell::new(false);
+        }
+
+        ON_RT_THREAD.with(|cell| cell.set(true));
+
+        let mut rt = runtime::Runtime::new().unwrap();
+        TaskSet::new().block_on(&mut rt, async {
+            assert!(ON_RT_THREAD.with(|cell| cell.get()));
+            let join = spawn_local(async move {
+                assert!(ON_RT_THREAD.with(|cell| cell.get()));
+                crate::timer::delay_for(Duration::from_millis(10)).await;
+                assert!(ON_RT_THREAD.with(|cell| cell.get()));
+            });
+            join.await.unwrap();
+        });
+    }
+
+    #[test]
     fn all_spawn_locals_are_local() {
         use futures_util::future;
 
