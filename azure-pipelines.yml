@@ -68,13 +68,6 @@ jobs:
       tokio-buf:
         - util
 
-# Run async-await tests
-- template: ci/azure-test-nightly.yml
-  parameters:
-    name: test_nightly
-    displayName: Test Async / Await
-    rust: beta-2019-11-06
-
 # Try cross compiling
 - template: ci/azure-cross-compile.yml
   parameters:
