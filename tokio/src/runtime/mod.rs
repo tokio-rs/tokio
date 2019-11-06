@@ -146,6 +146,8 @@ mod current_thread;
 
 #[cfg(feature = "blocking")]
 mod enter;
+#[cfg(feature = "blocking")]
+pub(crate) use self::enter::enter;
 
 mod global;
 pub use self::global::spawn;
@@ -340,10 +342,7 @@ impl Runtime {
         let kind = &mut self.kind;
 
         blocking::with_pool(&self.blocking_pool, || match kind {
-            Kind::Shell => {
-                let mut enter = enter::enter().unwrap();
-                enter.block_on(future)
-            }
+            Kind::Shell => enter().block_on(future),
             #[cfg(feature = "rt-current-thread")]
             Kind::CurrentThread(exec) => exec.block_on(future),
             #[cfg(feature = "rt-full")]

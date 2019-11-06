@@ -139,8 +139,7 @@ where
         let scheduler = &*self.scheduler;
 
         runtime::global::with_current_thread(scheduler, || {
-            let mut _enter =
-                runtime::enter::enter().expect("attempting to block while on a Tokio executor");
+            let mut _enter = runtime::enter();
 
             let raw_waker = RawWaker::new(
                 scheduler as *const Scheduler as *const (),
