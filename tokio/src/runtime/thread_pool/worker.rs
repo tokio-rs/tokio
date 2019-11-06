@@ -358,8 +358,6 @@ where
         park: &mut impl Park<Unpark = P>,
         gone: &Cell<bool>,
     ) -> Result<bool, WorkerGone> {
-        debug_assert!(self.is_running());
-
         loop {
             let tick = self.tick_fetch_inc();
 
@@ -412,8 +410,6 @@ where
     }
 
     fn search_for_work(&mut self, gone: &Cell<bool>) -> Result<bool, WorkerGone> {
-        debug_assert!(self.is_searching());
-
         if let Some(task) = self.steal_work() {
             self.run_task(task, gone)?;
             Ok(true)
@@ -435,8 +431,6 @@ where
     }
 
     fn transition_from_searching(&mut self) {
-        debug_assert!(self.is_searching());
-
         self.owned().is_searching.set(false);
 
         if self.set().idle().transition_worker_from_searching() {

@@ -57,6 +57,11 @@ pub trait AsyncRead {
     ///
     /// This function is called from [`poll_read_buf`].
     ///
+    /// # Safety
+    ///
+    /// Implementations that return `false` must never read from data slices
+    /// that they did not write to.
+    ///
     /// [`io::Read`]: std::io::Read
     /// [`poll_read_buf`]: #method.poll_read_buf
     unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {

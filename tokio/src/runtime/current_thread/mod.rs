@@ -337,6 +337,8 @@ impl fmt::Debug for Scheduler {
 
 unsafe fn sched_clone_waker(ptr: *const ()) -> RawWaker {
     let s1 = ManuallyDrop::new(Arc::from_raw(ptr as *const Scheduler));
+
+    #[allow(clippy::redundant_clone)]
     let s2 = s1.clone();
 
     RawWaker::new(
