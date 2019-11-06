@@ -1,5 +1,6 @@
 use crate::io::{AsyncBufRead, AsyncRead};
 
+use bytes::BufMut;
 use std::fmt;
 use std::io;
 use std::pin::Pin;
@@ -47,7 +48,7 @@ impl AsyncRead for Empty {
     fn poll_read(
         self: Pin<&mut Self>,
         _: &mut Context<'_>,
-        _: &mut [u8],
+        _: &mut dyn BufMut,
     ) -> Poll<io::Result<usize>> {
         Poll::Ready(Ok(0))
     }

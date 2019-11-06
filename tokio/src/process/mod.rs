@@ -120,6 +120,7 @@ mod kill;
 use crate::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 use crate::process::kill::Kill;
 
+use bytes::{Buf, BufMut};
 use futures_core::TryFuture;
 use futures_util::try_future::try_join3;
 use std::ffi::OsStr;
@@ -854,7 +855,7 @@ impl AsyncWrite for ChildStdin {
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &[u8],
+        buf: &mut dyn Buf,
     ) -> Poll<io::Result<usize>> {
         Pin::new(&mut self.inner).poll_write(cx, buf)
     }
@@ -872,7 +873,7 @@ impl AsyncRead for ChildStdout {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
+        buf: &mut dyn BufMut,
     ) -> Poll<io::Result<usize>> {
         Pin::new(&mut self.inner).poll_read(cx, buf)
     }
@@ -882,7 +883,7 @@ impl AsyncRead for ChildStderr {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
+        buf: &mut dyn BufMut,
     ) -> Poll<io::Result<usize>> {
         Pin::new(&mut self.inner).poll_read(cx, buf)
     }

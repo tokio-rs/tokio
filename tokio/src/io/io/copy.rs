@@ -87,7 +87,7 @@ where
             // continue.
             if self.pos == self.cap && !self.read_done {
                 let me = &mut *self;
-                let n = ready!(Pin::new(&mut *me.reader).poll_read(cx, &mut me.buf))?;
+                let n = ready!(Pin::new(&mut *me.reader).poll_read(cx, &mut &mut me.buf[..]))?;
                 if n == 0 {
                     self.read_done = true;
                 } else {
@@ -99,7 +99,8 @@ where
             // If our buffer has some data, let's write it out!
             while self.pos < self.cap {
                 let me = &mut *self;
-                let i = ready!(Pin::new(&mut *me.writer).poll_write(cx, &me.buf[me.pos..me.cap]))?;
+                let i =
+                    ready!(Pin::new(&mut *me.writer).poll_write(cx, &mut &me.buf[me.pos..me.cap]))?;
                 if i == 0 {
                     return Poll::Ready(Err(io::Error::new(
                         io::ErrorKind::WriteZero,

@@ -1,5 +1,4 @@
 use bytes::BufMut;
-use futures_core::ready;
 use std::io;
 use std::ops::DerefMut;
 use std::pin::Pin;
@@ -31,42 +30,6 @@ use std::task::{Context, Poll};
 /// This trait importantly means that the `read` method only works in the
 /// context of a future's task. The object may panic if used outside of a task.
 pub trait AsyncRead {
-    /// Prepares an uninitialized buffer to be safe to pass to `read`. Returns
-    /// `true` if the supplied buffer was zeroed out.
-    ///
-    /// While it would be highly unusual, implementations of [`io::Read`] are
-    /// able to read data from the buffer passed as an argument. Because of
-    /// this, the buffer passed to [`io::Read`] must be initialized memory. In
-    /// situations where large numbers of buffers are used, constantly having to
-    /// zero out buffers can be expensive.
-    ///
-    /// This function does any necessary work to prepare an uninitialized buffer
-    /// to be safe to pass to `read`. If `read` guarantees to never attempt to
-    /// read data out of the supplied buffer, then `prepare_uninitialized_buffer`
-    /// doesn't need to do any work.
-    ///
-    /// If this function returns `true`, then the memory has been zeroed out.
-    /// This allows implementations of `AsyncRead` which are composed of
-    /// multiple subimplementations to efficiently implement
-    /// `prepare_uninitialized_buffer`.
-    ///
-    /// This function isn't actually `unsafe` to call but `unsafe` to implement.
-    /// The implementer must ensure that either the whole `buf` has been zeroed
-    /// or `poll_read_buf()` overwrites the buffer without reading it and returns
-    /// correct value.
-    ///
-    /// This function is called from [`poll_read_buf`].
-    ///
-    /// [`io::Read`]: std::io::Read
-    /// [`poll_read_buf`]: #method.poll_read_buf
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
-        for x in buf {
-            *x = 0;
-        }
-
-        true
-    }
-
     /// Attempt to read from the `AsyncRead` into `buf`.
     ///
     /// On success, returns `Poll::Ready(Ok(num_bytes_read))`.
@@ -78,49 +41,13 @@ pub trait AsyncRead {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
+        buf: &mut dyn BufMut,
     ) -> Poll<io::Result<usize>>;
-
-    /// Pull some bytes from this source into the specified `BufMut`, returning
-    /// how many bytes were read.
-    ///
-    /// The `buf` provided will have bytes read into it and the internal cursor
-    /// will be advanced if any bytes were read. Note that this method typically
-    /// will not reallocate the buffer provided.
-    fn poll_read_buf<B: BufMut>(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>>
-    where
-        Self: Sized,
-    {
-        if !buf.has_remaining_mut() {
-            return Poll::Ready(Ok(0));
-        }
-
-        unsafe {
-            let n = {
-                let b = buf.bytes_mut();
-
-                self.prepare_uninitialized_buffer(b);
-
-                ready!(self.poll_read(cx, b))?
-            };
-
-            buf.advance_mut(n);
-            Poll::Ready(Ok(n))
-        }
-    }
 }
 
 macro_rules! deref_async_read {
     () => {
-        unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
-            (**self).prepare_uninitialized_buffer(buf)
-        }
-
-        fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8])
+        fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut dyn BufMut)
             -> Poll<io::Result<usize>>
         {
             Pin::new(&mut **self).poll_read(cx, buf)
@@ -141,43 +68,51 @@ where
     P: DerefMut + Unpin,
     P::Target: AsyncRead,
 {
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
-        (**self).prepare_uninitialized_buffer(buf)
-    }
-
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
+        buf: &mut dyn BufMut,
     ) -> Poll<io::Result<usize>> {
         self.get_mut().as_mut().poll_read(cx, buf)
     }
 }
 
 impl AsyncRead for &[u8] {
-    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [u8]) -> bool {
-        false
-    }
-
     fn poll_read(
         self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
-        buf: &mut [u8],
+        buf: &mut dyn BufMut,
     ) -> Poll<io::Result<usize>> {
-        Poll::Ready(io::Read::read(self.get_mut(), buf))
+        if self.len() > buf.remaining_mut() {
+            let n = buf.remaining_mut();
+            let (a, b) = self.split_at(n);
+            buf.put_slice(a);
+            *self.get_mut() = b;
+            Poll::Ready(Ok(n))
+        } else {
+            let n = self.len();
+            buf.put_slice(&*self);
+            Poll::Ready(Ok(n))
+        }
     }
 }
 
 impl<T: AsRef<[u8]> + Unpin> AsyncRead for io::Cursor<T> {
-    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [u8]) -> bool {
-        false
-    }
-
     fn poll_read(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
-        buf: &mut [u8],
+        mut buf: &mut dyn BufMut,
     ) -> Poll<io::Result<usize>> {
-        Poll::Ready(io::Read::read(self.get_mut(), buf))
+        use bytes::{buf::BufExt, Buf};
+
+        if self.as_mut().get_mut().remaining() > buf.remaining_mut() {
+            let n = buf.remaining_mut();
+            BufMut::put(&mut buf, self.as_mut().get_mut().take(n));
+            Poll::Ready(Ok(n))
+        } else {
+            let n = self.as_mut().get_mut().remaining();
+            BufMut::put(&mut buf, self.get_mut());
+            Poll::Ready(Ok(n))
+        }
     }
 }

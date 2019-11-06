@@ -6,10 +6,10 @@ use crate::net::ToSocketAddrs;
 use bytes::{Buf, BufMut};
 use futures_core::ready;
 use futures_util::future::poll_fn;
-use iovec::IoVec;
 use std::convert::TryFrom;
 use std::fmt;
 use std::io::{self, Read, Write};
+use std::mem::{self, MaybeUninit};
 use std::net::{self, Shutdown, SocketAddr};
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -590,30 +590,12 @@ impl TcpStream {
     pub(crate) fn poll_read_priv(
         &self,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
+        buf: &mut dyn BufMut,
     ) -> Poll<io::Result<usize>> {
         ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
 
-        match self.io.get_ref().read(buf) {
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(cx, mio::Ready::readable())?;
-                Poll::Pending
-            }
-            x => Poll::Ready(x),
-        }
-    }
-
-    pub(crate) fn poll_read_buf_priv<B: BufMut>(
-        &self,
-        cx: &mut Context<'_>,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
-
+        /* TODO: re-implement when mio supports IoSliceMut
         let r = unsafe {
-            // The `IoVec` type can't have a 0-length size, so we create a bunch
-            // of dummy versions on the stack with 1 length which we'll quickly
-            // overwrite.
             let b1: &mut [u8] = &mut [0];
             let b2: &mut [u8] = &mut [0];
             let b3: &mut [u8] = &mut [0];
@@ -651,45 +633,32 @@ impl TcpStream {
             let n = buf.bytes_vec_mut(&mut bufs);
             self.io.get_ref().read_bufs(&mut bufs[..n])
         };
+        */
 
-        match r {
-            Ok(n) => {
-                unsafe {
-                    buf.advance_mut(n);
-                }
-                Poll::Ready(Ok(n))
-            }
+        match self.io.get_ref().read(unsafe {
+            // TCP read() won't look at the bytes
+            mem::transmute::<&mut [MaybeUninit<u8>], &mut [u8]>(buf.bytes_mut())
+        }) {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 self.io.clear_read_ready(cx, mio::Ready::readable())?;
                 Poll::Pending
             }
             Err(e) => Poll::Ready(Err(e)),
+            Ok(n) => {
+                unsafe { buf.advance_mut(n) };
+                Poll::Ready(Ok(n))
+            }
         }
     }
 
     pub(crate) fn poll_write_priv(
         &self,
         cx: &mut Context<'_>,
-        buf: &[u8],
+        buf: &mut dyn Buf,
     ) -> Poll<io::Result<usize>> {
         ready!(self.io.poll_write_ready(cx))?;
 
-        match self.io.get_ref().write(buf) {
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_write_ready(cx)?;
-                Poll::Pending
-            }
-            x => Poll::Ready(x),
-        }
-    }
-
-    pub(crate) fn poll_write_buf_priv<B: Buf>(
-        &self,
-        cx: &mut Context<'_>,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        ready!(self.io.poll_write_ready(cx))?;
-
+        /* TODO: bring back when mio supports IoSlice
         let r = {
             // The `IoVec` type can't have a zero-length size, so create a dummy
             // version from a 1-length slice which we'll overwrite with the
@@ -700,16 +669,18 @@ impl TcpStream {
             let n = buf.bytes_vec(&mut bufs);
             self.io.get_ref().write_bufs(&bufs[..n])
         };
-        match r {
-            Ok(n) => {
-                buf.advance(n);
-                Poll::Ready(Ok(n))
-            }
+        */
+
+        match self.io.get_ref().write(buf.bytes()) {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 self.io.clear_write_ready(cx)?;
                 Poll::Pending
             }
             Err(e) => Poll::Ready(Err(e)),
+            Ok(n) => {
+                buf.advance(n);
+                Poll::Ready(Ok(n))
+            }
         }
     }
 }
@@ -743,24 +714,12 @@ impl TryFrom<net::TcpStream> for TcpStream {
 // ===== impl Read / Write =====
 
 impl AsyncRead for TcpStream {
-    unsafe fn prepare_uninitialized_buffer(&self, _: &mut [u8]) -> bool {
-        false
-    }
-
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
+        buf: &mut dyn BufMut,
     ) -> Poll<io::Result<usize>> {
         self.poll_read_priv(cx, buf)
-    }
-
-    fn poll_read_buf<B: BufMut>(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        self.poll_read_buf_priv(cx, buf)
     }
 }
 
@@ -768,7 +727,7 @@ impl AsyncWrite for TcpStream {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &[u8],
+        buf: &mut dyn Buf,
     ) -> Poll<io::Result<usize>> {
         self.poll_write_priv(cx, buf)
     }
@@ -782,14 +741,6 @@ impl AsyncWrite for TcpStream {
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.shutdown(std::net::Shutdown::Write)?;
         Poll::Ready(Ok(()))
-    }
-
-    fn poll_write_buf<B: Buf>(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        self.poll_write_buf_priv(cx, buf)
     }
 }
 

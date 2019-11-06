@@ -1,12 +1,15 @@
 use crate::io::{AsyncRead, AsyncWrite};
 use crate::net::driver::{platform, Registration};
 
+use bytes::{Buf, BufMut};
 use futures_core::ready;
 use mio::event::Evented;
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::marker::Unpin;
+use std::mem::{self, MaybeUninit};
 use std::pin::Pin;
+use std::ptr;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use std::task::{Context, Poll};
@@ -336,18 +339,30 @@ where
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
+        buf: &mut dyn BufMut,
     ) -> Poll<io::Result<usize>> {
         ready!(self.poll_read_ready(cx, mio::Ready::readable()))?;
 
-        let r = (*self).get_mut().read(buf);
+        let r = {
+            // `E: Read` means we don't have a way to know if it will peek
+            // at the buffer, so we must zero it.
+            let mut buf = unsafe {
+                let buf = mem::transmute::<&mut [MaybeUninit<u8>], &mut [u8]>(buf.bytes_mut());
+                ptr::write_bytes(buf.as_mut_ptr(), 0, buf.len());
+                buf
+            };
+            (*self).get_mut().read(buf)
+        };
 
         if is_wouldblock(&r) {
             self.clear_read_ready(cx, mio::Ready::readable())?;
             return Poll::Pending;
         }
 
-        Poll::Ready(r)
+        Poll::Ready(r.map(|n| {
+            unsafe { buf.advance_mut(n) };
+            n
+        }))
     }
 }
 
@@ -358,18 +373,21 @@ where
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &[u8],
+        buf: &mut dyn Buf,
     ) -> Poll<io::Result<usize>> {
         ready!(self.poll_write_ready(cx))?;
 
-        let r = (*self).get_mut().write(buf);
+        let r = (*self).get_mut().write(buf.bytes());
 
         if is_wouldblock(&r) {
             self.clear_write_ready(cx)?;
             return Poll::Pending;
         }
 
-        Poll::Ready(r)
+        Poll::Ready(r.map(|n| {
+            buf.advance(n);
+            n
+        }))
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {

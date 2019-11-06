@@ -1,5 +1,6 @@
 use crate::io::AsyncRead;
 
+use bytes::BufMut;
 use std::future::Future;
 use std::io;
 use std::marker::Unpin;
@@ -11,9 +12,10 @@ use std::task::{Context, Poll};
 ///
 /// The returned future will resolve to both the I/O stream and the buffer
 /// as well as the number of bytes read once the read operation is completed.
-pub(crate) fn read<'a, R>(reader: &'a mut R, buf: &'a mut [u8]) -> Read<'a, R>
+pub(crate) fn read<'a, R, B>(reader: &'a mut R, buf: &'a mut B) -> Read<'a, R, B>
 where
     R: AsyncRead + Unpin + ?Sized,
+    B: BufMut + Unpin,
 {
     Read { reader, buf }
 }
@@ -24,14 +26,15 @@ where
 /// Created by the [`read`] function.
 #[derive(Debug)]
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct Read<'a, R: ?Sized> {
+pub struct Read<'a, R: ?Sized, B> {
     reader: &'a mut R,
-    buf: &'a mut [u8],
+    buf: &'a mut B,
 }
 
-impl<R> Future for Read<'_, R>
+impl<R, B> Future for Read<'_, R, B>
 where
     R: AsyncRead + Unpin + ?Sized,
+    B: BufMut + Unpin,
 {
     type Output = io::Result<usize>;
 
@@ -48,6 +51,6 @@ mod tests {
     #[test]
     fn assert_unpin() {
         use std::marker::PhantomPinned;
-        crate::is_unpin::<Read<'_, PhantomPinned>>();
+        crate::is_unpin::<Read<'_, PhantomPinned, PhantomPinned>>();
     }
 }

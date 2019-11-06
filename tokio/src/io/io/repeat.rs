@@ -1,5 +1,6 @@
 use crate::io::AsyncRead;
 
+use bytes::BufMut;
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -47,12 +48,14 @@ impl AsyncRead for Repeat {
     fn poll_read(
         self: Pin<&mut Self>,
         _: &mut Context<'_>,
-        buf: &mut [u8],
+        buf: &mut dyn BufMut,
     ) -> Poll<io::Result<usize>> {
-        for byte in &mut *buf {
-            *byte = self.byte;
+        // TODO(perf): could use `ptr::write`
+        let n = buf.remaining_mut();
+        while buf.has_remaining_mut() {
+            buf.put_u8(self.byte);
         }
-        Poll::Ready(Ok(buf.len()))
+        Poll::Ready(Ok(n))
     }
 }
 

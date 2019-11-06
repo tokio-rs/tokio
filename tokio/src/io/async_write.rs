@@ -1,5 +1,4 @@
 use bytes::Buf;
-use futures_core::ready;
 use std::io;
 use std::ops::DerefMut;
 use std::pin::Pin;
@@ -47,7 +46,7 @@ pub trait AsyncWrite {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &[u8],
+        buf: &mut dyn Buf,
     ) -> Poll<Result<usize, io::Error>>;
 
     /// Attempt to flush the object, ensuring that any buffered data reach
@@ -120,32 +119,11 @@ pub trait AsyncWrite {
     /// This function will panic if not called within the context of a future's
     /// task.
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>>;
-
-    /// Write a `Buf` into this value, returning how many bytes were written.
-    ///
-    /// Note that this method will advance the `buf` provided automatically by
-    /// the number of bytes written.
-    fn poll_write_buf<B: Buf>(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut B,
-    ) -> Poll<Result<usize, io::Error>>
-    where
-        Self: Sized,
-    {
-        if !buf.has_remaining() {
-            return Poll::Ready(Ok(0));
-        }
-
-        let n = ready!(self.poll_write(cx, buf.bytes()))?;
-        buf.advance(n);
-        Poll::Ready(Ok(n))
-    }
 }
 
 macro_rules! deref_async_write {
     () => {
-        fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8])
+        fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut dyn Buf)
             -> Poll<io::Result<usize>>
         {
             Pin::new(&mut **self).poll_write(cx, buf)
@@ -177,7 +155,7 @@ where
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &[u8],
+        buf: &mut dyn Buf,
     ) -> Poll<io::Result<usize>> {
         self.get_mut().as_mut().poll_write(cx, buf)
     }
@@ -195,10 +173,12 @@ impl AsyncWrite for Vec<u8> {
     fn poll_write(
         self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
-        buf: &[u8],
+        buf: &mut dyn Buf,
     ) -> Poll<io::Result<usize>> {
-        self.get_mut().extend_from_slice(buf);
-        Poll::Ready(Ok(buf.len()))
+        use bytes::BufMut;
+        let n = buf.remaining();
+        self.get_mut().put(buf);
+        Poll::Ready(Ok(n))
     }
 
     fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {

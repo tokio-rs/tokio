@@ -1,6 +1,7 @@
 use crate::io::io::{BufReader, BufWriter};
 use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite};
 
+use bytes::{Buf, BufMut};
 use pin_project::pin_project;
 use std::io::{self};
 use std::{
@@ -94,7 +95,7 @@ impl<RW: AsyncRead + AsyncWrite> AsyncWrite for BufStream<RW> {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &[u8],
+        buf: &mut dyn Buf,
     ) -> Poll<io::Result<usize>> {
         self.project().0.poll_write(cx, buf)
     }
@@ -112,14 +113,9 @@ impl<RW: AsyncRead + AsyncWrite> AsyncRead for BufStream<RW> {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
+        buf: &mut dyn BufMut,
     ) -> Poll<io::Result<usize>> {
         self.project().0.poll_read(cx, buf)
-    }
-
-    // we can't skip unconditionally because of the large buffer case in read.
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
-        self.0.prepare_uninitialized_buffer(buf)
     }
 }
 

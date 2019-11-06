@@ -1,5 +1,6 @@
 use crate::io::{AsyncBufRead, AsyncRead};
 
+use bytes::BufMut;
 use futures_core::ready;
 use pin_project::{pin_project, project};
 use std::fmt;
@@ -86,13 +87,13 @@ where
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
+        buf: &mut dyn BufMut,
     ) -> Poll<io::Result<usize>> {
         let me = self.project();
 
         if !*me.done_first {
             match ready!(me.first.poll_read(cx, buf)?) {
-                0 if !buf.is_empty() => *me.done_first = true,
+                0 if buf.has_remaining_mut() => *me.done_first = true,
                 n => return Poll::Ready(Ok(n)),
             }
         }

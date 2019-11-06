@@ -304,7 +304,7 @@ impl Driver {
     /// was the case. See #38 for more info.
     fn drain(mut self: Pin<&mut Self>, cx: &mut Context<'_>) {
         loop {
-            match Pin::new(&mut self.wakeup).poll_read(cx, &mut [0; 128]) {
+            match Pin::new(&mut self.wakeup).poll_read(cx, &mut &mut [0u8; 128][..]) {
                 Poll::Ready(Ok(0)) => panic!("EOF on self-pipe"),
                 Poll::Ready(Ok(_)) => {}
                 Poll::Ready(Err(e)) => panic!("Bad read on self-pipe: {}", e),

@@ -93,7 +93,7 @@ futures-sink-preview = "=0.3.0-alpha.19"
 futures-util-preview = { version = "=0.3.0-alpha.19", features = ["sink", "channel"] }
 
 # Everything else is optional...
-bytes = { version = "0.4", optional = true }
+bytes = { git = "https://github.com/tokio-rs/bytes", optional = true }
 fnv = { version = "1.0.6", optional = true }
 iovec = { version = "0.1", optional = true }
 lazy_static = { version = "1.0.2", optional = true }

@@ -1,3 +1,5 @@
+use bytes::BufMut;
+
 use crate::io::io::chain::{chain, Chain};
 use crate::io::io::copy::{copy, Copy};
 use crate::io::io::read::{read, Read};
@@ -44,17 +46,19 @@ pub trait AsyncReadExt: AsyncRead {
     ///
     /// The returned future will resolve to the number of bytes read once the
     /// read operation is completed.
-    fn read<'a>(&'a mut self, dst: &'a mut [u8]) -> Read<'a, Self>
+    fn read<'a, B>(&'a mut self, dst: &'a mut B) -> Read<'a, Self, B>
     where
         Self: Unpin,
+        B: BufMut + Unpin,
     {
         read(self, dst)
     }
 
     /// Read exactly the amount of data needed to fill the provided buffer.
-    fn read_exact<'a>(&'a mut self, dst: &'a mut [u8]) -> ReadExact<'a, Self>
+    fn read_exact<'a, B>(&'a mut self, dst: &'a mut B) -> ReadExact<'a, Self, B>
     where
         Self: Unpin,
+        B: BufMut + Unpin,
     {
         read_exact(self, dst)
     }

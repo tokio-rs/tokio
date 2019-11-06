@@ -3,10 +3,11 @@
 //! [`File`]: file/struct.File.html
 
 use self::State::*;
-use crate::fs::blocking::Buf;
+use crate::fs::blocking::FsBuf;
 use crate::fs::{asyncify, sys};
 use crate::io::{AsyncRead, AsyncWrite};
 
+use bytes::{Buf, BufMut};
 use futures_core::ready;
 use std::fmt;
 use std::fs::{Metadata, Permissions};
@@ -75,8 +76,8 @@ pub struct File {
 
 #[derive(Debug)]
 enum State {
-    Idle(Option<Buf>),
-    Busy(sys::Blocking<(Operation, Buf)>),
+    Idle(Option<FsBuf>),
+    Busy(sys::Blocking<(Operation, FsBuf)>),
 }
 
 #[derive(Debug)]
@@ -172,7 +173,7 @@ impl File {
     pub fn from_std(std: sys::File) -> File {
         File {
             std: Arc::new(std),
-            state: State::Idle(Some(Buf::with_capacity(0))),
+            state: State::Idle(Some(FsBuf::with_capacity(0))),
             last_write_err: None,
         }
     }
@@ -442,7 +443,7 @@ impl AsyncRead for File {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        dst: &mut [u8],
+        dst: &mut dyn BufMut,
     ) -> Poll<io::Result<usize>> {
         loop {
             match self.state {
@@ -504,7 +505,7 @@ impl AsyncWrite for File {
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        src: &[u8],
+        src: &mut dyn Buf,
     ) -> Poll<io::Result<usize>> {
         if let Some(e) = self.last_write_err.take() {
             return Ready(Err(e.into()));

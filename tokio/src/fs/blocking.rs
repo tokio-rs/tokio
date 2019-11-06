@@ -1,6 +1,7 @@
 use crate::fs::sys;
 use crate::io::{AsyncRead, AsyncWrite};
 
+use bytes::{Buf, BufMut};
 use futures_core::ready;
 use std::cmp;
 use std::future::Future;
@@ -22,7 +23,7 @@ pub(crate) struct Blocking<T> {
 }
 
 #[derive(Debug)]
-pub(crate) struct Buf {
+pub(crate) struct FsBuf {
     buf: Vec<u8>,
     pos: usize,
 }
@@ -31,15 +32,15 @@ pub(crate) const MAX_BUF: usize = 16 * 1024;
 
 #[derive(Debug)]
 enum State<T> {
-    Idle(Option<Buf>),
-    Busy(sys::Blocking<(io::Result<usize>, Buf, T)>),
+    Idle(Option<FsBuf>),
+    Busy(sys::Blocking<(io::Result<usize>, FsBuf, T)>),
 }
 
 impl<T> Blocking<T> {
     pub(crate) fn new(inner: T) -> Blocking<T> {
         Blocking {
             inner: Some(inner),
-            state: State::Idle(Some(Buf::with_capacity(0))),
+            state: State::Idle(Some(FsBuf::with_capacity(0))),
             need_flush: false,
         }
     }
@@ -52,7 +53,7 @@ where
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        dst: &mut [u8],
+        dst: &mut dyn BufMut,
     ) -> Poll<io::Result<usize>> {
         loop {
             match self.state {
@@ -103,7 +104,7 @@ where
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        src: &[u8],
+        src: &mut dyn Buf,
     ) -> Poll<io::Result<usize>> {
         loop {
             match self.state {
@@ -186,9 +187,9 @@ macro_rules! uninterruptibly {
     }};
 }
 
-impl Buf {
-    pub(crate) fn with_capacity(n: usize) -> Buf {
-        Buf {
+impl FsBuf {
+    pub(crate) fn with_capacity(n: usize) -> FsBuf {
+        FsBuf {
             buf: Vec::with_capacity(n),
             pos: 0,
         }
@@ -202,9 +203,9 @@ impl Buf {
         self.buf.len() - self.pos
     }
 
-    pub(crate) fn copy_to(&mut self, dst: &mut [u8]) -> usize {
-        let n = cmp::min(self.len(), dst.len());
-        dst[..n].copy_from_slice(&self.bytes()[..n]);
+    pub(crate) fn copy_to(&mut self, dst: &mut dyn BufMut) -> usize {
+        let n = cmp::min(self.len(), dst.remaining_mut());
+        dst.put_slice(&self.bytes()[..n]);
         self.pos += n;
 
         if self.pos == self.buf.len() {
@@ -215,23 +216,28 @@ impl Buf {
         n
     }
 
-    pub(crate) fn copy_from(&mut self, src: &[u8]) -> usize {
+    pub(crate) fn copy_from(&mut self, src: &mut dyn Buf) -> usize {
         assert!(self.is_empty());
 
-        let n = cmp::min(src.len(), MAX_BUF);
-
-        self.buf.extend_from_slice(&src[..n]);
-        n
+        if src.remaining() > MAX_BUF {
+            use bytes::buf::BufExt;
+            self.buf.put(src.take(MAX_BUF));
+            MAX_BUF
+        } else {
+            let n = src.remaining();
+            self.buf.put(src);
+            n
+        }
     }
 
     pub(crate) fn bytes(&self) -> &[u8] {
         &self.buf[self.pos..]
     }
 
-    pub(crate) fn ensure_capacity_for(&mut self, bytes: &[u8]) {
+    pub(crate) fn ensure_capacity_for(&mut self, bytes: &dyn BufMut) {
         assert!(self.is_empty());
 
-        let len = cmp::min(bytes.len(), MAX_BUF);
+        let len = cmp::min(bytes.remaining_mut(), MAX_BUF);
 
         if self.buf.len() < len {
             self.buf.reserve(len - self.buf.len());

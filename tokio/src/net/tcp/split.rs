@@ -33,24 +33,12 @@ pub(crate) fn split(stream: &mut TcpStream) -> (ReadHalf<'_>, WriteHalf<'_>) {
 }
 
 impl AsyncRead for ReadHalf<'_> {
-    unsafe fn prepare_uninitialized_buffer(&self, _: &mut [u8]) -> bool {
-        false
-    }
-
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
+        buf: &mut dyn BufMut,
     ) -> Poll<io::Result<usize>> {
         self.0.poll_read_priv(cx, buf)
-    }
-
-    fn poll_read_buf<B: BufMut>(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        self.0.poll_read_buf_priv(cx, buf)
     }
 }
 
@@ -58,7 +46,7 @@ impl AsyncWrite for WriteHalf<'_> {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &[u8],
+        buf: &mut dyn Buf,
     ) -> Poll<io::Result<usize>> {
         self.0.poll_write_priv(cx, buf)
     }
@@ -72,14 +60,6 @@ impl AsyncWrite for WriteHalf<'_> {
     // `poll_shutdown` on a write half shutdowns the stream in the "write" direction.
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.0.shutdown(Shutdown::Write).into()
-    }
-
-    fn poll_write_buf<B: Buf>(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        self.0.poll_write_buf_priv(cx, buf)
     }
 }
 

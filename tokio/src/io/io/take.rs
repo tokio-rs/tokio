@@ -1,10 +1,11 @@
 use crate::io::{AsyncBufRead, AsyncRead};
 
+use bytes::BufMut;
 use futures_core::ready;
 use pin_project::{pin_project, project};
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::{cmp, io};
+use std::{cmp, io, mem::MaybeUninit};
 
 /// Stream for the [`take`](super::AsyncReadExt::take) method.
 #[pin_project]
@@ -74,22 +75,23 @@ impl<R: AsyncRead> Take<R> {
 }
 
 impl<R: AsyncRead> AsyncRead for Take<R> {
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
-        self.inner.prepare_uninitialized_buffer(buf)
-    }
-
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
+        buf: &mut dyn BufMut,
     ) -> Poll<Result<usize, io::Error>> {
         if self.limit_ == 0 {
             return Poll::Ready(Ok(0));
         }
 
         let me = self.project();
-        let max = std::cmp::min(buf.len() as u64, *me.limit_) as usize;
-        let n = ready!(me.inner.poll_read(cx, &mut buf[..max]))?;
+        let n = ready!(me.inner.poll_read(
+            cx,
+            &mut Limit {
+                inner: buf,
+                limit: *me.limit_ as usize,
+            }
+        ))?;
         *me.limit_ -= n as u64;
         Poll::Ready(Ok(n))
     }
@@ -117,6 +119,30 @@ impl<R: AsyncBufRead> AsyncBufRead for Take<R> {
         let amt = cmp::min(amt as u64, *me.limit_) as usize;
         *me.limit_ -= amt as u64;
         me.inner.consume(amt);
+    }
+}
+
+// TODO: replace with type from BufMutExt when it exists
+struct Limit<T> {
+    inner: T,
+    limit: usize,
+}
+
+impl<T: BufMut> BufMut for Limit<T> {
+    fn remaining_mut(&self) -> usize {
+        cmp::min(self.inner.remaining_mut(), self.limit)
+    }
+
+    fn bytes_mut(&mut self) -> &mut [MaybeUninit<u8>] {
+        let bytes = self.inner.bytes_mut();
+        let end = cmp::min(bytes.len(), self.limit);
+        &mut bytes[..end]
+    }
+
+    unsafe fn advance_mut(&mut self, cnt: usize) {
+        assert!(cnt <= self.limit);
+        self.inner.advance_mut(cnt);
+        self.limit -= cnt;
     }
 }
 

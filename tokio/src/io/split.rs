@@ -85,19 +85,10 @@ impl<T: AsyncRead> AsyncRead for ReadHalf<T> {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
+        buf: &mut dyn BufMut,
     ) -> Poll<io::Result<usize>> {
         let mut inner = ready!(self.inner.poll_lock(cx));
         inner.stream_pin().poll_read(cx, buf)
-    }
-
-    fn poll_read_buf<B: BufMut>(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        let mut inner = ready!(self.inner.poll_lock(cx));
-        inner.stream_pin().poll_read_buf(cx, buf)
     }
 }
 
@@ -105,7 +96,7 @@ impl<T: AsyncWrite> AsyncWrite for WriteHalf<T> {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &[u8],
+        buf: &mut dyn Buf,
     ) -> Poll<Result<usize, io::Error>> {
         let mut inner = ready!(self.inner.poll_lock(cx));
         inner.stream_pin().poll_write(cx, buf)
@@ -119,15 +110,6 @@ impl<T: AsyncWrite> AsyncWrite for WriteHalf<T> {
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         let mut inner = ready!(self.inner.poll_lock(cx));
         inner.stream_pin().poll_shutdown(cx)
-    }
-
-    fn poll_write_buf<B: Buf>(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut B,
-    ) -> Poll<Result<usize, io::Error>> {
-        let mut inner = ready!(self.inner.poll_lock(cx));
-        inner.stream_pin().poll_write_buf(cx, buf)
     }
 }
 

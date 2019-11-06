@@ -1,5 +1,6 @@
 use crate::io::AsyncWrite;
 
+use bytes::Buf;
 use std::fmt;
 use std::io;
 use std::pin::Pin;
@@ -45,9 +46,11 @@ impl AsyncWrite for Sink {
     fn poll_write(
         self: Pin<&mut Self>,
         _: &mut Context<'_>,
-        buf: &[u8],
+        buf: &mut dyn Buf,
     ) -> Poll<Result<usize, io::Error>> {
-        Poll::Ready(Ok(buf.len()))
+        let n = buf.remaining();
+        buf.advance(n);
+        Poll::Ready(Ok(n))
     }
 
     #[inline]

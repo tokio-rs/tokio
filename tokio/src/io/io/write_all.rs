@@ -1,40 +1,38 @@
 use crate::io::AsyncWrite;
 
+use bytes::Buf;
 use futures_core::ready;
 use std::future::Future;
 use std::io;
-use std::mem;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
 #[derive(Debug)]
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct WriteAll<'a, W: ?Sized> {
+pub struct WriteAll<'a, W: ?Sized, B> {
     writer: &'a mut W,
-    buf: &'a [u8],
+    buf: B,
 }
 
-pub(crate) fn write_all<'a, W>(writer: &'a mut W, buf: &'a [u8]) -> WriteAll<'a, W>
+pub(crate) fn write_all<'a, W, B>(writer: &'a mut W, buf: B) -> WriteAll<'a, W, B>
 where
     W: AsyncWrite + Unpin + ?Sized,
+    B: Buf + Unpin,
 {
     WriteAll { writer, buf }
 }
 
-impl<W> Future for WriteAll<'_, W>
+impl<W, B> Future for WriteAll<'_, W, B>
 where
     W: AsyncWrite + Unpin + ?Sized,
+    B: Buf + Unpin,
 {
     type Output = io::Result<()>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         let me = &mut *self;
-        while !me.buf.is_empty() {
-            let n = ready!(Pin::new(&mut me.writer).poll_write(cx, me.buf))?;
-            {
-                let (_, rest) = mem::replace(&mut me.buf, &[]).split_at(n);
-                me.buf = rest;
-            }
+        while me.buf.has_remaining() {
+            let n = ready!(Pin::new(&mut me.writer).poll_write(cx, &mut me.buf))?;
             if n == 0 {
                 return Poll::Ready(Err(io::ErrorKind::WriteZero.into()));
             }

@@ -1,9 +1,10 @@
 use crate::io::io::DEFAULT_BUF_SIZE;
 use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite};
 
+use bytes::{Buf, BufMut};
 use futures_core::ready;
 use pin_project::{pin_project, project};
-use std::io::{self, Read};
+use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{cmp, fmt};
@@ -42,16 +43,12 @@ impl<R: AsyncRead> BufReader<R> {
 
     /// Creates a new `BufReader` with the specified buffer capacity.
     pub fn with_capacity(capacity: usize, inner: R) -> Self {
-        unsafe {
-            let mut buffer = Vec::with_capacity(capacity);
-            buffer.set_len(capacity);
-            inner.prepare_uninitialized_buffer(&mut buffer);
-            Self {
-                inner,
-                buf: buffer.into_boxed_slice(),
-                pos: 0,
-                cap: 0,
-            }
+        let buffer = vec![0; capacity];
+        Self {
+            inner,
+            buf: buffer.into_boxed_slice(),
+            pos: 0,
+            cap: 0,
         }
     }
 
@@ -103,25 +100,23 @@ impl<R: AsyncRead> AsyncRead for BufReader<R> {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
+        buf: &mut dyn BufMut,
     ) -> Poll<io::Result<usize>> {
         // If we don't have any buffered data and we're doing a massive read
         // (larger than our internal buffer), bypass our internal buffer
         // entirely.
-        if self.pos == self.cap && buf.len() >= self.buf.len() {
+        if self.pos == self.cap && buf.remaining_mut() >= self.buf.len() {
             let res = ready!(self.as_mut().get_pin_mut().poll_read(cx, buf));
             self.discard_buffer();
             return Poll::Ready(res);
         }
+        unimplemented!()
+        /*
         let mut rem = ready!(self.as_mut().poll_fill_buf(cx))?;
         let nread = rem.read(buf)?;
         self.consume(nread);
         Poll::Ready(Ok(nread))
-    }
-
-    // we can't skip unconditionally because of the large buffer case in read.
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
-        self.inner.prepare_uninitialized_buffer(buf)
+        */
     }
 }
 
@@ -142,7 +137,7 @@ impl<R: AsyncRead> AsyncBufRead for BufReader<R> {
         // to tell the compiler that the pos..cap slice is always valid.
         if *pos >= *cap {
             debug_assert!(*pos == *cap);
-            *cap = ready!(inner.poll_read(cx, buf))?;
+            *cap = ready!(inner.poll_read(cx, &mut &mut buf[..]))?;
             *pos = 0;
         }
         Poll::Ready(Ok(&buf[*pos..*cap]))
@@ -158,7 +153,7 @@ impl<R: AsyncRead + AsyncWrite> AsyncWrite for BufReader<R> {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &[u8],
+        buf: &mut dyn Buf,
     ) -> Poll<io::Result<usize>> {
         self.get_pin_mut().poll_write(cx, buf)
     }

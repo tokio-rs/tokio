@@ -65,11 +65,10 @@ pub(super) fn read_to_end_internal<R: AsyncRead + ?Sized>(
                 g.buf.reserve(32);
                 let capacity = g.buf.capacity();
                 g.buf.set_len(capacity);
-                rd.prepare_uninitialized_buffer(&mut g.buf[g.len..]);
             }
         }
 
-        match ready!(rd.as_mut().poll_read(cx, &mut g.buf[g.len..])) {
+        match ready!(rd.as_mut().poll_read(cx, &mut g.buf)) {
             Ok(0) => {
                 ret = Poll::Ready(Ok(g.len - start_len));
                 break;

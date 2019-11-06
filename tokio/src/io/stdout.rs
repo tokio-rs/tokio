@@ -1,6 +1,7 @@
 use crate::fs::blocking::Blocking;
 use crate::io::AsyncWrite;
 
+use bytes::Buf;
 use std::io;
 use std::pin::Pin;
 use std::task::Context;
@@ -35,7 +36,7 @@ impl AsyncWrite for Stdout {
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &[u8],
+        buf: &mut dyn Buf,
     ) -> Poll<io::Result<usize>> {
         Pin::new(&mut self.std).poll_write(cx, buf)
     }

@@ -1,10 +1,11 @@
 use crate::io::io::DEFAULT_BUF_SIZE;
 use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite};
 
+use bytes::{Buf, BufMut};
 use futures_core::ready;
 use pin_project::{pin_project, project};
 use std::fmt;
-use std::io::{self, Write};
+use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -65,7 +66,7 @@ impl<W: AsyncWrite> BufWriter<W> {
         let len = buf.len();
         let mut ret = Ok(());
         while *written < len {
-            match ready!(inner.as_mut().poll_write(cx, &buf[*written..])) {
+            match ready!(inner.as_mut().poll_write(cx, &mut &buf[*written..])) {
                 Ok(0) => {
                     ret = Err(io::Error::new(
                         io::ErrorKind::WriteZero,
@@ -123,17 +124,19 @@ impl<W: AsyncWrite> AsyncWrite for BufWriter<W> {
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &[u8],
+        buf: &mut dyn Buf,
     ) -> Poll<io::Result<usize>> {
-        if self.buf.len() + buf.len() > self.buf.capacity() {
+        let buf_len = buf.remaining();
+        if self.buf.len() + buf_len > self.buf.capacity() {
             ready!(self.as_mut().flush_buf(cx))?;
         }
 
         let me = self.project();
-        if buf.len() >= me.buf.capacity() {
+        if buf_len >= me.buf.capacity() {
             me.inner.poll_write(cx, buf)
         } else {
-            Poll::Ready(me.buf.write(buf))
+            me.buf.put(buf);
+            Poll::Ready(Ok(buf_len))
         }
     }
 
@@ -152,14 +155,9 @@ impl<W: AsyncWrite + AsyncRead> AsyncRead for BufWriter<W> {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
+        buf: &mut dyn BufMut,
     ) -> Poll<io::Result<usize>> {
         self.get_pin_mut().poll_read(cx, buf)
-    }
-
-    // we can't skip unconditionally because of the large buffer case in read.
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
-        self.get_ref().prepare_uninitialized_buffer(buf)
     }
 }
 
