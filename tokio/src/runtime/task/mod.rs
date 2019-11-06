@@ -50,14 +50,14 @@ pub(crate) type UnsendTask<S> = Task<S, Unsendable>;
 /// Marker type indicating that a `Task` was constructed from a future that
 /// implements `Send`.
 #[derive(Debug)]
-pub(crate) struct Sendable {}
+pub(crate) struct Sendable;
 
 /// Marker type indicating that a `Task` was constructed from a future that
 /// does not implement `Send`, and may only be scheduled by a scheduler that is
 /// capable of scheduling `!Send` tasks.
 #[derive(Debug)]
 #[cfg(feature = "local")]
-pub(crate) struct Unsendable {}
+pub(crate) struct Unsendable;
 
 unsafe impl<S: Send + Sync + 'static> Send for Task<S, Sendable> {}
 
