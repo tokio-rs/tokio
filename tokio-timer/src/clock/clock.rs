@@ -3,7 +3,7 @@ use timer;
 
 use tokio_executor::Enter;
 
-use std::cell::Cell;
+use std::cell::RefCell;
 use std::fmt;
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -29,7 +29,7 @@ pub struct DefaultGuard<'a> {
 
 thread_local! {
     /// Thread-local tracking the current clock
-    static CLOCK: Cell<Option<*const Clock>> = Cell::new(None)
+    static CLOCK: RefCell<Option<Clock>> = RefCell::new(None)
 }
 
 /// Returns an `Instant` corresponding to "now".
@@ -50,8 +50,8 @@ thread_local! {
 /// let now = clock::now();
 /// ```
 pub fn now() -> Instant {
-    CLOCK.with(|current| match current.get() {
-        Some(ptr) => unsafe { (*ptr).now() },
+    CLOCK.with(|current| match current.borrow().as_ref() {
+        Some(c) => c.now(),
         None => Instant::now(),
     })
 }
@@ -60,8 +60,8 @@ impl Clock {
     /// Return a new `Clock` instance that uses the current execution context's
     /// source of time.
     pub fn new() -> Clock {
-        CLOCK.with(|current| match current.get() {
-            Some(ptr) => unsafe { (*ptr).clone() },
+        CLOCK.with(|current| match current.borrow().as_ref() {
+            Some(c) => c.clone(),
             None => Clock::system(),
         })
     }
@@ -134,11 +134,11 @@ where
 pub fn set_default(clock: &Clock) -> DefaultGuard<'_> {
     CLOCK.with(|cell| {
         assert!(
-            cell.get().is_none(),
+            cell.borrow().is_none(),
             "default clock already set for execution context"
         );
 
-        cell.set(Some(clock as *const Clock));
+        *cell.borrow_mut() = Some(clock.clone());
 
         DefaultGuard {
             _lifetime: PhantomData,
@@ -148,8 +148,6 @@ pub fn set_default(clock: &Clock) -> DefaultGuard<'_> {
 
 impl<'a> Drop for DefaultGuard<'a> {
     fn drop(&mut self) {
-        let _ = CLOCK.try_with(|cell| {
-            cell.set(None);
-        });
+        let _ = CLOCK.try_with(|cell| cell.borrow_mut().take());
     }
 }
