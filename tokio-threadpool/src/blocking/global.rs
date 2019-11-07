@@ -165,15 +165,17 @@ where
         // the blocking call finishes.
         let mut f = Some(f);
         let mut ret = None;
-        let ret2 = &mut ret;
-        let mut run = move || {
-            let f = f
-                .take()
-                .expect("blocking closure invoked twice; this is a bug!");
-            *ret2 = Some((f)());
-        };
+        {
+            let ret2 = &mut ret;
+            let mut run = move || {
+                let f = f
+                    .take()
+                    .expect("blocking closure invoked twice; this is a bug!");
+                *ret2 = Some((f)());
+            };
 
-        try_ready!((blocking)(&mut run));
+            try_ready!((blocking)(&mut run));
+        }
 
         // Return the result
         let ret =
