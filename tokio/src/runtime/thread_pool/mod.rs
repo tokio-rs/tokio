@@ -138,20 +138,6 @@ impl ThreadPool {
         }
     }
 
-    /*
-    fn from_parts(
-        spawner: Spawner,
-        shutdown_rx: shutdown::Receiver,
-        blocking: PoolWaiter,
-    ) -> ThreadPool {
-        ThreadPool {
-            spawner,
-            shutdown_rx,
-            blocking,
-        }
-    }
-    */
-
     /// Returns reference to `Spawner`.
     ///
     /// The `Spawner` handle can be cloned and enables spawning tasks from other
