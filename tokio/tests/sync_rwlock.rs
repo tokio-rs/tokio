@@ -13,8 +13,9 @@ use tokio_test::{assert_pending, assert_ready};
 
 // multiple reads should be Ready
 #[test]
-fn read_shared_ready() {
+fn read_shared() {
     let rwlock = RwLock::new(100);
+
     let mut t1 = spawn(rwlock.read());
     assert_ready!(t1.poll());
     let mut t2 = spawn(rwlock.read());
@@ -38,17 +39,6 @@ async fn read_uncontested() {
     let result = *rwlock.read().await;
 
     assert_eq!(result, 100);
-}
-
-// Acquire an RwLock nonexclusively by two different tasks simultaneously .
-#[test]
-fn read_shared() {
-    let rwlock = RwLock::<u32>::new(42);
-
-    let mut fut1 = spawn(rwlock.read());
-    let _guard1 = assert_ready!(fut1.poll()); // fut1 immediately gets ownership
-    let mut fut2 = spawn(rwlock.read());
-    let _guard2 = assert_ready!(fut2.poll()); // fut2 also gets ownership
 }
 
 // Attempt to acquire an RwLock for reading that already has a writer
