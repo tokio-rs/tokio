@@ -11,19 +11,56 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use std::task::{Context, Poll};
 
+macro_rules! poll_readiness {
+    ($me:expr, $cache:ident, $mask:ident, $take:ident, $poll:expr) => {{
+        let mut cached = $me.$cache.load(Relaxed);
+        let mut current = $mask & cached;
+
+        // If readiness is currently empty, loop until there is readiness;
+        // otherwise consume pending events and return the new readiness.
+        if current.is_empty() {
+            loop {
+                let new = match $poll? {
+                    Poll::Ready(v) => v,
+                    Poll::Pending => return Poll::Pending,
+                };
+                cached |= new.as_usize();
+
+                $me.$cache.store(cached, Relaxed);
+
+                current |= $mask & new;
+
+                if !current.is_empty() {
+                    return Poll::Ready(Ok(current));
+                }
+            }
+        } else {
+            if let Some(readiness) = $me.registration.$take()? {
+                cached |= readiness.as_usize();
+                $me.$cache.store(cached, Relaxed);
+            }
+
+            Poll::Ready(Ok(cached.into()))
+        }
+    }};
+}
+
+macro_rules! clear_readiness {
+    ($me:expr, $cache:ident, $mask:expr, $poll:expr, $waker:expr) => {{
+        $me.$cache.fetch_and(!$mask.as_usize(), Relaxed);
+        if $poll?.is_ready() {
+            // Notify the current task
+            $waker.wake_by_ref()
+        }
+        Ok(())
+    }};
+}
+
 /// TODO
 pub struct IoSource<S: mio::event::Source> {
     io: Option<S>,
-    inner: Inner,
-}
-
-struct Inner {
     registration: Registration,
-
-    /// Currently visible read readiness
     read_readiness: AtomicUsize,
-
-    /// Currently visible write readiness
     write_readiness: AtomicUsize,
 }
 
@@ -36,11 +73,9 @@ where
         let registration = Registration::new(&io)?;
         Ok(Self {
             io: Some(io),
-            inner: Inner {
-                registration,
-                read_readiness: AtomicUsize::default(),
-                write_readiness: AtomicUsize::default(),
-            },
+            registration,
+            read_readiness: AtomicUsize::default(),
+            write_readiness: AtomicUsize::default(),
         })
     }
 
@@ -57,106 +92,54 @@ where
     /// TODO
     pub fn into_inner(mut self) -> io::Result<S> {
         let io = self.io.take().unwrap();
-        self.inner.registration.deregister(&io)?;
+        self.registration.deregister(&io)?;
         Ok(io)
     }
 
     /// TODO
     pub fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Readiness>> {
-        self.inner.poll_read_ready(cx)
+        let mask = Readiness::readable() | Readiness::readable();
+        poll_readiness!(
+            self,
+            read_readiness,
+            mask,
+            take_read_ready,
+            self.registration.poll_read_ready(cx)
+        )
     }
 
     /// TODO
     pub fn clear_read_ready(&self, cx: &mut Context<'_>) -> io::Result<()> {
-        self.inner
-            .read_readiness
-            .fetch_and(!Readiness::readable().as_usize(), Relaxed);
-        if self.poll_read_ready(cx)?.is_ready() {
-            // Notify the current task
-            cx.waker().wake_by_ref();
-        }
-        Ok(())
+        clear_readiness!(
+            self,
+            read_readiness,
+            Readiness::readable(),
+            self.registration.poll_read_ready(cx),
+            cx.waker()
+        )
     }
 
     /// TODO
     pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Readiness>> {
-        self.inner.poll_write_ready(cx)
+        let mask = Readiness::writable() | Readiness::write_closed();
+        poll_readiness!(
+            self,
+            write_readiness,
+            mask,
+            take_write_ready,
+            self.registration.poll_write_ready(cx)
+        )
     }
 
     /// TODO
     pub fn clear_write_ready(&self, cx: &mut Context<'_>) -> io::Result<()> {
-        self.inner
-            .read_readiness
-            .fetch_and(!Readiness::writable().as_usize(), Relaxed);
-        if self.poll_write_ready(cx)?.is_ready() {
-            // Notify the current task
-            cx.waker().wake_by_ref();
-        }
-        Ok(())
-    }
-}
-
-impl Inner {
-    fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Readiness>> {
-        // Load cached readiness and see if it matches any bits
-        let mut cached = self.read_readiness.load(Relaxed);
-        let mut current = Readiness::from_usize(cached) & Readiness::readable();
-
-        if current.is_empty() {
-            loop {
-                let readiness = match self.registration.poll_read_ready(cx)? {
-                    Poll::Ready(v) => v,
-                    Poll::Pending => return Poll::Pending,
-                };
-                cached |= readiness.as_usize();
-
-                self.read_readiness.store(cached, Relaxed);
-
-                current |= readiness;
-
-                if !current.is_empty() {
-                    return Poll::Ready(Ok(current));
-                }
-            }
-        } else {
-            if let Some(readiness) = self.registration.take_read_ready()? {
-                cached |= readiness.as_usize();
-                self.read_readiness.store(cached, Relaxed);
-            }
-
-            Poll::Ready(Ok(Readiness::from_usize(cached)))
-        }
-    }
-
-    fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Readiness>> {
-        // Load cached readiness and see if it matches any bits
-        let mut cached = self.write_readiness.load(Relaxed);
-        let mut current = Readiness::from_usize(cached) & Readiness::writable();
-
-        if current.is_empty() {
-            loop {
-                let readiness = match self.registration.poll_write_ready(cx)? {
-                    Poll::Ready(v) => v,
-                    Poll::Pending => return Poll::Pending,
-                };
-                cached |= readiness.as_usize();
-
-                self.write_readiness.store(cached, Relaxed);
-
-                current |= readiness;
-
-                if !current.is_empty() {
-                    return Poll::Ready(Ok(current));
-                }
-            }
-        } else {
-            if let Some(readiness) = self.registration.take_write_ready()? {
-                cached |= readiness.as_usize();
-                self.write_readiness.store(cached, Relaxed);
-            }
-
-            Poll::Ready(Ok(Readiness::from_usize(cached)))
-        }
+        clear_readiness!(
+            self,
+            write_readiness,
+            Readiness::writable(),
+            self.registration.poll_write_ready(cx),
+            cx.waker()
+        )
     }
 }
 
@@ -240,7 +223,7 @@ impl<S: mio::event::Source> Drop for IoSource<S> {
     fn drop(&mut self) {
         if let Some(io) = self.io.take() {
             // Ignore errors
-            let _ = self.inner.registration.deregister(&io);
+            let _ = self.registration.deregister(&io);
         }
     }
 }
