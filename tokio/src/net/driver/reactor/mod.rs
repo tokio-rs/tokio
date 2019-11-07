@@ -29,6 +29,9 @@ pub struct Reactor {
     /// Reuse the `mio::Events` value across calls to poll.
     events: mio::Events,
 
+    /// TODO
+    poll: mio::Poll,
+
     /// State shared between the reactor and the handles.
     inner: Arc<Inner>,
     // Is this still needed?
@@ -56,7 +59,7 @@ pub struct Turn {
 
 pub(super) struct Inner {
     /// The underlying system event queue.
-    poll: mio::Poll,
+    registry: mio::Registry,
 
     /// Dispatch slabs for I/O and futures events
     // TODO(eliza): once worker threads are available, replace this with a
@@ -142,10 +145,13 @@ impl Reactor {
         //     mio::PollOpt::level(),
         // )?;
 
+        let registry = poll.registry().try_clone()?;
+
         Ok(Reactor {
             events: mio::Events::with_capacity(1024),
+            poll,
             inner: Arc::new(Inner {
-                poll,
+                registry,
                 io_dispatch: SingleShard::new(),
                 n_sources: AtomicUsize::new(0),
                 wakeup: waker,
@@ -207,7 +213,7 @@ impl Reactor {
     fn poll(&mut self, max_wait: Option<Duration>) -> io::Result<()> {
         // Block waiting for an event to happen, peeling out how many events
         // happened.
-        match self.inner.poll.poll(&mut self.events, max_wait) {
+        match self.poll.poll(&mut self.events, max_wait) {
             Ok(_) => {}
             Err(e) => return Err(e),
         }
@@ -287,7 +293,7 @@ impl Reactor {
 #[cfg(all(unix, not(target_os = "fuchsia")))]
 impl AsRawFd for Reactor {
     fn as_raw_fd(&self) -> RawFd {
-        self.inner.poll.as_raw_fd()
+        self.poll.as_raw_fd()
     }
 }
 
@@ -384,7 +390,7 @@ impl Inner {
         //     mio::Ready::all(),
         //     mio::PollOpt::edge(),
         // )?;
-        self.poll.registry().register(
+        self.registry.register(
             source,
             mio::Token(token),
             mio::Interests::READABLE | mio::Interests::WRITABLE,
@@ -395,7 +401,7 @@ impl Inner {
 
     /// Deregisters an I/O resource from the reactor.
     pub(super) fn deregister_source(&self, source: &dyn mio::event::Source) -> io::Result<()> {
-        self.poll.registry().deregister(source)
+        self.registry.deregister(source)
     }
 
     pub(super) fn drop_source(&self, token: usize) {

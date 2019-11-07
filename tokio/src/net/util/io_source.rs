@@ -11,6 +11,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use std::task::{Context, Poll};
 
+/// TODO
 pub struct IoSource<S: mio::event::Source> {
     io: Option<S>,
     inner: Inner,
@@ -30,85 +31,132 @@ impl<S> IoSource<S>
 where
     S: mio::event::Source,
 {
+    /// TODO
     pub fn new(io: S) -> io::Result<Self> {
-        unimplemented!()
+        let registration = Registration::new(&io)?;
+        Ok(Self {
+            io: Some(io),
+            inner: Inner {
+                registration,
+                read_readiness: AtomicUsize::default(),
+                write_readiness: AtomicUsize::default(),
+            },
+        })
     }
 
+    /// TODO
     pub fn get_ref(&self) -> &S {
         self.io.as_ref().unwrap()
     }
 
+    /// TODO
     pub fn get_mut(&mut self) -> &mut S {
         self.io.as_mut().unwrap()
     }
 
+    /// TODO
     pub fn into_inner(mut self) -> io::Result<S> {
         let io = self.io.take().unwrap();
         self.inner.registration.deregister(&io)?;
         Ok(io)
     }
 
+    /// TODO
     pub fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Readiness>> {
-        self.poll_ready(
-            cx,
-            Inner::get_read_readiness,
-            Registration::poll_read_ready,
-            Readiness::readable(),
-        )
+        self.inner.poll_read_ready(cx)
     }
+
+    /// TODO
     pub fn clear_read_ready(&self, cx: &mut Context<'_>) -> io::Result<()> {
-        unimplemented!()
-    }
-
-    pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Readiness>> {
-        self.poll_ready(
-            cx,
-            Inner::get_write_readiness,
-            Registration::poll_write_ready,
-            Readiness::writable(),
-        )
-    }
-
-    pub fn clear_write_ready(&self, cx: &mut Context<'_>) -> io::Result<()> {
-        unimplemented!()
-    }
-
-    fn poll_ready<C, P>(
-        &self,
-        cx: &mut Context<'_>,
-        cached_readiness: C,
-        poll_readiness: P,
-        readiness: Readiness,
-    ) -> Poll<io::Result<Readiness>>
-    where
-        C: for<'r> FnOnce(&'r Inner) -> Readiness,
-        P: for<'r> Fn(&'r Registration, &mut Context<'_>) -> Poll<io::Result<Readiness>>,
-    {
-        let cached = cached_readiness(&self.inner);
-        let readiness = cached & readiness;
-
-        if readiness.is_empty() {
-            loop {
-                let ready = match poll_readiness(&self.inner.registration, cx) {
-                    Poll::Ready(v) => v,
-                    Poll::Pending => return Poll::Pending,
-                };
-            }
+        self.inner
+            .read_readiness
+            .fetch_and(!Readiness::readable().as_usize(), Relaxed);
+        if self.poll_read_ready(cx)?.is_ready() {
+            // Notify the current task
+            cx.waker().wake_by_ref();
         }
+        Ok(())
+    }
 
-        unimplemented!()
+    /// TODO
+    pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Readiness>> {
+        self.inner.poll_write_ready(cx)
+    }
+
+    /// TODO
+    pub fn clear_write_ready(&self, cx: &mut Context<'_>) -> io::Result<()> {
+        self.inner
+            .read_readiness
+            .fetch_and(!Readiness::writable().as_usize(), Relaxed);
+        if self.poll_write_ready(cx)?.is_ready() {
+            // Notify the current task
+            cx.waker().wake_by_ref();
+        }
+        Ok(())
     }
 }
 
 impl Inner {
-    fn get_read_readiness(&self) -> Readiness {
-        let cached = self.read_readiness.load(Relaxed);
-        Readiness::from_usize(cached)
+    fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Readiness>> {
+        // Load cached readiness and see if it matches any bits
+        let mut cached = self.read_readiness.load(Relaxed);
+        let mut current = Readiness::from_usize(cached) & Readiness::readable();
+
+        if current.is_empty() {
+            loop {
+                let readiness = match self.registration.poll_read_ready(cx)? {
+                    Poll::Ready(v) => v,
+                    Poll::Pending => return Poll::Pending,
+                };
+                cached |= readiness.as_usize();
+
+                self.read_readiness.store(cached, Relaxed);
+
+                current |= readiness;
+
+                if !current.is_empty() {
+                    return Poll::Ready(Ok(current));
+                }
+            }
+        } else {
+            if let Some(readiness) = self.registration.take_read_ready()? {
+                cached |= readiness.as_usize();
+                self.read_readiness.store(cached, Relaxed);
+            }
+
+            Poll::Ready(Ok(Readiness::from_usize(cached)))
+        }
     }
 
-    fn get_write_readiness(&self) -> Readiness {
-        let cached = self.write_readiness.load(Relaxed);
-        Readiness::from_usize(cached)
+    fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Readiness>> {
+        // Load cached readiness and see if it matches any bits
+        let mut cached = self.write_readiness.load(Relaxed);
+        let mut current = Readiness::from_usize(cached) & Readiness::writable();
+
+        if current.is_empty() {
+            loop {
+                let readiness = match self.registration.poll_write_ready(cx)? {
+                    Poll::Ready(v) => v,
+                    Poll::Pending => return Poll::Pending,
+                };
+                cached |= readiness.as_usize();
+
+                self.write_readiness.store(cached, Relaxed);
+
+                current |= readiness;
+
+                if !current.is_empty() {
+                    return Poll::Ready(Ok(current));
+                }
+            }
+        } else {
+            if let Some(readiness) = self.registration.take_write_ready()? {
+                cached |= readiness.as_usize();
+                self.write_readiness.store(cached, Relaxed);
+            }
+
+            Poll::Ready(Ok(Readiness::from_usize(cached)))
+        }
     }
 }
 
