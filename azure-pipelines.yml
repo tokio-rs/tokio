@@ -8,20 +8,20 @@ jobs:
 # Check formatting
 - template: ci/azure-rustfmt.yml
   parameters:
-    rust: beta
+    rust: stable
     name: rustfmt
 
 # Apply clippy lints to all crates
 - template: ci/azure-clippy.yml
   parameters:
-    rust: beta
+    rust: stable
     name: clippy
 
 # Test top level crate
 - template: ci/azure-test-stable.yml
   parameters:
     name: test_tokio
-    rust: beta
+    rust: stable
     displayName: Test tokio
     cross: true
     crates:
@@ -33,7 +33,7 @@ jobs:
   parameters:
     name: test_linux
     displayName: Test sub crates -
-    rust: beta
+    rust: stable
     crates:
       - tokio-macros
       - tokio-test
@@ -44,7 +44,7 @@ jobs:
 - template: ci/azure-loom.yml
   parameters:
     name: loom
-    rust: beta
+    rust: stable
     crates:
       - tokio
 
@@ -52,7 +52,7 @@ jobs:
 - template: ci/azure-cross-compile.yml
   parameters:
     name: cross
-    rust: beta
+    rust: stable
 
 # # This represents the minimum Rust version supported by
 # # Tokio. Updating this should be done in a dedicated PR and
@@ -69,11 +69,11 @@ jobs:
 # - template: ci/azure-tsan.yml
 #   parameters:
 #     name: tsan
-#     rust: beta
+#     rust: stable
 
 - template: ci/azure-deploy-docs.yml
   parameters:
-    rust: beta
+    rust: stable
     dependsOn:
       - rustfmt
       - clippy
