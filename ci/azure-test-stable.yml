@@ -34,6 +34,10 @@ jobs:
       displayName: ${{ crate }} - cargo test
       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
 
+    # Test benches
+    - script: cargo test --benches --all
+      displayName: Test benchmarks
+
     # Run with all crate features
     - script: cargo test --all-features
       env:
@@ -70,6 +74,10 @@ jobs:
         CI: 'True'
       displayName: ${{ crate }} - cargo test --all-features
       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
+
+    # Test benches
+    - script: cargo test --benches --all
+      displayName: Test benchmarks
 
     # Check each specified feature works properly
     # * --each-feature - run for each feature which includes --no-default-features and default features of package
