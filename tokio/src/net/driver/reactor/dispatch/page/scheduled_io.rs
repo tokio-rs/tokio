@@ -1,5 +1,6 @@
 use super::super::{Pack, Tid, RESERVED_BITS, WIDTH};
 use crate::loom::{cell::CausalCell, sync::atomic::AtomicUsize};
+use crate::net::driver::Readiness;
 use crate::sync::AtomicWaker;
 
 use std::sync::atomic::Ordering;
@@ -147,7 +148,8 @@ impl ScheduledIo {
             }
             // Mask out the generation bits so that the modifying function
             // doesn't see them.
-            let current_readiness = current & mio::Ready::all().as_usize();
+            let mask = Readiness::all();
+            let current_readiness = current & mask.as_usize();
             let new = f(current_readiness);
             debug_assert!(
                 new < Generation::ONE,

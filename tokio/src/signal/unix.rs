@@ -6,12 +6,12 @@
 #![cfg(unix)]
 
 use crate::io::AsyncRead;
-use crate::net::util::PollEvented;
+use crate::net::util::IoSource;
 use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
 use crate::sync::mpsc::{channel, Receiver};
 
 use libc::c_int;
-use mio_uds::UnixStream;
+use mio::net::UnixStream;
 use std::io::{self, Error, ErrorKind, Write};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -257,7 +257,7 @@ fn signal_enable(signal: c_int) -> io::Result<()> {
 
 #[derive(Debug)]
 struct Driver {
-    wakeup: PollEvented<UnixStream>,
+    wakeup: IoSource<UnixStream>,
 }
 
 impl Driver {
@@ -281,13 +281,13 @@ impl Driver {
         // I'm not sure if the second (failed) registration simply doesn't end up
         // receiving wake up notifications, or there could be some race condition
         // when consuming readiness events, but having distinct descriptors for
-        // distinct PollEvented instances appears to mitigate this.
+        // distinct IoSource instances appears to mitigate this.
         //
-        // Unfortunately we cannot just use a single global PollEvented instance
+        // Unfortunately we cannot just use a single global IoSource instance
         // either, since we can't compare Handles or assume they will always
         // point to the exact same reactor.
         let stream = globals().receiver.try_clone()?;
-        let wakeup = PollEvented::new(stream)?;
+        let wakeup = IoSource::new(stream)?;
 
         Ok(Driver { wakeup })
     }

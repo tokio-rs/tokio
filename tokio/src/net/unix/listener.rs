@@ -1,20 +1,19 @@
 use crate::future::poll_fn;
 use crate::net::unix::{Incoming, UnixStream};
-use crate::net::util::PollEvented;
+use crate::net::util::IoSource;
 
-use mio::Ready;
-use mio_uds;
+use mio;
 use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::os::unix::io::{AsRawFd, RawFd};
-use std::os::unix::net::{self, SocketAddr};
+use std::os::unix::net;
 use std::path::Path;
 use std::task::{Context, Poll};
 
 /// A Unix socket which can accept connections from other Unix sockets.
 pub struct UnixListener {
-    io: PollEvented<mio_uds::UnixListener>,
+    io: IoSource<mio::net::UnixListener>,
 }
 
 impl UnixListener {
@@ -23,8 +22,8 @@ impl UnixListener {
     where
         P: AsRef<Path>,
     {
-        let listener = mio_uds::UnixListener::bind(path)?;
-        let io = PollEvented::new(listener)?;
+        let listener = mio::net::UnixListener::bind(path)?;
+        let io = IoSource::new(listener)?;
         Ok(UnixListener { io })
     }
 
@@ -34,13 +33,13 @@ impl UnixListener {
     /// The returned listener will be associated with the given event loop
     /// specified by `handle` and is ready to perform I/O.
     pub fn from_std(listener: net::UnixListener) -> io::Result<UnixListener> {
-        let listener = mio_uds::UnixListener::from_listener(listener)?;
-        let io = PollEvented::new(listener)?;
+        let listener = mio::net::UnixListener::from_std(listener);
+        let io = IoSource::new(listener)?;
         Ok(UnixListener { io })
     }
 
     /// Returns the local socket address of this listener.
-    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+    pub fn local_addr(&self) -> io::Result<mio::unix::SocketAddr> {
         self.io.get_ref().local_addr()
     }
 
@@ -50,34 +49,23 @@ impl UnixListener {
     }
 
     /// Accepts a new incoming connection to this listener.
-    pub async fn accept(&mut self) -> io::Result<(UnixStream, SocketAddr)> {
+    pub async fn accept(&mut self) -> io::Result<(UnixStream, mio::unix::SocketAddr)> {
         poll_fn(|cx| self.poll_accept(cx)).await
     }
 
     pub(crate) fn poll_accept(
         &mut self,
         cx: &mut Context<'_>,
-    ) -> Poll<io::Result<(UnixStream, SocketAddr)>> {
-        let (io, addr) = ready!(self.poll_accept_std(cx))?;
+    ) -> Poll<io::Result<(UnixStream, mio::unix::SocketAddr)>> {
+        ready!(self.io.poll_read_ready(cx))?;
 
-        let io = mio_uds::UnixStream::from_stream(io)?;
-        Ok((UnixStream::new(io)?, addr)).into()
-    }
-
-    fn poll_accept_std(
-        &mut self,
-        cx: &mut Context<'_>,
-    ) -> Poll<io::Result<(net::UnixStream, SocketAddr)>> {
-        ready!(self.io.poll_read_ready(cx, Ready::readable()))?;
-
-        match self.io.get_ref().accept_std() {
-            Ok(None) => {
-                self.io.clear_read_ready(cx, Ready::readable())?;
-                Poll::Pending
+        match self.io.get_ref().accept() {
+            Ok((stream, sockaddr)) => {
+                let stream = UnixStream::new(stream)?;
+                Ok((stream, sockaddr)).into()
             }
-            Ok(Some((sock, addr))) => Ok((sock, addr)).into(),
             Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(cx, Ready::readable())?;
+                self.io.clear_read_ready(cx)?;
                 Poll::Pending
             }
             Err(err) => Err(err).into(),
@@ -94,15 +82,15 @@ impl UnixListener {
     }
 }
 
-impl TryFrom<UnixListener> for mio_uds::UnixListener {
+impl TryFrom<UnixListener> for mio::net::UnixListener {
     type Error = io::Error;
 
     /// Consumes value, returning the mio I/O object.
     ///
-    /// See [`PollEvented::into_inner`] for more details about
+    /// See [`IoSource::into_inner`] for more details about
     /// resource deregistration that happens during the call.
     ///
-    /// [`PollEvented::into_inner`]: crate::util::PollEvented::into_inner
+    /// [`IoSource::into_inner`]: crate::util::PollEvented::into_inner
     fn try_from(value: UnixListener) -> Result<Self, Self::Error> {
         value.io.into_inner()
     }

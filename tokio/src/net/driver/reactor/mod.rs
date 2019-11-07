@@ -1,5 +1,4 @@
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::net::driver::platform;
 use crate::runtime::{Park, Unpark};
 
 use std::sync::atomic::Ordering::SeqCst;
@@ -8,7 +7,8 @@ mod dispatch;
 use dispatch::SingleShard;
 pub(crate) use dispatch::MAX_SOURCES;
 
-use mio::event::Evented;
+use super::Readiness;
+use mio;
 use std::cell::RefCell;
 use std::io;
 use std::marker::PhantomData;
@@ -31,8 +31,8 @@ pub struct Reactor {
 
     /// State shared between the reactor and the handles.
     inner: Arc<Inner>,
-
-    _wakeup_registration: mio::Registration,
+    // Is this still needed?
+    // _wakeup_registration: mio::Registry,
 }
 
 /// A reference to a reactor.
@@ -56,7 +56,7 @@ pub struct Turn {
 
 pub(super) struct Inner {
     /// The underlying system event queue.
-    io: mio::Poll,
+    poll: mio::Poll,
 
     /// Dispatch slabs for I/O and futures events
     // TODO(eliza): once worker threads are available, replace this with a
@@ -67,7 +67,9 @@ pub(super) struct Inner {
     n_sources: AtomicUsize,
 
     /// Used to wake up the reactor from a call to `turn`
-    wakeup: mio::SetReadiness,
+    ///
+    /// TODO: Rename to waker?
+    wakeup: mio::Waker,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
@@ -129,24 +131,24 @@ impl Reactor {
     /// Creates a new event loop, returning any error that happened during the
     /// creation.
     pub fn new() -> io::Result<Reactor> {
-        let io = mio::Poll::new()?;
-        let wakeup_pair = mio::Registration::new2();
+        let poll = mio::Poll::new()?;
+        // let wakeup_pair = mio::Registration::new2();
+        let waker = mio::Waker::new(poll.registry(), TOKEN_WAKEUP)?;
 
-        io.register(
-            &wakeup_pair.0,
-            TOKEN_WAKEUP,
-            mio::Ready::readable(),
-            mio::PollOpt::level(),
-        )?;
+        // io.register(
+        //     &wakeup_pair.0,
+        //     TOKEN_WAKEUP,
+        //     mio::Ready::readable(),
+        //     mio::PollOpt::level(),
+        // )?;
 
         Ok(Reactor {
             events: mio::Events::with_capacity(1024),
-            _wakeup_registration: wakeup_pair.0,
             inner: Arc::new(Inner {
-                io,
+                poll,
                 io_dispatch: SingleShard::new(),
                 n_sources: AtomicUsize::new(0),
-                wakeup: wakeup_pair.1,
+                wakeup: waker,
             }),
         })
     }
@@ -205,30 +207,33 @@ impl Reactor {
     fn poll(&mut self, max_wait: Option<Duration>) -> io::Result<()> {
         // Block waiting for an event to happen, peeling out how many events
         // happened.
-        match self.inner.io.poll(&mut self.events, max_wait) {
+        match self.inner.poll.poll(&mut self.events, max_wait) {
             Ok(_) => {}
             Err(e) => return Err(e),
         }
 
         // Process all the events that came in, dispatching appropriately
-
         for event in self.events.iter() {
             let token = event.token();
 
-            if token == TOKEN_WAKEUP {
-                self.inner
-                    .wakeup
-                    .set_readiness(mio::Ready::empty())
-                    .unwrap();
-            } else {
-                self.dispatch(token, event.readiness());
+            // if token == TOKEN_WAKEUP {
+            //     self.inner
+            //         .wakeup
+            //         .set_readiness(mio::Ready::empty())
+            //         .unwrap();
+            // } else {
+            //     self.dispatch(token, event.readiness());
+            // }
+            if token != TOKEN_WAKEUP {
+                self.dispatch(token, event);
             }
         }
 
         Ok(())
     }
 
-    fn dispatch(&self, token: mio::Token, ready: mio::Ready) {
+    // fn dispatch(&self, token: mio::Token, ready: mio::Ready) {
+    fn dispatch(&self, token: mio::Token, event: &mio::event::Event) {
         let mut rd = None;
         let mut wr = None;
 
@@ -237,19 +242,35 @@ impl Reactor {
             None => return,
         };
 
+        let mut readiness = Readiness::empty();
+        if event.is_readable() {
+            readiness |= Readiness::readable()
+        }
+        if event.is_writable() {
+            readiness |= Readiness::writable()
+        }
+        if event.is_read_closed() {
+            readiness |= Readiness::read_closed()
+        }
+        if event.is_write_closed() {
+            readiness |= Readiness::write_closed()
+        }
+
         if io
-            .set_readiness(token.0, |curr| curr | ready.as_usize())
+            .set_readiness(token.0, |curr| curr | readiness.as_usize())
             .is_err()
         {
             // token no longer valid!
             return;
         }
 
-        if ready.is_writable() || platform::is_hup(ready) {
+        // if ready.is_writable() || platform::is_hup(ready) {
+        if readiness.is_writable() || readiness.is_write_closed() {
             wr = io.writer.take_waker();
         }
 
-        if !(ready & (!mio::Ready::writable())).is_empty() {
+        // if !(ready & (!mio::Ready::writable())).is_empty() {
+        if readiness.is_readable() || readiness.is_read_closed() {
             rd = io.reader.take_waker();
         }
 
@@ -266,7 +287,7 @@ impl Reactor {
 #[cfg(all(unix, not(target_os = "fuchsia")))]
 impl AsRawFd for Reactor {
     fn as_raw_fd(&self) -> RawFd {
-        self.inner.io.as_raw_fd()
+        self.inner.poll.as_raw_fd()
     }
 }
 
@@ -321,7 +342,8 @@ impl Handle {
     /// return immediately.
     fn wakeup(&self) {
         if let Some(inner) = self.inner() {
-            inner.wakeup.set_readiness(mio::Ready::readable()).unwrap();
+            // inner.wakeup.set_readiness(mio::Ready::readable()).unwrap();
+            inner.wakeup.wake().expect("failed to wake reactor")
         }
     }
 
@@ -348,7 +370,7 @@ impl Inner {
     /// Register an I/O resource with the reactor.
     ///
     /// The registration token is returned.
-    pub(super) fn add_source(&self, source: &dyn Evented) -> io::Result<usize> {
+    pub(super) fn add_source(&self, source: &dyn mio::event::Source) -> io::Result<usize> {
         let token = self.io_dispatch.alloc().ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::Other,
@@ -356,19 +378,24 @@ impl Inner {
             )
         })?;
         self.n_sources.fetch_add(1, SeqCst);
-        self.io.register(
+        // self.io.register(
+        //     source,
+        //     mio::Token(token),
+        //     mio::Ready::all(),
+        //     mio::PollOpt::edge(),
+        // )?;
+        self.poll.registry().register(
             source,
             mio::Token(token),
-            mio::Ready::all(),
-            mio::PollOpt::edge(),
+            mio::Interests::READABLE | mio::Interests::WRITABLE,
         )?;
 
         Ok(token)
     }
 
     /// Deregisters an I/O resource from the reactor.
-    pub(super) fn deregister_source(&self, source: &dyn Evented) -> io::Result<()> {
-        self.io.deregister(source)
+    pub(super) fn deregister_source(&self, source: &dyn mio::event::Source) -> io::Result<()> {
+        self.poll.registry().deregister(source)
     }
 
     pub(super) fn drop_source(&self, token: usize) {
@@ -382,17 +409,19 @@ impl Inner {
             .io_dispatch
             .get(token)
             .unwrap_or_else(|| panic!("IO resource for token {} does not exist!", token));
-        let readiness = sched
+        let current = sched
             .get_readiness(token)
             .unwrap_or_else(|| panic!("token {} no longer valid!", token));
 
-        let (waker, ready) = match dir {
-            Direction::Read => (&sched.reader, !mio::Ready::writable()),
-            Direction::Write => (&sched.writer, mio::Ready::writable()),
+        let (waker, readiness) = match dir {
+            // Direction::Read => (&sched.reader, !mio::Ready::writable()),
+            Direction::Read => (&sched.reader, Readiness::readable()),
+            // Direction::Write => (&sched.writer, mio::Ready::writable()),
+            Direction::Write => (&sched.writer, Readiness::writable()),
         };
 
         waker.register(w);
-        if readiness & ready.as_usize() != 0 {
+        if current & readiness.as_usize() != 0 {
             waker.wake();
         }
     }
@@ -411,13 +440,14 @@ impl Drop for Inner {
 }
 
 impl Direction {
-    pub(super) fn mask(self) -> mio::Ready {
+    pub(super) fn mask(self) -> Readiness {
         match self {
             Direction::Read => {
                 // Everything except writable is signaled through read.
-                mio::Ready::all() - mio::Ready::writable()
+                // mio::Ready::all() - mio::Ready::writable()
+                Readiness::readable()
             }
-            Direction::Write => mio::Ready::writable() | platform::hup(),
+            Direction::Write => Readiness::writable(),
         }
     }
 }

@@ -1,18 +1,19 @@
 use crate::future::poll_fn;
-use crate::net::util::PollEvented;
+use crate::net::util::IoSource;
 
+use mio;
 use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, RawFd};
-use std::os::unix::net::{self, SocketAddr};
+use std::os::unix::net;
 use std::path::Path;
 use std::task::{Context, Poll};
 
 /// An I/O object representing a Unix datagram socket.
 pub struct UnixDatagram {
-    io: PollEvented<mio_uds::UnixDatagram>,
+    io: IoSource<mio::net::UnixDatagram>,
 }
 
 impl UnixDatagram {
@@ -21,7 +22,7 @@ impl UnixDatagram {
     where
         P: AsRef<Path>,
     {
-        let socket = mio_uds::UnixDatagram::bind(path)?;
+        let socket = mio::net::UnixDatagram::bind(path)?;
         UnixDatagram::new(socket)
     }
 
@@ -31,7 +32,7 @@ impl UnixDatagram {
     /// communicating back and forth between one another. Each socket will
     /// be associated with the default event loop's handle.
     pub fn pair() -> io::Result<(UnixDatagram, UnixDatagram)> {
-        let (a, b) = mio_uds::UnixDatagram::pair()?;
+        let (a, b) = mio::net::UnixDatagram::pair()?;
         let a = UnixDatagram::new(a)?;
         let b = UnixDatagram::new(b)?;
 
@@ -44,19 +45,19 @@ impl UnixDatagram {
     /// The returned datagram will be associated with the given event loop
     /// specified by `handle` and is ready to perform I/O.
     pub fn from_std(datagram: net::UnixDatagram) -> io::Result<UnixDatagram> {
-        let socket = mio_uds::UnixDatagram::from_datagram(datagram)?;
-        let io = PollEvented::new(socket)?;
+        let socket = mio::net::UnixDatagram::from_std(datagram);
+        let io = IoSource::new(socket)?;
         Ok(UnixDatagram { io })
     }
 
-    fn new(socket: mio_uds::UnixDatagram) -> io::Result<UnixDatagram> {
-        let io = PollEvented::new(socket)?;
+    fn new(socket: mio::net::UnixDatagram) -> io::Result<UnixDatagram> {
+        let io = IoSource::new(socket)?;
         Ok(UnixDatagram { io })
     }
 
     /// Creates a new `UnixDatagram` which is not bound to any address.
     pub fn unbound() -> io::Result<UnixDatagram> {
-        let socket = mio_uds::UnixDatagram::unbound()?;
+        let socket = mio::net::UnixDatagram::unbound()?;
         UnixDatagram::new(socket)
     }
 
@@ -109,11 +110,11 @@ impl UnixDatagram {
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
-        ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
+        ready!(self.io.poll_read_ready(cx))?;
 
         match self.io.get_ref().recv(buf) {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(cx, mio::Ready::readable())?;
+                self.io.clear_read_ready(cx)?;
                 Poll::Pending
             }
             x => Poll::Ready(x),
@@ -146,7 +147,10 @@ impl UnixDatagram {
     }
 
     /// Receives data from the socket.
-    pub async fn recv_from(&mut self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+    pub async fn recv_from(
+        &mut self,
+        buf: &mut [u8],
+    ) -> io::Result<(usize, mio::unix::SocketAddr)> {
         poll_fn(|cx| self.poll_recv_from_priv(cx, buf)).await
     }
 
@@ -154,12 +158,12 @@ impl UnixDatagram {
         &self,
         cx: &mut Context<'_>,
         buf: &mut [u8],
-    ) -> Poll<Result<(usize, SocketAddr), io::Error>> {
-        ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
+    ) -> Poll<Result<(usize, mio::unix::SocketAddr), io::Error>> {
+        ready!(self.io.poll_read_ready(cx))?;
 
         match self.io.get_ref().recv_from(buf) {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(cx, mio::Ready::readable())?;
+                self.io.clear_read_ready(cx)?;
                 Poll::Pending
             }
             x => Poll::Ready(x),
@@ -167,14 +171,14 @@ impl UnixDatagram {
     }
 
     /// Returns the local address that this socket is bound to.
-    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+    pub fn local_addr(&self) -> io::Result<mio::unix::SocketAddr> {
         self.io.get_ref().local_addr()
     }
 
     /// Returns the address of this socket's peer.
     ///
     /// The `connect` method will connect the socket to a peer.
-    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
+    pub fn peer_addr(&self) -> io::Result<mio::unix::SocketAddr> {
         self.io.get_ref().peer_addr()
     }
 
@@ -193,7 +197,7 @@ impl UnixDatagram {
     }
 }
 
-impl TryFrom<UnixDatagram> for mio_uds::UnixDatagram {
+impl TryFrom<UnixDatagram> for mio::net::UnixDatagram {
     type Error = io::Error;
 
     /// Consumes value, returning the mio I/O object.

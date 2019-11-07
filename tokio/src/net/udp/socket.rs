@@ -1,6 +1,6 @@
 use crate::future::poll_fn;
 use crate::net::udp::split::{split, UdpSocketRecvHalf, UdpSocketSendHalf};
-use crate::net::util::PollEvented;
+use crate::net::util::IoSource;
 use crate::net::ToSocketAddrs;
 
 use std::convert::TryFrom;
@@ -11,7 +11,7 @@ use std::task::{Context, Poll};
 
 /// An I/O object representing a UDP socket.
 pub struct UdpSocket {
-    io: PollEvented<mio::net::UdpSocket>,
+    io: IoSource<mio::net::UdpSocket>,
 }
 
 impl UdpSocket {
@@ -37,12 +37,12 @@ impl UdpSocket {
     }
 
     fn bind_addr(addr: SocketAddr) -> io::Result<UdpSocket> {
-        let sys = mio::net::UdpSocket::bind(&addr)?;
+        let sys = mio::net::UdpSocket::bind(addr)?;
         UdpSocket::new(sys)
     }
 
     fn new(socket: mio::net::UdpSocket) -> io::Result<UdpSocket> {
-        let io = PollEvented::new(socket)?;
+        let io = IoSource::new(socket)?;
         Ok(UdpSocket { io })
     }
 
@@ -56,8 +56,8 @@ impl UdpSocket {
     /// configure a socket before it's handed off, such as setting options like
     /// `reuse_address` or binding to multiple addresses.
     pub fn from_std(socket: net::UdpSocket) -> io::Result<UdpSocket> {
-        let io = mio::net::UdpSocket::from_socket(socket)?;
-        let io = PollEvented::new(io)?;
+        let io = mio::net::UdpSocket::from_std(socket);
+        let io = IoSource::new(io)?;
         Ok(UdpSocket { io })
     }
 
@@ -150,11 +150,11 @@ impl UdpSocket {
 
     #[doc(hidden)]
     pub fn poll_recv(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
-        ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
+        ready!(self.io.poll_read_ready(cx))?;
 
         match self.io.get_ref().recv(buf) {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(cx, mio::Ready::readable())?;
+                self.io.clear_read_ready(cx)?;
                 Poll::Pending
             }
             x => Poll::Ready(x),
@@ -188,7 +188,7 @@ impl UdpSocket {
     ) -> Poll<io::Result<usize>> {
         ready!(self.io.poll_write_ready(cx))?;
 
-        match self.io.get_ref().send_to(buf, target) {
+        match self.io.get_ref().send_to(buf, *target) {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 self.io.clear_write_ready(cx)?;
                 Poll::Pending
@@ -213,11 +213,11 @@ impl UdpSocket {
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<Result<(usize, SocketAddr), io::Error>> {
-        ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
+        ready!(self.io.poll_read_ready(cx))?;
 
         match self.io.get_ref().recv_from(buf) {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(cx, mio::Ready::readable())?;
+                self.io.clear_read_ready(cx)?;
                 Poll::Pending
             }
             x => Poll::Ready(x),
@@ -328,7 +328,7 @@ impl UdpSocket {
     /// multicast group. If it's equal to `INADDR_ANY` then an appropriate
     /// interface is chosen by the system.
     pub fn join_multicast_v4(&self, multiaddr: Ipv4Addr, interface: Ipv4Addr) -> io::Result<()> {
-        self.io.get_ref().join_multicast_v4(&multiaddr, &interface)
+        self.io.get_ref().join_multicast_v4(multiaddr, interface)
     }
 
     /// Executes an operation of the `IPV6_ADD_MEMBERSHIP` type.
@@ -346,7 +346,7 @@ impl UdpSocket {
     ///
     /// [`join_multicast_v4`]: #method.join_multicast_v4
     pub fn leave_multicast_v4(&self, multiaddr: Ipv4Addr, interface: Ipv4Addr) -> io::Result<()> {
-        self.io.get_ref().leave_multicast_v4(&multiaddr, &interface)
+        self.io.get_ref().leave_multicast_v4(multiaddr, interface)
     }
 
     /// Executes an operation of the `IPV6_DROP_MEMBERSHIP` type.

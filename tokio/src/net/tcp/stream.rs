@@ -1,18 +1,16 @@
 use crate::future::poll_fn;
 use crate::io::{AsyncRead, AsyncWrite};
 use crate::net::tcp::split::{split, ReadHalf, WriteHalf};
-use crate::net::util::PollEvented;
+use crate::net::util::IoSource;
 use crate::net::ToSocketAddrs;
 
 use bytes::{Buf, BufMut};
-use iovec::IoVec;
 use std::convert::TryFrom;
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::net::{self, Shutdown, SocketAddr};
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::time::Duration;
 
 /// An I/O object representing a TCP stream connected to a remote endpoint.
 ///
@@ -42,7 +40,7 @@ use std::time::Duration;
 /// }
 /// ```
 pub struct TcpStream {
-    io: PollEvented<mio::net::TcpStream>,
+    io: IoSource<mio::net::TcpStream>,
 }
 
 impl TcpStream {
@@ -96,7 +94,7 @@ impl TcpStream {
 
     /// Establish a connection to the specified `addr`.
     async fn connect_addr(addr: SocketAddr) -> io::Result<TcpStream> {
-        let sys = mio::net::TcpStream::connect(&addr)?;
+        let sys = mio::net::TcpStream::connect(addr)?;
         let stream = TcpStream::new(sys)?;
 
         // Once we've connected, wait for the stream to be writable as
@@ -115,7 +113,7 @@ impl TcpStream {
     }
 
     pub(crate) fn new(connected: mio::net::TcpStream) -> io::Result<TcpStream> {
-        let io = PollEvented::new(connected)?;
+        let io = IoSource::new(connected)?;
         Ok(TcpStream { io })
     }
 
@@ -138,8 +136,8 @@ impl TcpStream {
     /// }
     /// ```
     pub fn from_std(stream: net::TcpStream) -> io::Result<TcpStream> {
-        let io = mio::net::TcpStream::from_stream(stream)?;
-        let io = PollEvented::new(io)?;
+        let io = mio::net::TcpStream::from_std(stream);
+        let io = IoSource::new(io)?;
         Ok(TcpStream { io })
     }
 
@@ -147,10 +145,10 @@ impl TcpStream {
     //
     // This should be removed in favor of some in-crate TcpSocket builder API.
     #[doc(hidden)]
-    pub async fn connect_std(stream: net::TcpStream, addr: &SocketAddr) -> io::Result<TcpStream> {
-        let io = mio::net::TcpStream::connect_stream(stream, addr)?;
-        let io = PollEvented::new(io)?;
-        let stream = TcpStream { io };
+    pub async fn connect_std(_stream: net::TcpStream, _addr: &SocketAddr) -> io::Result<TcpStream> {
+        // let io = mio::net::TcpStream::connect_stream(stream, addr)?;
+        // let io = IoSource::new(io)?;
+        // let stream = TcpStream { io };
 
         // Once we've connected, wait for the stream to be writable as
         // that's when the actual connection has been initiated. Once we're
@@ -158,13 +156,14 @@ impl TcpStream {
         // actually hit an error or not.
         //
         // If all that succeeded then we ship everything on up.
-        poll_fn(|cx| stream.io.poll_write_ready(cx)).await?;
+        // poll_fn(|cx| stream.io.poll_write_ready(cx)).await?;
 
-        if let Some(e) = stream.io.get_ref().take_error()? {
-            return Err(e);
-        }
+        // if let Some(e) = stream.io.get_ref().take_error()? {
+        //     return Err(e);
+        // }
 
-        Ok(stream)
+        // Ok(stream)
+        unimplemented!()
     }
 
     /// Returns the local address that this stream is bound to.
@@ -203,12 +202,12 @@ impl TcpStream {
     }
 
     fn poll_peek(&mut self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
-        ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
+        ready!(self.io.poll_read_ready(cx))?;
 
         match self.io.get_ref().peek(buf) {
             Ok(ret) => Poll::Ready(Ok(ret)),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(cx, mio::Ready::readable())?;
+                self.io.clear_read_ready(cx)?;
                 Poll::Pending
             }
             Err(e) => Poll::Ready(Err(e)),
@@ -325,153 +324,6 @@ impl TcpStream {
         self.io.get_ref().set_nodelay(nodelay)
     }
 
-    /// Gets the value of the `SO_RCVBUF` option on this socket.
-    ///
-    /// For more information about this option, see [`set_recv_buffer_size`].
-    ///
-    /// [`set_recv_buffer_size`]: #tymethod.set_recv_buffer_size
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///
-    /// println!("{:?}", stream.recv_buffer_size()?);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn recv_buffer_size(&self) -> io::Result<usize> {
-        self.io.get_ref().recv_buffer_size()
-    }
-
-    /// Sets the value of the `SO_RCVBUF` option on this socket.
-    ///
-    /// Changes the size of the operating system's receive buffer associated
-    /// with the socket.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///
-    /// stream.set_recv_buffer_size(100)?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn set_recv_buffer_size(&self, size: usize) -> io::Result<()> {
-        self.io.get_ref().set_recv_buffer_size(size)
-    }
-
-    /// Gets the value of the `SO_SNDBUF` option on this socket.
-    ///
-    /// For more information about this option, see [`set_send_buffer`].
-    ///
-    /// [`set_send_buffer`]: #tymethod.set_send_buffer
-    ///
-    /// # Examples
-    ///
-    /// Returns whether keepalive messages are enabled on this socket, and if so
-    /// the duration of time between them.
-    ///
-    /// For more information about this option, see [`set_keepalive`].
-    ///
-    /// [`set_keepalive`]: #tymethod.set_keepalive
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///
-    /// println!("{:?}", stream.send_buffer_size()?);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn send_buffer_size(&self) -> io::Result<usize> {
-        self.io.get_ref().send_buffer_size()
-    }
-
-    /// Sets the value of the `SO_SNDBUF` option on this socket.
-    ///
-    /// Changes the size of the operating system's send buffer associated with
-    /// the socket.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///
-    /// stream.set_send_buffer_size(100)?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn set_send_buffer_size(&self, size: usize) -> io::Result<()> {
-        self.io.get_ref().set_send_buffer_size(size)
-    }
-
-    /// Returns whether keepalive messages are enabled on this socket, and if so
-    /// the duration of time between them.
-    ///
-    /// For more information about this option, see [`set_keepalive`].
-    ///
-    /// [`set_keepalive`]: #tymethod.set_keepalive
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///
-    /// println!("{:?}", stream.keepalive()?);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn keepalive(&self) -> io::Result<Option<Duration>> {
-        self.io.get_ref().keepalive()
-    }
-
-    /// Sets whether keepalive messages are enabled to be sent on this socket.
-    ///
-    /// On Unix, this option will set the `SO_KEEPALIVE` as well as the
-    /// `TCP_KEEPALIVE` or `TCP_KEEPIDLE` option (depending on your platform).
-    /// On Windows, this will set the `SIO_KEEPALIVE_VALS` option.
-    ///
-    /// If `None` is specified then keepalive messages are disabled, otherwise
-    /// the duration specified will be the time to remain idle before sending a
-    /// TCP keepalive probe.
-    ///
-    /// Some platforms specify this value in seconds, so sub-second
-    /// specifications may be omitted.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///
-    /// stream.set_keepalive(None)?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn set_keepalive(&self, keepalive: Option<Duration>) -> io::Result<()> {
-        self.io.get_ref().set_keepalive(keepalive)
-    }
-
     /// Gets the value of the `IP_TTL` option for this socket.
     ///
     /// For more information about this option, see [`set_ttl`].
@@ -515,57 +367,6 @@ impl TcpStream {
         self.io.get_ref().set_ttl(ttl)
     }
 
-    /// Reads the linger duration for this socket by getting the `SO_LINGER`
-    /// option.
-    ///
-    /// For more information about this option, see [`set_linger`].
-    ///
-    /// [`set_linger`]: #tymethod.set_linger
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///
-    /// println!("{:?}", stream.linger()?);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn linger(&self) -> io::Result<Option<Duration>> {
-        self.io.get_ref().linger()
-    }
-
-    /// Sets the linger duration of this socket by setting the `SO_LINGER`
-    /// option.
-    ///
-    /// This option controls the action taken when a stream has unsent messages
-    /// and the stream is closed. If `SO_LINGER` is set, the system
-    /// shall block the process  until it can transmit the data or until the
-    /// time expires.
-    ///
-    /// If `SO_LINGER` is not specified, and the stream is closed, the system
-    /// handles the call in a way that allows the process to continue as quickly
-    /// as possible.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///
-    /// stream.set_linger(None)?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
-        self.io.get_ref().set_linger(dur)
-    }
-
     /// Split a `TcpStream` into a read half and a write half, which can be used
     /// to read and write the stream concurrently.
     ///
@@ -591,11 +392,11 @@ impl TcpStream {
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
-        ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
+        ready!(self.io.poll_read_ready(cx))?;
 
         match self.io.get_ref().read(buf) {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(cx, mio::Ready::readable())?;
+                self.io.clear_read_ready(cx)?;
                 Poll::Pending
             }
             x => Poll::Ready(x),
@@ -607,50 +408,9 @@ impl TcpStream {
         cx: &mut Context<'_>,
         buf: &mut B,
     ) -> Poll<io::Result<usize>> {
-        ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
+        ready!(self.io.poll_read_ready(cx))?;
 
-        let r = unsafe {
-            // The `IoVec` type can't have a 0-length size, so we create a bunch
-            // of dummy versions on the stack with 1 length which we'll quickly
-            // overwrite.
-            let b1: &mut [u8] = &mut [0];
-            let b2: &mut [u8] = &mut [0];
-            let b3: &mut [u8] = &mut [0];
-            let b4: &mut [u8] = &mut [0];
-            let b5: &mut [u8] = &mut [0];
-            let b6: &mut [u8] = &mut [0];
-            let b7: &mut [u8] = &mut [0];
-            let b8: &mut [u8] = &mut [0];
-            let b9: &mut [u8] = &mut [0];
-            let b10: &mut [u8] = &mut [0];
-            let b11: &mut [u8] = &mut [0];
-            let b12: &mut [u8] = &mut [0];
-            let b13: &mut [u8] = &mut [0];
-            let b14: &mut [u8] = &mut [0];
-            let b15: &mut [u8] = &mut [0];
-            let b16: &mut [u8] = &mut [0];
-            let mut bufs: [&mut IoVec; 16] = [
-                b1.into(),
-                b2.into(),
-                b3.into(),
-                b4.into(),
-                b5.into(),
-                b6.into(),
-                b7.into(),
-                b8.into(),
-                b9.into(),
-                b10.into(),
-                b11.into(),
-                b12.into(),
-                b13.into(),
-                b14.into(),
-                b15.into(),
-                b16.into(),
-            ];
-            let n = buf.bytes_vec_mut(&mut bufs);
-            self.io.get_ref().read_bufs(&mut bufs[..n])
-        };
-
+        let r = unsafe { self.io.get_ref().read(buf.bytes_mut()) };
         match r {
             Ok(n) => {
                 unsafe {
@@ -659,7 +419,7 @@ impl TcpStream {
                 Poll::Ready(Ok(n))
             }
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(cx, mio::Ready::readable())?;
+                self.io.clear_read_ready(cx)?;
                 Poll::Pending
             }
             Err(e) => Poll::Ready(Err(e)),
@@ -689,16 +449,7 @@ impl TcpStream {
     ) -> Poll<io::Result<usize>> {
         ready!(self.io.poll_write_ready(cx))?;
 
-        let r = {
-            // The `IoVec` type can't have a zero-length size, so create a dummy
-            // version from a 1-length slice which we'll overwrite with the
-            // `bytes_vec` method.
-            static DUMMY: &[u8] = &[0];
-            let iovec = <&IoVec>::from(DUMMY);
-            let mut bufs = [iovec; 64];
-            let n = buf.bytes_vec(&mut bufs);
-            self.io.get_ref().write_bufs(&bufs[..n])
-        };
+        let r = self.io.get_ref().write(buf.bytes());
         match r {
             Ok(n) => {
                 buf.advance(n);

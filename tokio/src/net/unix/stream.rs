@@ -2,16 +2,15 @@ use crate::future::poll_fn;
 use crate::io::{AsyncRead, AsyncWrite};
 use crate::net::unix::split::{split, ReadHalf, WriteHalf};
 use crate::net::unix::ucred::{self, UCred};
-use crate::net::util::PollEvented;
+use crate::net::util::IoSource;
 
 use bytes::{Buf, BufMut};
-use iovec::IoVec;
 use std::convert::TryFrom;
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, RawFd};
-use std::os::unix::net::{self, SocketAddr};
+use std::os::unix::net;
 use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -22,7 +21,7 @@ use std::task::{Context, Poll};
 /// from a listener with `UnixListener::incoming`. Additionally, a pair of
 /// anonymous Unix sockets can be created with `UnixStream::pair`.
 pub struct UnixStream {
-    io: PollEvented<mio_uds::UnixStream>,
+    io: IoSource<mio::net::UnixStream>,
 }
 
 impl UnixStream {
@@ -35,7 +34,7 @@ impl UnixStream {
     where
         P: AsRef<Path>,
     {
-        let stream = mio_uds::UnixStream::connect(path)?;
+        let stream = mio::net::UnixStream::connect(path)?;
         let stream = UnixStream::new(stream)?;
 
         poll_fn(|cx| stream.io.poll_write_ready(cx)).await?;
@@ -48,8 +47,8 @@ impl UnixStream {
     /// The returned stream will be associated with the given event loop
     /// specified by `handle` and is ready to perform I/O.
     pub fn from_std(stream: net::UnixStream) -> io::Result<UnixStream> {
-        let stream = mio_uds::UnixStream::from_stream(stream)?;
-        let io = PollEvented::new(stream)?;
+        let stream = mio::net::UnixStream::from_std(stream);
+        let io = IoSource::new(stream)?;
 
         Ok(UnixStream { io })
     }
@@ -60,25 +59,25 @@ impl UnixStream {
     /// communicating back and forth between one another. Each socket will
     /// be associated with the default event loop's handle.
     pub fn pair() -> io::Result<(UnixStream, UnixStream)> {
-        let (a, b) = mio_uds::UnixStream::pair()?;
+        let (a, b) = mio::net::UnixStream::pair()?;
         let a = UnixStream::new(a)?;
         let b = UnixStream::new(b)?;
 
         Ok((a, b))
     }
 
-    pub(crate) fn new(stream: mio_uds::UnixStream) -> io::Result<UnixStream> {
-        let io = PollEvented::new(stream)?;
+    pub(crate) fn new(stream: mio::net::UnixStream) -> io::Result<UnixStream> {
+        let io = IoSource::new(stream)?;
         Ok(UnixStream { io })
     }
 
     /// Returns the socket address of the local half of this connection.
-    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+    pub fn local_addr(&self) -> io::Result<mio::unix::SocketAddr> {
         self.io.get_ref().local_addr()
     }
 
     /// Returns the socket address of the remote half of this connection.
-    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
+    pub fn peer_addr(&self) -> io::Result<mio::unix::SocketAddr> {
         self.io.get_ref().peer_addr()
     }
 
@@ -111,15 +110,15 @@ impl UnixStream {
     }
 }
 
-impl TryFrom<UnixStream> for mio_uds::UnixStream {
+impl TryFrom<UnixStream> for mio::net::UnixStream {
     type Error = io::Error;
 
     /// Consumes value, returning the mio I/O object.
     ///
-    /// See [`PollEvented::into_inner`] for more details about
+    /// See [`IoSource::into_inner`] for more details about
     /// resource deregistration that happens during the call.
     ///
-    /// [`PollEvented::into_inner`]: crate::util::PollEvented::into_inner
+    /// [`IoSource::into_inner`]: crate::util::PollEvented::into_inner
     fn try_from(value: UnixStream) -> Result<Self, Self::Error> {
         value.io.into_inner()
     }
@@ -202,11 +201,11 @@ impl UnixStream {
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
-        ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
+        ready!(self.io.poll_read_ready(cx))?;
 
         match self.io.get_ref().read(buf) {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(cx, mio::Ready::readable())?;
+                self.io.clear_read_ready(cx)?;
                 Poll::Pending
             }
             x => Poll::Ready(x),
@@ -218,48 +217,48 @@ impl UnixStream {
         cx: &mut Context<'_>,
         buf: &mut B,
     ) -> Poll<io::Result<usize>> {
-        ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
+        ready!(self.io.poll_read_ready(cx))?;
 
         let r = unsafe {
             // The `IoVec` type can't have a 0-length size, so we create a bunch
             // of dummy versions on the stack with 1 length which we'll quickly
             // overwrite.
-            let b1: &mut [u8] = &mut [0];
-            let b2: &mut [u8] = &mut [0];
-            let b3: &mut [u8] = &mut [0];
-            let b4: &mut [u8] = &mut [0];
-            let b5: &mut [u8] = &mut [0];
-            let b6: &mut [u8] = &mut [0];
-            let b7: &mut [u8] = &mut [0];
-            let b8: &mut [u8] = &mut [0];
-            let b9: &mut [u8] = &mut [0];
-            let b10: &mut [u8] = &mut [0];
-            let b11: &mut [u8] = &mut [0];
-            let b12: &mut [u8] = &mut [0];
-            let b13: &mut [u8] = &mut [0];
-            let b14: &mut [u8] = &mut [0];
-            let b15: &mut [u8] = &mut [0];
-            let b16: &mut [u8] = &mut [0];
-            let mut bufs: [&mut IoVec; 16] = [
-                b1.into(),
-                b2.into(),
-                b3.into(),
-                b4.into(),
-                b5.into(),
-                b6.into(),
-                b7.into(),
-                b8.into(),
-                b9.into(),
-                b10.into(),
-                b11.into(),
-                b12.into(),
-                b13.into(),
-                b14.into(),
-                b15.into(),
-                b16.into(),
-            ];
-            let n = buf.bytes_vec_mut(&mut bufs);
-            self.io.get_ref().read_bufs(&mut bufs[..n])
+            // let b1: &mut [u8] = &mut [0];
+            // let b2: &mut [u8] = &mut [0];
+            // let b3: &mut [u8] = &mut [0];
+            // let b4: &mut [u8] = &mut [0];
+            // let b5: &mut [u8] = &mut [0];
+            // let b6: &mut [u8] = &mut [0];
+            // let b7: &mut [u8] = &mut [0];
+            // let b8: &mut [u8] = &mut [0];
+            // let b9: &mut [u8] = &mut [0];
+            // let b10: &mut [u8] = &mut [0];
+            // let b11: &mut [u8] = &mut [0];
+            // let b12: &mut [u8] = &mut [0];
+            // let b13: &mut [u8] = &mut [0];
+            // let b14: &mut [u8] = &mut [0];
+            // let b15: &mut [u8] = &mut [0];
+            // let b16: &mut [u8] = &mut [0];
+            // let mut bufs: [&mut IoVec; 16] = [
+            //     b1.into(),
+            //     b2.into(),
+            //     b3.into(),
+            //     b4.into(),
+            //     b5.into(),
+            //     b6.into(),
+            //     b7.into(),
+            //     b8.into(),
+            //     b9.into(),
+            //     b10.into(),
+            //     b11.into(),
+            //     b12.into(),
+            //     b13.into(),
+            //     b14.into(),
+            //     b15.into(),
+            //     b16.into(),
+            // ];
+            // let n = buf.bytes_vec_mut(&mut bufs);
+            self.io.get_ref().read(buf.bytes_mut())
         };
 
         match r {
@@ -270,7 +269,7 @@ impl UnixStream {
                 Poll::Ready(Ok(n))
             }
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(cx, mio::Ready::readable())?;
+                self.io.clear_read_ready(cx)?;
                 Poll::Pending
             }
             Err(e) => Poll::Ready(Err(e)),
@@ -304,11 +303,11 @@ impl UnixStream {
             // The `IoVec` type can't have a zero-length size, so create a dummy
             // version from a 1-length slice which we'll overwrite with the
             // `bytes_vec` method.
-            static DUMMY: &[u8] = &[0];
-            let iovec = <&IoVec>::from(DUMMY);
-            let mut bufs = [iovec; 64];
-            let n = buf.bytes_vec(&mut bufs);
-            self.io.get_ref().write_bufs(&bufs[..n])
+            // static DUMMY: &[u8] = &[0];
+            // let iovec = <&IoVec>::from(DUMMY);
+            // let mut bufs = [iovec; 64];
+            // let n = buf.bytes_vec(&mut bufs);
+            self.io.get_ref().write(buf.bytes())
         };
         match r {
             Ok(n) => {

@@ -1,4 +1,4 @@
 //! Utilities for implementing networking types.
 
-mod poll_evented;
-pub use self::poll_evented::PollEvented;
+mod io_source;
+pub use self::io_source::IoSource;

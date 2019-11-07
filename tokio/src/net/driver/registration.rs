@@ -1,7 +1,7 @@
-use super::platform;
 use super::reactor::{Direction, Handle};
+use super::Readiness;
 
-use mio::{self, Evented};
+use mio;
 use std::task::{Context, Poll};
 use std::{io, usize};
 
@@ -52,7 +52,7 @@ impl Registration {
     /// - `Err` if an error was encountered during registration
     pub fn new<T>(io: &T) -> io::Result<Self>
     where
-        T: Evented,
+        T: mio::event::Source,
     {
         let handle = Handle::current();
         let token = if let Some(inner) = handle.inner() {
@@ -84,7 +84,7 @@ impl Registration {
     /// `Err` is returned if an error is encountered.
     pub fn deregister<T>(&mut self, io: &T) -> io::Result<()>
     where
-        T: Evented,
+        T: mio::event::Source,
     {
         let inner = match self.handle.inner() {
             Some(inner) => inner,
@@ -125,7 +125,7 @@ impl Registration {
     /// # Panics
     ///
     /// This function will panic if called from outside of a task context.
-    pub fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<mio::Ready>> {
+    pub fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Readiness>> {
         let v = self.poll_ready(Direction::Read, Some(cx))?;
         match v {
             Some(v) => Poll::Ready(Ok(v)),
@@ -140,7 +140,7 @@ impl Registration {
     /// it is safe to call this function from outside of a task context.
     ///
     /// [`poll_read_ready`]: #method.poll_read_ready
-    pub fn take_read_ready(&self) -> io::Result<Option<mio::Ready>> {
+    pub fn take_read_ready(&self) -> io::Result<Option<Readiness>> {
         self.poll_ready(Direction::Read, None)
     }
 
@@ -176,7 +176,7 @@ impl Registration {
     /// # Panics
     ///
     /// This function will panic if called from outside of a task context.
-    pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<mio::Ready>> {
+    pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Readiness>> {
         let v = self.poll_ready(Direction::Write, Some(cx))?;
         match v {
             Some(v) => Poll::Ready(Ok(v)),
@@ -191,7 +191,7 @@ impl Registration {
     /// it is safe to call this function from outside of a task context.
     ///
     /// [`poll_write_ready`]: #method.poll_write_ready
-    pub fn take_write_ready(&self) -> io::Result<Option<mio::Ready>> {
+    pub fn take_write_ready(&self) -> io::Result<Option<Readiness>> {
         self.poll_ready(Direction::Write, None)
     }
 
@@ -203,7 +203,7 @@ impl Registration {
         &self,
         direction: Direction,
         cx: Option<&mut Context<'_>>,
-    ) -> io::Result<Option<mio::Ready>> {
+    ) -> io::Result<Option<Readiness>> {
         let inner = match self.handle.inner() {
             Some(inner) => inner,
             None => return Err(io::Error::new(io::ErrorKind::Other, "reactor gone")),
@@ -216,7 +216,9 @@ impl Registration {
         }
 
         let mask = direction.mask();
-        let mask_no_hup = (mask - platform::hup()).as_usize();
+        let mask_no_closed =
+            (mask - (Readiness::read_closed() - Readiness::write_closed())).as_usize();
+        // let mask_no_hup = (mask - platform::hup()).as_usize();
 
         let sched = inner.io_dispatch.get(self.token).unwrap();
 
@@ -226,12 +228,14 @@ impl Registration {
         // observe this state.
         //
         // If HUP were to be cleared when `direction` is `Read`, then when
-        // `poll_ready` is called again with a _`direction` of `Write`, the HUP
+        // `poll_ready` is called again with a `direction` of `Write`, the HUP
         // state would not be visible.
         let curr_ready = sched
-            .set_readiness(self.token, |curr| curr & (!mask_no_hup))
+            // .set_readiness(self.token, |curr| curr & (!mask_no_hup))
+            .set_readiness(self.token, |curr| curr & (!mask_no_closed))
             .unwrap_or_else(|_| panic!("token {} no longer valid!", self.token));
-        let mut ready = mask & mio::Ready::from_usize(curr_ready);
+        // let mut ready = mask & mio::Ready::from_usize(curr_ready);
+        let mut ready = mask & Readiness::from_usize(curr_ready);
 
         if ready.is_empty() {
             if let Some(cx) = cx {
@@ -243,9 +247,11 @@ impl Registration {
 
                 // Try again
                 let curr_ready = sched
-                    .set_readiness(self.token, |curr| curr & (!mask_no_hup))
+                    // .set_readiness(self.token, |curr| curr & (!mask_no_hup))
+                    .set_readiness(self.token, |curr| curr & (!mask_no_closed))
                     .unwrap_or_else(|_| panic!("token {} no longer valid!", self.token));
-                ready = mask & mio::Ready::from_usize(curr_ready);
+                // ready = mask & mio::Ready::from_usize(curr_ready);
+                ready = mask & Readiness::from_usize(curr_ready);
             }
         }
 

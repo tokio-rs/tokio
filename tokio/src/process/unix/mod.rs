@@ -27,14 +27,14 @@ use orphan::{OrphanQueue, OrphanQueueImpl, Wait};
 mod reap;
 use reap::Reaper;
 
-use crate::net::util::PollEvented;
+use crate::net::util::IoSource;
 use crate::process::kill::Kill;
 use crate::process::SpawnedChild;
 use crate::signal::unix::{signal, Signal, SignalKind};
 
-use mio::event::Evented;
-use mio::unix::{EventedFd, UnixReady};
-use mio::{Poll as MioPoll, PollOpt, Ready, Token};
+use mio::event::Source;
+use mio::unix::SourceFd;
+use mio::{Interests, Registry, Token};
 use std::fmt;
 use std::future::Future;
 use std::io;
@@ -169,40 +169,30 @@ where
     }
 }
 
-impl<T> Evented for Fd<T>
+impl<T> Source for Fd<T>
 where
     T: AsRawFd,
 {
-    fn register(
-        &self,
-        poll: &MioPoll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).register(poll, token, interest | UnixReady::hup(), opts)
+    // fn register(&self, poll: &MioPoll, token: Token, interest: Interests) -> io::Result<()> {
+    fn register(&self, registry: &Registry, token: Token, interest: Interests) -> io::Result<()> {
+        // SourceFd(&self.as_raw_fd()).register(poll, token, interest | UnixReady::hup(), opts)
+        SourceFd(&self.as_raw_fd()).register(registry, token, interest)
     }
 
-    fn reregister(
-        &self,
-        poll: &MioPoll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
-    ) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).reregister(poll, token, interest | UnixReady::hup(), opts)
+    fn reregister(&self, registry: &Registry, token: Token, interest: Interests) -> io::Result<()> {
+        SourceFd(&self.as_raw_fd()).reregister(registry, token, interest)
     }
 
-    fn deregister(&self, poll: &MioPoll) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).deregister(poll)
+    fn deregister(&self, registry: &Registry) -> io::Result<()> {
+        SourceFd(&self.as_raw_fd()).deregister(registry)
     }
 }
 
-pub(crate) type ChildStdin = PollEvented<Fd<std::process::ChildStdin>>;
-pub(crate) type ChildStdout = PollEvented<Fd<std::process::ChildStdout>>;
-pub(crate) type ChildStderr = PollEvented<Fd<std::process::ChildStderr>>;
+pub(crate) type ChildStdin = IoSource<Fd<std::process::ChildStdin>>;
+pub(crate) type ChildStdout = IoSource<Fd<std::process::ChildStdout>>;
+pub(crate) type ChildStderr = IoSource<Fd<std::process::ChildStderr>>;
 
-fn stdio<T>(option: Option<T>) -> io::Result<Option<PollEvented<Fd<T>>>>
+fn stdio<T>(option: Option<T>) -> io::Result<Option<IoSource<Fd<T>>>>
 where
     T: AsRawFd,
 {
@@ -223,5 +213,5 @@ where
             return Err(io::Error::last_os_error());
         }
     }
-    Ok(Some(PollEvented::new(Fd { inner: io })?))
+    Ok(Some(IoSource::new(Fd { inner: io })?))
 }
