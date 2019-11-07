@@ -29,13 +29,11 @@ pub struct Reactor {
     /// Reuse the `mio::Events` value across calls to poll.
     events: mio::Events,
 
-    /// TODO
+    /// The underlying system event queue.
     poll: mio::Poll,
 
     /// State shared between the reactor and the handles.
     inner: Arc<Inner>,
-    // Is this still needed?
-    // _wakeup_registration: mio::Registry,
 }
 
 /// A reference to a reactor.
@@ -58,7 +56,7 @@ pub struct Turn {
 }
 
 pub(super) struct Inner {
-    /// The underlying system event queue.
+    /// TODO
     registry: mio::Registry,
 
     /// Dispatch slabs for I/O and futures events
@@ -70,9 +68,7 @@ pub(super) struct Inner {
     n_sources: AtomicUsize,
 
     /// Used to wake up the reactor from a call to `turn`
-    ///
-    /// TODO: Rename to waker?
-    wakeup: mio::Waker,
+    waker: mio::Waker,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
@@ -135,18 +131,8 @@ impl Reactor {
     /// creation.
     pub fn new() -> io::Result<Reactor> {
         let poll = mio::Poll::new()?;
-        // let wakeup_pair = mio::Registration::new2();
         let waker = mio::Waker::new(poll.registry(), TOKEN_WAKEUP)?;
-
-        // io.register(
-        //     &wakeup_pair.0,
-        //     TOKEN_WAKEUP,
-        //     mio::Ready::readable(),
-        //     mio::PollOpt::level(),
-        // )?;
-
         let registry = poll.registry().try_clone()?;
-
         Ok(Reactor {
             events: mio::Events::with_capacity(1024),
             poll,
@@ -154,7 +140,7 @@ impl Reactor {
                 registry,
                 io_dispatch: SingleShard::new(),
                 n_sources: AtomicUsize::new(0),
-                wakeup: waker,
+                waker,
             }),
         })
     }
@@ -221,15 +207,7 @@ impl Reactor {
         // Process all the events that came in, dispatching appropriately
         for event in self.events.iter() {
             let token = event.token();
-
-            // if token == TOKEN_WAKEUP {
-            //     self.inner
-            //         .wakeup
-            //         .set_readiness(mio::Ready::empty())
-            //         .unwrap();
-            // } else {
-            //     self.dispatch(token, event.readiness());
-            // }
+            // TODO
             if token != TOKEN_WAKEUP {
                 self.dispatch(token, event);
             }
@@ -270,12 +248,10 @@ impl Reactor {
             return;
         }
 
-        // if ready.is_writable() || platform::is_hup(ready) {
         if readiness.is_writable() || readiness.is_write_closed() {
             wr = io.writer.take_waker();
         }
 
-        // if !(ready & (!mio::Ready::writable())).is_empty() {
         if readiness.is_readable() || readiness.is_read_closed() {
             rd = io.reader.take_waker();
         }
@@ -348,8 +324,7 @@ impl Handle {
     /// return immediately.
     fn wakeup(&self) {
         if let Some(inner) = self.inner() {
-            // inner.wakeup.set_readiness(mio::Ready::readable()).unwrap();
-            inner.wakeup.wake().expect("failed to wake reactor")
+            inner.waker.wake().expect("failed to wake reactor")
         }
     }
 
@@ -384,18 +359,11 @@ impl Inner {
             )
         })?;
         self.n_sources.fetch_add(1, SeqCst);
-        // self.io.register(
-        //     source,
-        //     mio::Token(token),
-        //     mio::Ready::all(),
-        //     mio::PollOpt::edge(),
-        // )?;
         self.registry.register(
             source,
             mio::Token(token),
             mio::Interests::READABLE | mio::Interests::WRITABLE,
         )?;
-
         Ok(token)
     }
 
@@ -420,9 +388,7 @@ impl Inner {
             .unwrap_or_else(|| panic!("token {} no longer valid!", token));
 
         let (waker, readiness) = match dir {
-            // Direction::Read => (&sched.reader, !mio::Ready::writable()),
             Direction::Read => (&sched.reader, Readiness::readable()),
-            // Direction::Write => (&sched.writer, mio::Ready::writable()),
             Direction::Write => (&sched.writer, Readiness::writable()),
         };
 
@@ -448,11 +414,7 @@ impl Drop for Inner {
 impl Direction {
     pub(super) fn mask(self) -> Readiness {
         match self {
-            Direction::Read => {
-                // Everything except writable is signaled through read.
-                // mio::Ready::all() - mio::Ready::writable()
-                Readiness::readable()
-            }
+            Direction::Read => Readiness::readable(),
             Direction::Write => Readiness::writable(),
         }
     }

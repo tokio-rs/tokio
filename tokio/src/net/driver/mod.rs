@@ -133,7 +133,6 @@ macro_rules! loom_thread_local {
 macro_rules! loom_thread_local {
     ($($tts:tt)+) => { std::thread_local!{ $($tts)+ } }
 }
-pub(crate) mod platform;
 mod reactor;
 mod registration;
 
