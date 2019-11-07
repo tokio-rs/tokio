@@ -52,7 +52,7 @@ fn default_blocking(f: &mut dyn FnMut()) -> Poll<(), BlockingError> {
 }
 
 impl BlockingError {
-    #[doc(hidden)]
+    /// Returns a new `BlockingError`.
     pub fn new() -> Self {
         Self { _p: () }
     }
