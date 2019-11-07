@@ -126,6 +126,67 @@ mod util;
 #[cfg(feature = "local")]
 pub mod local {
     //! Runs `!Send` futures on the current thread.
+    //!
+    //! In some cases, it is necessary to run one or more futures that do not
+    //! implement [`Send`] and thus are unsafe to send between threads. In these
+    //! cases, a [local task group] may be used to schedule one or more `!Send`
+    //! futures to run together on the same thread.
+    //!
+    //! For example, the following code will not compile:
+    //!
+    //! ```rust,compile_fail
+    //! # use tokio::runtime::Runtime;
+    //! use std::rc::Rc;
+    //!
+    //! // `Rc` does not implement `Send`, and thus may not be sent between
+    //! // threads safely.
+    //! let unsend_data = Rc::new("my unsend data...");
+    //!
+    //! let mut rt = Runtime::new().unwrap();
+    //!
+    //! rt.block_on(async move {
+    //!     let unsend_data = unsend_data.clone();
+    //!     // Because the `async` block here moves `unsend_data`, the future is `!Send`.
+    //!     // Since `tokio::spawn` requires the spawned future to implement `Send`, this
+    //!     // will not compile.
+    //!     tokio::spawn(async move {
+    //!         println!("{}", unsend_data);
+    //!         // ...
+    //!     }).await.unwrap();
+    //! });
+    //! ```
+    //! In order to spawn `!Send` futures, we can use a local task group to
+    //! schedule them on the thread calling [`Runtime::block_on`]. When running
+    //! inside of the local task group, we can use [`local::spawn`], which can
+    //! spawn `!Send` futures. For example:
+    //!
+    //! ```rust
+    //! # use tokio::runtime::Runtime;
+    //! use std::rc::Rc;
+    //! use tokio::local;
+    //!
+    //! let unsend_data = Rc::new("my unsend data...");
+    //!
+    //! let mut rt = Runtime::new().unwrap();
+    //! // Construct a local task group that can run `!Send` futures.
+    //! let local_group = local::TaskGroup::new();
+    //!
+    //! // Run the local task group.
+    //! local_group.block_on(&mut rt, async move {
+    //!     let unsend_data = unsend_data.clone();
+    //!     // `local::spawn` ensures that the future is spawned on the local
+    //!     // task group.
+    //!     local::spawn(async move {
+    //!         println!("{}", unsend_data);
+    //!         // ...
+    //!     }).await.unwrap();
+    //! });
+    //! ```
+    //!
+    //! [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
+    //! [local task group]: struct.TaskGroup.html
+    //! [`Runtime::block_on`]: ../struct.Runtime.html#method.block_on
+    //! [`local::spawn`]: fn.spawn.html
     pub use crate::runtime::local::*;
 }
 

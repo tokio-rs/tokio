@@ -69,13 +69,13 @@ thread_local! {
 /// use std::rc::Rc;
 /// use tokio::local;
 ///
-/// let unsend_data = Rc::new("my unsync data...");
+/// let unsend_data = Rc::new("my unsend data...");
 ///
 /// let mut rt = Runtime::new().unwrap();
-/// let task_set = local::TaskGroup::new();
+/// let local_group = local::TaskGroup::new();
 ///
-/// // Run the local task set.
-/// task_set.block_on(&mut rt, async move {
+/// // Run the local task grou[].
+/// local_group.block_on(&mut rt, async move {
 ///     let unsend_data = unsend_data.clone();
 ///     local::spawn(async move {
 ///         println!("{}", unsend_data);
@@ -104,7 +104,7 @@ where
 const MAX_TASKS_PER_TICK: usize = 61;
 
 impl TaskGroup {
-    /// Returns a new local task group for the given future.
+    /// Returns a new local task group.
     pub fn new() -> Self {
         Self {
             scheduler: Rc::new(Scheduler::new()),
@@ -115,6 +115,38 @@ impl TaskGroup {
     /// Spawns a `!Send` task onto the local task group.
     ///
     /// This task is guaranteed to be run on the current thread.
+    ///
+    /// Unlike the free function [`local::spawn`], this method may be used to
+    /// spawn local tasks when the task group is _not_ running. For example:
+    /// ```rust
+    /// # use tokio::runtime::Runtime;
+    /// use tokio::local;
+    ///
+    /// let mut rt = Runtime::new().unwrap();
+    /// let local_group = local::TaskGroup::new();
+    ///
+    /// // Spawn a future on the local group. This future will be run when
+    /// // we call `block_on` to drive the task group.
+    /// local_group.spawn(async {
+    ///    // ...
+    /// });
+    ///
+    /// // Run the local task group.
+    /// local_group.block_on(&mut rt, async move {
+    ///     // ...
+    /// });
+    ///
+    /// // When `block_on` finishes, we can spawn _more_ futures, which will
+    /// // run in subsequent calls to `block_on`.
+    /// local_group.spawn(async {
+    ///    // ...
+    /// });
+    ///
+    /// local_group.block_on(&mut rt, async move {
+    ///     // ...
+    /// });
+    /// ```
+    /// [`local::spawn`]: fn.spawn.html
     pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + 'static,
@@ -131,7 +163,7 @@ impl TaskGroup {
     /// This runs the given future on the runtime, blocking until it is
     /// complete, and yielding its resolved result. Any tasks or timers which
     /// the future spawns internally will be executed on the runtime. The future
-    /// may also call [`spawn`] to spawn additional local futures on the
+    /// may also call [`local::spawn`] to spawn additional local futures on the
     /// current thread.
     ///
     /// This method should not be called from an asynchronous context.
@@ -150,8 +182,8 @@ impl TaskGroup {
     ///
     /// For example, this will panic:
     /// ```should_panic
-    /// use tokio::{blocking, local};
-    /// use tokio::runtime::Runtime;
+    /// use tokio::runtime::{blocking, Runtime};
+    /// use tokio::local;
     ///
     /// let mut rt = Runtime::new().unwrap();
     /// let local = local::TaskGroup::new();
@@ -167,8 +199,8 @@ impl TaskGroup {
     /// ```
     /// This, however, will not panic:
     /// ```
-    /// use tokio::{blocking, local};
-    /// use tokio::runtime::Runtime;
+    /// use tokio::runtime::{blocking, Runtime};
+    /// use tokio::local;
     ///
     /// let mut rt = Runtime::new().unwrap();
     /// let local = local::TaskGroup::new();
@@ -183,7 +215,7 @@ impl TaskGroup {
     /// })
     /// ```
     ///
-    /// [`spawn`]: fn.spawn.html
+    /// [`local::spawn`]: fn.spawn.html
     /// [`Runtime::block_on`]: ../struct.Runtime.html#method.block_on
     /// [in-place blocking]: ../blocking/fn.in_place.html
     /// [`blocking::run`]: ../blocking/fn.run.html
