@@ -4,18 +4,16 @@ use std::{marker::Unpin, pin::Pin};
 
 use tokio::sync::oneshot;
 
-use criterion_bencher_compat as test;
+use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion};
+use futures::{executor::block_on, future, task, task::Poll, Future};
 
-use futures::{executor::block_on, future, task, Future, Poll};
-use test::Bencher;
-
-fn new(b: &mut Bencher<'_, '_>) {
+fn new(b: &mut Bencher<'_>) {
     b.iter(|| {
-        let _ = test::black_box(&oneshot::channel::<i32>());
+        let _ = black_box(&oneshot::channel::<i32>());
     })
 }
 
-fn same_thread_send_recv(b: &mut Bencher<'_, '_>) {
+fn same_thread_send_recv(b: &mut Bencher<'_>) {
     block_on(future::lazy(|cx| {
         b.iter(|| {
             let (tx, mut rx) = oneshot::channel();
@@ -30,7 +28,7 @@ fn same_thread_send_recv(b: &mut Bencher<'_, '_>) {
     }));
 }
 
-fn same_thread_recv_multi_send_recv(b: &mut Bencher<'_, '_>) {
+fn same_thread_recv_multi_send_recv(b: &mut Bencher<'_>) {
     b.iter(|| {
         let (tx, mut rx) = oneshot::channel();
         let mut rx = Pin::new(&mut rx);
@@ -47,7 +45,7 @@ fn same_thread_recv_multi_send_recv(b: &mut Bencher<'_, '_>) {
     });
 }
 
-fn multi_thread_send_recv(b: &mut Bencher<'_, '_>) {
+fn multi_thread_send_recv(b: &mut Bencher<'_>) {
     const MAX: usize = 10_000_000;
 
     use std::thread;
@@ -108,11 +106,15 @@ fn multi_thread_send_recv(b: &mut Bencher<'_, '_>) {
     }))
 }
 
-criterion_bencher_compat::benchmark_group!(
-    oneshot,
-    new,
-    same_thread_recv_multi_send_recv,
-    same_thread_send_recv,
-    multi_thread_send_recv
-);
-criterion_bencher_compat::benchmark_main!(oneshot);
+fn bench_oneshot(c: &mut Criterion) {
+    c.bench_function("new", new);
+    c.bench_function(
+        "same_thread_recv_multi_send_recv",
+        same_thread_recv_multi_send_recv,
+    );
+    c.bench_function("same_thread_send_recv", same_thread_send_recv);
+    c.bench_function("multi_thread_send_recv", multi_thread_send_recv);
+}
+
+criterion_group!(oneshot, bench_oneshot);
+criterion_main!(oneshot);

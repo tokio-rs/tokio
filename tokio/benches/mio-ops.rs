@@ -1,18 +1,13 @@
 // Measure cost of different operations
 // to get a sense of performance tradeoffs
-#![cfg(feature = "broken")]
-#![feature(test)]
 #![warn(rust_2018_idioms)]
 
-extern crate test;
-
-use test::Bencher;
+use criterion::{criterion_group, criterion_main, Bencher, Criterion};
 
 use mio::tcp::TcpListener;
 use mio::{PollOpt, Ready, Token};
 
-#[bench]
-fn mio_register_deregister(b: &mut Bencher) {
+fn mio_register_deregister(b: &mut Bencher<'_>) {
     let addr = "127.0.0.1:0".parse().unwrap();
     // Setup the server socket
     let sock = TcpListener::bind(&addr).unwrap();
@@ -27,8 +22,7 @@ fn mio_register_deregister(b: &mut Bencher) {
     });
 }
 
-#[bench]
-fn mio_reregister(b: &mut Bencher) {
+fn mio_reregister(b: &mut Bencher<'_>) {
     let addr = "127.0.0.1:0".parse().unwrap();
     // Setup the server socket
     let sock = TcpListener::bind(&addr).unwrap();
@@ -45,8 +39,7 @@ fn mio_reregister(b: &mut Bencher) {
     poll.deregister(&sock).unwrap();
 }
 
-#[bench]
-fn mio_poll(b: &mut Bencher) {
+fn mio_poll(b: &mut Bencher<'_>) {
     let poll = mio::Poll::new().unwrap();
     let timeout = std::time::Duration::new(0, 0);
     let mut events = mio::Events::with_capacity(1024);
@@ -55,3 +48,12 @@ fn mio_poll(b: &mut Bencher) {
         poll.poll(&mut events, Some(timeout)).unwrap();
     });
 }
+
+fn bench_mio_ops(c: &mut Criterion) {
+    c.bench_function("mio_register_deregister", mio_register_deregister);
+    c.bench_function("mio_reregister", mio_reregister);
+    c.bench_function("mio_poll", mio_poll);
+}
+
+criterion_group!(mio_ops, bench_mio_ops);
+criterion_main!(mio_ops);

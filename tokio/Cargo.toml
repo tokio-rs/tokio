@@ -122,15 +122,36 @@ optional = true
 
 [dev-dependencies]
 tokio-test = { version = "0.2.0" }
-criterion_bencher_compat = "0.3"
+criterion = "0.3"
 futures = { version = "0.3.0", features = ["async-await"] }
 loom = { version = "0.2.13", features = ["futures", "checkpoint"] }
 proptest = "0.9.4"
 tempfile = "3.1.0"
 
 [[bench]]
+name = "latency"
+harness = false
+
+[[bench]]
+name = "mio-ops"
+harness = false
+
+[[bench]]
+name = "mpsc"
+harness = false
+
+[[bench]]
 name = "oneshot"
 harness = false
+
+[[bench]]
+name = "tcp"
+harness = false
+
+# Currently broken
+# [[bench]]
+# name = "thread_pool"
+# harness = false
 
 [package.metadata.docs.rs]
 all-features = true

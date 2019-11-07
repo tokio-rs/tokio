@@ -1,6 +1,4 @@
-#![feature(test)]
-
-extern crate test;
+#![cfg(feature = "broken")]
 
 use tokio::executor::thread_pool::{Builder, Spawner};
 use tokio::sync::oneshot;
@@ -11,6 +9,8 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::{mpsc, Arc};
 use std::task::{Context, Poll};
+
+use criterion::{criterion_group, criterion_main, Bencher, Criterion};
 
 struct Backoff(usize);
 
@@ -30,8 +30,7 @@ impl Future for Backoff {
 
 const NUM_THREADS: usize = 6;
 
-#[bench]
-fn spawn_many(b: &mut test::Bencher) {
+fn spawn_many(b: &mut Bencher) {
     const NUM_SPAWN: usize = 10_000;
 
     let threadpool = Builder::new().num_threads(NUM_THREADS).build();
@@ -57,8 +56,7 @@ fn spawn_many(b: &mut test::Bencher) {
     });
 }
 
-#[bench]
-fn yield_many(b: &mut test::Bencher) {
+fn yield_many(b: &mut Bencher) {
     const NUM_YIELD: usize = 1_000;
     const TASKS_PER_CPU: usize = 50;
 
@@ -84,8 +82,7 @@ fn yield_many(b: &mut test::Bencher) {
     });
 }
 
-#[bench]
-fn ping_pong(b: &mut test::Bencher) {
+fn ping_pong(b: &mut Bencher) {
     const NUM_PINGS: usize = 1_000;
 
     let threadpool = Builder::new().num_threads(NUM_THREADS).build();
@@ -130,8 +127,7 @@ fn ping_pong(b: &mut test::Bencher) {
     });
 }
 
-#[bench]
-fn chained_spawn(b: &mut test::Bencher) {
+fn chained_spawn(b: &mut Bencher) {
     const ITER: usize = 1_000;
 
     let threadpool = Builder::new().num_threads(NUM_THREADS).build();
@@ -159,3 +155,13 @@ fn chained_spawn(b: &mut test::Bencher) {
         done_rx.recv().unwrap();
     });
 }
+
+fn bench_thread_pool(c: &mut Criterion) {
+    c.bench_function("spawn_many", spawn_many);
+    c.bench_function("yield_many", yield_many);
+    c.bench_function("ping_pong", ping_pong);
+    c.bench_function("chained_spawn", chained_spawn);
+}
+
+criterion_group!(thread_pool, bench_thread_pool);
+criterion_main!(thread_pool);
