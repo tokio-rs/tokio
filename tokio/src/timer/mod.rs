@@ -30,15 +30,14 @@
 //! Wait 100ms and print "Hello World!"
 //!
 //! ```
-//! use tokio::timer::delay;
+//! use tokio::timer::delay_for;
 //!
 //! use std::time::Duration;
 //!
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!     let when = tokio::clock::now() + Duration::from_millis(100);
-//!     delay(when).await;
+//!     delay_for(Duration::from_millis(100)).await;
 //!     println!("100 ms have elapsed");
 //! }
 //! ```
