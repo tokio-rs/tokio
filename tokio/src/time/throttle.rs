@@ -1,6 +1,6 @@
 //! Slow down a stream by enforcing a delay between items.
 
-use crate::timer::{clock, Delay};
+use crate::time::{clock, Delay};
 
 use futures_core::ready;
 use futures_core::Stream;

@@ -38,7 +38,7 @@ rt_test! {
     use tokio::prelude::*;
     use tokio::runtime::Runtime;
     use tokio::sync::oneshot;
-    use tokio::timer;
+    use tokio::time;
     use tokio_test::{assert_err, assert_ok};
 
     use futures_util::future::poll_fn;
@@ -289,7 +289,7 @@ rt_test! {
         let dur = Duration::from_millis(50);
 
         rt.block_on(async move {
-            timer::delay_for(dur).await;
+            time::delay_for(dur).await;
         });
 
         assert!(now.elapsed() >= dur);
@@ -306,7 +306,7 @@ rt_test! {
             let (tx, rx) = oneshot::channel();
 
             tokio::spawn(async move {
-                timer::delay_for(dur).await;
+                time::delay_for(dur).await;
                 assert_ok!(tx.send(()));
             });
 

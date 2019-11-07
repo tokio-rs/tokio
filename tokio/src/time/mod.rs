@@ -21,24 +21,21 @@
 //! involving time.
 //!
 //! These types must be used from within the context of the
-//! [`Runtime`][runtime] or a timer context must be setup explicitly. See the
-//! [`tokio-timer`][tokio-timer] crate for more details on how to setup a timer
-//! context.
+//! [`Runtime`][runtime].
 //!
 //! # Examples
 //!
 //! Wait 100ms and print "Hello World!"
 //!
 //! ```
-//! use tokio::timer::delay;
+//! use tokio::time::delay_for;
 //!
 //! use std::time::Duration;
 //!
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!     let when = tokio::clock::now() + Duration::from_millis(100);
-//!     delay(when).await;
+//!     delay_for(Duration::from_millis(100)).await;
 //!     println!("100 ms have elapsed");
 //! }
 //! ```
@@ -67,7 +64,6 @@
 //! ```
 //!
 //! [runtime]: ../runtime/struct.Runtime.html
-//! [tokio-timer]: https://docs.rs/tokio-timer
 //! [ext]: ../util/trait.FutureExt.html#method.timeout
 //! [Timeout]: struct.Timeout.html
 //! [Delay]: struct.Delay.html
@@ -83,7 +79,6 @@ pub use self::delay_queue::DelayQueue;
 pub mod throttle;
 
 // TODO: clean this up
-#[allow(clippy::module_inception)]
 pub mod timer;
 pub use timer::{set_default, Timer};
 
@@ -113,7 +108,7 @@ pub fn delay(deadline: Instant) -> Delay {
 
 /// Create a Future that completes in `duration` from now.
 ///
-/// Equivalent to `delay(tokio::timer::clock::now() + duration)`. Analogous to `std::thread::sleep`.
+/// Equivalent to `delay(tokio::time::clock::now() + duration)`. Analogous to `std::thread::sleep`.
 pub fn delay_for(duration: Duration) -> Delay {
     delay(clock::now() + duration)
 }

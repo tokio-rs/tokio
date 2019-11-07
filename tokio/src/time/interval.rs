@@ -1,4 +1,4 @@
-use crate::timer::{clock, Delay};
+use crate::time::{clock, Delay};
 
 use futures_core::ready;
 use futures_util::future::poll_fn;
@@ -39,7 +39,7 @@ impl Interval {
 
     /// Creates new `Interval` that yields with interval of `duration`.
     ///
-    /// The function is shortcut for `Interval::new(tokio::timer::clock::now() + duration, duration)`.
+    /// The function is shortcut for `Interval::new(tokio::time::clock::now() + duration, duration)`.
     ///
     /// The `duration` argument must be a non-zero duration.
     ///
@@ -76,7 +76,7 @@ impl Interval {
     /// # Examples
     ///
     /// ```
-    /// use tokio::timer::Interval;
+    /// use tokio::time::Interval;
     ///
     /// use std::time::Duration;
     ///

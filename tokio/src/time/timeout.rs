@@ -4,8 +4,8 @@
 //!
 //! [`Timeout`]: struct.Timeout.html
 
-use crate::timer::clock::now;
-use crate::timer::Delay;
+use crate::time::clock::now;
+use crate::time::Delay;
 
 use futures_core::ready;
 use std::fmt;
@@ -95,7 +95,7 @@ impl<T> Timeout<T> {
     /// Create a new `Timeout` set to expire in 10 milliseconds.
     ///
     /// ```rust
-    /// use tokio::timer::Timeout;
+    /// use tokio::time::Timeout;
     /// use tokio::sync::oneshot;
     ///
     /// use std::time::Duration;

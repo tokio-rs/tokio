@@ -17,12 +17,6 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
-#[cfg(feature = "rt-full")]
-mod builder;
-
-#[cfg(feature = "rt-full")]
-pub(crate) use builder::Builder;
-
 #[derive(Clone, Copy)]
 enum State {
     Empty,
@@ -69,10 +63,21 @@ where
 }
 
 pub(crate) struct Pool {
+    /// State shared between worker threads
     shared: Mutex<Shared>,
+
+    /// Pool threads wait on this.
     condvar: Condvar,
-    new_thread: Box<dyn Fn() -> thread::Builder + Send + Sync + 'static>,
+
+    /// Spawned threads use this name
+    thread_name: String,
+
+    /// Spawned thread stack size
+    stack_size: Option<usize>,
 }
+
+#[derive(Debug)]
+pub(crate) struct PoolWaiter(Arc<Pool>);
 
 impl fmt::Debug for Pool {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -99,6 +104,21 @@ pub struct Blocking<T> {
 }
 
 impl Pool {
+    pub(crate) fn new(thread_name: String, stack_size: Option<usize>) -> Arc<Pool> {
+        Arc::new(Pool {
+            shared: Mutex::new(Shared {
+                queue: VecDeque::new(),
+                num_th: 0,
+                num_idle: 0,
+                num_notify: 0,
+                shutdown: false,
+            }),
+            condvar: Condvar::new(),
+            thread_name,
+            stack_size,
+        })
+    }
+
     /// Run the provided function on an executor dedicated to blocking operations.
     pub(crate) fn spawn(this: &Arc<Self>, f: Box<dyn FnOnce() + Send + 'static>) {
         let should_spawn = {
@@ -135,12 +155,18 @@ impl Pool {
         };
 
         if should_spawn {
-            Pool::spawn_thread(Arc::clone(this), (this.new_thread)());
+            Pool::spawn_thread(Arc::clone(this));
         }
     }
 
     // NOTE: we cannot use self here w/o arbitrary_self_types since Arc is loom::Arc
-    fn spawn_thread(this: Arc<Self>, builder: thread::Builder) {
+    fn spawn_thread(this: Arc<Self>) {
+        let mut builder = thread::Builder::new().name(this.thread_name.clone());
+
+        if let Some(stack_size) = this.stack_size {
+            builder = builder.stack_size(stack_size);
+        }
+
         builder
             .spawn(move || {
                 let mut shared = this.shared.lock().unwrap();
@@ -220,9 +246,6 @@ impl Pool {
         }
     }
 }
-
-#[derive(Debug)]
-pub(crate) struct PoolWaiter(Arc<Pool>);
 
 impl From<Pool> for PoolWaiter {
     fn from(p: Pool) -> Self {
@@ -340,22 +363,4 @@ fn run_task(f: Box<dyn FnOnce() + Send>) {
     use std::panic::{catch_unwind, AssertUnwindSafe};
 
     let _ = catch_unwind(AssertUnwindSafe(|| f()));
-}
-
-impl Default for Pool {
-    fn default() -> Self {
-        Pool {
-            shared: Mutex::new(Shared {
-                queue: VecDeque::new(),
-                num_th: 0,
-                num_idle: 0,
-                num_notify: 0,
-                shutdown: false,
-            }),
-            condvar: Condvar::new(),
-            new_thread: Box::new(|| {
-                thread::Builder::new().name("tokio-blocking-driver".to_string())
-            }),
-        }
-    }
 }

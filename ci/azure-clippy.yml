@@ -12,5 +12,5 @@ jobs:
         cargo clippy --version
       displayName: Install clippy
     - script: |
-        cargo clippy --all --all-features -- -A clippy::mutex-atomic -A clippy::needless-doctest-main
+        cargo clippy --all --all-features -- -A clippy::mutex-atomic
       displayName: cargo clippy --all

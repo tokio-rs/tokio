@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::sync::mpsc;
-use tokio::timer::throttle::Throttle;
+use tokio::time::throttle::Throttle;
 use tokio_test::task;
 use tokio_test::{assert_pending, assert_ready_eq, clock};
 

@@ -1,6 +1,6 @@
 #![warn(rust_2018_idioms)]
 
-use tokio::timer::delay;
+use tokio::time::delay;
 use tokio_test::block_on;
 
 use std::time::{Duration, Instant};

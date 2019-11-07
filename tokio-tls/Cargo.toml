@@ -33,7 +33,7 @@ tokio = { version = "=0.2.0-alpha.6", path = "../tokio" }
 
 cfg-if = "0.1"
 env_logger = { version = "0.6", default-features = false }
-futures-preview = { version = "=0.3.0-alpha.19", features = ["async-await"] }
+futures = { version = "0.3.0", features = ["async-await"] }
 
 [target.'cfg(all(not(target_os = "macos"), not(windows), not(target_os = "ios")))'.dev-dependencies]
 openssl = "0.10"

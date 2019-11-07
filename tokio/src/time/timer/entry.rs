@@ -1,7 +1,7 @@
 use crate::sync::AtomicWaker;
-use crate::timer::atomic::AtomicU64;
-use crate::timer::timer::{HandlePriv, Inner};
-use crate::timer::Error;
+use crate::time::atomic::AtomicU64;
+use crate::time::timer::{HandlePriv, Inner};
+use crate::time::Error;
 
 use std::cell::UnsafeCell;
 use std::ptr;

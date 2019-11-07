@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::prelude::*;
-use tokio::timer::*;
+use tokio::time::*;
 
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
@@ -35,7 +35,7 @@ fn timer_with_current_thread_runtime() {
     rt.block_on(async move {
         let when = Instant::now() + Duration::from_millis(100);
 
-        tokio::timer::delay(when).await;
+        tokio::time::delay(when).await;
         assert!(Instant::now() >= when);
 
         tx.send(()).unwrap();

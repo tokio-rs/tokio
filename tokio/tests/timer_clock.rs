@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 
-use tokio::timer::clock;
-use tokio::timer::clock::*;
+use tokio::time::clock;
+use tokio::time::clock::*;
 
 use std::time::Instant;
 
