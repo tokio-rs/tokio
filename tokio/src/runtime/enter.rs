@@ -1,5 +1,4 @@
 use std::cell::{Cell, RefCell};
-use std::error::Error;
 use std::fmt;
 use std::future::Future;
 use std::marker::PhantomData;
@@ -13,50 +12,30 @@ pub(crate) struct Enter {
     _p: PhantomData<RefCell<()>>,
 }
 
-/// An error returned by `enter` if an execution scope has already been
-/// entered.
-pub(crate) struct EnterError {
-    _a: (),
-}
-
-impl fmt::Debug for EnterError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("EnterError")
-            .field("reason", &format!("{}", self))
-            .finish()
-    }
-}
-
-impl fmt::Display for EnterError {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            fmt,
-            "attempted to run an executor while another executor is already running"
-        )
-    }
-}
-
-impl Error for EnterError {}
-
 /// Marks the current thread as being within the dynamic extent of an
 /// executor.
-///
-/// Executor implementations should call this function before blocking the
-/// thread. If `None` is returned, the executor should fail by panicking or
-/// taking some other action without blocking the current thread. This prevents
-/// deadlocks due to multiple executors competing for the same thread.
-///
-/// # Error
-///
-/// Returns an error if the current thread is already marked
-pub(crate) fn enter() -> Result<Enter, EnterError> {
+pub(crate) fn enter() -> Enter {
+    if let Some(enter) = try_enter() {
+        return enter;
+    }
+
+    panic!(
+        "Cannot start a runtime from within a runtime. This happens \
+         because a function (like `block_on`) attempted to block the \
+         current thread while the thread is being used to drive \
+         asynchronous tasks."
+    );
+}
+
+/// Tries to enter a runtime context, returns `None` if already in a runtime
+/// context.
+pub(crate) fn try_enter() -> Option<Enter> {
     ENTERED.with(|c| {
         if c.get() {
-            Err(EnterError { _a: () })
+            None
         } else {
             c.set(true);
-
-            Ok(Enter { _p: PhantomData })
+            Some(Enter { _p: PhantomData })
         }
     })
 }

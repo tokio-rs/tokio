@@ -173,25 +173,28 @@ where
             if let Some(expiration) = self.levels[level].next_expiration(self.elapsed) {
                 // There cannot be any expirations at a higher level that happen
                 // before this one.
-                debug_assert!({
-                    let mut res = true;
-
-                    for l2 in (level + 1)..NUM_LEVELS {
-                        if let Some(e2) = self.levels[l2].next_expiration(self.elapsed) {
-                            if e2.deadline < expiration.deadline {
-                                res = false;
-                            }
-                        }
-                    }
-
-                    res
-                });
+                debug_assert!(self.no_expirations_before(level + 1, expiration.deadline));
 
                 return Some(expiration);
             }
         }
 
         None
+    }
+
+    /// Used for debug assertions
+    fn no_expirations_before(&self, start_level: usize, before: u64) -> bool {
+        let mut res = true;
+
+        for l2 in start_level..NUM_LEVELS {
+            if let Some(e2) = self.levels[l2].next_expiration(self.elapsed) {
+                if e2.deadline < before {
+                    res = false;
+                }
+            }
+        }
+
+        res
     }
 
     pub(crate) fn poll_expiration(

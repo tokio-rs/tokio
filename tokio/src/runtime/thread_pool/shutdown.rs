@@ -27,18 +27,15 @@ pub(super) fn channel() -> (Sender, Receiver) {
 impl Receiver {
     /// Block the current thread until all `Sender` handles drop.
     pub(crate) fn wait(&mut self) {
-        use crate::runtime::enter::enter;
+        use crate::runtime::enter::{enter, try_enter};
 
-        let mut e = match enter() {
-            Ok(e) => e,
-            Err(_) => {
-                if std::thread::panicking() {
-                    // Already panicking, avoid a double panic
-                    return;
-                } else {
-                    panic!("cannot block on shutdown from the Tokio runtime");
-                }
+        let mut e = if std::thread::panicking() {
+            match try_enter() {
+                Some(enter) => enter,
+                _ => return,
             }
+        } else {
+            enter()
         };
 
         // The oneshot completes with an Err

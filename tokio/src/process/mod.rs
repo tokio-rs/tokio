@@ -121,7 +121,7 @@ use crate::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 use crate::process::kill::Kill;
 
 use futures_core::TryFuture;
-use futures_util::try_future::try_join3;
+use futures_util::future::try_join3;
 use std::ffi::OsStr;
 use std::future::Future;
 use std::io;
@@ -479,7 +479,7 @@ impl Command {
     /// will be called and the spawn operation will immediately return with a
     /// failure.
     ///
-    /// # Notes and Safety
+    /// # Safety
     ///
     /// This closure will be run in the context of the child process after a
     /// `fork`. This primarily means that any modifications made to memory on
