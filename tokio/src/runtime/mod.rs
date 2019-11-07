@@ -137,17 +137,21 @@ mod tests;
 mod blocking;
 #[cfg(feature = "blocking")]
 pub mod blocking;
+#[cfg(feature = "blocking")]
+use crate::runtime::blocking::PoolWaiter;
 
 mod builder;
 pub use self::builder::Builder;
 
 #[cfg(feature = "rt-current-thread")]
 mod current_thread;
+#[cfg(feature = "rt-current-thread")]
+use self::current_thread::CurrentThread;
 
 #[cfg(feature = "blocking")]
 mod enter;
 #[cfg(feature = "blocking")]
-pub(crate) use self::enter::enter;
+use self::enter::enter;
 
 mod global;
 pub use self::global::spawn;
@@ -171,13 +175,8 @@ mod timer;
 
 #[cfg(feature = "rt-full")]
 pub(crate) mod thread_pool;
-
-#[cfg(feature = "blocking")]
-use crate::runtime::blocking::PoolWaiter;
-#[cfg(feature = "rt-current-thread")]
-use crate::runtime::current_thread::CurrentThread;
 #[cfg(feature = "rt-full")]
-use crate::runtime::thread_pool::ThreadPool;
+use self::thread_pool::ThreadPool;
 
 #[cfg(feature = "blocking")]
 use std::future::Future;
