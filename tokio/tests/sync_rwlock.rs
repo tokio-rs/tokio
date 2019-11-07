@@ -3,11 +3,10 @@
 use std::sync::Arc;
 
 use futures_util::future::FutureExt;
+use futures_util::stream;
 use futures_util::stream::StreamExt;
-use futures_util::try_future::TryFutureExt;
-use futures_util::{future, stream};
 
-use tokio::sync::{oneshot, RwLock};
+use tokio::sync::{Barrier, RwLock};
 use tokio_test::task::spawn;
 use tokio_test::{assert_pending, assert_ready};
 
@@ -41,44 +40,6 @@ async fn read_uncontested() {
     assert_eq!(result, 100);
 }
 
-// Attempt to acquire an RwLock for reading that already has a writer
-#[tokio::test]
-async fn read_contested() {
-    let rwlock = RwLock::<u32>::new(0);
-    let (tx0, rx0) = oneshot::channel::<()>();
-
-    let task1 = rwlock.write().then(move |mut guard| {
-        *guard += 5;
-        rx0.map_err(|_| {
-            drop(guard);
-        })
-    });
-
-    let task2 = rwlock.read().map(|guard| *guard);
-    let task3 = rwlock.read().map(|guard| *guard);
-    let task4 = async { tx0.send(()) };
-
-    let result = future::join4(task1, task2, task3, task4).await;
-
-    assert_eq!(result, (Ok(()), 5, 5, Ok(())));
-}
-
-// Attempt to acquire an RwLock for reading after a writer has requested access
-#[tokio::test]
-async fn read_write_contested() {
-    let rwlock = RwLock::<u32>::new(42);
-
-    let task1 = rwlock.read().map(move |guard| *guard);
-    let task2 = rwlock.write().map(|mut guard| *guard += 1);
-    let task3 = rwlock.read().map(|guard| *guard);
-
-    let result = future::join3(task1, task2, task3).await;
-    assert_eq!(result, (42, (), 43));
-
-    let g = rwlock.read().await;
-    assert_eq!(*g, 43);
-}
-
 // Acquire an uncontested RwLock in exclusive mode.  poll immediately returns
 // Poll::Ready
 #[tokio::test]
@@ -105,41 +66,70 @@ async fn write_order() {
 // A single RwLock is contested by tasks in multiple threads
 #[tokio::test]
 async fn multithreaded() {
+    let barrier = Arc::new(Barrier::new(5));
     let rwlock = Arc::new(RwLock::<u32>::new(0));
+    let rwclone1 = rwlock.clone();
+    let rwclone2 = rwlock.clone();
+    let rwclone3 = rwlock.clone();
+    let rwclone4 = rwlock.clone();
 
-    let fut1 = stream::iter(0..1000).for_each(|_| {
-        async {
-            let rwlock_clone = rwlock.clone();
-            let mut guard = rwlock_clone.write().await;
-            *guard += 2;
-        }
+    let b1 = barrier.clone();
+    tokio::spawn(async move {
+        stream::iter(0..1000)
+            .for_each(move |_| {
+                let rwlock = rwclone1.clone();
+                async move {
+                    let mut guard = rwlock.write().await;
+                    *guard += 2;
+                }
+            })
+            .await;
+        b1.wait().await;
     });
 
-    let fut2 = stream::iter(0..1000).for_each(|_| {
-        async {
-            let rwlock_clone = rwlock.clone();
-            let mut guard = rwlock_clone.write().await;
-            *guard += 3;
-        }
+    let b2 = barrier.clone();
+    tokio::spawn(async move {
+        stream::iter(0..1000)
+            .for_each(move |_| {
+                let rwlock = rwclone2.clone();
+                async move {
+                    let mut guard = rwlock.write().await;
+                    *guard += 3;
+                }
+            })
+            .await;
+        b2.wait().await;
     });
 
-    let fut3 = stream::iter(0..1000).for_each(|_| {
-        async {
-            let rwlock_clone = rwlock.clone();
-            let mut guard = rwlock_clone.write().await;
-            *guard += 5;
-        }
+    let b3 = barrier.clone();
+    tokio::spawn(async move {
+        stream::iter(0..1000)
+            .for_each(move |_| {
+                let rwlock = rwclone3.clone();
+                async move {
+                    let mut guard = rwlock.write().await;
+                    *guard += 5;
+                }
+            })
+            .await;
+        b3.wait().await;
     });
 
-    let fut4 = stream::iter(0..1000).for_each(|_| {
-        async {
-            let rwlock_clone = rwlock.clone();
-            let mut guard = rwlock_clone.write().await;
-            *guard += 7;
-        }
+    let b4 = barrier.clone();
+    tokio::spawn(async move {
+        stream::iter(0..1000)
+            .for_each(move |_| {
+                let rwlock = rwclone4.clone();
+                async move {
+                    let mut guard = rwlock.write().await;
+                    *guard += 7;
+                }
+            })
+            .await;
+        b4.wait().await;
     });
 
-    future::join4(fut1, fut2, fut3, fut4).await;
+    barrier.wait().await;
     let g = rwlock.read().await;
     assert_eq!(*g, 17_000);
 }

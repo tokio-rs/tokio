@@ -59,8 +59,5 @@ fn read_write_contested() {
             });
             assert_eq!(43, result);
         });
-
-        let result = block_on(rwlock.read());
-        assert_eq!(*result, 42);
     });
 }
