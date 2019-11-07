@@ -55,7 +55,7 @@ thread_local! {
 
 /// Spawns a `!Send` future on the local task group.
 ///
-/// The spawned future will be run on the same thread that called `spawn_local.`
+/// The spawned future will be run on the same thread that called `spawn.`
 /// This may only be called from the context of a local task group.
 ///
 /// # Panics
@@ -68,23 +68,22 @@ thread_local! {
 /// # use tokio::runtime::Runtime;
 /// use std::rc::Rc;
 /// use tokio::local;
-/// let unsync_data = Rc::new("my unsync data...");
+///
+/// let unsend_data = Rc::new("my unsync data...");
 ///
 /// let mut rt = Runtime::new().unwrap();
 /// let task_set = local::TaskGroup::new();
-/// let local_task = task_set.spawn(async move {
-///     let more_unsync_data = unsync_data.clone();
-///     tokio::spawn_local(async move {
-///         println!("{}", more_unsync_data);
+///
+/// // Run the local task set.
+/// task_set.block_on(&mut rt, async move {
+///     let unsend_data = unsend_data.clone();
+///     local::spawn(async move {
+///         println!("{}", unsend_data);
 ///         // ...
 ///     }).await.unwrap();
 /// });
-///
-/// task_set.block_on(&mut rt, async move {
-///     local_task.await.unwrap();
-/// });
 /// ```
-pub fn spawn_local<F>(future: F) -> JoinHandle<F::Output>
+pub fn spawn<F>(future: F) -> JoinHandle<F::Output>
 where
     F: Future + 'static,
     F::Output: 'static,
@@ -132,7 +131,7 @@ impl TaskGroup {
     /// This runs the given future on the runtime, blocking until it is
     /// complete, and yielding its resolved result. Any tasks or timers which
     /// the future spawns internally will be executed on the runtime. The future
-    /// may also call [`spawn_local`] to spawn additional local futures on the
+    /// may also call [`spawn`] to spawn additional local futures on the
     /// current thread.
     ///
     /// This method should not be called from an asynchronous context.
@@ -151,12 +150,13 @@ impl TaskGroup {
     ///
     /// For example, this will panic:
     /// ```should_panic
-    /// use tokio::runtime::{Runtime, local, blocking};
+    /// use tokio::{blocking, local};
+    /// use tokio::runtime::Runtime;
     ///
     /// let mut rt = Runtime::new().unwrap();
     /// let local = local::TaskGroup::new();
     /// local.block_on(&mut rt, async {
-    ///     let join = tokio::spawn_local(async {
+    ///     let join = local::spawn(async {
     ///         let blocking_result = blocking::in_place(|| {
     ///             // ...
     ///         });
@@ -167,12 +167,13 @@ impl TaskGroup {
     /// ```
     /// This, however, will not panic:
     /// ```
-    /// use tokio::runtime::{Runtime, local, blocking};
+    /// use tokio::{blocking, local};
+    /// use tokio::runtime::Runtime;
     ///
     /// let mut rt = Runtime::new().unwrap();
     /// let local = local::TaskGroup::new();
     /// local.block_on(&mut rt, async {
-    ///     let join = tokio::spawn_local(async {
+    ///     let join = local::spawn(async {
     ///         let blocking_result = blocking::run(|| {
     ///             // ...
     ///         }).await;
@@ -182,7 +183,7 @@ impl TaskGroup {
     /// })
     /// ```
     ///
-    /// [`spawn_local`]: fn.spawn_local.html
+    /// [`spawn`]: fn.spawn.html
     /// [`Runtime::block_on`]: ../struct.Runtime.html#method.block_on
     /// [in-place blocking]: ../blocking/fn.in_place.html
     /// [`blocking::run`]: ../blocking/fn.run.html
@@ -337,7 +338,7 @@ mod tests {
     fn local_current_thread() {
         let mut rt = runtime::Builder::new().current_thread().build().unwrap();
         TaskGroup::new().block_on(&mut rt, async {
-            spawn_local(async {}).await.unwrap();
+            spawn(async {}).await.unwrap();
         });
     }
 
@@ -352,7 +353,7 @@ mod tests {
         let mut rt = runtime::Runtime::new().unwrap();
         TaskGroup::new().block_on(&mut rt, async {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
-            spawn_local(async {
+            spawn(async {
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
             })
             .await
@@ -374,7 +375,7 @@ mod tests {
         let mut rt = runtime::Runtime::new().unwrap();
         TaskGroup::new().block_on(&mut rt, async {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
-            let join = spawn_local(async move {
+            let join = spawn(async move {
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
                 crate::timer::delay_for(Duration::from_millis(10)).await;
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
@@ -397,7 +398,7 @@ mod tests {
         let mut rt = runtime::Runtime::new().unwrap();
         TaskGroup::new().block_on(&mut rt, async {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
-            let join = spawn_local(async move {
+            let join = spawn(async move {
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
                 runtime::blocking::in_place(|| {});
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
@@ -417,7 +418,7 @@ mod tests {
         let mut rt = runtime::Runtime::new().unwrap();
         TaskGroup::new().block_on(&mut rt, async {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
-            let join = spawn_local(async move {
+            let join = spawn(async move {
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
                 runtime::blocking::run(|| {
                     assert!(
@@ -433,7 +434,7 @@ mod tests {
     }
 
     #[test]
-    fn all_spawn_locals_are_local() {
+    fn all_spawns_are_local() {
         use futures_util::future;
 
         thread_local! {
@@ -447,7 +448,7 @@ mod tests {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
             let handles = (0..128)
                 .map(|_| {
-                    spawn_local(async {
+                    spawn(async {
                         assert!(ON_RT_THREAD.with(|cell| cell.get()));
                     })
                 })
@@ -459,7 +460,7 @@ mod tests {
     }
 
     #[test]
-    fn nested_spawn_local_is_local() {
+    fn nested_spawn_is_local() {
         thread_local! {
             static ON_RT_THREAD: Cell<bool> = Cell::new(false);
         }
@@ -469,13 +470,13 @@ mod tests {
         let mut rt = runtime::Runtime::new().unwrap();
         TaskGroup::new().block_on(&mut rt, async {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
-            spawn_local(async {
+            spawn(async {
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
-                spawn_local(async {
+                spawn(async {
                     assert!(ON_RT_THREAD.with(|cell| cell.get()));
-                    spawn_local(async {
+                    spawn(async {
                         assert!(ON_RT_THREAD.with(|cell| cell.get()));
-                        spawn_local(async {
+                        spawn(async {
                             assert!(ON_RT_THREAD.with(|cell| cell.get()));
                         })
                         .await

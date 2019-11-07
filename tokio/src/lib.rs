@@ -123,17 +123,15 @@ pub mod timer;
 #[cfg(feature = "rt-full")]
 mod util;
 
-if_runtime! {
+#[cfg(feature = "local")]
+pub mod local {
+    //! Runs `!Send` futures on the current thread.
+    pub use crate::runtime::local::*;
+}
 
+if_runtime! {
     #[doc(inline)]
     pub use crate::runtime::spawn;
-
-    #[doc(inline)]
-    #[cfg(feature = "local")]
-    pub use crate::local::spawn_local;
-
-    #[cfg(feature = "local")]
-    pub use crate::runtime::local;
 
     #[cfg(not(test))] // Work around for rust-lang/rust#62127
     #[cfg(feature = "macros")]

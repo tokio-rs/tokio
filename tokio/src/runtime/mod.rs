@@ -155,7 +155,7 @@ pub use self::global::spawn;
 mod io;
 
 #[cfg(feature = "local")]
-pub mod local;
+pub(super) mod local;
 
 mod park;
 pub use self::park::{Park, Unpark};
