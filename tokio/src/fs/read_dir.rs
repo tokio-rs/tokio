@@ -65,7 +65,7 @@ impl Stream for ReadDir {
                     }));
                 }
                 State::Pending(ref mut rx) => {
-                    let (ret, std) = ready!(Pin::new(rx).poll(cx));
+                    let (ret, std) = ready!(Pin::new(rx).poll(cx))?;
                     self.0 = State::Idle(Some(std));
 
                     let ret = ret.map(|res| res.map(|std| DirEntry(Arc::new(std))));

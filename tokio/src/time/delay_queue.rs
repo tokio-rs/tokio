@@ -4,10 +4,8 @@
 //!
 //! [`DelayQueue`]: struct.DelayQueue.html
 
-use crate::time::clock::now;
-use crate::time::timer::Handle;
 use crate::time::wheel::{self, Wheel};
-use crate::time::{Delay, Error};
+use crate::time::{Delay, Duration, Error, Instant};
 
 use futures_core::ready;
 use slab::Slab;
@@ -16,7 +14,6 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{self, Poll};
-use std::time::{Duration, Instant};
 
 /// A queue of delayed elements.
 ///
@@ -128,9 +125,6 @@ use std::time::{Duration, Instant};
 /// [`reserve`]: #method.reserve
 #[derive(Debug)]
 pub struct DelayQueue<T> {
-    /// Handle to the timer driving the `DelayQueue`
-    handle: Handle,
-
     /// Stores data associated with entries
     slab: Slab<Data<T>>,
 
@@ -224,31 +218,6 @@ impl<T> DelayQueue<T> {
         DelayQueue::with_capacity(0)
     }
 
-    /// Create a new, empty, `DelayQueue` backed by the specified timer.
-    ///
-    /// The queue will not allocate storage until items are inserted into it.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// # use tokio::time::DelayQueue;
-    /// use tokio::time::timer::Handle;
-    ///
-    /// let handle = Handle::default();
-    /// let delay_queue: DelayQueue<u32> = DelayQueue::with_capacity_and_handle(0, &handle);
-    /// ```
-    pub fn with_capacity_and_handle(capacity: usize, handle: &Handle) -> DelayQueue<T> {
-        DelayQueue {
-            handle: handle.clone(),
-            wheel: Wheel::new(),
-            slab: Slab::with_capacity(capacity),
-            expired: Stack::default(),
-            delay: None,
-            poll: wheel::Poll::new(0),
-            start: now(),
-        }
-    }
-
     /// Create a new, empty, `DelayQueue` with the specified capacity.
     ///
     /// The queue will be able to hold at least `capacity` elements without
@@ -271,7 +240,14 @@ impl<T> DelayQueue<T> {
     /// delay_queue.insert(11, Duration::from_secs(11));
     /// ```
     pub fn with_capacity(capacity: usize) -> DelayQueue<T> {
-        DelayQueue::with_capacity_and_handle(capacity, &Handle::default())
+        DelayQueue {
+            wheel: Wheel::new(),
+            slab: Slab::with_capacity(capacity),
+            expired: Stack::default(),
+            delay: None,
+            poll: wheel::Poll::new(0),
+            start: Instant::now(),
+        }
     }
 
     /// Insert `value` into the queue set to expire at a specific instant in
@@ -302,8 +278,7 @@ impl<T> DelayQueue<T> {
     /// Basic usage
     ///
     /// ```rust
-    /// use tokio::time::DelayQueue;
-    /// use std::time::{Instant, Duration};
+    /// use tokio::time::{DelayQueue, Duration, Instant};
     ///
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert_at(
@@ -345,7 +320,7 @@ impl<T> DelayQueue<T> {
         };
 
         if should_set_delay {
-            self.delay = Some(self.handle.delay(self.start + Duration::from_millis(when)));
+            self.delay = Some(Delay::new(self.start + Duration::from_millis(when)));
         }
 
         Key::new(key)
@@ -420,7 +395,7 @@ impl<T> DelayQueue<T> {
     /// [`Key`]: struct.Key.html
     /// [type]: #
     pub fn insert(&mut self, value: T, timeout: Duration) -> Key {
-        self.insert_at(value, now() + timeout)
+        self.insert_at(value, Instant::now() + timeout)
     }
 
     fn insert_idx(&mut self, when: u64, key: usize) {
@@ -501,8 +476,7 @@ impl<T> DelayQueue<T> {
     /// Basic usage
     ///
     /// ```rust
-    /// use tokio::time::DelayQueue;
-    /// use std::time::{Duration, Instant};
+    /// use tokio::time::{DelayQueue, Duration, Instant};
     ///
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert("foo", Duration::from_secs(5));
@@ -568,7 +542,7 @@ impl<T> DelayQueue<T> {
     /// // "foo"is now scheduled to be returned in 10 seconds
     /// ```
     pub fn reset(&mut self, key: &Key, timeout: Duration) {
-        self.reset_at(key, now() + timeout);
+        self.reset_at(key, Instant::now() + timeout);
     }
 
     /// Clears the queue, removing all items.
@@ -702,7 +676,7 @@ impl<T> DelayQueue<T> {
             }
 
             if let Some(deadline) = self.next_deadline() {
-                self.delay = Some(self.handle.delay(deadline));
+                self.delay = Some(Delay::new(deadline));
             } else {
                 return Poll::Ready(None);
             }

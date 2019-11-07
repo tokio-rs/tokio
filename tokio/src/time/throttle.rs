@@ -1,6 +1,6 @@
 //! Slow down a stream by enforcing a delay between items.
 
-use crate::time::{clock, Delay};
+use crate::time::{Delay, Instant};
 
 use futures_core::ready;
 use futures_core::Stream;
@@ -16,17 +16,27 @@ use std::{
 #[derive(Debug)]
 #[must_use = "streams do nothing unless polled"]
 pub struct Throttle<T> {
-    delay: Delay,
+    /// `None` when duration is zero.
+    delay: Option<Delay>,
+
     /// Set to true when `delay` has returned ready, but `stream` hasn't.
     has_delayed: bool,
+
+    /// The stream to throttle
     stream: T,
 }
 
 impl<T> Throttle<T> {
     /// Slow down a stream by enforcing a delay between items.
     pub fn new(stream: T, duration: Duration) -> Self {
+        let delay = if duration == Duration::from_millis(0) {
+            None
+        } else {
+            Some(Delay::new_timeout(Instant::now() + duration, duration))
+        };
+
         Self {
-            delay: Delay::new_timeout(clock::now() + duration, duration),
+            delay,
             has_delayed: true,
             stream,
         }
@@ -64,8 +74,11 @@ impl<T: Stream> Stream for Throttle<T> {
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {
         unsafe {
-            if !self.has_delayed {
-                ready!(self.as_mut().map_unchecked_mut(|me| &mut me.delay).poll(cx));
+            if !self.has_delayed && self.delay.is_some() {
+                ready!(self
+                    .as_mut()
+                    .map_unchecked_mut(|me| me.delay.as_mut().unwrap())
+                    .poll(cx));
                 self.as_mut().get_unchecked_mut().has_delayed = true;
             }
 
@@ -75,7 +88,10 @@ impl<T: Stream> Stream for Throttle<T> {
                 .poll_next(cx));
 
             if value.is_some() {
-                self.as_mut().get_unchecked_mut().delay.reset_timeout();
+                if let Some(ref mut delay) = self.as_mut().get_unchecked_mut().delay {
+                    delay.reset_timeout();
+                }
+
                 self.as_mut().get_unchecked_mut().has_delayed = false;
             }
 

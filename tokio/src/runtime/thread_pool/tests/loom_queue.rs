@@ -1,6 +1,6 @@
-use crate::runtime::task::{self, Task};
-use crate::runtime::tests::mock_schedule::{Noop, NOOP_SCHEDULE};
 use crate::runtime::thread_pool::queue;
+use crate::task::{self, Task};
+use crate::tests::mock_schedule::{Noop, NOOP_SCHEDULE};
 
 use loom::thread;
 

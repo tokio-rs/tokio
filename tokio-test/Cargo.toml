@@ -20,7 +20,7 @@ Testing utilities for Tokio- and futures-based code
 categories = ["asynchronous", "testing"]
 
 [dependencies]
-tokio = { version = "=0.2.0-alpha.6", path = "../tokio" }
+tokio = { version = "=0.2.0-alpha.6", path = "../tokio", features = ["test-util"] }
 
 bytes = "0.4"
 futures-core = "0.3.0"

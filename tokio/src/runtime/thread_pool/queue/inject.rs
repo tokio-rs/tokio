@@ -1,6 +1,6 @@
 use crate::loom::sync::Arc;
-use crate::runtime::task::Task;
 use crate::runtime::thread_pool::queue::Cluster;
+use crate::task::Task;
 
 pub(crate) struct Inject<T: 'static> {
     cluster: Arc<Cluster<T>>,

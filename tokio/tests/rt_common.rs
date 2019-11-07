@@ -264,14 +264,14 @@ rt_test! {
     #[test]
     fn spawn_from_other_thread() {
         let mut rt = rt();
-        let sp = rt.spawner();
+        let handle = rt.handle().clone();
 
         let (tx, rx) = oneshot::channel();
 
         thread::spawn(move || {
             thread::sleep(Duration::from_millis(50));
 
-            sp.spawn(async move {
+            handle.spawn(async move {
                 assert_ok!(tx.send(()));
             });
         });

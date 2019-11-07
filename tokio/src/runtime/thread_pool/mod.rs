@@ -13,7 +13,7 @@ mod queue;
 mod spawner;
 pub(crate) use self::spawner::Spawner;
 
-mod set;
+mod slice;
 
 mod shared;
 use self::shared::Shared;
@@ -21,10 +21,8 @@ use self::shared::Shared;
 mod shutdown;
 
 mod worker;
-use self::worker::Worker;
 
-#[cfg(feature = "blocking")]
-pub(crate) use worker::blocking;
+pub(crate) use worker::block_in_place;
 
 /// Unit tests
 #[cfg(test)]
@@ -39,10 +37,10 @@ const LOCAL_QUEUE_CAPACITY: usize = 256;
 #[cfg(loom)]
 const LOCAL_QUEUE_CAPACITY: usize = 2;
 
+use crate::blocking;
 use crate::loom::sync::Arc;
-use crate::runtime::blocking::{self, PoolWaiter};
-use crate::runtime::task::JoinHandle;
 use crate::runtime::Park;
+use crate::task::JoinHandle;
 
 use std::fmt;
 use std::future::Future;
@@ -53,9 +51,6 @@ pub(crate) struct ThreadPool {
 
     /// Shutdown waiter
     shutdown_rx: shutdown::Receiver,
-
-    /// Shutdown valve for Pool
-    blocking: PoolWaiter,
 }
 
 // The Arc<Box<_>> is needed because loom doesn't support Arc<T> where T: !Sized
@@ -66,7 +61,7 @@ type Callback = Arc<Box<dyn Fn(usize, &mut dyn FnMut()) + Send + Sync>>;
 impl ThreadPool {
     pub(crate) fn new<F, P>(
         pool_size: usize,
-        blocking_pool: Arc<blocking::Pool>,
+        blocking_pool: blocking::Spawner,
         around_worker: Callback,
         mut build_park: F,
     ) -> ThreadPool
@@ -76,65 +71,24 @@ impl ThreadPool {
     {
         let (shutdown_tx, shutdown_rx) = shutdown::channel();
 
-        let launch_worker = Arc::new(Box::new(move |worker: Worker<BoxedPark<P>>| {
-            // NOTE: It might seem like the shutdown_tx that's moved into this Arc is never
-            // dropped, and that shutdown_rx will therefore never see EOF, but that is not actually
-            // the case. Only `build_with_park` and each worker hold onto a copy of this Arc.
-            // `build_with_park` drops it immediately, and the workers drop theirs when their `run`
-            // method returns (and their copy of the Arc are dropped). In fact, we don't actually
-            // _need_ a copy of `shutdown_tx` for each worker thread; having them all hold onto
-            // this Arc, which in turn holds the last `shutdown_tx` would have been sufficient.
-            let shutdown_tx = shutdown_tx.clone();
-            let around_worker = around_worker.clone();
-
-            Box::new(move || {
-                struct AbortOnPanic;
-
-                impl Drop for AbortOnPanic {
-                    fn drop(&mut self) {
-                        if std::thread::panicking() {
-                            eprintln!("[ERROR] unhandled panic in Tokio scheduler. This is a bug and should be reported.");
-                            std::process::abort();
-                        }
-                    }
-                }
-
-                let _abort_on_panic = AbortOnPanic;
-
-                let idx = worker.id();
-                let mut f = Some(move || worker.run());
-                around_worker(idx, &mut || {
-                    (f.take()
-                        .expect("around_thread callback called closure twice"))(
-                    )
-                });
-
-                // Dropping the handle must happen __after__ the callback
-                drop(shutdown_tx);
-            }) as Box<dyn FnOnce() + Send + 'static>
-        })
-            as Box<dyn Fn(Worker<BoxedPark<P>>) -> Box<dyn FnOnce() + Send> + Send + Sync>);
-
         let (pool, workers) = worker::create_set::<_, BoxedPark<P>>(
             pool_size,
-            |i| Box::new(BoxedPark::new(build_park(i))),
-            Arc::clone(&launch_worker),
+            |i| BoxedPark::new(build_park(i)),
             blocking_pool.clone(),
+            around_worker,
+            shutdown_tx,
         );
 
         // Spawn threads for each worker
         for worker in workers {
-            crate::runtime::blocking::Pool::spawn(&blocking_pool, launch_worker(worker))
+            blocking_pool.spawn_background(|| worker.run());
         }
 
         let spawner = Spawner::new(pool);
-        let blocking = crate::runtime::blocking::PoolWaiter::from(blocking_pool);
 
-        // ThreadPool::from_parts(spawner, shutdown_rx, blocking)
         ThreadPool {
             spawner,
             shutdown_rx,
-            blocking,
         }
     }
 
@@ -165,9 +119,7 @@ impl ThreadPool {
     {
         crate::runtime::global::with_thread_pool(self.spawner(), || {
             let mut enter = crate::runtime::enter();
-            crate::runtime::blocking::with_pool(self.spawner.blocking_pool(), || {
-                enter.block_on(future)
-            })
+            enter.block_on(future)
         })
     }
 
@@ -176,7 +128,6 @@ impl ThreadPool {
         if self.spawner.workers().close() {
             self.shutdown_rx.wait();
         }
-        self.blocking.shutdown();
     }
 }
 

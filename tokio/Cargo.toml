@@ -27,8 +27,8 @@ keywords = ["io", "async", "non-blocking", "futures"]
 default = [
   "blocking",
   "fs",
-  "io",
-  "net-full",
+  "io-util",
+  "net",
   "process",
   "rt-full",
   "signal",
@@ -36,46 +36,15 @@ default = [
   "time",
 ]
 
-executor-core = []
-blocking = ["executor-core", "sync"]
-fs = ["blocking", "io-traits"]
-io-traits = ["bytes", "iovec"]
-io-util = ["io-traits", "pin-project", "memchr"]
-io = ["io-traits", "io-util"]
+blocking = ["rt-core"]
+dns = ["blocking"]
+fs = ["blocking"]
+io-driver = ["mio", "lazy_static", "sync"] # TODO: get rid of sync
+io-util = ["pin-project", "memchr"]
 macros = ["tokio-macros"]
-net-full = ["tcp", "udp", "uds"]
-net-driver = ["io-traits", "mio", "blocking", "lazy_static"]
-rt-current-thread = [
-  "executor-core",
-  "time",
-  "sync",
-  "net-driver",
-]
-rt-full = [
-  "executor-core",
-  "macros",
-  "num_cpus",
-  "net-full",
-  "rt-current-thread",
-  "sync",
-  "time",
-]
-signal = [
-  "lazy_static",
-  "libc",
-  "mio-uds",
-  "net-driver",
-  "signal-hook-registry",
-  "winapi/consoleapi",
-  "winapi/minwindef",
-]
-sync = ["fnv"]
-tcp = ["io", "net-driver"]
-time = ["executor-core", "sync", "slab"]
-udp = ["io", "net-driver"]
-uds = ["io", "net-driver", "mio-uds", "libc"]
+net = ["dns", "tcp", "udp", "uds"]
 process = [
-  "io",
+  "io-util", # TODO: Get rid of
   "libc",
   "mio-named-pipes",
   "signal",
@@ -84,18 +53,44 @@ process = [
   "winapi/threadpoollegacyapiset",
   "winapi/winerror",
 ]
+# Includes basic task execution capabilities
+rt-core = []
+rt-full = [
+  "macros",
+  "num_cpus",
+  "net",
+  "rt-core",
+  "sync",
+  "time",
+]
+signal = [
+  "io-driver",
+  "lazy_static",
+  "libc",
+  "mio-uds",
+  "signal-hook-registry",
+  "winapi/consoleapi",
+  "winapi/minwindef",
+]
+sync = ["fnv"]
+test-util = []
+tcp = ["io-driver"]
+time = ["rt-core", "sync", "slab"]
+udp = ["io-driver"]
+uds = ["io-driver", "mio-uds", "libc"]
+
 
 [dependencies]
 tokio-macros = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-macros" }
 
+bytes = "0.4"
 futures-core = "0.3.0"
 futures-sink = "0.3.0"
 futures-util = { version = "0.3.0", features = ["sink", "channel"] }
+iovec = "0.1"
 
 # Everything else is optional...
-bytes = { version = "0.4", optional = true }
 fnv = { version = "1.0.6", optional = true }
-iovec = { version = "0.1", optional = true }
 lazy_static = { version = "1.0.2", optional = true }
 memchr = { version = "2.2", optional = true }
 mio = { version = "0.6.14", optional = true }

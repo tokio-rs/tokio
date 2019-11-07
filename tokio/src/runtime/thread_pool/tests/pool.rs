@@ -1,7 +1,8 @@
 #![warn(rust_2018_idioms)]
 
+use crate::blocking;
 use crate::runtime::thread_pool::ThreadPool;
-use crate::runtime::{blocking, Park, Unpark};
+use crate::runtime::{Park, Unpark};
 
 use futures_util::future::poll_fn;
 use std::future::Future;
@@ -63,9 +64,11 @@ fn eagerly_drops_futures() {
     let (park_tx, park_rx) = mpsc::sync_channel(0);
     let (unpark_tx, unpark_rx) = mpsc::sync_channel(0);
 
+    let blocking_pool = blocking::BlockingPool::new("test".into(), None);
+
     let pool = ThreadPool::new(
         4,
-        blocking::Pool::new("test".into(), None),
+        blocking_pool.spawner().clone(),
         Arc::new(Box::new(|_, next| next())),
         move |_| {
             let (tx, rx) = mpsc::channel();
@@ -166,9 +169,11 @@ fn park_called_at_interval() {
 
     let (done_tx, done_rx) = mpsc::channel();
 
+    let blocking_pool = blocking::BlockingPool::new("test".into(), None);
+
     let pool = ThreadPool::new(
         1,
-        blocking::Pool::new("test".into(), None),
+        blocking_pool.spawner().clone(),
         Arc::new(Box::new(|_, next| next())),
         move |idx| {
             assert_eq!(idx, 0);

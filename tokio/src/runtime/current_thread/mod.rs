@@ -1,5 +1,5 @@
 use crate::runtime::park::{Park, Unpark};
-use crate::runtime::task::{self, JoinHandle, Schedule, Task};
+use crate::task::{self, JoinHandle, Schedule, Task};
 
 use std::cell::UnsafeCell;
 use std::collections::VecDeque;
@@ -82,7 +82,8 @@ struct RemoteQueue {
 }
 
 /// Max number of tasks to poll per tick.
-const MAX_TASKS_PER_TICK: usize = 61;
+// const MAX_TASKS_PER_TICK: usize = 61;
+const MAX_TASKS_PER_TICK: usize = 1;
 
 /// How often to check the remote queue first
 const CHECK_REMOTE_INTERVAL: u8 = 13;

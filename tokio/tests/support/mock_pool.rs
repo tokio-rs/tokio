@@ -32,13 +32,13 @@ where
 }
 
 impl<T> Future for Blocking<T> {
-    type Output = T;
+    type Output = Result<T, io::Error>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         use std::task::Poll::*;
 
         match Pin::new(&mut self.rx).poll(cx) {
-            Ready(Ok(v)) => Ready(v),
+            Ready(Ok(v)) => Ready(Ok(v)),
             Ready(Err(e)) => panic!("error = {:?}", e),
             Pending => Pending,
         }
@@ -50,7 +50,7 @@ where
     F: FnOnce() -> io::Result<T> + Send + 'static,
     T: Send + 'static,
 {
-    run(f).await
+    run(f).await?
 }
 
 pub(crate) fn len() -> usize {

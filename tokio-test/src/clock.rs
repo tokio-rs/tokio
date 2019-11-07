@@ -21,9 +21,8 @@
 //! });
 //! ```
 
-use tokio::runtime::{Park, Unpark};
+use tokio::runtime::{self, Runtime};
 use tokio::time::clock::{Clock, Now};
-use tokio::time::Timer;
 
 use std::marker::PhantomData;
 use std::rc::Rc;
@@ -61,7 +60,7 @@ pub struct MockClock {
 /// A handle to the `MockClock`.
 #[derive(Debug)]
 pub struct Handle {
-    timer: Timer<MockPark>,
+    rt: Runtime,
     time: MockTime,
 }
 
@@ -75,17 +74,6 @@ struct MockTime {
 
 #[derive(Debug)]
 struct MockNow {
-    inner: Inner,
-}
-
-#[derive(Debug)]
-struct MockPark {
-    inner: Inner,
-    _pd: PhantomData<Rc<()>>,
-}
-
-#[derive(Debug)]
-struct MockUnpark {
     inner: Inner,
 }
 
@@ -125,15 +113,24 @@ impl MockClock {
         F: FnOnce(&mut Handle) -> R,
     {
         tokio::time::clock::with_default(&self.clock, || {
-            let park = self.time.mock_park();
+            let rt = runtime::Builder::new()
+                .clock(self.clock.clone())
+                .build()
+                .unwrap();
+
+            let rt_handle = rt.handle().clone();
+
+            /*
             let timer = Timer::new(park);
             let handle = timer.handle();
+            */
             let time = self.time.clone();
 
+            /*
             let _timer = tokio::time::set_default(&handle);
-            let mut handle = Handle::new(timer, time);
-            f(&mut handle)
-            // lazy(|| Ok::<_, ()>(f(&mut handle))).wait().unwrap()
+            */
+            let mut handle = Handle::new(rt, time);
+            rt_handle.enter(|| f(&mut handle) )
         })
     }
 }
@@ -145,23 +142,25 @@ impl Default for MockClock {
 }
 
 impl Handle {
-    pub(self) fn new(timer: Timer<MockPark>, time: MockTime) -> Self {
-        Handle { timer, time }
+    fn new(rt: Runtime, time: MockTime) -> Self {
+        Handle { rt, time }
     }
 
     /// Turn the internal timer and mock park for the provided duration.
     pub fn turn(&mut self) {
-        self.timer.turn(None).unwrap();
+        self.rt.block_on(async {});
+        // self.timer.turn(None).unwrap();
     }
 
     /// Turn the internal timer and mock park for the provided duration.
-    pub fn turn_for(&mut self, duration: Duration) {
-        self.timer.turn(Some(duration)).unwrap();
+    pub fn turn_for(&mut self, _duration: Duration) {
+        self.rt.block_on(async {});
+        // self.timer.turn(Some(duration)).unwrap();
     }
 
     /// Advance the `MockClock` by the provided duration.
     pub fn advance(&mut self, duration: Duration) {
-        let inner = self.timer.get_park().inner.clone();
+        let inner = self.time.inner.clone();
         let deadline = inner.lock().unwrap().now() + duration;
 
         while inner.lock().unwrap().now() < deadline {
@@ -183,8 +182,11 @@ impl Handle {
     /// Turn the internal timer once, but force "parking" for `duration` regardless of any pending
     /// timeouts
     pub fn park_for(&mut self, duration: Duration) {
+        /*
         self.time.inner.lock().unwrap().park_for = Some(duration);
         self.turn()
+        */
+        unimplemented!();
     }
 }
 
@@ -208,6 +210,7 @@ impl MockTime {
         MockNow { inner }
     }
 
+    /*
     pub(crate) fn mock_park(&self) -> MockPark {
         let inner = self.inner.clone();
         MockPark {
@@ -215,6 +218,7 @@ impl MockTime {
             _pd: PhantomData,
         }
     }
+    */
 
     pub(crate) fn now(&self) -> Instant {
         self.inner.lock().unwrap().now()
@@ -231,6 +235,7 @@ impl State {
     }
 }
 
+/*
 impl Park for MockPark {
     type Unpark = MockUnpark;
     type Error = ();
@@ -269,6 +274,7 @@ impl Unpark for MockUnpark {
         }
     }
 }
+*/
 
 impl Now for MockNow {
     fn now(&self) -> Instant {
