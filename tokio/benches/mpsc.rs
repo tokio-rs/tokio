@@ -271,7 +271,7 @@ criterion_group!(mpsc, bench_mpsc);
 fn main() {
     // The large channel tests can run out of stack
     std::thread::Builder::new()
-        .stack_size(3_000_000)
+        .stack_size(10_000_000)
         .spawn(|| {
             mpsc();
 

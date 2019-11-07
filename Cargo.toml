@@ -12,5 +12,4 @@ members = [
   "tests-build",
   "tests-integration",
 ]
-[profile.bench]
-debug = true
+

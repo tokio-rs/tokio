@@ -22,6 +22,10 @@ jobs:
   - template: azure-is-release.yml
 
   - ${{ each crate in parameters.crates }}:
+    # Test benches
+    - script: cargo test --benches --all
+      displayName: Test benchmarks
+
     # Run with all crate features
     - script: cargo test --all-features
       env:
@@ -40,3 +44,7 @@ jobs:
         CI: 'True'
       displayName: ${{ crate }} - cargo test --all-features
       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
+
+    # Test benches
+    - script: cargo test --benches --all
+      displayName: Test benchmarks
