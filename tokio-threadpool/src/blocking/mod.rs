@@ -14,47 +14,41 @@ pub struct BlockingError {
     _p: (),
 }
 
-pub trait Blocking {
-    fn run_blocking<'a>(&self, f: &'a mut (dyn FnMut() + 'a)) -> Poll<(), BlockingError>;
-}
+/// A function implementing the behavior run on calls to `blocking`.
+pub type BlockingImpl = fn(&mut dyn FnMut()) -> Poll<(), BlockingError>;
 
-struct DefaultBlocking;
-static DEFAULT_BLOCKING: DefaultBlocking = DefaultBlocking;
+fn default_blocking(f: &mut dyn FnMut()) -> Poll<(), BlockingError> {
+    let res = Worker::with_current(|worker| {
+        let worker = match worker {
+            Some(worker) => worker,
+            None => {
+                return Err(BlockingError::new());
+            }
+        };
 
-impl Blocking for DefaultBlocking {
-    fn run_blocking<'a>(&self, f: &'a mut (dyn FnMut() + 'a)) -> Poll<(), BlockingError> {
-        let res = Worker::with_current(|worker| {
-            let worker = match worker {
-                Some(worker) => worker,
-                None => {
-                    return Err(BlockingError::new());
-                }
-            };
+        // Transition the worker state to blocking. This will exit the fn early
+        // with `NotReady` if the pool does not have enough capacity to enter
+        // blocking mode.
+        worker.transition_to_blocking()
+    });
 
-            // Transition the worker state to blocking. This will exit the fn early
-            // with `NotReady` if the pool does not have enough capacity to enter
-            // blocking mode.
-            worker.transition_to_blocking()
-        });
+    // If the transition cannot happen, exit early
+    try_ready!(res);
 
-        // If the transition cannot happen, exit early
-        try_ready!(res);
+    // Currently in blocking mode, so call the inner closure.
+    //
+    // "Exit" the current executor in case the blocking function wants
+    // to call a different executor.
+    tokio_executor::exit(move || (f)());
 
-        // Currently in blocking mode, so call the inner closure.
-        //
-        // "Exit" the current executor in case the blocking function wants
-        // to call a different executor.
-        tokio_executor::exit(move || (f)());
+    // Try to transition out of blocking mode. This is a fast path that takes
+    // back ownership of the worker if the worker handoff didn't complete yet.
+    Worker::with_current(|worker| {
+        // Worker must be set since it was above.
+        worker.unwrap().transition_from_blocking();
+    });
 
-        // Try to transition out of blocking mode. This is a fast path that takes
-        // back ownership of the worker if the worker handoff didn't complete yet.
-        Worker::with_current(|worker| {
-            // Worker must be set since it was above.
-            worker.unwrap().transition_from_blocking();
-        });
-
-        Ok(Async::Ready(()))
-    }
+    Ok(Async::Ready(()))
 }
 
 impl BlockingError {

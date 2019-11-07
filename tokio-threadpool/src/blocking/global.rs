@@ -1,54 +1,36 @@
-use super::{Blocking, BlockingError, DEFAULT_BLOCKING};
+use super::{BlockingError, BlockingImpl};
 use futures::Poll;
 use std::cell::Cell;
+use std::fmt;
 use std::marker::PhantomData;
 use tokio_executor::Enter;
 
 thread_local! {
-    static CURRENT: Cell<&'static dyn Blocking> = Cell::new(&DEFAULT_BLOCKING);
+    static CURRENT: Cell<BlockingImpl> = Cell::new(super::default_blocking);
 }
 
 /// Ensures that the executor is removed from the thread-local context
 /// when leaving the scope. This handles cases that involve panicking.
-#[derive(Debug)]
 pub struct DefaultGuard<'a> {
-    prior: &'static dyn Blocking,
+    prior: BlockingImpl,
     _lifetime: PhantomData<&'a ()>,
 }
 
 /// Set the default blocking implementation, returning a guard that resets the
 /// blocking implementation when dropped.
-pub fn set_default<B>(blocking: &B) -> DefaultGuard<'_>
-where
-    B: Blocking,
-{
+pub fn set_default<'a>(blocking: BlockingImpl) -> DefaultGuard<'a> {
     CURRENT.with(|cell| {
-        // While scary, this is safe. The function takes a
-        // `&Blocking`, which guarantees that the reference lives for the
-        // duration of `the guard's lifetime`.
-        //
-        // Because we are always clearing the TLS value when the the end of the
-        // function, we can cast the reference to 'static which thread-local
-        // cells require.
-        let blocking = unsafe { hide_lt(blocking) };
-
         let prior = cell.replace(blocking);
         DefaultGuard {
             prior,
             _lifetime: PhantomData,
         }
     })
-
-    unsafe fn hide_lt<'a>(p: &'a (dyn Blocking + 'a)) -> &'static (dyn Blocking + 'static) {
-        use std::mem;
-        mem::transmute(p)
-    }
 }
 
 /// Set the default blocking implementation for the duration of the closure
-pub fn with_default<B, F, R>(blocking: &B, enter: &mut Enter, f: F) -> R
+pub fn with_default<F, R>(blocking: BlockingImpl, enter: &mut Enter, f: F) -> R
 where
-    B: Blocking,
     F: FnOnce(&mut Enter) -> R,
 {
     let _guard = set_default(blocking);
@@ -191,13 +173,21 @@ where
             *ret2 = Some((f)());
         };
 
-        try_ready!(blocking.run_blocking(&mut run));
+        try_ready!((blocking)(&mut run));
 
         // Return the result
         let ret =
             ret.expect("blocking function finished, but return value was unset; this is a bug!");
         Ok(ret.into())
     })
+}
+
+// === impl DefaultGuard ===
+
+impl<'a> fmt::Debug for DefaultGuard<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.pad("DefaultGuard { .. }")
+    }
 }
 
 impl<'a> Drop for DefaultGuard<'a> {
