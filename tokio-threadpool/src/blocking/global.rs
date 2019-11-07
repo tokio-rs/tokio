@@ -199,3 +199,13 @@ where
         Ok(ret.into())
     })
 }
+
+impl<'a> Drop for DefaultGuard<'a> {
+    fn drop(&mut self) {
+        // if the TLS value has already been torn down, there's nothing else we
+        // can do. we're almost certainly panicking anyway.
+        let _ = CURRENT.try_with(|cell| {
+            cell.set(self.prior);
+        });
+    }
+}
