@@ -1,10 +1,10 @@
 //! A sequence of asynchronous values.
 
-#[cfg(feature = "timer")]
+#[cfg(feature = "time")]
 use std::time::Duration;
 
-#[cfg(feature = "timer")]
-use crate::timer::{throttle::Throttle, Timeout};
+#[cfg(feature = "time")]
+use crate::time::{throttle::Throttle, Timeout};
 
 #[doc(inline)]
 pub use futures_core::Stream;
@@ -29,7 +29,7 @@ pub trait StreamExt: Stream {
     /// Throttle down the stream by enforcing a fixed delay between items.
     ///
     /// Errors are also delayed.
-    #[cfg(feature = "timer")]
+    #[cfg(feature = "time")]
     fn throttle(self, duration: Duration) -> Throttle<Self>
     where
         Self: Sized,
@@ -66,7 +66,7 @@ pub trait StreamExt: Stream {
     /// }
     /// # }
     /// ```
-    #[cfg(feature = "timer")]
+    #[cfg(feature = "time")]
     fn timeout(self, timeout: Duration) -> Timeout<Self>
     where
         Self: Sized,

@@ -1,9 +1,9 @@
 //! Asynchronous values.
 
-#[cfg(feature = "timer")]
-use crate::timer::Timeout;
+#[cfg(feature = "time")]
+use crate::time::Timeout;
 
-#[cfg(feature = "timer")]
+#[cfg(feature = "time")]
 use std::time::Duration;
 
 #[doc(inline)]
@@ -57,7 +57,7 @@ pub trait FutureExt: Future {
     /// }
     /// # }
     /// ```
-    #[cfg(feature = "timer")]
+    #[cfg(feature = "time")]
     fn timeout(self, timeout: Duration) -> Timeout<Self>
     where
         Self: Sized,

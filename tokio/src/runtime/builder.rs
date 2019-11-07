@@ -22,7 +22,7 @@ use std::fmt;
 ///
 /// ```
 /// use tokio::runtime::Builder;
-/// use tokio::timer::clock::Clock;
+/// use tokio::time::clock::Clock;
 ///
 /// fn main() {
 ///     // build Runtime
@@ -324,7 +324,7 @@ impl Builder {
     #[cfg(feature = "rt-full")]
     fn build_threadpool(&mut self) -> io::Result<Runtime> {
         use crate::runtime::{Kind, ThreadPool};
-        use crate::timer::clock;
+        use crate::time::clock;
         use std::sync::Mutex;
 
         let mut net_handles = Vec::new();

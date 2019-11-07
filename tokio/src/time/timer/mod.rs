@@ -42,10 +42,10 @@ mod stack;
 use self::stack::Stack;
 
 use crate::runtime::{Park, Unpark};
-use crate::timer::atomic::AtomicU64;
-use crate::timer::clock::Clock;
-use crate::timer::wheel;
-use crate::timer::Error;
+use crate::time::atomic::AtomicU64;
+use crate::time::clock::Clock;
+use crate::time::wheel;
+use crate::time::Error;
 
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
@@ -257,9 +257,9 @@ where
 
     /// Run timer related logic
     fn process(&mut self) {
-        let now = crate::timer::ms(
+        let now = crate::time::ms(
             self.clock.now() - self.inner.start,
-            crate::timer::Round::Down,
+            crate::time::Round::Down,
         );
         let mut poll = wheel::Poll::new(now);
 
@@ -311,7 +311,7 @@ where
     ///
     /// Returns `None` if the entry was fired.
     fn add_entry(&mut self, entry: Arc<Entry>, when: u64) {
-        use crate::timer::wheel::InsertError;
+        use crate::time::wheel::InsertError;
 
         entry.set_when_internal(Some(when));
 
@@ -466,7 +466,7 @@ impl Inner {
             return 0;
         }
 
-        crate::timer::ms(deadline - self.start, crate::timer::Round::Up)
+        crate::time::ms(deadline - self.start, crate::time::Round::Up)
     }
 }
 

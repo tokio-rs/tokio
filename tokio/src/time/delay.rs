@@ -1,4 +1,4 @@
-use crate::timer::timer::{HandlePriv, Registration};
+use crate::time::timer::{HandlePriv, Registration};
 
 use futures_core::ready;
 use std::future::Future;

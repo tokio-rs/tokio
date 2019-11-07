@@ -33,7 +33,7 @@ default = [
   "rt-full",
   "signal",
   "sync",
-  "timer",
+  "time",
 ]
 
 executor-core = []
@@ -47,7 +47,7 @@ net-full = ["tcp", "udp", "uds"]
 net-driver = ["io-traits", "mio", "blocking", "lazy_static"]
 rt-current-thread = [
   "executor-core",
-  "timer",
+  "time",
   "sync",
   "net-driver",
 ]
@@ -58,7 +58,7 @@ rt-full = [
   "net-full",
   "rt-current-thread",
   "sync",
-  "timer",
+  "time",
 ]
 signal = [
   "lazy_static",
@@ -71,7 +71,7 @@ signal = [
 ]
 sync = ["fnv"]
 tcp = ["io", "net-driver"]
-timer = ["executor-core", "sync", "slab"]
+time = ["executor-core", "sync", "slab"]
 udp = ["io", "net-driver"]
 uds = ["io", "net-driver", "mio-uds", "libc"]
 process = [

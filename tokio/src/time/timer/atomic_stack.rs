@@ -1,5 +1,5 @@
-use super::Entry;
-use crate::timer::Error;
+use crate::time::timer::Entry;
+use crate::time::Error;
 
 use std::ptr;
 use std::sync::atomic::AtomicPtr;

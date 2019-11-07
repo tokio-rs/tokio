@@ -56,7 +56,7 @@ thread_local! {
 /// # Examples
 ///
 /// ```
-/// # use tokio::timer::clock;
+/// # use tokio::time::clock;
 /// let now = clock::now();
 /// ```
 pub fn now() -> Instant {

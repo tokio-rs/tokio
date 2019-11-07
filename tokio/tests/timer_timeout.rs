@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::sync::oneshot;
-use tokio::timer::*;
+use tokio::time::*;
 use tokio_test::task;
 use tokio_test::{
     assert_err, assert_pending, assert_ready, assert_ready_err, assert_ready_ok, clock,
