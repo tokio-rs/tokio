@@ -3,7 +3,6 @@ use super::{Enter, Executor, SpawnError};
 use futures::{future, Future};
 
 use std::cell::Cell;
-use std::marker::PhantomData;
 
 /// Executes futures on the default executor for the current execution context.
 ///
@@ -23,8 +22,8 @@ pub struct DefaultExecutor {
 /// Ensures that the executor is removed from the thread-local context
 /// when leaving the scope. This handles cases that involve panicking.
 #[derive(Debug)]
-pub struct DefaultGuard<'a> {
-    _lifetime: PhantomData<&'a ()>,
+pub struct DefaultGuard {
+    _p: (),
 }
 
 impl DefaultExecutor {
@@ -183,6 +182,11 @@ where
     T: Executor,
     F: FnOnce(&mut Enter) -> R,
 {
+    unsafe fn hide_lt<'a>(p: *mut (dyn Executor + 'a)) -> *mut (dyn Executor + 'static) {
+        use std::mem;
+        mem::transmute(p)
+    }
+
     EXECUTOR.with(|cell| {
         match cell.get() {
             State::Ready(_) | State::Active => {
@@ -224,7 +228,7 @@ where
 /// # Panics
 ///
 /// This function panics if there already is a default executor set.
-pub fn set_default<'a, T>(executor: T) -> DefaultGuard<'a>
+pub fn set_default<T>(executor: T) -> DefaultGuard
 where
     T: Executor + 'static,
 {
@@ -244,17 +248,10 @@ where
         cell.set(State::Ready(Box::into_raw(executor)));
     });
 
-    DefaultGuard {
-        _lifetime: PhantomData,
-    }
+    DefaultGuard { _p: () }
 }
 
-unsafe fn hide_lt<'a>(p: *mut (dyn Executor + 'a)) -> *mut (dyn Executor + 'static) {
-    use std::mem;
-    mem::transmute(p)
-}
-
-impl<'a> Drop for DefaultGuard<'a> {
+impl Drop for DefaultGuard {
     fn drop(&mut self) {
         let _ = EXECUTOR.try_with(|cell| {
             if let State::Ready(prev) = cell.replace(State::Empty) {

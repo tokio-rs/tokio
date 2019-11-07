@@ -5,7 +5,6 @@ use tokio_executor::Enter;
 
 use std::cell::RefCell;
 use std::fmt;
-use std::marker::PhantomData;
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 
@@ -47,8 +46,8 @@ pub(crate) struct HandlePriv {
 
 /// A guard that resets the current timer to `None` when dropped.
 #[derive(Debug)]
-pub struct DefaultGuard<'a> {
-    _lifetime: PhantomData<&'a ()>,
+pub struct DefaultGuard {
+    _p: (),
 }
 
 thread_local! {
@@ -80,7 +79,7 @@ where
 /// # Panics
 ///
 /// This function panics if there already is a default timer set.
-pub fn set_default(handle: &Handle) -> DefaultGuard<'_> {
+pub fn set_default(handle: &Handle) -> DefaultGuard {
     CURRENT_TIMER.with(|current| {
         let mut current = current.borrow_mut();
 
@@ -96,9 +95,7 @@ pub fn set_default(handle: &Handle) -> DefaultGuard<'_> {
 
         *current = Some(handle.clone());
     });
-    DefaultGuard {
-        _lifetime: PhantomData,
-    }
+    DefaultGuard { _p: () }
 }
 
 impl Handle {
@@ -194,7 +191,7 @@ impl fmt::Debug for HandlePriv {
     }
 }
 
-impl<'a> Drop for DefaultGuard<'a> {
+impl Drop for DefaultGuard {
     fn drop(&mut self) {
         let _ = CURRENT_TIMER.try_with(|current| {
             let mut current = current.borrow_mut();

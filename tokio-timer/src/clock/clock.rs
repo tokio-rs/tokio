@@ -5,7 +5,6 @@ use tokio_executor::Enter;
 
 use std::cell::RefCell;
 use std::fmt;
-use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -23,8 +22,8 @@ pub struct Clock {
 
 /// A guard that resets the current `Clock` to `None` when dropped.
 #[derive(Debug)]
-pub struct DefaultGuard<'a> {
-    _lifetime: PhantomData<&'a ()>,
+pub struct DefaultGuard {
+    _p: (),
 }
 
 thread_local! {
@@ -131,7 +130,7 @@ where
 /// # Panics
 ///
 /// This function panics if there already is a default clock set.
-pub fn set_default(clock: &Clock) -> DefaultGuard<'_> {
+pub fn set_default(clock: &Clock) -> DefaultGuard {
     CLOCK.with(|cell| {
         assert!(
             cell.borrow().is_none(),
@@ -140,13 +139,11 @@ pub fn set_default(clock: &Clock) -> DefaultGuard<'_> {
 
         *cell.borrow_mut() = Some(clock.clone());
 
-        DefaultGuard {
-            _lifetime: PhantomData,
-        }
+        DefaultGuard { _p: () }
     })
 }
 
-impl<'a> Drop for DefaultGuard<'a> {
+impl Drop for DefaultGuard {
     fn drop(&mut self) {
         let _ = CLOCK.try_with(|cell| cell.borrow_mut().take());
     }
