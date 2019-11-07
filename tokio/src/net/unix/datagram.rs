@@ -1,5 +1,5 @@
 use crate::future::poll_fn;
-use crate::net::util::IoSource;
+use crate::net::util::IoResource;
 
 use mio;
 use std::convert::TryFrom;
@@ -13,7 +13,7 @@ use std::task::{Context, Poll};
 
 /// An I/O object representing a Unix datagram socket.
 pub struct UnixDatagram {
-    io: IoSource<mio::net::UnixDatagram>,
+    io: IoResource<mio::net::UnixDatagram>,
 }
 
 impl UnixDatagram {
@@ -46,12 +46,12 @@ impl UnixDatagram {
     /// specified by `handle` and is ready to perform I/O.
     pub fn from_std(datagram: net::UnixDatagram) -> io::Result<UnixDatagram> {
         let socket = mio::net::UnixDatagram::from_std(datagram);
-        let io = IoSource::new(socket)?;
+        let io = IoResource::new(socket)?;
         Ok(UnixDatagram { io })
     }
 
     fn new(socket: mio::net::UnixDatagram) -> io::Result<UnixDatagram> {
-        let io = IoSource::new(socket)?;
+        let io = IoResource::new(socket)?;
         Ok(UnixDatagram { io })
     }
 

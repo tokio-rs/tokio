@@ -1,7 +1,7 @@
 use crate::future::poll_fn;
 use crate::io::{AsyncRead, AsyncWrite};
 use crate::net::tcp::split::{split, ReadHalf, WriteHalf};
-use crate::net::util::IoSource;
+use crate::net::util::IoResource;
 use crate::net::ToSocketAddrs;
 
 use bytes::{Buf, BufMut};
@@ -40,7 +40,7 @@ use std::task::{Context, Poll};
 /// }
 /// ```
 pub struct TcpStream {
-    io: IoSource<mio::net::TcpStream>,
+    io: IoResource<mio::net::TcpStream>,
 }
 
 impl TcpStream {
@@ -113,7 +113,7 @@ impl TcpStream {
     }
 
     pub(crate) fn new(connected: mio::net::TcpStream) -> io::Result<TcpStream> {
-        let io = IoSource::new(connected)?;
+        let io = IoResource::new(connected)?;
         Ok(TcpStream { io })
     }
 
@@ -137,7 +137,7 @@ impl TcpStream {
     /// ```
     pub fn from_std(stream: net::TcpStream) -> io::Result<TcpStream> {
         let io = mio::net::TcpStream::from_std(stream);
-        let io = IoSource::new(io)?;
+        let io = IoResource::new(io)?;
         Ok(TcpStream { io })
     }
 
@@ -147,7 +147,7 @@ impl TcpStream {
     #[doc(hidden)]
     pub async fn connect_std(_stream: net::TcpStream, _addr: &SocketAddr) -> io::Result<TcpStream> {
         // let io = mio::net::TcpStream::connect_stream(stream, addr)?;
-        // let io = IoSource::new(io)?;
+        // let io = IoResource::new(io)?;
         // let stream = TcpStream { io };
 
         // Once we've connected, wait for the stream to be writable as

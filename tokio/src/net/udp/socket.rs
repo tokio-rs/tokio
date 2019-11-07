@@ -1,6 +1,6 @@
 use crate::future::poll_fn;
 use crate::net::udp::split::{split, UdpSocketRecvHalf, UdpSocketSendHalf};
-use crate::net::util::IoSource;
+use crate::net::util::IoResource;
 use crate::net::ToSocketAddrs;
 
 use std::convert::TryFrom;
@@ -11,7 +11,7 @@ use std::task::{Context, Poll};
 
 /// An I/O object representing a UDP socket.
 pub struct UdpSocket {
-    io: IoSource<mio::net::UdpSocket>,
+    io: IoResource<mio::net::UdpSocket>,
 }
 
 impl UdpSocket {
@@ -42,7 +42,7 @@ impl UdpSocket {
     }
 
     fn new(socket: mio::net::UdpSocket) -> io::Result<UdpSocket> {
-        let io = IoSource::new(socket)?;
+        let io = IoResource::new(socket)?;
         Ok(UdpSocket { io })
     }
 
@@ -57,7 +57,7 @@ impl UdpSocket {
     /// `reuse_address` or binding to multiple addresses.
     pub fn from_std(socket: net::UdpSocket) -> io::Result<UdpSocket> {
         let io = mio::net::UdpSocket::from_std(socket);
-        let io = IoSource::new(io)?;
+        let io = IoResource::new(io)?;
         Ok(UdpSocket { io })
     }
 

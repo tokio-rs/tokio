@@ -2,7 +2,7 @@ use crate::future::poll_fn;
 use crate::io::{AsyncRead, AsyncWrite};
 use crate::net::unix::split::{split, ReadHalf, WriteHalf};
 use crate::net::unix::ucred::{self, UCred};
-use crate::net::util::IoSource;
+use crate::net::util::IoResource;
 
 use bytes::{Buf, BufMut};
 use std::convert::TryFrom;
@@ -21,7 +21,7 @@ use std::task::{Context, Poll};
 /// from a listener with `UnixListener::incoming`. Additionally, a pair of
 /// anonymous Unix sockets can be created with `UnixStream::pair`.
 pub struct UnixStream {
-    io: IoSource<mio::net::UnixStream>,
+    io: IoResource<mio::net::UnixStream>,
 }
 
 impl UnixStream {
@@ -48,7 +48,7 @@ impl UnixStream {
     /// specified by `handle` and is ready to perform I/O.
     pub fn from_std(stream: net::UnixStream) -> io::Result<UnixStream> {
         let stream = mio::net::UnixStream::from_std(stream);
-        let io = IoSource::new(stream)?;
+        let io = IoResource::new(stream)?;
 
         Ok(UnixStream { io })
     }
@@ -67,7 +67,7 @@ impl UnixStream {
     }
 
     pub(crate) fn new(stream: mio::net::UnixStream) -> io::Result<UnixStream> {
-        let io = IoSource::new(stream)?;
+        let io = IoResource::new(stream)?;
         Ok(UnixStream { io })
     }
 
@@ -115,10 +115,10 @@ impl TryFrom<UnixStream> for mio::net::UnixStream {
 
     /// Consumes value, returning the mio I/O object.
     ///
-    /// See [`IoSource::into_inner`] for more details about
+    /// See [`IoResource::into_inner`] for more details about
     /// resource deregistration that happens during the call.
     ///
-    /// [`IoSource::into_inner`]: crate::util::PollEvented::into_inner
+    /// [`IoResource::into_inner`]: crate::util::PollEvented::into_inner
     fn try_from(value: UnixStream) -> Result<Self, Self::Error> {
         value.io.into_inner()
     }

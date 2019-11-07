@@ -6,7 +6,7 @@
 #![cfg(unix)]
 
 use crate::io::AsyncRead;
-use crate::net::util::IoSource;
+use crate::net::util::IoResource;
 use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
 use crate::sync::mpsc::{channel, Receiver};
 
@@ -257,7 +257,7 @@ fn signal_enable(signal: c_int) -> io::Result<()> {
 
 #[derive(Debug)]
 struct Driver {
-    wakeup: IoSource<UnixStream>,
+    wakeup: IoResource<UnixStream>,
 }
 
 impl Driver {
@@ -281,13 +281,13 @@ impl Driver {
         // I'm not sure if the second (failed) registration simply doesn't end up
         // receiving wake up notifications, or there could be some race condition
         // when consuming readiness events, but having distinct descriptors for
-        // distinct IoSource instances appears to mitigate this.
+        // distinct IoResource instances appears to mitigate this.
         //
-        // Unfortunately we cannot just use a single global IoSource instance
+        // Unfortunately we cannot just use a single global IoResource instance
         // either, since we can't compare Handles or assume they will always
         // point to the exact same reactor.
         let stream = globals().receiver.try_clone()?;
-        let wakeup = IoSource::new(stream)?;
+        let wakeup = IoResource::new(stream)?;
 
         Ok(Driver { wakeup })
     }
