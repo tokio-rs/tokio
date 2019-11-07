@@ -3,8 +3,7 @@
 //! # Example
 //!
 //! ```
-//! use tokio::clock;
-//! use tokio::time::delay;
+//! use tokio::time::{clock, delay};
 //! use tokio_test::{assert_ready, assert_pending, task};
 //!
 //! use std::time::Duration;
