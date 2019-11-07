@@ -1,9 +1,9 @@
 pub(crate) use self::variant::*;
 
-#[cfg(feature = "timer")]
+#[cfg(feature = "time")]
 mod variant {
     use crate::runtime::io;
-    use crate::timer::{clock, timer};
+    use crate::time::{clock, timer};
 
     pub(crate) type Clock = clock::Clock;
     pub(crate) type Driver = timer::Timer<io::Driver>;
@@ -23,7 +23,7 @@ mod variant {
     }
 }
 
-#[cfg(not(feature = "timer"))]
+#[cfg(not(feature = "time"))]
 mod variant {
     use crate::runtime::io;
 

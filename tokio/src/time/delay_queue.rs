@@ -4,10 +4,10 @@
 //!
 //! [`DelayQueue`]: struct.DelayQueue.html
 
-use crate::timer::clock::now;
-use crate::timer::timer::Handle;
-use crate::timer::wheel::{self, Wheel};
-use crate::timer::{Delay, Error};
+use crate::time::clock::now;
+use crate::time::timer::Handle;
+use crate::time::wheel::{self, Wheel};
+use crate::time::{Delay, Error};
 
 use futures_core::ready;
 use slab::Slab;
@@ -70,7 +70,7 @@ use std::time::{Duration, Instant};
 /// Using `DelayQueue` to manage cache entries.
 ///
 /// ```rust,no_run
-/// use tokio::timer::{delay_queue, DelayQueue, Error};
+/// use tokio::time::{delay_queue, DelayQueue, Error};
 ///
 /// use futures_core::ready;
 /// use std::collections::HashMap;
@@ -217,7 +217,7 @@ impl<T> DelayQueue<T> {
     /// # Examples
     ///
     /// ```rust
-    /// # use tokio::timer::DelayQueue;
+    /// # use tokio::time::DelayQueue;
     /// let delay_queue: DelayQueue<u32> = DelayQueue::new();
     /// ```
     pub fn new() -> DelayQueue<T> {
@@ -231,8 +231,8 @@ impl<T> DelayQueue<T> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// # use tokio::timer::DelayQueue;
-    /// use tokio::timer::timer::Handle;
+    /// # use tokio::time::DelayQueue;
+    /// use tokio::time::timer::Handle;
     ///
     /// let handle = Handle::default();
     /// let delay_queue: DelayQueue<u32> = DelayQueue::with_capacity_and_handle(0, &handle);
@@ -258,7 +258,7 @@ impl<T> DelayQueue<T> {
     /// # Examples
     ///
     /// ```rust
-    /// # use tokio::timer::DelayQueue;
+    /// # use tokio::time::DelayQueue;
     /// # use std::time::Duration;
     /// let mut delay_queue = DelayQueue::with_capacity(10);
     ///
@@ -302,7 +302,7 @@ impl<T> DelayQueue<T> {
     /// Basic usage
     ///
     /// ```rust
-    /// use tokio::timer::DelayQueue;
+    /// use tokio::time::DelayQueue;
     /// use std::time::{Instant, Duration};
     ///
     /// let mut delay_queue = DelayQueue::new();
@@ -403,7 +403,7 @@ impl<T> DelayQueue<T> {
     /// Basic usage
     ///
     /// ```rust
-    /// use tokio::timer::DelayQueue;
+    /// use tokio::time::DelayQueue;
     /// use std::time::Duration;
     ///
     /// let mut delay_queue = DelayQueue::new();
@@ -453,7 +453,7 @@ impl<T> DelayQueue<T> {
     /// Basic usage
     ///
     /// ```rust
-    /// use tokio::timer::DelayQueue;
+    /// use tokio::time::DelayQueue;
     /// use std::time::Duration;
     ///
     /// let mut delay_queue = DelayQueue::new();
@@ -464,7 +464,7 @@ impl<T> DelayQueue<T> {
     /// assert_eq!(*item.get_ref(), "foo");
     /// ```
     pub fn remove(&mut self, key: &Key) -> Expired<T> {
-        use crate::timer::wheel::Stack;
+        use crate::time::wheel::Stack;
 
         // Special case the `expired` queue
         if self.slab[key.index].expired {
@@ -501,7 +501,7 @@ impl<T> DelayQueue<T> {
     /// Basic usage
     ///
     /// ```rust
-    /// use tokio::timer::DelayQueue;
+    /// use tokio::time::DelayQueue;
     /// use std::time::{Duration, Instant};
     ///
     /// let mut delay_queue = DelayQueue::new();
@@ -555,7 +555,7 @@ impl<T> DelayQueue<T> {
     /// Basic usage
     ///
     /// ```rust
-    /// use tokio::timer::DelayQueue;
+    /// use tokio::time::DelayQueue;
     /// use std::time::Duration;
     ///
     /// let mut delay_queue = DelayQueue::new();
@@ -582,7 +582,7 @@ impl<T> DelayQueue<T> {
     /// # Examples
     ///
     /// ```rust
-    /// use tokio::timer::DelayQueue;
+    /// use tokio::time::DelayQueue;
     /// use std::time::Duration;
     ///
     /// let mut delay_queue = DelayQueue::new();
@@ -607,7 +607,7 @@ impl<T> DelayQueue<T> {
     /// # Examples
     ///
     /// ```rust
-    /// use tokio::timer::DelayQueue;
+    /// use tokio::time::DelayQueue;
     ///
     /// let delay_queue: DelayQueue<i32> = DelayQueue::with_capacity(10);
     /// assert_eq!(delay_queue.capacity(), 10);
@@ -636,7 +636,7 @@ impl<T> DelayQueue<T> {
     /// # Examples
     ///
     /// ```
-    /// use tokio::timer::DelayQueue;
+    /// use tokio::time::DelayQueue;
     /// use std::time::Duration;
     ///
     /// let mut delay_queue = DelayQueue::new();
@@ -658,7 +658,7 @@ impl<T> DelayQueue<T> {
     /// # Examples
     ///
     /// ```
-    /// use tokio::timer::DelayQueue;
+    /// use tokio::time::DelayQueue;
     /// use std::time::Duration;
     ///
     /// let mut delay_queue = DelayQueue::new();
@@ -690,8 +690,7 @@ impl<T> DelayQueue<T> {
                     ready!(Pin::new(&mut *delay).poll(cx));
                 }
 
-                let now =
-                    crate::timer::ms(delay.deadline() - self.start, crate::timer::Round::Down);
+                let now = crate::time::ms(delay.deadline() - self.start, crate::time::Round::Down);
 
                 self.poll = wheel::Poll::new(now);
             }
@@ -714,7 +713,7 @@ impl<T> DelayQueue<T> {
         let when = if when < self.start {
             0
         } else {
-            crate::timer::ms(when - self.start, crate::timer::Round::Up)
+            crate::time::ms(when - self.start, crate::time::Round::Up)
         };
 
         cmp::max(when, self.wheel.elapsed())

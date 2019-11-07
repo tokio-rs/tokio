@@ -1,4 +1,4 @@
-use crate::timer::wheel::Stack;
+use crate::time::wheel::Stack;
 
 use std::fmt;
 

@@ -1,6 +1,6 @@
 #![warn(rust_2018_idioms)]
 
-use tokio::timer::*;
+use tokio::time::*;
 use tokio_test::{assert_ok, assert_pending, assert_ready};
 use tokio_test::{clock, task};
 

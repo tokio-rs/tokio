@@ -1,15 +1,15 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::runtime;
-use tokio::timer::clock::Clock;
-use tokio::timer::*;
+use tokio::time::clock::Clock;
+use tokio::time::*;
 
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
 struct MockNow(Instant);
 
-impl tokio::timer::clock::Now for MockNow {
+impl tokio::time::clock::Now for MockNow {
     fn now(&self) -> Instant {
         self.0
     }

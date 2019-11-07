@@ -85,9 +85,6 @@ macro_rules! thread_local {
     ($($tts:tt)+) => { loom::thread_local!{ $($tts)+ } }
 }
 
-#[cfg(feature = "timer")]
-pub mod clock;
-
 #[cfg(feature = "fs")]
 pub mod fs;
 
@@ -117,8 +114,8 @@ pub mod stream;
 #[cfg(feature = "sync")]
 pub mod sync;
 
-#[cfg(feature = "timer")]
-pub mod timer;
+#[cfg(feature = "time")]
+pub mod time;
 
 #[cfg(feature = "rt-full")]
 mod util;

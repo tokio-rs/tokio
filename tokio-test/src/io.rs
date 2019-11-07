@@ -18,7 +18,7 @@
 
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::mpsc;
-use tokio::timer::{clock, timer, Delay};
+use tokio::time::{clock, timer, Delay};
 
 use bytes::Buf;
 use futures_core::ready;

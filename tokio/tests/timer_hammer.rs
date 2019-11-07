@@ -3,7 +3,7 @@
 
 use tokio::executor::park::{Park, Unpark, UnparkThread};
 use tokio::runtime;
-use tokio::timer::{Delay, Timer};
+use tokio::time::{Delay, Timer};
 
 use rand::Rng;
 use std::cmp;
