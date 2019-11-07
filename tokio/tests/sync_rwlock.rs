@@ -41,24 +41,14 @@ async fn read_uncontested() {
 }
 
 // Acquire an RwLock nonexclusively by two different tasks simultaneously .
-#[tokio::test]
-async fn read_shared() {
-    let rwlock = RwLock::new(100);
+#[test]
+fn read_shared() {
+    let rwlock = RwLock::<u32>::new(42);
 
-    let (tx0, rx0) = oneshot::channel::<()>();
-    let (tx1, rx1) = oneshot::channel::<()>();
-    let task0 = rwlock.read().then(move |guard| {
-        tx1.send(()).unwrap();
-        rx0.map(move |_| *guard)
-    });
-    let task1 = rwlock.read().then(move |guard| {
-        tx0.send(()).unwrap();
-        rx1.map(move |_| *guard)
-    });
-
-    let result = future::join(task0, task1).await;
-
-    assert_eq!(result, (100, 100));
+    let mut fut1 = spawn(rwlock.read());
+    let _guard1 = assert_ready!(fut1.poll()); // fut1 immediately gets ownership
+    let mut fut2 = spawn(rwlock.read());
+    let _guard2 = assert_ready!(fut2.poll()); // fut2 also gets ownership
 }
 
 // Attempt to acquire an RwLock for reading that already has a writer
@@ -113,8 +103,10 @@ async fn write_uncontested() {
 #[tokio::test]
 async fn write_order() {
     let rwlock = RwLock::<Vec<u32>>::new(vec![]);
-    rwlock.write().map(|mut guard| guard.push(1)).await;
-    rwlock.write().map(|mut guard| guard.push(2)).await;
+    let fut2 = rwlock.write().map(|mut guard| guard.push(2));
+    let fut1 = rwlock.write().map(|mut guard| guard.push(1));
+    fut1.await;
+    fut2.await;
 
     let g = rwlock.read().await;
     assert_eq!(*g, vec![1, 2]);
