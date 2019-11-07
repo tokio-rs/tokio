@@ -1,53 +1,58 @@
 use super::{Blocking, BlockingError, DEFAULT_BLOCKING};
 use futures::Poll;
 use std::cell::Cell;
+use std::marker::PhantomData;
 use tokio_executor::Enter;
 
 thread_local! {
-    static CURRENT: Cell<*const dyn Blocking> = Cell::new(&DEFAULT_BLOCKING as *const _);
+    static CURRENT: Cell<&'static dyn Blocking> = Cell::new(&DEFAULT_BLOCKING);
 }
 
-/// Set the default executor for the duration of the closure
-///
-/// # Panics
-///
-/// This function panics if there already is a default executor set.
+/// Ensures that the executor is removed from the thread-local context
+/// when leaving the scope. This handles cases that involve panicking.
+#[derive(Debug)]
+pub struct DefaultGuard<'a> {
+    prior: &'static dyn Blocking,
+    _lifetime: PhantomData<&'a ()>,
+}
+
+/// Set the default blocking implementation, returning a guard that resets the
+/// blocking implementation when dropped.
+pub fn set_default<B>(blocking: &B) -> DefaultGuard<'_>
+where
+    B: Blocking,
+{
+    CURRENT.with(|cell| {
+        // While scary, this is safe. The function takes a
+        // `&Blocking`, which guarantees that the reference lives for the
+        // duration of `the guard's lifetime`.
+        //
+        // Because we are always clearing the TLS value when the the end of the
+        // function, we can cast the reference to 'static which thread-local
+        // cells require.
+        let blocking = unsafe { hide_lt(blocking) };
+
+        let prior = cell.replace(blocking);
+        DefaultGuard {
+            prior,
+            _lifetime: PhantomData,
+        }
+    })
+
+    unsafe fn hide_lt<'a>(p: &'a (dyn Blocking + 'a)) -> &'static (dyn Blocking + 'static) {
+        use std::mem;
+        mem::transmute(p)
+    }
+}
+
+/// Set the default blocking implementation for the duration of the closure
 pub fn with_default<B, F, R>(blocking: &B, enter: &mut Enter, f: F) -> R
 where
     B: Blocking,
     F: FnOnce(&mut Enter) -> R,
 {
-    CURRENT.with(|cell| {
-        struct Reset<'a> {
-            cell: &'a Cell<*const dyn Blocking>,
-            prior: *const dyn Blocking,
-        };
-
-        impl<'a> Drop for Reset<'a> {
-            fn drop(&mut self) {
-                self.cell.set(self.prior);
-            }
-        }
-
-        unsafe fn hide_lt<'a>(p: *const (dyn Blocking + 'a)) -> *const (dyn Blocking + 'static) {
-            use std::mem;
-            mem::transmute(p)
-        }
-
-        // While scary, this is safe. The function takes a
-        // `&mut Executor`, which guarantees that the reference lives for the
-        // duration of `with_default`.
-        //
-        // Because we are always clearing the TLS value at the end of the
-        // function, we can cast the reference to 'static which thread-local
-        // cells require.
-        let blocking = unsafe { hide_lt(blocking as &_ as *const _) };
-
-        let prior = cell.replace(blocking);
-        let _reset = Reset { cell, prior };
-
-        f(enter)
-    })
+    let _guard = set_default(blocking);
+    f(enter)
 }
 
 /// Enter a blocking section of code.
@@ -166,7 +171,7 @@ where
     F: FnOnce() -> T,
 {
     CURRENT.with(|cell| {
-        let blocking = unsafe { &*(cell.get()) };
+        let blocking = cell.get();
 
         // Object-safety workaround: the `Blocking` trait must be object-safe,
         // since we use a trait object in the thread-local. However, a blocking

@@ -7,10 +7,7 @@ use std::error::Error;
 use std::fmt;
 
 mod global;
-
-pub use self::global::blocking;
-#[doc(hidden)]
-pub use self::global::with_default;
+pub use self::global::{blocking, set_default, with_default, DefaultGuard};
 
 /// Error raised by `blocking`.
 pub struct BlockingError {
