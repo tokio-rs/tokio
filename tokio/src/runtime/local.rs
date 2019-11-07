@@ -409,7 +409,7 @@ mod tests {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
             let join = spawn(async move {
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
-                crate::timer::delay_for(Duration::from_millis(10)).await;
+                crate::time::delay_for(Duration::from_millis(10)).await;
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
             });
             join.await.unwrap();
