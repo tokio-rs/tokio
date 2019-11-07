@@ -1,19 +1,26 @@
-#![cfg(feature = "broken")]
-#![feature(test)]
 #![warn(rust_2018_idioms)]
 
-pub extern crate test;
-
 mod prelude {
-    pub use futures::*;
-    pub use tokio::net::{TcpListener, TcpStream};
-    pub use tokio::reactor::Reactor;
-    pub use tokio_io::io::read_to_end;
+    pub use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion};
 
-    pub use std::io::{self, Read, Write};
+    pub use futures::{task::Poll, *};
+    pub use tokio::{
+        io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
+        net::{TcpListener, TcpStream},
+    };
+
+    pub use std::io;
+    pub use std::net::SocketAddr;
+    pub use std::pin::Pin;
     pub use std::thread;
     pub use std::time::Duration;
-    pub use test::{self, Bencher};
+
+    pub fn block_on<F>(f: F) -> F::Output
+    where
+        F: Future,
+    {
+        tokio::runtime::Runtime::new().unwrap().block_on(f)
+    }
 }
 
 mod connect_churn {
@@ -22,73 +29,80 @@ mod connect_churn {
     const NUM: usize = 300;
     const CONCURRENT: usize = 8;
 
-    #[bench]
-    fn one_thread(b: &mut Bencher) {
-        let addr = "127.0.0.1:0".parse().unwrap();
+    pub fn one_thread(b: &mut Bencher<'_>) {
+        let addr = "127.0.0.1:0".parse::<SocketAddr>().unwrap();
 
         b.iter(move || {
-            let listener = TcpListener::bind(&addr).unwrap();
-            let addr = listener.local_addr().unwrap();
+            let result: io::Result<_> = block_on(async {
+                let mut listener = TcpListener::bind(&addr).await.unwrap();
+                let addr = listener.local_addr().unwrap();
 
-            // Spawn a single future that accepts & drops connections
-            let serve_incomings = listener
-                .incoming()
-                .map_err(|e| panic!("server err: {:?}", e))
-                .for_each(|_| Ok(()));
+                // Spawn a single future that accepts & drops connections
+                let serve_incomings = listener
+                    .incoming()
+                    .map_err(|e| panic!("server err: {:?}", e))
+                    .try_for_each(|_| async { Ok(()) });
 
-            let connects = stream::iter_result((0..NUM).map(|_| {
-                Ok(TcpStream::connect(&addr).and_then(|sock| {
-                    sock.set_linger(Some(Duration::from_secs(0))).unwrap();
-                    read_to_end(sock, vec![])
-                }))
-            }));
+                let connects = stream::iter((0..NUM).map(|_| {
+                    Ok(TcpStream::connect(&addr).and_then(|mut sock| {
+                        async move {
+                            sock.set_linger(Some(Duration::from_secs(0))).unwrap();
+                            sock.read_to_end(&mut vec![]).await
+                        }
+                    }))
+                }));
 
-            let connects_concurrent = connects
-                .buffer_unordered(CONCURRENT)
-                .map_err(|e| panic!("client err: {:?}", e))
-                .for_each(|_| Ok(()));
+                let connects_concurrent = connects
+                    .try_buffer_unordered(CONCURRENT)
+                    .map_err(|e| panic!("client err: {:?}", e))
+                    .try_for_each(|_| async { Ok(()) });
 
-            serve_incomings
-                .select(connects_concurrent)
-                .map(|_| ())
-                .map_err(|_| ())
-                .wait()
-                .unwrap();
+                future::try_select(Box::pin(serve_incomings), Box::pin(connects_concurrent))
+                    .map_ok(|_| ())
+                    .map_err(|_| ())
+                    .await
+                    .unwrap();
+                Ok(())
+            });
+            result.unwrap();
         });
     }
 
-    fn n_workers(n: usize, b: &mut Bencher) {
-        let (shutdown_tx, shutdown_rx) = sync::oneshot::channel();
-        let (addr_tx, addr_rx) = sync::oneshot::channel();
+    fn n_workers(n: usize, b: &mut Bencher<'_>) {
+        let (shutdown_tx, shutdown_rx) = channel::oneshot::channel();
+        let (addr_tx, addr_rx) = channel::oneshot::channel();
 
         // Spawn reactor thread
         let server_thread = thread::spawn(move || {
-            // Bind the TCP listener
-            let listener = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
+            block_on(async {
+                // Bind the TCP listener
+                let mut listener = TcpListener::bind(&"127.0.0.1:0".parse::<SocketAddr>().unwrap())
+                    .await
+                    .unwrap();
 
-            // Get the address being listened on.
-            let addr = listener.local_addr().unwrap();
+                // Get the address being listened on.
+                let addr = listener.local_addr().unwrap();
 
-            // Send the remote & address back to the main thread
-            addr_tx.send(addr).unwrap();
+                // Send the remote & address back to the main thread
+                addr_tx.send(addr).unwrap();
 
-            // Spawn a single future that accepts & drops connections
-            let serve_incomings = listener
-                .incoming()
-                .map_err(|e| panic!("server err: {:?}", e))
-                .for_each(|_| Ok(()));
+                // Spawn a single future that accepts & drops connections
+                let serve_incomings = listener
+                    .incoming()
+                    .map_err(|e| panic!("server err: {:?}", e))
+                    .try_for_each(|_| async { Ok(()) });
 
-            // Run server
-            serve_incomings
-                .select(shutdown_rx)
-                .map(|_| ())
-                .map_err(|_| ())
-                .wait()
-                .unwrap();
+                // Run server
+                future::try_select(Box::pin(serve_incomings), Box::pin(shutdown_rx))
+                    .map_ok(|_| ())
+                    .map_err(|_| ())
+                    .await
+            })
+            .unwrap();
         });
 
         // Get the bind addr of the server
-        let addr = addr_rx.wait().unwrap();
+        let addr = block_on(addr_rx).unwrap();
 
         b.iter(move || {
             use std::sync::{Arc, Barrier};
@@ -103,23 +117,26 @@ mod connect_churn {
                     let addr = addr.clone();
 
                     thread::spawn(move || {
-                        let connects = stream::iter_result((0..(NUM / n)).map(|_| {
+                        let connects = stream::iter((0..(NUM / n)).map(|_| {
                             Ok(TcpStream::connect(&addr)
                                 .map_err(|e| panic!("connect err: {:?}", e))
-                                .and_then(|sock| {
-                                    sock.set_linger(Some(Duration::from_secs(0))).unwrap();
-                                    read_to_end(sock, vec![])
+                                .and_then(|mut sock| {
+                                    async move {
+                                        sock.set_linger(Some(Duration::from_secs(0))).unwrap();
+                                        sock.read_to_end(&mut vec![]).await
+                                    }
                                 }))
                         }));
 
                         barrier.wait();
 
-                        connects
-                            .buffer_unordered(CONCURRENT)
-                            .map_err(|e| panic!("client err: {:?}", e))
-                            .for_each(|_| Ok(()))
-                            .wait()
-                            .unwrap();
+                        block_on(
+                            connects
+                                .try_buffer_unordered(CONCURRENT)
+                                .map_err(|e| panic!("client err: {:?}", e))
+                                .try_for_each(|_| async { Ok(()) }),
+                        )
+                        .unwrap();
                     })
                 })
                 .collect();
@@ -136,13 +153,11 @@ mod connect_churn {
         server_thread.join().unwrap();
     }
 
-    #[bench]
-    fn two_threads(b: &mut Bencher) {
+    pub fn two_threads(b: &mut Bencher<'_>) {
         n_workers(1, b);
     }
 
-    #[bench]
-    fn multi_threads(b: &mut Bencher) {
+    pub fn multi_threads(b: &mut Bencher<'_>) {
         n_workers(4, b);
     }
 }
@@ -150,7 +165,6 @@ mod connect_churn {
 mod transfer {
     use crate::prelude::*;
     use std::{cmp, mem};
-    use tokio_io::try_nb;
 
     const MB: usize = 3 * 1024 * 1024;
 
@@ -160,15 +174,15 @@ mod transfer {
     }
 
     impl Future for Drain {
-        type Item = ();
-        type Error = io::Error;
+        type Output = io::Result<()>;
 
-        fn poll(&mut self) -> Poll<(), io::Error> {
-            let mut buf: [u8; 1024] = unsafe { mem::uninitialized() };
+        fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<io::Result<()>> {
+            let mut buf: [u8; 1024] = unsafe { mem::MaybeUninit::uninit().assume_init() };
 
+            let self_ = &mut *self;
             loop {
-                match try_nb!(self.sock.read(&mut buf[..self.chunk])) {
-                    0 => return Ok(Async::Ready(())),
+                match ready!(Pin::new(&mut self_.sock).poll_read(cx, &mut buf[..self_.chunk]))? {
+                    0 => return Poll::Ready(Ok(())),
                     _ => {}
                 }
             }
@@ -182,76 +196,82 @@ mod transfer {
     }
 
     impl Future for Transfer {
-        type Item = ();
-        type Error = io::Error;
+        type Output = io::Result<()>;
 
-        fn poll(&mut self) -> Poll<(), io::Error> {
+        fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<io::Result<()>> {
             while self.rem > 0 {
                 let len = cmp::min(self.rem, self.chunk);
                 let buf = &DATA[..len];
 
-                let n = try_nb!(self.sock.write(&buf));
+                let n = ready!(Pin::new(&mut self.sock).poll_write(cx, &buf))?;
                 self.rem -= n;
             }
 
-            Ok(Async::Ready(()))
+            Poll::Ready(Ok(()))
         }
     }
 
     static DATA: [u8; 1024] = [0; 1024];
 
-    fn one_thread(b: &mut Bencher, read_size: usize, write_size: usize) {
-        let addr = "127.0.0.1:0".parse().unwrap();
+    fn one_thread(b: &mut Bencher<'_>, read_size: usize, write_size: usize) {
+        let addr = "127.0.0.1:0".parse::<SocketAddr>().unwrap();
 
         b.iter(move || {
-            let listener = TcpListener::bind(&addr).unwrap();
-            let addr = listener.local_addr().unwrap();
+            let result: io::Result<_> = block_on(async move {
+                let mut listener = TcpListener::bind(&addr).await?;
+                let addr = listener.local_addr().unwrap();
 
-            // Spawn a single future that accepts 1 connection, Drain it and drops
-            let server = listener
-                .incoming()
-                .into_future() // take the first connection
-                .map_err(|(e, _other_incomings)| e)
-                .map(|(connection, _other_incomings)| connection.unwrap())
-                .and_then(|sock| {
+                // Spawn a single future that accepts 1 connection, Drain it and drops
+                let server = async move {
+                    // take the first connection
+                    let sock = listener.incoming().into_future().await.0.unwrap()?;
                     sock.set_linger(Some(Duration::from_secs(0))).unwrap();
                     let drain = Drain {
                         sock,
                         chunk: read_size,
                     };
-                    drain
-                        .map(|_| ())
-                        .map_err(|e| panic!("server error: {:?}", e))
-                })
-                .map_err(|e| panic!("server err: {:?}", e));
+                    drain.map_ok(|_| ()).await
+                };
 
-            let client = TcpStream::connect(&addr)
-                .and_then(move |sock| Transfer {
+                let client = TcpStream::connect(&addr).and_then(move |sock| Transfer {
                     sock,
                     rem: MB,
                     chunk: write_size,
-                })
-                .map_err(|e| panic!("client err: {:?}", e));
+                });
 
-            server.join(client).wait().unwrap();
+                future::try_join(server, client).await
+            });
+            result.unwrap()
         });
     }
 
-    mod small_chunks {
+    pub mod small_chunks {
         use crate::prelude::*;
 
-        #[bench]
-        fn one_thread(b: &mut Bencher) {
+        pub fn one_thread(b: &mut Bencher<'_>) {
             super::one_thread(b, 32, 32);
         }
     }
 
-    mod big_chunks {
+    pub mod big_chunks {
         use crate::prelude::*;
 
-        #[bench]
-        fn one_thread(b: &mut Bencher) {
+        pub fn one_thread(b: &mut Bencher<'_>) {
             super::one_thread(b, 1_024, 1_024);
         }
     }
 }
+
+use prelude::*;
+
+fn bench_tcp(c: &mut Criterion) {
+    c.bench_function("connect_churn/one_thread", connect_churn::one_thread);
+    c.bench_function("connect_churn/two_threads", connect_churn::two_threads);
+    c.bench_function("connect_churn/multi_threads", connect_churn::multi_threads);
+
+    c.bench_function("transfer/small_chunks", transfer::small_chunks::one_thread);
+    c.bench_function("transfer/big_chunks", transfer::big_chunks::one_thread);
+}
+
+criterion_group!(tcp, bench_tcp);
+criterion_main!(tcp);
