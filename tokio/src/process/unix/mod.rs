@@ -173,9 +173,7 @@ impl<T> Source for Fd<T>
 where
     T: AsRawFd,
 {
-    // fn register(&self, poll: &MioPoll, token: Token, interest: Interests) -> io::Result<()> {
     fn register(&self, registry: &Registry, token: Token, interest: Interests) -> io::Result<()> {
-        // SourceFd(&self.as_raw_fd()).register(poll, token, interest | UnixReady::hup(), opts)
         SourceFd(&self.as_raw_fd()).register(registry, token, interest)
     }
 

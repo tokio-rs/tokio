@@ -123,6 +123,7 @@ impl ScheduledIo {
     /// the current value, returning the previous readiness value.
     ///
     /// # Arguments
+    ///
     /// - `token`: the token for this `ScheduledIo`.
     /// - `f`: a closure returning a new readiness value given the previous
     ///   readiness.

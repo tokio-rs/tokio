@@ -1,8 +1,6 @@
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::runtime::{Park, Unpark};
 
-use std::sync::atomic::Ordering::SeqCst;
-
 mod dispatch;
 use dispatch::SingleShard;
 pub(crate) use dispatch::MAX_SOURCES;
@@ -14,6 +12,7 @@ use std::io;
 use std::marker::PhantomData;
 #[cfg(all(unix, not(target_os = "fuchsia")))]
 use std::os::unix::io::{AsRawFd, RawFd};
+use std::sync::atomic::Ordering::SeqCst;
 use std::sync::{Arc, Weak};
 use std::task::Waker;
 use std::time::Duration;
@@ -56,7 +55,7 @@ pub struct Turn {
 }
 
 pub(super) struct Inner {
-    /// TODO
+    /// Registers I/O resources.
     registry: mio::Registry,
 
     /// Dispatch slabs for I/O and futures events
@@ -67,7 +66,9 @@ pub(super) struct Inner {
     /// The number of sources in `io_dispatch`.
     n_sources: AtomicUsize,
 
-    /// Used to wake up the reactor from a call to `turn`
+    /// Used to wake up the reactor from a call to [`turn`].
+    ///
+    /// [`turn`]: #method.turn
     waker: mio::Waker,
 }
 
@@ -207,8 +208,9 @@ impl Reactor {
         // Process all the events that came in, dispatching appropriately
         for event in self.events.iter() {
             let token = event.token();
-            // TODO
-            if token != TOKEN_WAKEUP {
+            if token == TOKEN_WAKEUP {
+                self.inner.waker.wake()?;
+            } else {
                 self.dispatch(token, event);
             }
         }
@@ -216,7 +218,6 @@ impl Reactor {
         Ok(())
     }
 
-    // fn dispatch(&self, token: mio::Token, ready: mio::Ready) {
     fn dispatch(&self, token: mio::Token, event: &mio::event::Event) {
         let mut rd = None;
         let mut wr = None;
@@ -383,17 +384,17 @@ impl Inner {
             .io_dispatch
             .get(token)
             .unwrap_or_else(|| panic!("IO resource for token {} does not exist!", token));
-        let current = sched
+        let readiness = sched
             .get_readiness(token)
             .unwrap_or_else(|| panic!("token {} no longer valid!", token));
 
-        let (waker, readiness) = match dir {
+        let (waker, interest) = match dir {
             Direction::Read => (&sched.reader, Readiness::readable()),
             Direction::Write => (&sched.writer, Readiness::writable()),
         };
 
         waker.register(w);
-        if current & readiness.as_usize() != 0 {
+        if readiness & interest.as_usize() != 0 {
             waker.wake();
         }
     }
@@ -426,30 +427,23 @@ mod tests {
     use loom::thread;
 
     // No-op `Evented` impl just so we can have something to pass to `add_source`.
-    struct NotEvented;
+    struct NotSource;
 
-    impl Evented for NotEvented {
-        fn register(
-            &self,
-            _: &mio::Poll,
-            _: mio::Token,
-            _: mio::Ready,
-            _: mio::PollOpt,
-        ) -> io::Result<()> {
+    impl mio::event::Source for NotSource {
+        fn register(&self, _: &mio::Registry, _: mio::Token, _: mio::Interests) -> io::Result<()> {
             Ok(())
         }
 
         fn reregister(
             &self,
-            _: &mio::Poll,
+            _: &mio::Registry,
             _: mio::Token,
-            _: mio::Ready,
-            _: mio::PollOpt,
+            _: mio::Interests,
         ) -> io::Result<()> {
             Ok(())
         }
 
-        fn deregister(&self, _: &mio::Poll) -> io::Result<()> {
+        fn deregister(&self, _: &mio::Registry) -> io::Result<()> {
             Ok(())
         }
     }
@@ -462,14 +456,14 @@ mod tests {
             let inner = reactor.inner;
             let inner2 = inner.clone();
 
-            let token_1 = inner.add_source(&NotEvented).unwrap();
+            let token_1 = inner.add_source(&NotSource).unwrap();
             println!("token 1: {:#x}", token_1);
             let thread = thread::spawn(move || {
                 inner2.drop_source(token_1);
                 println!("dropped: {:#x}", token_1);
             });
 
-            let token_2 = inner.add_source(&NotEvented).unwrap();
+            let token_2 = inner.add_source(&NotSource).unwrap();
             println!("token 2: {:#x}", token_2);
             thread.join().unwrap();
 
@@ -487,17 +481,17 @@ mod tests {
             // add sources to fill up the first page so that the dropped index
             // may be reused.
             for _ in 0..31 {
-                inner.add_source(&NotEvented).unwrap();
+                inner.add_source(&NotSource).unwrap();
             }
 
-            let token_1 = inner.add_source(&NotEvented).unwrap();
+            let token_1 = inner.add_source(&NotSource).unwrap();
             println!("token 1: {:#x}", token_1);
             let thread = thread::spawn(move || {
                 inner2.drop_source(token_1);
                 println!("dropped: {:#x}", token_1);
             });
 
-            let token_2 = inner.add_source(&NotEvented).unwrap();
+            let token_2 = inner.add_source(&NotSource).unwrap();
             println!("token 2: {:#x}", token_2);
             thread.join().unwrap();
 
@@ -514,12 +508,12 @@ mod tests {
             let inner2 = inner.clone();
 
             let thread = thread::spawn(move || {
-                let token_2 = inner2.add_source(&NotEvented).unwrap();
+                let token_2 = inner2.add_source(&NotSource).unwrap();
                 println!("token 2: {:#x}", token_2);
                 token_2
             });
 
-            let token_1 = inner.add_source(&NotEvented).unwrap();
+            let token_1 = inner.add_source(&NotSource).unwrap();
             println!("token 1: {:#x}", token_1);
             let token_2 = thread.join().unwrap();
 

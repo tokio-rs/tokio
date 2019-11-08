@@ -1,7 +1,7 @@
 use super::reactor::{Direction, Handle};
 use super::Readiness;
 
-use mio;
+use mio::event;
 use std::task::{Context, Poll};
 use std::{io, usize};
 
@@ -19,18 +19,12 @@ use std::{io, usize};
 /// the read readiness and one for write readiness. These streams are
 /// independent and can be consumed from separate tasks.
 ///
-/// **Note**: while `Registration` is `Sync`, the caller must ensure that there
-/// are at most two tasks that use a registration instance concurrently. One
-/// task for [`poll_read_ready`] and one task for [`poll_write_ready`]. While
-/// violating this requirement is "safe" from a Rust memory safety point of
-/// view, it will result in unexpected behavior in the form of lost
+/// **Note**: while `Registration` is `Sync`, the caller must ensure that
+/// there are at most two tasks that use a registration instance concurrently.
+/// One task for [`poll_read_ready`] and one task for [`poll_write_ready`].
+/// While violating this requirement is "safe" from a Rust memory safety point
+/// of view, it will result in unexpected behavior in the form of lost
 /// notifications and tasks hanging.
-///
-/// ## Platform-specific events
-///
-/// `Registration` also allows receiving platform-specific `mio::Ready` events.
-/// These events are included as part of the read readiness event stream. The
-/// write readiness event stream is only for `Ready::writable()` events.
 ///
 /// [`new`]: #method.new
 /// [`poll_read_ready`]: #method.poll_read_ready`]
@@ -52,7 +46,7 @@ impl Registration {
     /// - `Err` if an error was encountered during registration
     pub fn new<T>(io: &T) -> io::Result<Self>
     where
-        T: mio::event::Source,
+        T: event::Source,
     {
         let handle = Handle::current();
         let token = if let Some(inner) = handle.inner() {
@@ -77,14 +71,13 @@ impl Registration {
     ///
     /// # Return
     ///
-    /// If the deregistration was successful, `Ok` is returned. Any calls to
+    /// - `Ok` is the deregistration was successful. Any calls to
     /// `Reactor::turn` that happen after a successful call to `deregister` will
     /// no longer result in notifications getting sent for this registration.
-    ///
-    /// `Err` is returned if an error is encountered.
+    /// - `Err` if an error is encountered.
     pub fn deregister<T>(&mut self, io: &T) -> io::Result<()>
     where
-        T: mio::event::Source,
+        T: event::Source,
     {
         let inner = match self.handle.inner() {
             Some(inner) => inner,
@@ -99,9 +92,10 @@ impl Registration {
     /// call to `poll_read_ready`, it is returned. If it has not, the current
     /// task is notified once a new event is received.
     ///
-    /// All events except `HUP` are [edge-triggered]. Once `HUP` is returned,
-    /// the function will always return `Ready(HUP)`. This should be treated as
-    /// the end of the readiness stream.
+    /// All events except `READ_CLOSED` are [`edge-triggered`]. Once
+    /// `READ_CLOSED` is returned, the function will always return this
+    /// readiness. This should be treated as the end of the *read* readiness
+    /// stream, however the write readiness stream may still receive events.
     ///
     /// Ensure that [`register`] has been called first.
     ///
@@ -150,9 +144,10 @@ impl Registration {
     /// call to `poll_write_ready`, it is returned. If it has not, the current
     /// task is notified once a new event is received.
     ///
-    /// All events except `HUP` are [edge-triggered]. Once `HUP` is returned,
-    /// the function will always return `Ready(HUP)`. This should be treated as
-    /// the end of the readiness stream.
+    /// All events except `WRITE_CLOSED` are [`edge-triggered`]. Once
+    /// `WRITE_CLOSED` is returned, the function will always return this
+    /// readiness. This should be treated as the end of the *write* readiness
+    /// stream, however the read readiness stream may still receive events.
     ///
     /// Ensure that [`register`] has been called first.
     ///
@@ -218,23 +213,17 @@ impl Registration {
         let mask = direction.mask();
         let mask_no_closed =
             (mask - (Readiness::read_closed() - Readiness::write_closed())).as_usize();
-        // let mask_no_hup = (mask - platform::hup()).as_usize();
 
         let sched = inner.io_dispatch.get(self.token).unwrap();
 
-        // This consumes the current readiness state **except** for HUP. HUP is
-        // excluded because a) it is a final state and never transitions out of
-        // HUP and b) both the read AND the write directions need to be able to
-        // observe this state.
-        //
-        // If HUP were to be cleared when `direction` is `Read`, then when
-        // `poll_ready` is called again with a `direction` of `Write`, the HUP
-        // state would not be visible.
+        // This consumes the current readiness state **except** for
+        // `READ_CLOSED` and `WRITE_CLOSED`. These are excluded because:
+        // - They are a final state and never transitioned out of
+        // - Both the read and the write directions should be able to observe
+        // this state
         let curr_ready = sched
-            // .set_readiness(self.token, |curr| curr & (!mask_no_hup))
             .set_readiness(self.token, |curr| curr & (!mask_no_closed))
             .unwrap_or_else(|_| panic!("token {} no longer valid!", self.token));
-        // let mut ready = mask & mio::Ready::from_usize(curr_ready);
         let mut ready = mask & Readiness::from_usize(curr_ready);
 
         if ready.is_empty() {
@@ -247,10 +236,8 @@ impl Registration {
 
                 // Try again
                 let curr_ready = sched
-                    // .set_readiness(self.token, |curr| curr & (!mask_no_hup))
                     .set_readiness(self.token, |curr| curr & (!mask_no_closed))
                     .unwrap_or_else(|_| panic!("token {} no longer valid!", self.token));
-                // ready = mask & mio::Ready::from_usize(curr_ready);
                 ready = mask & Readiness::from_usize(curr_ready);
             }
         }

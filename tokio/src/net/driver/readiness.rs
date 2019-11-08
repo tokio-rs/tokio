@@ -5,65 +5,82 @@ const WRITABLE: usize = 0b0_10;
 const READ_CLOSED: usize = 0b0_0100;
 const WRITE_CLOSED: usize = 0b0_1000;
 
-/// TODO
+/// A set of readiness event kinds.
+///
+/// `Readiness` is set of operation descriptors indicating which kind of an
+/// operation is ready to be performed.
+///
+/// This struct only represents portable event kinds. Portable events are
+/// events that can be raised on any platform while guaranteeing no false
+/// positives.
+///
+/// # Examples
+///
+/// ```rust
+/// use tokio::net::driver::Readiness;
+///
+/// let readiness = Readiness::readable() | Readiness::read_closed();
+/// assert!(readiness.is_readable());
+/// assert!(readiness.is_read_closed());
+/// ```
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub struct Readiness(usize);
 
 impl Readiness {
-    pub(crate) fn empty() -> Readiness {
+    pub fn empty() -> Readiness {
         Readiness(0)
     }
 
-    pub(crate) fn readable() -> Readiness {
+    pub fn readable() -> Readiness {
         Readiness(READABLE)
     }
 
-    pub(crate) fn writable() -> Readiness {
+    pub fn writable() -> Readiness {
         Readiness(WRITABLE)
     }
 
-    pub(crate) fn read_closed() -> Readiness {
+    pub fn read_closed() -> Readiness {
         Readiness(READ_CLOSED)
     }
 
-    pub(crate) fn write_closed() -> Readiness {
+    pub fn write_closed() -> Readiness {
         Readiness(WRITE_CLOSED)
     }
 
-    pub(crate) fn all() -> Readiness {
+    pub fn all() -> Readiness {
         Readiness(READABLE | WRITABLE | READ_CLOSED | WRITE_CLOSED)
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         *self == Readiness::empty()
     }
 
-    pub(crate) fn is_readable(&self) -> bool {
+    pub fn is_readable(&self) -> bool {
         self.contains(Readiness::readable())
     }
 
-    pub(crate) fn is_writable(&self) -> bool {
+    pub fn is_writable(&self) -> bool {
         self.contains(Readiness::writable())
     }
 
-    pub(crate) fn is_read_closed(&self) -> bool {
+    pub fn is_read_closed(&self) -> bool {
         self.contains(Readiness::read_closed())
     }
 
-    pub(crate) fn is_write_closed(&self) -> bool {
+    pub fn is_write_closed(&self) -> bool {
         self.contains(Readiness::write_closed())
     }
 
-    pub(crate) fn contains<T: Into<Self>>(&self, other: T) -> bool {
+    pub fn contains<T: Into<Self>>(&self, other: T) -> bool {
         let other = other.into();
         (*self & other) == other
     }
 
-    pub(crate) fn from_usize(val: usize) -> Readiness {
+    pub fn from_usize(val: usize) -> Readiness {
         Readiness(val)
     }
 
-    pub(crate) fn as_usize(&self) -> usize {
+    pub fn as_usize(&self) -> usize {
         self.0
     }
 }

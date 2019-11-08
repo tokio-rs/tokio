@@ -134,10 +134,9 @@ macro_rules! loom_thread_local {
     ($($tts:tt)+) => { std::thread_local!{ $($tts)+ } }
 }
 mod reactor;
+mod readiness;
 mod registration;
 
 pub use self::reactor::{set_default, DefaultGuard, Handle, Reactor};
-pub use self::registration::Registration;
-
-mod readiness;
 pub use self::readiness::Readiness;
+pub use self::registration::Registration;

@@ -180,7 +180,7 @@ impl TcpListener {
     ///     Ok(())
     /// }
     /// ```
-    pub fn from_std(listener: net::TcpListener) -> io::Result<TcpListener> {
+    pub fn from_std(listener: std::net::TcpListener) -> io::Result<TcpListener> {
         let io = mio::net::TcpListener::from_std(listener);
         let io = IoResource::new(io)?;
         Ok(TcpListener { io })
@@ -301,14 +301,14 @@ impl TryFrom<TcpListener> for mio::net::TcpListener {
     }
 }
 
-impl TryFrom<net::TcpListener> for TcpListener {
+impl TryFrom<std::net::TcpListener> for TcpListener {
     type Error = io::Error;
 
     /// Consumes stream, returning the tokio I/O object.
     ///
     /// This is equivalent to
     /// [`TcpListener::from_std(stream)`](TcpListener::from_std).
-    fn try_from(stream: net::TcpListener) -> Result<Self, Self::Error> {
+    fn try_from(stream: std::net::TcpListener) -> Result<Self, Self::Error> {
         Self::from_std(stream)
     }
 }
