@@ -5,51 +5,85 @@ use std::{
     sync::atomic::{AtomicBool, Ordering::AcqRel},
 };
 
+pub(crate) unsafe trait DualDrop {
+    type Inner;
+    fn new(value: Self::Inner) -> Self;
+    fn dual_drop(&self) -> bool;
+    fn inner(&self) -> &Self::Inner;
+}
+
+unsafe impl<T> DualDrop for External<T> {
+    type Inner = T;
+    fn new(value: T) -> Self {
+        External {
+            value,
+            dropped: AtomicBool::new(false),
+        }
+    }
+    fn dual_drop(&self) -> bool {
+        self.dropped.fetch_or(true, AcqRel)
+    }
+
+    fn inner(&self) -> &T {
+        &self.value
+    }
+}
+
 #[derive(Debug)]
-struct Inner<T> {
+pub(crate) struct External<T> {
     value: T,
     dropped: AtomicBool,
 }
 
 #[derive(Debug)]
-pub(crate) struct Dual<T>(ManuallyDrop<Box<Inner<T>>>);
+pub(crate) struct Dual<T>(ManuallyDrop<Box<T>>)
+where
+    T: DualDrop;
 
-impl<T> Drop for Dual<T> {
+pub(crate) type ExternalDual<T> = Dual<External<T>>;
+
+impl<T> Drop for Dual<T>
+where
+    T: DualDrop,
+{
     fn drop(&mut self) {
         // SAFETY Only the second instance to drop will see the `true` set by the first one to drop
         unsafe {
-            if self.0.dropped.fetch_or(true, AcqRel) {
+            if self.0.dual_drop() {
                 ManuallyDrop::drop(&mut self.0);
             }
         }
     }
 }
 
-impl<T> Deref for Dual<T> {
-    type Target = T;
-    fn deref(&self) -> &T {
-        &self.0.value
+impl<T> Deref for Dual<T>
+where
+    T: DualDrop,
+{
+    type Target = T::Inner;
+    fn deref(&self) -> &T::Inner {
+        self.0.inner()
     }
 }
 
-impl<T> Dual<T> {
-    pub(crate) fn new(value: T) -> (Dual<T>, Dual<T>) {
-        let inner = ManuallyDrop::new(Box::new(Inner {
-            value,
-            dropped: AtomicBool::new(false),
-        }));
+impl<T> Dual<T>
+where
+    T: DualDrop,
+{
+    pub(crate) fn new(value: T::Inner) -> (Dual<T>, Dual<T>) {
+        let inner = ManuallyDrop::new(Box::new(T::new(value)));
 
         // SAFETY Duplicating the `Box` reference is ok since ManuallyDrop::drop must be called to
         // drop it
         (Dual(unsafe { ptr::read(&inner) }), Dual(inner))
     }
 
-    pub(crate) fn join(l: Dual<T>, r: Dual<T>) -> Result<T, (Dual<T>, Dual<T>)> {
-        if ptr::eq::<T>(&*l, &*r) {
+    pub(crate) fn join(l: Dual<T>, r: Dual<T>) -> Result<T::Inner, (Dual<T>, Dual<T>)> {
+        if ptr::eq::<T>(&**l.0, &**r.0) {
             // SAFETY `l` and `r` point to the same reference, so we can take ownership of the
             // inner `T` as `Dual::drop` is prevented from running with `mem::forget`
             unsafe {
-                let value = ptr::read(&l.0.value);
+                let value = ptr::read::<T::Inner>(&*l);
                 mem::forget(l);
                 mem::forget(r);
                 Ok(value)

@@ -6,7 +6,7 @@
 
 use crate::io::{AsyncRead, AsyncWrite};
 
-use crate::dual::Dual;
+use crate::dual::ExternalDual;
 use bytes::{Buf, BufMut};
 use std::cell::UnsafeCell;
 use std::fmt;
@@ -18,12 +18,12 @@ use std::task::{Context, Poll};
 
 /// The readable half of a value returned from `split`.
 pub struct ReadHalf<T> {
-    inner: Dual<Inner<T>>,
+    inner: ExternalDual<Inner<T>>,
 }
 
 /// The writable half of a value returned from `split`.
 pub struct WriteHalf<T> {
-    inner: Dual<Inner<T>>,
+    inner: ExternalDual<Inner<T>>,
 }
 
 struct Inner<T> {
@@ -44,7 +44,7 @@ pub fn split<T>(stream: T) -> (ReadHalf<T>, WriteHalf<T>)
 where
     T: AsyncRead + AsyncWrite,
 {
-    let (inner1, inner2) = Dual::new(Inner {
+    let (inner1, inner2) = ExternalDual::new(Inner {
         locked: AtomicBool::new(false),
         stream: UnsafeCell::new(stream),
     });
@@ -64,7 +64,7 @@ impl<T> ReadHalf<T> {
     /// If this `ReadHalf` and the given `WriteHalf` do not originate from the
     /// same `split` operation this method will panic.
     pub fn unsplit(self, wr: WriteHalf<T>) -> T {
-        if let Ok(v) = Dual::join(self.inner, wr.inner) {
+        if let Ok(v) = ExternalDual::join(self.inner, wr.inner) {
             v.stream.into_inner()
         } else {
             panic!("Unrelated `split::Write` passed to `split::Read::unsplit`.")

@@ -2,10 +2,9 @@
 
 //! A channel for sending a single message between asynchronous tasks.
 
-use crate::dual::Dual;
+use crate::dual::{Dual, DualDrop};
 use crate::loom::cell::CausalCell;
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::Arc;
 
 use std::fmt;
 use std::future::Future;
@@ -29,6 +28,19 @@ pub struct Sender<T> {
 #[derive(Debug)]
 pub struct Receiver<T> {
     inner: Option<Dual<Inner<T>>>,
+}
+
+unsafe impl<T> DualDrop for Inner<T> {
+    type Inner = Self;
+    fn new(value: Self) -> Self {
+        value
+    }
+    fn dual_drop(&self) -> bool {
+        (self.state.fetch_or(DROPPED, AcqRel) & DROPPED) == DROPPED
+    }
+    fn inner(&self) -> &Self {
+        self
+    }
 }
 
 pub mod error {
@@ -503,6 +515,7 @@ const RX_TASK_SET: usize = 0b00001;
 const VALUE_SENT: usize = 0b00010;
 const CLOSED: usize = 0b00100;
 const TX_TASK_SET: usize = 0b01000;
+const DROPPED: usize = 0b10000;
 
 impl State {
     fn new() -> State {

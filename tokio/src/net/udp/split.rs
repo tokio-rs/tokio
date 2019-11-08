@@ -20,24 +20,24 @@ use std::fmt;
 use std::io;
 use std::net::SocketAddr;
 
-use crate::dual::Dual;
+use crate::dual::ExternalDual;
 
 /// The send half after [`split`](super::UdpSocket::split).
 ///
 /// Use [`send_to`](#method.send_to) or [`send`](#method.send) to send
 /// datagrams.
 #[derive(Debug)]
-pub struct SendHalf(Dual<UdpSocket>);
+pub struct SendHalf(ExternalDual<UdpSocket>);
 
 /// The recv half after [`split`](super::UdpSocket::split).
 ///
 /// Use [`recv_from`](#method.recv_from) or [`recv`](#method.recv) to receive
 /// datagrams.
 #[derive(Debug)]
-pub struct RecvHalf(Dual<UdpSocket>);
+pub struct RecvHalf(ExternalDual<UdpSocket>);
 
 pub(crate) fn split(socket: UdpSocket) -> (RecvHalf, SendHalf) {
-    let (recv, send) = Dual::new(socket);
+    let (recv, send) = ExternalDual::new(socket);
     (RecvHalf(recv), SendHalf(send))
 }
 
@@ -58,7 +58,7 @@ impl fmt::Display for ReuniteError {
 impl Error for ReuniteError {}
 
 fn reunite(s: SendHalf, r: RecvHalf) -> Result<UdpSocket, ReuniteError> {
-    Dual::join(s.0, r.0).map_err(|(s, r)| ReuniteError(SendHalf(s), RecvHalf(r)))
+    ExternalDual::join(s.0, r.0).map_err(|(s, r)| ReuniteError(SendHalf(s), RecvHalf(r)))
 }
 
 impl RecvHalf {
