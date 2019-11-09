@@ -4,60 +4,71 @@ use loom::future::block_on;
 use loom::thread;
 use std::sync::Arc;
 
-// Attempt to acquire an RwLock for reading that already has a writer
 #[test]
-fn read_contested() {
+fn concurrent_write() {
     loom::model(|| {
         let rwlock = Arc::new(RwLock::<u32>::new(0));
 
         let rwclone = rwlock.clone();
-        thread::spawn(move || {
+        let t1 = thread::spawn(move || {
             block_on(async {
                 let mut guard = rwclone.write().await;
                 *guard += 5;
             });
         });
+
         let rwclone = rwlock.clone();
-        thread::spawn(move || {
-            let result = block_on(async {
-                let guard = rwclone.read().await;
-                *guard
+        let t2 = thread::spawn(move || {
+            block_on(async {
+                let mut guard = rwclone.write().await;
+                *guard += 5;
             });
-            assert_eq!(5, result);
         });
+
+        t1.join().expect("thread 1 write should not panic");
+        t2.join().expect("thread 2 write should not panic");
+        //when all threads have finished the value on the lock should be 10
+        let guard = block_on(rwlock.read());
+        assert_eq!(10, *guard);
     });
 }
 
-// Attempt to acquire an RwLock for reading after a writer has requested access
 #[test]
-fn read_write_contested() {
+fn concurrent_read_write() {
     loom::model(|| {
-        let rwlock = Arc::new(RwLock::<u32>::new(42));
+        let rwlock = Arc::new(RwLock::<u32>::new(0));
 
         let rwclone = rwlock.clone();
-        thread::spawn(move || {
-            let result = block_on(async {
-                let guard = rwclone.read().await;
-                *guard
-            });
-            assert_eq!(42, result);
-        });
-
-        let rwclone2 = rwlock.clone();
-        thread::spawn(move || {
+        let t1 = thread::spawn(move || {
             block_on(async {
-                let mut guard = rwclone2.write().await;
-                *guard += 1;
-            })
+                let mut guard = rwclone.write().await;
+                *guard += 5;
+            });
         });
 
-        let rwclone3 = rwlock.clone();
-        thread::spawn(move || {
-            let result = block_on(async {
-                let guard = rwclone3.read().await;
-                *guard
+        let rwclone = rwlock.clone();
+        let t2 = thread::spawn(move || {
+            block_on(async {
+                let mut guard = rwclone.write().await;
+                *guard += 5;
             });
-            assert_eq!(43, result);
         });
+
+        let rwclone = rwlock.clone();
+        let t3 = thread::spawn(move || {
+            block_on(async {
+                let guard = rwclone.read().await;
+                //at this state the value on the lock may either be 0, 5, or 10
+                assert!(*guard == 0 || *guard == 5 || *guard == 10);
+            });
+        });
+
+        t1.join().expect("thread 1 write should not panic");
+        t2.join().expect("thread 2 write should not panic");
+        t3.join().expect("thread 3 read should not panic");
+
+        let guard = block_on(rwlock.read());
+        //when all threads have finished the value on the lock should be 10
+        assert_eq!(10, *guard);
     });
 }
