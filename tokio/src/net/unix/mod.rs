@@ -9,7 +9,7 @@ pub(crate) mod listener;
 pub(crate) use listener::UnixListener;
 
 mod split;
-pub use split::{ReadHalf, WriteHalf};
+pub use split::{ReadHalf, WriteHalf, RecvHalf, SendHalf};
 
 pub(crate) mod stream;
 pub(crate) use stream::UnixStream;
