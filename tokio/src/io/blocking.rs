@@ -1,4 +1,4 @@
-use crate::fs::sys;
+use crate::io::sys;
 use crate::io::{AsyncRead, AsyncWrite};
 
 use futures_core::ready;
@@ -36,6 +36,7 @@ enum State<T> {
 }
 
 impl<T> Blocking<T> {
+    #[cfg(feature = "io")]
     pub(crate) fn new(inner: T) -> Blocking<T> {
         Blocking {
             inner: Some(inner),
@@ -265,6 +266,7 @@ impl Buf {
         res
     }
 
+    #[cfg(feature = "fs")]
     pub(crate) fn discard_read(&mut self) -> i64 {
         let ret = -(self.bytes().len() as i64);
         self.pos = 0;
