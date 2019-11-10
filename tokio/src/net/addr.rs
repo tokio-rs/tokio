@@ -85,23 +85,6 @@ impl sealed::ToSocketAddrsPriv for str {
     }
 }
 
-// ===== impl &'a [SocketAddr] =====
-
-impl<'a> ToSocketAddrs for &'a [SocketAddr] where ReadyFuture<Self::Iter>: 'a {}
-
-impl<'a> sealed::ToSocketAddrsPriv for &'a [SocketAddr]
-where
-    ReadyFuture<Self::Iter>: 'a,
-{
-    type Iter = std::iter::Cloned<std::slice::Iter<'a, SocketAddr>>;
-    type Future = ReadyFuture<Self::Iter>;
-
-    fn to_socket_addrs(&self) -> Self::Future {
-        let iter = self.iter().cloned();
-        future::ready(Ok(iter))
-    }
-}
-
 // ===== impl (&str, u16) =====
 
 #[cfg(feature = "dns")]
