@@ -1,8 +1,6 @@
 use futures_util::future;
 use std::io;
-use std::net::{IpAddr, SocketAddr};
-#[cfg(feature = "dns")]
-use std::net::{Ipv4Addr, Ipv6Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 
 /// Convert or resolve without blocking to one or more `SocketAddr` values.
 ///
@@ -28,6 +26,32 @@ impl sealed::ToSocketAddrsPriv for SocketAddr {
     fn to_socket_addrs(&self) -> Self::Future {
         let iter = Some(*self).into_iter();
         future::ready(Ok(iter))
+    }
+}
+
+// ===== impl SocketAddrV4 =====
+
+impl ToSocketAddrs for SocketAddrV4 {}
+
+impl sealed::ToSocketAddrsPriv for SocketAddrV4 {
+    type Iter = std::option::IntoIter<SocketAddr>;
+    type Future = ReadyFuture<Self::Iter>;
+
+    fn to_socket_addrs(&self) -> Self::Future {
+        SocketAddr::V4(*self).to_socket_addrs()
+    }
+}
+
+// ===== impl SocketAddrV6 =====
+
+impl ToSocketAddrs for SocketAddrV6 {}
+
+impl sealed::ToSocketAddrsPriv for SocketAddrV6 {
+    type Iter = std::option::IntoIter<SocketAddr>;
+    type Future = ReadyFuture<Self::Iter>;
+
+    fn to_socket_addrs(&self) -> Self::Future {
+        SocketAddr::V6(*self).to_socket_addrs()
     }
 }
 
@@ -61,20 +85,36 @@ impl sealed::ToSocketAddrsPriv for str {
     }
 }
 
+// ===== impl &'a [SocketAddr] =====
+
+impl<'a> ToSocketAddrs for &'a [SocketAddr] where ReadyFuture<Self::Iter>: 'a {}
+
+impl<'a> sealed::ToSocketAddrsPriv for &'a [SocketAddr]
+where
+    ReadyFuture<Self::Iter>: 'a,
+{
+    type Iter = std::iter::Cloned<std::slice::Iter<'a, SocketAddr>>;
+    type Future = ReadyFuture<Self::Iter>;
+
+    fn to_socket_addrs(&self) -> Self::Future {
+        let iter = self.iter().cloned();
+        future::ready(Ok(iter))
+    }
+}
+
 // ===== impl (&str, u16) =====
 
 #[cfg(feature = "dns")]
-impl ToSocketAddrs for (&'_ str, u16) {}
+impl ToSocketAddrs for (&str, u16) {}
 
 #[cfg(feature = "dns")]
-impl sealed::ToSocketAddrsPriv for (&'_ str, u16) {
+impl sealed::ToSocketAddrsPriv for (&str, u16) {
     type Iter = sealed::OneOrMore;
     type Future = sealed::MaybeReady;
 
     fn to_socket_addrs(&self) -> Self::Future {
         use crate::blocking;
         use sealed::MaybeReady;
-        use std::net::{SocketAddrV4, SocketAddrV6};
 
         let (host, port) = *self;
 
@@ -115,6 +155,34 @@ impl sealed::ToSocketAddrsPriv for (IpAddr, u16) {
     }
 }
 
+// ===== impl (Ipv4Addr, u16) =====
+
+impl ToSocketAddrs for (Ipv4Addr, u16) {}
+
+impl sealed::ToSocketAddrsPriv for (Ipv4Addr, u16) {
+    type Iter = std::option::IntoIter<SocketAddr>;
+    type Future = ReadyFuture<Self::Iter>;
+
+    fn to_socket_addrs(&self) -> Self::Future {
+        let (ip, port) = *self;
+        SocketAddrV4::new(ip, port).to_socket_addrs()
+    }
+}
+
+// ===== impl (Ipv6Addr, u16) =====
+
+impl ToSocketAddrs for (Ipv6Addr, u16) {}
+
+impl sealed::ToSocketAddrsPriv for (Ipv6Addr, u16) {
+    type Iter = std::option::IntoIter<SocketAddr>;
+    type Future = ReadyFuture<Self::Iter>;
+
+    fn to_socket_addrs(&self) -> Self::Future {
+        let (ip, port) = *self;
+        SocketAddrV6::new(ip, port, 0, 0).to_socket_addrs()
+    }
+}
+
 // ===== impl String =====
 
 #[cfg(feature = "dns")]
@@ -130,11 +198,11 @@ impl sealed::ToSocketAddrsPriv for String {
     }
 }
 
-// ===== impl &'_ impl ToSocketAddrs =====
+// ===== impl &impl ToSocketAddrs =====
 
-impl<T: ToSocketAddrs + ?Sized> ToSocketAddrs for &'_ T {}
+impl<T: ToSocketAddrs + ?Sized> ToSocketAddrs for &T {}
 
-impl<T> sealed::ToSocketAddrsPriv for &'_ T
+impl<T> sealed::ToSocketAddrsPriv for &T
 where
     T: sealed::ToSocketAddrsPriv + ?Sized,
 {
