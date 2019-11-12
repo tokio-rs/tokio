@@ -228,6 +228,11 @@ where
                 }
             }
         });
+
+        // We have to drop the `shutdown_tx` handle last to ensure expected
+        // ordering.
+        let Worker { inner, .. } = self;
+        drop(inner);
     }
 
     /// Acquire the lock
