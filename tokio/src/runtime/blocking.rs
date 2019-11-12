@@ -1,3 +1,8 @@
+//! Abstracts out the APIs necessary to `Runtime` for integrating the blocking
+//! pool. When the `blocking` feature flag is **not** enabled. These APIs are
+//! shells. This isolates the complexity of dealing with conditional
+//! compilation.
+
 pub(crate) use self::variant::*;
 
 #[cfg(feature = "blocking")]
