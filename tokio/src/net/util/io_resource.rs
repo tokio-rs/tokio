@@ -218,7 +218,7 @@ where
     ///
     /// * called from outside of a task context.
     pub fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Readiness>> {
-        let mask = Readiness::readable() | Readiness::readable();
+        let mask = Readiness::readable() | Readiness::read_closed();
         poll_readiness!(
             self,
             read_readiness,

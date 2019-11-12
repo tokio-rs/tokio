@@ -200,9 +200,14 @@ impl Reactor {
     fn poll(&mut self, max_wait: Option<Duration>) -> io::Result<()> {
         // Block waiting for an event to happen, peeling out how many events
         // happened.
+        //
+        // TODO: Should this loop?
         match self.poll.poll(&mut self.events, max_wait) {
             Ok(_) => {}
-            Err(e) => return Err(e),
+            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
+            Err(e) => {
+                return Err(e);
+            }
         }
 
         // Process all the events that came in, dispatching appropriately
@@ -415,8 +420,8 @@ impl Drop for Inner {
 impl Direction {
     pub(super) fn mask(self) -> Readiness {
         match self {
-            Direction::Read => Readiness::readable(),
-            Direction::Write => Readiness::writable(),
+            Direction::Read => Readiness::readable() | Readiness::read_closed(),
+            Direction::Write => Readiness::writable() | Readiness::write_closed(),
         }
     }
 }
