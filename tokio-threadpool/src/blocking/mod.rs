@@ -7,7 +7,9 @@ use std::error::Error;
 use std::fmt;
 
 mod global;
-pub use self::global::{blocking, set_default, with_default, DefaultGuard};
+pub use self::global::blocking;
+#[doc(hidden)]
+pub use self::global::{set_default, with_default, DefaultGuard};
 
 /// Error raised by `blocking`.
 pub struct BlockingError {
@@ -15,6 +17,12 @@ pub struct BlockingError {
 }
 
 /// A function implementing the behavior run on calls to `blocking`.
+///
+/// **NOTE:** This is intended specifically for use by `tokio` 0.2's
+/// backwards-compatibility layer. In general, user code should not override the
+/// blocking implementation. If you use this, make sure you know what you're
+/// doing.
+#[doc(hidden)]
 pub type BlockingImpl = fn(&mut dyn FnMut()) -> Poll<(), BlockingError>;
 
 fn default_blocking(f: &mut dyn FnMut()) -> Poll<(), BlockingError> {
@@ -53,6 +61,7 @@ fn default_blocking(f: &mut dyn FnMut()) -> Poll<(), BlockingError> {
 
 impl BlockingError {
     /// Returns a new `BlockingError`.
+    #[doc(hidden)]
     pub fn new() -> Self {
         Self { _p: () }
     }

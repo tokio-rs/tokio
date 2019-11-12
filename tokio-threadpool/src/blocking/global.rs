@@ -11,6 +11,11 @@ thread_local! {
 
 /// Ensures that the executor is removed from the thread-local context
 /// when leaving the scope. This handles cases that involve panicking.
+///
+/// **NOTE:** This is intended specifically for use by `tokio` 0.2's
+/// backwards-compatibility layer. In general, user code should not override the
+/// blocking implementation. If you use this, make sure you know what you're
+/// doing.
 pub struct DefaultGuard<'a> {
     prior: BlockingImpl,
     _lifetime: PhantomData<&'a ()>,
@@ -18,6 +23,11 @@ pub struct DefaultGuard<'a> {
 
 /// Set the default blocking implementation, returning a guard that resets the
 /// blocking implementation when dropped.
+///
+/// **NOTE:** This is intended specifically for use by `tokio` 0.2's
+/// backwards-compatibility layer. In general, user code should not override the
+/// blocking implementation. If you use this, make sure you know what you're
+/// doing.
 pub fn set_default<'a>(blocking: BlockingImpl) -> DefaultGuard<'a> {
     CURRENT.with(|cell| {
         let prior = cell.replace(blocking);
@@ -28,7 +38,12 @@ pub fn set_default<'a>(blocking: BlockingImpl) -> DefaultGuard<'a> {
     })
 }
 
-/// Set the default blocking implementation for the duration of the closure
+/// Set the default blocking implementation for the duration of the closure.
+///
+/// **NOTE:** This is intended specifically for use by `tokio` 0.2's
+/// backwards-compatibility layer. In general, user code should not override the
+/// blocking implementation. If you use this, make sure you know what you're
+/// doing.
 pub fn with_default<F, R>(blocking: BlockingImpl, enter: &mut Enter, f: F) -> R
 where
     F: FnOnce(&mut Enter) -> R,
