@@ -82,8 +82,7 @@ struct RemoteQueue {
 }
 
 /// Max number of tasks to poll per tick.
-// const MAX_TASKS_PER_TICK: usize = 61;
-const MAX_TASKS_PER_TICK: usize = 1;
+const MAX_TASKS_PER_TICK: usize = 61;
 
 /// How often to check the remote queue first
 const CHECK_REMOTE_INTERVAL: u8 = 13;
