@@ -36,7 +36,7 @@ impl Readiness {
     ///
     /// let readiness = Readiness::empty();
     ///
-    /// assert!(!ready.is_readable());
+    /// assert!(!readiness.is_readable());
     /// ```
     pub fn empty() -> Readiness {
         Readiness(0)
@@ -49,9 +49,9 @@ impl Readiness {
     /// ```
     /// use tokio::net::driver::Readiness;
     ///
-    /// let ready = Readiness::readable();
+    /// let readiness = Readiness::readable();
     ///
-    /// assert!(ready.is_readable());
+    /// assert!(readiness.is_readable());
     /// ```
     pub fn readable() -> Readiness {
         Readiness(READABLE)
@@ -64,9 +64,9 @@ impl Readiness {
     /// ```
     /// use tokio::net::driver::Readiness;
     ///
-    /// let ready = Readiness::writable();
+    /// let readiness = Readiness::writable();
     ///
-    /// assert!(ready.is_writable());
+    /// assert!(readiness.is_writable());
     /// ```
     pub fn writable() -> Readiness {
         Readiness(WRITABLE)
@@ -79,9 +79,9 @@ impl Readiness {
     /// ```
     /// use tokio::net::driver::Readiness;
     ///
-    /// let ready = Readiness::read_closed();
+    /// let readiness = Readiness::read_closed();
     ///
-    /// assert!(ready.is_read_closed());
+    /// assert!(readiness.is_read_closed());
     /// ```
     pub fn read_closed() -> Readiness {
         Readiness(READ_CLOSED)
@@ -94,9 +94,9 @@ impl Readiness {
     /// ```
     /// use tokio::net::driver::Readiness;
     ///
-    /// let ready = Readiness::write_closed();
+    /// let readiness = Readiness::write_closed();
     ///
-    /// assert!(ready.is_write_closed());
+    /// assert!(readiness.is_write_closed());
     /// ```
     pub fn write_closed() -> Readiness {
         Readiness(WRITE_CLOSED)
@@ -109,12 +109,12 @@ impl Readiness {
     /// ```
     /// use tokio::net::driver::Readiness;
     ///
-    /// let ready = Readiness::all();
+    /// let readiness = Readiness::all();
     ///
-    /// assert!(ready.is_readable());
-    /// assert!(ready.is_writable());
-    /// assert!(ready.is_read_closed());
-    /// assert!(ready.is_write_closed());
+    /// assert!(readiness.is_readable());
+    /// assert!(readiness.is_writable());
+    /// assert!(readiness.is_read_closed());
+    /// assert!(readiness.is_write_closed());
     /// ```
     pub fn all() -> Readiness {
         Readiness(READABLE | WRITABLE | READ_CLOSED | WRITE_CLOSED)
@@ -127,8 +127,8 @@ impl Readiness {
     /// ```
     /// use tokio::net::driver::Readiness;
     ///
-    /// let ready = Readiness::empty();
-    /// assert!(ready.is_empty());
+    /// let readiness = Readiness::empty();
+    /// assert!(readiness.is_empty());
     /// ```
     pub fn is_empty(&self) -> bool {
         *self == Readiness::empty()
@@ -141,9 +141,9 @@ impl Readiness {
     /// ```
     /// use tokio::net::driver::Readiness;
     ///
-    /// let ready = Readiness::readable();
+    /// let readiness = Readiness::readable();
     ///
-    /// assert!(ready.is_readable());
+    /// assert!(readiness.is_readable());
     /// ```
     pub fn is_readable(&self) -> bool {
         self.contains(Readiness::readable())
@@ -156,9 +156,9 @@ impl Readiness {
     /// ```
     /// use tokio::net::driver::Readiness;
     ///
-    /// let ready = Readiness::writable();
+    /// let readiness = Readiness::writable();
     ///
-    /// assert!(ready.is_writable());
+    /// assert!(readiness.is_writable());
     /// ```
     pub fn is_writable(&self) -> bool {
         self.contains(Readiness::writable())
@@ -171,9 +171,9 @@ impl Readiness {
     /// ```
     /// use tokio::net::driver::Readiness;
     ///
-    /// let ready = Readiness::read_closed();
+    /// let readiness = Readiness::read_closed();
     ///
-    /// assert!(ready.is_read_closed());
+    /// assert!(readiness.is_read_closed());
     /// ```
     pub fn is_read_closed(&self) -> bool {
         self.contains(Readiness::read_closed())
@@ -186,9 +186,9 @@ impl Readiness {
     /// ```
     /// use tokio::net::driver::Readiness;
     ///
-    /// let ready = Readiness::write_closed();
+    /// let readiness = Readiness::write_closed();
     ///
-    /// assert!(ready.is_write_closed());
+    /// assert!(readiness.is_write_closed());
     /// ```
     pub fn is_write_closed(&self) -> bool {
         self.contains(Readiness::write_closed())
@@ -245,11 +245,11 @@ impl Readiness {
     /// ```
     /// use tokio::net::driver::Readiness;
     ///
-    /// let ready = Readiness::readable();
-    /// let ready_usize = ready.as_usize();
-    /// let ready2 = Readiness::from_usize(ready_usize);
+    /// let readiness = Readiness::readable();
+    /// let readiness_usize = readiness.as_usize();
+    /// let readiness2 = Readiness::from_usize(readiness_usize);
     ///
-    /// assert_eq!(ready, ready2);
+    /// assert_eq!(readiness, readiness2);
     /// ```
     pub fn from_usize(val: usize) -> Readiness {
         Readiness(val)
@@ -265,11 +265,11 @@ impl Readiness {
     /// ```
     /// use tokio::net::driver::Readiness;
     ///
-    /// let ready = Readiness::readable();
-    /// let ready_usize = ready.as_usize();
-    /// let ready2 = Readiness::from_usize(ready_usize);
+    /// let readiness = Readiness::readable();
+    /// let readiness_usize = readiness.as_usize();
+    /// let readiness2 = Readiness::from_usize(readiness_usize);
     ///
-    /// assert_eq!(ready, ready2);
+    /// assert_eq!(readiness, readiness2);
     /// ```
     pub fn as_usize(&self) -> usize {
         self.0

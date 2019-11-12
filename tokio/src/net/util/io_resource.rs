@@ -58,25 +58,25 @@ use std::task::{Context, Poll};
 /// use tokio::net::util::IoResource;
 ///
 /// use futures_core::ready;
-/// use mio::Ready;
+/// use tokio::net::driver::Readiness;
 /// use mio::net::{TcpStream, TcpListener};
 /// use std::io;
 /// use std::task::{Context, Poll};
 ///
 /// struct MyListener {
-///     poll_evented: PollEvented<TcpListener>,
+///     poll_evented: IoResource<TcpListener>,
 /// }
 ///
 /// impl MyListener {
 ///     pub fn poll_accept(&mut self, cx: &mut Context<'_>) -> Poll<Result<TcpStream, io::Error>> {
-///         let ready = Ready::readable();
+///         let readiness = Readiness::readable();
 ///
-///         ready!(self.poll_evented.poll_read_ready(cx, ready))?;
+///         ready!(self.poll_evented.poll_read_ready(cx))?;
 ///
 ///         match self.poll_evented.get_ref().accept() {
 ///             Ok((socket, _)) => Poll::Ready(Ok(socket)),
 ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-///                 self.poll_evented.clear_read_ready(cx, ready)?;
+///                 self.poll_evented.clear_read_ready(cx)?;
 ///                 Poll::Pending
 ///             }
 ///             Err(e) => Poll::Ready(Err(e)),
@@ -86,11 +86,7 @@ use std::task::{Context, Poll};
 /// ```
 ///
 /// TODO
-/// ## Platform-specific events
-///
-/// `PollEvented` also allows receiving platform-specific `mio::Ready` events.
-/// These events are included as part of the read readiness event stream. The
-/// write readiness event stream is only for `Ready::writable()` events.
+/// ## Platform-specific events?
 ///
 /// [`std::io::Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
 /// [`std::io::Write`]: https://doc.rust-lang.org/std/io/trait.Write.html
