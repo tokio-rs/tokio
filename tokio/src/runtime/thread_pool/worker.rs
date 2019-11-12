@@ -231,9 +231,8 @@ where
 
         // We have to drop the `shutdown_tx` handle last to ensure expected
         // ordering.
-        let Worker { inner, .. } = self;
-        let shutdown_tx = inner.shutdown_tx.clone();
-        drop(inner);
+        let shutdown_tx = self.inner.shutdown_tx.clone();
+        drop(self);
         drop(shutdown_tx);
     }
 
