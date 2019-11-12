@@ -1,7 +1,6 @@
 #![warn(rust_2018_idioms)]
 
-use crate::time::driver::Handle;
-use crate::time::tests::mock_clock::{mock, mock_at};
+use crate::time::tests::mock_clock::mock;
 use crate::time::{delay, Duration, Instant};
 use tokio_test::task;
 use tokio_test::{assert_pending, assert_ready};
@@ -189,7 +188,7 @@ fn creating_delay_outside_of_context() {
     // that it will still expire.
     let mut fut = task::spawn(delay(now + ms(500)));
 
-    mock_at(now, |clock| {
+    mock(|clock| {
         // This registers the delay with the timer
         assert_pending!(fut.poll());
 

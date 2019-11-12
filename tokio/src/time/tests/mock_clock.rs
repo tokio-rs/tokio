@@ -1,26 +1,17 @@
 use crate::runtime::{Park, Unpark};
 use crate::time::driver::{self, Driver};
-use crate::time::{self, Clock, Duration, Instant};
+use crate::time::{Clock, Duration, Instant};
 
 use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 /// Run the provided closure with a `MockClock` that starts at the current time.
-pub fn mock<F, R>(f: F) -> R
+pub(crate) fn mock<F, R>(f: F) -> R
 where
     F: FnOnce(&mut Handle) -> R,
 {
     let mut mock = MockClock::new();
-    mock.enter(f)
-}
-
-/// Run the provided closure with a `MockClock` that starts at the provided `Instant`.
-pub fn mock_at<F, R>(instant: Instant, f: F) -> R
-where
-    F: FnOnce(&mut Handle) -> R,
-{
-    let mut mock = MockClock::with_instant(instant);
     mock.enter(f)
 }
 
@@ -29,14 +20,14 @@ where
 /// A mock timer that is able to advance and wake after a
 /// certain duration.
 #[derive(Debug)]
-pub struct MockClock {
+pub(crate) struct MockClock {
     time: MockTime,
     clock: Clock,
 }
 
 /// A handle to the `MockClock`.
 #[derive(Debug)]
-pub struct Handle {
+pub(crate) struct Handle {
     timer: Driver<MockPark>,
     time: MockTime,
     clock: Clock,
@@ -75,28 +66,15 @@ struct State {
 
 impl MockClock {
     /// Create a new `MockClock` with the current time.
-    pub fn new() -> Self {
-        MockClock::with_instant(Instant::now())
-    }
-
-    /// Create a `MockClock` with its current time at a duration from now
-    ///
-    /// This will create a clock with `Instant::now() + duration` as the current time.
-    pub fn with_duration(duration: Duration) -> Self {
-        let instant = Instant::now() + duration;
-        MockClock::with_instant(instant)
-    }
-
-    /// Create a `MockClock` that sets its current time as the `Instant` provided.
-    pub fn with_instant(instant: Instant) -> Self {
+    pub(crate) fn new() -> Self {
         let clock = Clock::new_frozen();
-        let time = MockTime::new(instant, clock.clone());
+        let time = MockTime::new(clock.clone());
 
         MockClock { time, clock }
     }
 
     /// Enter the `MockClock` context.
-    pub fn enter<F, R>(&mut self, f: F) -> R
+    pub(crate) fn enter<F, R>(&mut self, f: F) -> R
     where
         F: FnOnce(&mut Handle) -> R,
     {
@@ -127,18 +105,17 @@ impl Handle {
     }
 
     /// Turn the internal timer and mock park for the provided duration.
-    pub fn turn(&mut self) {
+    pub(crate) fn turn(&mut self) {
         self.timer.park().unwrap();
-        // self.timer.park_timeout(Duration::from_millis(0)).unwrap();
     }
 
     /// Turn the internal timer and mock park for the provided duration.
-    pub fn turn_for(&mut self, duration: Duration) {
+    pub(crate) fn turn_for(&mut self, duration: Duration) {
         self.timer.park_timeout(duration).unwrap();
     }
 
     /// Advance the `MockClock` by the provided duration.
-    pub fn advance(&mut self, duration: Duration) {
+    pub(crate) fn advance(&mut self, duration: Duration) {
         let now = Instant::now();
         let end = now + duration;
 
@@ -148,25 +125,25 @@ impl Handle {
     }
 
     /// Returns the total amount of time the time has been advanced.
-    pub fn advanced(&self) -> Duration {
+    pub(crate) fn advanced(&self) -> Duration {
         self.clock.advanced()
     }
 
     /// Get the currently mocked time
-    pub fn now(&mut self) -> Instant {
+    pub(crate) fn now(&mut self) -> Instant {
         self.time.now()
     }
 
     /// Turn the internal timer once, but force "parking" for `duration` regardless of any pending
     /// timeouts
-    pub fn park_for(&mut self, duration: Duration) {
+    pub(crate) fn park_for(&mut self, duration: Duration) {
         self.time.inner.lock().unwrap().park_for = Some(duration);
         self.turn()
     }
 }
 
 impl MockTime {
-    pub(crate) fn new(now: Instant, clock: Clock) -> MockTime {
+    pub(crate) fn new(clock: Clock) -> MockTime {
         let state = State {
             clock,
             unparked: false,
@@ -177,11 +154,6 @@ impl MockTime {
             inner: Arc::new(Mutex::new(state)),
             _pd: PhantomData,
         }
-    }
-
-    pub(crate) fn mock_now(&self) -> MockNow {
-        let inner = self.inner.clone();
-        MockNow { inner }
     }
 
     pub(crate) fn mock_park(&self) -> MockPark {

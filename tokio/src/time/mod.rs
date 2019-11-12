@@ -102,6 +102,7 @@ pub use timeout::Timeout;
 mod wheel;
 
 #[cfg(test)]
+#[cfg(not(loom))]
 mod tests;
 
 pub use std::time::Duration;
