@@ -1,14 +1,55 @@
-use worker::Worker;
-
+use super::{BlockingError, BlockingImpl};
 use futures::Poll;
-use tokio_executor;
-
-use std::error::Error;
+use std::cell::Cell;
 use std::fmt;
+use std::marker::PhantomData;
+use tokio_executor::Enter;
 
-/// Error raised by `blocking`.
-pub struct BlockingError {
-    _p: (),
+thread_local! {
+    static CURRENT: Cell<BlockingImpl> = Cell::new(super::default_blocking);
+}
+
+/// Ensures that the executor is removed from the thread-local context
+/// when leaving the scope. This handles cases that involve panicking.
+///
+/// **NOTE:** This is intended specifically for use by `tokio` 0.2's
+/// backwards-compatibility layer. In general, user code should not override the
+/// blocking implementation. If you use this, make sure you know what you're
+/// doing.
+pub struct DefaultGuard<'a> {
+    prior: BlockingImpl,
+    _lifetime: PhantomData<&'a ()>,
+}
+
+/// Set the default blocking implementation, returning a guard that resets the
+/// blocking implementation when dropped.
+///
+/// **NOTE:** This is intended specifically for use by `tokio` 0.2's
+/// backwards-compatibility layer. In general, user code should not override the
+/// blocking implementation. If you use this, make sure you know what you're
+/// doing.
+pub fn set_default<'a>(blocking: BlockingImpl) -> DefaultGuard<'a> {
+    CURRENT.with(|cell| {
+        let prior = cell.replace(blocking);
+        DefaultGuard {
+            prior,
+            _lifetime: PhantomData,
+        }
+    })
+}
+
+/// Set the default blocking implementation for the duration of the closure.
+///
+/// **NOTE:** This is intended specifically for use by `tokio` 0.2's
+/// backwards-compatibility layer. In general, user code should not override the
+/// blocking implementation. If you use this, make sure you know what you're
+/// doing.
+pub fn with_default<F, R>(blocking: BlockingImpl, enter: &mut Enter, f: F) -> R
+where
+    F: FnOnce(&mut Enter) -> R,
+{
+    let _guard = set_default(blocking);
+    f(enter)
 }
 
 /// Enter a blocking section of code.
@@ -126,56 +167,52 @@ pub fn blocking<F, T>(f: F) -> Poll<T, BlockingError>
 where
     F: FnOnce() -> T,
 {
-    let res = Worker::with_current(|worker| {
-        let worker = match worker {
-            Some(worker) => worker,
-            None => {
-                return Err(BlockingError { _p: () });
-            }
-        };
+    CURRENT.with(|cell| {
+        let blocking = cell.get();
 
-        // Transition the worker state to blocking. This will exit the fn early
-        // with `NotReady` if the pool does not have enough capacity to enter
-        // blocking mode.
-        worker.transition_to_blocking()
-    });
+        // Object-safety workaround: the `Blocking` trait must be object-safe,
+        // since we use a trait object in the thread-local. However, a blocking
+        // _operation_ will be generic over the return type of the blocking
+        // function. Therefore, rather than passing a function with a return
+        // type to `Blocking::run_blocking`, we pass a _new_ closure which
+        // doesn't have a return value. That closure invokes the blocking
+        // function and assigns its value to `ret`, which we then unpack when
+        // the blocking call finishes.
+        let mut f = Some(f);
+        let mut ret = None;
+        {
+            let ret2 = &mut ret;
+            let mut run = move || {
+                let f = f
+                    .take()
+                    .expect("blocking closure invoked twice; this is a bug!");
+                *ret2 = Some((f)());
+            };
 
-    // If the transition cannot happen, exit early
-    try_ready!(res);
+            try_ready!((blocking)(&mut run));
+        }
 
-    // Currently in blocking mode, so call the inner closure.
-    //
-    // "Exit" the current executor in case the blocking function wants
-    // to call a different executor.
-    let ret = tokio_executor::exit(move || f());
-
-    // Try to transition out of blocking mode. This is a fast path that takes
-    // back ownership of the worker if the worker handoff didn't complete yet.
-    Worker::with_current(|worker| {
-        // Worker must be set since it was above.
-        worker.unwrap().transition_from_blocking();
-    });
-
-    // Return the result
-    Ok(ret.into())
+        // Return the result
+        let ret =
+            ret.expect("blocking function finished, but return value was unset; this is a bug!");
+        Ok(ret.into())
+    })
 }
 
-impl fmt::Display for BlockingError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "{}", self.description())
-    }
-}
+// === impl DefaultGuard ===
 
-impl fmt::Debug for BlockingError {
+impl<'a> fmt::Debug for DefaultGuard<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("BlockingError")
-            .field("reason", &self.description())
-            .finish()
+        f.pad("DefaultGuard { .. }")
     }
 }
 
-impl Error for BlockingError {
-    fn description(&self) -> &str {
-        "`blocking` annotation used from outside the context of a thread pool"
+impl<'a> Drop for DefaultGuard<'a> {
+    fn drop(&mut self) {
+        // if the TLS value has already been torn down, there's nothing else we
+        // can do. we're almost certainly panicking anyway.
+        let _ = CURRENT.try_with(|cell| {
+            cell.set(self.prior);
+        });
     }
 }
