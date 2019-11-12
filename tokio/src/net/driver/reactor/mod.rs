@@ -247,6 +247,7 @@ impl Reactor {
         }
 
         if io
+            // .set_readiness(token.0, |curr| curr | readiness.into())
             .set_readiness(token.0, |curr| curr | readiness.as_usize())
             .is_err()
         {

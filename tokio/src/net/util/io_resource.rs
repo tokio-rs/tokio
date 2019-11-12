@@ -117,7 +117,7 @@ macro_rules! poll_readiness {
         // Load cached readiness and check if it currently has readiness
         // matching `$mask`.
         let mut cached = $me.$cache.load(Relaxed);
-        let mut current = $mask & cached;
+        let mut current = $mask & Readiness::from_usize(cached);
 
         // If readiness is currently empty, loop until there is readiness;
         // otherwise consume pending events and return the new readiness.
@@ -142,7 +142,7 @@ macro_rules! poll_readiness {
                 cached |= readiness.as_usize();
                 $me.$cache.store(cached, Relaxed);
             }
-            Poll::Ready(Ok(cached.into()))
+            Poll::Ready(Ok(Readiness::from_usize(cached)))
         }
     }};
 }
