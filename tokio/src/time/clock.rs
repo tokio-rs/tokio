@@ -170,7 +170,7 @@ mod variant {
         }
 
         // TODO: delete this. Some tests rely on this
-        #[cfg(test)]
+        #[cfg(all(test, not(loom)))]
         /// Return a new `Clock` instance that uses the current execution context's
         /// source of time.
         pub(crate) fn new_frozen() -> Clock {
@@ -193,7 +193,7 @@ mod variant {
         }
 
         // TODO: delete this as well
-        #[cfg(test)]
+        #[cfg(all(test, not(loom)))]
         pub(crate) fn advanced(&self) -> Duration {
             self.inner.frozen.lock().unwrap().unwrap()
         }
