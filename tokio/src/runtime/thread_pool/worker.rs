@@ -67,7 +67,7 @@ struct Inner<P: Park + 'static> {
     park: CausalCell<P>,
 
     /// Only held so that the scheduler can be signaled on shutdown.
-    _shutdown_tx: shutdown::Sender,
+    shutdown_tx: shutdown::Sender,
 }
 
 // TODO: clean up
@@ -147,7 +147,7 @@ where
         Worker {
             inner: Arc::new(Inner {
                 park: CausalCell::new(park),
-                _shutdown_tx: shutdown_tx,
+                shutdown_tx,
             }),
             slices,
             index,
@@ -232,7 +232,9 @@ where
         // We have to drop the `shutdown_tx` handle last to ensure expected
         // ordering.
         let Worker { inner, .. } = self;
+        let shutdown_tx = inner.shutdown_tx.clone();
         drop(inner);
+        drop(shutdown_tx);
     }
 
     /// Acquire the lock
