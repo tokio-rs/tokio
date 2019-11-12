@@ -130,8 +130,8 @@ impl Readiness {
     /// let readiness = Readiness::empty();
     /// assert!(readiness.is_empty());
     /// ```
-    pub fn is_empty(&self) -> bool {
-        *self == Readiness::empty()
+    pub fn is_empty(self) -> bool {
+        self == Readiness::empty()
     }
 
     /// Returns true if the value includes readable readiness
@@ -145,7 +145,7 @@ impl Readiness {
     ///
     /// assert!(readiness.is_readable());
     /// ```
-    pub fn is_readable(&self) -> bool {
+    pub fn is_readable(self) -> bool {
         self.contains(Readiness::readable())
     }
 
@@ -160,7 +160,7 @@ impl Readiness {
     ///
     /// assert!(readiness.is_writable());
     /// ```
-    pub fn is_writable(&self) -> bool {
+    pub fn is_writable(self) -> bool {
         self.contains(Readiness::writable())
     }
 
@@ -175,7 +175,7 @@ impl Readiness {
     ///
     /// assert!(readiness.is_read_closed());
     /// ```
-    pub fn is_read_closed(&self) -> bool {
+    pub fn is_read_closed(self) -> bool {
         self.contains(Readiness::read_closed())
     }
 
@@ -190,7 +190,7 @@ impl Readiness {
     ///
     /// assert!(readiness.is_write_closed());
     /// ```
-    pub fn is_write_closed(&self) -> bool {
+    pub fn is_write_closed(self) -> bool {
         self.contains(Readiness::write_closed())
     }
 
@@ -227,9 +227,9 @@ impl Readiness {
     /// assert!(!Readiness::readable().contains(readiness));
     /// assert!(readiness.contains(readiness));
     /// ```
-    pub fn contains<T: Into<Self>>(&self, other: T) -> bool {
+    pub fn contains<T: Into<Self>>(self, other: T) -> bool {
         let other = other.into();
-        (*self & other) == other
+        (self & other) == other
     }
 
     /// Create a `Readiness` instance using the given `usize` representation.
@@ -271,7 +271,7 @@ impl Readiness {
     ///
     /// assert_eq!(readiness, readiness2);
     /// ```
-    pub fn as_usize(&self) -> usize {
+    pub fn as_usize(self) -> usize {
         self.0
     }
 }
