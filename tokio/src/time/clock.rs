@@ -67,7 +67,9 @@ mod variant {
 
     /// Pause time
     ///
-    /// TODO: Dox
+    /// The current value of `Instant::now()` is saved and all subsequent calls
+    /// to `Instant::now()` will return the saved value. This is useful for
+    /// running tests that are dependent on time.
     ///
     /// # Panics
     ///
@@ -93,7 +95,8 @@ mod variant {
 
     /// Resume time
     ///
-    /// TODO: Dox
+    /// Clears the saved `Instant::now()` value. Subsequent calls to
+    /// `Instant::now()` will return the value returned by the system call.
     ///
     /// # Panics
     ///
@@ -119,7 +122,8 @@ mod variant {
 
     /// Advance time
     ///
-    /// TODO: Dox
+    /// Increments the saved `Instant::now()` value by `duration`. Subsequent
+    /// calls to `Instant::now()` will return the result of the increment.
     ///
     /// # Panics
     ///

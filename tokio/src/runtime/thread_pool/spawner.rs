@@ -45,12 +45,6 @@ impl Spawner {
         self.workers.spawn_background(future);
     }
 
-    /*
-    pub(super) fn blocking_pool(&self) -> &Arc<crate::runtime::blocking::Pool> {
-        self.workers.blocking_pool()
-    }
-    */
-
     /// Reference to the worker set. Used by `ThreadPool` to initiate shutdown.
     pub(super) fn workers(&self) -> &slice::Set<Box<dyn Unpark>> {
         &*self.workers
