@@ -1,5 +1,6 @@
-use crate::runtime::task::{self, Task};
+use crate::loom::sync::atomic::AtomicUsize;
 use crate::runtime::thread_pool::{queue, Shared};
+use crate::task::{self, Task};
 use crate::util::FastRand;
 
 use std::cell::Cell;
@@ -7,6 +8,13 @@ use std::cell::Cell;
 /// Per-worker data accessible only by the thread driving the worker.
 #[derive(Debug)]
 pub(super) struct Owned<P: 'static> {
+    /// Worker generation. This guards concurrent access to the `Owned` struct.
+    /// When a worker starts running, it checks that the generation it has
+    /// assigned matches the current generation. When it does, the worker has
+    /// obtained unique access to the struct. When it fails, another thread has
+    /// gained unique access.
+    pub(super) generation: AtomicUsize,
+
     /// Worker tick number. Used to schedule bookkeeping tasks every so often.
     pub(super) tick: Cell<u16>,
 
@@ -40,6 +48,7 @@ where
 {
     pub(super) fn new(work_queue: queue::Worker<Shared<P>>, rand: FastRand) -> Owned<P> {
         Owned {
+            generation: AtomicUsize::new(0),
             tick: Cell::new(1),
             is_running: Cell::new(true),
             is_searching: Cell::new(false),

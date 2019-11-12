@@ -1,8 +1,8 @@
-use crate::runtime::blocking;
-
 use futures_util::future;
 use std::io;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::net::{IpAddr, SocketAddr};
+#[cfg(feature = "dns")]
+use std::net::{Ipv4Addr, Ipv6Addr};
 
 /// Convert or resolve without blocking to one or more `SocketAddr` values.
 ///
@@ -33,13 +33,16 @@ impl sealed::ToSocketAddrsPriv for SocketAddr {
 
 // ===== impl str =====
 
+#[cfg(feature = "dns")]
 impl ToSocketAddrs for str {}
 
+#[cfg(feature = "dns")]
 impl sealed::ToSocketAddrsPriv for str {
     type Iter = sealed::OneOrMore;
     type Future = sealed::MaybeReady;
 
     fn to_socket_addrs(&self) -> Self::Future {
+        use crate::blocking;
         use sealed::MaybeReady;
 
         // First check if the input parses as a socket address
@@ -52,7 +55,7 @@ impl sealed::ToSocketAddrsPriv for str {
         // Run DNS lookup on the blocking pool
         let s = self.to_owned();
 
-        MaybeReady::Blocking(blocking::run(move || {
+        MaybeReady::Blocking(blocking::spawn_blocking(move || {
             std::net::ToSocketAddrs::to_socket_addrs(&s)
         }))
     }
@@ -60,13 +63,16 @@ impl sealed::ToSocketAddrsPriv for str {
 
 // ===== impl (&str, u16) =====
 
+#[cfg(feature = "dns")]
 impl ToSocketAddrs for (&'_ str, u16) {}
 
+#[cfg(feature = "dns")]
 impl sealed::ToSocketAddrsPriv for (&'_ str, u16) {
     type Iter = sealed::OneOrMore;
     type Future = sealed::MaybeReady;
 
     fn to_socket_addrs(&self) -> Self::Future {
+        use crate::blocking;
         use sealed::MaybeReady;
         use std::net::{SocketAddrV4, SocketAddrV6};
 
@@ -89,7 +95,7 @@ impl sealed::ToSocketAddrsPriv for (&'_ str, u16) {
 
         let host = host.to_owned();
 
-        MaybeReady::Blocking(blocking::run(move || {
+        MaybeReady::Blocking(blocking::spawn_blocking(move || {
             std::net::ToSocketAddrs::to_socket_addrs(&(&host[..], port))
         }))
     }
@@ -111,8 +117,10 @@ impl sealed::ToSocketAddrsPriv for (IpAddr, u16) {
 
 // ===== impl String =====
 
+#[cfg(feature = "dns")]
 impl ToSocketAddrs for String {}
 
+#[cfg(feature = "dns")]
 impl sealed::ToSocketAddrsPriv for String {
     type Iter = <str as sealed::ToSocketAddrsPriv>::Iter;
     type Future = <str as sealed::ToSocketAddrsPriv>::Future;
@@ -143,15 +151,19 @@ pub(crate) mod sealed {
     //! part of the `ToSocketAddrs` public API. The details will change over
     //! time.
 
-    use crate::runtime::blocking::Blocking;
+    #[cfg(feature = "dns")]
+    use crate::task::JoinHandle;
 
-    use futures_core::ready;
     use std::future::Future;
     use std::io;
     use std::net::SocketAddr;
+    #[cfg(feature = "dns")]
     use std::option;
+    #[cfg(feature = "dns")]
     use std::pin::Pin;
+    #[cfg(feature = "dns")]
     use std::task::{Context, Poll};
+    #[cfg(feature = "dns")]
     use std::vec;
 
     #[doc(hidden)]
@@ -164,29 +176,34 @@ pub(crate) mod sealed {
 
     #[doc(hidden)]
     #[derive(Debug)]
+    #[cfg(feature = "dns")]
     pub enum MaybeReady {
         Ready(Option<SocketAddr>),
-        Blocking(Blocking<io::Result<vec::IntoIter<SocketAddr>>>),
+        Blocking(JoinHandle<io::Result<vec::IntoIter<SocketAddr>>>),
     }
 
     #[doc(hidden)]
     #[derive(Debug)]
+    #[cfg(feature = "dns")]
     pub enum OneOrMore {
         One(option::IntoIter<SocketAddr>),
         More(vec::IntoIter<SocketAddr>),
     }
 
+    #[cfg(feature = "dns")]
     impl Future for MaybeReady {
         type Output = io::Result<OneOrMore>;
 
         fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            use futures_core::ready;
+
             match *self {
                 MaybeReady::Ready(ref mut i) => {
                     let iter = OneOrMore::One(i.take().into_iter());
                     Poll::Ready(Ok(iter))
                 }
                 MaybeReady::Blocking(ref mut rx) => {
-                    let res = ready!(Pin::new(rx).poll(cx)).map(OneOrMore::More);
+                    let res = ready!(Pin::new(rx).poll(cx))?.map(OneOrMore::More);
 
                     Poll::Ready(res)
                 }
@@ -194,6 +211,7 @@ pub(crate) mod sealed {
         }
     }
 
+    #[cfg(feature = "dns")]
     impl Iterator for OneOrMore {
         type Item = SocketAddr;
 

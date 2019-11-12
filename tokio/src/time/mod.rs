@@ -70,36 +70,42 @@
 //! [Interval]: struct.Interval.html
 //! [`DelayQueue`]: struct.DelayQueue.html
 
-pub mod clock;
+mod clock;
+pub(crate) use self::clock::Clock;
+#[cfg(feature = "test-util")]
+pub use clock::{advance, pause, resume};
 
 pub mod delay_queue;
 #[doc(inline)]
 pub use self::delay_queue::DelayQueue;
 
-pub mod throttle;
+mod delay;
+pub use self::delay::Delay;
 
-// TODO: clean this up
-pub mod timer;
-pub use timer::{set_default, Timer};
+pub(crate) mod driver;
+
+mod error;
+pub use error::Error;
+
+mod instant;
+pub use self::instant::Instant;
+
+mod interval;
+pub use interval::Interval;
+
+pub mod throttle;
 
 pub mod timeout;
 #[doc(inline)]
 pub use timeout::Timeout;
 
-mod atomic;
-
-mod delay;
-pub use self::delay::Delay;
-
-mod error;
-pub use error::Error;
-
-mod interval;
-pub use interval::Interval;
-
 mod wheel;
 
-use std::time::{Duration, Instant};
+#[cfg(test)]
+#[cfg(not(loom))]
+mod tests;
+
+pub use std::time::Duration;
 
 /// Create a Future that completes at `deadline`.
 pub fn delay(deadline: Instant) -> Delay {

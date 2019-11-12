@@ -1,6 +1,6 @@
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Mutex;
-use crate::runtime::task::{Header, Task};
+use crate::task::{Header, Task};
 
 use std::marker::PhantomData;
 use std::ptr::{self, NonNull};

@@ -1,5 +1,6 @@
 use std::cell::{Cell, RefCell};
 use std::fmt;
+#[cfg(feature = "rt-full")]
 use std::future::Future;
 use std::marker::PhantomData;
 
@@ -79,6 +80,7 @@ pub(crate) fn exit<F: FnOnce() -> R, R>(f: F) -> R {
 impl Enter {
     /// Blocks the thread on the specified future, returning the value with
     /// which that future completes.
+    #[cfg(feature = "rt-full")]
     pub(crate) fn block_on<F: Future>(&mut self, mut f: F) -> F::Output {
         use crate::runtime::park::{CachedParkThread, Park};
         use std::pin::Pin;

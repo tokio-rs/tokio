@@ -1,11 +1,10 @@
-use crate::time::{clock, Delay};
+use crate::time::{Delay, Duration, Instant};
 
 use futures_core::ready;
 use futures_util::future::poll_fn;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{self, Poll};
-use std::time::{Duration, Instant};
 
 /// A stream representing notifications at fixed interval
 #[derive(Debug)]
@@ -47,7 +46,7 @@ impl Interval {
     ///
     /// This function panics if `duration` is zero.
     pub fn new_interval(duration: Duration) -> Interval {
-        Interval::new(clock::now() + duration, duration)
+        Interval::new(Instant::now() + duration, duration)
     }
 
     pub(crate) fn new_with_delay(delay: Delay, duration: Duration) -> Interval {

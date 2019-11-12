@@ -22,6 +22,7 @@ pub(crate) struct CachedParkThread {
     _anchor: PhantomData<Rc<()>>,
 }
 
+#[derive(Debug)]
 pub(crate) struct ParkThread {
     inner: Arc<Inner>,
 }
@@ -167,7 +168,7 @@ impl CachedParkThread {
     ///
     /// This type cannot be moved to other threads, so it should be created on
     /// the thread that the caller intends to park.
-    #[cfg(feature = "blocking")]
+    #[cfg(feature = "rt-full")]
     pub(crate) fn new() -> CachedParkThread {
         CachedParkThread {
             _anchor: PhantomData,
@@ -216,7 +217,7 @@ impl Unpark for UnparkThread {
     }
 }
 
-#[cfg(feature = "blocking")]
+#[cfg(feature = "rt-full")]
 mod waker {
     use super::{Inner, UnparkThread};
     use crate::loom::sync::Arc;

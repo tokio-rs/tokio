@@ -84,12 +84,20 @@ where
     F: FnOnce() -> io::Result<T> + Send + 'static,
     T: Send + 'static,
 {
-    sys::run(f).await
+    match sys::run(f).await {
+        Ok(res) => res,
+        Err(_) => Err(io::Error::new(
+            io::ErrorKind::Other,
+            "background task failed",
+        )),
+    }
 }
 
 /// Types in this module can be mocked out in tests.
 mod sys {
     pub(crate) use std::fs::File;
 
-    pub(crate) use crate::runtime::blocking::{run, Blocking};
+    // TODO: don't rename
+    pub(crate) use crate::blocking::spawn_blocking as run;
+    pub(crate) use crate::task::JoinHandle as Blocking;
 }

@@ -5,14 +5,13 @@
 //! [`Timeout`]: struct.Timeout.html
 
 use crate::time::clock::now;
-use crate::time::Delay;
+use crate::time::{Delay, Duration, Instant};
 
 use futures_core::ready;
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{self, Poll};
-use std::time::{Duration, Instant};
 
 /// Allows a `Future` or `Stream` to execute for a limited amount of time.
 ///

@@ -1,4 +1,3 @@
-#[cfg(feature = "rt-current-thread")]
 use crate::runtime::current_thread;
 
 #[cfg(feature = "rt-full")]
@@ -12,13 +11,12 @@ enum State {
     // default executor not defined
     Empty,
 
+    // Current-thread executor
+    CurrentThread(*const current_thread::Scheduler),
+
     // default executor is a thread pool instance.
     #[cfg(feature = "rt-full")]
     ThreadPool(*const thread_pool::Spawner),
-
-    // Current-thread executor
-    #[cfg(feature = "rt-current-thread")]
-    CurrentThread(*const current_thread::Scheduler),
 }
 
 thread_local! {
@@ -79,7 +77,6 @@ where
             let thread_pool = unsafe { &*threadpool_ptr };
             thread_pool.spawn_background(future);
         }
-        #[cfg(feature = "rt-current-thread")]
         State::CurrentThread(current_thread_ptr) => {
             let current_thread = unsafe { &*current_thread_ptr };
 
@@ -98,7 +95,6 @@ where
     })
 }
 
-#[cfg(feature = "rt-current-thread")]
 pub(super) fn with_current_thread<F, R>(current_thread: &current_thread::Scheduler, f: F) -> R
 where
     F: FnOnce() -> R,
@@ -109,7 +105,6 @@ where
     )
 }
 
-#[cfg(feature = "rt-current-thread")]
 pub(super) fn current_thread_is_current(current_thread: &current_thread::Scheduler) -> bool {
     EXECUTOR.with(|current_executor| match current_executor.get() {
         State::CurrentThread(ptr) => ptr == current_thread as *const _,
@@ -125,7 +120,6 @@ where
     with_state(State::ThreadPool(thread_pool as *const _), f)
 }
 
-#[cfg(feature = "rt-current-thread")]
 fn with_state<F, R>(state: State, f: F) -> R
 where
     F: FnOnce() -> R,

@@ -18,7 +18,7 @@
 
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::mpsc;
-use tokio::time::{clock, timer, Delay};
+use tokio::time::{self, Delay, Duration, Instant};
 
 use bytes::Buf;
 use futures_core::ready;
@@ -26,7 +26,6 @@ use std::collections::VecDeque;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{self, Poll, Waker};
-use std::time::{Duration, Instant};
 use std::{cmp, io};
 
 /// An I/O object that follows a predefined script.
@@ -62,8 +61,6 @@ enum Action {
 struct Inner {
     actions: VecDeque<Action>,
     waiting: Option<Instant>,
-
-    timer_handle: timer::Handle,
     sleep: Option<Delay>,
     read_wait: Option<Waker>,
     rx: mpsc::UnboundedReceiver<Action>,
@@ -145,7 +142,6 @@ impl Inner {
 
         let inner = Inner {
             actions,
-            timer_handle: timer::Handle::default(),
             sleep: None,
             read_wait: None,
             rx,
@@ -301,8 +297,8 @@ impl AsyncRead for Mock {
             match self.inner.read(buf) {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     if let Some(rem) = self.inner.remaining_wait() {
-                        let until = clock::now() + rem;
-                        self.inner.sleep = Some(self.inner.timer_handle.delay(until));
+                        let until = Instant::now() + rem;
+                        self.inner.sleep = Some(time::delay(until));
                     } else {
                         self.inner.read_wait = Some(cx.waker().clone());
                         return Poll::Pending;
@@ -343,8 +339,8 @@ impl AsyncWrite for Mock {
             match self.inner.write(buf) {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     if let Some(rem) = self.inner.remaining_wait() {
-                        let until = clock::now() + rem;
-                        self.inner.sleep = Some(self.inner.timer_handle.delay(until));
+                        let until = Instant::now() + rem;
+                        self.inner.sleep = Some(time::delay(until));
                     } else {
                         panic!("unexpected WouldBlock");
                     }
