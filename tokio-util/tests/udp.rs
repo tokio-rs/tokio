@@ -10,7 +10,6 @@ use futures::stream::StreamExt;
 use std::io;
 
 #[tokio::test]
-#[ignore]
 async fn send_framed() -> std::io::Result<()> {
     let mut a_soc = UdpSocket::bind("127.0.0.1:0").await?;
     let mut b_soc = UdpSocket::bind("127.0.0.1:0").await?;
