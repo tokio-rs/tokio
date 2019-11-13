@@ -1,4 +1,4 @@
-use crate::task::{ScheduleSend, Schedule, Task};
+use crate::task::{Schedule, ScheduleSend, Task};
 
 use loom::sync::Notify;
 use std::collections::VecDeque;

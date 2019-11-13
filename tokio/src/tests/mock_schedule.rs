@@ -1,5 +1,5 @@
 #![allow(warnings)]
-use crate::task::{Header, ScheduleSend, Schedule, Task};
+use crate::task::{Header, Schedule, ScheduleSend, Task};
 
 use std::collections::VecDeque;
 use std::sync::Mutex;
