@@ -156,7 +156,7 @@ pub use self::handle::Handle;
 
 mod io;
 
-mod park;
+pub(crate) mod park;
 pub use self::park::{Park, Unpark};
 
 mod shell;

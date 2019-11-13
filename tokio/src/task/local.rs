@@ -1,4 +1,5 @@
 //! Runs `!Send` futures on the current thread.
+use crate::runtime::park::{CachedParkThread, Park, Unpark};
 use crate::task::{self, JoinHandle, Schedule, Task};
 
 use std::cell::{Cell, UnsafeCell};
@@ -10,6 +11,7 @@ use std::pin::Pin;
 use std::ptr::{self, NonNull};
 use std::rc::Rc;
 use std::task::{Context, Poll};
+use std::time::Duration;
 
 use pin_project::pin_project;
 
@@ -98,6 +100,9 @@ struct Scheduler {
     /// References should not be handed out. Only call `push` / `pop` functions.
     /// Only call from the owning thread.
     queue: UnsafeCell<VecDeque<Task<Scheduler>>>,
+
+    park: UnsafeCell<CachedParkThread>,
+    unpark: Box<dyn Unpark>,
 }
 
 #[pin_project]
@@ -300,16 +305,14 @@ impl<F: Future> Future for LocalFuture<F> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
         let scheduler = this.scheduler;
-        let future = this.future;
+        let mut future = this.future;
 
-        scheduler.tick();
-
-        match future.poll(cx) {
-            Poll::Ready(v) => Poll::Ready(v),
-            Poll::Pending => {
-                cx.waker().wake_by_ref();
-                Poll::Pending
+        loop {
+            if let Poll::Ready(output) = future.as_mut().poll(cx) {
+                return Poll::Ready(output);
             }
+
+            scheduler.tick();
         }
     }
 }
@@ -337,14 +340,19 @@ impl Schedule for Scheduler {
         unsafe {
             (*self.queue.get()).push_front(task);
         }
+        self.unpark.unpark();
     }
 }
 
 impl Scheduler {
     fn new() -> Self {
+        let park = CachedParkThread::new();
+        let unpark = park.unpark();
         Self {
             tasks: UnsafeCell::new(task::OwnedList::new()),
             queue: UnsafeCell::new(VecDeque::with_capacity(64)),
+            park: UnsafeCell::new(park),
+            unpark: Box::new(unpark),
         }
     }
 
@@ -383,16 +391,24 @@ impl Scheduler {
 
     fn tick(&self) {
         assert!(self.is_current());
+        let park = unsafe { &mut (*self.park.get()) };
         for _ in 0..MAX_TASKS_PER_TICK {
             let task = match self.next_task() {
                 Some(task) => task,
-                None => return,
+                None => {
+                    park.park().ok().expect("failed to park local task set");
+                    return;
+                }
             };
 
             if let Some(task) = task.run(&mut || Some(self.into())) {
                 self.schedule(task);
             }
         }
+
+        park.park_timeout(Duration::from_millis(0))
+            .ok()
+            .expect("failed to park local task set");
     }
 }
 
