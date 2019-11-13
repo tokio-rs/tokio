@@ -214,7 +214,7 @@ where
     ///
     /// * called from outside of a task context.
     pub fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Readiness>> {
-        let mask = Readiness::READABLE | Readiness::READ_CLOSED;
+        let mask = Readiness::READABLE;
         poll_readiness!(
             self,
             read_readiness,
@@ -263,7 +263,7 @@ where
     ///
     /// * called from outside of a task context.
     pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Readiness>> {
-        let mask = Readiness::WRITABLE | Readiness::WRITE_CLOSED;
+        let mask = Readiness::WRITABLE;
         poll_readiness!(
             self,
             write_readiness,
