@@ -96,8 +96,8 @@
 //!
 //! There are a couple of ways to do this.
 //!
-//! If the custom I/O resource implements [`mio::Evented`] and implements
-//! [`std::io::Read`] and / or [`std::io::Write`], then [`PollEvented`] is the
+//! If the custom I/O resource implements [`mio::event::Source`] and implements
+//! [`std::io::Read`] and / or [`std::io::Write`], then [`IoResource`] is the
 //! most suited.
 //!
 //! Otherwise, [`Registration`] can be used directly. This provides the lowest
@@ -119,9 +119,9 @@
 //! [`Handle::current`]: struct.Handle.html#method.current
 //! [`mio`]: https://github.com/carllerche/mio
 //! [`Reactor::poll`]: struct.Reactor.html#method.poll
-//! [`Poll::poll`]: https://docs.rs/mio/0.6/mio/struct.Poll.html#method.poll
-//! [`mio::Evented`]: https://docs.rs/mio/0.6/mio/trait.Evented.html
-//! [`PollEvented`]: struct.PollEvented.html
+//! [`Poll::poll`]: TODO
+//! [`mio::event::Source`]: TODO
+//! [`IoResource`]: struct.IoResource.html
 //! [`std::io::Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
 //! [`std::io::Write`]: https://doc.rust-lang.org/std/io/trait.Write.html
 #[cfg(all(loom, test))]

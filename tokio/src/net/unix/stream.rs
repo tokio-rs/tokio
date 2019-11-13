@@ -118,7 +118,7 @@ impl TryFrom<UnixStream> for mio::net::UnixStream {
     /// See [`IoResource::into_inner`] for more details about
     /// resource deregistration that happens during the call.
     ///
-    /// [`IoResource::into_inner`]: crate::util::PollEvented::into_inner
+    /// [`IoResource::into_inner`]: crate::util::IoResource::into_inner
     fn try_from(value: UnixStream) -> Result<Self, Self::Error> {
         value.io.into_inner()
     }
@@ -187,11 +187,11 @@ impl AsyncWrite for UnixStream {
 impl UnixStream {
     // == Poll IO functions that takes `&self` ==
     //
-    // They are not public because (taken from the doc of `PollEvented`):
+    // They are not public because (taken from the doc of `IoResource`):
     //
-    // While `PollEvented` is `Sync` (if the underlying I/O type is `Sync`), the
+    // While `IoResource` is `Sync` (if the underlying I/O type is `Sync`), the
     // caller must ensure that there are at most two tasks that use a
-    // `PollEvented` instance concurrently. One for reading and one for writing.
+    // `IoResource` instance concurrently. One for reading and one for writing.
     // While violating this requirement is "safe" from a Rust memory model point
     // of view, it will result in unexpected behavior in the form of lost
     // notifications and tasks hanging.

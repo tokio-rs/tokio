@@ -64,19 +64,19 @@ use std::task::{Context, Poll};
 /// use std::task::{Context, Poll};
 ///
 /// struct MyListener {
-///     poll_evented: IoResource<TcpListener>,
+///     io_resource: IoResource<TcpListener>,
 /// }
 ///
 /// impl MyListener {
 ///     pub fn poll_accept(&mut self, cx: &mut Context<'_>) -> Poll<Result<TcpStream, io::Error>> {
 ///         let readiness = Readiness::readable();
 ///
-///         ready!(self.poll_evented.poll_read_ready(cx))?;
+///         ready!(self.io_resource.poll_read_ready(cx))?;
 ///
-///         match self.poll_evented.get_ref().accept() {
+///         match self.io_resource.get_ref().accept() {
 ///             Ok((socket, _)) => Poll::Ready(Ok(socket)),
 ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-///                 self.poll_evented.clear_read_ready(cx)?;
+///                 self.io_resource.clear_read_ready(cx)?;
 ///                 Poll::Pending
 ///             }
 ///             Err(e) => Poll::Ready(Err(e)),
@@ -92,7 +92,7 @@ use std::task::{Context, Poll};
 /// [`std::io::Write`]: https://doc.rust-lang.org/std/io/trait.Write.html
 /// [`AsyncRead`]: ../io/trait.AsyncRead.html
 /// [`AsyncWrite`]: ../io/trait.AsyncWrite.html
-/// [`mio::Evented`]: https://docs.rs/mio/0.6/mio/trait.Evented.html
+/// [`mio::event::Source`]: TODO
 /// [`Registration`]: struct.Registration.html
 /// [`TcpListener`]: ../net/struct.TcpListener.html
 /// [`clear_read_ready`]: #method.clear_read_ready

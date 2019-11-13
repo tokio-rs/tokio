@@ -432,7 +432,7 @@ mod tests {
     use super::*;
     use loom::thread;
 
-    // No-op `Evented` impl just so we can have something to pass to `add_source`.
+    // No-op `Source` impl just so we can have something to pass to `add_source`.
     struct NotSource;
 
     impl mio::event::Source for NotSource {
