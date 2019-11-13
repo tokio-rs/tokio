@@ -57,7 +57,7 @@ unsafe impl<S: ScheduleSend + Send + Sync + 'static> Send for Task<S> {}
 /// Task result sent back
 pub(crate) type Result<T> = std::result::Result<T, JoinError>;
 
-pub(crate) trait Schedule: Send + Sync + Sized + 'static {
+pub(crate) trait Schedule: Sized + 'static {
     /// Bind a task to the executor.
     ///
     /// Guaranteed to be called from the thread that called `poll` on the task.
@@ -79,7 +79,7 @@ pub(crate) trait Schedule: Send + Sync + Sized + 'static {
 ///
 /// Schedulers that implement this trait may not schedule `!Send` futures. If
 /// trait is implemented, the corresponding `Task` type will implement `Send`.
-pub(crate) trait ScheduleSend: Schedule {}
+pub(crate) trait ScheduleSend: Schedule + Send + Sync {}
 
 /// Create a new task without an associated join handle
 pub(crate) fn background<T, S>(task: T) -> Task<S>

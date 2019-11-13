@@ -412,9 +412,6 @@ impl Scheduler {
     }
 }
 
-unsafe impl Send for Scheduler {}
-unsafe impl Sync for Scheduler {}
-
 impl fmt::Debug for Scheduler {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Scheduler { .. }").finish()
