@@ -12,7 +12,7 @@ jobs:
   - ${{ each crate in parameters.crates }}:
     - script: RUSTFLAGS="--cfg loom" cargo test --lib --release -- --test-threads=1 --nocapture
       env:
-        LOOM_MAX_PREEMPTIONS: 2
+        LOOM_MAX_PREEMPTIONS: 1
         CI: 'True'
       displayName: test ${{ crate }}
       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}

@@ -9,6 +9,3 @@ mod pool;
 
 #[cfg(not(loom))]
 mod queue;
-
-#[cfg(not(loom))]
-mod worker;

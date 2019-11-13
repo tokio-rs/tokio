@@ -1,5 +1,5 @@
 use crate::runtime::park::{Park, Unpark};
-use crate::runtime::task::{self, JoinHandle, Schedule, Task};
+use crate::task::{self, JoinHandle, Schedule, Task};
 
 use std::cell::UnsafeCell;
 use std::collections::VecDeque;

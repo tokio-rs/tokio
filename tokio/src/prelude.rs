@@ -26,8 +26,7 @@ pub use futures_util::sink::SinkExt as _;
 #[doc(no_inline)]
 pub use futures_util::stream::StreamExt as _;
 
-#[cfg(feature = "io")]
 pub use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite};
-#[cfg(feature = "io")]
+#[cfg(feature = "io-util")]
 #[doc(no_inline)]
 pub use crate::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _};

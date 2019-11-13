@@ -1,6 +1,6 @@
 use crate::loom::sync::Arc;
 use crate::runtime::park::Unpark;
-use crate::runtime::thread_pool::{worker, Owned};
+use crate::runtime::thread_pool::{slice, Owned};
 
 use std::cell::Cell;
 use std::ptr;
@@ -23,7 +23,7 @@ struct Inner {
 // Pointer to the current worker info
 thread_local!(static CURRENT_WORKER: Cell<Inner> = Cell::new(Inner::new()));
 
-pub(super) fn set<F, R, P>(pool: &Arc<worker::Set<P>>, index: usize, f: F) -> R
+pub(super) fn set<F, R, P>(pool: &Arc<slice::Set<P>>, index: usize, f: F) -> R
 where
     F: FnOnce() -> R,
     P: Unpark,
@@ -65,7 +65,7 @@ where
 }
 
 impl Current {
-    pub(super) fn as_member<'a, P>(&self, set: &'a worker::Set<P>) -> Option<&'a Owned<P>>
+    pub(super) fn as_member<'a, P>(&self, set: &'a slice::Set<P>) -> Option<&'a Owned<P>>
     where
         P: Unpark,
     {

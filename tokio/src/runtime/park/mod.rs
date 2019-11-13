@@ -45,9 +45,9 @@
 //! [mio]: https://docs.rs/mio/0.6/mio/struct.Poll.html
 
 mod thread;
-#[cfg(feature = "blocking")]
+#[cfg(feature = "rt-full")]
 pub(crate) use self::thread::CachedParkThread;
-#[cfg(not(feature = "net-driver"))]
+#[cfg(not(feature = "io-driver"))]
 pub(crate) use self::thread::ParkThread;
 
 use std::sync::Arc;

@@ -1,8 +1,8 @@
 use crate::loom::cell::{CausalCell, CausalCheck};
 use crate::loom::sync::atomic::{self, AtomicU32};
-use crate::runtime::task::Task;
 use crate::runtime::thread_pool::queue::global;
 use crate::runtime::thread_pool::LOCAL_QUEUE_CAPACITY;
+use crate::task::Task;
 
 use std::fmt;
 use std::mem::MaybeUninit;

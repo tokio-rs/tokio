@@ -1,5 +1,5 @@
 //! Runs `!Send` futures on the current thread.
-use crate::runtime::task::{self, JoinHandle, Schedule, UnsendTask, Unsendable};
+use crate::task::{self, JoinHandle, Schedule, UnsendTask, Unsendable};
 
 use std::cell::{Cell, UnsafeCell};
 use std::collections::VecDeque;

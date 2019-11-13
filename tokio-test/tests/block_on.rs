@@ -1,9 +1,7 @@
 #![warn(rust_2018_idioms)]
 
-use tokio::time::delay;
+use tokio::time::{delay, Duration, Instant};
 use tokio_test::block_on;
-
-use std::time::{Duration, Instant};
 
 #[test]
 fn async_block() {

@@ -1,10 +1,10 @@
-use crate::time::timer::{HandlePriv, Registration};
+use crate::time::driver::Registration;
+use crate::time::{Duration, Instant};
 
 use futures_core::ready;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{self, Poll};
-use std::time::{Duration, Instant};
 
 /// A future that completes at a specified instant in time.
 ///
@@ -43,17 +43,6 @@ impl Delay {
 
     pub(crate) fn new_timeout(deadline: Instant, duration: Duration) -> Delay {
         let registration = Registration::new(deadline, duration);
-        Delay { registration }
-    }
-
-    pub(crate) fn new_with_handle(
-        deadline: Instant,
-        duration: Duration,
-        handle: HandlePriv,
-    ) -> Delay {
-        let mut registration = Registration::new(deadline, duration);
-        registration.register_with(handle);
-
         Delay { registration }
     }
 

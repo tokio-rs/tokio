@@ -1,8 +1,7 @@
-// rt-full implies rt-current-thread
-
 #![cfg_attr(not(feature = "rt-full"), allow(unused_imports, dead_code))]
 
 mod atomic_u32;
+mod atomic_u64;
 mod atomic_usize;
 mod causal_cell;
 
@@ -43,6 +42,7 @@ pub(crate) mod sync {
 
     pub(crate) mod atomic {
         pub(crate) use crate::loom::std::atomic_u32::AtomicU32;
+        pub(crate) use crate::loom::std::atomic_u64::AtomicU64;
         pub(crate) use crate::loom::std::atomic_usize::AtomicUsize;
 
         pub(crate) use std::sync::atomic::spin_loop_hint;

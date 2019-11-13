@@ -265,7 +265,7 @@ fn blocking() {
         for _ in 0..4 {
             let block = block.clone();
             rt.spawn(async move {
-                tokio::runtime::blocking::in_place(move || {
+                tokio::blocking::in_place(move || {
                     block.wait();
                     block.wait();
                 })

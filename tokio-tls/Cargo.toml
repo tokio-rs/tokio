@@ -26,11 +26,9 @@ travis-ci = { repository = "tokio-rs/tokio-tls" }
 
 [dependencies]
 native-tls = "0.2"
-tokio = { version = "=0.2.0-alpha.6", path = "../tokio", features = ["io-traits"] }
-
-[dev-dependencies]
 tokio = { version = "=0.2.0-alpha.6", path = "../tokio" }
 
+[dev-dependencies]
 cfg-if = "0.1"
 env_logger = { version = "0.6", default-features = false }
 futures = { version = "0.3.0", features = ["async-await"] }

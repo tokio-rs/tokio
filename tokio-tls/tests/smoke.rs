@@ -53,6 +53,7 @@ fn openssl_keys() -> &'static Keys {
             [ ext ]\n\
             basicConstraints=CA:FALSE,pathlen:0\n\
             subjectAltName = @alt_names
+            extendedKeyUsage=serverAuth,clientAuth
             [alt_names]
             DNS.1 = localhost
         ",

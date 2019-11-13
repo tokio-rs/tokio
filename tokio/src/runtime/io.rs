@@ -1,9 +1,14 @@
+//! Abstracts out the APIs necessary to `Runtime` for integrating the I/O
+//! driver. When the `time` feature flag is **not** enabled. These APIs are
+//! shells. This isolates the complexity of dealing with conditional
+//! compilation.
+
 pub(crate) use self::variant::*;
 
 /// Re-exported for convenience.
 pub(crate) use std::io::Result;
 
-#[cfg(feature = "net-driver")]
+#[cfg(feature = "io-driver")]
 mod variant {
     use crate::net::driver;
 
@@ -21,7 +26,7 @@ mod variant {
     /// When the `io-driver` feature is **not** enabled, this is `()`.
     pub(crate) type Handle = driver::Handle;
 
-    pub(crate) fn create() -> io::Result<(Driver, Handle)> {
+    pub(crate) fn create_driver() -> io::Result<(Driver, Handle)> {
         let driver = driver::Reactor::new()?;
         let handle = driver.handle();
 
@@ -33,7 +38,7 @@ mod variant {
     }
 }
 
-#[cfg(not(feature = "net-driver"))]
+#[cfg(not(feature = "io-driver"))]
 mod variant {
     use crate::runtime::park::ParkThread;
 
@@ -45,12 +50,11 @@ mod variant {
     /// There is no handle
     pub(crate) type Handle = ();
 
-    pub(crate) fn create() -> io::Result<(Driver, Handle)> {
+    pub(crate) fn create_driver() -> io::Result<(Driver, Handle)> {
         let driver = ParkThread::new();
 
         Ok((driver, ()))
     }
 
-    #[cfg(feature = "blocking")]
     pub(crate) fn set_default(_handle: &Handle) {}
 }

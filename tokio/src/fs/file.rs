@@ -223,7 +223,7 @@ impl File {
 
         let (op, buf) = match self.state {
             Idle(_) => unreachable!(),
-            Busy(ref mut rx) => rx.await,
+            Busy(ref mut rx) => rx.await.unwrap(),
         };
 
         self.state = Idle(Some(buf));
@@ -343,7 +343,7 @@ impl File {
 
         let (op, buf) = match self.state {
             Idle(_) => unreachable!(),
-            Busy(ref mut rx) => rx.await,
+            Busy(ref mut rx) => rx.await?,
         };
 
         self.state = Idle(Some(buf));
@@ -464,7 +464,7 @@ impl AsyncRead for File {
                     }));
                 }
                 Busy(ref mut rx) => {
-                    let (op, mut buf) = ready!(Pin::new(rx).poll(cx));
+                    let (op, mut buf) = ready!(Pin::new(rx).poll(cx))?;
 
                     match op {
                         Operation::Read(Ok(_)) => {
@@ -537,7 +537,7 @@ impl AsyncWrite for File {
                     return Ready(Ok(n));
                 }
                 Busy(ref mut rx) => {
-                    let (op, buf) = ready!(Pin::new(rx).poll(cx));
+                    let (op, buf) = ready!(Pin::new(rx).poll(cx))?;
                     self.state = Idle(Some(buf));
 
                     match op {
@@ -570,7 +570,7 @@ impl AsyncWrite for File {
 
         let (op, buf) = match self.state {
             Idle(_) => return Ready(Ok(())),
-            Busy(ref mut rx) => ready!(Pin::new(rx).poll(cx)),
+            Busy(ref mut rx) => ready!(Pin::new(rx).poll(cx))?,
         };
 
         // The buffer is not used here
