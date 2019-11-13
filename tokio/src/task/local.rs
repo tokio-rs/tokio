@@ -283,7 +283,8 @@ impl LocalSet {
         F::Output: 'static,
     {
         let scheduler = self.scheduler.clone();
-        rt.block_on(LocalFuture { scheduler, future })
+        self.scheduler
+            .with(move || rt.block_on(LocalFuture { scheduler, future }))
     }
 }
 
@@ -301,17 +302,15 @@ impl<F: Future> Future for LocalFuture<F> {
         let scheduler = this.scheduler;
         let future = this.future;
 
-        scheduler.with(|| {
-            scheduler.tick();
+        scheduler.tick();
 
-            match future.poll(cx) {
-                Poll::Ready(v) => Poll::Ready(v),
-                Poll::Pending => {
-                    cx.waker().wake_by_ref();
-                    Poll::Pending
-                }
+        match future.poll(cx) {
+            Poll::Ready(v) => Poll::Ready(v),
+            Poll::Pending => {
+                cx.waker().wake_by_ref();
+                Poll::Pending
             }
-        })
+        }
     }
 }
 
