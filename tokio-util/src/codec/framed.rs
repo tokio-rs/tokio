@@ -31,6 +31,8 @@ pub(crate) struct Fuse<T, U> {
     pub(crate) codec: U,
 }
 
+/// Abstracts over `FramedRead2` being either `FramedRead2<FramedWrite2<Fuse<T, U>>>` or
+/// `FramedRead2<Fuse<T, U>>` and lets the io and codec parts be extracted in either case.
 pub(crate) trait ProjectFuse {
     type Io;
     type Codec;
