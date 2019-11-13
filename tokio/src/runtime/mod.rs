@@ -139,9 +139,9 @@ mod builder;
 pub use self::builder::Builder;
 
 #[cfg(feature = "rt-core")]
-mod current_thread;
+mod local;
 #[cfg(feature = "rt-core")]
-use self::current_thread::CurrentThread;
+use self::local::LocalScheduler;
 
 pub(crate) mod enter;
 use self::enter::enter;
@@ -220,7 +220,7 @@ enum Kind {
 
     /// Execute all tasks on the current-thread.
     #[cfg(feature = "rt-core")]
-    CurrentThread(CurrentThread<time::Driver>),
+    Local(LocalScheduler<time::Driver>),
 
     /// Execute tasks across multiple threads.
     #[cfg(feature = "rt-full")]
@@ -255,10 +255,10 @@ impl Runtime {
     /// [mod]: index.html
     pub fn new() -> io::Result<Self> {
         #[cfg(feature = "rt-full")]
-        let ret = Builder::new().thread_pool().build();
+        let ret = Builder::new().work_stealing_scheduler().build();
 
         #[cfg(all(not(feature = "rt-full"), feature = "rt-core"))]
-        let ret = Builder::new().current_thread().build();
+        let ret = Builder::new().local_scheduler().build();
 
         #[cfg(not(feature = "rt-core"))]
         let ret = Builder::new().build();
@@ -305,7 +305,7 @@ impl Runtime {
             Kind::Shell(_) => panic!("task execution disabled"),
             #[cfg(feature = "rt-full")]
             Kind::ThreadPool(exec) => exec.spawn(future),
-            Kind::CurrentThread(exec) => exec.spawn(future),
+            Kind::Local(exec) => exec.spawn(future),
         }
     }
 
@@ -328,7 +328,7 @@ impl Runtime {
         self.handle.enter(|| match kind {
             Kind::Shell(exec) => exec.block_on(future),
             #[cfg(feature = "rt-core")]
-            Kind::CurrentThread(exec) => exec.block_on(future),
+            Kind::Local(exec) => exec.block_on(future),
             #[cfg(feature = "rt-full")]
             Kind::ThreadPool(exec) => exec.block_on(future),
         })

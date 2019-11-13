@@ -18,9 +18,9 @@ extern crate proc_macro;
 use proc_macro::TokenStream;
 use quote::quote;
 
-enum RuntimeType {
-    Single,
-    Multi,
+enum Runtime {
+    Local,
+    WorkStealing,
     Auto,
 }
 
@@ -28,8 +28,8 @@ enum RuntimeType {
 ///
 /// ## Options:
 ///
-/// - `current_thread` - Uses the `current_thread` runtime.
-/// - `threadpool` - Uses the multi-threaded `threadpool` runtime. Used by default.
+/// - `local_scheduler` - All tasks are executed on the current thread.
+/// - `work_stealing_scheduler` - Uses the work-stealing scheduler. Used by default.
 ///
 /// ## Function arguments:
 ///
@@ -40,7 +40,7 @@ enum RuntimeType {
 /// ### Select runtime
 ///
 /// ```rust
-/// #[tokio::main(current_thread)]
+/// #[tokio::main(local_scheduler)]
 /// async fn main() {
 ///     println!("Hello world");
 /// }
@@ -77,7 +77,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
             .into();
     }
 
-    let mut runtime = RuntimeType::Auto;
+    let mut runtime = Runtime::Auto;
 
     for arg in args {
         if let syn::NestedMeta::Meta(syn::Meta::Path(path)) = arg {
@@ -87,10 +87,10 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
                 return syn::Error::new_spanned(path, msg).to_compile_error().into();
             }
             match ident.unwrap().to_string().to_lowercase().as_str() {
-                "threadpool" => runtime = RuntimeType::Multi,
-                "current_thread" => runtime = RuntimeType::Single,
+                "work_stealing_scheduler" => runtime = Runtime::WorkStealing,
+                "local_scheduler" => runtime = Runtime::Local,
                 name => {
-                    let msg = format!("Unknown attribute {} is specified; expected `current_thread` or `threadpool`", name);
+                    let msg = format!("Unknown attribute {} is specified; expected `local_scheduler` or `work_stealing_scheduler`", name);
                     return syn::Error::new_spanned(path, msg).to_compile_error().into();
                 }
             }
@@ -98,17 +98,17 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     }
 
     let result = match runtime {
-        RuntimeType::Multi | RuntimeType::Auto => quote! {
+        Runtime::WorkStealing | Runtime::Auto => quote! {
             #(#attrs)*
             fn #name(#inputs) #ret {
                 tokio::runtime::Runtime::new().unwrap().block_on(async { #body })
             }
         },
-        RuntimeType::Single => quote! {
+        Runtime::Local => quote! {
             #(#attrs)*
             fn #name(#inputs) #ret {
                 tokio::runtime::Builder::new()
-                    .current_thread()
+                    .local_scheduler()
                     .build()
                     .unwrap()
                     .block_on(async { #body })
@@ -123,15 +123,15 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ## Options:
 ///
-/// - `current_thread` - Uses the `current_thread` runtime. Used by default.
-/// - `threadpool` - Uses multi-threaded runtime.
+/// - `local_scheduler` - All tasks are executed on the current thread. Used by default.
+/// - `work_stealing_scheduler` - Uses work-stealing scheduler.
 ///
 /// ## Usage
 ///
 /// ### Select runtime
 ///
 /// ```no_run
-/// #[tokio::test(threadpool)]
+/// #[tokio::test(work_stealing_scheduler)]
 /// async fn my_test() {
 ///     assert!(true);
 /// }
@@ -176,7 +176,7 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
             .into();
     }
 
-    let mut runtime = RuntimeType::Auto;
+    let mut runtime = Runtime::Auto;
 
     for arg in args {
         if let syn::NestedMeta::Meta(syn::Meta::Path(path)) = arg {
@@ -186,10 +186,10 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
                 return syn::Error::new_spanned(path, msg).to_compile_error().into();
             }
             match ident.unwrap().to_string().to_lowercase().as_str() {
-                "threadpool" => runtime = RuntimeType::Multi,
-                "current_thread" => runtime = RuntimeType::Single,
+                "work_stealing_scheduler" => runtime = Runtime::WorkStealing,
+                "local_scheduler" => runtime = Runtime::Local,
                 name => {
-                    let msg = format!("Unknown attribute {} is specified; expected `current_thread` or `threadpool`", name);
+                    let msg = format!("Unknown attribute {} is specified; expected `local_scheduler` or `work_stealing_scheduler`", name);
                     return syn::Error::new_spanned(path, msg).to_compile_error().into();
                 }
             }
@@ -197,19 +197,19 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
     }
 
     let result = match runtime {
-        RuntimeType::Multi => quote! {
+        Runtime::WorkStealing => quote! {
             #[test]
             #(#attrs)*
             fn #name() #ret {
                 tokio::runtime::Runtime::new().unwrap().block_on(async { #body })
             }
         },
-        RuntimeType::Single | RuntimeType::Auto => quote! {
+        Runtime::Local | Runtime::Auto => quote! {
             #[test]
             #(#attrs)*
             fn #name() #ret {
                 tokio::runtime::Builder::new()
-                    .current_thread()
+                    .local_scheduler()
                     .build()
                     .unwrap()
                     .block_on(async { #body })
