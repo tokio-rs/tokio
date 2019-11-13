@@ -15,6 +15,11 @@ mod join;
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::join::JoinHandle;
 
+#[cfg(feature = "local")]
+mod local;
+#[cfg(feature = "local")]
+pub use self::local::{spawn, TaskGroup};
+
 mod list;
 pub(crate) use self::list::OwnedList;
 
