@@ -1,5 +1,4 @@
 //! Runs `!Send` futures on the current thread.
-use crate::runtime::park::{CachedParkThread, Park, Unpark};
 use crate::task::{self, JoinHandle, Schedule, Task};
 
 use std::cell::{Cell, UnsafeCell};
@@ -10,8 +9,7 @@ use std::marker::PhantomData;
 use std::pin::Pin;
 use std::ptr::{self, NonNull};
 use std::rc::Rc;
-use std::task::{Context, Poll};
-use std::time::Duration;
+use std::task::{Context, Poll, Waker};
 
 use pin_project::pin_project;
 
@@ -101,8 +99,7 @@ struct Scheduler {
     /// Only call from the owning thread.
     queue: UnsafeCell<VecDeque<Task<Scheduler>>>,
 
-    park: UnsafeCell<CachedParkThread>,
-    unpark: Box<dyn Unpark>,
+    waker: UnsafeCell<Option<Waker>>,
 }
 
 #[pin_project]
@@ -306,14 +303,16 @@ impl<F: Future> Future for LocalFuture<F> {
         let this = self.project();
         let scheduler = this.scheduler;
         let mut future = this.future;
-
-        loop {
-            if let Poll::Ready(output) = future.as_mut().poll(cx) {
-                return Poll::Ready(output);
-            }
-
-            scheduler.tick();
+        unsafe {
+            (*scheduler.waker.get()) = Some(cx.waker().clone());
         }
+
+        if let Poll::Ready(output) = future.as_mut().poll(cx) {
+            return Poll::Ready(output);
+        }
+
+        scheduler.tick();
+        Poll::Pending
     }
 }
 
@@ -340,19 +339,19 @@ impl Schedule for Scheduler {
         unsafe {
             (*self.queue.get()).push_front(task);
         }
-        self.unpark.unpark();
+        if let Some(waker) = self.waker() {
+            // If we are running, wake the local future.
+            waker.wake_by_ref();
+        }
     }
 }
 
 impl Scheduler {
     fn new() -> Self {
-        let park = CachedParkThread::new();
-        let unpark = park.unpark();
         Self {
             tasks: UnsafeCell::new(task::OwnedList::new()),
             queue: UnsafeCell::new(VecDeque::with_capacity(64)),
-            park: UnsafeCell::new(park),
-            unpark: Box::new(unpark),
+            waker: UnsafeCell::new(None),
         }
     }
 
@@ -389,26 +388,22 @@ impl Scheduler {
         unsafe { (*self.queue.get()).pop_front() }
     }
 
+    fn waker(&self) -> Option<&Waker> {
+        unsafe { (*self.waker.get()).as_ref() }
+    }
+
     fn tick(&self) {
         assert!(self.is_current());
-        let park = unsafe { &mut (*self.park.get()) };
         for _ in 0..MAX_TASKS_PER_TICK {
             let task = match self.next_task() {
                 Some(task) => task,
-                None => {
-                    park.park().ok().expect("failed to park local task set");
-                    return;
-                }
+                None => return,
             };
 
             if let Some(task) = task.run(&mut || Some(self.into())) {
                 self.schedule(task);
             }
         }
-
-        park.park_timeout(Duration::from_millis(0))
-            .ok()
-            .expect("failed to park local task set");
     }
 }
 
@@ -417,6 +412,7 @@ impl fmt::Debug for Scheduler {
         fmt.debug_struct("Scheduler { .. }").finish()
     }
 }
+
 impl Drop for Scheduler {
     fn drop(&mut self) {
         // Drain all local tasks
