@@ -410,7 +410,15 @@ impl Scheduler {
     }
 
     fn next_remote_task(&self) -> Option<Task<Self>> {
-        self.remote_queue.lock().unwrap().pop_front()
+        let mut lock = match self.remote_queue.lock() {
+            // If the lock is poisoned, but the thread is already panicking,
+            // avoid a double panic. This is necessary since `next_task` (which
+            // calls `next_remote_task`) can be called in the `Drop` impl.
+            Err(_) if std::thread::panicking() => return None,
+            Err(_) => panic!("mutex poisoned"),
+            Ok(lock) => lock,
+        };
+        lock.pop_front()
     }
 
     fn tick(&self) {
