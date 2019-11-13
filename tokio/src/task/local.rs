@@ -330,6 +330,7 @@ impl<F: Future> Future for LocalFuture<F> {
 
 impl Schedule for Scheduler {
     fn bind(&self, task: &Task<Self>) {
+        assert!(self.is_current());
         unsafe {
             (*self.tasks.get()).insert(task);
         }
@@ -340,6 +341,7 @@ impl Schedule for Scheduler {
     }
 
     fn release_local(&self, task: &Task<Self>) {
+        debug_assert!(self.is_current());
         unsafe {
             (*self.tasks.get()).remove(task);
         }
