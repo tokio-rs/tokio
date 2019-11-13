@@ -556,7 +556,8 @@ mod tests {
                         "blocking must not run on the local task set's thread"
                     );
                 })
-                .await;
+                .await
+                .unwrap();
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
             });
             join.await.unwrap();

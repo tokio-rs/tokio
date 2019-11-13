@@ -7,7 +7,6 @@ use crate::task::Schedule;
 
 use std::cell::UnsafeCell;
 use std::future::Future;
-use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::ptr::{self, NonNull};
