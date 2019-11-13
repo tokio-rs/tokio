@@ -15,10 +15,10 @@ use pin_project::pin_project;
 
 /// A group of tasks which are executed on the same thread.
 ///
-/// These tasks need not implement `Send`; a local task group provides the
+/// These tasks need not implement `Send`; a local task set provides the
 /// capacity to execute `!Send` futures.
 #[derive(Debug)]
-pub struct TaskGroup {
+pub struct LocalSet {
     scheduler: Rc<Scheduler>,
     _not_send_or_sync: PhantomData<*const ()>,
 }
@@ -53,14 +53,14 @@ thread_local! {
     static CURRENT_TASK_SET: Cell<Option<NonNull<Scheduler>>> = Cell::new(None);
 }
 
-/// Spawns a `!Send` future on the local task group.
+/// Spawns a `!Send` future on the local task set.
 ///
 /// The spawned future will be run on the same thread that called `spawn_local.`
-/// This may only be called from the context of a local task group.
+/// This may only be called from the context of a local task set.
 ///
 /// # Panics
 ///
-/// - This function panics if called outside of a local task group.
+/// - This function panics if called outside of a local task set.
 ///
 /// # Examples
 ///
@@ -72,7 +72,7 @@ thread_local! {
 /// let unsend_data = Rc::new("my unsend data...");
 ///
 /// let mut rt = Runtime::new().unwrap();
-/// let local_group = local::TaskGroup::new();
+/// let local_group = local::LocalSet::new();
 ///
 /// // Run the local task grou[].
 /// local_group.block_on(&mut rt, async move {
@@ -91,7 +91,7 @@ where
     CURRENT_TASK_SET.with(|current| {
         let current = current
             .get()
-            .expect("`spawn_local` called from outside of a local::TaskGroup!");
+            .expect("`spawn_local` called from outside of a local::LocalSet!");
         unsafe {
             let (task, handle) = task::joinable_unsend(future);
             current.as_ref().schedule(task);
@@ -103,8 +103,8 @@ where
 /// Max number of tasks to poll per tick.
 const MAX_TASKS_PER_TICK: usize = 61;
 
-impl TaskGroup {
-    /// Returns a new local task group.
+impl LocalSet {
+    /// Returns a new local task set.
     pub fn new() -> Self {
         Self {
             scheduler: Rc::new(Scheduler::new()),
@@ -112,26 +112,26 @@ impl TaskGroup {
         }
     }
 
-    /// Spawns a `!Send` task onto the local task group.
+    /// Spawns a `!Send` task onto the local task set.
     ///
     /// This task is guaranteed to be run on the current thread.
     ///
     /// Unlike the free function [`spawn_local`], this method may be used to
-    /// spawn_local local tasks when the task group is _not_ running. For example:
+    /// spawn_local local tasks when the task set is _not_ running. For example:
     /// ```rust
     /// # use tokio::runtime::Runtime;
     /// use tokio::local;
     ///
     /// let mut rt = Runtime::new().unwrap();
-    /// let local_group = local::TaskGroup::new();
+    /// let local_group = local::LocalSet::new();
     ///
     /// // Spawn a future on the local group. This future will be run when
-    /// // we call `block_on` to drive the task group.
+    /// // we call `block_on` to drive the task set.
     /// local_group.spawn_local(async {
     ///    // ...
     /// });
     ///
-    /// // Run the local task group.
+    /// // Run the local task set.
     /// local_group.block_on(&mut rt, async move {
     ///     // ...
     /// });
@@ -158,7 +158,7 @@ impl TaskGroup {
     }
 
     /// Run a future to completion on the provided runtime, driving any local
-    /// futures spawned on this task group on the current thread.
+    /// futures spawned on this task set on the current thread.
     ///
     /// This runs the given future on the runtime, blocking until it is
     /// complete, and yielding its resolved result. Any tasks or timers which
@@ -176,7 +176,7 @@ impl TaskGroup {
     /// # Notes
     ///
     /// Since this function internally calls [`Runtime::block_on`], and drives
-    /// futures in the local task group inside that call to `block_on`, the local
+    /// futures in the local task set inside that call to `block_on`, the local
     /// futures may not use [in-place blocking]. If a blocking call needs to be
     /// issued from a local task, the [`blocking::run`] API may be used instead.
     ///
@@ -186,7 +186,7 @@ impl TaskGroup {
     /// use tokio::local;
     ///
     /// let mut rt = Runtime::new().unwrap();
-    /// let local = local::TaskGroup::new();
+    /// let local = local::LocalSet::new();
     /// local.block_on(&mut rt, async {
     ///     let join = spawn_local(async {
     ///         let blocking_result = blocking::in_place(|| {
@@ -203,7 +203,7 @@ impl TaskGroup {
     /// use tokio::local;
     ///
     /// let mut rt = Runtime::new().unwrap();
-    /// let local = local::TaskGroup::new();
+    /// let local = local::LocalSet::new();
     /// local.block_on(&mut rt, async {
     ///     let join = spawn_local(async {
     ///         let blocking_result = blocking::run(|| {
@@ -229,7 +229,7 @@ impl TaskGroup {
     }
 }
 
-impl Default for TaskGroup {
+impl Default for LocalSet {
     fn default() -> Self {
         Self::new()
     }
@@ -369,7 +369,7 @@ mod tests {
     #[test]
     fn local_current_thread() {
         let mut rt = runtime::Builder::new().current_thread().build().unwrap();
-        TaskGroup::new().block_on(&mut rt, async {
+        LocalSet::new().block_on(&mut rt, async {
             spawn_local(async {}).await.unwrap();
         });
     }
@@ -383,7 +383,7 @@ mod tests {
         ON_RT_THREAD.with(|cell| cell.set(true));
 
         let mut rt = runtime::Runtime::new().unwrap();
-        TaskGroup::new().block_on(&mut rt, async {
+        LocalSet::new().block_on(&mut rt, async {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
             spawn_local(async {
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
@@ -396,7 +396,7 @@ mod tests {
     #[test]
     fn local_threadpool_timer() {
         // This test ensures that runtime services like the timer are properly
-        // set for the local task group.
+        // set for the local task set.
         use std::time::Duration;
         thread_local! {
             static ON_RT_THREAD: Cell<bool> = Cell::new(false);
@@ -405,7 +405,7 @@ mod tests {
         ON_RT_THREAD.with(|cell| cell.set(true));
 
         let mut rt = runtime::Runtime::new().unwrap();
-        TaskGroup::new().block_on(&mut rt, async {
+        LocalSet::new().block_on(&mut rt, async {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
             let join = spawn_local(async move {
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
@@ -428,7 +428,7 @@ mod tests {
         ON_RT_THREAD.with(|cell| cell.set(true));
 
         let mut rt = runtime::Runtime::new().unwrap();
-        TaskGroup::new().block_on(&mut rt, async {
+        LocalSet::new().block_on(&mut rt, async {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
             let join = spawn_local(async move {
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
@@ -448,14 +448,14 @@ mod tests {
         ON_RT_THREAD.with(|cell| cell.set(true));
 
         let mut rt = runtime::Runtime::new().unwrap();
-        TaskGroup::new().block_on(&mut rt, async {
+        LocalSet::new().block_on(&mut rt, async {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
             let join = spawn_local(async move {
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
                 runtime::blocking::run(|| {
                     assert!(
                         !ON_RT_THREAD.with(|cell| cell.get()),
-                        "blocking must not run on the local task group's thread"
+                        "blocking must not run on the local task set's thread"
                     );
                 })
                 .await;
@@ -476,7 +476,7 @@ mod tests {
         ON_RT_THREAD.with(|cell| cell.set(true));
 
         let mut rt = runtime::Runtime::new().unwrap();
-        TaskGroup::new().block_on(&mut rt, async {
+        LocalSet::new().block_on(&mut rt, async {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
             let handles = (0..128)
                 .map(|_| {
@@ -500,7 +500,7 @@ mod tests {
         ON_RT_THREAD.with(|cell| cell.set(true));
 
         let mut rt = runtime::Runtime::new().unwrap();
-        TaskGroup::new().block_on(&mut rt, async {
+        LocalSet::new().block_on(&mut rt, async {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
             spawn_local(async {
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));

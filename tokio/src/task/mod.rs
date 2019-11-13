@@ -18,7 +18,7 @@ pub use self::join::JoinHandle;
 #[cfg(feature = "local")]
 mod local;
 #[cfg(feature = "local")]
-pub use self::local::{spawn, TaskGroup};
+pub use self::local::{spawn_local, LocalSet};
 
 mod list;
 pub(crate) use self::list::OwnedList;
