@@ -54,11 +54,12 @@ process = [
   "winapi/winerror",
 ]
 # Includes basic task execution capabilities
-rt-core = ["pin-project"]
+rt-core = []
 rt-full = [
   "macros",
   "num_cpus",
   "net",
+  "pin-project",
   "rt-core",
   "sync",
   "time",

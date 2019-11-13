@@ -15,9 +15,9 @@ mod join;
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::join::JoinHandle;
 
-#[cfg(feature = "rt-core")]
+#[cfg(feature = "rt-full")]
 mod local;
-#[cfg(feature = "rt-core")]
+#[cfg(feature = "rt-full")]
 pub use self::local::{spawn_local, LocalSet};
 
 mod list;

@@ -1,4 +1,5 @@
 //! Runs `!Send` futures on the current thread.
+use crate::sync::AtomicWaker;
 use crate::task::{self, JoinHandle, Schedule, Task};
 
 use std::cell::{Cell, UnsafeCell};
@@ -9,7 +10,7 @@ use std::pin::Pin;
 use std::ptr::{self, NonNull};
 use std::rc::Rc;
 use std::sync::Mutex;
-use std::task::{Context, Poll, Waker};
+use std::task::{Context, Poll};
 
 use pin_project::pin_project;
 
@@ -90,7 +91,7 @@ struct Scheduler {
 
     /// Local run local_queue.
     ///
-    /// Tasks notified from the current thread are pushed into this local_queue.
+    /// Tasks notified from the current thread are pushed into this queue.
     ///
     /// # Safety
     ///
@@ -98,17 +99,14 @@ struct Scheduler {
     /// Only call from the owning thread.
     local_queue: UnsafeCell<VecDeque<Task<Scheduler>>>,
 
-    /// Shared state
-    shared: Mutex<Shared>,
-}
-
-struct Shared {
-    waker: Option<Waker>,
-
     /// Remote run queue.
     ///
     /// Tasks notified from another thread are pushed into this queue.
-    remote_queue: VecDeque<Task<Scheduler>>,
+    remote_queue: Mutex<VecDeque<Task<Scheduler>>>,
+
+    /// Used to notify the `LocalFuture` when a task in the local task set is
+    /// notified.
+    waker: AtomicWaker,
 }
 
 #[pin_project]
@@ -315,7 +313,7 @@ impl<F: Future> Future for LocalFuture<F> {
         let this = self.project();
         let scheduler = this.scheduler;
         let mut future = this.future;
-        scheduler.shared.lock().unwrap().waker = Some(cx.waker().clone());
+        scheduler.waker.register_by_ref(cx.waker());
 
         if let Poll::Ready(output) = future.as_mut().poll(cx) {
             return Poll::Ready(output);
@@ -353,13 +351,9 @@ impl Schedule for Scheduler {
                 self.schedule_local(task);
             }
         } else {
-            let mut lock = self.shared.lock().unwrap();
+            self.remote_queue.lock().unwrap().push_back(task);
 
-            lock.remote_queue.push_back(task);
-            lock.waker
-                .as_ref()
-                .expect("if a local task is notified, the local task set must be running!")
-                .wake_by_ref();
+            self.waker.wake();
         }
     }
 }
@@ -369,10 +363,8 @@ impl Scheduler {
         Self {
             tasks: UnsafeCell::new(task::OwnedList::new()),
             local_queue: UnsafeCell::new(VecDeque::with_capacity(64)),
-            shared: Mutex::new(Shared {
-                waker: None,
-                remote_queue: VecDeque::with_capacity(64),
-            }),
+            remote_queue: Mutex::new(VecDeque::with_capacity(64)),
+            waker: AtomicWaker::new(),
         }
     }
 
@@ -418,7 +410,7 @@ impl Scheduler {
     }
 
     fn next_remote_task(&self) -> Option<Task<Self>> {
-        self.shared.lock().unwrap().remote_queue.pop_front()
+        self.remote_queue.lock().unwrap().pop_front()
     }
 
     fn tick(&self) {
