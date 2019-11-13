@@ -149,8 +149,7 @@ impl ScheduledIo {
             }
             // Mask out the generation bits so that the modifying function
             // doesn't see them.
-            let mask = Readiness::ALL;
-            let current_readiness = current & mask.as_usize();
+            let current_readiness = current & Readiness::ALL.as_usize();
             let new = f(current_readiness);
             debug_assert!(
                 new < Generation::ONE,
