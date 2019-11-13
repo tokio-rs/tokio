@@ -69,7 +69,7 @@ use std::task::{Context, Poll};
 ///
 /// impl MyListener {
 ///     pub fn poll_accept(&mut self, cx: &mut Context<'_>) -> Poll<Result<TcpStream, io::Error>> {
-///         let readiness = Readiness::readable();
+///         let readiness = Readiness::READABLE;
 ///
 ///         ready!(self.io_resource.poll_read_ready(cx))?;
 ///
