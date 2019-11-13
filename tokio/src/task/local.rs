@@ -5,7 +5,6 @@ use std::cell::{Cell, UnsafeCell};
 use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
-use std::marker::PhantomData;
 use std::pin::Pin;
 use std::ptr::{self, NonNull};
 use std::rc::Rc;
@@ -78,7 +77,6 @@ use pin_project::pin_project;
 #[derive(Debug)]
 pub struct LocalSet {
     scheduler: Rc<Scheduler>,
-    _not_send_or_sync: PhantomData<*const ()>,
 }
 
 struct Scheduler {
@@ -168,7 +166,6 @@ impl LocalSet {
     pub fn new() -> Self {
         Self {
             scheduler: Rc::new(Scheduler::new()),
-            _not_send_or_sync: PhantomData,
         }
     }
 
