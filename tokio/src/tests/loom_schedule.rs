@@ -1,4 +1,4 @@
-use crate::task::{Schedule, Sendable, Task};
+use crate::task::{RequiresSend, Schedule, Task};
 
 use loom::sync::Notify;
 use std::collections::VecDeque;
@@ -32,7 +32,7 @@ impl LoomSchedule {
     }
 }
 
-impl Schedule<Sendable> for LoomSchedule {
+impl Schedule for LoomSchedule {
     fn bind(&self, _task: &Task<Self>) {}
 
     fn release(&self, task: Task<Self>) {
@@ -49,3 +49,5 @@ impl Schedule<Sendable> for LoomSchedule {
         self.notify.notify();
     }
 }
+
+impl RequiresSend for LoomSchedule {}

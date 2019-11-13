@@ -1,5 +1,5 @@
 //! Runs `!Send` futures on the current thread.
-use crate::task::{self, JoinHandle, Schedule, UnsendTask, Unsendable};
+use crate::task::{self, JoinHandle, Schedule, Task};
 
 use std::cell::{Cell, UnsafeCell};
 use std::collections::VecDeque;
@@ -87,7 +87,7 @@ struct Scheduler {
     /// # Safety
     ///
     /// Must only be accessed from the primary thread
-    tasks: UnsafeCell<task::OwnedList<Scheduler, Unsendable>>,
+    tasks: UnsafeCell<task::OwnedList<Scheduler>>,
 
     /// Local run queue.
     ///
@@ -97,7 +97,7 @@ struct Scheduler {
     ///
     /// References should not be handed out. Only call `push` / `pop` functions.
     /// Only call from the owning thread.
-    queue: UnsafeCell<VecDeque<UnsendTask<Scheduler>>>,
+    queue: UnsafeCell<VecDeque<Task<Scheduler>>>,
 }
 
 #[pin_project]
@@ -317,24 +317,24 @@ impl<F: Future> Future for LocalFuture<F> {
 
 // === impl Scheduler ===
 
-impl Schedule<Unsendable> for Scheduler {
-    fn bind(&self, task: &UnsendTask<Self>) {
+impl Schedule for Scheduler {
+    fn bind(&self, task: &Task<Self>) {
         unsafe {
             (*self.tasks.get()).insert(task);
         }
     }
 
-    fn release(&self, _: UnsendTask<Self>) {
+    fn release(&self, _: Task<Self>) {
         unreachable!("tasks should only be completed locally")
     }
 
-    fn release_local(&self, task: &UnsendTask<Self>) {
+    fn release_local(&self, task: &Task<Self>) {
         unsafe {
             (*self.tasks.get()).remove(task);
         }
     }
 
-    fn schedule(&self, task: UnsendTask<Self>) {
+    fn schedule(&self, task: Task<Self>) {
         unsafe {
             (*self.queue.get()).push_front(task);
         }
@@ -378,7 +378,7 @@ impl Scheduler {
             .unwrap_or(false)
     }
 
-    fn next_task(&self) -> Option<UnsendTask<Self>> {
+    fn next_task(&self) -> Option<Task<Self>> {
         unsafe { (*self.queue.get()).pop_front() }
     }
 

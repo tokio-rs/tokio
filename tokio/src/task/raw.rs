@@ -1,9 +1,7 @@
 use crate::loom::alloc::Track;
 use crate::task::Cell;
 use crate::task::Harness;
-#[cfg(feature = "local")]
-use crate::task::Unsendable;
-use crate::task::{Header, Schedule, Sendable};
+use crate::task::{Header, RequiresSend, Schedule};
 use crate::task::{Snapshot, State};
 
 use std::future::Future;
@@ -44,15 +42,15 @@ pub(super) struct Vtable {
 }
 
 /// Get the vtable for the requested `T` and `S` generics.
-pub(super) fn vtable<T: Future, S: Schedule<M>, M>() -> &'static Vtable {
+pub(super) fn vtable<T: Future, S: Schedule>() -> &'static Vtable {
     &Vtable {
-        poll: poll::<T, S, M>,
-        drop_task: drop_task::<T, S, M>,
-        read_output: read_output::<T, S, M>,
-        store_join_waker: store_join_waker::<T, S, M>,
-        swap_join_waker: swap_join_waker::<T, S, M>,
-        drop_join_handle_slow: drop_join_handle_slow::<T, S, M>,
-        cancel: cancel::<T, S, M>,
+        poll: poll::<T, S>,
+        drop_task: drop_task::<T, S>,
+        read_output: read_output::<T, S>,
+        store_join_waker: store_join_waker::<T, S>,
+        swap_join_waker: swap_join_waker::<T, S>,
+        drop_join_handle_slow: drop_join_handle_slow::<T, S>,
+        cancel: cancel::<T, S>,
     }
 }
 
@@ -60,32 +58,32 @@ impl RawTask {
     pub(super) fn new_background<T, S>(task: T) -> RawTask
     where
         T: Future + Send + 'static,
-        S: Schedule<Sendable>,
+        S: Schedule + RequiresSend,
     {
-        RawTask::new::<_, S, Sendable>(task, State::new_background())
+        RawTask::new::<_, S>(task, State::new_background())
     }
 
     pub(super) fn new_joinable<T, S>(task: T) -> RawTask
     where
         T: Future + Send + 'static,
-        S: Schedule<Sendable>,
+        S: Schedule + RequiresSend,
     {
-        RawTask::new::<_, S, Sendable>(task, State::new_joinable())
+        RawTask::new::<_, S>(task, State::new_joinable())
     }
 
     #[cfg(feature = "local")]
     pub(super) fn new_joinable_unsend<T, S>(task: T) -> RawTask
     where
         T: Future + 'static,
-        S: Schedule<Unsendable>,
+        S: Schedule,
     {
-        RawTask::new::<_, S, Unsendable>(task, State::new_joinable())
+        RawTask::new::<_, S>(task, State::new_joinable())
     }
 
-    fn new<T, S, M>(task: T, state: State) -> RawTask
+    fn new<T, S>(task: T, state: State) -> RawTask
     where
         T: Future + 'static,
-        S: Schedule<M>,
+        S: Schedule,
     {
         let ptr = Box::into_raw(Cell::new::<S>(task, state));
         let ptr = unsafe { NonNull::new_unchecked(ptr as *mut Header) };
@@ -161,44 +159,44 @@ impl Clone for RawTask {
 
 impl Copy for RawTask {}
 
-unsafe fn poll<T: Future, S: Schedule<M>, M>(
+unsafe fn poll<T: Future, S: Schedule>(
     ptr: *mut (),
     executor: &mut dyn FnMut() -> Option<NonNull<()>>,
 ) -> bool {
-    let harness = Harness::<T, S, M>::from_raw(ptr);
+    let harness = Harness::<T, S>::from_raw(ptr);
     harness.poll(executor)
 }
 
-unsafe fn drop_task<T: Future, S: Schedule<M>, M>(ptr: *mut ()) {
-    let harness = Harness::<T, S, M>::from_raw(ptr);
+unsafe fn drop_task<T: Future, S: Schedule>(ptr: *mut ()) {
+    let harness = Harness::<T, S>::from_raw(ptr);
     harness.drop_task();
 }
 
-unsafe fn read_output<T: Future, S: Schedule<M>, M>(ptr: *mut (), dst: *mut (), state: Snapshot) {
-    let harness = Harness::<T, S, M>::from_raw(ptr);
+unsafe fn read_output<T: Future, S: Schedule>(ptr: *mut (), dst: *mut (), state: Snapshot) {
+    let harness = Harness::<T, S>::from_raw(ptr);
     harness.read_output(dst as *mut Track<super::Result<T::Output>>, state);
 }
 
-unsafe fn store_join_waker<T: Future, S: Schedule<M>, M>(ptr: *mut (), waker: &Waker) -> Snapshot {
-    let harness = Harness::<T, S, M>::from_raw(ptr);
+unsafe fn store_join_waker<T: Future, S: Schedule>(ptr: *mut (), waker: &Waker) -> Snapshot {
+    let harness = Harness::<T, S>::from_raw(ptr);
     harness.store_join_waker(waker)
 }
 
-unsafe fn swap_join_waker<T: Future, S: Schedule<M>, M>(
+unsafe fn swap_join_waker<T: Future, S: Schedule>(
     ptr: *mut (),
     waker: &Waker,
     prev: Snapshot,
 ) -> Snapshot {
-    let harness = Harness::<T, S, M>::from_raw(ptr);
+    let harness = Harness::<T, S>::from_raw(ptr);
     harness.swap_join_waker(waker, prev)
 }
 
-unsafe fn drop_join_handle_slow<T: Future, S: Schedule<M>, M>(ptr: *mut ()) {
-    let harness = Harness::<T, S, M>::from_raw(ptr);
+unsafe fn drop_join_handle_slow<T: Future, S: Schedule>(ptr: *mut ()) {
+    let harness = Harness::<T, S>::from_raw(ptr);
     harness.drop_join_handle_slow()
 }
 
-unsafe fn cancel<T: Future, S: Schedule<M>, M>(ptr: *mut (), from_queue: bool) {
-    let harness = Harness::<T, S, M>::from_raw(ptr);
+unsafe fn cancel<T: Future, S: Schedule>(ptr: *mut (), from_queue: bool) {
+    let harness = Harness::<T, S>::from_raw(ptr);
     harness.cancel(from_queue)
 }

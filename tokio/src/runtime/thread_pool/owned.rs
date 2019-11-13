@@ -39,7 +39,7 @@ pub(super) struct Owned<P: 'static> {
     pub(super) work_queue: queue::Worker<Shared<P>>,
 
     /// List of tasks owned by the worker
-    pub(super) owned_tasks: task::OwnedList<Shared<P>, task::Sendable>,
+    pub(super) owned_tasks: task::OwnedList<Shared<P>>,
 }
 
 impl<P> Owned<P>

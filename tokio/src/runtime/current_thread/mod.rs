@@ -1,5 +1,5 @@
 use crate::runtime::park::{Park, Unpark};
-use crate::task::{self, JoinHandle, Schedule, Task};
+use crate::task::{self, JoinHandle, RequiresSend, Schedule, Task};
 
 use std::cell::UnsafeCell;
 use std::collections::VecDeque;
@@ -35,7 +35,7 @@ pub(super) struct Scheduler {
     /// # Safety
     ///
     /// Must only be accessed from the primary thread
-    owned_tasks: UnsafeCell<task::OwnedList<Self, task::Sendable>>,
+    owned_tasks: UnsafeCell<task::OwnedList<Self>>,
 
     /// Local run queue.
     ///
@@ -254,7 +254,7 @@ impl Scheduler {
     }
 }
 
-impl Schedule<task::Sendable> for Scheduler {
+impl Schedule for Scheduler {
     fn bind(&self, task: &Task<Self>) {
         unsafe {
             (*self.owned_tasks.get()).insert(task);
@@ -292,6 +292,8 @@ impl Schedule<task::Sendable> for Scheduler {
         }
     }
 }
+
+impl RequiresSend for Scheduler {}
 
 impl<P> Drop for CurrentThread<P>
 where

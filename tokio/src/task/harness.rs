@@ -11,21 +11,21 @@ use std::ptr::NonNull;
 use std::task::{Poll, Waker};
 
 /// Typed raw task handle
-pub(super) struct Harness<T: Future, S: 'static, M> {
-    cell: NonNull<Cell<T, M>>,
+pub(super) struct Harness<T: Future, S: 'static> {
+    cell: NonNull<Cell<T>>,
     _p: PhantomData<S>,
 }
 
-impl<T, S, M> Harness<T, S, M>
+impl<T, S> Harness<T, S>
 where
     T: Future,
     S: 'static,
 {
-    pub(super) unsafe fn from_raw(ptr: *mut ()) -> Harness<T, S, M> {
+    pub(super) unsafe fn from_raw(ptr: *mut ()) -> Harness<T, S> {
         debug_assert!(!ptr.is_null());
 
         Harness {
-            cell: NonNull::new_unchecked(ptr as *mut Cell<T, M>),
+            cell: NonNull::new_unchecked(ptr as *mut Cell<T>),
             _p: PhantomData,
         }
     }
@@ -38,15 +38,15 @@ where
         unsafe { &self.cell.as_ref().trailer }
     }
 
-    fn core(&mut self) -> &mut Core<T, M> {
+    fn core(&mut self) -> &mut Core<T> {
         unsafe { &mut self.cell.as_mut().core }
     }
 }
 
-impl<T, S, M> Harness<T, S, M>
+impl<T, S> Harness<T, S>
 where
     T: Future,
-    S: Schedule<M>,
+    S: Schedule,
 {
     /// Poll the inner future.
     ///
@@ -99,12 +99,12 @@ where
 
         let res = header.future_causality.with_mut(|_| {
             panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                struct Guard<'a, T: Future, M> {
-                    core: &'a mut Core<T, M>,
+                struct Guard<'a, T: Future> {
+                    core: &'a mut Core<T>,
                     polled: bool,
                 }
 
-                impl<T: Future, M> Drop for Guard<'_, T, M> {
+                impl<T: Future> Drop for Guard<'_, T> {
                     fn drop(&mut self) {
                         if !self.polled {
                             self.core.transition_to_consumed();
@@ -552,7 +552,7 @@ where
         self.trailer().waker.with_deferred(|ptr| ptr.read())
     }
 
-    unsafe fn to_task(&self) -> Task<S, M> {
+    unsafe fn to_task(&self) -> Task<S> {
         let ptr = self.cell.as_ptr() as *mut Header;
         Task::from_raw(NonNull::new_unchecked(ptr))
     }

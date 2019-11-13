@@ -1,11 +1,11 @@
-use crate::task::{Schedule, Sendable, Task};
+use crate::task::{RequiresSend, Schedule, Task};
 
 /// `task::Schedule` implementation that does nothing. This is unique to the
 /// blocking scheduler as tasks scheduled are not really futures but blocking
 /// operations.
 pub(super) struct NoopSchedule;
 
-impl Schedule<Sendable> for NoopSchedule {
+impl Schedule for NoopSchedule {
     fn bind(&self, _task: &Task<Self>) {}
 
     fn release(&self, _task: Task<Self>) {}
@@ -16,3 +16,5 @@ impl Schedule<Sendable> for NoopSchedule {
         unreachable!();
     }
 }
+
+impl RequiresSend for NoopSchedule {}
