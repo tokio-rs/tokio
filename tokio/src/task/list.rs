@@ -4,12 +4,12 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
-pub(crate) struct OwnedList<S: 'static> {
+pub(crate) struct OwnedList<T: 'static> {
     head: Option<NonNull<Header>>,
-    _p: PhantomData<S>,
+    _p: PhantomData<T>,
 }
 
-impl<S: 'static> OwnedList<S> {
+impl<T: 'static> OwnedList<T> {
     pub(crate) fn new() -> Self {
         OwnedList {
             head: None,
@@ -17,7 +17,7 @@ impl<S: 'static> OwnedList<S> {
         }
     }
 
-    pub(crate) fn insert(&mut self, task: &Task<S>) {
+    pub(crate) fn insert(&mut self, task: &Task<T>) {
         debug_assert!(!self.contains(task));
 
         unsafe {
@@ -36,7 +36,7 @@ impl<S: 'static> OwnedList<S> {
         }
     }
 
-    pub(crate) fn remove(&mut self, task: &Task<S>) {
+    pub(crate) fn remove(&mut self, task: &Task<T>) {
         debug_assert!(self.head.is_some());
 
         unsafe {
@@ -72,7 +72,7 @@ impl<S: 'static> OwnedList<S> {
     }
 
     /// Only used by debug assertions
-    fn contains(&self, task: &Task<S>) -> bool {
+    fn contains(&self, task: &Task<T>) -> bool {
         let mut curr = self.head;
 
         while let Some(p) = curr {
@@ -89,7 +89,7 @@ impl<S: 'static> OwnedList<S> {
     }
 }
 
-impl<S: 'static> fmt::Debug for OwnedList<S> {
+impl<T: 'static> fmt::Debug for OwnedList<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("OwnedList").finish()
     }
