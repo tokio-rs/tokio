@@ -418,7 +418,7 @@ impl Scheduler {
             // there is no semantic information in the `PoisonError`, and it
             // doesn't implement `Debug`, but clippy thinks that it's bad to
             // match all errors here...
-            #[allow(clippy::match-wild-err-arm)]
+            #[allow(clippy::match_wild_err_arm)]
             Err(_) => panic!("mutex poisoned"),
             Ok(lock) => lock,
         };
