@@ -151,7 +151,7 @@ where
             .get()
             .expect("`spawn_local` called from outside of a local::LocalSet!");
         unsafe {
-            let (task, handle) = task::joinable_unsend(future);
+            let (task, handle) = task::joinable_local(future);
             current.as_ref().schedule(task);
             handle
         }
@@ -210,7 +210,7 @@ impl LocalSet {
         F: Future + 'static,
         F::Output: 'static,
     {
-        let (task, handle) = task::joinable_unsend(future);
+        let (task, handle) = task::joinable_local(future);
         self.scheduler.schedule(task);
         handle
     }

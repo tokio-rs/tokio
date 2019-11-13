@@ -52,7 +52,7 @@ pub(crate) struct Task<S: 'static> {
     _p: PhantomData<S>,
 }
 
-unsafe impl<S: RequiresSend + Send + Sync + 'static> Send for Task<S> {}
+unsafe impl<S: ScheduleSend + Send + Sync + 'static> Send for Task<S> {}
 
 /// Task result sent back
 pub(crate) type Result<T> = std::result::Result<T, JoinError>;
@@ -76,13 +76,16 @@ pub(crate) trait Schedule: Send + Sync + Sized + 'static {
 
 /// Marker trait indicating that a scheduler can only schedule tasks which
 /// implement `Send`.
-pub(crate) trait RequiresSend: Schedule {}
+///
+/// Schedulers that implement this trait may not schedule `!Send` futures. If
+/// trait is implemented, the corresponding `Task` type will implement `Send`.
+pub(crate) trait ScheduleSend: Schedule {}
 
 /// Create a new task without an associated join handle
 pub(crate) fn background<T, S>(task: T) -> Task<S>
 where
     T: Future + Send + 'static,
-    S: Schedule + RequiresSend,
+    S: Schedule + ScheduleSend,
 {
     Task {
         raw: RawTask::new_background::<_, S>(task),
@@ -94,7 +97,7 @@ where
 pub(crate) fn joinable<T, S>(task: T) -> (Task<S>, JoinHandle<T::Output>)
 where
     T: Future + Send + 'static,
-    S: Schedule + RequiresSend,
+    S: Schedule + ScheduleSend,
 {
     let raw = RawTask::new_joinable::<_, S>(task);
 
@@ -110,12 +113,12 @@ where
 
 /// Create a new `!Send` task with an associated join handle
 #[cfg(feature = "local")]
-pub(crate) fn joinable_unsend<T, S>(task: T) -> (Task<S>, JoinHandle<T::Output>)
+pub(crate) fn joinable_local<T, S>(task: T) -> (Task<S>, JoinHandle<T::Output>)
 where
     T: Future + 'static,
     S: Schedule,
 {
-    let raw = RawTask::new_joinable_unsend::<_, S>(task);
+    let raw = RawTask::new_joinable_local::<_, S>(task);
 
     let task = Task {
         raw,
