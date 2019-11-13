@@ -299,7 +299,8 @@ impl Runtime {
     #[cfg(feature = "rt-core")]
     pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
-        F: Future<Output = ()> + Send + 'static,
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
     {
         match &self.kind {
             Kind::Shell(_) => panic!("task execution disabled"),
