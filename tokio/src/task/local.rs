@@ -422,7 +422,7 @@ impl Drop for Scheduler {
 #[cfg(all(test, not(loom)))]
 mod tests {
     use super::*;
-    use crate::runtime;
+    use crate::{blocking, runtime};
 
     #[test]
     fn local_current_thread() {
@@ -490,7 +490,7 @@ mod tests {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
             let join = spawn_local(async move {
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
-                runtime::blocking::in_place(|| {});
+                blocking::in_place(|| {});
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
             });
             join.await.unwrap();
@@ -510,7 +510,7 @@ mod tests {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
             let join = spawn_local(async move {
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
-                runtime::blocking::run(|| {
+                blocking::spawn_blocking(|| {
                     assert!(
                         !ON_RT_THREAD.with(|cell| cell.get()),
                         "blocking must not run on the local task set's thread"
