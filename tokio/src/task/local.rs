@@ -13,10 +13,68 @@ use std::task::{Context, Poll};
 
 use pin_project::pin_project;
 
-/// A group of tasks which are executed on the same thread.
+/// A set of tasks which are executed on the same thread.
 ///
-/// These tasks need not implement `Send`; a local task set provides the
-/// capacity to execute `!Send` futures.
+/// In some cases, it is necessary to run one or more futures that do not
+/// implement [`Send`] and thus are unsafe to send between threads. In these
+/// cases, a [local task set] may be used to schedule one or more `!Send`
+/// futures to run together on the same thread.
+///
+/// For example, the following code will not compile:
+///
+/// ```rust,compile_fail
+/// # use tokio::runtime::Runtime;
+/// use std::rc::Rc;
+///
+/// // `Rc` does not implement `Send`, and thus may not be sent between
+/// // threads safely.
+/// let unsend_data = Rc::new("my unsend data...");
+///
+/// let mut rt = Runtime::new().unwrap();
+///
+/// rt.block_on(async move {
+///     let unsend_data = unsend_data.clone();
+///     // Because the `async` block here moves `unsend_data`, the future is `!Send`.
+///     // Since `tokio::spawn` requires the spawned future to implement `Send`, this
+///     // will not compile.
+///     tokio::spawn(async move {
+///         println!("{}", unsend_data);
+///         // ...
+///     }).await.unwrap();
+/// });
+/// ```
+/// In order to spawn `!Send` futures, we can use a local task set to
+/// schedule them on the thread calling [`Runtime::block_on`]. When running
+/// inside of the local task set, we can use [`task::spawn_local`], which can
+/// spawn `!Send` futures. For example:
+///
+/// ```rust
+/// # use tokio::runtime::Runtime;
+/// use std::rc::Rc;
+/// use tokio::task;
+///
+/// let unsend_data = Rc::new("my unsend data...");
+///
+/// let mut rt = Runtime::new().unwrap();
+/// // Construct a local task set that can run `!Send` futures.
+/// let local = task::LocalSet::new();
+///
+/// // Run the local task group.
+/// local.block_on(&mut rt, async move {
+///     let unsend_data = unsend_data.clone();
+///     // `spawn_local` ensures that the future is spawned on the local
+///     // task group.
+///     task::spawn_local(async move {
+///         println!("{}", unsend_data);
+///         // ...
+///     }).await.unwrap();
+/// });
+/// ```
+///
+/// [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
+/// [local task set]: struct.LocalSet.html
+/// [`Runtime::block_on`]: ../struct.Runtime.html#method.block_on
+/// [`task::spawn_local`]: fn.spawn.html
 #[derive(Debug)]
 pub struct LocalSet {
     scheduler: Rc<Scheduler>,
@@ -67,17 +125,17 @@ thread_local! {
 /// ```rust
 /// # use tokio::runtime::Runtime;
 /// use std::rc::Rc;
-/// use tokio::local;
+/// use tokio::task;
 ///
 /// let unsend_data = Rc::new("my unsend data...");
 ///
 /// let mut rt = Runtime::new().unwrap();
-/// let local_group = local::LocalSet::new();
+/// let local = task::LocalSet::new();
 ///
-/// // Run the local task grou[].
-/// local_group.block_on(&mut rt, async move {
+/// // Run the local task set.
+/// local.block_on(&mut rt, async move {
 ///     let unsend_data = unsend_data.clone();
-///     spawn_local(async move {
+///     task::spawn_local(async move {
 ///         println!("{}", unsend_data);
 ///         // ...
 ///     }).await.unwrap();
@@ -120,29 +178,29 @@ impl LocalSet {
     /// spawn_local local tasks when the task set is _not_ running. For example:
     /// ```rust
     /// # use tokio::runtime::Runtime;
-    /// use tokio::local;
+    /// use tokio::task;
     ///
     /// let mut rt = Runtime::new().unwrap();
-    /// let local_group = local::LocalSet::new();
+    /// let local = task::LocalSet::new();
     ///
-    /// // Spawn a future on the local group. This future will be run when
+    /// // Spawn a future on the local set. This future will be run when
     /// // we call `block_on` to drive the task set.
-    /// local_group.spawn_local(async {
+    /// local.spawn_local(async {
     ///    // ...
     /// });
     ///
     /// // Run the local task set.
-    /// local_group.block_on(&mut rt, async move {
+    /// local.block_on(&mut rt, async move {
     ///     // ...
     /// });
     ///
     /// // When `block_on` finishes, we can spawn_local _more_ futures, which will
     /// // run in subsequent calls to `block_on`.
-    /// local_group.spawn_local(async {
+    /// local.spawn_local(async {
     ///    // ...
     /// });
     ///
-    /// local_group.block_on(&mut rt, async move {
+    /// local.block_on(&mut rt, async move {
     ///     // ...
     /// });
     /// ```
@@ -178,17 +236,17 @@ impl LocalSet {
     /// Since this function internally calls [`Runtime::block_on`], and drives
     /// futures in the local task set inside that call to `block_on`, the local
     /// futures may not use [in-place blocking]. If a blocking call needs to be
-    /// issued from a local task, the [`blocking::run`] API may be used instead.
+    /// issued from a local task, the [`spawn_blocking`] API may be used instead.
     ///
     /// For example, this will panic:
     /// ```should_panic
-    /// use tokio::runtime::{blocking, Runtime};
-    /// use tokio::local;
+    /// use tokio::runtime::Runtime;
+    /// use tokio::{task, blocking};
     ///
     /// let mut rt = Runtime::new().unwrap();
-    /// let local = local::LocalSet::new();
+    /// let local = task::LocalSet::new();
     /// local.block_on(&mut rt, async {
-    ///     let join = spawn_local(async {
+    ///     let join = task::spawn_local(async {
     ///         let blocking_result = blocking::in_place(|| {
     ///             // ...
     ///         });
@@ -199,14 +257,14 @@ impl LocalSet {
     /// ```
     /// This, however, will not panic:
     /// ```
-    /// use tokio::runtime::{blocking, Runtime};
-    /// use tokio::local;
+    /// use tokio::runtime::Runtime;
+    /// use tokio::{task, blocking};
     ///
     /// let mut rt = Runtime::new().unwrap();
-    /// let local = local::LocalSet::new();
+    /// let local = task::LocalSet::new();
     /// local.block_on(&mut rt, async {
-    ///     let join = spawn_local(async {
-    ///         let blocking_result = blocking::run(|| {
+    ///     let join = task::spawn_local(async {
+    ///         let blocking_result = blocking::spawn_blocking(|| {
     ///             // ...
     ///         }).await;
     ///         // ...
@@ -218,7 +276,7 @@ impl LocalSet {
     /// [`spawn_local`]: fn.spawn_local.html
     /// [`Runtime::block_on`]: ../struct.Runtime.html#method.block_on
     /// [in-place blocking]: ../blocking/fn.in_place.html
-    /// [`blocking::run`]: ../blocking/fn.run.html
+    /// [`spawn_blocking`]: ../blocking/fn.spawn_blocking.html
     pub fn block_on<F>(&self, rt: &mut crate::runtime::Runtime, future: F) -> F::Output
     where
         F: Future + 'static,
