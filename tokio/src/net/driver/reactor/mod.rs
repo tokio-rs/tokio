@@ -232,18 +232,18 @@ impl Reactor {
             None => return,
         };
 
-        let mut readiness = Readiness::empty();
+        let mut readiness = Readiness::EMPTY;
         if event.is_readable() {
-            readiness |= Readiness::readable()
+            readiness |= Readiness::READABLE
         }
         if event.is_writable() {
-            readiness |= Readiness::writable()
+            readiness |= Readiness::WRITABLE
         }
         if event.is_read_closed() {
-            readiness |= Readiness::read_closed()
+            readiness |= Readiness::READ_CLOSED
         }
         if event.is_write_closed() {
-            readiness |= Readiness::write_closed()
+            readiness |= Readiness::WRITE_CLOSED
         }
 
         if io
@@ -395,8 +395,8 @@ impl Inner {
             .unwrap_or_else(|| panic!("token {} no longer valid!", token));
 
         let (waker, interest) = match dir {
-            Direction::Read => (&sched.reader, Readiness::readable()),
-            Direction::Write => (&sched.writer, Readiness::writable()),
+            Direction::Read => (&sched.reader, Readiness::READABLE),
+            Direction::Write => (&sched.writer, Readiness::WRITABLE),
         };
 
         waker.register(w);
@@ -421,8 +421,8 @@ impl Drop for Inner {
 impl Direction {
     pub(super) fn mask(self) -> Readiness {
         match self {
-            Direction::Read => Readiness::readable() | Readiness::read_closed(),
-            Direction::Write => Readiness::writable() | Readiness::write_closed(),
+            Direction::Read => Readiness::READABLE | Readiness::READ_CLOSED,
+            Direction::Write => Readiness::WRITABLE | Readiness::WRITE_CLOSED,
         }
     }
 }

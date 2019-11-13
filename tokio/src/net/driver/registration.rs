@@ -211,8 +211,7 @@ impl Registration {
         }
 
         let mask = direction.mask();
-        let mask_no_closed =
-            (mask - (Readiness::read_closed() - Readiness::write_closed())).as_usize();
+        let mask_no_closed = (mask - (Readiness::READ_CLOSED - Readiness::WRITE_CLOSED)).as_usize();
 
         let sched = inner.io_dispatch.get(self.token).unwrap();
 
