@@ -15,9 +15,9 @@ mod join;
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::join::JoinHandle;
 
-#[cfg(feature = "local")]
+#[cfg(feature = "rt-core")]
 mod local;
-#[cfg(feature = "local")]
+#[cfg(feature = "rt-core")]
 pub use self::local::{spawn_local, LocalSet};
 
 mod list;
@@ -112,7 +112,6 @@ where
 }
 
 /// Create a new `!Send` task with an associated join handle
-#[cfg(feature = "local")]
 pub(crate) fn joinable_local<T, S>(task: T) -> (Task<S>, JoinHandle<T::Output>)
 where
     T: Future + 'static,

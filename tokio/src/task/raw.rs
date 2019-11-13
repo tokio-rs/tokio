@@ -71,7 +71,6 @@ impl RawTask {
         RawTask::new::<_, S>(task, State::new_joinable())
     }
 
-    #[cfg(feature = "local")]
     pub(super) fn new_joinable_local<T, S>(task: T) -> RawTask
     where
         T: Future + 'static,

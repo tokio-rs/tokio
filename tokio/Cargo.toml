@@ -28,7 +28,6 @@ default = [
   "blocking",
   "fs",
   "io-util",
-  "local",
   "net",
   "process",
   "rt-full",
@@ -42,7 +41,6 @@ dns = ["blocking"]
 fs = ["blocking"]
 io-driver = ["mio", "lazy_static", "sync"] # TODO: get rid of sync
 io-util = ["pin-project", "memchr"]
-local = ["rt-core", "pin-project"]
 macros = ["tokio-macros"]
 net = ["dns", "tcp", "udp", "uds"]
 process = [
@@ -56,7 +54,7 @@ process = [
   "winapi/winerror",
 ]
 # Includes basic task execution capabilities
-rt-core = []
+rt-core = ["pin-project"]
 rt-full = [
   "macros",
   "num_cpus",
