@@ -8,6 +8,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::ptr::{self, NonNull};
 use std::rc::Rc;
+use std::sync::Mutex;
 use std::task::{Context, Poll, Waker};
 
 use pin_project::pin_project;
@@ -87,17 +88,27 @@ struct Scheduler {
     /// Must only be accessed from the primary thread
     tasks: UnsafeCell<task::OwnedList<Scheduler>>,
 
-    /// Local run queue.
+    /// Local run local_queue.
     ///
-    /// Tasks notified from the current thread are pushed into this queue.
+    /// Tasks notified from the current thread are pushed into this local_queue.
     ///
     /// # Safety
     ///
     /// References should not be handed out. Only call `push` / `pop` functions.
     /// Only call from the owning thread.
-    queue: UnsafeCell<VecDeque<Task<Scheduler>>>,
+    local_queue: UnsafeCell<VecDeque<Task<Scheduler>>>,
 
-    waker: UnsafeCell<Option<Waker>>,
+    /// Shared state
+    shared: Mutex<Shared>,
+}
+
+struct Shared {
+    waker: Option<Waker>,
+
+    /// Remote run queue.
+    ///
+    /// Tasks notified from another thread are pushed into this queue.
+    remote_queue: VecDeque<Task<Scheduler>>,
 }
 
 #[pin_project]
@@ -152,7 +163,7 @@ where
             .expect("`spawn_local` called from outside of a local::LocalSet!");
         unsafe {
             let (task, handle) = task::joinable_local(future);
-            current.as_ref().schedule(task);
+            current.as_ref().schedule_local(task);
             handle
         }
     })
@@ -210,7 +221,11 @@ impl LocalSet {
         F::Output: 'static,
     {
         let (task, handle) = task::joinable_local(future);
-        self.scheduler.schedule(task);
+        unsafe {
+            // This is safe: since `LocalSet` is not Send or Sync, this is
+            // always being called from the local thread.
+            self.scheduler.schedule_local(task);
+        }
         handle
     }
 
@@ -300,9 +315,7 @@ impl<F: Future> Future for LocalFuture<F> {
         let this = self.project();
         let scheduler = this.scheduler;
         let mut future = this.future;
-        unsafe {
-            (*scheduler.waker.get()) = Some(cx.waker().clone());
-        }
+        scheduler.shared.lock().unwrap().waker = Some(cx.waker().clone());
 
         if let Poll::Ready(output) = future.as_mut().poll(cx) {
             return Poll::Ready(output);
@@ -333,12 +346,18 @@ impl Schedule for Scheduler {
     }
 
     fn schedule(&self, task: Task<Self>) {
-        unsafe {
-            (*self.queue.get()).push_front(task);
-        }
-        if let Some(waker) = self.waker() {
-            // If we are running, wake the local future.
-            waker.wake_by_ref();
+        if self.is_current() {
+            unsafe {
+                self.schedule_local(task);
+            }
+        } else {
+            let mut lock = self.shared.lock().unwrap();
+
+            lock.remote_queue.push_back(task);
+            lock.waker
+                .as_ref()
+                .expect("if a local task is notified, the local task set must be running!")
+                .wake_by_ref();
         }
     }
 }
@@ -347,8 +366,11 @@ impl Scheduler {
     fn new() -> Self {
         Self {
             tasks: UnsafeCell::new(task::OwnedList::new()),
-            queue: UnsafeCell::new(VecDeque::with_capacity(64)),
-            waker: UnsafeCell::new(None),
+            local_queue: UnsafeCell::new(VecDeque::with_capacity(64)),
+            shared: Mutex::new(Shared {
+                waker: None,
+                remote_queue: VecDeque::with_capacity(64),
+            }),
         }
     }
 
@@ -370,6 +392,10 @@ impl Scheduler {
         })
     }
 
+    unsafe fn schedule_local(&self, task: Task<Self>) {
+        (*self.local_queue.get()).push_front(task);
+    }
+
     fn is_current(&self) -> bool {
         CURRENT_TASK_SET
             .try_with(|current| {
@@ -382,11 +408,15 @@ impl Scheduler {
     }
 
     fn next_task(&self) -> Option<Task<Self>> {
-        unsafe { (*self.queue.get()).pop_front() }
+        self.next_local_task().or_else(|| self.next_remote_task())
     }
 
-    fn waker(&self) -> Option<&Waker> {
-        unsafe { (*self.waker.get()).as_ref() }
+    fn next_local_task(&self) -> Option<Task<Self>> {
+        unsafe { (*self.local_queue.get()).pop_front() }
+    }
+
+    fn next_remote_task(&self) -> Option<Task<Self>> {
+        self.shared.lock().unwrap().remote_queue.pop_front()
     }
 
     fn tick(&self) {
@@ -398,7 +428,10 @@ impl Scheduler {
             };
 
             if let Some(task) = task.run(&mut || Some(self.into())) {
-                self.schedule(task);
+                unsafe {
+                    // we are on the local thread, so this is okay.
+                    self.schedule_local(task);
+                }
             }
         }
     }
