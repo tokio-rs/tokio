@@ -156,9 +156,6 @@ pub use self::handle::Handle;
 
 mod io;
 
-#[cfg(feature = "local")]
-pub(super) mod local;
-
 mod park;
 pub use self::park::{Park, Unpark};
 
