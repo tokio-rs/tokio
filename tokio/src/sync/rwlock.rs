@@ -4,7 +4,7 @@
 //!
 //! This allows you to do something along the lines of:
 //!
-//! ```rust,no_run
+//! ```rust,block_on
 //! use tokio::sync::RwLock;
 //! use std::sync::Arc;
 //!
@@ -53,14 +53,14 @@ pub struct RwLock<T> {
     w: Mutex<()>,
 }
 
-/// A handle to a shared access to `Rwlock`.
+/// A shared-access handle to a locked RwLock
 #[derive(Debug)]
 pub struct RwLockReadGuard<'a, T> {
     permit: Permit,
     lock: &'a RwLock<T>,
 }
 
-/// A handle to an exclusive access to `Rwlock`.
+/// An exclusive handle to a locked RwLock
 #[derive(Debug)]
 pub struct RwLockWriteGuard<'a, T> {
     permits: Vec<Permit>,
@@ -96,7 +96,7 @@ impl<T> RwLock<T> {
         }
     }
 
-    /// A future that resolves on acquiring shared access to the lock and returns the `RwLockReadGuard`.
+    /// Acquire the rwlock nonexclusively, read-only
     pub async fn read(&self) -> RwLockReadGuard<'_, T> {
         RwLockReadFuture {
             lock: self,
@@ -110,7 +110,7 @@ impl<T> RwLock<T> {
         })
     }
 
-    /// A future that resolves on acquiring exclusive access to the the lock and returns the `RwLockWriteGuard`.
+    /// Acquire the RwLock exclusively, read-write
     pub async fn write(&self) -> RwLockWriteGuard<'_, T> {
         let _lock = self.w.lock().await;
         RwLockWriteFuture {
@@ -119,6 +119,11 @@ impl<T> RwLock<T> {
             polling_permit: None,
         }
         .await
+        .unwrap_or_else(|_| {
+            // The semaphore was closed. but, we never explicitly close it, and we have a
+            // handle to it through the Arc, which means that this can never happen.
+            unreachable!()
+        })
     }
 }
 
@@ -142,7 +147,7 @@ impl<'a, T> Future for RwLockReadFuture<'a, T> {
 }
 
 impl<'a, T> Future for RwLockWriteFuture<'a, T> {
-    type Output = RwLockWriteGuard<'a, T>;
+    type Output = Result<RwLockWriteGuard<'a, T>, AcquireError>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         while self.permits.len() < MAX_READS {
@@ -159,15 +164,15 @@ impl<'a, T> Future for RwLockWriteFuture<'a, T> {
                 Poll::Ready(Ok(())) => {
                     self.permits.push(permit);
                 }
-                Poll::Ready(Err(e)) => panic!(e),
+                Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
             };
         }
         let mut permits = Vec::new();
         permits.append(&mut self.permits);
-        Poll::Ready(RwLockWriteGuard {
+        Poll::Ready(Ok(RwLockWriteGuard {
             lock: self.lock,
             permits,
-        })
+        }))
     }
 }
 
