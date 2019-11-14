@@ -79,7 +79,7 @@ pub struct RwLock<T> {
 /// [`read`]: struct.RwLock.html#method.read
 #[derive(Debug)]
 pub struct RwLockReadGuard<'a, T> {
-    permit: Permit,
+    permit: ReleasingPermit<'a, T>,
     lock: &'a RwLock<T>,
 }
 
@@ -171,7 +171,7 @@ impl<T> RwLock<T> {
             });
         RwLockReadGuard {
             lock: self,
-            permit: std::mem::replace(&mut permit.0, Permit::new()),
+            permit
         }
     }
 
@@ -210,14 +210,8 @@ impl<T> RwLock<T> {
         }
         RwLockWriteGuard {
             lock: self,
-            permits: permits.split_off(0),
+            permits: permits,
         }
-    }
-}
-
-impl<T> Drop for RwLockReadGuard<'_, T> {
-    fn drop(&mut self) {
-        self.permit.release(&self.lock.s);
     }
 }
 
