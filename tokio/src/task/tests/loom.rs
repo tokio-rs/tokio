@@ -29,7 +29,7 @@ fn create_drop_join_handle() {
 
 #[test]
 fn poll_drop_handle_then_drop() {
-    use futures_util::future::poll_fn;
+    use futures::future::poll_fn;
     use std::pin::Pin;
     use std::task::Poll;
 
@@ -196,7 +196,7 @@ fn shutdown_from_queue_after_poll() {
 }
 
 fn gated(n: usize, complete_first_poll: bool, by_val: bool) -> impl Future<Output = &'static str> {
-    use futures_util::future::poll_fn;
+    use futures::future::poll_fn;
     use std::sync::Arc;
     use std::task::Poll;
 
@@ -255,7 +255,7 @@ fn join_one_task<T: Future + 'static>(join_handle: T) -> loom::thread::JoinHandl
 fn join_two_tasks<T: Future + Unpin + 'static>(
     join_handle: T,
 ) -> loom::thread::JoinHandle<T::Output> {
-    use futures_util::future::poll_fn;
+    use futures::future::poll_fn;
     use std::task::Poll;
 
     // Join handle

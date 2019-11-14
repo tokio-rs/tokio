@@ -2,7 +2,6 @@ use crate::sync::mpsc::chan;
 use crate::sync::semaphore;
 
 use std::fmt;
-use std::pin::Pin;
 use std::task::{Context, Poll};
 
 /// Send values to the associated `Receiver`.
@@ -161,7 +160,7 @@ impl<T> Receiver<T> {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<T> {
-        use futures_util::future::poll_fn;
+        use crate::future::poll_fn;
 
         poll_fn(|cx| self.poll_recv(cx)).await
     }
@@ -177,14 +176,6 @@ impl<T> Receiver<T> {
     /// still enabling the receiver to drain messages that are buffered.
     pub fn close(&mut self) {
         self.chan.close();
-    }
-}
-
-impl<T> futures_core::Stream for Receiver<T> {
-    type Item = T;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
-        self.get_mut().poll_recv(cx)
     }
 }
 
@@ -234,34 +225,11 @@ impl<T> Sender<T> {
     /// }
     /// ```
     pub async fn send(&mut self, value: T) -> Result<(), SendError> {
-        use futures_util::future::poll_fn;
+        use crate::future::poll_fn;
 
         poll_fn(|cx| self.poll_ready(cx)).await?;
 
         self.try_send(value).map_err(|_| SendError(()))
-    }
-}
-
-impl<T> futures_sink::Sink<T> for Sender<T> {
-    type Error = SendError;
-
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Sender::poll_ready(self.get_mut(), cx)
-    }
-
-    fn start_send(mut self: Pin<&mut Self>, msg: T) -> Result<(), Self::Error> {
-        self.as_mut().try_send(msg).map_err(|err| {
-            assert!(err.is_full(), "call `poll_ready` before sending");
-            SendError(())
-        })
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
     }
 }
 

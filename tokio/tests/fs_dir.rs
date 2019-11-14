@@ -3,8 +3,6 @@
 use tokio::fs;
 use tokio_test::assert_ok;
 
-use futures_util::future;
-use futures_util::stream::TryStreamExt;
 use std::sync::{Arc, Mutex};
 use tempfile::tempdir;
 
@@ -55,15 +53,12 @@ async fn read() {
     let f = files.clone();
     let p = p.to_path_buf();
 
-    let read_dir_fut = fs::read_dir(p).await.unwrap();
-    read_dir_fut
-        .try_for_each(move |e| {
-            let s = e.file_name().to_str().unwrap().to_string();
-            f.lock().unwrap().push(s);
-            future::ok(())
-        })
-        .await
-        .unwrap();
+    let mut entries = fs::read_dir(p).await.unwrap();
+
+    while let Some(e) = assert_ok!(entries.next_entry().await) {
+        let s = e.file_name().to_str().unwrap().to_string();
+        f.lock().unwrap().push(s);
+    }
 
     let mut files = files.lock().unwrap();
     files.sort(); // because the order is not guaranteed

@@ -41,7 +41,7 @@ rt_test! {
     use tokio::time;
     use tokio_test::{assert_err, assert_ok};
 
-    use futures_util::future::poll_fn;
+    use futures::future::poll_fn;
     use std::future::Future;
     use std::pin::Pin;
     use std::sync::{mpsc, Arc};

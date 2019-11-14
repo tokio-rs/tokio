@@ -37,15 +37,7 @@ impl Registration {
         unsafe {
             self.entry.time_mut().deadline = deadline;
         }
-        Entry::reset(&mut self.entry);
-    }
 
-    // Used by `Timeout<Stream>`
-    pub(crate) fn reset_timeout(&mut self) {
-        let deadline = crate::time::clock::now() + self.entry.time_ref().duration;
-        unsafe {
-            self.entry.time_mut().deadline = deadline;
-        }
         Entry::reset(&mut self.entry);
     }
 

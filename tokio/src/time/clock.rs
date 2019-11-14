@@ -7,7 +7,9 @@
 #[cfg(feature = "test-util")]
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::variant::{advance, pause, resume};
-pub(crate) use self::variant::{now, Clock};
+pub(crate) use self::variant::Clock;
+#[cfg(feature = "test-util")]
+pub(crate) use self::variant::now;
 
 #[cfg(not(feature = "test-util"))]
 mod variant {

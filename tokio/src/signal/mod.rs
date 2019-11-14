@@ -14,28 +14,15 @@
 //!
 //! # Examples
 //!
-//! Print out all ctrl-C notifications received
+//! Print on "ctrl-c" notification.
 //!
 //! ```rust,no_run
 //! use tokio::signal;
 //!
-//! use futures_util::future;
-//! use futures_util::stream::StreamExt;
-//!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     // Create an infinite stream of "Ctrl+C" notifications. Each item received
-//!     // on this stream may represent multiple ctrl-c signals.
-//!     let ctrl_c = signal::ctrl_c()?;
-//!
-//!     // Process each ctrl-c as it comes in
-//!     let prog = ctrl_c.for_each(|_| {
-//!         println!("ctrl-c received!");
-//!         future::ready(())
-//!     });
-//!
-//!     prog.await;
-//!
+//!     signal::ctrl_c().await?;
+//!     println!("ctrl-c received!");
 //!     Ok(())
 //! }
 //! ```
@@ -45,38 +32,25 @@
 //! ```rust,no_run
 //! # #[cfg(unix)] {
 //!
-//! use tokio::signal::{self, unix::{signal, SignalKind}};
-//!
-//! use futures_util::future;
-//! use futures_util::stream::StreamExt;
+//! use tokio::signal::unix::{signal, SignalKind};
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     // Create an infinite stream of "Ctrl+C" notifications. Each item received
-//!     // on this stream may represent multiple ctrl-c signals.
-//!     let ctrl_c = signal::ctrl_c()?;
+//!     // An infinite stream of hangup signals.
+//!     let mut stream = signal(SignalKind::hangup())?;
 //!
-//!     // Process each ctrl-c as it comes in
-//!     let prog = ctrl_c.for_each(|_| {
-//!         println!("ctrl-c received!");
-//!         future::ready(())
-//!     });
-//!
-//!     prog.await;
-//!
-//!     // Like the previous example, this is an infinite stream of signals
-//!     // being received, and signals may be coalesced while pending.
-//!     let stream = signal(SignalKind::hangup())?;
-//!
-//!     // Convert out stream into a future and block the program
-//!     let (signal, _stream) = stream.into_future().await;
-//!     println!("got signal {:?}", signal);
-//!     Ok(())
+//!     // Print whenever a HUP signal is received
+//!     loop {
+//!         stream.recv().await;
+//!         println!("got signal HUP");
+//!     }
 //! }
 //! # }
 //! ```
 
 mod ctrl_c;
+pub use ctrl_c::ctrl_c;
+
 mod registry;
 
 mod os {
@@ -89,5 +63,3 @@ mod os {
 
 pub mod unix;
 pub mod windows;
-
-pub use self::ctrl_c::{ctrl_c, CtrlC};

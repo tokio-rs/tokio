@@ -4,8 +4,6 @@ use crate::sync::mpsc::chan;
 use std::fmt;
 use std::task::{Context, Poll};
 
-use std::pin::Pin;
-
 /// Send values to the associated `UnboundedReceiver`.
 ///
 /// Instances are created by the
@@ -131,7 +129,7 @@ impl<T> UnboundedReceiver<T> {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<T> {
-        use futures_util::future::poll_fn;
+        use crate::future::poll_fn;
 
         poll_fn(|cx| self.poll_recv(cx)).await
     }
@@ -145,14 +143,6 @@ impl<T> UnboundedReceiver<T> {
     }
 }
 
-impl<T> futures_core::Stream for UnboundedReceiver<T> {
-    type Item = T;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
-        self.chan.recv(cx)
-    }
-}
-
 impl<T> UnboundedSender<T> {
     pub(crate) fn new(chan: chan::Tx<T, Semaphore>) -> UnboundedSender<T> {
         UnboundedSender { chan }
@@ -162,26 +152,6 @@ impl<T> UnboundedSender<T> {
     pub fn try_send(&mut self, message: T) -> Result<(), UnboundedTrySendError<T>> {
         self.chan.try_send(message)?;
         Ok(())
-    }
-}
-
-impl<T> futures_sink::Sink<T> for UnboundedSender<T> {
-    type Error = UnboundedSendError;
-
-    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn start_send(mut self: Pin<&mut Self>, msg: T) -> Result<(), Self::Error> {
-        self.try_send(msg).map_err(|_| UnboundedSendError(()))
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
     }
 }
 

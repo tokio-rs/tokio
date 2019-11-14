@@ -6,7 +6,6 @@ mod support {
 }
 use support::signal::send_signal;
 
-use tokio::prelude::*;
 use tokio::runtime::Runtime;
 use tokio::signal::unix::{signal, SignalKind};
 
@@ -25,7 +24,7 @@ fn dropping_loops_does_not_cause_starvation() {
     send_signal(libc::SIGUSR1);
 
     first_rt
-        .block_on(first_signal.next())
+        .block_on(first_signal.recv())
         .expect("failed to await first signal");
 
     drop(first_rt);
@@ -33,7 +32,7 @@ fn dropping_loops_does_not_cause_starvation() {
 
     send_signal(libc::SIGUSR1);
 
-    second_rt.block_on(second_signal.next());
+    second_rt.block_on(second_signal.recv());
 }
 
 fn rt() -> Runtime {

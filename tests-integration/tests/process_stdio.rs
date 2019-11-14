@@ -47,7 +47,7 @@ async fn feed_cat(mut cat: Child, n: usize) -> io::Result<ExitStatus> {
         // (i.e. EOF is reached after `n` lines.
         loop {
             let data = reader
-                .next()
+                .next_line()
                 .await
                 .unwrap_or_else(|| Ok(String::new()))
                 .expect("failed to read line");

@@ -6,7 +6,6 @@ mod support {
 }
 use support::signal::send_signal;
 
-use tokio::prelude::*;
 use tokio::signal::unix::{signal, SignalKind};
 
 #[tokio::test]
@@ -16,7 +15,7 @@ async fn drop_then_get_a_signal() {
     drop(sig);
 
     send_signal(libc::SIGUSR1);
-    let sig = signal(kind).expect("failed to create second signal");
+    let mut sig = signal(kind).expect("failed to create second signal");
 
-    let _ = sig.into_future().await;
+    let _ = sig.recv().await;
 }

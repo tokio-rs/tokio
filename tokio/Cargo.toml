@@ -84,9 +84,6 @@ uds = ["io-driver", "mio-uds", "libc"]
 tokio-macros = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-macros" }
 
 bytes = "0.4"
-futures-core = "0.3.0"
-futures-sink = "0.3.0"
-futures-util = { version = "0.3.0", features = ["sink", "channel"] }
 iovec = "0.1"
 
 # Everything else is optional...

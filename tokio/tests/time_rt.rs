@@ -1,6 +1,5 @@
 #![warn(rust_2018_idioms)]
 
-use tokio::prelude::*;
 use tokio::time::*;
 
 use std::sync::mpsc;
@@ -15,7 +14,7 @@ fn timer_with_threaded_runtime() {
     rt.spawn(async move {
         let when = Instant::now() + Duration::from_millis(100);
 
-        delay(when).await;
+        delay_until(when).await;
         assert!(Instant::now() >= when);
 
         tx.send(()).unwrap();
@@ -34,7 +33,7 @@ fn timer_with_current_thread_runtime() {
     rt.block_on(async move {
         let when = Instant::now() + Duration::from_millis(100);
 
-        tokio::time::delay(when).await;
+        delay_until(when).await;
         assert!(Instant::now() >= when);
 
         tx.send(()).unwrap();
@@ -68,14 +67,14 @@ async fn starving() {
     }
 
     let when = Instant::now() + Duration::from_millis(20);
-    let starve = Starve(delay(when), 0);
+    let starve = Starve(delay_until(when), 0);
 
     starve.await;
     assert!(Instant::now() >= when);
 }
 
 #[tokio::test]
-async fn timeout() {
+async fn timeout_value() {
     use tokio::sync::oneshot;
 
     let (_tx, rx) = oneshot::channel::<()>();
@@ -83,7 +82,7 @@ async fn timeout() {
     let now = Instant::now();
     let dur = Duration::from_millis(20);
 
-    let res = rx.timeout(dur).await;
+    let res = timeout(dur, rx).await;
     assert!(res.is_err());
     assert!(Instant::now() >= now + dur);
 }

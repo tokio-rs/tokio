@@ -5,9 +5,6 @@
 mod datagram;
 pub use self::datagram::UnixDatagram;
 
-mod incoming;
-pub use self::incoming::Incoming;
-
 mod listener;
 pub use self::listener::UnixListener;
 

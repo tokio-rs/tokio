@@ -1,9 +1,8 @@
-use crate::net::tcp::{Incoming, TcpStream};
+use crate::future::poll_fn;
+use crate::net::tcp::TcpStream;
 use crate::net::util::PollEvented;
 use crate::net::ToSocketAddrs;
 
-use futures_core::ready;
-use futures_util::future::poll_fn;
 use std::convert::TryFrom;
 use std::fmt;
 use std::io;
@@ -11,9 +10,6 @@ use std::net::{self, SocketAddr};
 use std::task::{Context, Poll};
 
 /// An I/O object representing a TCP socket listening for incoming connections.
-///
-/// This object can be converted into a stream of incoming connections for
-/// various forms of processing.
 ///
 /// # Examples
 ///
@@ -228,22 +224,6 @@ impl TcpListener {
     /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.io.get_ref().local_addr()
-    }
-
-    /// Consumes this listener, returning a stream of the sockets this listener
-    /// accepts.
-    ///
-    /// This method returns an implementation of the `Stream` trait which
-    /// resolves to the sockets the are accepted on this listener.
-    ///
-    /// # Errors
-    ///
-    /// Note that accepting a connection can lead to various errors and not all of them are
-    /// necessarily fatal ‒ for example having too many open file descriptors or the other side
-    /// closing the connection while it waits in an accept queue. These would terminate the stream
-    /// if not handled in any way.
-    pub fn incoming(self) -> Incoming {
-        Incoming::new(self)
     }
 
     /// Gets the value of the `IP_TTL` option for this socket.

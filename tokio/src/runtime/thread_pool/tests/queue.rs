@@ -246,7 +246,7 @@ fn val(num: u32) -> Task<Noop> {
 }
 
 fn num(task: Task<Noop>) -> u32 {
-    use futures_util::task::noop_waker_ref;
+    use futures::task::noop_waker_ref;
     use std::future::Future;
     use std::pin::Pin;
     use std::task::Context;

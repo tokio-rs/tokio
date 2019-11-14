@@ -52,36 +52,6 @@ async fn async_send_recv_with_buffer() {
 }
 
 #[test]
-fn send_sink_recv_with_buffer() {
-    use futures_core::Stream;
-    use futures_sink::Sink;
-
-    let (tx, rx) = mpsc::channel::<i32>(16);
-
-    task::spawn(tx).enter(|cx, mut tx| {
-        assert_ready_ok!(tx.as_mut().poll_ready(cx));
-        assert_ok!(tx.as_mut().start_send(1));
-
-        assert_ready_ok!(tx.as_mut().poll_ready(cx));
-        assert_ok!(tx.as_mut().start_send(2));
-
-        assert_ready_ok!(tx.as_mut().poll_flush(cx));
-        assert_ready_ok!(tx.as_mut().poll_close(cx));
-    });
-
-    task::spawn(rx).enter(|cx, mut rx| {
-        let val = assert_ready!(rx.as_mut().poll_next(cx));
-        assert_eq!(val, Some(1));
-
-        let val = assert_ready!(rx.as_mut().poll_next(cx));
-        assert_eq!(val, Some(2));
-
-        let val = assert_ready!(rx.as_mut().poll_next(cx));
-        assert!(val.is_none());
-    });
-}
-
-#[test]
 fn start_send_past_cap() {
     let mut t1 = task::spawn(());
     let mut t2 = task::spawn(());
@@ -154,43 +124,6 @@ async fn async_send_recv_unbounded() {
     assert_eq!(Some(1), rx.recv().await);
     assert_eq!(Some(2), rx.recv().await);
     assert_eq!(None, rx.recv().await);
-}
-
-#[test]
-fn sink_send_recv_unbounded() {
-    use futures_core::Stream;
-    use futures_sink::Sink;
-    use futures_util::pin_mut;
-
-    let mut t1 = task::spawn(());
-
-    let (tx, rx) = mpsc::unbounded_channel::<i32>();
-
-    t1.enter(|cx, _| {
-        pin_mut!(tx);
-
-        assert_ready_ok!(tx.as_mut().poll_ready(cx));
-        assert_ok!(tx.as_mut().start_send(1));
-
-        assert_ready_ok!(tx.as_mut().poll_ready(cx));
-        assert_ok!(tx.as_mut().start_send(2));
-
-        assert_ready_ok!(tx.as_mut().poll_flush(cx));
-        assert_ready_ok!(tx.as_mut().poll_close(cx));
-    });
-
-    t1.enter(|cx, _| {
-        pin_mut!(rx);
-
-        let val = assert_ready!(rx.as_mut().poll_next(cx));
-        assert_eq!(val, Some(1));
-
-        let val = assert_ready!(rx.as_mut().poll_next(cx));
-        assert_eq!(val, Some(2));
-
-        let val = assert_ready!(rx.as_mut().poll_next(cx));
-        assert!(val.is_none());
-    });
 }
 
 #[test]
