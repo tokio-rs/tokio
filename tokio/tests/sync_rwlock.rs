@@ -1,6 +1,7 @@
 #![warn(rust_2018_idioms)]
 
 use std::sync::Arc;
+use std::task::Poll;
 
 use futures_util::future::FutureExt;
 use futures_util::stream;
@@ -16,7 +17,7 @@ fn read_shared() {
     let rwlock = RwLock::new(100);
 
     let mut t1 = spawn(rwlock.read());
-    assert_ready!(t1.poll());
+    let _g1 = assert_ready!(t1.poll());
     let mut t2 = spawn(rwlock.read());
     assert_ready!(t2.poll());
 }
@@ -26,9 +27,105 @@ fn read_shared() {
 fn write_shared_pending() {
     let rwlock = RwLock::new(100);
     let mut t1 = spawn(rwlock.read());
+
     let _g1 = assert_ready!(t1.poll());
     let mut t2 = spawn(rwlock.write());
     assert_pending!(t2.poll());
+}
+
+// When there is an active exclusive owner, subsequent exclusive access should not be possible
+#[test]
+fn read_exclusive_pending() {
+    let rwlock = RwLock::new(100);
+    let mut t1 = spawn(rwlock.write());
+
+    let _g1 = assert_ready!(t1.poll());
+    let mut t2 = spawn(rwlock.read());
+    assert_pending!(t2.poll());
+}
+
+// If the max shared access is reached and subsquent shared access is pending
+// should be made available when one of the shared acesses is dropped
+#[test]
+fn exaust_reading() {
+    let rwlock = RwLock::new(100);
+    let mut reads = Vec::new();
+    loop {
+        let mut t = spawn(rwlock.read());
+        match t.poll() {
+            Poll::Ready(guard) => reads.push(guard),
+            Poll::Pending => break,
+        }
+    }
+
+    let mut t1 = spawn(rwlock.read());
+    assert_pending!(t1.poll());
+    let g2 = reads.pop().unwrap();
+    drop(g2);
+    assert!(t1.is_woken());
+    assert_ready!(t1.poll());
+}
+
+// When there is an active exclusive owner, subsequent exclusive access should not be possible
+#[test]
+fn write_exclusive_pending() {
+    let rwlock = RwLock::new(100);
+    let mut t1 = spawn(rwlock.write());
+
+    let _g1 = assert_ready!(t1.poll());
+    let mut t2 = spawn(rwlock.write());
+    assert_pending!(t2.poll());
+}
+
+// When there is an active shared owner, exclusive access should be possible after shared is dropped
+#[test]
+fn write_shared_drop() {
+    let rwlock = RwLock::new(100);
+    let mut t1 = spawn(rwlock.read());
+
+    let g1 = assert_ready!(t1.poll());
+    let mut t2 = spawn(rwlock.write());
+    assert_pending!(t2.poll());
+    drop(g1);
+    assert!(t2.is_woken());
+    assert_ready!(t2.poll());
+}
+
+// when there is an active shared owner, and exclusive access is triggered,
+// subsequent shared access should not be possible as write gathers all the available semaphore permits
+#[test]
+fn write_read_shared_pending() {
+    let rwlock = RwLock::new(100);
+    let mut t1 = spawn(rwlock.read());
+    let _g1 = assert_ready!(t1.poll());
+
+    let mut t2 = spawn(rwlock.read());
+    assert_ready!(t2.poll());
+
+    let mut t3 = spawn(rwlock.write());
+    let mut _g2 = assert_pending!(t3.poll());
+
+    let mut t4 = spawn(rwlock.read());
+    assert_pending!(t4.poll());
+}
+
+// when there is an active shared owner, and exclusive access is triggered,
+// reading should be possible after pending exclusive access is dropped
+#[test]
+fn write_read_shared_drop_pending() {
+    let rwlock = RwLock::new(100);
+    let mut t1 = spawn(rwlock.read());
+    let _g1 = assert_ready!(t1.poll());
+
+    let mut t2 = spawn(rwlock.write());
+    assert_pending!(t2.poll());
+
+    let mut t3 = spawn(rwlock.read());
+    assert_pending!(t3.poll());
+    drop(t2);
+
+    assert!(t3.is_woken());
+    assert_ready!(t3.poll());
 }
 
 // Acquire an RwLock nonexclusively by a single task
@@ -40,8 +137,7 @@ async fn read_uncontested() {
     assert_eq!(result, 100);
 }
 
-// Acquire an uncontested RwLock in exclusive mode.  poll immediately returns
-// Poll::Ready
+// Acquire an uncontested RwLock in exclusive mode
 #[tokio::test]
 async fn write_uncontested() {
     let rwlock = RwLock::new(100);
@@ -64,7 +160,7 @@ async fn write_order() {
 }
 
 // A single RwLock is contested by tasks in multiple threads
-#[tokio::test]
+#[tokio::test(threadpool)]
 async fn multithreaded() {
     let barrier = Arc::new(Barrier::new(5));
     let rwlock = Arc::new(RwLock::<u32>::new(0));
