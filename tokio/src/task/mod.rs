@@ -52,7 +52,7 @@ pub(crate) struct Task<S: 'static> {
     _p: PhantomData<S>,
 }
 
-unsafe impl<S: ScheduleSend + Send + Sync + 'static> Send for Task<S> {}
+unsafe impl<S: ScheduleSend + 'static> Send for Task<S> {}
 
 /// Task result sent back
 pub(crate) type Result<T> = std::result::Result<T, JoinError>;
@@ -85,7 +85,7 @@ pub(crate) trait ScheduleSend: Schedule + Send + Sync {}
 pub(crate) fn background<T, S>(task: T) -> Task<S>
 where
     T: Future + Send + 'static,
-    S: Schedule + ScheduleSend,
+    S: ScheduleSend,
 {
     Task {
         raw: RawTask::new_background::<_, S>(task),
@@ -97,7 +97,7 @@ where
 pub(crate) fn joinable<T, S>(task: T) -> (Task<S>, JoinHandle<T::Output>)
 where
     T: Future + Send + 'static,
-    S: Schedule + ScheduleSend,
+    S: ScheduleSend,
 {
     let raw = RawTask::new_joinable::<_, S>(task);
 

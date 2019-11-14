@@ -10,7 +10,7 @@ pub(crate) struct OwnedList<T: 'static> {
 }
 
 impl<T: 'static> OwnedList<T> {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new() -> OwnedList<T> {
         OwnedList {
             head: None,
             _p: PhantomData,

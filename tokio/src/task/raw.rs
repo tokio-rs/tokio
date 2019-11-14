@@ -58,7 +58,7 @@ impl RawTask {
     pub(super) fn new_background<T, S>(task: T) -> RawTask
     where
         T: Future + Send + 'static,
-        S: Schedule + ScheduleSend,
+        S: ScheduleSend,
     {
         RawTask::new::<_, S>(task, State::new_background())
     }
@@ -66,7 +66,7 @@ impl RawTask {
     pub(super) fn new_joinable<T, S>(task: T) -> RawTask
     where
         T: Future + Send + 'static,
-        S: Schedule + ScheduleSend,
+        S: ScheduleSend,
     {
         RawTask::new::<_, S>(task, State::new_joinable())
     }
