@@ -1,5 +1,5 @@
 #![allow(warnings)]
-use crate::task::{Header, Schedule, ScheduleSend, Task};
+use crate::task::{Header, Schedule, ScheduleSendOnly, Task};
 
 use std::collections::VecDeque;
 use std::sync::Mutex;
@@ -111,7 +111,7 @@ impl Schedule for Mock {
     }
 }
 
-impl ScheduleSend for Mock {}
+impl ScheduleSendOnly for Mock {}
 
 impl Drop for Mock {
     fn drop(&mut self) {
@@ -131,4 +131,4 @@ impl Schedule for Noop {
     fn schedule(&self, _task: Task<Self>) {}
 }
 
-impl ScheduleSend for Noop {}
+impl ScheduleSendOnly for Noop {}

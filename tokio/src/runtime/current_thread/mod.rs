@@ -1,5 +1,5 @@
 use crate::runtime::park::{Park, Unpark};
-use crate::task::{self, JoinHandle, Schedule, ScheduleSend, Task};
+use crate::task::{self, JoinHandle, Schedule, ScheduleSendOnly, Task};
 
 use std::cell::UnsafeCell;
 use std::collections::VecDeque;
@@ -293,7 +293,7 @@ impl Schedule for Scheduler {
     }
 }
 
-impl ScheduleSend for Scheduler {}
+impl ScheduleSendOnly for Scheduler {}
 
 impl<P> Drop for CurrentThread<P>
 where

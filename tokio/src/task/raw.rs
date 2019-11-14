@@ -1,7 +1,7 @@
 use crate::loom::alloc::Track;
 use crate::task::Cell;
 use crate::task::Harness;
-use crate::task::{Header, Schedule, ScheduleSend};
+use crate::task::{Header, Schedule, ScheduleSendOnly};
 use crate::task::{Snapshot, State};
 
 use std::future::Future;
@@ -58,7 +58,7 @@ impl RawTask {
     pub(super) fn new_background<T, S>(task: T) -> RawTask
     where
         T: Future + Send + 'static,
-        S: ScheduleSend,
+        S: ScheduleSendOnly,
     {
         RawTask::new::<_, S>(task, State::new_background())
     }
@@ -66,7 +66,7 @@ impl RawTask {
     pub(super) fn new_joinable<T, S>(task: T) -> RawTask
     where
         T: Future + Send + 'static,
-        S: ScheduleSend,
+        S: ScheduleSendOnly,
     {
         RawTask::new::<_, S>(task, State::new_joinable())
     }

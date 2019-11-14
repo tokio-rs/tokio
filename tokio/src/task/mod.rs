@@ -52,7 +52,7 @@ pub(crate) struct Task<S: 'static> {
     _p: PhantomData<S>,
 }
 
-unsafe impl<S: ScheduleSend + 'static> Send for Task<S> {}
+unsafe impl<S: ScheduleSendOnly + 'static> Send for Task<S> {}
 
 /// Task result sent back
 pub(crate) type Result<T> = std::result::Result<T, JoinError>;
@@ -79,13 +79,13 @@ pub(crate) trait Schedule: Sized + 'static {
 ///
 /// Schedulers that implement this trait may not schedule `!Send` futures. If
 /// trait is implemented, the corresponding `Task` type will implement `Send`.
-pub(crate) trait ScheduleSend: Schedule + Send + Sync {}
+pub(crate) trait ScheduleSendOnly: Schedule + Send + Sync {}
 
 /// Create a new task without an associated join handle
 pub(crate) fn background<T, S>(task: T) -> Task<S>
 where
     T: Future + Send + 'static,
-    S: ScheduleSend,
+    S: ScheduleSendOnly,
 {
     Task {
         raw: RawTask::new_background::<_, S>(task),
@@ -97,7 +97,7 @@ where
 pub(crate) fn joinable<T, S>(task: T) -> (Task<S>, JoinHandle<T::Output>)
 where
     T: Future + Send + 'static,
-    S: ScheduleSend,
+    S: ScheduleSendOnly,
 {
     let raw = RawTask::new_joinable::<_, S>(task);
 
