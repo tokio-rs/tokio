@@ -1,8 +1,8 @@
 use crate::sync::semaphore::{Permit, Semaphore};
 use crate::sync::Mutex;
+use futures_util::future::poll_fn;
 use std::cell::UnsafeCell;
 use std::ops;
-use futures_util::future::poll_fn;
 
 const MAX_READS: usize = 32;
 
@@ -169,7 +169,10 @@ impl<T> RwLock<T> {
                 // handle to it through the Arc, which means that this can never happen.
                 unreachable!()
             });
-        RwLockReadGuard { lock: self, permit: std::mem::replace(&mut permit.0, Permit::new()) }
+        RwLockReadGuard {
+            lock: self,
+            permit: std::mem::replace(&mut permit.0, Permit::new()),
+        }
     }
 
     /// Locks this rwlock with exclusive write access, blocking the current
