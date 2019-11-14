@@ -112,6 +112,7 @@ where
 }
 
 /// Create a new `!Send` task with an associated join handle
+#[cfg(feature = "rt-full")]
 pub(crate) fn joinable_local<T, S>(task: T) -> (Task<S>, JoinHandle<T::Output>)
 where
     T: Future + 'static,
