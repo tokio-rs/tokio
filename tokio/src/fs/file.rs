@@ -436,6 +436,27 @@ impl File {
             self.last_write_err = Some(e.kind());
         }
     }
+
+    /// Destructures the `tokio_fs::File` into a [`std::fs::File`][std].
+    ///
+    /// [std]: https://doc.rust-lang.org/std/fs/struct.File.html
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::fs::File;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let file = File::open("foo.txt").await?;
+    /// let std: std::fs::File = file.into_std();
+    ///
+    /// println!("{:?}", std);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn into_std(self) -> sys::File {
+        Arc::try_unwrap(self.std).unwrap()
+    }
 }
 
 impl AsyncRead for File {
