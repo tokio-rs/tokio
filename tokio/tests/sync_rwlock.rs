@@ -47,7 +47,7 @@ fn read_exclusive_pending() {
 // If the max shared access is reached and subsquent shared access is pending
 // should be made available when one of the shared acesses is dropped
 #[test]
-fn exaust_reading() {
+fn exhaust_reading() {
     let rwlock = RwLock::new(100);
     let mut reads = Vec::new();
     loop {

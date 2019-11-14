@@ -1,46 +1,63 @@
-//! An asynchronous `RwLock`-like type.
-//!
-//! This module provides [`RwLock`], a type that acts similarly to an asynchronous `RwLock`.
-//!
-//! This allows you to do something along the lines of:
-//!
-//! ```rust,block_on
-//! use tokio::sync::RwLock;
-//! use std::sync::Arc;
-//!
-//! #[tokio::main]
-//! async fn main() {
-//!     let data1 = Arc::new(RwLock::new(0));
-//!     let data2 = data1.clone();
-//!
-//!     tokio::spawn(async move {
-//!         let mut lock = data2.write().await;
-//!         *lock += 1;
-//!     });
-//!
-//!     let mut lock = data1.write().await;
-//!     *lock += 1;
-//! }
-//! ```
-//!
-//! [`RwLock`]: struct.RwLock.html
-//! [`RwLockReadGuard`]: struct.RwLockReadGuard.html
-//! [`RwLockWriteGuard`]: struct.RwLockWriteGuard.html
-
-use crate::sync::semaphore::{AcquireError, Permit, Semaphore};
+use crate::sync::semaphore::{Permit, Semaphore};
 use crate::sync::Mutex;
 use std::cell::UnsafeCell;
-use std::future::Future;
 use std::ops;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use futures_util::future::poll_fn;
 
 const MAX_READS: usize = 32;
-/// An asynchronous readers writer lock usefull for protecting shared data
+
+/// An asynchronous reader-writer lock
 ///
-/// Each lock has a type parameter (`T`) which represents the data that it is protecting. The data
-/// can only be accessed through the RAII guards returned from `read` and `write`, which
-/// guarantees that the data is only ever modified when the rwlock is with write lock.
+/// This type of lock allows a number of readers or at most one writer at any
+/// point in time. The write portion of this lock typically allows modification
+/// of the underlying data (exclusive access) and the read portion of this lock
+/// typically allows for read-only access (shared access).
+///
+/// In comparison, a [`Mutex`] does not distinguish between readers or writers
+/// that acquire the lock, therefore blocking any tasks waiting for the lock to
+/// become available. An `RwLock` will allow any number of readers to acquire the
+/// lock as long as a writer is not holding the lock.
+///
+/// The priority policy of the lock is dependent on the underlying operating
+/// system's implementation, and this type does not guarantee that any
+/// particular policy will be used.
+///
+/// The type parameter `T` represents the data that this lock protects. It is
+/// required that `T` satisfies [`Send`] to be shared across threads. The RAII guards
+/// returned from the locking methods implement [`Deref`][] (and [`DerefMut`]
+/// for the `write` methods) to allow access to the content of the lock.
+///
+/// # Examples
+///
+/// ```
+/// use tokio::sync::RwLock;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let lock = RwLock::new(5);
+///
+/// // many reader locks can be held at once
+///     {
+///         let r1 = lock.read().await;
+///         let r2 = lock.read().await;
+///         assert_eq!(*r1, 5);
+///         assert_eq!(*r2, 5);
+///     } // read locks are dropped at this point
+///
+/// // only one write lock may be held, however
+///     {
+///         let mut w = lock.write().await;
+///         *w += 1;
+///         assert_eq!(*w, 6);
+///     } // write lock is dropped here
+/// }
+/// ```
+///
+/// [`Mutex`]: struct.Mutex.html
+/// [`RwLock`]: struct.RwLock.html
+/// [`RwLockReadGuard`]: struct.RwLockReadGuard.html
+/// [`RwLockWriteGuard`]: struct.RwLockWriteGuard.html
+/// [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
 #[derive(Debug)]
 pub struct RwLock<T> {
     //semaphore to coordinate read and write access to T
@@ -53,29 +70,41 @@ pub struct RwLock<T> {
     w: Mutex<()>,
 }
 
-/// A shared-access handle to a locked RwLock
+/// RAII structure used to release the shared read access of a lock when
+/// dropped.
+///
+/// This structure is created by the [`read`] method on
+/// [`RwLock`].
+///
+/// [`read`]: struct.RwLock.html#method.read
 #[derive(Debug)]
 pub struct RwLockReadGuard<'a, T> {
     permit: Permit,
     lock: &'a RwLock<T>,
 }
 
-/// An exclusive handle to a locked RwLock
+/// RAII structure used to release the exclusive write access of a lock when
+/// dropped.
+///
+/// This structure is created by the [`write`] and method
+/// on [`RwLock`].
+///
+/// [`write`]: struct.RwLock.html#method.write
+/// [`RwLock`]: struct.RwLock.html
 #[derive(Debug)]
 pub struct RwLockWriteGuard<'a, T> {
-    permits: Vec<Permit>,
+    permits: Vec<ReleasingPermit<'a, T>>,
     lock: &'a RwLock<T>,
 }
 
-struct RwLockReadFuture<'a, T> {
-    lock: &'a RwLock<T>,
-    permit: Option<Permit>,
-}
+// Wrapper arround Permit that releases on Drop
+#[derive(Debug)]
+struct ReleasingPermit<'a, T>(Permit, &'a RwLock<T>);
 
-struct RwLockWriteFuture<'a, T> {
-    lock: &'a RwLock<T>,
-    permits: Vec<Permit>,
-    polling_permit: Option<Permit>,
+impl<'a, T> Drop for ReleasingPermit<'a, T> {
+    fn drop(&mut self) {
+        self.0.release(&self.1.s);
+    }
 }
 
 // As long as T: Send, it's fine to send and share Mutex<T> between threads.
@@ -87,7 +116,15 @@ unsafe impl<'a, T> Sync for RwLockReadGuard<'a, T> where T: Send + Sync {}
 unsafe impl<'a, T> Sync for RwLockWriteGuard<'a, T> where T: Send + Sync {}
 
 impl<T> RwLock<T> {
-    /// Creates a new rwlock in an unlocked state ready for use.
+    /// Creates a new instance of an `RwLock<T>` which is unlocked.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::RwLock;
+    ///
+    /// let lock = RwLock::new(5);
+    /// ```
     pub fn new(value: T) -> RwLock<T> {
         RwLock {
             c: UnsafeCell::new(value),
@@ -96,102 +133,81 @@ impl<T> RwLock<T> {
         }
     }
 
-    /// Acquire the rwlock nonexclusively, read-only
+    /// Locks this rwlock with shared read access, blocking the current task
+    /// until it can be acquired.
+    ///
+    /// The calling task will be blocked until there are no more writers which
+    /// hold the lock. There may be other readers currently inside the lock when
+    /// this method returns.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::RwLock;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let lock = Arc::new(RwLock::new(1));
+    ///     let c_lock = lock.clone();
+    ///
+    ///     let n = lock.read().await;
+    ///     assert_eq!(*n, 1);
+    ///
+    ///     tokio::spawn(async move {
+    ///         let r = c_lock.read().await;
+    ///         assert_eq!(*r, 1);
+    ///     })
+    ///}
+    /// ```
     pub async fn read(&self) -> RwLockReadGuard<'_, T> {
-        RwLockReadFuture {
-            lock: self,
-            permit: Some(Permit::new()),
-        }
-        .await
-        .unwrap_or_else(|_| {
-            // The semaphore was closed. but, we never explicitly close it, and we have a
-            // handle to it through the Arc, which means that this can never happen.
-            unreachable!()
-        })
+        let mut permit = ReleasingPermit(Permit::new(), self);
+        poll_fn(|cx| permit.0.poll_acquire(cx, &self.s))
+            .await
+            .unwrap_or_else(|_| {
+                // The semaphore was closed. but, we never explicitly close it, and we have a
+                // handle to it through the Arc, which means that this can never happen.
+                unreachable!()
+            });
+        RwLockReadGuard { lock: self, permit: std::mem::replace(&mut permit.0, Permit::new()) }
     }
 
-    /// Acquire the RwLock exclusively, read-write
+    /// Locks this rwlock with exclusive write access, blocking the current
+    /// task until it can be acquired.
+    ///
+    /// This function will not return while other writers or other readers
+    /// currently have access to the lock.
+    ///
+    /// Returns an RAII guard which will drop the write access of this rwlock
+    /// when dropped.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::RwLock;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///   let lock = RwLock::new(1);
+    ///
+    ///   let mut n = lock.write().await;
+    ///   *n = 2;
+    ///}
+    /// ```
     pub async fn write(&self) -> RwLockWriteGuard<'_, T> {
         let _lock = self.w.lock().await;
-        RwLockWriteFuture {
+
+        let mut permits = vec![];
+        for _ in 0..MAX_READS {
+            let mut permit = ReleasingPermit(Permit::new(), self);
+            poll_fn(|cx| permit.0.poll_acquire(cx, &self.s))
+                .await
+                .unwrap();
+            permits.push(permit);
+        }
+        RwLockWriteGuard {
             lock: self,
-            permits: Vec::new(),
-            polling_permit: None,
-        }
-        .await
-        .unwrap_or_else(|_| {
-            // The semaphore was closed. but, we never explicitly close it, and we have a
-            // handle to it through the Arc, which means that this can never happen.
-            unreachable!()
-        })
-    }
-}
-
-impl<'a, T> Future for RwLockReadFuture<'a, T> {
-    type Output = Result<RwLockReadGuard<'a, T>, AcquireError>;
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut permit = self.permit.take().unwrap();
-        match permit.poll_acquire(cx, &self.lock.s) {
-            Poll::Pending => {
-                self.permit = Some(permit);
-                Poll::Pending
-            }
-            Poll::Ready(Ok(_)) => Poll::Ready(Ok(RwLockReadGuard {
-                lock: self.lock,
-                permit,
-            })),
-            Poll::Ready(Err(err)) => Poll::Ready(Err(err)),
-        }
-    }
-}
-
-impl<'a, T> Future for RwLockWriteFuture<'a, T> {
-    type Output = Result<RwLockWriteGuard<'a, T>, AcquireError>;
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        while self.permits.len() < MAX_READS {
-            let mut permit = match self.polling_permit.take() {
-                Some(permit) => permit,
-                None => Permit::new(),
-            };
-
-            match permit.poll_acquire(cx, &self.lock.s) {
-                Poll::Pending => {
-                    self.polling_permit = Some(permit);
-                    return Poll::Pending;
-                }
-                Poll::Ready(Ok(())) => {
-                    self.permits.push(permit);
-                }
-                Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
-            };
-        }
-        let mut permits = Vec::new();
-        permits.append(&mut self.permits);
-        Poll::Ready(Ok(RwLockWriteGuard {
-            lock: self.lock,
-            permits,
-        }))
-    }
-}
-
-impl<T> Drop for RwLockReadFuture<'_, T> {
-    fn drop(&mut self) {
-        if let Some(mut permit) = self.permit.take() {
-            permit.release(&self.lock.s);
-        }
-    }
-}
-
-impl<T> Drop for RwLockWriteFuture<'_, T> {
-    fn drop(&mut self) {
-        if let Some(mut permit) = self.polling_permit.take() {
-            permit.release(&self.lock.s);
-        }
-
-        for p in self.permits.iter_mut() {
-            p.release(&self.lock.s);
+            permits: permits.split_off(0),
         }
     }
 }
@@ -199,14 +215,6 @@ impl<T> Drop for RwLockWriteFuture<'_, T> {
 impl<T> Drop for RwLockReadGuard<'_, T> {
     fn drop(&mut self) {
         self.permit.release(&self.lock.s);
-    }
-}
-
-impl<T> Drop for RwLockWriteGuard<'_, T> {
-    fn drop(&mut self) {
-        for p in self.permits.iter_mut() {
-            p.release(&self.lock.s);
-        }
     }
 }
 
