@@ -8,9 +8,8 @@
 
 #![warn(rust_2018_idioms)]
 
-use tokio::future::FutureExt as TokioFutureExt;
-use tokio::io;
 use tokio::net::UdpSocket;
+use tokio::{io, time};
 use tokio_util::codec::BytesCodec;
 use tokio_util::udp::UdpFramed;
 
@@ -68,7 +67,7 @@ async fn ping(socket: &mut UdpFramed<BytesCodec>, b_addr: SocketAddr) -> Result<
 async fn pong(socket: &mut UdpFramed<BytesCodec>) -> Result<(), io::Error> {
     let timeout = Duration::from_millis(200);
 
-    while let Ok(Some(Ok((bytes, addr)))) = socket.next().timeout(timeout).await {
+    while let Ok(Some(Ok((bytes, addr)))) = time::timeout(timeout, socket.next()).await {
         println!("[b] recv: {}", String::from_utf8_lossy(&bytes));
 
         socket.send((Bytes::from(&b"PONG"[..]), addr)).await?;

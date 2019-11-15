@@ -163,7 +163,7 @@ mod tests {
     use super::*;
     use crate::runtime::Runtime;
 
-    use futures_util::stream::StreamExt;
+    use futures::stream::StreamExt;
 
     #[test]
     fn ctrl_c() {

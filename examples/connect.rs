@@ -20,7 +20,7 @@ use tokio::io;
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::codec::{FramedRead, FramedWrite};
 
-use futures::{SinkExt, Stream, StreamExt};
+use futures::{Stream, StreamExt};
 use std::env;
 use std::error::Error;
 use std::net::SocketAddr;
@@ -69,12 +69,14 @@ async fn run() -> Result<(), Box<dyn Error>> {
 
 // Temporary work around for stdin blocking the stream
 fn stdin() -> impl Stream<Item = Result<Vec<u8>, io::Error>> + Unpin {
-    let mut stdin = FramedRead::new(io::stdin(), codec::Bytes).map(Ok);
+    let mut stdin = FramedRead::new(io::stdin(), codec::Bytes);
 
-    let (mut tx, rx) = mpsc::unbounded_channel();
+    let (tx, rx) = mpsc::unbounded_channel();
 
     tokio::spawn(async move {
-        tx.send_all(&mut stdin).await.unwrap();
+        while let Some(res) = stdin.next().await {
+            let _ = tx.send(res);
+        }
     });
 
     rx
