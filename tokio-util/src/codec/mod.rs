@@ -9,9 +9,6 @@
 //! [`Sink`]: https://docs.rs/futures-sink/*/futures_sink/trait.Sink.html
 //! [`Stream`]: https://docs.rs/futures-core/*/futures_core/stream/trait.Stream.html
 
-#[macro_use]
-mod macros;
-
 mod bytes_codec;
 pub use self::bytes_codec::BytesCodec;
 

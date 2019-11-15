@@ -8,6 +8,7 @@ use tokio::io::{AsyncBufRead, AsyncRead, AsyncWrite};
 use bytes::BytesMut;
 use futures_core::Stream;
 use futures_sink::Sink;
+use pin_project::pin_project;
 use std::fmt;
 use std::io::{self, BufRead, Read, Write};
 use std::pin::Pin;
@@ -17,11 +18,40 @@ use std::task::{Context, Poll};
 /// the `Encoder` and `Decoder` traits to encode and decode frames.
 ///
 /// You can create a `Framed` instance by using the `AsyncRead::framed` adapter.
+#[pin_project]
 pub struct Framed<T, U> {
+    #[pin]
     inner: FramedRead2<FramedWrite2<Fuse<T, U>>>,
 }
 
-pub(crate) struct Fuse<T, U>(pub(crate) T, pub(crate) U);
+#[pin_project]
+pub(crate) struct Fuse<T, U> {
+    #[pin]
+    pub(crate) io: T,
+    pub(crate) codec: U,
+}
+
+/// Abstracts over `FramedRead2` being either `FramedRead2<FramedWrite2<Fuse<T, U>>>` or
+/// `FramedRead2<Fuse<T, U>>` and lets the io and codec parts be extracted in either case.
+pub(crate) trait ProjectFuse {
+    type Io;
+    type Codec;
+
+    fn project(self: Pin<&mut Self>) -> Fuse<Pin<&mut Self::Io>, &mut Self::Codec>;
+}
+
+impl<T, U> ProjectFuse for Fuse<T, U> {
+    type Io = T;
+    type Codec = U;
+
+    fn project(self: Pin<&mut Self>) -> Fuse<Pin<&mut Self::Io>, &mut Self::Codec> {
+        let self_ = self.project();
+        Fuse {
+            io: self_.io,
+            codec: self_.codec,
+        }
+    }
+}
 
 impl<T, U> Framed<T, U>
 where
@@ -47,7 +77,7 @@ where
     /// break them into separate objects, allowing them to interact more easily.
     pub fn new(inner: T, codec: U) -> Framed<T, U> {
         Framed {
-            inner: framed_read2(framed_write2(Fuse(inner, codec))),
+            inner: framed_read2(framed_write2(Fuse { io: inner, codec })),
         }
     }
 }
@@ -76,7 +106,13 @@ impl<T, U> Framed<T, U> {
     pub fn from_parts(parts: FramedParts<T, U>) -> Framed<T, U> {
         Framed {
             inner: framed_read2_with_buffer(
-                framed_write2_with_buffer(Fuse(parts.io, parts.codec), parts.write_buf),
+                framed_write2_with_buffer(
+                    Fuse {
+                        io: parts.io,
+                        codec: parts.codec,
+                    },
+                    parts.write_buf,
+                ),
                 parts.read_buf,
             ),
         }
@@ -89,7 +125,7 @@ impl<T, U> Framed<T, U> {
     /// of data coming in as it may corrupt the stream of frames otherwise
     /// being worked with.
     pub fn get_ref(&self) -> &T {
-        &self.inner.get_ref().get_ref().0
+        &self.inner.get_ref().get_ref().io
     }
 
     /// Returns a mutable reference to the underlying I/O stream wrapped by
@@ -99,7 +135,7 @@ impl<T, U> Framed<T, U> {
     /// of data coming in as it may corrupt the stream of frames otherwise
     /// being worked with.
     pub fn get_mut(&mut self) -> &mut T {
-        &mut self.inner.get_mut().get_mut().0
+        &mut self.inner.get_mut().get_mut().io
     }
 
     /// Returns a reference to the underlying codec wrapped by
@@ -108,7 +144,7 @@ impl<T, U> Framed<T, U> {
     /// Note that care should be taken to not tamper with the underlying codec
     /// as it may corrupt the stream of frames otherwise being worked with.
     pub fn codec(&self) -> &U {
-        &self.inner.get_ref().get_ref().1
+        &self.inner.get_ref().get_ref().codec
     }
 
     /// Returns a mutable reference to the underlying codec wrapped by
@@ -117,7 +153,7 @@ impl<T, U> Framed<T, U> {
     /// Note that care should be taken to not tamper with the underlying codec
     /// as it may corrupt the stream of frames otherwise being worked with.
     pub fn codec_mut(&mut self) -> &mut U {
-        &mut self.inner.get_mut().get_mut().1
+        &mut self.inner.get_mut().get_mut().codec
     }
 
     /// Returns a reference to the read buffer.
@@ -131,7 +167,7 @@ impl<T, U> Framed<T, U> {
     /// of data coming in as it may corrupt the stream of frames otherwise
     /// being worked with.
     pub fn into_inner(self) -> T {
-        self.inner.into_inner().into_inner().0
+        self.inner.into_inner().into_inner().io
     }
 
     /// Consumes the `Frame`, returning its underlying I/O stream, the buffer
@@ -145,8 +181,8 @@ impl<T, U> Framed<T, U> {
         let (inner, write_buf) = inner.into_parts();
 
         FramedParts {
-            io: inner.0,
-            codec: inner.1,
+            io: inner.io,
+            codec: inner.codec,
             read_buf,
             write_buf,
             _priv: (),
@@ -156,38 +192,38 @@ impl<T, U> Framed<T, U> {
 
 impl<T, U> Stream for Framed<T, U>
 where
-    T: AsyncRead + Unpin,
-    U: Decoder + Unpin,
+    T: AsyncRead,
+    U: Decoder,
 {
     type Item = Result<U::Item, U::Error>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        pin!(self.get_mut().inner).poll_next(cx)
+        self.project().inner.poll_next(cx)
     }
 }
 
 impl<T, I, U> Sink<I> for Framed<T, U>
 where
-    T: AsyncWrite + Unpin,
-    U: Encoder<Item = I> + Unpin,
+    T: AsyncWrite,
+    U: Encoder<Item = I>,
     U::Error: From<io::Error>,
 {
     type Error = U::Error;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Pin::new(Pin::get_mut(self).inner.get_mut()).poll_ready(cx)
+        self.project().inner.get_pin_mut().poll_ready(cx)
     }
 
     fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::Error> {
-        Pin::new(Pin::get_mut(self).inner.get_mut()).start_send(item)
+        self.project().inner.get_pin_mut().start_send(item)
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Pin::new(Pin::get_mut(self).inner.get_mut()).poll_flush(cx)
+        self.project().inner.get_pin_mut().poll_flush(cx)
     }
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Pin::new(Pin::get_mut(self).inner.get_mut()).poll_close(cx)
+        self.project().inner.get_pin_mut().poll_close(cx)
     }
 }
 
@@ -198,8 +234,8 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Framed")
-            .field("io", &self.inner.get_ref().get_ref().0)
-            .field("codec", &self.inner.get_ref().get_ref().1)
+            .field("io", &self.inner.get_ref().get_ref().io)
+            .field("codec", &self.inner.get_ref().get_ref().codec)
             .finish()
     }
 }
@@ -208,23 +244,23 @@ where
 
 impl<T: Read, U> Read for Fuse<T, U> {
     fn read(&mut self, dst: &mut [u8]) -> io::Result<usize> {
-        self.0.read(dst)
+        self.io.read(dst)
     }
 }
 
 impl<T: BufRead, U> BufRead for Fuse<T, U> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
-        self.0.fill_buf()
+        self.io.fill_buf()
     }
 
     fn consume(&mut self, amt: usize) {
-        self.0.consume(amt)
+        self.io.consume(amt)
     }
 }
 
-impl<T: AsyncRead + Unpin, U: Unpin> AsyncRead for Fuse<T, U> {
+impl<T: AsyncRead, U> AsyncRead for Fuse<T, U> {
     unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
-        self.0.prepare_uninitialized_buffer(buf)
+        self.io.prepare_uninitialized_buffer(buf)
     }
 
     fn poll_read(
@@ -232,45 +268,45 @@ impl<T: AsyncRead + Unpin, U: Unpin> AsyncRead for Fuse<T, U> {
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<Result<usize, io::Error>> {
-        pin!(self.get_mut().0).poll_read(cx, buf)
+        self.project().io.poll_read(cx, buf)
     }
 }
 
-impl<T: AsyncBufRead + Unpin, U: Unpin> AsyncBufRead for Fuse<T, U> {
+impl<T: AsyncBufRead, U> AsyncBufRead for Fuse<T, U> {
     fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
-        pin!(self.get_mut().0).poll_fill_buf(cx)
+        self.project().io.poll_fill_buf(cx)
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {
-        pin!(self.get_mut().0).consume(amt)
+        self.project().io.consume(amt)
     }
 }
 
 impl<T: Write, U> Write for Fuse<T, U> {
     fn write(&mut self, src: &[u8]) -> io::Result<usize> {
-        self.0.write(src)
+        self.io.write(src)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.0.flush()
+        self.io.flush()
     }
 }
 
-impl<T: AsyncWrite + Unpin, U: Unpin> AsyncWrite for Fuse<T, U> {
+impl<T: AsyncWrite, U> AsyncWrite for Fuse<T, U> {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
-        pin!(self.get_mut().0).poll_write(cx, buf)
+        self.project().io.poll_write(cx, buf)
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        pin!(self.get_mut().0).poll_flush(cx)
+        self.project().io.poll_flush(cx)
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        pin!(self.get_mut().0).poll_shutdown(cx)
+        self.project().io.poll_shutdown(cx)
     }
 }
 
@@ -279,11 +315,11 @@ impl<T, U: Decoder> Decoder for Fuse<T, U> {
     type Error = U::Error;
 
     fn decode(&mut self, buffer: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        self.1.decode(buffer)
+        self.codec.decode(buffer)
     }
 
     fn decode_eof(&mut self, buffer: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        self.1.decode_eof(buffer)
+        self.codec.decode_eof(buffer)
     }
 }
 
@@ -292,7 +328,7 @@ impl<T, U: Encoder> Encoder for Fuse<T, U> {
     type Error = U::Error;
 
     fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        self.1.encode(item, dst)
+        self.codec.encode(item, dst)
     }
 }
 
