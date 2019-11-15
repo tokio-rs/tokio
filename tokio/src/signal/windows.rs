@@ -213,7 +213,7 @@ mod tests {
                 super::handler(CTRL_BREAK_EVENT);
             }
 
-            assert_ok!(ctrl_break.next().await.unwrap());
+            ctrl_break.next().await.unwrap();
         });
     }
 
