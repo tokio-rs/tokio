@@ -162,6 +162,7 @@ pub fn ctrl_break() -> io::Result<CtrlBreak> {
 mod tests {
     use super::*;
     use crate::runtime::Runtime;
+    use tokio_test::assert_ok;
 
     use futures::stream::StreamExt;
 
@@ -170,7 +171,7 @@ mod tests {
         let mut rt = rt();
 
         rt.block_on(async {
-            let ctrl_c = crate::signal::ctrl_c().expect("failed to create CtrlC");
+            let ctrl_c = crate::signal::ctrl_c();
 
             // Windows doesn't have a good programmatic way of sending events
             // like sending signals on Unix, so we'll stub out the actual OS
@@ -179,7 +180,7 @@ mod tests {
                 super::handler(CTRL_C_EVENT);
             }
 
-            let _ = ctrl_c.into_future().await;
+            assert_ok!(ctrl_c.await);
         });
     }
 
@@ -188,7 +189,7 @@ mod tests {
         let mut rt = rt();
 
         rt.block_on(async {
-            let ctrl_break = super::ctrl_break().expect("failed to create CtrlC");
+            let ctrl_break = super::ctrl_break();
 
             // Windows doesn't have a good programmatic way of sending events
             // like sending signals on Unix, so we'll stub out the actual OS
@@ -197,7 +198,7 @@ mod tests {
                 super::handler(CTRL_BREAK_EVENT);
             }
 
-            let _ = ctrl_break.into_future().await;
+            assert_ok!(ctrl_break.await);
         });
     }
 
