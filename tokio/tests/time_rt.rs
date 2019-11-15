@@ -25,10 +25,10 @@ fn timer_with_threaded_runtime() {
 }
 
 #[test]
-fn timer_with_local_scheduler() {
+fn timer_with_basic_scheduler() {
     use tokio::runtime::Builder;
 
-    let mut rt = Builder::new().local_scheduler().build().unwrap();
+    let mut rt = Builder::new().basic_scheduler().build().unwrap();
     let (tx, rx) = mpsc::channel();
 
     rt.block_on(async move {

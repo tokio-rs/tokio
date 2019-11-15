@@ -1,4 +1,4 @@
-use crate::runtime::local;
+use crate::runtime::basic_scheduler;
 
 #[cfg(feature = "rt-full")]
 use crate::runtime::thread_pool;
@@ -11,8 +11,8 @@ enum State {
     // default executor not defined
     Empty,
 
-    // Local (to the thread) scheduler
-    Local(*const local::SchedulerInner),
+    // Basic scheduler (runs on the current-thread)
+    Basic(*const basic_scheduler::SchedulerPriv),
 
     // default executor is a thread pool instance.
     #[cfg(feature = "rt-full")]
@@ -77,13 +77,13 @@ where
             let thread_pool = unsafe { &*thread_pool_ptr };
             thread_pool.spawn_background(future);
         }
-        State::Local(local_scheduler_ptr) => {
-            let local_scheduler = unsafe { &*local_scheduler_ptr };
+        State::Basic(basic_scheduler_ptr) => {
+            let basic_scheduler = unsafe { &*basic_scheduler_ptr };
 
-            // Safety: The `LocalScheduler` value set the thread-local (same
+            // Safety: The `BasicScheduler` value set the thread-local (same
             // thread).
             unsafe {
-                local_scheduler.spawn_background(future);
+                basic_scheduler.spawn_background(future);
             }
         }
         State::Empty => {
@@ -95,19 +95,22 @@ where
     })
 }
 
-pub(super) fn with_local_scheduler<F, R>(local_scheduler: &local::SchedulerInner, f: F) -> R
+pub(super) fn with_basic_scheduler<F, R>(
+    basic_scheduler: &basic_scheduler::SchedulerPriv,
+    f: F,
+) -> R
 where
     F: FnOnce() -> R,
 {
     with_state(
-        State::Local(local_scheduler as *const local::SchedulerInner),
+        State::Basic(basic_scheduler as *const basic_scheduler::SchedulerPriv),
         f,
     )
 }
 
-pub(super) fn local_scheduler_is_current(local_scheduler: &local::SchedulerInner) -> bool {
+pub(super) fn basic_scheduler_is_current(basic_scheduler: &basic_scheduler::SchedulerPriv) -> bool {
     EXECUTOR.with(|current_executor| match current_executor.get() {
-        State::Local(ptr) => ptr == local_scheduler as *const _,
+        State::Basic(ptr) => ptr == basic_scheduler as *const _,
         _ => false,
     })
 }

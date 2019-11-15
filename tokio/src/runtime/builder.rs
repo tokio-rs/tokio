@@ -61,7 +61,7 @@ pub struct Builder {
 enum Kind {
     Shell,
     #[cfg(feature = "rt-core")]
-    Local,
+    Basic,
     #[cfg(feature = "rt-full")]
     ThreadPool,
 }
@@ -121,19 +121,19 @@ impl Builder {
         self
     }
 
-    /// Use only the current thread for executing tasks.
+    /// Use a simpler scheduler that runs all tasks on the current-thread.
     ///
     /// The executor and all necessary drivers will all be run on the current
     /// thread during `block_on` calls.
     #[cfg(feature = "rt-core")]
-    pub fn local_scheduler(&mut self) -> &mut Self {
-        self.kind = Kind::Local;
+    pub fn basic_scheduler(&mut self) -> &mut Self {
+        self.kind = Kind::Basic;
         self
     }
 
-    /// Use a thread-pool for executing tasks.
+    /// Use a multi-threaded scheduler for executing tasks.
     #[cfg(feature = "rt-full")]
-    pub fn work_stealing_scheduler(&mut self) -> &mut Self {
+    pub fn threaded_scheduler(&mut self) -> &mut Self {
         self.kind = Kind::ThreadPool;
         self
     }
@@ -254,9 +254,9 @@ impl Builder {
         match self.kind {
             Kind::Shell => self.build_shell_runtime(),
             #[cfg(feature = "rt-core")]
-            Kind::Local => self.build_local_runtime(),
+            Kind::Basic => self.build_basic_runtime(),
             #[cfg(feature = "rt-full")]
-            Kind::ThreadPool => self.build_work_stealing_runtime(),
+            Kind::ThreadPool => self.build_threaded_runtime(),
         }
     }
 
@@ -289,8 +289,8 @@ impl Builder {
     }
 
     #[cfg(feature = "rt-core")]
-    fn build_local_runtime(&mut self) -> io::Result<Runtime> {
-        use crate::runtime::{LocalScheduler, Kind};
+    fn build_basic_runtime(&mut self) -> io::Result<Runtime> {
+        use crate::runtime::{BasicScheduler, Kind};
 
         let clock = time::create_clock();
 
@@ -305,7 +305,7 @@ impl Builder {
         // there are no futures ready to do something, it'll let the timer or
         // the reactor to generate some new stimuli for the futures to continue
         // in their life.
-        let scheduler = LocalScheduler::new(driver);
+        let scheduler = BasicScheduler::new(driver);
         let spawner = scheduler.spawner();
 
         // Blocking pool
@@ -313,9 +313,9 @@ impl Builder {
         let blocking_spawner = blocking_pool.spawner().clone();
 
         Ok(Runtime {
-            kind: Kind::Local(scheduler),
+            kind: Kind::Basic(scheduler),
             handle: Handle {
-                kind: handle::Kind::Local(spawner),
+                kind: handle::Kind::Basic(spawner),
                 io_handles,
                 time_handles,
                 clock,
@@ -326,7 +326,7 @@ impl Builder {
     }
 
     #[cfg(feature = "rt-full")]
-    fn build_work_stealing_runtime(&mut self) -> io::Result<Runtime> {
+    fn build_threaded_runtime(&mut self) -> io::Result<Runtime> {
         use crate::runtime::{Kind, ThreadPool};
         use std::sync::Mutex;
 

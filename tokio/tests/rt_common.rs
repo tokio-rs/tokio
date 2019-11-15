@@ -4,12 +4,12 @@
 
 macro_rules! rt_test {
     ($($t:tt)*) => {
-        mod local_scheduler {
+        mod basic_scheduler {
             $($t)*
 
             fn rt() -> Runtime {
                 tokio::runtime::Builder::new()
-                    .local_scheduler()
+                    .basic_scheduler()
                     .build()
                     .unwrap()
             }

@@ -309,6 +309,6 @@ mod tests {
     }
 
     fn rt() -> Runtime {
-        runtime::Builder::new().local_scheduler().build().unwrap()
+        runtime::Builder::new().basic_scheduler().build().unwrap()
     }
 }

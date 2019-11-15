@@ -19,8 +19,8 @@ use proc_macro::TokenStream;
 use quote::quote;
 
 enum Runtime {
-    Local,
-    WorkStealing,
+    Basic,
+    Threaded,
     Auto,
 }
 
@@ -28,8 +28,8 @@ enum Runtime {
 ///
 /// ## Options:
 ///
-/// - `local_scheduler` - All tasks are executed on the current thread.
-/// - `work_stealing_scheduler` - Uses the work-stealing scheduler. Used by default.
+/// - `basic_scheduler` - All tasks are executed on the current thread.
+/// - `threaded_scheduler` - Uses the multi-threaded scheduler. Used by default.
 ///
 /// ## Function arguments:
 ///
@@ -37,18 +37,19 @@ enum Runtime {
 ///
 /// ## Usage
 ///
-/// ### Select runtime
-///
-/// ```rust
-/// #[tokio::main(local_scheduler)]
-/// async fn main() {
-///     println!("Hello world");
-/// }
-/// ```
 /// ### Using default
 ///
 /// ```rust
 /// #[tokio::main]
+/// async fn main() {
+///     println!("Hello world");
+/// }
+/// ```
+///
+/// ### Select runtime
+///
+/// ```rust
+/// #[tokio::main(basic_scheduler)]
 /// async fn main() {
 ///     println!("Hello world");
 /// }
@@ -87,10 +88,10 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
                 return syn::Error::new_spanned(path, msg).to_compile_error().into();
             }
             match ident.unwrap().to_string().to_lowercase().as_str() {
-                "work_stealing_scheduler" => runtime = Runtime::WorkStealing,
-                "local_scheduler" => runtime = Runtime::Local,
+                "threaded_scheduler" => runtime = Runtime::Threaded,
+                "basic_scheduler" => runtime = Runtime::Basic,
                 name => {
-                    let msg = format!("Unknown attribute {} is specified; expected `local_scheduler` or `work_stealing_scheduler`", name);
+                    let msg = format!("Unknown attribute {} is specified; expected `basic_scheduler` or `threaded_scheduler`", name);
                     return syn::Error::new_spanned(path, msg).to_compile_error().into();
                 }
             }
@@ -98,17 +99,17 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     }
 
     let result = match runtime {
-        Runtime::WorkStealing | Runtime::Auto => quote! {
+        Runtime::Threaded | Runtime::Auto => quote! {
             #(#attrs)*
             fn #name(#inputs) #ret {
                 tokio::runtime::Runtime::new().unwrap().block_on(async { #body })
             }
         },
-        Runtime::Local => quote! {
+        Runtime::Basic => quote! {
             #(#attrs)*
             fn #name(#inputs) #ret {
                 tokio::runtime::Builder::new()
-                    .local_scheduler()
+                    .basic_scheduler()
                     .build()
                     .unwrap()
                     .block_on(async { #body })
@@ -123,15 +124,15 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ## Options:
 ///
-/// - `local_scheduler` - All tasks are executed on the current thread. Used by default.
-/// - `work_stealing_scheduler` - Uses work-stealing scheduler.
+/// - `basic_scheduler` - All tasks are executed on the current thread. Used by default.
+/// - `threaded_scheduler` - Use multi-threaded scheduler.
 ///
 /// ## Usage
 ///
 /// ### Select runtime
 ///
 /// ```no_run
-/// #[tokio::test(work_stealing_scheduler)]
+/// #[tokio::test(threaded_scheduler)]
 /// async fn my_test() {
 ///     assert!(true);
 /// }
@@ -186,10 +187,10 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
                 return syn::Error::new_spanned(path, msg).to_compile_error().into();
             }
             match ident.unwrap().to_string().to_lowercase().as_str() {
-                "work_stealing_scheduler" => runtime = Runtime::WorkStealing,
-                "local_scheduler" => runtime = Runtime::Local,
+                "threaded_scheduler" => runtime = Runtime::Threaded,
+                "basic_scheduler" => runtime = Runtime::Basic,
                 name => {
-                    let msg = format!("Unknown attribute {} is specified; expected `local_scheduler` or `work_stealing_scheduler`", name);
+                    let msg = format!("Unknown attribute {} is specified; expected `basic_scheduler` or `threaded_scheduler`", name);
                     return syn::Error::new_spanned(path, msg).to_compile_error().into();
                 }
             }
@@ -197,19 +198,19 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
     }
 
     let result = match runtime {
-        Runtime::WorkStealing => quote! {
+        Runtime::Threaded => quote! {
             #[test]
             #(#attrs)*
             fn #name() #ret {
                 tokio::runtime::Runtime::new().unwrap().block_on(async { #body })
             }
         },
-        Runtime::Local | Runtime::Auto => quote! {
+        Runtime::Basic | Runtime::Auto => quote! {
             #[test]
             #(#attrs)*
             fn #name() #ret {
                 tokio::runtime::Builder::new()
-                    .local_scheduler()
+                    .basic_scheduler()
                     .build()
                     .unwrap()
                     .block_on(async { #body })

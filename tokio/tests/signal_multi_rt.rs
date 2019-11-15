@@ -48,7 +48,7 @@ fn multi_loop() {
 
 fn rt() -> Runtime {
     tokio::runtime::Builder::new()
-        .local_scheduler()
+        .basic_scheduler()
         .build()
         .unwrap()
 }
