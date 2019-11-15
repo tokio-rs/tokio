@@ -10,10 +10,8 @@
 use crate::signal::registry::{globals, EventId, EventInfo, Init, Storage};
 use crate::sync::mpsc::{channel, Receiver};
 
-use futures_core::stream::Stream;
 use std::convert::TryFrom;
 use std::io;
-use std::pin::Pin;
 use std::sync::Once;
 use std::task::{Context, Poll};
 use winapi::shared::minwindef::*;
@@ -97,11 +95,10 @@ pub(crate) fn ctrl_c() -> io::Result<Event> {
     Event::new(CTRL_C_EVENT)
 }
 
-impl Stream for Event {
-    type Item = ();
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        self.rx.poll_recv(cx)
+impl Event {
+    pub(crate) async fn recv(&mut self) -> Option<()> {
+        use crate::future::poll_fn;
+        poll_fn(|cx| self.rx.poll_recv(cx)).await
     }
 }
 
@@ -109,6 +106,7 @@ fn global_init() -> io::Result<()> {
     static INIT: Once = Once::new();
 
     let mut init = None;
+
     INIT.call_once(|| unsafe {
         let rc = SetConsoleCtrlHandler(Some(handler), TRUE);
         let ret = if rc == 0 {
@@ -159,16 +157,6 @@ pub struct CtrlBreak {
 /// This function binds to the default reactor.
 pub fn ctrl_break() -> io::Result<CtrlBreak> {
     Event::new(CTRL_BREAK_EVENT).map(|inner| CtrlBreak { inner })
-}
-
-impl Stream for CtrlBreak {
-    type Item = ();
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Pin::new(&mut self.inner)
-            .poll_next(cx)
-            .map(|item| item.map(|_| ()))
-    }
 }
 
 #[cfg(all(test, not(loom)))]
