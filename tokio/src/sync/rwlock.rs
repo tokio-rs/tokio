@@ -169,10 +169,7 @@ impl<T> RwLock<T> {
                 // handle to it through the Arc, which means that this can never happen.
                 unreachable!()
             });
-        RwLockReadGuard {
-            lock: self,
-            permit
-        }
+        RwLockReadGuard { lock: self, permit }
     }
 
     /// Locks this rwlock with exclusive write access, blocking the current
@@ -210,7 +207,7 @@ impl<T> RwLock<T> {
         }
         RwLockWriteGuard {
             lock: self,
-            permits: permits,
+            permits,
         }
     }
 }
