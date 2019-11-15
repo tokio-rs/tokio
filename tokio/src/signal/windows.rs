@@ -13,6 +13,7 @@ use crate::sync::mpsc::{channel, Receiver};
 use std::convert::TryFrom;
 use std::io;
 use std::sync::Once;
+use std::task::{Context, Poll};
 use winapi::shared::minwindef::*;
 use winapi::um::consoleapi::SetConsoleCtrlHandler;
 use winapi::um::wincon::*;
@@ -79,6 +80,10 @@ pub(crate) struct Event {
     rx: Receiver<()>,
 }
 
+pub(crate) fn ctrl_c() -> io::Result<Event> {
+    Event::new(CTRL_C_EVENT)
+}
+
 impl Event {
     fn new(signum: DWORD) -> io::Result<Self> {
         global_init()?;
@@ -88,13 +93,7 @@ impl Event {
 
         Ok(Event { rx })
     }
-}
 
-pub(crate) fn ctrl_c() -> io::Result<Event> {
-    Event::new(CTRL_C_EVENT)
-}
-
-impl Event {
     pub(crate) async fn recv(&mut self) -> Option<()> {
         use crate::future::poll_fn;
         poll_fn(|cx| self.rx.poll_recv(cx)).await
@@ -150,6 +149,22 @@ pub struct CtrlBreak {
     inner: Event,
 }
 
+impl CtrlBreak {
+    #[doc(hidden)] // TODO: document
+    pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
+        self.inner.rx.poll_recv(cx)
+    }
+}
+
+#[cfg(feature = "stream")]
+impl futures_core::Stream for CtrlBreak {
+    type Item = ();
+
+    fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<()>> {
+        self.poll_recv(cx)
+    }
+}
+
 /// Creates a new stream which receives "ctrl-break" notifications sent to the
 /// process.
 ///
@@ -189,7 +204,7 @@ mod tests {
         let mut rt = rt();
 
         rt.block_on(async {
-            let ctrl_break = super::ctrl_break();
+            let mut ctrl_break = assert_ok!(super::ctrl_break());
 
             // Windows doesn't have a good programmatic way of sending events
             // like sending signals on Unix, so we'll stub out the actual OS
@@ -198,7 +213,7 @@ mod tests {
                 super::handler(CTRL_BREAK_EVENT);
             }
 
-            assert_ok!(ctrl_break.await);
+            assert_ok!(ctrl_break.next().await.unwrap());
         });
     }
 
