@@ -6,11 +6,8 @@ fn is_error<T: ::std::error::Error + Send + Sync>() {}
 fn mpsc_error_bound() {
     use tokio::sync::mpsc::error;
 
-    is_error::<error::SendError>();
+    is_error::<error::SendError<()>>();
     is_error::<error::TrySendError<()>>();
-    is_error::<error::UnboundedRecvError>();
-    is_error::<error::UnboundedSendError>();
-    is_error::<error::UnboundedTrySendError<()>>();
 }
 
 #[test]

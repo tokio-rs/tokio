@@ -1,19 +1,23 @@
 use crate::io::util::read_line::read_line_internal;
 use crate::io::AsyncBufRead;
 
+use pin_project_lite::pin_project;
 use std::io;
 use std::mem;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// Stream for the [`lines`](crate::io::AsyncBufReadExt::lines) method.
-#[derive(Debug)]
-#[must_use = "streams do nothing unless polled"]
-pub struct Lines<R> {
-    reader: R,
-    buf: String,
-    bytes: Vec<u8>,
-    read: usize,
+pin_project! {
+    /// Stream for the [`lines`](crate::io::AsyncBufReadExt::lines) method.
+    #[derive(Debug)]
+    #[must_use = "streams do nothing unless polled"]
+    pub struct Lines<R> {
+        #[pin]
+        reader: R,
+        buf: String,
+        bytes: Vec<u8>,
+        read: usize,
+    }
 }
 
 pub(crate) fn lines<R>(reader: R) -> Lines<R>
@@ -52,32 +56,49 @@ where
     pub async fn next_line(&mut self) -> io::Result<Option<String>> {
         use crate::future::poll_fn;
 
-        poll_fn(|cx| self.poll_next_line(cx)).await
+        poll_fn(|cx| Pin::new(&mut *self).poll_next_line(cx)).await
     }
+}
 
+impl<R> Lines<R>
+where
+    R: AsyncBufRead,
+{
     #[doc(hidden)]
-    pub fn poll_next_line(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<Option<String>>> {
-        let n = ready!(read_line_internal(
-            Pin::new(&mut self.reader),
-            cx,
-            &mut self.buf,
-            &mut self.bytes,
-            &mut self.read
-        ))?;
+    pub fn poll_next_line(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<io::Result<Option<String>>> {
+        let me = self.project();
 
-        if n == 0 && self.buf.is_empty() {
+        let n = ready!(read_line_internal(me.reader, cx, me.buf, me.bytes, me.read))?;
+
+        if n == 0 && me.buf.is_empty() {
             return Poll::Ready(Ok(None));
         }
 
-        if self.buf.ends_with('\n') {
-            self.buf.pop();
+        if me.buf.ends_with('\n') {
+            me.buf.pop();
 
-            if self.buf.ends_with('\r') {
-                self.buf.pop();
+            if me.buf.ends_with('\r') {
+                me.buf.pop();
             }
         }
 
-        Poll::Ready(Ok(Some(mem::replace(&mut self.buf, String::new()))))
+        Poll::Ready(Ok(Some(mem::replace(me.buf, String::new()))))
+    }
+}
+
+#[cfg(feature = "stream")]
+impl<R: AsyncBufRead> futures_core::Stream for Lines<R> {
+    type Item = io::Result<String>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        Poll::Ready(match ready!(self.poll_next_line(cx)) {
+            Ok(Some(line)) => Some(Ok(line)),
+            Ok(None) => None,
+            Err(err) => Some(Err(err)),
+        })
     }
 }
 

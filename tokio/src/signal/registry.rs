@@ -87,6 +87,8 @@ impl<S: Storage> Registry<S> {
     ///
     /// Returns true if an event was delivered to at least one listener.
     fn broadcast(&self) -> bool {
+        use crate::sync::mpsc::error::TrySendError;
+
         let mut did_notify = false;
         self.storage.for_each(|event_info| {
             // Any signal of this kind arrived since we checked last?
@@ -103,17 +105,13 @@ impl<S: Storage> Registry<S> {
             for i in (0..recipients.len()).rev() {
                 match recipients[i].try_send(()) {
                     Ok(()) => did_notify = true,
-                    Err(ref e) if e.is_closed() => {
+                    Err(TrySendError::Closed(..)) => {
                         recipients.swap_remove(i);
                     }
 
                     // Channel is full, ignore the error since the
                     // receiver has already been woken up
-                    Err(e) => {
-                        // Sanity check in case this error type ever gets
-                        // additional variants we have not considered.
-                        debug_assert!(e.is_full());
-                    }
+                    Err(_) => {}
                 }
             }
         });

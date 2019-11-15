@@ -42,6 +42,20 @@ async fn usage() {
     assert_pending!(poll_next(&mut i));
 }
 
+#[tokio::test]
+async fn usage_stream() {
+    use futures::StreamExt;
+
+    let start = Instant::now();
+    let mut interval = time::interval(ms(10));
+
+    for _ in 0..3 {
+        interval.next().await.unwrap();
+    }
+
+    assert!(start.elapsed() > ms(20));
+}
+
 fn poll_next(interval: &mut task::Spawn<time::Interval>) -> Poll<Instant> {
     interval.enter(|cx, mut interval| interval.poll_tick(cx))
 }

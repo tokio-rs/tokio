@@ -18,6 +18,9 @@
 mod listener;
 pub use self::listener::TcpListener;
 
+mod incoming;
+pub use self::incoming::Incoming;
+
 pub mod split;
 
 mod stream;

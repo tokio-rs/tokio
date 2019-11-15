@@ -14,9 +14,4 @@
 //! Utilities for working with Tokio.
 
 pub mod codec;
-mod fs;
-mod io;
-pub mod stream;
-mod sync;
-mod time;
 pub mod udp;

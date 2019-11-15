@@ -122,7 +122,7 @@ impl Handle {
     /// The next operation in the mock's script will be to expect a `read` call
     /// and return `buf`.
     pub fn read(&mut self, buf: &[u8]) -> &mut Self {
-        self.tx.try_send(Action::Read(buf.into())).unwrap();
+        self.tx.send(Action::Read(buf.into())).unwrap();
         self
     }
 
@@ -131,7 +131,7 @@ impl Handle {
     /// The next operation in the mock's script will be to expect a `write`
     /// call.
     pub fn write(&mut self, buf: &[u8]) -> &mut Self {
-        self.tx.try_send(Action::Write(buf.into())).unwrap();
+        self.tx.send(Action::Write(buf.into())).unwrap();
         self
     }
 }

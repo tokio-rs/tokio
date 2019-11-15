@@ -1,5 +1,5 @@
 use crate::future::poll_fn;
-use crate::net::tcp::TcpStream;
+use crate::net::tcp::{Incoming, TcpStream};
 use crate::net::util::PollEvented;
 use crate::net::ToSocketAddrs;
 
@@ -122,7 +122,8 @@ impl TcpListener {
         poll_fn(|cx| self.poll_accept(cx)).await
     }
 
-    pub(crate) fn poll_accept(
+    #[doc(hidden)] // TODO: document
+    pub fn poll_accept(
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<io::Result<(TcpStream, SocketAddr)>> {
@@ -224,6 +225,22 @@ impl TcpListener {
     /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.io.get_ref().local_addr()
+    }
+
+    /// Consumes this listener, returning a stream of the sockets this listener
+    /// accepts.
+    ///
+    /// This method returns an implementation of the `Stream` trait which
+    /// resolves to the sockets the are accepted on this listener.
+    ///
+    /// # Errors
+    ///
+    /// Note that accepting a connection can lead to various errors and not all of them are
+    /// necessarily fatal ‒ for example having too many open file descriptors or the other side
+    /// closing the connection while it waits in an accept queue. These would terminate the stream
+    /// if not handled in any way.
+    pub fn incoming(&mut self) -> Incoming<'_> {
+        Incoming::new(self)
     }
 
     /// Gets the value of the `IP_TTL` option for this socket.

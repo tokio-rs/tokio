@@ -3,7 +3,7 @@ use crate::time::{delay_until, Delay, Duration, Instant};
 
 use std::future::Future;
 use std::pin::Pin;
-use std::task::{self, Poll};
+use std::task::{Context, Poll};
 
 /// Creates new `Interval` that yields with interval of `duration`. The first
 /// tick completes immediately.
@@ -87,7 +87,7 @@ pub struct Interval {
 
 impl Interval {
     #[doc(hidden)] // TODO: document
-    pub fn poll_tick(&mut self, cx: &mut task::Context<'_>) -> Poll<Instant> {
+    pub fn poll_tick(&mut self, cx: &mut Context<'_>) -> Poll<Instant> {
         // Wait for the delay to be done
         ready!(Pin::new(&mut self.delay).poll(cx));
 
@@ -126,5 +126,14 @@ impl Interval {
     #[allow(clippy::should_implement_trait)] // TODO: rename (tokio-rs/tokio#1261)
     pub async fn tick(&mut self) -> Instant {
         poll_fn(|cx| self.poll_tick(cx)).await
+    }
+}
+
+#[cfg(feature = "stream")]
+impl futures_core::Stream for Interval {
+    type Item = Instant;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Instant>> {
+        Poll::Ready(Some(ready!(self.poll_tick(cx))))
     }
 }

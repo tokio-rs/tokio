@@ -258,13 +258,23 @@ impl<T> Receiver<T> {
 
 impl<T: Clone> Receiver<T> {
     /// Attempts to clone the latest value sent via the channel.
-    #[allow(clippy::map_clone)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3274
     pub async fn recv(&mut self) -> Option<T> {
         poll_fn(|cx| {
             let v_ref = ready!(self.poll_recv_ref(cx));
-            Poll::Ready(v_ref.map(|v| v.clone()))
+            Poll::Ready(v_ref.map(|v_ref| (*v_ref).clone()))
         })
         .await
+    }
+}
+
+#[cfg(feature = "stream")]
+impl<T: Clone> futures_core::Stream for Receiver<T> {
+    type Item = T;
+
+    fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        let v_ref = ready!(self.poll_recv_ref(cx));
+
+        Poll::Ready(v_ref.map(|v_ref| (*v_ref).clone()))
     }
 }
 

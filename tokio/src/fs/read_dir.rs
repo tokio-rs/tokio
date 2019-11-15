@@ -49,7 +49,7 @@ enum State {
 }
 
 impl ReadDir {
-    /// TODO: Dox
+    /// Returns the next entry in the directory stream.
     pub async fn next_entry(&mut self) -> io::Result<Option<DirEntry>> {
         use crate::future::poll_fn;
         poll_fn(|cx| self.poll_next_entry(cx)).await
@@ -81,6 +81,19 @@ impl ReadDir {
                 }
             }
         }
+    }
+}
+
+#[cfg(feature = "stream")]
+impl futures_core::Stream for ReadDir {
+    type Item = io::Result<DirEntry>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        Poll::Ready(match ready!(self.poll_next_entry(cx)) {
+            Ok(Some(entry)) => Some(Ok(entry)),
+            Ok(None) => None,
+            Err(err) => Some(Err(err)),
+        })
     }
 }
 

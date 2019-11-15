@@ -113,7 +113,7 @@ pub trait AsyncBufReadExt: AsyncBufRead {
     /// [`AsyncBufReadExt::read_line`]: AsyncBufReadExt::read_line
     fn lines(self) -> Lines<Self>
     where
-        Self: Sized + Unpin,
+        Self: Sized,
     {
         lines(self)
     }

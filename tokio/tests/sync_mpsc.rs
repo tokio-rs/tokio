@@ -1,6 +1,7 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::sync::mpsc;
+use tokio::sync::mpsc::error::TrySendError;
 use tokio_test::task;
 use tokio_test::{
     assert_err, assert_ok, assert_pending, assert_ready, assert_ready_err, assert_ready_ok,
@@ -35,6 +36,22 @@ fn send_recv_with_buffer() {
 
     let val = assert_ready!(rx.enter(|cx, mut rx| rx.poll_recv(cx)));
     assert!(val.is_none());
+}
+
+#[tokio::test]
+async fn send_recv_stream_with_buffer() {
+    use futures::StreamExt;
+
+    let (mut tx, mut rx) = mpsc::channel::<i32>(16);
+
+    tokio::spawn(async move {
+        assert_ok!(tx.send(1).await);
+        assert_ok!(tx.send(2).await);
+    });
+
+    assert_eq!(Some(1), rx.next().await);
+    assert_eq!(Some(2), rx.next().await);
+    assert_eq!(None, rx.next().await);
 }
 
 #[tokio::test]
@@ -94,11 +111,11 @@ fn buffer_gteq_one() {
 fn send_recv_unbounded() {
     let mut t1 = task::spawn(());
 
-    let (mut tx, mut rx) = mpsc::unbounded_channel::<i32>();
+    let (tx, mut rx) = mpsc::unbounded_channel::<i32>();
 
     // Using `try_send`
-    assert_ok!(tx.try_send(1));
-    assert_ok!(tx.try_send(2));
+    assert_ok!(tx.send(1));
+    assert_ok!(tx.send(2));
 
     let val = assert_ready!(t1.enter(|cx, _| rx.poll_recv(cx)));
     assert_eq!(val, Some(1));
@@ -114,16 +131,32 @@ fn send_recv_unbounded() {
 
 #[tokio::test]
 async fn async_send_recv_unbounded() {
-    let (mut tx, mut rx) = mpsc::unbounded_channel();
+    let (tx, mut rx) = mpsc::unbounded_channel();
 
     tokio::spawn(async move {
-        assert_ok!(tx.try_send(1));
-        assert_ok!(tx.try_send(2));
+        assert_ok!(tx.send(1));
+        assert_ok!(tx.send(2));
     });
 
     assert_eq!(Some(1), rx.recv().await);
     assert_eq!(Some(2), rx.recv().await);
     assert_eq!(None, rx.recv().await);
+}
+
+#[tokio::test]
+async fn send_recv_stream_unbounded() {
+    use futures::StreamExt;
+
+    let (tx, mut rx) = mpsc::unbounded_channel::<i32>();
+
+    tokio::spawn(async move {
+        assert_ok!(tx.send(1));
+        assert_ok!(tx.send(2));
+    });
+
+    assert_eq!(Some(1), rx.next().await);
+    assert_eq!(Some(2), rx.next().await);
+    assert_eq!(None, rx.next().await);
 }
 
 #[test]
@@ -156,7 +189,7 @@ fn no_t_bounds_unbounded() {
     // same with Receiver
     println!("{:?}", rx);
     // and sender should be Clone even though T isn't Clone
-    assert!(tx.clone().try_send(NoImpls).is_ok());
+    assert!(tx.clone().send(NoImpls).is_ok());
 
     let val = assert_ready!(t1.enter(|cx, _| rx.poll_recv(cx)));
     assert!(val.is_some());
@@ -289,8 +322,10 @@ fn try_send_fail() {
     tx.try_send("hello").unwrap();
 
     // This should fail
-    let err = assert_err!(tx.try_send("fail"));
-    assert!(err.is_full());
+    match assert_err!(tx.try_send("fail")) {
+        TrySendError::Full(..) => {}
+        _ => panic!(),
+    }
 
     let val = assert_ready!(t1.enter(|cx, _| rx.poll_recv(cx)));
     assert_eq!(val, Some("hello"));
@@ -354,7 +389,10 @@ fn dropping_rx_closes_channel_for_try() {
 
     {
         let err = assert_err!(tx.try_send(msg.clone()));
-        assert!(err.is_closed());
+        match err {
+            TrySendError::Closed(..) => {}
+            _ => panic!(),
+        }
     }
 
     assert_eq!(1, Arc::strong_count(&msg));

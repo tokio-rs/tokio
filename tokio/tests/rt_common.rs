@@ -138,7 +138,7 @@ rt_test! {
                     tokio::spawn(async move {
                         let msg = assert_ok!(rx.await);
                         assert_eq!(i, msg);
-                        assert_ok!(done_tx.try_send(msg));
+                        assert_ok!(done_tx.send(msg));
                     });
 
                     tx

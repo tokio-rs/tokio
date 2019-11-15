@@ -190,3 +190,40 @@ fn poll_close() {
 
     assert!(tx.broadcast("two").is_err());
 }
+
+#[test]
+fn stream_impl() {
+    use futures::StreamExt;
+
+    let (tx, mut rx) = watch::channel("one");
+
+    {
+        let mut t = spawn(rx.next());
+        let v = assert_ready!(t.poll()).unwrap();
+        assert_eq!(v, "one");
+    }
+
+    {
+        let mut t = spawn(rx.next());
+
+        assert_pending!(t.poll());
+
+        tx.broadcast("two").unwrap();
+
+        assert!(t.is_woken());
+
+        let v = assert_ready!(t.poll()).unwrap();
+        assert_eq!(v, "two");
+    }
+
+    {
+        let mut t = spawn(rx.next());
+
+        assert_pending!(t.poll());
+
+        drop(tx);
+
+        let res = assert_ready!(t.poll());
+        assert!(res.is_none());
+    }
+}

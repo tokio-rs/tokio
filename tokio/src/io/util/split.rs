@@ -1,19 +1,23 @@
 use crate::io::util::read_until::read_until_internal;
 use crate::io::AsyncBufRead;
 
+use pin_project_lite::pin_project;
 use std::io;
 use std::mem;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// Stream for the [`split`](crate::io::AsyncBufReadExt::split) method.
-#[derive(Debug)]
-#[must_use = "streams do nothing unless polled"]
-pub struct Split<R> {
-    reader: R,
-    buf: Vec<u8>,
-    delim: u8,
-    read: usize,
+pin_project! {
+    /// Stream for the [`split`](crate::io::AsyncBufReadExt::split) method.
+    #[derive(Debug)]
+    #[must_use = "streams do nothing unless polled"]
+    pub struct Split<R> {
+        #[pin]
+        reader: R,
+        buf: Vec<u8>,
+        delim: u8,
+        read: usize,
+    }
 }
 
 pub(crate) fn split<R>(reader: R, delim: u8) -> Split<R>
@@ -52,28 +56,47 @@ where
     pub async fn next_segment(&mut self) -> io::Result<Option<Vec<u8>>> {
         use crate::future::poll_fn;
 
-        poll_fn(|cx| self.poll_next_segment(cx)).await
+        poll_fn(|cx| Pin::new(&mut *self).poll_next_segment(cx)).await
     }
+}
 
+impl<R> Split<R>
+where
+    R: AsyncBufRead,
+{
     #[doc(hidden)]
-    pub fn poll_next_segment(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<Option<Vec<u8>>>> {
+    pub fn poll_next_segment(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<io::Result<Option<Vec<u8>>>> {
+        let me = self.project();
+
         let n = ready!(read_until_internal(
-            Pin::new(&mut self.reader),
-            cx,
-            self.delim,
-            &mut self.buf,
-            &mut self.read
+            me.reader, cx, *me.delim, me.buf, me.read,
         ))?;
 
-        if n == 0 && self.buf.is_empty() {
+        if n == 0 && me.buf.is_empty() {
             return Poll::Ready(Ok(None));
         }
 
-        if self.buf.last() == Some(&self.delim) {
-            self.buf.pop();
+        if me.buf.last() == Some(me.delim) {
+            me.buf.pop();
         }
 
-        Poll::Ready(Ok(Some(mem::replace(&mut self.buf, Vec::new()))))
+        Poll::Ready(Ok(Some(mem::replace(me.buf, Vec::new()))))
+    }
+}
+
+#[cfg(feature = "stream")]
+impl<R: AsyncBufRead> futures_core::Stream for Split<R> {
+    type Item = io::Result<Vec<u8>>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        Poll::Ready(match ready!(self.poll_next_segment(cx)) {
+            Ok(Some(segment)) => Some(Ok(segment)),
+            Ok(None) => None,
+            Err(err) => Some(Err(err)),
+        })
     }
 }
 
