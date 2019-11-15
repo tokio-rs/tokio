@@ -13,7 +13,6 @@ use crate::sync::mpsc::{channel, Receiver};
 use std::convert::TryFrom;
 use std::io;
 use std::sync::Once;
-use std::task::{Context, Poll};
 use winapi::shared::minwindef::*;
 use winapi::um::consoleapi::SetConsoleCtrlHandler;
 use winapi::um::wincon::*;

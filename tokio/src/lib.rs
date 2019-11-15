@@ -116,8 +116,6 @@ pub mod runtime;
 #[cfg(not(loom))]
 pub mod signal;
 
-mod stream;
-
 #[cfg(feature = "sync")]
 pub mod sync;
 
