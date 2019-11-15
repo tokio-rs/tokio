@@ -133,7 +133,7 @@ rt_test! {
             let mut txs = (0..ITER)
                 .map(|i| {
                     let (tx, rx) = oneshot::channel();
-                    let mut done_tx = done_tx.clone();
+                    let done_tx = done_tx.clone();
 
                     tokio::spawn(async move {
                         let msg = assert_ok!(rx.await);

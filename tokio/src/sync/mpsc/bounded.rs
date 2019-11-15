@@ -218,7 +218,7 @@ impl<T> Sender<T> {
     pub async fn send(&mut self, value: T) -> Result<(), SendError<T>> {
         use crate::future::poll_fn;
 
-        if let Err(_) = poll_fn(|cx| self.poll_ready(cx)).await {
+        if poll_fn(|cx| self.poll_ready(cx)).await.is_err() {
             return Err(SendError(value));
         }
 
