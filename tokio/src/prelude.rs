@@ -11,21 +11,6 @@
 //!
 //! The prelude may grow over time as additional items see ubiquitous use.
 
-#[doc(no_inline)]
-pub use crate::future::FutureExt as _;
-#[doc(no_inline)]
-pub use futures_util::future::FutureExt as _;
-pub use std::future::Future;
-
-pub use crate::stream::Stream;
-#[doc(no_inline)]
-pub use crate::stream::StreamExt as _;
-pub use futures_sink::Sink;
-#[doc(no_inline)]
-pub use futures_util::sink::SinkExt as _;
-#[doc(no_inline)]
-pub use futures_util::stream::StreamExt as _;
-
 pub use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite};
 #[cfg(feature = "io-util")]
 #[doc(no_inline)]

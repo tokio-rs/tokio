@@ -1,5 +1,5 @@
 #[cfg(feature = "rt-core")]
-use crate::runtime::current_thread;
+use crate::runtime::basic_scheduler;
 #[cfg(feature = "rt-full")]
 use crate::runtime::thread_pool;
 use crate::runtime::{blocking, io, time};
@@ -30,7 +30,7 @@ pub struct Handle {
 pub(super) enum Kind {
     Shell,
     #[cfg(feature = "rt-core")]
-    CurrentThread(current_thread::Spawner),
+    Basic(basic_scheduler::Spawner),
     #[cfg(feature = "rt-full")]
     ThreadPool(thread_pool::Spawner),
 }
@@ -70,12 +70,13 @@ impl Handle {
     #[cfg(feature = "rt-core")]
     pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
-        F: Future<Output = ()> + Send + 'static,
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
     {
         match &self.kind {
             Kind::Shell => panic!("spawning not enabled for runtime"),
             #[cfg(feature = "rt-core")]
-            Kind::CurrentThread(spawner) => spawner.spawn(future),
+            Kind::Basic(spawner) => spawner.spawn(future),
             #[cfg(feature = "rt-full")]
             Kind::ThreadPool(spawner) => spawner.spawn(future),
         }

@@ -22,7 +22,7 @@
 
 #![warn(rust_2018_idioms)]
 
-use futures::{future::try_join, FutureExt, StreamExt};
+use futures::{future::try_join, FutureExt};
 use std::{env, error::Error};
 use tokio::{
     io::AsyncReadExt,
@@ -37,9 +37,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Listening on: {}", listen_addr);
     println!("Proxying to: {}", server_addr);
 
-    let mut incoming = TcpListener::bind(listen_addr).await?.incoming();
+    let mut listener = TcpListener::bind(listen_addr).await?;
 
-    while let Some(Ok(inbound)) = incoming.next().await {
+    while let Ok((inbound, _)) = listener.accept().await {
         let transfer = transfer(inbound, server_addr.clone()).map(|r| {
             if let Err(e) = r {
                 println!("Failed to transfer; error={}", e);

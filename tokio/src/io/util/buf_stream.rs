@@ -1,4 +1,4 @@
-use crate::io::io::{BufReader, BufWriter};
+use crate::io::util::{BufReader, BufWriter};
 use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite};
 
 use pin_project::pin_project;

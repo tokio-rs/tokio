@@ -3,8 +3,6 @@
 use tokio::fs;
 use tokio_test::assert_ok;
 
-use futures_util::future;
-use futures_util::stream::TryStreamExt;
 use std::sync::{Arc, Mutex};
 use tempfile::tempdir;
 
@@ -42,7 +40,7 @@ async fn remove() {
 }
 
 #[tokio::test]
-async fn read() {
+async fn read_inherent() {
     let base_dir = tempdir().unwrap();
 
     let p = base_dir.path();
@@ -55,15 +53,44 @@ async fn read() {
     let f = files.clone();
     let p = p.to_path_buf();
 
-    let read_dir_fut = fs::read_dir(p).await.unwrap();
-    read_dir_fut
-        .try_for_each(move |e| {
-            let s = e.file_name().to_str().unwrap().to_string();
-            f.lock().unwrap().push(s);
-            future::ok(())
-        })
-        .await
-        .unwrap();
+    let mut entries = fs::read_dir(p).await.unwrap();
+
+    while let Some(e) = assert_ok!(entries.next_entry().await) {
+        let s = e.file_name().to_str().unwrap().to_string();
+        f.lock().unwrap().push(s);
+    }
+
+    let mut files = files.lock().unwrap();
+    files.sort(); // because the order is not guaranteed
+    assert_eq!(
+        *files,
+        vec!["aa".to_string(), "bb".to_string(), "cc".to_string()]
+    );
+}
+
+#[tokio::test]
+async fn read_stream() {
+    use futures::StreamExt;
+
+    let base_dir = tempdir().unwrap();
+
+    let p = base_dir.path();
+    std::fs::create_dir(p.join("aa")).unwrap();
+    std::fs::create_dir(p.join("bb")).unwrap();
+    std::fs::create_dir(p.join("cc")).unwrap();
+
+    let files = Arc::new(Mutex::new(Vec::new()));
+
+    let f = files.clone();
+    let p = p.to_path_buf();
+
+    let mut entries = fs::read_dir(p).await.unwrap();
+
+    while let Some(res) = entries.next().await {
+        let e = assert_ok!(res);
+        let s = e.file_name().to_str().unwrap().to_string();
+        f.lock().unwrap().push(s);
+    }
 
     let mut files = files.lock().unwrap();
     files.sort(); // because the order is not guaranteed

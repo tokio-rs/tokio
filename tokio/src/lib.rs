@@ -75,6 +75,15 @@ macro_rules! thread_local {
     ($($tts:tt)+) => { loom::thread_local!{ $($tts)+ } }
 }
 
+macro_rules! ready {
+    ($e:expr $(,)?) => {
+        match $e {
+            std::task::Poll::Ready(t) => t,
+            std::task::Poll::Pending => return std::task::Poll::Pending,
+        }
+    };
+}
+
 // At the top due to macros
 #[cfg(test)]
 #[macro_use]
@@ -86,7 +95,7 @@ pub mod blocking;
 #[cfg(feature = "fs")]
 pub mod fs;
 
-pub mod future;
+mod future;
 
 pub mod io;
 
@@ -106,8 +115,6 @@ pub mod runtime;
 #[cfg(feature = "signal")]
 #[cfg(not(loom))]
 pub mod signal;
-
-pub mod stream;
 
 #[cfg(feature = "sync")]
 pub mod sync;

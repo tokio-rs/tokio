@@ -1,7 +1,7 @@
-use crate::io::io::flush::{flush, Flush};
-use crate::io::io::shutdown::{shutdown, Shutdown};
-use crate::io::io::write::{write, Write};
-use crate::io::io::write_all::{write_all, WriteAll};
+use crate::io::util::flush::{flush, Flush};
+use crate::io::util::shutdown::{shutdown, Shutdown};
+use crate::io::util::write::{write, Write};
+use crate::io::util::write_all::{write_all, WriteAll};
 use crate::io::AsyncWrite;
 
 /// An extension trait which adds utility methods to `AsyncWrite` types.

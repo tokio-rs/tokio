@@ -1,10 +1,10 @@
-use crate::io::io::chain::{chain, Chain};
-use crate::io::io::copy::{copy, Copy};
-use crate::io::io::read::{read, Read};
-use crate::io::io::read_exact::{read_exact, ReadExact};
-use crate::io::io::read_to_end::{read_to_end, ReadToEnd};
-use crate::io::io::read_to_string::{read_to_string, ReadToString};
-use crate::io::io::take::{take, Take};
+use crate::io::util::chain::{chain, Chain};
+use crate::io::util::copy::{copy, Copy};
+use crate::io::util::read::{read, Read};
+use crate::io::util::read_exact::{read_exact, ReadExact};
+use crate::io::util::read_to_end::{read_to_end, ReadToEnd};
+use crate::io::util::read_to_string::{read_to_string, ReadToString};
+use crate::io::util::take::{take, Take};
 use crate::io::{AsyncRead, AsyncWrite};
 
 /// An extension trait which adds utility methods to `AsyncRead` types.

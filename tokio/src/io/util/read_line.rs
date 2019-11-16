@@ -1,7 +1,6 @@
-use crate::io::io::read_until::read_until_internal;
+use crate::io::util::read_until::read_until_internal;
 use crate::io::AsyncBufRead;
 
-use futures_core::ready;
 use std::future::Future;
 use std::io;
 use std::mem;

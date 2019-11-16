@@ -1,25 +1,44 @@
 use crate::time::driver::Registration;
 use crate::time::{Duration, Instant};
 
-use futures_core::ready;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{self, Poll};
 
-/// A future that completes at a specified instant in time.
+/// Wait until `deadline` is reached.
 ///
-/// Instances of `Delay` perform no work and complete with `()` once the
-/// specified deadline has been reached.
-///
-/// `Delay` has a resolution of one millisecond and should not be used for tasks
-/// that require high-resolution timers.
+/// No work is performed while awaiting on the delay to complete. The delay
+/// operates at millisecond granularity and should not be used for tasks that
+/// require high-resolution timers.
 ///
 /// # Cancellation
 ///
-/// Canceling a `Delay` is done by dropping the value. No additional cleanup or
-/// other work is required.
+/// Canceling a delay is done by dropping the returned future. No additional
+/// cleanup work is required.
+pub fn delay_until(deadline: Instant) -> Delay {
+    let registration = Registration::new(deadline, Duration::from_millis(0));
+    Delay { registration }
+}
+
+/// Wait until `duration` has elapsed.
 ///
-/// [`new`]: #method.new
+/// Equivalent to `delay_until(Instant::now() + duration)`. An asynchronous
+/// analog to `std::thread::sleep`.
+///
+/// No work is performed while awaiting on the delay to complete. The delay
+/// operates at millisecond granularity and should not be used for tasks that
+/// require high-resolution timers.
+///
+/// # Cancellation
+///
+/// Canceling a delay is done by dropping the returned future. No additional
+/// cleanup work is required.
+pub fn delay_for(duration: Duration) -> Delay {
+    delay_until(Instant::now() + duration)
+}
+
+/// Future returned by [`delay_until`](delay_until) and
+/// [`delay_for`](delay_for).
 #[derive(Debug)]
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct Delay {
@@ -30,17 +49,6 @@ pub struct Delay {
 }
 
 impl Delay {
-    /// Create a new `Delay` instance that elapses at `deadline`.
-    ///
-    /// Only millisecond level resolution is guaranteed. There is no guarantee
-    /// as to how the sub-millisecond portion of `deadline` will be handled.
-    /// `Delay` should not be used for high-resolution timer use cases.
-    pub(crate) fn new(deadline: Instant) -> Delay {
-        let registration = Registration::new(deadline, Duration::from_millis(0));
-
-        Delay { registration }
-    }
-
     pub(crate) fn new_timeout(deadline: Instant, duration: Duration) -> Delay {
         let registration = Registration::new(deadline, duration);
         Delay { registration }
@@ -67,10 +75,6 @@ impl Delay {
     /// completed.
     pub fn reset(&mut self, deadline: Instant) {
         self.registration.reset(deadline);
-    }
-
-    pub(crate) fn reset_timeout(&mut self) {
-        self.registration.reset_timeout();
     }
 
     /// Register the delay with the timer instance for the current execution

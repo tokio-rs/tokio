@@ -6,13 +6,13 @@ mod support {
 }
 use support::signal::send_signal;
 
-use tokio::prelude::*;
 use tokio::signal;
 use tokio::sync::oneshot;
+use tokio_test::assert_ok;
 
 #[tokio::test]
 async fn ctrl_c() {
-    let ctrl_c = signal::ctrl_c().expect("failed to init ctrl_c");
+    let ctrl_c = signal::ctrl_c();
 
     let (fire, wait) = oneshot::channel();
 
@@ -24,5 +24,6 @@ async fn ctrl_c() {
     });
 
     let _ = fire.send(());
-    let _ = ctrl_c.into_future().await;
+
+    assert_ok!(ctrl_c.await);
 }

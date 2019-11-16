@@ -16,7 +16,10 @@ use std::task::{Context, Poll};
 #[test]
 fn single_thread() {
     // No panic when starting a runtime w/ a single thread
-    let _ = runtime::Builder::new().thread_pool().num_threads(1).build();
+    let _ = runtime::Builder::new()
+        .threaded_scheduler()
+        .num_threads(1)
+        .build();
 }
 
 #[test]
@@ -185,7 +188,7 @@ fn drop_threadpool_drops_futures() {
         let b = num_dec.clone();
 
         let rt = runtime::Builder::new()
-            .thread_pool()
+            .threaded_scheduler()
             .after_start(move || {
                 a.fetch_add(1, Relaxed);
             })
@@ -224,7 +227,7 @@ fn after_start_and_before_stop_is_called() {
     let after_inner = after_start.clone();
     let before_inner = before_stop.clone();
     let mut rt = tokio::runtime::Builder::new()
-        .thread_pool()
+        .threaded_scheduler()
         .after_start(move || {
             after_inner.clone().fetch_add(1, Ordering::Relaxed);
         })

@@ -12,9 +12,9 @@
 //! The halves can be reunited to the original socket with their `reunite`
 //! methods.
 
-use super::UdpSocket;
+use crate::future::poll_fn;
+use crate::net::udp::UdpSocket;
 
-use futures_util::future::poll_fn;
 use std::error::Error;
 use std::fmt;
 use std::io;

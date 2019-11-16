@@ -28,7 +28,7 @@ fn spawned_task_does_not_progress_without_block_on() {
 
 fn rt() -> Runtime {
     tokio::runtime::Builder::new()
-        .current_thread()
+        .basic_scheduler()
         .build()
         .unwrap()
 }

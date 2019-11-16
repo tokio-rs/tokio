@@ -1,7 +1,6 @@
-use crate::io::io::read_to_end::read_to_end_internal;
+use crate::io::util::read_to_end::read_to_end_internal;
 use crate::io::AsyncRead;
 
-use futures_core::ready;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};

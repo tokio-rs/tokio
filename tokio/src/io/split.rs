@@ -7,7 +7,6 @@
 use crate::io::{AsyncRead, AsyncWrite};
 
 use bytes::{Buf, BufMut};
-use futures_core::ready;
 use std::cell::UnsafeCell;
 use std::fmt;
 use std::io;
