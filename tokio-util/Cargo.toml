@@ -26,7 +26,7 @@ bytes = "0.4.7"
 futures-core = "0.3.0"
 futures-sink = "0.3.0"
 log = "0.4"
-pin-project = "0.4"
+pin-project-lite = "0.1.1"
 
 [dev-dependencies]
 tokio = { version = "=0.2.0-alpha.6", path = "../tokio" }

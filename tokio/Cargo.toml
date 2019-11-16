@@ -41,7 +41,7 @@ blocking = ["rt-core"]
 dns = ["blocking"]
 fs = ["blocking"]
 io-driver = ["mio", "lazy_static", "sync"] # TODO: get rid of sync
-io-util = ["pin-project", "pin-project-lite", "memchr"]
+io-util = ["pin-project-lite", "memchr"]
 macros = ["tokio-macros"]
 net = ["dns", "tcp", "udp", "uds"]
 process = [
@@ -96,8 +96,7 @@ lazy_static = { version = "1.0.2", optional = true }
 memchr = { version = "2.2", optional = true }
 mio = { version = "0.6.14", optional = true }
 num_cpus = { version = "1.8.0", optional = true }
-pin-project = { version = "0.4", optional = true }
-pin-project-lite = { version = "0.1", optional = true }
+pin-project-lite = { version = "0.1.1", optional = true }
 # Backs `DelayQueue`
 slab = { version = "0.4.1", optional = true }
 

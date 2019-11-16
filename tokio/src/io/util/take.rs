@@ -1,19 +1,20 @@
 use crate::io::{AsyncBufRead, AsyncRead};
 
-use pin_project::{pin_project, project};
+use pin_project_lite::pin_project;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{cmp, io};
 
-/// Stream for the [`take`](super::AsyncReadExt::take) method.
-#[pin_project]
-#[derive(Debug)]
-#[must_use = "streams do nothing unless you `.await` or poll them"]
-pub struct Take<R> {
-    #[pin]
-    inner: R,
-    // Add '_' to avoid conflicts with `limit` method.
-    limit_: u64,
+pin_project! {
+    /// Stream for the [`take`](super::AsyncReadExt::take) method.
+    #[derive(Debug)]
+    #[must_use = "streams do nothing unless you `.await` or poll them"]
+    pub struct Take<R> {
+        #[pin]
+        inner: R,
+        // Add '_' to avoid conflicts with `limit` method.
+        limit_: u64,
+    }
 }
 
 pub(super) fn take<R: AsyncRead>(inner: R, limit: u64) -> Take<R> {
@@ -95,18 +96,16 @@ impl<R: AsyncRead> AsyncRead for Take<R> {
 }
 
 impl<R: AsyncBufRead> AsyncBufRead for Take<R> {
-    #[project]
     fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
-        #[project]
-        let Take { inner, limit_ } = self.project();
+        let me = self.project();
 
         // Don't call into inner reader at all at EOF because it may still block
-        if *limit_ == 0 {
+        if *me.limit_ == 0 {
             return Poll::Ready(Ok(&[]));
         }
 
-        let buf = ready!(inner.poll_fill_buf(cx)?);
-        let cap = cmp::min(buf.len() as u64, *limit_) as usize;
+        let buf = ready!(me.inner.poll_fill_buf(cx)?);
+        let cap = cmp::min(buf.len() as u64, *me.limit_) as usize;
         Poll::Ready(Ok(&buf[..cap]))
     }
 
