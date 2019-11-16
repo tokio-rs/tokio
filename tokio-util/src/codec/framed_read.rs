@@ -7,25 +7,27 @@ use bytes::BytesMut;
 use futures_core::Stream;
 use futures_sink::Sink;
 use log::trace;
-use pin_project::pin_project;
+use pin_project_lite::pin_project;
 use std::fmt;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// A `Stream` of messages decoded from an `AsyncRead`.
-#[pin_project]
-pub struct FramedRead<T, D> {
-    #[pin]
-    inner: FramedRead2<Fuse<T, D>>,
+pin_project! {
+    /// A `Stream` of messages decoded from an `AsyncRead`.
+    pub struct FramedRead<T, D> {
+        #[pin]
+        inner: FramedRead2<Fuse<T, D>>,
+    }
 }
 
-#[pin_project]
-pub(crate) struct FramedRead2<T> {
-    #[pin]
-    inner: T,
-    eof: bool,
-    is_readable: bool,
-    buffer: BytesMut,
+pin_project! {
+    pub(crate) struct FramedRead2<T> {
+        #[pin]
+        inner: T,
+        eof: bool,
+        is_readable: bool,
+        buffer: BytesMut,
+    }
 }
 
 const INITIAL_CAPACITY: usize = 8 * 1024;

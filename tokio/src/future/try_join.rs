@@ -1,5 +1,6 @@
 use crate::future::{maybe_done, MaybeDone};
 
+use pin_project_lite::pin_project;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -21,15 +22,20 @@ where
     }
 }
 
-pub(crate) struct TryJoin3<F1, F2, F3>
-where
-    F1: Future,
-    F2: Future,
-    F3: Future,
-{
-    future1: MaybeDone<F1>,
-    future2: MaybeDone<F2>,
-    future3: MaybeDone<F3>,
+pin_project! {
+    pub(crate) struct TryJoin3<F1, F2, F3>
+    where
+        F1: Future,
+        F2: Future,
+        F3: Future,
+    {
+        #[pin]
+        future1: MaybeDone<F1>,
+        #[pin]
+        future2: MaybeDone<F2>,
+        #[pin]
+        future3: MaybeDone<F3>,
+    }
 }
 
 impl<T1, F1, T2, F2, T3, F3, E> Future for TryJoin3<F1, F2, F3>
@@ -43,73 +49,34 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut all_done = true;
 
-        // Safety: the fn takes `Pin`, we don't move any data out of `self`.
-        unsafe {
-            let me = self.get_unchecked_mut();
+        let mut me = self.project();
 
-            if Pin::new_unchecked(&mut me.future1).poll(cx).is_pending() {
-                all_done = false;
-            } else if Pin::new_unchecked(&mut me.future1)
-                .output_mut()
-                .unwrap()
-                .is_err()
-            {
-                return Poll::Ready(Err(Pin::new_unchecked(&mut me.future1)
-                    .take_output()
-                    .unwrap()
-                    .err()
-                    .unwrap()));
-            }
+        if me.future1.as_mut().poll(cx).is_pending() {
+            all_done = false;
+        } else if me.future1.as_mut().output_mut().unwrap().is_err() {
+            return Poll::Ready(Err(me.future1.take_output().unwrap().err().unwrap()));
+        }
 
-            if Pin::new_unchecked(&mut me.future2).poll(cx).is_pending() {
-                all_done = false;
-            } else if Pin::new_unchecked(&mut me.future2)
-                .output_mut()
-                .unwrap()
-                .is_err()
-            {
-                return Poll::Ready(Err(Pin::new_unchecked(&mut me.future2)
-                    .take_output()
-                    .unwrap()
-                    .err()
-                    .unwrap()));
-            }
+        if me.future2.as_mut().poll(cx).is_pending() {
+            all_done = false;
+        } else if me.future2.as_mut().output_mut().unwrap().is_err() {
+            return Poll::Ready(Err(me.future2.take_output().unwrap().err().unwrap()));
+        }
 
-            if Pin::new_unchecked(&mut me.future3).poll(cx).is_pending() {
-                all_done = false;
-            } else if Pin::new_unchecked(&mut me.future3)
-                .output_mut()
-                .unwrap()
-                .is_err()
-            {
-                return Poll::Ready(Err(Pin::new_unchecked(&mut me.future3)
-                    .take_output()
-                    .unwrap()
-                    .err()
-                    .unwrap()));
-            }
+        if me.future3.as_mut().poll(cx).is_pending() {
+            all_done = false;
+        } else if me.future3.as_mut().output_mut().unwrap().is_err() {
+            return Poll::Ready(Err(me.future3.take_output().unwrap().err().unwrap()));
+        }
 
-            if all_done {
-                Poll::Ready(Ok((
-                    Pin::new_unchecked(&mut me.future1)
-                        .take_output()
-                        .unwrap()
-                        .ok()
-                        .unwrap(),
-                    Pin::new_unchecked(&mut me.future2)
-                        .take_output()
-                        .unwrap()
-                        .ok()
-                        .unwrap(),
-                    Pin::new_unchecked(&mut me.future3)
-                        .take_output()
-                        .unwrap()
-                        .ok()
-                        .unwrap(),
-                )))
-            } else {
-                Poll::Pending
-            }
+        if all_done {
+            Poll::Ready(Ok((
+                me.future1.take_output().unwrap().ok().unwrap(),
+                me.future2.take_output().unwrap().ok().unwrap(),
+                me.future3.take_output().unwrap().ok().unwrap(),
+            )))
+        } else {
+            Poll::Pending
         }
     }
 }

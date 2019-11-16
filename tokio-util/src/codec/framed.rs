@@ -8,27 +8,29 @@ use tokio::io::{AsyncBufRead, AsyncRead, AsyncWrite};
 use bytes::BytesMut;
 use futures_core::Stream;
 use futures_sink::Sink;
-use pin_project::pin_project;
+use pin_project_lite::pin_project;
 use std::fmt;
 use std::io::{self, BufRead, Read, Write};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// A unified `Stream` and `Sink` interface to an underlying I/O object, using
-/// the `Encoder` and `Decoder` traits to encode and decode frames.
-///
-/// You can create a `Framed` instance by using the `AsyncRead::framed` adapter.
-#[pin_project]
-pub struct Framed<T, U> {
-    #[pin]
-    inner: FramedRead2<FramedWrite2<Fuse<T, U>>>,
+pin_project! {
+    /// A unified `Stream` and `Sink` interface to an underlying I/O object, using
+    /// the `Encoder` and `Decoder` traits to encode and decode frames.
+    ///
+    /// You can create a `Framed` instance by using the `AsyncRead::framed` adapter.
+    pub struct Framed<T, U> {
+        #[pin]
+        inner: FramedRead2<FramedWrite2<Fuse<T, U>>>,
+    }
 }
 
-#[pin_project]
-pub(crate) struct Fuse<T, U> {
-    #[pin]
-    pub(crate) io: T,
-    pub(crate) codec: U,
+pin_project! {
+    pub(crate) struct Fuse<T, U> {
+        #[pin]
+        pub(crate) io: T,
+        pub(crate) codec: U,
+    }
 }
 
 /// Abstracts over `FramedRead2` being either `FramedRead2<FramedWrite2<Fuse<T, U>>>` or

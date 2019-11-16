@@ -1,35 +1,36 @@
 use crate::io::util::DEFAULT_BUF_SIZE;
 use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite};
 
-use pin_project::{pin_project, project};
+use pin_project_lite::pin_project;
 use std::io::{self, Read};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{cmp, fmt};
 
-/// The `BufReader` struct adds buffering to any reader.
-///
-/// It can be excessively inefficient to work directly with a [`AsyncRead`]
-/// instance. A `BufReader` performs large, infrequent reads on the underlying
-/// [`AsyncRead`] and maintains an in-memory buffer of the results.
-///
-/// `BufReader` can improve the speed of programs that make *small* and
-/// *repeated* read calls to the same file or network socket. It does not
-/// help when reading very large amounts at once, or reading just one or a few
-/// times. It also provides no advantage when reading from a source that is
-/// already in memory, like a `Vec<u8>`.
-///
-/// When the `BufReader` is dropped, the contents of its buffer will be
-/// discarded. Creating multiple instances of a `BufReader` on the same
-/// stream can cause data loss.
-// TODO: Examples
-#[pin_project]
-pub struct BufReader<R> {
-    #[pin]
-    pub(super) inner: R,
-    pub(super) buf: Box<[u8]>,
-    pub(super) pos: usize,
-    pub(super) cap: usize,
+pin_project! {
+    /// The `BufReader` struct adds buffering to any reader.
+    ///
+    /// It can be excessively inefficient to work directly with a [`AsyncRead`]
+    /// instance. A `BufReader` performs large, infrequent reads on the underlying
+    /// [`AsyncRead`] and maintains an in-memory buffer of the results.
+    ///
+    /// `BufReader` can improve the speed of programs that make *small* and
+    /// *repeated* read calls to the same file or network socket. It does not
+    /// help when reading very large amounts at once, or reading just one or a few
+    /// times. It also provides no advantage when reading from a source that is
+    /// already in memory, like a `Vec<u8>`.
+    ///
+    /// When the `BufReader` is dropped, the contents of its buffer will be
+    /// discarded. Creating multiple instances of a `BufReader` on the same
+    /// stream can cause data loss.
+    // TODO: Examples
+    pub struct BufReader<R> {
+        #[pin]
+        pub(super) inner: R,
+        pub(super) buf: Box<[u8]>,
+        pub(super) pos: usize,
+        pub(super) cap: usize,
+    }
 }
 
 impl<R: AsyncRead> BufReader<R> {
@@ -125,26 +126,19 @@ impl<R: AsyncRead> AsyncRead for BufReader<R> {
 }
 
 impl<R: AsyncRead> AsyncBufRead for BufReader<R> {
-    #[project]
     fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
-        #[project]
-        let BufReader {
-            inner,
-            buf,
-            cap,
-            pos,
-        } = self.project();
+        let me = self.project();
 
         // If we've reached the end of our internal buffer then we need to fetch
         // some more data from the underlying reader.
         // Branch using `>=` instead of the more correct `==`
         // to tell the compiler that the pos..cap slice is always valid.
-        if *pos >= *cap {
-            debug_assert!(*pos == *cap);
-            *cap = ready!(inner.poll_read(cx, buf))?;
-            *pos = 0;
+        if *me.pos >= *me.cap {
+            debug_assert!(*me.pos == *me.cap);
+            *me.cap = ready!(me.inner.poll_read(cx, me.buf))?;
+            *me.pos = 0;
         }
-        Poll::Ready(Ok(&buf[*pos..*cap]))
+        Poll::Ready(Ok(&me.buf[*me.pos..*me.cap]))
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {

@@ -8,24 +8,26 @@ use bytes::BytesMut;
 use futures_core::{ready, Stream};
 use futures_sink::Sink;
 use log::trace;
-use pin_project::pin_project;
+use pin_project_lite::pin_project;
 use std::fmt;
 use std::io::{self, BufRead, Read};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// A `Sink` of frames encoded to an `AsyncWrite`.
-#[pin_project]
-pub struct FramedWrite<T, E> {
-    #[pin]
-    inner: FramedWrite2<Fuse<T, E>>,
+pin_project! {
+    /// A `Sink` of frames encoded to an `AsyncWrite`.
+    pub struct FramedWrite<T, E> {
+        #[pin]
+        inner: FramedWrite2<Fuse<T, E>>,
+    }
 }
 
-#[pin_project]
-pub(crate) struct FramedWrite2<T> {
-    #[pin]
-    inner: T,
-    buffer: BytesMut,
+pin_project! {
+    pub(crate) struct FramedWrite2<T> {
+        #[pin]
+        inner: T,
+        buffer: BytesMut,
+    }
 }
 
 const INITIAL_CAPACITY: usize = 8 * 1024;
