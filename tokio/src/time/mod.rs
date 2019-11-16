@@ -45,17 +45,14 @@
 //! included in the prelude.
 //!
 //! ```
-//! use tokio::prelude::*;
-//! use std::time::Duration;
+//! use tokio::time::{timeout, Duration};
 //!
 //! async fn long_future() {
 //!     // do work here
 //! }
 //!
 //! # async fn dox() {
-//! let res = long_future()
-//!     .timeout(Duration::from_secs(1))
-//!     .await;
+//! let res = timeout(Duration::from_secs(1), long_future()).await;
 //!
 //! if res.is_err() {
 //!     println!("operation timed out");
@@ -70,48 +67,41 @@
 //! [Interval]: struct.Interval.html
 //! [`DelayQueue`]: struct.DelayQueue.html
 
-pub mod clock;
+mod clock;
+pub(crate) use self::clock::Clock;
+#[cfg(feature = "test-util")]
+pub use clock::{advance, pause, resume};
 
 pub mod delay_queue;
 #[doc(inline)]
-pub use self::delay_queue::DelayQueue;
-
-pub mod throttle;
-
-// TODO: clean this up
-pub mod timer;
-pub use timer::{set_default, Timer};
-
-pub mod timeout;
-#[doc(inline)]
-pub use timeout::Timeout;
-
-mod atomic;
+pub use delay_queue::DelayQueue;
 
 mod delay;
-pub use self::delay::Delay;
+pub use delay::{delay_for, delay_until, Delay};
+
+pub(crate) mod driver;
 
 mod error;
 pub use error::Error;
 
+mod instant;
+pub use self::instant::Instant;
+
 mod interval;
-pub use interval::Interval;
+pub use interval::{interval, interval_at, Interval};
+
+mod timeout;
+#[doc(inline)]
+pub use timeout::{timeout, timeout_at, Timeout};
 
 mod wheel;
 
-use std::time::{Duration, Instant};
+#[cfg(test)]
+#[cfg(not(loom))]
+mod tests;
 
-/// Create a Future that completes at `deadline`.
-pub fn delay(deadline: Instant) -> Delay {
-    Delay::new(deadline)
-}
-
-/// Create a Future that completes in `duration` from now.
-///
-/// Equivalent to `delay(tokio::time::clock::now() + duration)`. Analogous to `std::thread::sleep`.
-pub fn delay_for(duration: Duration) -> Delay {
-    delay(clock::now() + duration)
-}
+// Re-export for convenience
+pub use std::time::Duration;
 
 // ===== Internal utils =====
 

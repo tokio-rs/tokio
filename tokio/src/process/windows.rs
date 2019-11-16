@@ -20,8 +20,6 @@ use crate::process::kill::Kill;
 use crate::process::SpawnedChild;
 use crate::sync::oneshot;
 
-use futures_util::future::Fuse;
-use futures_util::future::FutureExt;
 use mio_named_pipes::NamedPipe;
 use std::fmt;
 use std::future::Future;
@@ -59,7 +57,7 @@ impl fmt::Debug for Child {
 }
 
 struct Waiting {
-    rx: Fuse<oneshot::Receiver<()>>,
+    rx: oneshot::Receiver<()>,
     wait_object: HANDLE,
     tx: *mut Option<oneshot::Sender<()>>,
 }
@@ -103,7 +101,7 @@ impl Future for Child {
         let inner = Pin::get_mut(self);
         loop {
             if let Some(ref mut w) = inner.waiting {
-                match w.rx.poll_unpin(cx) {
+                match Pin::new(&mut w.rx).poll(cx) {
                     Poll::Ready(Ok(())) => {}
                     Poll::Ready(Err(_)) => panic!("should not be canceled"),
                     Poll::Pending => return Poll::Pending,
@@ -134,7 +132,7 @@ impl Future for Child {
                 return Poll::Ready(Err(err));
             }
             inner.waiting = Some(Waiting {
-                rx: rx.fuse(),
+                rx,
                 wait_object,
                 tx: ptr,
             });

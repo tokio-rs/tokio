@@ -48,19 +48,18 @@ pub use self::async_read::AsyncRead;
 mod async_write;
 pub use self::async_write::AsyncWrite;
 
-#[allow(clippy::module_inception)] // TODO: remove
-#[cfg(feature = "io-util")]
-mod io;
-#[cfg(feature = "io-util")]
-pub use self::io::{
-    copy, empty, repeat, sink, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufStream,
-    BufWriter, Copy, Empty, Repeat, Sink, Take,
-};
-
 #[cfg(feature = "io-util")]
 pub mod split;
 #[cfg(feature = "io-util")]
 pub use self::split::split;
+
+#[cfg(feature = "io-util")]
+mod util;
+#[cfg(feature = "io-util")]
+pub use self::util::{
+    copy, empty, repeat, sink, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufStream,
+    BufWriter, Copy, Empty, Lines, Repeat, Sink, Split, Take,
+};
 
 #[cfg(feature = "io")]
 mod stderr;

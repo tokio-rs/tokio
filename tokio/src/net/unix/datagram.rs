@@ -1,7 +1,6 @@
+use crate::future::poll_fn;
 use crate::net::util::PollEvented;
 
-use futures_core::ready;
-use futures_util::future::poll_fn;
 use std::convert::TryFrom;
 use std::fmt;
 use std::io;

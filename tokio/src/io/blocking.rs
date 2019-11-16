@@ -1,7 +1,6 @@
 use crate::io::sys;
 use crate::io::{AsyncRead, AsyncWrite};
 
-use futures_core::ready;
 use std::cmp;
 use std::future::Future;
 use std::io;
@@ -75,7 +74,7 @@ where
                     }));
                 }
                 Busy(ref mut rx) => {
-                    let (res, mut buf, inner) = ready!(Pin::new(rx).poll(cx));
+                    let (res, mut buf, inner) = ready!(Pin::new(rx).poll(cx))?;
                     self.inner = Some(inner);
 
                     match res {
@@ -127,7 +126,7 @@ where
                     return Ready(Ok(n));
                 }
                 Busy(ref mut rx) => {
-                    let (res, buf, inner) = ready!(Pin::new(rx).poll(cx));
+                    let (res, buf, inner) = ready!(Pin::new(rx).poll(cx))?;
                     self.state = Idle(Some(buf));
                     self.inner = Some(inner);
 
@@ -159,7 +158,7 @@ where
                     }
                 }
                 Busy(ref mut rx) => {
-                    let (res, buf, inner) = ready!(Pin::new(rx).poll(cx));
+                    let (res, buf, inner) = ready!(Pin::new(rx).poll(cx))?;
                     self.state = Idle(Some(buf));
                     self.inner = Some(inner);
 

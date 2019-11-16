@@ -1,5 +1,5 @@
 use crate::runtime::tests::loom_oneshot as oneshot;
-use crate::runtime::thread_pool::{self, ThreadPool};
+use crate::runtime::thread_pool::ThreadPool;
 use crate::runtime::{Park, Unpark};
 use crate::spawn;
 
@@ -50,7 +50,7 @@ fn only_blocking() {
         let (block_tx, block_rx) = oneshot::channel();
 
         pool.spawn(async move {
-            thread_pool::blocking(move || {
+            crate::blocking::in_place(move || {
                 block_tx.send(());
             })
         });
@@ -72,7 +72,7 @@ fn blocking_and_regular() {
         let done_tx = Arc::new(Mutex::new(Some(done_tx)));
 
         pool.spawn(async move {
-            thread_pool::blocking(move || {
+            crate::blocking::in_place(move || {
                 block_tx.send(());
             })
         });
@@ -166,15 +166,21 @@ fn complete_block_on_under_load() {
     });
 }
 
-fn mk_pool(num_threads: usize) -> ThreadPool {
-    use crate::runtime::blocking;
+fn mk_pool(num_threads: usize) -> Runtime {
+    use crate::blocking::BlockingPool;
 
-    ThreadPool::new(
+    let blocking_pool = BlockingPool::new("test".into(), None);
+    let executor = ThreadPool::new(
         num_threads,
-        blocking::Pool::new("test".into(), None),
+        blocking_pool.spawner().clone(),
         Arc::new(Box::new(|_, next| next())),
         move |_| LoomPark::new(),
-    )
+    );
+
+    Runtime {
+        executor,
+        blocking_pool,
+    }
 }
 
 use futures::future::poll_fn;
@@ -233,6 +239,29 @@ fn gated2(thread: bool) -> impl Future<Output = &'static str> {
             Poll::Pending
         }
     })
+}
+
+/// Fake runtime
+struct Runtime {
+    executor: ThreadPool,
+    #[allow(dead_code)]
+    blocking_pool: crate::blocking::BlockingPool,
+}
+
+use std::ops;
+
+impl ops::Deref for Runtime {
+    type Target = ThreadPool;
+
+    fn deref(&self) -> &ThreadPool {
+        &self.executor
+    }
+}
+
+impl ops::DerefMut for Runtime {
+    fn deref_mut(&mut self) -> &mut ThreadPool {
+        &mut self.executor
+    }
 }
 
 struct LoomPark {

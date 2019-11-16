@@ -5,8 +5,8 @@
 use tokio::process::Command;
 use tokio::runtime;
 
-use futures_util::future::FutureExt;
-use futures_util::stream::FuturesOrdered;
+use futures::future::FutureExt;
+use futures::stream::FuturesOrdered;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;

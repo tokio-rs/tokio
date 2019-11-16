@@ -1,5 +1,9 @@
-use crate::loom::{cell::CausalCell, future::AtomicWaker, sync::atomic::AtomicUsize, sync::Arc};
-use crate::sync::mpsc::list;
+use crate::loom::cell::CausalCell;
+use crate::loom::future::AtomicWaker;
+use crate::loom::sync::atomic::AtomicUsize;
+use crate::loom::sync::Arc;
+use crate::sync::mpsc::error::ClosedError;
+use crate::sync::mpsc::{error, list};
 
 use std::fmt;
 use std::process;
@@ -43,7 +47,25 @@ where
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) enum TrySendError {
     Closed,
-    NoPermits,
+    Full,
+}
+
+impl<T> From<(T, TrySendError)> for error::SendError<T> {
+    fn from(src: (T, TrySendError)) -> error::SendError<T> {
+        match src.1 {
+            TrySendError::Closed => error::SendError(src.0),
+            TrySendError::Full => unreachable!(),
+        }
+    }
+}
+
+impl<T> From<(T, TrySendError)> for error::TrySendError<T> {
+    fn from(src: (T, TrySendError)) -> error::TrySendError<T> {
+        match src.1 {
+            TrySendError::Closed => error::TrySendError::Closed(src.0),
+            TrySendError::Full => error::TrySendError::Full(src.0),
+        }
+    }
 }
 
 pub(crate) trait Semaphore {
@@ -59,8 +81,11 @@ pub(crate) trait Semaphore {
 
     fn add_permit(&self);
 
-    fn poll_acquire(&self, cx: &mut Context<'_>, permit: &mut Self::Permit)
-        -> Poll<Result<(), ()>>;
+    fn poll_acquire(
+        &self,
+        cx: &mut Context<'_>,
+        permit: &mut Self::Permit,
+    ) -> Poll<Result<(), ClosedError>>;
 
     fn try_acquire(&self, permit: &mut Self::Permit) -> Result<(), TrySendError>;
 
@@ -161,26 +186,19 @@ where
         }
     }
 
-    pub(crate) fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), ()>> {
+    pub(crate) fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), ClosedError>> {
         self.inner.semaphore.poll_acquire(cx, &mut self.permit)
     }
 
     /// Send a message and notify the receiver.
     pub(crate) fn try_send(&mut self, value: T) -> Result<(), (T, TrySendError)> {
-        if let Err(e) = self.inner.semaphore.try_acquire(&mut self.permit) {
-            return Err((value, e));
-        }
+        self.inner.try_send(value, &mut self.permit)
+    }
+}
 
-        // Push the value
-        self.inner.tx.push(value);
-
-        // Notify the rx task
-        self.inner.rx_waker.wake();
-
-        // Release the permit
-        self.inner.semaphore.forget(&mut self.permit);
-
-        Ok(())
+impl<T> Tx<T, AtomicUsize> {
+    pub(crate) fn send_unbounded(&self, value: T) -> Result<(), (T, TrySendError)> {
+        self.inner.try_send(value, &mut ())
     }
 }
 
@@ -317,6 +335,28 @@ where
 
 // ===== impl Chan =====
 
+impl<T, S> Chan<T, S>
+where
+    S: Semaphore,
+{
+    fn try_send(&self, value: T, permit: &mut S::Permit) -> Result<(), (T, TrySendError)> {
+        if let Err(e) = self.semaphore.try_acquire(permit) {
+            return Err((value, e));
+        }
+
+        // Push the value
+        self.tx.push(value);
+
+        // Notify the rx task
+        self.rx_waker.wake();
+
+        // Release the permit
+        self.semaphore.forget(permit);
+
+        Ok(())
+    }
+}
+
 impl<T, S> Drop for Chan<T, S> {
     fn drop(&mut self) {
         use super::block::Read::Value;
@@ -339,7 +379,7 @@ impl From<TryAcquireError> for TrySendError {
         if src.is_closed() {
             TrySendError::Closed
         } else if src.is_no_permits() {
-            TrySendError::NoPermits
+            TrySendError::Full
         } else {
             unreachable!();
         }
@@ -369,8 +409,14 @@ impl Semaphore for (crate::sync::semaphore::Semaphore, usize) {
         self.0.available_permits() == self.1
     }
 
-    fn poll_acquire(&self, cx: &mut Context<'_>, permit: &mut Permit) -> Poll<Result<(), ()>> {
-        permit.poll_acquire(cx, &self.0).map_err(|_| ())
+    fn poll_acquire(
+        &self,
+        cx: &mut Context<'_>,
+        permit: &mut Permit,
+    ) -> Poll<Result<(), ClosedError>> {
+        permit
+            .poll_acquire(cx, &self.0)
+            .map_err(|_| ClosedError::new())
     }
 
     fn try_acquire(&self, permit: &mut Permit) -> Result<(), TrySendError> {
@@ -412,8 +458,12 @@ impl Semaphore for AtomicUsize {
         self.load(Acquire) >> 1 == 0
     }
 
-    fn poll_acquire(&self, _cx: &mut Context<'_>, permit: &mut ()) -> Poll<Result<(), ()>> {
-        Ready(self.try_acquire(permit).map_err(|_| ()))
+    fn poll_acquire(
+        &self,
+        _cx: &mut Context<'_>,
+        permit: &mut (),
+    ) -> Poll<Result<(), ClosedError>> {
+        Ready(self.try_acquire(permit).map_err(|_| ClosedError::new()))
     }
 
     fn try_acquire(&self, _permit: &mut ()) -> Result<(), TrySendError> {

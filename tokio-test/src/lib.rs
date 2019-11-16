@@ -13,7 +13,6 @@
 
 //! Tokio and Futures based testing utilites
 
-pub mod clock;
 pub mod io;
 mod macros;
 pub mod task;

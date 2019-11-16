@@ -69,38 +69,45 @@
 //!     }
 //! }
 //! ```
-macro_rules! if_runtime {
-    ($($i:item)*) => ($(
-        #[cfg(any(
-            feature = "blocking",
-            feature = "rt-full",
-            feature = "rt-current-thread",
-        ))]
-        $i
-    )*)
-}
 
 #[cfg(all(loom, test))]
 macro_rules! thread_local {
     ($($tts:tt)+) => { loom::thread_local!{ $($tts)+ } }
 }
 
+macro_rules! ready {
+    ($e:expr $(,)?) => {
+        match $e {
+            std::task::Poll::Ready(t) => t,
+            std::task::Poll::Pending => return std::task::Poll::Pending,
+        }
+    };
+}
+
+// At the top due to macros
+#[cfg(test)]
+#[macro_use]
+mod tests;
+
+#[cfg(feature = "blocking")]
+pub mod blocking;
+
 #[cfg(feature = "fs")]
 pub mod fs;
 
-pub mod future;
+mod future;
 
-#[cfg(feature = "io-traits")]
 pub mod io;
 
-#[cfg(feature = "net-driver")]
+#[cfg(feature = "io-driver")]
 pub mod net;
 
 mod loom;
 
 pub mod prelude;
 
-#[cfg(all(feature = "process", not(loom)))]
+#[cfg(feature = "process")]
+#[cfg(not(loom))]
 pub mod process;
 
 pub mod runtime;
@@ -109,10 +116,11 @@ pub mod runtime;
 #[cfg(not(loom))]
 pub mod signal;
 
-pub mod stream;
-
 #[cfg(feature = "sync")]
 pub mod sync;
+
+#[cfg(feature = "rt-core")]
+pub mod task;
 
 #[cfg(feature = "time")]
 pub mod time;
@@ -120,20 +128,18 @@ pub mod time;
 #[cfg(feature = "rt-full")]
 mod util;
 
-if_runtime! {
+#[doc(inline)]
+#[cfg(feature = "rt-core")]
+pub use crate::runtime::spawn;
 
-    #[doc(inline)]
-    pub use crate::runtime::spawn;
+#[cfg(not(test))] // Work around for rust-lang/rust#62127
+#[cfg(feature = "macros")]
+#[doc(inline)]
+pub use tokio_macros::main;
 
-    #[cfg(not(test))] // Work around for rust-lang/rust#62127
-    #[cfg(feature = "macros")]
-    #[doc(inline)]
-    pub use tokio_macros::main;
-
-    #[cfg(feature = "macros")]
-    #[doc(inline)]
-    pub use tokio_macros::test;
-}
+#[cfg(feature = "macros")]
+#[doc(inline)]
+pub use tokio_macros::test;
 
 #[cfg(feature = "io-util")]
 #[cfg(test)]

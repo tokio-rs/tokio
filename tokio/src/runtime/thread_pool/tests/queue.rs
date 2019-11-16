@@ -1,6 +1,6 @@
-use crate::runtime::task::{self, Task};
-use crate::runtime::tests::mock_schedule::{Noop, NOOP_SCHEDULE};
 use crate::runtime::thread_pool::{queue, LOCAL_QUEUE_CAPACITY};
+use crate::task::{self, Task};
+use crate::tests::mock_schedule::{Noop, NOOP_SCHEDULE};
 
 macro_rules! assert_pop {
     ($q:expr, $expect:expr) => {
@@ -246,7 +246,7 @@ fn val(num: u32) -> Task<Noop> {
 }
 
 fn num(task: Task<Noop>) -> u32 {
-    use futures_util::task::noop_waker_ref;
+    use futures::task::noop_waker_ref;
     use std::future::Future;
     use std::pin::Pin;
     use std::task::Context;

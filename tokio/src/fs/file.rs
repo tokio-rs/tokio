@@ -7,7 +7,6 @@ use crate::fs::{asyncify, sys};
 use crate::io::blocking::Buf;
 use crate::io::{AsyncRead, AsyncWrite};
 
-use futures_core::ready;
 use std::fmt;
 use std::fs::{Metadata, Permissions};
 use std::future::Future;
@@ -223,7 +222,7 @@ impl File {
 
         let (op, buf) = match self.state {
             Idle(_) => unreachable!(),
-            Busy(ref mut rx) => rx.await,
+            Busy(ref mut rx) => rx.await.unwrap(),
         };
 
         self.state = Idle(Some(buf));
@@ -343,7 +342,7 @@ impl File {
 
         let (op, buf) = match self.state {
             Idle(_) => unreachable!(),
-            Busy(ref mut rx) => rx.await,
+            Busy(ref mut rx) => rx.await?,
         };
 
         self.state = Idle(Some(buf));
@@ -430,7 +429,7 @@ impl File {
     }
 
     async fn complete_inflight(&mut self) {
-        use futures_util::future::poll_fn;
+        use crate::future::poll_fn;
 
         if let Err(e) = poll_fn(|cx| Pin::new(&mut *self).poll_flush(cx)).await {
             self.last_write_err = Some(e.kind());
@@ -464,7 +463,7 @@ impl AsyncRead for File {
                     }));
                 }
                 Busy(ref mut rx) => {
-                    let (op, mut buf) = ready!(Pin::new(rx).poll(cx));
+                    let (op, mut buf) = ready!(Pin::new(rx).poll(cx))?;
 
                     match op {
                         Operation::Read(Ok(_)) => {
@@ -537,7 +536,7 @@ impl AsyncWrite for File {
                     return Ready(Ok(n));
                 }
                 Busy(ref mut rx) => {
-                    let (op, buf) = ready!(Pin::new(rx).poll(cx));
+                    let (op, buf) = ready!(Pin::new(rx).poll(cx))?;
                     self.state = Idle(Some(buf));
 
                     match op {
@@ -570,7 +569,7 @@ impl AsyncWrite for File {
 
         let (op, buf) = match self.state {
             Idle(_) => return Ready(Ok(())),
-            Busy(ref mut rx) => ready!(Pin::new(rx).poll(cx)),
+            Busy(ref mut rx) => ready!(Pin::new(rx).poll(cx))?,
         };
 
         // The buffer is not used here

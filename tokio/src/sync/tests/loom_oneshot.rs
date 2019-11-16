@@ -1,6 +1,6 @@
 use crate::sync::oneshot;
 
-use futures_util::future::poll_fn;
+use futures::future::poll_fn;
 use loom::future::block_on;
 use loom::thread;
 use std::task::Poll::{Pending, Ready};
