@@ -4,12 +4,12 @@
 
 macro_rules! rt_test {
     ($($t:tt)*) => {
-        mod current_thread {
+        mod basic_scheduler {
             $($t)*
 
             fn rt() -> Runtime {
                 tokio::runtime::Builder::new()
-                    .current_thread()
+                    .basic_scheduler()
                     .build()
                     .unwrap()
             }

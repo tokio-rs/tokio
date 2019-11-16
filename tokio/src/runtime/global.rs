@@ -1,4 +1,4 @@
-use crate::runtime::current_thread;
+use crate::runtime::basic_scheduler;
 
 #[cfg(feature = "rt-full")]
 use crate::runtime::thread_pool;
@@ -11,8 +11,8 @@ enum State {
     // default executor not defined
     Empty,
 
-    // Current-thread executor
-    CurrentThread(*const current_thread::Scheduler),
+    // Basic scheduler (runs on the current-thread)
+    Basic(*const basic_scheduler::SchedulerPriv),
 
     // default executor is a thread pool instance.
     #[cfg(feature = "rt-full")]
@@ -73,17 +73,17 @@ where
 {
     EXECUTOR.with(|current_executor| match current_executor.get() {
         #[cfg(feature = "rt-full")]
-        State::ThreadPool(threadpool_ptr) => {
-            let thread_pool = unsafe { &*threadpool_ptr };
+        State::ThreadPool(thread_pool_ptr) => {
+            let thread_pool = unsafe { &*thread_pool_ptr };
             thread_pool.spawn_background(future);
         }
-        State::CurrentThread(current_thread_ptr) => {
-            let current_thread = unsafe { &*current_thread_ptr };
+        State::Basic(basic_scheduler_ptr) => {
+            let basic_scheduler = unsafe { &*basic_scheduler_ptr };
 
-            // Safety: The `CurrentThread` value set the thread-local (same
+            // Safety: The `BasicScheduler` value set the thread-local (same
             // thread).
             unsafe {
-                current_thread.spawn_background(future);
+                basic_scheduler.spawn_background(future);
             }
         }
         State::Empty => {
@@ -95,19 +95,22 @@ where
     })
 }
 
-pub(super) fn with_current_thread<F, R>(current_thread: &current_thread::Scheduler, f: F) -> R
+pub(super) fn with_basic_scheduler<F, R>(
+    basic_scheduler: &basic_scheduler::SchedulerPriv,
+    f: F,
+) -> R
 where
     F: FnOnce() -> R,
 {
     with_state(
-        State::CurrentThread(current_thread as *const current_thread::Scheduler),
+        State::Basic(basic_scheduler as *const basic_scheduler::SchedulerPriv),
         f,
     )
 }
 
-pub(super) fn current_thread_is_current(current_thread: &current_thread::Scheduler) -> bool {
+pub(super) fn basic_scheduler_is_current(basic_scheduler: &basic_scheduler::SchedulerPriv) -> bool {
     EXECUTOR.with(|current_executor| match current_executor.get() {
-        State::CurrentThread(ptr) => ptr == current_thread as *const _,
+        State::Basic(ptr) => ptr == basic_scheduler as *const _,
         _ => false,
     })
 }

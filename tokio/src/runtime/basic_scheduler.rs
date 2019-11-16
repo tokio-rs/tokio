@@ -12,24 +12,24 @@ use std::time::Duration;
 
 /// Executes tasks on the current thread
 #[derive(Debug)]
-pub(crate) struct CurrentThread<P>
+pub(crate) struct BasicScheduler<P>
 where
     P: Park,
 {
     /// Scheduler component
-    scheduler: Arc<Scheduler>,
+    scheduler: Arc<SchedulerPriv>,
 
     /// Local state
-    local: Local<P>,
+    local: LocalState<P>,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct Spawner {
-    scheduler: Arc<Scheduler>,
+    scheduler: Arc<SchedulerPriv>,
 }
 
 /// The scheduler component.
-pub(super) struct Scheduler {
+pub(super) struct SchedulerPriv {
     /// List of all active tasks spawned onto this executor.
     ///
     /// # Safety
@@ -45,7 +45,7 @@ pub(super) struct Scheduler {
     ///
     /// References should not be handed out. Only call `push` / `pop` functions.
     /// Only call from the owning thread.
-    local_queue: UnsafeCell<VecDeque<Task<Scheduler>>>,
+    local_queue: UnsafeCell<VecDeque<Task<SchedulerPriv>>>,
 
     /// Remote run queue.
     ///
@@ -59,12 +59,12 @@ pub(super) struct Scheduler {
     unpark: Box<dyn Unpark>,
 }
 
-unsafe impl Send for Scheduler {}
-unsafe impl Sync for Scheduler {}
+unsafe impl Send for SchedulerPriv {}
+unsafe impl Sync for SchedulerPriv {}
 
 /// Local state
 #[derive(Debug)]
-struct Local<P> {
+struct LocalState<P> {
     /// Current tick
     tick: u8,
 
@@ -75,7 +75,7 @@ struct Local<P> {
 #[derive(Debug)]
 struct RemoteQueue {
     /// FIFO list of tasks
-    queue: VecDeque<Task<Scheduler>>,
+    queue: VecDeque<Task<SchedulerPriv>>,
 
     /// `true` when a task can be pushed into the queue, false otherwise.
     open: bool,
@@ -87,15 +87,15 @@ const MAX_TASKS_PER_TICK: usize = 61;
 /// How often to check the remote queue first
 const CHECK_REMOTE_INTERVAL: u8 = 13;
 
-impl<P> CurrentThread<P>
+impl<P> BasicScheduler<P>
 where
     P: Park,
 {
-    pub(crate) fn new(park: P) -> CurrentThread<P> {
+    pub(crate) fn new(park: P) -> BasicScheduler<P> {
         let unpark = park.unpark();
 
-        CurrentThread {
-            scheduler: Arc::new(Scheduler {
+        BasicScheduler {
+            scheduler: Arc::new(SchedulerPriv {
                 owned_tasks: UnsafeCell::new(task::OwnedList::new()),
                 local_queue: UnsafeCell::new(VecDeque::with_capacity(64)),
                 remote_queue: Mutex::new(RemoteQueue {
@@ -105,7 +105,7 @@ where
                 pending_drop: task::TransferStack::new(),
                 unpark: Box::new(unpark),
             }),
-            local: Local { tick: 0, park },
+            local: LocalState { tick: 0, park },
         }
     }
 
@@ -138,11 +138,11 @@ where
         let local = &mut self.local;
         let scheduler = &*self.scheduler;
 
-        runtime::global::with_current_thread(scheduler, || {
+        runtime::global::with_basic_scheduler(scheduler, || {
             let mut _enter = runtime::enter();
 
             let raw_waker = RawWaker::new(
-                scheduler as *const Scheduler as *const (),
+                scheduler as *const SchedulerPriv as *const (),
                 &RawWakerVTable::new(sched_clone_waker, sched_noop, sched_wake_by_ref, sched_noop),
             );
 
@@ -181,8 +181,8 @@ impl Spawner {
     }
 }
 
-impl Scheduler {
-    fn tick(&self, local: &mut Local<impl Park>) {
+impl SchedulerPriv {
+    fn tick(&self, local: &mut LocalState<impl Park>) {
         for _ in 0..MAX_TASKS_PER_TICK {
             // Get the current tick
             let tick = local.tick;
@@ -223,7 +223,7 @@ impl Scheduler {
 
     /// # Safety
     ///
-    /// Must be called from the same thread that holds the `CurrentThread`
+    /// Must be called from the same thread that holds the `BasicScheduler`
     /// value.
     pub(super) unsafe fn spawn_background<F>(&self, future: F)
     where
@@ -254,7 +254,7 @@ impl Scheduler {
     }
 }
 
-impl Schedule for Scheduler {
+impl Schedule for SchedulerPriv {
     fn bind(&self, task: &Task<Self>) {
         unsafe {
             (*self.owned_tasks.get()).insert(task);
@@ -274,7 +274,7 @@ impl Schedule for Scheduler {
     fn schedule(&self, task: Task<Self>) {
         use crate::runtime::global;
 
-        if global::current_thread_is_current(self) {
+        if global::basic_scheduler_is_current(self) {
             unsafe { self.schedule_local(task) };
         } else {
             let mut lock = self.remote_queue.lock().unwrap();
@@ -293,7 +293,7 @@ impl Schedule for Scheduler {
     }
 }
 
-impl<P> Drop for CurrentThread<P>
+impl<P> Drop for BasicScheduler<P>
 where
     P: Park,
 {
@@ -328,36 +328,36 @@ where
     }
 }
 
-impl fmt::Debug for Scheduler {
+impl fmt::Debug for SchedulerPriv {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Scheduler").finish()
     }
 }
 
 unsafe fn sched_clone_waker(ptr: *const ()) -> RawWaker {
-    let s1 = ManuallyDrop::new(Arc::from_raw(ptr as *const Scheduler));
+    let s1 = ManuallyDrop::new(Arc::from_raw(ptr as *const SchedulerPriv));
 
     #[allow(clippy::redundant_clone)]
     let s2 = s1.clone();
 
     RawWaker::new(
-        &**s2 as *const Scheduler as *const (),
+        &**s2 as *const SchedulerPriv as *const (),
         &RawWakerVTable::new(sched_clone_waker, sched_wake, sched_wake_by_ref, sched_drop),
     )
 }
 
 unsafe fn sched_wake(ptr: *const ()) {
-    let scheduler = Arc::from_raw(ptr as *const Scheduler);
+    let scheduler = Arc::from_raw(ptr as *const SchedulerPriv);
     scheduler.unpark.unpark();
 }
 
 unsafe fn sched_wake_by_ref(ptr: *const ()) {
-    let scheduler = ManuallyDrop::new(Arc::from_raw(ptr as *const Scheduler));
+    let scheduler = ManuallyDrop::new(Arc::from_raw(ptr as *const SchedulerPriv));
     scheduler.unpark.unpark();
 }
 
 unsafe fn sched_drop(ptr: *const ()) {
-    let _ = Arc::from_raw(ptr as *const Scheduler);
+    let _ = Arc::from_raw(ptr as *const SchedulerPriv);
 }
 
 unsafe fn sched_noop(_ptr: *const ()) {
