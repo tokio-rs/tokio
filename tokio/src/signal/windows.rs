@@ -216,7 +216,7 @@ mod tests {
 
     fn rt() -> Runtime {
         crate::runtime::Builder::new()
-            .current_thread()
+            .basic_scheduler()
             .build()
             .unwrap()
     }
