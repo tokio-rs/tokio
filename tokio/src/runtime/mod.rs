@@ -149,7 +149,7 @@ use self::enter::enter;
 #[cfg(feature = "rt-core")]
 mod global;
 #[cfg(feature = "rt-core")]
-pub use self::global::spawn;
+pub(crate) use self::global::spawn;
 
 mod handle;
 pub use self::handle::Handle;

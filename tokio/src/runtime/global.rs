@@ -1,4 +1,5 @@
 use crate::runtime::current_thread;
+use crate::task::JoinHandle;
 
 #[cfg(feature = "rt-full")]
 use crate::runtime::thread_pool;
@@ -27,64 +28,23 @@ thread_local! {
 // ===== global spawn fns =====
 
 /// Spawns a future on the default executor.
-///
-/// In order for a future to do work, it must be spawned on an executor. The
-/// `spawn` function is the easiest way to do this. It spawns a future on the
-/// [default executor] for the current execution context (tracked using a
-/// thread-local variable).
-///
-/// The default executor is **usually** a thread pool.
-///
-/// # Examples
-///
-/// In this example, a server is started and `spawn` is used to start a new task
-/// that processes each received connection.
-///
-/// ```
-/// use tokio::net::TcpListener;
-///
-/// # async fn process<T>(_t: T) {}
-/// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-/// let mut listener = TcpListener::bind("127.0.0.1:8080").await?;
-///
-/// loop {
-///     let (socket, _) = listener.accept().await?;
-///
-///     tokio::spawn(async move {
-///         // Process each socket concurrently.
-///         process(socket).await
-///     });
-/// }
-/// # }
-/// ```
-///
-/// [default executor]: struct.DefaultExecutor.html
-///
-/// # Panics
-///
-/// This function will panic if the default executor is not set or if spawning
-/// onto the default executor returns an error. To avoid the panic, use
-/// [`DefaultExecutor`].
-///
-/// [`DefaultExecutor`]: struct.DefaultExecutor.html
-pub fn spawn<T>(future: T)
+pub(crate) fn spawn<T>(future: T) -> JoinHandle<T::Output>
 where
-    T: Future<Output = ()> + Send + 'static,
+    T: Future + Send + 'static,
+    T::Output: Send + 'static,
 {
     EXECUTOR.with(|current_executor| match current_executor.get() {
         #[cfg(feature = "rt-full")]
         State::ThreadPool(threadpool_ptr) => {
             let thread_pool = unsafe { &*threadpool_ptr };
-            thread_pool.spawn_background(future);
+            thread_pool.spawn(future)
         }
         State::CurrentThread(current_thread_ptr) => {
             let current_thread = unsafe { &*current_thread_ptr };
 
             // Safety: The `CurrentThread` value set the thread-local (same
             // thread).
-            unsafe {
-                current_thread.spawn_background(future);
-            }
+            unsafe { current_thread.spawn(future) }
         }
         State::Empty => {
             // Explicit drop of `future` silences the warning that `future` is

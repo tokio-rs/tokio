@@ -21,6 +21,11 @@ pub(crate) use self::list::OwnedList;
 mod raw;
 use self::raw::RawTask;
 
+#[cfg(feature = "rt-core")]
+mod spawn;
+#[cfg(feature = "rt-core")]
+pub use spawn::spawn;
+
 mod stack;
 pub(crate) use self::stack::TransferStack;
 

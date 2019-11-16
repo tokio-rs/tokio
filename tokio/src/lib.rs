@@ -114,16 +114,14 @@ pub mod sync;
 
 #[cfg(feature = "rt-core")]
 pub mod task;
+#[cfg(feature = "rt-core")]
+pub use crate::task::spawn;
 
 #[cfg(feature = "time")]
 pub mod time;
 
 #[cfg(feature = "rt-full")]
 mod util;
-
-#[doc(inline)]
-#[cfg(feature = "rt-core")]
-pub use crate::runtime::spawn;
 
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
 #[cfg(feature = "macros")]

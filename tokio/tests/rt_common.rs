@@ -180,7 +180,7 @@ rt_test! {
 
             tokio::spawn(poll_fn(move |_| {
                 assert_eq!(2, Arc::strong_count(&cnt));
-                Poll::Pending
+                Poll::<()>::Pending
             }));
         });
 
