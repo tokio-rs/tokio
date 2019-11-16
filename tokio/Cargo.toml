@@ -28,6 +28,7 @@ default = [
   "blocking",
   "fs",
   "io-util",
+  "io",
   "net",
   "process",
   "rt-full",
