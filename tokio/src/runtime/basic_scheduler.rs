@@ -225,12 +225,14 @@ impl SchedulerPriv {
     ///
     /// Must be called from the same thread that holds the `BasicScheduler`
     /// value.
-    pub(super) unsafe fn spawn_background<F>(&self, future: F)
+    pub(super) unsafe fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
-        F: Future<Output = ()> + Send + 'static,
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
     {
-        let task = task::background(future);
+        let (task, handle) = task::joinable(future);
         self.schedule_local(task);
+        handle
     }
 
     unsafe fn schedule_local(&self, task: Task<Self>) {

@@ -37,14 +37,6 @@ impl Spawner {
         self.workers.spawn_typed(future)
     }
 
-    /// Spawn a task in the background
-    pub(crate) fn spawn_background<F>(&self, future: F)
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        self.workers.spawn_background(future);
-    }
-
     /// Reference to the worker set. Used by `ThreadPool` to initiate shutdown.
     pub(super) fn workers(&self) -> &slice::Set<Box<dyn Unpark>> {
         &*self.workers

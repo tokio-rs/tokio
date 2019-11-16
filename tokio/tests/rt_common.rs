@@ -80,7 +80,7 @@ rt_test! {
     }
 
     #[test]
-    fn spawn_one() {
+    fn spawn_one_bg() {
         let mut rt = rt();
 
         let out = rt.block_on(async {
@@ -91,6 +91,29 @@ rt_test! {
             });
 
             assert_ok!(rx.await)
+        });
+
+        assert_eq!(out, "ZOMG");
+    }
+
+    #[test]
+    fn spawn_one_join() {
+        let mut rt = rt();
+
+        let out = rt.block_on(async {
+            let (tx, rx) = oneshot::channel();
+
+            let handle = tokio::spawn(async move {
+                tx.send("ZOMG").unwrap();
+                "DONE"
+            });
+
+            let msg = assert_ok!(rx.await);
+
+            let out = assert_ok!(handle.await);
+            assert_eq!(out, "DONE");
+
+            msg
         });
 
         assert_eq!(out, "ZOMG");
@@ -180,7 +203,7 @@ rt_test! {
 
             tokio::spawn(poll_fn(move |_| {
                 assert_eq!(2, Arc::strong_count(&cnt));
-                Poll::Pending
+                Poll::<()>::Pending
             }));
         });
 
