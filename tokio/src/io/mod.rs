@@ -84,5 +84,7 @@ pub use std::io::{Error, ErrorKind, Result};
 /// Types in this module can be mocked out in tests.
 #[cfg(any(feature = "io", feature = "fs"))]
 mod sys {
-    pub(crate) use crate::runtime::blocking::{run, Blocking};
+    // TODO: don't rename
+    pub(crate) use crate::blocking::spawn_blocking as run;
+    pub(crate) use crate::task::JoinHandle as Blocking;
 }

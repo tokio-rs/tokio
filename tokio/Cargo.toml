@@ -42,6 +42,7 @@ dns = ["blocking"]
 fs = ["blocking"]
 io-driver = ["mio", "lazy_static", "sync"] # TODO: get rid of sync
 io-util = ["pin-project", "pin-project-lite", "memchr"]
+io = ["io-util", "blocking"]
 macros = ["tokio-macros"]
 net = ["dns", "tcp", "udp", "uds"]
 process = [
