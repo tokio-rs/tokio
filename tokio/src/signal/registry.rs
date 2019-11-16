@@ -104,9 +104,7 @@ impl<S: Storage> Registry<S> {
             // has gone away then we can remove that slot.
             for i in (0..recipients.len()).rev() {
                 match recipients[i].try_send(()) {
-                    Ok(()) => {
-                        did_notify = true
-                    }
+                    Ok(()) => did_notify = true,
                     Err(TrySendError::Closed(..)) => {
                         recipients.swap_remove(i);
                     }
