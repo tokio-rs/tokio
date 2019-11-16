@@ -1,7 +1,6 @@
 use crate::io::{AsyncRead, AsyncWrite};
 use crate::net::driver::{platform, Registration};
 
-use futures_core::ready;
 use mio::event::Evented;
 use std::fmt;
 use std::io::{self, Read, Write};
@@ -55,7 +54,7 @@ use std::task::{Context, Poll};
 /// ```rust
 /// use tokio::net::util::PollEvented;
 ///
-/// use futures_core::ready;
+/// use futures::ready;
 /// use mio::Ready;
 /// use mio::net::{TcpStream, TcpListener};
 /// use std::io;

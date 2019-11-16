@@ -6,7 +6,7 @@ use tokio_test::{assert_ok, assert_pending, assert_ready, task};
 
 macro_rules! poll {
     ($queue:ident) => {
-        $queue.enter(|cx, mut queue| queue.poll_next(cx))
+        $queue.enter(|cx, mut queue| queue.poll_expired(cx))
     };
 }
 

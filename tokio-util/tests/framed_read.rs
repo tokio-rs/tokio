@@ -1,11 +1,12 @@
 #![warn(rust_2018_idioms)]
 
-use tokio::prelude::*;
+use tokio::io::AsyncRead;
 use tokio_test::assert_ready;
 use tokio_test::task;
 use tokio_util::codec::{Decoder, FramedRead};
 
 use bytes::{Buf, BytesMut, IntoBuf};
+use futures::Stream;
 use std::collections::VecDeque;
 use std::io;
 use std::pin::Pin;

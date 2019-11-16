@@ -1,7 +1,6 @@
 use crate::fs::sys;
 use crate::io::{AsyncRead, AsyncWrite};
 
-use futures_core::ready;
 use std::cmp;
 use std::future::Future;
 use std::io;

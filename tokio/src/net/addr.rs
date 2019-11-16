@@ -1,4 +1,5 @@
-use futures_util::future;
+use crate::future;
+
 use std::io;
 use std::net::{IpAddr, SocketAddr};
 #[cfg(feature = "dns")]
@@ -27,7 +28,7 @@ impl sealed::ToSocketAddrsPriv for SocketAddr {
 
     fn to_socket_addrs(&self) -> Self::Future {
         let iter = Some(*self).into_iter();
-        future::ready(Ok(iter))
+        future::ok(iter)
     }
 }
 
@@ -111,7 +112,7 @@ impl sealed::ToSocketAddrsPriv for (IpAddr, u16) {
 
     fn to_socket_addrs(&self) -> Self::Future {
         let iter = Some(SocketAddr::from(*self)).into_iter();
-        future::ready(Ok(iter))
+        future::ok(iter)
     }
 }
 
@@ -195,8 +196,6 @@ pub(crate) mod sealed {
         type Output = io::Result<OneOrMore>;
 
         fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            use futures_core::ready;
-
             match *self {
                 MaybeReady::Ready(ref mut i) => {
                     let iter = OneOrMore::One(i.take().into_iter());

@@ -1,8 +1,7 @@
-use crate::net::unix::UnixStream;
+use crate::future::poll_fn;
+use crate::net::unix::{Incoming, UnixStream};
 use crate::net::util::PollEvented;
 
-use futures_core::ready;
-use futures_util::future::poll_fn;
 use mio::Ready;
 use mio_uds;
 use std::convert::TryFrom;
@@ -90,8 +89,8 @@ impl UnixListener {
     ///
     /// This method returns an implementation of the `Stream` trait which
     /// resolves to the sockets the are accepted on this listener.
-    pub fn incoming(self) -> super::Incoming {
-        super::Incoming::new(self)
+    pub fn incoming(&mut self) -> Incoming<'_> {
+        Incoming::new(self)
     }
 }
 

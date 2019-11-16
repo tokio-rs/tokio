@@ -7,7 +7,7 @@ use crate::tests::track_drop::track_drop;
 use tokio_test::task::spawn;
 use tokio_test::{assert_pending, assert_ready_err, assert_ready_ok};
 
-use futures_util::future::poll_fn;
+use futures::future::poll_fn;
 use std::sync::mpsc;
 
 #[test]

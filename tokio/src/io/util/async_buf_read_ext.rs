@@ -1,7 +1,7 @@
-use crate::io::io::lines::{lines, Lines};
-use crate::io::io::read_line::{read_line, ReadLine};
-use crate::io::io::read_until::{read_until, ReadUntil};
-use crate::io::io::split::{split, Split};
+use crate::io::util::lines::{lines, Lines};
+use crate::io::util::read_line::{read_line, ReadLine};
+use crate::io::util::read_until::{read_until, ReadUntil};
+use crate::io::util::split::{split, Split};
 use crate::io::AsyncBufRead;
 
 /// An extension trait which adds utility methods to `AsyncBufRead` types.
@@ -59,7 +59,7 @@ pub trait AsyncBufReadExt: AsyncBufRead {
     /// Returns a stream of the contents of this reader split on the byte
     /// `byte`.
     ///
-    /// This method is the async equivalent to
+    /// This method is the asynchronous equivalent to
     /// [`BufRead::split`](std::io::BufRead::split).
     ///
     /// The stream returned from this function will yield instances of
@@ -73,9 +73,25 @@ pub trait AsyncBufReadExt: AsyncBufRead {
     ///
     /// Each item of the stream has the same error semantics as
     /// [`AsyncBufReadExt::read_until`](AsyncBufReadExt::read_until).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use tokio::io::AsyncBufRead;
+    /// use tokio::io::AsyncBufReadExt;
+    ///
+    /// # async fn dox(my_buf_read: impl AsyncBufRead + Unpin) -> std::io::Result<()> {
+    /// let mut segments = my_buf_read.split(b'f');
+    ///
+    /// while let Some(segment) = segments.next_segment().await? {
+    ///     println!("length = {}", segment.len())
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     fn split(self, byte: u8) -> Split<Self>
     where
-        Self: Sized,
+        Self: Sized + Unpin,
     {
         split(self, byte)
     }

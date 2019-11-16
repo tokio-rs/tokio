@@ -1,7 +1,6 @@
-use crate::io::io::DEFAULT_BUF_SIZE;
+use crate::io::util::DEFAULT_BUF_SIZE;
 use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite};
 
-use futures_core::ready;
 use pin_project::{pin_project, project};
 use std::fmt;
 use std::io::{self, Write};
