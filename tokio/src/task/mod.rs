@@ -75,6 +75,7 @@ pub(crate) trait Schedule: Send + Sync + Sized + 'static {
 }
 
 /// Create a new task without an associated join handle
+#[cfg(feature = "rt-full")]
 pub(crate) fn background<T, S>(task: T) -> Task<S>
 where
     T: Future + Send + 'static,

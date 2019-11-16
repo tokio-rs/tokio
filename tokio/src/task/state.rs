@@ -58,6 +58,7 @@ const INITIAL_STATE: usize = NOTIFIED;
 /// unambiguous modification order.
 impl State {
     /// Starts with a ref count of 1
+    #[cfg(feature = "rt-full")]
     pub(super) fn new_background() -> State {
         State {
             val: AtomicUsize::new(INITIAL_STATE),
