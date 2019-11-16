@@ -156,17 +156,16 @@ fn complete_block_on_under_load() {
         let pool = mk_pool(2);
 
         pool.block_on({
-            futures::future::lazy(|_| ())
-                .then(|_| {
-                    // Spin hard
-                    crate::spawn(async {
-                        for _ in 0..2 {
-                            yield_once().await;
-                        }
-                    });
+            futures::future::lazy(|_| ()).then(|_| {
+                // Spin hard
+                crate::spawn(async {
+                    for _ in 0..2 {
+                        yield_once().await;
+                    }
+                });
 
-                    gated2(true)
-                })
+                gated2(true)
+            })
         });
     });
 }
