@@ -3,7 +3,7 @@
 #[cfg(feature = "blocking")]
 mod blocking;
 #[cfg(feature = "blocking")]
-pub use blocking::{spawn_blocking, block_in_place};
+pub use blocking::{block_in_place, spawn_blocking};
 
 mod core;
 use self::core::Cell;

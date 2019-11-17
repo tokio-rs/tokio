@@ -50,7 +50,7 @@ fn only_blocking() {
         let (block_tx, block_rx) = oneshot::channel();
 
         pool.spawn(async move {
-            crate::blocking::in_place(move || {
+            crate::task::block_in_place(move || {
                 block_tx.send(());
             })
         });
@@ -72,7 +72,7 @@ fn blocking_and_regular() {
         let done_tx = Arc::new(Mutex::new(Some(done_tx)));
 
         pool.spawn(async move {
-            crate::blocking::in_place(move || {
+            crate::task::block_in_place(move || {
                 block_tx.send(());
             })
         });
