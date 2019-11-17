@@ -90,7 +90,13 @@ impl Handle {
         self.blocking_spawner.enter(|| {
             let _io = io::set_default(&self.io_handles[0]);
 
-            time::with_default(&self.time_handles[0], &self.clock, f)
+            time::with_default(&self.time_handles[0], &self.clock, || match &self.kind {
+                Kind::Shell => f(),
+                #[cfg(feature = "rt-core")]
+                Kind::Basic(spawner) => spawner.enter(f),
+                #[cfg(feature = "rt-full")]
+                Kind::ThreadPool(spawner) => spawner.enter(f),
+            })
         })
     }
 }
