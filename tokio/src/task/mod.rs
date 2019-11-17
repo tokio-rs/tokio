@@ -1,5 +1,10 @@
 //! Asynchronous green-threads.
 
+#[cfg(feature = "blocking")]
+mod blocking;
+#[cfg(feature = "blocking")]
+pub use blocking::{spawn_blocking, block_in_place};
+
 mod core;
 use self::core::Cell;
 pub(crate) use self::core::Header;

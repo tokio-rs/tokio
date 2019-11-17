@@ -90,7 +90,7 @@ macro_rules! ready {
 mod tests;
 
 #[cfg(feature = "blocking")]
-pub mod blocking;
+pub(crate) mod blocking;
 
 #[cfg(feature = "fs")]
 pub mod fs;
