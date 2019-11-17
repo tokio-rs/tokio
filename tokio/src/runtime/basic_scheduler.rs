@@ -179,6 +179,15 @@ impl Spawner {
         self.scheduler.schedule(task);
         handle
     }
+
+    /// Enter the executor context
+    pub(crate) fn enter<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce() -> R,
+    {
+        use crate::runtime::global;
+        global::with_basic_scheduler(&*self.scheduler, f)
+    }
 }
 
 impl SchedulerPriv {

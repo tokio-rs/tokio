@@ -418,6 +418,16 @@ rt_test! {
         .await
     }
 
+    #[test]
+    fn enter_and_spawn() {
+        let mut rt = rt();
+        let handle = rt.enter(|| {
+            tokio::spawn(async {})
+        });
+
+        assert_ok!(rt.block_on(handle));
+    }
+
     async fn client_server(tx: mpsc::Sender<()>) {
         let mut server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
 

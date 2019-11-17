@@ -117,7 +117,7 @@ impl ThreadPool {
     where
         F: Future,
     {
-        crate::runtime::global::with_thread_pool(self.spawner(), || {
+        self.spawner.enter(|| {
             let mut enter = crate::runtime::enter();
             enter.block_on(future)
         })
