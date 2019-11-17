@@ -21,6 +21,11 @@ pub(crate) use self::list::OwnedList;
 mod raw;
 use self::raw::RawTask;
 
+#[cfg(feature = "rt-core")]
+mod spawn;
+#[cfg(feature = "rt-core")]
+pub use spawn::spawn;
+
 mod stack;
 pub(crate) use self::stack::TransferStack;
 
@@ -70,6 +75,7 @@ pub(crate) trait Schedule: Send + Sync + Sized + 'static {
 }
 
 /// Create a new task without an associated join handle
+#[cfg(feature = "rt-full")]
 pub(crate) fn background<T, S>(task: T) -> Task<S>
 where
     T: Future + Send + 'static,

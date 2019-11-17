@@ -37,7 +37,7 @@ fn dropping_loops_does_not_cause_starvation() {
 
 fn rt() -> Runtime {
     tokio::runtime::Builder::new()
-        .current_thread()
+        .basic_scheduler()
         .build()
         .unwrap()
 }

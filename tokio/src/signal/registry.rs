@@ -304,7 +304,7 @@ mod tests {
     }
 
     fn rt() -> Runtime {
-        runtime::Builder::new().current_thread().build().unwrap()
+        runtime::Builder::new().basic_scheduler().build().unwrap()
     }
 
     async fn collect(mut rx: crate::sync::mpsc::Receiver<()>) -> Vec<()> {

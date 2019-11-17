@@ -55,6 +55,7 @@ pub(super) fn vtable<T: Future, S: Schedule>() -> &'static Vtable {
 }
 
 impl RawTask {
+    #[cfg(feature = "rt-full")]
     pub(super) fn new_background<T, S>(task: T) -> RawTask
     where
         T: Future + Send + 'static,

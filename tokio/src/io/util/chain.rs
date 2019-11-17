@@ -1,20 +1,21 @@
 use crate::io::{AsyncBufRead, AsyncRead};
 
-use pin_project::{pin_project, project};
+use pin_project_lite::pin_project;
 use std::fmt;
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// Stream for the [`chain`](super::AsyncReadExt::chain) method.
-#[pin_project]
-#[must_use = "streams do nothing unless polled"]
-pub struct Chain<T, U> {
-    #[pin]
-    first: T,
-    #[pin]
-    second: U,
-    done_first: bool,
+pin_project! {
+    /// Stream for the [`chain`](super::AsyncReadExt::chain) method.
+    #[must_use = "streams do nothing unless polled"]
+    pub struct Chain<T, U> {
+        #[pin]
+        first: T,
+        #[pin]
+        second: U,
+        done_first: bool,
+    }
 }
 
 pub(super) fn chain<T, U>(first: T, second: U) -> Chain<T, U>
@@ -104,24 +105,18 @@ where
     T: AsyncBufRead,
     U: AsyncBufRead,
 {
-    #[project]
     fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
-        #[project]
-        let Chain {
-            first,
-            second,
-            done_first,
-        } = self.project();
+        let me = self.project();
 
-        if !*done_first {
-            match ready!(first.poll_fill_buf(cx)?) {
+        if !*me.done_first {
+            match ready!(me.first.poll_fill_buf(cx)?) {
                 buf if buf.is_empty() => {
-                    *done_first = true;
+                    *me.done_first = true;
                 }
                 buf => return Poll::Ready(Ok(buf)),
             }
         }
-        second.poll_fill_buf(cx)
+        me.second.poll_fill_buf(cx)
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {

@@ -1,39 +1,40 @@
 use crate::io::util::DEFAULT_BUF_SIZE;
 use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite};
 
-use pin_project::{pin_project, project};
+use pin_project_lite::pin_project;
 use std::fmt;
 use std::io::{self, Write};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// Wraps a writer and buffers its output.
-///
-/// It can be excessively inefficient to work directly with something that
-/// implements [`AsyncWrite`]. A `BufWriter` keeps an in-memory buffer of data and
-/// writes it to an underlying writer in large, infrequent batches.
-///
-/// `BufWriter` can improve the speed of programs that make *small* and
-/// *repeated* write calls to the same file or network socket. It does not
-/// help when writing very large amounts at once, or writing just one or a few
-/// times. It also provides no advantage when writing to a destination that is
-/// in memory, like a `Vec<u8>`.
-///
-/// When the `BufWriter` is dropped, the contents of its buffer will be
-/// discarded. Creating multiple instances of a `BufWriter` on the same
-/// stream can cause data loss. If you need to write out the contents of its
-/// buffer, you must manually call flush before the writer is dropped.
-///
-/// [`AsyncWrite`]: AsyncWrite
-/// [`flush`]: super::AsyncWriteExt::flush
-///
-// TODO: Examples
-#[pin_project]
-pub struct BufWriter<W> {
-    #[pin]
-    pub(super) inner: W,
-    pub(super) buf: Vec<u8>,
-    pub(super) written: usize,
+pin_project! {
+    /// Wraps a writer and buffers its output.
+    ///
+    /// It can be excessively inefficient to work directly with something that
+    /// implements [`AsyncWrite`]. A `BufWriter` keeps an in-memory buffer of data and
+    /// writes it to an underlying writer in large, infrequent batches.
+    ///
+    /// `BufWriter` can improve the speed of programs that make *small* and
+    /// *repeated* write calls to the same file or network socket. It does not
+    /// help when writing very large amounts at once, or writing just one or a few
+    /// times. It also provides no advantage when writing to a destination that is
+    /// in memory, like a `Vec<u8>`.
+    ///
+    /// When the `BufWriter` is dropped, the contents of its buffer will be
+    /// discarded. Creating multiple instances of a `BufWriter` on the same
+    /// stream can cause data loss. If you need to write out the contents of its
+    /// buffer, you must manually call flush before the writer is dropped.
+    ///
+    /// [`AsyncWrite`]: AsyncWrite
+    /// [`flush`]: super::AsyncWriteExt::flush
+    ///
+    // TODO: Examples
+    pub struct BufWriter<W> {
+        #[pin]
+        pub(super) inner: W,
+        pub(super) buf: Vec<u8>,
+        pub(super) written: usize,
+    }
 }
 
 impl<W: AsyncWrite> BufWriter<W> {
@@ -52,19 +53,13 @@ impl<W: AsyncWrite> BufWriter<W> {
         }
     }
 
-    #[project]
     fn flush_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        #[project]
-        let BufWriter {
-            mut inner,
-            buf,
-            written,
-        } = self.project();
+        let mut me = self.project();
 
-        let len = buf.len();
+        let len = me.buf.len();
         let mut ret = Ok(());
-        while *written < len {
-            match ready!(inner.as_mut().poll_write(cx, &buf[*written..])) {
+        while *me.written < len {
+            match ready!(me.inner.as_mut().poll_write(cx, &me.buf[*me.written..])) {
                 Ok(0) => {
                     ret = Err(io::Error::new(
                         io::ErrorKind::WriteZero,
@@ -72,17 +67,17 @@ impl<W: AsyncWrite> BufWriter<W> {
                     ));
                     break;
                 }
-                Ok(n) => *written += n,
+                Ok(n) => *me.written += n,
                 Err(e) => {
                     ret = Err(e);
                     break;
                 }
             }
         }
-        if *written > 0 {
-            buf.drain(..*written);
+        if *me.written > 0 {
+            me.buf.drain(..*me.written);
         }
-        *written = 0;
+        *me.written = 0;
         Poll::Ready(ret)
     }
 
