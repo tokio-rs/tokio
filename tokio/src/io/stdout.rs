@@ -1,4 +1,4 @@
-use crate::fs::blocking::Blocking;
+use crate::io::blocking::Blocking;
 use crate::io::AsyncWrite;
 
 use std::io;

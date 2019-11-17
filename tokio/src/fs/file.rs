@@ -3,8 +3,8 @@
 //! [`File`]: file/struct.File.html
 
 use self::State::*;
-use crate::fs::blocking::Buf;
 use crate::fs::{asyncify, sys};
+use crate::io::blocking::Buf;
 use crate::io::{AsyncRead, AsyncWrite};
 
 use std::fmt;

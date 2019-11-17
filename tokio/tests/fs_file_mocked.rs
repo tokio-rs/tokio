@@ -18,7 +18,7 @@ mod file;
 use file::File;
 
 #[allow(warnings)]
-#[path = "../src/fs/blocking.rs"]
+#[path = "../src/io/blocking.rs"]
 mod blocking;
 
 // Load mocked types
@@ -29,9 +29,16 @@ mod support {
 pub(crate) use support::mock_pool as pool;
 
 // Place them where the source expects them
-pub(crate) mod fs {
+pub(crate) mod io {
+    pub(crate) use tokio::io::*;
+
     pub(crate) use crate::blocking;
 
+    pub(crate) mod sys {
+        pub(crate) use crate::support::mock_pool::{run, Blocking};
+    }
+}
+pub(crate) mod fs {
     pub(crate) mod sys {
         pub(crate) use crate::support::mock_file::File;
         pub(crate) use crate::support::mock_pool::{run, Blocking};
@@ -41,7 +48,6 @@ pub(crate) mod fs {
 }
 use fs::sys;
 
-use tokio::io;
 use tokio::prelude::*;
 use tokio_test::{assert_pending, assert_ready, assert_ready_err, assert_ready_ok, task};
 
