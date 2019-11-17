@@ -1,6 +1,4 @@
-#![warn(rust_2018_idioms)]
-
-use tokio::sync::AtomicWaker;
+use crate::sync::AtomicWaker;
 use tokio_test::task;
 
 use std::task::Waker;
