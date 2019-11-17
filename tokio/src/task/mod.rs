@@ -3,7 +3,9 @@
 #[cfg(feature = "blocking")]
 mod blocking;
 #[cfg(feature = "blocking")]
-pub use blocking::{block_in_place, spawn_blocking};
+pub use blocking::spawn_blocking;
+#[cfg(feature = "rt-full")]
+pub use blocking::block_in_place;
 
 mod core;
 use self::core::Cell;
