@@ -8,11 +8,11 @@
 //!
 //! [`channel`] returns a [`Sender`] / [`Receiver`] pair. These are
 //! the producer and sender halves of the channel. The channel is
-//! created with an initial value. [`Receiver::get_ref`] will always
+//! created with an initial value. [`Receiver::recv`] will always
 //! be ready upon creation and will yield either this initial value or
 //! the latest value that has been sent by `Sender`.
 //!
-//! Calls to [`Receiver::get_ref`] will always yield the latest value.
+//! Calls to [`Receiver::recv`] will always yield the latest value.
 //!
 //! # Examples
 //!
@@ -49,7 +49,6 @@
 //! [`Receiver`]: struct.Receiver.html
 //! [`channel`]: fn.channel.html
 //! [`Sender::closed`]: struct.Sender.html#method.closed
-//! [`Receiver::get_ref`]: struct.Receiver.html#method.get_ref
 
 use crate::future::poll_fn;
 use crate::sync::task::AtomicWaker;
@@ -178,7 +177,7 @@ const CLOSED: usize = 1;
 ///
 /// [`Sender`]: struct.Sender.html
 /// [`Receiver`]: struct.Receiver.html
-pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
+pub fn channel<T: Clone>(init: T) -> (Sender<T>, Receiver<T>) {
     const INIT_ID: u64 = 0;
 
     let inner = Arc::new(WatchInner::new());
@@ -224,9 +223,9 @@ impl<T> Receiver<T> {
     /// use tokio::sync::watch;
     ///
     /// let (_, rx) = watch::channel("hello");
-    /// assert_eq!(*rx.get_ref(), "hello");
+    /// assert_eq!(*rx.borrow(), "hello");
     /// ```
-    pub fn get_ref(&self) -> Ref<'_, T> {
+    pub fn borrow(&self) -> Ref<'_, T> {
         let inner = self.shared.value.read().unwrap();
         Ref { inner }
     }
