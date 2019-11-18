@@ -541,7 +541,10 @@ mod tests {
 
         ON_RT_THREAD.with(|cell| cell.set(true));
 
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime::Builder::new()
+            .threaded_scheduler()
+            .build()
+            .unwrap();
         LocalSet::new().block_on(&mut rt, async {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
             let join = spawn_local(async move {
@@ -564,7 +567,10 @@ mod tests {
 
         ON_RT_THREAD.with(|cell| cell.set(true));
 
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime::Builder::new()
+            .threaded_scheduler()
+            .build()
+            .unwrap();
         LocalSet::new().block_on(&mut rt, async {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
             let join = spawn_local(async move {
@@ -584,7 +590,10 @@ mod tests {
 
         ON_RT_THREAD.with(|cell| cell.set(true));
 
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime::Builder::new()
+            .threaded_scheduler()
+            .build()
+            .unwrap();
         LocalSet::new().block_on(&mut rt, async {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
             let join = spawn_local(async move {
@@ -611,7 +620,10 @@ mod tests {
 
         ON_RT_THREAD.with(|cell| cell.set(true));
 
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime::Builder::new()
+            .threaded_scheduler()
+            .build()
+            .unwrap();
         LocalSet::new().block_on(&mut rt, async {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
             let handles = (0..128)
@@ -635,7 +647,10 @@ mod tests {
 
         ON_RT_THREAD.with(|cell| cell.set(true));
 
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime::Builder::new()
+            .threaded_scheduler()
+            .build()
+            .unwrap();
         LocalSet::new().block_on(&mut rt, async {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
             spawn_local(async {
