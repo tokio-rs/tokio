@@ -22,7 +22,9 @@ mod shutdown;
 
 mod worker;
 
-pub(crate) use worker::block_in_place;
+cfg_blocking! {
+    pub(crate) use worker::block_in_place;
+}
 
 /// Unit tests
 #[cfg(test)]
@@ -117,7 +119,7 @@ impl ThreadPool {
     where
         F: Future,
     {
-        crate::runtime::global::with_thread_pool(self.spawner(), || {
+        self.spawner.enter(|| {
             let mut enter = crate::runtime::enter();
             enter.block_on(future)
         })

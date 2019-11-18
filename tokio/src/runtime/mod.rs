@@ -132,24 +132,24 @@
 #[macro_use]
 mod tests;
 
+cfg_rt_core! {
+    mod basic_scheduler;
+    use basic_scheduler::BasicScheduler;
+}
+
 mod blocking;
 use blocking::BlockingPool;
 
 mod builder;
 pub use self::builder::Builder;
 
-#[cfg(feature = "rt-core")]
-mod current_thread;
-#[cfg(feature = "rt-core")]
-use self::current_thread::CurrentThread;
-
 pub(crate) mod enter;
 use self::enter::enter;
 
-#[cfg(feature = "rt-core")]
-mod global;
-#[cfg(feature = "rt-core")]
-pub use self::global::spawn;
+cfg_rt_core! {
+    mod global;
+    pub(crate) use global::spawn;
+}
 
 mod handle;
 pub use self::handle::Handle;
@@ -164,13 +164,14 @@ use self::shell::Shell;
 
 mod time;
 
-#[cfg(feature = "rt-full")]
-pub(crate) mod thread_pool;
-#[cfg(feature = "rt-full")]
-use self::thread_pool::ThreadPool;
+cfg_rt_threaded! {
+    pub(crate) mod thread_pool;
+    use self::thread_pool::ThreadPool;
+}
 
-#[cfg(feature = "rt-core")]
-use crate::task::JoinHandle;
+cfg_rt_core! {
+    use crate::task::JoinHandle;
+}
 
 use std::future::Future;
 
@@ -220,10 +221,10 @@ enum Kind {
 
     /// Execute all tasks on the current-thread.
     #[cfg(feature = "rt-core")]
-    CurrentThread(CurrentThread<time::Driver>),
+    Basic(BasicScheduler<time::Driver>),
 
     /// Execute tasks across multiple threads.
-    #[cfg(feature = "rt-full")]
+    #[cfg(feature = "rt-threaded")]
     ThreadPool(ThreadPool),
 }
 
@@ -254,11 +255,11 @@ impl Runtime {
     ///
     /// [mod]: index.html
     pub fn new() -> io::Result<Self> {
-        #[cfg(feature = "rt-full")]
-        let ret = Builder::new().thread_pool().build();
+        #[cfg(feature = "rt-threaded")]
+        let ret = Builder::new().threaded_scheduler().build();
 
-        #[cfg(all(not(feature = "rt-full"), feature = "rt-core"))]
-        let ret = Builder::new().current_thread().build();
+        #[cfg(all(not(feature = "rt-threaded"), feature = "rt-core"))]
+        let ret = Builder::new().basic_scheduler().build();
 
         #[cfg(not(feature = "rt-core"))]
         let ret = Builder::new().build();
@@ -299,13 +300,14 @@ impl Runtime {
     #[cfg(feature = "rt-core")]
     pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
-        F: Future<Output = ()> + Send + 'static,
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
     {
         match &self.kind {
             Kind::Shell(_) => panic!("task execution disabled"),
-            #[cfg(feature = "rt-full")]
+            #[cfg(feature = "rt-threaded")]
             Kind::ThreadPool(exec) => exec.spawn(future),
-            Kind::CurrentThread(exec) => exec.spawn(future),
+            Kind::Basic(exec) => exec.spawn(future),
         }
     }
 
@@ -328,10 +330,18 @@ impl Runtime {
         self.handle.enter(|| match kind {
             Kind::Shell(exec) => exec.block_on(future),
             #[cfg(feature = "rt-core")]
-            Kind::CurrentThread(exec) => exec.block_on(future),
-            #[cfg(feature = "rt-full")]
+            Kind::Basic(exec) => exec.block_on(future),
+            #[cfg(feature = "rt-threaded")]
             Kind::ThreadPool(exec) => exec.block_on(future),
         })
+    }
+
+    /// Enter the runtime context
+    pub fn enter<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce() -> R,
+    {
+        self.handle.enter(f)
     }
 
     /// Return a handle to the runtime's spawner.

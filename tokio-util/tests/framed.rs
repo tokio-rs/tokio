@@ -5,6 +5,7 @@ use tokio_test::assert_ok;
 use tokio_util::codec::{Decoder, Encoder, Framed, FramedParts};
 
 use bytes::{Buf, BufMut, BytesMut, IntoBuf};
+use futures::StreamExt;
 use std::io::{self, Read};
 use std::pin::Pin;
 use std::task::{Context, Poll};

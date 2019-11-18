@@ -1,8 +1,5 @@
-use crate::net::tcp::TcpListener;
-use crate::net::tcp::TcpStream;
+use crate::net::tcp::{TcpListener, TcpStream};
 
-use futures_core::ready;
-use futures_core::stream::Stream;
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -11,17 +8,27 @@ use std::task::{Context, Poll};
 /// stream of sockets received from a listener.
 #[must_use = "streams do nothing unless polled"]
 #[derive(Debug)]
-pub struct Incoming {
-    inner: TcpListener,
+pub struct Incoming<'a> {
+    inner: &'a mut TcpListener,
 }
 
-impl Incoming {
-    pub(crate) fn new(listener: TcpListener) -> Incoming {
+impl Incoming<'_> {
+    pub(crate) fn new(listener: &mut TcpListener) -> Incoming<'_> {
         Incoming { inner: listener }
+    }
+
+    #[doc(hidden)] // TODO: dox
+    pub fn poll_accept(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<io::Result<TcpStream>> {
+        let (socket, _) = ready!(self.inner.poll_accept(cx))?;
+        Poll::Ready(Ok(socket))
     }
 }
 
-impl Stream for Incoming {
+#[cfg(feature = "stream")]
+impl futures_core::Stream for Incoming<'_> {
     type Item = io::Result<TcpStream>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {

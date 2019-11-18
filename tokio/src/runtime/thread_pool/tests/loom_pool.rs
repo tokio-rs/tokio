@@ -50,7 +50,7 @@ fn only_blocking() {
         let (block_tx, block_rx) = oneshot::channel();
 
         pool.spawn(async move {
-            crate::blocking::in_place(move || {
+            crate::task::block_in_place(move || {
                 block_tx.send(());
             })
         });
@@ -72,7 +72,7 @@ fn blocking_and_regular() {
         let done_tx = Arc::new(Mutex::new(Some(done_tx)));
 
         pool.spawn(async move {
-            crate::blocking::in_place(move || {
+            crate::task::block_in_place(move || {
                 block_tx.send(());
             })
         });
@@ -150,18 +150,22 @@ fn pool_shutdown() {
 
 #[test]
 fn complete_block_on_under_load() {
+    use futures::FutureExt;
+
     loom::model(|| {
         let pool = mk_pool(2);
 
-        pool.block_on(async {
-            // Spin hard
-            crate::spawn(async {
-                for _ in 0..2 {
-                    yield_once().await;
-                }
-            });
+        pool.block_on({
+            futures::future::lazy(|_| ()).then(|_| {
+                // Spin hard
+                crate::spawn(async {
+                    for _ in 0..2 {
+                        yield_once().await;
+                    }
+                });
 
-            gated2(true).await
+                gated2(true)
+            })
         });
     });
 }

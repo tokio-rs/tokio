@@ -1,16 +1,11 @@
 //! Slow down a stream by enforcing a delay between items.
 
-use crate::time::{Delay, Instant};
+use crate::time::{Delay, Duration, Instant};
 
-use futures_core::ready;
-use futures_core::Stream;
-use std::{
-    future::Future,
-    marker::Unpin,
-    pin::Pin,
-    task::{self, Poll},
-    time::Duration,
-};
+use std::future::Future;
+use std::marker::Unpin;
+use std::pin::Pin;
+use std::task::{self, Poll};
 
 /// Slow down a stream by enforcing a delay between items.
 #[derive(Debug)]

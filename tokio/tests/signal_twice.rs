@@ -6,7 +6,6 @@ mod support {
 }
 use support::signal::send_signal;
 
-use tokio::prelude::*;
 use tokio::signal::unix::{signal, SignalKind};
 
 #[tokio::test]
@@ -17,9 +16,6 @@ async fn twice() {
     for _ in 0..2 {
         send_signal(libc::SIGUSR1);
 
-        let (item, sig_next) = sig.into_future().await;
-        assert_eq!(item, Some(()));
-
-        sig = sig_next;
+        assert!(sig.recv().await.is_some());
     }
 }

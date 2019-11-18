@@ -1,5 +1,4 @@
 use bytes::BufMut;
-use futures_core::ready;
 use std::io;
 use std::ops::DerefMut;
 use std::pin::Pin;

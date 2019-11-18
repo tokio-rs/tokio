@@ -70,70 +70,68 @@
 //! }
 //! ```
 
-#[cfg(all(loom, test))]
-macro_rules! thread_local {
-    ($($tts:tt)+) => { loom::thread_local!{ $($tts)+ } }
+// macros used internally
+#[macro_use]
+mod macros;
+
+// Blocking task implementation
+pub(crate) mod blocking;
+
+cfg_fs! {
+    pub mod fs;
 }
 
-// At the top due to macros
-#[cfg(test)]
-#[macro_use]
-mod tests;
-
-#[cfg(feature = "blocking")]
-pub mod blocking;
-
-#[cfg(feature = "fs")]
-pub mod fs;
-
-pub mod future;
+mod future;
 
 pub mod io;
 
-#[cfg(feature = "io-driver")]
 pub mod net;
 
 mod loom;
 
 pub mod prelude;
 
-#[cfg(feature = "process")]
-#[cfg(not(loom))]
-pub mod process;
+cfg_process! {
+    pub mod process;
+}
 
 pub mod runtime;
 
-#[cfg(feature = "signal")]
-#[cfg(not(loom))]
-pub mod signal;
+cfg_signal! {
+    pub mod signal;
+}
 
-pub mod stream;
+cfg_sync! {
+    pub mod sync;
+}
+cfg_not_sync! {
+    mod sync;
+}
 
-#[cfg(feature = "sync")]
-pub mod sync;
+cfg_rt_core! {
+    pub mod task;
+    pub use task::spawn;
+}
 
-#[cfg(feature = "rt-core")]
-pub mod task;
+cfg_time! {
+    pub mod time;
+}
 
-#[cfg(feature = "time")]
-pub mod time;
+cfg_rt_threaded! {
+    mod util;
+}
 
-#[cfg(feature = "rt-full")]
-mod util;
+cfg_macros! {
+    #[cfg(not(test))] // Work around for rust-lang/rust#62127
+    pub use tokio_macros::main;
+    pub use tokio_macros::test;
+}
 
-#[doc(inline)]
-#[cfg(feature = "rt-core")]
-pub use crate::runtime::spawn;
+// Tests
+#[cfg(test)]
+mod tests;
 
-#[cfg(not(test))] // Work around for rust-lang/rust#62127
-#[cfg(feature = "macros")]
-#[doc(inline)]
-pub use tokio_macros::main;
-
-#[cfg(feature = "macros")]
-#[doc(inline)]
-pub use tokio_macros::test;
-
+// TODO: rm
 #[cfg(feature = "io-util")]
 #[cfg(test)]
 fn is_unpin<T: Unpin>() {}

@@ -4,7 +4,7 @@ use crate::blocking;
 use crate::runtime::thread_pool::ThreadPool;
 use crate::runtime::{Park, Unpark};
 
-use futures_util::future::poll_fn;
+use futures::future::poll_fn;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::Ordering::Relaxed;

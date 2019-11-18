@@ -6,7 +6,6 @@ mod support {
 }
 use support::signal::send_signal;
 
-use tokio::prelude::*;
 use tokio::runtime::Runtime;
 use tokio::signal::unix::{signal, SignalKind};
 
@@ -26,9 +25,9 @@ fn multi_loop() {
                 thread::spawn(move || {
                     let mut rt = rt();
                     let _ = rt.block_on(async {
-                        let signal = signal(SignalKind::hangup()).unwrap();
+                        let mut signal = signal(SignalKind::hangup()).unwrap();
                         sender.send(()).unwrap();
-                        signal.into_future().await
+                        signal.recv().await
                     });
                 })
             })
@@ -48,7 +47,7 @@ fn multi_loop() {
 
 fn rt() -> Runtime {
     tokio::runtime::Builder::new()
-        .current_thread()
+        .basic_scheduler()
         .build()
         .unwrap()
 }

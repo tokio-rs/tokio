@@ -12,7 +12,7 @@ use std::rc::Rc;
 use std::sync::Mutex;
 use std::task::{Context, Poll};
 
-use pin_project::pin_project;
+use pin_project_lite::pin_project;
 
 /// A set of tasks which are executed on the same thread.
 ///
@@ -109,11 +109,12 @@ struct Scheduler {
     waker: AtomicWaker,
 }
 
-#[pin_project]
-struct LocalFuture<F> {
-    scheduler: Rc<Scheduler>,
-    #[pin]
-    future: F,
+pin_project! {
+    struct LocalFuture<F> {
+        scheduler: Rc<Scheduler>,
+        #[pin]
+        future: F,
+    }
 }
 
 thread_local! {
@@ -253,13 +254,13 @@ impl LocalSet {
     /// For example, this will panic:
     /// ```should_panic
     /// use tokio::runtime::Runtime;
-    /// use tokio::{task, blocking};
+    /// use tokio::task;
     ///
     /// let mut rt = Runtime::new().unwrap();
     /// let local = task::LocalSet::new();
     /// local.block_on(&mut rt, async {
     ///     let join = task::spawn_local(async {
-    ///         let blocking_result = blocking::in_place(|| {
+    ///         let blocking_result = task::block_in_place(|| {
     ///             // ...
     ///         });
     ///         // ...
@@ -270,13 +271,13 @@ impl LocalSet {
     /// This, however, will not panic:
     /// ```
     /// use tokio::runtime::Runtime;
-    /// use tokio::{task, blocking};
+    /// use tokio::task;
     ///
     /// let mut rt = Runtime::new().unwrap();
     /// let local = task::LocalSet::new();
     /// local.block_on(&mut rt, async {
     ///     let join = task::spawn_local(async {
-    ///         let blocking_result = blocking::spawn_blocking(|| {
+    ///         let blocking_result = task::spawn_blocking(|| {
     ///             // ...
     ///         }).await;
     ///         // ...
@@ -466,11 +467,11 @@ impl Drop for Scheduler {
 #[cfg(all(test, not(loom)))]
 mod tests {
     use super::*;
-    use crate::{blocking, runtime};
+    use crate::{runtime, task};
 
     #[test]
     fn local_current_thread() {
-        let mut rt = runtime::Builder::new().current_thread().build().unwrap();
+        let mut rt = runtime::Builder::new().basic_scheduler().build().unwrap();
         LocalSet::new().block_on(&mut rt, async {
             spawn_local(async {}).await.unwrap();
         });
@@ -534,7 +535,7 @@ mod tests {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
             let join = spawn_local(async move {
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
-                blocking::in_place(|| {});
+                task::block_in_place(|| {});
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
             });
             join.await.unwrap();
@@ -554,7 +555,7 @@ mod tests {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
             let join = spawn_local(async move {
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
-                blocking::spawn_blocking(|| {
+                task::spawn_blocking(|| {
                     assert!(
                         !ON_RT_THREAD.with(|cell| cell.get()),
                         "blocking must not run on the local task set's thread"
@@ -570,8 +571,6 @@ mod tests {
 
     #[test]
     fn all_spawns_are_local() {
-        use futures_util::future;
-
         thread_local! {
             static ON_RT_THREAD: Cell<bool> = Cell::new(false);
         }
@@ -588,8 +587,8 @@ mod tests {
                     })
                 })
                 .collect::<Vec<_>>();
-            for result in future::join_all(handles).await {
-                result.unwrap();
+            for handle in handles {
+                handle.await.unwrap();
             }
         })
     }

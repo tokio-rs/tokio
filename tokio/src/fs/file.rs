@@ -3,11 +3,10 @@
 //! [`File`]: file/struct.File.html
 
 use self::State::*;
-use crate::fs::blocking::Buf;
 use crate::fs::{asyncify, sys};
+use crate::io::blocking::Buf;
 use crate::io::{AsyncRead, AsyncWrite};
 
-use futures_core::ready;
 use std::fmt;
 use std::fs::{Metadata, Permissions};
 use std::future::Future;
@@ -430,7 +429,7 @@ impl File {
     }
 
     async fn complete_inflight(&mut self) {
-        use futures_util::future::poll_fn;
+        use crate::future::poll_fn;
 
         if let Err(e) = poll_fn(|cx| Pin::new(&mut *self).poll_flush(cx)).await {
             self.last_write_err = Some(e.kind());

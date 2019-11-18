@@ -37,6 +37,7 @@ jobs:
     crates:
       - tokio-macros
       - tokio-test
+      - tokio-tls
       - tokio-util
       - examples
 

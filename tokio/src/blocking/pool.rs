@@ -53,7 +53,7 @@ const MAX_THREADS: u32 = 1_000;
 const KEEP_ALIVE: Duration = Duration::from_secs(10);
 
 /// Run the provided function on an executor dedicated to blocking operations.
-pub(super) fn spawn<F, R>(func: F) -> JoinHandle<R>
+pub(crate) fn spawn_blocking<F, R>(func: F) -> JoinHandle<R>
 where
     F: FnOnce() -> R + Send + 'static,
 {
@@ -116,16 +116,20 @@ impl fmt::Debug for BlockingPool {
 
 // ===== impl Spawner =====
 
-impl Spawner {
-    #[cfg(feature = "rt-full")]
-    pub(crate) fn spawn_background<F>(&self, func: F)
-    where
-        F: FnOnce() + Send + 'static,
-    {
-        let task = task::background(BlockingTask::new(func));
-        self.schedule(task);
-    }
 
+cfg_rt_threaded! {
+    impl Spawner {
+        pub(crate) fn spawn_background<F>(&self, func: F)
+        where
+            F: FnOnce() + Send + 'static,
+        {
+            let task = task::background(BlockingTask::new(func));
+            self.schedule(task);
+        }
+    }
+}
+
+impl Spawner {
     /// Set the blocking pool for the duration of the closure
     ///
     /// If a blocking pool is already set, it will be restored when the closure

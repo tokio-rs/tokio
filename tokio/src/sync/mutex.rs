@@ -29,9 +29,9 @@
 //! [`Mutex`]: struct.Mutex.html
 //! [`MutexGuard`]: struct.MutexGuard.html
 
+use crate::future::poll_fn;
 use crate::sync::semaphore;
 
-use futures_util::future::poll_fn;
 use std::cell::UnsafeCell;
 use std::fmt;
 use std::ops::{Deref, DerefMut};

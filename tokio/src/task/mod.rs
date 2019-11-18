@@ -1,5 +1,14 @@
 //! Asynchronous green-threads.
 
+cfg_blocking! {
+    mod blocking;
+    pub use blocking::spawn_blocking;
+
+    cfg_rt_threaded! {
+        pub use blocking::block_in_place;
+    }
+}
+
 mod core;
 use self::core::Cell;
 pub(crate) use self::core::Header;
@@ -10,14 +19,15 @@ pub use self::error::JoinError;
 mod harness;
 use self::harness::Harness;
 
-mod join;
-#[cfg(feature = "rt-core")]
-#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
-pub use self::join::JoinHandle;
+cfg_rt_core! {
+    mod join;
+    #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
+    pub use self::join::JoinHandle;
+}
 
-#[cfg(feature = "rt-full")]
+#[cfg(feature = "rt-threaded")]
 mod local;
-#[cfg(feature = "rt-full")]
+#[cfg(feature = "rt-threaded")]
 pub use self::local::{spawn_local, LocalSet};
 
 mod list;
@@ -25,6 +35,11 @@ pub(crate) use self::list::OwnedList;
 
 mod raw;
 use self::raw::RawTask;
+
+cfg_rt_core! {
+    mod spawn;
+    pub use spawn::spawn;
+}
 
 mod stack;
 pub(crate) use self::stack::TransferStack;
@@ -81,15 +96,17 @@ pub(crate) trait Schedule: Sized + 'static {
 /// trait is implemented, the corresponding `Task` type will implement `Send`.
 pub(crate) trait ScheduleSendOnly: Schedule + Send + Sync {}
 
-/// Create a new task without an associated join handle
-pub(crate) fn background<T, S>(task: T) -> Task<S>
-where
-    T: Future + Send + 'static,
-    S: ScheduleSendOnly,
-{
-    Task {
-        raw: RawTask::new_background::<_, S>(task),
-        _p: PhantomData,
+cfg_rt_threaded! {
+    /// Create a new task without an associated join handle
+    pub(crate) fn background<T, S>(task: T) -> Task<S>
+    where
+        T: Future + Send + 'static,
+        S: ScheduleSendOnly,
+    {
+        Task {
+            raw: RawTask::new_background::<_, S>(task),
+            _p: PhantomData,
+        }
     }
 }
 
@@ -112,7 +129,7 @@ where
 }
 
 /// Create a new `!Send` task with an associated join handle
-#[cfg(feature = "rt-full")]
+#[cfg(feature = "rt-threaded")]
 pub(crate) fn joinable_local<T, S>(task: T) -> (Task<S>, JoinHandle<T::Output>)
 where
     T: Future + 'static,

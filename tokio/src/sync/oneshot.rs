@@ -1,10 +1,11 @@
+#![cfg_attr(not(feature = "sync"), allow(dead_code, unreachable_pub))]
+
 //! A channel for sending a single message between asynchronous tasks.
 
 use crate::loom::cell::CausalCell;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Arc;
 
-use futures_core::ready;
 use std::fmt;
 use std::future::Future;
 use std::mem::MaybeUninit;
@@ -225,7 +226,7 @@ impl<T> Sender<T> {
     /// }
     /// ```
     pub async fn closed(&mut self) {
-        use futures_util::future::poll_fn;
+        use crate::future::poll_fn;
 
         poll_fn(|cx| self.poll_closed(cx)).await
     }

@@ -20,7 +20,7 @@ use std::task::Waker;
 ///
 /// A single `AtomicWaker` may be reused for any number of calls to `register` or
 /// `wake`.
-pub struct AtomicWaker {
+pub(crate) struct AtomicWaker {
     state: AtomicUsize,
     waker: CausalCell<Option<Waker>>,
 }
@@ -132,7 +132,7 @@ const WAKING: usize = 0b10;
 
 impl AtomicWaker {
     /// Create an `AtomicWaker`
-    pub fn new() -> AtomicWaker {
+    pub(crate) fn new() -> AtomicWaker {
         AtomicWaker {
             state: AtomicUsize::new(WAITING),
             waker: CausalCell::new(None),
@@ -142,7 +142,8 @@ impl AtomicWaker {
     /// Registers the current waker to be notified on calls to `wake`.
     ///
     /// This is the same as calling `register_task` with `task::current()`.
-    pub fn register(&self, waker: Waker) {
+    #[cfg(feature = "io-driver")]
+    pub(crate) fn register(&self, waker: Waker) {
         self.do_register(waker);
     }
 
@@ -161,7 +162,7 @@ impl AtomicWaker {
     /// idea. Concurrent calls to `register` will attempt to register different
     /// tasks to be woken. One of the callers will win and have its task set,
     /// but there is no guarantee as to which caller will succeed.
-    pub fn register_by_ref(&self, waker: &Waker) {
+    pub(crate) fn register_by_ref(&self, waker: &Waker) {
         self.do_register(waker);
     }
 
@@ -169,10 +170,8 @@ impl AtomicWaker {
     where
         W: WakerRef,
     {
-        debug!(" + register_task");
         match self.state.compare_and_swap(WAITING, REGISTERING, Acquire) {
             WAITING => {
-                debug!(" + WAITING");
                 unsafe {
                     // Locked acquired, update the waker cell
                     self.waker.with_mut(|t| *t = Some(waker.into_waker()));
@@ -213,7 +212,6 @@ impl AtomicWaker {
                 }
             }
             WAKING => {
-                debug!(" + WAKING");
                 // Currently in the process of waking the task, i.e.,
                 // `wake` is currently being called on the old waker.
                 // So, we call wake on the new waker.
@@ -238,8 +236,7 @@ impl AtomicWaker {
     /// Wakes the task that last called `register`.
     ///
     /// If `register` has not been called yet, then this does nothing.
-    pub fn wake(&self) {
-        debug!(" + wake");
+    pub(crate) fn wake(&self) {
         if let Some(waker) = self.take_waker() {
             waker.wake();
         }
@@ -247,25 +244,21 @@ impl AtomicWaker {
 
     /// Attempts to take the `Waker` value out of the `AtomicWaker` with the
     /// intention that the caller will wake the task later.
-    pub fn take_waker(&self) -> Option<Waker> {
-        debug!(" + take_waker");
+    pub(crate) fn take_waker(&self) -> Option<Waker> {
         // AcqRel ordering is used in order to acquire the value of the `waker`
         // cell as well as to establish a `release` ordering with whatever
         // memory the `AtomicWaker` is associated with.
         match self.state.fetch_or(WAKING, AcqRel) {
             WAITING => {
-                debug!(" + WAITING");
                 // The waking lock has been acquired.
                 let waker = unsafe { self.waker.with_mut(|t| (*t).take()) };
 
                 // Release the lock
                 self.state.fetch_and(!WAKING, Release);
-                debug!(" + Done taking");
 
                 waker
             }
             state => {
-                debug!(" + state = {:?}", state);
                 // There is a concurrent thread currently updating the
                 // associated waker.
                 //

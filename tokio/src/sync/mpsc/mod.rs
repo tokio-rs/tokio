@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "sync"), allow(dead_code, unreachable_pub))]
+
 //! A multi-producer, single-consumer queue for sending values across
 //! asynchronous tasks.
 //!
@@ -46,12 +48,7 @@ pub(super) mod list;
 mod unbounded;
 pub use self::unbounded::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
-pub mod error {
-    //! Channel error types
-
-    pub use super::bounded::{RecvError, SendError, TrySendError};
-    pub use super::unbounded::{UnboundedRecvError, UnboundedSendError, UnboundedTrySendError};
-}
+pub mod error;
 
 /// The number of values a block can contain.
 ///
