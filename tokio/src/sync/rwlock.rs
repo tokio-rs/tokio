@@ -107,9 +107,9 @@ impl<'a, T> Drop for ReleasingPermit<'a, T> {
     }
 }
 
-// As long as T: Send, it's fine to send and share Mutex<T> between threads.
-// If T was not Send, sending and sharing a Mutex<T> would be bad, since you can access T through
-// Mutex<T>.
+// As long as T: Send, it's fine to send and share RwLock<T> between threads.
+// If T were not Send, sending and sharing a RwLock<T> would be bad, since you can access T through
+// RwLock<T>.
 unsafe impl<T> Send for RwLock<T> where T: Send {}
 unsafe impl<T> Sync for RwLock<T> where T: Send {}
 unsafe impl<'a, T> Sync for RwLockReadGuard<'a, T> where T: Send + Sync {}
