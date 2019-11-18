@@ -1,6 +1,6 @@
 //! Runs `!Send` futures on the current thread.
 use crate::sync::AtomicWaker;
-use crate::task::{self, JoinHandle, Schedule, Task};
+use crate::task::{self, JoinHandle, Schedule, Task, TransferStack};
 
 use std::cell::{Cell, UnsafeCell};
 use std::collections::VecDeque;
@@ -105,6 +105,9 @@ struct Scheduler {
     ///
     /// Tasks notified from another thread are pushed into this queue.
     remote_queue: Mutex<VecDeque<Task<Scheduler>>>,
+
+    /// Tasks pending drop
+    pending_drop: TransferStack<Self>,
 
     /// Used to notify the `LocalFuture` when a task in the local task set is
     /// notified.
@@ -370,6 +373,7 @@ impl Scheduler {
             tasks: UnsafeCell::new(task::OwnedList::new()),
             local_queue: UnsafeCell::new(VecDeque::with_capacity(64)),
             tick: Cell::new(0),
+            pending_drop: TransferStack::new(),
             remote_queue: Mutex::new(VecDeque::with_capacity(64)),
             waker: AtomicWaker::new(),
         }
@@ -454,6 +458,15 @@ impl Scheduler {
             }
         }
     }
+
+    fn drain_pending_drop(&self) {
+        for task in self.pending_drop.drain() {
+            unsafe {
+                (*self.tasks.get()).remove(&task);
+            }
+            drop(task);
+        }
+    }
 }
 
 impl fmt::Debug for Scheduler {
@@ -465,13 +478,22 @@ impl fmt::Debug for Scheduler {
 impl Drop for Scheduler {
     fn drop(&mut self) {
         // Drain all local tasks
-        while let Some(task) = self.next_task() {
+        while let Some(task) = self.next_local_task() {
             task.shutdown();
         }
 
         // Release owned tasks
         unsafe {
             (*self.tasks.get()).shutdown();
+        }
+
+        self.drain_pending_drop();
+
+        // Wait until all tasks have been released.
+        // XXX: this is a busy loop, but we don't really have any way to park
+        // the thread here?
+        while unsafe { !(*self.tasks.get()).is_empty() } {
+            self.drain_pending_drop();
         }
     }
 }
