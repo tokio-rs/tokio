@@ -614,6 +614,7 @@ mod tests {
 
     #[test]
     fn all_spawns_are_local() {
+        use futures::future;
         thread_local! {
             static ON_RT_THREAD: Cell<bool> = Cell::new(false);
         }
@@ -633,8 +634,8 @@ mod tests {
                     })
                 })
                 .collect::<Vec<_>>();
-            for handle in handles {
-                handle.await.unwrap();
+            for joined in future::join_all(handles).await {
+                joined.unwrap();
             }
         })
     }
