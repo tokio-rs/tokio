@@ -1,6 +1,6 @@
+use crate::future::poll_fn;
 use crate::sync::semaphore::{Permit, Semaphore};
 use crate::sync::Mutex;
-use crate::future::poll_fn;
 use std::cell::UnsafeCell;
 use std::ops;
 
