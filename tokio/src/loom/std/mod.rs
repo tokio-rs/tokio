@@ -1,4 +1,4 @@
-#![cfg_attr(not(feature = "rt-full"), allow(unused_imports, dead_code))]
+#![cfg_attr(not(feature = "full"), allow(unused_imports, dead_code))]
 
 mod atomic_u32;
 mod atomic_u64;
@@ -11,7 +11,7 @@ pub(crate) mod cell {
     pub(crate) use super::causal_cell::{CausalCell, CausalCheck};
 }
 
-#[cfg(feature = "sync")]
+#[cfg(any(feature = "sync", feature = "io-driver"))]
 pub(crate) mod future {
     pub(crate) use crate::sync::AtomicWaker;
 }
@@ -51,12 +51,12 @@ pub(crate) mod sync {
 }
 
 pub(crate) mod sys {
-    #[cfg(feature = "rt-full")]
+    #[cfg(feature = "rt-threaded")]
     pub(crate) fn num_cpus() -> usize {
         usize::max(1, num_cpus::get_physical())
     }
 
-    #[cfg(not(feature = "rt-full"))]
+    #[cfg(not(feature = "rt-threaded"))]
     pub(crate) fn num_cpus() -> usize {
         1
     }

@@ -116,7 +116,7 @@ mod imp;
 
 mod kill;
 
-use crate::io::{AsyncRead, AsyncReadExt, AsyncWrite};
+use crate::io::{AsyncRead, AsyncWrite};
 use crate::process::kill::Kill;
 
 use std::ffi::OsStr;
@@ -771,7 +771,7 @@ impl Child {
         async fn read_to_end<A: AsyncRead + Unpin>(io: Option<A>) -> io::Result<Vec<u8>> {
             let mut vec = Vec::new();
             if let Some(mut io) = io {
-                AsyncReadExt::read_to_end(&mut io, &mut vec).await?;
+                crate::io::util::read_to_end(&mut io, &mut vec).await?;
             }
             Ok(vec)
         }

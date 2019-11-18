@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "sync"), allow(dead_code, unreachable_pub))]
+
 //! A multi-producer, single-consumer queue for sending values across
 //! asynchronous tasks.
 //!

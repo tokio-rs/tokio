@@ -1,9 +1,6 @@
 use crate::runtime::basic_scheduler;
 use crate::task::JoinHandle;
 
-#[cfg(feature = "rt-full")]
-use crate::runtime::thread_pool;
-
 use std::cell::Cell;
 use std::future::Future;
 
@@ -16,7 +13,7 @@ enum State {
     Basic(*const basic_scheduler::SchedulerPriv),
 
     // default executor is a thread pool instance.
-    #[cfg(feature = "rt-full")]
+    #[cfg(feature = "rt-threaded")]
     ThreadPool(*const thread_pool::Spawner),
 }
 
@@ -34,7 +31,7 @@ where
     T::Output: Send + 'static,
 {
     EXECUTOR.with(|current_executor| match current_executor.get() {
-        #[cfg(feature = "rt-full")]
+        #[cfg(feature = "rt-threaded")]
         State::ThreadPool(thread_pool_ptr) => {
             let thread_pool = unsafe { &*thread_pool_ptr };
             thread_pool.spawn(future)
@@ -75,12 +72,15 @@ pub(super) fn basic_scheduler_is_current(basic_scheduler: &basic_scheduler::Sche
     })
 }
 
-#[cfg(feature = "rt-full")]
-pub(super) fn with_thread_pool<F, R>(thread_pool: &thread_pool::Spawner, f: F) -> R
-where
-    F: FnOnce() -> R,
-{
-    with_state(State::ThreadPool(thread_pool as *const _), f)
+cfg_rt_threaded! {
+    use crate::runtime::thread_pool;
+
+    pub(super) fn with_thread_pool<F, R>(thread_pool: &thread_pool::Spawner, f: F) -> R
+    where
+        F: FnOnce() -> R,
+    {
+        with_state(State::ThreadPool(thread_pool as *const _), f)
+    }
 }
 
 fn with_state<F, R>(state: State, f: F) -> R

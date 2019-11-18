@@ -3,13 +3,10 @@
 //! shells. This isolates the complexity of dealing with conditional
 //! compilation.
 
-pub(crate) use self::variant::*;
-
 /// Re-exported for convenience.
 pub(crate) use std::io::Result;
 
-#[cfg(feature = "io-driver")]
-mod variant {
+cfg_io_driver! {
     use crate::net::driver;
 
     use std::io;
@@ -38,8 +35,7 @@ mod variant {
     }
 }
 
-#[cfg(not(feature = "io-driver"))]
-mod variant {
+cfg_not_io_driver! {
     use crate::runtime::park::ParkThread;
 
     use std::io;

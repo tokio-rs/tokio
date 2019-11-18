@@ -4,15 +4,7 @@
 //! `test-util` feature flag is enabled, the values returned for `now()` are
 //! configurable.
 
-#[cfg(feature = "test-util")]
-pub(crate) use self::variant::now;
-pub(crate) use self::variant::Clock;
-#[cfg(feature = "test-util")]
-#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
-pub use self::variant::{advance, pause, resume};
-
-#[cfg(not(feature = "test-util"))]
-mod variant {
+cfg_not_test_util! {
     use crate::time::Instant;
 
     #[derive(Debug, Clone)]
@@ -40,8 +32,7 @@ mod variant {
     }
 }
 
-#[cfg(feature = "test-util")]
-mod variant {
+cfg_test_util! {
     use crate::time::{Duration, Instant};
 
     use std::cell::Cell;

@@ -1,7 +1,5 @@
 use std::cell::{Cell, RefCell};
 use std::fmt;
-#[cfg(feature = "rt-full")]
-use std::future::Future;
 use std::marker::PhantomData;
 
 thread_local!(static ENTERED: Cell<bool> = Cell::new(false));
@@ -48,58 +46,62 @@ pub(crate) fn try_enter() -> Option<Enter> {
 //
 // This is hidden for a reason. Do not use without fully understanding
 // executors. Misuing can easily cause your program to deadlock.
-#[cfg(feature = "rt-full")]
-pub(crate) fn exit<F: FnOnce() -> R, R>(f: F) -> R {
-    // Reset in case the closure panics
-    struct Reset;
-    impl Drop for Reset {
-        fn drop(&mut self) {
-            ENTERED.with(|c| {
-                c.set(true);
-            });
+cfg_rt_threaded! {
+    #[cfg(feature = "blocking")]
+    pub(crate) fn exit<F: FnOnce() -> R, R>(f: F) -> R {
+        // Reset in case the closure panics
+        struct Reset;
+        impl Drop for Reset {
+            fn drop(&mut self) {
+                ENTERED.with(|c| {
+                    c.set(true);
+                });
+            }
         }
+
+        ENTERED.with(|c| {
+            debug_assert!(c.get());
+            c.set(false);
+        });
+
+        let reset = Reset;
+        let ret = f();
+        ::std::mem::forget(reset);
+
+        ENTERED.with(|c| {
+            assert!(!c.get(), "closure claimed permanent executor");
+            c.set(true);
+        });
+
+        ret
     }
 
-    ENTERED.with(|c| {
-        debug_assert!(c.get());
-        c.set(false);
-    });
+    impl Enter {
+        /// Blocks the thread on the specified future, returning the value with
+        /// which that future completes.
+        pub(crate) fn block_on<F>(&mut self, mut f: F) -> F::Output
+        where
+            F: std::future::Future,
+        {
+            use crate::runtime::park::{CachedParkThread, Park};
+            use std::pin::Pin;
+            use std::task::Context;
+            use std::task::Poll::Ready;
 
-    let reset = Reset;
-    let ret = f();
-    ::std::mem::forget(reset);
+            let mut park = CachedParkThread::new();
+            let waker = park.unpark().into_waker();
+            let mut cx = Context::from_waker(&waker);
 
-    ENTERED.with(|c| {
-        assert!(!c.get(), "closure claimed permanent executor");
-        c.set(true);
-    });
+            // `block_on` takes ownership of `f`. Once it is pinned here, the original `f` binding can
+            // no longer be accessed, making the pinning safe.
+            let mut f = unsafe { Pin::new_unchecked(&mut f) };
 
-    ret
-}
-
-impl Enter {
-    /// Blocks the thread on the specified future, returning the value with
-    /// which that future completes.
-    #[cfg(feature = "rt-full")]
-    pub(crate) fn block_on<F: Future>(&mut self, mut f: F) -> F::Output {
-        use crate::runtime::park::{CachedParkThread, Park};
-        use std::pin::Pin;
-        use std::task::Context;
-        use std::task::Poll::Ready;
-
-        let mut park = CachedParkThread::new();
-        let waker = park.unpark().into_waker();
-        let mut cx = Context::from_waker(&waker);
-
-        // `block_on` takes ownership of `f`. Once it is pinned here, the original `f` binding can
-        // no longer be accessed, making the pinning safe.
-        let mut f = unsafe { Pin::new_unchecked(&mut f) };
-
-        loop {
-            if let Ready(v) = f.as_mut().poll(&mut cx) {
-                return v;
+            loop {
+                if let Ready(v) = f.as_mut().poll(&mut cx) {
+                    return v;
+                }
+                park.park().unwrap();
             }
-            park.park().unwrap();
         }
     }
 }

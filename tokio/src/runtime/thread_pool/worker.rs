@@ -15,24 +15,26 @@ thread_local! {
     static ON_BLOCK: Cell<Option<*const dyn Fn()>> = Cell::new(None)
 }
 
-pub(crate) fn block_in_place<F, R>(f: F) -> R
-where
-    F: FnOnce() -> R,
-{
-    // Make the current worker give away its Worker to another thread so that we can safely block
-    // this one without preventing progress on other futures the worker owns.
-    ON_BLOCK.with(|ob| {
-        let allow_blocking = ob
-            .get()
-            .expect("can only call blocking when on Tokio runtime");
+cfg_blocking! {
+    pub(crate) fn block_in_place<F, R>(f: F) -> R
+    where
+        F: FnOnce() -> R,
+    {
+        // Make the current worker give away its Worker to another thread so that we can safely block
+        // this one without preventing progress on other futures the worker owns.
+        ON_BLOCK.with(|ob| {
+            let allow_blocking = ob
+                .get()
+                .expect("can only call blocking when on Tokio runtime");
 
-        // This is safe, because ON_BLOCK was set from an &mut dyn FnMut in the worker that wraps
-        // the worker's operation, and is unset just prior to when the FnMut is dropped.
-        let allow_blocking = unsafe { &*allow_blocking };
+            // This is safe, because ON_BLOCK was set from an &mut dyn FnMut in the worker that wraps
+            // the worker's operation, and is unset just prior to when the FnMut is dropped.
+            let allow_blocking = unsafe { &*allow_blocking };
 
-        allow_blocking();
-        f()
-    })
+            allow_blocking();
+            f()
+        })
+    }
 }
 
 pub(crate) struct Worker<P: Park + 'static> {

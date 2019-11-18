@@ -299,12 +299,6 @@ where
             // second time here.
             try_recv!();
 
-            debug!(
-                "recv; rx_closed = {:?}; is_idle = {:?}",
-                rx_fields.rx_closed,
-                self.inner.semaphore.is_idle()
-            );
-
             if rx_fields.rx_closed && self.inner.semaphore.is_idle() {
                 Ready(None)
             } else {

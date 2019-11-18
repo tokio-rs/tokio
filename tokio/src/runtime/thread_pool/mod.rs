@@ -22,7 +22,9 @@ mod shutdown;
 
 mod worker;
 
-pub(crate) use worker::block_in_place;
+cfg_blocking! {
+    pub(crate) use worker::block_in_place;
+}
 
 /// Unit tests
 #[cfg(test)]
