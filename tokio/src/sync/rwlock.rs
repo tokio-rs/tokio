@@ -1,6 +1,6 @@
 use crate::sync::semaphore::{Permit, Semaphore};
 use crate::sync::Mutex;
-use futures_util::future::poll_fn;
+use crate::future::poll_fn;
 use std::cell::UnsafeCell;
 use std::ops;
 
@@ -157,7 +157,7 @@ impl<T> RwLock<T> {
     ///     tokio::spawn(async move {
     ///         let r = c_lock.read().await;
     ///         assert_eq!(*r, 1);
-    ///     })
+    ///     });
     ///}
     /// ```
     pub async fn read(&self) -> RwLockReadGuard<'_, T> {

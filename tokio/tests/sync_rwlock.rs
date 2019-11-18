@@ -3,9 +3,9 @@
 use std::sync::Arc;
 use std::task::Poll;
 
-use futures_util::future::FutureExt;
-use futures_util::stream;
-use futures_util::stream::StreamExt;
+use futures::future::FutureExt;
+use futures::stream;
+use futures::stream::StreamExt;
 
 use tokio::sync::{Barrier, RwLock};
 use tokio_test::task::spawn;
@@ -160,7 +160,7 @@ async fn write_order() {
 }
 
 // A single RwLock is contested by tasks in multiple threads
-#[tokio::test(threadpool)]
+#[tokio::test(threaded_scheduler)]
 async fn multithreaded() {
     let barrier = Arc::new(Barrier::new(5));
     let rwlock = Arc::new(RwLock::<u32>::new(0));
