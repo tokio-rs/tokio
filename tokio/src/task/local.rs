@@ -676,4 +676,46 @@ mod tests {
             .unwrap();
         })
     }
+    #[test]
+    fn join_local_future_elsewhere() {
+        thread_local! {
+            static ON_RT_THREAD: Cell<bool> = Cell::new(false);
+        }
+
+        ON_RT_THREAD.with(|cell| cell.set(true));
+
+        let mut rt = runtime::Builder::new()
+            .threaded_scheduler()
+            .build()
+            .unwrap();
+        let local = LocalSet::new();
+        local.block_on(&mut rt, async move {
+            let (tx, rx) = crate::sync::oneshot::channel();
+            let join = spawn_local(async move {
+                println!("hello world running...");
+                assert!(
+                    ON_RT_THREAD.with(|cell| cell.get()),
+                    "local task must run on local thread, no matter where it is awaited"
+                );
+                rx.await.unwrap();
+
+                println!("hello world task done");
+                "hello world"
+            });
+            let join2 = task::spawn(async move {
+                assert!(
+                    !ON_RT_THREAD.with(|cell| cell.get()),
+                    "spawned task should be on a worker"
+                );
+
+                tx.send(()).expect("task shouldn't have ended yet");
+                println!("waking up hello world...");
+
+                join.await.expect("task should complete successfully");
+
+                println!("hello world task joined");
+            });
+            join2.await.unwrap()
+        });
+    }
 }
