@@ -161,12 +161,13 @@ impl<T> Receiver<T> {
 
 impl<T> Unpin for Receiver<T> {}
 
-#[cfg(feature = "stream")]
-impl<T> futures_core::Stream for Receiver<T> {
-    type Item = T;
+cfg_stream! {
+    impl<T> futures_core::Stream for Receiver<T> {
+        type Item = T;
 
-    fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
-        self.poll_recv(cx)
+        fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
+            self.poll_recv(cx)
+        }
     }
 }
 

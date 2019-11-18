@@ -24,24 +24,22 @@
 mod addr;
 pub use addr::ToSocketAddrs;
 
-pub mod driver;
+cfg_io_driver! {
+    pub mod driver;
+    pub mod util;
+}
 
-pub mod util;
+cfg_tcp! {
+    pub mod tcp;
+    pub use tcp::{TcpListener, TcpStream};
+}
 
-#[cfg(feature = "tcp")]
-pub mod tcp;
+cfg_udp! {
+    pub mod udp;
+    pub use udp::UdpSocket;
+}
 
-#[cfg(feature = "tcp")]
-pub use self::tcp::{TcpListener, TcpStream};
-
-#[cfg(feature = "udp")]
-pub mod udp;
-
-#[cfg(feature = "udp")]
-pub use self::udp::UdpSocket;
-
-#[cfg(all(unix, feature = "uds"))]
-pub mod unix;
-
-#[cfg(all(unix, feature = "uds"))]
-pub use self::unix::{UnixDatagram, UnixListener, UnixStream};
+cfg_uds! {
+    pub mod unix;
+    pub use unix::{UnixDatagram, UnixListener, UnixStream};
+}

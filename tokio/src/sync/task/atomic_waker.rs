@@ -170,10 +170,8 @@ impl AtomicWaker {
     where
         W: WakerRef,
     {
-        debug!(" + register_task");
         match self.state.compare_and_swap(WAITING, REGISTERING, Acquire) {
             WAITING => {
-                debug!(" + WAITING");
                 unsafe {
                     // Locked acquired, update the waker cell
                     self.waker.with_mut(|t| *t = Some(waker.into_waker()));
@@ -214,7 +212,6 @@ impl AtomicWaker {
                 }
             }
             WAKING => {
-                debug!(" + WAKING");
                 // Currently in the process of waking the task, i.e.,
                 // `wake` is currently being called on the old waker.
                 // So, we call wake on the new waker.
@@ -240,7 +237,6 @@ impl AtomicWaker {
     ///
     /// If `register` has not been called yet, then this does nothing.
     pub(crate) fn wake(&self) {
-        debug!(" + wake");
         if let Some(waker) = self.take_waker() {
             waker.wake();
         }
@@ -249,24 +245,20 @@ impl AtomicWaker {
     /// Attempts to take the `Waker` value out of the `AtomicWaker` with the
     /// intention that the caller will wake the task later.
     pub(crate) fn take_waker(&self) -> Option<Waker> {
-        debug!(" + take_waker");
         // AcqRel ordering is used in order to acquire the value of the `waker`
         // cell as well as to establish a `release` ordering with whatever
         // memory the `AtomicWaker` is associated with.
         match self.state.fetch_or(WAKING, AcqRel) {
             WAITING => {
-                debug!(" + WAITING");
                 // The waking lock has been acquired.
                 let waker = unsafe { self.waker.with_mut(|t| (*t).take()) };
 
                 // Release the lock
                 self.state.fetch_and(!WAKING, Release);
-                debug!(" + Done taking");
 
                 waker
             }
             state => {
-                debug!(" + state = {:?}", state);
                 // There is a concurrent thread currently updating the
                 // associated waker.
                 //

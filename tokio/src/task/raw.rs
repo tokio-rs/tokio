@@ -54,16 +54,19 @@ pub(super) fn vtable<T: Future, S: Schedule>() -> &'static Vtable {
     }
 }
 
-impl RawTask {
-    #[cfg(feature = "rt-full")]
-    pub(super) fn new_background<T, S>(task: T) -> RawTask
-    where
-        T: Future + Send + 'static,
-        S: Schedule,
-    {
-        RawTask::new::<_, S>(task, State::new_background())
+cfg_rt_threaded! {
+    impl RawTask {
+        pub(super) fn new_background<T, S>(task: T) -> RawTask
+        where
+            T: Future + Send + 'static,
+            S: Schedule,
+        {
+            RawTask::new::<_, S>(task, State::new_background())
+        }
     }
+}
 
+impl RawTask {
     pub(super) fn new_joinable<T, S>(task: T) -> RawTask
     where
         T: Future + Send + 'static,

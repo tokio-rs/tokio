@@ -1,11 +1,13 @@
 //! Asynchronous green-threads.
 
-#[cfg(feature = "blocking")]
-mod blocking;
-#[cfg(feature = "rt-full")]
-pub use blocking::block_in_place;
-#[cfg(feature = "blocking")]
-pub use blocking::spawn_blocking;
+cfg_blocking! {
+    mod blocking;
+    pub use blocking::spawn_blocking;
+
+    cfg_rt_threaded! {
+        pub use blocking::block_in_place;
+    }
+}
 
 mod core;
 use self::core::Cell;
@@ -17,10 +19,11 @@ pub use self::error::JoinError;
 mod harness;
 use self::harness::Harness;
 
-mod join;
-#[cfg(feature = "rt-core")]
-#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
-pub use self::join::JoinHandle;
+cfg_rt_core! {
+    mod join;
+    #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
+    pub use self::join::JoinHandle;
+}
 
 mod list;
 pub(crate) use self::list::OwnedList;
@@ -28,10 +31,10 @@ pub(crate) use self::list::OwnedList;
 mod raw;
 use self::raw::RawTask;
 
-#[cfg(feature = "rt-core")]
-mod spawn;
-#[cfg(feature = "rt-core")]
-pub use spawn::spawn;
+cfg_rt_core! {
+    mod spawn;
+    pub use spawn::spawn;
+}
 
 mod stack;
 pub(crate) use self::stack::TransferStack;
@@ -81,16 +84,17 @@ pub(crate) trait Schedule: Send + Sync + Sized + 'static {
     fn schedule(&self, task: Task<Self>);
 }
 
-/// Create a new task without an associated join handle
-#[cfg(feature = "rt-full")]
-pub(crate) fn background<T, S>(task: T) -> Task<S>
-where
-    T: Future + Send + 'static,
-    S: Schedule,
-{
-    Task {
-        raw: RawTask::new_background::<_, S>(task),
-        _p: PhantomData,
+cfg_rt_threaded! {
+    /// Create a new task without an associated join handle
+    pub(crate) fn background<T, S>(task: T) -> Task<S>
+    where
+        T: Future + Send + 'static,
+        S: Schedule,
+    {
+        Task {
+            raw: RawTask::new_background::<_, S>(task),
+            _p: PhantomData,
+        }
     }
 }
 

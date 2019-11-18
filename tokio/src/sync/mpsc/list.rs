@@ -169,7 +169,6 @@ impl<T> Tx<T> {
     }
 
     pub(crate) unsafe fn reclaim_block(&self, mut block: NonNull<Block<T>>) {
-        debug!("+ reclaim_block({:p})", block);
         // The block has been removed from the linked list and ownership
         // is reclaimed.
         //
@@ -206,7 +205,6 @@ impl<T> Tx<T> {
         }
 
         if !reused {
-            debug!(" + block freed {:p}", block);
             let _ = Box::from_raw(block.as_ptr());
         }
     }
@@ -226,7 +224,6 @@ impl<T> Rx<T> {
     pub(crate) fn pop(&mut self, tx: &Tx<T>) -> Option<block::Read<T>> {
         // Advance `head`, if needed
         if !self.try_advancing_head() {
-            debug!("+ !self.try_advancing_head() -> false");
             return None;
         }
 
@@ -276,8 +273,6 @@ impl<T> Rx<T> {
     }
 
     fn reclaim_blocks(&mut self, tx: &Tx<T>) {
-        debug!("+ reclaim_blocks()");
-
         while self.free_head != self.head {
             unsafe {
                 // Get a handle to the block that will be freed and update
@@ -316,7 +311,6 @@ impl<T> Rx<T> {
     /// Effectively `Drop` all the blocks. Should only be called once, when
     /// the list is dropping.
     pub(super) unsafe fn free_blocks(&mut self) {
-        debug!("+ free_blocks()");
         debug_assert_ne!(self.free_head, NonNull::dangling());
 
         let mut cur = Some(self.free_head);
@@ -331,7 +325,6 @@ impl<T> Rx<T> {
 
         while let Some(block) = cur {
             cur = block.as_ref().load_next(Relaxed);
-            debug!(" + free: block = {:p}", block);
             drop(Box::from_raw(block.as_ptr()));
         }
     }

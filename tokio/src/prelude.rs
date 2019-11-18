@@ -12,6 +12,8 @@
 //! The prelude may grow over time as additional items see ubiquitous use.
 
 pub use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite};
-#[cfg(feature = "io-util")]
-#[doc(no_inline)]
-pub use crate::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _};
+
+cfg_io_util! {
+    #[doc(no_inline)]
+    pub use crate::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _};
+}

@@ -21,17 +21,14 @@ fn smoke() {
                 for i in 0..NUM_MSG {
                     tx.push((th, i));
                 }
-                debug!(" + tx thread done");
             });
         }
 
         let mut next = vec![0; NUM_TX];
 
         loop {
-            debug!(" + rx.pop()");
             match rx.pop(&tx) {
                 Some(Value((th, v))) => {
-                    debug!(" + pop() -> Some(Value({}))", v);
                     assert_eq!(v, next[th]);
                     next[th] += 1;
 
@@ -43,7 +40,6 @@ fn smoke() {
                     panic!();
                 }
                 None => {
-                    debug!(" + pop() -> None");
                     thread::yield_now();
                 }
             }

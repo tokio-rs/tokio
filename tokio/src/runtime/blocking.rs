@@ -3,10 +3,7 @@
 //! shells. This isolates the complexity of dealing with conditional
 //! compilation.
 
-pub(crate) use self::variant::*;
-
-#[cfg(feature = "blocking")]
-mod variant {
+cfg_blocking_impl! {
     pub(crate) use crate::blocking::BlockingPool;
     pub(crate) use crate::blocking::Spawner;
 
@@ -17,8 +14,7 @@ mod variant {
     }
 }
 
-#[cfg(not(feature = "blocking"))]
-mod variant {
+cfg_not_blocking_impl! {
     use crate::runtime::Builder;
 
     #[derive(Debug, Clone)]
