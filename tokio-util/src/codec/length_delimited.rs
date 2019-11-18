@@ -42,6 +42,7 @@
 //! use tokio::prelude::*;
 //! use tokio_util::codec::{Framed, LengthDelimitedCodec};
 //!
+//! use futures::SinkExt;
 //! use bytes::Bytes;
 //!
 //! async fn write_frame<T>(io: T) -> Result<(), Box<dyn std::error::Error>>

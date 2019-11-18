@@ -75,18 +75,27 @@ macro_rules! thread_local {
     ($($tts:tt)+) => { loom::thread_local!{ $($tts)+ } }
 }
 
+macro_rules! ready {
+    ($e:expr $(,)?) => {
+        match $e {
+            std::task::Poll::Ready(t) => t,
+            std::task::Poll::Pending => return std::task::Poll::Pending,
+        }
+    };
+}
+
 // At the top due to macros
 #[cfg(test)]
 #[macro_use]
 mod tests;
 
 #[cfg(feature = "blocking")]
-pub mod blocking;
+pub(crate) mod blocking;
 
 #[cfg(feature = "fs")]
 pub mod fs;
 
-pub mod future;
+mod future;
 
 pub mod io;
 
@@ -107,23 +116,19 @@ pub mod runtime;
 #[cfg(not(loom))]
 pub mod signal;
 
-pub mod stream;
-
 #[cfg(feature = "sync")]
 pub mod sync;
 
 #[cfg(feature = "rt-core")]
 pub mod task;
+#[cfg(feature = "rt-core")]
+pub use crate::task::spawn;
 
 #[cfg(feature = "time")]
 pub mod time;
 
 #[cfg(feature = "rt-full")]
 mod util;
-
-#[doc(inline)]
-#[cfg(feature = "rt-core")]
-pub use crate::runtime::spawn;
 
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
 #[cfg(feature = "macros")]

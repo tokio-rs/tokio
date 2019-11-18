@@ -14,14 +14,12 @@
 //! [`TcpStream`]: struct.TcpStream.html
 //! [`connect`]: struct.TcpStream.html#method.connect
 //! [`TcpListener`]: struct.TcpListener.html
-//! [incoming_method]: struct.TcpListener.html#method.incoming
-//! [`Incoming`]: struct.Incoming.html
-
-mod incoming;
-pub use self::incoming::Incoming;
 
 mod listener;
 pub use self::listener::TcpListener;
+
+mod incoming;
+pub use self::incoming::Incoming;
 
 pub mod split;
 

@@ -1,7 +1,5 @@
 use crate::fs::{asyncify, sys};
 
-use futures_core::ready;
-use futures_core::stream::Stream;
 use std::ffi::OsString;
 use std::fs::{FileType, Metadata};
 use std::future::Future;
@@ -50,10 +48,15 @@ enum State {
     Pending(sys::Blocking<(Option<io::Result<std::fs::DirEntry>>, std::fs::ReadDir)>),
 }
 
-impl Stream for ReadDir {
-    type Item = io::Result<DirEntry>;
+impl ReadDir {
+    /// Returns the next entry in the directory stream.
+    pub async fn next_entry(&mut self) -> io::Result<Option<DirEntry>> {
+        use crate::future::poll_fn;
+        poll_fn(|cx| self.poll_next_entry(cx)).await
+    }
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    #[doc(hidden)]
+    pub fn poll_next_entry(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<Option<DirEntry>>> {
         loop {
             match self.0 {
                 State::Idle(ref mut std) => {
@@ -68,12 +71,29 @@ impl Stream for ReadDir {
                     let (ret, std) = ready!(Pin::new(rx).poll(cx))?;
                     self.0 = State::Idle(Some(std));
 
-                    let ret = ret.map(|res| res.map(|std| DirEntry(Arc::new(std))));
+                    let ret = match ret {
+                        Some(Ok(std)) => Ok(Some(DirEntry(Arc::new(std)))),
+                        Some(Err(e)) => Err(e),
+                        None => Ok(None),
+                    };
 
                     return Poll::Ready(ret);
                 }
             }
         }
+    }
+}
+
+#[cfg(feature = "stream")]
+impl futures_core::Stream for ReadDir {
+    type Item = io::Result<DirEntry>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        Poll::Ready(match ready!(self.poll_next_entry(cx)) {
+            Ok(Some(entry)) => Some(Ok(entry)),
+            Ok(None) => None,
+            Err(err) => Some(Err(err)),
+        })
     }
 }
 
@@ -100,13 +120,11 @@ impl DirEntry {
     ///
     /// ```no_run
     /// use tokio::fs;
-    /// use tokio::prelude::*;
     ///
     /// # async fn dox() -> std::io::Result<()> {
     /// let mut entries = fs::read_dir(".").await?;
     ///
-    /// while let Some(res) = entries.next().await {
-    ///     let entry = res?;
+    /// while let Some(entry) = entries.next_entry().await? {
     ///     println!("{:?}", entry.path());
     /// }
     /// # Ok(())
@@ -133,13 +151,11 @@ impl DirEntry {
     ///
     /// ```
     /// use tokio::fs;
-    /// use tokio::prelude::*;
     ///
     /// # async fn dox() -> std::io::Result<()> {
     /// let mut entries = fs::read_dir(".").await?;
     ///
-    /// while let Some(res) = entries.next().await {
-    ///     let entry = res?;
+    /// while let Some(entry) = entries.next_entry().await? {
     ///     println!("{:?}", entry.file_name());
     /// }
     /// # Ok(())
@@ -164,14 +180,11 @@ impl DirEntry {
     ///
     /// ```
     /// use tokio::fs;
-    /// use tokio::prelude::*;
     ///
     /// # async fn dox() -> std::io::Result<()> {
     /// let mut entries = fs::read_dir(".").await?;
     ///
-    /// while let Some(res) = entries.next().await {
-    ///     let entry = res?;
-    ///
+    /// while let Some(entry) = entries.next_entry().await? {
     ///     if let Ok(metadata) = entry.metadata().await {
     ///         // Now let's show our entry's permissions!
     ///         println!("{:?}: {:?}", entry.path(), metadata.permissions());
@@ -202,14 +215,11 @@ impl DirEntry {
     ///
     /// ```
     /// use tokio::fs;
-    /// use tokio::prelude::*;
     ///
     /// # async fn dox() -> std::io::Result<()> {
     /// let mut entries = fs::read_dir(".").await?;
     ///
-    /// while let Some(res) = entries.next().await {
-    ///     let entry = res?;
-    ///
+    /// while let Some(entry) = entries.next_entry().await? {
     ///     if let Ok(file_type) = entry.file_type().await {
     ///         // Now let's show our entry's file type!
     ///         println!("{:?}: {:?}", entry.path(), file_type);

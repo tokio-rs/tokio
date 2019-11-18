@@ -1,9 +1,8 @@
+use crate::future::poll_fn;
 use crate::net::udp::split::{split, UdpSocketRecvHalf, UdpSocketSendHalf};
 use crate::net::util::PollEvented;
 use crate::net::ToSocketAddrs;
 
-use futures_core::ready;
-use futures_util::future::poll_fn;
 use std::convert::TryFrom;
 use std::fmt;
 use std::io;

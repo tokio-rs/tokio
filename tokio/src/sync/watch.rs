@@ -8,11 +8,11 @@
 //!
 //! [`channel`] returns a [`Sender`] / [`Receiver`] pair. These are
 //! the producer and sender halves of the channel. The channel is
-//! created with an initial value. [`Receiver::get_ref`] will always
+//! created with an initial value. [`Receiver::recv`] will always
 //! be ready upon creation and will yield either this initial value or
 //! the latest value that has been sent by `Sender`.
 //!
-//! Calls to [`Receiver::get_ref`] will always yield the latest value.
+//! Calls to [`Receiver::recv`] will always yield the latest value.
 //!
 //! # Examples
 //!
@@ -49,22 +49,17 @@
 //! [`Receiver`]: struct.Receiver.html
 //! [`channel`]: fn.channel.html
 //! [`Sender::closed`]: struct.Sender.html#method.closed
-//! [`Receiver::get_ref`]: struct.Receiver.html#method.get_ref
 
+use crate::future::poll_fn;
 use crate::sync::task::AtomicWaker;
 
-use core::task::Poll::{Pending, Ready};
-use core::task::{Context, Poll};
 use fnv::FnvHashMap;
-use futures_util::future::poll_fn;
 use std::ops;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard, Weak};
-
-use futures_core::ready;
-use futures_util::pin_mut;
-use std::pin::Pin;
+use std::task::Poll::{Pending, Ready};
+use std::task::{Context, Poll};
 
 /// Receives values from the associated [`Sender`](struct.Sender.html).
 ///
@@ -182,7 +177,7 @@ const CLOSED: usize = 1;
 ///
 /// [`Sender`]: struct.Sender.html
 /// [`Receiver`]: struct.Receiver.html
-pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
+pub fn channel<T: Clone>(init: T) -> (Sender<T>, Receiver<T>) {
     const INIT_ID: u64 = 0;
 
     let inner = Arc::new(WatchInner::new());
@@ -228,84 +223,57 @@ impl<T> Receiver<T> {
     /// use tokio::sync::watch;
     ///
     /// let (_, rx) = watch::channel("hello");
-    /// assert_eq!(*rx.get_ref(), "hello");
+    /// assert_eq!(*rx.borrow(), "hello");
     /// ```
-    pub fn get_ref(&self) -> Ref<'_, T> {
+    pub fn borrow(&self) -> Ref<'_, T> {
         let inner = self.shared.value.read().unwrap();
         Ref { inner }
     }
 
-    /// Attempts to receive the latest value sent via the channel.
-    ///
-    /// If a new, unobserved, value has been sent, a reference to it is
-    /// returned. If no new value has been sent, then `Pending` is returned and
-    /// the current task is notified once a new value is sent.
-    ///
-    /// Only the **most recent** value is returned. If the receiver is falling
-    /// behind the sender, intermediate values are dropped.
-    pub async fn recv_ref(&mut self) -> Option<Ref<'_, T>> {
-        let shared = &self.shared;
-        let inner = &self.inner;
-        let version = self.ver;
+    // TODO: document
+    #[doc(hidden)]
+    pub fn poll_recv_ref<'a>(&'a mut self, cx: &mut Context<'_>) -> Poll<Option<Ref<'a, T>>> {
+        // Make sure the task is up to date
+        self.inner.waker.register_by_ref(cx.waker());
 
-        match poll_fn(|cx| poll_lock(cx, shared, inner, version)).await {
-            Some((lock, version)) => {
-                self.ver = version;
-                Some(lock)
-            }
-            None => None,
+        let state = self.shared.version.load(SeqCst);
+        let version = state & !CLOSED;
+
+        if version != self.ver {
+            let inner = self.shared.value.read().unwrap();
+            self.ver = version;
+
+            return Ready(Some(Ref { inner }));
         }
+
+        if CLOSED == state & CLOSED {
+            // The `Store` handle has been dropped.
+            return Ready(None);
+        }
+
+        Pending
     }
-}
-
-fn poll_lock<'a, T>(
-    cx: &mut Context<'_>,
-    shared: &'a Arc<Shared<T>>,
-    inner: &Arc<WatchInner>,
-    ver: usize,
-) -> Poll<Option<(Ref<'a, T>, usize)>> {
-    // Make sure the task is up to date
-    inner.waker.register_by_ref(cx.waker());
-
-    let state = shared.version.load(SeqCst);
-    let version = state & !CLOSED;
-
-    if version != ver {
-        let inner = shared.value.read().unwrap();
-
-        return Ready(Some((Ref { inner }, version)));
-    }
-
-    if CLOSED == state & CLOSED {
-        // The `Store` handle has been dropped.
-        return Ready(None);
-    }
-
-    Pending
 }
 
 impl<T: Clone> Receiver<T> {
     /// Attempts to clone the latest value sent via the channel.
-    ///
-    /// This is equivalent to calling `clone()` on the value returned by
-    /// `recv_ref()`.
-    #[allow(clippy::map_clone)] // false positive: https://github.com/rust-lang/rust-clippy/issues/3274
     pub async fn recv(&mut self) -> Option<T> {
-        self.recv_ref().await.map(|v_ref| v_ref.clone())
+        poll_fn(|cx| {
+            let v_ref = ready!(self.poll_recv_ref(cx));
+            Poll::Ready(v_ref.map(|v_ref| (*v_ref).clone()))
+        })
+        .await
     }
 }
 
+#[cfg(feature = "stream")]
 impl<T: Clone> futures_core::Stream for Receiver<T> {
     type Item = T;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
-        use std::future::Future;
+    fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        let v_ref = ready!(self.poll_recv_ref(cx));
 
-        let fut = self.get_mut().recv();
-        pin_mut!(fut);
-
-        let item = ready!(fut.poll(cx));
-        Ready(item.map(|v_ref| v_ref))
+        Poll::Ready(v_ref.map(|v_ref| (*v_ref).clone()))
     }
 }
 
@@ -391,27 +359,6 @@ impl<T> Sender<T> {
             }
             None => Ready(()),
         }
-    }
-}
-
-impl<T> futures_sink::Sink<T> for Sender<T> {
-    type Error = error::SendError<T>;
-
-    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Ready(Ok(()))
-    }
-
-    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        self.as_ref().get_ref().broadcast(item)?;
-        Ok(())
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Ready(Ok(()))
-    }
-
-    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Ready(Ok(()))
     }
 }
 

@@ -132,16 +132,16 @@
 #[macro_use]
 mod tests;
 
+#[cfg(feature = "rt-core")]
+mod basic_scheduler;
+#[cfg(feature = "rt-core")]
+use self::basic_scheduler::BasicScheduler;
+
 mod blocking;
 use blocking::BlockingPool;
 
 mod builder;
 pub use self::builder::Builder;
-
-#[cfg(feature = "rt-core")]
-mod current_thread;
-#[cfg(feature = "rt-core")]
-use self::current_thread::CurrentThread;
 
 pub(crate) mod enter;
 use self::enter::enter;
@@ -149,7 +149,7 @@ use self::enter::enter;
 #[cfg(feature = "rt-core")]
 mod global;
 #[cfg(feature = "rt-core")]
-pub use self::global::spawn;
+pub(crate) use self::global::spawn;
 
 mod handle;
 pub use self::handle::Handle;
@@ -220,7 +220,7 @@ enum Kind {
 
     /// Execute all tasks on the current-thread.
     #[cfg(feature = "rt-core")]
-    CurrentThread(CurrentThread<time::Driver>),
+    Basic(BasicScheduler<time::Driver>),
 
     /// Execute tasks across multiple threads.
     #[cfg(feature = "rt-full")]
@@ -255,10 +255,10 @@ impl Runtime {
     /// [mod]: index.html
     pub fn new() -> io::Result<Self> {
         #[cfg(feature = "rt-full")]
-        let ret = Builder::new().thread_pool().build();
+        let ret = Builder::new().threaded_scheduler().build();
 
         #[cfg(all(not(feature = "rt-full"), feature = "rt-core"))]
-        let ret = Builder::new().current_thread().build();
+        let ret = Builder::new().basic_scheduler().build();
 
         #[cfg(not(feature = "rt-core"))]
         let ret = Builder::new().build();
@@ -299,13 +299,14 @@ impl Runtime {
     #[cfg(feature = "rt-core")]
     pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
-        F: Future<Output = ()> + Send + 'static,
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
     {
         match &self.kind {
             Kind::Shell(_) => panic!("task execution disabled"),
             #[cfg(feature = "rt-full")]
             Kind::ThreadPool(exec) => exec.spawn(future),
-            Kind::CurrentThread(exec) => exec.spawn(future),
+            Kind::Basic(exec) => exec.spawn(future),
         }
     }
 
@@ -328,10 +329,18 @@ impl Runtime {
         self.handle.enter(|| match kind {
             Kind::Shell(exec) => exec.block_on(future),
             #[cfg(feature = "rt-core")]
-            Kind::CurrentThread(exec) => exec.block_on(future),
+            Kind::Basic(exec) => exec.block_on(future),
             #[cfg(feature = "rt-full")]
             Kind::ThreadPool(exec) => exec.block_on(future),
         })
+    }
+
+    /// Enter the runtime context
+    pub fn enter<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce() -> R,
+    {
+        self.handle.enter(f)
     }
 
     /// Return a handle to the runtime's spawner.

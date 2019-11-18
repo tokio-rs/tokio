@@ -122,7 +122,7 @@ impl Handle {
     /// The next operation in the mock's script will be to expect a `read` call
     /// and return `buf`.
     pub fn read(&mut self, buf: &[u8]) -> &mut Self {
-        self.tx.try_send(Action::Read(buf.into())).unwrap();
+        self.tx.send(Action::Read(buf.into())).unwrap();
         self
     }
 
@@ -131,7 +131,7 @@ impl Handle {
     /// The next operation in the mock's script will be to expect a `write`
     /// call.
     pub fn write(&mut self, buf: &[u8]) -> &mut Self {
-        self.tx.try_send(Action::Write(buf.into())).unwrap();
+        self.tx.send(Action::Write(buf.into())).unwrap();
         self
     }
 }
@@ -298,7 +298,7 @@ impl AsyncRead for Mock {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     if let Some(rem) = self.inner.remaining_wait() {
                         let until = Instant::now() + rem;
-                        self.inner.sleep = Some(time::delay(until));
+                        self.inner.sleep = Some(time::delay_until(until));
                     } else {
                         self.inner.read_wait = Some(cx.waker().clone());
                         return Poll::Pending;
@@ -340,7 +340,7 @@ impl AsyncWrite for Mock {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     if let Some(rem) = self.inner.remaining_wait() {
                         let until = Instant::now() + rem;
-                        self.inner.sleep = Some(time::delay(until));
+                        self.inner.sleep = Some(time::delay_until(until));
                     } else {
                         panic!("unexpected WouldBlock");
                     }

@@ -4,7 +4,7 @@ use tokio::net::driver::Reactor;
 use tokio::net::TcpListener;
 use tokio_test::{assert_ok, assert_pending};
 
-use futures_util::task::{waker_ref, ArcWake};
+use futures::task::{waker_ref, ArcWake};
 use std::future::Future;
 use std::net::TcpStream;
 use std::pin::Pin;

@@ -58,7 +58,6 @@
 //! use tokio::io::{BufReader, AsyncBufReadExt};
 //! use tokio::process::Command;
 //!
-//! use futures_util::stream::StreamExt;
 //! use std::process::Stdio;
 //!
 //! #[tokio::main]
@@ -89,8 +88,8 @@
 //!         println!("child status was: {}", status);
 //!     });
 //!
-//!     while let Some(line) = reader.next().await {
-//!         println!("Line: {}", line?);
+//!     while let Some(line) = reader.next_line().await? {
+//!         println!("Line: {}", line);
 //!     }
 //!
 //!     Ok(())
@@ -120,8 +119,6 @@ mod kill;
 use crate::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 use crate::process::kill::Kill;
 
-use futures_core::TryFuture;
-use futures_util::future::try_join3;
 use std::ffi::OsStr;
 use std::future::Future;
 use std::io;
@@ -681,11 +678,14 @@ impl<T: Kill> Drop for ChildDropGuard<T> {
     }
 }
 
-impl<T: TryFuture + Kill + Unpin> Future for ChildDropGuard<T> {
-    type Output = Result<T::Ok, T::Error>;
+impl<T, E, F> Future for ChildDropGuard<F>
+where
+    F: Future<Output = Result<T, E>> + Kill + Unpin,
+{
+    type Output = Result<T, E>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let ret = Pin::new(&mut self.inner).try_poll(cx);
+        let ret = Pin::new(&mut self.inner).poll(cx);
 
         if let Poll::Ready(Ok(_)) = ret {
             // Avoid the overhead of trying to kill a reaped process
@@ -766,6 +766,8 @@ impl Child {
     /// new pipes between parent and child. Use `stdout(Stdio::piped())` or
     /// `stderr(Stdio::piped())`, respectively, when creating a `Command`.
     pub async fn wait_with_output(mut self) -> io::Result<Output> {
+        use crate::future::try_join3;
+
         async fn read_to_end<A: AsyncRead + Unpin>(io: Option<A>) -> io::Result<Vec<u8>> {
             let mut vec = Vec::new();
             if let Some(mut io) = io {
@@ -940,16 +942,14 @@ mod sys {
 
 #[cfg(all(test, not(loom)))]
 mod test {
+    use super::kill::Kill;
+    use super::ChildDropGuard;
+
+    use futures::future::FutureExt;
     use std::future::Future;
     use std::io;
     use std::pin::Pin;
-    use std::task::Context;
-    use std::task::Poll;
-
-    use futures_util::future::FutureExt;
-
-    use super::kill::Kill;
-    use super::ChildDropGuard;
+    use std::task::{Context, Poll};
 
     struct Mock {
         num_kills: usize,
@@ -1021,7 +1021,7 @@ mod test {
         let mut mock_reaped = Mock::with_result(Poll::Ready(Ok(())));
         let mut mock_err = Mock::with_result(Poll::Ready(Err(())));
 
-        let waker = futures_util::task::noop_waker();
+        let waker = futures::task::noop_waker();
         let mut context = Context::from_waker(&waker);
         {
             let mut guard = ChildDropGuard::new(&mut mock_pending);

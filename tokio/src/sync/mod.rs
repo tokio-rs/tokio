@@ -47,7 +47,7 @@ pub mod oneshot;
 pub mod semaphore;
 
 mod task;
-pub use task::AtomicWaker;
+pub(crate) use task::AtomicWaker;
 
 pub mod watch;
 

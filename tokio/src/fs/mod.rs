@@ -22,8 +22,6 @@
 //!
 //! [`AsyncRead`]: https://docs.rs/tokio-io/0.1/tokio_io/trait.AsyncRead.html
 
-pub(crate) mod blocking;
-
 mod create_dir;
 pub use self::create_dir::create_dir;
 

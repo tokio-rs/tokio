@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 
 use crate::time::tests::mock_clock::mock;
-use crate::time::{delay, Duration, Instant};
+use crate::time::{delay_until, Duration, Instant};
 use tokio_test::task;
 use tokio_test::{assert_pending, assert_ready};
 
@@ -9,7 +9,7 @@ use tokio_test::{assert_pending, assert_ready};
 fn immediate_delay() {
     mock(|clock| {
         // Create `Delay` that elapsed immediately.
-        let mut fut = task::spawn(delay(clock.now()));
+        let mut fut = task::spawn(delay_until(clock.now()));
 
         // Ready!
         assert_ready!(fut.poll());
@@ -27,7 +27,7 @@ fn delayed_delay_level_0() {
     for &i in &[1, 10, 60] {
         mock(|clock| {
             // Create a `Delay` that elapses in the future
-            let mut fut = task::spawn(delay(clock.now() + ms(i)));
+            let mut fut = task::spawn(delay_until(clock.now() + ms(i)));
 
             // The delay has not elapsed.
             assert_pending!(fut.poll());
@@ -46,7 +46,7 @@ fn sub_ms_delayed_delay() {
         for _ in 0..5 {
             let deadline = clock.now() + Duration::from_millis(1) + Duration::new(0, 1);
 
-            let mut fut = task::spawn(delay(deadline));
+            let mut fut = task::spawn(delay_until(deadline));
 
             assert_pending!(fut.poll());
 
@@ -66,7 +66,7 @@ fn delayed_delay_wrapping_level_0() {
         clock.turn_for(ms(5));
         assert_eq!(clock.advanced(), ms(5));
 
-        let mut fut = task::spawn(delay(clock.now() + ms(60)));
+        let mut fut = task::spawn(delay_until(clock.now() + ms(60)));
 
         assert_pending!(fut.poll());
 
@@ -85,14 +85,14 @@ fn delayed_delay_wrapping_level_0() {
 fn timer_wrapping_with_higher_levels() {
     mock(|clock| {
         // Set delay to hit level 1
-        let mut s1 = task::spawn(delay(clock.now() + ms(64)));
+        let mut s1 = task::spawn(delay_until(clock.now() + ms(64)));
         assert_pending!(s1.poll());
 
         // Turn a bit
         clock.turn_for(ms(5));
 
         // Set timeout such that it will hit level 0, but wrap
-        let mut s2 = task::spawn(delay(clock.now() + ms(60)));
+        let mut s2 = task::spawn(delay_until(clock.now() + ms(60)));
         assert_pending!(s2.poll());
 
         // This should result in s1 firing
@@ -113,7 +113,7 @@ fn timer_wrapping_with_higher_levels() {
 fn delay_with_deadline_in_past() {
     mock(|clock| {
         // Create `Delay` that elapsed immediately.
-        let mut fut = task::spawn(delay(clock.now() - ms(100)));
+        let mut fut = task::spawn(delay_until(clock.now() - ms(100)));
 
         // Even though the delay expires in the past, it is not ready yet
         // because the timer must observe it.
@@ -131,7 +131,7 @@ fn delay_with_deadline_in_past() {
 fn delayed_delay_level_1() {
     mock(|clock| {
         // Create a `Delay` that elapses in the future
-        let mut fut = task::spawn(delay(clock.now() + ms(234)));
+        let mut fut = task::spawn(delay_until(clock.now() + ms(234)));
 
         // The delay has not elapsed.
         assert_pending!(fut.poll());
@@ -153,7 +153,7 @@ fn delayed_delay_level_1() {
 
     mock(|clock| {
         // Create a `Delay` that elapses in the future
-        let mut fut = task::spawn(delay(clock.now() + ms(234)));
+        let mut fut = task::spawn(delay_until(clock.now() + ms(234)));
 
         // The delay has not elapsed.
         assert_pending!(fut.poll());
@@ -186,7 +186,7 @@ fn creating_delay_outside_of_context() {
 
     // This creates a delay outside of the context of a mock timer. This tests
     // that it will still expire.
-    let mut fut = task::spawn(delay(now + ms(500)));
+    let mut fut = task::spawn(delay_until(now + ms(500)));
 
     mock(|clock| {
         // This registers the delay with the timer
@@ -209,8 +209,8 @@ fn creating_delay_outside_of_context() {
 #[test]
 fn concurrently_set_two_timers_second_one_shorter() {
     mock(|clock| {
-        let mut fut1 = task::spawn(delay(clock.now() + ms(500)));
-        let mut fut2 = task::spawn(delay(clock.now() + ms(200)));
+        let mut fut1 = task::spawn(delay_until(clock.now() + ms(500)));
+        let mut fut2 = task::spawn(delay_until(clock.now() + ms(200)));
 
         // The delay has not elapsed
         assert_pending!(fut1.poll());
@@ -245,7 +245,7 @@ fn concurrently_set_two_timers_second_one_shorter() {
 fn short_delay() {
     mock(|clock| {
         // Create a `Delay` that elapses in the future
-        let mut fut = task::spawn(delay(clock.now() + ms(1)));
+        let mut fut = task::spawn(delay_until(clock.now() + ms(1)));
 
         // The delay has not elapsed.
         assert_pending!(fut.poll());
@@ -262,12 +262,12 @@ fn short_delay() {
 }
 
 #[test]
-fn sorta_long_delay() {
+fn sorta_long_delay_until() {
     const MIN_5: u64 = 5 * 60 * 1000;
 
     mock(|clock| {
         // Create a `Delay` that elapses in the future
-        let mut fut = task::spawn(delay(clock.now() + ms(MIN_5)));
+        let mut fut = task::spawn(delay_until(clock.now() + ms(MIN_5)));
 
         // The delay has not elapsed.
         assert_pending!(fut.poll());
@@ -295,7 +295,7 @@ fn very_long_delay() {
 
     mock(|clock| {
         // Create a `Delay` that elapses in the future
-        let mut fut = task::spawn(delay(clock.now() + ms(MO_5)));
+        let mut fut = task::spawn(delay_until(clock.now() + ms(MO_5)));
 
         // The delay has not elapsed.
         assert_pending!(fut.poll());
@@ -332,7 +332,7 @@ fn greater_than_max() {
 
     mock(|clock| {
         // Create a `Delay` that elapses in the future
-        let mut fut = task::spawn(delay(clock.now() + ms(YR_5)));
+        let mut fut = task::spawn(delay_until(clock.now() + ms(YR_5)));
 
         assert_pending!(fut.poll());
 
@@ -346,9 +346,9 @@ fn greater_than_max() {
 #[test]
 fn unpark_is_delayed() {
     mock(|clock| {
-        let mut fut1 = task::spawn(delay(clock.now() + ms(100)));
-        let mut fut2 = task::spawn(delay(clock.now() + ms(101)));
-        let mut fut3 = task::spawn(delay(clock.now() + ms(200)));
+        let mut fut1 = task::spawn(delay_until(clock.now() + ms(100)));
+        let mut fut2 = task::spawn(delay_until(clock.now() + ms(101)));
+        let mut fut3 = task::spawn(delay_until(clock.now() + ms(200)));
 
         assert_pending!(fut1.poll());
         assert_pending!(fut2.poll());
@@ -374,7 +374,7 @@ fn set_timeout_at_deadline_greater_than_max_timer() {
             clock.turn_for(ms(YR_1));
         }
 
-        let mut fut = task::spawn(delay(clock.now() + ms(1)));
+        let mut fut = task::spawn(delay_until(clock.now() + ms(1)));
         assert_pending!(fut.poll());
 
         clock.turn_for(ms(1000));
@@ -387,7 +387,7 @@ fn set_timeout_at_deadline_greater_than_max_timer() {
 #[test]
 fn reset_future_delay_before_fire() {
     mock(|clock| {
-        let mut fut = task::spawn(delay(clock.now() + ms(100)));
+        let mut fut = task::spawn(delay_until(clock.now() + ms(100)));
 
         assert_pending!(fut.poll());
 
@@ -408,7 +408,7 @@ fn reset_future_delay_before_fire() {
 #[test]
 fn reset_past_delay_before_turn() {
     mock(|clock| {
-        let mut fut = task::spawn(delay(clock.now() + ms(100)));
+        let mut fut = task::spawn(delay_until(clock.now() + ms(100)));
 
         assert_pending!(fut.poll());
 
@@ -429,7 +429,7 @@ fn reset_past_delay_before_turn() {
 #[test]
 fn reset_past_delay_before_fire() {
     mock(|clock| {
-        let mut fut = task::spawn(delay(clock.now() + ms(100)));
+        let mut fut = task::spawn(delay_until(clock.now() + ms(100)));
 
         assert_pending!(fut.poll());
         clock.turn_for(ms(10));
@@ -452,7 +452,7 @@ fn reset_past_delay_before_fire() {
 #[test]
 fn reset_future_delay_after_fire() {
     mock(|clock| {
-        let mut fut = task::spawn(delay(clock.now() + ms(100)));
+        let mut fut = task::spawn(delay_until(clock.now() + ms(100)));
 
         assert_pending!(fut.poll());
 

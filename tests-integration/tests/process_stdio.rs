@@ -5,7 +5,6 @@ use tokio::process::{Child, Command};
 use tokio_test::assert_ok;
 
 use futures::future::{self, FutureExt};
-use futures::stream::StreamExt;
 use std::env;
 use std::io;
 use std::process::{ExitStatus, Stdio};
@@ -47,9 +46,9 @@ async fn feed_cat(mut cat: Child, n: usize) -> io::Result<ExitStatus> {
         // (i.e. EOF is reached after `n` lines.
         loop {
             let data = reader
-                .next()
+                .next_line()
                 .await
-                .unwrap_or_else(|| Ok(String::new()))
+                .unwrap_or_else(|_| Some(String::new()))
                 .expect("failed to read line");
 
             let num_read = data.len();

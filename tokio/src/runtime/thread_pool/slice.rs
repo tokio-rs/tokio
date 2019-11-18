@@ -95,15 +95,6 @@ where
         }
     }
 
-    pub(crate) fn spawn_background<F>(&self, future: F)
-    where
-        F: Future + Send + 'static,
-        F::Output: Send + 'static,
-    {
-        let task = task::background(future);
-        self.schedule(task);
-    }
-
     pub(crate) fn schedule(&self, task: Task<Shared<P>>) {
         current::get(|current_worker| match current_worker.as_member(self) {
             Some(worker) => {

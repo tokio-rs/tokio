@@ -37,12 +37,12 @@ impl Spawner {
         self.workers.spawn_typed(future)
     }
 
-    /// Spawn a task in the background
-    pub(crate) fn spawn_background<F>(&self, future: F)
+    /// Enter the executor context
+    pub(crate) fn enter<F, R>(&self, f: F) -> R
     where
-        F: Future<Output = ()> + Send + 'static,
+        F: FnOnce() -> R,
     {
-        self.workers.spawn_background(future);
+        crate::runtime::global::with_thread_pool(self, f)
     }
 
     /// Reference to the worker set. Used by `ThreadPool` to initiate shutdown.
