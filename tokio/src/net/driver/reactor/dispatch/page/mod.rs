@@ -1,5 +1,5 @@
 use super::{Pack, INITIAL_PAGE_SIZE, WIDTH};
-use crate::loom::CausalCell;
+use crate::loom::cell::CausalCell;
 
 pub(crate) mod scheduled_io;
 mod stack;

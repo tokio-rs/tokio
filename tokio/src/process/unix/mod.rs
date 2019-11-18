@@ -22,14 +22,16 @@
 //! bad in theory...
 
 mod orphan;
-mod reap;
+use orphan::{OrphanQueue, OrphanQueueImpl, Wait};
 
-use self::orphan::{OrphanQueue, OrphanQueueImpl, Wait};
-use self::reap::Reaper;
-use super::SpawnedChild;
+mod reap;
+use reap::Reaper;
+
 use crate::net::util::PollEvented;
 use crate::process::kill::Kill;
+use crate::process::SpawnedChild;
 use crate::signal::unix::{signal, Signal, SignalKind};
+
 use mio::event::Evented;
 use mio::unix::{EventedFd, UnixReady};
 use mio::{Poll as MioPoll, PollOpt, Ready, Token};
@@ -38,11 +40,11 @@ use std::future::Future;
 use std::io;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::pin::Pin;
-use std::process::{self, ExitStatus};
+use std::process::ExitStatus;
 use std::task::Context;
 use std::task::Poll;
 
-impl Wait for process::Child {
+impl Wait for std::process::Child {
     fn id(&self) -> u32 {
         self.id()
     }
@@ -52,14 +54,14 @@ impl Wait for process::Child {
     }
 }
 
-impl Kill for process::Child {
+impl Kill for std::process::Child {
     fn kill(&mut self) -> io::Result<()> {
         self.kill()
     }
 }
 
 lazy_static::lazy_static! {
-    static ref ORPHAN_QUEUE: OrphanQueueImpl<process::Child> = OrphanQueueImpl::new();
+    static ref ORPHAN_QUEUE: OrphanQueueImpl<std::process::Child> = OrphanQueueImpl::new();
 }
 
 struct GlobalOrphanQueue;
@@ -70,8 +72,8 @@ impl fmt::Debug for GlobalOrphanQueue {
     }
 }
 
-impl OrphanQueue<process::Child> for GlobalOrphanQueue {
-    fn push_orphan(&self, orphan: process::Child) {
+impl OrphanQueue<std::process::Child> for GlobalOrphanQueue {
+    fn push_orphan(&self, orphan: std::process::Child) {
         ORPHAN_QUEUE.push_orphan(orphan)
     }
 
@@ -82,7 +84,7 @@ impl OrphanQueue<process::Child> for GlobalOrphanQueue {
 
 #[must_use = "futures do nothing unless polled"]
 pub(crate) struct Child {
-    inner: Reaper<process::Child, GlobalOrphanQueue, Signal>,
+    inner: Reaper<std::process::Child, GlobalOrphanQueue, Signal>,
 }
 
 impl fmt::Debug for Child {
@@ -93,7 +95,7 @@ impl fmt::Debug for Child {
     }
 }
 
-pub(crate) fn spawn_child(cmd: &mut process::Command) -> io::Result<SpawnedChild> {
+pub(crate) fn spawn_child(cmd: &mut std::process::Command) -> io::Result<SpawnedChild> {
     let mut child = cmd.spawn()?;
     let stdin = stdio(child.stdin.take())?;
     let stdout = stdio(child.stdout.take())?;
@@ -196,9 +198,9 @@ where
     }
 }
 
-pub(crate) type ChildStdin = PollEvented<Fd<process::ChildStdin>>;
-pub(crate) type ChildStdout = PollEvented<Fd<process::ChildStdout>>;
-pub(crate) type ChildStderr = PollEvented<Fd<process::ChildStderr>>;
+pub(crate) type ChildStdin = PollEvented<Fd<std::process::ChildStdin>>;
+pub(crate) type ChildStdout = PollEvented<Fd<std::process::ChildStdout>>;
+pub(crate) type ChildStderr = PollEvented<Fd<std::process::ChildStderr>>;
 
 fn stdio<T>(option: Option<T>) -> io::Result<Option<PollEvented<Fd<T>>>>
 where

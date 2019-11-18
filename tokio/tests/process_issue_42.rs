@@ -5,8 +5,8 @@
 use tokio::process::Command;
 use tokio::runtime;
 
-use futures_util::future::FutureExt;
-use futures_util::stream::FuturesOrdered;
+use futures::future::FutureExt;
+use futures::stream::FuturesOrdered;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -18,7 +18,7 @@ fn run_test() {
     let finished_clone = finished.clone();
 
     thread::spawn(move || {
-        let mut rt = runtime::Builder::new().current_thread().build().unwrap();
+        let mut rt = runtime::Builder::new().basic_scheduler().build().unwrap();
 
         let mut futures = FuturesOrdered::new();
         rt.block_on(async {

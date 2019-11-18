@@ -4,7 +4,7 @@ use tokio::net::driver::Reactor;
 use tokio::net::TcpListener;
 use tokio_test::{assert_ok, assert_pending};
 
-use futures_util::task::{waker_ref, ArcWake};
+use futures::task::{waker_ref, ArcWake};
 use std::future::Future;
 use std::net::TcpStream;
 use std::pin::Pin;
@@ -60,8 +60,6 @@ fn test_drop_on_notify() {
             let _ = listener.accept().await;
         }
     }));
-
-    let _enter = tokio::executor::enter().unwrap();
 
     {
         let handle = reactor.handle();

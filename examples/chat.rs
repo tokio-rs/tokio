@@ -30,7 +30,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, Mutex};
 use tokio_util::codec::{Framed, LinesCodec, LinesCodecError};
 
-use futures::{Poll, SinkExt, Stream, StreamExt};
+use futures::{SinkExt, Stream, StreamExt};
 use std::collections::HashMap;
 use std::env;
 use std::error::Error;
@@ -38,7 +38,7 @@ use std::io;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::Context;
+use std::task::{Context, Poll};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -116,18 +116,12 @@ impl Shared {
 
     /// Send a `LineCodec` encoded message to every peer, except
     /// for the sender.
-    async fn broadcast(
-        &mut self,
-        sender: SocketAddr,
-        message: &str,
-    ) -> Result<(), mpsc::error::UnboundedSendError> {
+    async fn broadcast(&mut self, sender: SocketAddr, message: &str) {
         for peer in self.peers.iter_mut() {
             if *peer.0 != sender {
-                peer.1.send(message.into()).await?;
+                let _ = peer.1.send(message.into());
             }
         }
-
-        Ok(())
     }
 }
 
@@ -218,7 +212,7 @@ async fn process(
         let mut state = state.lock().await;
         let msg = format!("{} has joined the chat", username);
         println!("{}", msg);
-        state.broadcast(addr, &msg).await?;
+        state.broadcast(addr, &msg).await;
     }
 
     // Process incoming messages until our stream is exhausted by a disconnect.
@@ -230,7 +224,7 @@ async fn process(
                 let mut state = state.lock().await;
                 let msg = format!("{}: {}", username, msg);
 
-                state.broadcast(addr, &msg).await?;
+                state.broadcast(addr, &msg).await;
             }
             // A message was received from a peer. Send it to the
             // current user.
@@ -254,7 +248,7 @@ async fn process(
 
         let msg = format!("{} has left the chat", username);
         println!("{}", msg);
-        state.broadcast(addr, &msg).await?;
+        state.broadcast(addr, &msg).await;
     }
 
     Ok(())

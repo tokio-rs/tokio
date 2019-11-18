@@ -4,12 +4,12 @@
 
 macro_rules! rt_test {
     ($($t:tt)*) => {
-        mod current_thread {
+        mod basic_scheduler {
             $($t)*
 
             fn rt() -> Runtime {
                 tokio::runtime::Builder::new()
-                    .current_thread()
+                    .basic_scheduler()
                     .build()
                     .unwrap()
             }
@@ -38,10 +38,10 @@ rt_test! {
     use tokio::prelude::*;
     use tokio::runtime::Runtime;
     use tokio::sync::oneshot;
-    use tokio::timer;
+    use tokio::time;
     use tokio_test::{assert_err, assert_ok};
 
-    use futures_util::future::poll_fn;
+    use futures::future::poll_fn;
     use std::future::Future;
     use std::pin::Pin;
     use std::sync::{mpsc, Arc};
@@ -80,7 +80,7 @@ rt_test! {
     }
 
     #[test]
-    fn spawn_one() {
+    fn spawn_one_bg() {
         let mut rt = rt();
 
         let out = rt.block_on(async {
@@ -91,6 +91,29 @@ rt_test! {
             });
 
             assert_ok!(rx.await)
+        });
+
+        assert_eq!(out, "ZOMG");
+    }
+
+    #[test]
+    fn spawn_one_join() {
+        let mut rt = rt();
+
+        let out = rt.block_on(async {
+            let (tx, rx) = oneshot::channel();
+
+            let handle = tokio::spawn(async move {
+                tx.send("ZOMG").unwrap();
+                "DONE"
+            });
+
+            let msg = assert_ok!(rx.await);
+
+            let out = assert_ok!(handle.await);
+            assert_eq!(out, "DONE");
+
+            msg
         });
 
         assert_eq!(out, "ZOMG");
@@ -133,12 +156,12 @@ rt_test! {
             let mut txs = (0..ITER)
                 .map(|i| {
                     let (tx, rx) = oneshot::channel();
-                    let mut done_tx = done_tx.clone();
+                    let done_tx = done_tx.clone();
 
                     tokio::spawn(async move {
                         let msg = assert_ok!(rx.await);
                         assert_eq!(i, msg);
-                        assert_ok!(done_tx.try_send(msg));
+                        assert_ok!(done_tx.send(msg));
                     });
 
                     tx
@@ -180,7 +203,7 @@ rt_test! {
 
             tokio::spawn(poll_fn(move |_| {
                 assert_eq!(2, Arc::strong_count(&cnt));
-                Poll::Pending
+                Poll::<()>::Pending
             }));
         });
 
@@ -264,14 +287,14 @@ rt_test! {
     #[test]
     fn spawn_from_other_thread() {
         let mut rt = rt();
-        let sp = rt.spawner();
+        let handle = rt.handle().clone();
 
         let (tx, rx) = oneshot::channel();
 
         thread::spawn(move || {
             thread::sleep(Duration::from_millis(50));
 
-            sp.spawn(async move {
+            handle.spawn(async move {
                 assert_ok!(tx.send(()));
             });
         });
@@ -289,7 +312,7 @@ rt_test! {
         let dur = Duration::from_millis(50);
 
         rt.block_on(async move {
-            timer::delay_for(dur).await;
+            time::delay_for(dur).await;
         });
 
         assert!(now.elapsed() >= dur);
@@ -306,7 +329,7 @@ rt_test! {
             let (tx, rx) = oneshot::channel();
 
             tokio::spawn(async move {
-                timer::delay_for(dur).await;
+                time::delay_for(dur).await;
                 assert_ok!(tx.send(()));
             });
 
@@ -393,6 +416,16 @@ rt_test! {
             }
         })
         .await
+    }
+
+    #[test]
+    fn enter_and_spawn() {
+        let mut rt = rt();
+        let handle = rt.enter(|| {
+            tokio::spawn(async {})
+        });
+
+        assert_ok!(rt.block_on(handle));
     }
 
     async fn client_server(tx: mpsc::Sender<()>) {

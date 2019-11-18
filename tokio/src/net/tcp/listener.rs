@@ -1,9 +1,8 @@
+use crate::future::poll_fn;
 use crate::net::tcp::{Incoming, TcpStream};
 use crate::net::util::PollEvented;
 use crate::net::ToSocketAddrs;
 
-use futures_core::ready;
-use futures_util::future::poll_fn;
 use std::convert::TryFrom;
 use std::fmt;
 use std::io;
@@ -11,9 +10,6 @@ use std::net::{self, SocketAddr};
 use std::task::{Context, Poll};
 
 /// An I/O object representing a TCP socket listening for incoming connections.
-///
-/// This object can be converted into a stream of incoming connections for
-/// various forms of processing.
 ///
 /// # Examples
 ///
@@ -126,7 +122,8 @@ impl TcpListener {
         poll_fn(|cx| self.poll_accept(cx)).await
     }
 
-    pub(crate) fn poll_accept(
+    #[doc(hidden)] // TODO: document
+    pub fn poll_accept(
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<io::Result<(TcpStream, SocketAddr)>> {
@@ -242,7 +239,7 @@ impl TcpListener {
     /// necessarily fatal ‒ for example having too many open file descriptors or the other side
     /// closing the connection while it waits in an accept queue. These would terminate the stream
     /// if not handled in any way.
-    pub fn incoming(self) -> Incoming {
+    pub fn incoming(&mut self) -> Incoming<'_> {
         Incoming::new(self)
     }
 

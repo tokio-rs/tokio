@@ -1,5 +1,7 @@
-use crate::loom::atomic::{AtomicUsize, Ordering};
+use crate::loom::sync::atomic::AtomicUsize;
+
 use std::fmt;
+use std::sync::atomic::Ordering;
 
 pub(super) struct TransferStack {
     head: AtomicUsize,
@@ -55,7 +57,7 @@ impl fmt::Debug for TransferStack {
 mod test {
     use super::super::super::test_util;
     use super::*;
-    use crate::loom::CausalCell;
+    use loom::cell::CausalCell;
     use loom::thread;
     use std::sync::Arc;
 

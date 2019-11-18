@@ -11,4 +11,4 @@ publish = false
 tokio = { path = "../tokio" }
 tokio-test = { path = "../tokio-test" }
 
-futures-preview = { version = "=0.3.0-alpha.19", features = ["async-await"] }
+futures = { version = "0.3.0", features = ["async-await"] }

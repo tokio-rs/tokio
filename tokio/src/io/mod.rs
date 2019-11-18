@@ -36,6 +36,9 @@
 //! [`ErrorKind`]: enum.ErrorKind.html
 //! [`Result`]: type.Result.html
 
+#[cfg(any(feature = "io", feature = "fs"))]
+pub(crate) mod blocking;
+
 mod async_buf_read;
 pub use self::async_buf_read::AsyncBufRead;
 
@@ -45,38 +48,43 @@ pub use self::async_read::AsyncRead;
 mod async_write;
 pub use self::async_write::AsyncWrite;
 
-#[allow(clippy::module_inception)] // TODO: remove
-#[cfg(feature = "io-util")]
-mod io;
-#[cfg(feature = "io-util")]
-pub use self::io::{
-    copy, empty, repeat, sink, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufStream,
-    BufWriter, Copy, Empty, Repeat, Sink, Take,
-};
-
 #[cfg(feature = "io-util")]
 pub mod split;
 #[cfg(feature = "io-util")]
 pub use self::split::split;
 
-// TODO: These should not be guarded by `fs`
+#[cfg(feature = "io-util")]
+mod util;
+#[cfg(feature = "io-util")]
+pub use self::util::{
+    copy, empty, repeat, sink, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufStream,
+    BufWriter, Copy, Empty, Lines, Repeat, Sink, Split, Take,
+};
 
-#[cfg(feature = "fs")]
+#[cfg(feature = "io")]
 mod stderr;
-#[cfg(feature = "fs")]
+#[cfg(feature = "io")]
 pub use self::stderr::{stderr, Stderr};
 
-#[cfg(feature = "fs")]
+#[cfg(feature = "io")]
 mod stdin;
-#[cfg(feature = "fs")]
+#[cfg(feature = "io")]
 pub use self::stdin::{stdin, Stdin};
 
-#[cfg(feature = "fs")]
+#[cfg(feature = "io")]
 mod stdout;
-#[cfg(feature = "fs")]
+#[cfg(feature = "io")]
 pub use self::stdout::{stdout, Stdout};
 
 // Re-export io::Error so that users don't have to deal
 // with conflicts when `use`ing `tokio::io` and `std::io`.
 #[cfg(feature = "io-util")]
 pub use std::io::{Error, ErrorKind, Result};
+
+/// Types in this module can be mocked out in tests.
+#[cfg(any(feature = "io", feature = "fs"))]
+mod sys {
+    // TODO: don't rename
+    pub(crate) use crate::blocking::spawn_blocking as run;
+    pub(crate) use crate::task::JoinHandle as Blocking;
+}

@@ -6,11 +6,8 @@
 //!
 //! [`AsyncRead`]: https://docs.rs/tokio/*/tokio/io/trait.AsyncRead.html
 //! [`AsyncWrite`]: https://docs.rs/tokio/*/tokio/io/trait.AsyncWrite.html
-//! [`Sink`]: https://docs.rs/futures-sink-preview/*/futures_sink/trait.Sink.html
-//! [`Stream`]: https://docs.rs/futures-core-preview/*/futures_core/stream/trait.Stream.html
-
-#[macro_use]
-mod macros;
+//! [`Sink`]: https://docs.rs/futures-sink/*/futures_sink/trait.Sink.html
+//! [`Stream`]: https://docs.rs/futures-core/*/futures_core/stream/trait.Stream.html
 
 mod bytes_codec;
 pub use self::bytes_codec::BytesCodec;

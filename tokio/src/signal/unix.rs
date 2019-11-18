@@ -10,10 +10,8 @@ use crate::net::util::PollEvented;
 use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
 use crate::sync::mpsc::{channel, Receiver};
 
-use futures_core::stream::Stream;
 use libc::c_int;
 use mio_uds::UnixStream;
-use std::future::Future;
 use std::io::{self, Error, ErrorKind, Write};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -262,10 +260,8 @@ struct Driver {
     wakeup: PollEvented<UnixStream>,
 }
 
-impl Future for Driver {
-    type Output = ();
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+impl Driver {
+    fn poll(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         // Drain the data from the pipe and maintain interest in getting more
         self.drain(cx);
         // Broadcast any signals which were received
@@ -302,7 +298,7 @@ impl Driver {
     /// We do *NOT* use the existence of any read bytes as evidence a sigal was
     /// received since the `pending` flags would have already been set if that
     /// was the case. See #38 for more info.
-    fn drain(mut self: Pin<&mut Self>, cx: &mut Context<'_>) {
+    fn drain(&mut self, cx: &mut Context<'_>) {
         loop {
             match Pin::new(&mut self.wakeup).poll_read(cx, &mut [0; 128]) {
                 Poll::Ready(Ok(0)) => panic!("EOF on self-pipe"),
@@ -395,18 +391,22 @@ pub fn signal(kind: SignalKind) -> io::Result<Signal> {
     Ok(Signal { driver, rx })
 }
 
-pub(crate) fn ctrl_c() -> io::Result<Signal> {
-    signal(SignalKind::interrupt())
-}
+impl Signal {
+    #[doc(hidden)] // TODO: Dox
+    pub async fn recv(&mut self) -> Option<()> {
+        use crate::future::poll_fn;
+        poll_fn(|cx| self.poll_recv(cx)).await
+    }
 
-impl Stream for Signal {
-    type Item = ();
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let _ = Pin::new(&mut self.driver).poll(cx);
-
+    #[doc(hidden)] // TODO: document
+    pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
+        let _ = self.driver.poll(cx);
         self.rx.poll_recv(cx)
     }
+}
+
+pub(crate) fn ctrl_c() -> io::Result<Signal> {
+    signal(SignalKind::interrupt())
 }
 
 #[cfg(all(test, not(loom)))]

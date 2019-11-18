@@ -1,5 +1,4 @@
 use bytes::BufMut;
-use futures_core::ready;
 use std::io;
 use std::ops::DerefMut;
 use std::pin::Pin;
@@ -56,6 +55,11 @@ pub trait AsyncRead {
     /// correct value.
     ///
     /// This function is called from [`poll_read_buf`].
+    ///
+    /// # Safety
+    ///
+    /// Implementations that return `false` must never read from data slices
+    /// that they did not write to.
     ///
     /// [`io::Read`]: std::io::Read
     /// [`poll_read_buf`]: #method.poll_read_buf

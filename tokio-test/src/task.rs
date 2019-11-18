@@ -1,44 +1,19 @@
 //! Futures task based helpers
 
-use tokio::executor::enter;
-
-use pin_convert::AsPinMut;
+use futures_core::Stream;
 use std::future::Future;
 use std::mem;
+use std::ops;
 use std::pin::Pin;
 use std::sync::{Arc, Condvar, Mutex};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
-/// Run the provided closure in a `MockTask` context.
-///
-/// # Examples
-///
-/// ```
-/// use std::future::Future;
-/// use futures_util::{future, pin_mut};
-/// use tokio_test::task;
-///
-/// task::mock(|cx| {
-///     let fut = future::ready(());
-///
-///     pin_mut!(fut);
-///     assert!(fut.poll(cx).is_ready());
-/// })
-/// ```
-pub fn mock<F, R>(f: F) -> R
-where
-    F: Fn(&mut Context<'_>) -> R,
-{
-    let mut task = MockTask::new();
-    task.enter(|cx| f(cx))
-}
-
-/// Mock task
-///
-/// A mock task is able to intercept and track wake notifications.
-#[derive(Debug, Clone)]
-pub struct MockTask {
-    waker: Arc<ThreadWaker>,
+/// TOOD: dox
+pub fn spawn<T>(task: T) -> Spawn<T> {
+    Spawn {
+        task: MockTask::new(),
+        future: Box::pin(task),
+    }
 }
 
 /// Future spawned on a mock task
@@ -48,12 +23,12 @@ pub struct Spawn<T> {
     future: Pin<Box<T>>,
 }
 
-/// TOOD: dox
-pub fn spawn<T>(task: T) -> Spawn<T> {
-    Spawn {
-        task: MockTask::new(),
-        future: Box::pin(task),
-    }
+/// Mock task
+///
+/// A mock task is able to intercept and track wake notifications.
+#[derive(Debug, Clone)]
+struct MockTask {
+    waker: Arc<ThreadWaker>,
 }
 
 #[derive(Debug)]
@@ -66,11 +41,23 @@ const IDLE: usize = 0;
 const WAKE: usize = 1;
 const SLEEP: usize = 2;
 
-impl<T: Future> Spawn<T> {
-    /// Poll a future
-    pub fn poll(&mut self) -> Poll<T::Output> {
-        let fut = self.future.as_mut();
-        self.task.enter(|cx| fut.poll(cx))
+impl<T> Spawn<T> {
+    /// Consume `self` returning the inner value
+    pub fn into_inner(mut self) -> T
+    where
+        T: Unpin,
+    {
+        drop(self.task);
+
+        // Pin::into_inner is unstable, so we work around it
+        //
+        // Safety: `T` is bound by `Unpin`.
+        unsafe {
+            let ptr = Pin::get_mut(self.future.as_mut()) as *mut T;
+            let future = Box::from_raw(ptr);
+            mem::forget(self.future);
+            *future
+        }
     }
 
     /// Returns `true` if the inner future has received a wake notification
@@ -85,35 +72,63 @@ impl<T: Future> Spawn<T> {
     pub fn waker_ref_count(&self) -> usize {
         self.task.waker_ref_count()
     }
+
+    /// Enter the task context
+    pub fn enter<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&mut Context<'_>, Pin<&mut T>) -> R,
+    {
+        let fut = self.future.as_mut();
+        self.task.enter(|cx| f(cx, fut))
+    }
+}
+
+impl<T: Unpin> ops::Deref for Spawn<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        &self.future
+    }
+}
+
+impl<T: Unpin> ops::DerefMut for Spawn<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        &mut self.future
+    }
+}
+
+impl<T: Future> Spawn<T> {
+    /// Poll a future
+    pub fn poll(&mut self) -> Poll<T::Output> {
+        let fut = self.future.as_mut();
+        self.task.enter(|cx| fut.poll(cx))
+    }
+}
+
+impl<T: Stream> Spawn<T> {
+    /// Poll a stream
+    pub fn poll_next(&mut self) -> Poll<Option<T::Item>> {
+        let stream = self.future.as_mut();
+        self.task.enter(|cx| stream.poll_next(cx))
+    }
 }
 
 impl MockTask {
     /// Create a new mock task
-    pub fn new() -> Self {
+    fn new() -> Self {
         MockTask {
             waker: Arc::new(ThreadWaker::new()),
         }
-    }
-
-    /// Poll a future
-    pub fn poll<T, F>(&mut self, mut fut: T) -> Poll<F::Output>
-    where
-        T: AsPinMut<F>,
-        F: Future,
-    {
-        self.enter(|cx| fut.as_pin_mut().poll(cx))
     }
 
     /// Run a closure from the context of the task.
     ///
     /// Any wake notifications resulting from the execution of the closure are
     /// tracked.
-    pub fn enter<F, R>(&mut self, f: F) -> R
+    fn enter<F, R>(&mut self, f: F) -> R
     where
         F: FnOnce(&mut Context<'_>) -> R,
     {
-        let _enter = enter().unwrap();
-
         self.waker.clear();
         let waker = self.waker();
         let mut cx = Context::from_waker(&waker);
@@ -123,14 +138,14 @@ impl MockTask {
 
     /// Returns `true` if the inner future has received a wake notification
     /// since the last call to `enter`.
-    pub fn is_woken(&self) -> bool {
+    fn is_woken(&self) -> bool {
         self.waker.is_woken()
     }
 
     /// Returns the number of references to the task waker
     ///
     /// The task itself holds a reference. The return value will never be zero.
-    pub fn waker_ref_count(&self) -> usize {
+    fn waker_ref_count(&self) -> usize {
         Arc::strong_count(&self.waker)
     }
 
@@ -193,7 +208,7 @@ impl ThreadWaker {
     }
 }
 
-static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, drop);
+static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, drop_waker);
 
 unsafe fn to_raw(waker: Arc<ThreadWaker>) -> RawWaker {
     RawWaker::new(Arc::into_raw(waker) as *const (), &VTABLE)
@@ -225,6 +240,6 @@ unsafe fn wake_by_ref(raw: *const ()) {
     mem::forget(waker);
 }
 
-unsafe fn drop(raw: *const ()) {
+unsafe fn drop_waker(raw: *const ()) {
     let _ = from_raw(raw);
 }

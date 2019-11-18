@@ -1,8 +1,7 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::io::AsyncWrite;
-use tokio_test::assert_ready;
-use tokio_test::task::MockTask;
+use tokio_test::{assert_ready, task};
 use tokio_util::codec::{Encoder, FramedWrite};
 
 use bytes::{BufMut, BytesMut};
@@ -43,13 +42,13 @@ impl Encoder for U32Encoder {
 
 #[test]
 fn write_multi_frame_in_packet() {
-    let mut task = MockTask::new();
+    let mut task = task::spawn(());
     let mock = mock! {
         Ok(b"\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x02".to_vec()),
     };
     let mut framed = FramedWrite::new(mock, U32Encoder);
 
-    task.enter(|cx| {
+    task.enter(|cx, _| {
         assert!(assert_ready!(pin!(framed).poll_ready(cx)).is_ok());
         assert!(pin!(framed).start_send(0).is_ok());
         assert!(assert_ready!(pin!(framed).poll_ready(cx)).is_ok());
@@ -99,9 +98,9 @@ fn write_hits_backpressure() {
     // 1 'wouldblock', 4 * 2KB buffers, 1 b-byte buffer
     assert_eq!(mock.calls.len(), 6);
 
-    let mut task = MockTask::new();
+    let mut task = task::spawn(());
     let mut framed = FramedWrite::new(mock, U32Encoder);
-    task.enter(|cx| {
+    task.enter(|cx, _| {
         // Send 8KB. This fills up FramedWrite2 buffer
         for i in 0..ITER {
             assert!(assert_ready!(pin!(framed).poll_ready(cx)).is_ok());

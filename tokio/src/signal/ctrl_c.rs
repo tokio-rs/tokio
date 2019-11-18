@@ -1,46 +1,35 @@
 #[cfg(unix)]
-use super::unix::{self as os_impl, Signal as Inner};
+use super::unix::{self as os_impl};
 #[cfg(windows)]
-use super::windows::{self as os_impl, Event as Inner};
+use super::windows::{self as os_impl};
 
-use futures_core::stream::Stream;
 use std::io;
-use std::pin::Pin;
-use std::task::{Context, Poll};
 
-/// Represents a stream which receives "ctrl-c" notifications sent to the process.
+/// Completes when a "ctrl-c" notification is sent to the process.
 ///
-/// In general signals are handled very differently across Unix and Windows, but
-/// this is somewhat cross platform in terms of how it can be handled. A ctrl-c
-/// event to a console process can be represented as a stream for both Windows
-/// and Unix.
+/// While signals are handled very differently between Unix and Windows, both
+/// platforms support receiving a signal on "ctrl-c". This function provides a
+/// portable API for receiving this notification.
 ///
-/// Note that there are a number of caveats listening for signals, and you may
-/// wish to read up on the documentation in the `unix` or `windows` module to
-/// take a peek.
+/// Once the returned future is polled, a listener a listener is registered. The
+/// future will complete on the first received `ctrl-c` **after** the initial
+/// call to either `Future::poll` or `.await`.
 ///
-/// Notably, a notification to this process notifies *all* streams listening to
-/// this event. Moreover, the notifications **are coalesced** if they aren't processed
-/// quickly enough. This means that if two notifications are received back-to-back,
-/// then the stream may only receive one item about the two notifications.
-#[must_use = "streams do nothing unless polled"]
-#[derive(Debug)]
-pub struct CtrlC {
-    inner: Inner,
-}
-
-/// Creates a new stream which receives "ctrl-c" notifications sent to the
-/// process.
+/// # Examples
 ///
-/// This function binds to the default reactor.
-pub fn ctrl_c() -> io::Result<CtrlC> {
-    os_impl::ctrl_c().map(|inner| CtrlC { inner })
-}
-
-impl Stream for CtrlC {
-    type Item = ();
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Pin::new(&mut self.inner).poll_next(cx)
-    }
+/// ```rust,no_run
+/// use tokio::signal;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     println!("waiting for ctrl-c");
+///
+///     signal::ctrl_c().await.expect("failed to listen for event");
+///
+///     println!("received ctrl-c event");
+/// }
+/// ```
+pub async fn ctrl_c() -> io::Result<()> {
+    os_impl::ctrl_c()?.recv().await;
+    Ok(())
 }

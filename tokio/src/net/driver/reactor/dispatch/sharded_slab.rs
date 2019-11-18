@@ -1,7 +1,7 @@
 use super::*;
 use std::fmt;
 
-use crate::loom::Mutex;
+use crate::loom::sync::Mutex;
 
 /// A sharded slab.
 pub(crate) struct Slab {

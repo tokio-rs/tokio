@@ -1,14 +1,9 @@
-use crate::executor::blocking::{Pool, PoolWaiter};
-use crate::executor::current_thread::CurrentThread;
-#[cfg(feature = "rt-full")]
-use crate::executor::thread_pool;
-use crate::net::driver::Reactor;
-use crate::runtime::{Runtime, Kind};
-use crate::timer::clock::Clock;
-use crate::timer::timer::Timer;
+use crate::loom::sync::Arc;
+use crate::runtime::handle::{self, Handle};
+use crate::runtime::shell::Shell;
+use crate::runtime::{blocking, io, time, Runtime};
 
-use std::sync::Arc;
-use std::{fmt, io};
+use std::fmt;
 
 /// Builds Tokio Runtime with custom configuration values.
 ///
@@ -27,12 +22,10 @@ use std::{fmt, io};
 ///
 /// ```
 /// use tokio::runtime::Builder;
-/// use tokio::timer::clock::Clock;
 ///
 /// fn main() {
 ///     // build Runtime
 ///     let runtime = Builder::new()
-///         .clock(Clock::system())
 ///         .num_threads(4)
 ///         .thread_name("my-custom-name")
 ///         .thread_stack_size(3 * 1024 * 1024)
@@ -43,8 +36,8 @@ use std::{fmt, io};
 /// }
 /// ```
 pub struct Builder {
-    /// When `true`, use the current-thread executor.
-    current_thread: bool,
+    /// The task execution model to use.
+    kind: Kind,
 
     /// The number of worker threads.
     ///
@@ -52,20 +45,32 @@ pub struct Builder {
     num_threads: usize,
 
     /// Name used for threads spawned by the runtime.
-    thread_name: String,
+    pub(super) thread_name: String,
 
     /// Stack size used for threads spawned by the runtime.
-    thread_stack_size: Option<usize>,
+    pub(super) thread_stack_size: Option<usize>,
 
     /// Callback to run after each thread starts.
-    after_start: Option<Arc<dyn Fn() + Send + Sync>>,
+    after_start: Option<Callback>,
 
     /// To run before each worker thread stops
-    before_stop: Option<Arc<dyn Fn() + Send + Sync>>,
-
-    /// The clock to use
-    clock: Clock,
+    before_stop: Option<Callback>,
 }
+
+#[derive(Debug)]
+enum Kind {
+    Shell,
+    #[cfg(feature = "rt-core")]
+    Basic,
+    #[cfg(feature = "rt-full")]
+    ThreadPool,
+}
+
+#[cfg(not(loom))]
+type Callback = Arc<dyn Fn() + Send + Sync>;
+
+#[cfg(loom)]
+type Callback = Arc<Box<dyn Fn() + Send + Sync>>;
 
 impl Builder {
     /// Returns a new runtime builder initialized with default configuration
@@ -74,11 +79,11 @@ impl Builder {
     /// Configuration methods can be chained on the return value.
     pub fn new() -> Builder {
         Builder {
-            // Use the thread-pool executor by default
-            current_thread: false,
+            // No task execution by default
+            kind: Kind::Shell,
 
             // Default to use an equal number of threads to number of CPU cores
-            num_threads: crate::executor::loom::sys::num_cpus(),
+            num_threads: crate::loom::sys::num_cpus(),
 
             // Default thread name
             thread_name: "tokio-runtime-worker".into(),
@@ -89,9 +94,6 @@ impl Builder {
             // No worker thread callbacks
             after_start: None,
             before_stop: None,
-
-            // Default clock
-            clock: Clock::new(),
         }
     }
 
@@ -119,12 +121,20 @@ impl Builder {
         self
     }
 
-    /// Use only the current thread for the runtime.
+    /// Use a simpler scheduler that runs all tasks on the current-thread.
     ///
-    /// The network driver, timer, and executor will all be run on the current
+    /// The executor and all necessary drivers will all be run on the current
     /// thread during `block_on` calls.
-    pub fn current_thread(&mut self) -> &mut Self {
-        self.current_thread = true;
+    #[cfg(feature = "rt-core")]
+    pub fn basic_scheduler(&mut self) -> &mut Self {
+        self.kind = Kind::Basic;
+        self
+    }
+
+    /// Use a multi-threaded scheduler for executing tasks.
+    #[cfg(feature = "rt-full")]
+    pub fn threaded_scheduler(&mut self) -> &mut Self {
+        self.kind = Kind::ThreadPool;
         self
     }
 
@@ -190,6 +200,7 @@ impl Builder {
     ///     .build();
     /// # }
     /// ```
+    #[cfg(not(loom))]
     pub fn after_start<F>(&mut self, f: F) -> &mut Self
     where
         F: Fn() + Send + Sync + 'static,
@@ -215,17 +226,12 @@ impl Builder {
     ///     .build();
     /// # }
     /// ```
+    #[cfg(not(loom))]
     pub fn before_stop<F>(&mut self, f: F) -> &mut Self
     where
         F: Fn() + Send + Sync + 'static,
     {
         self.before_stop = Some(Arc::new(f));
-        self
-    }
-
-    /// Set the `Clock` instance that will be used by the runtime.
-    pub fn clock(&mut self, clock: Clock) -> &mut Self {
-        self.clock = clock;
         self
     }
 
@@ -245,117 +251,155 @@ impl Builder {
     /// });
     /// ```
     pub fn build(&mut self) -> io::Result<Runtime> {
-        if self.current_thread {
-            self.build_current_thread()
-        } else {
-            self.build_threadpool()
+        match self.kind {
+            Kind::Shell => self.build_shell_runtime(),
+            #[cfg(feature = "rt-core")]
+            Kind::Basic => self.build_basic_runtime(),
+            #[cfg(feature = "rt-full")]
+            Kind::ThreadPool => self.build_threaded_runtime(),
         }
     }
 
-    fn build_current_thread(&mut self) -> io::Result<Runtime> {
-        // Create network driver
-        let net = Reactor::new()?;
-        let net_handles = vec![net.handle()];
+    fn build_shell_runtime(&mut self) -> io::Result<Runtime> {
+        use crate::runtime::Kind;
 
-        let timer = Timer::new_with_clock(net, self.clock.clone());
-        let timer_handles = vec![timer.handle()];
+        let clock = time::create_clock();
 
-        // And now put a single-threaded executor on top of the timer. When
-        // there are no futures ready to do something, it'll let the timer or
-        // the reactor to generate some new stimuli for the futures to continue
-        // in their life.
-        let executor = CurrentThread::new(timer);
+        // Create I/O driver
+        let (io_driver, handle) = io::create_driver()?;
+        let io_handles = vec![handle];
 
-        // Blocking pool
-        let blocking_pool = PoolWaiter::from(Pool::default());
+        let (driver, handle) = time::create_driver(io_driver, clock.clone());
+        let time_handles = vec![handle];
+
+        let blocking_pool = blocking::create_blocking_pool(self);
+        let blocking_spawner = blocking_pool.spawner().clone();
 
         Ok(Runtime {
-            kind: Kind::CurrentThread(executor),
-            net_handles,
-            timer_handles,
+            kind: Kind::Shell(Shell::new(driver)),
+            handle: Handle {
+                kind: handle::Kind::Shell,
+                io_handles,
+                time_handles,
+                clock,
+                blocking_spawner,
+            },
             blocking_pool,
         })
     }
 
-    // Without rt-full, the "threadpool" variant just uses current-thread
-    #[cfg(not(feature = "rt-full"))]
-    fn build_threadpool(&mut self) -> io::Result<Runtime> {
-        self.build_current_thread()
+    #[cfg(feature = "rt-core")]
+    fn build_basic_runtime(&mut self) -> io::Result<Runtime> {
+        use crate::runtime::{BasicScheduler, Kind};
+
+        let clock = time::create_clock();
+
+        // Create I/O driver
+        let (io_driver, handle) = io::create_driver()?;
+        let io_handles = vec![handle];
+
+        let (driver, handle) = time::create_driver(io_driver, clock.clone());
+        let time_handles = vec![handle];
+
+        // And now put a single-threaded scheduler on top of the timer. When
+        // there are no futures ready to do something, it'll let the timer or
+        // the reactor to generate some new stimuli for the futures to continue
+        // in their life.
+        let scheduler = BasicScheduler::new(driver);
+        let spawner = scheduler.spawner();
+
+        // Blocking pool
+        let blocking_pool = blocking::create_blocking_pool(self);
+        let blocking_spawner = blocking_pool.spawner().clone();
+
+        Ok(Runtime {
+            kind: Kind::Basic(scheduler),
+            handle: Handle {
+                kind: handle::Kind::Basic(spawner),
+                io_handles,
+                time_handles,
+                clock,
+                blocking_spawner,
+            },
+            blocking_pool,
+        })
     }
 
     #[cfg(feature = "rt-full")]
-    fn build_threadpool(&mut self) -> io::Result<Runtime> {
-        use crate::net::driver;
-        use crate::timer::{clock, timer};
+    fn build_threaded_runtime(&mut self) -> io::Result<Runtime> {
+        use crate::runtime::{Kind, ThreadPool};
         use std::sync::Mutex;
 
-        let mut net_handles = Vec::new();
-        let mut timer_handles = Vec::new();
-        let mut timers = Vec::new();
+        let clock = time::create_clock();
+
+        let mut io_handles = Vec::new();
+        let mut time_handles = Vec::new();
+        let mut drivers = Vec::new();
 
         for _ in 0..self.num_threads {
-            // Create network driver
-            let net = Reactor::new()?;
-            net_handles.push(net.handle());
+            // Create I/O driver and handle
+            let (io_driver, handle) = io::create_driver()?;
+            io_handles.push(handle);
 
             // Create a new timer.
-            let timer = Timer::new_with_clock(net, self.clock.clone());
-            timer_handles.push(timer.handle());
-            timers.push(Mutex::new(Some(timer)));
+            let (time_driver, handle) = time::create_driver(io_driver, clock.clone());
+            time_handles.push(handle);
+            drivers.push(Mutex::new(Some(time_driver)));
         }
 
-        // Get a handle to the clock for the runtime.
-        let clock = self.clock.clone();
+        // Create the blocking pool
+        let blocking_pool = blocking::create_blocking_pool(self);
+        let blocking_spawner = blocking_pool.spawner().clone();
 
-        // Blocking pool
-        let blocking_pool = PoolWaiter::from(Pool::default());
-
-        let pool = {
-            let net_handles = net_handles.clone();
-            let timer_handles = timer_handles.clone();
+        let scheduler = {
+            let clock = clock.clone();
+            let io_handles = io_handles.clone();
+            let time_handles = time_handles.clone();
 
             let after_start = self.after_start.clone();
             let before_stop = self.before_stop.clone();
 
-            let mut builder = thread_pool::Builder::new();
-            builder.num_threads(self.num_threads);
-            builder.name(&self.thread_name);
+            let around_worker = Arc::new(Box::new(move |index, next: &mut dyn FnMut()| {
+                // Configure the I/O driver
+                let _io = io::set_default(&io_handles[index]);
 
-            if let Some(stack_size) = self.thread_stack_size {
-                builder.stack_size(stack_size);
-            }
+                // Configure time
+                time::with_default(&time_handles[index], &clock, || {
+                    // Call the start callback
+                    if let Some(after_start) = after_start.as_ref() {
+                        after_start();
+                    }
 
-            builder
-                .around_worker(move |index, next| {
-                    // Configure the network driver
-                    let _net = driver::set_default(&net_handles[index]);
+                    // Run the worker
+                    next();
 
-                    // Configure the clock
-                    clock::with_default(&clock, || {
-                        // Configure the timer
-                        let _timer = timer::set_default(&timer_handles[index]);
-
-                        // Call the start callback
-                        if let Some(after_start) = after_start.as_ref() {
-                            after_start();
-                        }
-
-                        // Run the worker
-                        next();
-
-                        // Call the after call back
-                        if let Some(before_stop) = before_stop.as_ref() {
-                            before_stop();
-                        }
-                    })
+                    // Call the after call back
+                    if let Some(before_stop) = before_stop.as_ref() {
+                        before_stop();
+                    }
                 })
-                .build_with_park(move |index| timers[index].lock().unwrap().take().unwrap())
+            })
+                as Box<dyn Fn(usize, &mut dyn FnMut()) + Send + Sync>);
+
+            ThreadPool::new(
+                self.num_threads,
+                blocking_pool.spawner().clone(),
+                around_worker,
+                move |index| drivers[index].lock().unwrap().take().unwrap(),
+            )
         };
 
+        let spawner = scheduler.spawner().clone();
+
         Ok(Runtime {
-            kind: Kind::ThreadPool(pool),
-            net_handles,
-            timer_handles,
+            kind: Kind::ThreadPool(scheduler),
+            handle: Handle {
+                kind: handle::Kind::ThreadPool(spawner),
+                io_handles,
+                time_handles,
+                clock,
+                blocking_spawner,
+            },
             blocking_pool,
         })
     }
@@ -370,13 +414,12 @@ impl Default for Builder {
 impl fmt::Debug for Builder {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Builder")
-            .field("current_thread", &self.current_thread)
+            .field("kind", &self.kind)
             .field("num_threads", &self.num_threads)
             .field("thread_name", &self.thread_name)
             .field("thread_stack_size", &self.thread_stack_size)
             .field("after_start", &self.after_start.as_ref().map(|_| "..."))
             .field("before_stop", &self.after_start.as_ref().map(|_| "..."))
-            .field("clock", &self.clock)
             .finish()
     }
 }

@@ -1,9 +1,8 @@
 use super::super::{Pack, Tid, RESERVED_BITS, WIDTH};
-use crate::loom::{
-    atomic::{AtomicUsize, Ordering},
-    CausalCell,
-};
+use crate::loom::{cell::CausalCell, sync::atomic::AtomicUsize};
 use crate::sync::AtomicWaker;
+
+use std::sync::atomic::Ordering;
 
 #[derive(Debug)]
 pub(crate) struct ScheduledIo {

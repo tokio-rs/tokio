@@ -8,8 +8,9 @@ use std::sync::Mutex;
 /// # #[tokio::main]
 /// # async fn main() {
 /// use tokio::sync::Barrier;
+///
+/// use futures::future::join_all;
 /// use std::sync::Arc;
-/// use futures_util::future::join_all;
 ///
 /// let mut handles = Vec::with_capacity(10);
 /// let barrier = Arc::new(Barrier::new(10));

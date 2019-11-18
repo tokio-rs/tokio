@@ -37,8 +37,6 @@ macro_rules! if_loom {
 mod barrier;
 pub use barrier::{Barrier, BarrierWaitResult};
 
-mod loom;
-
 pub mod mpsc;
 
 mod mutex;
@@ -52,7 +50,7 @@ pub mod oneshot;
 pub mod semaphore;
 
 mod task;
-pub use task::AtomicWaker;
+pub(crate) use task::AtomicWaker;
 
 pub mod watch;
 

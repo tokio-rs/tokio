@@ -22,8 +22,6 @@
 //!
 //! [`AsyncRead`]: https://docs.rs/tokio-io/0.1/tokio_io/trait.AsyncRead.html
 
-pub(crate) mod blocking;
-
 mod create_dir;
 pub use self::create_dir::create_dir;
 
@@ -84,12 +82,20 @@ where
     F: FnOnce() -> io::Result<T> + Send + 'static,
     T: Send + 'static,
 {
-    sys::run(f).await
+    match sys::run(f).await {
+        Ok(res) => res,
+        Err(_) => Err(io::Error::new(
+            io::ErrorKind::Other,
+            "background task failed",
+        )),
+    }
 }
 
 /// Types in this module can be mocked out in tests.
 mod sys {
     pub(crate) use std::fs::File;
 
-    pub(crate) use crate::executor::blocking::{run, Blocking};
+    // TODO: don't rename
+    pub(crate) use crate::blocking::spawn_blocking as run;
+    pub(crate) use crate::task::JoinHandle as Blocking;
 }

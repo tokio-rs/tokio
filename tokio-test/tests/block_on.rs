@@ -1,9 +1,7 @@
 #![warn(rust_2018_idioms)]
 
-use tokio::timer::delay;
+use tokio::time::{delay_until, Duration, Instant};
 use tokio_test::block_on;
-
-use std::time::{Duration, Instant};
 
 #[test]
 fn async_block() {
@@ -22,5 +20,5 @@ fn async_fn() {
 #[test]
 fn test_delay() {
     let deadline = Instant::now() + Duration::from_millis(100);
-    assert_eq!((), block_on(delay(deadline)));
+    assert_eq!((), block_on(delay_until(deadline)));
 }
