@@ -1,7 +1,6 @@
 use crate::io::{AsyncRead, AsyncWrite};
 use crate::net::driver::{Readiness, Registration};
 
-use futures_core::ready;
 use mio;
 use std::fmt;
 use std::io::{self, Read, Write};
