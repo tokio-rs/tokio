@@ -99,6 +99,8 @@ struct Scheduler {
     /// Only call from the owning thread.
     local_queue: UnsafeCell<VecDeque<Task<Scheduler>>>,
 
+    tick: Cell<u8>,
+
     /// Remote run queue.
     ///
     /// Tasks notified from another thread are pushed into this queue.
@@ -170,6 +172,9 @@ where
 
 /// Max number of tasks to poll per tick.
 const MAX_TASKS_PER_TICK: usize = 61;
+
+/// How often to check the remote queue first
+const CHECK_REMOTE_INTERVAL: u8 = 13;
 
 impl LocalSet {
     /// Returns a new local task set.
@@ -364,6 +369,7 @@ impl Scheduler {
         Self {
             tasks: UnsafeCell::new(task::OwnedList::new()),
             local_queue: UnsafeCell::new(VecDeque::with_capacity(64)),
+            tick: Cell::new(0),
             remote_queue: Mutex::new(VecDeque::with_capacity(64)),
             waker: AtomicWaker::new(),
         }
@@ -402,8 +408,12 @@ impl Scheduler {
             .unwrap_or(false)
     }
 
-    fn next_task(&self) -> Option<Task<Self>> {
-        self.next_local_task().or_else(|| self.next_remote_task())
+    fn next_task(&self, tick: u8) -> Option<Task<Self>> {
+        if 0 == tick % CHECK_REMOTE_INTERVAL {
+            self.next_remote_task().or_else(|| self.next_local_task())
+        } else {
+            self.next_local_task().or_else(|| self.next_remote_task())
+        }
     }
 
     fn next_local_task(&self) -> Option<Task<Self>> {
@@ -429,7 +439,9 @@ impl Scheduler {
     fn tick(&self) {
         assert!(self.is_current());
         for _ in 0..MAX_TASKS_PER_TICK {
-            let task = match self.next_task() {
+            let tick = self.tick.get().wrapping_add(1);
+            self.tick.set(tick);
+            let task = match self.next_task(tick) {
                 Some(task) => task,
                 None => return,
             };
