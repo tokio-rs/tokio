@@ -132,10 +132,10 @@
 #[macro_use]
 mod tests;
 
-#[cfg(feature = "rt-core")]
-mod basic_scheduler;
-#[cfg(feature = "rt-core")]
-use self::basic_scheduler::BasicScheduler;
+cfg_rt_core! {
+    mod basic_scheduler;
+    use basic_scheduler::BasicScheduler;
+}
 
 mod blocking;
 use blocking::BlockingPool;
@@ -146,10 +146,10 @@ pub use self::builder::Builder;
 pub(crate) mod enter;
 use self::enter::enter;
 
-#[cfg(feature = "rt-core")]
-mod global;
-#[cfg(feature = "rt-core")]
-pub(crate) use self::global::spawn;
+cfg_rt_core! {
+    mod global;
+    pub(crate) use global::spawn;
+}
 
 mod handle;
 pub use self::handle::Handle;
@@ -164,13 +164,14 @@ use self::shell::Shell;
 
 mod time;
 
-#[cfg(feature = "rt-full")]
-pub(crate) mod thread_pool;
-#[cfg(feature = "rt-full")]
-use self::thread_pool::ThreadPool;
+cfg_rt_threaded! {
+    pub(crate) mod thread_pool;
+    use self::thread_pool::ThreadPool;
+}
 
-#[cfg(feature = "rt-core")]
-use crate::task::JoinHandle;
+cfg_rt_core! {
+    use crate::task::JoinHandle;
+}
 
 use std::future::Future;
 
@@ -223,7 +224,7 @@ enum Kind {
     Basic(BasicScheduler<time::Driver>),
 
     /// Execute tasks across multiple threads.
-    #[cfg(feature = "rt-full")]
+    #[cfg(feature = "rt-threaded")]
     ThreadPool(ThreadPool),
 }
 
@@ -254,10 +255,10 @@ impl Runtime {
     ///
     /// [mod]: index.html
     pub fn new() -> io::Result<Self> {
-        #[cfg(feature = "rt-full")]
+        #[cfg(feature = "rt-threaded")]
         let ret = Builder::new().threaded_scheduler().build();
 
-        #[cfg(all(not(feature = "rt-full"), feature = "rt-core"))]
+        #[cfg(all(not(feature = "rt-threaded"), feature = "rt-core"))]
         let ret = Builder::new().basic_scheduler().build();
 
         #[cfg(not(feature = "rt-core"))]
@@ -304,7 +305,7 @@ impl Runtime {
     {
         match &self.kind {
             Kind::Shell(_) => panic!("task execution disabled"),
-            #[cfg(feature = "rt-full")]
+            #[cfg(feature = "rt-threaded")]
             Kind::ThreadPool(exec) => exec.spawn(future),
             Kind::Basic(exec) => exec.spawn(future),
         }
@@ -330,7 +331,7 @@ impl Runtime {
             Kind::Shell(exec) => exec.block_on(future),
             #[cfg(feature = "rt-core")]
             Kind::Basic(exec) => exec.block_on(future),
-            #[cfg(feature = "rt-full")]
+            #[cfg(feature = "rt-threaded")]
             Kind::ThreadPool(exec) => exec.block_on(future),
         })
     }

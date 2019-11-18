@@ -36,8 +36,9 @@
 //! [`ErrorKind`]: enum.ErrorKind.html
 //! [`Result`]: type.Result.html
 
-#[cfg(any(feature = "io", feature = "fs"))]
-pub(crate) mod blocking;
+cfg_io_blocking! {
+    pub(crate) mod blocking;
+}
 
 mod async_buf_read;
 pub use self::async_buf_read::AsyncBufRead;
@@ -48,43 +49,43 @@ pub use self::async_read::AsyncRead;
 mod async_write;
 pub use self::async_write::AsyncWrite;
 
-#[cfg(feature = "io-util")]
-pub mod split;
-#[cfg(feature = "io-util")]
-pub use self::split::split;
+cfg_io_std! {
+    mod stderr;
+    pub use stderr::{stderr, Stderr};
 
-#[cfg(feature = "io-util")]
-mod util;
-#[cfg(feature = "io-util")]
-pub use self::util::{
-    copy, empty, repeat, sink, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufStream,
-    BufWriter, Copy, Empty, Lines, Repeat, Sink, Split, Take,
-};
+    mod stdin;
+    pub use stdin::{stdin, Stdin};
 
-#[cfg(feature = "io")]
-mod stderr;
-#[cfg(feature = "io")]
-pub use self::stderr::{stderr, Stderr};
+    mod stdout;
+    pub use stdout::{stdout, Stdout};
+}
 
-#[cfg(feature = "io")]
-mod stdin;
-#[cfg(feature = "io")]
-pub use self::stdin::{stdin, Stdin};
+cfg_io_util! {
+    pub mod split;
+    pub use split::split;
 
-#[cfg(feature = "io")]
-mod stdout;
-#[cfg(feature = "io")]
-pub use self::stdout::{stdout, Stdout};
+    pub(crate) mod util;
+    pub use util::{
+        copy, empty, repeat, sink, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufStream,
+        BufWriter, Copy, Empty, Lines, Repeat, Sink, Split, Take,
+    };
 
-// Re-export io::Error so that users don't have to deal
-// with conflicts when `use`ing `tokio::io` and `std::io`.
-#[cfg(feature = "io-util")]
-pub use std::io::{Error, ErrorKind, Result};
+    // Re-export io::Error so that users don't have to deal with conflicts when
+    // `use`ing `tokio::io` and `std::io`.
+    pub use std::io::{Error, ErrorKind, Result};
+}
 
-/// Types in this module can be mocked out in tests.
-#[cfg(any(feature = "io", feature = "fs"))]
-mod sys {
-    // TODO: don't rename
-    pub(crate) use crate::blocking::spawn_blocking as run;
-    pub(crate) use crate::task::JoinHandle as Blocking;
+cfg_not_io_util! {
+    cfg_process! {
+        pub(crate) mod util;
+    }
+}
+
+cfg_io_blocking! {
+    /// Types in this module can be mocked out in tests.
+    mod sys {
+        // TODO: don't rename
+        pub(crate) use crate::blocking::spawn_blocking as run;
+        pub(crate) use crate::task::JoinHandle as Blocking;
+    }
 }

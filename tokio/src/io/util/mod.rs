@@ -1,71 +1,75 @@
-mod async_buf_read_ext;
-#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
-pub use self::async_buf_read_ext::AsyncBufReadExt;
+#![allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 
-mod async_read_ext;
-#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
-pub use self::async_read_ext::AsyncReadExt;
+cfg_io_util! {
+    mod async_buf_read_ext;
+    pub use async_buf_read_ext::AsyncBufReadExt;
 
-mod async_write_ext;
-#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
-pub use self::async_write_ext::AsyncWriteExt;
+    mod async_read_ext;
+    pub use async_read_ext::AsyncReadExt;
 
-mod buf_reader;
-#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
-pub use self::buf_reader::BufReader;
+    mod async_write_ext;
+    pub use async_write_ext::AsyncWriteExt;
 
-mod buf_stream;
-#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
-pub use self::buf_stream::BufStream;
+    mod buf_reader;
+    pub use buf_reader::BufReader;
 
-mod buf_writer;
-#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
-pub use self::buf_writer::BufWriter;
+    mod buf_stream;
+    pub use buf_stream::BufStream;
 
-mod chain;
+    mod buf_writer;
+    pub use buf_writer::BufWriter;
 
-mod copy;
-#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
-pub use self::copy::{copy, Copy};
+    mod chain;
 
-mod empty;
-#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
-pub use self::empty::{empty, Empty};
+    mod copy;
+    pub use copy::{copy, Copy};
 
-mod flush;
+    mod empty;
+    pub use empty::{empty, Empty};
 
-mod lines;
-#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
-pub use self::lines::Lines;
+    mod flush;
 
-mod read;
-mod read_exact;
-mod read_line;
-mod read_to_end;
-mod read_to_string;
-mod read_until;
+    mod lines;
+    pub use lines::Lines;
 
-mod repeat;
-#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
-pub use self::repeat::{repeat, Repeat};
+    mod read;
+    mod read_exact;
+    mod read_line;
 
-mod shutdown;
+    mod read_to_end;
+    cfg_process! {
+        pub(crate) use read_to_end::read_to_end;
+    }
 
-mod sink;
-#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
-pub use self::sink::{sink, Sink};
+    mod read_to_string;
+    mod read_until;
 
-mod split;
-#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
-pub use self::split::Split;
+    mod repeat;
+    pub use repeat::{repeat, Repeat};
 
-mod take;
-#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
-pub use self::take::Take;
+    mod shutdown;
 
-mod write;
-mod write_all;
+    mod sink;
+    pub use sink::{sink, Sink};
 
-// used by `BufReader` and `BufWriter`
-// https://github.com/rust-lang/rust/blob/master/src/libstd/sys_common/io.rs#L1
-const DEFAULT_BUF_SIZE: usize = 8 * 1024;
+    mod split;
+    pub use split::Split;
+
+    mod take;
+    pub use take::Take;
+
+    mod write;
+    mod write_all;
+
+    // used by `BufReader` and `BufWriter`
+    // https://github.com/rust-lang/rust/blob/master/src/libstd/sys_common/io.rs#L1
+    const DEFAULT_BUF_SIZE: usize = 8 * 1024;
+}
+
+cfg_not_io_util! {
+    cfg_process! {
+        mod read_to_end;
+        // Used by process
+        pub(crate) use read_to_end::read_to_end;
+    }
+}

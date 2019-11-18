@@ -24,14 +24,21 @@ categories = ["asynchronous", "network-programming"]
 keywords = ["io", "async", "non-blocking", "futures"]
 
 [features]
-default = [
+default = ["full"]
+
+# enable everything
+full = [
   "blocking",
+  "dns",
   "fs",
+  "io-driver",
   "io-util",
-  "io",
+  "io-std",
+  "macros",
   "net",
   "process",
-  "rt-full",
+  "rt-core",
+  "rt-threaded",
   "signal",
   "stream",
   "sync",
@@ -39,15 +46,16 @@ default = [
 ]
 
 blocking = ["rt-core"]
-dns = ["blocking"]
-fs = ["blocking"]
-io-driver = ["mio", "lazy_static", "sync"] # TODO: get rid of sync
+dns = ["rt-core"]
+fs = ["rt-core"]
+io-driver = ["rt-core", "mio", "lazy_static"]
 io-util = ["memchr"]
-io = ["io-util", "blocking"]
+# stdin, stdout, stderr
+io-std = ["rt-core"]
 macros = ["tokio-macros"]
 net = ["dns", "tcp", "udp", "uds"]
 process = [
-  "io-util", # TODO: Get rid of
+  "io-driver",
   "libc",
   "mio-named-pipes",
   "signal",
@@ -58,14 +66,9 @@ process = [
 ]
 # Includes basic task execution capabilities
 rt-core = []
-# TODO: rename this -> `rt-threaded`
-rt-full = [
-  "macros",
+rt-threaded = [
   "num_cpus",
-  "net",
   "rt-core",
-  "sync",
-  "time",
 ]
 signal = [
   "io-driver",
@@ -80,7 +83,7 @@ stream = ["futures-core"]
 sync = ["fnv"]
 test-util = []
 tcp = ["io-driver"]
-time = ["rt-core", "sync", "slab"]
+time = ["rt-core", "slab"]
 udp = ["io-driver"]
 uds = ["io-driver", "mio-uds", "libc"]
 

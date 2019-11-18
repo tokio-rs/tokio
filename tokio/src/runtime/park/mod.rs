@@ -45,7 +45,7 @@
 //! [mio]: https://docs.rs/mio/0.6/mio/struct.Poll.html
 
 mod thread;
-#[cfg(feature = "rt-full")]
+#[cfg(feature = "rt-threaded")]
 pub(crate) use self::thread::CachedParkThread;
 #[cfg(not(feature = "io-driver"))]
 pub(crate) use self::thread::ParkThread;

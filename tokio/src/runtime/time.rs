@@ -3,10 +3,7 @@
 //! shells. This isolates the complexity of dealing with conditional
 //! compilation.
 
-pub(crate) use self::variant::*;
-
-#[cfg(feature = "time")]
-mod variant {
+cfg_time! {
     use crate::runtime::io;
     use crate::time::{self, driver};
 
@@ -35,8 +32,7 @@ mod variant {
     }
 }
 
-#[cfg(not(feature = "time"))]
-mod variant {
+cfg_not_time! {
     use crate::runtime::io;
 
     pub(crate) type Clock = ();

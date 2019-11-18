@@ -9,6 +9,16 @@ macro_rules! ready {
     };
 }
 
+#[macro_export]
+macro_rules! cfg_fs {
+    ($($item:item)*) => { $($item)* }
+}
+
+#[macro_export]
+macro_rules! cfg_io_std {
+    ($($item:item)*) => { $($item)* }
+}
+
 use futures::future;
 
 // Load source

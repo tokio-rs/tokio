@@ -1,17 +1,12 @@
-#[cfg(not(loom))]
-mod atomic_waker;
+cfg_not_loom! {
+    mod atomic_waker;
+    mod semaphore;
+}
 
-#[cfg(loom)]
-mod loom_atomic_waker;
-
-#[cfg(loom)]
-mod loom_list;
-
-#[cfg(loom)]
-mod loom_mpsc;
-
-#[cfg(loom)]
-mod loom_oneshot;
-
-#[cfg(loom)]
-mod loom_semaphore;
+cfg_loom! {
+    mod loom_atomic_waker;
+    mod loom_list;
+    mod loom_mpsc;
+    mod loom_oneshot;
+    mod loom_semaphore;
+}

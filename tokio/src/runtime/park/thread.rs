@@ -168,7 +168,7 @@ impl CachedParkThread {
     ///
     /// This type cannot be moved to other threads, so it should be created on
     /// the thread that the caller intends to park.
-    #[cfg(feature = "rt-full")]
+    #[cfg(feature = "rt-threaded")]
     pub(crate) fn new() -> CachedParkThread {
         CachedParkThread {
             _anchor: PhantomData,
@@ -217,7 +217,7 @@ impl Unpark for UnparkThread {
     }
 }
 
-#[cfg(feature = "rt-full")]
+#[cfg(feature = "rt-threaded")]
 mod waker {
     use super::{Inner, UnparkThread};
     use crate::loom::sync::Arc;

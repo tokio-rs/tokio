@@ -34,13 +34,14 @@ enum State<T> {
     Busy(sys::Blocking<(io::Result<usize>, Buf, T)>),
 }
 
-impl<T> Blocking<T> {
-    #[cfg(feature = "io")]
-    pub(crate) fn new(inner: T) -> Blocking<T> {
-        Blocking {
-            inner: Some(inner),
-            state: State::Idle(Some(Buf::with_capacity(0))),
-            need_flush: false,
+cfg_io_std! {
+    impl<T> Blocking<T> {
+        pub(crate) fn new(inner: T) -> Blocking<T> {
+            Blocking {
+                inner: Some(inner),
+                state: State::Idle(Some(Buf::with_capacity(0))),
+                need_flush: false,
+            }
         }
     }
 }
@@ -264,12 +265,15 @@ impl Buf {
         self.buf.clear();
         res
     }
+}
 
-    #[cfg(feature = "fs")]
-    pub(crate) fn discard_read(&mut self) -> i64 {
-        let ret = -(self.bytes().len() as i64);
-        self.pos = 0;
-        self.buf.truncate(0);
-        ret
+cfg_fs! {
+    impl Buf {
+        pub(crate) fn discard_read(&mut self) -> i64 {
+            let ret = -(self.bytes().len() as i64);
+            self.pos = 0;
+            self.buf.truncate(0);
+            ret
+        }
     }
 }
