@@ -20,7 +20,7 @@ macro_rules! t {
 }
 
 cfg_if! {
-    if #[cfg(feature = "force-rustls")] {
+    if #[cfg(all(feature = "force-rustls", not(feature = "native-tls")))] {
         fn assert_bad_hostname_error(err: &io::Error) {
             let err = err.to_string();
             assert!(err.contains("CertNotValidForName"), "bad error: {}", err);

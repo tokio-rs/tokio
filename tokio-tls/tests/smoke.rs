@@ -125,7 +125,7 @@ fn openssl_keys() -> &'static Keys {
 }
 
 cfg_if! {
-    if #[cfg(feature = "rustls")] {
+    if #[cfg(all(feature = "rustls", not(feature = "native-tls")))] {
         use webpki;
         use untrusted;
         use std::env;

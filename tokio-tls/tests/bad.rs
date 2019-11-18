@@ -18,7 +18,7 @@ macro_rules! t {
 }
 
 cfg_if! {
-    if #[cfg(feature = "force-rustls")] {
+    if #[cfg(all(feature = "force-rustls", not(feature = "native-tls")))] {
         fn verify_failed(err: &Error, s:  &str) {
             let err = err.to_string();
             assert!(err.contains(s), "bad error: {}", err);

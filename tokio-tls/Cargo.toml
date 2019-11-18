@@ -24,9 +24,34 @@ categories = ["asynchronous", "network-programming"]
 [badges]
 travis-ci = { repository = "tokio-rs/tokio-tls" }
 
+[[example]]
+name = "echo"
+
+[[example]]
+name = "download-rust-lang"
+required-features = ["native-tls"]
+
+[[test]]
+name = "bad"
+path = "tests/bad.rs"
+required-features = ["native-tls"]
+
+[[test]]
+name = "google"
+path = "tests/google.rs"
+required-features = ["native-tls"]
+
+[[test]]
+name = "smoke"
+path = "tests/smoke.rs"
+required-features = ["native-tls"]
+
 [dependencies]
-native-tls = "0.2"
-tokio = { version = "0.2.0", path = "../tokio" }
+native-tls = { version = "0.2", optional = true }
+rustls-dep = { version = "0.16", package = "rustls", optional = true }
+tokio = { version = "=0.2.6", path = "../tokio" }
+futures = { version = "0.3.0" }
+webpki = { version = "0.21.0", optional = true }
 
 [dev-dependencies]
 tokio = { version = "0.2.0", path = "../tokio", features = ["macros", "stream", "rt-core", "io-util", "net"] }
@@ -35,6 +60,13 @@ tokio-util = { version = "0.2.0", path = "../tokio-util", features = ["full"] }
 cfg-if = "0.1"
 env_logger = { version = "0.6", default-features = false }
 futures = { version = "0.3.0", features = ["async-await"] }
+
+[features]
+rustls = [
+  "webpki",
+  "rustls-dep",
+]
+default = []
 
 [target.'cfg(all(not(target_os = "macos"), not(windows), not(target_os = "ios")))'.dev-dependencies]
 openssl = "0.10"
