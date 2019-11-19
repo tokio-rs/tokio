@@ -23,9 +23,6 @@ use stack::TransferStack;
 mod tid;
 use tid::Tid;
 
-mod scheduled_io;
-pub(crate) use scheduled_io::ScheduledIo;
-
 // this is used by sub-modules
 #[cfg(all(test, loom))]
 use self::tests::test_util;

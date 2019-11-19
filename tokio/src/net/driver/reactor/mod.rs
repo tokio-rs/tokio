@@ -5,8 +5,10 @@ use crate::runtime::{Park, Unpark};
 use std::sync::atomic::Ordering::SeqCst;
 
 mod dispatch;
-use dispatch::{Slab, ScheduledIo};
-pub(crate) use dispatch::MAX_SOURCES;
+use dispatch::{Slab, MAX_SOURCES};
+
+mod scheduled_io;
+use scheduled_io::ScheduledIo;
 
 use mio::event::Evented;
 use std::cell::RefCell;

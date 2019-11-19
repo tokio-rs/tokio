@@ -1,4 +1,4 @@
-use super::{Entry, Generation, Pack};
+use super::dispatch::{Entry, Generation};
 use crate::loom::future::AtomicWaker;
 use crate::loom::sync::atomic::AtomicUsize;
 
@@ -67,13 +67,17 @@ impl ScheduledIo {
     /// generation, then the corresponding IO resource has been removed and
     /// replaced with a new resource. In that case, this method returns `None`.
     /// Otherwise, this returns the current readiness.
-    pub(in crate::net::driver) fn get_readiness(&self, token: usize) -> Option<usize> {
+    pub(crate) fn get_readiness(&self, token: usize) -> Option<usize> {
+        drop(token);
+        unimplemented!();
+        /*
         let gen = token & Generation::MASK;
         let ready = self.readiness.load(Ordering::Acquire);
         if ready & Generation::MASK != gen {
             return None;
         }
         Some(ready & (!Generation::MASK))
+        */
     }
 
     /// Sets the readiness on this `ScheduledIo` by invoking the given closure on
@@ -90,7 +94,7 @@ impl ScheduledIo {
     /// generation, then the corresponding IO resource has been removed and
     /// replaced with a new resource. In that case, this method returns `Err`.
     /// Otherwise, this returns the previous readiness.
-    pub(in crate::net::driver) fn set_readiness(
+    pub(crate) fn set_readiness(
         &self,
         token: usize,
         f: impl Fn(usize) -> usize,
