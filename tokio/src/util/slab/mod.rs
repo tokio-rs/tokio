@@ -1,13 +1,13 @@
 //! A lock-free concurrent slab.
 
+mod addr;
+pub(crate) use addr::Address;
+
 mod entry;
 pub(crate) use entry::Entry;
 
 mod generation;
 pub(crate) use generation::Generation;
-
-mod pack;
-use pack::{Pack, WIDTH};
 
 mod page;
 
@@ -20,9 +20,6 @@ use slot::Slot;
 mod stack;
 use stack::TransferStack;
 
-mod tid;
-use tid::Tid;
-
 // this is used by sub-modules
 #[cfg(all(test, loom))]
 use self::tests::test_util;
@@ -31,8 +28,21 @@ use self::tests::test_util;
 mod tests;
 
 use crate::loom::sync::Mutex;
+use crate::util::bit;
 
 use std::fmt;
+
+#[cfg(target_pointer_width = "64")]
+const MAX_THREADS: usize = 4096;
+
+#[cfg(target_pointer_width = "32")]
+const MAX_THREADS: usize = 2048;
+
+/// Max number of pages per slab
+const MAX_PAGES: usize = bit::pointer_width() as usize / 4;
+
+/// Size of first page
+const INITIAL_PAGE_SIZE: usize = 32;
 
 /// A sharded slab.
 pub(crate) struct Slab<T> {
@@ -43,22 +53,6 @@ pub(crate) struct Slab<T> {
 
 unsafe impl<T: Send> Send for Slab<T> {}
 unsafe impl<T: Sync> Sync for Slab<T> {}
-
-#[cfg(target_pointer_width = "64")]
-const MAX_THREADS: usize = 4096;
-
-#[cfg(target_pointer_width = "32")]
-const MAX_THREADS: usize = 2048;
-
-pub(crate) const MAX_ENTRIES: usize = (1 << TOKEN_SHIFT) - 1;
-const TOKEN_SHIFT: usize = Tid::SHIFT + Tid::LEN;
-
-const INITIAL_PAGE_SIZE: usize = 32;
-
-const MAX_PAGES: usize = WIDTH / 4;
-
-// Chosen arbitrarily.
-const RESERVED_BITS: usize = 5;
 
 impl<T: Entry> Slab<T> {
     /// Returns a new slab with the default configuration parameters.
@@ -75,14 +69,14 @@ impl<T: Entry> Slab<T> {
     /// If this function returns `None`, then the shard for the current thread
     /// is full and no items can be added until some are removed, or the maximum
     /// number of shards has been reached.
-    pub(crate) fn alloc(&self) -> Option<usize> {
+    pub(crate) fn alloc(&self) -> Option<Address> {
         // we must lock the slab to alloc an item.
         let _local = self.local.lock().unwrap();
         self.shard.alloc()
     }
 
     /// Removes the value associated with the given key from the slab.
-    pub(crate) fn remove(&self, idx: usize) {
+    pub(crate) fn remove(&self, idx: Address) {
         // try to lock the slab so that we can use `remove_local`.
         let lock = self.local.try_lock();
 
@@ -99,7 +93,7 @@ impl<T: Entry> Slab<T> {
     ///
     /// If the slab does not contain a value for the given key, `None` is
     /// returned instead.
-    pub(crate) fn get(&self, token: usize) -> Option<&T> {
+    pub(crate) fn get(&self, token: Address) -> Option<&T> {
         self.shard.get(token)
     }
 }

@@ -1,4 +1,5 @@
-use super::{Entry, page, Pack, MAX_PAGES};
+use super::{Address, Entry, page, MAX_PAGES};
+
 use std::fmt;
 
 // ┌─────────────┐      ┌────────┐
@@ -54,10 +55,11 @@ impl<T: Entry> Shard<T> {
         }
     }
 
-    pub(super) fn alloc(&self) -> Option<usize> {
+    pub(super) fn alloc(&self) -> Option<Address> {
         // Can we fit the value into an existing page?
         for (page_idx, page) in self.shared.iter().enumerate() {
             let local = self.local(page_idx);
+
             if let Some(page_offset) = page.alloc(local) {
                 return Some(page_offset);
             }
@@ -66,33 +68,29 @@ impl<T: Entry> Shard<T> {
         None
     }
 
-    pub(super) fn get(&self, idx: usize) -> Option<&T> {
-        let addr = page::Addr::from_packed(idx);
-        let i = addr.index();
+    pub(super) fn get(&self, addr: Address) -> Option<&T> {
+        let page_idx = addr.page();
 
-        if i > self.shared.len() {
+        if page_idx > self.shared.len() {
             return None;
         }
-        self.shared[i].get(addr)
+
+        self.shared[page_idx].get(addr)
     }
 
     /// Remove an item on the shard's local thread.
-    pub(super) fn remove_local(&self, idx: usize) {
-        let addr = page::Addr::from_packed(idx);
-        let page_idx = addr.index();
+    pub(super) fn remove_local(&self, addr: Address) {
+        let page_idx = addr.page();
 
         if let Some(page) = self.shared.get(page_idx) {
-            page.remove_local(self.local(page_idx), addr, idx);
+            page.remove_local(self.local(page_idx), addr);
         }
     }
 
     /// Remove an item, while on a different thread from the shard's local thread.
-    pub(super) fn remove_remote(&self, idx: usize) {
-        let addr = page::Addr::from_packed(idx);
-        let page_idx = addr.index();
-
-        if let Some(page) = self.shared.get(page_idx) {
-            page.remove_remote(addr, idx);
+    pub(super) fn remove_remote(&self, addr: Address) {
+        if let Some(page) = self.shared.get(addr.page()) {
+            page.remove_remote(addr);
         }
     }
 

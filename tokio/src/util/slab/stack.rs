@@ -1,8 +1,9 @@
-use super::page::Addr;
+use super::Address;
 use crate::loom::sync::atomic::AtomicUsize;
 
 use std::fmt;
 use std::sync::atomic::Ordering;
+use std::usize;
 
 pub(super) struct TransferStack {
     head: AtomicUsize,
@@ -11,13 +12,14 @@ pub(super) struct TransferStack {
 impl TransferStack {
     pub(super) fn new() -> Self {
         Self {
-            head: AtomicUsize::new(Addr::NULL),
+            head: AtomicUsize::new(Address::NULL),
         }
     }
 
     pub(super) fn pop_all(&self) -> Option<usize> {
-        let val = self.head.swap(Addr::NULL, Ordering::Acquire);
-        if val == Addr::NULL {
+        let val = self.head.swap(Address::NULL, Ordering::Acquire);
+
+        if val == Address::NULL {
             None
         } else {
             Some(val)
@@ -26,6 +28,7 @@ impl TransferStack {
 
     pub(super) fn push(&self, value: usize, before: impl Fn(usize)) {
         let mut next = self.head.load(Ordering::Relaxed);
+
         loop {
             before(next);
 

@@ -1,7 +1,7 @@
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::net::driver::platform;
 use crate::runtime::{Park, Unpark};
-use crate::util::slab::{Slab, MAX_ENTRIES};
+use crate::util::slab::{Address, Slab};
 
 use std::sync::atomic::Ordering::SeqCst;
 
@@ -10,14 +10,12 @@ use scheduled_io::ScheduledIo;
 
 use mio::event::Evented;
 use std::cell::RefCell;
+use std::fmt;
 use std::io;
 use std::marker::PhantomData;
-#[cfg(all(unix, not(target_os = "fuchsia")))]
-use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::{Arc, Weak};
 use std::task::Waker;
 use std::time::Duration;
-use std::{fmt, usize};
 
 /// The core reactor, or event loop.
 ///
@@ -45,15 +43,6 @@ pub struct Handle {
     inner: Weak<Inner>,
 }
 
-/// Return value from the `turn` method on `Reactor`.
-///
-/// Currently this value doesn't actually provide any functionality, but it may
-/// in the future give insight into what happened during `turn`.
-#[derive(Debug)]
-pub struct Turn {
-    _priv: (),
-}
-
 pub(super) struct Inner {
     /// The underlying system event queue.
     io: mio::Poll,
@@ -79,7 +68,7 @@ thread_local! {
     static CURRENT_REACTOR: RefCell<Option<Handle>> = RefCell::new(None)
 }
 
-const TOKEN_WAKEUP: mio::Token = mio::Token(MAX_ENTRIES);
+const TOKEN_WAKEUP: mio::Token = mio::Token(Address::NULL);
 
 fn _assert_kinds() {
     fn _assert<T: Send + Sync>() {}
@@ -161,46 +150,7 @@ impl Reactor {
         }
     }
 
-    /// Performs one iteration of the event loop, blocking on waiting for events
-    /// for at most `max_wait` (forever if `None`).
-    ///
-    /// This method is the primary method of running this reactor and processing
-    /// I/O events that occur. This method executes one iteration of an event
-    /// loop, blocking at most once waiting for events to happen.
-    ///
-    /// If a `max_wait` is specified then the method should block no longer than
-    /// the duration specified, but this shouldn't be used as a super-precise
-    /// timer but rather a "ballpark approximation"
-    ///
-    /// # Return value
-    ///
-    /// This function returns an instance of `Turn`
-    ///
-    /// `Turn` as of today has no extra information with it and can be safely
-    /// discarded.  In the future `Turn` may contain information about what
-    /// happened while this reactor blocked.
-    ///
-    /// # Errors
-    ///
-    /// This function may also return any I/O error which occurs when polling
-    /// for readiness of I/O objects with the OS. This is quite unlikely to
-    /// arise and typically mean that things have gone horribly wrong at that
-    /// point. Currently this is primarily only known to happen for internal
-    /// bugs to `tokio` itself.
-    pub fn turn(&mut self, max_wait: Option<Duration>) -> io::Result<Turn> {
-        self.poll(max_wait)?;
-        Ok(Turn { _priv: () })
-    }
-
-    /// Returns true if the reactor is currently idle.
-    ///
-    /// Idle is defined as all tasks that have been spawned have completed,
-    /// either successfully or with an error.
-    pub fn is_idle(&self) -> bool {
-        self.inner.n_sources.load(SeqCst) == 0
-    }
-
-    fn poll(&mut self, max_wait: Option<Duration>) -> io::Result<()> {
+    fn turn(&mut self, max_wait: Option<Duration>) -> io::Result<()> {
         // Block waiting for an event to happen, peeling out how many events
         // happened.
         match self.inner.io.poll(&mut self.events, max_wait) {
@@ -230,13 +180,15 @@ impl Reactor {
         let mut rd = None;
         let mut wr = None;
 
-        let io = match self.inner.io_dispatch.get(token.0) {
+        let address = Address::from_usize(token.0);
+
+        let io = match self.inner.io_dispatch.get(address) {
             Some(io) => io,
             None => return,
         };
 
         if io
-            .set_readiness(token.0, |curr| curr | ready.as_usize())
+            .set_readiness(address, |curr| curr | ready.as_usize())
             .is_err()
         {
             // token no longer valid!
@@ -258,13 +210,6 @@ impl Reactor {
         if let Some(w) = wr {
             w.wake();
         }
-    }
-}
-
-#[cfg(all(unix, not(target_os = "fuchsia")))]
-impl AsRawFd for Reactor {
-    fn as_raw_fd(&self) -> RawFd {
-        self.inner.io.as_raw_fd()
     }
 }
 
@@ -346,22 +291,24 @@ impl Inner {
     /// Register an I/O resource with the reactor.
     ///
     /// The registration token is returned.
-    pub(super) fn add_source(&self, source: &dyn Evented) -> io::Result<usize> {
-        let token = self.io_dispatch.alloc().ok_or_else(|| {
+    pub(super) fn add_source(&self, source: &dyn Evented) -> io::Result<Address> {
+        let address = self.io_dispatch.alloc().ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::Other,
                 "reactor at max registered I/O resources",
             )
         })?;
+
         self.n_sources.fetch_add(1, SeqCst);
+
         self.io.register(
             source,
-            mio::Token(token),
+            mio::Token(address.to_usize()),
             mio::Ready::all(),
             mio::PollOpt::edge(),
         )?;
 
-        Ok(token)
+        Ok(address)
     }
 
     /// Deregisters an I/O resource from the reactor.
@@ -369,21 +316,21 @@ impl Inner {
         self.io.deregister(source)
     }
 
-    pub(super) fn drop_source(&self, token: usize) {
-        self.io_dispatch.remove(token);
+    pub(super) fn drop_source(&self, address: Address) {
+        self.io_dispatch.remove(address);
         self.n_sources.fetch_sub(1, SeqCst);
     }
 
     /// Registers interest in the I/O resource associated with `token`.
-    pub(super) fn register(&self, token: usize, dir: Direction, w: Waker) {
+    pub(super) fn register(&self, token: Address, dir: Direction, w: Waker) {
         let sched = self
             .io_dispatch
             .get(token)
-            .unwrap_or_else(|| panic!("IO resource for token {} does not exist!", token));
+            .unwrap_or_else(|| panic!("IO resource for token {:?} does not exist!", token));
 
         let readiness = sched
             .get_readiness(token)
-            .unwrap_or_else(|| panic!("token {} no longer valid!", token));
+            .unwrap_or_else(|| panic!("token {:?} no longer valid!", token));
 
         let (waker, ready) = match dir {
             Direction::Read => (&sched.reader, !mio::Ready::writable()),

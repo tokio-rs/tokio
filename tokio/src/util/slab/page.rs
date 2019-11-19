@@ -1,65 +1,24 @@
-use super::{Entry, Generation, Pack, Slot, TransferStack, INITIAL_PAGE_SIZE, WIDTH};
+use super::{Address, Entry, Generation, Slot, TransferStack, INITIAL_PAGE_SIZE};
 use crate::loom::cell::CausalCell;
 
 use std::fmt;
 
-/// A page address encodes the location of a slot within a shard (the page
-/// number and offset within that page) as a single linear value.
-#[repr(transparent)]
-#[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
-pub(crate) struct Addr {
-    addr: usize,
-}
-
-impl Addr {
-    pub(super) const NULL: usize = Self::BITS + 1;
-    const INDEX_SHIFT: usize = INITIAL_PAGE_SIZE.trailing_zeros() as usize + 1;
-
-    pub(crate) fn index(self) -> usize {
-        // Since every page is twice as large as the previous page, and all page sizes
-        // are powers of two, we can determine the page index that contains a given
-        // address by shifting the address down by the smallest page size and
-        // looking at how many twos places necessary to represent that number,
-        // telling us what power of two page size it fits inside of. We can
-        // determine the number of twos places by counting the number of leading
-        // zeros (unused twos places) in the number's binary representation, and
-        // subtracting that count from the total number of bits in a word.
-        WIDTH - ((self.addr + INITIAL_PAGE_SIZE) >> Self::INDEX_SHIFT).leading_zeros() as usize
-    }
-
-    pub(crate) fn offset(self) -> usize {
-        self.addr
-    }
-}
-
-pub(super) fn size(n: usize) -> usize {
-    INITIAL_PAGE_SIZE * 2usize.pow(n as _)
-}
-
-impl Pack for Addr {
-    const LEN: usize = super::MAX_PAGES + Self::INDEX_SHIFT;
-
-    type Prev = ();
-
-    fn as_usize(&self) -> usize {
-        self.addr
-    }
-
-    fn from_usize(addr: usize) -> Self {
-        debug_assert!(addr <= Self::BITS);
-        Self { addr }
-    }
-}
-
+/// Data accessed only by the thread that owns the shard.
 pub(crate) struct Local {
     head: CausalCell<usize>,
 }
 
+/// Data accessed by any thread.
 pub(crate) struct Shared<T> {
     remote: TransferStack,
     size: usize,
     prev_sz: usize,
     slab: CausalCell<Option<Box<[Slot<T>]>>>,
+}
+
+/// Returns the size of the page at index `n`
+pub(super) fn size(n: usize) -> usize {
+    INITIAL_PAGE_SIZE << n
 }
 
 impl Local {
@@ -81,8 +40,6 @@ impl Local {
 }
 
 impl<T: Entry> Shared<T> {
-    const NULL: usize = Addr::NULL;
-
     pub(crate) fn new(size: usize, prev_sz: usize) -> Shared<T> {
         Self {
             prev_sz,
@@ -106,7 +63,7 @@ impl<T: Entry> Shared<T> {
 
         let mut slab = Vec::with_capacity(self.size);
         slab.extend((1..self.size).map(Slot::new));
-        slab.push(Slot::new(Self::NULL));
+        slab.push(Slot::new(Address::NULL));
 
         self.slab.with_mut(|s| {
             // this mut access is safe — it only occurs to initially
@@ -119,7 +76,7 @@ impl<T: Entry> Shared<T> {
         });
     }
 
-    pub(crate) fn alloc(&self, local: &Local) -> Option<usize> {
+    pub(crate) fn alloc(&self, local: &Local) -> Option<Address> {
         let head = local.head();
 
         // are there any items on the local free list? (fast path)
@@ -133,7 +90,7 @@ impl<T: Entry> Shared<T> {
 
         // if the head is still null, both the local and remote free lists are
         // empty --- we can't fit any more items on this page.
-        if head == Self::NULL {
+        if head == Address::NULL {
             return None;
         }
 
@@ -155,18 +112,22 @@ impl<T: Entry> Shared<T> {
         });
 
         let index = head + self.prev_sz;
-        Some(gen.pack(index))
+
+        Some(Address::new(index, gen))
     }
 
-    pub(crate) fn get(&self, addr: Addr) -> Option<&T> {
-        let page_offset = addr.offset() - self.prev_sz;
+    pub(crate) fn get(&self, addr: Address) -> Option<&T> {
+        let page_offset = addr.slot() - self.prev_sz;
 
         self.slab
             .with(|slab| unsafe { &*slab }.as_ref()?.get(page_offset))
             .map(|slot| slot.get())
     }
 
-    pub(crate) fn remove_local(&self, local: &Local, addr: Addr, idx: usize) {
+    pub(crate) fn remove_local(&self, local: &Local, addr: Address) {
+        drop((local, addr));
+        unimplemented!();
+        /*
         let offset = addr.offset() - self.prev_sz;
 
         self.slab.with(|slab| {
@@ -183,10 +144,15 @@ impl<T: Entry> Shared<T> {
                 local.set_head(offset);
             }
         })
+        */
     }
 
-    pub(crate) fn remove_remote(&self, addr: Addr, idx: usize) {
+    pub(crate) fn remove_remote(&self, addr: Address) {
+        drop(addr);
+        unimplemented!();
+        /*
         let offset = addr.offset() - self.prev_sz;
+
         self.slab.with(|slab| {
             let slab = unsafe { &*slab }.as_ref();
 
@@ -202,6 +168,7 @@ impl<T: Entry> Shared<T> {
 
             self.remote.push(offset, |next| slot.set_next(next));
         })
+        */
     }
 }
 
@@ -223,16 +190,6 @@ impl<T> fmt::Debug for Shared<T> {
             .field("prev_sz", &self.prev_sz)
             .field("size", &self.size)
             // .field("slab", &self.slab)
-            .finish()
-    }
-}
-
-impl fmt::Debug for Addr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Addr")
-            .field("addr", &format_args!("{:#0x}", &self.addr))
-            .field("index", &self.index())
-            .field("offset", &self.offset())
             .finish()
     }
 }

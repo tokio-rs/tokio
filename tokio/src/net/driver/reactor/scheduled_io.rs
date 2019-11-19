@@ -1,7 +1,7 @@
 use crate::loom::future::AtomicWaker;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::util::bit;
-use crate::util::slab::{Entry, Generation};
+use crate::util::slab::{Address, Entry, Generation};
 
 use std::sync::atomic::Ordering::{Acquire, AcqRel, SeqCst};
 
@@ -67,8 +67,8 @@ impl ScheduledIo {
     /// generation, then the corresponding IO resource has been removed and
     /// replaced with a new resource. In that case, this method returns `None`.
     /// Otherwise, this returns the current readiness.
-    pub(crate) fn get_readiness(&self, token: usize) -> Option<usize> {
-        drop(token);
+    pub(crate) fn get_readiness(&self, address: Address) -> Option<usize> {
+        drop(address);
         unimplemented!();
         /*
         let gen = token & Generation::MASK;
@@ -96,7 +96,7 @@ impl ScheduledIo {
     /// Otherwise, this returns the previous readiness.
     pub(crate) fn set_readiness(
         &self,
-        token: usize,
+        token: Address,
         f: impl Fn(usize) -> usize,
     ) -> Result<usize, ()> {
         drop((token, f));
