@@ -68,16 +68,13 @@ impl ScheduledIo {
     /// replaced with a new resource. In that case, this method returns `None`.
     /// Otherwise, this returns the current readiness.
     pub(crate) fn get_readiness(&self, address: Address) -> Option<usize> {
-        drop(address);
-        unimplemented!();
-        /*
-        let gen = token & Generation::MASK;
-        let ready = self.readiness.load(Ordering::Acquire);
-        if ready & Generation::MASK != gen {
+        let ready = self.readiness.load(Acquire);
+
+        if unpack_generation(ready) != address.generation() {
             return None;
         }
-        Some(ready & (!Generation::MASK))
-        */
+
+        Some(ready & !PACK.max_value())
     }
 
     /// Sets the readiness on this `ScheduledIo` by invoking the given closure on
@@ -96,42 +93,47 @@ impl ScheduledIo {
     /// Otherwise, this returns the previous readiness.
     pub(crate) fn set_readiness(
         &self,
-        token: Address,
+        address: Address,
         f: impl Fn(usize) -> usize,
     ) -> Result<usize, ()> {
-        drop((token, f));
-        unimplemented!();
-        /*
-        let gen = token & Generation::MASK;
+        let generation = address.generation();
 
-        let mut current = self.readiness.load(Ordering::Acquire);
+        let mut current = self.readiness.load(Acquire);
+
         loop {
             // Check that the generation for this access is still the current
             // one.
-            if current & Generation::MASK != gen {
+            if unpack_generation(current) != generation {
                 return Err(());
             }
             // Mask out the generation bits so that the modifying function
             // doesn't see them.
             let current_readiness = current & mio::Ready::all().as_usize();
             let new = f(current_readiness);
+
             debug_assert!(
-                new < Generation::ONE,
+                new <= !PACK.max_value(),
                 "new readiness value would overwrite generation bits!"
             );
 
             match self.readiness.compare_exchange(
                 current,
-                new | gen,
-                Ordering::AcqRel,
-                Ordering::Acquire,
+                PACK.pack(generation.to_usize(), new),
+                AcqRel,
+                Acquire,
             ) {
                 Ok(_) => return Ok(current),
                 // we lost the race, retry!
                 Err(actual) => current = actual,
             }
         }
-        */
+    }
+}
+
+impl Drop for ScheduledIo {
+    fn drop(&mut self) {
+        self.writer.wake();
+        self.reader.wake();
     }
 }
 

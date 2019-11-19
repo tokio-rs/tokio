@@ -338,24 +338,10 @@ impl Inner {
         };
 
         waker.register(w);
+
         if readiness & ready.as_usize() != 0 {
             waker.wake();
         }
-    }
-}
-
-impl Drop for Inner {
-    fn drop(&mut self) {
-        unimplemented!();
-        /*
-        // When a reactor is dropped it needs to wake up all blocked tasks as
-        // they'll never receive a notification, and all connected I/O objects
-        // will start returning errors pretty quickly.
-        for io in self.io_dispatch.unique_iter() {
-            io.writer.wake();
-            io.reader.wake();
-        }
-        */
     }
 }
 
