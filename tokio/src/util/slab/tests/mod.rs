@@ -1,30 +1,26 @@
-mod idx {
-    use super::super::{page, Pack, Tid};
-    use proptest::prelude::*;
+use crate::net::driver::reactor::ScheduledIo;
+use crate::util::slab::{Address, Slab};
 
-    proptest! {
-        #[test]
-        fn tid_roundtrips(tid in 0usize..Tid::BITS) {
-            let tid = Tid::from_usize(tid);
-            let packed = tid.pack(0);
-            assert_eq!(tid, Tid::from_packed(packed));
-        }
+use loom::sync::Arc;
 
-        #[test]
-        fn idx_roundtrips(
-            tid in 0usize..Tid::BITS,
-            addr in 0usize..page::Addr::BITS,
-        ) {
-            let tid = Tid::from_usize(tid);
-            let addr = page::Addr::from_usize(addr);
-            let packed = tid.pack(addr.pack(0));
-            assert_eq!(addr, page::Addr::from_packed(packed));
-            assert_eq!(tid, Tid::from_packed(packed));
-        }
+fn store_val(slab: &Arc<Slab<ScheduledIo>>, readiness: usize) -> Address {
+    let key = slab.alloc().expect("allocate slot");
+
+    if let Some(slot) = slab.get(key) {
+        slot.set_readiness(key, |_| readiness)
+            .expect("generation should still be valid!");
+    } else {
+        panic!("slab did not contain a value for {:?}", key);
     }
+
+    key
 }
 
-#[cfg(loom)]
-mod loom;
-#[cfg(loom)]
-pub(super) use self::loom::test_util;
+fn get_val(slab: &Arc<Slab<ScheduledIo>>, address: Address) -> Option<usize> {
+    slab.get(address).and_then(|s| s.get_readiness(address))
+}
+
+mod loom_slab;
+// mod loom_small_shard;
+// mod loom_small_slab;
+// mod loom_stack;

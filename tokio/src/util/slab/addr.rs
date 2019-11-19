@@ -53,7 +53,7 @@ use crate::util::bit;
 use std::usize;
 
 /// References the location at which an entry is stored in a slab.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub(crate) struct Address(usize);
 
 const PAGE_INDEX_SHIFT: u32 = INITIAL_PAGE_SIZE.trailing_zeros() + 1;
@@ -75,7 +75,7 @@ const RESERVED: bit::Pack = bit::Pack::most_significant(5);
 impl Address {
     /// Represents no entry, picked to avoid collision with Mio's internals.
     /// This value should not be passed to mio.
-    pub(crate) const NULL: usize = usize::MAX;
+    pub(crate) const NULL: usize = usize::MAX >> 1;
 
     /// Re-exported by `Generation`.
     pub(super) const GENERATION_WIDTH: u32 = GENERATION.width();
@@ -123,5 +123,31 @@ impl Address {
     /// Returns the slot index
     pub(super) fn slot(self) -> usize {
         SHARD.unpack(self.0)
+    }
+}
+
+#[cfg(test)]
+cfg_not_loom! {
+    use proptest::proptest;
+
+    #[test]
+    fn test_pack_format() {
+        assert_eq!(5, RESERVED.width());
+        assert_eq!(0b11111, RESERVED.max_value());
+    }
+
+    proptest! {
+        #[test]
+        fn address_roundtrips(
+            slot in 0usize..Address::MAX_ENTRIES,
+            generation in 0usize..Generation::MAX,
+        ) {
+            let address = Address::new(slot, Generation::new(generation));
+            // Round trip
+            let address = Address::from_usize(address.to_usize());
+
+            assert_eq!(address.slot(), slot);
+            assert_eq!(address.generation().to_usize(), generation);
+        }
     }
 }

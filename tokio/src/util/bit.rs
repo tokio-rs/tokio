@@ -1,4 +1,6 @@
-#[derive(Debug, Clone, Copy)]
+use std::fmt;
+
+#[derive(Clone, Copy)]
 pub(crate) struct Pack {
     mask: usize,
     shift: u32,
@@ -38,7 +40,7 @@ impl Pack {
 
     /// Width, in bits, dedicated to storing the value.
     pub(crate) const fn width(&self) -> u32 {
-        self.mask.leading_zeros().wrapping_sub(self.shift)
+        pointer_width() - (self.mask >> self.shift).leading_zeros()
     }
 
     /// Max representable value
@@ -53,6 +55,12 @@ impl Pack {
 
     pub(crate) fn unpack(&self, src: usize) -> usize {
         unpack(src, self.mask, self.shift)
+    }
+}
+
+impl fmt::Debug for Pack {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(fmt, "Pack {{ mask: {:b}, shift: {} }}", self.mask, self.shift)
     }
 }
 

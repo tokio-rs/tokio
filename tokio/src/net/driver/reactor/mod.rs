@@ -6,7 +6,7 @@ use crate::util::slab::{Address, Slab};
 use std::sync::atomic::Ordering::SeqCst;
 
 mod scheduled_io;
-use scheduled_io::ScheduledIo;
+pub(crate) use scheduled_io::ScheduledIo; // pub(crate) for tests
 
 use mio::event::Evented;
 use std::cell::RefCell;
@@ -394,20 +394,16 @@ mod tests {
     #[test]
     fn tokens_unique_when_dropped() {
         loom::model(|| {
-            println!("\n--- iteration ---\n");
             let reactor = Reactor::new().unwrap();
             let inner = reactor.inner;
             let inner2 = inner.clone();
 
             let token_1 = inner.add_source(&NotEvented).unwrap();
-            println!("token 1: {:#x}", token_1);
             let thread = thread::spawn(move || {
                 inner2.drop_source(token_1);
-                println!("dropped: {:#x}", token_1);
             });
 
             let token_2 = inner.add_source(&NotEvented).unwrap();
-            println!("token 2: {:#x}", token_2);
             thread.join().unwrap();
 
             assert!(token_1 != token_2);
@@ -417,7 +413,6 @@ mod tests {
     #[test]
     fn tokens_unique_when_dropped_on_full_page() {
         loom::model(|| {
-            println!("\n--- iteration ---\n");
             let reactor = Reactor::new().unwrap();
             let inner = reactor.inner;
             let inner2 = inner.clone();
@@ -428,14 +423,11 @@ mod tests {
             }
 
             let token_1 = inner.add_source(&NotEvented).unwrap();
-            println!("token 1: {:#x}", token_1);
             let thread = thread::spawn(move || {
                 inner2.drop_source(token_1);
-                println!("dropped: {:#x}", token_1);
             });
 
             let token_2 = inner.add_source(&NotEvented).unwrap();
-            println!("token 2: {:#x}", token_2);
             thread.join().unwrap();
 
             assert!(token_1 != token_2);
@@ -445,19 +437,16 @@ mod tests {
     #[test]
     fn tokens_unique_concurrent_add() {
         loom::model(|| {
-            println!("\n--- iteration ---\n");
             let reactor = Reactor::new().unwrap();
             let inner = reactor.inner;
             let inner2 = inner.clone();
 
             let thread = thread::spawn(move || {
                 let token_2 = inner2.add_source(&NotEvented).unwrap();
-                println!("token 2: {:#x}", token_2);
                 token_2
             });
 
             let token_1 = inner.add_source(&NotEvented).unwrap();
-            println!("token 1: {:#x}", token_1);
             let token_2 = thread.join().unwrap();
 
             assert!(token_1 != token_2);

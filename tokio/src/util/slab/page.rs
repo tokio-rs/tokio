@@ -185,18 +185,3 @@ impl<T> fmt::Debug for Shared<T> {
             .finish()
     }
 }
-
-#[cfg(all(test, not(loom)))]
-mod test {
-    use super::*;
-    use proptest::prelude::*;
-
-    proptest! {
-        #[test]
-        fn addr_roundtrips(pidx in 0usize..Addr::BITS) {
-            let addr = Addr::from_usize(pidx);
-            let packed = addr.pack(0);
-            assert_eq!(addr, Addr::from_packed(packed));
-        }
-    }
-}

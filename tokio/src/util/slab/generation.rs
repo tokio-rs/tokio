@@ -6,10 +6,10 @@ use crate::util::bit;
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
 pub(crate) struct Generation(usize);
 
-const MAX_VALUE: usize = bit::mask_for(Address::GENERATION_WIDTH);
-
 impl Generation {
     pub(crate) const WIDTH: u32 = Address::GENERATION_WIDTH;
+
+    pub(super) const MAX: usize = bit::mask_for(Address::GENERATION_WIDTH);
 
     /// Create a new generation
     ///
@@ -17,13 +17,13 @@ impl Generation {
     ///
     /// Panics if `value` is greater than max generation.
     pub(crate) fn new(value: usize) -> Generation {
-        assert!(value <= MAX_VALUE);
+        assert!(value <= Self::MAX);
         Generation(value)
     }
 
     /// Returns the next generation value
     pub(crate) fn next(self) -> Generation {
-        Generation((self.0 + 1) & MAX_VALUE)
+        Generation((self.0 + 1) & Self::MAX)
     }
 
     pub(crate) fn to_usize(self) -> usize {

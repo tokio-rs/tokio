@@ -20,11 +20,7 @@ use slot::Slot;
 mod stack;
 use stack::TransferStack;
 
-// this is used by sub-modules
-#[cfg(all(test, loom))]
-use self::tests::test_util;
-
-#[cfg(test)]
+#[cfg(all(loom, test))]
 mod tests;
 
 use crate::loom::sync::Mutex;
