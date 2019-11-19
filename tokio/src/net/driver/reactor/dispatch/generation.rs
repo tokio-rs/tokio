@@ -8,7 +8,7 @@ pub(crate) struct Generation {
 }
 
 impl Generation {
-    // const ONE: usize = 1 << Self::SHIFT;
+    pub(crate) const WIDTH: usize = <Self as Pack>::LEN;
 
     /// Create a new generation
     ///
@@ -21,11 +21,14 @@ impl Generation {
         Generation { value }
     }
 
-    /*
-    fn next(self) -> Self {
+    /// Returns the next generation value
+    pub(crate) fn next(self) -> Generation {
         Generation::from_usize((self.value + 1) % Self::BITS)
     }
-    */
+
+    pub(crate) fn to_usize(self) -> usize {
+        self.value
+    }
 }
 
 impl Pack for Generation {

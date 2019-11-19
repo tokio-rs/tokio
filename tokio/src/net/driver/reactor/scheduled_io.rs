@@ -1,38 +1,39 @@
 use super::dispatch::{Entry, Generation};
 use crate::loom::future::AtomicWaker;
 use crate::loom::sync::atomic::AtomicUsize;
+use crate::util::bit;
 
-use std::sync::atomic::Ordering;
+use std::sync::atomic::Ordering::{Acquire, AcqRel, SeqCst};
 
 #[derive(Debug)]
 pub(crate) struct ScheduledIo {
     readiness: AtomicUsize,
-    pub(in crate::net::driver) reader: AtomicWaker,
-    pub(in crate::net::driver) writer: AtomicWaker,
+    pub(crate) reader: AtomicWaker,
+    pub(crate) writer: AtomicWaker,
 }
+
+const PACK: bit::Pack = bit::Pack::most_significant(Generation::WIDTH);
 
 impl Entry for ScheduledIo {
     fn generation(&self) -> Generation {
-        unimplemented!();
+        unpack_generation(self.readiness.load(SeqCst))
     }
 
     fn reset(&self, generation: Generation) -> bool {
-        drop(generation);
-        unimplemented!();
-        /*
-        let mut current = self.readiness.load(Ordering::Acquire);
+        let mut current = self.readiness.load(Acquire);
+
         loop {
-            if Generation::from_packed(current) != gen {
+            if unpack_generation(current) != generation {
                 return false;
             }
 
-            let next_gen = gen.next().pack(0);
+            let next = PACK.pack(generation.next().to_usize(), 0);
 
             match self.readiness.compare_exchange(
                 current,
-                next_gen,
-                Ordering::AcqRel,
-                Ordering::Acquire,
+                next,
+                AcqRel,
+                Acquire,
             ) {
                 Ok(_) => break,
                 Err(actual) => current = actual,
@@ -43,7 +44,6 @@ impl Entry for ScheduledIo {
         drop(self.writer.take_waker());
 
         true
-        */
     }
 }
 
@@ -103,6 +103,7 @@ impl ScheduledIo {
         unimplemented!();
         /*
         let gen = token & Generation::MASK;
+
         let mut current = self.readiness.load(Ordering::Acquire);
         loop {
             // Check that the generation for this access is still the current
@@ -132,4 +133,8 @@ impl ScheduledIo {
         }
         */
     }
+}
+
+fn unpack_generation(src: usize) -> Generation {
+    Generation::new(PACK.unpack(src))
 }

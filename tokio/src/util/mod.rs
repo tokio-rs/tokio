@@ -1,3 +1,5 @@
+pub(crate) mod bit;
+
 mod pad;
 pub(crate) use self::pad::CachePadded;
 

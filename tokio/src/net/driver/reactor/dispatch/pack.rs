@@ -1,3 +1,5 @@
+use crate::util::bit;
+
 pub(super) const WIDTH: usize = std::mem::size_of::<usize>() * 8;
 
 /// Trait encapsulating the calculations required for bit-packing slab indices.
@@ -29,10 +31,8 @@ pub(crate) trait Pack: Sized {
     /// left by `Self::SHIFT` bits to calculate this type's `MASK`.
     ///
     /// This is computed automatically based on `Self::LEN`.
-    const BITS: usize = {
-        let shift = 1 << (Self::LEN - 1);
-        shift | (shift - 1)
-    };
+    const BITS: usize = bit::mask_for(Self::LEN);
+
     /// The number of bits to shift a number to pack it into a usize with other
     /// values.
     ///
@@ -56,7 +56,7 @@ pub(crate) trait Pack: Sized {
     }
 
     fn from_packed(from: usize) -> Self {
-        let value = (from & Self::MASK) >> Self::SHIFT;
+        let value = bit::unpack(from, Self::MASK, Self::SHIFT as u32);
         debug_assert!(value <= Self::BITS);
         Self::from_usize(value)
     }
