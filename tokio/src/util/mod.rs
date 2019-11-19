@@ -1,7 +1,9 @@
 pub(crate) mod bit;
 
 mod pad;
-pub(crate) use self::pad::CachePadded;
+pub(crate) use pad::CachePadded;
 
 mod rand;
-pub(crate) use self::rand::FastRand;
+pub(crate) use rand::FastRand;
+
+pub(crate) mod slab;

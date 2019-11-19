@@ -1,11 +1,9 @@
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::net::driver::platform;
 use crate::runtime::{Park, Unpark};
+use crate::util::slab::{Slab, MAX_ENTRIES};
 
 use std::sync::atomic::Ordering::SeqCst;
-
-mod dispatch;
-use dispatch::{Slab, MAX_SOURCES};
 
 mod scheduled_io;
 use scheduled_io::ScheduledIo;
@@ -81,7 +79,7 @@ thread_local! {
     static CURRENT_REACTOR: RefCell<Option<Handle>> = RefCell::new(None)
 }
 
-const TOKEN_WAKEUP: mio::Token = mio::Token(MAX_SOURCES);
+const TOKEN_WAKEUP: mio::Token = mio::Token(MAX_ENTRIES);
 
 fn _assert_kinds() {
     fn _assert<T: Send + Sync>() {}

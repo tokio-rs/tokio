@@ -50,7 +50,7 @@ const MAX_THREADS: usize = 4096;
 #[cfg(target_pointer_width = "32")]
 const MAX_THREADS: usize = 2048;
 
-pub(crate) const MAX_SOURCES: usize = (1 << TOKEN_SHIFT) - 1;
+pub(crate) const MAX_ENTRIES: usize = (1 << TOKEN_SHIFT) - 1;
 const TOKEN_SHIFT: usize = Tid::SHIFT + Tid::LEN;
 
 const INITIAL_PAGE_SIZE: usize = 32;

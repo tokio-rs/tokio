@@ -1,7 +1,7 @@
-use super::dispatch::{Entry, Generation};
 use crate::loom::future::AtomicWaker;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::util::bit;
+use crate::util::slab::{Entry, Generation};
 
 use std::sync::atomic::Ordering::{Acquire, AcqRel, SeqCst};
 
