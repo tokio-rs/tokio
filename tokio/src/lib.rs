@@ -26,7 +26,11 @@
 //!
 //! Guide level documentation is found on the [website].
 //!
-//! [driver]: tokio::net::driver
+//! [driver]: driver/index.html
+//! [runtime]: runtime/index.html
+//! [net]: net/index.html
+//! [fs]: fs/index.html
+//! [timer]: time/index.html
 //! [website]: https://tokio.rs/docs/
 //!
 //! # Examples
