@@ -64,7 +64,7 @@ impl fmt::Display for Error {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         use self::Kind::*;
         let descr = match self.0 {
-            Shutdown => "timer is shutdown",
+            Shutdown => "The timer is shutdown, you must execute from within the tokio runtime",
             AtCapacity => "timer is at capacity and cannot create a new entry",
         };
         write!(fmt, "{}", descr)

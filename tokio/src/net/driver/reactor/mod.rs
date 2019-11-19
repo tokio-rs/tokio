@@ -306,7 +306,7 @@ impl Handle {
     pub(super) fn current() -> Self {
         CURRENT_REACTOR.with(|current| match *current.borrow() {
             Some(ref handle) => handle.clone(),
-            None => panic!("no current reactor"),
+            None => panic!("There is no reactor, you must execute from within the tokio runtime"),
         })
     }
 
