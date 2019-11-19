@@ -17,20 +17,28 @@
 //! applications with the Rust programming language. At a high level, it
 //! provides a few major components:
 //!
-//! * A multi threaded, work-stealing based task [scheduler][runtime].
-//! * A [driver] backed by the operating system's event queue (epoll, kqueue,
-//!   IOCP, etc...).
-//! * Asynchronous [TCP and UDP][net] sockets.
-//! * Asynchronous [filesystem][fs] operations.
-//! * [Timer][timer] API for scheduling work in the future.
+//! * Tools for working with [asynchronous tasks][task], and a multi threaded,
+//!   work-stealing based task [scheduler][runtime].
+//! * APIs for performing asynchronous IO, including [TCP and UDP][net] sockets,
+//!   [filesystem][fs] operations, and [process management][process].
+//! * A [driver] for these asynchronous IO operations, backed by the operating
+//!   system's event queue (epoll, kqueue, IOCP, etc...).
+//! * Utilities for tracking [time], such as setting [timeouts][timeout],
+//!   scheduling work to [run in the future][delay] or [repeat at an
+//!   interval][interval].
 //!
 //! Guide level documentation is found on the [website].
 //!
+//! [task]: task/index.html
 //! [driver]: driver/index.html
 //! [runtime]: runtime/index.html
 //! [net]: net/index.html
 //! [fs]: fs/index.html
-//! [timer]: time/index.html
+//! [process]: process/index.html
+//! [time]: time/index.html
+//! [timeout]: time/struct.Timeout.html
+//! [delay]: time/struct.Delay.html
+//! [interval]: time/struct.Interval.html
 //! [website]: https://tokio.rs/docs/
 //!
 //! # Examples
