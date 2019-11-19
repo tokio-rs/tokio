@@ -1,10 +1,21 @@
+mod entry;
+pub(crate) use entry::Entry;
+
+mod generation;
+pub(crate) use generation::Generation;
+
+mod scheduled_io;
+pub(crate) use scheduled_io::ScheduledIo;
+
+mod slot;
+use slot::Slot;
+
+mod stack;
+use stack::TransferStack;
+
 use super::{Pack, INITIAL_PAGE_SIZE, WIDTH};
 use crate::loom::cell::CausalCell;
 
-pub(crate) mod scheduled_io;
-mod stack;
-pub(crate) use self::scheduled_io::ScheduledIo;
-use self::stack::TransferStack;
 use std::fmt;
 
 /// A page address encodes the location of a slot within a shard (the page
@@ -55,17 +66,15 @@ impl Pack for Addr {
     }
 }
 
-pub(in crate::net::driver) type Iter<'a> = std::slice::Iter<'a, ScheduledIo>;
-
 pub(crate) struct Local {
     head: CausalCell<usize>,
 }
 
-pub(crate) struct Shared {
+pub(crate) struct Shared<T> {
     remote: TransferStack,
     size: usize,
     prev_sz: usize,
-    slab: CausalCell<Option<Box<[ScheduledIo]>>>,
+    slab: CausalCell<Option<Box<[Slot<T>]>>>,
 }
 
 impl Local {
@@ -88,10 +97,10 @@ impl Local {
     }
 }
 
-impl Shared {
+impl<T: Entry> Shared<T> {
     const NULL: usize = Addr::NULL;
 
-    pub(crate) fn new(size: usize, prev_sz: usize) -> Self {
+    pub(crate) fn new(size: usize, prev_sz: usize) -> Shared<T> {
         Self {
             prev_sz,
             size,
@@ -113,8 +122,9 @@ impl Shared {
         debug_assert!(self.slab.with(|s| unsafe { (*s).is_none() }));
 
         let mut slab = Vec::with_capacity(self.size);
-        slab.extend((1..self.size).map(ScheduledIo::new));
-        slab.push(ScheduledIo::new(Self::NULL));
+        slab.extend((1..self.size).map(Slot::new));
+        slab.push(Slot::new(Self::NULL));
+
         self.slab.with_mut(|s| {
             // this mut access is safe — it only occurs to initially
             // allocate the page, which only happens on this thread; if the
@@ -155,9 +165,11 @@ impl Shared {
             let slab = unsafe { &*(slab) }
                 .as_ref()
                 .expect("page must have been allocated to alloc!");
+
             let slot = &slab[head];
+
             local.set_head(slot.next());
-            slot.alloc()
+            slot.generation()
         });
 
         let index = head + self.prev_sz;
@@ -165,22 +177,27 @@ impl Shared {
     }
 
     #[inline]
-    pub(in crate::net::driver) fn get(&self, addr: Addr) -> Option<&ScheduledIo> {
+    pub(crate) fn get(&self, addr: Addr) -> Option<&T> {
         let page_offset = addr.offset() - self.prev_sz;
+
         self.slab
             .with(|slab| unsafe { &*slab }.as_ref()?.get(page_offset))
+            .map(|slot| slot.get())
     }
 
     pub(crate) fn remove_local(&self, local: &Local, addr: Addr, idx: usize) {
         let offset = addr.offset() - self.prev_sz;
+
         self.slab.with(|slab| {
             let slab = unsafe { &*slab }.as_ref();
+
             let slot = if let Some(slot) = slab.and_then(|slab| slab.get(offset)) {
                 slot
             } else {
                 return;
             };
-            if slot.reset(scheduled_io::Generation::from_packed(idx)) {
+
+            if slot.reset(Generation::from_packed(idx)) {
                 slot.set_next(local.head());
                 local.set_head(offset);
             }
@@ -191,21 +208,19 @@ impl Shared {
         let offset = addr.offset() - self.prev_sz;
         self.slab.with(|slab| {
             let slab = unsafe { &*slab }.as_ref();
+
             let slot = if let Some(slot) = slab.and_then(|slab| slab.get(offset)) {
                 slot
             } else {
                 return;
             };
-            if !slot.reset(scheduled_io::Generation::from_packed(idx)) {
+
+            if !slot.reset(Generation::from_packed(idx)) {
                 return;
             }
+
             self.remote.push(offset, |next| slot.set_next(next));
         })
-    }
-
-    pub(in crate::net::driver) fn iter(&self) -> Option<Iter<'_>> {
-        let slab = self.slab.with(|slab| unsafe { (&*slab).as_ref() });
-        slab.map(|slab| slab.iter())
     }
 }
 
@@ -220,7 +235,7 @@ impl fmt::Debug for Local {
     }
 }
 
-impl fmt::Debug for Shared {
+impl<T> fmt::Debug for Shared<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Shared")
             .field("remote", &self.remote)

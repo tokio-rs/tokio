@@ -4,16 +4,9 @@ use std::fmt;
 use crate::loom::sync::Mutex;
 
 /// A sharded slab.
-pub(crate) struct Slab {
-    shards: Box<[Shard]>,
-}
-
-/// A slab implemented with a single shard.
-// TODO(eliza): once worker threads are available, this type will be
-// unnecessary and can be removed.
-#[derive(Debug)]
-pub(crate) struct SingleShard {
-    shard: Shard,
+pub(crate) struct Slab<T> {
+    // Signal shard for now. Eventually there will be more.
+    shard: Shard<T>,
     local: Mutex<()>,
 }
 
@@ -36,7 +29,7 @@ pub(crate) struct SingleShard {
 //                      │XXXXXXXX│
 //                      └────────┘
 //                         ...
-pub(super) struct Shard {
+pub(super) struct Shard<T> {
     #[cfg(debug_assertions)]
     tid: usize,
     /// The local free list for each page.
@@ -49,76 +42,16 @@ pub(super) struct Shard {
     ///
     /// This consists of the page's metadata (size, previous size), remote free
     /// list, and a pointer to the actual array backing that page.
-    shared: Box<[page::Shared]>,
+    shared: Box<[page::Shared<T>]>,
 }
 
 pub(crate) const TOKEN_SHIFT: usize = Tid::SHIFT + Tid::LEN;
 pub(crate) const MAX_SOURCES: usize = (1 << TOKEN_SHIFT) - 1;
 
-#[allow(dead_code)] // coming back soon!
-impl Slab {
+impl<T: page::Entry> Slab<T> {
     /// Returns a new slab with the default configuration parameters.
-    pub(crate) fn new() -> Self {
-        Self::with_max_threads(MAX_THREADS)
-    }
-
-    pub(crate) fn with_max_threads(max_threads: usize) -> Self {
-        // Round the max number of threads to the next power of two and clamp to
-        // the maximum representable number.
-        let max = max_threads.next_power_of_two().min(MAX_THREADS);
-        let shards = (0..max).map(Shard::new).collect();
-        Self { shards }
-    }
-
-    /// allocs a value into the slab, returning a key that can be used to
-    /// access it.
-    ///
-    /// If this function returns `None`, then the shard for the current thread
-    /// is full and no items can be added until some are removed, or the maximum
-    /// number of shards has been reached.
-    pub(crate) fn alloc(&self) -> Option<usize> {
-        let tid = Tid::current();
-        self.shards[tid.as_usize()].alloc().map(|idx| tid.pack(idx))
-    }
-
-    /// Removes the value associated with the given key from the slab.
-    pub(crate) fn remove(&self, idx: usize) {
-        let tid = Tid::from_packed(idx);
-        let shard = &self.shards[tid.as_usize()];
-        if tid.is_current() {
-            shard.remove_local(idx)
-        } else {
-            shard.remove_remote(idx)
-        }
-    }
-
-    /// Return a reference to the value associated with the given key.
-    ///
-    /// If the slab does not contain a value for the given key, `None` is
-    /// returned instead.
-    pub(in crate::net::driver) fn get(&self, token: usize) -> Option<&page::ScheduledIo> {
-        let tid = Tid::from_packed(token);
-        self.shards.get(tid.as_usize())?.get(token)
-    }
-
-    /// Returns an iterator over all the items in the slab.
-    pub(in crate::net::driver::reactor) fn unique_iter(&mut self) -> iter::UniqueIter<'_> {
-        let mut shards = self.shards.iter_mut();
-        let shard = shards.next().expect("must be at least 1 shard");
-        let mut pages = shard.iter();
-        let slots = pages.next().and_then(page::Shared::iter);
-        iter::UniqueIter {
-            shards,
-            slots,
-            pages,
-        }
-    }
-}
-
-impl SingleShard {
-    /// Returns a new slab with the default configuration parameters.
-    pub(crate) fn new() -> Self {
-        Self {
+    pub(crate) fn new() -> Slab<T> {
+        Slab {
             shard: Shard::new(0),
             local: Mutex::new(()),
         }
@@ -140,6 +73,7 @@ impl SingleShard {
     pub(crate) fn remove(&self, idx: usize) {
         // try to lock the slab so that we can use `remove_local`.
         let lock = self.local.try_lock();
+
         // if we were able to lock the slab, we are "local" and can use the fast
         // path; otherwise, we will use `remove_remote`.
         if lock.is_ok() {
@@ -153,20 +87,13 @@ impl SingleShard {
     ///
     /// If the slab does not contain a value for the given key, `None` is
     /// returned instead.
-    pub(in crate::net::driver) fn get(&self, token: usize) -> Option<&page::ScheduledIo> {
+    pub(crate) fn get(&self, token: usize) -> Option<&T> {
         self.shard.get(token)
-    }
-
-    /// Returns an iterator over all the items in the slab.
-    pub(in crate::net::driver::reactor) fn unique_iter(&mut self) -> iter::ShardIter<'_> {
-        let mut pages = self.shard.iter_mut();
-        let slots = pages.next().and_then(|pg| pg.iter());
-        iter::ShardIter { slots, pages }
     }
 }
 
-impl Shard {
-    fn new(_idx: usize) -> Self {
+impl<T: page::Entry> Shard<T> {
+    fn new(_idx: usize) -> Shard<T> {
         let mut total_sz = 0;
         let shared = (0..MAX_PAGES)
             .map(|page_num| {
@@ -177,7 +104,8 @@ impl Shard {
             })
             .collect();
         let local = (0..MAX_PAGES).map(|_| page::Local::new()).collect();
-        Self {
+
+        Shard {
             #[cfg(debug_assertions)]
             tid: _idx,
             local,
@@ -198,7 +126,7 @@ impl Shard {
     }
 
     #[inline(always)]
-    fn get(&self, idx: usize) -> Option<&page::ScheduledIo> {
+    fn get(&self, idx: usize) -> Option<&T> {
         #[cfg(debug_assertions)]
         debug_assert_eq!(Tid::from_packed(idx).as_usize(), self.tid);
 
@@ -239,31 +167,20 @@ impl Shard {
     fn local(&self, i: usize) -> &page::Local {
         &self.local[i]
     }
-
-    pub(super) fn iter(&self) -> std::slice::Iter<'_, page::Shared> {
-        self.shared.iter()
-    }
-
-    fn iter_mut(&mut self) -> std::slice::IterMut<'_, page::Shared> {
-        self.shared.iter_mut()
-    }
 }
 
-impl fmt::Debug for Slab {
+impl<T> fmt::Debug for Slab<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Slab")
-            .field("shards", &self.shards)
+            .field("shard", &self.shard)
             .finish()
     }
 }
 
-unsafe impl Send for Slab {}
-unsafe impl Sync for Slab {}
+unsafe impl<T: Send> Send for Slab<T> {}
+unsafe impl<T: Sync> Sync for Slab<T> {}
 
-unsafe impl Send for SingleShard {}
-unsafe impl Sync for SingleShard {}
-
-impl fmt::Debug for Shard {
+impl<T> fmt::Debug for Shard<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut d = f.debug_struct("Shard");
 

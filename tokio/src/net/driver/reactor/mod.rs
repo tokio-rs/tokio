@@ -5,7 +5,7 @@ use crate::runtime::{Park, Unpark};
 use std::sync::atomic::Ordering::SeqCst;
 
 mod dispatch;
-use dispatch::SingleShard;
+use dispatch::{Slab, ScheduledIo};
 pub(crate) use dispatch::MAX_SOURCES;
 
 use mio::event::Evented;
@@ -59,9 +59,7 @@ pub(super) struct Inner {
     io: mio::Poll,
 
     /// Dispatch slabs for I/O and futures events
-    // TODO(eliza): once worker threads are available, replace this with a
-    // properly sharded slab.
-    pub(super) io_dispatch: SingleShard,
+    pub(super) io_dispatch: Slab<ScheduledIo>,
 
     /// The number of sources in `io_dispatch`.
     n_sources: AtomicUsize,
@@ -144,7 +142,7 @@ impl Reactor {
             _wakeup_registration: wakeup_pair.0,
             inner: Arc::new(Inner {
                 io,
-                io_dispatch: SingleShard::new(),
+                io_dispatch: Slab::new(),
                 n_sources: AtomicUsize::new(0),
                 wakeup: wakeup_pair.1,
             }),
@@ -382,6 +380,7 @@ impl Inner {
             .io_dispatch
             .get(token)
             .unwrap_or_else(|| panic!("IO resource for token {} does not exist!", token));
+
         let readiness = sched
             .get_readiness(token)
             .unwrap_or_else(|| panic!("token {} no longer valid!", token));
@@ -400,6 +399,8 @@ impl Inner {
 
 impl Drop for Inner {
     fn drop(&mut self) {
+        unimplemented!();
+        /*
         // When a reactor is dropped it needs to wake up all blocked tasks as
         // they'll never receive a notification, and all connected I/O objects
         // will start returning errors pretty quickly.
@@ -407,6 +408,7 @@ impl Drop for Inner {
             io.writer.wake();
             io.reader.wake();
         }
+        */
     }
 }
 

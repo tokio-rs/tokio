@@ -129,10 +129,6 @@ macro_rules! loom_thread_local {
     ($($tts:tt)+) => { loom::thread_local!{ $($tts)+ } }
 }
 
-#[cfg(any(not(loom), not(test)))]
-macro_rules! loom_thread_local {
-    ($($tts:tt)+) => { std::thread_local!{ $($tts)+ } }
-}
 pub(crate) mod platform;
 mod reactor;
 mod registration;
