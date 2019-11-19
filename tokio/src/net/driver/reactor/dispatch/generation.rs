@@ -1,4 +1,4 @@
-use super::super::{Pack, Tid, RESERVED_BITS, WIDTH};
+use super::{Pack, Tid, RESERVED_BITS, WIDTH};
 
 /// An mutation identifier for a slot in the slab. The generation helps prevent
 /// accessing an entry with an outdated token.

@@ -1,19 +1,4 @@
-mod entry;
-pub(crate) use entry::Entry;
-
-mod generation;
-pub(crate) use generation::Generation;
-
-mod scheduled_io;
-pub(crate) use scheduled_io::ScheduledIo;
-
-mod slot;
-use slot::Slot;
-
-mod stack;
-use stack::TransferStack;
-
-use super::{Pack, INITIAL_PAGE_SIZE, WIDTH};
+use super::{Entry, Generation, Pack, Slot, TransferStack, INITIAL_PAGE_SIZE, WIDTH};
 use crate::loom::cell::CausalCell;
 
 use std::fmt;
@@ -27,7 +12,7 @@ pub(crate) struct Addr {
 }
 
 impl Addr {
-    const NULL: usize = Self::BITS + 1;
+    pub(super) const NULL: usize = Self::BITS + 1;
     const INDEX_SHIFT: usize = INITIAL_PAGE_SIZE.trailing_zeros() as usize + 1;
 
     pub(crate) fn index(self) -> usize {
@@ -84,12 +69,10 @@ impl Local {
         }
     }
 
-    #[inline(always)]
     fn head(&self) -> usize {
         self.head.with(|head| unsafe { *head })
     }
 
-    #[inline(always)]
     fn set_head(&self, new_head: usize) {
         self.head.with_mut(|head| unsafe {
             *head = new_head;
@@ -136,7 +119,6 @@ impl<T: Entry> Shared<T> {
         });
     }
 
-    #[inline]
     pub(crate) fn alloc(&self, local: &Local) -> Option<usize> {
         let head = local.head();
 
@@ -176,7 +158,6 @@ impl<T: Entry> Shared<T> {
         Some(gen.pack(index))
     }
 
-    #[inline]
     pub(crate) fn get(&self, addr: Addr) -> Option<&T> {
         let page_offset = addr.offset() - self.prev_sz;
 

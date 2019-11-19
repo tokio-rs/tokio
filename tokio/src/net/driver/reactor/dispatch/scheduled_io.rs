@@ -1,5 +1,4 @@
-use super::{Entry, Generation};
-use super::super::Pack;
+use super::{Entry, Generation, Pack};
 use crate::loom::future::AtomicWaker;
 use crate::loom::sync::atomic::AtomicUsize;
 

@@ -48,7 +48,6 @@ pub(crate) trait Pack: Sized {
     fn as_usize(&self) -> usize;
     fn from_usize(val: usize) -> Self;
 
-    #[inline(always)]
     fn pack(&self, to: usize) -> usize {
         let value = self.as_usize();
         debug_assert!(value <= Self::BITS);
@@ -56,7 +55,6 @@ pub(crate) trait Pack: Sized {
         (to & !Self::MASK) | (value << Self::SHIFT)
     }
 
-    #[inline(always)]
     fn from_packed(from: usize) -> Self {
         let value = (from & Self::MASK) >> Self::SHIFT;
         debug_assert!(value <= Self::BITS);
