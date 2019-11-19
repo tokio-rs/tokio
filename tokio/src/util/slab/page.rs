@@ -1,4 +1,4 @@
-use super::{Address, Entry, Generation, Slot, TransferStack, INITIAL_PAGE_SIZE};
+use super::{Address, Entry, Slot, TransferStack, INITIAL_PAGE_SIZE};
 use crate::loom::cell::CausalCell;
 
 use std::fmt;
@@ -125,10 +125,7 @@ impl<T: Entry> Shared<T> {
     }
 
     pub(crate) fn remove_local(&self, local: &Local, addr: Address) {
-        drop((local, addr));
-        unimplemented!();
-        /*
-        let offset = addr.offset() - self.prev_sz;
+        let offset = addr.slot() - self.prev_sz;
 
         self.slab.with(|slab| {
             let slab = unsafe { &*slab }.as_ref();
@@ -139,19 +136,15 @@ impl<T: Entry> Shared<T> {
                 return;
             };
 
-            if slot.reset(Generation::from_packed(idx)) {
+            if slot.reset(addr.generation()) {
                 slot.set_next(local.head());
                 local.set_head(offset);
             }
         })
-        */
     }
 
     pub(crate) fn remove_remote(&self, addr: Address) {
-        drop(addr);
-        unimplemented!();
-        /*
-        let offset = addr.offset() - self.prev_sz;
+        let offset = addr.slot() - self.prev_sz;
 
         self.slab.with(|slab| {
             let slab = unsafe { &*slab }.as_ref();
@@ -162,13 +155,12 @@ impl<T: Entry> Shared<T> {
                 return;
             };
 
-            if !slot.reset(Generation::from_packed(idx)) {
+            if !slot.reset(addr.generation()) {
                 return;
             }
 
             self.remote.push(offset, |next| slot.set_next(next));
         })
-        */
     }
 }
 
