@@ -18,7 +18,7 @@
 //!   _preempts_ it, temporarily pausing that thread and switching to another.
 //!   Tasks, on the other hand, implement _cooperative multitasking_. In
 //!   cooperative multitasking, a task is allowed to run until it _yields_,
-//!   indicating to the Tokio runtime's scheduler that it cannopt currently
+//!   indicating to the Tokio runtime's scheduler that it cannot currently
 //!   continue executing. When a task yields, the Tokio runtime switches to
 //!   executing the next task.
 //!
@@ -105,7 +105,7 @@
 //!
 //! ### Blocking and Yielding
 //!
-//! As we discussed above, code running in asynchronous tasks should nbt perform
+//! As we discussed above, code running in asynchronous tasks should not perform
 //! operations that can block. A blocking operation performed in a task running
 //! on a thread that is also running other tasks would block the entire thread,
 //! preventing other tasks from running.
