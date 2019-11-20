@@ -181,29 +181,13 @@ fn delayed_delay_level_1() {
 }
 
 #[test]
+#[should_panic]
 fn creating_delay_outside_of_context() {
     let now = Instant::now();
 
     // This creates a delay outside of the context of a mock timer. This tests
-    // that it will still expire.
-    let mut fut = task::spawn(delay_until(now + ms(500)));
-
-    mock(|clock| {
-        // This registers the delay with the timer
-        assert_pending!(fut.poll());
-
-        // Wait some time... the timer is cascading
-        clock.turn_for(ms(1000));
-        assert_eq!(clock.advanced(), ms(448));
-
-        assert_pending!(fut.poll());
-
-        clock.turn_for(ms(1000));
-        assert_eq!(clock.advanced(), ms(500));
-
-        // The delay has elapsed
-        assert_ready!(fut.poll());
-    });
+    // that it will panic.
+    let _fut = task::spawn(delay_until(now + ms(500)));
 }
 
 #[test]
