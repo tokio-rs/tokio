@@ -1,5 +1,6 @@
 use bytes::BufMut;
 use std::io;
+use std::mem::MaybeUninit;
 use std::ops::DerefMut;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -63,9 +64,9 @@ pub trait AsyncRead {
     ///
     /// [`io::Read`]: std::io::Read
     /// [`poll_read_buf`]: #method.poll_read_buf
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
+    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [MaybeUninit<u8>]) -> bool {
         for x in buf {
-            *x = 0;
+            *x.as_mut_ptr() = 0;
         }
 
         true
@@ -109,6 +110,9 @@ pub trait AsyncRead {
 
                 self.prepare_uninitialized_buffer(b);
 
+                // Convert to `&mut [u8]`
+                let b = &mut *(b as *mut [MaybeUninit<u8>] as *mut [u8]);
+
                 ready!(self.poll_read(cx, b))?
             };
 
@@ -120,7 +124,7 @@ pub trait AsyncRead {
 
 macro_rules! deref_async_read {
     () => {
-        unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
+        unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [MaybeUninit<u8>]) -> bool {
             (**self).prepare_uninitialized_buffer(buf)
         }
 
@@ -145,7 +149,7 @@ where
     P: DerefMut + Unpin,
     P::Target: AsyncRead,
 {
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
+    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [MaybeUninit<u8>]) -> bool {
         (**self).prepare_uninitialized_buffer(buf)
     }
 
@@ -159,7 +163,7 @@ where
 }
 
 impl AsyncRead for &[u8] {
-    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [u8]) -> bool {
+    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [MaybeUninit<u8>]) -> bool {
         false
     }
 
@@ -173,7 +177,7 @@ impl AsyncRead for &[u8] {
 }
 
 impl<T: AsRef<[u8]> + Unpin> AsyncRead for io::Cursor<T> {
-    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [u8]) -> bool {
+    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [MaybeUninit<u8>]) -> bool {
         false
     }
 

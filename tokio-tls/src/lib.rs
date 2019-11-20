@@ -35,6 +35,7 @@ use std::fmt;
 use std::future::Future;
 use std::io::{self, Read, Write};
 use std::marker::Unpin;
+use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::ptr::null_mut;
 use std::task::{Context, Poll};
@@ -182,7 +183,7 @@ impl<S> AsyncRead for TlsStream<S>
 where
     S: AsyncRead + AsyncWrite + Unpin,
 {
-    unsafe fn prepare_uninitialized_buffer(&self, _: &mut [u8]) -> bool {
+    unsafe fn prepare_uninitialized_buffer(&self, _: &mut [MaybeUninit<u8>]) -> bool {
         // Note that this does not forward to `S` because the buffer is
         // unconditionally filled in by OpenSSL, not the actual object `S`.
         // We're decrypting bytes from `S` into the buffer above!

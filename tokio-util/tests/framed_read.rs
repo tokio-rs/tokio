@@ -5,7 +5,7 @@ use tokio_test::assert_ready;
 use tokio_test::task;
 use tokio_util::codec::{Decoder, FramedRead};
 
-use bytes::{Buf, BytesMut, IntoBuf};
+use bytes::{Buf, BytesMut};
 use futures::Stream;
 use std::collections::VecDeque;
 use std::io;
@@ -45,7 +45,7 @@ impl Decoder for U32Decoder {
             return Ok(None);
         }
 
-        let n = buf.split_to(4).into_buf().get_u32_be();
+        let n = buf.split_to(4).get_u32();
         Ok(Some(n))
     }
 }

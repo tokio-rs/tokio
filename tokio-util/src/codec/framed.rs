@@ -11,6 +11,7 @@ use futures_sink::Sink;
 use pin_project_lite::pin_project;
 use std::fmt;
 use std::io::{self, BufRead, Read, Write};
+use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -261,7 +262,7 @@ impl<T: BufRead, U> BufRead for Fuse<T, U> {
 }
 
 impl<T: AsyncRead, U> AsyncRead for Fuse<T, U> {
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
+    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [MaybeUninit<u8>]) -> bool {
         self.io.prepare_uninitialized_buffer(buf)
     }
 
