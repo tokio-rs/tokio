@@ -35,7 +35,7 @@
 //!
 //! ## Working with Tasks
 //!
-//! This module provides APIs for working with tasks.
+//! This module provides the following APIs for working with tasks:
 //!
 //! ### Spawning
 //!
@@ -168,9 +168,35 @@
 //! # }
 //! ```
 //!
+//! In addition, this module also provides a [`task::yield_now`] async function
+//! that is analogous to the standard library's [`thread::yield_now`]. Calling and
+//! `await`ing this function will cause the current task to yield to the Tokio
+//! runtime's scheduler, allowing another task to be scheduled. Eventually, the
+//! yielding task will be polled again, allowing it to execute. For example:
+//!
+//! ```rust
+//! use tokio::task;
+//!
+//! # #[tokio::main] async fn main() {
+//! async {
+//!     task::spawn(async {
+//!         // ...
+//!         println!("spawned task done!")
+//!     });
+//!
+//!     // Yield, allowing the newly-spawned task to execute first.
+//!     task::yield_now().await;
+//!     println!("main task done!");
+//! }
+//! # .await;
+//! # }
+//! ```
+//!
 //! [`task::spawn_blocking`]: crate::task::spawn_blocking
 //! [`task::block_in_place`]: crate::task::block_in_place
 //! [rt-threaded]: crate::runtime::Runtime::builder::threaded_scheduler
+//! [`task::yield_now`]: crate::task::yield_now()
+//! [`thread::yield_now`]: std::thread::yield_now
 cfg_blocking! {
     mod blocking;
     pub use blocking::spawn_blocking;
