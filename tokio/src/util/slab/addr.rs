@@ -61,15 +61,15 @@ pub(crate) struct Address(usize);
 const PAGE_INDEX_SHIFT: u32 = INITIAL_PAGE_SIZE.trailing_zeros() + 1;
 
 /// Address in the shard
-const SHARD: bit::Pack = bit::Pack::least_significant(
+const SLOT: bit::Pack = bit::Pack::least_significant(
     MAX_PAGES as u32 + PAGE_INDEX_SHIFT);
 
 /// Masks the thread identifier
-const THREAD: bit::Pack = SHARD.then(MAX_THREADS.trailing_zeros() + 1);
+const THREAD: bit::Pack = SLOT.then(MAX_THREADS.trailing_zeros() + 1);
 
 /// Masks the generation
 const GENERATION: bit::Pack = THREAD.then(
-    bit::pointer_width().wrapping_sub(RESERVED.width() + THREAD.width() + SHARD.width()));
+    bit::pointer_width().wrapping_sub(RESERVED.width() + THREAD.width() + SLOT.width()));
 
 // Chosen arbitrarily
 const RESERVED: bit::Pack = bit::Pack::most_significant(5);
@@ -85,7 +85,7 @@ impl Address {
     pub(super) fn new(shard_index: usize, generation: Generation) -> Address {
         let mut repr = 0;
 
-        repr = SHARD.pack(shard_index, repr);
+        repr = SLOT.pack(shard_index, repr);
         repr = GENERATION.pack(generation.to_usize(), repr);
 
         Address(repr)
@@ -124,7 +124,7 @@ impl Address {
 
     /// Returns the slot index
     pub(super) fn slot(self) -> usize {
-        SHARD.unpack(self.0)
+        SLOT.unpack(self.0)
     }
 }
 
@@ -141,7 +141,7 @@ cfg_not_loom! {
     proptest! {
         #[test]
         fn address_roundtrips(
-            slot in 0usize..SHARD.max_value(),
+            slot in 0usize..SLOT.max_value(),
             generation in 0usize..Generation::MAX,
         ) {
             let address = Address::new(slot, Generation::new(generation));
