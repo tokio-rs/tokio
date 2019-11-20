@@ -53,8 +53,8 @@ use std::task::{Context, Poll};
 /// use std::time::Duration;
 ///
 /// # #[tokio::main] async fn main() {
-/// let original_task = task::spawn(|| {
-///     let _detached_task = task::spawn(|| {
+/// let original_task = task::spawn(async {
+///     let _detached_task = task::spawn(async {
 ///         // Here we sleep to make sure that the first task returns before.
 ///         time::delay_for(Duration::from_millis(10)).await;
 ///         // This will be called, even though the JoinHandle is dropped.
