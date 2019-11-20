@@ -115,8 +115,8 @@ mod tcp {
 }
 
 mod udp {
-    use tokio::net::UdpSocket;
     use tokio::net::udp::{RecvHalf, SendHalf};
+    use tokio::net::UdpSocket;
 
     use futures::{future, Sink, SinkExt, Stream, StreamExt};
     use std::error::Error;
