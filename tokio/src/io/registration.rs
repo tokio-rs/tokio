@@ -1,5 +1,4 @@
-use super::platform;
-use super::reactor::{Direction, Handle};
+use crate::io::driver::{Direction, Handle, platform};
 use crate::util::slab::Address;
 
 use mio::{self, Evented};

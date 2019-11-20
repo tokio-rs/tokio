@@ -27,7 +27,7 @@ use orphan::{OrphanQueue, OrphanQueueImpl, Wait};
 mod reap;
 use reap::Reaper;
 
-use crate::net::util::PollEvented;
+use crate::io::PollEvented;
 use crate::process::kill::Kill;
 use crate::process::SpawnedChild;
 use crate::signal::unix::{signal, Signal, SignalKind};

@@ -1,8 +1,7 @@
 use crate::future::poll_fn;
-use crate::io::{AsyncRead, AsyncWrite};
+use crate::io::{AsyncRead, AsyncWrite, PollEvented};
 use crate::net::unix::split::{split, ReadHalf, WriteHalf};
 use crate::net::unix::ucred::{self, UCred};
-use crate::net::util::PollEvented;
 
 use bytes::{Buf, BufMut};
 use iovec::IoVec;

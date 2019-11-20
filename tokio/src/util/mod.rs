@@ -1,9 +1,12 @@
-pub(crate) mod bit;
+cfg_io_driver! {
+    pub(crate) mod bit;
+    pub(crate) mod slab;
+}
 
-mod pad;
-pub(crate) use pad::CachePadded;
+cfg_rt_threaded! {
+    mod pad;
+    pub(crate) use pad::CachePadded;
 
-mod rand;
-pub(crate) use rand::FastRand;
-
-pub(crate) mod slab;
+    mod rand;
+    pub(crate) use rand::FastRand;
+}

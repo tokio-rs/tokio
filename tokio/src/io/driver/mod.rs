@@ -1,12 +1,11 @@
-use crate::loom::sync::atomic::AtomicUsize;
-use crate::net::driver::platform;
-use crate::runtime::{Park, Unpark};
-use crate::util::slab::{Address, Slab};
-
-use std::sync::atomic::Ordering::SeqCst;
+pub(crate) mod platform;
 
 mod scheduled_io;
 pub(crate) use scheduled_io::ScheduledIo; // pub(crate) for tests
+
+use crate::loom::sync::atomic::AtomicUsize;
+use crate::runtime::{Park, Unpark};
+use crate::util::slab::{Address, Slab};
 
 use mio::event::Evented;
 use std::cell::RefCell;
@@ -14,16 +13,12 @@ use std::fmt;
 use std::io;
 use std::marker::PhantomData;
 use std::sync::{Arc, Weak};
+use std::sync::atomic::Ordering::SeqCst;
 use std::task::Waker;
 use std::time::Duration;
 
-/// The core reactor, or event loop.
-///
-/// The event loop is the main source of blocking in an application which drives
-/// all other I/O events and notifications happening. Each event loop can have
-/// multiple handles pointing to it, each of which can then be used to create
-/// various I/O objects to interact with the event loop in interesting ways.
-pub struct Reactor {
+/// I/O driver, backed by Mio
+pub(crate) struct Driver {
     /// Reuse the `mio::Events` value across calls to poll.
     events: mio::Events,
 
@@ -33,13 +28,9 @@ pub struct Reactor {
     _wakeup_registration: mio::Registration,
 }
 
-/// A reference to a reactor.
-///
-/// A `Handle` is used for associating I/O objects with an event loop
-/// explicitly. Typically though you won't end up using a `Handle` that often
-/// and will instead use the default reactor for the execution context.
+/// A reference to an I/O driver
 #[derive(Clone)]
-pub struct Handle {
+pub(crate) struct Handle {
     inner: Weak<Inner>,
 }
 
@@ -76,11 +67,11 @@ fn _assert_kinds() {
     _assert::<Handle>();
 }
 
-// ===== impl Reactor =====
+// ===== impl Driver =====
 
 #[derive(Debug)]
 /// Guard that resets current reactor on drop.
-pub struct DefaultGuard<'a> {
+pub(crate) struct DefaultGuard<'a> {
     _lifetime: PhantomData<&'a u8>,
 }
 
@@ -94,7 +85,7 @@ impl Drop for DefaultGuard<'_> {
 }
 
 /// Sets handle for a default reactor, returning guard that unsets it on drop.
-pub fn set_default(handle: &Handle) -> DefaultGuard<'_> {
+pub(crate) fn set_default(handle: &Handle) -> DefaultGuard<'_> {
     CURRENT_REACTOR.with(|current| {
         let mut current = current.borrow_mut();
 
@@ -112,10 +103,10 @@ pub fn set_default(handle: &Handle) -> DefaultGuard<'_> {
     }
 }
 
-impl Reactor {
+impl Driver {
     /// Creates a new event loop, returning any error that happened during the
     /// creation.
-    pub fn new() -> io::Result<Reactor> {
+    pub(crate) fn new() -> io::Result<Driver> {
         let io = mio::Poll::new()?;
         let wakeup_pair = mio::Registration::new2();
 
@@ -126,7 +117,7 @@ impl Reactor {
             mio::PollOpt::level(),
         )?;
 
-        Ok(Reactor {
+        Ok(Driver {
             events: mio::Events::with_capacity(1024),
             _wakeup_registration: wakeup_pair.0,
             inner: Arc::new(Inner {
@@ -144,14 +135,13 @@ impl Reactor {
     /// Handles are cloneable and clones always refer to the same event loop.
     /// This handle is typically passed into functions that create I/O objects
     /// to bind them to this event loop.
-    pub fn handle(&self) -> Handle {
+    pub(crate) fn handle(&self) -> Handle {
         Handle {
             inner: Arc::downgrade(&self.inner),
         }
     }
 
-    #[doc(hidden)]
-    pub fn turn(&mut self, max_wait: Option<Duration>) -> io::Result<()> {
+    fn turn(&mut self, max_wait: Option<Duration>) -> io::Result<()> {
         // Block waiting for an event to happen, peeling out how many events
         // happened.
         match self.inner.io.poll(&mut self.events, max_wait) {
@@ -214,7 +204,7 @@ impl Reactor {
     }
 }
 
-impl Park for Reactor {
+impl Park for Driver {
     type Unpark = Handle;
     type Error = io::Error;
 
@@ -233,9 +223,9 @@ impl Park for Reactor {
     }
 }
 
-impl fmt::Debug for Reactor {
+impl fmt::Debug for Driver {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Reactor")
+        write!(f, "Driver")
     }
 }
 
@@ -395,7 +385,7 @@ mod tests {
     #[test]
     fn tokens_unique_when_dropped() {
         loom::model(|| {
-            let reactor = Reactor::new().unwrap();
+            let reactor = Driver::new().unwrap();
             let inner = reactor.inner;
             let inner2 = inner.clone();
 
@@ -414,7 +404,7 @@ mod tests {
     #[test]
     fn tokens_unique_when_dropped_on_full_page() {
         loom::model(|| {
-            let reactor = Reactor::new().unwrap();
+            let reactor = Driver::new().unwrap();
             let inner = reactor.inner;
             let inner2 = inner.clone();
             // add sources to fill up the first page so that the dropped index
@@ -438,7 +428,7 @@ mod tests {
     #[test]
     fn tokens_unique_concurrent_add() {
         loom::model(|| {
-            let reactor = Reactor::new().unwrap();
+            let reactor = Driver::new().unwrap();
             let inner = reactor.inner;
             let inner2 = inner.clone();
 
