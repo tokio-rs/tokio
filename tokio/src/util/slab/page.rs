@@ -1,71 +1,24 @@
-use super::{Pack, INITIAL_PAGE_SIZE, WIDTH};
 use crate::loom::cell::CausalCell;
+use crate::util::slab::{Address, Entry, Slot, TransferStack, INITIAL_PAGE_SIZE};
 
-pub(crate) mod scheduled_io;
-mod stack;
-pub(crate) use self::scheduled_io::ScheduledIo;
-use self::stack::TransferStack;
 use std::fmt;
 
-/// A page address encodes the location of a slot within a shard (the page
-/// number and offset within that page) as a single linear value.
-#[repr(transparent)]
-#[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
-pub(crate) struct Addr {
-    addr: usize,
-}
-
-impl Addr {
-    const NULL: usize = Self::BITS + 1;
-    const INDEX_SHIFT: usize = INITIAL_PAGE_SIZE.trailing_zeros() as usize + 1;
-
-    pub(crate) fn index(self) -> usize {
-        // Since every page is twice as large as the previous page, and all page sizes
-        // are powers of two, we can determine the page index that contains a given
-        // address by shifting the address down by the smallest page size and
-        // looking at how many twos places necessary to represent that number,
-        // telling us what power of two page size it fits inside of. We can
-        // determine the number of twos places by counting the number of leading
-        // zeros (unused twos places) in the number's binary representation, and
-        // subtracting that count from the total number of bits in a word.
-        WIDTH - ((self.addr + INITIAL_PAGE_SIZE) >> Self::INDEX_SHIFT).leading_zeros() as usize
-    }
-
-    pub(crate) fn offset(self) -> usize {
-        self.addr
-    }
-}
-
-pub(super) fn size(n: usize) -> usize {
-    INITIAL_PAGE_SIZE * 2usize.pow(n as _)
-}
-
-impl Pack for Addr {
-    const LEN: usize = super::MAX_PAGES + Self::INDEX_SHIFT;
-
-    type Prev = ();
-
-    fn as_usize(&self) -> usize {
-        self.addr
-    }
-
-    fn from_usize(addr: usize) -> Self {
-        debug_assert!(addr <= Self::BITS);
-        Self { addr }
-    }
-}
-
-pub(in crate::net::driver) type Iter<'a> = std::slice::Iter<'a, ScheduledIo>;
-
+/// Data accessed only by the thread that owns the shard.
 pub(crate) struct Local {
     head: CausalCell<usize>,
 }
 
-pub(crate) struct Shared {
+/// Data accessed by any thread.
+pub(crate) struct Shared<T> {
     remote: TransferStack,
     size: usize,
     prev_sz: usize,
-    slab: CausalCell<Option<Box<[ScheduledIo]>>>,
+    slab: CausalCell<Option<Box<[Slot<T>]>>>,
+}
+
+/// Returns the size of the page at index `n`
+pub(super) fn size(n: usize) -> usize {
+    INITIAL_PAGE_SIZE << n
 }
 
 impl Local {
@@ -75,12 +28,10 @@ impl Local {
         }
     }
 
-    #[inline(always)]
     fn head(&self) -> usize {
         self.head.with(|head| unsafe { *head })
     }
 
-    #[inline(always)]
     fn set_head(&self, new_head: usize) {
         self.head.with_mut(|head| unsafe {
             *head = new_head;
@@ -88,10 +39,8 @@ impl Local {
     }
 }
 
-impl Shared {
-    const NULL: usize = Addr::NULL;
-
-    pub(crate) fn new(size: usize, prev_sz: usize) -> Self {
+impl<T: Entry> Shared<T> {
+    pub(crate) fn new(size: usize, prev_sz: usize) -> Shared<T> {
         Self {
             prev_sz,
             size,
@@ -113,8 +62,9 @@ impl Shared {
         debug_assert!(self.slab.with(|s| unsafe { (*s).is_none() }));
 
         let mut slab = Vec::with_capacity(self.size);
-        slab.extend((1..self.size).map(ScheduledIo::new));
-        slab.push(ScheduledIo::new(Self::NULL));
+        slab.extend((1..self.size).map(Slot::new));
+        slab.push(Slot::new(Address::NULL));
+
         self.slab.with_mut(|s| {
             // this mut access is safe — it only occurs to initially
             // allocate the page, which only happens on this thread; if the
@@ -126,8 +76,7 @@ impl Shared {
         });
     }
 
-    #[inline]
-    pub(crate) fn alloc(&self, local: &Local) -> Option<usize> {
+    pub(crate) fn alloc(&self, local: &Local) -> Option<Address> {
         let head = local.head();
 
         // are there any items on the local free list? (fast path)
@@ -141,7 +90,7 @@ impl Shared {
 
         // if the head is still null, both the local and remote free lists are
         // empty --- we can't fit any more items on this page.
-        if head == Self::NULL {
+        if head == Address::NULL {
             return None;
         }
 
@@ -155,57 +104,63 @@ impl Shared {
             let slab = unsafe { &*(slab) }
                 .as_ref()
                 .expect("page must have been allocated to alloc!");
+
             let slot = &slab[head];
+
             local.set_head(slot.next());
-            slot.alloc()
+            slot.generation()
         });
 
         let index = head + self.prev_sz;
-        Some(gen.pack(index))
+
+        Some(Address::new(index, gen))
     }
 
-    #[inline]
-    pub(in crate::net::driver) fn get(&self, addr: Addr) -> Option<&ScheduledIo> {
-        let page_offset = addr.offset() - self.prev_sz;
+    pub(crate) fn get(&self, addr: Address) -> Option<&T> {
+        let page_offset = addr.slot() - self.prev_sz;
+
         self.slab
             .with(|slab| unsafe { &*slab }.as_ref()?.get(page_offset))
+            .map(|slot| slot.get())
     }
 
-    pub(crate) fn remove_local(&self, local: &Local, addr: Addr, idx: usize) {
-        let offset = addr.offset() - self.prev_sz;
+    pub(crate) fn remove_local(&self, local: &Local, addr: Address) {
+        let offset = addr.slot() - self.prev_sz;
+
         self.slab.with(|slab| {
             let slab = unsafe { &*slab }.as_ref();
+
             let slot = if let Some(slot) = slab.and_then(|slab| slab.get(offset)) {
                 slot
             } else {
                 return;
             };
-            if slot.reset(scheduled_io::Generation::from_packed(idx)) {
+
+            if slot.reset(addr.generation()) {
                 slot.set_next(local.head());
                 local.set_head(offset);
             }
         })
     }
 
-    pub(crate) fn remove_remote(&self, addr: Addr, idx: usize) {
-        let offset = addr.offset() - self.prev_sz;
+    pub(crate) fn remove_remote(&self, addr: Address) {
+        let offset = addr.slot() - self.prev_sz;
+
         self.slab.with(|slab| {
             let slab = unsafe { &*slab }.as_ref();
+
             let slot = if let Some(slot) = slab.and_then(|slab| slab.get(offset)) {
                 slot
             } else {
                 return;
             };
-            if !slot.reset(scheduled_io::Generation::from_packed(idx)) {
+
+            if !slot.reset(addr.generation()) {
                 return;
             }
+
             self.remote.push(offset, |next| slot.set_next(next));
         })
-    }
-
-    pub(in crate::net::driver) fn iter(&self) -> Option<Iter<'_>> {
-        let slab = self.slab.with(|slab| unsafe { (&*slab).as_ref() });
-        slab.map(|slab| slab.iter())
     }
 }
 
@@ -220,7 +175,7 @@ impl fmt::Debug for Local {
     }
 }
 
-impl fmt::Debug for Shared {
+impl<T> fmt::Debug for Shared<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Shared")
             .field("remote", &self.remote)
@@ -228,30 +183,5 @@ impl fmt::Debug for Shared {
             .field("size", &self.size)
             // .field("slab", &self.slab)
             .finish()
-    }
-}
-
-impl fmt::Debug for Addr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Addr")
-            .field("addr", &format_args!("{:#0x}", &self.addr))
-            .field("index", &self.index())
-            .field("offset", &self.offset())
-            .finish()
-    }
-}
-
-#[cfg(all(test, not(loom)))]
-mod test {
-    use super::*;
-    use proptest::prelude::*;
-
-    proptest! {
-        #[test]
-        fn addr_roundtrips(pidx in 0usize..Addr::BITS) {
-            let addr = Addr::from_usize(pidx);
-            let packed = addr.pack(0);
-            assert_eq!(addr, Addr::from_packed(packed));
-        }
     }
 }

@@ -49,6 +49,16 @@ pub use self::async_read::AsyncRead;
 mod async_write;
 pub use self::async_write::AsyncWrite;
 
+cfg_io_driver! {
+    pub(crate) mod driver;
+
+    mod poll_evented;
+    pub use poll_evented::PollEvented;
+
+    mod registration;
+    pub use registration::Registration;
+}
+
 cfg_io_std! {
     mod stderr;
     pub use stderr::{stderr, Stderr};

@@ -24,11 +24,6 @@
 mod addr;
 pub use addr::ToSocketAddrs;
 
-cfg_io_driver! {
-    pub mod driver;
-    pub mod util;
-}
-
 cfg_tcp! {
     pub mod tcp;
     pub use tcp::{TcpListener, TcpStream};

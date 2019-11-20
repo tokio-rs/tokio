@@ -1,6 +1,6 @@
 use crate::future::poll_fn;
+use crate::io::PollEvented;
 use crate::net::udp::split::{split, RecvHalf, SendHalf};
-use crate::net::util::PollEvented;
 use crate::net::ToSocketAddrs;
 
 use std::convert::TryFrom;

@@ -7,7 +7,7 @@
 pub(crate) use std::io::Result;
 
 cfg_io_driver! {
-    use crate::net::driver;
+    use crate::io::driver;
 
     use std::io;
 
@@ -16,7 +16,7 @@ cfg_io_driver! {
     /// When the `io-driver` feature is enabled, this is the "real" I/O driver
     /// backed by Mio. Without the `io-driver` feature, this is a thread parker
     /// backed by a condition variable.
-    pub(crate) type Driver = driver::Reactor;
+    pub(crate) type Driver = driver::Driver;
 
     /// The handle the runtime stores for future use.
     ///
@@ -24,7 +24,7 @@ cfg_io_driver! {
     pub(crate) type Handle = driver::Handle;
 
     pub(crate) fn create_driver() -> io::Result<(Driver, Handle)> {
-        let driver = driver::Reactor::new()?;
+        let driver = driver::Driver::new()?;
         let handle = driver.handle();
 
         Ok((driver, handle))

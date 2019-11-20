@@ -1,9 +1,9 @@
-use super::platform;
-use super::reactor::{Direction, Handle};
+use crate::io::driver::{Direction, Handle, platform};
+use crate::util::slab::Address;
 
 use mio::{self, Evented};
 use std::task::{Context, Poll};
-use std::{io, usize};
+use std::io;
 
 /// Associates an I/O resource with the reactor instance that drives it.
 ///
@@ -38,7 +38,7 @@ use std::{io, usize};
 #[derive(Debug)]
 pub struct Registration {
     handle: Handle,
-    token: usize,
+    address: Address,
 }
 
 // ===== impl Registration =====
@@ -50,12 +50,12 @@ impl Registration {
     ///
     /// - `Ok` if the registration happened successfully
     /// - `Err` if an error was encountered during registration
-    pub fn new<T>(io: &T) -> io::Result<Self>
+    pub fn new<T>(io: &T) -> io::Result<Registration>
     where
         T: Evented,
     {
         let handle = Handle::current();
-        let token = if let Some(inner) = handle.inner() {
+        let address = if let Some(inner) = handle.inner() {
             inner.add_source(io)?
         } else {
             return Err(io::Error::new(
@@ -63,7 +63,8 @@ impl Registration {
                 "failed to find event loop",
             ));
         };
-        Ok(Self { handle, token })
+
+        Ok(Registration { handle, address })
     }
 
     /// Deregister the I/O resource from the reactor it is associated with.
@@ -212,13 +213,13 @@ impl Registration {
         // If the task should be notified about new events, ensure that it has
         // been registered
         if let Some(ref cx) = cx {
-            inner.register(self.token, direction, cx.waker().clone())
+            inner.register(self.address, direction, cx.waker().clone())
         }
 
         let mask = direction.mask();
         let mask_no_hup = (mask - platform::hup()).as_usize();
 
-        let sched = inner.io_dispatch.get(self.token).unwrap();
+        let sched = inner.io_dispatch.get(self.address).unwrap();
 
         // This consumes the current readiness state **except** for HUP. HUP is
         // excluded because a) it is a final state and never transitions out of
@@ -229,8 +230,9 @@ impl Registration {
         // `poll_ready` is called again with a _`direction` of `Write`, the HUP
         // state would not be visible.
         let curr_ready = sched
-            .set_readiness(self.token, |curr| curr & (!mask_no_hup))
-            .unwrap_or_else(|_| panic!("token {} no longer valid!", self.token));
+            .set_readiness(self.address, |curr| curr & (!mask_no_hup))
+            .unwrap_or_else(|_| panic!("address {:?} no longer valid!", self.address));
+
         let mut ready = mask & mio::Ready::from_usize(curr_ready);
 
         if ready.is_empty() {
@@ -243,8 +245,8 @@ impl Registration {
 
                 // Try again
                 let curr_ready = sched
-                    .set_readiness(self.token, |curr| curr & (!mask_no_hup))
-                    .unwrap_or_else(|_| panic!("token {} no longer valid!", self.token));
+                    .set_readiness(self.address, |curr| curr & (!mask_no_hup))
+                    .unwrap_or_else(|_| panic!("address {:?} no longer valid!", self.address));
                 ready = mask & mio::Ready::from_usize(curr_ready);
             }
         }
@@ -266,6 +268,6 @@ impl Drop for Registration {
             Some(inner) => inner,
             None => return,
         };
-        inner.drop_source(self.token);
+        inner.drop_source(self.address);
     }
 }
