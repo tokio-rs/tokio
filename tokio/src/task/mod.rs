@@ -72,6 +72,7 @@
 //! // Await the result of the spawned task.
 //! let result = join.await?;
 //! assert_eq!(result, "hello world!");
+//! # Ok(())
 //! # }
 //! ```
 //!
@@ -121,8 +122,8 @@
 //! ```
 //! use tokio::task;
 //!
-//! # async fn docs()>{
-//! task::spawn_blocking(move || {
+//! # async fn docs() {
+//! task::spawn_blocking(|| {
 //!     // do some compute-heavy work or call synchronous code
 //! });
 //! # }
@@ -134,7 +135,7 @@
 //! ```rust
 //! # use tokio::task;
 //! # async fn docs() -> Result<(), Box<dyn std::error::Error>>{
-//! let join = task::spawn_blocking(move || {
+//! let join = task::spawn_blocking(|| {
 //!     // do some compute-heavy work or call synchronous code
 //!     "blocking completed"
 //! });
@@ -159,7 +160,7 @@
 //! use tokio::task;
 //!
 //! # async fn docs() {
-//! let result = task::block_in_place(move || {
+//! let result = task::block_in_place(|| {
 //!     // do some compute-heavy work or call synchronous code
 //!     "blocking completed"
 //! });
