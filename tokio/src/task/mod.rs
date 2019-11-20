@@ -61,7 +61,7 @@
 //! ```
 //! use tokio::task;
 //!
-//! # #[tokio::main] async fn main() {
+//! # #[tokio::main] async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let join = task::spawn(async {
 //!     // ...
 //!     "hello world!"
@@ -70,7 +70,7 @@
 //! // ...
 //!
 //! // Await the result of the spawned task.
-//! let result = join.await.unwrap();
+//! let result = join.await?;
 //! assert_eq!(result, "hello world!");
 //! # }
 //! ```
@@ -111,8 +111,65 @@
 //! Instead, Tokio provides two APIs for running blocking operations in an
 //! asynchronous context: [`task::spawn_blocking`] and [`task::block_in_place`].
 //!
+//! The `task::spawn_blocking` function is similar to the `task::spawn` function
+//! discussed in the previous section, but rather than spawning an
+//! _non-blocking_ future on the Tokio runtime, it instead spawns a
+//! _blocking_ function on a dedicated thread pool for blocking tasks. For
+//! example:
+//!
+//! ```
+//! use tokio::task;
+//!
+//! # async fn docs()>{
+//! task::spawn_blocking(move || {
+//!     // do some compute-heavy work or call synchronous code
+//! });
+//! # }
+//! ```
+//!
+//! Just like `task::spawn`, `task::spawn_blocking` returns a `JoinHandle`
+//! which we can use to await the result of the blocking operation:
+//!
+//! ```rust
+//! # use tokio::task;
+//! # async fn docs() -> Result<(), Box<dyn std::error::Error>>{
+//! let join = task::spawn_blocking(move || {
+//!     // do some compute-heavy work or call synchronous code
+//!     "blocking completed"
+//! });
+//!
+//! let result = join.await?;
+//! assert_eq!(result, "blocking completed");
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! When using the [threaded runtime][rt-threaded], the [`task::block_in_place`]
+//! function is also available. Like `task::spawn_blocking`, this function
+//! allows running a blocking operation from an asynchronous context. Unlike
+//! `spawn_blocking`, however, `block_in_place` works by transitioning the
+//! _current_ worker thread to a blocking thread, moving other tasks running on
+//! that thread to another worker thread. This can improve performance by avoiding
+//! context switches.
+//!
+//! For example:
+//!
+//! ```
+//! use tokio::task;
+//!
+//! # async fn docs() {
+//! let result = task::block_in_place(move || {
+//!     // do some compute-heavy work or call synchronous code
+//!     "blocking completed"
+//! });
+//!
+//! assert_eq!(result, "blocking completed");
+//! # }
+//! ```
+//!
 //! [`task::spawn_blocking`]: fn.spawn_blocking.html
 //! [`task::block_in_place`]: fn.block_in_place.html
+//! [rt-threaded]: ../runtime/struct.Builder.html#method.threaded_scheduler
 cfg_blocking! {
     mod blocking;
     pub use blocking::spawn_blocking;
