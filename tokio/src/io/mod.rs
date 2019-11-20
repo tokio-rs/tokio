@@ -126,7 +126,8 @@
 //! implement [`AsyncRead`] and [`AsyncWrite`].
 //!
 //! Note that the standard input / output APIs  **must** be used from the
-//! context of the Tokio runtime, as they require Tokio-specific features to function.
+//! context of the Tokio runtime, as they require Tokio-specific features to
+//! function. Calling these functions outside of a Tokio runtime will panic.
 //!
 //! [input]: fn.stdin.html
 //! [output]: fn.stdout.html
