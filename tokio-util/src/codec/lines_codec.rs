@@ -1,7 +1,7 @@
 use crate::codec::decoder::Decoder;
 use crate::codec::encoder::Encoder;
 
-use bytes::{BufMut, BytesMut};
+use bytes::{Buf, BufMut, BytesMut};
 use std::{cmp, fmt, io, str, usize};
 
 /// A simple `Codec` implementation that splits up data into lines.
@@ -168,7 +168,7 @@ impl Decoder for LinesCodec {
                 if buf.is_empty() || buf == &b"\r"[..] {
                     None
                 } else {
-                    let line = buf.take();
+                    let line = buf.split_to(buf.len());
                     let line = without_carriage_return(&line);
                     let line = utf8(line)?;
                     self.next_index = 0;
@@ -185,7 +185,7 @@ impl Encoder for LinesCodec {
 
     fn encode(&mut self, line: String, buf: &mut BytesMut) -> Result<(), LinesCodecError> {
         buf.reserve(line.len() + 1);
-        buf.put(line);
+        buf.put(line.as_bytes());
         buf.put_u8(b'\n');
         Ok(())
     }

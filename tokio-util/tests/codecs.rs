@@ -45,14 +45,14 @@ fn lines_decoder() {
     let mut codec = LinesCodec::new();
     let buf = &mut BytesMut::new();
     buf.reserve(200);
-    buf.put("line 1\nline 2\r\nline 3\n\r\n\r");
+    buf.put_slice(b"line 1\nline 2\r\nline 3\n\r\n\r");
     assert_eq!("line 1", codec.decode(buf).unwrap().unwrap());
     assert_eq!("line 2", codec.decode(buf).unwrap().unwrap());
     assert_eq!("line 3", codec.decode(buf).unwrap().unwrap());
     assert_eq!("", codec.decode(buf).unwrap().unwrap());
     assert_eq!(None, codec.decode(buf).unwrap());
     assert_eq!(None, codec.decode_eof(buf).unwrap());
-    buf.put("k");
+    buf.put_slice(b"k");
     assert_eq!(None, codec.decode(buf).unwrap());
     assert_eq!("\rk", codec.decode_eof(buf).unwrap().unwrap());
     assert_eq!(None, codec.decode(buf).unwrap());
@@ -67,7 +67,7 @@ fn lines_decoder_max_length() {
     let buf = &mut BytesMut::new();
 
     buf.reserve(200);
-    buf.put("line 1 is too long\nline 2\nline 3\r\nline 4\n\r\n\r");
+    buf.put_slice(b"line 1 is too long\nline 2\nline 3\r\nline 4\n\r\n\r");
 
     assert!(codec.decode(buf).is_err());
 
@@ -102,7 +102,7 @@ fn lines_decoder_max_length() {
 
     assert_eq!(None, codec.decode(buf).unwrap());
     assert_eq!(None, codec.decode_eof(buf).unwrap());
-    buf.put("k");
+    buf.put_slice(b"k");
     assert_eq!(None, codec.decode(buf).unwrap());
 
     let line = codec.decode_eof(buf).unwrap().unwrap();
@@ -119,7 +119,7 @@ fn lines_decoder_max_length() {
 
     // Line that's one character too long. This could cause an out of bounds
     // error if we peek at the next characters using slice indexing.
-    buf.put("aaabbbc");
+    buf.put_slice(b"aaabbbc");
     assert!(codec.decode(buf).is_err());
 }
 
@@ -131,16 +131,16 @@ fn lines_decoder_max_length_underrun() {
     let buf = &mut BytesMut::new();
 
     buf.reserve(200);
-    buf.put("line ");
+    buf.put_slice(b"line ");
     assert_eq!(None, codec.decode(buf).unwrap());
-    buf.put("too l");
+    buf.put_slice(b"too l");
     assert!(codec.decode(buf).is_err());
-    buf.put("ong\n");
+    buf.put_slice(b"ong\n");
     assert_eq!(None, codec.decode(buf).unwrap());
 
-    buf.put("line 2");
+    buf.put_slice(b"line 2");
     assert_eq!(None, codec.decode(buf).unwrap());
-    buf.put("\n");
+    buf.put_slice(b"\n");
     assert_eq!("line 2", codec.decode(buf).unwrap().unwrap());
 }
 
@@ -152,11 +152,11 @@ fn lines_decoder_max_length_bursts() {
     let buf = &mut BytesMut::new();
 
     buf.reserve(200);
-    buf.put("line ");
+    buf.put_slice(b"line ");
     assert_eq!(None, codec.decode(buf).unwrap());
-    buf.put("too l");
+    buf.put_slice(b"too l");
     assert_eq!(None, codec.decode(buf).unwrap());
-    buf.put("ong\n");
+    buf.put_slice(b"ong\n");
     assert!(codec.decode(buf).is_err());
 }
 
@@ -168,9 +168,9 @@ fn lines_decoder_max_length_big_burst() {
     let buf = &mut BytesMut::new();
 
     buf.reserve(200);
-    buf.put("line ");
+    buf.put_slice(b"line ");
     assert_eq!(None, codec.decode(buf).unwrap());
-    buf.put("too long!\n");
+    buf.put_slice(b"too long!\n");
     assert!(codec.decode(buf).is_err());
 }
 
@@ -182,10 +182,10 @@ fn lines_decoder_max_length_newline_between_decodes() {
     let buf = &mut BytesMut::new();
 
     buf.reserve(200);
-    buf.put("hello");
+    buf.put_slice(b"hello");
     assert_eq!(None, codec.decode(buf).unwrap());
 
-    buf.put("\nworld");
+    buf.put_slice(b"\nworld");
     assert_eq!("hello", codec.decode(buf).unwrap().unwrap());
 }
 
@@ -198,9 +198,9 @@ fn lines_decoder_discard_repeat() {
     let buf = &mut BytesMut::new();
 
     buf.reserve(200);
-    buf.put("aa");
+    buf.put_slice(b"aa");
     assert!(codec.decode(buf).is_err());
-    buf.put("a");
+    buf.put_slice(b"a");
     assert!(codec.decode(buf).is_err());
 }
 

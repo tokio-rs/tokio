@@ -4,7 +4,7 @@ use tokio::prelude::*;
 use tokio_test::assert_ok;
 use tokio_util::codec::{Decoder, Encoder, Framed, FramedParts};
 
-use bytes::{Buf, BufMut, BytesMut, IntoBuf};
+use bytes::{Buf, BufMut, BytesMut};
 use futures::StreamExt;
 use std::io::{self, Read};
 use std::pin::Pin;
@@ -24,7 +24,7 @@ impl Decoder for U32Codec {
             return Ok(None);
         }
 
-        let n = buf.split_to(4).into_buf().get_u32_be();
+        let n = buf.split_to(4).get_u32();
         Ok(Some(n))
     }
 }
@@ -36,7 +36,7 @@ impl Encoder for U32Codec {
     fn encode(&mut self, item: u32, dst: &mut BytesMut) -> io::Result<()> {
         // Reserve space
         dst.reserve(4);
-        dst.put_u32_be(item);
+        dst.put_u32(item);
         Ok(())
     }
 }
@@ -66,7 +66,7 @@ impl AsyncRead for DontReadIntoThis {
 #[tokio::test]
 async fn can_read_from_existing_buf() {
     let mut parts = FramedParts::new(DontReadIntoThis, U32Codec);
-    parts.read_buf = vec![0, 0, 0, 42].into();
+    parts.read_buf = BytesMut::from(&[0, 0, 0, 42][..]);
 
     let mut framed = Framed::from_parts(parts);
     let num = assert_ok!(framed.next().await.unwrap());
@@ -77,7 +77,7 @@ async fn can_read_from_existing_buf() {
 #[test]
 fn external_buf_grows_to_init() {
     let mut parts = FramedParts::new(DontReadIntoThis, U32Codec);
-    parts.read_buf = vec![0, 0, 0, 42].into();
+    parts.read_buf = BytesMut::from(&[0, 0, 0, 42][..]);
 
     let framed = Framed::from_parts(parts);
     let FramedParts { read_buf, .. } = framed.into_parts();
@@ -88,7 +88,7 @@ fn external_buf_grows_to_init() {
 #[test]
 fn external_buf_does_not_shrink() {
     let mut parts = FramedParts::new(DontReadIntoThis, U32Codec);
-    parts.read_buf = vec![0; INITIAL_CAPACITY * 2].into();
+    parts.read_buf = BytesMut::from(&vec![0; INITIAL_CAPACITY * 2][..]);
 
     let framed = Framed::from_parts(parts);
     let FramedParts { read_buf, .. } = framed.into_parts();
