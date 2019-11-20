@@ -8,6 +8,7 @@
 //! [`UdpSocket`]: struct.UdpSocket
 
 mod socket;
-pub mod split;
+pub use socket::UdpSocket;
 
-pub use self::socket::UdpSocket;
+mod split;
+pub use split::{RecvHalf, SendHalf, ReuniteError};

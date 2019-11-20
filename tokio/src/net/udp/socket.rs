@@ -1,6 +1,6 @@
 use crate::future::poll_fn;
 use crate::io::PollEvented;
-use crate::net::udp::split::{split, UdpSocketRecvHalf, UdpSocketSendHalf};
+use crate::net::udp::split::{split, RecvHalf, SendHalf};
 use crate::net::ToSocketAddrs;
 
 use std::convert::TryFrom;
@@ -67,7 +67,7 @@ impl UdpSocket {
     ///
     /// See the module level documenation of [`split`](super::split) for more
     /// details.
-    pub fn split(self) -> (UdpSocketRecvHalf, UdpSocketSendHalf) {
+    pub fn split(self) -> (RecvHalf, SendHalf) {
         split(self)
     }
 
