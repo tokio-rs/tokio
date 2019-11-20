@@ -126,7 +126,7 @@ impl Entry {
             time: CachePadded(UnsafeCell::new(Time { deadline, duration })),
             inner: handle_priv.into_inner(),
             waker: AtomicWaker::new(),
-            state: AtomicU64::from(state),
+            state: AtomicU64::new(state),
             queued: AtomicBool::new(false),
             next_atomic: UnsafeCell::new(ptr::null_mut()),
             when: UnsafeCell::new(None),
