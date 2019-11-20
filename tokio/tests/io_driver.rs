@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 
-use tokio::net::driver::Reactor;
 use tokio::net::TcpListener;
+use tokio::runtime;
 use tokio_test::{assert_ok, assert_pending};
 
 use futures::task::{waker_ref, ArcWake};
@@ -44,7 +44,8 @@ fn test_drop_on_notify() {
     // shutting down. Then, when the task handle is dropped, the task itself is
     // dropped.
 
-    let mut reactor = assert_ok!(Reactor::new());
+    let mut rt = runtime::Builder::new().basic_scheduler().build().unwrap();
+
     let (addr_tx, addr_rx) = mpsc::channel();
 
     // Define a task that just drains the listener
@@ -62,11 +63,11 @@ fn test_drop_on_notify() {
     }));
 
     {
-        let handle = reactor.handle();
-        let _reactor = tokio::net::driver::set_default(&handle);
-        let waker = waker_ref(&task);
-        let mut cx = Context::from_waker(&waker);
-        assert_pending!(task.future.lock().unwrap().as_mut().poll(&mut cx));
+        rt.enter(|| {
+            let waker = waker_ref(&task);
+            let mut cx = Context::from_waker(&waker);
+            assert_pending!(task.future.lock().unwrap().as_mut().poll(&mut cx));
+        });
     }
 
     // Get the address
@@ -77,5 +78,6 @@ fn test_drop_on_notify() {
     // Establish a connection to the acceptor
     let _s = TcpStream::connect(&addr).unwrap();
 
-    reactor.turn(None).unwrap();
+    // Force the reactor to turn
+    rt.block_on(async {});
 }

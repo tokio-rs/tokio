@@ -1,6 +1,6 @@
 use crate::future::poll_fn;
+use crate::io::PollEvented;
 use crate::net::unix::{Incoming, UnixStream};
-use crate::net::util::PollEvented;
 
 use mio::Ready;
 use mio_uds;

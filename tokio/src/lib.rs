@@ -117,9 +117,7 @@ cfg_time! {
     pub mod time;
 }
 
-cfg_rt_threaded! {
-    mod util;
-}
+mod util;
 
 cfg_macros! {
     #[cfg(not(test))] // Work around for rust-lang/rust#62127

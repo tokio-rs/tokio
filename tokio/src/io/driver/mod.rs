@@ -1,31 +1,24 @@
+pub(crate) mod platform;
+
+mod scheduled_io;
+pub(crate) use scheduled_io::ScheduledIo; // pub(crate) for tests
+
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::net::driver::platform;
 use crate::runtime::{Park, Unpark};
-
-use std::sync::atomic::Ordering::SeqCst;
-
-mod dispatch;
-use dispatch::SingleShard;
-pub(crate) use dispatch::MAX_SOURCES;
+use crate::util::slab::{Address, Slab};
 
 use mio::event::Evented;
 use std::cell::RefCell;
+use std::fmt;
 use std::io;
 use std::marker::PhantomData;
-#[cfg(all(unix, not(target_os = "fuchsia")))]
-use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::{Arc, Weak};
+use std::sync::atomic::Ordering::SeqCst;
 use std::task::Waker;
 use std::time::Duration;
-use std::{fmt, usize};
 
-/// The core reactor, or event loop.
-///
-/// The event loop is the main source of blocking in an application which drives
-/// all other I/O events and notifications happening. Each event loop can have
-/// multiple handles pointing to it, each of which can then be used to create
-/// various I/O objects to interact with the event loop in interesting ways.
-pub struct Reactor {
+/// I/O driver, backed by Mio
+pub(crate) struct Driver {
     /// Reuse the `mio::Events` value across calls to poll.
     events: mio::Events,
 
@@ -35,23 +28,10 @@ pub struct Reactor {
     _wakeup_registration: mio::Registration,
 }
 
-/// A reference to a reactor.
-///
-/// A `Handle` is used for associating I/O objects with an event loop
-/// explicitly. Typically though you won't end up using a `Handle` that often
-/// and will instead use the default reactor for the execution context.
+/// A reference to an I/O driver
 #[derive(Clone)]
-pub struct Handle {
+pub(crate) struct Handle {
     inner: Weak<Inner>,
-}
-
-/// Return value from the `turn` method on `Reactor`.
-///
-/// Currently this value doesn't actually provide any functionality, but it may
-/// in the future give insight into what happened during `turn`.
-#[derive(Debug)]
-pub struct Turn {
-    _priv: (),
 }
 
 pub(super) struct Inner {
@@ -59,9 +39,7 @@ pub(super) struct Inner {
     io: mio::Poll,
 
     /// Dispatch slabs for I/O and futures events
-    // TODO(eliza): once worker threads are available, replace this with a
-    // properly sharded slab.
-    pub(super) io_dispatch: SingleShard,
+    pub(super) io_dispatch: Slab<ScheduledIo>,
 
     /// The number of sources in `io_dispatch`.
     n_sources: AtomicUsize,
@@ -81,7 +59,7 @@ thread_local! {
     static CURRENT_REACTOR: RefCell<Option<Handle>> = RefCell::new(None)
 }
 
-const TOKEN_WAKEUP: mio::Token = mio::Token(MAX_SOURCES);
+const TOKEN_WAKEUP: mio::Token = mio::Token(Address::NULL);
 
 fn _assert_kinds() {
     fn _assert<T: Send + Sync>() {}
@@ -89,11 +67,11 @@ fn _assert_kinds() {
     _assert::<Handle>();
 }
 
-// ===== impl Reactor =====
+// ===== impl Driver =====
 
 #[derive(Debug)]
 /// Guard that resets current reactor on drop.
-pub struct DefaultGuard<'a> {
+pub(crate) struct DefaultGuard<'a> {
     _lifetime: PhantomData<&'a u8>,
 }
 
@@ -107,7 +85,7 @@ impl Drop for DefaultGuard<'_> {
 }
 
 /// Sets handle for a default reactor, returning guard that unsets it on drop.
-pub fn set_default(handle: &Handle) -> DefaultGuard<'_> {
+pub(crate) fn set_default(handle: &Handle) -> DefaultGuard<'_> {
     CURRENT_REACTOR.with(|current| {
         let mut current = current.borrow_mut();
 
@@ -125,10 +103,10 @@ pub fn set_default(handle: &Handle) -> DefaultGuard<'_> {
     }
 }
 
-impl Reactor {
+impl Driver {
     /// Creates a new event loop, returning any error that happened during the
     /// creation.
-    pub fn new() -> io::Result<Reactor> {
+    pub(crate) fn new() -> io::Result<Driver> {
         let io = mio::Poll::new()?;
         let wakeup_pair = mio::Registration::new2();
 
@@ -139,12 +117,12 @@ impl Reactor {
             mio::PollOpt::level(),
         )?;
 
-        Ok(Reactor {
+        Ok(Driver {
             events: mio::Events::with_capacity(1024),
             _wakeup_registration: wakeup_pair.0,
             inner: Arc::new(Inner {
                 io,
-                io_dispatch: SingleShard::new(),
+                io_dispatch: Slab::new(),
                 n_sources: AtomicUsize::new(0),
                 wakeup: wakeup_pair.1,
             }),
@@ -157,52 +135,13 @@ impl Reactor {
     /// Handles are cloneable and clones always refer to the same event loop.
     /// This handle is typically passed into functions that create I/O objects
     /// to bind them to this event loop.
-    pub fn handle(&self) -> Handle {
+    pub(crate) fn handle(&self) -> Handle {
         Handle {
             inner: Arc::downgrade(&self.inner),
         }
     }
 
-    /// Performs one iteration of the event loop, blocking on waiting for events
-    /// for at most `max_wait` (forever if `None`).
-    ///
-    /// This method is the primary method of running this reactor and processing
-    /// I/O events that occur. This method executes one iteration of an event
-    /// loop, blocking at most once waiting for events to happen.
-    ///
-    /// If a `max_wait` is specified then the method should block no longer than
-    /// the duration specified, but this shouldn't be used as a super-precise
-    /// timer but rather a "ballpark approximation"
-    ///
-    /// # Return value
-    ///
-    /// This function returns an instance of `Turn`
-    ///
-    /// `Turn` as of today has no extra information with it and can be safely
-    /// discarded.  In the future `Turn` may contain information about what
-    /// happened while this reactor blocked.
-    ///
-    /// # Errors
-    ///
-    /// This function may also return any I/O error which occurs when polling
-    /// for readiness of I/O objects with the OS. This is quite unlikely to
-    /// arise and typically mean that things have gone horribly wrong at that
-    /// point. Currently this is primarily only known to happen for internal
-    /// bugs to `tokio` itself.
-    pub fn turn(&mut self, max_wait: Option<Duration>) -> io::Result<Turn> {
-        self.poll(max_wait)?;
-        Ok(Turn { _priv: () })
-    }
-
-    /// Returns true if the reactor is currently idle.
-    ///
-    /// Idle is defined as all tasks that have been spawned have completed,
-    /// either successfully or with an error.
-    pub fn is_idle(&self) -> bool {
-        self.inner.n_sources.load(SeqCst) == 0
-    }
-
-    fn poll(&mut self, max_wait: Option<Duration>) -> io::Result<()> {
+    fn turn(&mut self, max_wait: Option<Duration>) -> io::Result<()> {
         // Block waiting for an event to happen, peeling out how many events
         // happened.
         match self.inner.io.poll(&mut self.events, max_wait) {
@@ -232,13 +171,15 @@ impl Reactor {
         let mut rd = None;
         let mut wr = None;
 
-        let io = match self.inner.io_dispatch.get(token.0) {
+        let address = Address::from_usize(token.0);
+
+        let io = match self.inner.io_dispatch.get(address) {
             Some(io) => io,
             None => return,
         };
 
         if io
-            .set_readiness(token.0, |curr| curr | ready.as_usize())
+            .set_readiness(address, |curr| curr | ready.as_usize())
             .is_err()
         {
             // token no longer valid!
@@ -263,14 +204,7 @@ impl Reactor {
     }
 }
 
-#[cfg(all(unix, not(target_os = "fuchsia")))]
-impl AsRawFd for Reactor {
-    fn as_raw_fd(&self) -> RawFd {
-        self.inner.io.as_raw_fd()
-    }
-}
-
-impl Park for Reactor {
+impl Park for Driver {
     type Unpark = Handle;
     type Error = io::Error;
 
@@ -289,9 +223,9 @@ impl Park for Reactor {
     }
 }
 
-impl fmt::Debug for Reactor {
+impl fmt::Debug for Driver {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Reactor")
+        write!(f, "Driver")
     }
 }
 
@@ -348,22 +282,24 @@ impl Inner {
     /// Register an I/O resource with the reactor.
     ///
     /// The registration token is returned.
-    pub(super) fn add_source(&self, source: &dyn Evented) -> io::Result<usize> {
-        let token = self.io_dispatch.alloc().ok_or_else(|| {
+    pub(super) fn add_source(&self, source: &dyn Evented) -> io::Result<Address> {
+        let address = self.io_dispatch.alloc().ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::Other,
                 "reactor at max registered I/O resources",
             )
         })?;
+
         self.n_sources.fetch_add(1, SeqCst);
+
         self.io.register(
             source,
-            mio::Token(token),
+            mio::Token(address.to_usize()),
             mio::Ready::all(),
             mio::PollOpt::edge(),
         )?;
 
-        Ok(token)
+        Ok(address)
     }
 
     /// Deregisters an I/O resource from the reactor.
@@ -371,20 +307,21 @@ impl Inner {
         self.io.deregister(source)
     }
 
-    pub(super) fn drop_source(&self, token: usize) {
-        self.io_dispatch.remove(token);
+    pub(super) fn drop_source(&self, address: Address) {
+        self.io_dispatch.remove(address);
         self.n_sources.fetch_sub(1, SeqCst);
     }
 
     /// Registers interest in the I/O resource associated with `token`.
-    pub(super) fn register(&self, token: usize, dir: Direction, w: Waker) {
+    pub(super) fn register(&self, token: Address, dir: Direction, w: Waker) {
         let sched = self
             .io_dispatch
             .get(token)
-            .unwrap_or_else(|| panic!("IO resource for token {} does not exist!", token));
+            .unwrap_or_else(|| panic!("IO resource for token {:?} does not exist!", token));
+
         let readiness = sched
             .get_readiness(token)
-            .unwrap_or_else(|| panic!("token {} no longer valid!", token));
+            .unwrap_or_else(|| panic!("token {:?} no longer valid!", token));
 
         let (waker, ready) = match dir {
             Direction::Read => (&sched.reader, !mio::Ready::writable()),
@@ -392,20 +329,9 @@ impl Inner {
         };
 
         waker.register(w);
+
         if readiness & ready.as_usize() != 0 {
             waker.wake();
-        }
-    }
-}
-
-impl Drop for Inner {
-    fn drop(&mut self) {
-        // When a reactor is dropped it needs to wake up all blocked tasks as
-        // they'll never receive a notification, and all connected I/O objects
-        // will start returning errors pretty quickly.
-        for io in self.io_dispatch.unique_iter() {
-            io.writer.wake();
-            io.reader.wake();
         }
     }
 }
@@ -459,20 +385,16 @@ mod tests {
     #[test]
     fn tokens_unique_when_dropped() {
         loom::model(|| {
-            println!("\n--- iteration ---\n");
-            let reactor = Reactor::new().unwrap();
+            let reactor = Driver::new().unwrap();
             let inner = reactor.inner;
             let inner2 = inner.clone();
 
             let token_1 = inner.add_source(&NotEvented).unwrap();
-            println!("token 1: {:#x}", token_1);
             let thread = thread::spawn(move || {
                 inner2.drop_source(token_1);
-                println!("dropped: {:#x}", token_1);
             });
 
             let token_2 = inner.add_source(&NotEvented).unwrap();
-            println!("token 2: {:#x}", token_2);
             thread.join().unwrap();
 
             assert!(token_1 != token_2);
@@ -482,8 +404,7 @@ mod tests {
     #[test]
     fn tokens_unique_when_dropped_on_full_page() {
         loom::model(|| {
-            println!("\n--- iteration ---\n");
-            let reactor = Reactor::new().unwrap();
+            let reactor = Driver::new().unwrap();
             let inner = reactor.inner;
             let inner2 = inner.clone();
             // add sources to fill up the first page so that the dropped index
@@ -493,14 +414,11 @@ mod tests {
             }
 
             let token_1 = inner.add_source(&NotEvented).unwrap();
-            println!("token 1: {:#x}", token_1);
             let thread = thread::spawn(move || {
                 inner2.drop_source(token_1);
-                println!("dropped: {:#x}", token_1);
             });
 
             let token_2 = inner.add_source(&NotEvented).unwrap();
-            println!("token 2: {:#x}", token_2);
             thread.join().unwrap();
 
             assert!(token_1 != token_2);
@@ -510,19 +428,16 @@ mod tests {
     #[test]
     fn tokens_unique_concurrent_add() {
         loom::model(|| {
-            println!("\n--- iteration ---\n");
-            let reactor = Reactor::new().unwrap();
+            let reactor = Driver::new().unwrap();
             let inner = reactor.inner;
             let inner2 = inner.clone();
 
             let thread = thread::spawn(move || {
                 let token_2 = inner2.add_source(&NotEvented).unwrap();
-                println!("token 2: {:#x}", token_2);
                 token_2
             });
 
             let token_1 = inner.add_source(&NotEvented).unwrap();
-            println!("token 1: {:#x}", token_1);
             let token_2 = thread.join().unwrap();
 
             assert!(token_1 != token_2);

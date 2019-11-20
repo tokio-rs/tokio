@@ -1,5 +1,5 @@
 use crate::future::poll_fn;
-use crate::net::util::PollEvented;
+use crate::io::PollEvented;
 
 use std::convert::TryFrom;
 use std::fmt;
