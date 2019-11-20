@@ -22,8 +22,9 @@ thread_local! {
 }
 
 #[derive(Debug)]
-/// Guard that resets the default timer on drop.
+/// Guard that unsets the current default timer on drop.
 pub(crate) struct DefaultGuard<'a> {
+    prev: Option<HandlePriv>,
     _lifetime: PhantomData<&'a u8>,
 }
 
@@ -31,7 +32,7 @@ impl Drop for DefaultGuard<'_> {
     fn drop(&mut self) {
         CURRENT_TIMER.with(|current| {
             let mut current = current.borrow_mut();
-            *current = None;
+            *current = self.prev.take();
         })
     }
 }
@@ -44,23 +45,19 @@ impl Drop for DefaultGuard<'_> {
 pub(crate) fn set_default(handle: &Handle) -> DefaultGuard<'_> {
     CURRENT_TIMER.with(|current| {
         let mut current = current.borrow_mut();
-        // let prev = current.take();
-
-        assert!(
-            current.is_none(),
-            "default Tokio timer already set \
-             for execution context"
-        );
+        let prev = current.take();
 
         let handle = handle
             .as_priv()
             .unwrap_or_else(|| panic!("`handle` does not reference a timer"));
-        *current = Some(handle.clone());
-    });
 
-    DefaultGuard {
-        _lifetime: PhantomData,
-    }
+        *current = Some(handle.clone());
+
+        DefaultGuard {
+            prev,
+            _lifetime: PhantomData,
+        }
+    })
 }
 
 impl Handle {
