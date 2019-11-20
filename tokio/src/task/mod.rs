@@ -31,7 +31,7 @@
 //!   thread from executing as well. Instead, this module provides APIs for
 //!   running blocking operations in an asynchronous context.
 //!
-//! [rt]: ../runtime/index.html
+//! [rt]: crate::runtime
 //!
 //! ## Working with Tasks
 //!
@@ -54,9 +54,9 @@
 //! # }
 //! ```
 //!
-//! Like [`std::thread::spawn`][thread_spawn], `task::spawn` returns a
-//! [`JoinHandle`] struct. A `JoinHandle` is itself a future which may be used
-//! to await the output of the spawned task. For example:
+//! Like [`std::thread::spawn`], `task::spawn` returns a [`JoinHandle`] struct.
+//! A `JoinHandle` is itself a future which may be used to await the output of
+//! the spawned task. For example:
 //!
 //! ```
 //! use tokio::task;
@@ -95,11 +95,12 @@
 //! `spawn`, `JoinHandle`, and `JoinError` are present when the "rt-core"
 //! feature flag is enabled.
 //!
-//! [`task::spawn`]: fn.spawn.html
-//! [thread_spawn]: https://doc.rust-lang.org/std/thread/fn.spawn.html
-//! [`JoinHandle`]: struct.JoinHandle.html
-//! [thread_join]: https://doc.rust-lang.org/std/thread/struct.JoinHandle.html
-//! [`JoinError`]: struct.JoinError.html
+//! [`task::spawn`]: crate::task::spawn()
+//! [future]: std::future::Future
+//! [`std::thread::spawn`]: std::thread::spawn
+//! [`JoinHandle`]: crate::task::JoinHandle
+//! [thread_join]: std::thread::JoinHandle
+//! [`JoinError`]: crate::task::JoinError
 //!
 //! ### Blocking and Yielding
 //!
@@ -167,9 +168,9 @@
 //! # }
 //! ```
 //!
-//! [`task::spawn_blocking`]: fn.spawn_blocking.html
-//! [`task::block_in_place`]: fn.block_in_place.html
-//! [rt-threaded]: ../runtime/struct.Builder.html#method.threaded_scheduler
+//! [`task::spawn_blocking`]: crate::task::spawn_blocking
+//! [`task::block_in_place`]: crate::task::block_in_place
+//! [rt-threaded]: crate::runtime::Runtime::builder::threaded_scheduler
 cfg_blocking! {
     mod blocking;
     pub use blocking::spawn_blocking;
