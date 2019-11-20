@@ -1,4 +1,4 @@
-use crate::net::driver::reactor::ScheduledIo;
+use crate::io::driver::ScheduledIo;
 use crate::util::slab::{Address, Slab};
 
 use loom::sync::{Arc, Condvar, Mutex};

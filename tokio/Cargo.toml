@@ -118,5 +118,12 @@ version = "0.3.8"
 default-features = false
 optional = true
 
+[dev-dependencies]
+tokio-test = { version = "=0.2.0-alpha.6", path = "../tokio-test" }
+futures = { version = "0.3.0", features = ["async-await"] }
+loom = { version = "0.2.13", features = ["futures", "checkpoint"] }
+proptest = "0.9.4"
+tempfile = "3.1.0"
+
 [package.metadata.docs.rs]
 all-features = true
