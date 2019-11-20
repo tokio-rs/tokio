@@ -1,5 +1,4 @@
-use tokio::io::split::{ReadHalf, WriteHalf};
-use tokio::io::{split, AsyncRead, AsyncWrite};
+use tokio::io::{split, AsyncRead, AsyncWrite, ReadHalf, WriteHalf};
 
 use std::io;
 use std::pin::Pin;
