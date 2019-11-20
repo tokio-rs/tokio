@@ -21,7 +21,7 @@ keywords = ["futures", "tokio"]
 categories = ["concurrency", "asynchronous"]
 
 [dependencies]
-crossbeam-utils = "0.6.2"
+crossbeam-utils = "0.7.0"
 futures = "0.1.19"
 
 [dev-dependencies]

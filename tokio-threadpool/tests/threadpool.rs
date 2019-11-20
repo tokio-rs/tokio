@@ -131,7 +131,7 @@ fn force_shutdown_drops_futures() {
                 b.fetch_add(1, Relaxed);
             })
             .build();
-        let mut tx = pool.sender().clone();
+        let tx = pool.sender().clone();
 
         tx.spawn(Never(num_drop.clone())).unwrap();
 
@@ -190,7 +190,7 @@ fn drop_threadpool_drops_futures() {
                 b.fetch_add(1, Relaxed);
             })
             .build();
-        let mut tx = pool.sender().clone();
+        let tx = pool.sender().clone();
 
         tx.spawn(Never(num_drop.clone())).unwrap();
 
@@ -219,7 +219,7 @@ fn many_oneshot_futures() {
 
     for _ in 0..50 {
         let pool = ThreadPool::new();
-        let mut tx = pool.sender().clone();
+        let tx = pool.sender().clone();
         let cnt = Arc::new(AtomicUsize::new(0));
 
         for _ in 0..NUM {
@@ -251,7 +251,7 @@ fn many_multishot_futures() {
 
     for _ in 0..50 {
         let pool = ThreadPool::new();
-        let mut pool_tx = pool.sender().clone();
+        let pool_tx = pool.sender().clone();
 
         let mut start_txs = Vec::with_capacity(TRACKS);
         let mut final_rxs = Vec::with_capacity(TRACKS);

@@ -390,7 +390,7 @@ fn reset_first_expiring_item_to_expire_later() {
         let epoch = time.now();
 
         let foo = queue.insert_at("foo", epoch + ms(200));
-        let bar = queue.insert_at("bar", epoch + ms(250));
+        let _bar = queue.insert_at("bar", epoch + ms(250));
 
         task.enter(|| {
             assert_not_ready!(queue);
