@@ -1,5 +1,5 @@
-use super::{Generation, Entry};
 use crate::loom::cell::CausalCell;
+use crate::util::slab::{Generation, Entry};
 
 /// Stores an entry in the slab.
 pub(super) struct Slot<T> {

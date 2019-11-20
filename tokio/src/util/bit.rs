@@ -38,6 +38,11 @@ impl Pack {
         }
     }
 
+    /// Mask used to unpack value
+    pub(crate) const fn mask(&self) -> usize {
+        self.mask
+    }
+
     /// Width, in bits, dedicated to storing the value.
     pub(crate) const fn width(&self) -> u32 {
         pointer_width() - (self.mask >> self.shift).leading_zeros()

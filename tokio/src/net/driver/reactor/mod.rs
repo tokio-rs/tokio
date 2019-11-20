@@ -150,7 +150,8 @@ impl Reactor {
         }
     }
 
-    fn turn(&mut self, max_wait: Option<Duration>) -> io::Result<()> {
+    #[doc(hidden)]
+    pub fn turn(&mut self, max_wait: Option<Duration>) -> io::Result<()> {
         // Block waiting for an event to happen, peeling out how many events
         // happened.
         match self.inner.io.poll(&mut self.events, max_wait) {

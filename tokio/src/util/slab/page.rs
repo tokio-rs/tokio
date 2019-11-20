@@ -1,5 +1,5 @@
-use super::{Address, Entry, Slot, TransferStack, INITIAL_PAGE_SIZE};
 use crate::loom::cell::CausalCell;
+use crate::util::slab::{Address, Entry, Slot, TransferStack, INITIAL_PAGE_SIZE};
 
 use std::fmt;
 

@@ -39,6 +39,7 @@
 //!
 //! Visualized:
 //!
+//! ```text
 //!     ┌──────────┬───────────────┬──────────────────┬──────────────────────────┐
 //!     │ reserved │  generation   │    thread ID     │         address          │
 //!     └▲─────────┴▲──────────────┴▲─────────────────┴▲────────────────────────▲┘
@@ -46,9 +47,10 @@
 //! bits(usize)     │       bits(MAX_THREADS)          │                        0
 //!                 │                                  │
 //!      bits(usize) - RESERVED       MAX_PAGES + bits(INITIAL_PAGE_SIZE)
+//! ```
 
-use super::{Generation, MAX_PAGES, MAX_THREADS, INITIAL_PAGE_SIZE};
 use crate::util::bit;
+use crate::util::slab::{Generation, MAX_PAGES, MAX_THREADS, INITIAL_PAGE_SIZE};
 
 use std::usize;
 
@@ -139,7 +141,7 @@ cfg_not_loom! {
     proptest! {
         #[test]
         fn address_roundtrips(
-            slot in 0usize..Address::MAX_ENTRIES,
+            slot in 0usize..SHARD.max_value(),
             generation in 0usize..Generation::MAX,
         ) {
             let address = Address::new(slot, Generation::new(generation));

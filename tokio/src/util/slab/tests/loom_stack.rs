@@ -1,12 +1,12 @@
-use super::super::super::test_util;
-use super::*;
+use crate::util::slab::TransferStack;
+
 use loom::cell::CausalCell;
+use loom::sync::Arc;
 use loom::thread;
-use std::sync::Arc;
 
 #[test]
 fn transfer_stack() {
-    test_util::run_model("transfer_stack", || {
+    loom::model(|| {
         let causalities = [CausalCell::new(None), CausalCell::new(None)];
         let shared = Arc::new((causalities, TransferStack::new()));
         let shared1 = shared.clone();
@@ -19,7 +19,6 @@ fn transfer_stack() {
                 causalities[0].with_mut(|c| unsafe {
                     *c = Some(prev);
                 });
-                test_println!("prev={:#x}", prev)
             });
         });
 
@@ -29,7 +28,6 @@ fn transfer_stack() {
                 causalities[1].with_mut(|c| unsafe {
                     *c = Some(prev);
                 });
-                test_println!("prev={:#x}", prev)
             });
         });
 
@@ -42,7 +40,6 @@ fn transfer_stack() {
             thread::yield_now();
         }
         let idx = idx.unwrap();
-        test_println!("popped {:#x}", idx);
 
         let saw_both = causalities[idx].with(|val| {
             let val = unsafe { *val };
@@ -53,7 +50,6 @@ fn transfer_stack() {
             // were there two entries in the stack? if so, check that
             // both saw a write.
             if let Some(c) = causalities.get(val.unwrap()) {
-                test_println!("saw both entries!");
                 c.with(|val| {
                     let val = unsafe { *val };
                     assert!(
@@ -77,7 +73,6 @@ fn transfer_stack() {
             }
             let idx = idx.unwrap();
 
-            test_println!("popped {:#x}", idx);
             causalities[idx].with(|val| {
                 let val = unsafe { *val };
                 assert!(

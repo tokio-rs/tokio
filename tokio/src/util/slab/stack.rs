@@ -1,5 +1,5 @@
-use super::Address;
 use crate::loom::sync::atomic::AtomicUsize;
+use crate::util::slab::Address;
 
 use std::fmt;
 use std::sync::atomic::Ordering;

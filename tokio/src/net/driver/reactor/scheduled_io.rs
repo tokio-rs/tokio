@@ -74,7 +74,7 @@ impl ScheduledIo {
             return None;
         }
 
-        Some(ready & !PACK.max_value())
+        Some(ready & !PACK.mask())
     }
 
     /// Sets the readiness on this `ScheduledIo` by invoking the given closure on

@@ -37,8 +37,14 @@ const MAX_THREADS: usize = 2048;
 /// Max number of pages per slab
 const MAX_PAGES: usize = bit::pointer_width() as usize / 4;
 
-/// Size of first page
-const INITIAL_PAGE_SIZE: usize = 32;
+cfg_not_loom! {
+    /// Size of first page
+    const INITIAL_PAGE_SIZE: usize = 32;
+}
+
+cfg_loom! {
+    const INITIAL_PAGE_SIZE: usize = 2;
+}
 
 /// A sharded slab.
 pub(crate) struct Slab<T> {

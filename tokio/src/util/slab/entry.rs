@@ -1,4 +1,4 @@
-use super::Generation;
+use crate::util::slab::Generation;
 
 pub(crate) trait Entry: Default {
     fn generation(&self) -> Generation;

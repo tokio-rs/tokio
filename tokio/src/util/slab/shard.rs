@@ -1,4 +1,4 @@
-use super::{Address, Entry, page, MAX_PAGES};
+use crate::util::slab::{Address, Entry, page, MAX_PAGES};
 
 use std::fmt;
 

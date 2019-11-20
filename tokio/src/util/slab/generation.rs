@@ -1,5 +1,5 @@
-use super::Address;
 use crate::util::bit;
+use crate::util::slab::Address;
 
 /// An mutation identifier for a slot in the slab. The generation helps prevent
 /// accessing an entry with an outdated token.
