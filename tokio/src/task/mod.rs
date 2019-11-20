@@ -4,7 +4,12 @@
 //!
 //! A _task_ is a light weight, non-blocking unit of execution. A task is similar
 //! to an OS thread, but rather than being managed by the OS scheduler, they are
-//! managed by the [Tokio runtime][rt]. Key points about tasks include:
+//! managed by the [Tokio runtime][rt]. Another name for this general patterh is
+//! [green threads]. If you are familiar with [Go's goroutines], [Kotlin's
+//! coroutines], or [Erlang's processes], you  can think of Tokio's tasks as
+//! something similar.
+//!
+//! Key points about tasks include:
 //!
 //! * Tasks are **light weight**. Because tasks are scheduled by the Tokio
 //!   runtime rather than the operating system, creating new tasks or switching
@@ -32,6 +37,10 @@
 //!   running blocking operations in an asynchronous context.
 //!
 //! [rt]: crate::runtime
+//! [green threads]: https://en.wikipedia.org/wiki/Green_threads
+//! [Go's goroutines]: https://tour.golang.org/concurrency/1
+//! [Kotlin's coroutines]: https://kotlinlang.org/docs/reference/coroutines-overview.html
+//! [Erlang's processes]: http://erlang.org/doc/getting_started/conc_prog.html#processes
 //!
 //! ## Working with Tasks
 //!
