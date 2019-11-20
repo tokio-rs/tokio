@@ -71,8 +71,8 @@ cfg_io_std! {
 }
 
 cfg_io_util! {
-    pub mod split;
-    pub use split::split;
+    mod split;
+    pub use split::{split, ReadHalf, WriteHalf};
 
     pub(crate) mod util;
     pub use util::{
