@@ -102,7 +102,7 @@ impl TryFrom<UnixListener> for mio_uds::UnixListener {
     /// See [`PollEvented::into_inner`] for more details about
     /// resource deregistration that happens during the call.
     ///
-    /// [`PollEvented::into_inner`]: crate::util::PollEvented::into_inner
+    /// [`PollEvented::into_inner`]: crate::io::PollEvented::into_inner
     fn try_from(value: UnixListener) -> Result<Self, Self::Error> {
         value.io.into_inner()
     }

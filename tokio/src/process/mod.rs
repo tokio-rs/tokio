@@ -101,7 +101,7 @@
 //! While similar to the standard library, this crate's `Child` type differs
 //! importantly in the behavior of `drop`. In the standard library, a child
 //! process will continue running after the instance of [`std::process::Child`]
-//! is dropped. In this crate, however, because [`tokio::process::Child`] is a
+//! is dropped. In this crate, however, because [`tokio::process::Child`][Child] is a
 //! future of the child's `ExitStatus`, a child process is terminated if
 //! `tokio::process::Child` is dropped. The behavior of the standard library can
 //! be regained with the [`Child::forget`](crate::process::Child::forget) method.

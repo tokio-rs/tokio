@@ -22,11 +22,11 @@
 //!   IOCP, etc...).
 //! * Asynchronous [TCP and UDP][net] sockets.
 //! * Asynchronous [filesystem][fs] operations.
-//! * [Timer][timer] API for scheduling work in the future.
+//! * [Timer][time] API for scheduling work in the future.
 //!
 //! Guide level documentation is found on the [website].
 //!
-//! [driver]: tokio::net::driver
+//! [driver]: driver/index.html
 //! [website]: https://tokio.rs/docs/
 //!
 //! # Examples

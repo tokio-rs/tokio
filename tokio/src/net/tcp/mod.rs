@@ -7,7 +7,7 @@
 //! [`connect`] method, which returns a future which returns a `TcpStream`.
 //!
 //! To listen on an address [`TcpListener`] can be used. `TcpListener`'s
-//! [`incoming`][incoming_method] method can be used to accept new connections.
+//! [`incoming`][TcpListener::incoming] method can be used to accept new connections.
 //! It return the [`Incoming`] struct, which implements a stream which returns
 //! `TcpStream`s.
 //!
