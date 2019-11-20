@@ -15,22 +15,13 @@ pub(crate) struct Registration {
 
 impl Registration {
     pub(crate) fn new(deadline: Instant, duration: Duration) -> Registration {
-        fn is_send<T: Send + Sync>() {}
-        is_send::<Registration>();
-
         Registration {
-            entry: Arc::new(Entry::new(deadline, duration)),
+            entry: Entry::new(deadline, duration),
         }
     }
 
     pub(crate) fn deadline(&self) -> Instant {
         self.entry.time_ref().deadline
-    }
-
-    pub(crate) fn register(&mut self) {
-        if !self.entry.is_registered() {
-            Entry::register(&mut self.entry)
-        }
     }
 
     pub(crate) fn reset(&mut self, deadline: Instant) {

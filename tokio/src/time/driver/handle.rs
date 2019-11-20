@@ -1,6 +1,4 @@
 use crate::time::driver::Inner;
-use crate::time::Error;
-
 use std::cell::RefCell;
 use std::fmt;
 use std::marker::PhantomData;
@@ -24,9 +22,8 @@ thread_local! {
 }
 
 #[derive(Debug)]
-///Unsets default timer handler on drop.
+/// Guard that resets the default timer on drop.
 pub(crate) struct DefaultGuard<'a> {
-    prev: Option<HandlePriv>,
     _lifetime: PhantomData<&'a u8>,
 }
 
@@ -34,12 +31,12 @@ impl Drop for DefaultGuard<'_> {
     fn drop(&mut self) {
         CURRENT_TIMER.with(|current| {
             let mut current = current.borrow_mut();
-            *current = self.prev.take();
+            *current = None;
         })
     }
 }
 
-///Sets handle to default timer, returning guard that unsets it on drop.
+/// Sets handle to default timer, returning guard that unsets it on drop.
 ///
 /// # Panics
 ///
@@ -47,19 +44,23 @@ impl Drop for DefaultGuard<'_> {
 pub(crate) fn set_default(handle: &Handle) -> DefaultGuard<'_> {
     CURRENT_TIMER.with(|current| {
         let mut current = current.borrow_mut();
-        let prev = current.take();
+        // let prev = current.take();
+
+        assert!(
+            current.is_none(),
+            "default Tokio timer already set \
+             for execution context"
+        );
 
         let handle = handle
             .as_priv()
             .unwrap_or_else(|| panic!("`handle` does not reference a timer"));
-
         *current = Some(handle.clone());
+    });
 
-        DefaultGuard {
-            prev,
-            _lifetime: PhantomData,
-        }
-    })
+    DefaultGuard {
+        _lifetime: PhantomData,
+    }
 }
 
 impl Handle {
@@ -82,11 +83,13 @@ impl Default for Handle {
 impl HandlePriv {
     /// Try to get a handle to the current timer.
     ///
-    /// Returns `Err` if no handle is found.
-    pub(crate) fn try_current() -> Result<HandlePriv, Error> {
+    /// # Panics
+    ///
+    /// This function panics if there is no current timer set.
+    pub(crate) fn current() -> Self {
         CURRENT_TIMER.with(|current| match *current.borrow() {
-            Some(ref handle) => Ok(handle.clone()),
-            None => Err(Error::shutdown()),
+            Some(ref handle) => handle.clone(),
+            None => panic!("no current timer"),
         })
     }
 

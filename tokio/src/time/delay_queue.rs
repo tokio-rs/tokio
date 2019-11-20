@@ -228,15 +228,19 @@ impl<T> DelayQueue<T> {
     /// ```rust
     /// # use tokio::time::DelayQueue;
     /// # use std::time::Duration;
-    /// let mut delay_queue = DelayQueue::with_capacity(10);
     ///
-    /// // These insertions are done without further allocation
-    /// for i in 0..10 {
-    ///     delay_queue.insert(i, Duration::from_secs(i));
-    /// }
+    /// # #[tokio::main]
+    /// # async fn main() {
+    ///     let mut delay_queue = DelayQueue::with_capacity(10);
     ///
-    /// // This will make the queue allocate additional storage
-    /// delay_queue.insert(11, Duration::from_secs(11));
+    ///     // These insertions are done without further allocation
+    ///     for i in 0..10 {
+    ///         delay_queue.insert(i, Duration::from_secs(i));
+    ///     }
+    ///
+    ///     // This will make the queue allocate additional storage
+    ///     delay_queue.insert(11, Duration::from_secs(11));
+    /// # }
     /// ```
     pub fn with_capacity(capacity: usize) -> DelayQueue<T> {
         DelayQueue {
@@ -279,13 +283,16 @@ impl<T> DelayQueue<T> {
     /// ```rust
     /// use tokio::time::{DelayQueue, Duration, Instant};
     ///
-    /// let mut delay_queue = DelayQueue::new();
-    /// let key = delay_queue.insert_at(
-    ///     "foo", Instant::now() + Duration::from_secs(5));
+    /// # #[tokio::main]
+    /// # async fn main() {
+    ///     let mut delay_queue = DelayQueue::new();
+    ///     let key = delay_queue.insert_at(
+    ///         "foo", Instant::now() + Duration::from_secs(5));
     ///
-    /// // Remove the entry
-    /// let item = delay_queue.remove(&key);
-    /// assert_eq!(*item.get_ref(), "foo");
+    ///     // Remove the entry
+    ///     let item = delay_queue.remove(&key);
+    ///     assert_eq!(*item.get_ref(), "foo");
+    /// # }
     /// ```
     ///
     /// [`poll`]: #method.poll
@@ -380,12 +387,15 @@ impl<T> DelayQueue<T> {
     /// use tokio::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// let mut delay_queue = DelayQueue::new();
-    /// let key = delay_queue.insert("foo", Duration::from_secs(5));
+    /// # #[tokio::main]
+    /// # async fn main() {
+    ///     let mut delay_queue = DelayQueue::new();
+    ///     let key = delay_queue.insert("foo", Duration::from_secs(5));
     ///
-    /// // Remove the entry
-    /// let item = delay_queue.remove(&key);
-    /// assert_eq!(*item.get_ref(), "foo");
+    ///     // Remove the entry
+    ///     let item = delay_queue.remove(&key);
+    ///     assert_eq!(*item.get_ref(), "foo");
+    /// # }
     /// ```
     ///
     /// [`poll`]: #method.poll
@@ -430,12 +440,15 @@ impl<T> DelayQueue<T> {
     /// use tokio::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// let mut delay_queue = DelayQueue::new();
-    /// let key = delay_queue.insert("foo", Duration::from_secs(5));
+    /// # #[tokio::main]
+    /// # async fn main() {
+    ///     let mut delay_queue = DelayQueue::new();
+    ///     let key = delay_queue.insert("foo", Duration::from_secs(5));
     ///
-    /// // Remove the entry
-    /// let item = delay_queue.remove(&key);
-    /// assert_eq!(*item.get_ref(), "foo");
+    ///     // Remove the entry
+    ///     let item = delay_queue.remove(&key);
+    ///     assert_eq!(*item.get_ref(), "foo");
+    /// # }
     /// ```
     pub fn remove(&mut self, key: &Key) -> Expired<T> {
         use crate::time::wheel::Stack;
@@ -477,14 +490,17 @@ impl<T> DelayQueue<T> {
     /// ```rust
     /// use tokio::time::{DelayQueue, Duration, Instant};
     ///
-    /// let mut delay_queue = DelayQueue::new();
-    /// let key = delay_queue.insert("foo", Duration::from_secs(5));
+    /// # #[tokio::main]
+    /// # async fn main() {
+    ///     let mut delay_queue = DelayQueue::new();
+    ///     let key = delay_queue.insert("foo", Duration::from_secs(5));
     ///
-    /// // "foo" is scheduled to be returned in 5 seconds
+    ///     // "foo" is scheduled to be returned in 5 seconds
     ///
-    /// delay_queue.reset_at(&key, Instant::now() + Duration::from_secs(10));
+    ///     delay_queue.reset_at(&key, Instant::now() + Duration::from_secs(10));
     ///
-    /// // "foo"is now scheduled to be returned in 10 seconds
+    ///     // "foo"is now scheduled to be returned in 10 seconds
+    /// # }
     /// ```
     pub fn reset_at(&mut self, key: &Key, when: Instant) {
         self.wheel.remove(&key.index, &mut self.slab);
@@ -531,14 +547,17 @@ impl<T> DelayQueue<T> {
     /// use tokio::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// let mut delay_queue = DelayQueue::new();
-    /// let key = delay_queue.insert("foo", Duration::from_secs(5));
+    /// # #[tokio::main]
+    /// # async fn main() {
+    ///     let mut delay_queue = DelayQueue::new();
+    ///     let key = delay_queue.insert("foo", Duration::from_secs(5));
     ///
-    /// // "foo" is scheduled to be returned in 5 seconds
+    ///     // "foo" is scheduled to be returned in 5 seconds
     ///
-    /// delay_queue.reset(&key, Duration::from_secs(10));
+    ///     delay_queue.reset(&key, Duration::from_secs(10));
     ///
-    /// // "foo"is now scheduled to be returned in 10 seconds
+    ///     // "foo"is now scheduled to be returned in 10 seconds
+    /// # }
     /// ```
     pub fn reset(&mut self, key: &Key, timeout: Duration) {
         self.reset_at(key, Instant::now() + timeout);
@@ -558,15 +577,18 @@ impl<T> DelayQueue<T> {
     /// use tokio::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// let mut delay_queue = DelayQueue::new();
+    /// # #[tokio::main]
+    /// # async fn main() {
+    ///     let mut delay_queue = DelayQueue::new();
     ///
-    /// delay_queue.insert("foo", Duration::from_secs(5));
+    ///     delay_queue.insert("foo", Duration::from_secs(5));
     ///
-    /// assert!(!delay_queue.is_empty());
+    ///     assert!(!delay_queue.is_empty());
     ///
-    /// delay_queue.clear();
+    ///     delay_queue.clear();
     ///
-    /// assert!(delay_queue.is_empty());
+    ///     assert!(delay_queue.is_empty());
+    /// # }
     /// ```
     pub fn clear(&mut self) {
         self.slab.clear();
@@ -612,12 +634,15 @@ impl<T> DelayQueue<T> {
     /// use tokio::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// let mut delay_queue = DelayQueue::new();
+    /// # #[tokio::main]
+    /// # async fn main() {
+    ///     let mut delay_queue = DelayQueue::new();
     ///
-    /// delay_queue.insert("hello", Duration::from_secs(10));
-    /// delay_queue.reserve(10);
+    ///     delay_queue.insert("hello", Duration::from_secs(10));
+    ///     delay_queue.reserve(10);
     ///
-    /// assert!(delay_queue.capacity() >= 11);
+    ///     assert!(delay_queue.capacity() >= 11);
+    /// # }
     /// ```
     pub fn reserve(&mut self, additional: usize) {
         self.slab.reserve(additional);
@@ -634,11 +659,14 @@ impl<T> DelayQueue<T> {
     /// use tokio::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// let mut delay_queue = DelayQueue::new();
-    /// assert!(delay_queue.is_empty());
+    /// # #[tokio::main]
+    /// # async fn main() {
+    ///     let mut delay_queue = DelayQueue::new();
+    ///     assert!(delay_queue.is_empty());
     ///
-    /// delay_queue.insert("hello", Duration::from_secs(5));
-    /// assert!(!delay_queue.is_empty());
+    ///     delay_queue.insert("hello", Duration::from_secs(5));
+    ///     assert!(!delay_queue.is_empty());
+    /// # }
     /// ```
     pub fn is_empty(&self) -> bool {
         self.slab.is_empty()
