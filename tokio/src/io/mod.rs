@@ -86,7 +86,7 @@
 //!
 //! ```no_run
 //! use tokio::io;
-//! use tokio::io::BufReader;
+//! use tokio::io::BufWriter;
 //! use tokio::fs::File;
 //! use tokio::prelude::*;
 //!
