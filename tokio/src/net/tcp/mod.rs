@@ -16,12 +16,13 @@
 //! [`TcpListener`]: struct.TcpListener.html
 
 mod listener;
-pub use self::listener::TcpListener;
+pub use listener::TcpListener;
 
 mod incoming;
-pub use self::incoming::Incoming;
+pub use incoming::Incoming;
 
-pub mod split;
+mod split;
+pub use split::{ReadHalf, WriteHalf};
 
 mod stream;
-pub use self::stream::TcpStream;
+pub use stream::TcpStream;
