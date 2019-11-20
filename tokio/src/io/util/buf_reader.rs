@@ -3,6 +3,7 @@ use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite};
 
 use pin_project_lite::pin_project;
 use std::io::{self, Read};
+use std::mem::{self, MaybeUninit};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{cmp, fmt};
@@ -45,7 +46,7 @@ impl<R: AsyncRead> BufReader<R> {
         unsafe {
             let mut buffer = Vec::with_capacity(capacity);
             buffer.set_len(capacity);
-            inner.prepare_uninitialized_buffer(&mut buffer);
+            inner.prepare_uninitialized_buffer(mem::transmute(&mut buffer[..]));
             Self {
                 inner,
                 buf: buffer.into_boxed_slice(),
@@ -120,7 +121,7 @@ impl<R: AsyncRead> AsyncRead for BufReader<R> {
     }
 
     // we can't skip unconditionally because of the large buffer case in read.
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
+    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [MaybeUninit<u8>]) -> bool {
         self.inner.prepare_uninitialized_buffer(buf)
     }
 }

@@ -91,8 +91,7 @@ uds = ["io-driver", "mio-uds", "libc"]
 [dependencies]
 tokio-macros = { version = "=0.2.0-alpha.6", optional = true, path = "../tokio-macros" }
 
-bytes = "0.4"
-iovec = "0.1"
+bytes = { git = "https://github.com/tokio-rs/bytes" }
 pin-project-lite = "0.1.1"
 
 # Everything else is optional...
