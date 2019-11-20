@@ -1,14 +1,12 @@
+use crate::runtime::{self, Runtime};
 use crate::runtime::tests::loom_oneshot as oneshot;
-use crate::runtime::thread_pool::ThreadPool;
-use crate::runtime::{Park, Unpark};
 use crate::spawn;
 
 use loom::sync::atomic::{AtomicBool, AtomicUsize};
-use loom::sync::{Arc, Mutex, Notify};
+use loom::sync::{Arc, Mutex};
 
 use std::future::Future;
 use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
-use std::time::Duration;
 
 #[test]
 fn pool_multi_spawn() {
@@ -46,7 +44,7 @@ fn pool_multi_spawn() {
 #[test]
 fn only_blocking() {
     loom::model(|| {
-        let mut pool = mk_pool(1);
+        let pool = mk_pool(1);
         let (block_tx, block_rx) = oneshot::channel();
 
         pool.spawn(async move {
@@ -56,7 +54,7 @@ fn only_blocking() {
         });
 
         block_rx.recv();
-        pool.shutdown_now();
+        drop(pool);
     });
 }
 
@@ -64,7 +62,7 @@ fn only_blocking() {
 fn blocking_and_regular() {
     const NUM: usize = 3;
     loom::model(|| {
-        let mut pool = mk_pool(1);
+        let pool = mk_pool(1);
         let cnt = Arc::new(AtomicUsize::new(0));
 
         let (block_tx, block_rx) = oneshot::channel();
@@ -91,7 +89,7 @@ fn blocking_and_regular() {
         done_rx.recv();
         block_rx.recv();
 
-        pool.shutdown_now();
+        drop(pool);
     });
 }
 
@@ -153,7 +151,7 @@ fn complete_block_on_under_load() {
     use futures::FutureExt;
 
     loom::model(|| {
-        let pool = mk_pool(2);
+        let mut pool = mk_pool(2);
 
         pool.block_on({
             futures::future::lazy(|_| ()).then(|_| {
@@ -171,20 +169,11 @@ fn complete_block_on_under_load() {
 }
 
 fn mk_pool(num_threads: usize) -> Runtime {
-    use crate::blocking::BlockingPool;
-
-    let blocking_pool = BlockingPool::new("test".into(), None);
-    let executor = ThreadPool::new(
-        num_threads,
-        blocking_pool.spawner().clone(),
-        Arc::new(Box::new(|_, next| next())),
-        move |_| LoomPark::new(),
-    );
-
-    Runtime {
-        executor,
-        blocking_pool,
-    }
+    runtime::Builder::new()
+        .threaded_scheduler()
+        .num_threads(num_threads)
+        .build()
+        .unwrap()
 }
 
 use futures::future::poll_fn;
@@ -243,70 +232,4 @@ fn gated2(thread: bool) -> impl Future<Output = &'static str> {
             Poll::Pending
         }
     })
-}
-
-/// Fake runtime
-struct Runtime {
-    executor: ThreadPool,
-    #[allow(dead_code)]
-    blocking_pool: crate::blocking::BlockingPool,
-}
-
-use std::ops;
-
-impl ops::Deref for Runtime {
-    type Target = ThreadPool;
-
-    fn deref(&self) -> &ThreadPool {
-        &self.executor
-    }
-}
-
-impl ops::DerefMut for Runtime {
-    fn deref_mut(&mut self) -> &mut ThreadPool {
-        &mut self.executor
-    }
-}
-
-struct LoomPark {
-    notify: Arc<Notify>,
-}
-
-struct LoomUnpark {
-    notify: Arc<Notify>,
-}
-
-impl LoomPark {
-    fn new() -> LoomPark {
-        LoomPark {
-            notify: Arc::new(Notify::new()),
-        }
-    }
-}
-
-impl Park for LoomPark {
-    type Unpark = LoomUnpark;
-
-    type Error = ();
-
-    fn unpark(&self) -> LoomUnpark {
-        let notify = self.notify.clone();
-        LoomUnpark { notify }
-    }
-
-    fn park(&mut self) -> Result<(), Self::Error> {
-        self.notify.wait();
-        Ok(())
-    }
-
-    fn park_timeout(&mut self, _duration: Duration) -> Result<(), Self::Error> {
-        self.notify.wait();
-        Ok(())
-    }
-}
-
-impl Unpark for LoomUnpark {
-    fn unpark(&self) {
-        self.notify.notify();
-    }
 }

@@ -1,3 +1,5 @@
+#![cfg(not(loom))]
+
 //! TCP/UDP/Unix bindings for `tokio`.
 //!
 //! This module contains the TCP/UDP/Unix networking types, similar to the standard

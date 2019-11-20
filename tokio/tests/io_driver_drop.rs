@@ -6,7 +6,7 @@ use tokio_test::{assert_err, assert_pending, assert_ready, task};
 
 #[test]
 fn tcp_doesnt_block() {
-    let rt = runtime::Builder::new().basic_scheduler().build().unwrap();
+    let rt = rt();
 
     let mut listener = rt.enter(|| {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -24,7 +24,7 @@ fn tcp_doesnt_block() {
 
 #[test]
 fn drop_wakes() {
-    let rt = runtime::Builder::new().basic_scheduler().build().unwrap();
+    let rt = rt();
 
     let mut listener = rt.enter(|| {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -41,4 +41,12 @@ fn drop_wakes() {
 
     assert!(task.is_woken());
     assert_ready!(task.poll());
+}
+
+fn rt() -> runtime::Runtime {
+    runtime::Builder::new()
+        .basic_scheduler()
+        .enable_all()
+        .build()
+        .unwrap()
 }

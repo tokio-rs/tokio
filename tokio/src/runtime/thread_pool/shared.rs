@@ -1,4 +1,5 @@
-use crate::runtime::park::Unpark;
+use crate::park::Unpark;
+use crate::runtime::Unparker;
 use crate::runtime::thread_pool::slice;
 use crate::task::{self, Schedule, Task};
 
@@ -11,12 +12,9 @@ use std::ptr;
 /// - other workers
 /// - tasks
 ///
-pub(crate) struct Shared<P>
-where
-    P: 'static,
-{
+pub(crate) struct Shared {
     /// Thread unparker
-    unpark: P,
+    unpark: Unparker,
 
     /// Tasks pending drop. Any worker pushes tasks, only the "owning" worker
     /// pops.
@@ -26,17 +24,14 @@ where
     ///
     /// The slice::Set itself is tracked by an `Arc`, but this pointer is not
     /// included in the ref count.
-    slices: *const slice::Set<P>,
+    slices: *const slice::Set,
 }
 
-unsafe impl<P: Unpark> Send for Shared<P> {}
-unsafe impl<P: Unpark> Sync for Shared<P> {}
+unsafe impl Send for Shared {}
+unsafe impl Sync for Shared {}
 
-impl<P> Shared<P>
-where
-    P: Unpark,
-{
-    pub(super) fn new(unpark: P) -> Shared<P> {
+impl Shared {
+    pub(super) fn new(unpark: Unparker) -> Shared {
         Shared {
             unpark,
             pending_drop: task::TransferStack::new(),
@@ -52,19 +47,16 @@ where
         self.unpark.unpark();
     }
 
-    fn slices(&self) -> &slice::Set<P> {
+    fn slices(&self) -> &slice::Set {
         unsafe { &*self.slices }
     }
 
-    pub(super) fn set_slices_ptr(&mut self, slices: *const slice::Set<P>) {
+    pub(super) fn set_slices_ptr(&mut self, slices: *const slice::Set) {
         self.slices = slices;
     }
 }
 
-impl<P> Schedule for Shared<P>
-where
-    P: Unpark,
-{
+impl Schedule for Shared {
     fn bind(&self, task: &Task<Self>) {
         // Get access to the Owned component. This function can only be called
         // when on the worker.

@@ -1,8 +1,12 @@
 #![allow(unused_macros)]
 
-macro_rules! cfg_atomic_waker {
+macro_rules! cfg_resource_drivers {
     ($($item:item)*) => {
-        $( #[cfg(any(feature = "io-driver", feature = "time"))] $item )*
+        $(
+            #[cfg(any(feature = "io-driver", feature = "time"))]
+            #[cfg(not(loom))]
+            $item
+        )*
     }
 }
 

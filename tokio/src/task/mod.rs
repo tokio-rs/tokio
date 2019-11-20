@@ -291,20 +291,6 @@ pub(crate) trait Schedule: Send + Sync + Sized + 'static {
     fn schedule(&self, task: Task<Self>);
 }
 
-cfg_rt_threaded! {
-    /// Create a new task without an associated join handle
-    pub(crate) fn background<T, S>(task: T) -> Task<S>
-    where
-        T: Future + Send + 'static,
-        S: Schedule,
-    {
-        Task {
-            raw: RawTask::new_background::<_, S>(task),
-            _p: PhantomData,
-        }
-    }
-}
-
 /// Create a new task with an associated join handle
 pub(crate) fn joinable<T, S>(task: T) -> (Task<S>, JoinHandle<T::Output>)
 where

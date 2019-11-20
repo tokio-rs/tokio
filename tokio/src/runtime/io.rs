@@ -6,8 +6,12 @@
 /// Re-exported for convenience.
 pub(crate) use std::io::Result;
 
-cfg_io_driver! {
+pub(crate) use variant::*;
+
+#[cfg(all(feature = "io-driver", not(loom)))]
+mod variant {
     use crate::io::driver;
+    use crate::park::{Either, ParkThread};
 
     use std::io;
 
@@ -16,27 +20,33 @@ cfg_io_driver! {
     /// When the `io-driver` feature is enabled, this is the "real" I/O driver
     /// backed by Mio. Without the `io-driver` feature, this is a thread parker
     /// backed by a condition variable.
-    pub(crate) type Driver = driver::Driver;
+    pub(crate) type Driver = Either<driver::Driver, ParkThread>;
 
     /// The handle the runtime stores for future use.
     ///
     /// When the `io-driver` feature is **not** enabled, this is `()`.
-    pub(crate) type Handle = driver::Handle;
+    pub(crate) type Handle = Option<driver::Handle>;
 
-    pub(crate) fn create_driver() -> io::Result<(Driver, Handle)> {
-        let driver = driver::Driver::new()?;
-        let handle = driver.handle();
+    pub(crate) fn create_driver(enable: bool) -> io::Result<(Driver, Handle)> {
+        if enable {
+            let driver = driver::Driver::new()?;
+            let handle = driver.handle();
 
-        Ok((driver, handle))
+            Ok((Either::A(driver), Some(handle)))
+        } else {
+            let driver = ParkThread::new();
+            Ok((Either::B(driver), None))
+        }
     }
 
-    pub(crate) fn set_default(handle: &Handle) -> driver::DefaultGuard<'_> {
-        driver::set_default(handle)
+    pub(crate) fn set_default(handle: &Handle) -> Option<driver::DefaultGuard<'_>> {
+        handle.as_ref().map(|handle| driver::set_default(handle))
     }
 }
 
-cfg_not_io_driver! {
-    use crate::runtime::park::ParkThread;
+#[cfg(any(not(feature = "io-driver"), loom))]
+mod variant {
+    use crate::park::ParkThread;
 
     use std::io;
 
@@ -46,7 +56,7 @@ cfg_not_io_driver! {
     /// There is no handle
     pub(crate) type Handle = ();
 
-    pub(crate) fn create_driver() -> io::Result<(Driver, Handle)> {
+    pub(crate) fn create_driver(_enable: bool) -> io::Result<(Driver, Handle)> {
         let driver = ParkThread::new();
 
         Ok((driver, ()))
