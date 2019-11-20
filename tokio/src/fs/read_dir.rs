@@ -36,7 +36,7 @@ pub async fn read_dir(path: impl AsRef<Path>) -> io::Result<ReadDir> {
 ///
 /// [`read_dir`]: read_dir
 /// [`DirEntry`]: DirEntry
-/// [`Stream`]: Stream
+/// [`Stream`]: futures_core::Stream
 /// [`Err`]: std::result::Result::Err
 #[derive(Debug)]
 #[must_use = "streams do nothing unless polled"]
