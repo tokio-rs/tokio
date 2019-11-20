@@ -97,7 +97,7 @@
 //!         let mut writer = BufWriter::new(f);
 //!
 //!         // write a byte to the buffer
-//!         writer.write(&[42]).await?;
+//!         writer.write(&[42u8]).await?;
 //!
 //!     } // the buffer is flushed once writer goes out of scope
 //!
