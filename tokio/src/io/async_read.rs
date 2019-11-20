@@ -1,6 +1,6 @@
 use bytes::BufMut;
 use std::io;
-use std::mem::{self, MaybeUninit};
+use std::mem::MaybeUninit;
 use std::ops::DerefMut;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -110,7 +110,10 @@ pub trait AsyncRead {
 
                 self.prepare_uninitialized_buffer(b);
 
-                ready!(self.poll_read(cx, mem::transmute(b)))?
+                // Convert to `&mut [u8]`
+                let b = &mut *(b as *mut [MaybeUninit<u8>] as *mut [u8]);
+
+                ready!(self.poll_read(cx, b))?
             };
 
             buf.advance_mut(n);

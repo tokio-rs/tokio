@@ -3,7 +3,7 @@ use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite};
 
 use pin_project_lite::pin_project;
 use std::io::{self, Read};
-use std::mem::{self, MaybeUninit};
+use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{cmp, fmt};
@@ -46,7 +46,12 @@ impl<R: AsyncRead> BufReader<R> {
         unsafe {
             let mut buffer = Vec::with_capacity(capacity);
             buffer.set_len(capacity);
-            inner.prepare_uninitialized_buffer(mem::transmute(&mut buffer[..]));
+
+            {
+                // Convert to MaybeUninit
+                let b = &mut *(&mut buffer[..] as *mut [u8] as *mut [MaybeUninit<u8>]);
+                inner.prepare_uninitialized_buffer(b);
+            }
             Self {
                 inner,
                 buf: buffer.into_boxed_slice(),

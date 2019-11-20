@@ -4,6 +4,7 @@ use tokio_test::{assert_ready_err, assert_ready_ok};
 
 use bytes::{BufMut, BytesMut};
 use std::io;
+use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -75,12 +76,10 @@ fn read_buf_no_capacity() {
         }
     }
 
-    // Can't create BytesMut w/ zero capacity, so fill it up
-    let mut buf = BytesMut::with_capacity(64);
-    buf.put(&[0; 64][..]);
+    let mut buf = [0u8; 0];
 
     task::spawn(Rd).enter(|cx, rd| {
-        let n = assert_ready_ok!(rd.poll_read_buf(cx, &mut buf));
+        let n = assert_ready_ok!(rd.poll_read_buf(cx, &mut &mut buf[..]));
         assert_eq!(0, n);
     });
 }
@@ -116,7 +115,7 @@ fn read_buf_uninitialized_ok() {
     struct Rd;
 
     impl AsyncRead for Rd {
-        unsafe fn prepare_uninitialized_buffer(&self, _: &mut [u8]) -> bool {
+        unsafe fn prepare_uninitialized_buffer(&self, _: &mut [MaybeUninit<u8>]) -> bool {
             false
         }
 
@@ -134,7 +133,8 @@ fn read_buf_uninitialized_ok() {
     let mut buf = BytesMut::with_capacity(64);
 
     unsafe {
-        buf.bytes_mut()[0..11].copy_from_slice(b"hello world");
+        let b: &mut [u8] = std::mem::transmute(buf.bytes_mut());
+        b[0..11].copy_from_slice(b"hello world");
     }
 
     task::spawn(Rd).enter(|cx, rd| {

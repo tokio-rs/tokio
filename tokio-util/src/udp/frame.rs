@@ -51,8 +51,7 @@ impl<C: Decoder + Unpin> Stream for UdpFramed<C> {
             // safety: we know tokio::net::UdpSocket never reads from the memory
             // during a recv
             let res = {
-                use std::mem;
-                let bytes = mem::transmute(pin.rd.bytes_mut());
+                let bytes = &mut *(pin.rd.bytes_mut() as *mut _ as *mut [u8]);
                 ready!(Pin::new(&mut pin.socket).poll_recv_from(cx, bytes))
             };
 
