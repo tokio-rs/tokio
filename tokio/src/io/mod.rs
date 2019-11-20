@@ -1,8 +1,8 @@
 //! Asynchronous I/O.
 //!
 //! This module is the asynchronous version of `std::io`. Primarily, it
-//! defines two traits, [`AsyncRead`] and [`AsyncWrite`], which extend the
-//! `Read` and `Write` traits of the standard library.
+//! defines two traits, [`AsyncRead`] and [`AsyncWrite`], which are asynchronous
+//! versions of the [`Read`] and [`Write`] traits in the standard library.
 //!
 //! # AsyncRead and AsyncWrite
 //!
@@ -35,7 +35,8 @@
 //! [`Error`]: struct.Error.html
 //! [`ErrorKind`]: enum.ErrorKind.html
 //! [`Result`]: type.Result.html
-
+//! [`Read`]: std::io::Read
+//! [`Write`]: std::io::Write
 cfg_io_blocking! {
     pub(crate) mod blocking;
 }
