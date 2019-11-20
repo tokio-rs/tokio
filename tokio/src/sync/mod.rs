@@ -45,6 +45,10 @@ cfg_not_sync! {
     cfg_signal! {
         pub(crate) mod mpsc;
         pub(crate) mod semaphore;
+
+        cfg_not_rt_threaded! {
+            pub(crate) mod oneshot;
+        }
     }
 }
 
