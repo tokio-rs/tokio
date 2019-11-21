@@ -304,8 +304,8 @@ impl Runtime {
     ///
     /// [mod]: index.html
     /// [main]: ../../tokio_macros/attr.main.html
-    /// [threaded scheduler] index.html#threaded-scheduler
-    /// [basic scheduler] index.html#basic-scheduler
+    /// [threaded scheduler]: index.html#threaded-scheduler
+    /// [basic scheduler]: index.html#basic-scheduler
     /// [runtime builder]: crate::runtime::Builder
     pub fn new() -> io::Result<Self> {
         #[cfg(feature = "rt-threaded")]
