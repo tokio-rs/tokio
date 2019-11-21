@@ -17,20 +17,27 @@
 //! applications with the Rust programming language. At a high level, it
 //! provides a few major components:
 //!
-//! * Tools for working with [asynchronous tasks][task], and a multi threaded,
-//!   work-stealing based task [scheduler][runtime].
-//! * APIs for performing asynchronous IO, including [TCP and UDP][net] sockets,
-//!   [filesystem][fs] operations, and [process management][process].
-//! * A [driver] for these asynchronous IO operations, backed by the operating
-//!   system's event queue (epoll, kqueue, IOCP, etc...).
-//! * Utilities for tracking [time], such as setting [timeouts][timeout],
-//!   scheduling work to [run in the future][delay] or [repeat at an
-//!   interval][interval].
-//!
+//! * Tools for [working with asynchronous tasks][tasks], including
+//!   [synchronization primitives and channels][sync] and [timeouts, delays, and
+//!   intervals][time].
+//! * APIs for [performing asynchronous I/O][io], including [TCP and UDP][net] sockets,
+//!   [filesystem][fs] operations, and [process] and [signal] management.
+//! * A [runtime] for executing asynchronous code, including a task scheduler,
+//!   an I/O driver backed by the operating system's event queue (epoll, kqueue,
+//!   IOCP, etc...), and a high performance timer.
 //!
 //! Guide level documentation is found on the [website].
 //!
-//! [driver]: driver/index.html
+//! [tasks]: #working-with-tasks
+//! [sync]: crate::sync
+//! [time]: crate::time
+//! [io]: #asynchronous-io
+//! [net]: crate::net
+//! [fs]: crate::fs
+//! [process]: crate::process
+//! [signal]: crate::signal
+//! [fs]: crate::fs
+//! [runtime]: crate::runtime
 //! [website]: https://tokio.rs/docs/
 //!
 //! # Examples
