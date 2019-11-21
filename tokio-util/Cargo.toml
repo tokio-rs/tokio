@@ -23,8 +23,8 @@ categories = ["asynchronous"]
 tokio = { version = "=0.2.0-alpha.6", path = "../tokio" }
 
 bytes = { git = "https://github.com/tokio-rs/bytes" }
-futures-core = "0.3.0"
-futures-sink = "0.3.0"
+futures-core = "0.3.1"
+futures-sink = "0.3.1"
 log = "0.4"
 pin-project-lite = "0.1.1"
 
@@ -32,7 +32,7 @@ pin-project-lite = "0.1.1"
 tokio = { version = "=0.2.0-alpha.6", path = "../tokio" }
 tokio-test = { version = "=0.2.0-alpha.6", path = "../tokio-test" }
 
-futures = "0.3.0"
+futures = "0.3.1"
 
 [package.metadata.docs.rs]
 all-features = true

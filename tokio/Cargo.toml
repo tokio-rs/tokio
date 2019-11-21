@@ -96,7 +96,7 @@ pin-project-lite = "0.1.1"
 
 # Everything else is optional...
 fnv = { version = "1.0.6", optional = true }
-futures-core = { version = "0.3.0", optional = true }
+futures-core = { version = "0.3.1", optional = true }
 lazy_static = { version = "1.0.2", optional = true }
 memchr = { version = "2.2", optional = true }
 mio = { version = "0.6.14", optional = true }
@@ -119,7 +119,7 @@ optional = true
 
 [dev-dependencies]
 tokio-test = { version = "=0.2.0-alpha.6", path = "../tokio-test" }
-futures = { version = "0.3.0", features = ["async-await"] }
+futures = { version = "0.3.1", features = ["async-await"] }
 loom = { version = "0.2.13", features = ["futures", "checkpoint"] }
 proptest = "0.9.4"
 tempfile = "3.1.0"
