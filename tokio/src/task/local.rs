@@ -398,7 +398,7 @@ impl Scheduler {
     }
 
     unsafe fn schedule_local(&self, task: Task<Self>) {
-        (*self.local_queue.get()).push_front(task);
+        (*self.local_queue.get()).push_back(task);
     }
 
     fn is_current(&self) -> bool {
