@@ -50,8 +50,8 @@
 //!
 //! Perhaps the most important function in this module is [`task::spawn`]. This
 //! function can be thought of as an async equivalent to the standard library's
-//! [`thread::spawn`][thread_spawn]. It takes an `async` block or other [future],
-//! and creates a new task to run that work concurrently:
+//! [`thread::spawn`][`std::thread::spawn`]. It takes an `async` block or other
+//! [future], and creates a new task to run that work concurrently:
 //!
 //! ```
 //! use tokio::task;
@@ -204,7 +204,7 @@
 //!
 //! [`task::spawn_blocking`]: crate::task::spawn_blocking
 //! [`task::block_in_place`]: crate::task::block_in_place
-//! [rt-threaded]: crate::runtime::Runtime::builder::threaded_scheduler
+//! [rt-threaded]: ../runtime/index.html#threaded-scheduler
 //! [`task::yield_now`]: crate::task::yield_now()
 //! [`thread::yield_now`]: std::thread::yield_now
 cfg_blocking! {
