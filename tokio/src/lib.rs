@@ -159,6 +159,43 @@
 //! [rt-threaded]: runtime/index.html#threaded-scheduler
 //! [rt-features]: runtime/index.html#runtime-scheduler
 //!
+//! ### Asynchronous IO
+//!
+//! As well as scheduling and running tasks, Tokio provides everything you need
+//! to perform input and output asynchronously.
+//!
+//! The [`tokio::io`] module provides Tokio's asynchronous core I/O primitives,
+//! the [`AsyncRead`], [`AsyncWrite`], and [`AsyncBufRead`] traits. In addition,
+//! when the "io-util" feature flag is enabled, it also provides combinators and
+//! functions for working with these traits, forming as an asynchronous
+//! counterpart to [`std::io`]. When the "io-driver" feature flag is enabled, it
+//! also provides utilities for library authors implementing I/O resources.
+//!
+//! Tokio also includes APIs for performing various kinds of I/O and interacting
+//! with the operating system asynchronously. These include:
+//!
+//! * [`tokio::net`], which contains non-blocking versions of [TCP], [UDP], and
+//!   [Unix Domain Sockets][UDS] (enabled by the "net" feature flag),
+//! * [`tokio::fs`], similar to [`std::fs`] but for performing filesystem I/O
+//!   asynchronously (enabled by the "fs" feature flag),
+//! * [`tokio::signal`], for asynchronously handling Unix and Windows OS signals
+//!   (enabled by the "signal" feature flag),
+//! * [`tokio::process`], for spawning and managing child processes (enabled by
+//!   the "process" feature flag).
+//!
+//! [`tokio::io`]: crate::io
+//! [`AsyncRead`]: crate::io::AsyncRead
+//! [`AsyncWrite`]: crate::io::AsyncWrite
+//! [`AsyncBufRead`]: crate::io::AsyncBufRead
+//! [`std::io`]: std::io
+//! [`tokio::net`]: crate::net
+//! [TCP]: crate::net::tcp
+//! [UDP]: crate::net::udp
+//! [UDS]: crate::net::unix
+//! [`tokio::fs`]: crate::fs
+//! [`std::fs`]: std::fs
+//! [`tokio::signal`]: crate::signal
+//! [`tokio::process`]: crate::process
 
 // macros used internally
 #[macro_use]
