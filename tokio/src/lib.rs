@@ -81,9 +81,8 @@
 //! units of execution called [_tasks_][tasks]. The [`tokio::task`] module provides
 //! important tools for working with tasks:
 //!
-//! * The [`spawn`] function, for scheduling a new task on the Tokio runtime,
-//! * A [`JoinHandle`] type, for awaiting the output of a spawned
-//!   task,
+//! * The [`spawn`] function and [`JoinHandle`] type, for scheduling a new task
+//!   on the Tokio runtime and awaiting the output of a spawned task, respectively,
 //! * Functions for [running blocking operations][blocking] in an asynchronous
 //!   task context.
 //!
@@ -97,17 +96,14 @@
 //! [`blocking`]: task/index.html#blocking-and-yielding
 //!
 //! The [`tokio::sync`] module contains synchronization primitives to use when
-//! need to communicate or share data. These include _channels_, for sending
-//! values between tasks; an asynchronous [`Mutex`], for controlling access to a
-//! shared, mutable value; and a [`Barrier`] type for multiple tasks to
-//! synchronize before beginning a computation.
+//! need to communicate or share data. These include:
 //!
-//! The channels provided by `tokio` include:
-//!
-//! * , a channel for sending a single value between tasks,
-//! * [`mpsc`], a multi-producer, single-consumer channel for multiple values,
-//! * [`watch`], a single producer, multi-consumer channel that broadcasts the
-//!   most recently sent value.
+//! * _channels_ ([`oneshot`], [`mpsc`], and [`watch`]), for sending values
+//!   between tasks,
+//! * an asynchronous [`Mutex`], for controlling access to a shared, mutable
+//!   value,
+//! * an asynchronous [`Barrier`] type, for multiple tasks to synchronize before
+//!   beginning a computation.
 //!
 //! The `tokio::sync` module is present only when the "sync" feature flag is
 //! enabled.
@@ -145,11 +141,9 @@
 //!
 //! Finally, Tokio provides a _runtime_ for executing asynchronous tasks. Most
 //! applications can use the [`#[tokio::main]`][main] macro to run their code on the
-//! Tokio runtime. In use-cases where more advanced configuration or management
-//! of the runtime is required, the [`tokio::runtime`] module includes:
-//!
-//! * A [`Builder`] for configuring a new runtime,
-//! * A [`Runtime`] type that provides a handle to a runtime instance.
+//! Tokio runtime. In use-cases where manual control over the runtime is
+//! required, the [`tokio::runtime`] module  provides APIs for configuring and
+//! managing runtimes.
 //!
 //! Using the runtime requires the "rt-core" or "rt-threaded" feature flags, to
 //! enable the basic [single-threaded scheduler][rt-core] and the [thread-pool
