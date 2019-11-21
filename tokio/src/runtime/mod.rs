@@ -120,7 +120,7 @@
 //! ```
 //! use tokio::runtime;
 //!
-//! # fn main() -> Result<(), Box<dyn std::error::Error> {
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let basic_rt = runtime::Builder::new()
 //!     .basic_scheduler()
 //!     .build()?;
@@ -140,7 +140,7 @@
 //! ```
 //! use tokio::runtime;
 //!
-//! # fn main() -> Result<(), Box<dyn std::error::Error> {
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let threaded_rt = runtime::Builder::new()
 //!     .threaded_scheduler()
 //!     .build()?;
