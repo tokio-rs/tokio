@@ -98,9 +98,9 @@
 //! The [`tokio::sync`] module contains synchronization primitives to use when
 //! need to communicate or share data. These include:
 //!
-//! * _channels_ ([`oneshot`], [`mpsc`], and [`watch`]), for sending values
+//! * channels ([`oneshot`], [`mpsc`], and [`watch`]), for sending values
 //!   between tasks,
-//! * an asynchronous [`Mutex`], for controlling access to a shared, mutable
+//! * a non-blocking [`Mutex`], for controlling access to a shared, mutable
 //!   value,
 //! * an asynchronous [`Barrier`] type, for multiple tasks to synchronize before
 //!   beginning a computation.
@@ -139,7 +139,7 @@
 //! documentation][rt-features]  for details.  In addition, the "macros" feature
 //! flag enables the `#[tokio::main]` and `#[tokio::test]` attributes.
 //!
-//! [main]: crate::main
+//! [main]: attr.main.html
 //! [`tokio::runtime`]: crate::runtime
 //! [`Builder`]: crate::runtime::Builder
 //! [`Runtime`]: crate::runtime::Runtime
