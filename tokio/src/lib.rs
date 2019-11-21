@@ -116,28 +116,16 @@
 //! [`watch`]: crate::sync::watch
 //!
 //! The [`tokio::time`] module provides utilities for tracking time and
-//! scheduling work. It includes the following functions:
-//!
-//! * [`delay_until`] and [`delay_for`], for waiting until a
-//!   deadline is reached or a duration is elapsed, respectively,
-//! * [`interval`] and [`interval_at`], to repeat an operation
-//!   every time a period of time elapses,
-//! * [`timeout`] and [`timeout_at`], to cancel a future if it does not complete
-//!   within a given duration.
-//!
-//! In addition, the [`DelayQueue`] type implements a data structure where items
-//! are enqueued with a duration, and yielded when their duration elapses.
+//! scheduling work. This includes functions for setting [timeouts][timeout] for
+//! tasks, [delaying][delay] work to run in the future, or [repeating an operation at an
+//! interval][interval].
 //!
 //! In order to use `tokio::time`, the "time" feature flag must be enabled.
 //!
 //! [`tokio::time`]: crate::time
-//! [`delay_until`]: crate::time::delay_until()
-//! [`delay_for`]: crate::time::delay_for()
-//! [`interval`]: crate::time::interval()
-//! [`interval_at`]: crate::time::interval_at()
-//! [`timeout`]: crate::time::timeout()
-//! [`timeout_at`]: crate::time::timeout_at()
-//! [`DelayQueue`]: crate::time::DelayQueue
+//! [delay]: crate::time::delay_for()
+//! [interval]: crate::time::interval()
+//! [timeout]: crate::time::timeout()
 //!
 //! Finally, Tokio provides a _runtime_ for executing asynchronous tasks. Most
 //! applications can use the [`#[tokio::main]`][main] macro to run their code on the
