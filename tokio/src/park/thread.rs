@@ -107,16 +107,22 @@ impl Inner {
 
                 return;
             }
-            Err(_) => panic!("inconsistent park state"),
+            Err(actual) => panic!("inconsistent park state; actual = {}", actual),
         }
 
         loop {
             m = self.condvar.wait(m).unwrap();
 
-            match self.state.compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst) {
-                Ok(_) => return, // got a notification
-                Err(_) => {}     // spurious wakeup, go back to sleep
+            if self
+                .state
+                .compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst)
+                .is_ok()
+            {
+                // got a notification
+                return;
             }
+
+            // spurious wakeup, go back to sleep
         }
     }
 
@@ -142,7 +148,7 @@ impl Inner {
 
                 return;
             }
-            Err(_) => panic!("inconsistent park_timeout state"),
+            Err(actual) => panic!("inconsistent park_timeout state; actual = {}", actual),
         }
 
         // Wait with a timeout, and if we spuriously wake up or otherwise wake up

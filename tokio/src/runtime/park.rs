@@ -144,16 +144,18 @@ impl Inner {
 
                 return;
             }
-            Err(_) => panic!("inconsistent park state"),
+            Err(actual) => panic!("inconsistent park state; actual = {}", actual),
         }
 
         loop {
             m = self.condvar.wait(m).unwrap();
 
-            match self.state.compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst) {
-                Ok(_) => return, // got a notification
-                Err(_) => {} // spurious wakeup, go back to sleep
+            if self.state.compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst).is_ok() {
+                // got a notification
+                return;
             }
+
+            // spurious wakeup, go back to sleep
         }
     }
 
@@ -172,7 +174,7 @@ impl Inner {
 
                 return;
             }
-            Err(_) => panic!("inconsistent park state"),
+            Err(actual) => panic!("inconsistent park state; actual = {}", actual),
         }
 
         // TODO: don't unwrap
@@ -192,11 +194,11 @@ impl Inner {
         // is already `NOTIFIED`. That is why this must be a swap rather than a
         // compare-and-swap that returns if it reads `NOTIFIED` on failure.
         match self.state.swap(NOTIFIED, SeqCst) {
-            EMPTY => return, // no one was waiting
-            NOTIFIED => return, // already unparked
+            EMPTY => {}, // no one was waiting
+            NOTIFIED => {}, // already unparked
             PARKED_CONDVAR => self.unpark_condvar(),
             PARKED_DRIVER => self.unpark_driver(),
-            _ => panic!("inconsistent state in unpark"),
+            actual => panic!("inconsistent state in unpark; actual = {}", actual),
         }
     }
 

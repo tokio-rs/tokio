@@ -32,7 +32,7 @@ unsafe impl Sync for Set {}
 impl Set {
     /// Create a new worker set using the provided queues.
     pub(crate) fn new(parkers: &[Parker]) -> Self {
-        assert!(parkers.len() > 0);
+        assert!(!parkers.is_empty());
 
         let queues = queue::build(parkers.len());
         let inject = queues[0].injector();

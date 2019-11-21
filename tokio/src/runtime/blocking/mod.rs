@@ -21,14 +21,11 @@ cfg_blocking_impl! {
         clock: &time::Clock,
     ) -> BlockingPool {
         BlockingPool::new(
-            builder.thread_name.clone(),
-            builder.thread_stack_size,
-            builder.after_start.clone(),
-            builder.before_stop.clone(),
-            spawner.clone(),
-            io.clone(),
-            time.clone(),
-            clock.clone())
+            builder,
+            spawner,
+            io,
+            time,
+            clock)
 
     }
 }

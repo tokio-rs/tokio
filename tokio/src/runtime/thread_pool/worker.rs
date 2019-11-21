@@ -507,7 +507,7 @@ impl GenerationGuard<'_> {
         // calling the parker. This is done in a loop as spurious wakeups are
         // permitted.
         loop {
-            self.park_mut().park().ok().expect("park failed");
+            self.park_mut().park().expect("park failed");
 
             // We might have been woken to clean up a dropped task
             self.maintenance();
@@ -525,7 +525,6 @@ impl GenerationGuard<'_> {
 
         self.park_mut()
             .park_timeout(Duration::from_millis(0))
-            .ok()
             .expect("park failed");
 
         self.owned().defer_notification.set(false);
@@ -571,7 +570,7 @@ impl GenerationGuard<'_> {
             // `transition_to_parked` is not called as we are not working
             // anymore. When a task is released, the owning worker is unparked
             // directly.
-            self.park_mut().park().ok().expect("park failed");
+            self.park_mut().park().expect("park failed");
 
             // Try draining more tasks
             self.drain_tasks_pending_drop();

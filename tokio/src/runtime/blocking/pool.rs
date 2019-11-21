@@ -2,7 +2,7 @@
 
 use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::loom::thread;
-use crate::runtime::{self, io, time, Callback};
+use crate::runtime::{self, io, time, Builder, Callback};
 use crate::runtime::blocking::shutdown;
 use crate::runtime::blocking::schedule::NoopSchedule;
 use crate::runtime::blocking::task::BlockingTask;
@@ -96,14 +96,11 @@ where
 
 impl BlockingPool {
     pub(crate) fn new(
-        thread_name: String,
-        stack_size: Option<usize>,
-        after_start: Option<Callback>,
-        before_stop: Option<Callback>,
-        spawner: runtime::Spawner,
-        io_handle: io::Handle,
-        time_handle: time::Handle,
-        clock: time::Clock,
+        builder: &Builder,
+        spawner: &runtime::Spawner,
+        io: &io::Handle,
+        time: &time::Handle,
+        clock: &time::Clock,
     ) -> BlockingPool {
         let (shutdown_tx, shutdown_rx) = shutdown::channel();
 
@@ -119,14 +116,14 @@ impl BlockingPool {
                         shutdown_tx: Some(shutdown_tx),
                     }),
                     condvar: Condvar::new(),
-                    thread_name,
-                    stack_size,
-                    after_start,
-                    before_stop,
-                    spawner,
-                    io_handle,
-                    time_handle,
-                    clock,
+                    thread_name: builder.thread_name.clone(),
+                    stack_size: builder.thread_stack_size,
+                    after_start: builder.after_start.clone(),
+                    before_stop: builder.before_stop.clone(),
+                    spawner: spawner.clone(),
+                    io_handle: io.clone(),
+                    time_handle: time.clone(),
+                    clock: clock.clone(),
                 }),
             },
             shutdown_rx,
