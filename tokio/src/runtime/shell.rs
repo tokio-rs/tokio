@@ -1,6 +1,6 @@
 use crate::park::Park;
-use crate::runtime::time;
 use crate::runtime::enter;
+use crate::runtime::time;
 
 use std::future::Future;
 use std::mem::ManuallyDrop;

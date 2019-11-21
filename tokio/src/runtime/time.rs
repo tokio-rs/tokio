@@ -20,7 +20,11 @@ mod variant {
     }
 
     /// Create a new timer driver / handle pair
-    pub(crate) fn create_driver(enable: bool, io_driver: io::Driver, clock: Clock) -> (Driver, Handle) {
+    pub(crate) fn create_driver(
+        enable: bool,
+        io_driver: io::Driver,
+        clock: Clock,
+    ) -> (Driver, Handle) {
         if enable {
             let driver = driver::Driver::new(io_driver, clock);
             let handle = driver.handle();
@@ -53,7 +57,11 @@ mod variant {
     }
 
     /// Create a new timer driver / handle pair
-    pub(crate) fn create_driver(_enable: bool, io_driver: io::Driver, _clock: Clock) -> (Driver, Handle) {
+    pub(crate) fn create_driver(
+        _enable: bool,
+        io_driver: io::Driver,
+        _clock: Clock,
+    ) -> (Driver, Handle) {
         (io_driver, ())
     }
 

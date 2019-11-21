@@ -1,6 +1,6 @@
-use crate::runtime::{blocking, io, time, Runtime, Callback, Spawner};
 use crate::runtime::handle::Handle;
 use crate::runtime::shell::Shell;
+use crate::runtime::{blocking, io, time, Callback, Runtime, Spawner};
 
 use std::fmt;
 #[cfg(not(loom))]
@@ -301,7 +301,8 @@ impl Builder {
 
         let spawner = Spawner::Shell;
 
-        let blocking_pool = blocking::create_blocking_pool(self, &spawner, &io_handle, &time_handle, &clock);
+        let blocking_pool =
+            blocking::create_blocking_pool(self, &spawner, &io_handle, &time_handle, &clock);
         let blocking_spawner = blocking_pool.spawner().clone();
 
         Ok(Runtime {

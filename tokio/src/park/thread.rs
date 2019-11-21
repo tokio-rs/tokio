@@ -82,7 +82,11 @@ impl Inner {
     fn park(&self) {
         // If we were previously notified then we consume this notification and
         // return quickly.
-        if self.state.compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst).is_ok() {
+        if self
+            .state
+            .compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst)
+            .is_ok()
+        {
             return;
         }
 
@@ -111,7 +115,7 @@ impl Inner {
 
             match self.state.compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst) {
                 Ok(_) => return, // got a notification
-                Err(_) => {} // spurious wakeup, go back to sleep
+                Err(_) => {}     // spurious wakeup, go back to sleep
             }
         }
     }
@@ -119,8 +123,12 @@ impl Inner {
     fn park_timeout(&self, dur: Duration) {
         // Like `park` above we have a fast path for an already-notified thread,
         // and afterwards we start coordinating for a sleep.  return quickly.
-        if self.state.compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst).is_ok() {
-            return
+        if self
+            .state
+            .compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst)
+            .is_ok()
+        {
+            return;
         }
 
         let m = self.mutex.lock().unwrap();
@@ -145,7 +153,7 @@ impl Inner {
 
         match self.state.swap(EMPTY, SeqCst) {
             NOTIFIED => {} // got a notification, hurray!
-            PARKED => {} // no notification, alas
+            PARKED => {}   // no notification, alas
             n => panic!("inconsistent park_timeout state: {}", n),
         }
     }
@@ -157,9 +165,9 @@ impl Inner {
         // is already `NOTIFIED`. That is why this must be a swap rather than a
         // compare-and-swap that returns if it reads `NOTIFIED` on failure.
         match self.state.swap(NOTIFIED, SeqCst) {
-            EMPTY => return, // no one was waiting
+            EMPTY => return,    // no one was waiting
             NOTIFIED => return, // already unparked
-            PARKED => {} // gotta go wake someone up
+            PARKED => {}        // gotta go wake someone up
             _ => panic!("inconsistent state in unpark"),
         }
 
