@@ -50,8 +50,8 @@
 //!
 //! Perhaps the most important function in this module is [`task::spawn`]. This
 //! function can be thought of as an async equivalent to the standard library's
-//! [`thread::spawn`][thread_spawn]. It takes an `async` block or other [future],
-//! and creates a new task to run that work concurrently:
+//! [`thread::spawn`][`std::thread::spawn`]. It takes an `async` block or other
+//! [future], and creates a new task to run that work concurrently:
 //!
 //! ```
 //! use tokio::task;
