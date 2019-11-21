@@ -204,7 +204,7 @@
 //!
 //! [`task::spawn_blocking`]: crate::task::spawn_blocking
 //! [`task::block_in_place`]: crate::task::block_in_place
-//! [rt-threaded]: crate::runtime::Runtime::builder::threaded_scheduler
+//! [rt-threaded]: crate::runtime#threaded-scheduler
 //! [`task::yield_now`]: crate::task::yield_now()
 //! [`thread::yield_now`]: std::thread::yield_now
 cfg_blocking! {
