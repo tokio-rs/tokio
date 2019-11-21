@@ -40,49 +40,20 @@
 //! [runtime]: crate::runtime
 //! [website]: https://tokio.rs/docs/
 //!
-//! # Examples
+//! # A Tour of Tokio
 //!
-//! A simple TCP echo server:
+//! Tokio consists of a number of modules that provide a range of functionality
+//! essential for implementing asynchronous applications in Rust. In this
+//! section, we will take a brief tour of Tokio, summarizing the major APIs and
+//! their uses.
 //!
-//! ```no_run
-//! use tokio::net::TcpListener;
-//! use tokio::prelude::*;
+//! Note that Tokio uses [Cargo feature flags][features] to allow users to
+//! control what features are present, so that unused code can be eliminated.
+//! This documentation also lists what feature flags are necessary to enable each API.
 //!
-//! #[tokio::main]
-//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let mut listener = TcpListener::bind("127.0.0.1:8080").await?;
+//! [features]: https://doc.rust-lang.org/cargo/reference/manifest.html#the-features-section
 //!
-//!     loop {
-//!         let (mut socket, _) = listener.accept().await?;
-//!
-//!         tokio::spawn(async move {
-//!             let mut buf = [0; 1024];
-//!
-//!             // In a loop, read data from the socket and write the data back.
-//!             loop {
-//!                 let n = match socket.read(&mut buf).await {
-//!                     // socket closed
-//!                     Ok(n) if n == 0 => return,
-//!                     Ok(n) => n,
-//!                     Err(e) => {
-//!                         println!("failed to read from socket; err = {:?}", e);
-//!                         return;
-//!                     }
-//!                 };
-//!
-//!                 // Write the data back
-//!                 if let Err(e) = socket.write_all(&buf[0..n]).await {
-//!                     println!("failed to write to socket; err = {:?}", e);
-//!                     return;
-//!                 }
-//!             }
-//!         });
-//!     }
-//! }
-//! ```
-//! ## A Tour of Tokio
-//!
-//! ### Working With Tasks
+//! ## Working With Tasks
 //!
 //! Asynchronous programs in Rust are based around lightweight, non-blocking
 //! units of execution called [_tasks_][tasks]. The [`tokio::task`] module provides
@@ -154,7 +125,7 @@
 //! [rt-threaded]: runtime/index.html#threaded-scheduler
 //! [rt-features]: runtime/index.html#runtime-scheduler
 //!
-//! ### Asynchronous IO
+//! ## Asynchronous IO
 //!
 //! As well as scheduling and running tasks, Tokio provides everything you need
 //! to perform input and output asynchronously.
@@ -191,6 +162,47 @@
 //! [`std::fs`]: std::fs
 //! [`tokio::signal`]: crate::signal
 //! [`tokio::process`]: crate::process
+//!
+//! # Examples
+//!
+//! A simple TCP echo server:
+//!
+//! ```no_run
+//! use tokio::net::TcpListener;
+//! use tokio::prelude::*;
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let mut listener = TcpListener::bind("127.0.0.1:8080").await?;
+//!
+//!     loop {
+//!         let (mut socket, _) = listener.accept().await?;
+//!
+//!         tokio::spawn(async move {
+//!             let mut buf = [0; 1024];
+//!
+//!             // In a loop, read data from the socket and write the data back.
+//!             loop {
+//!                 let n = match socket.read(&mut buf).await {
+//!                     // socket closed
+//!                     Ok(n) if n == 0 => return,
+//!                     Ok(n) => n,
+//!                     Err(e) => {
+//!                         println!("failed to read from socket; err = {:?}", e);
+//!                         return;
+//!                     }
+//!                 };
+//!
+//!                 // Write the data back
+//!                 if let Err(e) = socket.write_all(&buf[0..n]).await {
+//!                     println!("failed to write to socket; err = {:?}", e);
+//!                     return;
+//!                 }
+//!             }
+//!         });
+//!     }
+//! }
+//! ```
 
 // macros used internally
 #[macro_use]
