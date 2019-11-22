@@ -3,6 +3,7 @@ pr: ["master"]
 
 variables:
   RUSTFLAGS: -Dwarnings
+  nightly: nightly-2019-11-16
 
 jobs:
 # Test top level crate
@@ -43,6 +44,12 @@ jobs:
     name: cross
     rust: stable
 
+# Check each feature works properly
+- template: ci/azure-check-features.yml
+  parameters:
+    rust: $(nightly)
+    name: check_features
+
 # This represents the minimum Rust version supported by
 # Tokio. Updating this should be done in a dedicated PR and
 # cannot be greater than two 0.x releases prior to the
@@ -53,7 +60,7 @@ jobs:
 - template: ci/azure-check-minrust.yml
   parameters:
     name: minrust
-    rust_version: 1.39.0
+    rust: 1.39.0
 
 # Check formatting
 - template: ci/azure-rustfmt.yml
@@ -70,7 +77,7 @@ jobs:
 # Check doc generation
 - template: ci/azure-check-docs.yml
   parameters:
-    rust: nightly-2019-11-16
+    rust: $(nightly)
     name: docs
 
 # - template: ci/azure-tsan.yml
@@ -89,4 +96,5 @@ jobs:
       - loom
       - cross
       - minrust
+      - check_features
 #      - tsan
