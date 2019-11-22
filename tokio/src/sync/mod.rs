@@ -40,9 +40,11 @@ cfg_not_sync! {
         pub(crate) use task::AtomicWaker;
     }
 
-    cfg_rt_core! {
-        pub(crate) mod oneshot;
-    }
+    #[cfg(any(
+            feature = "rt-core",
+            feature = "process",
+            feature = "signal"))]
+    pub(crate) mod oneshot;
 
     cfg_signal! {
         pub(crate) mod mpsc;
