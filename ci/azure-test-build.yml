@@ -14,4 +14,4 @@ jobs:
 
   - script: cargo hack test --each-feature
     displayName: cargo hack test --each-feature
-    workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
+    workingDirectory: $(Build.SourcesDirectory)/tests-build
