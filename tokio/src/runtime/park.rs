@@ -122,7 +122,7 @@ impl Inner {
         if let Some(mut driver) = self.shared.driver.try_lock() {
             self.park_driver(&mut driver);
         } else {
-            self.park_condvar()
+            self.park_condvar();
         }
     }
 
