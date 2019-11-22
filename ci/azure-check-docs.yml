@@ -7,7 +7,7 @@ jobs:
   steps:
     - template: azure-install-rust.yml
       parameters:
-        rust_version: ${{ variables.nightly }}
+        rust_version: ${{ parameters.rust_version }}
 
     - script: |
         RUSTDOCFLAGS="--cfg docsrs" cargo doc --lib --no-deps --all-features

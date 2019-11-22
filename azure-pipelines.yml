@@ -3,7 +3,6 @@ pr: ["master"]
 
 variables:
   RUSTFLAGS: -Dwarnings
-  nightly: nightly-2019-11-16
 
 jobs:
 # Test top level crate
@@ -70,7 +69,7 @@ jobs:
 # Check doc generation
 - template: ci/azure-check-docs.yml
   parameters:
-    rust: stable
+    rust: nightly-2019-11-16
     name: docs
 
 # - template: ci/azure-tsan.yml
