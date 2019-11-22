@@ -11,6 +11,7 @@ pin_project! {
     /// Stream for the [`split`](crate::io::AsyncBufReadExt::split) method.
     #[derive(Debug)]
     #[must_use = "streams do nothing unless polled"]
+    #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
     pub struct Split<R> {
         #[pin]
         reader: R,

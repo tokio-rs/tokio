@@ -18,15 +18,17 @@ where
     Read { reader, buf }
 }
 
-/// A future which can be used to easily read available number of bytes to fill
-/// a buffer.
-///
-/// Created by the [`read`] function.
-#[derive(Debug)]
-#[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct Read<'a, R: ?Sized> {
-    reader: &'a mut R,
-    buf: &'a mut [u8],
+cfg_io_util! {
+    /// A future which can be used to easily read available number of bytes to fill
+    /// a buffer.
+    ///
+    /// Created by the [`read`] function.
+    #[derive(Debug)]
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
+    pub struct Read<'a, R: ?Sized> {
+        reader: &'a mut R,
+        buf: &'a mut [u8],
+    }
 }
 
 impl<R> Future for Read<'_, R>

@@ -6,18 +6,6 @@ variables:
   nightly: 2019-11-16
 
 jobs:
-# Check formatting
-- template: ci/azure-rustfmt.yml
-  parameters:
-    rust: stable
-    name: rustfmt
-
-# Apply clippy lints to all crates
-- template: ci/azure-clippy.yml
-  parameters:
-    rust: stable
-    name: clippy
-
 # Test top level crate
 - template: ci/azure-test-stable.yml
   parameters:
@@ -29,7 +17,7 @@ jobs:
       - tokio
       - tests-integration
 
-# Test crates that are NOT platform specific
+# Test sub crates
 - template: ci/azure-test-stable.yml
   parameters:
     name: test_linux
@@ -67,6 +55,24 @@ jobs:
   parameters:
     name: minrust
     rust_version: 1.39.0
+
+# Check formatting
+- template: ci/azure-rustfmt.yml
+  parameters:
+    rust: stable
+    name: rustfmt
+
+# Apply clippy lints to all crates
+- template: ci/azure-clippy.yml
+  parameters:
+    rust: stable
+    name: clippy
+
+# Check doc generation
+- template: ci/azure-check-docs.yml
+  parameters:
+    rust: nightly-2019-11-16
+    name: docs
 
 # - template: ci/azure-tsan.yml
 #   parameters:

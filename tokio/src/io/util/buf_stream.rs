@@ -16,6 +16,7 @@ pin_project! {
     /// types aid with these problems respectively, but do so in only one direction. `BufStream` wraps
     /// one in the other so that both directions are buffered. See their documentation for details.
     #[derive(Debug)]
+    #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
     pub struct BufStream<RW> {
         #[pin]
         inner: BufReader<BufWriter<RW>>,

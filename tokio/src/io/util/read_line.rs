@@ -8,14 +8,16 @@ use std::pin::Pin;
 use std::str;
 use std::task::{Context, Poll};
 
-/// Future for the [`read_line`](crate::io::AsyncBufReadExt::read_line) method.
-#[derive(Debug)]
-#[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct ReadLine<'a, R: ?Sized> {
-    reader: &'a mut R,
-    buf: &'a mut String,
-    bytes: Vec<u8>,
-    read: usize,
+cfg_io_util! {
+    /// Future for the [`read_line`](crate::io::AsyncBufReadExt::read_line) method.
+    #[derive(Debug)]
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
+    pub struct ReadLine<'a, R: ?Sized> {
+        reader: &'a mut R,
+        buf: &'a mut String,
+        bytes: Vec<u8>,
+        read: usize,
+    }
 }
 
 pub(crate) fn read_line<'a, R>(reader: &'a mut R, buf: &'a mut String) -> ReadLine<'a, R>
