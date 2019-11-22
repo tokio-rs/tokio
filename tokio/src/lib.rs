@@ -256,8 +256,10 @@ cfg_macros! {
     pub use tokio_macros::test;
 }
 
-// Tests
+#[cfg(any(feature = "sync", feature = "io-util"))]
 mod dual;
+
+// Tests
 #[cfg(test)]
 mod tests;
 
