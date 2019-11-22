@@ -10,7 +10,6 @@ cfg_io_util! {
     ///
     /// Created by the [`AsyncWriteExt::flush`] function.
     #[derive(Debug)]
-    #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
     pub struct Flush<'a, A: ?Sized> {
         a: &'a mut A,
     }
