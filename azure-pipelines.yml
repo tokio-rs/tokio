@@ -14,6 +14,7 @@ jobs:
     cross: true
     crates:
       - tokio
+      - tests-integration
 
 # Test sub crates
 - template: ci/azure-test-stable.yml
