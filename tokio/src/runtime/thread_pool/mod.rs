@@ -18,9 +18,8 @@ mod slice;
 mod shared;
 use self::shared::Shared;
 
-mod shutdown;
-
 mod worker;
+use worker::Worker;
 
 cfg_blocking! {
     pub(crate) use worker::block_in_place;
@@ -39,9 +38,7 @@ const LOCAL_QUEUE_CAPACITY: usize = 256;
 #[cfg(loom)]
 const LOCAL_QUEUE_CAPACITY: usize = 2;
 
-use crate::blocking;
-use crate::loom::sync::Arc;
-use crate::runtime::Park;
+use crate::runtime::{self, blocking, Parker};
 use crate::task::JoinHandle;
 
 use std::fmt;
@@ -50,48 +47,29 @@ use std::future::Future;
 /// Work-stealing based thread pool for executing futures.
 pub(crate) struct ThreadPool {
     spawner: Spawner,
-
-    /// Shutdown waiter
-    shutdown_rx: shutdown::Receiver,
 }
 
-// The Arc<Box<_>> is needed because loom doesn't support Arc<T> where T: !Sized
-// loom doesn't support that because it requires CoerceUnsized, which is
-// unstable
-type Callback = Arc<Box<dyn Fn(usize, &mut dyn FnMut()) + Send + Sync>>;
+pub(crate) struct Workers {
+    workers: Vec<Worker>,
+}
 
 impl ThreadPool {
-    pub(crate) fn new<F, P>(
+    pub(crate) fn new(
         pool_size: usize,
-        blocking_pool: blocking::Spawner,
-        around_worker: Callback,
-        mut build_park: F,
-    ) -> ThreadPool
-    where
-        F: FnMut(usize) -> P,
-        P: Park + Send + 'static,
-    {
-        let (shutdown_tx, shutdown_rx) = shutdown::channel();
-
-        let (pool, workers) = worker::create_set::<_, BoxedPark<P>>(
+        parker: Parker,
+    ) -> (ThreadPool, Workers) {
+        let (pool, workers) = worker::create_set(
             pool_size,
-            |i| BoxedPark::new(build_park(i)),
-            blocking_pool.clone(),
-            around_worker,
-            shutdown_tx,
+            parker,
         );
-
-        // Spawn threads for each worker
-        for worker in workers {
-            blocking_pool.spawn_background(|| worker.run());
-        }
 
         let spawner = Spawner::new(pool);
 
-        ThreadPool {
+        let pool = ThreadPool {
             spawner,
-            shutdown_rx,
-        }
+        };
+
+        (pool, Workers { workers })
     }
 
     /// Returns reference to `Spawner`.
@@ -124,13 +102,6 @@ impl ThreadPool {
             enter.block_on(future)
         })
     }
-
-    /// Shutdown the thread pool.
-    pub(crate) fn shutdown_now(&mut self) {
-        if self.spawner.workers().close() {
-            self.shutdown_rx.wait();
-        }
-    }
 }
 
 impl fmt::Debug for ThreadPool {
@@ -141,37 +112,17 @@ impl fmt::Debug for ThreadPool {
 
 impl Drop for ThreadPool {
     fn drop(&mut self) {
-        self.shutdown_now();
+        self.spawner.workers().close();
     }
 }
 
-// TODO: delete?
-pub(crate) struct BoxedPark<P> {
-    inner: P,
-}
-
-impl<P> BoxedPark<P> {
-    pub(crate) fn new(inner: P) -> Self {
-        BoxedPark { inner }
-    }
-}
-
-impl<P> Park for BoxedPark<P>
-where
-    P: Park,
-{
-    type Unpark = Box<dyn crate::runtime::park::Unpark>;
-    type Error = P::Error;
-
-    fn unpark(&self) -> Self::Unpark {
-        Box::new(self.inner.unpark())
-    }
-
-    fn park(&mut self) -> Result<(), Self::Error> {
-        self.inner.park()
-    }
-
-    fn park_timeout(&mut self, duration: std::time::Duration) -> Result<(), Self::Error> {
-        self.inner.park_timeout(duration)
+impl Workers {
+    pub(crate) fn spawn(self, blocking_pool: &blocking::Spawner) {
+        blocking_pool.enter(|| {
+            for worker in self.workers {
+                let b = blocking_pool.clone();
+                runtime::spawn_blocking(move || worker.run(b));
+            }
+        });
     }
 }

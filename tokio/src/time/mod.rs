@@ -1,3 +1,5 @@
+#![cfg(not(loom))]
+
 //! Utilities for tracking time.
 //!
 //! This module provides a number of types for executing code after a set period

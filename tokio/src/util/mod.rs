@@ -9,4 +9,7 @@ cfg_rt_threaded! {
 
     mod rand;
     pub(crate) use rand::FastRand;
+
+    mod try_lock;
+    pub(crate) use try_lock::TryLock;
 }

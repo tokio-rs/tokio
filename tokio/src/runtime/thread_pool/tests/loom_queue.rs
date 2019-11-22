@@ -64,5 +64,6 @@ fn multi_worker() {
 }
 
 fn val(num: u32) -> Task<Noop> {
-    task::background(async move { num })
+    let (task, _) = task::joinable(async move { num });
+    task
 }

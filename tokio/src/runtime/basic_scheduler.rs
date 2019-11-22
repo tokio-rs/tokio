@@ -1,4 +1,4 @@
-use crate::runtime::park::{Park, Unpark};
+use crate::park::{Park, Unpark};
 use crate::task::{self, JoinHandle, Schedule, Task};
 
 use std::cell::UnsafeCell;
@@ -245,7 +245,7 @@ impl SchedulerPriv {
     }
 
     unsafe fn schedule_local(&self, task: Task<Self>) {
-        (*self.local_queue.get()).push_front(task);
+        (*self.local_queue.get()).push_back(task);
     }
 
     fn next_task(&self, tick: u8) -> Option<Task<Self>> {

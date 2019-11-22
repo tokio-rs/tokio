@@ -1,3 +1,5 @@
+#![cfg(not(loom))]
+
 //! A mock type implementing [`AsyncRead`] and [`AsyncWrite`].
 //!
 //!

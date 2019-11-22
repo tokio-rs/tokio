@@ -1,3 +1,5 @@
+#![cfg(not(loom))]
+
 //! A "prelude" for users of the `tokio` crate.
 //!
 //! This prelude is similar to the standard library's prelude in that you'll

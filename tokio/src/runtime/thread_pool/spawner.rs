@@ -1,5 +1,4 @@
 use crate::loom::sync::Arc;
-use crate::runtime::park::Unpark;
 use crate::runtime::thread_pool::slice;
 use crate::task::JoinHandle;
 
@@ -20,11 +19,11 @@ use std::future::Future;
 /// [`ThreadPool::spawner`]: struct.ThreadPool.html#method.spawner
 #[derive(Clone)]
 pub(crate) struct Spawner {
-    workers: Arc<slice::Set<Box<dyn Unpark>>>,
+    workers: Arc<slice::Set>,
 }
 
 impl Spawner {
-    pub(super) fn new(workers: Arc<slice::Set<Box<dyn Unpark>>>) -> Spawner {
+    pub(super) fn new(workers: Arc<slice::Set>) -> Spawner {
         Spawner { workers }
     }
 
@@ -46,7 +45,7 @@ impl Spawner {
     }
 
     /// Reference to the worker set. Used by `ThreadPool` to initiate shutdown.
-    pub(super) fn workers(&self) -> &slice::Set<Box<dyn Unpark>> {
+    pub(super) fn workers(&self) -> &slice::Set {
         &*self.workers
     }
 }

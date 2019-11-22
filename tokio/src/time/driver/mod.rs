@@ -16,7 +16,7 @@ mod stack;
 use self::stack::Stack;
 
 use crate::loom::sync::atomic::{AtomicU64, AtomicUsize};
-use crate::runtime::{Park, Unpark};
+use crate::park::{Park, Unpark};
 use crate::time::{wheel, Error};
 use crate::time::{Clock, Duration, Instant};
 

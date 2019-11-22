@@ -153,6 +153,14 @@
 //! Most applications should use the threaded scheduler, except in some niche
 //! use-cases, such as when running only a single thread is required.
 //!
+//! #### Resource drivers
+//!
+//! When configuring a runtime by hand, no resource drivers are enabled by
+//! default. In this case, attempting to use networking types or time types will
+//! fail. In order to enable these types, the resource drivers must be enabled.
+//! This is done with [`Builder::enable_io`] and [`Builder::enable_time`]. As a
+//! shorthand, [`Builder::enable_all`] enables both resource drivers.
+//!
 //! [tasks]: crate::task
 //! [driver]: crate::io::driver
 //! [executor]: https://tokio.rs/docs/internals/runtime-model/#executors
@@ -165,6 +173,9 @@
 //! [`Runtime::new`]: crate::runtime::Runtime::new
 //! [`Builder::basic_scheduler`]: crate::runtime::Builder::basic_scheduler
 //! [`Builder::threaded_scheduler`]: crate::runtime::Builder::threaded_scheduler
+//! [`Builder::enable_io`]: crate::runtime::Builder::enable_io
+//! [`Builder::enable_time`]: crate::runtime::Builder::enable_time
+//! [`Builder::enable_all`]: crate::runtime::Builder::enable_all
 
 // At the top due to macros
 #[cfg(test)]
@@ -178,6 +189,10 @@ cfg_rt_core! {
 
 mod blocking;
 use blocking::BlockingPool;
+
+cfg_blocking_impl! {
+    pub(crate) use blocking::spawn_blocking;
+}
 
 mod builder;
 pub use self::builder::Builder;
@@ -195,11 +210,16 @@ pub use self::handle::Handle;
 
 mod io;
 
-mod park;
-pub use self::park::{Park, Unpark};
+cfg_rt_threaded! {
+    mod park;
+    use park::{Parker, Unparker};
+}
 
 mod shell;
 use self::shell::Shell;
+
+mod spawner;
+use self::spawner::Spawner;
 
 mod time;
 
@@ -271,6 +291,9 @@ enum Kind {
     ThreadPool(ThreadPool),
 }
 
+/// After thread starts / before thread stops
+type Callback = ::std::sync::Arc<dyn Fn() + Send + Sync>;
+
 impl Runtime {
     /// Create a new runtime instance with default configuration values.
     ///
@@ -309,13 +332,13 @@ impl Runtime {
     /// [runtime builder]: crate::runtime::Builder
     pub fn new() -> io::Result<Self> {
         #[cfg(feature = "rt-threaded")]
-        let ret = Builder::new().threaded_scheduler().build();
+        let ret = Builder::new().threaded_scheduler().enable_all().build();
 
         #[cfg(all(not(feature = "rt-threaded"), feature = "rt-core"))]
-        let ret = Builder::new().basic_scheduler().build();
+        let ret = Builder::new().basic_scheduler().enable_all().build();
 
         #[cfg(not(feature = "rt-core"))]
-        let ret = Builder::new().build();
+        let ret = Builder::new().enable_all().build();
 
         ret
     }

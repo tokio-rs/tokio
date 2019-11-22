@@ -44,7 +44,11 @@ fn test_drop_on_notify() {
     // shutting down. Then, when the task handle is dropped, the task itself is
     // dropped.
 
-    let mut rt = runtime::Builder::new().basic_scheduler().build().unwrap();
+    let mut rt = runtime::Builder::new()
+        .basic_scheduler()
+        .enable_all()
+        .build()
+        .unwrap();
 
     let (addr_tx, addr_rx) = mpsc::channel();
 

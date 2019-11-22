@@ -208,9 +208,6 @@
 #[macro_use]
 mod macros;
 
-// Blocking task implementation
-pub(crate) mod blocking;
-
 cfg_fs! {
     pub mod fs;
 }
@@ -218,10 +215,10 @@ cfg_fs! {
 mod future;
 
 pub mod io;
-
 pub mod net;
 
 mod loom;
+mod park;
 
 pub mod prelude;
 

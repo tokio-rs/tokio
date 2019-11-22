@@ -1,3 +1,5 @@
+#![cfg(not(loom))]
+
 //! Asynchronous file and standard stream adaptation.
 //!
 //! This module contains utility methods and adapter types for input/output to
@@ -96,6 +98,6 @@ mod sys {
     pub(crate) use std::fs::File;
 
     // TODO: don't rename
-    pub(crate) use crate::blocking::spawn_blocking as run;
+    pub(crate) use crate::runtime::spawn_blocking as run;
     pub(crate) use crate::task::JoinHandle as Blocking;
 }

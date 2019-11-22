@@ -1,5 +1,6 @@
+use crate::park::Park;
+use crate::runtime::enter;
 use crate::runtime::time;
-use crate::runtime::{enter, io, Park};
 
 use std::future::Future;
 use std::mem::ManuallyDrop;
@@ -16,11 +17,12 @@ pub(super) struct Shell {
     waker: Waker,
 }
 
-type Handle = <io::Driver as Park>::Unpark;
+type Handle = <time::Driver as Park>::Unpark;
 
 impl Shell {
     pub(super) fn new(driver: time::Driver) -> Shell {
-        let unpark = Arc::new(driver.unpark());
+        // Make sure we don't mess up types (as we do casts later)
+        let unpark: Arc<Handle> = Arc::new(driver.unpark());
 
         let raw_waker = RawWaker::new(
             Arc::into_raw(unpark) as *const Handle as *const (),
@@ -62,13 +64,13 @@ fn clone_waker(ptr: *const ()) -> RawWaker {
 }
 
 fn wake(ptr: *const ()) {
-    use crate::runtime::park::Unpark;
+    use crate::park::Unpark;
     let unpark = unsafe { Arc::from_raw(ptr as *const Handle) };
     (unpark).unpark()
 }
 
 fn wake_by_ref(ptr: *const ()) {
-    use crate::runtime::park::Unpark;
+    use crate::park::Unpark;
 
     let unpark = ptr as *const Handle;
     unsafe { (*unpark).unpark() }
