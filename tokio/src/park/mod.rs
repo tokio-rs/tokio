@@ -44,11 +44,17 @@
 //! [up]: trait.Unpark.html
 //! [mio]: https://docs.rs/mio/0.6/mio/struct.Poll.html
 
+cfg_resource_drivers! {
+    mod either;
+    pub(crate) use self::either::Either;
+}
+
 mod thread;
-#[cfg(feature = "rt-threaded")]
-pub(crate) use self::thread::CachedParkThread;
-#[cfg(not(feature = "io-driver"))]
 pub(crate) use self::thread::ParkThread;
+
+cfg_blocking_impl! {
+    pub(crate) use self::thread::CachedParkThread;
+}
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -58,7 +64,7 @@ use std::time::Duration;
 /// See [module documentation][mod] for more details.
 ///
 /// [mod]: ../index.html
-pub trait Park {
+pub(crate) trait Park {
     /// Unpark handle type for the `Park` implementation.
     type Unpark: Unpark;
 
@@ -112,7 +118,7 @@ pub trait Park {
 ///
 /// [mod]: ../index.html
 /// [`Park`]: trait.Park.html
-pub trait Unpark: Sync + Send + 'static {
+pub(crate) trait Unpark: Sync + Send + 'static {
     /// Unblock a thread that is blocked by the associated `Park` handle.
     ///
     /// Calling `unpark` atomically makes available the unpark token, if it is

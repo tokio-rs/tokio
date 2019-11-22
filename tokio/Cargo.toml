@@ -99,7 +99,7 @@ fnv = { version = "1.0.6", optional = true }
 futures-core = { version = "0.3.0", optional = true }
 lazy_static = { version = "1.0.2", optional = true }
 memchr = { version = "2.2", optional = true }
-mio = { version = "0.6.14", optional = true }
+mio = { version = "0.6.20", optional = true }
 num_cpus = { version = "1.8.0", optional = true }
 # Backs `DelayQueue`
 slab = { version = "0.4.1", optional = true }

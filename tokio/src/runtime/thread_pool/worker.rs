@@ -1,8 +1,9 @@
-use crate::blocking;
 use crate::loom::cell::CausalCell;
 use crate::loom::sync::Arc;
-use crate::runtime::park::{Park, Unpark};
-use crate::runtime::thread_pool::{current, shutdown, slice, Callback, Owned, Shared, Spawner};
+use crate::park::Park;
+use crate::runtime::{self, blocking};
+use crate::runtime::park::Parker;
+use crate::runtime::thread_pool::{current, slice, Owned, Shared, Spawner};
 use crate::task::Task;
 
 use std::cell::Cell;
@@ -37,22 +38,16 @@ cfg_blocking! {
     }
 }
 
-pub(crate) struct Worker<P: Park + 'static> {
+pub(crate) struct Worker {
     /// Parks the thread. Requires the calling worker to have obtained unique
     /// access via the generation synchronization action.
-    inner: Arc<Inner<P>>,
+    inner: Arc<Inner>,
 
     /// Scheduler slices
-    slices: Arc<slice::Set<P::Unpark>>,
+    slices: Arc<slice::Set>,
 
     /// Slice assigned to this worker
     index: usize,
-
-    /// Handle to the blocking pool
-    blocking_pool: blocking::Spawner,
-
-    /// Run before calling worker logic
-    around_worker: Callback,
 
     /// Worker generation. This is used to synchronize access to the internal
     /// data.
@@ -64,21 +59,17 @@ pub(crate) struct Worker<P: Park + 'static> {
 
 /// Internal worker state. This may be referenced from multiple threads, but the
 /// generation guard protects unsafe access
-struct Inner<P: Park + 'static> {
+struct Inner {
     /// Used to park the thread
-    park: CausalCell<P>,
-
-    /// Only held so that the scheduler can be signaled on shutdown.
-    shutdown_tx: shutdown::Sender,
+    park: CausalCell<Parker>,
 }
 
-// TODO: clean up
-unsafe impl<P: Park + Send + 'static> Send for Worker<P> {}
+unsafe impl Send for Worker {}
 
 /// Used to ensure the invariants are respected
-struct GenerationGuard<'a, P: Park + 'static> {
+struct GenerationGuard<'a> {
     /// Worker reference
-    worker: &'a Worker<P>,
+    worker: &'a Worker,
 
     /// Prevent `Sync` access
     _p: PhantomData<Cell<()>>,
@@ -87,38 +78,28 @@ struct GenerationGuard<'a, P: Park + 'static> {
 struct WorkerGone;
 
 // TODO: Move into slices
-pub(super) fn create_set<F, P>(
+pub(super) fn create_set(
     pool_size: usize,
-    mk_park: F,
-    blocking_pool: blocking::Spawner,
-    around_worker: Callback,
-    shutdown_tx: shutdown::Sender,
-) -> (Arc<slice::Set<P::Unpark>>, Vec<Worker<P>>)
-where
-    P: Send + Park,
-    F: FnMut(usize) -> P,
-{
+    parker: Parker,
+) -> (Arc<slice::Set>, Vec<Worker>) {
     // Create the parks...
-    let parks: Vec<_> = (0..pool_size).map(mk_park).collect();
+    let parkers: Vec<_> = (0..pool_size).map(|_| parker.clone()).collect();
 
-    let mut slices = Arc::new(slice::Set::new(pool_size, |i| parks[i].unpark()));
+    let mut slices = Arc::new(slice::Set::new(&parkers));
 
     // Establish the circular link between the individual worker state
     // structure and the container.
     Arc::get_mut(&mut slices).unwrap().set_ptr();
 
     // This will contain each worker.
-    let workers = parks
+    let workers = parkers
         .into_iter()
         .enumerate()
-        .map(|(index, park)| {
+        .map(|(index, parker)| {
             Worker::new(
                 slices.clone(),
                 index,
-                park,
-                blocking_pool.clone(),
-                around_worker.clone(),
-                shutdown_tx.clone(),
+                parker,
             )
         })
         .collect();
@@ -132,114 +113,94 @@ where
 /// The number is fairly arbitrary. I believe this value was copied from golang.
 const GLOBAL_POLL_INTERVAL: u16 = 61;
 
-impl<P> Worker<P>
-where
-    P: Send + Park,
-{
+impl Worker {
     // Safe as aquiring a lock is required before doing anything potentially
     // dangerous.
     pub(super) fn new(
-        slices: Arc<slice::Set<P::Unpark>>,
+        slices: Arc<slice::Set>,
         index: usize,
-        park: P,
-        blocking_pool: blocking::Spawner,
-        around_worker: Callback,
-        shutdown_tx: shutdown::Sender,
+        park: Parker,
     ) -> Self {
         Worker {
             inner: Arc::new(Inner {
                 park: CausalCell::new(park),
-                shutdown_tx,
             }),
             slices,
             index,
-            blocking_pool,
-            around_worker,
             generation: 0,
             gone: Cell::new(false),
         }
     }
 
-    pub(super) fn run(self)
-    where
-        P: Park<Unpark = Box<dyn Unpark>>,
-    {
-        (self.around_worker)(self.index, &mut || {
-            // First, acquire a lock on the worker.
-            let guard = match self.acquire_lock() {
-                Some(guard) => guard,
-                None => return,
-            };
+    pub(super) fn run(self, blocking_pool: blocking::Spawner) {
+        // First, acquire a lock on the worker.
+        let guard = match self.acquire_lock() {
+            Some(guard) => guard,
+            None => return,
+        };
 
-            let spawner = Spawner::new(self.slices.clone());
+        let spawner = Spawner::new(self.slices.clone());
 
-            // Track the current worker
-            current::set(&self.slices, self.index, || {
-                // Enter a runtime context
-                let _enter = crate::runtime::enter();
+        // Track the current worker
+        current::set(&self.slices, self.index, || {
+            // Enter a runtime context
+            let _enter = crate::runtime::enter();
 
-                crate::runtime::global::with_thread_pool(&spawner, || {
-                    self.blocking_pool.enter(|| {
-                        ON_BLOCK.with(|ob| {
-                            // Ensure that the ON_BLOCK is removed from the thread-local context
-                            // when leaving the scope. This handles cases that involve panicking.
-                            struct Reset<'a>(&'a Cell<Option<*const dyn Fn()>>);
+            crate::runtime::global::with_thread_pool(&spawner, || {
+                blocking_pool.enter(|| {
+                    ON_BLOCK.with(|ob| {
+                        // Ensure that the ON_BLOCK is removed from the thread-local context
+                        // when leaving the scope. This handles cases that involve panicking.
+                        struct Reset<'a>(&'a Cell<Option<*const dyn Fn()>>);
 
-                            impl<'a> Drop for Reset<'a> {
-                                fn drop(&mut self) {
-                                    self.0.set(None);
-                                }
+                        impl<'a> Drop for Reset<'a> {
+                            fn drop(&mut self) {
+                                self.0.set(None);
                             }
+                        }
 
-                            let _reset = Reset(ob);
+                        let _reset = Reset(ob);
 
-                            let allow_blocking: &dyn Fn() = &|| self.block_in_place();
+                        let allow_blocking: &dyn Fn() = &|| self.block_in_place(&blocking_pool);
 
-                            ob.set(Some(unsafe {
-                                // NOTE: We cannot use a safe cast to raw pointer here, since we are
-                                // _also_ erasing the lifetime of these pointers. That is safe here,
-                                // because we know that ob will set back to None before allow_blocking
-                                // is dropped.
-                                #[allow(clippy::useless_transmute)]
-                                std::mem::transmute::<_, *const dyn Fn()>(allow_blocking)
-                            }));
+                        ob.set(Some(unsafe {
+                            // NOTE: We cannot use a safe cast to raw pointer here, since we are
+                            // _also_ erasing the lifetime of these pointers. That is safe here,
+                            // because we know that ob will set back to None before allow_blocking
+                            // is dropped.
+                            #[allow(clippy::useless_transmute)]
+                            std::mem::transmute::<_, *const dyn Fn()>(allow_blocking)
+                        }));
 
-                            let _ = guard.run();
+                        let _ = guard.run();
 
-                            // Ensure that we reset ob before allow_blocking is dropped.
-                            drop(_reset);
-                        });
-                    })
+                        // Ensure that we reset ob before allow_blocking is dropped.
+                        drop(_reset);
+                    });
                 })
-            });
-
-            if self.gone.get() {
-                // Synchronize with the pool for load(Acquire) in is_closed to get
-                // up-to-date value.
-                self.slices.wait_for_unlocked();
-
-                if self.slices.is_closed() {
-                    // If the pool is shutting down, some other thread may be
-                    // waiting to clean up after the task that we were holding on
-                    // to. If we completed that task, we did nothing (because
-                    // task.run() returned None), and so crucially we did not wait
-                    // up any such thread.
-                    //
-                    // So, we have to do that here.
-                    self.slices.notify_all();
-                }
-            }
+            })
         });
 
-        // We have to drop the `shutdown_tx` handle last to ensure expected
-        // ordering.
-        let shutdown_tx = self.inner.shutdown_tx.clone();
-        drop(self);
-        drop(shutdown_tx);
+        if self.gone.get() {
+            // Synchronize with the pool for load(Acquire) in is_closed to get
+            // up-to-date value.
+            self.slices.wait_for_unlocked();
+
+            if self.slices.is_closed() {
+                // If the pool is shutting down, some other thread may be
+                // waiting to clean up after the task that we were holding on
+                // to. If we completed that task, we did nothing (because
+                // task.run() returned None), and so crucially we did not wait
+                // up any such thread.
+                //
+                // So, we have to do that here.
+                self.slices.notify_all();
+            }
+        }
     }
 
     /// Acquire the lock
-    fn acquire_lock(&self) -> Option<GenerationGuard<'_, P>> {
+    fn acquire_lock(&self) -> Option<GenerationGuard<'_>> {
         // Safety: Only getting `&self` access to access atomic field
         let owned = unsafe { &*self.slices.owned()[self.index].get() };
 
@@ -262,10 +223,7 @@ where
     }
 
     /// Enter an in-place blocking section
-    fn block_in_place(&self)
-    where
-        P: Park<Unpark = Box<dyn Unpark>>,
-    {
+    fn block_in_place(&self, blocking_pool: &blocking::Spawner) {
         // If our Worker has already been given away, then blocking is fine!
         if self.gone.get() {
             return;
@@ -313,21 +271,17 @@ where
             inner: self.inner.clone(),
             slices: self.slices.clone(),
             index: self.index,
-            blocking_pool: self.blocking_pool.clone(),
-            around_worker: self.around_worker.clone(),
             generation: self.generation + 1,
             gone: Cell::new(false),
         };
 
         // Give away the worker
-        self.blocking_pool.spawn_background(move || worker.run());
+        let b = blocking_pool.clone();
+        runtime::spawn_blocking(move || worker.run(b));
     }
 }
 
-impl<P> GenerationGuard<'_, P>
-where
-    P: Park + 'static,
-{
+impl GenerationGuard<'_> {
     fn run(self) -> Result<(), WorkerGone> {
         let mut me = self;
 
@@ -392,7 +346,7 @@ where
     }
 
     /// Find local work
-    fn find_local_work(&mut self) -> Option<Task<Shared<P::Unpark>>> {
+    fn find_local_work(&mut self) -> Option<Task<Shared>> {
         let tick = self.tick_fetch_inc();
 
         if tick % GLOBAL_POLL_INTERVAL == 0 {
@@ -413,7 +367,7 @@ where
         }
     }
 
-    fn steal_work(&mut self) -> Option<Task<Shared<P::Unpark>>> {
+    fn steal_work(&mut self) -> Option<Task<Shared>> {
         let num_slices = self.worker.slices.len();
         let start = self.owned().rand.fastrand_n(num_slices as u32);
 
@@ -501,7 +455,7 @@ where
     /// Runs the task. During the task execution, it is possible for worker to
     /// transition to a new thread. In this case, the caller loses the guard to
     /// access the generation and must stop processing.
-    fn run_task(mut self, task: Task<Shared<P::Unpark>>) -> Result<Self, WorkerGone> {
+    fn run_task(mut self, task: Task<Shared>) -> Result<Self, WorkerGone> {
         if self.is_searching() {
             self.transition_from_searching();
         }
@@ -553,7 +507,7 @@ where
         // calling the parker. This is done in a loop as spurious wakeups are
         // permitted.
         loop {
-            self.park_mut().park().ok().expect("park failed");
+            self.park_mut().park().expect("park failed");
 
             // We might have been woken to clean up a dropped task
             self.maintenance();
@@ -571,7 +525,6 @@ where
 
         self.park_mut()
             .park_timeout(Duration::from_millis(0))
-            .ok()
             .expect("park failed");
 
         self.owned().defer_notification.set(false);
@@ -617,7 +570,7 @@ where
             // `transition_to_parked` is not called as we are not working
             // anymore. When a task is released, the owning worker is unparked
             // directly.
-            self.park_mut().park().ok().expect("park failed");
+            self.park_mut().park().expect("park failed");
 
             // Try draining more tasks
             self.drain_tasks_pending_drop();
@@ -639,21 +592,21 @@ where
         self.worker.index
     }
 
-    fn slices(&self) -> &slice::Set<P::Unpark> {
+    fn slices(&self) -> &slice::Set {
         &self.worker.slices
     }
 
-    fn shared(&self) -> &Shared<P::Unpark> {
+    fn shared(&self) -> &Shared {
         &self.slices().shared()[self.index()]
     }
 
-    fn owned(&self) -> &Owned<P::Unpark> {
+    fn owned(&self) -> &Owned {
         let index = self.index();
         // safety: we own the slot
         unsafe { &*self.slices().owned()[index].get() }
     }
 
-    fn park_mut(&mut self) -> &mut P {
+    fn park_mut(&mut self) -> &mut Parker {
         // Safety: `&mut self` on `GenerationGuard` implies it is safe to
         // perform the action.
         unsafe { self.worker.inner.park.with_mut(|ptr| &mut *ptr) }

@@ -4,7 +4,7 @@ mod scheduled_io;
 pub(crate) use scheduled_io::ScheduledIo; // pub(crate) for tests
 
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::runtime::{Park, Unpark};
+use crate::park::{Park, Unpark};
 use crate::util::slab::{Address, Slab};
 
 use mio::event::Evented;

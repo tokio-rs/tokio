@@ -1,9 +1,11 @@
 //! Thread pool for blocking operations
 
-use crate::blocking::schedule::NoopSchedule;
-use crate::blocking::task::BlockingTask;
 use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::loom::thread;
+use crate::runtime::{self, io, time, Builder, Callback};
+use crate::runtime::blocking::shutdown;
+use crate::runtime::blocking::schedule::NoopSchedule;
+use crate::runtime::blocking::task::BlockingTask;
 use crate::task::{self, JoinHandle};
 
 use std::cell::Cell;
@@ -13,6 +15,7 @@ use std::time::Duration;
 
 pub(crate) struct BlockingPool {
     spawner: Spawner,
+    shutdown_rx: shutdown::Receiver,
 }
 
 #[derive(Clone)]
@@ -32,6 +35,25 @@ struct Inner {
 
     /// Spawned thread stack size
     stack_size: Option<usize>,
+
+    /// Call after a thread starts
+    after_start: Option<Callback>,
+
+    /// Call before a thread stops
+    before_stop: Option<Callback>,
+
+    /// Spawns async tasks
+    spawner: runtime::Spawner,
+
+    /// Runtime I/O driver handle
+    io_handle: io::Handle,
+
+    /// Runtime time driver handle
+    time_handle: time::Handle,
+
+    /// Source of `Instant::now()`
+    clock: time::Clock,
+
 }
 
 struct Shared {
@@ -40,6 +62,7 @@ struct Shared {
     num_idle: u32,
     num_notify: u32,
     shutdown: bool,
+    shutdown_tx: Option<shutdown::Sender>,
 }
 
 type Task = task::Task<NoopSchedule>;
@@ -72,7 +95,15 @@ where
 // ===== impl BlockingPool =====
 
 impl BlockingPool {
-    pub(crate) fn new(thread_name: String, stack_size: Option<usize>) -> BlockingPool {
+    pub(crate) fn new(
+        builder: &Builder,
+        spawner: &runtime::Spawner,
+        io: &io::Handle,
+        time: &time::Handle,
+        clock: &time::Clock,
+    ) -> BlockingPool {
+        let (shutdown_tx, shutdown_rx) = shutdown::channel();
+
         BlockingPool {
             spawner: Spawner {
                 inner: Arc::new(Inner {
@@ -82,12 +113,20 @@ impl BlockingPool {
                         num_idle: 0,
                         num_notify: 0,
                         shutdown: false,
+                        shutdown_tx: Some(shutdown_tx),
                     }),
                     condvar: Condvar::new(),
-                    thread_name,
-                    stack_size,
+                    thread_name: builder.thread_name.clone(),
+                    stack_size: builder.thread_stack_size,
+                    after_start: builder.after_start.clone(),
+                    before_stop: builder.before_stop.clone(),
+                    spawner: spawner.clone(),
+                    io_handle: io.clone(),
+                    time_handle: time.clone(),
+                    clock: clock.clone(),
                 }),
             },
+            shutdown_rx,
         }
     }
 
@@ -99,12 +138,14 @@ impl BlockingPool {
 impl Drop for BlockingPool {
     fn drop(&mut self) {
         let mut shared = self.spawner.inner.shared.lock().unwrap();
+
         shared.shutdown = true;
+        shared.shutdown_tx = None;
         self.spawner.inner.condvar.notify_all();
 
-        while shared.num_th > 0 {
-            shared = self.spawner.inner.condvar.wait(shared).unwrap();
-        }
+        drop(shared);
+
+        self.shutdown_rx.wait();
     }
 }
 
@@ -115,19 +156,6 @@ impl fmt::Debug for BlockingPool {
 }
 
 // ===== impl Spawner =====
-
-
-cfg_rt_threaded! {
-    impl Spawner {
-        pub(crate) fn spawn_background<F>(&self, func: F)
-        where
-            F: FnOnce() + Send + 'static,
-        {
-            let task = task::background(BlockingTask::new(func));
-            self.schedule(task);
-        }
-    }
-}
 
 impl Spawner {
     /// Set the blocking pool for the duration of the closure
@@ -165,7 +193,7 @@ impl Spawner {
     }
 
     fn schedule(&self, task: Task) {
-        let should_spawn_thread = {
+        let shutdown_tx = {
             let mut shared = self.inner.shared.lock().unwrap();
 
             if shared.shutdown {
@@ -180,10 +208,11 @@ impl Spawner {
 
                 if shared.num_th == MAX_THREADS {
                     // At max number of threads
-                    false
+                    None
                 } else {
                     shared.num_th += 1;
-                    true
+                    assert!(shared.shutdown_tx.is_some());
+                    shared.shutdown_tx.clone()
                 }
             } else {
                 // Notify an idle worker thread. The notification counter
@@ -194,16 +223,16 @@ impl Spawner {
                 shared.num_idle -= 1;
                 shared.num_notify += 1;
                 self.inner.condvar.notify_one();
-                false
+                None
             }
         };
 
-        if should_spawn_thread {
-            self.spawn_thread();
+        if let Some(shutdown_tx) = shutdown_tx {
+            self.spawn_thread(shutdown_tx);
         }
     }
 
-    fn spawn_thread(&self) {
+    fn spawn_thread(&self, shutdown_tx: shutdown::Sender) {
         let mut builder = thread::Builder::new().name(self.inner.thread_name.clone());
 
         if let Some(stack_size) = self.inner.stack_size {
@@ -214,71 +243,101 @@ impl Spawner {
 
         builder
             .spawn(move || {
-                let mut shared = inner.shared.lock().unwrap();
+                inner.run();
 
-                'main: loop {
-                    // BUSY
-                    while let Some(task) = shared.queue.pop_front() {
-                        drop(shared);
-                        run_task(task);
-
-                        shared = inner.shared.lock().unwrap();
-                        if shared.shutdown {
-                            break; // Need to increment idle before we exit
-                        }
-                    }
-
-                    // IDLE
-                    shared.num_idle += 1;
-
-                    while !shared.shutdown {
-                        let lock_result = inner.condvar.wait_timeout(shared, KEEP_ALIVE).unwrap();
-
-                        shared = lock_result.0;
-                        let timeout_result = lock_result.1;
-
-                        if shared.num_notify != 0 {
-                            // We have received a legitimate wakeup,
-                            // acknowledge it by decrementing the counter
-                            // and transition to the BUSY state.
-                            shared.num_notify -= 1;
-                            break;
-                        }
-
-                        if timeout_result.timed_out() {
-                            break 'main;
-                        }
-
-                        // Spurious wakeup detected, go back to sleep.
-                    }
-
-                    if shared.shutdown {
-                        // Work was produced, and we "took" it (by decrementing num_notify).
-                        // This means that num_idle was decremented once for our wakeup.
-                        // But, since we are exiting, we need to "undo" that, as we'll stay idle.
-                        shared.num_idle += 1;
-                        // NOTE: Technically we should also do num_notify++ and notify again,
-                        // but since we're shutting down anyway, that won't be necessary.
-                        break;
-                    }
-                }
-
-                // Thread exit
-                shared.num_th -= 1;
-
-                // num_idle should now be tracked exactly, panic
-                // with a descriptive message if it is not the
-                // case.
-                shared.num_idle = shared
-                    .num_idle
-                    .checked_sub(1)
-                    .expect("num_idle underflowed on thread exit");
-
-                if shared.shutdown && shared.num_th == 0 {
-                    inner.condvar.notify_one();
-                }
+                // Make sure `inner` drops first to ensure that the shutdown_rx
+                // sees all refs to `Inner` are dropped when the `shutdown_rx`
+                // resolves.
+                drop(inner);
+                drop(shutdown_tx);
             })
             .unwrap();
+    }
+}
+
+impl Inner {
+    fn run(&self) {
+        let _io = io::set_default(&self.io_handle);
+
+        time::with_default(&self.time_handle, &self.clock, || {
+            self.spawner.enter(|| self.run2());
+        });
+    }
+
+    fn run2(&self) {
+        if let Some(f) = &self.after_start {
+            f()
+        }
+
+        let mut shared = self.shared.lock().unwrap();
+
+        'main: loop {
+            // BUSY
+            while let Some(task) = shared.queue.pop_front() {
+                drop(shared);
+                run_task(task);
+
+                shared = self.shared.lock().unwrap();
+                if shared.shutdown {
+                    break; // Need to increment idle before we exit
+                }
+            }
+
+            // IDLE
+            shared.num_idle += 1;
+
+            while !shared.shutdown {
+                let lock_result = self.condvar.wait_timeout(shared, KEEP_ALIVE).unwrap();
+
+                shared = lock_result.0;
+                let timeout_result = lock_result.1;
+
+                if shared.num_notify != 0 {
+                    // We have received a legitimate wakeup,
+                    // acknowledge it by decrementing the counter
+                    // and transition to the BUSY state.
+                    shared.num_notify -= 1;
+                    break;
+                }
+
+                if timeout_result.timed_out() {
+                    break 'main;
+                }
+
+                // Spurious wakeup detected, go back to sleep.
+            }
+
+            if shared.shutdown {
+                // Work was produced, and we "took" it (by decrementing num_notify).
+                // This means that num_idle was decremented once for our wakeup.
+                // But, since we are exiting, we need to "undo" that, as we'll stay idle.
+                shared.num_idle += 1;
+                // NOTE: Technically we should also do num_notify++ and notify again,
+                // but since we're shutting down anyway, that won't be necessary.
+                break;
+            }
+        }
+
+        // Thread exit
+        shared.num_th -= 1;
+
+        // num_idle should now be tracked exactly, panic
+        // with a descriptive message if it is not the
+        // case.
+        shared.num_idle = shared
+            .num_idle
+            .checked_sub(1)
+            .expect("num_idle underflowed on thread exit");
+
+        if shared.shutdown && shared.num_th == 0 {
+            self.condvar.notify_one();
+        }
+
+        drop(shared);
+
+        if let Some(f) = &self.before_stop {
+            f()
+        }
     }
 }
 

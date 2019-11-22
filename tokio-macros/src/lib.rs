@@ -110,6 +110,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
             fn #name(#inputs) #ret {
                 tokio::runtime::Builder::new()
                     .basic_scheduler()
+                    .enable_all()
                     .build()
                     .unwrap()
                     .block_on(async { #body })
@@ -211,6 +212,7 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
             fn #name() #ret {
                 tokio::runtime::Builder::new()
                     .basic_scheduler()
+                    .enable_all()
                     .build()
                     .unwrap()
                     .block_on(async { #body })

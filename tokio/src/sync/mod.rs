@@ -1,3 +1,5 @@
+#![cfg_attr(loom, allow(dead_code, unreachable_pub, unused_imports))]
+
 //! Future-aware synchronization
 //!
 //! This module is enabled with the **`sync`** feature flag.
@@ -33,22 +35,18 @@ cfg_sync! {
 }
 
 cfg_not_sync! {
-    cfg_atomic_waker! {
+    cfg_resource_drivers! {
         mod task;
         pub(crate) use task::AtomicWaker;
     }
 
-    cfg_rt_threaded! {
+    cfg_rt_core! {
         pub(crate) mod oneshot;
     }
 
     cfg_signal! {
         pub(crate) mod mpsc;
         pub(crate) mod semaphore;
-
-        cfg_not_rt_threaded! {
-            pub(crate) mod oneshot;
-        }
     }
 }
 

@@ -124,7 +124,7 @@ cfg_dns! {
         type Future = sealed::MaybeReady;
 
         fn to_socket_addrs(&self) -> Self::Future {
-            use crate::blocking;
+            use crate::runtime::spawn_blocking;
             use sealed::MaybeReady;
 
             // First check if the input parses as a socket address
@@ -137,7 +137,7 @@ cfg_dns! {
             // Run DNS lookup on the blocking pool
             let s = self.to_owned();
 
-            MaybeReady::Blocking(blocking::spawn_blocking(move || {
+            MaybeReady::Blocking(spawn_blocking(move || {
                 std::net::ToSocketAddrs::to_socket_addrs(&s)
             }))
         }
@@ -152,7 +152,7 @@ cfg_dns! {
         type Future = sealed::MaybeReady;
 
         fn to_socket_addrs(&self) -> Self::Future {
-            use crate::blocking;
+            use crate::runtime::spawn_blocking;
             use sealed::MaybeReady;
 
             let (host, port) = *self;
@@ -174,7 +174,7 @@ cfg_dns! {
 
             let host = host.to_owned();
 
-            MaybeReady::Blocking(blocking::spawn_blocking(move || {
+            MaybeReady::Blocking(spawn_blocking(move || {
                 std::net::ToSocketAddrs::to_socket_addrs(&(&host[..], port))
             }))
         }
