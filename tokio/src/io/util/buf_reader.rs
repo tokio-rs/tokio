@@ -24,7 +24,7 @@ pin_project! {
     /// When the `BufReader` is dropped, the contents of its buffer will be
     /// discarded. Creating multiple instances of a `BufReader` on the same
     /// stream can cause data loss.
-    // TODO: Examples
+    #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
     pub struct BufReader<R> {
         #[pin]
         pub(super) inner: R,

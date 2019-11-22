@@ -29,7 +29,7 @@ pin_project! {
     /// [`AsyncWrite`]: AsyncWrite
     /// [`flush`]: super::AsyncWriteExt::flush
     ///
-    // TODO: Examples
+    #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
     pub struct BufWriter<W> {
         #[pin]
         pub(super) inner: W,

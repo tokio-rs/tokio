@@ -10,6 +10,7 @@
     no_crate_inject,
     attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
 ))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 //! A runtime for writing reliable, asynchronous, and slim applications.
 //!
@@ -71,7 +72,7 @@
 //! [`tokio::task`]: crate::task
 //! [`spawn`]: crate::task::spawn()
 //! [`JoinHandle`]: crate::task::JoinHandle
-//! [`blocking`]: task/index.html#blocking-and-yielding
+//! [blocking]: task/index.html#blocking-and-yielding
 //!
 //! The [`tokio::sync`] module contains synchronization primitives to use when
 //! need to communicate or share data. These include:

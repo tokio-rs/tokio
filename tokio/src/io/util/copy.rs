@@ -5,71 +5,73 @@ use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// A future that asynchronously copies the entire contents of a reader into a
-/// writer.
-///
-/// This struct is generally created by calling [`copy`][copy]. Please
-/// see the documentation of `copy()` for more details.
-///
-/// [copy]: fn.copy.html
-#[derive(Debug)]
-#[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct Copy<'a, R: ?Sized, W: ?Sized> {
-    reader: &'a mut R,
-    read_done: bool,
-    writer: &'a mut W,
-    pos: usize,
-    cap: usize,
-    amt: u64,
-    buf: Box<[u8]>,
-}
+cfg_io_util! {
+    /// A future that asynchronously copies the entire contents of a reader into a
+    /// writer.
+    ///
+    /// This struct is generally created by calling [`copy`][copy]. Please
+    /// see the documentation of `copy()` for more details.
+    ///
+    /// [copy]: fn.copy.html
+    #[derive(Debug)]
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
+    pub struct Copy<'a, R: ?Sized, W: ?Sized> {
+        reader: &'a mut R,
+        read_done: bool,
+        writer: &'a mut W,
+        pos: usize,
+        cap: usize,
+        amt: u64,
+        buf: Box<[u8]>,
+    }
 
-/// Asynchronously copies the entire contents of a reader into a writer.
-///
-/// This function returns a future that will continuously read data from
-/// `reader` and then write it into `writer` in a streaming fashion until
-/// `reader` returns EOF.
-///
-/// On success, the total number of bytes that were copied from
-/// `reader` to `writer` is returned.
-///
-/// This is an asynchronous version of [`std::io::copy`][std].
-///
-/// # Errors
-///
-/// The returned future will finish with an error will return an error
-/// immediately if any call to `poll_read` or `poll_write` returns an error.
-///
-/// # Examples
-///
-/// ```
-/// use tokio::io;
-///
-/// # async fn dox() -> std::io::Result<()> {
-/// let mut reader: &[u8] = b"hello";
-/// let mut writer: Vec<u8> = vec![];
-///
-/// io::copy(&mut reader, &mut writer).await?;
-///
-/// assert_eq!(&b"hello"[..], &writer[..]);
-/// # Ok(())
-/// # }
-/// ```
-///
-/// [std]: https://doc.rust-lang.org/std/io/fn.copy.html
-pub fn copy<'a, R, W>(reader: &'a mut R, writer: &'a mut W) -> Copy<'a, R, W>
-where
-    R: AsyncRead + Unpin + ?Sized,
-    W: AsyncWrite + Unpin + ?Sized,
-{
-    Copy {
-        reader,
-        read_done: false,
-        writer,
-        amt: 0,
-        pos: 0,
-        cap: 0,
-        buf: Box::new([0; 2048]),
+    /// Asynchronously copies the entire contents of a reader into a writer.
+    ///
+    /// This function returns a future that will continuously read data from
+    /// `reader` and then write it into `writer` in a streaming fashion until
+    /// `reader` returns EOF.
+    ///
+    /// On success, the total number of bytes that were copied from `reader` to
+    /// `writer` is returned.
+    ///
+    /// This is an asynchronous version of [`std::io::copy`][std].
+    ///
+    /// # Errors
+    ///
+    /// The returned future will finish with an error will return an error
+    /// immediately if any call to `poll_read` or `poll_write` returns an error.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::io;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let mut reader: &[u8] = b"hello";
+    /// let mut writer: Vec<u8> = vec![];
+    ///
+    /// io::copy(&mut reader, &mut writer).await?;
+    ///
+    /// assert_eq!(&b"hello"[..], &writer[..]);
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// [std]: https://doc.rust-lang.org/std/io/fn.copy.html
+    pub fn copy<'a, R, W>(reader: &'a mut R, writer: &'a mut W) -> Copy<'a, R, W>
+    where
+        R: AsyncRead + Unpin + ?Sized,
+        W: AsyncWrite + Unpin + ?Sized,
+    {
+        Copy {
+            reader,
+            read_done: false,
+            writer,
+            amt: 0,
+            pos: 0,
+            cap: 0,
+            buf: Box::new([0; 2048]),
+        }
     }
 }
 

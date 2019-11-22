@@ -5,40 +5,43 @@ use mio::{self, Evented};
 use std::task::{Context, Poll};
 use std::io;
 
-/// Associates an I/O resource with the reactor instance that drives it.
-///
-/// A registration represents an I/O resource registered with a Reactor such
-/// that it will receive task notifications on readiness. This is the lowest
-/// level API for integrating with a reactor.
-///
-/// The association between an I/O resource is made by calling [`new`]. Once
-/// the association is established, it remains established until the
-/// registration instance is dropped.
-///
-/// A registration instance represents two separate readiness streams. One for
-/// the read readiness and one for write readiness. These streams are
-/// independent and can be consumed from separate tasks.
-///
-/// **Note**: while `Registration` is `Sync`, the caller must ensure that there
-/// are at most two tasks that use a registration instance concurrently. One
-/// task for [`poll_read_ready`] and one task for [`poll_write_ready`]. While
-/// violating this requirement is "safe" from a Rust memory safety point of
-/// view, it will result in unexpected behavior in the form of lost
-/// notifications and tasks hanging.
-///
-/// ## Platform-specific events
-///
-/// `Registration` also allows receiving platform-specific `mio::Ready` events.
-/// These events are included as part of the read readiness event stream. The
-/// write readiness event stream is only for `Ready::writable()` events.
-///
-/// [`new`]: #method.new
-/// [`poll_read_ready`]: #method.poll_read_ready`]
-/// [`poll_write_ready`]: #method.poll_write_ready`]
-#[derive(Debug)]
-pub struct Registration {
-    handle: Handle,
-    address: Address,
+cfg_io_driver! {
+    /// Associates an I/O resource with the reactor instance that drives it.
+    ///
+    /// A registration represents an I/O resource registered with a Reactor such
+    /// that it will receive task notifications on readiness. This is the lowest
+    /// level API for integrating with a reactor.
+    ///
+    /// The association between an I/O resource is made by calling [`new`]. Once
+    /// the association is established, it remains established until the
+    /// registration instance is dropped.
+    ///
+    /// A registration instance represents two separate readiness streams. One
+    /// for the read readiness and one for write readiness. These streams are
+    /// independent and can be consumed from separate tasks.
+    ///
+    /// **Note**: while `Registration` is `Sync`, the caller must ensure that
+    /// there are at most two tasks that use a registration instance
+    /// concurrently. One task for [`poll_read_ready`] and one task for
+    /// [`poll_write_ready`]. While violating this requirement is "safe" from a
+    /// Rust memory safety point of view, it will result in unexpected behavior
+    /// in the form of lost notifications and tasks hanging.
+    ///
+    /// ## Platform-specific events
+    ///
+    /// `Registration` also allows receiving platform-specific `mio::Ready`
+    /// events.  These events are included as part of the read readiness event
+    /// stream. The write readiness event stream is only for `Ready::writable()`
+    /// events.
+    ///
+    /// [`new`]: #method.new
+    /// [`poll_read_ready`]: #method.poll_read_ready`]
+    /// [`poll_write_ready`]: #method.poll_write_ready`]
+    #[derive(Debug)]
+    pub struct Registration {
+        handle: Handle,
+        address: Address,
+    }
 }
 
 // ===== impl Registration =====
