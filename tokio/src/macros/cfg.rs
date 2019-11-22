@@ -82,7 +82,7 @@ macro_rules! cfg_io_driver {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "io-driver")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
+            #[cfg_attr(docsrs, doc(cfg(feature = "io-driver")))]
             $item
         )*
     }
