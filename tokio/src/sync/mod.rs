@@ -40,7 +40,7 @@ cfg_not_sync! {
         pub(crate) use task::AtomicWaker;
     }
 
-    cfg_blocking_impl! {
+    cfg_rt_core! {
         pub(crate) mod oneshot;
     }
 
