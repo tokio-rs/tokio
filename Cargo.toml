@@ -9,5 +9,6 @@ members = [
 
   # Internal
   "examples",
+  "tests-build",
   "tests-integration",
 ]
