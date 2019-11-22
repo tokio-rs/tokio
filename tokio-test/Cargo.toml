@@ -26,6 +26,7 @@ bytes = { git = "https://github.com/tokio-rs/bytes" }
 futures-core = "0.3.0"
 
 [dev-dependencies]
+tokio = { version = "=0.2.0-alpha.6", path = "../tokio", features = ["full"] }
 futures-util = "0.3.0"
 
 [package.metadata.docs.rs]
