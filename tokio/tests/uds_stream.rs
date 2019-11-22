@@ -1,5 +1,6 @@
-#![cfg(unix)]
+#![cfg(feature = "full")]
 #![warn(rust_2018_idioms)]
+#![cfg(unix)]
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::unix::*;

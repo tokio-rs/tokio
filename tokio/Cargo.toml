@@ -24,7 +24,8 @@ categories = ["asynchronous", "network-programming"]
 keywords = ["io", "async", "non-blocking", "futures"]
 
 [features]
-default = ["full"]
+# Include nothing by default
+default = []
 
 # enable everything
 full = [
@@ -48,7 +49,7 @@ full = [
 blocking = ["rt-core"]
 dns = ["rt-core"]
 fs = ["rt-core"]
-io-driver = ["rt-core", "mio", "lazy_static"]
+io-driver = ["mio", "lazy_static"]
 io-util = ["memchr"]
 # stdin, stdout, stderr
 io-std = ["rt-core"]
@@ -83,7 +84,7 @@ stream = ["futures-core"]
 sync = ["fnv"]
 test-util = []
 tcp = ["io-driver"]
-time = ["rt-core", "slab"]
+time = ["slab"]
 udp = ["io-driver"]
 uds = ["io-driver", "mio-uds", "libc"]
 

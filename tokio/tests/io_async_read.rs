@@ -1,3 +1,6 @@
+#![warn(rust_2018_idioms)]
+#![cfg(feature = "full")]
+
 use tokio::io::AsyncRead;
 use tokio_test::task;
 use tokio_test::{assert_ready_err, assert_ready_ok};

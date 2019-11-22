@@ -1,5 +1,6 @@
-#![cfg(unix)]
-#![cfg(not(target_os = "dragonfly"))]
+#![warn(rust_2018_idioms)]
+#![cfg(feature = "full")]
+#![cfg(all(unix, not(target_os = "dragonfly")))]
 
 use tokio::net::UnixStream;
 

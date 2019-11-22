@@ -1,36 +1,10 @@
-#![cfg(unix)]
 #![warn(rust_2018_idioms)]
+#![cfg(feature = "full")]
+#![cfg(unix)]
 
 use tokio::net::unix::*;
 
 use std::io;
-
-// struct StringDatagramCodec;
-
-// /// A codec to decode datagrams from a unix domain socket as utf-8 text messages.
-// impl Encoder for StringDatagramCodec {
-//     type Item = String;
-//     type Error = io::Error;
-
-//     fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
-//         dst.extend_from_slice(&item.into_bytes());
-//         Ok(())
-//     }
-// }
-
-// /// A codec to decode datagrams from a unix domain socket as utf-8 text messages.
-// impl Decoder for StringDatagramCodec {
-//     type Item = String;
-//     type Error = io::Error;
-
-//     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-//         let decoded = str::from_utf8(buf)
-//             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?
-//             .to_string();
-
-//         Ok(Some(decoded))
-//     }
-// }
 
 async fn echo_server(mut socket: UnixDatagram) -> io::Result<()> {
     let mut recv_buf = vec![0u8; 1024];

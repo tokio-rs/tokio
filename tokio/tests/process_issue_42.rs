@@ -1,6 +1,6 @@
-#![cfg(feature = "process")]
-#![cfg(unix)]
 #![warn(rust_2018_idioms)]
+#![cfg(feature = "full")]
+#![cfg(unix)]
 
 use tokio::process::Command;
 use tokio::runtime;

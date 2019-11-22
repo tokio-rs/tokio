@@ -1,3 +1,6 @@
+#![warn(rust_2018_idioms)]
+#![cfg(feature = "full")]
+
 use tokio::net::TcpListener;
 
 use std::convert::TryFrom;

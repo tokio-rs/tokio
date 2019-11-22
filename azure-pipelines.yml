@@ -3,6 +3,7 @@ pr: ["master"]
 
 variables:
   RUSTFLAGS: -Dwarnings
+  nightly: 2019-11-16
 
 jobs:
 # Check formatting
@@ -80,9 +81,7 @@ jobs:
       - clippy
       - test_tokio
       - test_linux
-      # - test_features
       - loom
-#      - test_nightly
       - cross
-#      - minrust
+      - minrust
 #      - tsan

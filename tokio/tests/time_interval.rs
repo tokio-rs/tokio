@@ -1,4 +1,5 @@
 #![warn(rust_2018_idioms)]
+#![cfg(feature = "full")]
 
 use tokio::time::{self, Duration, Instant};
 use tokio_test::{assert_pending, assert_ready_eq, task};
