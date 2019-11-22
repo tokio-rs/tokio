@@ -19,9 +19,6 @@ jobs:
     parameters:
       rust_version: ${{ parameters.rust }}
 
-  - script: cargo install cargo-hack
-    displayName: Install cargo-hack
-
   - template: azure-is-release.yml
 
   - ${{ each crate in parameters.crates }}:
@@ -41,16 +38,6 @@ jobs:
       displayName: ${{ crate }} - cargo test --all-features
       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
 
-    # Check each specified feature works properly
-    # * --each-feature - run for each feature which includes --no-default-features and default features of package
-    # * --no-dev-deps - build without dev-dependencies to avoid https://github.com/rust-lang/cargo/issues/4866
-    - script: cargo hack check --each-feature --no-dev-deps
-      env:
-        LOOM_MAX_PREEMPTIONS: 2
-        CI: 'True'
-      displayName: ${{ crate }} - cargo hack check --each-feature
-      workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
-
   - template: azure-patch-crates.yml
 
   - ${{ each crate in parameters.crates }}:
@@ -68,14 +55,4 @@ jobs:
         LOOM_MAX_PREEMPTIONS: 2
         CI: 'True'
       displayName: ${{ crate }} - cargo test --all-features
-      workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
-
-    # Check each specified feature works properly
-    # * --each-feature - run for each feature which includes --no-default-features and default features of package
-    # * --no-dev-deps - build without dev-dependencies to avoid https://github.com/rust-lang/cargo/issues/4866
-    - script: cargo hack check --each-feature --no-dev-deps
-      env:
-        LOOM_MAX_PREEMPTIONS: 2
-        CI: 'True'
-      displayName: ${{ crate }} - cargo hack check --each-feature
       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
