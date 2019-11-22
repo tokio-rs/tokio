@@ -10,98 +10,101 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use std::task::{Context, Poll};
 
-/// Associates an I/O resource that implements the [`std::io::Read`] and/or
-/// [`std::io::Write`] traits with the reactor that drives it.
-///
-/// `PollEvented` uses [`Registration`] internally to take a type that
-/// implements [`mio::Evented`] as well as [`std::io::Read`] and or
-/// [`std::io::Write`] and associate it with a reactor that will drive it.
-///
-/// Once the [`mio::Evented`] type is wrapped by `PollEvented`, it can be
-/// used from within the future's execution model. As such, the `PollEvented`
-/// type provides [`AsyncRead`] and [`AsyncWrite`] implementations using the
-/// underlying I/O resource as well as readiness events provided by the reactor.
-///
-/// **Note**: While `PollEvented` is `Sync` (if the underlying I/O type is
-/// `Sync`), the caller must ensure that there are at most two tasks that use a
-/// `PollEvented` instance concurrently. One for reading and one for writing.
-/// While violating this requirement is "safe" from a Rust memory model point of
-/// view, it will result in unexpected behavior in the form of lost
-/// notifications and tasks hanging.
-///
-/// ## Readiness events
-///
-/// Besides just providing [`AsyncRead`] and [`AsyncWrite`] implementations,
-/// this type also supports access to the underlying readiness event stream.
-/// While similar in function to what [`Registration`] provides, the semantics
-/// are a bit different.
-///
-/// Two functions are provided to access the readiness events:
-/// [`poll_read_ready`] and [`poll_write_ready`]. These functions return the
-/// current readiness state of the `PollEvented` instance. If
-/// [`poll_read_ready`] indicates read readiness, immediately calling
-/// [`poll_read_ready`] again will also indicate read readiness.
-///
-/// When the operation is attempted and is unable to succeed due to the I/O
-/// resource not being ready, the caller must call [`clear_read_ready`] or
-/// [`clear_write_ready`]. This clears the readiness state until a new readiness
-/// event is received.
-///
-/// This allows the caller to implement additional functions. For example,
-/// [`TcpListener`] implements poll_accept by using [`poll_read_ready`] and
-/// [`clear_read_ready`].
-///
-/// ```rust
-/// use tokio::io::PollEvented;
-///
-/// use futures::ready;
-/// use mio::Ready;
-/// use mio::net::{TcpStream, TcpListener};
-/// use std::io;
-/// use std::task::{Context, Poll};
-///
-/// struct MyListener {
-///     poll_evented: PollEvented<TcpListener>,
-/// }
-///
-/// impl MyListener {
-///     pub fn poll_accept(&mut self, cx: &mut Context<'_>) -> Poll<Result<TcpStream, io::Error>> {
-///         let ready = Ready::readable();
-///
-///         ready!(self.poll_evented.poll_read_ready(cx, ready))?;
-///
-///         match self.poll_evented.get_ref().accept() {
-///             Ok((socket, _)) => Poll::Ready(Ok(socket)),
-///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-///                 self.poll_evented.clear_read_ready(cx, ready)?;
-///                 Poll::Pending
-///             }
-///             Err(e) => Poll::Ready(Err(e)),
-///         }
-///     }
-/// }
-/// ```
-///
-/// ## Platform-specific events
-///
-/// `PollEvented` also allows receiving platform-specific `mio::Ready` events.
-/// These events are included as part of the read readiness event stream. The
-/// write readiness event stream is only for `Ready::writable()` events.
-///
-/// [`std::io::Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
-/// [`std::io::Write`]: https://doc.rust-lang.org/std/io/trait.Write.html
-/// [`AsyncRead`]: ../io/trait.AsyncRead.html
-/// [`AsyncWrite`]: ../io/trait.AsyncWrite.html
-/// [`mio::Evented`]: https://docs.rs/mio/0.6/mio/trait.Evented.html
-/// [`Registration`]: struct.Registration.html
-/// [`TcpListener`]: ../net/struct.TcpListener.html
-/// [`clear_read_ready`]: #method.clear_read_ready
-/// [`clear_write_ready`]: #method.clear_write_ready
-/// [`poll_read_ready`]: #method.poll_read_ready
-/// [`poll_write_ready`]: #method.poll_write_ready
-pub struct PollEvented<E: Evented> {
-    io: Option<E>,
-    inner: Inner,
+cfg_io_driver! {
+    /// Associates an I/O resource that implements the [`std::io::Read`] and/or
+    /// [`std::io::Write`] traits with the reactor that drives it.
+    ///
+    /// `PollEvented` uses [`Registration`] internally to take a type that
+    /// implements [`mio::Evented`] as well as [`std::io::Read`] and or
+    /// [`std::io::Write`] and associate it with a reactor that will drive it.
+    ///
+    /// Once the [`mio::Evented`] type is wrapped by `PollEvented`, it can be
+    /// used from within the future's execution model. As such, the
+    /// `PollEvented` type provides [`AsyncRead`] and [`AsyncWrite`]
+    /// implementations using the underlying I/O resource as well as readiness
+    /// events provided by the reactor.
+    ///
+    /// **Note**: While `PollEvented` is `Sync` (if the underlying I/O type is
+    /// `Sync`), the caller must ensure that there are at most two tasks that
+    /// use a `PollEvented` instance concurrently. One for reading and one for
+    /// writing.  While violating this requirement is "safe" from a Rust memory
+    /// model point of view, it will result in unexpected behavior in the form
+    /// of lost notifications and tasks hanging.
+    ///
+    /// ## Readiness events
+    ///
+    /// Besides just providing [`AsyncRead`] and [`AsyncWrite`] implementations,
+    /// this type also supports access to the underlying readiness event stream.
+    /// While similar in function to what [`Registration`] provides, the
+    /// semantics are a bit different.
+    ///
+    /// Two functions are provided to access the readiness events:
+    /// [`poll_read_ready`] and [`poll_write_ready`]. These functions return the
+    /// current readiness state of the `PollEvented` instance. If
+    /// [`poll_read_ready`] indicates read readiness, immediately calling
+    /// [`poll_read_ready`] again will also indicate read readiness.
+    ///
+    /// When the operation is attempted and is unable to succeed due to the I/O
+    /// resource not being ready, the caller must call [`clear_read_ready`] or
+    /// [`clear_write_ready`]. This clears the readiness state until a new
+    /// readiness event is received.
+    ///
+    /// This allows the caller to implement additional functions. For example,
+    /// [`TcpListener`] implements poll_accept by using [`poll_read_ready`] and
+    /// [`clear_read_ready`].
+    ///
+    /// ```rust
+    /// use tokio::io::PollEvented;
+    ///
+    /// use futures::ready;
+    /// use mio::Ready;
+    /// use mio::net::{TcpStream, TcpListener};
+    /// use std::io;
+    /// use std::task::{Context, Poll};
+    ///
+    /// struct MyListener {
+    ///     poll_evented: PollEvented<TcpListener>,
+    /// }
+    ///
+    /// impl MyListener {
+    ///     pub fn poll_accept(&mut self, cx: &mut Context<'_>) -> Poll<Result<TcpStream, io::Error>> {
+    ///         let ready = Ready::readable();
+    ///
+    ///         ready!(self.poll_evented.poll_read_ready(cx, ready))?;
+    ///
+    ///         match self.poll_evented.get_ref().accept() {
+    ///             Ok((socket, _)) => Poll::Ready(Ok(socket)),
+    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                 self.poll_evented.clear_read_ready(cx, ready)?;
+    ///                 Poll::Pending
+    ///             }
+    ///             Err(e) => Poll::Ready(Err(e)),
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// ## Platform-specific events
+    ///
+    /// `PollEvented` also allows receiving platform-specific `mio::Ready` events.
+    /// These events are included as part of the read readiness event stream. The
+    /// write readiness event stream is only for `Ready::writable()` events.
+    ///
+    /// [`std::io::Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
+    /// [`std::io::Write`]: https://doc.rust-lang.org/std/io/trait.Write.html
+    /// [`AsyncRead`]: ../io/trait.AsyncRead.html
+    /// [`AsyncWrite`]: ../io/trait.AsyncWrite.html
+    /// [`mio::Evented`]: https://docs.rs/mio/0.6/mio/trait.Evented.html
+    /// [`Registration`]: struct.Registration.html
+    /// [`TcpListener`]: ../net/struct.TcpListener.html
+    /// [`clear_read_ready`]: #method.clear_read_ready
+    /// [`clear_write_ready`]: #method.clear_write_ready
+    /// [`poll_read_ready`]: #method.poll_read_ready
+    /// [`poll_write_ready`]: #method.poll_write_ready
+    pub struct PollEvented<E: Evented> {
+        io: Option<E>,
+        inner: Inner,
+    }
 }
 
 struct Inner {

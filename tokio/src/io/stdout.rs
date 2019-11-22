@@ -6,28 +6,30 @@ use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
 
-/// A handle to the standard output stream of a process.
-///
-/// The handle implements the [`AsyncWrite`] trait, but beware that concurrent
-/// writes to `Stdout` must be executed with care.
-///
-/// Created by the [`stdout`] function.
-///
-/// [`stdout`]: fn.stdout.html
-/// [`AsyncWrite`]: trait.AsyncWrite.html
-#[derive(Debug)]
-pub struct Stdout {
-    std: Blocking<std::io::Stdout>,
-}
+cfg_io_std! {
+    /// A handle to the standard output stream of a process.
+    ///
+    /// The handle implements the [`AsyncWrite`] trait, but beware that concurrent
+    /// writes to `Stdout` must be executed with care.
+    ///
+    /// Created by the [`stdout`] function.
+    ///
+    /// [`stdout`]: fn.stdout.html
+    /// [`AsyncWrite`]: trait.AsyncWrite.html
+    #[derive(Debug)]
+    pub struct Stdout {
+        std: Blocking<std::io::Stdout>,
+    }
 
-/// Constructs a new handle to the standard output of the current process.
-///
-/// The returned handle allows writing to standard out from the within the Tokio
-/// runtime.
-pub fn stdout() -> Stdout {
-    let std = io::stdout();
-    Stdout {
-        std: Blocking::new(std),
+    /// Constructs a new handle to the standard output of the current process.
+    ///
+    /// The returned handle allows writing to standard out from the within the Tokio
+    /// runtime.
+    pub fn stdout() -> Stdout {
+        let std = io::stdout();
+        Stdout {
+            std: Blocking::new(std),
+        }
     }
 }
 

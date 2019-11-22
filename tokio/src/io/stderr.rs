@@ -6,28 +6,30 @@ use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
 
-/// A handle to the standard error stream of a process.
-///
-/// The handle implements the [`AsyncWrite`] trait, but beware that concurrent
-/// writes to `Stderr` must be executed with care.
-///
-/// Created by the [`stderr`] function.
-///
-/// [`stderr`]: fn.stderr.html
-/// [`AsyncWrite`]: trait.AsyncWrite.html
-#[derive(Debug)]
-pub struct Stderr {
-    std: Blocking<std::io::Stderr>,
-}
+cfg_io_std! {
+    /// A handle to the standard error stream of a process.
+    ///
+    /// The handle implements the [`AsyncWrite`] trait, but beware that concurrent
+    /// writes to `Stderr` must be executed with care.
+    ///
+    /// Created by the [`stderr`] function.
+    ///
+    /// [`stderr`]: fn.stderr.html
+    /// [`AsyncWrite`]: trait.AsyncWrite.html
+    #[derive(Debug)]
+    pub struct Stderr {
+        std: Blocking<std::io::Stderr>,
+    }
 
-/// Constructs a new handle to the standard error of the current process.
-///
-/// The returned handle allows writing to standard error from the within the
-/// Tokio runtime.
-pub fn stderr() -> Stderr {
-    let std = io::stderr();
-    Stderr {
-        std: Blocking::new(std),
+    /// Constructs a new handle to the standard error of the current process.
+    ///
+    /// The returned handle allows writing to standard error from the within the
+    /// Tokio runtime.
+    pub fn stderr() -> Stderr {
+        let std = io::stderr();
+        Stderr {
+            std: Blocking::new(std),
+        }
     }
 }
 

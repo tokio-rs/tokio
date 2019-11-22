@@ -4,38 +4,40 @@ use crate::io::util::write::{write, Write};
 use crate::io::util::write_all::{write_all, WriteAll};
 use crate::io::AsyncWrite;
 
-/// An extension trait which adds utility methods to `AsyncWrite` types.
-pub trait AsyncWriteExt: AsyncWrite {
-    /// Write a buffer into this writter, returning how many bytes were written.
-    fn write<'a>(&'a mut self, src: &'a [u8]) -> Write<'a, Self>
-    where
-        Self: Unpin,
-    {
-        write(self, src)
-    }
+cfg_io_util! {
+    /// An extension trait which adds utility methods to `AsyncWrite` types.
+    pub trait AsyncWriteExt: AsyncWrite {
+        /// Write a buffer into this writter, returning how many bytes were written.
+        fn write<'a>(&'a mut self, src: &'a [u8]) -> Write<'a, Self>
+        where
+            Self: Unpin,
+        {
+            write(self, src)
+        }
 
-    /// Attempt to write an entire buffer into this writter.
-    fn write_all<'a>(&'a mut self, src: &'a [u8]) -> WriteAll<'a, Self>
-    where
-        Self: Unpin,
-    {
-        write_all(self, src)
-    }
+        /// Attempt to write an entire buffer into this writter.
+        fn write_all<'a>(&'a mut self, src: &'a [u8]) -> WriteAll<'a, Self>
+        where
+            Self: Unpin,
+        {
+            write_all(self, src)
+        }
 
-    /// Flush the contents of this writer.
-    fn flush(&mut self) -> Flush<'_, Self>
-    where
-        Self: Unpin,
-    {
-        flush(self)
-    }
+        /// Flush the contents of this writer.
+        fn flush(&mut self) -> Flush<'_, Self>
+        where
+            Self: Unpin,
+        {
+            flush(self)
+        }
 
-    /// Shutdown this writer.
-    fn shutdown(&mut self) -> Shutdown<'_, Self>
-    where
-        Self: Unpin,
-    {
-        shutdown(self)
+        /// Shutdown this writer.
+        fn shutdown(&mut self) -> Shutdown<'_, Self>
+        where
+            Self: Unpin,
+        {
+            shutdown(self)
+        }
     }
 }
 

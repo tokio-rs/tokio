@@ -8,7 +8,11 @@ macro_rules! cfg_atomic_waker {
 
 macro_rules! cfg_blocking {
     ($($item:item)*) => {
-        $( #[cfg(feature = "blocking")] $item )*
+        $(
+            #[cfg(feature = "blocking")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
+            $item
+        )*
     }
 }
 
@@ -46,12 +50,22 @@ macro_rules! cfg_not_blocking_impl {
 
 macro_rules! cfg_dns {
     ($($item:item)*) => {
-        $( #[cfg(feature = "dns")] $item )*
+        $(
+            #[cfg(feature = "dns")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "dns")))]
+            $item
+        )*
     }
 }
 
 macro_rules! cfg_fs {
-    ($($item:item)*) => { $( #[cfg(feature = "fs")] $item )* }
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "fs")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
+            $item
+        )*
+    }
 }
 
 macro_rules! cfg_io_blocking {
@@ -62,25 +76,40 @@ macro_rules! cfg_io_blocking {
 
 macro_rules! cfg_io_driver {
     ($($item:item)*) => {
-        $( #[cfg(feature = "io-driver")] $item )*
+        $(
+            #[cfg(feature = "io-driver")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
+            $item
+        )*
     }
 }
 
 macro_rules! cfg_not_io_driver {
     ($($item:item)*) => {
-        $( #[cfg(not(feature = "io-driver"))] $item )*
+        $(
+            #[cfg(not(feature = "io-driver"))]
+            $item
+        )*
     }
 }
 
 macro_rules! cfg_io_std {
     ($($item:item)*) => {
-        $( #[cfg(feature = "io-std")] $item )*
+        $(
+            #[cfg(feature = "io-std")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "io-std")))]
+            $item
+        )*
     }
 }
 
 macro_rules! cfg_io_util {
     ($($item:item)*) => {
-        $( #[cfg(feature = "io-util")] $item )*
+        $(
+            #[cfg(feature = "io-util")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
+            $item
+        )*
     }
 }
 
@@ -106,6 +135,7 @@ macro_rules! cfg_macros {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "macros")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
             #[doc(inline)]
             $item
         )*
@@ -116,6 +146,7 @@ macro_rules! cfg_process {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "process")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "process")))]
             #[cfg(not(loom))]
             $item
         )*

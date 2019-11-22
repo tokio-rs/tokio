@@ -6,14 +6,16 @@ use std::mem;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// Future for the [`read_until`](crate::io::AsyncBufReadExt::read_until) method.
-#[derive(Debug)]
-#[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct ReadUntil<'a, R: ?Sized> {
-    reader: &'a mut R,
-    byte: u8,
-    buf: &'a mut Vec<u8>,
-    read: usize,
+cfg_io_util! {
+    /// Future for the [`read_until`](crate::io::AsyncBufReadExt::read_until) method.
+    #[derive(Debug)]
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
+    pub struct ReadUntil<'a, R: ?Sized> {
+        reader: &'a mut R,
+        byte: u8,
+        buf: &'a mut Vec<u8>,
+        read: usize,
+    }
 }
 
 pub(crate) fn read_until<'a, R>(

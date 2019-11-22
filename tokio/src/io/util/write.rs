@@ -5,12 +5,14 @@ use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// A future to write some of the buffer to an `AsyncWrite`.
-#[derive(Debug)]
-#[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct Write<'a, W: ?Sized> {
-    writer: &'a mut W,
-    buf: &'a [u8],
+cfg_io_util! {
+    /// A future to write some of the buffer to an `AsyncWrite`.
+    #[derive(Debug)]
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
+    pub struct Write<'a, W: ?Sized> {
+        writer: &'a mut W,
+        buf: &'a [u8],
+    }
 }
 
 /// Tries to write some bytes from the given `buf` to the writer in an
