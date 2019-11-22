@@ -1,4 +1,5 @@
 #![warn(rust_2018_idioms)]
+#![cfg(feature = "full")]
 
 use tokio::sync::oneshot;
 use tokio::time::{self, timeout, timeout_at, Instant};

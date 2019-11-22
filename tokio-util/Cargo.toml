@@ -19,6 +19,16 @@ Additional utilities for working with Tokio.
 """
 categories = ["asynchronous"]
 
+[features]
+# No features on by default
+default = []
+
+# Shorthand for enabling everything
+full = ["codec", "udp"]
+
+codec = []
+udp = ["tokio/udp"]
+
 [dependencies]
 tokio = { version = "=0.2.0-alpha.6", path = "../tokio" }
 
@@ -29,10 +39,11 @@ log = "0.4"
 pin-project-lite = "0.1.1"
 
 [dev-dependencies]
-tokio = { version = "=0.2.0-alpha.6", path = "../tokio" }
+tokio = { version = "=0.2.0-alpha.6", path = "../tokio", features = ["full"] }
 tokio-test = { version = "=0.2.0-alpha.6", path = "../tokio-test" }
 
 futures = "0.3.0"
 
 [package.metadata.docs.rs]
 all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

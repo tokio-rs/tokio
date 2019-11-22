@@ -27,6 +27,7 @@ use std::task::{Context, Poll};
 /// calling `split` on the `UdpFramed` returned by this method, which will break
 /// them into separate objects, allowing them to interact more easily.
 #[must_use = "sinks do nothing unless polled"]
+#[cfg_attr(docsrs, doc(feature = "codec-udp"))]
 #[derive(Debug)]
 pub struct UdpFramed<C> {
     socket: UdpSocket,

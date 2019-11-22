@@ -29,7 +29,7 @@ quote = "1"
 syn = { version = "1.0.3", features = ["full"] }
 
 [dev-dependencies]
-tokio = { version = "=0.2.0-alpha.6", path = "../tokio" }
+tokio = { version = "=0.2.0-alpha.6", path = "../tokio", features = ["full"] }
 
 [package.metadata.docs.rs]
 all-features = true

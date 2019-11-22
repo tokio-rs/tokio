@@ -1,3 +1,6 @@
+#![warn(rust_2018_idioms)]
+#![cfg(feature = "full")]
+
 use tokio::io::{split, AsyncRead, AsyncWrite, ReadHalf, WriteHalf};
 
 use std::io;

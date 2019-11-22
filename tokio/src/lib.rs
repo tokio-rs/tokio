@@ -52,6 +52,13 @@
 //! control what features are present, so that unused code can be eliminated.
 //! This documentation also lists what feature flags are necessary to enable each API.
 //!
+//! The easiest way to get started is to enable all features. Do this by
+//! enabling the `full` feature flag:
+//!
+//! ```toml
+//! tokio = { version = "0.2", features = ["full"] }
+//! ```
+//!
 //! [features]: https://doc.rust-lang.org/cargo/reference/manifest.html#the-features-section
 //!
 //! ## Working With Tasks

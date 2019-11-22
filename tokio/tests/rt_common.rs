@@ -1,6 +1,7 @@
-// Tests to run on both current-thread & therad-pool runtime variants.
-
 #![warn(rust_2018_idioms)]
+#![cfg(feature = "full")]
+
+// Tests to run on both current-thread & therad-pool runtime variants.
 
 macro_rules! rt_test {
     ($($t:tt)*) => {

@@ -22,14 +22,6 @@ jobs:
   - template: azure-is-release.yml
 
   - ${{ each crate in parameters.crates }}:
-    # Run with default crate features
-    - script: cargo test
-      env:
-        LOOM_MAX_PREEMPTIONS: 2
-        CI: 'True'
-      displayName: ${{ crate }} - cargo test
-      workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
-
     # Run with all crate features
     - script: cargo test --all-features
       env:
@@ -41,14 +33,6 @@ jobs:
   - template: azure-patch-crates.yml
 
   - ${{ each crate in parameters.crates }}:
-    # Run with default crate features
-    - script: cargo test
-      env:
-        LOOM_MAX_PREEMPTIONS: 2
-        CI: 'True'
-      displayName: ${{ crate }} - cargo test
-      workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
-
     # Run with all crate features
     - script: cargo test --all-features
       env:
