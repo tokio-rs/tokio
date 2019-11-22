@@ -52,6 +52,15 @@ an asynchronous application.
 
 ## Example
 
+To get started, add the following to `Cargo.toml`.
+
+```toml
+tokio = { version = "0.2.0", features = ["full"] }
+```
+
+Tokio requires components to be explicitly enabled using feature flags. As a
+shorthand, the `full` feature enables all components.
+
 A basic TCP echo server with Tokio:
 
 ```rust
