@@ -55,6 +55,11 @@ impl Handle {
     pub fn status(&self) -> Result<(), tokio_executor::SpawnError> {
         self.0.status()
     }
+
+    /// Retrieve inner `CurrentThread` executor handle
+    pub fn into_inner(self) -> ExecutorHandle {
+        self.0
+    }
 }
 
 impl<T> future::Executor<T> for Handle
