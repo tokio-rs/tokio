@@ -72,7 +72,7 @@
 //! [`tokio::task`]: crate::task
 //! [`spawn`]: crate::task::spawn()
 //! [`JoinHandle`]: crate::task::JoinHandle
-//! [`blocking`]: task/index.html#blocking-and-yielding
+//! [blocking]: task/index.html#blocking-and-yielding
 //!
 //! The [`tokio::sync`] module contains synchronization primitives to use when
 //! need to communicate or share data. These include:

@@ -6,14 +6,13 @@ use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-cfg_io_util! {
-    #[derive(Debug)]
-    #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub struct ReadToEnd<'a, R: ?Sized> {
-        reader: &'a mut R,
-        buf: &'a mut Vec<u8>,
-        start_len: usize,
-    }
+#[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
+#[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
+pub struct ReadToEnd<'a, R: ?Sized> {
+    reader: &'a mut R,
+    buf: &'a mut Vec<u8>,
+    start_len: usize,
 }
 
 pub(crate) fn read_to_end<'a, R>(reader: &'a mut R, buf: &'a mut Vec<u8>) -> ReadToEnd<'a, R>
