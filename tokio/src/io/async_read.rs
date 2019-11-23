@@ -5,11 +5,13 @@ use std::ops::DerefMut;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// Read bytes asynchronously.
+/// Read bytes from a source.
 ///
-/// This trait inherits from `std::io::Read` and indicates that an I/O object is
-/// **non-blocking**. All non-blocking I/O objects must return an error when
-/// bytes are unavailable instead of blocking the current thread.
+/// This trait is analogous to the [`std::io::Read`] trait, but integrates with
+/// the asynchronous task system. In particular, the [`poll_read`] method,
+/// unlike [`Read::read`], will automatically queue the current task for wakeup
+/// and return if data is not yet available, rather than blocking the calling
+/// thread.
 ///
 /// Specifically, this means that the `poll_read` function will return one of
 /// the following:
@@ -30,6 +32,14 @@ use std::task::{Context, Poll};
 ///
 /// This trait importantly means that the `read` method only works in the
 /// context of a future's task. The object may panic if used outside of a task.
+///
+/// Utilities for working with `AsyncRead` values are provided by
+/// [`AsyncReadExt`].
+///
+/// [`poll_read`]: AsyncRead::poll_read
+/// [`std::io::Read`]: std::io::Read
+/// [`Read::read`]: std::io::Read::read
+/// [`AsyncReadExt`]: crate::io::AsyncReadExt
 pub trait AsyncRead {
     /// Prepares an uninitialized buffer to be safe to pass to `read`. Returns
     /// `true` if the supplied buffer was zeroed out.
