@@ -1,6 +1,6 @@
 #![cfg_attr(loom, allow(dead_code, unreachable_pub))]
 
-//! Asynchronous I/O.
+//! Traits, helpers, and type definitions for asynchronous I/O functionality.
 //!
 //! This module is the asynchronous version of `std::io`. Primarily, it
 //! defines two traits, [`AsyncRead`] and [`AsyncWrite`], which are asynchronous
@@ -15,7 +15,19 @@
 //! type will _yield_ to the Tokio scheduler when IO is not ready, rather than
 //! blocking. This allows other tasks to run while waiting on IO.
 //!
-//! In asynchronous programs, Tokio's [`AsyncRead`] and [`AsyncWrite`] traits
+//! Another difference is that [`AsyncRead`] and [`AsyncWrite`] only contain
+//! core methods needed to provide asynchronous reading and writing
+//! functionality. Instead, utility methods are defined in the [`AsyncReadExt`]
+//! and [`AsyncWriteExt`] extension traits. These traits are automatically
+//! implemented for all values that implement [`AsyncRead`] and [`AsyncWrite`]
+//! respectively.
+//!
+//! End users will rarely interact directly with [`AsyncRead`] and
+//! [`AsyncWrite`]. Instead, they will use the async functions defined in the
+//! extension traits. Library authors are expected to implement [`AsyncRead`]
+//! and [`AsyncWrite`] in order to provide types that behave like byte streams.
+//!
+//! Even with these differences, Tokio's [`AsyncRead`] and [`AsyncWrite`] traits
 //! can be used in almost exactly the same manner as the standard library's
 //! `Read` and `Write`. Most types in the standard library that implement `Read`
 //! and `Write` have asynchronous equivalents in `tokio` that implement
@@ -26,8 +38,7 @@
 //! can do the same with [`tokio::fs::File`][`File`]:
 //!
 //! ```no_run
-//! use tokio::io;
-//! use tokio::prelude::*;
+//! use tokio::io::{self, AsyncReadExt};
 //! use tokio::fs::File;
 //!
 //! #[tokio::main]
@@ -64,10 +75,8 @@
 //! extra methods to any async reader:
 //!
 //! ```no_run
-//! use tokio::io;
-//! use tokio::io::BufReader;
+//! use tokio::io::{self, BufReader, AsyncBufReadExt};
 //! use tokio::fs::File;
-//! use tokio::prelude::*;
 //!
 //! #[tokio::main]
 //! async fn main() -> io::Result<()> {
@@ -87,10 +96,8 @@
 //! to [`write`](crate::io::AsyncWriteExt::write):
 //!
 //! ```no_run
-//! use tokio::io;
-//! use tokio::io::BufWriter;
+//! use tokio::io::{self, BufWriter, AsyncWriteExt};
 //! use tokio::fs::File;
-//! use tokio::prelude::*;
 //!
 //! #[tokio::main]
 //! async fn main() -> io::Result<()> {

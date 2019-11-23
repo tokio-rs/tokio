@@ -13,7 +13,7 @@
 //!
 //! The prelude may grow over time as additional items see ubiquitous use.
 
-pub use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite};
+pub use crate::io::{self, AsyncBufRead, AsyncRead, AsyncWrite};
 
 cfg_io_util! {
     #[doc(no_inline)]

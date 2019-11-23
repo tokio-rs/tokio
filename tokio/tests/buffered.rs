@@ -41,7 +41,7 @@ async fn echo_server() {
     let (mut a, _) = assert_ok!(srv.accept().await);
     let (mut b, _) = assert_ok!(srv.accept().await);
 
-    let n = assert_ok!(a.copy(&mut b).await);
+    let n = assert_ok!(io::copy(&mut a, &mut b).await);
 
     let (expected, t2) = t.join().unwrap();
     let actual = t2.join().unwrap();
