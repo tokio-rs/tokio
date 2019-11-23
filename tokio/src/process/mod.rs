@@ -105,6 +105,8 @@
 //! The `Command::kill_on_drop` method can be used to modify this behavior
 //! and kill the child process if the `Child` wrapper is dropped before it
 //! has exited.
+//!
+//! [`Command`]: crate::process::Command
 
 #[path = "unix/mod.rs"]
 #[cfg(unix)]
