@@ -1,10 +1,9 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::io::{AsyncRead, AsyncReadExt};
+use tokio::io::{self, AsyncRead};
 use tokio_test::assert_ok;
 
-use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -31,7 +30,7 @@ async fn copy() {
     let mut rd = Rd(true);
     let mut wr = Vec::new();
 
-    let n = assert_ok!(rd.copy(&mut wr).await);
+    let n = assert_ok!(io::copy(&mut rd, &mut wr).await);
     assert_eq!(n, 11);
     assert_eq!(wr, b"hello world");
 }

@@ -35,7 +35,7 @@ async fn echo_server() {
     let (mut stream, _) = assert_ok!(srv.accept().await);
     let (mut rd, mut wr) = stream.split();
 
-    let n = assert_ok!(rd.copy(&mut wr).await);
+    let n = assert_ok!(io::copy(&mut rd, &mut wr).await);
     assert_eq!(n, (ITER * msg.len()) as u64);
 
     assert_ok!(rx.await);
