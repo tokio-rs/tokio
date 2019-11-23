@@ -17,7 +17,6 @@ cfg_io_util! {
     ///
     /// ```no_run
     /// use tokio::fs::File;
-    /// use tokio::io;
     /// use tokio::prelude::*;
     ///
     /// #[tokio::main]

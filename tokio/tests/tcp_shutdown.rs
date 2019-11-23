@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::io::AsyncWriteExt;
+use tokio::io::{self, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
 use tokio_test::assert_ok;
@@ -24,6 +24,6 @@ async fn shutdown() {
     let (mut stream, _) = assert_ok!(srv.accept().await);
     let (mut rd, mut wr) = stream.split();
 
-    let n = assert_ok!(rd.copy(&mut wr).await);
+    let n = assert_ok!(io::copy(&mut rd, &mut wr).await);
     assert_eq!(n, 0);
 }
