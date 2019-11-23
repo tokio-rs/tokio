@@ -25,8 +25,8 @@
 use tokio::io;
 use tokio::net::{TcpListener, TcpStream};
 
-use futures::FutureExt;
 use futures::future::try_join;
+use futures::FutureExt;
 use std::env;
 use std::error::Error;
 
