@@ -98,17 +98,15 @@
 //!
 //! # Caveats
 //!
-//! While similar to the standard library, this crate's `Child` type differs
-//! importantly in the behavior of `drop`. In the standard library, a child
-//! process will continue running after the instance of [`std::process::Child`]
-//! is dropped. In this crate, however, because [`tokio::process::Child`] is a
-//! future of the child's `ExitStatus`, a child process is terminated if
-//! `tokio::process::Child` is dropped. The behavior of the standard library can
-//! be regained with the [`Child::forget`](crate::process::Child::forget)
-//! method.
+//! Similar to the behavior to the standard library, and unlike the futures
+//! paradigm of dropping-implies-cancellation, a spawned process will, by
+//! default, continue to execute even after the `Child` handle has been dropped.
+//!
+//! The `Command::kill_on_drop` method can be used to modify this behavior
+//! and kill the child process if the `Child` wrapper is dropped before it
+//! has exited.
 //!
 //! [`Command`]: crate::process::Command
-//! [`tokio::process::Child`]: crate::process::Child
 
 #[path = "unix/mod.rs"]
 #[cfg(unix)]
@@ -145,6 +143,7 @@ use std::task::Poll;
 #[derive(Debug)]
 pub struct Command {
     std: StdCommand,
+    kill_on_drop: bool,
 }
 
 pub(crate) struct SpawnedChild {
@@ -183,9 +182,7 @@ impl Command {
     /// let command = Command::new("sh");
     /// ```
     pub fn new<S: AsRef<OsStr>>(program: S) -> Command {
-        Command {
-            std: StdCommand::new(program),
-        }
+        Self::from(StdCommand::new(program))
     }
 
     /// Adds an argument to pass to the program.
@@ -440,6 +437,17 @@ impl Command {
         self
     }
 
+    /// Controls whether a `kill` operation should be invoked on a spawned child
+    /// process when its corresponding `Child` handle is dropped.
+    ///
+    /// By default, this value is assumed to be `false`, meaning the next spawned
+    /// process will not be killed on drop, similar to the behavior of the standard
+    /// library.
+    pub fn kill_on_drop(&mut self, kill_on_drop: bool) -> &mut Command {
+        self.kill_on_drop = kill_on_drop;
+        self
+    }
+
     /// Sets the [process creation flags][1] to be passed to `CreateProcess`.
     ///
     /// These will always be ORed with `CREATE_UNICODE_ENVIRONMENT`.
@@ -519,6 +527,16 @@ impl Command {
     /// All I/O this child does will be associated with the current default
     /// event loop.
     ///
+    /// # Caveats
+    ///
+    /// Similar to the behavior to the standard library, and unlike the futures
+    /// paradigm of dropping-implies-cancellation, the spawned process will, by
+    /// default, continue to execute even after the `Child` handle has been dropped.
+    ///
+    /// The `Command::kill_on_drop` method can be used to modify this behavior
+    /// and kill the child process if the `Child` wrapper is dropped before it
+    /// has exited.
+    ///
     /// # Examples
     ///
     /// Basic usage:
@@ -535,7 +553,10 @@ impl Command {
     /// }
     pub fn spawn(&mut self) -> io::Result<Child> {
         imp::spawn_child(&mut self.std).map(|spawned_child| Child {
-            child: ChildDropGuard::new(spawned_child.child),
+            child: ChildDropGuard {
+                inner: spawned_child.child,
+                kill_on_drop: self.kill_on_drop
+            },
             stdin: spawned_child.stdin.map(|inner| ChildStdin { inner }),
             stdout: spawned_child.stdout.map(|inner| ChildStdout { inner }),
             stderr: spawned_child.stderr.map(|inner| ChildStderr { inner }),
@@ -637,29 +658,18 @@ impl Command {
 
 impl From<StdCommand> for Command {
     fn from(std: StdCommand) -> Command {
-        Command { std }
+        Command {
+            std,
+            kill_on_drop: false,
+        }
     }
 }
 
-/// A drop guard which ensures the child process is killed on drop to maintain
-/// the contract of dropping a Future leads to "cancellation".
+/// A drop guard which can ensure the child process is killed on drop if specified.
 #[derive(Debug)]
 struct ChildDropGuard<T: Kill> {
     inner: T,
     kill_on_drop: bool,
-}
-
-impl<T: Kill> ChildDropGuard<T> {
-    fn new(inner: T) -> Self {
-        Self {
-            inner,
-            kill_on_drop: true,
-        }
-    }
-
-    fn forget(&mut self) {
-        self.kill_on_drop = false;
-    }
 }
 
 impl<T: Kill> Kill for ChildDropGuard<T> {
@@ -706,13 +716,14 @@ where
 /// underlying child process. A `Child` here also provides access to information
 /// like the OS-assigned identifier and the stdio streams.
 ///
-/// > **Note**: The behavior of `drop` on a child in this crate is *different
-/// > than the behavior of the standard library*. If a `tokio::process::Child` is
-/// > dropped before the process finishes then the process will be terminated.
-/// > In the standard library, however, the process continues executing. This is
-/// > done because futures in general take `drop` as a sign of cancellation, and
-/// > this `Child` is itself a future. If you'd like to run a process in the
-/// > background, though, you may use the `forget` method.
+/// # Caveats
+/// Similar to the behavior to the standard library, and unlike the futures
+/// paradigm of dropping-implies-cancellation, a spawned process will, by
+/// default, continue to execute even after the `Child` handle has been dropped.
+///
+/// The `Command::kill_on_drop` method can be used to modify this behavior
+/// and kill the child process if the `Child` wrapper is dropped before it
+/// has exited.
 #[must_use = "futures do nothing unless polled"]
 #[derive(Debug)]
 pub struct Child {
@@ -791,33 +802,6 @@ impl Child {
             stdout,
             stderr,
         })
-    }
-
-    /// Drop this `Child` without killing the underlying process.
-    ///
-    /// Normally a `Child` is killed if it's still alive when dropped, but this
-    /// method will ensure that the child may continue running once the `Child`
-    /// instance is dropped.
-    ///
-    /// > **Note**: this method may leak OS resources depending on your platform.
-    /// > To ensure resources are eventually cleaned up, consider sending the
-    /// > `Child` instance into an event loop as an alternative to this method.
-    ///
-    /// ```no_run
-    /// # use tokio::process::Command;
-    ///
-    /// # #[tokio::main]
-    /// # async fn main() {
-    /// let child = Command::new("echo").arg("hello").arg("world")
-    ///                     .spawn()
-    ///                     .expect("failed to spawn");
-    ///
-    /// tokio::spawn(async {
-    ///   let _ = child.await;
-    /// });
-    /// # }
-    pub fn forget(mut self) {
-        self.child.forget();
     }
 }
 
@@ -993,11 +977,14 @@ mod test {
     }
 
     #[test]
-    fn kills_on_drop() {
+    fn kills_on_drop_if_specified() {
         let mut mock = Mock::new();
 
         {
-            let guard = ChildDropGuard::new(&mut mock);
+            let guard = ChildDropGuard {
+                inner: &mut mock,
+                kill_on_drop: true,
+            };
             drop(guard);
         }
 
@@ -1006,11 +993,30 @@ mod test {
     }
 
     #[test]
+    fn no_kill_on_drop_by_default() {
+        let mut mock = Mock::new();
+
+        {
+            let guard = ChildDropGuard {
+                inner: &mut mock,
+                kill_on_drop: false,
+            };
+            drop(guard);
+        }
+
+        assert_eq!(0, mock.num_kills);
+        assert_eq!(0, mock.num_polls);
+    }
+
+    #[test]
     fn no_kill_if_already_killed() {
         let mut mock = Mock::new();
 
         {
-            let mut guard = ChildDropGuard::new(&mut mock);
+            let mut guard = ChildDropGuard {
+                inner: &mut mock,
+                kill_on_drop: true,
+            };
             let _ = guard.kill();
             drop(guard);
         }
@@ -1028,13 +1034,22 @@ mod test {
         let waker = futures::task::noop_waker();
         let mut context = Context::from_waker(&waker);
         {
-            let mut guard = ChildDropGuard::new(&mut mock_pending);
+            let mut guard = ChildDropGuard {
+                inner: &mut mock_pending,
+                kill_on_drop: true,
+            };
             let _ = guard.poll_unpin(&mut context);
 
-            let mut guard = ChildDropGuard::new(&mut mock_reaped);
+            let mut guard = ChildDropGuard {
+                inner: &mut mock_reaped,
+                kill_on_drop: true,
+            };
             let _ = guard.poll_unpin(&mut context);
 
-            let mut guard = ChildDropGuard::new(&mut mock_err);
+            let mut guard = ChildDropGuard {
+                inner: &mut mock_err,
+                kill_on_drop: true,
+            };
             let _ = guard.poll_unpin(&mut context);
         }
 
@@ -1046,19 +1061,5 @@ mod test {
 
         assert_eq!(1, mock_err.num_kills);
         assert_eq!(1, mock_err.num_polls);
-    }
-
-    #[test]
-    fn no_kill_on_forget() {
-        let mut mock = Mock::new();
-
-        {
-            let mut guard = ChildDropGuard::new(&mut mock);
-            guard.forget();
-            drop(guard);
-        }
-
-        assert_eq!(0, mock.num_kills);
-        assert_eq!(0, mock.num_polls);
     }
 }
