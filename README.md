@@ -1,6 +1,6 @@
 # Tokio
 
- **NOTE**: Tokio's [`master`](https://github.com/tokio-rs/tokio) is currently undergoing heavy development. This branch and the alpha releases will see API breaking changes and there are currently significant performance regressions that still need to be fixed before the final release. Use the [`v0.1.x`](https://github.com/tokio-rs/tokio/tree/v0.1.x) branch for stable releases.
+ **NOTE**: Tokio's [`master`](https://github.com/tokio-rs/tokio) is currently undergoing heavy development. This branch and the alpha releases will see API breaking changes. Use the [`v0.1.x`](https://github.com/tokio-rs/tokio/tree/v0.1.x) branch for stable releases.
 
 A runtime for writing reliable, asynchronous, and slim applications with
 the Rust programming language. It is:
