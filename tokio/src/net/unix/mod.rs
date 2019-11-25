@@ -1,7 +1,6 @@
 //! Unix domain socket utility types
 
 pub(crate) mod datagram;
-pub(crate) use datagram::UnixDatagram;
 
 mod incoming;
 pub use incoming::Incoming;
