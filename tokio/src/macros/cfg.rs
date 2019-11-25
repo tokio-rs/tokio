@@ -161,6 +161,7 @@ macro_rules! cfg_signal {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "signal")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "signal")))]
             #[cfg(not(loom))]
             $item
         )*
@@ -169,13 +170,21 @@ macro_rules! cfg_signal {
 
 macro_rules! cfg_stream {
     ($($item:item)*) => {
-        $( #[cfg(feature = "stream")] $item )*
+        $(
+            #[cfg(feature = "stream")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "stream")))]
+            $item
+        )*
     }
 }
 
 macro_rules! cfg_sync {
     ($($item:item)*) => {
-        $( #[cfg(feature = "sync")] $item )*
+        $(
+            #[cfg(feature = "sync")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+            $item
+        )*
     }
 }
 
@@ -187,7 +196,11 @@ macro_rules! cfg_not_sync {
 
 macro_rules! cfg_rt_core {
     ($($item:item)*) => {
-        $( #[cfg(feature = "rt-core")] $item )*
+        $(
+            #[cfg(feature = "rt-core")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "rt-core")))]
+            $item
+        )*
     }
 }
 
@@ -199,7 +212,11 @@ macro_rules! cfg_not_rt_core {
 
 macro_rules! cfg_rt_threaded {
     ($($item:item)*) => {
-        $( #[cfg(feature = "rt-threaded")] $item )*
+        $(
+            #[cfg(feature = "rt-threaded")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "rt-threaded")))]
+            $item
+        )*
     }
 }
 
@@ -211,13 +228,21 @@ macro_rules! cfg_not_rt_threaded {
 
 macro_rules! cfg_tcp {
     ($($item:item)*) => {
-        $( #[cfg(feature = "tcp")] $item )*
+        $(
+            #[cfg(feature = "tcp")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "tcp")))]
+            $item
+        )*
     }
 }
 
 macro_rules! cfg_test_util {
     ($($item:item)*) => {
-        $( #[cfg(feature = "test-util")] $item )*
+        $(
+            #[cfg(feature = "test-util")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
+            $item
+        )*
     }
 }
 
@@ -229,7 +254,11 @@ macro_rules! cfg_not_test_util {
 
 macro_rules! cfg_time {
     ($($item:item)*) => {
-        $( #[cfg(feature = "time")] $item )*
+        $(
+            #[cfg(feature = "time")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+            $item
+        )*
     }
 }
 
@@ -241,12 +270,20 @@ macro_rules! cfg_not_time {
 
 macro_rules! cfg_udp {
     ($($item:item)*) => {
-        $( #[cfg(feature = "udp")] $item )*
+        $(
+            #[cfg(feature = "udp")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "udp")))]
+            $item
+        )*
     }
 }
 
 macro_rules! cfg_uds {
     ($($item:item)*) => {
-        $( #[cfg(all(unix, feature = "uds"))] $item )*
+        $(
+            #[cfg(all(unix, feature = "uds"))]
+            #[cfg_attr(docsrs, doc(cfg(feature = "uds")))]
+            $item
+        )*
     }
 }

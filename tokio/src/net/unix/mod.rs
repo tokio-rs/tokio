@@ -1,21 +1,18 @@
-//! Unix Domain Sockets for Tokio.
-//!
-//! This crate provides APIs for using Unix Domain Sockets with Tokio.
+//! Unix domain socket utility types
 
-mod datagram;
-pub use datagram::UnixDatagram;
+pub(crate) mod datagram;
 
 mod incoming;
 pub use incoming::Incoming;
 
-mod listener;
-pub use listener::UnixListener;
+pub(crate) mod listener;
+pub(crate) use listener::UnixListener;
 
 mod split;
 pub use split::{ReadHalf, WriteHalf};
 
-mod stream;
-pub use stream::UnixStream;
+pub(crate) mod stream;
+pub(crate) use stream::UnixStream;
 
 mod ucred;
 pub use ucred::UCred;

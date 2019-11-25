@@ -9,9 +9,11 @@ use std::io;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::task::{Context, Poll};
 
-/// An I/O object representing a UDP socket.
-pub struct UdpSocket {
-    io: PollEvented<mio::net::UdpSocket>,
+cfg_udp! {
+    /// A UDP socket
+    pub struct UdpSocket {
+        io: PollEvented<mio::net::UdpSocket>,
+    }
 }
 
 impl UdpSocket {

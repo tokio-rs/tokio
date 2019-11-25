@@ -12,35 +12,37 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
-/// An I/O object representing a TCP stream connected to a remote endpoint.
-///
-/// A TCP stream can either be created by connecting to an endpoint, via the
-/// [`connect`] method, or by [accepting] a connection from a [listener].
-///
-/// [`connect`]: struct.TcpStream.html#method.connect
-/// [accepting]: struct.TcpListener.html#method.accept
-/// [listener]: struct.TcpListener.html
-///
-/// # Examples
-///
-/// ```no_run
-/// use tokio::net::TcpStream;
-/// use tokio::prelude::*;
-/// use std::error::Error;
-///
-/// #[tokio::main]
-/// async fn main() -> Result<(), Box<dyn Error>> {
-///     // Connect to a peer
-///     let mut stream = TcpStream::connect("127.0.0.1:8080").await?;
-///
-///     // Write some data.
-///     stream.write_all(b"hello world!").await?;
-///
-///     Ok(())
-/// }
-/// ```
-pub struct TcpStream {
-    io: PollEvented<mio::net::TcpStream>,
+cfg_tcp! {
+    /// A TCP stream between a local and a remote socket.
+    ///
+    /// A TCP stream can either be created by connecting to an endpoint, via the
+    /// [`connect`] method, or by [accepting] a connection from a [listener].
+    ///
+    /// [`connect`]: struct.TcpStream.html#method.connect
+    /// [accepting]: struct.TcpListener.html#method.accept
+    /// [listener]: struct.TcpListener.html
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpStream;
+    /// use tokio::prelude::*;
+    /// use std::error::Error;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     // Connect to a peer
+    ///     let mut stream = TcpStream::connect("127.0.0.1:8080").await?;
+    ///
+    ///     // Write some data.
+    ///     stream.write_all(b"hello world!").await?;
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    pub struct TcpStream {
+        io: PollEvented<mio::net::TcpStream>,
+    }
 }
 
 impl TcpStream {

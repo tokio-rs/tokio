@@ -28,15 +28,18 @@ pub use addr::ToSocketAddrs;
 
 cfg_tcp! {
     pub mod tcp;
-    pub use tcp::{TcpListener, TcpStream};
+    pub use tcp::listener::TcpListener;
+    pub use tcp::stream::TcpStream;
 }
 
 cfg_udp! {
     pub mod udp;
-    pub use udp::UdpSocket;
+    pub use udp::socket::UdpSocket;
 }
 
 cfg_uds! {
     pub mod unix;
-    pub use unix::{UnixDatagram, UnixListener, UnixStream};
+    pub use unix::datagram::UnixDatagram;
+    pub use unix::listener::UnixListener;
+    pub use unix::stream::UnixStream;
 }

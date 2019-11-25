@@ -10,9 +10,11 @@ use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
 use std::task::{Context, Poll};
 
-/// An I/O object representing a Unix datagram socket.
-pub struct UnixDatagram {
-    io: PollEvented<mio_uds::UnixDatagram>,
+cfg_uds! {
+    /// An I/O object representing a Unix datagram socket.
+    pub struct UnixDatagram {
+        io: PollEvented<mio_uds::UnixDatagram>,
+    }
 }
 
 impl UnixDatagram {

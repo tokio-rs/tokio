@@ -3,7 +3,7 @@
 #![cfg(unix)]
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::unix::*;
+use tokio::net::{UnixListener, UnixStream};
 
 use futures::future::try_join;
 
