@@ -5,6 +5,14 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV
 
 /// Convert or resolve without blocking to one or more `SocketAddr` values.
 ///
+/// # DNS
+///
+/// Implementations of `ToSocketAddrs` for string types require a DNS lookup.
+/// These implementations are only provided when Tokio is used with the
+/// **`dns`** feature flag.
+///
+/// # Calling
+///
 /// Currently, this trait is only used as an argument to Tokio functions that
 /// need to reference a target socket address.
 ///

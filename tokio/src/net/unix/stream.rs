@@ -14,13 +14,15 @@ use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// A structure representing a connected Unix socket.
-///
-/// This socket can be connected directly with `UnixStream::connect` or accepted
-/// from a listener with `UnixListener::incoming`. Additionally, a pair of
-/// anonymous Unix sockets can be created with `UnixStream::pair`.
-pub struct UnixStream {
-    io: PollEvented<mio_uds::UnixStream>,
+cfg_uds! {
+    /// A structure representing a connected Unix socket.
+    ///
+    /// This socket can be connected directly with `UnixStream::connect` or accepted
+    /// from a listener with `UnixListener::incoming`. Additionally, a pair of
+    /// anonymous Unix sockets can be created with `UnixStream::pair`.
+    pub struct UnixStream {
+        io: PollEvented<mio_uds::UnixStream>,
+    }
 }
 
 impl UnixStream {

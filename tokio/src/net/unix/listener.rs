@@ -12,9 +12,11 @@ use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
 use std::task::{Context, Poll};
 
-/// A Unix socket which can accept connections from other Unix sockets.
-pub struct UnixListener {
-    io: PollEvented<mio_uds::UnixListener>,
+cfg_uds! {
+    /// A Unix socket which can accept connections from other Unix sockets.
+    pub struct UnixListener {
+        io: PollEvented<mio_uds::UnixListener>,
+    }
 }
 
 impl UnixListener {

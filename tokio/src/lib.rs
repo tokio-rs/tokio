@@ -72,8 +72,8 @@
 //! * Functions for [running blocking operations][blocking] in an asynchronous
 //!   task context.
 //!
-//! The `tokio::task` module is present only when the "rt-core" feature flag is
-//! enabled.
+//! The [`tokio::task`] module is present only when the "rt-core" feature flag
+//! is enabled.
 //!
 //! [tasks]: task/index.html#what-are-tasks
 //! [`tokio::task`]: crate::task
