@@ -2,7 +2,7 @@
 #![cfg(feature = "full")]
 #![cfg(unix)]
 
-use tokio::net::unix::*;
+use tokio::net::UnixDatagram;
 
 use std::io;
 
