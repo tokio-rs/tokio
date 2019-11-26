@@ -393,7 +393,8 @@ impl Scheduler {
         }
 
         CURRENT_TASK_SET.with(|current| {
-            current.set(Some(NonNull::from(self)));
+            let prev = current.replace(Some(NonNull::from(self)));
+            assert!(prev.is_none(), "nested call to local::Scheduler::with");
             let _entered = Entered { current };
             f()
         })
