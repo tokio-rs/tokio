@@ -1,6 +1,6 @@
 # 0.3.0 (November 26, 2019)
 
-- ???
+- Updates for tokio 0.2 release
 
 # 0.3.0-alpha.6 (September 30, 2019)
 
