@@ -56,12 +56,12 @@ pub(super) fn vtable<T: Future, S: Schedule>() -> &'static Vtable {
 
 cfg_rt_threaded! {
     impl RawTask {
-        pub(super) fn new_background<T, S>(task: T) -> RawTask
+        pub(super) fn new_joinable_local<T, S>(task: T) -> RawTask
         where
-            T: Future + Send + 'static,
-            S: ScheduleSendOnly,
+            T: Future + 'static,
+            S: Schedule,
         {
-            RawTask::new::<_, S>(task, State::new_background())
+            RawTask::new::<_, S>(task, State::new_joinable())
         }
     }
 }
@@ -69,8 +69,8 @@ cfg_rt_threaded! {
 impl RawTask {
     pub(super) fn new_joinable<T, S>(task: T) -> RawTask
     where
-        T: Future + 'static,
-        S: Schedule,
+        T: Future + Send + 'static,
+        S: ScheduleSendOnly,
     {
         RawTask::new::<_, S>(task, State::new_joinable())
     }

@@ -216,15 +216,6 @@ cfg_blocking! {
     }
 }
 
-cfg_blocking! {
-    mod blocking;
-    pub use blocking::spawn_blocking;
-
-    cfg_rt_threaded! {
-        pub use blocking::block_in_place;
-    }
-}
-
 mod core;
 use self::core::Cell;
 pub(crate) use self::core::Header;
@@ -312,20 +303,6 @@ pub(crate) trait Schedule: Sized + 'static {
 /// trait is implemented, the corresponding `Task` type will implement `Send`.
 pub(crate) trait ScheduleSendOnly: Schedule + Send + Sync {}
 
-cfg_rt_threaded! {
-    /// Create a new task without an associated join handle
-    pub(crate) fn background<T, S>(task: T) -> Task<S>
-    where
-        T: Future + Send + 'static,
-        S: ScheduleSendOnly,
-    {
-        Task {
-            raw: RawTask::new_background::<_, S>(task),
-            _p: PhantomData,
-        }
-    }
-}
-
 /// Create a new task with an associated join handle
 pub(crate) fn joinable<T, S>(task: T) -> (Task<S>, JoinHandle<T::Output>)
 where
@@ -344,23 +321,24 @@ where
     (task, join)
 }
 
-/// Create a new `!Send` task with an associated join handle
-#[cfg(feature = "rt-threaded")]
-pub(crate) fn joinable_local<T, S>(task: T) -> (Task<S>, JoinHandle<T::Output>)
-where
-    T: Future + 'static,
-    S: Schedule,
-{
-    let raw = RawTask::new_joinable_local::<_, S>(task);
+cfg_rt_threaded! {
+    /// Create a new `!Send` task with an associated join handle
+    pub(crate) fn joinable_local<T, S>(task: T) -> (Task<S>, JoinHandle<T::Output>)
+    where
+        T: Future + 'static,
+        S: Schedule,
+    {
+        let raw = RawTask::new_joinable_local::<_, S>(task);
 
-    let task = Task {
-        raw,
-        _p: PhantomData,
-    };
+        let task = Task {
+            raw,
+            _p: PhantomData,
+        };
 
-    let join = JoinHandle::new(raw);
+        let join = JoinHandle::new(raw);
 
-    (task, join)
+        (task, join)
+    }
 }
 
 impl<S: 'static> Task<S> {

@@ -57,14 +57,6 @@ const INITIAL_STATE: usize = NOTIFIED;
 /// All transitions are performed via RMW operations. This establishes an
 /// unambiguous modification order.
 impl State {
-    /// Starts with a ref count of 1
-    #[cfg(feature = "rt-threaded")]
-    pub(super) fn new_background() -> State {
-        State {
-            val: AtomicUsize::new(INITIAL_STATE),
-        }
-    }
-
     /// Starts with a ref count of 2
     pub(super) fn new_joinable() -> State {
         State {

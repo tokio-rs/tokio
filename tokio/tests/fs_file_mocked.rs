@@ -22,27 +22,6 @@ macro_rules! cfg_io_std {
 
 use futures::future;
 
-macro_rules! ready {
-    ($e:expr $(,)?) => {
-        match $e {
-            std::task::Poll::Ready(t) => t,
-            std::task::Poll::Pending => return std::task::Poll::Pending,
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! cfg_fs {
-    ($($item:item)*) => { $($item)* }
-}
-
-#[macro_export]
-macro_rules! cfg_io_std {
-    ($($item:item)*) => { $($item)* }
-}
-
-use futures::future;
-
 // Load source
 #[allow(warnings)]
 #[path = "../src/fs/file.rs"]

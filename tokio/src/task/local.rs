@@ -543,6 +543,7 @@ mod tests {
 
         let mut rt = runtime::Builder::new()
             .threaded_scheduler()
+            .enable_all()
             .build()
             .unwrap();
         LocalSet::new().block_on(&mut rt, async {
@@ -569,6 +570,7 @@ mod tests {
 
         let mut rt = runtime::Builder::new()
             .threaded_scheduler()
+            .enable_all()
             .build()
             .unwrap();
         LocalSet::new().block_on(&mut rt, async {
@@ -592,6 +594,7 @@ mod tests {
 
         let mut rt = runtime::Builder::new()
             .threaded_scheduler()
+            .enable_all()
             .build()
             .unwrap();
         LocalSet::new().block_on(&mut rt, async {

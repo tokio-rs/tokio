@@ -2,10 +2,10 @@
 
 use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::loom::thread;
-use crate::runtime::blocking::schedule::NoopSchedule;
-use crate::runtime::blocking::shutdown;
-use crate::runtime::blocking::task::BlockingTask;
 use crate::runtime::{self, io, time, Builder, Callback};
+use crate::runtime::blocking::shutdown;
+use crate::runtime::blocking::schedule::NoopSchedule;
+use crate::runtime::blocking::task::BlockingTask;
 use crate::task::{self, JoinHandle};
 
 use std::cell::Cell;
@@ -53,6 +53,7 @@ struct Inner {
 
     /// Source of `Instant::now()`
     clock: time::Clock,
+
 }
 
 struct Shared {

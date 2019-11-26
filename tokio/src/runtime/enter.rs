@@ -56,23 +56,24 @@ pub(crate) fn exit<F: FnOnce() -> R, R>(f: F) -> R {
                 c.set(true);
             });
         }
-
-        ENTERED.with(|c| {
-            debug_assert!(c.get());
-            c.set(false);
-        });
-
-        let reset = Reset;
-        let ret = f();
-        ::std::mem::forget(reset);
-
-        ENTERED.with(|c| {
-            assert!(!c.get(), "closure claimed permanent executor");
-            c.set(true);
-        });
-
-        ret
     }
+
+    ENTERED.with(|c| {
+        debug_assert!(c.get());
+        c.set(false);
+    });
+
+    let reset = Reset;
+    let ret = f();
+    ::std::mem::forget(reset);
+
+    ENTERED.with(|c| {
+        assert!(!c.get(), "closure claimed permanent executor");
+        c.set(true);
+    });
+
+    ret
+}
 
 cfg_blocking_impl! {
     impl Enter {
