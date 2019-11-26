@@ -232,10 +232,10 @@ cfg_rt_core! {
     pub use self::join::JoinHandle;
 }
 
-#[cfg(feature = "rt-threaded")]
-mod local;
-#[cfg(feature = "rt-threaded")]
-pub use self::local::{spawn_local, LocalSet};
+cfg_rt_threaded! {
+    mod local;
+    pub use self::local::{spawn_local, LocalSet};
+}
 
 mod list;
 pub(crate) use self::list::OwnedList;
@@ -394,6 +394,6 @@ impl<S: 'static> Drop for Task<S> {
 
 impl<S> fmt::Debug for Task<S> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.pad("Task")
+        fmt.debug_struct("Task").finish()
     }
 }
