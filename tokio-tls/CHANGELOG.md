@@ -1,3 +1,7 @@
+# 0.3.0 (November 26, 2019)
+
+- ???
+
 # 0.3.0-alpha.6 (September 30, 2019)
 
 - Move to `futures-*-preview 0.3.0-alpha.19`

@@ -30,7 +30,7 @@ the Rust programming language. It is:
 
 [Website](https://tokio.rs) |
 [Guides](https://tokio.rs/docs/) |
-[API Docs](https://docs.rs/tokio/0.2.0-alpha.2/tokio) |
+[API Docs](https://docs.rs/tokio/0.2.0/tokio) |
 [Chat](https://gitter.im/tokio-rs/tokio)
 
 ## Overview
@@ -47,15 +47,15 @@ level, it provides a few major components:
 These components provide the runtime components necessary for building
 an asynchronous application.
 
-[net]: https://docs.rs/tokio/0.2.0-alpha.2/tokio/net/index.html
-[scheduler]: https://docs.rs/tokio/0.2.0-alpha.2/tokio/runtime/index.html
+[net]: https://docs.rs/tokio/0.2.0/tokio/net/index.html
+[scheduler]: https://docs.rs/tokio/0.2.0/tokio/runtime/index.html
 
 ## Example
 
 To get started, add the following to `Cargo.toml`.
 
 ```toml
-tokio = { version = "0.2.0", features = ["full"] }
+tokio = { version = "0.2", features = ["full"] }
 ```
 
 Tokio requires components to be explicitly enabled using feature flags. As a
@@ -116,7 +116,7 @@ the [Tokio Gitter channel][chat]. We would be happy to try to answer your
 question.  Last, if that doesn't work, try opening an [issue] with the question.
 
 [Guides]: https://tokio.rs/docs/
-[API documentation]: https://docs.rs/tokio/0.2.0-alpha.2/tokio
+[API documentation]: https://docs.rs/tokio/0.2
 [chat]: https://gitter.im/tokio-rs/tokio
 [issue]: https://github.com/tokio-rs/tokio/issues/new
 
