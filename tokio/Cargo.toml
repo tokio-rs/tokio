@@ -39,6 +39,7 @@ full = [
   "net",
   "process",
   "rt-core",
+  "rt-util",
   "rt-threaded",
   "signal",
   "stream",
@@ -67,6 +68,7 @@ process = [
 ]
 # Includes basic task execution capabilities
 rt-core = []
+rt-util = []
 rt-threaded = [
   "num_cpus",
   "rt-core",

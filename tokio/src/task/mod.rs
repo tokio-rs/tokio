@@ -232,9 +232,9 @@ cfg_rt_core! {
     pub use self::join::JoinHandle;
 }
 
-cfg_rt_threaded! {
+cfg_rt_util! {
     mod local;
-    pub use self::local::{spawn_local, LocalSet};
+    pub use local::{spawn_local, LocalSet};
 }
 
 mod list;
@@ -321,7 +321,7 @@ where
     (task, join)
 }
 
-cfg_rt_threaded! {
+cfg_rt_util! {
     /// Create a new `!Send` task with an associated join handle
     pub(crate) fn joinable_local<T, S>(task: T) -> (Task<S>, JoinHandle<T::Output>)
     where

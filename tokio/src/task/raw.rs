@@ -54,7 +54,7 @@ pub(super) fn vtable<T: Future, S: Schedule>() -> &'static Vtable {
     }
 }
 
-cfg_rt_threaded! {
+cfg_rt_util! {
     impl RawTask {
         pub(super) fn new_joinable_local<T, S>(task: T) -> RawTask
         where

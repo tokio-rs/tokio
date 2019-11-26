@@ -13,74 +13,74 @@ use std::sync::Mutex;
 use std::task::{Context, Poll};
 
 use pin_project_lite::pin_project;
-
-/// A set of tasks which are executed on the same thread.
-///
-/// In some cases, it is necessary to run one or more futures that do not
-/// implement [`Send`] and thus are unsafe to send between threads. In these
-/// cases, a [local task set] may be used to schedule one or more `!Send`
-/// futures to run together on the same thread.
-///
-/// For example, the following code will not compile:
-///
-/// ```rust,compile_fail
-/// # use tokio::runtime::Runtime;
-/// use std::rc::Rc;
-///
-/// // `Rc` does not implement `Send`, and thus may not be sent between
-/// // threads safely.
-/// let unsend_data = Rc::new("my unsend data...");
-///
-/// let mut rt = Runtime::new().unwrap();
-///
-/// rt.block_on(async move {
-///     let unsend_data = unsend_data.clone();
-///     // Because the `async` block here moves `unsend_data`, the future is `!Send`.
-///     // Since `tokio::spawn` requires the spawned future to implement `Send`, this
-///     // will not compile.
-///     tokio::spawn(async move {
-///         println!("{}", unsend_data);
-///         // ...
-///     }).await.unwrap();
-/// });
-/// ```
-/// In order to spawn `!Send` futures, we can use a local task set to
-/// schedule them on the thread calling [`Runtime::block_on`]. When running
-/// inside of the local task set, we can use [`task::spawn_local`], which can
-/// spawn `!Send` futures. For example:
-///
-/// ```rust
-/// # use tokio::runtime::Runtime;
-/// use std::rc::Rc;
-/// use tokio::task;
-///
-/// let unsend_data = Rc::new("my unsend data...");
-///
-/// let mut rt = Runtime::new().unwrap();
-/// // Construct a local task set that can run `!Send` futures.
-/// let local = task::LocalSet::new();
-///
-/// // Run the local task group.
-/// local.block_on(&mut rt, async move {
-///     let unsend_data = unsend_data.clone();
-///     // `spawn_local` ensures that the future is spawned on the local
-///     // task group.
-///     task::spawn_local(async move {
-///         println!("{}", unsend_data);
-///         // ...
-///     }).await.unwrap();
-/// });
-/// ```
-///
-/// [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
-/// [local task set]: struct.LocalSet.html
-/// [`Runtime::block_on`]: ../struct.Runtime.html#method.block_on
-/// [`task::spawn_local`]: fn.spawn.html
-#[derive(Debug)]
-pub struct LocalSet {
-    scheduler: Rc<Scheduler>,
+cfg_rt_util! {
+    /// A set of tasks which are executed on the same thread.
+    ///
+    /// In some cases, it is necessary to run one or more futures that do not
+    /// implement [`Send`] and thus are unsafe to send between threads. In these
+    /// cases, a [local task set] may be used to schedule one or more `!Send`
+    /// futures to run together on the same thread.
+    ///
+    /// For example, the following code will not compile:
+    ///
+    /// ```rust,compile_fail
+    /// # use tokio::runtime::Runtime;
+    /// use std::rc::Rc;
+    ///
+    /// // `Rc` does not implement `Send`, and thus may not be sent between
+    /// // threads safely.
+    /// let unsend_data = Rc::new("my unsend data...");
+    ///
+    /// let mut rt = Runtime::new().unwrap();
+    ///
+    /// rt.block_on(async move {
+    ///     let unsend_data = unsend_data.clone();
+    ///     // Because the `async` block here moves `unsend_data`, the future is `!Send`.
+    ///     // Since `tokio::spawn` requires the spawned future to implement `Send`, this
+    ///     // will not compile.
+    ///     tokio::spawn(async move {
+    ///         println!("{}", unsend_data);
+    ///         // ...
+    ///     }).await.unwrap();
+    /// });
+    /// ```
+    /// In order to spawn `!Send` futures, we can use a local task set to
+    /// schedule them on the thread calling [`Runtime::block_on`]. When running
+    /// inside of the local task set, we can use [`task::spawn_local`], which can
+    /// spawn `!Send` futures. For example:
+    ///
+    /// ```rust
+    /// # use tokio::runtime::Runtime;
+    /// use std::rc::Rc;
+    /// use tokio::task;
+    ///
+    /// let unsend_data = Rc::new("my unsend data...");
+    ///
+    /// let mut rt = Runtime::new().unwrap();
+    /// // Construct a local task set that can run `!Send` futures.
+    /// let local = task::LocalSet::new();
+    ///
+    /// // Run the local task group.
+    /// local.block_on(&mut rt, async move {
+    ///     let unsend_data = unsend_data.clone();
+    ///     // `spawn_local` ensures that the future is spawned on the local
+    ///     // task group.
+    ///     task::spawn_local(async move {
+    ///         println!("{}", unsend_data);
+    ///         // ...
+    ///     }).await.unwrap();
+    /// });
+    /// ```
+    ///
+    /// [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
+    /// [local task set]: struct.LocalSet.html
+    /// [`Runtime::block_on`]: ../struct.Runtime.html#method.block_on
+    /// [`task::spawn_local`]: fn.spawn.html
+    #[derive(Debug)]
+    pub struct LocalSet {
+        scheduler: Rc<Scheduler>,
+    }
 }
-
 struct Scheduler {
     /// List of all active tasks spawned onto this executor.
     ///
@@ -126,51 +126,53 @@ thread_local! {
     static CURRENT_TASK_SET: Cell<Option<NonNull<Scheduler>>> = Cell::new(None);
 }
 
-/// Spawns a `!Send` future on the local task set.
-///
-/// The spawned future will be run on the same thread that called `spawn_local.`
-/// This may only be called from the context of a local task set.
-///
-/// # Panics
-///
-/// - This function panics if called outside of a local task set.
-///
-/// # Examples
-///
-/// ```rust
-/// # use tokio::runtime::Runtime;
-/// use std::rc::Rc;
-/// use tokio::task;
-///
-/// let unsend_data = Rc::new("my unsend data...");
-///
-/// let mut rt = Runtime::new().unwrap();
-/// let local = task::LocalSet::new();
-///
-/// // Run the local task set.
-/// local.block_on(&mut rt, async move {
-///     let unsend_data = unsend_data.clone();
-///     task::spawn_local(async move {
-///         println!("{}", unsend_data);
-///         // ...
-///     }).await.unwrap();
-/// });
-/// ```
-pub fn spawn_local<F>(future: F) -> JoinHandle<F::Output>
-where
-    F: Future + 'static,
-    F::Output: 'static,
-{
-    CURRENT_TASK_SET.with(|current| {
-        let current = current
-            .get()
-            .expect("`spawn_local` called from outside of a local::LocalSet!");
-        unsafe {
-            let (task, handle) = task::joinable_local(future);
-            current.as_ref().schedule_local(task);
-            handle
-        }
-    })
+cfg_rt_util! {
+    /// Spawns a `!Send` future on the local task set.
+    ///
+    /// The spawned future will be run on the same thread that called `spawn_local.`
+    /// This may only be called from the context of a local task set.
+    ///
+    /// # Panics
+    ///
+    /// - This function panics if called outside of a local task set.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use tokio::runtime::Runtime;
+    /// use std::rc::Rc;
+    /// use tokio::task;
+    ///
+    /// let unsend_data = Rc::new("my unsend data...");
+    ///
+    /// let mut rt = Runtime::new().unwrap();
+    /// let local = task::LocalSet::new();
+    ///
+    /// // Run the local task set.
+    /// local.block_on(&mut rt, async move {
+    ///     let unsend_data = unsend_data.clone();
+    ///     task::spawn_local(async move {
+    ///         println!("{}", unsend_data);
+    ///         // ...
+    ///     }).await.unwrap();
+    /// });
+    /// ```
+    pub fn spawn_local<F>(future: F) -> JoinHandle<F::Output>
+    where
+        F: Future + 'static,
+        F::Output: 'static,
+    {
+        CURRENT_TASK_SET.with(|current| {
+            let current = current
+                .get()
+                .expect("`spawn_local` called from outside of a local::LocalSet!");
+            unsafe {
+                let (task, handle) = task::joinable_local(future);
+                current.as_ref().schedule_local(task);
+                handle
+            }
+        })
+    }
 }
 
 /// Max number of tasks to poll per tick.
