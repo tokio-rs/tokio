@@ -12,7 +12,7 @@ another. This changelog entry contains a highlight
 - I/O driver uses a concurrent slab for allocating state.
 - components are made available via feature flag.
 - Use `bytes` 0.5
-- `tokio::codec` is moved to `tokio-util`.[
+- `tokio::codec` is moved to `tokio-util`.
 
 ### Removed
 - Standalone `timer` and `net` drivers are removed, use `Runtime` instead
