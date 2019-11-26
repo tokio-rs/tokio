@@ -16,14 +16,39 @@ use std::sync::atomic::Ordering::{Acquire, Release};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-/// The readable half of a value returned from `split`.
-pub struct ReadHalf<T> {
-    inner: Arc<Inner<T>>,
-}
+cfg_io_util! {
+    /// The readable half of a value returned from `split`.
+    pub struct ReadHalf<T> {
+        inner: Arc<Inner<T>>,
+    }
 
-/// The writable half of a value returned from `split`.
-pub struct WriteHalf<T> {
-    inner: Arc<Inner<T>>,
+    /// The writable half of a value returned from `split`.
+    pub struct WriteHalf<T> {
+        inner: Arc<Inner<T>>,
+    }
+
+    /// Split a single value implementing `AsyncRead + AsyncWrite` into separate
+    /// `AsyncRead` and `AsyncWrite` handles.
+    ///
+    /// To restore this read/write object from its `split::ReadHalf` and
+    /// `split::WriteHalf` use `unsplit`.
+    pub fn split<T>(stream: T) -> (ReadHalf<T>, WriteHalf<T>)
+    where
+        T: AsyncRead + AsyncWrite,
+    {
+        let inner = Arc::new(Inner {
+            locked: AtomicBool::new(false),
+            stream: UnsafeCell::new(stream),
+        });
+
+        let rd = ReadHalf {
+            inner: inner.clone(),
+        };
+
+        let wr = WriteHalf { inner };
+
+        (rd, wr)
+    }
 }
 
 struct Inner<T> {
@@ -33,29 +58,6 @@ struct Inner<T> {
 
 struct Guard<'a, T> {
     inner: &'a Inner<T>,
-}
-
-/// Split a single value implementing `AsyncRead + AsyncWrite` into separate
-/// `AsyncRead` and `AsyncWrite` handles.
-///
-/// To restore this read/write object from its `split::ReadHalf` and
-/// `split::WriteHalf` use `unsplit`.
-pub fn split<T>(stream: T) -> (ReadHalf<T>, WriteHalf<T>)
-where
-    T: AsyncRead + AsyncWrite,
-{
-    let inner = Arc::new(Inner {
-        locked: AtomicBool::new(false),
-        stream: UnsafeCell::new(stream),
-    });
-
-    let rd = ReadHalf {
-        inner: inner.clone(),
-    };
-
-    let wr = WriteHalf { inner };
-
-    (rd, wr)
 }
 
 impl<T> ReadHalf<T> {

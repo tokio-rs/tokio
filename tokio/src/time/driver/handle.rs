@@ -1,6 +1,4 @@
 use crate::time::driver::Inner;
-use crate::time::Error;
-
 use std::cell::RefCell;
 use std::fmt;
 use std::marker::PhantomData;
@@ -24,7 +22,7 @@ thread_local! {
 }
 
 #[derive(Debug)]
-///Unsets default timer handler on drop.
+/// Guard that unsets the current default timer on drop.
 pub(crate) struct DefaultGuard<'a> {
     prev: Option<HandlePriv>,
     _lifetime: PhantomData<&'a u8>,
@@ -39,7 +37,7 @@ impl Drop for DefaultGuard<'_> {
     }
 }
 
-///Sets handle to default timer, returning guard that unsets it on drop.
+/// Sets handle to default timer, returning guard that unsets it on drop.
 ///
 /// # Panics
 ///
@@ -82,11 +80,13 @@ impl Default for Handle {
 impl HandlePriv {
     /// Try to get a handle to the current timer.
     ///
-    /// Returns `Err` if no handle is found.
-    pub(crate) fn try_current() -> Result<HandlePriv, Error> {
+    /// # Panics
+    ///
+    /// This function panics if there is no current timer set.
+    pub(crate) fn current() -> Self {
         CURRENT_TIMER.with(|current| match *current.borrow() {
-            Some(ref handle) => Ok(handle.clone()),
-            None => Err(Error::shutdown()),
+            Some(ref handle) => handle.clone(),
+            None => panic!("no current timer"),
         })
     }
 

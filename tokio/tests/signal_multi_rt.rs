@@ -1,5 +1,6 @@
-#![cfg(unix)]
 #![warn(rust_2018_idioms)]
+#![cfg(feature = "full")]
+#![cfg(unix)]
 
 mod support {
     pub mod signal;
@@ -48,6 +49,7 @@ fn multi_loop() {
 fn rt() -> Runtime {
     tokio::runtime::Builder::new()
         .basic_scheduler()
+        .enable_all()
         .build()
         .unwrap()
 }

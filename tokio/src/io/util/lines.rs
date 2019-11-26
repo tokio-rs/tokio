@@ -11,6 +11,7 @@ pin_project! {
     /// Stream for the [`lines`](crate::io::AsyncBufReadExt::lines) method.
     #[derive(Debug)]
     #[must_use = "streams do nothing unless polled"]
+    #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
     pub struct Lines<R> {
         #[pin]
         reader: R,

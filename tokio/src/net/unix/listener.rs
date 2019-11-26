@@ -1,6 +1,6 @@
 use crate::future::poll_fn;
+use crate::io::PollEvented;
 use crate::net::unix::{Incoming, UnixStream};
-use crate::net::util::PollEvented;
 
 use mio::Ready;
 use mio_uds;
@@ -12,9 +12,11 @@ use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
 use std::task::{Context, Poll};
 
-/// A Unix socket which can accept connections from other Unix sockets.
-pub struct UnixListener {
-    io: PollEvented<mio_uds::UnixListener>,
+cfg_uds! {
+    /// A Unix socket which can accept connections from other Unix sockets.
+    pub struct UnixListener {
+        io: PollEvented<mio_uds::UnixListener>,
+    }
 }
 
 impl UnixListener {
@@ -102,7 +104,7 @@ impl TryFrom<UnixListener> for mio_uds::UnixListener {
     /// See [`PollEvented::into_inner`] for more details about
     /// resource deregistration that happens during the call.
     ///
-    /// [`PollEvented::into_inner`]: crate::util::PollEvented::into_inner
+    /// [`PollEvented::into_inner`]: crate::io::PollEvented::into_inner
     fn try_from(value: UnixListener) -> Result<Self, Self::Error> {
         value.io.into_inner()
     }

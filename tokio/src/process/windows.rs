@@ -15,7 +15,7 @@
 //! `RegisterWaitForSingleObject` and then wait on the other end of the oneshot
 //! from then on out.
 
-use crate::net::util::PollEvented;
+use crate::io::PollEvented;
 use crate::process::kill::Kill;
 use crate::process::SpawnedChild;
 use crate::sync::oneshot;

@@ -1,5 +1,6 @@
-#![cfg(unix)]
 #![warn(rust_2018_idioms)]
+#![cfg(feature = "full")]
+#![cfg(unix)]
 
 use tokio::signal::unix::{signal, SignalKind};
 

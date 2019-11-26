@@ -4,6 +4,7 @@ use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite};
 use pin_project_lite::pin_project;
 use std::fmt;
 use std::io::{self, Write};
+use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -28,7 +29,7 @@ pin_project! {
     /// [`AsyncWrite`]: AsyncWrite
     /// [`flush`]: super::AsyncWriteExt::flush
     ///
-    // TODO: Examples
+    #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
     pub struct BufWriter<W> {
         #[pin]
         pub(super) inner: W,
@@ -152,7 +153,7 @@ impl<W: AsyncWrite + AsyncRead> AsyncRead for BufWriter<W> {
     }
 
     // we can't skip unconditionally because of the large buffer case in read.
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
+    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [MaybeUninit<u8>]) -> bool {
         self.get_ref().prepare_uninitialized_buffer(buf)
     }
 }

@@ -46,17 +46,15 @@ pub(crate) fn try_enter() -> Option<Enter> {
 //
 // This is hidden for a reason. Do not use without fully understanding
 // executors. Misuing can easily cause your program to deadlock.
-cfg_rt_threaded! {
-    #[cfg(feature = "blocking")]
-    pub(crate) fn exit<F: FnOnce() -> R, R>(f: F) -> R {
-        // Reset in case the closure panics
-        struct Reset;
-        impl Drop for Reset {
-            fn drop(&mut self) {
-                ENTERED.with(|c| {
-                    c.set(true);
-                });
-            }
+#[cfg(all(feature = "rt-threaded", feature = "blocking"))]
+pub(crate) fn exit<F: FnOnce() -> R, R>(f: F) -> R {
+    // Reset in case the closure panics
+    struct Reset;
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            ENTERED.with(|c| {
+                c.set(true);
+            });
         }
 
         ENTERED.with(|c| {
@@ -76,6 +74,7 @@ cfg_rt_threaded! {
         ret
     }
 
+cfg_blocking_impl! {
     impl Enter {
         /// Blocks the thread on the specified future, returning the value with
         /// which that future completes.
@@ -83,7 +82,7 @@ cfg_rt_threaded! {
         where
             F: std::future::Future,
         {
-            use crate::runtime::park::{CachedParkThread, Park};
+            use crate::park::{CachedParkThread, Park};
             use std::pin::Pin;
             use std::task::Context;
             use std::task::Poll::Ready;

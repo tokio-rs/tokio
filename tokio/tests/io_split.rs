@@ -1,5 +1,7 @@
-use tokio::io::split::{ReadHalf, WriteHalf};
-use tokio::io::{split, AsyncRead, AsyncWrite};
+#![warn(rust_2018_idioms)]
+#![cfg(feature = "full")]
+
+use tokio::io::{split, AsyncRead, AsyncWrite, ReadHalf, WriteHalf};
 
 use std::io;
 use std::pin::Pin;

@@ -1,4 +1,3 @@
-use crate::blocking;
 use crate::task::JoinHandle;
 
 cfg_rt_threaded! {
@@ -60,6 +59,6 @@ cfg_blocking! {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        blocking::spawn_blocking(f)
+        crate::runtime::spawn_blocking(f)
     }
 }

@@ -1,4 +1,5 @@
 #![warn(rust_2018_idioms)]
+#![cfg(feature = "full")]
 
 use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
@@ -29,6 +30,7 @@ fn spawned_task_does_not_progress_without_block_on() {
 fn rt() -> Runtime {
     tokio::runtime::Builder::new()
         .basic_scheduler()
+        .enable_all()
         .build()
         .unwrap()
 }

@@ -69,15 +69,6 @@ cfg_rt_threaded! {
 impl RawTask {
     pub(super) fn new_joinable<T, S>(task: T) -> RawTask
     where
-        T: Future + Send + 'static,
-        S: ScheduleSendOnly,
-    {
-        RawTask::new::<_, S>(task, State::new_joinable())
-    }
-
-    #[cfg(feature = "rt-threaded")]
-    pub(super) fn new_joinable_local<T, S>(task: T) -> RawTask
-    where
         T: Future + 'static,
         S: Schedule,
     {

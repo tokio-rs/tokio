@@ -11,6 +11,7 @@ use log::trace;
 use pin_project_lite::pin_project;
 use std::fmt;
 use std::io::{self, BufRead, Read};
+use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -284,7 +285,7 @@ impl<T: BufRead> BufRead for FramedWrite2<T> {
 }
 
 impl<T: AsyncRead> AsyncRead for FramedWrite2<T> {
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
+    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [MaybeUninit<u8>]) -> bool {
         self.inner.prepare_uninitialized_buffer(buf)
     }
 

@@ -1,46 +1,23 @@
-This changelog only applies to the `tokio` crate proper. Each sub crate
-maintains its own changelog tracking changes made in each respective sub crate.
+# 0.2.0 (November 26, 2019)
 
-# 0.2.0-alpha.6 (September 30, 2019)
-
-- Move to `futures-*-preview 0.3.0-alpha.19`
-- Move to `pin-project 0.4`
-
-# 0.2.0-alpha.5 (September 19, 2019)
+A major breaking change. Most implementation and APIs have changed one way or
+another. This changelog entry contains a highlight
 
 ### Changed
-- rename `sleep` to `delay_for` (#1518).
-- rename `Lock` to `Mutex` and make it more like `std::sync::Mutex` (#1573).
+- APIs are updated to use `async / await`.
+- most `tokio-*` crates are collapsed into this crate.
+- Scheduler is rewritten.
+- `tokio::spawn` returns a `JoinHandle`.
+- A single I/O / timer is used per runtime.
+- I/O driver uses a concurrent slab for allocating state.
+- components are made available via feature flag.
+- Use `bytes` 0.5
+- `tokio::codec` is moved to `tokio-util`.
 
-### Added
-- add generic `split` for `AsyncRead + AsyncWrite` (#1521).
-
-# 0.2.0-alpha.4 (August 29, 2019)
-
-- Track tokio-net release.
-
-# 0.2.0-alpha.3 (August 28, 2019)
-
-### Changed
-- `delay(...)` instead of `Delay::new(...)` (#1440).
-- use `tracing` instead of `log` (#1454).
-
-### Added
-- re-export `tokio_net::signal::ctrl_c()` (#1491).
-
-# 0.2.0-alpha.2 (August 17, 2019)
-
-### Changed
-- Update `futures` dependency to 0.3.0-alpha.18.
-- Remove `reactor` module.
-
-### Added
-- Add `BufReader` / `BufWriter` (#1438).
-- Update `UdpFramed` to `std::future` (#1370).
-
-# 0.2.0-alpha.1 (August 8, 2019)
-
-- Switch to `async`, `await`, and `std::future`.
+### Removed
+- Standalone `timer` and `net` drivers are removed, use `Runtime` instead
+- `current_thread` runtime is removed, use `tokio::runtime::Runtime` with
+  `basic_scheduler` instead.
 
 # 0.1.21 (May 30, 2019)
 

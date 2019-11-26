@@ -28,7 +28,7 @@ impl<T: 'static> TransferStack<T> {
 
             // At this point, the queue_next field may also be used to track
             // whether or not the task must drop the join waker.
-            debug_assert_eq!(0, next & 1);
+            debug_assert_eq!(0, next & !1);
 
             // We don't care about any memory associated w/ setting the `head`
             // field, just the current value.

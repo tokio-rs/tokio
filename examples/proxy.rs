@@ -22,12 +22,13 @@
 
 #![warn(rust_2018_idioms)]
 
-use futures::{future::try_join, FutureExt};
-use std::{env, error::Error};
-use tokio::{
-    io::AsyncReadExt,
-    net::{TcpListener, TcpStream},
-};
+use tokio::io;
+use tokio::net::{TcpListener, TcpStream};
+
+use futures::future::try_join;
+use futures::FutureExt;
+use std::env;
+use std::error::Error;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -58,8 +59,8 @@ async fn transfer(mut inbound: TcpStream, proxy_addr: String) -> Result<(), Box<
     let (mut ri, mut wi) = inbound.split();
     let (mut ro, mut wo) = outbound.split();
 
-    let client_to_server = ri.copy(&mut wo);
-    let server_to_client = ro.copy(&mut wi);
+    let client_to_server = io::copy(&mut ri, &mut wo);
+    let server_to_client = io::copy(&mut ro, &mut wi);
 
     try_join(client_to_server, server_to_client).await?;
 

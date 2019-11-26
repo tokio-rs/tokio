@@ -4,7 +4,7 @@ use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Mutex;
 
 use std::fmt;
-use std::sync::atomic::Ordering::{self, AcqRel, Relaxed, SeqCst};
+use std::sync::atomic::Ordering::{self, SeqCst};
 
 pub(super) struct Idle {
     /// Tracks both the number of searching workers and the number of unparked
@@ -89,12 +89,7 @@ impl Idle {
     }
 
     pub(super) fn transition_worker_to_searching(&self) -> bool {
-        // Using `Relaxed` ordering is acceptable here as it is just an
-        // optimization. This load has does not need to synchronize with
-        // anything, and the algorithm is correct no matter what the load
-        // returns (as in, it could return absolutely any `usize` value and the
-        // pool would be correct.
-        let state = State::load(&self.state, Relaxed);
+        let state = State::load(&self.state, SeqCst);
         if 2 * state.num_searching() >= self.num_workers {
             return false;
         }
@@ -102,9 +97,7 @@ impl Idle {
         // It is possible for this routine to allow more than 50% of the workers
         // to search. That is OK. Limiting searchers is only an optimization to
         // prevent too much contention.
-        //
-        // At this point, we do not need a hard synchronization with `notify_work`, so `AcqRel` is sufficient.
-        State::inc_num_searching(&self.state, AcqRel);
+        State::inc_num_searching(&self.state, SeqCst);
         true
     }
 
@@ -140,7 +133,7 @@ impl Idle {
     }
 
     fn notify_should_wakeup(&self) -> bool {
-        let state = State::load(&self.state, SeqCst);
+        let state = State(self.state.fetch_add(0, SeqCst));
         state.num_searching() == 0 && state.num_unparked() < self.num_workers
     }
 }
