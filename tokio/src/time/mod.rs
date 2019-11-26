@@ -94,7 +94,7 @@ pub use interval::{interval, interval_at, Interval};
 
 mod timeout;
 #[doc(inline)]
-pub use timeout::{timeout, timeout_at, Timeout};
+pub use timeout::{timeout, timeout_at, Timeout, Elapsed};
 
 mod wheel;
 
