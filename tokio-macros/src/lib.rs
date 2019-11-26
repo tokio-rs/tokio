@@ -26,6 +26,28 @@ enum Runtime {
     Threaded,
 }
 
+fn parse_duration(lit: &syn::Lit) -> Result<std::time::Duration, syn::Error> {
+    match lit {
+        syn::Lit::Int(expr) => {
+            match expr.base10_parse::<u64>() {
+                Ok(v) => Ok(std::time::Duration::from_millis(v)),
+                Err(_) => {
+                    Err(syn::Error::new_spanned(lit, "unable to parse integer literal"))
+                },
+            }
+        },
+        syn::Lit::Str(expr) => {
+            humantime::parse_duration(&expr.value()).map_err(|err| {
+                let msg = format!("unable to parse duration string: {}", err);
+                syn::Error::new_spanned(lit, msg)
+            })
+        },
+        _ => {
+            Err(syn::Error::new_spanned(lit, "expected an integer or string literal specifying duration"))
+        }
+    }
+}
+
 fn parse_knobs(
     input: syn::ItemFn,
     args: syn::AttributeArgs,
@@ -47,6 +69,7 @@ fn parse_knobs(
     let mut runtime = None;
     let mut core_threads = None;
     let mut max_threads = None;
+    let mut timeout_opt: Option<std::time::Duration> = None;
 
     for arg in args {
         match arg {
@@ -114,8 +137,16 @@ fn parse_knobs(
                             ))
                         }
                     },
+                    "timeout" if is_test => {
+                        timeout_opt = Some(parse_duration(&namevalue.lit)?);
+                    },
                     name => {
-                        let msg = format!("Unknown attribute pair {} is specified; expected one of: `core_threads`, `max_threads`", name);
+                        let allowed_attributes = if is_test {
+                            "`core_threads`, `max_threads`, `timeout`"
+                        } else {
+                            "`core_threads`, `max_threads`"
+                        };
+                        let msg = format!("Unknown attribute pair {} is specified; expected one of: {}", name, allowed_attributes);
                         return Err(syn::Error::new_spanned(namevalue, msg));
                     }
                 }
@@ -167,15 +198,43 @@ fn parse_knobs(
         }
     };
 
+    let async_body = match timeout_opt {
+        Some(timeout) => {
+            let name_as_string = name.to_string();
+            let msg = format!("test `{}` timed out", &name_as_string);
+            let msg_lit = syn::Lit::Str(syn::LitStr::new(&msg, name.span()));
+
+            let timeout_secs_str = format!("{}", timeout.as_secs());
+            let timeout_secs = syn::Lit::Int(syn::LitInt::new(&timeout_secs_str, name.span()));
+            let timeout_subsec_nanos_str = format!("{}", timeout.subsec_nanos());
+            let timeout_subsec_nanos = syn::Lit::Int(syn::LitInt::new(&timeout_subsec_nanos_str, name.span()));
+
+            quote! {
+                let async_body = async {
+                    let duration = std::time::Duration::new(#timeout_secs, #timeout_subsec_nanos);
+                    let body = async { #body };
+                    match tokio::time::timeout(duration, body).await {
+                        Ok(result) => result,
+                        Err(_) => panic!(#msg_lit),
+                    }
+                };
+            }
+        }
+        None => quote! {
+            let async_body = async { #body };
+        },
+    };
+
     let result = quote! {
         #header
         #(#attrs)*
         #vis fn #name(#inputs) #ret {
+            #async_body
             #rt
                 .enable_all()
                 .build()
                 .unwrap()
-                .block_on(async { #body })
+                .block_on(async_body)
         }
     };
 
