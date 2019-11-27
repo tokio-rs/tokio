@@ -54,7 +54,7 @@ use std::{cmp, fmt};
 /// instant, and processes each entry for that slot. When the timer reaches the
 /// end of the wheel, it starts again at the beginning.
 ///
-/// The implementation maintains six wheels arranged in a set of levels.  As the
+/// The implementation maintains six wheels arranged in a set of levels. As the
 /// levels go up, the slots of the associated wheel represent larger intervals
 /// of time. At each level, the wheel has 64 slots. Each slot covers a range of
 /// time equal to the wheel at the lower level. At level zero, each slot

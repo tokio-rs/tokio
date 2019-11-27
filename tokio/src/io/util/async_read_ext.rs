@@ -161,7 +161,7 @@ cfg_io_util! {
         ///
         /// If the operation encounters an "end of file" before completely
         /// filling the buffer, it returns an error of the kind
-        /// [`ErrorKind::UnexpectedEof`].  The contents of `buf` are unspecified
+        /// [`ErrorKind::UnexpectedEof`]. The contents of `buf` are unspecified
         /// in this case.
         ///
         /// If any other read error is encountered then the operation

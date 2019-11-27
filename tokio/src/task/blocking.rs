@@ -5,7 +5,7 @@ cfg_rt_threaded! {
     ///
     /// In general, issuing a blocking call or performing a lot of compute in a
     /// future without yielding is not okay, as it may prevent the executor from
-    /// driving other futures forward.  If you run a closure through this method,
+    /// driving other futures forward. If you run a closure through this method,
     /// the current executor thread will relegate all its executor duties to another
     /// (possibly new) thread, and only then poll the task. Note that this requires
     /// additional synchronization.

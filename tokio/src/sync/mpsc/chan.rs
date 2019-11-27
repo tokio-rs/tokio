@@ -279,7 +279,7 @@ where
                             // TODO: This check may not be required as it most
                             // likely can only return `true` at this point. A
                             // channel is closed when all tx handles are
-                            // dropped.  Dropping a tx handle releases memory,
+                            // dropped. Dropping a tx handle releases memory,
                             // which ensures that if dropping the tx handle is
                             // visible, then all messages sent are also visible.
                             assert!(self.inner.semaphore.is_idle());

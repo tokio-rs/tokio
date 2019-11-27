@@ -30,7 +30,7 @@ cfg_io_driver! {
     /// ## Platform-specific events
     ///
     /// `Registration` also allows receiving platform-specific `mio::Ready`
-    /// events.  These events are included as part of the read readiness event
+    /// events. These events are included as part of the read readiness event
     /// stream. The write readiness event stream is only for `Ready::writable()`
     /// events.
     ///

@@ -538,7 +538,7 @@ where
     }
 
     unsafe fn wake_join(&self) {
-        // LOOM: ensure we can  make this call
+        // LOOM: ensure we can make this call
         self.trailer().waker.check();
         self.trailer().waker.with_unchecked(|ptr| {
             (*(*ptr).as_ptr())
