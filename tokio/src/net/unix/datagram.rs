@@ -1,5 +1,5 @@
 use crate::future::poll_fn;
-use crate::net::util::IoResource;
+use crate::io::IoResource;
 
 use mio;
 use std::convert::TryFrom;
@@ -11,9 +11,11 @@ use std::os::unix::net;
 use std::path::Path;
 use std::task::{Context, Poll};
 
-/// An I/O object representing a Unix datagram socket.
-pub struct UnixDatagram {
-    io: IoResource<mio::net::UnixDatagram>,
+cfg_uds! {
+    /// An I/O object representing a Unix datagram socket.
+    pub struct UnixDatagram {
+        io: IoResource<mio::net::UnixDatagram>,
+    }
 }
 
 impl UnixDatagram {
@@ -205,7 +207,7 @@ impl TryFrom<UnixDatagram> for mio::net::UnixDatagram {
     /// See [`IoResource::into_inner`] for more details about
     /// resource deregistration that happens during the call.
     ///
-    /// [`IoResource::into_inner`]: crate::util::IoResource::into_inner
+    /// [`IoResource::into_inner`]: crate::io::IoResource::into_inner
     fn try_from(value: UnixDatagram) -> Result<Self, Self::Error> {
         value.io.into_inner()
     }

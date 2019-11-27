@@ -1,4 +1,4 @@
-use crate::runtime::{Park, Unpark};
+use crate::park::{Park, Unpark};
 use crate::time::driver::{self, Driver};
 use crate::time::{Clock, Duration, Instant};
 

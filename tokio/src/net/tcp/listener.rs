@@ -1,6 +1,6 @@
 use crate::future::poll_fn;
+use crate::io::IoResource;
 use crate::net::tcp::{Incoming, TcpStream};
-use crate::net::util::IoResource;
 use crate::net::ToSocketAddrs;
 
 use std::convert::TryFrom;
@@ -9,28 +9,30 @@ use std::io;
 use std::net::SocketAddr;
 use std::task::{Context, Poll};
 
-/// An I/O object representing a TCP socket listening for incoming connections.
-///
-/// # Examples
-///
-/// ```no_run
-/// use tokio::net::TcpListener;
-///
-/// use std::io;
-/// # async fn process_socket<T>(_socket: T) {}
-///
-/// #[tokio::main]
-/// async fn main() -> io::Result<()> {
-///     let mut listener = TcpListener::bind("127.0.0.1:8080").await?;
-///
-///     loop {
-///         let (socket, _) = listener.accept().await?;
-///         process_socket(socket).await;
-///     }
-/// }
-/// ```
-pub struct TcpListener {
-    io: IoResource<mio::net::TcpListener>,
+cfg_tcp! {
+    /// A TCP socket server, listening for connections.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpListener;
+    ///
+    /// use std::io;
+    /// # async fn process_socket<T>(_socket: T) {}
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let mut listener = TcpListener::bind("127.0.0.1:8080").await?;
+    ///
+    ///     loop {
+    ///         let (socket, _) = listener.accept().await?;
+    ///         process_socket(socket).await;
+    ///     }
+    /// }
+    /// ```
+    pub struct TcpListener {
+        io: IoResource<mio::net::TcpListener>,
+    }
 }
 
 impl TcpListener {
@@ -218,18 +220,42 @@ impl TcpListener {
         self.io.get_ref().local_addr()
     }
 
-    /// Consumes this listener, returning a stream of the sockets this listener
-    /// accepts.
+    /// Returns a stream over the connections being received on this listener.
     ///
-    /// This method returns an implementation of the `Stream` trait which
-    /// resolves to the sockets the are accepted on this listener.
+    /// The returned stream will never return `None` and will also not yield the
+    /// peer's `SocketAddr` structure. Iterating over it is equivalent to
+    /// calling accept in a loop.
     ///
     /// # Errors
     ///
-    /// Note that accepting a connection can lead to various errors and not all of them are
-    /// necessarily fatal ‒ for example having too many open file descriptors or the other side
-    /// closing the connection while it waits in an accept queue. These would terminate the stream
-    /// if not handled in any way.
+    /// Note that accepting a connection can lead to various errors and not all
+    /// of them are necessarily fatal ‒ for example having too many open file
+    /// descriptors or the other side closing the connection while it waits in
+    /// an accept queue. These would terminate the stream if not handled in any
+    /// way.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpListener;
+    ///
+    /// use futures::StreamExt;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
+    ///     let mut incoming = listener.incoming();
+    ///
+    ///     while let Some(stream) = incoming.next().await {
+    ///         match stream {
+    ///             Ok(stream) => {
+    ///                 println!("new client!");
+    ///             }
+    ///             Err(e) => { /* connection failed */ }
+    ///         }
+    ///     }
+    /// }
+    /// ```
     pub fn incoming(&mut self) -> Incoming<'_> {
         Incoming::new(self)
     }
@@ -295,7 +321,7 @@ impl TryFrom<TcpListener> for mio::net::TcpListener {
     /// See [`IoResource::into_inner`] for more details about
     /// resource deregistration that happens during the call.
     ///
-    /// [`IoResource::into_inner`]: crate::util::IoResource::into_inner
+    /// [`IoResource::into_inner`]: crate::io::IoResource::into_inner
     fn try_from(value: TcpListener) -> Result<Self, Self::Error> {
         value.io.into_inner()
     }

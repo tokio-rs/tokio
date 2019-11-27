@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-util/0.2.0-alpha.6")]
+#![doc(html_root_url = "https://docs.rs/tokio-util/0.2.0")]
 #![warn(
     missing_debug_implementations,
     missing_docs,
@@ -10,8 +10,17 @@
     no_crate_inject,
     attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
 ))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 //! Utilities for working with Tokio.
 
-pub mod codec;
-pub mod udp;
+#[macro_use]
+mod cfg;
+
+cfg_codec! {
+    pub mod codec;
+}
+
+cfg_udp! {
+    pub mod udp;
+}

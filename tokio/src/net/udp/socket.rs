@@ -1,6 +1,6 @@
 use crate::future::poll_fn;
-use crate::net::udp::split::{split, UdpSocketRecvHalf, UdpSocketSendHalf};
-use crate::net::util::IoResource;
+use crate::io::IoResource;
+use crate::net::udp::split::{split, RecvHalf, SendHalf};
 use crate::net::ToSocketAddrs;
 
 use std::convert::TryFrom;
@@ -9,9 +9,11 @@ use std::io;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::task::{Context, Poll};
 
-/// An I/O object representing a UDP socket.
-pub struct UdpSocket {
-    io: IoResource<mio::net::UdpSocket>,
+cfg_udp! {
+    /// A UDP socket
+    pub struct UdpSocket {
+        io: IoResource<mio::net::UdpSocket>,
+    }
 }
 
 impl UdpSocket {
@@ -67,7 +69,7 @@ impl UdpSocket {
     ///
     /// See the module level documenation of [`split`](super::split) for more
     /// details.
-    pub fn split(self) -> (UdpSocketRecvHalf, UdpSocketSendHalf) {
+    pub fn split(self) -> (RecvHalf, SendHalf) {
         split(self)
     }
 
@@ -367,7 +369,7 @@ impl TryFrom<UdpSocket> for mio::net::UdpSocket {
     /// See [`IoResource::into_inner`] for more details about
     /// resource deregistration that happens during the call.
     ///
-    /// [`IoResource::into_inner`]: crate::util::IoResource::into_inner
+    /// [`IoResource::into_inner`]: crate::io::IoResource::into_inner
     fn try_from(value: UdpSocket) -> Result<Self, Self::Error> {
         value.io.into_inner()
     }

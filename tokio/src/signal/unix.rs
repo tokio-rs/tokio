@@ -5,8 +5,7 @@
 
 #![cfg(unix)]
 
-use crate::io::AsyncRead;
-use crate::net::util::IoResource;
+use crate::io::{AsyncRead, IoResource};
 use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
 use crate::sync::mpsc::{channel, Receiver};
 

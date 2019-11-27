@@ -1,3 +1,5 @@
+#![cfg(not(loom))]
+
 //! TCP/UDP/Unix bindings for `tokio`.
 //!
 //! This module contains the TCP/UDP/Unix networking types, similar to the standard
@@ -9,7 +11,7 @@
 //! * [`UdpSocket`] provides functionality for communication over UDP
 //! * [`UnixListener`] and [`UnixStream`] provide functionality for communication over a
 //! Unix Domain Stream Socket **(available on Unix only)**
-//! * [`UnixDatagram`] and [`UnixDatagramFramed`] provide functionality for communication
+//! * [`UnixDatagram`] provides functionality for communication
 //! over Unix Domain Datagram Socket **(available on Unix only)**
 
 //!
@@ -19,27 +21,24 @@
 //! [`UnixListener`]: struct.UnixListener.html
 //! [`UnixStream`]: struct.UnixStream.html
 //! [`UnixDatagram`]: struct.UnixDatagram.html
-//! [`UnixDatagramFramed`]: struct.UnixDatagramFramed.html
 
 mod addr;
 pub use addr::ToSocketAddrs;
 
-cfg_io_driver! {
-    pub mod driver;
-    pub mod util;
-}
-
 cfg_tcp! {
     pub mod tcp;
-    pub use tcp::{TcpListener, TcpStream};
+    pub use tcp::listener::TcpListener;
+    pub use tcp::stream::TcpStream;
 }
 
 cfg_udp! {
     pub mod udp;
-    pub use udp::UdpSocket;
+    pub use udp::socket::UdpSocket;
 }
 
 cfg_uds! {
     pub mod unix;
-    pub use unix::{UnixDatagram, UnixListener, UnixStream};
+    pub use unix::datagram::UnixDatagram;
+    pub use unix::listener::UnixListener;
+    pub use unix::stream::UnixStream;
 }

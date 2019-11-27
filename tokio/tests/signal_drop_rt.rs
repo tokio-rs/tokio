@@ -1,5 +1,6 @@
-#![cfg(unix)]
 #![warn(rust_2018_idioms)]
+#![cfg(feature = "full")]
+#![cfg(unix)]
 
 mod support {
     pub mod signal;
@@ -38,6 +39,7 @@ fn dropping_loops_does_not_cause_starvation() {
 fn rt() -> Runtime {
     tokio::runtime::Builder::new()
         .basic_scheduler()
+        .enable_all()
         .build()
         .unwrap()
 }

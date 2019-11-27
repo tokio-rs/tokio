@@ -1,4 +1,5 @@
 #![warn(rust_2018_idioms)]
+#![cfg(feature = "full")]
 
 use tokio::time::*;
 
@@ -27,7 +28,11 @@ fn timer_with_threaded_runtime() {
 fn timer_with_basic_scheduler() {
     use tokio::runtime::Builder;
 
-    let mut rt = Builder::new().basic_scheduler().build().unwrap();
+    let mut rt = Builder::new()
+        .basic_scheduler()
+        .enable_all()
+        .build()
+        .unwrap();
     let (tx, rx) = mpsc::channel();
 
     rt.block_on(async move {

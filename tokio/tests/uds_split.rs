@@ -1,5 +1,6 @@
+#![warn(rust_2018_idioms)]
+#![cfg(feature = "full")]
 #![cfg(unix)]
-#![deny(warnings, rust_2018_idioms)]
 
 use tokio::net::UnixStream;
 use tokio::prelude::*;

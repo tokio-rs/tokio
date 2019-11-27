@@ -1,6 +1,7 @@
-// Tests to run on both current-thread & therad-pool runtime variants.
-
 #![warn(rust_2018_idioms)]
+#![cfg(feature = "full")]
+
+// Tests to run on both current-thread & therad-pool runtime variants.
 
 macro_rules! rt_test {
     ($($t:tt)*) => {
@@ -10,16 +11,21 @@ macro_rules! rt_test {
             fn rt() -> Runtime {
                 tokio::runtime::Builder::new()
                     .basic_scheduler()
+                    .enable_all()
                     .build()
                     .unwrap()
             }
         }
 
-        mod thread_pool {
+        mod threaded_scheduler {
             $($t)*
 
             fn rt() -> Runtime {
-                Runtime::new().unwrap()
+                tokio::runtime::Builder::new()
+                    .threaded_scheduler()
+                    .enable_all()
+                    .build()
+                    .unwrap()
             }
         }
     }
@@ -341,7 +347,7 @@ rt_test! {
 
     #[test]
     fn block_on_socket() {
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = rt();
 
         rt.block_on(async move {
             let (tx, rx) = oneshot::channel();
@@ -360,6 +366,100 @@ rt_test! {
     }
 
     #[test]
+    fn spawn_from_blocking() {
+        let mut rt = rt();
+
+        let out = rt.block_on(async move {
+            let inner = assert_ok!(tokio::task::spawn_blocking(|| {
+                tokio::spawn(async move { "hello" })
+            }).await);
+
+            assert_ok!(inner.await)
+        });
+
+        assert_eq!(out, "hello")
+    }
+
+    #[test]
+    fn delay_from_blocking() {
+        let mut rt = rt();
+
+        rt.block_on(async move {
+            assert_ok!(tokio::task::spawn_blocking(|| {
+                let now = std::time::Instant::now();
+                let dur = Duration::from_millis(1);
+
+                // use the futures' block_on fn to make sure we aren't setting
+                // any Tokio context
+                futures::executor::block_on(async {
+                    tokio::time::delay_for(dur).await;
+                });
+
+                assert!(now.elapsed() >= dur);
+            }).await);
+        });
+    }
+
+    #[test]
+    fn socket_from_blocking() {
+        let mut rt = rt();
+
+        rt.block_on(async move {
+            let mut listener = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+            let addr = assert_ok!(listener.local_addr());
+
+            let peer = tokio::task::spawn_blocking(move || {
+                // use the futures' block_on fn to make sure we aren't setting
+                // any Tokio context
+                futures::executor::block_on(async {
+                    assert_ok!(TcpStream::connect(addr).await);
+                });
+            });
+
+            // Wait for the client to connect
+            let _ = assert_ok!(listener.accept().await);
+
+            assert_ok!(peer.await);
+        });
+    }
+
+    #[test]
+    fn io_driver_called_when_under_load() {
+        let mut rt = rt();
+
+        // Create a lot of constant load. The scheduler will always be busy.
+        for _ in 0..100 {
+            rt.spawn(async {
+                loop {
+                    tokio::task::yield_now().await;
+                }
+            });
+        }
+
+        // Do some I/O work
+        rt.block_on(async {
+            let mut listener = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+            let addr = assert_ok!(listener.local_addr());
+
+            let srv = tokio::spawn(async move {
+                let (mut stream, _) = assert_ok!(listener.accept().await);
+                assert_ok!(stream.write_all(b"hello world").await);
+            });
+
+            let cli = tokio::spawn(async move {
+                let mut stream = assert_ok!(TcpStream::connect(addr).await);
+                let mut dst = vec![0; 11];
+
+                assert_ok!(stream.read_exact(&mut dst).await);
+                assert_eq!(dst, b"hello world");
+            });
+
+            assert_ok!(srv.await);
+            assert_ok!(cli.await);
+        });
+    }
+
+    #[test]
     fn client_server_block_on() {
         let mut rt = rt();
         let (tx, rx) = mpsc::channel();
@@ -371,12 +471,11 @@ rt_test! {
     }
 
     #[test]
-    #[ignore]
     fn panic_in_task() {
-        let rt = rt();
-        let (tx, rx) = mpsc::channel();
+        let mut rt = rt();
+        let (tx, rx) = oneshot::channel();
 
-        struct Boom(mpsc::Sender<()>);
+        struct Boom(Option<oneshot::Sender<()>>);
 
         impl Future for Boom {
             type Output = ();
@@ -389,12 +488,12 @@ rt_test! {
         impl Drop for Boom {
             fn drop(&mut self) {
                 assert!(::std::thread::panicking());
-                self.0.send(()).unwrap();
+                self.0.take().unwrap().send(()).unwrap();
             }
         }
 
-        rt.spawn(Boom(tx));
-        rx.recv().unwrap();
+        rt.spawn(Boom(Some(tx)));
+        assert_ok!(rt.block_on(rx));
     }
 
     #[test]
@@ -428,6 +527,48 @@ rt_test! {
         assert_ok!(rt.block_on(handle));
     }
 
+    #[test]
+    fn eagerly_drops_futures_on_shutdown() {
+        use std::sync::mpsc;
+
+        struct Never {
+            drop_tx: mpsc::Sender<()>,
+        }
+
+        impl Future for Never {
+            type Output = ();
+
+            fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<()> {
+                Poll::Pending
+            }
+        }
+
+        impl Drop for Never {
+            fn drop(&mut self) {
+                self.drop_tx.send(()).unwrap();
+            }
+        }
+
+        let mut rt = rt();
+
+        let (drop_tx, drop_rx) = mpsc::channel();
+        let (run_tx, run_rx) = oneshot::channel();
+
+        rt.block_on(async move {
+            tokio::spawn(async move {
+                assert_ok!(run_tx.send(()));
+
+                Never { drop_tx }.await
+            });
+
+            assert_ok!(run_rx.await);
+        });
+
+        drop(rt);
+
+        assert_ok!(drop_rx.recv());
+    }
+
     async fn client_server(tx: mpsc::Sender<()>) {
         let mut server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
 
@@ -450,5 +591,68 @@ rt_test! {
 
         assert_eq!(buf, b"hello");
         tx.send(()).unwrap();
+    }
+
+    mod local_set {
+        use tokio::task;
+        use super::*;
+
+        #[test]
+        fn block_on_socket() {
+            let mut rt = rt();
+            let local = task::LocalSet::new();
+
+            local.block_on(&mut rt, async move {
+                let (tx, rx) = oneshot::channel();
+
+                let mut listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+                let addr = listener.local_addr().unwrap();
+
+                task::spawn_local(async move {
+                    let _ = listener.accept().await;
+                    tx.send(()).unwrap();
+                });
+
+                TcpStream::connect(&addr).await.unwrap();
+                rx.await.unwrap();
+            });
+        }
+
+        #[test]
+        fn client_server_block_on() {
+            let mut rt = rt();
+            let (tx, rx) = mpsc::channel();
+
+            let local = task::LocalSet::new();
+
+            local.block_on(&mut rt, async move { client_server_local(tx).await });
+
+            assert_ok!(rx.try_recv());
+            assert_err!(rx.try_recv());
+        }
+
+        async fn client_server_local(tx: mpsc::Sender<()>) {
+            let mut server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+
+            // Get the assigned address
+            let addr = assert_ok!(server.local_addr());
+
+            // Spawn the server
+            task::spawn_local(async move {
+                // Accept a socket
+                let (mut socket, _) = server.accept().await.unwrap();
+
+                // Write some data
+                socket.write_all(b"hello").await.unwrap();
+            });
+
+            let mut client = TcpStream::connect(&addr).await.unwrap();
+
+            let mut buf = vec![];
+            client.read_to_end(&mut buf).await.unwrap();
+
+            assert_eq!(buf, b"hello");
+            tx.send(()).unwrap();
+        }
     }
 }

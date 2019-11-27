@@ -1,3 +1,5 @@
+#![cfg(not(loom))]
+
 //! Utilities for tracking time.
 //!
 //! This module provides a number of types for executing code after a set period
@@ -92,7 +94,7 @@ pub use interval::{interval, interval_at, Interval};
 
 mod timeout;
 #[doc(inline)]
-pub use timeout::{timeout, timeout_at, Timeout};
+pub use timeout::{timeout, timeout_at, Timeout, Elapsed};
 
 mod wheel;
 

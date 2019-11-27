@@ -73,7 +73,7 @@ impl Encoder for ByteCodec {
 
     fn encode(&mut self, data: Vec<u8>, buf: &mut BytesMut) -> Result<(), io::Error> {
         buf.reserve(data.len());
-        buf.put(data);
+        buf.put_slice(&data);
         Ok(())
     }
 }

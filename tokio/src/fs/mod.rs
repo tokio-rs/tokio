@@ -1,3 +1,5 @@
+#![cfg(not(loom))]
+
 //! Asynchronous file and standard stream adaptation.
 //!
 //! This module contains utility methods and adapter types for input/output to
@@ -6,7 +8,7 @@
 //!
 //! Tasks run by *worker* threads should not block, as this could delay
 //! servicing reactor events. Portable filesystem operations are blocking,
-//! however. This module offers adapters which use a [`blocking`] annotation
+//! however. This module offers adapters which use a `blocking` annotation
 //! to inform the runtime that a blocking operation is required. When
 //! necessary, this allows the runtime to convert the current thread from a
 //! *worker* to a *backup* thread, where blocking is acceptable.
@@ -16,7 +18,7 @@
 //! Where possible, users should prefer the provided asynchronous-specific
 //! traits such as [`AsyncRead`], or methods returning a `Future` or `Poll`
 //! type. Adaptions also extend to traits like `std::io::Read` where methods
-//! return `std::io::Result`.  Be warned that these adapted methods may return
+//! return `std::io::Result`. Be warned that these adapted methods may return
 //! `std::io::ErrorKind::WouldBlock` if a *worker* thread can not be converted
 //! to a *backup* thread immediately.
 //!
@@ -96,6 +98,6 @@ mod sys {
     pub(crate) use std::fs::File;
 
     // TODO: don't rename
-    pub(crate) use crate::blocking::spawn_blocking as run;
+    pub(crate) use crate::runtime::spawn_blocking as run;
     pub(crate) use crate::task::JoinHandle as Blocking;
 }

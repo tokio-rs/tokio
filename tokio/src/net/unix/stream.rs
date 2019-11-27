@@ -1,13 +1,12 @@
 use crate::future::poll_fn;
-use crate::io::{AsyncRead, AsyncWrite};
+use crate::io::{AsyncRead, AsyncWrite, IoResource};
 use crate::net::unix::split::{split, ReadHalf, WriteHalf};
 use crate::net::unix::ucred::{self, UCred};
-use crate::net::util::IoResource;
 
-use bytes::{Buf, BufMut};
 use std::convert::TryFrom;
 use std::fmt;
 use std::io::{self, Read, Write};
+use std::mem::MaybeUninit;
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::os::unix::net;
@@ -15,13 +14,15 @@ use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// A structure representing a connected Unix socket.
-///
-/// This socket can be connected directly with `UnixStream::connect` or accepted
-/// from a listener with `UnixListener::incoming`. Additionally, a pair of
-/// anonymous Unix sockets can be created with `UnixStream::pair`.
-pub struct UnixStream {
-    io: IoResource<mio::net::UnixStream>,
+cfg_uds! {
+    /// A structure representing a connected Unix socket.
+    ///
+    /// This socket can be connected directly with `UnixStream::connect` or accepted
+    /// from a listener with `UnixListener::incoming`. Additionally, a pair of
+    /// anonymous Unix sockets can be created with `UnixStream::pair`.
+    pub struct UnixStream {
+        io: IoResource<mio::net::UnixStream>,
+    }
 }
 
 impl UnixStream {
@@ -118,7 +119,7 @@ impl TryFrom<UnixStream> for mio::net::UnixStream {
     /// See [`IoResource::into_inner`] for more details about
     /// resource deregistration that happens during the call.
     ///
-    /// [`IoResource::into_inner`]: crate::util::IoResource::into_inner
+    /// [`IoResource::into_inner`]: crate::io::IoResource::into_inner
     fn try_from(value: UnixStream) -> Result<Self, Self::Error> {
         value.io.into_inner()
     }
@@ -137,7 +138,7 @@ impl TryFrom<net::UnixStream> for UnixStream {
 }
 
 impl AsyncRead for UnixStream {
-    unsafe fn prepare_uninitialized_buffer(&self, _: &mut [u8]) -> bool {
+    unsafe fn prepare_uninitialized_buffer(&self, _: &mut [MaybeUninit<u8>]) -> bool {
         false
     }
 
@@ -147,14 +148,6 @@ impl AsyncRead for UnixStream {
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
         self.poll_read_priv(cx, buf)
-    }
-
-    fn poll_read_buf<B: BufMut>(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        self.poll_read_buf_priv(cx, buf)
     }
 }
 
@@ -173,14 +166,6 @@ impl AsyncWrite for UnixStream {
 
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
         Poll::Ready(Ok(()))
-    }
-
-    fn poll_write_buf<B: Buf>(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        self.poll_write_buf_priv(cx, buf)
     }
 }
 
@@ -212,28 +197,6 @@ impl UnixStream {
         }
     }
 
-    pub(crate) fn poll_read_buf_priv<B: BufMut>(
-        &self,
-        cx: &mut Context<'_>,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        ready!(self.io.poll_read_ready(cx))?;
-
-        match unsafe { self.io.get_ref().read(buf.bytes_mut()) } {
-            Ok(n) => {
-                unsafe {
-                    buf.advance_mut(n);
-                }
-                Poll::Ready(Ok(n))
-            }
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(cx)?;
-                Poll::Pending
-            }
-            Err(e) => Poll::Ready(Err(e)),
-        }
-    }
-
     pub(crate) fn poll_write_priv(
         &self,
         cx: &mut Context<'_>,
@@ -247,26 +210,6 @@ impl UnixStream {
                 Poll::Pending
             }
             x => Poll::Ready(x),
-        }
-    }
-
-    pub(crate) fn poll_write_buf_priv<B: Buf>(
-        &self,
-        cx: &mut Context<'_>,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        ready!(self.io.poll_write_ready(cx))?;
-
-        match self.io.get_ref().write(buf.bytes()) {
-            Ok(n) => {
-                buf.advance(n);
-                Poll::Ready(Ok(n))
-            }
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_write_ready(cx)?;
-                Poll::Pending
-            }
-            Err(e) => Poll::Ready(Err(e)),
         }
     }
 }

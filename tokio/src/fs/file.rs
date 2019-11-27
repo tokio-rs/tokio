@@ -600,3 +600,17 @@ impl fmt::Debug for File {
             .finish()
     }
 }
+
+#[cfg(unix)]
+impl std::os::unix::io::AsRawFd for File {
+    fn as_raw_fd(&self) -> std::os::unix::io::RawFd {
+        self.std.as_raw_fd()
+    }
+}
+
+#[cfg(windows)]
+impl std::os::windows::io::AsRawHandle for File {
+    fn as_raw_handle(&self) -> std::os::windows::io::RawHandle {
+        self.std.as_raw_handle()
+    }
+}

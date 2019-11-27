@@ -1,6 +1,6 @@
-#![cfg(feature = "process")]
-#![cfg(unix)]
 #![warn(rust_2018_idioms)]
+#![cfg(feature = "full")]
+#![cfg(unix)]
 
 use tokio::process::Command;
 use tokio::runtime;
@@ -18,7 +18,11 @@ fn run_test() {
     let finished_clone = finished.clone();
 
     thread::spawn(move || {
-        let mut rt = runtime::Builder::new().basic_scheduler().build().unwrap();
+        let mut rt = runtime::Builder::new()
+            .basic_scheduler()
+            .enable_all()
+            .build()
+            .unwrap();
 
         let mut futures = FuturesOrdered::new();
         rt.block_on(async {
@@ -29,6 +33,7 @@ fn run_test() {
                         .stdin(Stdio::null())
                         .stdout(Stdio::null())
                         .stderr(Stdio::null())
+                        .kill_on_drop(true)
                         .spawn()
                         .unwrap()
                         .boxed(),

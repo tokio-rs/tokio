@@ -1,5 +1,4 @@
 use crate::loom::sync::Arc;
-use crate::runtime::park::Unpark;
 use crate::runtime::thread_pool::{slice, Owned};
 
 use std::cell::Cell;
@@ -23,10 +22,9 @@ struct Inner {
 // Pointer to the current worker info
 thread_local!(static CURRENT_WORKER: Cell<Inner> = Cell::new(Inner::new()));
 
-pub(super) fn set<F, R, P>(pool: &Arc<slice::Set<P>>, index: usize, f: F) -> R
+pub(super) fn set<F, R>(pool: &Arc<slice::Set>, index: usize, f: F) -> R
 where
     F: FnOnce() -> R,
-    P: Unpark,
 {
     CURRENT_WORKER.with(|cell| {
         assert!(cell.get().workers.is_null());
@@ -65,10 +63,7 @@ where
 }
 
 impl Current {
-    pub(super) fn as_member<'a, P>(&self, set: &'a slice::Set<P>) -> Option<&'a Owned<P>>
-    where
-        P: Unpark,
-    {
+    pub(super) fn as_member<'a>(&self, set: &'a slice::Set) -> Option<&'a Owned> {
         let inner = CURRENT_WORKER.with(|cell| cell.get());
 
         if ptr::eq(inner.workers as *const _, set.shared().as_ptr()) {

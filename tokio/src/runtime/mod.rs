@@ -1,33 +1,19 @@
-//! A batteries included runtime for applications using Tokio.
+//! The Tokio runtime.
 //!
-//! Applications using Tokio require some runtime support in order to work:
+//! Unlike other Rust programs, asynchronous applications require
+//! runtime support. In particular, the following runtime services are
+//! necessary:
 //!
-//! * A [driver] to drive I/O resources.
-//! * An [executor] to execute tasks that use these I/O resources.
-//! * A timer for scheduling work to run after a set period of time.
+//! * An **I/O event loop**, called the [driver], which drives I/O resources and
+//!   dispatches I/O events to tasks that depend on them.
+//! * A **scheduler** to execute [tasks] that use these I/O resources.
+//! * A **timer** for scheduling work to run after a set period of time.
 //!
-//! While it is possible to setup each component manually, this involves a bunch
-//! of boilerplate.
-//!
-//! [`Runtime`] bundles all of these various runtime components into a single
-//! handle that can be started and shutdown together, eliminating the necessary
-//! boilerplate to run a Tokio application.
-//!
-//! Most applications wont need to use [`Runtime`] directly. Instead, they will
-//! use the [`tokio::main`] attribute macro, which uses [`Runtime`] under the hood.
-//!
-//! Creating a [`Runtime`] does the following:
-//!
-//! * Spawn a background thread running a [`Reactor`] instance.
-//! * Start a thread pool for executing futures.
-//! * Run an instance of `Timer` **per** thread pool worker thread.
-//!
-//! The thread pool uses a work-stealing strategy and is configured to start a
-//! worker thread for each CPU core available on the system. This tends to be
-//! the ideal setup for Tokio applications.
-//!
-//! A timer per thread pool worker thread is used to minimize the amount of
-//! synchronization that is required for working with the timer.
+//! Tokio's [`Runtime`] bundles all of these services as a single type, allowing
+//! them to be started, shut down, and configured together. However, most
+//! applications won't need to use [`Runtime`] directly. Instead, they can
+//! use the [`tokio::main`] attribute macro, which creates a [`Runtime`] under
+//! the hood.
 //!
 //! # Usage
 //!
@@ -119,13 +105,77 @@
 //! }
 //! ```
 //!
-//! [driver]: tokio::net::driver
+//! ## Runtime Configurations
+//!
+//! Tokio provides multiple task scheding strategies, suitable for different
+//! applications. The [runtime builder] or `#[tokio::main]` attribute may be
+//! used to select which scheduler to use.
+//!
+//! #### Basic Scheduler
+//!
+//! The basic scheduler provides a _single-threaded_ future executor. All tasks
+//! will be created and executed on the current thread. The basic scheduler
+//! requires the `rt-core` feature flag, and can be selected using the
+//! [`Builder::basic_scheduler`] method:
+//! ```
+//! use tokio::runtime;
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let basic_rt = runtime::Builder::new()
+//!     .basic_scheduler()
+//!     .build()?;
+//! # Ok(()) }
+//! ```
+//!
+//! If the `rt-core` feature is enabled and `rt-threaded` is not,
+//! [`Runtime::new`] will return a basic scheduler runtime by default.
+//!
+//! #### Threaded Scheduler
+//!
+//! The threaded scheduler executes futures on a _thread pool_, using a
+//! work-stealing strategy. By default, it will start a worker thread for each
+//! CPU core available on the system. This tends to be the ideal configurations
+//! for most applications. The threaded scheduler requires the `rt-threaded` feature
+//! flag, and can be selected using the  [`Builder::threaded_scheduler`] method:
+//! ```
+//! use tokio::runtime;
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let threaded_rt = runtime::Builder::new()
+//!     .threaded_scheduler()
+//!     .build()?;
+//! # Ok(()) }
+//! ```
+//!
+//! If the `rt-threaded` feature flag is enabled, [`Runtime::new`] will return a
+//! basic scheduler runtime by default.
+//!
+//! Most applications should use the threaded scheduler, except in some niche
+//! use-cases, such as when running only a single thread is required.
+//!
+//! #### Resource drivers
+//!
+//! When configuring a runtime by hand, no resource drivers are enabled by
+//! default. In this case, attempting to use networking types or time types will
+//! fail. In order to enable these types, the resource drivers must be enabled.
+//! This is done with [`Builder::enable_io`] and [`Builder::enable_time`]. As a
+//! shorthand, [`Builder::enable_all`] enables both resource drivers.
+//!
+//! [tasks]: crate::task
+//! [driver]: crate::io::driver
 //! [executor]: https://tokio.rs/docs/internals/runtime-model/#executors
 //! [`Runtime`]: struct.Runtime.html
 //! [`Reactor`]: ../reactor/struct.Reactor.html
 //! [`run`]: fn.run.html
 //! [`tokio::spawn`]: ../executor/fn.spawn.html
 //! [`tokio::main`]: ../../tokio_macros/attr.main.html
+//! [runtime builder]: crate::runtime::Builder
+//! [`Runtime::new`]: crate::runtime::Runtime::new
+//! [`Builder::basic_scheduler`]: crate::runtime::Builder::basic_scheduler
+//! [`Builder::threaded_scheduler`]: crate::runtime::Builder::threaded_scheduler
+//! [`Builder::enable_io`]: crate::runtime::Builder::enable_io
+//! [`Builder::enable_time`]: crate::runtime::Builder::enable_time
+//! [`Builder::enable_all`]: crate::runtime::Builder::enable_all
 
 // At the top due to macros
 #[cfg(test)]
@@ -139,6 +189,10 @@ cfg_rt_core! {
 
 mod blocking;
 use blocking::BlockingPool;
+
+cfg_blocking_impl! {
+    pub(crate) use blocking::spawn_blocking;
+}
 
 mod builder;
 pub use self::builder::Builder;
@@ -156,11 +210,16 @@ pub use self::handle::Handle;
 
 mod io;
 
-mod park;
-pub use self::park::{Park, Unpark};
+cfg_rt_threaded! {
+    mod park;
+    use park::{Parker, Unparker};
+}
 
 mod shell;
 use self::shell::Shell;
+
+mod spawner;
+use self::spawner::Spawner;
 
 mod time;
 
@@ -175,11 +234,13 @@ cfg_rt_core! {
 
 use std::future::Future;
 
-/// The Tokio runtime, includes a reactor as well as an executor for running
-/// tasks.
+/// The Tokio runtime.
+///
+/// The runtime provides an I/O [driver], task scheduler, [timer], and blocking
+/// pool, necessary for running asynchronous tasks.
 ///
 /// Instances of `Runtime` can be created using [`new`] or [`Builder`]. However,
-/// most users will use the `#[tokio::main]` annotation on their entry point.
+/// most users will use the `#[tokio::main]` annotation on their entry point instead.
 ///
 /// See [module level][mod] documentation for more details.
 ///
@@ -196,6 +257,8 @@ use std::future::Future;
 /// that reactor will no longer function. Calling any method on them will
 /// result in an error.
 ///
+/// [driver]: crate::io::driver
+/// [timer]: crate::time
 /// [mod]: index.html
 /// [`new`]: #method.new
 /// [`Builder`]: struct.Builder.html
@@ -228,15 +291,24 @@ enum Kind {
     ThreadPool(ThreadPool),
 }
 
+/// After thread starts / before thread stops
+type Callback = ::std::sync::Arc<dyn Fn() + Send + Sync>;
+
 impl Runtime {
     /// Create a new runtime instance with default configuration values.
     ///
-    /// This results in a thread pool, I/O driver, and time driver being
-    /// initialized. The thread pool will not spawn any worker threads until it
-    /// needs to, i.e. tasks are scheduled to run.
+    /// This results in a scheduler, I/O driver, and time driver being
+    /// initialized. The type of scheduler used depends on what feature flags
+    /// are enabled: if the `rt-threaded` feature is enabled, the [threaded
+    /// scheduler] is used, while if only the `rt-core` feature is enabled, the
+    /// [basic scheduler] is used instead.
     ///
-    /// Most users will not need to call this function directly, instead they
-    /// will use [`tokio::run`](fn.run.html).
+    /// If the threaded cheduler is selected, it will not spawn
+    /// any worker threads until it needs to, i.e. tasks are scheduled to run.
+    ///
+    /// Most applications will not need to call this function directly. Instead,
+    /// they will use the  [`#[tokio::main]` attribute][main]. When more complex
+    /// configuration is necessary, the [runtime builder] may be used.
     ///
     /// See [module level][mod] documentation for more details.
     ///
@@ -254,15 +326,19 @@ impl Runtime {
     /// ```
     ///
     /// [mod]: index.html
+    /// [main]: ../../tokio_macros/attr.main.html
+    /// [threaded scheduler]: index.html#threaded-scheduler
+    /// [basic scheduler]: index.html#basic-scheduler
+    /// [runtime builder]: crate::runtime::Builder
     pub fn new() -> io::Result<Self> {
         #[cfg(feature = "rt-threaded")]
-        let ret = Builder::new().threaded_scheduler().build();
+        let ret = Builder::new().threaded_scheduler().enable_all().build();
 
         #[cfg(all(not(feature = "rt-threaded"), feature = "rt-core"))]
-        let ret = Builder::new().basic_scheduler().build();
+        let ret = Builder::new().basic_scheduler().enable_all().build();
 
         #[cfg(not(feature = "rt-core"))]
-        let ret = Builder::new().build();
+        let ret = Builder::new().enable_all().build();
 
         ret
     }

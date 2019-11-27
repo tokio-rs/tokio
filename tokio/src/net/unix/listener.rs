@@ -1,6 +1,6 @@
 use crate::future::poll_fn;
+use crate::io::IoResource;
 use crate::net::unix::{Incoming, UnixStream};
-use crate::net::util::IoResource;
 
 use mio;
 use std::convert::TryFrom;
@@ -11,9 +11,11 @@ use std::os::unix::net;
 use std::path::Path;
 use std::task::{Context, Poll};
 
-/// A Unix socket which can accept connections from other Unix sockets.
-pub struct UnixListener {
-    io: IoResource<mio::net::UnixListener>,
+cfg_uds! {
+    /// A Unix socket which can accept connections from other Unix sockets.
+    pub struct UnixListener {
+        io: IoResource<mio::net::UnixListener>,
+    }
 }
 
 impl UnixListener {
@@ -72,11 +74,42 @@ impl UnixListener {
         }
     }
 
-    /// Consumes this listener, returning a stream of the sockets this listener
-    /// accepts.
+    /// Returns a stream over the connections being received on this listener.
     ///
-    /// This method returns an implementation of the `Stream` trait which
-    /// resolves to the sockets the are accepted on this listener.
+    /// The returned stream will never return `None` and will also not yield the
+    /// peer's `SocketAddr` structure. Iterating over it is equivalent to
+    /// calling accept in a loop.
+    ///
+    /// # Errors
+    ///
+    /// Note that accepting a connection can lead to various errors and not all
+    /// of them are necessarily fatal ‒ for example having too many open file
+    /// descriptors or the other side closing the connection while it waits in
+    /// an accept queue. These would terminate the stream if not handled in any
+    /// way.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::UnixListener;
+    ///
+    /// use futures::StreamExt;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut listener = UnixListener::bind("/path/to/the/socket").unwrap();
+    ///     let mut incoming = listener.incoming();
+    ///
+    ///     while let Some(stream) = incoming.next().await {
+    ///         match stream {
+    ///             Ok(stream) => {
+    ///                 println!("new client!");
+    ///             }
+    ///             Err(e) => { /* connection failed */ }
+    ///         }
+    ///     }
+    /// }
+    /// ```
     pub fn incoming(&mut self) -> Incoming<'_> {
         Incoming::new(self)
     }
@@ -90,7 +123,7 @@ impl TryFrom<UnixListener> for mio::net::UnixListener {
     /// See [`IoResource::into_inner`] for more details about
     /// resource deregistration that happens during the call.
     ///
-    /// [`IoResource::into_inner`]: crate::util::IoResource::into_inner
+    /// [`IoResource::into_inner`]: crate::io::IoResource::into_inner
     fn try_from(value: UnixListener) -> Result<Self, Self::Error> {
         value.io.into_inner()
     }

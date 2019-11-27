@@ -42,7 +42,7 @@ pub fn delay_for(duration: Duration) -> Delay {
 #[derive(Debug)]
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct Delay {
-    /// The link between the `Delay` instance at the timer that drives it.
+    /// The link between the `Delay` instance and the timer that drives it.
     ///
     /// This also stores the `deadline` value.
     registration: Registration,
@@ -76,21 +76,12 @@ impl Delay {
     pub fn reset(&mut self, deadline: Instant) {
         self.registration.reset(deadline);
     }
-
-    /// Register the delay with the timer instance for the current execution
-    /// context.
-    fn register(&mut self) {
-        self.registration.register();
-    }
 }
 
 impl Future for Delay {
     type Output = ();
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
-        // Ensure the `Delay` instance is associated with a timer.
-        self.register();
-
+    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
         // `poll_elapsed` can return an error in two cases:
         //
         // - AtCapacity: this is a pathlogical case where far too many

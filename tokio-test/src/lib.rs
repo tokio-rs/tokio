@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-test/0.2.0-alpha.6")]
+#![doc(html_root_url = "https://docs.rs/tokio-test/0.2.0")]
 #![warn(
     missing_debug_implementations,
     missing_docs,
@@ -14,6 +14,7 @@
 //! Tokio and Futures based testing utilites
 
 pub mod io;
+
 mod macros;
 pub mod task;
 
@@ -27,7 +28,11 @@ pub mod task;
 pub fn block_on<F: std::future::Future>(future: F) -> F::Output {
     use tokio::runtime;
 
-    let mut rt = runtime::Builder::new().basic_scheduler().build().unwrap();
+    let mut rt = runtime::Builder::new()
+        .basic_scheduler()
+        .enable_all()
+        .build()
+        .unwrap();
 
     rt.block_on(future)
 }

@@ -1,46 +1,47 @@
 use crate::future::poll_fn;
-use crate::io::{AsyncRead, AsyncWrite};
+use crate::io::{AsyncRead, AsyncWrite, IoResource};
 use crate::net::tcp::split::{split, ReadHalf, WriteHalf};
-use crate::net::util::IoResource;
 use crate::net::ToSocketAddrs;
 
-use bytes::{Buf, BufMut};
 use std::convert::TryFrom;
 use std::fmt;
 use std::io::{self, Read, Write};
+use std::mem::MaybeUninit;
 use std::net::{self, Shutdown, SocketAddr};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// An I/O object representing a TCP stream connected to a remote endpoint.
-///
-/// A TCP stream can either be created by connecting to an endpoint, via the
-/// [`connect`] method, or by [accepting] a connection from a [listener].
-///
-/// [`connect`]: struct.TcpStream.html#method.connect
-/// [accepting]: struct.TcpListener.html#method.accept
-/// [listener]: struct.TcpListener.html
-///
-/// # Examples
-///
-/// ```no_run
-/// use tokio::net::TcpStream;
-/// use tokio::prelude::*;
-/// use std::error::Error;
-///
-/// #[tokio::main]
-/// async fn main() -> Result<(), Box<dyn Error>> {
-///     // Connect to a peer
-///     let mut stream = TcpStream::connect("127.0.0.1:8080").await?;
-///
-///     // Write some data.
-///     stream.write_all(b"hello world!").await?;
-///
-///     Ok(())
-/// }
-/// ```
-pub struct TcpStream {
-    io: IoResource<mio::net::TcpStream>,
+cfg_tcp! {
+    /// A TCP stream between a local and a remote socket.
+    ///
+    /// A TCP stream can either be created by connecting to an endpoint, via the
+    /// [`connect`] method, or by [accepting] a connection from a [listener].
+    ///
+    /// [`connect`]: struct.TcpStream.html#method.connect
+    /// [accepting]: struct.TcpListener.html#method.accept
+    /// [listener]: struct.TcpListener.html
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpStream;
+    /// use tokio::prelude::*;
+    /// use std::error::Error;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     // Connect to a peer
+    ///     let mut stream = TcpStream::connect("127.0.0.1:8080").await?;
+    ///
+    ///     // Write some data.
+    ///     stream.write_all(b"hello world!").await?;
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    pub struct TcpStream {
+        io: IoResource<mio::net::TcpStream>,
+    }
 }
 
 impl TcpStream {
@@ -378,28 +379,6 @@ impl TcpStream {
         }
     }
 
-    pub(crate) fn poll_read_buf_priv<B: BufMut>(
-        &self,
-        cx: &mut Context<'_>,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        ready!(self.io.poll_read_ready(cx))?;
-
-        match unsafe { self.io.get_ref().read(buf.bytes_mut()) } {
-            Ok(n) => {
-                unsafe {
-                    buf.advance_mut(n);
-                }
-                Poll::Ready(Ok(n))
-            }
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(cx)?;
-                Poll::Pending
-            }
-            Err(e) => Poll::Ready(Err(e)),
-        }
-    }
-
     pub(crate) fn poll_write_priv(
         &self,
         cx: &mut Context<'_>,
@@ -415,26 +394,6 @@ impl TcpStream {
             x => Poll::Ready(x),
         }
     }
-
-    pub(crate) fn poll_write_buf_priv<B: Buf>(
-        &self,
-        cx: &mut Context<'_>,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        ready!(self.io.poll_write_ready(cx))?;
-
-        match self.io.get_ref().write(buf.bytes()) {
-            Ok(n) => {
-                buf.advance(n);
-                Poll::Ready(Ok(n))
-            }
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_write_ready(cx)?;
-                Poll::Pending
-            }
-            Err(e) => Poll::Ready(Err(e)),
-        }
-    }
 }
 
 impl TryFrom<TcpStream> for mio::net::TcpStream {
@@ -445,7 +404,7 @@ impl TryFrom<TcpStream> for mio::net::TcpStream {
     /// See [`IoResource::into_inner`] for more details about
     /// resource deregistration that happens during the call.
     ///
-    /// [`IoResource::into_inner`]: crate::util::IoResource::into_inner
+    /// [`IoResource::into_inner`]: crate::io::IoResource::into_inner
     fn try_from(value: TcpStream) -> Result<Self, Self::Error> {
         value.io.into_inner()
     }
@@ -466,7 +425,7 @@ impl TryFrom<net::TcpStream> for TcpStream {
 // ===== impl Read / Write =====
 
 impl AsyncRead for TcpStream {
-    unsafe fn prepare_uninitialized_buffer(&self, _: &mut [u8]) -> bool {
+    unsafe fn prepare_uninitialized_buffer(&self, _: &mut [MaybeUninit<u8>]) -> bool {
         false
     }
 
@@ -476,14 +435,6 @@ impl AsyncRead for TcpStream {
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
         self.poll_read_priv(cx, buf)
-    }
-
-    fn poll_read_buf<B: BufMut>(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        self.poll_read_buf_priv(cx, buf)
     }
 }
 
@@ -505,14 +456,6 @@ impl AsyncWrite for TcpStream {
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.shutdown(std::net::Shutdown::Write)?;
         Poll::Ready(Ok(()))
-    }
-
-    fn poll_write_buf<B: Buf>(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        self.poll_write_buf_priv(cx, buf)
     }
 }
 

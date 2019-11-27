@@ -45,10 +45,11 @@
 //! threads and can be used in a concurrent environment. Clones of [`Receiver`]
 //! handles may be moved to separate threads and also used concurrently.
 //!
-//! [`Sender`]: struct.Sender.html
-//! [`Receiver`]: struct.Receiver.html
-//! [`channel`]: fn.channel.html
-//! [`Sender::closed`]: struct.Sender.html#method.closed
+//! [`Sender`]: crate::sync::watch::Sender
+//! [`Receiver`]: crate::sync::watch::Receiver
+//! [`Receiver::recv`]: crate::sync::watch::Receiver::recv
+//! [`channel`]: crate::sync::watch::channel
+//! [`Sender::closed`]: crate::sync::watch::Sender::closed
 
 use crate::future::poll_fn;
 use crate::sync::task::AtomicWaker;
