@@ -1,3 +1,9 @@
+# 0.1.11 (November 27, 2019)
+
+### Added
+- `set_default`, which functions like `with_default` but returns a drop
+  guard (#1725)
+
 # 0.1.10 (September 25, 2019)
 
 ### Changed

@@ -1,3 +1,11 @@
+# 0.2.12 (November 27, 2019)
+
+### Added
+- `timer::set_default`, which functions like `timer::with_default`, but
+  returns a drop guard (#1725).
+- `clock::set_default`, which functions like `clock::with_default`, but
+  returns a drop guard (#1725).
+
 # 0.2.11 (May 14, 2019)
 
 ### Added

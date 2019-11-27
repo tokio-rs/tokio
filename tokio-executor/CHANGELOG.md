@@ -1,3 +1,9 @@
+# 0.1.9 (November 27, 2019)
+
+### Added
+- Add `executor::set_default` which behaves like `with_default` but returns a
+  drop guard (#1725).
+
 # 0.1.8 (June 2, 2019)
 
 ### Added

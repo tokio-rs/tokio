@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-reactor/0.1.10")]
+#![doc(html_root_url = "https://docs.rs/tokio-reactor/0.1.11")]
 #![deny(missing_docs, missing_debug_implementations)]
 
 //! Event loop that drives Tokio I/O resources.
@@ -68,7 +68,6 @@ use tokio_sync::task::AtomicTask;
 use std::cell::RefCell;
 use std::error::Error;
 use std::io;
-use std::marker::PhantomData;
 use std::mem;
 #[cfg(all(unix, not(target_os = "fuchsia")))]
 use std::os::unix::io::{AsRawFd, RawFd};
@@ -137,8 +136,8 @@ pub type SetDefaultError = SetFallbackError;
 /// Ensure that the default reactor is removed from the thread-local context
 /// when leaving the scope. This handles cases that involve panicking.
 #[derive(Debug)]
-pub struct DefaultGuard<'a> {
-    _lifetime: PhantomData<&'a ()>,
+pub struct DefaultGuard {
+    _p: (),
 }
 
 #[test]
@@ -217,7 +216,7 @@ where
 /// # Panics
 ///
 /// This function panics if there already is a default reactor set.
-pub fn set_default(handle: &Handle) -> DefaultGuard<'_> {
+pub fn set_default(handle: &Handle) -> DefaultGuard {
     CURRENT_REACTOR.with(|current| {
         let mut current = current.borrow_mut();
 
@@ -236,9 +235,7 @@ pub fn set_default(handle: &Handle) -> DefaultGuard<'_> {
 
         *current = Some(handle.clone());
     });
-    DefaultGuard {
-        _lifetime: PhantomData,
-    }
+    DefaultGuard { _p: () }
 }
 
 impl Reactor {
@@ -746,7 +743,7 @@ impl Direction {
     }
 }
 
-impl<'a> Drop for DefaultGuard<'a> {
+impl Drop for DefaultGuard {
     fn drop(&mut self) {
         let _ = CURRENT_REACTOR.try_with(|current| {
             let mut current = current.borrow_mut();

@@ -3,7 +3,6 @@ use super::{Enter, Executor, SpawnError};
 use futures::{future, Future};
 
 use std::cell::Cell;
-use std::marker::PhantomData;
 
 /// Executes futures on the default executor for the current execution context.
 ///
@@ -23,8 +22,8 @@ pub struct DefaultExecutor {
 /// Ensures that the executor is removed from the thread-local context
 /// when leaving the scope. This handles cases that involve panicking.
 #[derive(Debug)]
-pub struct DefaultGuard<'a> {
-    _lifetime: PhantomData<&'a ()>,
+pub struct DefaultGuard {
+    _p: (),
 }
 
 impl DefaultExecutor {
@@ -183,20 +182,11 @@ where
     T: Executor,
     F: FnOnce(&mut Enter) -> R,
 {
-    let _guard = set_default(executor);
-    f(enter)
-}
+    unsafe fn hide_lt<'a>(p: *mut (dyn Executor + 'a)) -> *mut (dyn Executor + 'static) {
+        use std::mem;
+        mem::transmute(p)
+    }
 
-/// Sets `executor` as the default executor, returning a guard that unsets it when
-/// dropped.
-///
-/// # Panics
-///
-/// This function panics if there already is a default executor set.
-pub fn set_default<T>(executor: &mut T) -> DefaultGuard<'_>
-where
-    T: Executor,
-{
     EXECUTOR.with(|cell| {
         match cell.get() {
             State::Ready(_) | State::Active => {
@@ -204,6 +194,18 @@ where
             }
             _ => {}
         }
+
+        // Ensure that the executor is removed from the thread-local context
+        // when leaving the scope. This handles cases that involve panicking.
+        struct Reset<'a>(&'a Cell<State>);
+
+        impl<'a> Drop for Reset<'a> {
+            fn drop(&mut self) {
+                self.0.set(State::Empty);
+            }
+        }
+
+        let _reset = Reset(cell);
 
         // While scary, this is safe. The function takes a
         // `&mut Executor`, which guarantees that the reference lives for the
@@ -215,22 +217,50 @@ where
         let executor = unsafe { hide_lt(executor as &mut _ as *mut _) };
 
         cell.set(State::Ready(executor));
+
+        f(enter)
+    })
+}
+
+/// Sets `executor` as the default executor, returning a guard that unsets it when
+/// dropped.
+///
+/// # Panics
+///
+/// This function panics if there already is a default executor set.
+pub fn set_default<T>(executor: T) -> DefaultGuard
+where
+    T: Executor + 'static,
+{
+    EXECUTOR.with(|cell| {
+        match cell.get() {
+            State::Ready(_) | State::Active => {
+                panic!("default executor already set for execution context")
+            }
+            _ => {}
+        }
+
+        // Ensure that the executor will outlive the call to set_default, even
+        // if the drop guard is never dropped due to calls to `mem::forget` or
+        // similar.
+        let executor = Box::new(executor);
+
+        cell.set(State::Ready(Box::into_raw(executor)));
     });
 
-    DefaultGuard {
-        _lifetime: PhantomData,
-    }
+    DefaultGuard { _p: () }
 }
 
-unsafe fn hide_lt<'a>(p: *mut (dyn Executor + 'a)) -> *mut (dyn Executor + 'static) {
-    use std::mem;
-    mem::transmute(p)
-}
-
-impl<'a> Drop for DefaultGuard<'a> {
+impl Drop for DefaultGuard {
     fn drop(&mut self) {
         let _ = EXECUTOR.try_with(|cell| {
-            cell.set(State::Empty);
+            if let State::Ready(prev) = cell.replace(State::Empty) {
+                // drop the previous executor.
+                unsafe {
+                    let prev = Box::from_raw(prev);
+                    drop(prev);
+                };
+            }
         });
     }
 }
