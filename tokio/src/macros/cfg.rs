@@ -56,7 +56,11 @@ macro_rules! cfg_not_blocking_impl {
 macro_rules! cfg_atomic_waker_impl {
     ($($item:item)*) => {
         $(
-            #[cfg(any(feature = "io-driver", feature = "time",  feature = "rt-util"))]
+            #[cfg(any(
+                feature = "io-driver",
+                feature = "time",
+                all(feature = "rt-core", feature = "rt-util")
+            ))]
             #[cfg(not(loom))]
             $item
         )*
