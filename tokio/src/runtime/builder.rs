@@ -25,8 +25,9 @@ use std::sync::Arc;
 /// use tokio::runtime::Builder;
 ///
 /// fn main() {
-///     // build Runtime
+///     // build runtime
 ///     let runtime = Builder::new()
+///         .threaded_scheduler()
 ///         .num_threads(4)
 ///         .thread_name("my-custom-name")
 ///         .thread_stack_size(3 * 1024 * 1024)
