@@ -229,18 +229,42 @@ impl TcpListener {
         self.io.get_ref().local_addr()
     }
 
-    /// Consumes this listener, returning a stream of the sockets this listener
-    /// accepts.
+    /// Returns a stream over the connections being received on this listener.
     ///
-    /// This method returns an implementation of the `Stream` trait which
-    /// resolves to the sockets the are accepted on this listener.
+    /// The returned stream will never return `None` and will also not yield the
+    /// peer's `SocketAddr` structure. Iterating over it is equivalent to
+    /// calling accept in a loop.
     ///
     /// # Errors
     ///
-    /// Note that accepting a connection can lead to various errors and not all of them are
-    /// necessarily fatal ‒ for example having too many open file descriptors or the other side
-    /// closing the connection while it waits in an accept queue. These would terminate the stream
-    /// if not handled in any way.
+    /// Note that accepting a connection can lead to various errors and not all
+    /// of them are necessarily fatal ‒ for example having too many open file
+    /// descriptors or the other side closing the connection while it waits in
+    /// an accept queue. These would terminate the stream if not handled in any
+    /// way.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpListener;
+    ///
+    /// use futures::StreamExt;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
+    ///     let mut incoming = listener.incoming();
+    ///
+    ///     while let Some(stream) = incoming.next().await {
+    ///         match stream {
+    ///             Ok(stream) => {
+    ///                 println!("new client!");
+    ///             }
+    ///             Err(e) => { /* connection failed */ }
+    ///         }
+    ///     }
+    /// }
+    /// ```
     pub fn incoming(&mut self) -> Incoming<'_> {
         Incoming::new(self)
     }
