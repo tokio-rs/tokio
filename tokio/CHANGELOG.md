@@ -1,3 +1,13 @@
+# 0.2.1 (November 26, 2019)
+
+### Fixes
+- API docs for `TcpListener::incoming`, `UnixListener::incoming` (#1831).
+
+### Added
+- `tokio::task::LocalSet` provides a strategy for spawning `!Send` tasks (#1733).
+- export `tokio::time::Elapsed` (#1826).
+- impl `AsRawFd`, `AsRawHandle` for `tokio::fs::File` (#1827).
+
 # 0.2.0 (November 26, 2019)
 
 A major breaking change. Most implementation and APIs have changed one way or
