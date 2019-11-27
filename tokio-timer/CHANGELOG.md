@@ -1,4 +1,4 @@
-# 0.2.12 (November 7, 2019)
+# 0.2.12 (November 27, 2019)
 
 ### Added
 - `timer::set_default`, which functions like `timer::with_default`, but

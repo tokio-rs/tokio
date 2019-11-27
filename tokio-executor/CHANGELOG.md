@@ -1,4 +1,4 @@
-# 0.1.9 (November 7, 2019)
+# 0.1.9 (November 27, 2019)
 
 ### Added
 - Add `executor::set_default` which behaves like `with_default` but returns a
