@@ -1,7 +1,7 @@
 use crate::loom::alloc::Track;
 use crate::task::Cell;
 use crate::task::Harness;
-use crate::task::{Header, Schedule};
+use crate::task::{Header, Schedule, ScheduleSendOnly};
 use crate::task::{Snapshot, State};
 
 use std::future::Future;
@@ -54,18 +54,30 @@ pub(super) fn vtable<T: Future, S: Schedule>() -> &'static Vtable {
     }
 }
 
+cfg_rt_util! {
+    impl RawTask {
+        pub(super) fn new_joinable_local<T, S>(task: T) -> RawTask
+        where
+            T: Future + 'static,
+            S: Schedule,
+        {
+            RawTask::new::<_, S>(task, State::new_joinable())
+        }
+    }
+}
+
 impl RawTask {
     pub(super) fn new_joinable<T, S>(task: T) -> RawTask
     where
         T: Future + Send + 'static,
-        S: Schedule,
+        S: ScheduleSendOnly,
     {
         RawTask::new::<_, S>(task, State::new_joinable())
     }
 
     fn new<T, S>(task: T, state: State) -> RawTask
     where
-        T: Future + Send + 'static,
+        T: Future + 'static,
         S: Schedule,
     {
         let ptr = Box::into_raw(Cell::new::<S>(task, state));

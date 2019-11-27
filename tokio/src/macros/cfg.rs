@@ -52,6 +52,21 @@ macro_rules! cfg_not_blocking_impl {
     }
 }
 
+/// Enable internal `AtomicWaker` impl
+macro_rules! cfg_atomic_waker_impl {
+    ($($item:item)*) => {
+        $(
+            #[cfg(any(
+                feature = "io-driver",
+                feature = "time",
+                all(feature = "rt-core", feature = "rt-util")
+            ))]
+            #[cfg(not(loom))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_dns {
     ($($item:item)*) => {
         $(
@@ -215,6 +230,16 @@ macro_rules! cfg_rt_threaded {
         $(
             #[cfg(feature = "rt-threaded")]
             #[cfg_attr(docsrs, doc(cfg(feature = "rt-threaded")))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_rt_util {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "rt-util")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "rt-util")))]
             $item
         )*
     }

@@ -1,5 +1,5 @@
 use crate::park::{Park, Unpark};
-use crate::task::{self, JoinHandle, Schedule, Task};
+use crate::task::{self, JoinHandle, Schedule, ScheduleSendOnly, Task};
 
 use std::cell::UnsafeCell;
 use std::collections::VecDeque;
@@ -303,6 +303,8 @@ impl Schedule for SchedulerPriv {
         }
     }
 }
+
+impl ScheduleSendOnly for SchedulerPriv {}
 
 impl<P> Drop for BasicScheduler<P>
 where

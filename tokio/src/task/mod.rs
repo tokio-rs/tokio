@@ -232,6 +232,11 @@ cfg_rt_core! {
     pub use self::join::JoinHandle;
 }
 
+cfg_rt_util! {
+    mod local;
+    pub use local::{spawn_local, LocalSet};
+}
+
 mod list;
 pub(crate) use self::list::OwnedList;
 
@@ -269,12 +274,12 @@ pub(crate) struct Task<S: 'static> {
     _p: PhantomData<S>,
 }
 
-unsafe impl<S: Send + Sync + 'static> Send for Task<S> {}
+unsafe impl<S: ScheduleSendOnly + 'static> Send for Task<S> {}
 
 /// Task result sent back
 pub(crate) type Result<T> = std::result::Result<T, JoinError>;
 
-pub(crate) trait Schedule: Send + Sync + Sized + 'static {
+pub(crate) trait Schedule: Sized + 'static {
     /// Bind a task to the executor.
     ///
     /// Guaranteed to be called from the thread that called `poll` on the task.
@@ -291,11 +296,18 @@ pub(crate) trait Schedule: Send + Sync + Sized + 'static {
     fn schedule(&self, task: Task<Self>);
 }
 
+/// Marker trait indicating that a scheduler can only schedule tasks which
+/// implement `Send`.
+///
+/// Schedulers that implement this trait may not schedule `!Send` futures. If
+/// trait is implemented, the corresponding `Task` type will implement `Send`.
+pub(crate) trait ScheduleSendOnly: Schedule + Send + Sync {}
+
 /// Create a new task with an associated join handle
 pub(crate) fn joinable<T, S>(task: T) -> (Task<S>, JoinHandle<T::Output>)
 where
     T: Future + Send + 'static,
-    S: Schedule,
+    S: ScheduleSendOnly,
 {
     let raw = RawTask::new_joinable::<_, S>(task);
 
@@ -307,6 +319,26 @@ where
     let join = JoinHandle::new(raw);
 
     (task, join)
+}
+
+cfg_rt_util! {
+    /// Create a new `!Send` task with an associated join handle
+    pub(crate) fn joinable_local<T, S>(task: T) -> (Task<S>, JoinHandle<T::Output>)
+    where
+        T: Future + 'static,
+        S: Schedule,
+    {
+        let raw = RawTask::new_joinable_local::<_, S>(task);
+
+        let task = Task {
+            raw,
+            _p: PhantomData,
+        };
+
+        let join = JoinHandle::new(raw);
+
+        (task, join)
+    }
 }
 
 impl<S: 'static> Task<S> {

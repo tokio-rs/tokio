@@ -1,6 +1,5 @@
 #![allow(warnings)]
-
-use crate::task::{Header, Schedule, Task};
+use crate::task::{Header, Schedule, ScheduleSendOnly, Task};
 
 use std::collections::VecDeque;
 use std::sync::Mutex;
@@ -112,6 +111,8 @@ impl Schedule for Mock {
     }
 }
 
+impl ScheduleSendOnly for Mock {}
+
 impl Drop for Mock {
     fn drop(&mut self) {
         if !thread::panicking() {
@@ -129,3 +130,5 @@ impl Schedule for Noop {
 
     fn schedule(&self, _task: Task<Self>) {}
 }
+
+impl ScheduleSendOnly for Noop {}

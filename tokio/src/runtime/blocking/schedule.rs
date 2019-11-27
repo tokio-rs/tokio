@@ -1,4 +1,4 @@
-use crate::task::{Schedule, Task};
+use crate::task::{Schedule, ScheduleSendOnly, Task};
 
 /// `task::Schedule` implementation that does nothing. This is unique to the
 /// blocking scheduler as tasks scheduled are not really futures but blocking
@@ -16,3 +16,5 @@ impl Schedule for NoopSchedule {
         unreachable!();
     }
 }
+
+impl ScheduleSendOnly for NoopSchedule {}

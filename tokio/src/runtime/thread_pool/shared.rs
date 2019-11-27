@@ -1,7 +1,7 @@
 use crate::park::Unpark;
-use crate::runtime::Unparker;
 use crate::runtime::thread_pool::slice;
-use crate::task::{self, Schedule, Task};
+use crate::runtime::Unparker;
+use crate::task::{self, Schedule, ScheduleSendOnly, Task};
 
 use std::ptr;
 
@@ -90,3 +90,5 @@ impl Schedule for Shared {
         Self::schedule(self, task);
     }
 }
+
+impl ScheduleSendOnly for Shared {}
