@@ -47,7 +47,7 @@ where
             // Explicit drop of `future` silences the warning that `future` is
             // not used when neither rt-* feature flags are enabled.
             drop(future);
-            panic!("must be called from the context of Tokio runtime");
+            panic!("must be called from the context of Tokio runtime configured with either `basic_scheduler` or `threaded_scheduler`");
         }
     })
 }
