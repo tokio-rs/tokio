@@ -1,132 +1,108 @@
-trigger: ["master", "std-future"]
-pr: ["master", "std-future"]
+trigger: ["master"]
+pr: ["master"]
 
 variables:
-  nightly: nightly-2019-08-21
   RUSTFLAGS: -Dwarnings
+  nightly: nightly-2019-11-16
 
 jobs:
+# Test top level crate
+- template: ci/azure-test-stable.yml
+  parameters:
+    name: test_tokio
+    rust: stable
+    displayName: Test tokio
+    cross: true
+    crates:
+      - tokio
+      - tests-integration
+
+# Test sub crates
+- template: ci/azure-test-stable.yml
+  parameters:
+    name: test_linux
+    displayName: Test sub crates -
+    rust: stable
+    crates:
+      - tokio-macros
+      - tokio-test
+      - tokio-tls
+      - tokio-util
+      - examples
+
+# Run tests from `tests-build`. This requires a different process
+- template: ci/azure-test-build.yml
+  parameters:
+    name: test_build
+    displayName: Test build permutations
+    rust: stable
+
+# Run loom tests
+- template: ci/azure-loom.yml
+  parameters:
+    name: loom
+    rust: stable
+    crates:
+      - tokio
+
+# Try cross compiling
+- template: ci/azure-cross-compile.yml
+  parameters:
+    name: cross
+    rust: stable
+
+# Check each feature works properly
+- template: ci/azure-check-features.yml
+  parameters:
+    rust: $(nightly)
+    name: check_features
+
+# This represents the minimum Rust version supported by
+# Tokio. Updating this should be done in a dedicated PR and
+# cannot be greater than two 0.x releases prior to the
+# current stable.
+#
+# Tests are not run as tests may require newer versions of
+# rust.
+- template: ci/azure-check-minrust.yml
+  parameters:
+    name: minrust
+    rust: 1.39.0
+
 # Check formatting
 - template: ci/azure-rustfmt.yml
   parameters:
-    rust: $(nightly)
+    rust: stable
     name: rustfmt
 
 # Apply clippy lints to all crates
 - template: ci/azure-clippy.yml
   parameters:
-    rust: $(nightly)
+    rust: stable
     name: clippy
 
-# Test top level crate
-- template: ci/azure-test-stable.yml
+# Check doc generation
+- template: ci/azure-check-docs.yml
   parameters:
-    name: test_tokio
     rust: $(nightly)
-    displayName: Test tokio
-    cross: true
-    crates:
-      tokio:
-        - codec
-        - fs
-        - io
-        - rt-full
-        - net
-        - sync
-        - tcp
-        - timer
-        - udp
-        - uds
+    name: docs
 
-# Test crates that are platform specific
-- template: ci/azure-test-stable.yml
-  parameters:
-    name: test_sub_cross
-    displayName: Test sub crates (cross) -
-    cross: true
-    rust: $(nightly)
-    crates:
-      tokio-fs: []
-      tokio-net:
-        - process
-        - signal
-        - tcp
-        - udp
-        - uds
-
-# Test crates that are NOT platform specific
-- template: ci/azure-test-stable.yml
-  parameters:
-    name: test_linux
-    displayName: Test sub crates -
-    rust: $(nightly)
-    crates:
-      tokio-buf: []
-      tokio-codec: []
-      tokio-executor:
-        - current-thread
-        - threadpool
-      tokio-io:
-        - util
-      tokio-sync:
-        - async-traits
-      tokio-macros: []
-      tokio-timer:
-        - async-traits
-      tokio-test: []
-
-# Test compilation failure
-- template: ci/azure-test-stable.yml
-  parameters:
-    name: test_features
-    displayName: Test feature flags
-    rust: $(nightly)
-    crates:
-      build-tests:
-        - tokio-executor
-        - tokio-net
-        - executor-without-current-thread
-        - net-no-features
-        - net-with-tcp
-        - net-with-udp
-        - net-with-uds
-        - tokio-no-features
-        - tokio-with-net
-
-# # Try cross compiling
-# - template: ci/azure-cross-compile.yml
-#   parameters:
-#     name: cross_32bit_linux
-#     target: i686-unknown-linux-gnu
-#
-# # This represents the minimum Rust version supported by
-# # Tokio. Updating this should be done in a dedicated PR and
-# # cannot be greater than two 0.x releases prior to the
-# # current stable.
-# #
-# # Tests are not run as tests may require newer versions of
-# # rust.
-# - template: ci/azure-check-minrust.yml
-#   parameters:
-#     name: minrust
-#     rust_version: 1.34.0
-#
 # - template: ci/azure-tsan.yml
 #   parameters:
 #     name: tsan
-#     rust: $(nightly)
+#     rust: stable
 
 - template: ci/azure-deploy-docs.yml
   parameters:
-    rust: $(nightly)
+    rust: stable
     dependsOn:
       - rustfmt
       - clippy
       - test_tokio
-      - test_sub_cross
       - test_linux
-      - test_features
-#      - test_nightly
-#      - cross_32bit_linux
-#      - minrust
+      - test_build
+      - loom
+      - cross
+      - minrust
+      - check_features
 #      - tsan

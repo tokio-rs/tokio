@@ -1,7 +1,0 @@
-error[E0432]: unresolved import `build_tests::tokio_executor::current_thread`
- --> $DIR/executor_without_current_thread.rs:1:5
-  |
-1 | use build_tests::tokio_executor::current_thread;
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `current_thread` in `tokio_executor`
-
-For more information about this error, try `rustc --explain E0432`.

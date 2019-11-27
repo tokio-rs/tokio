@@ -1,11 +1,15 @@
-#![doc(html_root_url = "https://docs.rs/tokio-tls/0.3.0-alpha.4")]
+#![doc(html_root_url = "https://docs.rs/tokio-tls/0.3.0")]
 #![warn(
     missing_debug_implementations,
     missing_docs,
     rust_2018_idioms,
     unreachable_pub
 )]
-#![doc(test(no_crate_inject, attr(deny(rust_2018_idioms))))]
+#![deny(intra_doc_link_resolution_failure)]
+#![doc(test(
+    no_crate_inject,
+    attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
+))]
 
 //! Async TLS streams
 //!
@@ -24,15 +28,17 @@
 //! built. Configuration of TLS parameters is still primarily done through the
 //! `native-tls` crate.
 
+use tokio::io::{AsyncRead, AsyncWrite};
+
 use native_tls::{Error, HandshakeError, MidHandshakeTlsStream};
 use std::fmt;
 use std::future::Future;
 use std::io::{self, Read, Write};
 use std::marker::Unpin;
+use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::ptr::null_mut;
 use std::task::{Context, Poll};
-use tokio_io::{AsyncRead, AsyncWrite};
 
 #[derive(Debug)]
 struct AllowStd<S> {
@@ -177,7 +183,7 @@ impl<S> AsyncRead for TlsStream<S>
 where
     S: AsyncRead + AsyncWrite + Unpin,
 {
-    unsafe fn prepare_uninitialized_buffer(&self, _: &mut [u8]) -> bool {
+    unsafe fn prepare_uninitialized_buffer(&self, _: &mut [MaybeUninit<u8>]) -> bool {
         // Note that this does not forward to `S` because the buffer is
         // unconditionally filled in by OpenSSL, not the actual object `S`.
         // We're decrypting bytes from `S` into the buffer above!
@@ -287,7 +293,7 @@ impl TlsConnector {
     where
         S: AsyncRead + AsyncWrite + Unpin,
     {
-        handshake(|s| self.0.connect(domain, s), stream).await
+        handshake(move |s| self.0.connect(domain, s), stream).await
     }
 }
 
@@ -318,7 +324,7 @@ impl TlsAcceptor {
     where
         S: AsyncRead + AsyncWrite + Unpin,
     {
-        handshake(|s| self.0.accept(s), stream).await
+        handshake(move |s| self.0.accept(s), stream).await
     }
 }
 

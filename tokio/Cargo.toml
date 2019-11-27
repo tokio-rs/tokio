@@ -8,12 +8,12 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.2.0-alpha.4"
+version = "0.2.1"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 readme = "README.md"
-documentation = "https://docs.rs/tokio/0.2.0-alpha.4/tokio/"
+documentation = "https://docs.rs/tokio/0.2.1/tokio/"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
 description = """
@@ -24,75 +24,109 @@ categories = ["asynchronous", "network-programming"]
 keywords = ["io", "async", "non-blocking", "futures"]
 
 [features]
-default = [
-  "codec",
+# Include nothing by default
+default = []
+
+# enable everything
+full = [
+  "blocking",
+  "dns",
   "fs",
-  "io",
+  "io-driver",
+  "io-util",
+  "io-std",
+  "macros",
   "net",
-  "rt-full",
+  "process",
+  "rt-core",
+  "rt-util",
+  "rt-threaded",
+  "signal",
+  "stream",
   "sync",
-  "timer",
+  "time",
 ]
 
-codec = ["io", "tokio-codec", "bytes"]
-fs = ["tokio-fs"]
-io = ["tokio-io"]
-net = ["tcp", "udp", "uds"]
-rt-full = [
-  "num_cpus",
-  "net",
-  "sync",
-  "timer",
-  "tokio-executor/current-thread",
-  "tokio-executor/threadpool",
-  "tokio-macros",
-  "tracing-core",
+blocking = ["rt-core"]
+dns = ["rt-core"]
+fs = ["rt-core"]
+io-driver = ["mio", "lazy_static"]
+io-util = ["memchr"]
+# stdin, stdout, stderr
+io-std = ["rt-core"]
+macros = ["tokio-macros"]
+net = ["dns", "tcp", "udp", "uds"]
+process = [
+  "io-driver",
+  "libc",
+  "mio-named-pipes",
+  "signal",
+  "winapi/consoleapi",
+  "winapi/minwindef",
+  "winapi/threadpoollegacyapiset",
+  "winapi/winerror",
 ]
-signal = ["tokio-net/signal"]
-sync = ["tokio-sync"]
-tcp = ["io", "tokio-net/tcp"]
-timer = ["tokio-timer"]
-tracing = ["tracing-core"]
-udp = ["io", "tokio-net/udp"]
-uds = ["io", "tokio-net/uds"]
+# Includes basic task execution capabilities
+rt-core = []
+rt-util = []
+rt-threaded = [
+  "num_cpus",
+  "rt-core",
+]
+signal = [
+  "io-driver",
+  "lazy_static",
+  "libc",
+  "mio-uds",
+  "signal-hook-registry",
+  "winapi/consoleapi",
+  "winapi/minwindef",
+]
+stream = ["futures-core"]
+sync = ["fnv"]
+test-util = []
+tcp = ["io-driver"]
+time = ["slab"]
+udp = ["io-driver"]
+uds = ["io-driver", "mio-uds", "libc"]
+
 
 [dependencies]
-futures-core-preview = "=0.3.0-alpha.18"
-futures-sink-preview = "=0.3.0-alpha.18"
-futures-util-preview = { version = "=0.3.0-alpha.18", features = ["sink"] }
+tokio-macros = { version = "0.2.0", optional = true, path = "../tokio-macros" }
+
+bytes = "0.5.0"
+pin-project-lite = "0.1.1"
 
 # Everything else is optional...
-bytes = { version = "0.4", optional = true }
+fnv = { version = "1.0.6", optional = true }
+futures-core = { version = "0.3.0", optional = true }
+lazy_static = { version = "1.0.2", optional = true }
+memchr = { version = "2.2", optional = true }
+mio = { version = "0.6.20", optional = true }
 num_cpus = { version = "1.8.0", optional = true }
-tokio-codec = { version = "=0.2.0-alpha.4", optional = true, path = "../tokio-codec" }
-tokio-fs = { version = "=0.2.0-alpha.4", optional = true, path = "../tokio-fs" }
-tokio-io = { version = "=0.2.0-alpha.4", optional = true, features = ["util"], path = "../tokio-io" }
-tokio-executor = { version = "=0.2.0-alpha.4", optional = true, path = "../tokio-executor" }
-tokio-macros = { version = "=0.2.0-alpha.4", optional = true, path = "../tokio-macros" }
-tokio-net = { version = "=0.2.0-alpha.4", optional = true, features = ["async-traits"], path = "../tokio-net" }
-tokio-sync = { version = "=0.2.0-alpha.4", optional = true, path = "../tokio-sync", features = ["async-traits"] }
-tokio-timer = { version = "=0.3.0-alpha.4", optional = true, path = "../tokio-timer", features = ["async-traits"] }
-tracing-core = { version = "0.1", optional = true }
+# Backs `DelayQueue`
+slab = { version = "0.4.1", optional = true }
 
-[target.'cfg(feature = "tracing")'.dependencies]
-tokio-net = { version = "=0.2.0-alpha.4", optional = true, path = "../tokio-net", features = ["tracing", "async-traits"] }
-tokio-executor = { version = "=0.2.0-alpha.4", optional = true, path = "../tokio-executor", features = ["tracing"] }
+[target.'cfg(unix)'.dependencies]
+mio-uds = { version = "0.6.5", optional = true }
+libc = { version = "0.2.42", optional = true }
+signal-hook-registry = { version = "1.1.1", optional = true }
+
+[target.'cfg(windows)'.dependencies]
+mio-named-pipes = { version = "0.1.6", optional = true }
+
+[target.'cfg(windows)'.dependencies.winapi]
+version = "0.3.8"
+default-features = false
+optional = true
 
 [dev-dependencies]
-tokio-test = { version = "0.2.0-alpha.4", path = "../tokio-test" }
-
-futures-preview = "=0.3.0-alpha.18"
-futures-util-preview = "=0.3.0-alpha.18"
-pin-utils = "=0.1.0-alpha.4"
-env_logger = { version = "0.6", default-features = false }
-flate2 = { version = "1", features = ["tokio"] }
-http = "0.1"
-httparse = "1.0"
-libc = "0.2"
-num_cpus = "1.0"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-time = "0.1"
+tokio-test = { version = "0.2.0", path = "../tokio-test" }
+futures = { version = "0.3.0", features = ["async-await"] }
+loom = { version = "0.2.13", features = ["futures", "checkpoint"] }
+proptest = "0.9.4"
+tempfile = "3.1.0"
 
 [package.metadata.docs.rs]
 all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

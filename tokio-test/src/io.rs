@@ -1,3 +1,5 @@
+#![cfg(not(loom))]
+
 //! A mock type implementing [`AsyncRead`] and [`AsyncWrite`].
 //!
 //!
@@ -13,20 +15,20 @@
 //! Attempting to write data that the mock isn't expected will result in a
 //! panic.
 //!
-//! [`AsyncRead`]: tokio_io::AsyncRead
-//! [`AsyncWrite`]: tokio_io::AsyncWrite
+//! [`AsyncRead`]: tokio::io::AsyncRead
+//! [`AsyncWrite`]: tokio::io::AsyncWrite
 
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::sync::mpsc;
+use tokio::time::{self, Delay, Duration, Instant};
+
+use bytes::Buf;
+use futures_core::ready;
 use std::collections::VecDeque;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{self, Poll, Waker};
-use std::time::{Duration, Instant};
 use std::{cmp, io};
-
-use futures_core::ready;
-use tokio_io::{AsyncRead, AsyncWrite, Buf};
-use tokio_sync::mpsc;
-use tokio_timer::{clock, timer, Delay};
 
 /// An I/O object that follows a predefined script.
 ///
@@ -61,8 +63,6 @@ enum Action {
 struct Inner {
     actions: VecDeque<Action>,
     waiting: Option<Instant>,
-
-    timer_handle: timer::Handle,
     sleep: Option<Delay>,
     read_wait: Option<Waker>,
     rx: mpsc::UnboundedReceiver<Action>,
@@ -124,7 +124,7 @@ impl Handle {
     /// The next operation in the mock's script will be to expect a `read` call
     /// and return `buf`.
     pub fn read(&mut self, buf: &[u8]) -> &mut Self {
-        self.tx.try_send(Action::Read(buf.into())).unwrap();
+        self.tx.send(Action::Read(buf.into())).unwrap();
         self
     }
 
@@ -133,7 +133,7 @@ impl Handle {
     /// The next operation in the mock's script will be to expect a `write`
     /// call.
     pub fn write(&mut self, buf: &[u8]) -> &mut Self {
-        self.tx.try_send(Action::Write(buf.into())).unwrap();
+        self.tx.send(Action::Write(buf.into())).unwrap();
         self
     }
 }
@@ -144,7 +144,6 @@ impl Inner {
 
         let inner = Inner {
             actions,
-            timer_handle: timer::Handle::default(),
             sleep: None,
             read_wait: None,
             rx,
@@ -268,42 +267,6 @@ impl Inner {
     }
 }
 
-/*
-impl io::Read for Mock {
-    fn read(&mut self, dst: &mut [u8]) -> io::Result<usize> {
-        if self.is_async() {
-            tokio::async_read(self, dst)
-        } else {
-            self.sync_read(dst)
-        }
-    }
-}
-
-impl io::Write for Mock {
-    fn write(&mut self, src: &[u8]) -> io::Result<usize> {
-        if self.is_async() {
-            tokio::async_write(self, src)
-        } else {
-            self.sync_write(src)
-        }
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-}
-*/
-
-/*
-use self::futures::{Future, Stream, Poll, Async};
-use self::futures::sync::mpsc;
-use self::futures::task::{self, Task};
-use self::tokio_io::{AsyncRead, AsyncWrite};
-use self::tokio_timer::{Timer, Sleep};
-
-use std::io;
-*/
-
 // ===== impl Inner =====
 
 impl Mock {
@@ -336,8 +299,8 @@ impl AsyncRead for Mock {
             match self.inner.read(buf) {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     if let Some(rem) = self.inner.remaining_wait() {
-                        let until = clock::now() + rem;
-                        self.inner.sleep = Some(self.inner.timer_handle.delay(until));
+                        let until = Instant::now() + rem;
+                        self.inner.sleep = Some(time::delay_until(until));
                     } else {
                         self.inner.read_wait = Some(cx.waker().clone());
                         return Poll::Pending;
@@ -378,8 +341,8 @@ impl AsyncWrite for Mock {
             match self.inner.write(buf) {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     if let Some(rem) = self.inner.remaining_wait() {
-                        let until = clock::now() + rem;
-                        self.inner.sleep = Some(self.inner.timer_handle.delay(until));
+                        let until = Instant::now() + rem;
+                        self.inner.sleep = Some(time::delay_until(until));
                     } else {
                         panic!("unexpected WouldBlock");
                     }
