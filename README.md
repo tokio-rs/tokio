@@ -15,7 +15,7 @@ the Rust programming language. It is:
 [![Crates.io][crates-badge]][crates-url]
 [![MIT licensed][mit-badge]][mit-url]
 [![Build Status][azure-badge]][azure-url]
-[![Gitter chat][gitter-badge]][gitter-url]
+[![Discord chat][discord-badge]][discord-url]
 
 [crates-badge]: https://img.shields.io/crates/v/tokio.svg
 [crates-url]: https://crates.io/crates/tokio
@@ -23,13 +23,13 @@ the Rust programming language. It is:
 [mit-url]: LICENSE
 [azure-badge]: https://dev.azure.com/tokio-rs/Tokio/_apis/build/status/tokio-rs.tokio?branchName=master
 [azure-url]: https://dev.azure.com/tokio-rs/Tokio/_build/latest?definitionId=1&branchName=master
-[gitter-badge]: https://img.shields.io/gitter/room/tokio-rs/tokio.svg
-[gitter-url]: https://gitter.im/tokio-rs/tokio
+[discord-badge]: https://img.shields.io/discord/500028886025895936.svg?logo=discord&style=flat-square
+[discord-url]: https://discord.gg/6yGkFeN
 
 [Website](https://tokio.rs) |
 [Guides](https://tokio.rs/docs/) |
 [API Docs](https://docs.rs/tokio/latest/tokio) |
-[Chat](https://gitter.im/tokio-rs/tokio)
+[Chat](https://discord.gg/6yGkFeN)
 
 ## Overview
 
@@ -100,12 +100,12 @@ not fully ported. Examples for stable Tokio can be found
 
 First, see if the answer to your question can be found in the [Guides] or the
 [API documentation]. If the answer is not there, there is an active community in
-the [Tokio Gitter channel][chat]. We would be happy to try to answer your
+the [Tokio Discord server][chat]. We would be happy to try to answer your
 question.  Last, if that doesn't work, try opening an [issue] with the question.
 
 [Guides]: https://tokio.rs/docs/
 [API documentation]: https://docs.rs/tokio/latest/tokio
-[chat]: https://gitter.im/tokio-rs/tokio
+[chat]: https://discord.gg/6yGkFeN
 [issue]: https://github.com/tokio-rs/tokio/issues/new
 
 ## Contributing
