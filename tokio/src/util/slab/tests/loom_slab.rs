@@ -102,7 +102,7 @@ fn remove_remote_and_reuse() {
             let value = get_val(&s, idx1);
 
             // We may or may not see the new value yet, depending on when
-            // this occurs, but we must either  see the new value or `None`;
+            // this occurs, but we must either see the new value or `None`;
             // the old value has been removed!
             assert!(value == None || value == Some(3));
         });

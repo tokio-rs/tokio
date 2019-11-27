@@ -531,7 +531,7 @@ impl<T> DelayQueue<T> {
     /// of an `Instant`.
     ///
     /// The item remains in the queue but the delay is set to expire after
-    /// `timeout`.  If `timeout` is zero, then the item is immediately made
+    /// `timeout`. If `timeout` is zero, then the item is immediately made
     /// available to the caller.
     ///
     /// # Panics

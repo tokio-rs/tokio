@@ -18,7 +18,7 @@
 //! Where possible, users should prefer the provided asynchronous-specific
 //! traits such as [`AsyncRead`], or methods returning a `Future` or `Poll`
 //! type. Adaptions also extend to traits like `std::io::Read` where methods
-//! return `std::io::Result`.  Be warned that these adapted methods may return
+//! return `std::io::Result`. Be warned that these adapted methods may return
 //! `std::io::ErrorKind::WouldBlock` if a *worker* thread can not be converted
 //! to a *backup* thread immediately.
 //!

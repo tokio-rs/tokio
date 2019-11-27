@@ -116,13 +116,13 @@
 //! Finally, Tokio provides a _runtime_ for executing asynchronous tasks. Most
 //! applications can use the [`#[tokio::main]`][main] macro to run their code on the
 //! Tokio runtime. In use-cases where manual control over the runtime is
-//! required, the [`tokio::runtime`] module  provides APIs for configuring and
+//! required, the [`tokio::runtime`] module provides APIs for configuring and
 //! managing runtimes.
 //!
 //! Using the runtime requires the "rt-core" or "rt-threaded" feature flags, to
 //! enable the basic [single-threaded scheduler][rt-core] and the [thread-pool
 //! scheduler][rt-threaded], respectively. See the [`runtime` module
-//! documentation][rt-features]  for details.  In addition, the "macros" feature
+//! documentation][rt-features] for details. In addition, the "macros" feature
 //! flag enables the `#[tokio::main]` and `#[tokio::test]` attributes.
 //!
 //! [main]: attr.main.html

@@ -543,7 +543,7 @@ impl TcpStream {
     ///
     /// This option controls the action taken when a stream has unsent messages
     /// and the stream is closed. If `SO_LINGER` is set, the system
-    /// shall block the process  until it can transmit the data or until the
+    /// shall block the process until it can transmit the data or until the
     /// time expires.
     ///
     /// If `SO_LINGER` is not specified, and the stream is closed, the system

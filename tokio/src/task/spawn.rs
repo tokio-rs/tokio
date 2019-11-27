@@ -4,7 +4,7 @@ use crate::task::JoinHandle;
 use std::future::Future;
 
 /// Spawns a new asynchronous task, returning a
-/// [`JoinHandle`](super::JoinHandle)] for it.
+/// [`JoinHandle`](super::JoinHandle) for it.
 ///
 /// Spawning a task enables the task to execute concurrently to other tasks. The
 /// spawned task may execute on the current thread, or it may be sent to a

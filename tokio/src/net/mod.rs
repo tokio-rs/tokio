@@ -11,7 +11,7 @@
 //! * [`UdpSocket`] provides functionality for communication over UDP
 //! * [`UnixListener`] and [`UnixStream`] provide functionality for communication over a
 //! Unix Domain Stream Socket **(available on Unix only)**
-//! * [`UnixDatagram`] and [`UnixDatagramFramed`] provide functionality for communication
+//! * [`UnixDatagram`] provides functionality for communication
 //! over Unix Domain Datagram Socket **(available on Unix only)**
 
 //!
@@ -21,7 +21,6 @@
 //! [`UnixListener`]: struct.UnixListener.html
 //! [`UnixStream`]: struct.UnixStream.html
 //! [`UnixDatagram`]: struct.UnixDatagram.html
-//! [`UnixDatagramFramed`]: struct.UnixDatagramFramed.html
 
 mod addr;
 pub use addr::ToSocketAddrs;

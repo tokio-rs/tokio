@@ -27,7 +27,7 @@ cfg_io_driver! {
     /// **Note**: While `PollEvented` is `Sync` (if the underlying I/O type is
     /// `Sync`), the caller must ensure that there are at most two tasks that
     /// use a `PollEvented` instance concurrently. One for reading and one for
-    /// writing.  While violating this requirement is "safe" from a Rust memory
+    /// writing. While violating this requirement is "safe" from a Rust memory
     /// model point of view, it will result in unexpected behavior in the form
     /// of lost notifications and tasks hanging.
     ///

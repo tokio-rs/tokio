@@ -101,7 +101,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```
 
 More examples can be found [here](../examples). Note that the `master` branch
-is currently being updated to use `async` / `await`.  The examples are
+is currently being updated to use `async` / `await`. The examples are
 not fully ported. Examples for stable Tokio can be found
 [here](https://github.com/tokio-rs/tokio/tree/v0.1.x/tokio/examples).
 
@@ -111,7 +111,7 @@ not fully ported. Examples for stable Tokio can be found
 First, see if the answer to your question can be found in the [Guides] or the
 [API documentation]. If the answer is not there, there is an active community in
 the [Tokio Discord server][chat]. We would be happy to try to answer your
-question.  Last, if that doesn't work, try opening an [issue] with the question.
+question. Last, if that doesn't work, try opening an [issue] with the question.
 
 [Guides]: https://tokio.rs/docs/
 [API documentation]: https://docs.rs/tokio/0.2

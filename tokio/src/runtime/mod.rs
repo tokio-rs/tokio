@@ -304,7 +304,7 @@ impl Runtime {
     /// [basic scheduler] is used instead.
     ///
     /// If the threaded cheduler is selected, it will not spawn
-    /// any worker threads until it  needs to, i.e. tasks are scheduled to run.
+    /// any worker threads until it needs to, i.e. tasks are scheduled to run.
     ///
     /// Most applications will not need to call this function directly. Instead,
     /// they will use the  [`#[tokio::main]` attribute][main]. When more complex
