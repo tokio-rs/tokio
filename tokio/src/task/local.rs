@@ -345,8 +345,9 @@ impl Schedule for Scheduler {
         }
     }
 
-    fn release(&self, _: Task<Self>) {
-        unreachable!("tasks should only be completed locally")
+    fn release(&self, task: Task<Self>) {
+        // This will be called when dropping the local runtime.
+        self.pending_drop.push(task);
     }
 
     fn release_local(&self, task: &Task<Self>) {
