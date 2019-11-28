@@ -27,7 +27,6 @@
 //!
 //! ```rust,no_run
 //! # #[cfg(unix)] {
-//!
 //! use tokio::signal::unix::{signal, SignalKind};
 //!
 //! #[tokio::main]

@@ -152,14 +152,57 @@ impl CtrlBreak {
     /// Receive the next signal notification event.
     ///
     /// `None` is returned if no more events can be received by this stream.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use tokio::signal::windows::ctrl_break;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     // An infinite stream of CTRL-BREAK events.
+    ///     let mut stream = ctrl_break()?;
+    ///
+    ///     // Print whenever a CTRL-BREAK event is received
+    ///     loop {
+    ///         stream.recv().await;
+    ///         println!("got signal CTRL-BREAK");
+    ///     }
+    /// }
+    /// ```
     pub async fn recv(&mut self) -> Option<()> {
         use crate::future::poll_fn;
         poll_fn(|cx| self.poll_recv(cx)).await
     }
 
-    /// Receive the next signal notification event, outside of an `async` context.
+    /// Poll to receive the next signal notification event, outside of an
+    /// `async` context.
     ///
     /// `None` is returned if no more events can be received by this stream.
+    ///
+    /// # Examples
+    ///
+    /// Polling from a manually implemented future
+    ///
+    /// ```rust,no_run
+    /// use std::pin::Pin;
+    /// use std::future::Future;
+    /// use std::task::{Context, Poll};
+    /// use tokio::signal::windows::CtrlBreak;
+    ///
+    /// struct MyFuture {
+    ///     ctrlBreak: CtrlBreak,
+    /// }
+    ///
+    /// impl Future for MyFuture {
+    ///     type Output = Option<()>;
+    ///
+    ///     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    ///         println!("polling MyFuture");
+    ///         self.ctrlBreak.poll_recv(cx)
+    ///     }
+    /// }
+    /// ```
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
         self.inner.rx.poll_recv(cx)
     }
@@ -177,6 +220,24 @@ cfg_stream! {
 
 /// Creates a new stream which receives "ctrl-break" notifications sent to the
 /// process.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use tokio::signal::windows::ctrl_break;
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     // An infinite stream of CTRL-BREAK events.
+///     let mut stream = ctrl_break()?;
+///
+///     // Print whenever a CTRL-BREAK event is received
+///     loop {
+///         stream.recv().await;
+///         println!("got signal CTRL-BREAK");
+///     }
+/// }
+/// ```
 pub fn ctrl_break() -> io::Result<CtrlBreak> {
     Event::new(CTRL_BREAK_EVENT).map(|inner| CtrlBreak { inner })
 }

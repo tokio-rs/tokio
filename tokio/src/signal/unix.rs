@@ -351,6 +351,26 @@ impl Driver {
 ///
 /// Thus, applications should take care to ensure the expected signal behavior
 /// occurs as expected after listening for specific signals.
+///
+/// # Examples
+///
+/// Wait for SIGHUP
+///
+/// ```rust,no_run
+/// use tokio::signal::unix::{signal, SignalKind};
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     // An infinite stream of hangup signals.
+///     let mut stream = signal(SignalKind::hangup())?;
+///
+///     // Print whenever a HUP signal is received
+///     loop {
+///         stream.recv().await;
+///         println!("got signal HUP");
+///     }
+/// }
+/// ```
 #[must_use = "streams do nothing unless polled"]
 #[derive(Debug)]
 pub struct Signal {
@@ -402,14 +422,59 @@ impl Signal {
     /// Receive the next signal notification event.
     ///
     /// `None` is returned if no more events can be received by this stream.
+    ///
+    /// # Examples
+    ///
+    /// Wait for SIGHUP
+    ///
+    /// ```rust,no_run
+    /// use tokio::signal::unix::{signal, SignalKind};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     // An infinite stream of hangup signals.
+    ///     let mut stream = signal(SignalKind::hangup())?;
+    ///
+    ///     // Print whenever a HUP signal is received
+    ///     loop {
+    ///         stream.recv().await;
+    ///         println!("got signal HUP");
+    ///     }
+    /// }
+    /// ```
     pub async fn recv(&mut self) -> Option<()> {
         use crate::future::poll_fn;
         poll_fn(|cx| self.poll_recv(cx)).await
     }
 
-    /// Receive the next signal notification event, outside of an `async` context.
+    /// Poll to receive the next signal notification event, outside of an
+    /// `async` context.
     ///
     /// `None` is returned if no more events can be received by this stream.
+    ///
+    /// # Examples
+    ///
+    /// Polling from a manually implemented future
+    ///
+    /// ```rust,no_run
+    /// use std::pin::Pin;
+    /// use std::future::Future;
+    /// use std::task::{Context, Poll};
+    /// use tokio::signal::unix::Signal;
+    ///
+    /// struct MyFuture {
+    ///     signal: Signal,
+    /// }
+    ///
+    /// impl Future for MyFuture {
+    ///     type Output = Option<()>;
+    ///
+    ///     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    ///         println!("polling MyFuture");
+    ///         self.signal.poll_recv(cx)
+    ///     }
+    /// }
+    /// ```
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
         let _ = self.driver.poll(cx);
         self.rx.poll_recv(cx)
