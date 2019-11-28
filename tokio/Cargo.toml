@@ -8,12 +8,12 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.2.1"
+version = "0.2.2"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 readme = "README.md"
-documentation = "https://docs.rs/tokio/0.2.1/tokio/"
+documentation = "https://docs.rs/tokio/0.2.2/tokio/"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
 description = """
@@ -92,7 +92,7 @@ uds = ["io-driver", "mio-uds", "libc"]
 
 
 [dependencies]
-tokio-macros = { version = "0.2.0", optional = true, path = "../tokio-macros" }
+tokio-macros = { version = "0.2.0", optional = true }
 
 bytes = "0.5.0"
 pin-project-lite = "0.1.1"
@@ -121,7 +121,7 @@ default-features = false
 optional = true
 
 [dev-dependencies]
-tokio-test = { version = "0.2.0", path = "../tokio-test" }
+tokio-test = { version = "0.2.0" }
 futures = { version = "0.3.0", features = ["async-await"] }
 loom = { version = "0.2.13", features = ["futures", "checkpoint"] }
 proptest = "0.9.4"
