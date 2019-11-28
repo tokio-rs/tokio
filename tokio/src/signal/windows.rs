@@ -191,7 +191,7 @@ impl CtrlBreak {
     /// use tokio::signal::windows::CtrlBreak;
     ///
     /// struct MyFuture {
-    ///     ctrlBreak: CtrlBreak,
+    ///     ctrl_break: CtrlBreak,
     /// }
     ///
     /// impl Future for MyFuture {
