@@ -1,5 +1,5 @@
 use tokio::net::UdpSocket;
-use tokio_util::codec::{Decoder, Encoder};
+use tokio_util::codec::{Decoder, Encoder, LinesCodec};
 use tokio_util::udp::UdpFramed;
 
 use bytes::{BufMut, BytesMut};
@@ -10,7 +10,7 @@ use futures::stream::StreamExt;
 use std::io;
 
 #[tokio::test]
-async fn send_framed() -> std::io::Result<()> {
+async fn send_framed_byte_codec() -> std::io::Result<()> {
     let mut a_soc = UdpSocket::bind("127.0.0.1:0").await?;
     let mut b_soc = UdpSocket::bind("127.0.0.1:0").await?;
 
@@ -76,4 +76,25 @@ impl Encoder for ByteCodec {
         buf.put_slice(&data);
         Ok(())
     }
+}
+
+#[tokio::test]
+async fn send_framed_lines_codec() -> std::io::Result<()> {
+    let mut a_soc = UdpSocket::bind("127.0.0.1:0").await?;
+    let mut b_soc = UdpSocket::bind("127.0.0.1:0").await?;
+
+    let a_addr = a_soc.local_addr()?;
+    let b_addr = b_soc.local_addr()?;
+
+    let a = UdpFramed::new(a_soc, ByteCodec);
+    let b = UdpFramed::new(b_soc, LinesCodec::new());
+
+    let msg = b"1\r\n2\r\n3\r\n".to_vec();
+    a.send(&msg).await?;
+
+    assert_eq!(b.next().await, Some(("1".to_string(), a_addr)));
+    assert_eq!(b.next().await, Some(("2".to_string(), a_addr)));
+    assert_eq!(b.next().await, Some(("3".to_string(), a_addr)));
+
+    Ok(())
 }
