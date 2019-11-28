@@ -9,6 +9,7 @@ use std::io;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::mem::MaybeUninit;
 
 /// A unified `Stream` and `Sink` interface to an underlying `UdpSocket`, using
 /// the `Encoder` and `Decoder` traits to encode and decode frames.
@@ -52,7 +53,6 @@ impl<C: Decoder + Unpin> Stream for UdpFramed<C> {
             // Are there are still bytes left in the read buffer to decode?
             if pin.is_readable {
                 if let Some(frame) = pin.codec.decode_eof(&mut pin.rd)? {
-                    //trace!("frame decoded from buffer");
 
                     let current_addr = pin
                         .current_addr
@@ -68,11 +68,12 @@ impl<C: Decoder + Unpin> Stream for UdpFramed<C> {
 
             // We're out of data. Try and fetch more data to decode
             let addr = unsafe {
-                // Read into the buffer without having to initialize the memory.
-                let res = ready!(Pin::new(&mut pin.socket).poll_recv_from(cx, &mut pin.rd[..]));
+                // Convert to `&mut [u8]`
+                let b = &mut *(pin.rd.bytes_mut() as *mut [MaybeUninit<u8>] as *mut [u8]);
+
+                let res = ready!(Pin::new(&mut pin.socket).poll_recv_from(cx, b));
                 
                 let (n, addr) = res?;
-                //trace!("received {} bytes, decoding", n);
                 pin.rd.advance_mut(n);
                 addr
             };
