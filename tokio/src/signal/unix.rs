@@ -404,6 +404,16 @@ impl Signal {
     }
 }
 
+cfg_stream! {
+    impl futures_core::Stream for Signal {
+        type Item = ();
+
+        fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<()>> {
+            self.poll_recv(cx)
+        }
+    }
+}
+
 pub(crate) fn ctrl_c() -> io::Result<Signal> {
     signal(SignalKind::interrupt())
 }
