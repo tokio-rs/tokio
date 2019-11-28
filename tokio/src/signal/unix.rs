@@ -309,12 +309,7 @@ impl Driver {
     }
 }
 
-/// An implementation of `Stream` for receiving a particular type of signal.
-///
-/// This structure implements the `Stream` trait and represents notifications
-/// of the current process receiving a particular signal. The signal being
-/// listened for is passed to `Signal::new`, and the same signal number is then
-/// yielded as each element for the stream.
+/// A stream of events for receiving a particular type of OS signal.
 ///
 /// In general signal handling on Unix is a pretty tricky topic, and this
 /// structure is no exception! There are some important limitations to keep in
@@ -336,13 +331,46 @@ impl Driver {
 ///   improvements are possible in this crate, it's recommended to not plan on
 ///   having millions of signal channels open.
 ///
-/// * Currently the "driver task" to process incoming signals never exits. This
-///   driver task runs in the background of the event loop provided, and
-///   in general you shouldn't need to worry about it.
-///
 /// If you've got any questions about this feel free to open an issue on the
-/// repo, though, as I'd love to chat about this! In other words, I'd love to
-/// alleviate some of these limitations if possible!
+/// repo! New approaches to alleviate some of these limitations are always
+/// appreciated!
+///
+/// # Caveats
+///
+/// The first time that a `Signal` instance is registered for a particular
+/// signal kind, an OS signal-handler is installed which replaces the default
+/// platform behavior when that signal is received, **for the duration of the
+/// entire process**.
+///
+/// For example, Unix systems will terminate a process by default when it
+/// receives SIGINT. But, when a `Signal` instance is created to listen for
+/// this signal, the next SIGINT that arrives will be translated to a stream
+/// event, and the process will continue to execute. **Even if this `Signal`
+/// instance is dropped, subsequent SIGINT deliveries will end up captured by
+/// Tokio, and the default platform behavior will NOT be reset**.
+///
+/// Thus, applications should take care to ensure the expected signal behavior
+/// occurs as expected after listening for specific signals.
+///
+/// # Examples
+///
+/// Wait for SIGHUP
+///
+/// ```rust,no_run
+/// use tokio::signal::unix::{signal, SignalKind};
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     // An infinite stream of hangup signals.
+///     let mut stream = signal(SignalKind::hangup())?;
+///
+///     // Print whenever a HUP signal is received
+///     loop {
+///         stream.recv().await;
+///         println!("got signal HUP");
+///     }
+/// }
+/// ```
 #[must_use = "streams do nothing unless polled"]
 #[derive(Debug)]
 pub struct Signal {
@@ -351,7 +379,7 @@ pub struct Signal {
 }
 
 /// Creates a new stream which will receive notifications when the current
-/// process receives the signal `signal`.
+/// process receives the specified signal `kind`.
 ///
 /// This function will create a new stream which binds to the default reactor.
 /// The `Signal` stream is an infinite stream which will receive
@@ -391,13 +419,62 @@ pub fn signal(kind: SignalKind) -> io::Result<Signal> {
 }
 
 impl Signal {
-    #[doc(hidden)] // TODO: Dox
+    /// Receive the next signal notification event.
+    ///
+    /// `None` is returned if no more events can be received by this stream.
+    ///
+    /// # Examples
+    ///
+    /// Wait for SIGHUP
+    ///
+    /// ```rust,no_run
+    /// use tokio::signal::unix::{signal, SignalKind};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     // An infinite stream of hangup signals.
+    ///     let mut stream = signal(SignalKind::hangup())?;
+    ///
+    ///     // Print whenever a HUP signal is received
+    ///     loop {
+    ///         stream.recv().await;
+    ///         println!("got signal HUP");
+    ///     }
+    /// }
+    /// ```
     pub async fn recv(&mut self) -> Option<()> {
         use crate::future::poll_fn;
         poll_fn(|cx| self.poll_recv(cx)).await
     }
 
-    #[doc(hidden)] // TODO: document
+    /// Poll to receive the next signal notification event, outside of an
+    /// `async` context.
+    ///
+    /// `None` is returned if no more events can be received by this stream.
+    ///
+    /// # Examples
+    ///
+    /// Polling from a manually implemented future
+    ///
+    /// ```rust,no_run
+    /// use std::pin::Pin;
+    /// use std::future::Future;
+    /// use std::task::{Context, Poll};
+    /// use tokio::signal::unix::Signal;
+    ///
+    /// struct MyFuture {
+    ///     signal: Signal,
+    /// }
+    ///
+    /// impl Future for MyFuture {
+    ///     type Output = Option<()>;
+    ///
+    ///     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    ///         println!("polling MyFuture");
+    ///         self.signal.poll_recv(cx)
+    ///     }
+    /// }
+    /// ```
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
         let _ = self.driver.poll(cx);
         self.rx.poll_recv(cx)
