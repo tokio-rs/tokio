@@ -199,7 +199,7 @@ impl CtrlBreak {
     ///
     ///     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
     ///         println!("polling MyFuture");
-    ///         self.ctrlBreak.poll_recv(cx)
+    ///         self.ctrl_break.poll_recv(cx)
     ///     }
     /// }
     /// ```
