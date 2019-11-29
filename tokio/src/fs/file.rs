@@ -394,6 +394,55 @@ impl File {
         Ok(File::from_std(std_file))
     }
 
+    /// Destructures `File` into a [`std::fs::File`][std]. This function is
+    /// async to allow any in-flight operations to complete.
+    ///
+    /// Use `File::try_into_std` to attempt conversion immediately.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::fs::File;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let tokio_file = File::open("foo.txt").await?;
+    /// let std_file = tokio_file.into_std().await;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn into_std(mut self) -> sys::File {
+        self.complete_inflight().await;
+        Arc::try_unwrap(self.std).expect("Arc::try_unwrap failed")
+    }
+
+    /// Tries to immediately destructure `File` into a [`std::fs::File`][std].
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error containing the file if some
+    /// operation is in-flight.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::fs::File;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let tokio_file = File::open("foo.txt").await?;
+    /// let std_file = tokio_file.try_into_std().unwrap();
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn try_into_std(mut self) -> Result<sys::File, Self> {
+        match Arc::try_unwrap(self.std) {
+            Ok(file) => Ok(file),
+            Err(std_file_arc) => {
+                self.std = std_file_arc;
+                Err(self)
+            }
+        }
+    }
+
     /// Changes the permissions on the underlying file.
     ///
     /// # Platform-specific behavior
