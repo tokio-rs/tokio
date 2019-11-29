@@ -65,13 +65,6 @@ where
     )
 }
 
-pub(super) fn basic_scheduler_is_current(basic_scheduler: &basic_scheduler::SchedulerPriv) -> bool {
-    EXECUTOR.with(|current_executor| match current_executor.get() {
-        State::Basic(ptr) => ptr == basic_scheduler as *const _,
-        _ => false,
-    })
-}
-
 cfg_rt_threaded! {
     use crate::runtime::thread_pool;
 

@@ -199,6 +199,21 @@ rt_test! {
     }
 
     #[test]
+    fn spawn_await_chain() {
+        let mut rt = rt();
+
+        let out = rt.block_on(async {
+            assert_ok!(tokio::spawn(async {
+                assert_ok!(tokio::spawn(async {
+                    "hello"
+                }).await)
+            }).await)
+        });
+
+        assert_eq!(out, "hello");
+    }
+
+    #[test]
     fn outstanding_tasks_dropped() {
         let mut rt = rt();
 
