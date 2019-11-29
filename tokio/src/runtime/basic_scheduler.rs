@@ -1,11 +1,12 @@
 use crate::park::{Park, Unpark};
 use crate::task::{self, JoinHandle, Schedule, ScheduleSendOnly, Task};
 
-use std::cell::UnsafeCell;
+use std::cell::{Cell, UnsafeCell};
 use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
 use std::mem::ManuallyDrop;
+use std::ptr;
 use std::sync::{Arc, Mutex};
 use std::task::{RawWaker, RawWakerVTable, Waker};
 use std::time::Duration;
@@ -87,6 +88,10 @@ const MAX_TASKS_PER_TICK: usize = 61;
 /// How often to check the remote queue first
 const CHECK_REMOTE_INTERVAL: u8 = 13;
 
+thread_local! {
+    static ACTIVE: Cell<*const SchedulerPriv> = Cell::new(ptr::null())
+}
+
 impl<P> BasicScheduler<P>
 where
     P: Park,
@@ -137,6 +142,27 @@ where
 
         let local = &mut self.local;
         let scheduler = &*self.scheduler;
+
+        struct Guard {
+            old: *const SchedulerPriv,
+        }
+
+        impl Drop for Guard {
+            fn drop(&mut self) {
+                ACTIVE.with(|cell| cell.set(self.old));
+            }
+        }
+
+        // Track the current scheduler
+        let _guard = ACTIVE.with(|cell| {
+            let guard = Guard {
+                old: cell.get(),
+            };
+
+            cell.set(scheduler as *const SchedulerPriv);
+
+            guard
+        });
 
         runtime::global::with_basic_scheduler(scheduler, || {
             let mut _enter = runtime::enter();
@@ -283,9 +309,11 @@ impl Schedule for SchedulerPriv {
     }
 
     fn schedule(&self, task: Task<Self>) {
-        use crate::runtime::global;
+        let is_current = ACTIVE.with(|cell| {
+            cell.get() == self as *const SchedulerPriv
+        });
 
-        if global::basic_scheduler_is_current(self) {
+        if is_current {
             unsafe { self.schedule_local(task) };
         } else {
             let mut lock = self.remote_queue.lock().unwrap();
