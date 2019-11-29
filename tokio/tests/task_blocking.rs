@@ -11,12 +11,18 @@ use std::time::Duration;
 async fn basic_blocking() {
     // Run a few times
     for _ in 0..100 {
-        let out = assert_ok!(tokio::spawn(async {
-            assert_ok!(task::spawn_blocking(|| {
-                thread::sleep(Duration::from_millis(5));
-                "hello"
-            }).await)
-        }).await);
+        let out = assert_ok!(
+            tokio::spawn(async {
+                assert_ok!(
+                    task::spawn_blocking(|| {
+                        thread::sleep(Duration::from_millis(5));
+                        "hello"
+                    })
+                    .await
+                )
+            })
+            .await
+        );
 
         assert_eq!(out, "hello");
     }
