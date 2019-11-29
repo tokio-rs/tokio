@@ -1,7 +1,8 @@
 # 0.2.2 (November 29, 2019)
 
 ### Fixes
-- Update `spawn` panic message to specify that a task scheduler is required (#1839).
+- scheduling with `basic_scheduler` (#1861).
+- update `spawn` panic message to specify that a task scheduler is required (#1839).
 - API docs example for `runtime::Builder` to include a task scheduler (#1841).
 - general documentation (#1834).
 - building on illumos/solaris (#1772).
