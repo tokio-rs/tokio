@@ -1,4 +1,4 @@
-# 0.2.2 (November 28, 2019)
+# 0.2.2 (November 29, 2019)
 
 ### Fixes
 - Update `spawn` panic message to specify that a task scheduler is required (#1839).
