@@ -204,6 +204,7 @@ impl<T> Sender<T> {
     /// [`send`]: Sender::send
     /// [`poll_ready`]: Sender::poll_ready
     /// [`channel`]: channel
+    /// [`close`]: Receiver::close
     ///
     /// # Examples
     ///
