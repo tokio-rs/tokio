@@ -221,6 +221,12 @@ cfg_io_util! {
         read_impl! {
             /// Reads an unsigned 8 bit integer from the underlying reader.
             ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_u8(&mut self) -> io::Result<u8>;
+            /// ```
+            ///
             /// It is recommended to use a buffered reader to avoid excessive
             /// syscalls.
             ///
@@ -252,6 +258,12 @@ cfg_io_util! {
             fn read_u8(&mut self) -> ReadU8;
 
             /// Reads a signed 8 bit integer from the underlying reader.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_i8(&mut self) -> io::Result<i8>;
+            /// ```
             ///
             /// It is recommended to use a buffered reader to avoid excessive
             /// syscalls.
@@ -286,6 +298,12 @@ cfg_io_util! {
             /// Reads an unsigned 16-bit integer in big-endian order from the
             /// underlying reader.
             ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_u16(&mut self) -> io::Result<u16>;
+            /// ```
+            ///
             /// It is recommended to use a buffered reader to avoid excessive
             /// syscalls.
             ///
@@ -317,6 +335,12 @@ cfg_io_util! {
 
             /// Reads a signed 16-bit integer in big-endian order from the
             /// underlying reader.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_i16(&mut self) -> io::Result<i16>;
+            /// ```
             ///
             /// It is recommended to use a buffered reader to avoid excessive
             /// syscalls.
@@ -350,6 +374,12 @@ cfg_io_util! {
             /// Reads an unsigned 32-bit integer in big-endian order from the
             /// underlying reader.
             ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_u32(&mut self) -> io::Result<u32>;
+            /// ```
+            ///
             /// It is recommended to use a buffered reader to avoid excessive
             /// syscalls.
             ///
@@ -381,6 +411,13 @@ cfg_io_util! {
             /// Reads a signed 32-bit integer in big-endian order from the
             /// underlying reader.
             ///
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_i32(&mut self) -> io::Result<i32>;
+            /// ```
+            ///
             /// It is recommended to use a buffered reader to avoid excessive
             /// syscalls.
             ///
@@ -411,6 +448,12 @@ cfg_io_util! {
 
             /// Reads an unsigned 64-bit integer in big-endian order from the
             /// underlying reader.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_u64(&mut self) -> io::Result<u64>;
+            /// ```
             ///
             /// It is recommended to use a buffered reader to avoid excessive
             /// syscalls.
@@ -445,6 +488,12 @@ cfg_io_util! {
             /// Reads an signed 64-bit integer in big-endian order from the
             /// underlying reader.
             ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_i64(&mut self) -> io::Result<i64>;
+            /// ```
+            ///
             /// It is recommended to use a buffered reader to avoid excessive
             /// syscalls.
             ///
@@ -475,6 +524,12 @@ cfg_io_util! {
 
             /// Reads an unsigned 128-bit integer in big-endian order from the
             /// underlying reader.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_u128(&mut self) -> io::Result<u128>;
+            /// ```
             ///
             /// It is recommended to use a buffered reader to avoid excessive
             /// syscalls.
@@ -509,6 +564,12 @@ cfg_io_util! {
 
             /// Reads an signed 128-bit integer in big-endian order from the
             /// underlying reader.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_i128(&mut self) -> io::Result<i128>;
+            /// ```
             ///
             /// It is recommended to use a buffered reader to avoid excessive
             /// syscalls.

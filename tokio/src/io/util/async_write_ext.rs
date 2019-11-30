@@ -151,6 +151,12 @@ cfg_io_util! {
         write_impl! {
             /// Writes an unsigned 8-bit integer to the underlying writer.
             ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn write_u8(&mut self, n: u8) -> io::Result<()>;
+            /// ```
+            ///
             /// It is recommended to use a buffered writer to avoid excessive
             /// syscalls.
             ///
@@ -181,6 +187,12 @@ cfg_io_util! {
             fn write_u8(&mut self, n: u8) -> WriteU8;
 
             /// Writes an unsigned 8-bit integer to the underlying writer.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn write_i8(&mut self, n: i8) -> io::Result<()>;
+            /// ```
             ///
             /// It is recommended to use a buffered writer to avoid excessive
             /// syscalls.
@@ -214,6 +226,12 @@ cfg_io_util! {
             /// Writes an unsigned 16-bit integer in big-endian order to the
             /// underlying writer.
             ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn write_u16(&mut self, n: u16) -> io::Result<()>;
+            /// ```
+            ///
             /// It is recommended to use a buffered writer to avoid excessive
             /// syscalls.
             ///
@@ -245,6 +263,12 @@ cfg_io_util! {
 
             /// Writes a signed 16-bit integer in big-endian order to the
             /// underlying writer.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn write_i16(&mut self, n: i16) -> io::Result<()>;
+            /// ```
             ///
             /// It is recommended to use a buffered writer to avoid excessive
             /// syscalls.
@@ -278,6 +302,12 @@ cfg_io_util! {
             /// Writes an unsigned 32-bit integer in big-endian order to the
             /// underlying writer.
             ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn write_u32(&mut self, n: u32) -> io::Result<()>;
+            /// ```
+            ///
             /// It is recommended to use a buffered writer to avoid excessive
             /// syscalls.
             ///
@@ -309,6 +339,12 @@ cfg_io_util! {
 
             /// Writes a signed 32-bit integer in big-endian order to the
             /// underlying writer.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn write_i32(&mut self, n: i32) -> io::Result<()>;
+            /// ```
             ///
             /// It is recommended to use a buffered writer to avoid excessive
             /// syscalls.
@@ -342,6 +378,12 @@ cfg_io_util! {
             /// Writes an unsigned 64-bit integer in big-endian order to the
             /// underlying writer.
             ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn write_u64(&mut self, n: u64) -> io::Result<()>;
+            /// ```
+            ///
             /// It is recommended to use a buffered writer to avoid excessive
             /// syscalls.
             ///
@@ -374,6 +416,12 @@ cfg_io_util! {
             /// Writes an signed 64-bit integer in big-endian order to the
             /// underlying writer.
             ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn write_i64(&mut self, n: i64) -> io::Result<()>;
+            /// ```
+            ///
             /// It is recommended to use a buffered writer to avoid excessive
             /// syscalls.
             ///
@@ -405,6 +453,12 @@ cfg_io_util! {
 
             /// Writes an unsigned 128-bit integer in big-endian order to the
             /// underlying writer.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn write_u128(&mut self, n: u128) -> io::Result<()>;
+            /// ```
             ///
             /// It is recommended to use a buffered writer to avoid excessive
             /// syscalls.
@@ -439,6 +493,12 @@ cfg_io_util! {
 
             /// Writes an signed 128-bit integer in big-endian order to the
             /// underlying writer.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn write_i128(&mut self, n: i128) -> io::Result<()>;
+            /// ```
             ///
             /// It is recommended to use a buffered writer to avoid excessive
             /// syscalls.
