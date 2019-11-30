@@ -1,5 +1,6 @@
 use crate::future;
 
+use std::future::Future;
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 
@@ -40,16 +41,38 @@ where
     }
 }
 
-struct LookupHost<T: Iterator> {
-    iter: T
+pub struct LookupHost<T>
+where
+    T: Future
+{
+    fut: T,
+    is_ready: bool,
+    hosts: Option<T::Output>
 }
 
+impl<T> LookupHost<T>
+where
+    T: Future + Unpin,
+    <T as Future>::Output: Iterator
+{
+    pub async fn next_addr(&mut self) -> Option<<<T as Future>::Output as Iterator>::Item> {
+        let hosts = &mut self.fut;
+        if !self.is_ready {
+            self.hosts = Some(hosts.await);
+            self.is_ready = true;
+        }
+        let hosts = &mut self.hosts;
+        if let Some(hosts) = hosts {
+            hosts.next()
+        } else {
+            None
+        }
+    }
+}
 
-
-async fn lookup_host<T: ToSocketAddrs>(host: T) -> io::Result<LookupHost<<T as sealed::ToSocketAddrsPriv>::Iter>> {
-    let hosts = host.to_socket_addrs().await?;
-    Ok(LookupHost { iter: hosts })
-    // Ok(hosts)
+pub fn lookup_host<T: ToSocketAddrs>(host: T) -> LookupHost<<T as sealed::ToSocketAddrsPriv>::Future> {
+    let fut = host.to_socket_addrs();
+    LookupHost { fut,  is_ready: false, hosts: None }
 }
 
 // ===== impl SocketAddr =====

@@ -23,7 +23,7 @@
 //! [`UnixDatagram`]: struct.UnixDatagram.html
 
 mod addr;
-pub use addr::ToSocketAddrs;
+pub use addr::{ToSocketAddrs, lookup_host, LookupHost};
 
 cfg_tcp! {
     pub mod tcp;
