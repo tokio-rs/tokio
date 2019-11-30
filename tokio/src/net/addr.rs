@@ -1,6 +1,5 @@
 use crate::future;
 
-use std::future::Future;
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 
@@ -41,38 +40,60 @@ where
     }
 }
 
-pub struct LookupHost<T>
-where
-    T: Future
-{
-    fut: T,
-    is_ready: bool,
-    hosts: Option<T::Output>
-}
+cfg_dns! {
 
-impl<T> LookupHost<T>
-where
-    T: Future + Unpin,
-    <T as Future>::Output: Iterator
-{
-    pub async fn next_addr(&mut self) -> Option<<<T as Future>::Output as Iterator>::Item> {
-        let hosts = &mut self.fut;
-        if !self.is_ready {
-            self.hosts = Some(hosts.await);
-            self.is_ready = true;
-        }
-        let hosts = &mut self.hosts;
-        if let Some(hosts) = hosts {
-            hosts.next()
-        } else {
-            None
+    /// LookupHost contains resolved SocketAddrs.
+    ///
+    /// This type is created by the function [`lookup_host`]. See its documentation for more.
+    #[derive(Debug)]
+    pub struct LookupHost<T>
+    where
+        T: sealed::ToSocketAddrsPriv,
+        T: ToSocketAddrs<Future = sealed::MaybeReady>,
+        T: ToSocketAddrs<Iter = sealed::OneOrMore>,
+    {
+        fut: <T as sealed::ToSocketAddrsPriv>::Future,
+        addrs: Option<sealed::OneOrMore>
+    }
+
+    impl<T> LookupHost<T>
+    where
+        T: sealed::ToSocketAddrsPriv + Unpin,
+        T: ToSocketAddrs<Future = sealed::MaybeReady>,
+        T: ToSocketAddrs<Iter = sealed::OneOrMore>,
+    {
+        /// Fetches the next resolved address.
+        pub async fn next_addr(&mut self) -> Option<io::Result<SocketAddr>> {
+            if self.addrs.is_none() {
+                let hosts = &mut self.fut;
+                    let hosts = hosts.await;
+                    match hosts {
+                        Ok(addrs) => self.addrs = Some(addrs),
+                        Err(e) => return Some(Result::Err(e))
+                };
+            }
+            let addrs = &mut self.addrs;
+            if let Some(addrs) = addrs {
+                let next = addrs.next();
+                next.and_then(|t| Some(Ok(t)))
+            } else {
+                unreachable!()
+            }
         }
     }
-}
 
-pub fn lookup_host<T: ToSocketAddrs>(host: T) -> LookupHost<<T as sealed::ToSocketAddrsPriv>::Future> {
-    let fut = host.to_socket_addrs();
-    LookupHost { fut,  is_ready: false, hosts: None }
+    /// Performs a DNS resolution.
+    ///
+    /// This API is not intended to cover all DNS use cases.
+    /// Anything beyond the basic use case should be done with a specialized library.
+    pub fn lookup_host<T: ToSocketAddrs>(host: T) -> LookupHost<T>
+    where
+        T: ToSocketAddrs<Future = sealed::MaybeReady>,
+        T: ToSocketAddrs<Iter = sealed::OneOrMore>,
+    {
+        let fut = host.to_socket_addrs();
+        LookupHost { fut, addrs: None }
+    }
 }
 
 // ===== impl SocketAddr =====
