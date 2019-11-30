@@ -40,6 +40,18 @@ where
     }
 }
 
+struct LookupHost<T: Iterator> {
+    iter: T
+}
+
+
+
+async fn lookup_host<T: ToSocketAddrs>(host: T) -> io::Result<LookupHost<<T as sealed::ToSocketAddrsPriv>::Iter>> {
+    let hosts = host.to_socket_addrs().await?;
+    Ok(LookupHost { iter: hosts })
+    // Ok(hosts)
+}
+
 // ===== impl SocketAddr =====
 
 impl ToSocketAddrs for SocketAddr {}
