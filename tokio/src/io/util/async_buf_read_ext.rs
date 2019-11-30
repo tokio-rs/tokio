@@ -50,6 +50,73 @@ cfg_io_util! {
         /// the event that all data read so far was valid UTF-8.
         ///
         /// [`read_until`]: AsyncBufReadExt::read_until
+        /// ------------
+        /// Read all bytes until a newline (the 0xA byte) is reached, and append
+        /// them to the provided buffer.
+        ///
+        /// This function will read bytes from the underlying stream until the
+        /// newline delimiter (the 0xA byte) or EOF is found. Once found, all bytes
+        /// up to, and including, the delimiter (if found) will be appended to
+        /// `buf`.
+        ///
+        /// If successful, this function will return the total number of bytes read.
+        ///
+        /// If this function returns `Ok(0)`, the stream has reached EOF.
+        ///
+        /// # Errors
+        ///
+        /// This function has the same error semantics as [`read_until`] and will
+        /// also return an error if the read bytes are not valid UTF-8. If an I/O
+        /// error is encountered then `buf` may contain some bytes already read in
+        /// the event that all data read so far was valid UTF-8.
+        ///
+        /// [`read_until`]: AsyncBufReadExt::read_until
+        ///
+        /// # Examples
+        ///
+        /// [`std::io::Cursor`][`Cursor`] is a type that implements
+        /// `AsyncBufRead`. In this example, we use [`Cursor`] to read all the
+        /// lines in a byte slice:
+        ///
+        /// [`Cursor`]: std::io::Cursor
+        ///
+        /// ```
+        /// use tokio::io::AsyncBufReadExt;
+        ///
+        /// use std::io::Cursor;
+        ///
+        /// #[tokio::main]
+        /// async fn main() {
+        ///     let mut cursor = Cursor::new(b"foo\nbar");
+        ///     let mut buf = String::new();
+        ///
+        ///     // cursor is at 'f'
+        ///     let num_bytes = cursor.read_line(&mut buf)
+        ///         .await
+        ///         .expect("reading from cursor won't fail");
+        ///
+        ///     assert_eq!(num_bytes, 4);
+        ///     assert_eq!(buf, "foo\n");
+        ///     buf.clear();
+        ///
+        ///     // cursor is at 'b'
+        ///     let num_bytes = cursor.read_line(&mut buf)
+        ///         .await
+        ///         .expect("reading from cursor won't fail");
+        ///
+        ///     assert_eq!(num_bytes, 3);
+        ///     assert_eq!(buf, "bar");
+        ///     buf.clear();
+        ///
+        ///     // cursor is at EOF
+        ///     let num_bytes = cursor.read_line(&mut buf)
+        ///         .await
+        ///         .expect("reading from cursor won't fail");
+        ///
+        ///     assert_eq!(num_bytes, 0);
+        ///     assert_eq!(buf, "");
+        /// }
+        /// ```
         fn read_line<'a>(&'a mut self, buf: &'a mut String) -> ReadLine<'a, Self>
         where
             Self: Unpin,
