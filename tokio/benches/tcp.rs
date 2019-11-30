@@ -34,7 +34,7 @@ mod connect_churn {
 
         b.iter(move || {
             let result: io::Result<_> = block_on(async {
-                let listener = TcpListener::bind(&addr).await.unwrap();
+                let mut listener = TcpListener::bind(&addr).await.unwrap();
                 let addr = listener.local_addr().unwrap();
 
                 // Spawn a single future that accepts & drops connections
@@ -76,7 +76,7 @@ mod connect_churn {
         let server_thread = thread::spawn(move || {
             block_on(async {
                 // Bind the TCP listener
-                let listener = TcpListener::bind(&"127.0.0.1:0".parse::<SocketAddr>().unwrap())
+                let mut listener = TcpListener::bind(&"127.0.0.1:0".parse::<SocketAddr>().unwrap())
                     .await
                     .unwrap();
 
@@ -218,7 +218,7 @@ mod transfer {
 
         b.iter(move || {
             let result: io::Result<_> = block_on(async move {
-                let listener = TcpListener::bind(&addr).await?;
+                let mut listener = TcpListener::bind(&addr).await?;
                 let addr = listener.local_addr().unwrap();
 
                 // Spawn a single future that accepts 1 connection, Drain it and drops
