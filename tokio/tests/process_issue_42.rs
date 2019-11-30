@@ -4,10 +4,8 @@
 
 use futures::future::join_all;
 use std::process::Stdio;
-use std::time::Duration;
 use tokio::process::Command;
 use tokio::task;
-use tokio::time::timeout;
 
 #[tokio::test]
 async fn issue_42() {
@@ -34,7 +32,5 @@ async fn issue_42() {
         })
     });
 
-    timeout(Duration::from_secs(1), join_all(join_handles))
-        .await
-        .expect("timed out, did we deadlock?");
+    join_all(join_handles).await;
 }
