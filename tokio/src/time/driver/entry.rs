@@ -266,8 +266,9 @@ impl Entry {
         let when = inner.normalize_deadline(deadline);
         let elapsed = inner.elapsed();
 
+        let next = if when <= elapsed { ELAPSED } else { when };
+
         let mut curr = entry.state.load(SeqCst);
-        let mut notify;
 
         loop {
             // In these two cases, there is no work to do when resetting the
@@ -276,16 +277,6 @@ impl Entry {
             // the reset is a noop.
             if curr == ERROR || curr == when {
                 return;
-            }
-
-            let next;
-
-            if when <= elapsed {
-                next = ELAPSED;
-                notify = !is_elapsed(curr);
-            } else {
-                next = when;
-                notify = true;
             }
 
             let actual = entry.state.compare_and_swap(curr, next, SeqCst);
@@ -297,7 +288,16 @@ impl Entry {
             curr = actual;
         }
 
-        if notify {
+        // If the state has transitioned to 'elapsed' then wake the task as
+        // this entry is ready to be polled.
+        if !is_elapsed(curr) && is_elapsed(next) {
+            entry.waker.wake();
+        }
+
+        // The driver tracks all non-elapsed entries; notify the driver that it
+        // should update its state for this entry unless the entry had already
+        // elapsed and remains elapsed.
+        if !is_elapsed(curr) || !is_elapsed(next) {
             let _ = inner.queue(entry);
         }
     }
