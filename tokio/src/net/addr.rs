@@ -44,9 +44,13 @@ cfg_dns! {
     use std::future::Future;
     use std::pin::Pin;
     use std::task::{Context, Poll};
-    /// LookupHost contains resolved SocketAddrs.
+
+    /// `LookupHost` contains resolved [`SocketAddr`]s.
     ///
     /// This type is created by the function [`lookup_host`]. See its documentation for more.
+    /// 
+    /// [`SocketAddr`]: https://doc.rust-lang.org/stable/std/net/enum.SocketAddr.html
+    /// [`lookup_host`]: ./fn.lookup_host.html
     #[derive(Debug)]
     pub struct LookupHost<T>
     where
@@ -131,14 +135,18 @@ cfg_dns! {
     /// This API is not intended to cover all DNS use cases.
     /// Anything beyond the basic use case should be done with a specialized library.
     /// There are two, mutually exclusive ways of using this API:
-    /// 1. `.await`ing `LookupHost`. This provides _only_ the first resolved DNS entry.
-    ///    If no DNS entries are found, the `LookupHost` future will return a
-    ///   `std::io::Error`.
-    /// 2. Calling `LookupHost::next_addr` to fetch all resolved `SocketAddr`s.
-    ///    Once streams are stabilized in the standard library, `LookupHost::next_addr`
-    ///    will be replaced a stream.
+    /// 1. `.await`ing [`LookupHost`]. This option provides _only_ the
+    ///    first resolved DNS entry. If no DNS entries are found, the 
+    ///    [`LookupHost`] future will return a [`io::Error`].
+    /// 2. Calling [`LookupHost::next_addr`] to fetch all resolved [`SocketAddr`]s.
     ///
+    /// If the first `.await` on [`LookupHost`]—either directly on the [`LookupHost`]
+    /// future or via [`LookupHost::next_addr`]—returns an `Ok`, 
+    /// at least one valid DNS entry is guaranteed to be present. 
+    /// 
     /// # Examples
+    /// 
+    /// To resolve a single DNS entry: 
     ///
     /// ```no_run
     /// use tokio::net;
@@ -147,12 +155,35 @@ cfg_dns! {
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
-    ///    let addr = net::lookup_host("localhost:3000").await?;
-    ///    println!("The IP address is: {}", addr);
+    ///     let addr = net::lookup_host("localhost:3000").await?;
+    ///     println!("The IP address is: {}", addr);
     ///
-    ///    Ok(())
+    ///     Ok(())
     /// }
     /// ```
+    /// 
+    /// To resolve all DNS entries:
+    /// 
+    /// ```no_run
+    /// use tokio::net::{self, LookupHost};
+    ///
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let addrs = net::lookup_host("localhost:3000");
+    ///     while let Some(addr) = addrs.next_addr().await? {
+    ///         println!("The IP address is: {}", addr);
+    ///     }
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    /// 
+    /// [`LookupHost`]: ./struct.LookupHost.html
+    /// [`io::Error`]: https://doc.rust-lang.org/stable/std/io/struct.Error.html
+    /// [`LookupHost::next_addr`]: ./struct.LookupHost.html#method.next_addr
+    /// [`SocketAddr`]: https://doc.rust-lang.org/stable/std/net/enum.SocketAddr.html
     pub fn lookup_host<T: ToSocketAddrs>(host: T) -> LookupHost<T>
     where
         T: ToSocketAddrs<Future = sealed::MaybeReady>,
