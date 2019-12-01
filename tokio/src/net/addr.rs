@@ -165,13 +165,13 @@ cfg_dns! {
     /// To resolve all DNS entries:
     /// 
     /// ```no_run
-    /// use tokio::net::{self, LookupHost};
+    /// use tokio::net;
     ///
     /// use std::io;
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
-    ///     let addrs: LookupHost = net::lookup_host("localhost:3000");
+    ///     let addrs = net::lookup_host("localhost:3000");
     ///     while let Some(addr) = addrs.next_addr().await? {
     ///         println!("The IP address is: {}", addr);
     ///     }
