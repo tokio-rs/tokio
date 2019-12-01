@@ -169,7 +169,7 @@ cfg_dns! {
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
-    ///     let addrs = net::lookup_host("localhost:3000");
+    ///     let mut addrs = net::lookup_host("localhost:3000");
     ///     while let Some(addr) = addrs.next_addr().await? {
     ///         println!("The IP address is: {}", addr);
     ///     }
