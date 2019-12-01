@@ -3,7 +3,7 @@
 
 use std::{
     io,
-    net::{IpAddr, Ipv6Addr, Ipv4Addr, SocketAddr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
 };
 use tokio::net::lookup_host;
 
