@@ -96,6 +96,7 @@ tokio-macros = { version = "0.2.0", optional = true }
 
 bytes = "0.5.0"
 pin-project-lite = "0.1.1"
+pin-project = "0.4"
 
 # Everything else is optional...
 fnv = { version = "1.0.6", optional = true }

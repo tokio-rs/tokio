@@ -41,6 +41,9 @@ where
 }
 
 cfg_dns! {
+    use std::future::Future;
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
     /// LookupHost contains resolved SocketAddrs.
     ///
     /// This type is created by the function [`lookup_host`]. See its documentation for more.
@@ -51,9 +54,40 @@ cfg_dns! {
         T: ToSocketAddrs<Future = sealed::MaybeReady>,
         T: ToSocketAddrs<Iter = sealed::OneOrMore>,
     {
-        inner: LookupHostInner<T>
+        inner: LookupHostInner<T>,
     }
 
+    impl<T> Future for LookupHost<T>
+    where
+        T: sealed::ToSocketAddrsPriv,
+        T: ToSocketAddrs<Future = sealed::MaybeReady>,
+        T: ToSocketAddrs<Iter = sealed::OneOrMore>,
+    {
+        type Output = io::Result<SocketAddr>;
+
+        fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            if let LookupHostInner::Pending { fut } = &mut self.inner {
+                if let Poll::Ready(addrs) = Pin::new(fut).poll(cx) {
+                    match addrs {
+                        Ok(mut addrs) => {
+                            let addr = addrs.next().unwrap();
+                            return Poll::Ready(Ok(addr))
+                        },
+                        Err(e) => return Poll::Ready(Err(e))
+                    };
+                } else {
+                    Poll::Pending
+                }
+            } else {
+                unimplemented!()
+            }
+        }
+    }
+
+    // TODO: collapse this into a single enum once Rust 1.40 ships
+    // with the the `#[non_exhaustive]` attribute if Tokio's MSRV allows
+    // 
+    // https://github.com/rust-lang/rust/pull/64639
     #[derive(Debug)]
     enum LookupHostInner<T>
     where
@@ -61,8 +95,12 @@ cfg_dns! {
         T: ToSocketAddrs<Future = sealed::MaybeReady>,
         T: ToSocketAddrs<Iter = sealed::OneOrMore>,
     {
-        Pending { fut: <T as sealed::ToSocketAddrsPriv>::Future },
-        Addrs { addrs: sealed::OneOrMore },
+        Pending {
+            fut: <T as sealed::ToSocketAddrsPriv>::Future,
+        },
+        Addrs {
+            addrs: sealed::OneOrMore,
+        },
     }
 
     impl<T> LookupHost<T>
@@ -77,12 +115,10 @@ cfg_dns! {
             if let LookupHostInner::Pending { fut } = inner {
                 *inner = LookupHostInner::Addrs { addrs: fut.await? };
             }
-            
+
             match inner {
-                LookupHostInner::Addrs { addrs} => {
-                    Ok(addrs.next())
-                }
-                _ => unreachable!("The future should have already been resolved")
+                LookupHostInner::Addrs { addrs } => Ok(addrs.next()),
+                _ => unreachable!("The future should have already been resolved"),
             }
         }
     }
@@ -91,13 +127,38 @@ cfg_dns! {
     ///
     /// This API is not intended to cover all DNS use cases.
     /// Anything beyond the basic use case should be done with a specialized library.
+    /// There are two, mutually exclusive ways of using this API:
+    /// 1. `.await`ing `LookupHost`. This provides _only_ the first resolved DNS entry.
+    ///    If no DNS entries are found, the `LookupHost` future will return a
+    ///   `std::io::Error`.
+    /// 2. Calling `LookupHost::next_addr` to fetch all resolved `SocketAddr`s.
+    ///    Once streams are stabilized in the standard library, `LookupHost::next_addr`
+    ///    will be replaced a stream.
+    /// 
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net;
+    ///
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///    let addr = net::lookup_host("localhost:3000").await?;
+    ///    println!("The IP address is: {}", addr);
+    ///
+    ///    Ok(())
+    /// }
+    /// ```
     pub fn lookup_host<T: ToSocketAddrs>(host: T) -> LookupHost<T>
     where
         T: ToSocketAddrs<Future = sealed::MaybeReady>,
         T: ToSocketAddrs<Iter = sealed::OneOrMore>,
     {
         let fut = host.to_socket_addrs();
-        LookupHost { inner: LookupHostInner::Pending { fut } }
+        LookupHost {
+            inner: LookupHostInner::Pending { fut },
+        }
     }
 }
 
@@ -289,55 +350,55 @@ pub(crate) mod sealed {
         fn to_socket_addrs(&self) -> Self::Future;
     }
 
-    cfg_dns! {
-        #[doc(hidden)]
-        #[derive(Debug)]
-        pub enum MaybeReady {
-            Ready(Option<SocketAddr>),
-            Blocking(JoinHandle<io::Result<vec::IntoIter<SocketAddr>>>),
-        }
+    // cfg_dns! {
+    #[doc(hidden)]
+    #[derive(Debug)]
+    pub enum MaybeReady {
+        Ready(Option<SocketAddr>),
+        Blocking(JoinHandle<io::Result<vec::IntoIter<SocketAddr>>>),
+    }
 
-        #[doc(hidden)]
-        #[derive(Debug)]
-        pub enum OneOrMore {
-            One(option::IntoIter<SocketAddr>),
-            More(vec::IntoIter<SocketAddr>),
-        }
+    #[doc(hidden)]
+    #[derive(Debug)]
+    pub enum OneOrMore {
+        One(option::IntoIter<SocketAddr>),
+        More(vec::IntoIter<SocketAddr>),
+    }
 
-        impl Future for MaybeReady {
-            type Output = io::Result<OneOrMore>;
+    impl Future for MaybeReady {
+        type Output = io::Result<OneOrMore>;
 
-            fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                match *self {
-                    MaybeReady::Ready(ref mut i) => {
-                        let iter = OneOrMore::One(i.take().into_iter());
-                        Poll::Ready(Ok(iter))
-                    }
-                    MaybeReady::Blocking(ref mut rx) => {
-                        let res = ready!(Pin::new(rx).poll(cx))?.map(OneOrMore::More);
-
-                        Poll::Ready(res)
-                    }
+        fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            match *self {
+                MaybeReady::Ready(ref mut i) => {
+                    let iter = OneOrMore::One(i.take().into_iter());
+                    Poll::Ready(Ok(iter))
                 }
-            }
-        }
+                MaybeReady::Blocking(ref mut rx) => {
+                    let res = ready!(Pin::new(rx).poll(cx))?.map(OneOrMore::More);
 
-        impl Iterator for OneOrMore {
-            type Item = SocketAddr;
-
-            fn next(&mut self) -> Option<Self::Item> {
-                match self {
-                    OneOrMore::One(i) => i.next(),
-                    OneOrMore::More(i) => i.next(),
-                }
-            }
-
-            fn size_hint(&self) -> (usize, Option<usize>) {
-                match self {
-                    OneOrMore::One(i) => i.size_hint(),
-                    OneOrMore::More(i) => i.size_hint(),
+                    Poll::Ready(res)
                 }
             }
         }
     }
+
+    impl Iterator for OneOrMore {
+        type Item = SocketAddr;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            match self {
+                OneOrMore::One(i) => i.next(),
+                OneOrMore::More(i) => i.next(),
+            }
+        }
+
+        fn size_hint(&self) -> (usize, Option<usize>) {
+            match self {
+                OneOrMore::One(i) => i.size_hint(),
+                OneOrMore::More(i) => i.size_hint(),
+            }
+        }
+    }
+    // }
 }
