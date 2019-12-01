@@ -20,7 +20,6 @@ async fn resolve_dns() -> io::Result<()> {
     Ok(())
 }
 
-
 #[tokio::test]
 async fn unknown_host_errors() -> io::Result<()> {
     let err = lookup_host("localhhost:3000").await.unwrap_err();

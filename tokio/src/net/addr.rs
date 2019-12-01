@@ -86,7 +86,7 @@ cfg_dns! {
 
     // TODO: collapse this into a single enum once Rust 1.40 ships
     // with the the `#[non_exhaustive]` attribute if Tokio's MSRV allows
-    // 
+    //
     // https://github.com/rust-lang/rust/pull/64639
     #[derive(Debug)]
     enum LookupHostInner<T>
@@ -134,7 +134,7 @@ cfg_dns! {
     /// 2. Calling `LookupHost::next_addr` to fetch all resolved `SocketAddr`s.
     ///    Once streams are stabilized in the standard library, `LookupHost::next_addr`
     ///    will be replaced a stream.
-    /// 
+    ///
     /// # Examples
     ///
     /// ```no_run
