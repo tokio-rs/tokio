@@ -149,9 +149,8 @@ cfg_dns! {
     /// To resolve a single DNS entry: 
     ///
     /// ```no_run
-    /// use tokio::net;
-    ///
     /// use std::io;
+    /// use tokio::net;
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
@@ -165,9 +164,8 @@ cfg_dns! {
     /// To resolve all DNS entries:
     /// 
     /// ```no_run
-    /// use tokio::net;
-    ///
     /// use std::io;
+    /// use tokio::net;
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
