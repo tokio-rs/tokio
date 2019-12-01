@@ -213,6 +213,15 @@ macro_rules! cfg_rt_core {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "rt-core")]
+            $item
+        )*
+    }
+}
+
+macro_rules! doc_rt_core {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "rt-core")]
             #[cfg_attr(docsrs, doc(cfg(feature = "rt-core")))]
             $item
         )*
