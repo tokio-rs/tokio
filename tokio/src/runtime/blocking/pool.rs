@@ -197,6 +197,9 @@ impl Spawner {
             let mut shared = self.inner.shared.lock().unwrap();
 
             if shared.shutdown {
+                // Shutdown the task
+                task.shutdown();
+
                 // no need to even push this task; it would never get picked up
                 return;
             }
