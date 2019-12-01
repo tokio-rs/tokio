@@ -71,10 +71,10 @@ cfg_dns! {
                     match addrs {
                         Ok(mut addrs) => {
                             let addr = addrs.next().unwrap();
-                            return Poll::Ready(Ok(addr))
+                            Poll::Ready(Ok(addr))
                         },
-                        Err(e) => return Poll::Ready(Err(e))
-                    };
+                        Err(e) => Poll::Ready(Err(e))
+                    }
                 } else {
                     Poll::Pending
                 }
@@ -109,7 +109,10 @@ cfg_dns! {
         T: ToSocketAddrs<Future = sealed::MaybeReady>,
         T: ToSocketAddrs<Iter = sealed::OneOrMore>,
     {
-        /// Fetches the next resolved address. If the first
+        /// Fetches the next resolved address. If the first call to `next_addr` doesn't
+        /// return an error, then every subsequent call to `next_addr` will succeed.
+        /// Once this method returns `Ok(None)`, `LookupHost` should be considered exhausted
+        /// as all `SocketAddr`s have been yielded.
         pub async fn next_addr(&mut self) -> io::Result<Option<SocketAddr>> {
             let inner = &mut self.inner;
             if let LookupHostInner::Pending { fut } = inner {
