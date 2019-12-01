@@ -109,7 +109,7 @@ cfg_dns! {
         T: ToSocketAddrs<Future = sealed::MaybeReady>,
         T: ToSocketAddrs<Iter = sealed::OneOrMore>,
     {
-        /// Fetches the next resolved address.
+        /// Fetches the next resolved address. If the first
         pub async fn next_addr(&mut self) -> io::Result<Option<SocketAddr>> {
             let inner = &mut self.inner;
             if let LookupHostInner::Pending { fut } = inner {
@@ -350,55 +350,55 @@ pub(crate) mod sealed {
         fn to_socket_addrs(&self) -> Self::Future;
     }
 
-    // cfg_dns! {
-    #[doc(hidden)]
-    #[derive(Debug)]
-    pub enum MaybeReady {
-        Ready(Option<SocketAddr>),
-        Blocking(JoinHandle<io::Result<vec::IntoIter<SocketAddr>>>),
-    }
+    cfg_dns! {
+        #[doc(hidden)]
+        #[derive(Debug)]
+        pub enum MaybeReady {
+            Ready(Option<SocketAddr>),
+            Blocking(JoinHandle<io::Result<vec::IntoIter<SocketAddr>>>),
+        }
 
-    #[doc(hidden)]
-    #[derive(Debug)]
-    pub enum OneOrMore {
-        One(option::IntoIter<SocketAddr>),
-        More(vec::IntoIter<SocketAddr>),
-    }
+        #[doc(hidden)]
+        #[derive(Debug)]
+        pub enum OneOrMore {
+            One(option::IntoIter<SocketAddr>),
+            More(vec::IntoIter<SocketAddr>),
+        }
 
-    impl Future for MaybeReady {
-        type Output = io::Result<OneOrMore>;
+        impl Future for MaybeReady {
+            type Output = io::Result<OneOrMore>;
 
-        fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            match *self {
-                MaybeReady::Ready(ref mut i) => {
-                    let iter = OneOrMore::One(i.take().into_iter());
-                    Poll::Ready(Ok(iter))
+            fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                match *self {
+                    MaybeReady::Ready(ref mut i) => {
+                        let iter = OneOrMore::One(i.take().into_iter());
+                        Poll::Ready(Ok(iter))
+                    }
+                    MaybeReady::Blocking(ref mut rx) => {
+                        let res = ready!(Pin::new(rx).poll(cx))?.map(OneOrMore::More);
+
+                        Poll::Ready(res)
+                    }
                 }
-                MaybeReady::Blocking(ref mut rx) => {
-                    let res = ready!(Pin::new(rx).poll(cx))?.map(OneOrMore::More);
+            }
+        }
 
-                    Poll::Ready(res)
+        impl Iterator for OneOrMore {
+            type Item = SocketAddr;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                match self {
+                    OneOrMore::One(i) => i.next(),
+                    OneOrMore::More(i) => i.next(),
+                }
+            }
+
+            fn size_hint(&self) -> (usize, Option<usize>) {
+                match self {
+                    OneOrMore::One(i) => i.size_hint(),
+                    OneOrMore::More(i) => i.size_hint(),
                 }
             }
         }
     }
-
-    impl Iterator for OneOrMore {
-        type Item = SocketAddr;
-
-        fn next(&mut self) -> Option<Self::Item> {
-            match self {
-                OneOrMore::One(i) => i.next(),
-                OneOrMore::More(i) => i.next(),
-            }
-        }
-
-        fn size_hint(&self) -> (usize, Option<usize>) {
-            match self {
-                OneOrMore::One(i) => i.size_hint(),
-                OneOrMore::More(i) => i.size_hint(),
-            }
-        }
-    }
-    // }
 }
