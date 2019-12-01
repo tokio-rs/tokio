@@ -41,7 +41,6 @@ where
 }
 
 cfg_dns! {
-
     /// LookupHost contains resolved SocketAddrs.
     ///
     /// This type is created by the function [`lookup_host`]. See its documentation for more.
@@ -75,7 +74,7 @@ cfg_dns! {
             let addrs = &mut self.addrs;
             if let Some(addrs) = addrs {
                 let next = addrs.next();
-                next.map(|t| Ok(t))
+                next.map(Ok)
             } else {
                 unreachable!()
             }
