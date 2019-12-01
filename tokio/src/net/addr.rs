@@ -75,7 +75,7 @@ cfg_dns! {
             let addrs = &mut self.addrs;
             if let Some(addrs) = addrs {
                 let next = addrs.next();
-                next.and_then(|t| Some(Ok(t)))
+                next.map(|t| Ok(t))
             } else {
                 unreachable!()
             }

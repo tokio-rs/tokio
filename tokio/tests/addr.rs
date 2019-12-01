@@ -3,7 +3,7 @@
 
 use std::{
     io,
-    net::{IpAddr, Ipv6Addr, SocketAddr},
+    net::{IpAddr, Ipv6Addr, Ipv4Addr, SocketAddr},
 };
 use tokio::net::lookup_host;
 
@@ -13,7 +13,11 @@ async fn resolve_dns() -> io::Result<()> {
     let host = host.expect("localhost:3000");
     let actual = host.expect("no error in getting host");
 
-    let expected = SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), 3000);
+    let expected = if actual.is_ipv4() {
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 3000)
+    } else {
+        SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), 3000)
+    };
     assert_eq!(actual, expected);
 
     Ok(())
