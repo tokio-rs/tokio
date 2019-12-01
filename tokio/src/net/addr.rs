@@ -51,8 +51,18 @@ cfg_dns! {
         T: ToSocketAddrs<Future = sealed::MaybeReady>,
         T: ToSocketAddrs<Iter = sealed::OneOrMore>,
     {
-        fut: <T as sealed::ToSocketAddrsPriv>::Future,
-        addrs: Option<sealed::OneOrMore>
+        inner: LookupHostInner<T>
+    }
+
+    #[derive(Debug)]
+    enum LookupHostInner<T>
+    where
+        T: sealed::ToSocketAddrsPriv,
+        T: ToSocketAddrs<Future = sealed::MaybeReady>,
+        T: ToSocketAddrs<Iter = sealed::OneOrMore>,
+    {
+        Pending { fut: <T as sealed::ToSocketAddrsPriv>::Future },
+        Addrs { addrs: sealed::OneOrMore },
     }
 
     impl<T> LookupHost<T>
@@ -62,21 +72,17 @@ cfg_dns! {
         T: ToSocketAddrs<Iter = sealed::OneOrMore>,
     {
         /// Fetches the next resolved address.
-        pub async fn next_addr(&mut self) -> Option<io::Result<SocketAddr>> {
-            if self.addrs.is_none() {
-                let hosts = &mut self.fut;
-                    let hosts = hosts.await;
-                    match hosts {
-                        Ok(addrs) => self.addrs = Some(addrs),
-                        Err(e) => return Some(Result::Err(e))
-                };
+        pub async fn next_addr(&mut self) -> io::Result<Option<SocketAddr>> {
+            let inner = &mut self.inner;
+            if let LookupHostInner::Pending { fut } = inner {
+                *inner = LookupHostInner::Addrs { addrs: fut.await? };
             }
-            let addrs = &mut self.addrs;
-            if let Some(addrs) = addrs {
-                let next = addrs.next();
-                next.map(Ok)
-            } else {
-                unreachable!()
+            
+            match inner {
+                LookupHostInner::Addrs { addrs} => {
+                    Ok(addrs.next())
+                }
+                _ => unreachable!("The future should have already been resolved")
             }
         }
     }
@@ -91,7 +97,7 @@ cfg_dns! {
         T: ToSocketAddrs<Iter = sealed::OneOrMore>,
     {
         let fut = host.to_socket_addrs();
-        LookupHost { fut, addrs: None }
+        LookupHost { inner: LookupHostInner::Pending { fut } }
     }
 }
 
