@@ -13,6 +13,7 @@ use std::sync::Mutex;
 use std::task::{Context, Poll};
 
 use pin_project_lite::pin_project;
+
 cfg_rt_util! {
     /// A set of tasks which are executed on the same thread.
     ///
@@ -345,8 +346,9 @@ impl Schedule for Scheduler {
         }
     }
 
-    fn release(&self, _: Task<Self>) {
-        unreachable!("tasks should only be completed locally")
+    fn release(&self, task: Task<Self>) {
+        // This will be called when dropping the local runtime.
+        self.pending_drop.push(task);
     }
 
     fn release_local(&self, task: &Task<Self>) {
@@ -723,5 +725,33 @@ mod tests {
             });
             join2.await.unwrap()
         });
+    }
+    #[test]
+    fn drop_cancels_tasks() {
+        // This test reproduces issue #1842
+        use crate::sync::oneshot;
+        use std::time::Duration;
+
+        let mut rt = runtime::Builder::new()
+            .enable_time()
+            .basic_scheduler()
+            .build()
+            .unwrap();
+
+        let (started_tx, started_rx) = oneshot::channel();
+
+        let local = LocalSet::new();
+        local.spawn_local(async move {
+            started_tx.send(()).unwrap();
+            loop {
+                crate::time::delay_for(Duration::from_secs(3600)).await;
+            }
+        });
+
+        local.block_on(&mut rt, async {
+            started_rx.await.unwrap();
+        });
+        drop(local);
+        drop(rt);
     }
 }

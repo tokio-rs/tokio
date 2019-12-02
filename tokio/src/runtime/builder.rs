@@ -152,23 +152,6 @@ impl Builder {
         self
     }
 
-    /// Use a simpler scheduler that runs all tasks on the current-thread.
-    ///
-    /// The executor and all necessary drivers will all be run on the current
-    /// thread during `block_on` calls.
-    #[cfg(feature = "rt-core")]
-    pub fn basic_scheduler(&mut self) -> &mut Self {
-        self.kind = Kind::Basic;
-        self
-    }
-
-    /// Use a multi-threaded scheduler for executing tasks.
-    #[cfg(feature = "rt-threaded")]
-    pub fn threaded_scheduler(&mut self) -> &mut Self {
-        self.kind = Kind::ThreadPool;
-        self
-    }
-
     /// Set name of threads spawned by the `Runtime`'s thread pool.
     ///
     /// The default name is "tokio-runtime-worker".
@@ -369,6 +352,15 @@ cfg_time! {
 
 cfg_rt_core! {
     impl Builder {
+        /// Use a simpler scheduler that runs all tasks on the current-thread.
+        ///
+        /// The executor and all necessary drivers will all be run on the current
+        /// thread during `block_on` calls.
+        pub fn basic_scheduler(&mut self) -> &mut Self {
+            self.kind = Kind::Basic;
+            self
+        }
+
         fn build_basic_runtime(&mut self) -> io::Result<Runtime> {
             use crate::runtime::{BasicScheduler, Kind};
 
@@ -407,6 +399,12 @@ cfg_rt_core! {
 
 cfg_rt_threaded! {
     impl Builder {
+        /// Use a multi-threaded scheduler for executing tasks.
+        pub fn threaded_scheduler(&mut self) -> &mut Self {
+            self.kind = Kind::ThreadPool;
+            self
+        }
+
         fn build_threaded_runtime(&mut self) -> io::Result<Runtime> {
             use crate::runtime::{Kind, ThreadPool};
             use crate::runtime::park::Parker;

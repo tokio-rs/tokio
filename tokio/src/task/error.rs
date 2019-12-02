@@ -2,9 +2,11 @@ use std::any::Any;
 use std::fmt;
 use std::io;
 
-/// Task failed to execute to completion.
-pub struct JoinError {
-    repr: Repr,
+doc_rt_core! {
+    /// Task failed to execute to completion.
+    pub struct JoinError {
+        repr: Repr,
+    }
 }
 
 enum Repr {

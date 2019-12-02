@@ -112,10 +112,10 @@ pub(crate) mod impl_macos {
 
 #[cfg(any(target_os = "solaris"))]
 pub(crate) mod impl_solaris {
+    use crate::net::unix::UnixStream;
     use std::io;
     use std::os::unix::io::AsRawFd;
     use std::ptr;
-    use UnixStream;
 
     #[allow(non_camel_case_types)]
     enum ucred_t {}

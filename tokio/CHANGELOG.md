@@ -1,3 +1,20 @@
+# 0.2.2 (November 29, 2019)
+
+### Fixes
+- scheduling with `basic_scheduler` (#1861).
+- update `spawn` panic message to specify that a task scheduler is required (#1839).
+- API docs example for `runtime::Builder` to include a task scheduler (#1841).
+- general documentation (#1834).
+- building on illumos/solaris (#1772).
+- panic when dropping `LocalSet` (#1843).
+- API docs mention the required Cargo features for `Builder::{basic, threaded}_scheduler` (#1858).
+
+### Added
+- impl `Stream` for `signal::unix::Signal` (#1849).
+- API docs for platform specific behavior of `signal::ctrl_c` and `signal::unix::Signal` (#1854).
+- API docs for `signal::unix::Signal::{recv, poll_recv}` and `signal::windows::CtrlBreak::{recv, poll_recv}` (#1854).
+- `File::into_std` and `File::try_into_std` methods (#1856).
+
 # 0.2.1 (November 26, 2019)
 
 ### Fixes

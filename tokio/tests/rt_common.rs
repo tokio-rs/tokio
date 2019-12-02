@@ -44,7 +44,7 @@ rt_test! {
     use tokio::prelude::*;
     use tokio::runtime::Runtime;
     use tokio::sync::oneshot;
-    use tokio::time;
+    use tokio::{task, time};
     use tokio_test::{assert_err, assert_ok};
 
     use futures::future::poll_fn;
@@ -196,6 +196,21 @@ rt_test! {
         for i in 0..ITER {
             assert_eq!(i, out[i]);
         }
+    }
+
+    #[test]
+    fn spawn_await_chain() {
+        let mut rt = rt();
+
+        let out = rt.block_on(async {
+            assert_ok!(tokio::spawn(async {
+                assert_ok!(tokio::spawn(async {
+                    "hello"
+                }).await)
+            }).await)
+        });
+
+        assert_eq!(out, "hello");
     }
 
     #[test]
@@ -420,6 +435,23 @@ rt_test! {
             let _ = assert_ok!(listener.accept().await);
 
             assert_ok!(peer.await);
+        });
+    }
+
+    #[test]
+    fn spawn_blocking_after_shutdown() {
+        let rt = rt();
+        let handle = rt.handle().clone();
+
+        // Shutdown
+        drop(rt);
+
+        handle.enter(|| {
+            let res = task::spawn_blocking(|| unreachable!());
+
+            // Avoid using a tokio runtime
+            let out = futures::executor::block_on(res);
+            assert!(out.is_err());
         });
     }
 

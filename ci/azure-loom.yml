@@ -10,7 +10,7 @@ jobs:
       rust_version: ${{ parameters.rust }}
 
   - ${{ each crate in parameters.crates }}:
-    - script: RUSTFLAGS="--cfg loom" cargo test --lib --release -- --test-threads=1 --nocapture
+    - script: RUSTFLAGS="--cfg loom" cargo test --lib --release --features "full" -- --test-threads=1 --nocapture
       env:
         LOOM_MAX_PREEMPTIONS: 1
         CI: 'True'

@@ -161,6 +161,7 @@ impl TcpStream {
     }
 
     /// Returns the remote address that this stream is connected to.
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -177,7 +178,43 @@ impl TcpStream {
         self.io.get_ref().peer_addr()
     }
 
-    fn poll_peek(&mut self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
+    /// Attempt to receive data on the socket, without removing that data from
+    /// the queue, registering the current task for wakeup if data is not yet
+    /// available.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if data is not yet available.
+    /// * `Poll::Ready(Ok(n))` if data is available. `n` is the number of bytes peeked.
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::io;
+    /// use tokio::net::TcpStream;
+    ///
+    /// use futures::future::poll_fn;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let mut stream = TcpStream::connect("127.0.0.1:8000").await?;
+    ///     let mut buf = [0; 10];
+    ///
+    ///     poll_fn(|cx| {
+    ///         stream.poll_peek(cx, &mut buf)
+    ///     }).await?;
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn poll_peek(&mut self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         ready!(self.io.poll_read_ready(cx))?;
 
         match self.io.get_ref().peek(buf) {

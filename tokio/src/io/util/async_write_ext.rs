@@ -2,9 +2,28 @@ use crate::io::util::flush::{flush, Flush};
 use crate::io::util::shutdown::{shutdown, Shutdown};
 use crate::io::util::write::{write, Write};
 use crate::io::util::write_all::{write_all, WriteAll};
+use crate::io::util::write_int::{WriteU8, WriteU16, WriteU32, WriteU64, WriteU128};
+use crate::io::util::write_int::{WriteI8, WriteI16, WriteI32, WriteI64, WriteI128};
 use crate::io::AsyncWrite;
 
 cfg_io_util! {
+    /// Define numeric writer
+    macro_rules! write_impl {
+        (
+            $(
+                $(#[$outer:meta])*
+                fn $name:ident(&mut self, n: $ty:ty) -> $($fut:ident)*;
+            )*
+        ) => {
+            $(
+                $(#[$outer])*
+                fn $name<'a>(&'a mut self, n: $ty) -> $($fut)*<&'a mut Self> where Self: Unpin {
+                    $($fut)*::new(self, n)
+                }
+            )*
+        }
+    }
+
     /// Write bytes to a sink.
     ///
     /// Implemented as an extention trait, adding utility methods to all
@@ -127,6 +146,390 @@ cfg_io_util! {
             Self: Unpin,
         {
             write_all(self, src)
+        }
+
+        write_impl! {
+            /// Writes an unsigned 8-bit integer to the underlying writer.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn write_u8(&mut self, n: u8) -> io::Result<()>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered writer to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncWriteExt::write_all`].
+            ///
+            /// [`AsyncWriteExt::write_all`]: AsyncWriteExt::write_all
+            ///
+            /// # Examples
+            ///
+            /// Write unsigned 8 bit integers to a `AsyncWrite`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncWriteExt};
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut writer = Vec::new();
+            ///
+            ///     writer.write_u8(2).await?;
+            ///     writer.write_u8(5).await?;
+            ///
+            ///     assert_eq!(writer, b"\x02\x05");
+            ///     Ok(())
+            /// }
+            /// ```
+            fn write_u8(&mut self, n: u8) -> WriteU8;
+
+            /// Writes an unsigned 8-bit integer to the underlying writer.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn write_i8(&mut self, n: i8) -> io::Result<()>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered writer to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncWriteExt::write_all`].
+            ///
+            /// [`AsyncWriteExt::write_all`]: AsyncWriteExt::write_all
+            ///
+            /// # Examples
+            ///
+            /// Write unsigned 8 bit integers to a `AsyncWrite`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncWriteExt};
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut writer = Vec::new();
+            ///
+            ///     writer.write_u8(2).await?;
+            ///     writer.write_u8(5).await?;
+            ///
+            ///     assert_eq!(writer, b"\x02\x05");
+            ///     Ok(())
+            /// }
+            /// ```
+            fn write_i8(&mut self, n: i8) -> WriteI8;
+
+            /// Writes an unsigned 16-bit integer in big-endian order to the
+            /// underlying writer.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn write_u16(&mut self, n: u16) -> io::Result<()>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered writer to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncWriteExt::write_all`].
+            ///
+            /// [`AsyncWriteExt::write_all`]: AsyncWriteExt::write_all
+            ///
+            /// # Examples
+            ///
+            /// Write unsigned 16-bit integers to a `AsyncWrite`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncWriteExt};
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut writer = Vec::new();
+            ///
+            ///     writer.write_u16(517).await?;
+            ///     writer.write_u16(768).await?;
+            ///
+            ///     assert_eq!(writer, b"\x02\x05\x03\x00");
+            ///     Ok(())
+            /// }
+            /// ```
+            fn write_u16(&mut self, n: u16) -> WriteU16;
+
+            /// Writes a signed 16-bit integer in big-endian order to the
+            /// underlying writer.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn write_i16(&mut self, n: i16) -> io::Result<()>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered writer to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncWriteExt::write_all`].
+            ///
+            /// [`AsyncWriteExt::write_all`]: AsyncWriteExt::write_all
+            ///
+            /// # Examples
+            ///
+            /// Write signed 16-bit integers to a `AsyncWrite`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncWriteExt};
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut writer = Vec::new();
+            ///
+            ///     writer.write_i16(193).await?;
+            ///     writer.write_i16(-132).await?;
+            ///
+            ///     assert_eq!(writer, b"\x00\xc1\xff\x7c");
+            ///     Ok(())
+            /// }
+            /// ```
+            fn write_i16(&mut self, n: i16) -> WriteI16;
+
+            /// Writes an unsigned 32-bit integer in big-endian order to the
+            /// underlying writer.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn write_u32(&mut self, n: u32) -> io::Result<()>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered writer to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncWriteExt::write_all`].
+            ///
+            /// [`AsyncWriteExt::write_all`]: AsyncWriteExt::write_all
+            ///
+            /// # Examples
+            ///
+            /// Write unsigned 32-bit integers to a `AsyncWrite`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncWriteExt};
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut writer = Vec::new();
+            ///
+            ///     writer.write_u32(267).await?;
+            ///     writer.write_u32(1205419366).await?;
+            ///
+            ///     assert_eq!(writer, b"\x00\x00\x01\x0b\x47\xd9\x3d\x66");
+            ///     Ok(())
+            /// }
+            /// ```
+            fn write_u32(&mut self, n: u32) -> WriteU32;
+
+            /// Writes a signed 32-bit integer in big-endian order to the
+            /// underlying writer.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn write_i32(&mut self, n: i32) -> io::Result<()>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered writer to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncWriteExt::write_all`].
+            ///
+            /// [`AsyncWriteExt::write_all`]: AsyncWriteExt::write_all
+            ///
+            /// # Examples
+            ///
+            /// Write signed 32-bit integers to a `AsyncWrite`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncWriteExt};
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut writer = Vec::new();
+            ///
+            ///     writer.write_i32(267).await?;
+            ///     writer.write_i32(1205419366).await?;
+            ///
+            ///     assert_eq!(writer, b"\x00\x00\x01\x0b\x47\xd9\x3d\x66");
+            ///     Ok(())
+            /// }
+            /// ```
+            fn write_i32(&mut self, n: i32) -> WriteI32;
+
+            /// Writes an unsigned 64-bit integer in big-endian order to the
+            /// underlying writer.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn write_u64(&mut self, n: u64) -> io::Result<()>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered writer to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncWriteExt::write_all`].
+            ///
+            /// [`AsyncWriteExt::write_all`]: AsyncWriteExt::write_all
+            ///
+            /// # Examples
+            ///
+            /// Write unsigned 64-bit integers to a `AsyncWrite`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncWriteExt};
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut writer = Vec::new();
+            ///
+            ///     writer.write_u64(918733457491587).await?;
+            ///     writer.write_u64(143).await?;
+            ///
+            ///     assert_eq!(writer, b"\x00\x03\x43\x95\x4d\x60\x86\x83\x00\x00\x00\x00\x00\x00\x00\x8f");
+            ///     Ok(())
+            /// }
+            /// ```
+            fn write_u64(&mut self, n: u64) -> WriteU64;
+
+            /// Writes an signed 64-bit integer in big-endian order to the
+            /// underlying writer.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn write_i64(&mut self, n: i64) -> io::Result<()>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered writer to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncWriteExt::write_all`].
+            ///
+            /// [`AsyncWriteExt::write_all`]: AsyncWriteExt::write_all
+            ///
+            /// # Examples
+            ///
+            /// Write signed 64-bit integers to a `AsyncWrite`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncWriteExt};
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut writer = Vec::new();
+            ///
+            ///     writer.write_i64(i64::min_value()).await?;
+            ///     writer.write_i64(i64::max_value()).await?;
+            ///
+            ///     assert_eq!(writer, b"\x80\x00\x00\x00\x00\x00\x00\x00\x7f\xff\xff\xff\xff\xff\xff\xff");
+            ///     Ok(())
+            /// }
+            /// ```
+            fn write_i64(&mut self, n: i64) -> WriteI64;
+
+            /// Writes an unsigned 128-bit integer in big-endian order to the
+            /// underlying writer.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn write_u128(&mut self, n: u128) -> io::Result<()>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered writer to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncWriteExt::write_all`].
+            ///
+            /// [`AsyncWriteExt::write_all`]: AsyncWriteExt::write_all
+            ///
+            /// # Examples
+            ///
+            /// Write unsigned 128-bit integers to a `AsyncWrite`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncWriteExt};
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut writer = Vec::new();
+            ///
+            ///     writer.write_u128(16947640962301618749969007319746179).await?;
+            ///
+            ///     assert_eq!(writer, vec![
+            ///         0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83,
+            ///         0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83
+            ///     ]);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn write_u128(&mut self, n: u128) -> WriteU128;
+
+            /// Writes an signed 128-bit integer in big-endian order to the
+            /// underlying writer.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn write_i128(&mut self, n: i128) -> io::Result<()>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered writer to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncWriteExt::write_all`].
+            ///
+            /// [`AsyncWriteExt::write_all`]: AsyncWriteExt::write_all
+            ///
+            /// # Examples
+            ///
+            /// Write signed 128-bit integers to a `AsyncWrite`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncWriteExt};
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut writer = Vec::new();
+            ///
+            ///     writer.write_i128(i128::min_value()).await?;
+            ///
+            ///     assert_eq!(writer, vec![
+            ///         0x80, 0, 0, 0, 0, 0, 0, 0,
+            ///         0, 0, 0, 0, 0, 0, 0, 0
+            ///     ]);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn write_i128(&mut self, n: i128) -> WriteI128;
         }
 
         /// Flush this output stream, ensuring that all intermediately buffered

@@ -34,6 +34,7 @@ cfg_io_util! {
 
     mod read;
     mod read_exact;
+    mod read_int;
     mod read_line;
 
     mod read_to_end;
@@ -60,6 +61,8 @@ cfg_io_util! {
 
     mod write;
     mod write_all;
+    mod write_int;
+
 
     // used by `BufReader` and `BufWriter`
     // https://github.com/rust-lang/rust/blob/master/src/libstd/sys_common/io.rs#L1
