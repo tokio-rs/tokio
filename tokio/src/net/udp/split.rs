@@ -14,6 +14,7 @@
 
 use crate::future::poll_fn;
 use crate::net::udp::UdpSocket;
+use crate::net::ToSocketAddrs;
 
 use std::error::Error;
 use std::fmt;
@@ -119,8 +120,16 @@ impl SendHalf {
     ///
     /// The future will resolve to an error if the IP version of the socket does
     /// not match that of `target`.
-    pub async fn send_to(&mut self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
-        poll_fn(|cx| self.0.poll_send_to(cx, buf, target)).await
+    pub async fn send_to<A: ToSocketAddrs>(&mut self, buf: &[u8], target: A) -> io::Result<usize> {
+        let mut addrs = target.to_socket_addrs().await?;
+
+        match addrs.next() {
+            Some(target) => poll_fn(|cx| self.0.poll_send_to(cx, buf, &target)).await,
+            None => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "no addresses to send data to",
+            )),
+        }
     }
 
     /// Returns a future that sends data on the socket to the remote address to which it is connected.
