@@ -303,8 +303,7 @@ impl LocalSet {
     /// [`spawn_blocking`]: ../blocking/fn.spawn_blocking.html
     pub fn block_on<F>(&self, rt: &mut crate::runtime::Runtime, future: F) -> F::Output
     where
-        F: Future + 'static,
-        F::Output: 'static,
+        F: Future,
     {
         let scheduler = self.scheduler.clone();
         self.scheduler
