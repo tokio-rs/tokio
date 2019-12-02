@@ -48,7 +48,7 @@ cfg_dns! {
     /// `LookupHost` contains resolved [`SocketAddr`]s.
     ///
     /// This type is created by the function [`lookup_host`]. See its documentation for more.
-    /// 
+    ///
     /// [`SocketAddr`]: https://doc.rust-lang.org/stable/std/net/enum.SocketAddr.html
     /// [`lookup_host`]: ./fn.lookup_host.html
     #[derive(Debug)]
@@ -136,17 +136,17 @@ cfg_dns! {
     /// Anything beyond the basic use case should be done with a specialized library.
     /// There are two, mutually exclusive ways of using this API:
     /// 1. `.await`ing [`LookupHost`]. This option provides _only_ the
-    ///    first resolved DNS entry. If no DNS entries are found, the 
+    ///    first resolved DNS entry. If no DNS entries are found, the
     ///    [`LookupHost`] future will return a [`io::Error`].
     /// 2. Calling [`LookupHost::next_addr`] to fetch all resolved [`SocketAddr`]s.
     ///
     /// If the first `.await` on [`LookupHost`]—either directly on the [`LookupHost`]
-    /// future or via [`LookupHost::next_addr`]—returns an `Ok`, 
-    /// at least one valid DNS entry is guaranteed to be present. 
-    /// 
+    /// future or via [`LookupHost::next_addr`]—returns an `Ok`,
+    /// at least one valid DNS entry is guaranteed to be present.
+    ///
     /// # Examples
-    /// 
-    /// To resolve a single DNS entry: 
+    ///
+    /// To resolve a single DNS entry:
     ///
     /// ```no_run
     /// use std::io;
@@ -160,9 +160,9 @@ cfg_dns! {
     ///     Ok(())
     /// }
     /// ```
-    /// 
+    ///
     /// To resolve all DNS entries:
-    /// 
+    ///
     /// ```no_run
     /// use std::io;
     /// use tokio::net;
@@ -177,7 +177,7 @@ cfg_dns! {
     ///     Ok(())
     /// }
     /// ```
-    /// 
+    ///
     /// [`LookupHost`]: ./struct.LookupHost.html
     /// [`io::Error`]: https://doc.rust-lang.org/stable/std/io/struct.Error.html
     /// [`LookupHost::next_addr`]: ./struct.LookupHost.html#method.next_addr
