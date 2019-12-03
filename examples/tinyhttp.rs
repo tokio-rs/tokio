@@ -16,20 +16,20 @@
 use bytes::BytesMut;
 use futures::{SinkExt, StreamExt};
 use http::{header::HeaderValue, Request, Response, StatusCode};
-use serde::Serialize;
+#[macro_use]
+extern crate serde_derive;
+use serde_json;
 use std::{env, error::Error, fmt, io};
-use tokio::{
-    codec::{Decoder, Encoder, Framed},
-    net::{TcpListener, TcpStream},
-};
+use tokio::net::{TcpListener, TcpStream};
+use tokio_util::codec::{Decoder, Encoder, Framed};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     // Parse the arguments, bind the TCP socket we'll be listening to, spin up
     // our worker threads, and start shipping sockets to those worker threads.
     let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
-
-    let mut incoming = TcpListener::bind(&addr).await?.incoming();
+    let mut server = TcpListener::bind(&addr).await?;
+    let mut incoming = server.incoming();
     println!("Listening on: {}", addr);
 
     while let Some(Ok(stream)) = incoming.next().await {
@@ -63,11 +63,11 @@ async fn respond(req: Request<()>) -> Result<Response<String>, Box<dyn Error>> {
     let mut response = Response::builder();
     let body = match req.uri().path() {
         "/plaintext" => {
-            response.header("Content-Type", "text/plain");
+            response = response.header("Content-Type", "text/plain");
             "Hello, World!".to_string()
         }
         "/json" => {
-            response.header("Content-Type", "application/json");
+            response = response.header("Content-Type", "application/json");
 
             #[derive(Serialize)]
             struct Message {
@@ -78,7 +78,7 @@ async fn respond(req: Request<()>) -> Result<Response<String>, Box<dyn Error>> {
             })?
         }
         _ => {
-            response.status(StatusCode::NOT_FOUND);
+            response = response.status(StatusCode::NOT_FOUND);
             String::new()
         }
     };
@@ -196,16 +196,19 @@ impl Decoder for Http {
         }
         let data = src.split_to(amt).freeze();
         let mut ret = Request::builder();
-        ret.method(&data[method.0..method.1]);
-        ret.uri(data.slice(path.0, path.1));
-        ret.version(http::Version::HTTP_11);
+        ret = ret.method(&data[method.0..method.1]);
+        let s = data.slice(path.0..path.1);
+        let s = unsafe { String::from_utf8_unchecked(Vec::from(s.as_ref())) };
+        ret = ret.uri(s);
+        ret = ret.version(http::Version::HTTP_11);
         for header in headers.iter() {
             let (k, v) = match *header {
                 Some((ref k, ref v)) => (k, v),
                 None => break,
             };
-            let value = unsafe { HeaderValue::from_shared_unchecked(data.slice(v.0, v.1)) };
-            ret.header(&data[k.0..k.1], value);
+            let value = HeaderValue::from_bytes(data.slice(v.0..v.1).as_ref())
+                .map_err(|_| io::Error::new(io::ErrorKind::Other, "header decode error"))?;
+            ret = ret.header(&data[k.0..k.1], value);
         }
 
         let req = ret
