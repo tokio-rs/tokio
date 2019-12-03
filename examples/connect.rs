@@ -17,27 +17,14 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::io;
-use tokio::sync::{mpsc, oneshot};
 use tokio_util::codec::{FramedRead, FramedWrite};
 
-use futures::{Stream, StreamExt};
 use std::env;
 use std::error::Error;
 use std::net::SocketAddr;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let (tx, rx) = oneshot::channel();
-    tokio::spawn(async move {
-        run().await.unwrap();
-        tx.send(()).unwrap();
-    });
-
-    rx.await.map_err(Into::into)
-}
-
-// Currently, we need to spawn the initial future due to https://github.com/tokio-rs/tokio/issues/1356
-async fn run() -> Result<(), Box<dyn Error>> {
     // Determine if we're going to run in TCP or UDP mode
     let mut args = env::args().skip(1).collect::<Vec<_>>();
     let tcp = match args.iter().position(|a| a == "--udp") {
@@ -55,7 +42,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
     };
     let addr = addr.parse::<SocketAddr>()?;
 
-    let stdin = stdin();
+    let stdin = FramedRead::new(io::stdin(), codec::Bytes);
     let stdout = FramedWrite::new(io::stdout(), codec::Bytes);
 
     if tcp {
@@ -65,21 +52,6 @@ async fn run() -> Result<(), Box<dyn Error>> {
     }
 
     Ok(())
-}
-
-// Temporary work around for stdin blocking the stream
-fn stdin() -> impl Stream<Item = Result<Vec<u8>, io::Error>> + Unpin {
-    let mut stdin = FramedRead::new(io::stdin(), codec::Bytes);
-
-    let (tx, rx) = mpsc::unbounded_channel();
-
-    tokio::spawn(async move {
-        while let Some(res) = stdin.next().await {
-            let _ = tx.send(res);
-        }
-    });
-
-    rx
 }
 
 mod tcp {
