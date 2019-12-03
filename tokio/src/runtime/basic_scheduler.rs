@@ -482,8 +482,12 @@ impl SchedulerPriv {
 impl Schedule for SchedulerPriv {
     fn bind(&self, task: &Task<Self>) {
         unsafe {
-            // safety: tasks are only bound to a basic scheduler from the local
-            // thread it runs on, so it's safe to call this.
+            // safety: `Queues::add_task` is only safe to call from the thread
+            // that owns the queues (the thread the scheduler is running on).
+            // `Scheduler::bind` is called when polling a task that
+            // doesn't have a scheduler set. We will only poll tasks from the
+            // thread that the scheduler is running on. Therefore, this is safe
+            // to call.
             self.queues.add_task(task);
         }
     }
@@ -494,8 +498,10 @@ impl Schedule for SchedulerPriv {
 
     fn release_local(&self, task: &Task<Self>) {
         unsafe {
-            // safety: Scheduler::release_local is only called from the
-            // scheduler's thread.
+            // safety: `Scheduler::release_local` is only called from the
+            // thread that the scheduler is running on. The `Schedule` trait's
+            // contract is that releasing a task from another thread should call
+            // `release` rather than `release_local`.
             self.queues.release_local(task);
         }
     }
@@ -506,7 +512,7 @@ impl Schedule for SchedulerPriv {
         if is_current {
             unsafe {
                 // safety: this function is safe to call only from the
-                // thread the basic scheduler is running on. if `is_current` is
+                // thread the basic scheduler is running on. If `is_current` is
                 // then we are on that thread.
                 self.queues.push_local(task)
             };
@@ -538,9 +544,9 @@ where
         }
 
         unsafe {
-            // safety: the basic scheduler's local state will not be accessed
-            // from another thread. Since dropping the scheduler closes the
-            // remote queue, no tasks will be notified externally.
+            // safety: the `Drop` impl owns the scheduler's queues. these fields
+            // will only be accessed when running the scheduler, and it can no
+            // longer be run, since we are in the process of dropping it.
 
             // Release owned tasks
             self.scheduler.queues.shutdown();
