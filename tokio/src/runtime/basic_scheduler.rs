@@ -179,6 +179,8 @@ where
 
                 // Maintenance work
                 unsafe {
+                    // safety: this function is safe to call only from the
+                    // thread the basic scheduler is running on (which we are).
                     scheduler.queues.drain_pending_drop();
                 }
             }
@@ -401,8 +403,7 @@ where
     ///
     /// If the queue is open to accept new tasks, the task is pushed to the back
     /// of the queue. Otherwise, if the queue is closed (the scheduler is
-    /// shutting down), the new task
-    /// will be shut down immediately.
+    /// shutting down), the new task will be shut down immediately.
     pub(crate) fn schedule(&mut self, task: Task<S>) {
         if self.open {
             self.queue.push_back(task);
@@ -431,8 +432,14 @@ impl SchedulerPriv {
 
             // Increment the tick
             local.tick = tick.wrapping_add(1);
+            let next = unsafe {
+                // safety: this function is safe to call only from the
+                // thread the basic scheduler is running on. The `LocalState`
+                // parameter to this method implies that we are on that thread.
+                self.queues.next_task(tick)
+            };
 
-            let task = match unsafe { self.queues.next_task(tick) } {
+            let task = match next {
                 Some(task) => task,
                 None => {
                     local.park.park().ok().expect("failed to park");
@@ -442,6 +449,9 @@ impl SchedulerPriv {
 
             if let Some(task) = task.run(&mut || Some(self.into())) {
                 unsafe {
+                    // safety: this function is safe to call only from the
+                    // thread the basic scheduler is running on. The `LocalState`
+                    // parameter to this method implies that we are on that thread.
                     self.queues.push_local(task);
                 }
             }
@@ -472,6 +482,8 @@ impl SchedulerPriv {
 impl Schedule for SchedulerPriv {
     fn bind(&self, task: &Task<Self>) {
         unsafe {
+            // safety: tasks are only bound to a basic scheduler from the local
+            // thread it runs on, so it's safe to call this.
             self.queues.add_task(task);
         }
     }
@@ -482,6 +494,8 @@ impl Schedule for SchedulerPriv {
 
     fn release_local(&self, task: &Task<Self>) {
         unsafe {
+            // safety: Scheduler::release_local is only called from the
+            // scheduler's thread.
             self.queues.release_local(task);
         }
     }
@@ -490,7 +504,12 @@ impl Schedule for SchedulerPriv {
         let is_current = ACTIVE.with(|cell| cell.get() == self as *const SchedulerPriv);
 
         if is_current {
-            unsafe { self.queues.push_local(task) };
+            unsafe {
+                // safety: this function is safe to call only from the
+                // thread the basic scheduler is running on. if `is_current` is
+                // then we are on that thread.
+                self.queues.push_local(task)
+            };
         } else {
             let mut lock = self.queues.remote();
             lock.schedule(task);
@@ -518,12 +537,14 @@ where
             task.shutdown();
         }
 
-        // Release owned tasks
         unsafe {
-            self.scheduler.queues.shutdown();
-        }
+            // safety: the basic scheduler's local state will not be accessed
+            // from another thread. Since dropping the scheduler closes the
+            // remote queue, no tasks will be notified externally.
 
-        unsafe {
+            // Release owned tasks
+            self.scheduler.queues.shutdown();
+
             self.scheduler.queues.drain_pending_drop();
         }
 

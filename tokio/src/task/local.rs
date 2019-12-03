@@ -143,9 +143,13 @@ cfg_rt_util! {
         CURRENT_TASK_SET.with(|current| {
             let current = current
                 .get()
-                .expect("`spawn_local` called from outside of a local::LocalSet!");
+                .expect("`spawn_local` called from outside of a task::LocalSet!");
             let (task, handle) = task::joinable_local(future);
             unsafe {
+                // safety: this function is unsafe to call outside of the local
+                // thread. Since the call above to get the current task set
+                // would not succeed if we were outside of a local set, this is
+                // safe.
                 current.as_ref().queues.push_local(task);
             }
 
@@ -207,7 +211,7 @@ impl LocalSet {
     {
         let (task, handle) = task::joinable_local(future);
         unsafe {
-            // This is safe: since `LocalSet` is not Send or Sync, this is
+            // safety: since `LocalSet` is not Send or Sync, this is
             // always being called from the local thread.
             self.scheduler.queues.push_local(task);
         }
@@ -390,14 +394,20 @@ impl Scheduler {
         for _ in 0..MAX_TASKS_PER_TICK {
             let tick = self.tick.get().wrapping_add(1);
             self.tick.set(tick);
-            let task = match unsafe { self.queues.next_task(tick) } {
+
+            let task = match unsafe {
+                // safety: we must be on the local thread to call this. The assertion
+                // the top of this method ensures that `tick` is only called locally.
+                self.queues.next_task(tick)
+            } {
                 Some(task) => task,
                 None => return,
             };
 
             if let Some(task) = task.run(&mut || Some(self.into())) {
                 unsafe {
-                    // we are on the local thread, so this is okay.
+                    // safety: we must be on the local thread to call this. The
+                    // the top of this method ensures that `tick` is only called locally.
                     self.queues.push_local(task);
                 }
             }
@@ -415,19 +425,19 @@ impl Drop for Scheduler {
             task.shutdown();
         }
 
-        // Release owned tasks
         unsafe {
+            // safety: these functions are unsafe to call outside of the local
+            // thread. Since the `Scheduler` type is not `Send` or `Sync`, we
+            // know it will be dropped only from the local thread.
+
+            // Release owned tasks
             self.queues.shutdown();
-        }
 
-        unsafe {
             self.queues.drain_pending_drop();
-        }
 
-        // Wait until all tasks have been released.
-        // XXX: this is a busy loop, but we don't really have any way to park
-        // the thread here?
-        unsafe {
+            // Wait until all tasks have been released.
+            // XXX: this is a busy loop, but we don't really have any way to park
+            // the thread here?
             while self.queues.has_tasks_remaining() {
                 self.queues.drain_pending_drop();
             }
