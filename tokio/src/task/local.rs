@@ -1,15 +1,13 @@
 //! Runs `!Send` futures on the current thread.
+use crate::runtime::basic_scheduler::Queues;
 use crate::sync::AtomicWaker;
-use crate::task::{self, JoinHandle, Schedule, Task, TransferStack};
+use crate::task::{self, JoinHandle, Schedule, Task};
 
-use std::cell::{Cell, UnsafeCell};
-use std::collections::VecDeque;
-use std::fmt;
+use std::cell::Cell;
 use std::future::Future;
 use std::pin::Pin;
 use std::ptr::{self, NonNull};
 use std::rc::Rc;
-use std::sync::Mutex;
 use std::task::{Context, Poll};
 
 use pin_project_lite::pin_project;
@@ -82,33 +80,12 @@ cfg_rt_util! {
         scheduler: Rc<Scheduler>,
     }
 }
+
+#[derive(Debug)]
 struct Scheduler {
-    /// List of all active tasks spawned onto this executor.
-    ///
-    /// # Safety
-    ///
-    /// Must only be accessed from the primary thread
-    tasks: UnsafeCell<task::OwnedList<Scheduler>>,
-
-    /// Local run local_queue.
-    ///
-    /// Tasks notified from the current thread are pushed into this queue.
-    ///
-    /// # Safety
-    ///
-    /// References should not be handed out. Only call `push` / `pop` functions.
-    /// Only call from the owning thread.
-    local_queue: UnsafeCell<VecDeque<Task<Scheduler>>>,
-
     tick: Cell<u8>,
 
-    /// Remote run queue.
-    ///
-    /// Tasks notified from another thread are pushed into this queue.
-    remote_queue: Mutex<VecDeque<Task<Scheduler>>>,
-
-    /// Tasks pending drop
-    pending_drop: TransferStack<Self>,
+    queues: Queues<Self>,
 
     /// Used to notify the `LocalFuture` when a task in the local task set is
     /// notified.
@@ -167,20 +144,18 @@ cfg_rt_util! {
             let current = current
                 .get()
                 .expect("`spawn_local` called from outside of a local::LocalSet!");
+            let (task, handle) = task::joinable_local(future);
             unsafe {
-                let (task, handle) = task::joinable_local(future);
-                current.as_ref().schedule_local(task);
-                handle
+                current.as_ref().queues.push_local(task);
             }
+
+            handle
         })
     }
 }
 
 /// Max number of tasks to poll per tick.
 const MAX_TASKS_PER_TICK: usize = 61;
-
-/// How often to check the remote queue first
-const CHECK_REMOTE_INTERVAL: u8 = 13;
 
 impl LocalSet {
     /// Returns a new local task set.
@@ -234,7 +209,7 @@ impl LocalSet {
         unsafe {
             // This is safe: since `LocalSet` is not Send or Sync, this is
             // always being called from the local thread.
-            self.scheduler.schedule_local(task);
+            self.scheduler.queues.push_local(task);
         }
         handle
     }
@@ -341,31 +316,32 @@ impl Schedule for Scheduler {
     fn bind(&self, task: &Task<Self>) {
         assert!(self.is_current());
         unsafe {
-            (*self.tasks.get()).insert(task);
+            self.queues.add_task(task);
         }
     }
 
     fn release(&self, task: Task<Self>) {
         // This will be called when dropping the local runtime.
-        self.pending_drop.push(task);
+        self.queues.release_remote(task);
     }
 
     fn release_local(&self, task: &Task<Self>) {
         debug_assert!(self.is_current());
         unsafe {
-            (*self.tasks.get()).remove(task);
+            self.queues.release_local(task);
         }
     }
 
     fn schedule(&self, task: Task<Self>) {
         if self.is_current() {
-            unsafe {
-                self.schedule_local(task);
-            }
+            unsafe { self.queues.push_local(task) };
         } else {
-            self.remote_queue.lock().unwrap().push_back(task);
+            let mut lock = self.queues.remote();
+            lock.schedule(task);
 
             self.waker.wake();
+
+            drop(lock);
         }
     }
 }
@@ -373,11 +349,8 @@ impl Schedule for Scheduler {
 impl Scheduler {
     fn new() -> Self {
         Self {
-            tasks: UnsafeCell::new(task::OwnedList::new()),
-            local_queue: UnsafeCell::new(VecDeque::with_capacity(64)),
             tick: Cell::new(0),
-            pending_drop: TransferStack::new(),
-            remote_queue: Mutex::new(VecDeque::with_capacity(64)),
+            queues: Queues::new(),
             waker: AtomicWaker::new(),
         }
     }
@@ -401,10 +374,6 @@ impl Scheduler {
         })
     }
 
-    unsafe fn schedule_local(&self, task: Task<Self>) {
-        (*self.local_queue.get()).push_back(task);
-    }
-
     fn is_current(&self) -> bool {
         CURRENT_TASK_SET
             .try_with(|current| {
@@ -416,40 +385,12 @@ impl Scheduler {
             .unwrap_or(false)
     }
 
-    fn next_task(&self, tick: u8) -> Option<Task<Self>> {
-        if 0 == tick % CHECK_REMOTE_INTERVAL {
-            self.next_remote_task().or_else(|| self.next_local_task())
-        } else {
-            self.next_local_task().or_else(|| self.next_remote_task())
-        }
-    }
-
-    fn next_local_task(&self) -> Option<Task<Self>> {
-        unsafe { (*self.local_queue.get()).pop_front() }
-    }
-
-    fn next_remote_task(&self) -> Option<Task<Self>> {
-        // there is no semantic information in the `PoisonError`, and it
-        // doesn't implement `Debug`, but clippy thinks that it's bad to
-        // match all errors here...
-        #[allow(clippy::match_wild_err_arm)]
-        let mut lock = match self.remote_queue.lock() {
-            // If the lock is poisoned, but the thread is already panicking,
-            // avoid a double panic. This is necessary since `next_task` (which
-            // calls `next_remote_task`) can be called in the `Drop` impl.
-            Err(_) if std::thread::panicking() => return None,
-            Err(_) => panic!("mutex poisoned"),
-            Ok(lock) => lock,
-        };
-        lock.pop_front()
-    }
-
     fn tick(&self) {
         assert!(self.is_current());
         for _ in 0..MAX_TASKS_PER_TICK {
             let tick = self.tick.get().wrapping_add(1);
             self.tick.set(tick);
-            let task = match self.next_task(tick) {
+            let task = match unsafe { self.queues.next_task(tick) } {
                 Some(task) => task,
                 None => return,
             };
@@ -457,56 +398,39 @@ impl Scheduler {
             if let Some(task) = task.run(&mut || Some(self.into())) {
                 unsafe {
                     // we are on the local thread, so this is okay.
-                    self.schedule_local(task);
+                    self.queues.push_local(task);
                 }
             }
         }
-    }
-
-    fn drain_pending_drop(&self) {
-        for task in self.pending_drop.drain() {
-            unsafe {
-                (*self.tasks.get()).remove(&task);
-            }
-            drop(task);
-        }
-    }
-}
-
-impl fmt::Debug for Scheduler {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("Scheduler { .. }").finish()
     }
 }
 
 impl Drop for Scheduler {
     fn drop(&mut self) {
         // Close the remote queue
-        let mut lock = self.remote_queue.lock().unwrap();
-
-        while let Some(task) = lock.pop_front() {
-            task.shutdown();
-        }
-
-        drop(lock);
+        self.queues.close_remote();
 
         // Drain all local tasks
-        while let Some(task) = self.next_local_task() {
+        while let Some(task) = unsafe { self.queues.next_local_task() } {
             task.shutdown();
         }
 
         // Release owned tasks
         unsafe {
-            (*self.tasks.get()).shutdown();
+            self.queues.shutdown();
         }
 
-        self.drain_pending_drop();
+        unsafe {
+            self.queues.drain_pending_drop();
+        }
 
         // Wait until all tasks have been released.
         // XXX: this is a busy loop, but we don't really have any way to park
         // the thread here?
-        while unsafe { !(*self.tasks.get()).is_empty() } {
-            self.drain_pending_drop();
+        unsafe {
+            while self.queues.has_tasks_remaining() {
+                self.queues.drain_pending_drop();
+            }
         }
     }
 }
