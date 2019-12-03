@@ -506,6 +506,7 @@ impl Drop for Scheduler {
 mod tests {
     use super::*;
     use crate::{runtime, task};
+    use std::time::Duration;
 
     #[test]
     fn local_current_thread() {
@@ -729,7 +730,6 @@ mod tests {
     fn drop_cancels_tasks() {
         // This test reproduces issue #1842
         use crate::sync::oneshot;
-        use std::time::Duration;
 
         let mut rt = runtime::Builder::new()
             .enable_time()
@@ -752,5 +752,63 @@ mod tests {
         });
         drop(local);
         drop(rt);
+    }
+
+    #[test]
+    fn drop_cancels_remote_tasks() {
+        // This test reproduces issue #1885.
+        use std::sync::mpsc::RecvTimeoutError;
+
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        let thread = std::thread::spawn(move || {
+            let (tx, mut rx) = crate::sync::mpsc::channel::<()>(1024);
+
+            let mut rt = runtime::Builder::new()
+                .enable_time()
+                .basic_scheduler()
+                .build()
+                .expect("building runtime should succeed");
+
+            let local = LocalSet::new();
+            local.spawn_local(async move { while let Some(_) = rx.recv().await {} });
+            local.block_on(&mut rt, async {
+                crate::time::delay_for(Duration::from_millis(1)).await;
+            });
+
+            drop(tx);
+
+            // This enters an infinite loop if the remote notified tasks are not
+            // properly cancelled.
+            drop(local);
+
+            // Send a message on the channel so that the test thread can
+            // determine if we have entered an infinite loop:
+            done_tx.send(()).unwrap();
+        });
+
+        // Since the failure mode of this test is an infinite loop, rather than
+        // something we can easily make assertions about, we'll run it in a
+        // thread. When the test thread finishes, it will send a message on a
+        // channel to this thread. We'll wait for that message with a fairly
+        // generous timeout, and if we don't recieve it, we assume the test
+        // thread has hung.
+        //
+        // Note that it should definitely complete in under a minute, but just
+        // in case CI is slow, we'll give it a long timeout.
+        match done_rx.recv_timeout(Duration::from_secs(60)) {
+            Err(RecvTimeoutError::Timeout) => panic!(
+                "test did not complete within 60 seconds, \
+                 we have (probably) entered an infinite loop!"
+            ),
+            // Did the test thread panic? We'll find out for sure when we `join`
+            // with it.
+            Err(RecvTimeoutError::Disconnected) => {
+                println!("done_rx dropped, did the test thread panic?");
+            }
+            // Test completed successfully!
+            Ok(()) => {}
+        }
+
+        thread.join().expect("test thread should not panic!")
     }
 }
