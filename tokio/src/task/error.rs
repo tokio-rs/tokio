@@ -11,7 +11,7 @@ doc_rt_core! {
 
 enum Repr {
     Cancelled,
-    Panic(Box<dyn Any + Send + 'static>),
+    Panic(Box<dyn Any + Send + Sync + 'static>),
 }
 
 impl JoinError {
@@ -23,7 +23,7 @@ impl JoinError {
     }
 
     /// Create a new `panic` error
-    pub fn panic(err: Box<dyn Any + Send + 'static>) -> JoinError {
+    pub fn panic(err: Box<dyn Any + Send + Sync + 'static>) -> JoinError {
         JoinError {
             repr: Repr::Panic(err),
         }

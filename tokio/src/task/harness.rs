@@ -8,6 +8,7 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::mem::{ManuallyDrop, MaybeUninit};
 use std::ptr::NonNull;
+use std::sync::Mutex;
 use std::task::{Poll, Waker};
 
 /// Typed raw task handle
@@ -142,7 +143,7 @@ where
                 }
             }
             Err(err) => {
-                self.complete(executor, join_interest, Err(JoinError::panic(err)));
+                self.complete(executor, join_interest, Err(JoinError::panic(Box::new(Mutex::new(err)))));
                 false
             }
         }
