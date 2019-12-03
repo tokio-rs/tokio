@@ -481,6 +481,15 @@ impl fmt::Debug for Scheduler {
 
 impl Drop for Scheduler {
     fn drop(&mut self) {
+        // Close the remote queue
+        let mut lock = self.remote_queue.lock().unwrap();
+
+        while let Some(task) = lock.pop_front() {
+            task.shutdown();
+        }
+
+        drop(lock);
+
         // Drain all local tasks
         while let Some(task) = self.next_local_task() {
             task.shutdown();
