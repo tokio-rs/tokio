@@ -16,8 +16,10 @@
 use bytes::BytesMut;
 use futures::SinkExt;
 use http::{header::HeaderValue, Request, Response, StatusCode};
+
 #[macro_use]
 extern crate serde_derive;
+
 use serde_json;
 use std::{env, error::Error, fmt, io};
 use tokio::net::{TcpListener, TcpStream};
@@ -28,9 +30,8 @@ use tokio_util::codec::{Decoder, Encoder, Framed};
 async fn main() -> Result<(), Box<dyn Error>> {
     // Parse the arguments, bind the TCP socket we'll be listening to, spin up
     // our worker threads, and start shipping sockets to those worker threads.
-    let addr = env::args()
-        .nth(1)
-        .unwrap_or_else(|| "127.0.0.1:8080".to_string());
+    let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
+
     let mut server = TcpListener::bind(&addr).await?;
     let mut incoming = server.incoming();
     println!("Listening on: {}", addr);
