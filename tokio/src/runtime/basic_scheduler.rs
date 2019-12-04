@@ -1,5 +1,5 @@
 use crate::park::{Park, Unpark};
-use crate::task::{self, queue::SingleThreadQueues, JoinHandle, Schedule, ScheduleSendOnly, Task};
+use crate::task::{self, queue::MpscQueues, JoinHandle, Schedule, ScheduleSendOnly, Task};
 
 use std::cell::Cell;
 use std::fmt;
@@ -30,7 +30,7 @@ pub(crate) struct Spawner {
 
 /// The scheduler component.
 pub(super) struct SchedulerPriv {
-    queues: SingleThreadQueues<Self>,
+    queues: MpscQueues<Self>,
     /// Unpark the blocked thread
     unpark: Box<dyn Unpark>,
 }
@@ -64,7 +64,7 @@ where
 
         BasicScheduler {
             scheduler: Arc::new(SchedulerPriv {
-                queues: SingleThreadQueues::new(),
+                queues: MpscQueues::new(),
                 unpark: Box::new(unpark),
             }),
             local: LocalState { tick: 0, park },

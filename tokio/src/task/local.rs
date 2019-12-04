@@ -1,6 +1,6 @@
 //! Runs `!Send` futures on the current thread.
 use crate::sync::AtomicWaker;
-use crate::task::{self, queue::SingleThreadQueues, JoinHandle, Schedule, Task};
+use crate::task::{self, queue::MpscQueues, JoinHandle, Schedule, Task};
 
 use std::cell::Cell;
 use std::future::Future;
@@ -84,7 +84,7 @@ cfg_rt_util! {
 struct Scheduler {
     tick: Cell<u8>,
 
-    queues: SingleThreadQueues<Self>,
+    queues: MpscQueues<Self>,
 
     /// Used to notify the `LocalFuture` when a task in the local task set is
     /// notified.
@@ -353,7 +353,7 @@ impl Scheduler {
     fn new() -> Self {
         Self {
             tick: Cell::new(0),
-            queues: SingleThreadQueues::new(),
+            queues: MpscQueues::new(),
             waker: AtomicWaker::new(),
         }
     }

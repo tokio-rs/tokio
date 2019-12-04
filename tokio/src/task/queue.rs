@@ -6,7 +6,19 @@ use std::{
     sync::{Mutex, MutexGuard},
 };
 
-pub(crate) struct SingleThreadQueues<S: 'static> {
+/// A set of multi-producer, single consumer task queues, suitable for use by a
+/// single-threaded scheduler.
+///
+/// This consists of a list of _all_ tasks bound to the scheduler, a run queue
+/// of tasks notified from the thread the scheduler is running on (the "local
+/// queue"), a run queue of tasks notified from another thread (the "remote
+/// queue"), and a stack of tasks released from other threads which will
+/// eventually need to be dropped by the scheduler on its own thread ("pending
+/// drop").
+///
+/// Submitting tasks to or popping tasks from the local queue is unsafe, as it
+/// must only be performed on the same thread as the scheduler.
+pub(crate) struct MpscQueues<S: 'static> {
     /// List of all active tasks spawned onto this executor.
     ///
     /// # Safety
@@ -43,7 +55,7 @@ pub(crate) struct RemoteQueue<S: 'static> {
 
 // === impl Queues ===
 
-impl<S> SingleThreadQueues<S>
+impl<S> MpscQueues<S>
 where
     S: Schedule + 'static,
 {
@@ -267,9 +279,9 @@ where
     }
 }
 
-impl<S> fmt::Debug for SingleThreadQueues<S> {
+impl<S> fmt::Debug for MpscQueues<S> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("SingleThreadQueues")
+        fmt.debug_struct("MpscQueues")
             .field("owned_tasks", &self.owned_tasks)
             .field("remote_queue", &self.remote_queue)
             .field("local_queue", &self.local_queue)
