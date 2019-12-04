@@ -238,9 +238,9 @@ impl Schedule for SchedulerPriv {
             // safety: `Queues::add_task` is only safe to call from the thread
             // that owns the queues (the thread the scheduler is running on).
             // `Scheduler::bind` is called when polling a task that
-            // doesn't have a scheduler set. We will only poll tasks from the
-            // thread that the scheduler is running on. Therefore, this is safe
-            // to call.
+            // doesn't have a scheduler set. We will only poll new tasks from
+            // the thread that the scheduler is running on. Therefore, this is
+            // safe to call.
             self.queues.add_task(task);
         }
     }
