@@ -1,3 +1,8 @@
+# 0.1.17 (December 3, 2019)
+
+### Added
+- Internal APIs for overriding blocking behavior (#1752)
+
 # 0.1.16 (September 25, 2019)
 
 ### Changed
