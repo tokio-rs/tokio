@@ -1,6 +1,7 @@
 use std::any::Any;
 use std::fmt;
 use std::io;
+use std::sync::Mutex;
 
 doc_rt_core! {
     /// Task failed to execute to completion.
@@ -11,21 +12,21 @@ doc_rt_core! {
 
 enum Repr {
     Cancelled,
-    Panic(Box<dyn Any + Send + Sync + 'static>),
+    Panic(Mutex<Box<dyn Any + Send + 'static>>),
 }
 
 impl JoinError {
     /// Create a new `cancelled` error
-    pub fn cancelled() -> JoinError {
+    pub(crate) fn cancelled() -> JoinError {
         JoinError {
             repr: Repr::Cancelled,
         }
     }
 
     /// Create a new `panic` error
-    pub fn panic(err: Box<dyn Any + Send + Sync + 'static>) -> JoinError {
+    pub(crate) fn panic(err: Box<dyn Any + Send + 'static>) -> JoinError {
         JoinError {
-            repr: Repr::Panic(err),
+            repr: Repr::Panic(Mutex::new(err)),
         }
     }
 }
