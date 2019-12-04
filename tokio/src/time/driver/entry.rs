@@ -1,6 +1,6 @@
 use crate::loom::sync::atomic::AtomicU64;
 use crate::sync::AtomicWaker;
-use crate::time::driver::{HandlePriv, Inner};
+use crate::time::driver::{Handle, Inner};
 use crate::time::{Duration, Error, Instant};
 
 use std::cell::UnsafeCell;
@@ -105,36 +105,24 @@ const ERROR: u64 = u64::MAX;
 
 impl Entry {
     pub(crate) fn new(deadline: Instant, duration: Duration) -> Arc<Entry> {
-        let handle_priv = HandlePriv::current();
-        let handle = handle_priv.inner().unwrap();
+        let inner = Handle::current().inner().unwrap();
+        let entry: Entry;
 
         // Increment the number of active timeouts
-        if handle.increment().is_err() {
-            // TODO(kleimkuhler): Transition to error state instead of
-            // panicking?
-            panic!("failed to add entry; timer at capacity");
-        };
-
-        let when = handle.normalize_deadline(deadline);
-        let state = if when <= handle.elapsed() {
-            ELAPSED
+        if inner.increment().is_err() {
+            entry = Entry::new2(deadline, duration, Weak::new(), ERROR)
         } else {
-            when
-        };
+            let when = inner.normalize_deadline(deadline);
+            let state = if when <= inner.elapsed() {
+                ELAPSED
+            } else {
+                when
+            };
+            entry = Entry::new2(deadline, duration, Arc::downgrade(&inner), state);
+        }
 
-        let entry = Arc::new(Entry {
-            time: CachePadded(UnsafeCell::new(Time { deadline, duration })),
-            inner: handle_priv.into_inner(),
-            waker: AtomicWaker::new(),
-            state: AtomicU64::new(state),
-            queued: AtomicBool::new(false),
-            next_atomic: UnsafeCell::new(ptr::null_mut()),
-            when: UnsafeCell::new(None),
-            next_stack: UnsafeCell::new(None),
-            prev_stack: UnsafeCell::new(ptr::null_mut()),
-        });
-
-        if handle.queue(&entry).is_err() {
+        let entry = Arc::new(entry);
+        if inner.queue(&entry).is_err() {
             entry.error();
         }
 
@@ -311,6 +299,20 @@ impl Entry {
 
         if notify {
             let _ = inner.queue(entry);
+        }
+    }
+
+    fn new2(deadline: Instant, duration: Duration, inner: Weak<Inner>, state: u64) -> Self {
+        Self {
+            time: CachePadded(UnsafeCell::new(Time { deadline, duration })),
+            inner,
+            waker: AtomicWaker::new(),
+            state: AtomicU64::new(state),
+            queued: AtomicBool::new(false),
+            next_atomic: UnsafeCell::new(ptr::null_mut()),
+            when: UnsafeCell::new(None),
+            next_stack: UnsafeCell::new(None),
+            prev_stack: UnsafeCell::new(ptr::null_mut()),
         }
     }
 
