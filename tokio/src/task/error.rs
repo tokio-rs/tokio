@@ -16,15 +16,25 @@ enum Repr {
 }
 
 impl JoinError {
-    /// Create a new `cancelled` error
-    pub(crate) fn cancelled() -> JoinError {
+    #[doc(hidden)]
+    #[deprecated]
+    pub fn cancelled() -> JoinError {
+        Self::cancelled2()
+    }
+
+    pub(crate) fn cancelled2() -> JoinError {
         JoinError {
             repr: Repr::Cancelled,
         }
     }
 
-    /// Create a new `panic` error
-    pub(crate) fn panic(err: Box<dyn Any + Send + 'static>) -> JoinError {
+    #[doc(hidden)]
+    #[deprecated]
+    pub fn panic(err: Box<dyn Any + Send + 'static>) -> JoinError {
+        Self::panic2(err)
+    }
+
+    pub(crate) fn panic2(err: Box<dyn Any + Send + 'static>) -> JoinError {
         JoinError {
             repr: Repr::Panic(Mutex::new(err)),
         }
