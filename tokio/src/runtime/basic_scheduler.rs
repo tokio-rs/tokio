@@ -249,7 +249,7 @@ where
         (*self.local_queue.get()).push_back(task);
     }
 
-    /// Push a task to the local queue.
+    /// Remove a task from the local queue.
     ///
     /// # Safety
     ///
@@ -309,8 +309,9 @@ where
     /// Returns the next task from the remote queue.
     ///
     /// # Panics
-    /// - If the mutex around the remote queue is poisoned _and_ the current
-    ///   thread is not already panicking. This is safe to call in a `Drop` impl.
+    ///
+    /// If the mutex around the remote queue is poisoned _and_ the current
+    /// thread is not already panicking. This is safe to call in a `Drop` impl.
     pub(crate) fn next_remote_task(&self) -> Option<Task<S>> {
         // there is no semantic information in the `PoisonError`, and it
         // doesn't implement `Debug`, but clippy thinks that it's bad to
@@ -348,12 +349,51 @@ where
         }
     }
 
+    /// Shut down the queues.
+    ///
+    /// This performs the following operations:
+    ///
+    /// 1. Close the remote queue (so that it will no longer accept new tasks).
+    /// 2. Drain the remote queue and shut down all tasks.
+    /// 3. Drain the local queue and shut down all tasks.
+    /// 4. Shut down the owned task list.
+    /// 5. Drain the list of tasks dropped externally and remove them from the
+    ///    owned task list.
+    ///
+    /// This method should be called before dropping a `Queues`. It is provided
+    /// as a method rather than a `Drop` impl because types that own a `Queues`
+    /// wish to perform other work in their `Drop` implementations _after_
+    /// shutting down the task queues.
+    ///
+    /// # Safety
+    ///
+    /// This method accesses the local task queue, and therefore *must* be
+    /// called only from the thread that owns the scheduler.
+    ///
+    /// # Panics
+    ///
+    /// If the mutex around the remote queue is poisoned _and_ the current
+    /// thread is not already panicking. This is safe to call in a `Drop` impl.
+    pub(crate) unsafe fn shutdown(&self) {
+        // Close and drain the remote queue.
+        self.close_remote();
+
+        // Drain the local queue.
+        self.close_local();
+
+        // Release owned tasks
+        self.shutdown_owned_tasks();
+
+        // Drain tasks pending drop.
+        self.drain_pending_drop();
+    }
+
     /// Shut down the scheduler's owned task list.
     ///
     /// # Safety
     ///
     /// This *must* be called only from the thread that owns the scheduler.
-    pub(crate) unsafe fn shutdown(&self) {
+    unsafe fn shutdown_owned_tasks(&self) {
         (*self.owned_tasks.get()).shutdown();
     }
 
@@ -363,9 +403,9 @@ where
     /// shut down instead.
     ///
     /// # Panics
-    /// - If the mutex around the remote queue is poisoned _and_ the current
-    ///   thread is not already panicking. This is safe to call in a `Drop` impl.
-    pub(crate) fn close_remote(&self) {
+    /// If the mutex around the remote queue is poisoned _and_ the current
+    /// thread is not already panicking. This is safe to call in a `Drop` impl.
+    fn close_remote(&self) {
         #[allow(clippy::match_wild_err_arm)]
         let mut lock = match self.remote_queue.lock() {
             // If the lock is poisoned, but the thread is already panicking,
@@ -378,6 +418,17 @@ where
         lock.open = false;
 
         while let Some(task) = lock.queue.pop_front() {
+            task.shutdown();
+        }
+    }
+
+    /// Drain the local queue, and shut down its tasks.
+    ///
+    /// # Safety
+    ///
+    /// This *must* be called only from the thread that owns the scheduler.
+    unsafe fn close_local(&self) {
+        while let Some(task) = self.next_local_task() {
             task.shutdown();
         }
     }
@@ -535,23 +586,13 @@ where
     P: Park,
 {
     fn drop(&mut self) {
-        // Close the remote queue
-        self.scheduler.queues.close_remote();
-
-        // Drain all local tasks
-        while let Some(task) = unsafe { self.scheduler.queues.next_local_task() } {
-            task.shutdown();
-        }
-
         unsafe {
             // safety: the `Drop` impl owns the scheduler's queues. these fields
             // will only be accessed when running the scheduler, and it can no
             // longer be run, since we are in the process of dropping it.
 
-            // Release owned tasks
+            // Shut down the task queues.
             self.scheduler.queues.shutdown();
-
-            self.scheduler.queues.drain_pending_drop();
         }
 
         // Wait until all tasks have been released.

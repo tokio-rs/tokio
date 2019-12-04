@@ -417,23 +417,11 @@ impl Scheduler {
 
 impl Drop for Scheduler {
     fn drop(&mut self) {
-        // Close the remote queue
-        self.queues.close_remote();
-
-        // Drain all local tasks
-        while let Some(task) = unsafe { self.queues.next_local_task() } {
-            task.shutdown();
-        }
-
         unsafe {
             // safety: these functions are unsafe to call outside of the local
             // thread. Since the `Scheduler` type is not `Send` or `Sync`, we
             // know it will be dropped only from the local thread.
-
-            // Release owned tasks
             self.queues.shutdown();
-
-            self.queues.drain_pending_drop();
 
             // Wait until all tasks have been released.
             // XXX: this is a busy loop, but we don't really have any way to park
