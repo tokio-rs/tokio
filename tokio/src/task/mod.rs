@@ -234,6 +234,8 @@ cfg_rt_core! {
     mod list;
     pub(crate) use self::list::OwnedList;
 
+    pub(crate) mod queue;
+
     mod raw;
     use self::raw::RawTask;
 
