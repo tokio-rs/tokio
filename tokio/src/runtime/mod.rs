@@ -183,7 +183,7 @@
 mod tests;
 
 cfg_rt_core! {
-    pub(crate) mod basic_scheduler;
+    mod basic_scheduler;
     use basic_scheduler::BasicScheduler;
 }
 
