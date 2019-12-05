@@ -308,7 +308,12 @@ impl<F: Future> Future for LocalFuture<F> {
             return Poll::Ready(output);
         }
 
-        scheduler.tick();
+        if scheduler.tick() {
+            // If `tick` returns true, we need to notify the local future again:
+            // there are still tasks remaining in the run queue.
+            cx.waker().wake_by_ref();
+        }
+
         Poll::Pending
     }
 }
@@ -388,7 +393,9 @@ impl Scheduler {
             .unwrap_or(false)
     }
 
-    fn tick(&self) {
+    /// Tick the scheduler, returning whether the local future needs to be
+    /// notified again.
+    fn tick(&self) -> bool {
         assert!(self.is_current());
         for _ in 0..MAX_TASKS_PER_TICK {
             let tick = self.tick.get().wrapping_add(1);
@@ -400,7 +407,10 @@ impl Scheduler {
                 self.queues.next_task(tick)
             } {
                 Some(task) => task,
-                None => return,
+                // We have fully drained the queue of notified tasks, so the
+                // local future doesn't need to be notified again — it can wait
+                // until something else wakes a task in the local set.
+                None => return false,
             };
 
             if let Some(task) = task.run(&mut || Some(self.into())) {
@@ -411,6 +421,8 @@ impl Scheduler {
                 }
             }
         }
+
+        true
     }
 }
 
@@ -779,7 +791,7 @@ mod tests {
                 time::delay_for(Duration::from_millis(100)).await;
 
                 for tx in oneshots.drain(..) {
-                    tx.send(());
+                    tx.send(()).unwrap();
                 }
 
                 time::delay_for(Duration::from_millis(300)).await;
