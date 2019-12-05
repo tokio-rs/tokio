@@ -86,29 +86,24 @@ impl<T> Mutex<T> {
 
     /// A future that resolves on acquiring the lock and returns the `MutexGuard`.
     pub async fn lock(&self) -> MutexGuard<'_, T> {
-        let mut permit = semaphore::Permit::new();
-        poll_fn(|cx| permit.poll_acquire(cx, &self.s))
+        let mut guard = MutexGuard {
+            lock: self,
+            permit: semaphore::Permit::new(),
+        };
+        poll_fn(|cx| guard.permit.poll_acquire(cx, &self.s))
             .await
             .unwrap_or_else(|_| {
                 // The semaphore was closed. but, we never explicitly close it, and we have a
                 // handle to it through the Arc, which means that this can never happen.
                 unreachable!()
             });
-
-        MutexGuard { lock: self, permit }
+        guard
     }
 }
 
 impl<'a, T> Drop for MutexGuard<'a, T> {
     fn drop(&mut self) {
-        if self.permit.is_acquired() {
-            self.permit.release(&self.lock.s);
-        } else if ::std::thread::panicking() {
-            // A guard _should_ always hold its permit, but if the thread is already panicking,
-            // we don't want to generate a panic-while-panicing, since that's just unhelpful!
-        } else {
-            unreachable!("Permit not held when MutexGuard was dropped")
-        }
+        self.permit.release(&self.lock.s);
     }
 }
 
