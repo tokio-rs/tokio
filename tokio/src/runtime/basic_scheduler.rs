@@ -46,6 +46,8 @@ struct LocalState<P> {
 
     /// Thread park handle
     park: P,
+
+    last_tick: Option<std::time::Instant>,
 }
 
 /// Max number of tasks to poll per tick.
@@ -67,7 +69,7 @@ where
                 queues: MpscQueues::new(),
                 unpark: Box::new(unpark),
             }),
-            local: LocalState { tick: 0, park },
+            local: LocalState { tick: 0, park, last_tick: None },
         }
     }
 
@@ -168,7 +170,7 @@ impl Spawner {
 
 impl SchedulerPriv {
     fn tick(&self, local: &mut LocalState<impl Park>) {
-        for _ in 0..MAX_TASKS_PER_TICK {
+        loop {
             // Get the current tick
             let tick = local.tick;
 
@@ -183,10 +185,7 @@ impl SchedulerPriv {
 
             let task = match next {
                 Some(task) => task,
-                None => {
-                    local.park.park().ok().expect("failed to park");
-                    return;
-                }
+                None => break,
             };
 
             if let Some(task) = task.run(&mut || Some(self.into())) {
@@ -199,9 +198,21 @@ impl SchedulerPriv {
             }
         }
 
+        if let Some(last_tick) = local.last_tick {
+            use std::thread;
+
+            let now = std::time::Instant::now();
+            let diff = now - last_tick;
+            const WAIT: std::time::Duration = std::time::Duration::from_millis(20);
+            if diff < WAIT {
+                thread::sleep(WAIT - diff);
+            }
+        }
+        local.last_tick = Some(std::time::Instant::now());
+
         local
             .park
-            .park_timeout(Duration::from_millis(0))
+            .park()
             .ok()
             .expect("failed to park");
     }
