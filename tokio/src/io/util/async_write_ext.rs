@@ -3,8 +3,14 @@ use crate::io::util::shutdown::{shutdown, Shutdown};
 use crate::io::util::write::{write, Write};
 use crate::io::util::write_all::{write_all, WriteAll};
 use crate::io::util::write_buf::{write_buf, WriteBuf};
-use crate::io::util::write_int::{WriteU8, WriteU16, WriteU32, WriteU64, WriteU128};
-use crate::io::util::write_int::{WriteI8, WriteI16, WriteI32, WriteI64, WriteI128};
+use crate::io::util::write_int::{
+    WriteI128, WriteI128Le, WriteI16, WriteI16Le, WriteI32, WriteI32Le, WriteI64, WriteI64Le,
+    WriteI8,
+};
+use crate::io::util::write_int::{
+    WriteU128, WriteU128Le, WriteU16, WriteU16Le, WriteU32, WriteU32Le, WriteU64, WriteU64Le,
+    WriteU8,
+};
 use crate::io::AsyncWrite;
 
 use bytes::Buf;
@@ -608,6 +614,16 @@ cfg_io_util! {
             /// }
             /// ```
             fn write_i128(&mut self, n: i128) -> WriteI128;
+
+            fn write_i16(&mut self, n: i16) -> WriteI16;
+            fn write_i32(&mut self, n: i32) -> WriteI32;
+            fn write_i64(&mut self, n: i64) -> WriteI64;
+            fn write_i128(&mut self, n: i128) -> WriteI128;
+
+            fn write_u16(&mut self, n: u16) -> WriteU16;
+            fn write_u32(&mut self, n: u32) -> WriteU32;
+            fn write_u64(&mut self, n: u64) -> WriteU64;
+            fn write_u128(&mut self, n: u128) -> WriteU128;
         }
 
         /// Flush this output stream, ensuring that all intermediately buffered
