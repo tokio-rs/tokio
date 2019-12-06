@@ -551,6 +551,7 @@ impl Command {
     ///         .await
     ///         .expect("ls command failed to run")
     /// }
+    /// ```
     pub fn spawn(&mut self) -> io::Result<Child> {
         imp::spawn_child(&mut self.std).map(|spawned_child| Child {
             child: ChildDropGuard {
