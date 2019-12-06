@@ -2,8 +2,12 @@ use crate::io::util::chain::{chain, Chain};
 use crate::io::util::read::{read, Read};
 use crate::io::util::read_buf::{read_buf, ReadBuf};
 use crate::io::util::read_exact::{read_exact, ReadExact};
-use crate::io::util::read_int::{ReadU8, ReadU16, ReadU32, ReadU64, ReadU128};
-use crate::io::util::read_int::{ReadI8, ReadI16, ReadI32, ReadI64, ReadI128};
+use crate::io::util::read_int::{
+    ReadI128, ReadI128Le, ReadI16, ReadI16Le, ReadI32, ReadI32Le, ReadI64, ReadI64Le, ReadI8,
+};
+use crate::io::util::read_int::{
+    ReadU128, ReadU128Le, ReadU16, ReadU16Le, ReadU32, ReadU32Le, ReadU64, ReadU64Le, ReadU8,
+};
 use crate::io::util::read_to_end::{read_to_end, ReadToEnd};
 use crate::io::util::read_to_string::{read_to_string, ReadToString};
 use crate::io::util::take::{take, Take};
@@ -669,6 +673,16 @@ cfg_io_util! {
             /// }
             /// ```
             fn read_i128(&mut self) -> ReadI128;
+
+            fn read_u16_le(&mut self) -> ReadU16Le;
+            fn read_u32_le(&mut self) -> ReadU32Le;
+            fn read_u64_le(&mut self) -> ReadU64Le;
+            fn read_u128_le(&mut self) -> ReadU128Le;
+
+            fn read_i16_le(&mut self) -> ReadI16Le;
+            fn read_i32_le(&mut self) -> ReadI32Le;
+            fn read_i64_le(&mut self) -> ReadI64Le;
+            fn read_i128_le(&mut self) -> ReadI128Le;
         }
 
         /// Read all bytes until EOF in this source, placing them into `buf`.
