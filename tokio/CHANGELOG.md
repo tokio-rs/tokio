@@ -1,3 +1,22 @@
+# 0.2.3 (December 6, 2019)
+
+### Added
+- read / write integers using `AsyncReadExt` and `AsyncWriteExt` (#1863).
+- `read_buf` / `write_buf` for reading / writing `Buf` / `BufMut` (#1881).
+- `TcpStream::poll_peek` - pollable API for performing TCP peek (#1864).
+- `sync::oneshot::error::TryRecvError` provides variants to detect the error
+  kind (#1874).
+- `LocalSet::block_on` accepts `!'static` task (#1882).
+- `task::JoinError` is now `Sync` (#1888).
+- impl conversions between `tokio::time::Instant` and
+  `std::time::Instant` (#1904).
+
+### Fixes
+- calling `spawn_blocking` after runtime shutdown (#1875).
+- `LocalSet` drop inifinite loop (#1892).
+- `LocalSet` hang under load (#1905).
+- improved documentation (#1865, #1866, #1868, #1874, #1876, #1911).
+
 # 0.2.2 (November 29, 2019)
 
 ### Fixes
