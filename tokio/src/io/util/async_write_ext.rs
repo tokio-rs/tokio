@@ -648,7 +648,7 @@ cfg_io_util! {
             ///     writer.write_u16_le(517).await?;
             ///     writer.write_u16_le(768).await?;
             ///
-            ///     assert_eq!(writer, b"\x02\x05\x03\x00");
+            ///     assert_eq!(writer, b"\x05\x02\x00\x03");
             ///     Ok(())
             /// }
             /// ```
@@ -686,7 +686,7 @@ cfg_io_util! {
             ///     writer.write_i16_le(193).await?;
             ///     writer.write_i16_le(-132).await?;
             ///
-            ///     assert_eq!(writer, b"\x00\xc1\xff\x7c");
+            ///     assert_eq!(writer, b"\xc1\x00\x7c\xff");
             ///     Ok(())
             /// }
             /// ```
@@ -724,7 +724,7 @@ cfg_io_util! {
             ///     writer.write_u32_le(267).await?;
             ///     writer.write_u32_le(1205419366).await?;
             ///
-            ///     assert_eq!(writer, b"\x00\x00\x01\x0b\x47\xd9\x3d\x66");
+            ///     assert_eq!(writer, b"\x0b\x01\x00\x00\x66\x3d\xd9\x47");
             ///     Ok(())
             /// }
             /// ```
@@ -762,7 +762,7 @@ cfg_io_util! {
             ///     writer.write_i32_le(267).await?;
             ///     writer.write_i32_le(1205419366).await?;
             ///
-            ///     assert_eq!(writer, b"\x00\x00\x01\x0b\x47\xd9\x3d\x66");
+            ///     assert_eq!(writer, b"\x0b\x01\x00\x00\x66\x3d\xd9\x47");
             ///     Ok(())
             /// }
             /// ```
@@ -800,7 +800,7 @@ cfg_io_util! {
             ///     writer.write_u64_le(918733457491587).await?;
             ///     writer.write_u64_le(143).await?;
             ///
-            ///     assert_eq!(writer, b"\x00\x03\x43\x95\x4d\x60\x86\x83\x00\x00\x00\x00\x00\x00\x00\x8f");
+            ///     assert_eq!(writer, b"\x83\x86\x60\x4d\x95\x43\x03\x00\x8f\x00\x00\x00\x00\x00\x00\x00");
             ///     Ok(())
             /// }
             /// ```
@@ -838,7 +838,7 @@ cfg_io_util! {
             ///     writer.write_i64_le(i64::min_value()).await?;
             ///     writer.write_i64_le(i64::max_value()).await?;
             ///
-            ///     assert_eq!(writer, b"\x80\x00\x00\x00\x00\x00\x00\x00\x7f\xff\xff\xff\xff\xff\xff\xff");
+            ///     assert_eq!(writer, b"\x00\x00\x00\x00\x00\x00\x00\x80\xff\xff\xff\xff\xff\xff\xff\x7f");
             ///     Ok(())
             /// }
             /// ```
@@ -876,8 +876,8 @@ cfg_io_util! {
             ///     writer.write_u128_le(16947640962301618749969007319746179).await?;
             ///
             ///     assert_eq!(writer, vec![
-            ///         0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83,
-            ///         0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83
+            ///         0x83, 0x86, 0x60, 0x4d, 0x95, 0x43, 0x03, 0x00,
+            ///         0x83, 0x86, 0x60, 0x4d, 0x95, 0x43, 0x03, 0x00,
             ///     ]);
             ///     Ok(())
             /// }
@@ -916,8 +916,8 @@ cfg_io_util! {
             ///     writer.write_i128_le(i128::min_value()).await?;
             ///
             ///     assert_eq!(writer, vec![
-            ///         0x80, 0, 0, 0, 0, 0, 0, 0,
-            ///         0, 0, 0, 0, 0, 0, 0, 0
+            ///          0, 0, 0, 0, 0, 0, 0,
+            ///         0, 0, 0, 0, 0, 0, 0, 0, 0x80
             ///     ]);
             ///     Ok(())
             /// }

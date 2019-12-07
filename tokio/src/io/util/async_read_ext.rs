@@ -705,8 +705,8 @@ cfg_io_util! {
             /// async fn main() -> io::Result<()> {
             ///     let mut reader = Cursor::new(vec![2, 5, 3, 0]);
             ///
-            ///     assert_eq!(517, reader.read_u16_le().await?);
-            ///     assert_eq!(768, reader.read_u16_le().await?);
+            ///     assert_eq!(1282, reader.read_u16_le().await?);
+            ///     assert_eq!(3, reader.read_u16_le().await?);
             ///     Ok(())
             /// }
             /// ```
@@ -743,8 +743,8 @@ cfg_io_util! {
             /// async fn main() -> io::Result<()> {
             ///     let mut reader = Cursor::new(vec![0x00, 0xc1, 0xff, 0x7c]);
             ///
-            ///     assert_eq!(193, reader.read_i16_le().await?);
-            ///     assert_eq!(-132, reader.read_i16_le().await?);
+            ///     assert_eq!(-16128, reader.read_i16_le().await?);
+            ///     assert_eq!(31999, reader.read_i16_le().await?);
             ///     Ok(())
             /// }
             /// ```
@@ -781,7 +781,7 @@ cfg_io_util! {
             /// async fn main() -> io::Result<()> {
             ///     let mut reader = Cursor::new(vec![0x00, 0x00, 0x01, 0x0b]);
             ///
-            ///     assert_eq!(267, reader.read_u32_le().await?);
+            ///     assert_eq!(184614912, reader.read_u32_le().await?);
             ///     Ok(())
             /// }
             /// ```
@@ -819,7 +819,7 @@ cfg_io_util! {
             /// async fn main() -> io::Result<()> {
             ///     let mut reader = Cursor::new(vec![0xff, 0xff, 0x7a, 0x33]);
             ///
-            ///     assert_eq!(-34253, reader.read_i32_le().await?);
+            ///     assert_eq!(863698943, reader.read_i32_le().await?);
             ///     Ok(())
             /// }
             /// ```
@@ -858,7 +858,7 @@ cfg_io_util! {
             ///         0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83
             ///     ]);
             ///
-            ///     assert_eq!(918733457491587, reader.read_u64_le().await?);
+            ///     assert_eq!(9477368352180732672, reader.read_u64_le().await?);
             ///     Ok(())
             /// }
             /// ```
@@ -895,7 +895,7 @@ cfg_io_util! {
             /// async fn main() -> io::Result<()> {
             ///     let mut reader = Cursor::new(vec![0x80, 0, 0, 0, 0, 0, 0, 0]);
             ///
-            ///     assert_eq!(i64::min_value(), reader.read_i64_le().await?);
+            ///     assert_eq!(128, reader.read_i64_le().await?);
             ///     Ok(())
             /// }
             /// ```
@@ -935,7 +935,7 @@ cfg_io_util! {
             ///         0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83
             ///     ]);
             ///
-            ///     assert_eq!(16947640962301618749969007319746179, reader.read_u128_le().await?);
+            ///     assert_eq!(174826588484952389081207917399662330624, reader.read_u128_le().await?);
             ///     Ok(())
             /// }
             /// ```
@@ -975,7 +975,7 @@ cfg_io_util! {
             ///         0, 0, 0, 0, 0, 0, 0, 0
             ///     ]);
             ///
-            ///     assert_eq!(i128::min_value(), reader.read_i128_le().await?);
+            ///     assert_eq!(128, reader.read_i128_le().await?);
             ///     Ok(())
             /// }
             /// ```
