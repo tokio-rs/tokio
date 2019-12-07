@@ -1,3 +1,8 @@
+# 0.2.4 (December 6, 2019)
+
+### Fixes
+- `sync::Mutex` deadlock when `lock()` future is dropped early (#1898).
+
 # 0.2.3 (December 6, 2019)
 
 ### Added
