@@ -1,12 +1,25 @@
 #![feature(test)]
-#![warn(rust_2018_idioms)]
 
 extern crate test;
 
 use tokio::sync::oneshot;
 
-use futures::{future, Async, Future};
+use futures::{future, task, Future};
+use std::task::{Context, Poll};
 use test::Bencher;
+
+fn spin<F: Future>(f: F) -> F::Output {
+    let waker = task::noop_waker_ref();
+    let mut cx = Context::from_waker(waker);
+    futures::pin_mut!(f);
+    loop {
+        match f.as_mut().poll(&mut cx) {
+            Poll::Ready(v) => return v,
+
+            Poll::Pending => {}
+        }
+    }
+}
 
 #[bench]
 fn new(b: &mut Bencher) {
@@ -18,32 +31,35 @@ fn new(b: &mut Bencher) {
 #[bench]
 fn same_thread_send_recv(b: &mut Bencher) {
     b.iter(|| {
-        let (tx, mut rx) = oneshot::channel();
+        let (tx, rx) = oneshot::channel();
 
         let _ = tx.send(1);
+        let waker = task::noop_waker_ref();
+        let mut cx = Context::from_waker(waker);
+        futures::pin_mut!(rx);
 
-        assert_eq!(Async::Ready(1), rx.poll().unwrap());
+        assert_eq!(Poll::Ready(1), rx.poll(&mut cx).map(Result::unwrap));
     });
 }
 
 #[bench]
 fn same_thread_recv_multi_send_recv(b: &mut Bencher) {
     b.iter(|| {
-        let (tx, mut rx) = oneshot::channel();
-
-        future::lazy(|| {
-            let _ = rx.poll();
-            let _ = rx.poll();
-            let _ = rx.poll();
-            let _ = rx.poll();
+        let (tx, rx) = oneshot::channel();
+        futures::pin_mut!(rx);
+        let fut = future::lazy(|mut cx| {
+            let _ = rx.as_mut().poll(&mut cx);
+            let _ = rx.as_mut().poll(&mut cx);
+            let _ = rx.as_mut().poll(&mut cx);
+            let _ = rx.as_mut().poll(&mut cx);
 
             let _ = tx.send(1);
-            assert_eq!(Async::Ready(1), rx.poll().unwrap());
+
+            assert_eq!(Poll::Ready(1), rx.poll(&mut cx).map(Result::unwrap));
 
             Ok::<_, ()>(())
-        })
-        .wait()
-        .unwrap();
+        });
+        spin(fut).unwrap();
     });
 }
 
@@ -52,17 +68,6 @@ fn multi_thread_send_recv(b: &mut Bencher) {
     const MAX: usize = 10_000_000;
 
     use std::thread;
-
-    fn spin<F: Future>(mut f: F) -> Result<F::Item, F::Error> {
-        use futures::Async::Ready;
-        loop {
-            match f.poll() {
-                Ok(Ready(v)) => return Ok(v),
-                Ok(_) => {}
-                Err(e) => return Err(e),
-            }
-        }
-    }
 
     let mut ping_txs = vec![];
     let mut ping_rxs = vec![];
@@ -82,7 +87,7 @@ fn multi_thread_send_recv(b: &mut Bencher) {
     }
 
     thread::spawn(move || {
-        future::lazy(|| {
+        let fut = future::lazy(|_| {
             for i in 0..MAX {
                 let ping_rx = ping_rxs[i].take().unwrap();
                 let pong_tx = pong_txs[i].take().unwrap();
@@ -95,12 +100,11 @@ fn multi_thread_send_recv(b: &mut Bencher) {
             }
 
             Ok::<(), ()>(())
-        })
-        .wait()
-        .unwrap();
+        });
+        spin(fut).unwrap();
     });
 
-    future::lazy(|| {
+    let fut = future::lazy(|_| {
         let mut i = 0;
 
         b.iter(|| {
@@ -114,7 +118,6 @@ fn multi_thread_send_recv(b: &mut Bencher) {
         });
 
         Ok::<(), ()>(())
-    })
-    .wait()
-    .unwrap();
+    });
+    spin(fut).unwrap();
 }
