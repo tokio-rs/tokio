@@ -29,7 +29,7 @@
 //! Note that in contrast to `std::sync::Mutex`, this implementation does not
 //! poison the mutex when a thread holding the `MutexGuard` panics. In such a
 //! case, the mutex will be unlocked. If the panic is caught, this might leave
-//! the data protected by the mutes in an inconsistent state.
+//! the data protected by the mutex in an inconsistent state.
 //!
 //! [`Mutex`]: struct.Mutex.html
 //! [`MutexGuard`]: struct.MutexGuard.html
