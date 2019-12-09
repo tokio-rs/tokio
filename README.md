@@ -87,7 +87,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 }
-
 ```
 
 More examples can be found [here](examples). Note that the `master` branch
