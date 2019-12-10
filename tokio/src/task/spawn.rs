@@ -52,7 +52,7 @@ doc_rt_core! {
     ///
     /// # Using `!Send` values from a task
     ///
-    /// The task supplied to `spawn` must implement `!Send`. However, it is
+    /// The task supplied to `spawn` must implement `Send`. However, it is
     /// possible to **use** `!Send` values from the task as long as they only
     /// exist between calls to `.await`.
     ///
