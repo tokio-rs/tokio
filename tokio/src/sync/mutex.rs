@@ -38,6 +38,7 @@ use crate::future::poll_fn;
 use crate::sync::semaphore;
 
 use std::cell::UnsafeCell;
+use std::error::Error;
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 
@@ -73,6 +74,30 @@ unsafe impl<T> Send for Mutex<T> where T: Send {}
 unsafe impl<T> Sync for Mutex<T> where T: Send {}
 unsafe impl<'a, T> Sync for MutexGuard<'a, T> where T: Send + Sync {}
 
+/// An enumeration of possible errors associated with a `TryLockResult`
+/// which can occur while trying to aquire a lock from the `try_lock`
+/// method on a `Mutex`.
+#[derive(Debug)]
+pub enum TryLockError {
+    /// The lock could not be acquired at this time because the operation
+    /// would otherwise block.
+    WouldBlock,
+}
+
+impl fmt::Display for TryLockError {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            fmt,
+            "{}",
+            match self {
+                TryLockError::WouldBlock => "operation would block"
+            }
+        )
+    }
+}
+
+impl Error for TryLockError {}
+
 #[test]
 #[cfg(not(loom))]
 fn bounds() {
@@ -103,6 +128,15 @@ impl<T> Mutex<T> {
                 unreachable!()
             });
         guard
+    }
+
+    /// Try to aquire the lock
+    pub fn try_lock(&self) -> Result<MutexGuard<'_, T>, TryLockError> {
+        let mut permit = semaphore::Permit::new();
+        match permit.try_acquire(&self.s) {
+            Ok(_) => Ok(MutexGuard { lock: self, permit }),
+            Err(_) => Err(TryLockError::WouldBlock),
+        }
     }
 }
 
