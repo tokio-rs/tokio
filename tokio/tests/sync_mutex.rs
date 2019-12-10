@@ -134,3 +134,16 @@ async fn aborted_future_2() {
     .await
     .expect("Mutex is locked");
 }
+
+#[test]
+fn try_lock() {
+    let m: Mutex<usize> = Mutex::new(0);
+    {
+        let g1 = m.try_lock();
+        assert_eq!(g1.is_ok(), true);
+        let g2 = m.try_lock();
+        assert_eq!(g2.is_ok(), false);
+    }
+    let g3 = m.try_lock();
+    assert_eq!(g3.is_ok(), true);
+}

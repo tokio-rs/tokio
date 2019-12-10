@@ -1,5 +1,5 @@
 use crate::sync::mpsc::chan;
-use crate::sync::mpsc::error::{ClosedError, SendError, TrySendError};
+use crate::sync::mpsc::error::{ClosedError, SendError, TryRecvError, TrySendError};
 use crate::sync::semaphore;
 
 use std::fmt;
@@ -148,6 +148,21 @@ impl<T> Receiver<T> {
     #[doc(hidden)] // TODO: document
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         self.chan.recv(cx)
+    }
+
+    /// Attempts to return a pending value on this receiver without blocking.
+    ///
+    /// This method will never block the caller in order to wait for data to
+    /// become available. Instead, this will always return immediately with
+    /// a possible option of pending data on the channel.
+    ///
+    /// This is useful for a flavor of "optimistic check" before deciding to
+    /// block on a receiver.
+    ///
+    /// Compared with recv, this function has two failure cases instead of
+    /// one (one for disconnection, one for an empty buffer).
+    pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
+        self.chan.try_recv()
     }
 
     /// Closes the receiving half of a channel, without dropping it.

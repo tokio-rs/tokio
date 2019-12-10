@@ -2,7 +2,7 @@ use crate::loom::cell::CausalCell;
 use crate::loom::future::AtomicWaker;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Arc;
-use crate::sync::mpsc::error::ClosedError;
+use crate::sync::mpsc::error::{ClosedError, TryRecvError};
 use crate::sync::mpsc::{error, list};
 
 use std::fmt;
@@ -303,6 +303,22 @@ where
                 Ready(None)
             } else {
                 Pending
+            }
+        })
+    }
+
+    /// Receive the next value without blocking
+    pub(crate) fn try_recv(&mut self) -> Result<T, TryRecvError> {
+        use super::block::Read::*;
+        self.inner.rx_fields.with_mut(|rx_fields_ptr| {
+            let rx_fields = unsafe { &mut *rx_fields_ptr };
+            match rx_fields.list.pop(&self.inner.tx) {
+                Some(Value(value)) => {
+                    self.inner.semaphore.add_permit();
+                    Ok(value)
+                }
+                Some(Closed) => Err(TryRecvError::Closed),
+                None => Err(TryRecvError::Empty),
             }
         })
     }
