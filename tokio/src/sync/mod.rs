@@ -19,6 +19,8 @@ cfg_sync! {
     mod barrier;
     pub use barrier::{Barrier, BarrierWaitResult};
 
+    pub mod broadcast;
+
     pub mod mpsc;
 
     mod mutex;
