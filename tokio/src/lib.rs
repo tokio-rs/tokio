@@ -196,14 +196,14 @@
 //!                     Ok(n) if n == 0 => return,
 //!                     Ok(n) => n,
 //!                     Err(e) => {
-//!                         println!("failed to read from socket; err = {:?}", e);
+//!                         eprintln!("failed to read from socket; err = {:?}", e);
 //!                         return;
 //!                     }
 //!                 };
 //!
 //!                 // Write the data back
 //!                 if let Err(e) = socket.write_all(&buf[0..n]).await {
-//!                     println!("failed to write to socket; err = {:?}", e);
+//!                     eprintln!("failed to write to socket; err = {:?}", e);
 //!                     return;
 //!                 }
 //!             }
