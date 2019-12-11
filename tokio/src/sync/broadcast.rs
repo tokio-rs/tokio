@@ -216,7 +216,9 @@ pub enum RecvError {
     /// The receiver lagged too far behind and has been forcibly disconnected.
     /// Attempting to receive again will return the oldest message still
     /// retained by the channel.
-    Lagged,
+    ///
+    /// Includes the number of skipped messages.
+    Lagged(u64),
 }
 
 /// An error returned from the [`try_recv`] function on a [`Receiver`].
@@ -236,7 +238,9 @@ pub enum TryRecvError {
     /// The receiver lagged too far behind and has been forcibly disconnected.
     /// Attempting to receive again will return the oldest message still
     /// retained by the channel.
-    Lagged,
+    ///
+    /// Includes the number of skipped messages.
+    Lagged(u64),
 }
 
 /// Data shared between senders and receivers
@@ -423,6 +427,12 @@ impl<T> Sender<T> {
     /// handle. An unsuccessful send would be one where all associated
     /// [`Receiver`] handles have already been dropped.
     ///
+    /// # Return
+    ///
+    /// On success, the number of subscribed [`Receiver`] handles is returned.
+    /// This does not mean that this number of receivers will see the message as
+    /// a receiver may drop before receiving the message.
+    ///
     /// # Note
     ///
     /// A return value of `Ok` **does not** mean that the sent value will be
@@ -460,7 +470,7 @@ impl<T> Sender<T> {
     ///     tx.send(20).unwrap();
     /// }
     /// ```
-    pub fn send(&self, value: T) -> Result<(), SendError<T>> {
+    pub fn send(&self, value: T) -> Result<usize, SendError<T>> {
         self.send2(Some(value))
             .map_err(|SendError(maybe_v)| SendError(maybe_v.unwrap()))
     }
@@ -554,7 +564,7 @@ impl<T> Sender<T> {
         tail.rx_cnt
     }
 
-    fn send2(&self, value: Option<T>) -> Result<(), SendError<Option<T>>> {
+    fn send2(&self, value: Option<T>) -> Result<usize, SendError<Option<T>>> {
         let mut tail = self.shared.tail.lock().unwrap();
 
         if tail.rx_cnt == 0 {
@@ -598,7 +608,7 @@ impl<T> Sender<T> {
         // Notify waiting receivers
         self.notify_rx();
 
-        Ok(())
+        Ok(rem)
     }
 
     fn notify_rx(&self) {
@@ -676,9 +686,12 @@ impl<T> Receiver<T> {
                 // Because a receiver is lagging, this slot also holds the
                 // oldest value. To make the positions match, we subtract the
                 // capacity.
-                self.next = tail.pos.wrapping_sub(self.shared.buffer.len() as u64);
+                let next = tail.pos.wrapping_sub(self.shared.buffer.len() as u64);
+                let missed = next.wrapping_sub(self.next);
 
-                return Err(TryRecvError::Lagged);
+                self.next = next;
+
+                return Err(TryRecvError::Lagged(missed));
             }
         }
 
@@ -871,7 +884,7 @@ impl<T> Drop for Receiver<T> {
                 // The channel is closed
                 Err(TryRecvError::Closed) => break,
                 // Ignore lagging, we will catch up
-                Err(TryRecvError::Lagged) => {}
+                Err(TryRecvError::Lagged(..)) => {}
                 // Can't be empty
                 Err(TryRecvError::Empty) => panic!("unexpected empty broadcast channel"),
             }
@@ -974,7 +987,7 @@ fn ok_empty<T>(res: Result<T, TryRecvError>) -> Result<Option<T>, RecvError> {
     match res {
         Ok(value) => Ok(Some(value)),
         Err(TryRecvError::Empty) => Ok(None),
-        Err(TryRecvError::Lagged) => Err(RecvError::Lagged),
+        Err(TryRecvError::Lagged(n)) => Err(RecvError::Lagged(n)),
         Err(TryRecvError::Closed) => Err(RecvError::Closed),
     }
 }

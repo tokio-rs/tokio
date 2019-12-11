@@ -1,5 +1,5 @@
 use crate::sync::broadcast;
-use crate::sync::broadcast::RecvError::Closed;
+use crate::sync::broadcast::RecvError::{Closed, Lagged};
 
 use loom::future::block_on;
 use loom::sync::Arc;
@@ -60,33 +60,37 @@ fn broadcast_wrap() {
 
         let th1 = thread::spawn(move || {
             block_on(async {
-                let mut values = vec![];
+                let mut num = 0;
 
                 loop {
                     match rx1.recv().await {
-                        Ok(v) => values.push(v),
+                        Ok(_) => num += 1,
                         Err(Closed) => break,
-                        _ => {}
+                        Err(Lagged(n)) => {
+                            num += n as usize
+                        },
                     }
                 }
 
-                assert!(values.len() >= 1, "actual = {:?}", values);
+                assert_eq!(num, 3);
             });
         });
 
         let th2 = thread::spawn(move || {
             block_on(async {
-                let mut values = vec![];
+                let mut num = 0;
 
                 loop {
                     match rx2.recv().await {
-                        Ok(v) => values.push(v),
+                        Ok(_) => num += 1,
                         Err(Closed) => break,
-                        _ => {}
+                        Err(Lagged(n)) => {
+                            num += n as usize
+                        }
                     }
                 }
 
-                assert!(values.len() >= 1);
+                assert_eq!(num, 3);
             });
         });
 

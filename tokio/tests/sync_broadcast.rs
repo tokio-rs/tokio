@@ -28,6 +28,17 @@ macro_rules! assert_empty {
     };
 }
 
+macro_rules! assert_lagged {
+    ($e:expr, $n:expr) => {
+        match assert_err!($e) {
+            broadcast::TryRecvError::Lagged(n) => {
+                assert_eq!(n, $n);
+            }
+            _ => panic!("did not lag"),
+        }
+    }
+}
+
 trait AssertSend: Send {}
 impl AssertSend for broadcast::Sender<i32> {}
 impl AssertSend for broadcast::Receiver<i32> {}
@@ -38,7 +49,8 @@ fn send_try_recv_bounded() {
 
     assert_empty!(rx);
 
-    assert_ok!(tx.send("hello"));
+    let n = assert_ok!(tx.send("hello"));
+    assert_eq!(n, 1);
 
     let val = assert_recv!(rx);
     assert_eq!(val, "hello");
@@ -54,7 +66,8 @@ fn send_two_recv() {
     assert_empty!(rx1);
     assert_empty!(rx2);
 
-    assert_ok!(tx.send("hello"));
+    let n = assert_ok!(tx.send("hello"));
+    assert_eq!(n, 2);
 
     let val = assert_recv!(rx1);
     assert_eq!(val, "hello");
@@ -198,8 +211,7 @@ fn lagging_rx() {
     assert_ok!(tx.send("three"));
 
     // Lagged too far
-    let err = assert_err!(rx2.try_recv());
-    assert!(is_lagged(err));
+    assert_lagged!(rx2.try_recv(), 1);
 
     // Calling again gets the next value
     assert_eq!("two", assert_recv!(rx2));
@@ -210,13 +222,11 @@ fn lagging_rx() {
     assert_ok!(tx.send("four"));
     assert_ok!(tx.send("five"));
 
-    let err = assert_err!(rx2.try_recv());
-    assert!(is_lagged(err));
+    assert_lagged!(rx2.try_recv(), 1);
 
     assert_ok!(tx.send("six"));
 
-    let err = assert_err!(rx2.try_recv());
-    assert!(is_lagged(err));
+    assert_lagged!(rx2.try_recv(), 1);
 }
 
 #[test]
@@ -319,13 +329,6 @@ fn unconsumed_messages_are_dropped() {
     drop(rx);
 
     assert_eq!(1, Arc::strong_count(&msg));
-}
-
-fn is_lagged(err: broadcast::TryRecvError) -> bool {
-    match err {
-        broadcast::TryRecvError::Lagged => true,
-        _ => false,
-    }
 }
 
 fn is_closed(err: broadcast::RecvError) -> bool {
