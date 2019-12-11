@@ -29,7 +29,7 @@
 //! upper bound on the number of values the channel may retain at any given
 //! time. This upper bound is passed to the [`channel`] function as an argument.
 //!
-//! When a value is sent and the channel is at capacity, the oldest value
+//! If a value is sent when the channel is at capacity, the oldest value
 //! currently held by the channel is released. This frees up space for the new
 //! value. Any receiver that has not yet seen the released value will return
 //! [`RecvError::Lagged`] the next time [`recv`] is called.
