@@ -291,7 +291,7 @@ struct Slot<T> {
 
 /// A write in the buffer
 struct Write<T> {
-    /// Uniquely identifies this wrote
+    /// Uniquely identifies this write
     pos: CausalCell<u64>,
 
     /// The written value
