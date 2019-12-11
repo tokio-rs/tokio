@@ -705,11 +705,7 @@ impl<T> Receiver<T>
 where
     T: Clone,
 {
-    /// Attempts to return a pending value on this receiver without blocking.
-    ///
-    /// This method will never block the caller in order to wait for data to
-    /// become available. Instead, this will always return immediately with a
-    /// possible option of pending data on the channel.
+    /// Attempts to return a pending value on this receiver without awaiting.
     ///
     /// This is useful for a flavor of "optimistic check" before deciding to
     /// block on a receiver.
@@ -850,6 +846,9 @@ where
             self.wait.queued.store(true, SeqCst);
 
             let mut curr = self.shared.wait_stack.load(SeqCst);
+
+            // The ref count is decremented in `notify_rx` when all nodes are
+            // removed from the waiter stack.
             let node = Arc::into_raw(self.wait.clone()) as *mut _;
 
             loop {
@@ -931,10 +930,10 @@ impl<T> Slot<T> {
 
             let res = self.lock.compare_exchange(curr, curr + 2, SeqCst, SeqCst);
 
-            curr = match res {
+            match res {
                 Ok(_) => return true,
-                Err(actual) => actual,
-            };
+                Err(actual) => curr = actual,
+            }
         }
     }
 
