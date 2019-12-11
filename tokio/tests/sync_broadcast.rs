@@ -36,7 +36,7 @@ macro_rules! assert_lagged {
             }
             _ => panic!("did not lag"),
         }
-    }
+    };
 }
 
 trait AssertSend: Send {}
