@@ -7,6 +7,9 @@ cfg_io_util! {
     mod async_read_ext;
     pub use async_read_ext::AsyncReadExt;
 
+    mod async_seek_ext;
+    pub use async_seek_ext::AsyncSeekExt;
+
     mod async_write_ext;
     pub use async_write_ext::AsyncWriteExt;
 
