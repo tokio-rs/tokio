@@ -708,7 +708,7 @@ where
     /// Attempts to return a pending value on this receiver without awaiting.
     ///
     /// This is useful for a flavor of "optimistic check" before deciding to
-    /// block on a receiver.
+    /// await on a receiver.
     ///
     /// Compared with [`recv`], this function has three failure cases instead of one
     /// (one for closed, one for an empty buffer, one for a lagging receiver).
@@ -745,12 +745,7 @@ where
     /// ```
     pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
         let guard = self.recv_ref(false)?;
-
-        if let Some(value) = guard.clone_value() {
-            Ok(value)
-        } else {
-            Err(TryRecvError::Closed)
-        }
+        guard.clone_value().ok_or(TryRecvError::Closed)
     }
 
     #[doc(hidden)] // TODO: document
@@ -928,6 +923,7 @@ impl<T> Slot<T> {
                 return false;
             }
 
+            // Only increment (by 2) if the LSB "lock" bit is not set.
             let res = self.lock.compare_exchange(curr, curr + 2, SeqCst, SeqCst);
 
             match res {
