@@ -155,7 +155,7 @@ pub struct Sender<T> {
 
 /// Receiving-half of the [`broadcast`] channel.
 ///
-/// Maybe used from only a single thread. Messages may be retrieved using
+/// May not be used concurrently. Messages may be retrieved using
 /// [`recv`][Receiver::recv].
 ///
 /// # Examples
