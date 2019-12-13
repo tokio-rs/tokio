@@ -15,9 +15,9 @@ async fn issue_42() {
     // We then do this many times (in parallel) in an effort to stress test the
     // implementation to ensure there are no race conditions.
     // See alexcrichton/tokio-process#42 for background
-    let join_handles = (0..10usize).into_iter().map(|_| {
+    let join_handles = (0..10usize).map(|_| {
         task::spawn(async {
-            let processes = (0..10usize).into_iter().map(|i| {
+            let processes = (0..10usize).map(|i| {
                 Command::new("echo")
                     .arg(format!("I am spawned process #{}", i))
                     .stdin(Stdio::null())

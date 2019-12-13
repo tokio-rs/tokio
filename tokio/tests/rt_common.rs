@@ -1,3 +1,4 @@
+#![allow(clippy::needless_range_loop)]
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 

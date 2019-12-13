@@ -1,3 +1,5 @@
+#![allow(clippy::unnecessary_operation)]
+
 use std::collections::VecDeque;
 use std::fmt;
 use std::fs::{Metadata, Permissions};
