@@ -49,7 +49,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // client connection.
     let state = Arc::new(Mutex::new(Shared::new()));
 
-    let addr = env::args().nth(1).unwrap_or("127.0.0.1:6142".to_string());
+    let addr = env::args()
+        .nth(1)
+        .unwrap_or_else(|| "127.0.0.1:6142".to_string());
 
     // Bind a TCP listener to the socket address.
     //

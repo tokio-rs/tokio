@@ -84,7 +84,9 @@ enum Response {
 async fn main() -> Result<(), Box<dyn Error>> {
     // Parse the address we're going to run this server on
     // and set up our TCP listener to accept connections.
-    let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
+    let addr = env::args()
+        .nth(1)
+        .unwrap_or_else(|| "127.0.0.1:8080".to_string());
 
     let mut listener = TcpListener::bind(&addr).await?;
     println!("Listening on: {}", addr);
@@ -175,15 +177,12 @@ fn handle_request(line: &str, db: &Arc<Database>) -> Response {
 
 impl Request {
     fn parse(input: &str) -> Result<Request, String> {
-        let mut parts = input.splitn(3, " ");
+        let mut parts = input.splitn(3, ' ');
         match parts.next() {
             Some("GET") => {
-                let key = match parts.next() {
-                    Some(key) => key,
-                    None => return Err(format!("GET must be followed by a key")),
-                };
+                let key = parts.next().ok_or("GET must be followed by a key")?;
                 if parts.next().is_some() {
-                    return Err(format!("GET's key must not be followed by anything"));
+                    return Err("GET's key must not be followed by anything".into());
                 }
                 Ok(Request::Get {
                     key: key.to_string(),
@@ -192,11 +191,11 @@ impl Request {
             Some("SET") => {
                 let key = match parts.next() {
                     Some(key) => key,
-                    None => return Err(format!("SET must be followed by a key")),
+                    None => return Err("SET must be followed by a key".into()),
                 };
                 let value = match parts.next() {
                     Some(value) => value,
-                    None => return Err(format!("SET needs a value")),
+                    None => return Err("SET needs a value".into()),
                 };
                 Ok(Request::Set {
                     key: key.to_string(),
@@ -204,7 +203,7 @@ impl Request {
                 })
             }
             Some(cmd) => Err(format!("unknown command: {}", cmd)),
-            None => Err(format!("empty input")),
+            None => Err("empty input".into()),
         }
     }
 }

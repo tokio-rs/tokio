@@ -41,9 +41,8 @@ macro_rules! assert_steal {
 macro_rules! assert_empty {
     ($q:expr) => {{
         let q: &mut queue::Worker<Noop> = &mut $q;
-        match q.pop_local_first() {
-            Some(v) => panic!("expected emtpy queue; got {}", num(v)),
-            None => {}
+        if let Some(v) = q.pop_local_first() {
+            panic!("expected emtpy queue; got {}", num(v));
         }
     }};
 }
@@ -261,12 +260,9 @@ fn num(task: Task<Noop>) -> u32 {
 
         for (_, join) in map.iter_mut() {
             let mut cx = Context::from_waker(noop_waker_ref());
-            match Pin::new(join).poll(&mut cx) {
-                Ready(n) => {
-                    num = Some(n.unwrap());
-                    break;
-                }
-                _ => {}
+            if let Ready(n) = Pin::new(join).poll(&mut cx) {
+                num = Some(n.unwrap());
+                break;
             }
         }
 

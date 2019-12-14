@@ -1,3 +1,5 @@
+#![allow(clippy::redundant_clone)]
+
 use crate::park::Park;
 use crate::runtime::enter;
 use crate::runtime::time;
