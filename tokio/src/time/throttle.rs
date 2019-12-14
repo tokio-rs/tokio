@@ -11,6 +11,25 @@ use futures_core::Stream;
 use pin_project_lite::pin_project;
 
 /// Slow down a stream by enforcing a delay between items.
+/// They will be produced not more often than the specified interval.
+///
+/// # Example
+///
+/// Create a throttled stream.
+/// ```rust,norun
+/// use futures::stream::StreamExt;
+/// use std::time::Duration;
+/// use tokio::time::throttle;
+///
+/// # async fn dox() {
+/// let mut item_stream = throttle(Duration::from_secs(2), futures::stream::repeat("one"));
+///
+/// loop {
+///     // The string will be produced at most every 2 seconds
+///     println!("{:?}", item_stream.next().await);
+/// }
+/// # }
+/// ```
 pub fn throttle<T>(duration: Duration, stream: T) -> Throttle<T>
 where
     T: Stream,
