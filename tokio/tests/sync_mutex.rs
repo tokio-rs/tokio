@@ -147,3 +147,11 @@ fn try_lock() {
     let g3 = m.try_lock();
     assert_eq!(g3.is_ok(), true);
 }
+
+#[tokio::main]
+#[test]
+async fn debug_format() {
+    let s = "debug";
+    let m = Mutex::new(s.to_string());
+    assert_eq!(format!("{:?}", s), format!("{:?}", m.lock().await));
+}

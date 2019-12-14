@@ -61,7 +61,6 @@ pub struct Mutex<T> {
 ///
 /// The lock is automatically released whenever the guard is dropped, at which point `lock`
 /// will succeed yet again.
-#[derive(Debug)]
 pub struct MutexGuard<'a, T> {
     lock: &'a Mutex<T>,
     permit: semaphore::Permit,
@@ -173,6 +172,12 @@ impl<'a, T> DerefMut for MutexGuard<'a, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         assert!(self.permit.is_acquired());
         unsafe { &mut *self.lock.c.get() }
+    }
+}
+
+impl<'a, T: fmt::Debug> fmt::Debug for MutexGuard<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&**self, f)
     }
 }
 
