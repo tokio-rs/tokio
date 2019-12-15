@@ -1,10 +1,9 @@
 use crate::codec::framed::{Fuse, ProjectFuse};
 use crate::codec::Decoder;
 
-use tokio::io::AsyncRead;
+use tokio::{io::AsyncRead, stream::Stream};
 
 use bytes::BytesMut;
-use futures_core::Stream;
 use futures_sink::Sink;
 use log::trace;
 use pin_project_lite::pin_project;

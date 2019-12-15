@@ -130,7 +130,7 @@ impl Interval {
 }
 
 #[cfg(feature = "stream")]
-impl futures_core::Stream for Interval {
+impl crate::stream::Stream for Interval {
     type Item = Instant;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Instant>> {

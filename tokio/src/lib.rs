@@ -241,6 +241,10 @@ cfg_signal! {
     pub mod signal;
 }
 
+cfg_stream! {
+    pub mod stream;
+}
+
 cfg_sync! {
     pub mod sync;
 }
