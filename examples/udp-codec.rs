@@ -22,7 +22,9 @@ use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let addr = env::args().nth(1).unwrap_or("127.0.0.1:0".to_string());
+    let addr = env::args()
+        .nth(1)
+        .unwrap_or_else(|| "127.0.0.1:0".to_string());
 
     // Bind both our sockets and then figure out what ports we got.
     let a = UdpSocket::bind(&addr).await?;

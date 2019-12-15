@@ -61,15 +61,13 @@ shorthand, the `full` feature enables all components.
 
 A basic TCP echo server with Tokio:
 
-```rust
-
+```rust,no_run
 use tokio::net::TcpListener;
 use tokio::prelude::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr = "127.0.0.1:8080".parse()?;
-    let mut listener = TcpListener::bind(&addr).unwrap();
+    let mut listener = TcpListener::bind("127.0.0.1:8080").await?;
 
     loop {
         let (mut socket, _) = listener.accept().await?;
@@ -84,14 +82,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Ok(n) if n == 0 => return,
                     Ok(n) => n,
                     Err(e) => {
-                        println!("failed to read from socket; err = {:?}", e);
+                        eprintln!("failed to read from socket; err = {:?}", e);
                         return;
                     }
                 };
 
                 // Write the data back
                 if let Err(e) = socket.write_all(&buf[0..n]).await {
-                    println!("failed to write to socket; err = {:?}", e);
+                    eprintln!("failed to write to socket; err = {:?}", e);
                     return;
                 }
             }

@@ -1,3 +1,4 @@
+#![allow(clippy::transmute_ptr_to_ptr)]
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 

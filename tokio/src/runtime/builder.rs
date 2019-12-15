@@ -430,7 +430,7 @@ cfg_rt_threaded! {
                     io_handle,
                     time_handle,
                     clock,
-                    blocking_spawner: blocking_spawner.clone(),
+                    blocking_spawner,
                 },
                 blocking_pool,
             })

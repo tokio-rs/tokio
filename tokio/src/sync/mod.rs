@@ -5,7 +5,7 @@
 //! This module is enabled with the **`sync`** feature flag.
 //!
 //! Tasks sometimes need to communicate with each other. This module contains
-//! two basic abstractions for doing so:
+//! basic abstractions for doing so:
 //!
 //! - [oneshot](oneshot/index.html), a way of sending a single value
 //!   from one task to another.

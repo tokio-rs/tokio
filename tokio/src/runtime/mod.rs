@@ -161,6 +161,16 @@
 //! This is done with [`Builder::enable_io`] and [`Builder::enable_time`]. As a
 //! shorthand, [`Builder::enable_all`] enables both resource drivers.
 //!
+//! ## Lifetime of spawned threads
+//!
+//! The runtime may spawn threads depending on its configuration and usage. The
+//! threaded scheduler spawns threads to schedule tasks and calls to
+//! `spawn_blocking` spawn threads to run blocking operations.
+//!
+//! While the `Runtime` is active, threads may shutdown after periods of being
+//! idle. Once `Runtime` is dropped, all runtime threads are forcibly shutdown.
+//! Any tasks that have not yet completed will be dropped.
+//!
 //! [tasks]: crate::task
 //! [driver]: crate::io::driver
 //! [executor]: https://tokio.rs/docs/internals/runtime-model/#executors
