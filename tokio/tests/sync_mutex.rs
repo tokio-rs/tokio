@@ -82,8 +82,7 @@ fn lock() {
 }
 */
 
-#[tokio::main]
-#[test]
+#[tokio::test]
 /// Ensure a mutex is unlocked if a future holding the lock
 /// is aborted prematurely.
 async fn aborted_future_1() {
@@ -108,8 +107,7 @@ async fn aborted_future_1() {
     .expect("Mutex is locked");
 }
 
-#[tokio::main]
-#[test]
+#[tokio::test]
 /// This test is similar to `aborted_future_1` but this time the
 /// aborted future is waiting for the lock.
 async fn aborted_future_2() {
@@ -148,8 +146,7 @@ fn try_lock() {
     assert_eq!(g3.is_ok(), true);
 }
 
-#[tokio::main]
-#[test]
+#[tokio::test]
 async fn debug_format() {
     let s = "debug";
     let m = Mutex::new(s.to_string());
