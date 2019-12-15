@@ -27,7 +27,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
              Host: www.rust-lang.org\r\n\
              \r\n\
              "
-                .as_bytes(),
+            .as_bytes(),
         )
         .await?;
 

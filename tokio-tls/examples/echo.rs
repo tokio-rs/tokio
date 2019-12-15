@@ -4,9 +4,9 @@
 use native_tls;
 use native_tls::Identity;
 use tokio;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio_tls;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 /**
 an example to setup a tls server.
@@ -31,8 +31,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("accept connection from {}", remote_addr);
         tokio::spawn(async move {
             // Accept the TLS connection.
-            let mut tls_stream = tls_acceptor
-                .accept(socket).await.expect("accept error");
+            let mut tls_stream = tls_acceptor.accept(socket).await.expect("accept error");
             // In a loop, read data from the socket and write the data back.
 
             let mut buf = [0; 1024];
@@ -44,7 +43,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if n == 0 {
                 return;
             }
-            println!("read={}", unsafe { String::from_utf8_unchecked(buf[0..n].into()) });
+            println!("read={}", unsafe {
+                String::from_utf8_unchecked(buf[0..n].into())
+            });
             tls_stream
                 .write_all(&buf[0..n])
                 .await
