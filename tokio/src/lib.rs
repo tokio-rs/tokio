@@ -83,7 +83,7 @@
 //! [blocking]: task/index.html#blocking-and-yielding
 //!
 //! The [`tokio::sync`] module contains synchronization primitives to use when
-//! need to communicate or share data. These include:
+//! needing to communicate or share data. These include:
 //!
 //! * channels ([`oneshot`], [`mpsc`], and [`watch`]), for sending values
 //!   between tasks,
