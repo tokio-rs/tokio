@@ -591,12 +591,42 @@ mod tests {
                 RAN2.store(true, Ordering::SeqCst);
             });
             local.await;
-            println!("local done");
         });
         assert!(RAN1.load(Ordering::SeqCst));
         assert!(RAN2.load(Ordering::SeqCst));
     }
 
+    #[test]
+    fn localset_future_drives_all_local_futs() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        static RAN1: AtomicBool = AtomicBool::new(false);
+        static RAN2: AtomicBool = AtomicBool::new(false);
+        static RAN3: AtomicBool = AtomicBool::new(false);
+
+        let mut rt = runtime::Builder::new()
+            .threaded_scheduler()
+            .build()
+            .unwrap();
+        rt.block_on(async {
+            let local = LocalSet::new();
+            local.spawn_local(async move {
+                spawn_local(async {
+                    task::yield_now().await;
+                    RAN3.store(true, Ordering::SeqCst);
+                });
+                task::yield_now().await;
+                RAN1.store(true, Ordering::SeqCst);
+            });
+            local.spawn_local(async move {
+                task::yield_now().await;
+                RAN2.store(true, Ordering::SeqCst);
+            });
+            local.await;
+        });
+        assert!(RAN1.load(Ordering::SeqCst));
+        assert!(RAN2.load(Ordering::SeqCst));
+        assert!(RAN3.load(Ordering::SeqCst));
+    }
     #[test]
     fn local_threadpool_timer() {
         // This test ensures that runtime services like the timer are properly
