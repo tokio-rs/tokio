@@ -29,6 +29,7 @@ the Rust programming language. It is:
 [Website](https://tokio.rs) |
 [Guides](https://tokio.rs/docs/) |
 [API Docs](https://docs.rs/tokio/latest/tokio) |
+[Roadmap](https://github.com/tokio-rs/tokio/ROADMAP.md) |
 [Chat](https://discord.gg/6yGkFeN)
 
 ## Overview
