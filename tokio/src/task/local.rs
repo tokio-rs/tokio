@@ -51,7 +51,7 @@ cfg_rt_util! {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    /// let unsend_data = Rc::new("my unsend data...");
+    ///     let unsend_data = Rc::new("my unsend data...");
     ///
     ///     // Construct a local task set that can run `!Send` futures.
     ///     let local = task::LocalSet::new();
