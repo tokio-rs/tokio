@@ -70,6 +70,39 @@ cfg_rt_util! {
     /// });
     /// ```
     ///
+    /// ## Awaiting a `LocalSet`
+    ///
+    /// Additionally, a `LocalSet` itself implements `Future`, completing when
+    /// *all* tasks spawned on the `LocalSet` complete. This can be used to run
+    /// several futures on a `LocalSet` and drive the whole set until they
+    /// complete. For example,
+    ///
+    /// ```rust
+    /// use tokio::{task, time};
+    /// use std::rc::Rc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let unsend_data = Rc::new("world");
+    ///     let local = task::LocalSet::new();
+    ///
+    ///     let unsend_data2 = unsend_data.clone();
+    ///     local.spawn_local(async move {
+    ///         // ...
+    ///         println!("hello {}", unsend_data2)
+    ///     });
+    ///
+    ///     local.spawn_local(async move {
+    ///         time::delay_for(time::Duration::from_millis(100)).await;
+    ///         println!("goodbye {}", unsend_data)
+    ///     });
+    ///
+    ///     // ...
+    ///
+    ///     local.await;
+    /// }
+    /// ```
+    ///
     /// [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
     /// [local task set]: struct.LocalSet.html
     /// [`Runtime::block_on`]: ../struct.Runtime.html#method.block_on
@@ -286,6 +319,28 @@ impl LocalSet {
         let scheduler = self.scheduler.clone();
         self.scheduler
             .with(move || rt.block_on(LocalFuture { scheduler, future }))
+
+impl Future for LocalSet {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let scheduler = self.as_ref().scheduler.clone();
+        scheduler.waker.register_by_ref(cx.waker());
+
+        if scheduler.with(|| scheduler.tick()) {
+            // If `tick` returns true, we need to notify the local future again:
+            // there are still tasks remaining in the run queue.
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        } else if scheduler.is_empty() {
+            // If the scheduler has no remaining futures, we're done!
+            Poll::Ready(())
+        } else {
+            // There are still futures in the local set, but we've polled all the
+            // futures in the run queue. Therefore, we can just return Pending
+            // since the remaining futures will be woken from somewhere else.
+            Poll::Pending
+        }
     }
 }
 
@@ -294,6 +349,8 @@ impl Default for LocalSet {
         Self::new()
     }
 }
+
+// === impl LocalFuture ===
 
 impl<F: Future> Future for LocalFuture<F> {
     type Output = F::Output;
@@ -424,6 +481,15 @@ impl Scheduler {
 
         true
     }
+
+    fn is_empty(&self) -> bool {
+        unsafe {
+            // safety: this method may not be called from threads other than the
+            // thread that owns the `Queues`. since `Scheduler` is not `Send` or
+            // `Sync`, that shouldn't happen.
+            !self.queues.has_tasks_remaining()
+        }
+    }
 }
 
 impl Drop for Scheduler {
@@ -479,6 +545,56 @@ mod tests {
             .await
             .unwrap();
         });
+    }
+
+    #[test]
+    fn localset_future_threadpool() {
+        thread_local! {
+            static ON_LOCAL_THREAD: Cell<bool> = Cell::new(false);
+        }
+
+        ON_LOCAL_THREAD.with(|cell| cell.set(true));
+
+        let mut rt = runtime::Builder::new()
+            .threaded_scheduler()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async {
+            let local = LocalSet::new();
+            local.spawn_local(async move {
+                assert!(ON_LOCAL_THREAD.with(|cell| cell.get()));
+            });
+            local.await;
+        });
+    }
+
+    #[test]
+    fn localset_future_timers() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        static RAN1: AtomicBool = AtomicBool::new(false);
+        static RAN2: AtomicBool = AtomicBool::new(false);
+
+        let mut rt = runtime::Builder::new()
+            .threaded_scheduler()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async {
+            let local = LocalSet::new();
+            local.spawn_local(async move {
+                crate::time::delay_for(Duration::from_millis(10)).await;
+                RAN1.store(true, Ordering::SeqCst);
+            });
+            local.spawn_local(async move {
+                crate::time::delay_for(Duration::from_millis(20)).await;
+                RAN2.store(true, Ordering::SeqCst);
+            });
+            local.await;
+            println!("local done");
+        });
+        assert!(RAN1.load(Ordering::SeqCst));
+        assert!(RAN2.load(Ordering::SeqCst));
     }
 
     #[test]
