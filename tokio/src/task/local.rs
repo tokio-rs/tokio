@@ -22,16 +22,14 @@ cfg_rt_util! {
     /// For example, the following code will not compile:
     ///
     /// ```rust,compile_fail
-    /// # use tokio::runtime::Runtime;
     /// use std::rc::Rc;
     ///
-    /// // `Rc` does not implement `Send`, and thus may not be sent between
-    /// // threads safely.
-    /// let unsend_data = Rc::new("my unsend data...");
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     // `Rc` does not implement `Send`, and thus may not be sent between
+    ///     // threads safely.
+    ///     let unsend_data = Rc::new("my unsend data...");
     ///
-    /// let mut rt = Runtime::new().unwrap();
-    ///
-    /// rt.block_on(async move {
     ///     let unsend_data = unsend_data.clone();
     ///     // Because the `async` block here moves `unsend_data`, the future is `!Send`.
     ///     // Since `tokio::spawn` requires the spawned future to implement `Send`, this
@@ -40,7 +38,7 @@ cfg_rt_util! {
     ///         println!("{}", unsend_data);
     ///         // ...
     ///     }).await.unwrap();
-    /// });
+    /// }
     /// ```
     /// In order to spawn `!Send` futures, we can use a local task set to
     /// schedule them on the thread calling [`Runtime::block_on`]. When running
@@ -48,26 +46,27 @@ cfg_rt_util! {
     /// spawn `!Send` futures. For example:
     ///
     /// ```rust
-    /// # use tokio::runtime::Runtime;
     /// use std::rc::Rc;
     /// use tokio::task;
     ///
+    /// #[tokio::main]
+    /// async fn main() {
     /// let unsend_data = Rc::new("my unsend data...");
     ///
-    /// let mut rt = Runtime::new().unwrap();
-    /// // Construct a local task set that can run `!Send` futures.
-    /// let local = task::LocalSet::new();
+    ///     // Construct a local task set that can run `!Send` futures.
+    ///     let local = task::LocalSet::new();
     ///
-    /// // Run the local task group.
-    /// local.block_on(&mut rt, async move {
-    ///     let unsend_data = unsend_data.clone();
-    ///     // `spawn_local` ensures that the future is spawned on the local
-    ///     // task group.
-    ///     task::spawn_local(async move {
-    ///         println!("{}", unsend_data);
-    ///         // ...
-    ///     }).await.unwrap();
-    /// });
+    ///     // Run the local task set.
+    ///     local.run(async move {
+    ///         let unsend_data = unsend_data.clone();
+    ///         // `spawn_local` ensures that the future is spawned on the local
+    ///         // task set.
+    ///         task::spawn_local(async move {
+    ///             println!("{}", unsend_data);
+    ///             // ...
+    ///         }).await.unwrap();
+    ///     });
+    /// }
     /// ```
     ///
     /// ## Awaiting a `LocalSet`
@@ -125,7 +124,11 @@ struct Scheduler {
 }
 
 pin_project! {
-    struct LocalFuture<F> {
+    /// The future returned by [`LocalSet::run`].
+    ///
+    /// [`LocalSet::run`]: struct.LocalSet.html#method.run
+    #[derive(Debug)]
+    pub struct LocalFuture<F> {
         scheduler: Rc<Scheduler>,
         #[pin]
         future: F,
@@ -149,23 +152,24 @@ cfg_rt_util! {
     /// # Examples
     ///
     /// ```rust
-    /// # use tokio::runtime::Runtime;
     /// use std::rc::Rc;
     /// use tokio::task;
     ///
-    /// let unsend_data = Rc::new("my unsend data...");
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let unsend_data = Rc::new("my unsend data...");
     ///
-    /// let mut rt = Runtime::new().unwrap();
-    /// let local = task::LocalSet::new();
+    ///     let local = task::LocalSet::new();
     ///
-    /// // Run the local task set.
-    /// local.block_on(&mut rt, async move {
-    ///     let unsend_data = unsend_data.clone();
-    ///     task::spawn_local(async move {
-    ///         println!("{}", unsend_data);
-    ///         // ...
-    ///     }).await.unwrap();
-    /// });
+    ///     // Run the local task set.
+    ///     local.run(async move {
+    ///         let unsend_data = unsend_data.clone();
+    ///         task::spawn_local(async move {
+    ///             println!("{}", unsend_data);
+    ///             // ...
+    ///         }).await.unwrap();
+    ///     });
+    /// }
     /// ```
     pub fn spawn_local<F>(future: F) -> JoinHandle<F::Output>
     where
@@ -206,34 +210,35 @@ impl LocalSet {
     /// This task is guaranteed to be run on the current thread.
     ///
     /// Unlike the free function [`spawn_local`], this method may be used to
-    /// spawn_local local tasks when the task set is _not_ running. For example:
+    /// spawn local tasks when the task set is _not_ running. For example:
     /// ```rust
-    /// # use tokio::runtime::Runtime;
     /// use tokio::task;
     ///
-    /// let mut rt = Runtime::new().unwrap();
-    /// let local = task::LocalSet::new();
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let local = task::LocalSet::new();
     ///
-    /// // Spawn a future on the local set. This future will be run when
-    /// // we call `block_on` to drive the task set.
-    /// local.spawn_local(async {
-    ///    // ...
-    /// });
+    ///     // Spawn a future on the local set. This future will be run when
+    ///     // we call `run` to drive the task set.
+    ///     local.spawn_local(async {
+    ///        // ...
+    ///     });
     ///
-    /// // Run the local task set.
-    /// local.block_on(&mut rt, async move {
-    ///     // ...
-    /// });
+    ///     // Run the local task set.
+    ///     local.run(async move {
+    ///         // ...
+    ///     });
     ///
-    /// // When `block_on` finishes, we can spawn_local _more_ futures, which will
-    /// // run in subsequent calls to `block_on`.
-    /// local.spawn_local(async {
-    ///    // ...
-    /// });
+    ///     // When `run` finishes, we can spawn _more_ futures, which will
+    ///     // run in subsequent calls to `run`.
+    ///     local.spawn_local(async {
+    ///        // ...
+    ///     });
     ///
-    /// local.block_on(&mut rt, async move {
-    ///     // ...
-    /// });
+    ///     local.run(async move {
+    ///         // ...
+    ///     });
+    /// }
     /// ```
     /// [`spawn_local`]: fn.spawn_local.html
     pub fn spawn_local<F>(&self, future: F) -> JoinHandle<F::Output>
@@ -316,9 +321,45 @@ impl LocalSet {
     where
         F: Future,
     {
+        rt.block_on(async { self.run(future).await })
+    }
+
+    /// Run a future to completion on the local set, returning its output.
+    ///
+    /// This returns a future that runs the given future with a local set,
+    /// allowing it to call [`spawn_local`] to spawn additional `!Send` futures.
+    /// Any local futures spawned on the local set will be driven in the
+    /// background until the future passed to `run` completes. When the future
+    /// passed to `run` finishes, any local futures which have not completed
+    /// will remain on the local set, and will be driven on subsequent calls to
+    /// `run` or when [awaiting the local set] itself.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use tokio::task;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     task::LocalSet::new().run(async {
+    ///         task::spawn_local(async move {
+    ///             // ...
+    ///         }).await.unwrap();
+    ///         // ...
+    ///     });
+    /// }
+    /// ```
+    ///
+    /// [`spawn_local`]: fn.spawn_local.html
+    /// [awaiting the local set]: #awaiting-a-localset
+    pub fn run<F>(&self, future: F) -> LocalFuture<F>
+    where
+        F: Future,
+    {
         let scheduler = self.scheduler.clone();
-        self.scheduler
-            .with(move || rt.block_on(LocalFuture { scheduler, future }))
+        LocalFuture { scheduler, future }
+    }
+}
 
 impl Future for LocalSet {
     type Output = ();
@@ -360,18 +401,19 @@ impl<F: Future> Future for LocalFuture<F> {
         let scheduler = this.scheduler;
         let mut future = this.future;
         scheduler.waker.register_by_ref(cx.waker());
+        scheduler.with(|| {
+            if let Poll::Ready(output) = future.as_mut().poll(cx) {
+                return Poll::Ready(output);
+            }
 
-        if let Poll::Ready(output) = future.as_mut().poll(cx) {
-            return Poll::Ready(output);
-        }
+            if scheduler.tick() {
+                // If `tick` returns true, we need to notify the local future again:
+                // there are still tasks remaining in the run queue.
+                cx.waker().wake_by_ref();
+            }
 
-        if scheduler.tick() {
-            // If `tick` returns true, we need to notify the local future again:
-            // there are still tasks remaining in the run queue.
-            cx.waker().wake_by_ref();
-        }
-
-        Poll::Pending
+            Poll::Pending
+        })
     }
 }
 
