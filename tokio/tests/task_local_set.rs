@@ -13,7 +13,7 @@ fn acquire_mutex_in_drop() {
     let (tx2, rx2) = oneshot::channel();
 
     let mut rt = rt();
-    let local = task::LocalSet::new();
+    let local = LocalSet::new();
 
     local.spawn_local(async move {
         let _ = rx2.await;
