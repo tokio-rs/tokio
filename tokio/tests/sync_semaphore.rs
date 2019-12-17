@@ -14,34 +14,12 @@ fn try_acquire() {
     let sem = Semaphore::new(1);
     {
         let p1 = sem.try_acquire();
-        assert!(p1.is_ok());
+        assert!(p1.is_some());
         let p2 = sem.try_acquire();
-        assert!(p2.is_err());
+        assert!(p2.is_none());
     }
     let p3 = sem.try_acquire();
-    assert!(p3.is_ok());
-}
-
-#[test]
-fn try_acquire_closed() {
-    let sem = Arc::new(Semaphore::new(1));
-    sem.close();
-    assert!(sem.try_acquire().is_err());
-}
-
-#[tokio::test]
-async fn acquire_closed() {
-    let sem = Arc::new(Semaphore::new(1));
-    let p1 = sem.try_acquire();
-    let sem_clone = sem.clone();
-    let j = tokio::spawn(async move { sem_clone.acquire().await.is_ok() });
-    sem.close();
-    assert!(!j.await.unwrap());
-    assert!(sem.acquire().await.is_err());
-    // dropping the permit should not make it possible to
-    // grab a permit from a closed permit
-    drop(p1);
-    assert!(sem.acquire().await.is_err());
+    assert!(p3.is_some());
 }
 
 #[tokio::test]
@@ -50,7 +28,7 @@ async fn acquire() {
     let p1 = sem.try_acquire().unwrap();
     let sem_clone = sem.clone();
     let j = tokio::spawn(async move {
-        let _p2 = sem_clone.acquire().await.unwrap();
+        let _p2 = sem_clone.acquire().await;
     });
     drop(p1);
     j.await.unwrap();
@@ -61,27 +39,10 @@ async fn add_permits() {
     let sem = Arc::new(Semaphore::new(0));
     let sem_clone = sem.clone();
     let j = tokio::spawn(async move {
-        let _p2 = sem_clone.acquire().await.unwrap();
+        let _p2 = sem_clone.acquire().await;
     });
     sem.add_permits(1);
     j.await.unwrap();
-}
-
-#[tokio::test]
-async fn remove_permits() {
-    let sem = Arc::new(Semaphore::new(5));
-    sem.remove_permits(3).await.unwrap();
-    assert_eq!(sem.available_permits(), 2);
-}
-
-#[test]
-fn try_remove_permits() {
-    let sem = Arc::new(Semaphore::new(3));
-    let p = sem.try_acquire().unwrap();
-    assert_eq!(sem.try_remove_permits(3), 2);
-    drop(p);
-    assert_eq!(sem.try_remove_permits(3), 1);
-    assert_eq!(sem.try_remove_permits(3), 0);
 }
 
 #[test]
@@ -94,7 +55,7 @@ fn forget() {
         assert_eq!(sem.available_permits(), 0);
     }
     assert_eq!(sem.available_permits(), 0);
-    assert!(sem.try_acquire().is_err());
+    assert!(sem.try_acquire().is_none());
 }
 
 #[tokio::test]
@@ -104,7 +65,7 @@ async fn stresstest() {
     for _ in 0..1000 {
         let sem_clone = sem.clone();
         join_handles.push(tokio::spawn(async move {
-            let _p = sem_clone.acquire().await.unwrap();
+            let _p = sem_clone.acquire().await;
         }));
     }
     for j in join_handles {
@@ -116,5 +77,5 @@ async fn stresstest() {
     let _p3 = sem.try_acquire().unwrap();
     let _p4 = sem.try_acquire().unwrap();
     let _p5 = sem.try_acquire().unwrap();
-    assert!(sem.try_acquire().is_err());
+    assert!(sem.try_acquire().is_none());
 }
