@@ -52,6 +52,9 @@ pub struct Builder {
     /// Only used when not using the current-thread executor.
     num_threads: usize,
 
+    ///Cap on blocking pool.
+    blocking_threads: usize,
+
     /// Name used for threads spawned by the runtime.
     pub(super) thread_name: String,
 
@@ -92,6 +95,8 @@ impl Builder {
 
             // Default to use an equal number of threads to number of CPU cores
             num_threads: crate::loom::sys::num_cpus(),
+
+            blocking_threads: 512,
 
             // Default thread name
             thread_name: "tokio-runtime-worker".into(),
@@ -149,6 +154,14 @@ impl Builder {
     /// ```
     pub fn num_threads(&mut self, val: usize) -> &mut Self {
         self.num_threads = val;
+        self
+    }
+
+    ///Specifies limit on number of threads, used for blocking annotation.
+    ///
+    ///The default value is 512.
+    pub fn blocking_threads(&mut self, val: usize) -> &mut Self {
+        self.blocking_threads = val;
         self
     }
 
@@ -286,7 +299,7 @@ impl Builder {
         let spawner = Spawner::Shell;
 
         let blocking_pool =
-            blocking::create_blocking_pool(self, &spawner, &io_handle, &time_handle, &clock);
+            blocking::create_blocking_pool(self, &spawner, &io_handle, &time_handle, &clock, self.blocking_threads);
         let blocking_spawner = blocking_pool.spawner().clone();
 
         Ok(Runtime {
@@ -379,7 +392,7 @@ cfg_rt_core! {
             let spawner = Spawner::Basic(scheduler.spawner());
 
             // Blocking pool
-            let blocking_pool = blocking::create_blocking_pool(self, &spawner, &io_handle, &time_handle, &clock);
+            let blocking_pool = blocking::create_blocking_pool(self, &spawner, &io_handle, &time_handle, &clock, self.blocking_threads);
             let blocking_spawner = blocking_pool.spawner().clone();
 
             Ok(Runtime {
@@ -417,7 +430,7 @@ cfg_rt_threaded! {
             let spawner = Spawner::ThreadPool(scheduler.spawner().clone());
 
             // Create the blocking pool
-            let blocking_pool = blocking::create_blocking_pool(self, &spawner, &io_handle, &time_handle, &clock);
+            let blocking_pool = blocking::create_blocking_pool(self, &spawner, &io_handle, &time_handle, &clock, self.blocking_threads);
             let blocking_spawner = blocking_pool.spawner().clone();
 
             // Spawn the thread pool workers
