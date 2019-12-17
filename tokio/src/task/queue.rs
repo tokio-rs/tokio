@@ -233,7 +233,7 @@ where
         self.drain_pending_drop();
     }
 
-    /// Drain run queues, shutting down any task.
+    /// Drain both the local and remote run queues, shutting down any tasks.
     ///
     /// # Safety
     ///
