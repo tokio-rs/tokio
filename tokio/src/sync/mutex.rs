@@ -35,7 +35,7 @@
 //! [`MutexGuard`]: struct.MutexGuard.html
 
 use crate::future::poll_fn;
-use crate::sync::semaphore;
+use crate::sync::semaphore_ll as semaphore;
 
 use std::cell::UnsafeCell;
 use std::error::Error;
