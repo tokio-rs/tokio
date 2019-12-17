@@ -111,6 +111,15 @@ impl UdpSocket {
         poll_fn(|cx| self.poll_send(cx, buf)).await
     }
 
+    /// dox
+    pub fn try_send(&self, buf: &[u8]) -> io::Result<Option<usize>> {
+        match self.io.get_ref().send(buf) {
+            Ok(sent) => Ok(Some(sent)),
+            Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => Ok(None),
+            Err(err) => Err(err),
+        }
+    }
+
     // Poll IO functions that takes `&self` are provided for the split API.
     //
     // They are not public because (taken from the doc of `PollEvented`):
@@ -148,6 +157,15 @@ impl UdpSocket {
     /// [`connect`]: #method.connect
     pub async fn recv(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         poll_fn(|cx| self.poll_recv(cx, buf)).await
+    }
+
+    /// dox
+    pub fn try_recv(&self, buf: &mut [u8]) -> io::Result<Option<usize>> {
+        match self.io.get_ref().recv(buf) {
+            Ok(received) => Ok(Some(received)),
+            Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => Ok(None),
+            Err(err) => Err(err),
+        }
     }
 
     #[doc(hidden)]
