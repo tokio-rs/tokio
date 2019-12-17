@@ -111,13 +111,18 @@ impl UdpSocket {
         poll_fn(|cx| self.poll_send(cx, buf)).await
     }
 
-    /// dox
-    pub fn try_send(&self, buf: &[u8]) -> io::Result<Option<usize>> {
-        match self.io.get_ref().send(buf) {
-            Ok(sent) => Ok(Some(sent)),
-            Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => Ok(None),
-            Err(err) => Err(err),
-        }
+    /// Try to send data on the socket to the remote address to which it is
+    /// connected.
+    ///
+    /// # Returns
+    ///
+    /// If successfull, the number of bytes sent is returned. Users
+    /// should ensure that when the remote cannot receive, the
+    /// [`ErrorKind::WouldBlock`] is properly handled.
+    ///
+    /// [`ErrorKind::WouldBlock`]: std::io::error::ErrorKind::WouldBlock
+    pub fn try_send(&self, buf: &[u8]) -> io::Result<usize> {
+        self.io.get_ref().send(buf)
     }
 
     // Poll IO functions that takes `&self` are provided for the split API.
@@ -159,15 +164,6 @@ impl UdpSocket {
         poll_fn(|cx| self.poll_recv(cx, buf)).await
     }
 
-    /// dox
-    pub fn try_recv(&self, buf: &mut [u8]) -> io::Result<Option<usize>> {
-        match self.io.get_ref().recv(buf) {
-            Ok(received) => Ok(Some(received)),
-            Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => Ok(None),
-            Err(err) => Err(err),
-        }
-    }
-
     #[doc(hidden)]
     pub fn poll_recv(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
@@ -191,6 +187,29 @@ impl UdpSocket {
 
         match addrs.next() {
             Some(target) => poll_fn(|cx| self.poll_send_to(cx, buf, &target)).await,
+            None => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "no addresses to send data to",
+            )),
+        }
+    }
+
+    /// Try to send data on the socket to the given address.
+    ///
+    /// # Returns
+    ///
+    /// If successfull, the future resolves to the number of bytes sent.
+    ///
+    /// Users should ensure that when the remote cannot receive, the
+    /// [`ErrorKind::WouldBlock`] is properly handled. An error can also occur
+    /// if the IP version of the socket does not match that of `target`.
+    ///
+    /// [`ErrorKind::WouldBlock`]: std::io::error::ErrorKind::WouldBlock
+    pub async fn try_send_to<A: ToSocketAddrs>(&self, buf: &[u8], target: A) -> io::Result<usize> {
+        let mut addrs = target.to_socket_addrs().await?;
+
+        match addrs.next() {
+            Some(target) => self.io.get_ref().send_to(buf, &target),
             None => Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "no addresses to send data to",
