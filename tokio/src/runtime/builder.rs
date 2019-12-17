@@ -298,8 +298,14 @@ impl Builder {
 
         let spawner = Spawner::Shell;
 
-        let blocking_pool =
-            blocking::create_blocking_pool(self, &spawner, &io_handle, &time_handle, &clock, self.blocking_threads);
+        let blocking_pool = blocking::create_blocking_pool(
+            self,
+            &spawner,
+            &io_handle,
+            &time_handle,
+            &clock,
+            self.blocking_threads,
+        );
         let blocking_spawner = blocking_pool.spawner().clone();
 
         Ok(Runtime {
