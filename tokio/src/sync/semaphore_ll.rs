@@ -65,11 +65,11 @@ pub(crate) struct AcquireError(());
 /// Error returned by `Permit::try_acquire`.
 #[derive(Debug)]
 pub(crate) struct TryAcquireError {
-    kind: ErrorKind,
+    pub(crate) kind: ErrorKind,
 }
 
 #[derive(Debug)]
-enum ErrorKind {
+pub(crate) enum ErrorKind {
     Closed,
     NoPermits,
 }

@@ -27,6 +27,7 @@ cfg_sync! {
     pub mod oneshot;
 
     pub(crate) mod semaphore_ll;
+    pub mod semaphore;
 
     mod task;
     pub(crate) use task::AtomicWaker;
