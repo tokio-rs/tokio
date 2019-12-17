@@ -29,8 +29,8 @@ fn spawned_task_does_not_progress_without_block_on() {
 
 #[test]
 fn acquire_mutex_in_drop() {
-    use tokio::task;
     use futures::future::pending;
+    use tokio::task;
 
     let (tx1, rx1) = oneshot::channel();
     let (tx2, rx2) = oneshot::channel();
