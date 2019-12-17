@@ -80,12 +80,13 @@ async fn try_send_spawn() -> std::io::Result<()> {
     let sender = UdpSocket::bind("127.0.0.1:0").await?;
     let mut receiver = UdpSocket::bind("127.0.0.1:0").await?;
 
-    sender.connect(receiver.local_addr()?).await?;
     receiver.connect(sender.local_addr()?).await?;
 
-    let sent = &sender.try_send(MSG)?;
+    let sent = &sender.try_send_to(MSG, &receiver.local_addr()?).await?;
     assert_eq!(sent, &MSG_LEN);
-    let sent = &sender.try_send_to(MSG2, &receiver.local_addr()?).await?;
+
+    sender.connect(receiver.local_addr()?).await?;
+    let sent = &sender.try_send(MSG2)?;
     assert_eq!(sent, &MSG2_LEN);
 
     std::thread::spawn(move || {
