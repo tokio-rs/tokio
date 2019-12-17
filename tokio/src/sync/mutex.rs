@@ -75,7 +75,7 @@ unsafe impl<T> Sync for Mutex<T> where T: Send {}
 unsafe impl<'a, T> Sync for MutexGuard<'a, T> where T: Send + Sync {}
 
 /// An enumeration of possible errors associated with a `TryLockResult`
-/// which can occur while trying to aquire a lock from the `try_lock`
+/// which can occur while trying to acquire a lock from the `try_lock`
 /// method on a `Mutex`.
 #[derive(Debug)]
 pub enum TryLockError {
@@ -130,7 +130,7 @@ impl<T> Mutex<T> {
         guard
     }
 
-    /// Try to aquire the lock
+    /// Try to acquire the lock
     pub fn try_lock(&self) -> Result<MutexGuard<'_, T>, TryLockError> {
         let mut permit = semaphore::Permit::new();
         match permit.try_acquire(&self.s) {

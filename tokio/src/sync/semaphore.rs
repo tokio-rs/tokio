@@ -15,7 +15,7 @@ use super::semaphore_ll as ll;
 use crate::future::poll_fn; // low level implementation
 
 /// An enumeration of possible errors which can occur while trying to
-/// aquire a permit using the `Semaphore::acquire` function.
+/// acquire a permit using the `Semaphore::acquire` function.
 #[derive(Debug)]
 pub enum AcquireError {
     /// The semaphore is closed and no new permits can be acquired.
@@ -43,7 +43,7 @@ impl fmt::Display for AcquireError {
 impl Error for AcquireError {}
 
 /// An enumeration of possible errors which can occur while trying to
-/// aquire a permit using the `Semaphore::try_acquire` function.
+/// acquire a permit using the `Semaphore::try_acquire` function.
 #[derive(Debug)]
 pub enum TryAcquireError {
     /// The semaphore is closed and no new permits can be acquired.
@@ -137,7 +137,7 @@ impl Semaphore {
         n
     }
 
-    /// Aquire permit from the semaphore
+    /// Acquire permit from the semaphore
     pub async fn acquire(&self) -> Result<Permit<'_>, AcquireError> {
         let mut permit = Permit {
             sem: &self,
@@ -147,7 +147,7 @@ impl Semaphore {
         Ok(permit)
     }
 
-    /// Try to aquire a permit form the semaphore
+    /// Try to acquire a permit form the semaphore
     pub fn try_acquire(&self) -> Result<Permit<'_>, TryAcquireError> {
         let mut ll_permit = ll::Permit::new();
         ll_permit.try_acquire(&self.ll_sem)?;
