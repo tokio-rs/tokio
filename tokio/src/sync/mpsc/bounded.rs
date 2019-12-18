@@ -1,6 +1,6 @@
 use crate::sync::mpsc::chan;
 use crate::sync::mpsc::error::{ClosedError, SendError, TryRecvError, TrySendError};
-use crate::sync::semaphore;
+use crate::sync::semaphore_ll as semaphore;
 
 use std::fmt;
 use std::task::{Context, Poll};

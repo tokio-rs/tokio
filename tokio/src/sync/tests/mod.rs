@@ -1,6 +1,6 @@
 cfg_not_loom! {
     mod atomic_waker;
-    mod semaphore;
+    mod semaphore_ll;
 }
 
 cfg_loom! {
@@ -8,5 +8,5 @@ cfg_loom! {
     mod loom_list;
     mod loom_mpsc;
     mod loom_oneshot;
-    mod loom_semaphore;
+    mod loom_semaphore_ll;
 }
