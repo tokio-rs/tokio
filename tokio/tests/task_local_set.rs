@@ -3,64 +3,42 @@
 
 use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
-use tokio_test::{assert_err, assert_ok};
-
-use std::thread;
-use std::time::Duration;
-
-#[test]
-fn spawned_task_does_not_progress_without_block_on() {
-    let (tx, mut rx) = oneshot::channel();
-
-    let mut rt = rt();
-
-    rt.spawn(async move {
-        assert_ok!(tx.send("hello"));
-    });
-
-    thread::sleep(Duration::from_millis(50));
-
-    assert_err!(rx.try_recv());
-
-    let out = rt.block_on(async { assert_ok!(rx.await) });
-
-    assert_eq!(out, "hello");
-}
+use tokio::task::{self, LocalSet};
 
 #[test]
 fn acquire_mutex_in_drop() {
     use futures::future::pending;
-    use tokio::task;
 
     let (tx1, rx1) = oneshot::channel();
     let (tx2, rx2) = oneshot::channel();
 
     let mut rt = rt();
+    let local = LocalSet::new();
 
-    rt.spawn(async move {
+    local.spawn_local(async move {
         let _ = rx2.await;
         unreachable!();
     });
 
-    rt.spawn(async move {
+    local.spawn_local(async move {
         let _ = rx1.await;
         let _ = tx2.send(()).unwrap();
         unreachable!();
     });
 
     // Spawn a task that will never notify
-    rt.spawn(async move {
+    local.spawn_local(async move {
         pending::<()>().await;
         tx1.send(()).unwrap();
     });
 
     // Tick the loop
-    rt.block_on(async {
+    local.block_on(&mut rt, async {
         task::yield_now().await;
     });
 
-    // Drop the rt
-    drop(rt);
+    // Drop the LocalSet
+    drop(local);
 }
 
 fn rt() -> Runtime {
