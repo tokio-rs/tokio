@@ -149,7 +149,7 @@ impl Builder {
 
     /// Set the core number of worker threads for the `Runtime`'s thread pool.
     ///
-    /// This must be a number between 1 and 32,768 though it is advised to keep
+    /// This should be a number between 1 and 32,768 though it is advised to keep
     /// this value on the smaller side.
     ///
     /// The default value is the number of cores available to the system.
@@ -167,24 +167,25 @@ impl Builder {
     ///     .unwrap();
     /// ```
     pub fn core_threads(&mut self, val: usize) -> &mut Self {
+        assert_ne!(val, 0, "Core threads cannot be zero");
         self.core_threads = val;
         self
     }
 
     /// Specifies limit for threads, spawned by the Runtime.
     ///
-    /// This is number of threads to be used outside of Runtime core threads.
-    /// In the current implementation it is used to cap number of threads spawned when using
-    /// blocking annotation
+    /// This is number of threads to be used by Runtime, including `core_threads`
+    /// Having `max_threads` less than `core_threads` results in invalid configuration
+    /// when building multi-threaded `Runtime`, which would cause a panic.
+    ///
+    /// Similarly to the `core_threads`, this number should be between 1 and 32,768.
     ///
     /// The default value is 512.
     ///
     /// When multi-threaded runtime is not used, will act as limit on additional threads.
     ///
-    /// Otherwise it limits additional threads as following: `max_threads - core_threads`
-    ///
-    /// If `core_threads` is greater than `max_threads`, then core_threads is capped
-    /// by `max_threads`
+    /// Otherwise as `core_threads` are always active, it limits additional threads (e.g. for
+    /// blocking annotations) as `max_threads - core_threads`.
     pub fn max_threads(&mut self, val: usize) -> &mut Self {
         assert_ne!(val, 0, "Thread limit cannot be zero");
         self.max_threads = val;
