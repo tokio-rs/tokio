@@ -23,7 +23,7 @@ impl<I> Unpin for Iter<I> {}
 /// use tokio::stream::{self, StreamExt};
 ///
 /// let mut stream = stream::iter(vec![17, 19]);
-/// 
+///
 /// assert_eq!(stream.next().await, Some(17));
 /// assert_eq!(stream.next().await, Some(19));
 /// assert_eq!(stream.next().await, None);

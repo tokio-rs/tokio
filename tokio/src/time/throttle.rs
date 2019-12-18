@@ -1,6 +1,7 @@
 //! Slow down a stream by enforcing a delay between items.
 
-use crate::{stream::Stream, time::{Delay, Duration, Instant}};
+use crate::stream::Stream;
+use crate::time::{Delay, Duration, Instant};
 
 use std::future::Future;
 use std::marker::Unpin;
@@ -17,7 +18,8 @@ use pin_project_lite::pin_project;
 /// Create a throttled stream.
 /// ```rust,norun
 /// use std::time::Duration;
-/// use tokio::{stream::StreamExt, time::throttle};
+/// use tokio::stream::StreamExt;
+/// use tokio::time::throttle;
 ///
 /// # async fn dox() {
 /// let mut item_stream = throttle(Duration::from_secs(2), futures::stream::repeat("one"));
