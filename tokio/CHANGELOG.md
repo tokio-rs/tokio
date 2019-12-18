@@ -19,7 +19,7 @@
 
 ### Changes
 - runtime threads are configured with `runtime::Builder::core_threads` and
-  `runtime::Builder::num_threads`. `runtime::Builder::num_threads` is
+  `runtime::Builder::max_threads`. `runtime::Builder::num_threads` is
   deprecated (#1977).
 
 # 0.2.4 (December 6, 2019)
