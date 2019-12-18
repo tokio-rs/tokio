@@ -44,7 +44,7 @@ fn get_stdin_data() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
 async fn main() -> Result<(), Box<dyn Error>> {
     let remote_addr: SocketAddr = env::args()
         .nth(1)
-        .unwrap_or("127.0.0.1:8080".into())
+        .unwrap_or_else(|| "127.0.0.1:8080".into())
         .parse()?;
 
     // We use port 0 to let the operating system allocate an available port for us.

@@ -65,6 +65,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     let inputs = &input.sig.inputs;
     let body = &input.block;
     let attrs = &input.attrs;
+    let vis = input.vis;
 
     if input.sig.asyncness.is_none() {
         let msg = "the async keyword is missing from the function declaration";
@@ -101,13 +102,13 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     let result = match runtime {
         Runtime::Threaded | Runtime::Auto => quote! {
             #(#attrs)*
-            fn #name(#inputs) #ret {
+            #vis fn #name(#inputs) #ret {
                 tokio::runtime::Runtime::new().unwrap().block_on(async { #body })
             }
         },
         Runtime::Basic => quote! {
             #(#attrs)*
-            fn #name(#inputs) #ret {
+            #vis fn #name(#inputs) #ret {
                 tokio::runtime::Builder::new()
                     .basic_scheduler()
                     .enable_all()
@@ -156,6 +157,7 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
     let name = &input.sig.ident;
     let body = &input.block;
     let attrs = &input.attrs;
+    let vis = input.vis;
 
     for attr in attrs {
         if attr.path.is_ident("test") {
@@ -202,14 +204,14 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
         Runtime::Threaded => quote! {
             #[test]
             #(#attrs)*
-            fn #name() #ret {
+            #vis fn #name() #ret {
                 tokio::runtime::Runtime::new().unwrap().block_on(async { #body })
             }
         },
         Runtime::Basic | Runtime::Auto => quote! {
             #[test]
             #(#attrs)*
-            fn #name() #ret {
+            #vis fn #name() #ret {
                 tokio::runtime::Builder::new()
                     .basic_scheduler()
                     .enable_all()

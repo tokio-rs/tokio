@@ -164,6 +164,9 @@ pub use self::async_buf_read::AsyncBufRead;
 mod async_read;
 pub use self::async_read::AsyncRead;
 
+mod async_seek;
+pub use self::async_seek::AsyncSeek;
+
 mod async_write;
 pub use self::async_write::AsyncWrite;
 
@@ -192,10 +195,13 @@ cfg_io_util! {
     mod split;
     pub use split::{split, ReadHalf, WriteHalf};
 
+    pub(crate) mod seek;
+    pub use self::seek::Seek;
+
     pub(crate) mod util;
     pub use util::{
-        copy, empty, repeat, sink, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufStream,
-        BufWriter, Copy, Empty, Lines, Repeat, Sink, Split, Take,
+        copy, empty, repeat, sink, AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt, BufReader,
+        BufStream, BufWriter, Copy, Empty, Lines, Repeat, Sink, Split, Take,
     };
 
     // Re-export io::Error so that users don't have to deal with conflicts when

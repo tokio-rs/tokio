@@ -1,3 +1,5 @@
+#![allow(clippy::unit_arg)]
+
 use crate::signal::os::{OsExtraData, OsStorage};
 
 use crate::sync::mpsc::Sender;

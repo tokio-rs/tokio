@@ -1,5 +1,7 @@
 //! Futures task based helpers
 
+#![allow(clippy::mutex_atomic)]
+
 use futures_core::Stream;
 use std::future::Future;
 use std::mem;

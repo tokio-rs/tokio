@@ -11,9 +11,8 @@ macro_rules! assert_some {
 /// Assert option is none
 macro_rules! assert_none {
     ($e:expr) => {{
-        match $e {
-            Some(v) => panic!("expected none, was {:?}", v),
-            _ => {}
+        if let Some(v) = $e {
+            panic!("expected none, was {:?}", v);
         }
     }};
 }

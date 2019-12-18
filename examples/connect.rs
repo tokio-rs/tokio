@@ -36,10 +36,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     };
 
     // Parse what address we're going to connect to
-    let addr = match args.first() {
-        Some(addr) => addr,
-        None => Err("this program requires at least one argument")?,
-    };
+    let addr = args
+        .first()
+        .ok_or("this program requires at least one argument")?;
     let addr = addr.parse::<SocketAddr>()?;
 
     let stdin = FramedRead::new(io::stdin(), codec::Bytes);
@@ -163,7 +162,7 @@ mod codec {
         type Error = io::Error;
 
         fn decode(&mut self, buf: &mut BytesMut) -> io::Result<Option<Vec<u8>>> {
-            if buf.len() > 0 {
+            if !buf.is_empty() {
                 let len = buf.len();
                 Ok(Some(buf.split_to(len).into_iter().collect()))
             } else {

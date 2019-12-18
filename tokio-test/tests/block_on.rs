@@ -20,10 +20,8 @@ fn async_fn() {
 #[test]
 fn test_delay() {
     let deadline = Instant::now() + Duration::from_millis(100);
-    assert_eq!(
-        (),
-        block_on(async {
-            delay_until(deadline).await;
-        })
-    );
+
+    block_on(async {
+        delay_until(deadline).await;
+    });
 }

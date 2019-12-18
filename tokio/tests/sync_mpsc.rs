@@ -1,3 +1,4 @@
+#![allow(clippy::redundant_clone)]
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 

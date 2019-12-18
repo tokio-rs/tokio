@@ -35,7 +35,7 @@
 //! [`MutexGuard`]: struct.MutexGuard.html
 
 use crate::future::poll_fn;
-use crate::sync::semaphore;
+use crate::sync::semaphore_ll as semaphore;
 
 use std::cell::UnsafeCell;
 use std::error::Error;
@@ -61,7 +61,6 @@ pub struct Mutex<T> {
 ///
 /// The lock is automatically released whenever the guard is dropped, at which point `lock`
 /// will succeed yet again.
-#[derive(Debug)]
 pub struct MutexGuard<'a, T> {
     lock: &'a Mutex<T>,
     permit: semaphore::Permit,
@@ -75,7 +74,7 @@ unsafe impl<T> Sync for Mutex<T> where T: Send {}
 unsafe impl<'a, T> Sync for MutexGuard<'a, T> where T: Send + Sync {}
 
 /// An enumeration of possible errors associated with a `TryLockResult`
-/// which can occur while trying to aquire a lock from the `try_lock`
+/// which can occur while trying to acquire a lock from the `try_lock`
 /// method on a `Mutex`.
 #[derive(Debug)]
 pub enum TryLockError {
@@ -130,7 +129,7 @@ impl<T> Mutex<T> {
         guard
     }
 
-    /// Try to aquire the lock
+    /// Try to acquire the lock
     pub fn try_lock(&self) -> Result<MutexGuard<'_, T>, TryLockError> {
         let mut permit = semaphore::Permit::new();
         match permit.try_acquire(&self.s) {
@@ -173,6 +172,12 @@ impl<'a, T> DerefMut for MutexGuard<'a, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         assert!(self.permit.is_acquired());
         unsafe { &mut *self.lock.c.get() }
+    }
+}
+
+impl<'a, T: fmt::Debug> fmt::Debug for MutexGuard<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&**self, f)
     }
 }
 

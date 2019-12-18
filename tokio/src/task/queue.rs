@@ -233,6 +233,16 @@ where
         self.drain_pending_drop();
     }
 
+    /// Drain both the local and remote run queues, shutting down any tasks.
+    ///
+    /// # Safety
+    ///
+    /// This *must* be called only from the thread that owns the scheduler.
+    pub(crate) unsafe fn drain_queues(&self) {
+        self.close_local();
+        self.close_remote();
+    }
+
     /// Shut down the scheduler's owned task list.
     ///
     /// # Safety
@@ -300,8 +310,10 @@ where
     /// If the queue is open to accept new tasks, the task is pushed to the back
     /// of the queue. Otherwise, if the queue is closed (the scheduler is
     /// shutting down), the new task will be shut down immediately.
-    pub(crate) fn schedule(&mut self, task: Task<S>) {
-        if self.open {
+    ///
+    /// `spawn` should be set if the caller is spawning a new task.
+    pub(crate) fn schedule(&mut self, task: Task<S>, spawn: bool) {
+        if !spawn || self.open {
             self.queue.push_back(task);
         } else {
             task.shutdown();
