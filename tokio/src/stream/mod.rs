@@ -8,10 +8,10 @@ mod iter;
 pub use iter::{iter, Iter};
 
 mod map;
-pub use map::Map;
+use map::Map;
 
 mod next;
-pub use next::Next;
+use next::Next;
 
 pub use futures_core::Stream;
 
@@ -19,6 +19,12 @@ pub use futures_core::Stream;
 /// combinator functions.
 pub trait StreamExt: Stream {
     /// Creates a future that resolves to the next item in the stream.
+    ///
+    /// Equivalent to:
+    ///
+    /// ```ignore
+    /// async fn next(&mut self) -> Option<Self::Item>;
+    /// ```
     ///
     /// Note that because `next` doesn't take ownership over the stream,
     /// the [`Stream`] type must be [`Unpin`]. If you want to use `next` with a
