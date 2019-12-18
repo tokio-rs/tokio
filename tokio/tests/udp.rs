@@ -72,22 +72,42 @@ async fn reunite_error() -> std::io::Result<()> {
     Ok(())
 }
 
+// # Note
+//
+// This test is purposely written such that each time `sender` sends data on
+// the socket, `receiver` awaits the data. On Unix, it would be okay waiting
+// until the end of the test to receive all the data. On Windows, this would
+// **not** be okay because it's resources are completion based (via IOCP).
+// If data is sent and not yet received, attempting to send more data will
+// result in `ErrorKind::WouldBlock` until the first operation completes.
 #[tokio::test]
-async fn try_send_spawn() -> std::io::Result<()> {
+async fn try_send_spawn() {
     const MSG2: &[u8] = b"world!";
     const MSG2_LEN: usize = MSG2.len();
 
-    let sender = UdpSocket::bind("127.0.0.1:0").await?;
-    let mut receiver = UdpSocket::bind("127.0.0.1:0").await?;
+    let sender = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let mut receiver = UdpSocket::bind("127.0.0.1:0").await.unwrap();
 
-    receiver.connect(sender.local_addr()?).await?;
+    receiver
+        .connect(sender.local_addr().unwrap())
+        .await
+        .unwrap();
 
-    let sent = &sender.try_send_to(MSG, &receiver.local_addr()?).await?;
+    let sent = &sender
+        .try_send_to(MSG, &receiver.local_addr().unwrap())
+        .await
+        .unwrap();
     assert_eq!(sent, &MSG_LEN);
+    let mut buf = [0u8; 32];
+    let mut received = receiver.recv(&mut buf[..]).await.unwrap();
 
-    sender.connect(receiver.local_addr()?).await?;
-    let sent = &sender.try_send(MSG2)?;
+    sender
+        .connect(receiver.local_addr().unwrap())
+        .await
+        .unwrap();
+    let sent = &sender.try_send(MSG2).unwrap();
     assert_eq!(sent, &MSG2_LEN);
+    received += receiver.recv(&mut buf[..]).await.unwrap();
 
     std::thread::spawn(move || {
         let sent = &sender.try_send(MSG).unwrap();
@@ -95,11 +115,7 @@ async fn try_send_spawn() -> std::io::Result<()> {
     })
     .join()
     .unwrap();
+    received += receiver.recv(&mut buf[..]).await.unwrap();
 
-    let mut buf = [0u8; 32];
-    let mut received = receiver.recv(&mut buf[..]).await?;
-    received += receiver.recv(&mut buf[..]).await?;
-    received += receiver.recv(&mut buf[..]).await?;
     assert_eq!(received, MSG_LEN * 2 + MSG2_LEN);
-    Ok(())
 }
