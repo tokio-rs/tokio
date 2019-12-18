@@ -18,6 +18,15 @@ pub struct Semaphore {
     ll_sem: ll::Semaphore,
 }
 
+/// Error returned from the [`Semaphore::try_acquire`] function.
+///
+/// A `try_acquire` operation can only fail if the semaphore has no available
+/// permits.
+///
+/// [`Semaphore::try_acquire`]: Semaphore::try_acquire
+#[derive(Debug)]
+pub struct TryAcquireError(());
+
 impl Semaphore {
     /// Creates a new semaphore with the initial number of permits
     pub fn new(permits: usize) -> Self {
@@ -47,11 +56,11 @@ impl Semaphore {
     }
 
     /// Try to acquire a permit form the semaphore
-    pub fn try_acquire(&self) -> Option<Permit<'_>> {
+    pub fn try_acquire(&self) -> Result<Permit<'_>, TryAcquireError> {
         let mut ll_permit = ll::Permit::new();
         match ll_permit.try_acquire(&self.ll_sem) {
-            Ok(_) => Some(Permit { sem: self, ll_permit }),
-            Err(_) => None,
+            Ok(_) => Ok(Permit { sem: self, ll_permit }),
+            Err(_) => Err(TryAcquireError(())),
         }
 
     }

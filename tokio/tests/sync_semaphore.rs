@@ -14,12 +14,12 @@ fn try_acquire() {
     let sem = Semaphore::new(1);
     {
         let p1 = sem.try_acquire();
-        assert!(p1.is_some());
+        assert!(p1.is_ok());
         let p2 = sem.try_acquire();
-        assert!(p2.is_none());
+        assert!(p2.is_err());
     }
     let p3 = sem.try_acquire();
-    assert!(p3.is_some());
+    assert!(p3.is_ok());
 }
 
 #[tokio::test]
@@ -55,7 +55,7 @@ fn forget() {
         assert_eq!(sem.available_permits(), 0);
     }
     assert_eq!(sem.available_permits(), 0);
-    assert!(sem.try_acquire().is_none());
+    assert!(sem.try_acquire().is_err());
 }
 
 #[tokio::test]
@@ -77,5 +77,5 @@ async fn stresstest() {
     let _p3 = sem.try_acquire().unwrap();
     let _p4 = sem.try_acquire().unwrap();
     let _p5 = sem.try_acquire().unwrap();
-    assert!(sem.try_acquire().is_none());
+    assert!(sem.try_acquire().is_err());
 }
