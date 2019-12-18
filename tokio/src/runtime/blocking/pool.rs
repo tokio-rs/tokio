@@ -54,11 +54,13 @@ struct Inner {
     /// Source of `Instant::now()`
     clock: time::Clock,
 
+    thread_cap: usize,
+
 }
 
 struct Shared {
     queue: VecDeque<Task>,
-    num_th: u32,
+    num_th: usize,
     num_idle: u32,
     num_notify: u32,
     shutdown: bool,
@@ -72,7 +74,6 @@ thread_local! {
     static BLOCKING: Cell<Option<*const Spawner>> = Cell::new(None)
 }
 
-const MAX_THREADS: u32 = 1_000;
 const KEEP_ALIVE: Duration = Duration::from_secs(10);
 
 /// Run the provided function on an executor dedicated to blocking operations.
@@ -101,6 +102,7 @@ impl BlockingPool {
         io: &io::Handle,
         time: &time::Handle,
         clock: &time::Clock,
+        thread_cap: usize,
     ) -> BlockingPool {
         let (shutdown_tx, shutdown_rx) = shutdown::channel();
 
@@ -124,6 +126,7 @@ impl BlockingPool {
                     io_handle: io.clone(),
                     time_handle: time.clone(),
                     clock: clock.clone(),
+                    thread_cap,
                 }),
             },
             shutdown_rx,
@@ -209,7 +212,7 @@ impl Spawner {
             if shared.num_idle == 0 {
                 // No threads are able to process the task.
 
-                if shared.num_th == MAX_THREADS {
+                if shared.num_th == self.inner.thread_cap {
                     // At max number of threads
                     None
                 } else {
