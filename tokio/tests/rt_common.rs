@@ -18,6 +18,19 @@ macro_rules! rt_test {
             }
         }
 
+        mod basic_scheduler_throttling {
+            $($t)*
+
+            fn rt() -> Runtime {
+                tokio::runtime::Builder::new()
+                    .basic_scheduler()
+                    .enable_all()
+                    .max_throttling(std::time::Duration::from_millis(1))
+                    .build()
+                    .unwrap()
+            }
+        }
+
         mod threaded_scheduler {
             $($t)*
 

@@ -5,6 +5,8 @@ use crate::runtime::{blocking, io, time, Callback, Runtime, Spawner};
 use std::fmt;
 #[cfg(not(loom))]
 use std::sync::Arc;
+#[cfg(feature = "rt-core")]
+use std::time::Duration;
 
 /// Builds Tokio Runtime with custom configuration values.
 ///
@@ -66,6 +68,10 @@ pub struct Builder {
 
     /// To run before each worker thread stops
     pub(super) before_stop: Option<Callback>,
+
+    /// Max throttling duration
+    #[cfg(feature = "rt-core")]
+    pub(super) max_throttling: Option<std::time::Duration>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -107,6 +113,10 @@ impl Builder {
             // No worker thread callbacks
             after_start: None,
             before_stop: None,
+
+            // No throttling by default
+            #[cfg(feature = "rt-core")]
+            max_throttling: None,
         }
     }
 
@@ -294,6 +304,35 @@ impl Builder {
         self
     }
 
+    /// Sets the maximum throttling duration.
+    ///
+    /// Throttling reduces syscalls & context switches
+    /// by grouping timers, I/O and tasks handling.
+    ///
+    /// The default is to not apply any throttling.
+    ///
+    /// This is only available for the basic scheduler.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use tokio::runtime;
+    /// # use std::time::Duration;
+    ///
+    /// # pub fn main() {
+    /// let rt = runtime::Builder::new()
+    ///     .basic_scheduler()
+    ///     .enable_all()
+    ///     .max_throttling(Duration::from_millis(20))
+    ///     .build();
+    /// # }
+    /// ```
+    #[cfg(feature = "rt-core")]
+    pub fn max_throttling(&mut self, dur: Duration) -> &mut Self {
+        self.max_throttling = Some(dur);
+        self
+    }
+
     /// Creates the configured `Runtime`.
     ///
     /// The returned `ThreadPool` instance is ready to spawn tasks.
@@ -415,16 +454,21 @@ cfg_rt_core! {
 
             let clock = time::create_clock();
 
-            // Create I/O driver
-            let (io_driver, io_handle) = io::create_driver(self.enable_io)?;
+            let max_throttling = self.max_throttling.take().filter(|max_throttling| max_throttling.as_millis() > 0);
 
-            let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone());
+            let (io_driver, io_handle) = io::create_driver(self.enable_io)?;
+            let (driver, time_handle) = time::create_throttling_driver(
+                self.enable_time,
+                io_driver,
+                clock.clone(),
+                max_throttling,
+            );
 
             // And now put a single-threaded scheduler on top of the timer. When
             // there are no futures ready to do something, it'll let the timer or
             // the reactor to generate some new stimuli for the futures to continue
             // in their life.
-            let scheduler = BasicScheduler::new(driver);
+            let scheduler = BasicScheduler::new(driver, max_throttling);
             let spawner = Spawner::Basic(scheduler.spawner());
 
             // Blocking pool
@@ -489,6 +533,7 @@ cfg_rt_threaded! {
             // Spawn the thread pool workers
             workers.spawn(&handle);
 
+            // FIXME(fengalin): use max_throttling?
             Ok(Runtime {
                 kind: Kind::ThreadPool(scheduler),
                 handle,

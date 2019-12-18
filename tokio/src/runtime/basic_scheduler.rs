@@ -8,7 +8,8 @@ use std::mem::ManuallyDrop;
 use std::ptr;
 use std::sync::Arc;
 use std::task::{RawWaker, RawWakerVTable, Waker};
-use std::time::Duration;
+
+use std::time::{Duration, Instant};
 
 /// Executes tasks on the current thread
 #[derive(Debug)]
@@ -33,10 +34,40 @@ pub(super) struct SchedulerPriv {
     queues: MpscQueues<Self>,
     /// Unpark the blocked thread
     unpark: Box<dyn Unpark>,
+
+    /// Max throttling duration
+    max_throttling: Option<Duration>,
 }
 
 unsafe impl Send for SchedulerPriv {}
 unsafe impl Sync for SchedulerPriv {}
+
+/// States of the throttling state machine.
+///
+/// The `Instant` value is the instant when
+/// the timers and I/O were last checked.
+#[derive(Copy, Clone, Debug)]
+enum ThrottleState {
+    /// Throttling not active.
+    Inactive,
+
+    /// Tasks are available.
+    HandlingTasks(Instant),
+
+    /// Ran dry of tasks.
+    RanDryOfTasks(Instant),
+
+    /// Draining tasks resulting from last timers and I/O check
+    /// in `RanDryOfTasks` state.
+    DrainningTasks(Instant),
+
+    /// Last preparations before pausing.
+    PrepareToPause(Instant),
+
+    /// The state machine is ready to pause the thread
+    /// if the maximum throttling duration has not already elapsed.
+    ReadyToPause(Instant),
+}
 
 /// Local state
 #[derive(Debug)]
@@ -47,7 +78,8 @@ struct LocalState<P> {
     /// Thread park handle
     park: P,
 
-    last_tick: Option<std::time::Instant>,
+    /// Current state of the throttling state machine
+    throttle_state: ThrottleState,
 }
 
 /// Max number of tasks to poll per tick.
@@ -61,15 +93,20 @@ impl<P> BasicScheduler<P>
 where
     P: Park,
 {
-    pub(crate) fn new(park: P) -> BasicScheduler<P> {
+    pub(crate) fn new(park: P, max_throttling: Option<Duration>) -> BasicScheduler<P> {
         let unpark = park.unpark();
 
         BasicScheduler {
             scheduler: Arc::new(SchedulerPriv {
                 queues: MpscQueues::new(),
                 unpark: Box::new(unpark),
+                max_throttling,
             }),
-            local: LocalState { tick: 0, park, last_tick: None },
+            local: LocalState {
+                tick: 0,
+                park,
+                throttle_state: ThrottleState::Inactive,
+            },
         }
     }
 
@@ -136,18 +173,41 @@ where
         // pinning safe.
         let mut future = unsafe { Pin::new_unchecked(&mut future) };
 
-        loop {
-            if let Ready(v) = future.as_mut().poll(&mut cx) {
-                return v;
+        match scheduler.max_throttling {
+            None => {
+                loop {
+                    if let Ready(v) = future.as_mut().poll(&mut cx) {
+                        return v;
+                    }
+
+                    scheduler.tick(local);
+
+                    // Maintenance work
+                    unsafe {
+                        // safety: this function is safe to call only from the
+                        // thread the basic scheduler is running on (which we are).
+                        scheduler.queues.drain_pending_drop();
+                    }
+                }
             }
+            Some(max_throttling) => {
+                local.throttle_state = ThrottleState::HandlingTasks(Instant::now());
 
-            scheduler.tick(local);
+                loop {
+                    if let Ready(v) = future.as_mut().poll(&mut cx) {
+                        local.throttle_state = ThrottleState::Inactive;
+                        return v;
+                    }
 
-            // Maintenance work
-            unsafe {
-                // safety: this function is safe to call only from the
-                // thread the basic scheduler is running on (which we are).
-                scheduler.queues.drain_pending_drop();
+                    scheduler.tick_throttling(local, max_throttling);
+
+                    // Maintenance work
+                    unsafe {
+                        // safety: this function is safe to call only from the
+                        // thread the basic scheduler is running on (which we are).
+                        scheduler.queues.drain_pending_drop();
+                    }
+                }
             }
         }
     }
@@ -170,7 +230,7 @@ impl Spawner {
 
 impl SchedulerPriv {
     fn tick(&self, local: &mut LocalState<impl Park>) {
-        loop {
+        for _ in 0..MAX_TASKS_PER_TICK {
             // Get the current tick
             let tick = local.tick;
 
@@ -185,7 +245,10 @@ impl SchedulerPriv {
 
             let task = match next {
                 Some(task) => task,
-                None => break,
+                None => {
+                    local.park.park().ok().expect("failed to park");
+                    return;
+                }
             };
 
             if let Some(task) = task.run(&mut || Some(self.into())) {
@@ -198,23 +261,149 @@ impl SchedulerPriv {
             }
         }
 
-        if let Some(last_tick) = local.last_tick {
-            use std::thread;
-
-            let now = std::time::Instant::now();
-            let diff = now - last_tick;
-            const WAIT: std::time::Duration = std::time::Duration::from_millis(20);
-            if diff < WAIT {
-                thread::sleep(WAIT - diff);
-            }
-        }
-        local.last_tick = Some(std::time::Instant::now());
-
         local
             .park
-            .park()
+            .park_timeout(Duration::from_millis(0))
             .ok()
             .expect("failed to park");
+    }
+
+    fn tick_throttling(&self, local: &mut LocalState<impl Park>, max_throttling: Duration) {
+        use std::thread;
+
+        let mut nb_task_checks = 0;
+        while nb_task_checks < MAX_TASKS_PER_TICK {
+            match local.throttle_state {
+                ThrottleState::HandlingTasks(last) => {
+                    // Get the current tick
+                    let tick = local.tick;
+
+                    // Increment the tick
+                    local.tick = tick.wrapping_add(1);
+
+                    nb_task_checks += 1;
+
+                    let next = unsafe {
+                        // safety: this function is safe to call only from the
+                        // thread the basic scheduler is running on. The `LocalState`
+                        // parameter to this method implies that we are on that thread.
+                        self.queues.next_task(tick)
+                    };
+
+                    match next {
+                        Some(task) => {
+                            if let Some(task) = task.run(&mut || Some(self.into())) {
+                                unsafe {
+                                    // safety: this function is safe to call only from the
+                                    // thread the basic scheduler is running on. The `LocalState`
+                                    // parameter to this method implies that we are on that thread.
+                                    self.queues.push_local(task);
+                                }
+                            }
+
+                            if last.elapsed() > max_throttling {
+                                // Check timers & I/O.
+                                //
+                                // Note that the time driver should be intialized
+                                // with `enable_throttling`.
+                                local
+                                    .park
+                                    .park_timeout(max_throttling)
+                                    .ok()
+                                    .expect("failed to park");
+
+                                // Update the last instant when the timers and I/O
+                                // were checked, but keep checking tasks
+                                local.throttle_state = ThrottleState::HandlingTasks(Instant::now());
+                            }
+                            // else keep checking tasks.
+                        }
+                        None => {
+                            // No more tasks. Initiate throttling.
+                            local.throttle_state = ThrottleState::RanDryOfTasks(last);
+                        }
+                    }
+                }
+                ThrottleState::RanDryOfTasks(last) => {
+                    if last.elapsed() > max_throttling {
+                        // More than the maximum throttling duration has elasped
+                        // since last time timers and I/O were checked,
+                        // so check them now.
+                        //
+                        // This is particularly important for timers
+                        // otherwise they might be fired too late.
+                        //
+                        // Note that the time driver should be intialized
+                        // with `enable_throttling`.
+                        local
+                            .park
+                            .park_timeout(max_throttling)
+                            .ok()
+                            .expect("failed to park");
+
+                        // Prepare to drain tasks resulting from this
+                        // timers and I/O check, if any.
+                        local.throttle_state = ThrottleState::DrainningTasks(Instant::now());
+                    } else {
+                        // No more tasks, so attempt to pause,
+                        local.throttle_state = ThrottleState::PrepareToPause(last);
+                    }
+                }
+                ThrottleState::DrainningTasks(last) => {
+                    // Get the current tick
+                    let tick = local.tick;
+
+                    // Increment the tick
+                    local.tick = tick.wrapping_add(1);
+
+                    nb_task_checks += 1;
+
+                    let next = unsafe {
+                        // safety: this function is safe to call only from the
+                        // thread the basic scheduler is running on. The `LocalState`
+                        // parameter to this method implies that we are on that thread.
+                        self.queues.next_task(tick)
+                    };
+
+                    match next {
+                        Some(task) => {
+                            if let Some(task) = task.run(&mut || Some(self.into())) {
+                                unsafe {
+                                    // safety: this function is safe to call only from the
+                                    // thread the basic scheduler is running on. The `LocalState`
+                                    // parameter to this method implies that we are on that thread.
+                                    self.queues.push_local(task);
+                                }
+                            }
+
+                            // Keep checking tasks.
+                        }
+                        None => {
+                            // Not more tasks, attempt to pause.
+                            local.throttle_state = ThrottleState::PrepareToPause(last);
+                        }
+                    }
+                }
+                ThrottleState::PrepareToPause(last) => {
+                    local.throttle_state = ThrottleState::ReadyToPause(last);
+
+                    // Before pausing, go check the main Future
+                    // in case it's time to exit, or timers or I/O need handling there.
+                    break;
+                }
+                ThrottleState::ReadyToPause(last) => {
+                    // Pause until the maximum throttling duration has elapsed.
+                    let elapsed = last.elapsed();
+                    if elapsed < max_throttling {
+                        thread::sleep(max_throttling - elapsed);
+                    }
+
+                    // Prepare to start a new cycle.
+                    local.throttle_state = ThrottleState::HandlingTasks(last);
+                }
+                ThrottleState::Inactive => unreachable!("ThrottleState::Inactive"),
+            }
+        }
     }
 
     /// Schedule the provided task on the scheduler.
