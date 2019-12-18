@@ -1,3 +1,27 @@
+# 0.2.5 (December 18, 2019)
+
+### Added
+- `io::AsyncSeek` trait (#1924).
+- `Mutex::try_lock` (#1939)
+- `mpsc::Receiver::try_recv` and `mpsc::UnboundedReceiver::try_recv` (#1939).
+- `writev` support for `TcpStream` (#1956).
+- `time::throttle` for throttling streams (#1949).
+- implement `Stream` for `time::DelayQueue` (#1975).
+- `sync::broadcast` provides a fan-out channel (#1943).
+- `sync::Semaphore` provides an async semaphore (#1973).
+- `stream::StreamExt` provides stream utilities (#1962).
+
+### Fixes
+- deadlock risk while shutting down the runtime (#1972).
+- panic while shutting down the runtime (#1978).
+- `sync::MutexGuard` debug output (#1961).
+- misc doc improvements (#1933, #1934, #1940, #1942).
+
+### Changes
+- runtime threads are configured with `runtime::Builder::core_threads` and
+  `runtime::Builder::max_threads`. `runtime::Builder::num_threads` is
+  deprecated (#1977).
+
 # 0.2.4 (December 6, 2019)
 
 ### Fixes
