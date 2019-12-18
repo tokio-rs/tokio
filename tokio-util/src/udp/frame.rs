@@ -1,9 +1,9 @@
 use crate::codec::{Decoder, Encoder};
 
-use tokio::net::UdpSocket;
+use tokio::{net::UdpSocket, stream::Stream};
 
 use bytes::{BufMut, BytesMut};
-use futures_core::{ready, Stream};
+use futures_core::ready;
 use futures_sink::Sink;
 use std::io;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};

@@ -226,8 +226,8 @@ cfg_io_util! {
         ///
         /// ```
         /// use tokio::io::AsyncBufReadExt;
+        /// use tokio::stream::StreamExt;
         ///
-        /// use futures::{StreamExt};
         /// use std::io::Cursor;
         ///
         /// #[tokio::main]
