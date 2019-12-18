@@ -57,8 +57,9 @@ mod tcp {
     use super::codec;
     use futures::{future, Sink, SinkExt};
     use std::{error::Error, io, net::SocketAddr};
+    use futures::StreamExt;
     use tokio::net::TcpStream;
-    use tokio::stream::{Stream, StreamExt};
+    use tokio::stream::Stream;
     use tokio_util::codec::{FramedRead, FramedWrite};
 
     pub async fn connect(
