@@ -25,7 +25,7 @@ fn create_complete_drop() {
         tx.send(1).unwrap();
     });
 
-    let task = task::background(task);
+    let (task, _) = task::joinable(task);
 
     let mock = mock().bind(&task).release_local();
     let mock = &mut || Some(From::from(&mock));
@@ -50,7 +50,7 @@ fn create_yield_complete_drop() {
         tx.send(1).unwrap();
     });
 
-    let task = task::background(task);
+    let (task, _) = task::joinable(task);
 
     let mock = mock().bind(&task).release_local();
     let mock = || Some(From::from(&mock));
@@ -80,7 +80,7 @@ fn create_clone_yield_complete_drop() {
         tx.send(1).unwrap();
     });
 
-    let task = task::background(task);
+    let (task, _) = task::joinable(task);
 
     let mock = mock().bind(&task).release_local();
     let mock = || Some(From::from(&mock));
@@ -107,7 +107,7 @@ fn create_wake_drop() {
 
     let (task, did_drop) = track_drop(async move { rx.await });
 
-    let task = task::background(task);
+    let (task, _) = task::joinable(task);
 
     let mock = mock().bind(&task).schedule().release_local();
 
@@ -140,7 +140,7 @@ fn notify_complete() {
         .await;
     });
 
-    let task = task::background(task);
+    let (task, _) = task::joinable(task);
 
     let mock = mock().bind(&task).release_local();
     let mock = &mut || Some(From::from(&mock));
@@ -159,7 +159,7 @@ fn complete_on_second_schedule_obj() {
         tx.send(1).unwrap();
     });
 
-    let task = task::background(task);
+    let (task, _) = task::joinable(task);
 
     let mock1 = mock();
     let mock2 = mock().bind(&task).release();
@@ -396,7 +396,7 @@ fn task_panic_background() {
         "hello"
     });
 
-    let task = task::background(task);
+    let (task, _) = task::joinable(task);
 
     let mock = mock().bind(&task).release_local();
 

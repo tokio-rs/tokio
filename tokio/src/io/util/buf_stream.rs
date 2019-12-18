@@ -2,11 +2,10 @@ use crate::io::util::{BufReader, BufWriter};
 use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite};
 
 use pin_project_lite::pin_project;
-use std::io::{self};
-use std::{
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::io;
+use std::mem::MaybeUninit;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 pin_project! {
     /// Wraps a type that is [`AsyncWrite`] and [`AsyncRead`], and buffers its input and output.
@@ -17,6 +16,7 @@ pin_project! {
     /// types aid with these problems respectively, but do so in only one direction. `BufStream` wraps
     /// one in the other so that both directions are buffered. See their documentation for details.
     #[derive(Debug)]
+    #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
     pub struct BufStream<RW> {
         #[pin]
         inner: BufReader<BufWriter<RW>>,
@@ -126,7 +126,7 @@ impl<RW: AsyncRead + AsyncWrite> AsyncRead for BufStream<RW> {
     }
 
     // we can't skip unconditionally because of the large buffer case in read.
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
+    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [MaybeUninit<u8>]) -> bool {
         self.inner.prepare_uninitialized_buffer(buf)
     }
 }

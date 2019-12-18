@@ -1,4 +1,5 @@
 #![warn(rust_2018_idioms)]
+#![cfg(feature = "full")]
 
 use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
@@ -26,9 +27,46 @@ fn spawned_task_does_not_progress_without_block_on() {
     assert_eq!(out, "hello");
 }
 
+#[test]
+fn acquire_mutex_in_drop() {
+    use futures::future::pending;
+    use tokio::task;
+
+    let (tx1, rx1) = oneshot::channel();
+    let (tx2, rx2) = oneshot::channel();
+
+    let mut rt = rt();
+
+    rt.spawn(async move {
+        let _ = rx2.await;
+        unreachable!();
+    });
+
+    rt.spawn(async move {
+        let _ = rx1.await;
+        let _ = tx2.send(()).unwrap();
+        unreachable!();
+    });
+
+    // Spawn a task that will never notify
+    rt.spawn(async move {
+        pending::<()>().await;
+        tx1.send(()).unwrap();
+    });
+
+    // Tick the loop
+    rt.block_on(async {
+        task::yield_now().await;
+    });
+
+    // Drop the rt
+    drop(rt);
+}
+
 fn rt() -> Runtime {
     tokio::runtime::Builder::new()
         .basic_scheduler()
+        .enable_all()
         .build()
         .unwrap()
 }

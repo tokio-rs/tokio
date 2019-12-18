@@ -1,4 +1,5 @@
 #![warn(rust_2018_idioms)]
+#![cfg(feature = "full")]
 
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
@@ -16,7 +17,7 @@ async fn peek() {
 
     let left = net::TcpStream::connect(&addr).unwrap();
     let mut right = t.join().unwrap();
-    right.write(&[1, 2, 3, 4]).unwrap();
+    let _ = right.write(&[1, 2, 3, 4]).unwrap();
 
     let mut left: TcpStream = left.try_into().unwrap();
     let mut buf = [0u8; 16];

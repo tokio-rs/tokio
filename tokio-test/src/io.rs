@@ -1,3 +1,5 @@
+#![cfg(not(loom))]
+
 //! A mock type implementing [`AsyncRead`] and [`AsyncWrite`].
 //!
 //!
@@ -13,8 +15,8 @@
 //! Attempting to write data that the mock isn't expected will result in a
 //! panic.
 //!
-//! [`AsyncRead`]: tokio_io::AsyncRead
-//! [`AsyncWrite`]: tokio_io::AsyncWrite
+//! [`AsyncRead`]: tokio::io::AsyncRead
+//! [`AsyncWrite`]: tokio::io::AsyncWrite
 
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::mpsc;

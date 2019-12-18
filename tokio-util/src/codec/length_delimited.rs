@@ -345,7 +345,7 @@ use crate::codec::{Decoder, Encoder, Framed, FramedRead, FramedWrite};
 
 use tokio::io::{AsyncRead, AsyncWrite};
 
-use bytes::{Buf, BufMut, Bytes, BytesMut, IntoBuf};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::error::Error as StdError;
 use std::io::{self, Cursor};
 use std::{cmp, fmt};
@@ -457,7 +457,7 @@ impl LengthDelimitedCodec {
 
             // match endianess
             let n = if self.builder.length_field_is_big_endian {
-                src.get_uint_be(field_len)
+                src.get_uint(field_len)
             } else {
                 src.get_uint_le(field_len)
             };
@@ -551,7 +551,7 @@ impl Encoder for LengthDelimitedCodec {
     type Error = io::Error;
 
     fn encode(&mut self, data: Bytes, dst: &mut BytesMut) -> Result<(), io::Error> {
-        let n = (&data).into_buf().remaining();
+        let n = (&data).remaining();
 
         if n > self.builder.max_frame_len {
             return Err(io::Error::new(
@@ -579,7 +579,7 @@ impl Encoder for LengthDelimitedCodec {
         dst.reserve(self.builder.length_field_len + n);
 
         if self.builder.length_field_is_big_endian {
-            dst.put_uint_be(n as u64, self.builder.length_field_len);
+            dst.put_uint(n as u64, self.builder.length_field_len);
         } else {
             dst.put_uint_le(n as u64, self.builder.length_field_len);
         }

@@ -1,4 +1,3 @@
-use crate::blocking;
 use crate::task::JoinHandle;
 
 cfg_rt_threaded! {
@@ -6,7 +5,7 @@ cfg_rt_threaded! {
     ///
     /// In general, issuing a blocking call or performing a lot of compute in a
     /// future without yielding is not okay, as it may prevent the executor from
-    /// driving other futures forward.  If you run a closure through this method,
+    /// driving other futures forward. If you run a closure through this method,
     /// the current executor thread will relegate all its executor duties to another
     /// (possibly new) thread, and only then poll the task. Note that this requires
     /// additional synchronization.
@@ -22,6 +21,7 @@ cfg_rt_threaded! {
     /// });
     /// # }
     /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
     pub fn block_in_place<F, R>(f: F) -> R
     where
         F: FnOnce() -> R,
@@ -60,6 +60,6 @@ cfg_blocking! {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        blocking::spawn_blocking(f)
+        crate::runtime::spawn_blocking(f)
     }
 }

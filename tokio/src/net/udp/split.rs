@@ -26,26 +26,26 @@ use std::sync::Arc;
 /// Use [`send_to`](#method.send_to) or [`send`](#method.send) to send
 /// datagrams.
 #[derive(Debug)]
-pub struct UdpSocketSendHalf(Arc<UdpSocket>);
+pub struct SendHalf(Arc<UdpSocket>);
 
 /// The recv half after [`split`](super::UdpSocket::split).
 ///
 /// Use [`recv_from`](#method.recv_from) or [`recv`](#method.recv) to receive
 /// datagrams.
 #[derive(Debug)]
-pub struct UdpSocketRecvHalf(Arc<UdpSocket>);
+pub struct RecvHalf(Arc<UdpSocket>);
 
-pub(crate) fn split(socket: UdpSocket) -> (UdpSocketRecvHalf, UdpSocketSendHalf) {
+pub(crate) fn split(socket: UdpSocket) -> (RecvHalf, SendHalf) {
     let shared = Arc::new(socket);
     let send = shared.clone();
     let recv = shared;
-    (UdpSocketRecvHalf(recv), UdpSocketSendHalf(send))
+    (RecvHalf(recv), SendHalf(send))
 }
 
 /// Error indicating two halves were not from the same socket, and thus could
 /// not be `reunite`d.
 #[derive(Debug)]
-pub struct ReuniteError(pub UdpSocketSendHalf, pub UdpSocketRecvHalf);
+pub struct ReuniteError(pub SendHalf, pub RecvHalf);
 
 impl fmt::Display for ReuniteError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -58,7 +58,7 @@ impl fmt::Display for ReuniteError {
 
 impl Error for ReuniteError {}
 
-fn reunite(s: UdpSocketSendHalf, r: UdpSocketRecvHalf) -> Result<UdpSocket, ReuniteError> {
+fn reunite(s: SendHalf, r: RecvHalf) -> Result<UdpSocket, ReuniteError> {
     if Arc::ptr_eq(&s.0, &r.0) {
         drop(r);
         // Only two instances of the `Arc` are ever created, one for the
@@ -71,11 +71,11 @@ fn reunite(s: UdpSocketSendHalf, r: UdpSocketRecvHalf) -> Result<UdpSocket, Reun
     }
 }
 
-impl UdpSocketRecvHalf {
+impl RecvHalf {
     /// Attempts to put the two "halves" of a `UdpSocket` back together and
     /// recover the original socket. Succeeds only if the two "halves"
     /// originated from the same call to `UdpSocket::split`.
-    pub fn reunite(self, other: UdpSocketSendHalf) -> Result<UdpSocket, ReuniteError> {
+    pub fn reunite(self, other: SendHalf) -> Result<UdpSocket, ReuniteError> {
         reunite(other, self)
     }
 
@@ -106,11 +106,11 @@ impl UdpSocketRecvHalf {
     }
 }
 
-impl UdpSocketSendHalf {
+impl SendHalf {
     /// Attempts to put the two "halves" of a `UdpSocket` back together and
     /// recover the original socket. Succeeds only if the two "halves"
     /// originated from the same call to `UdpSocket::split`.
-    pub fn reunite(self, other: UdpSocketRecvHalf) -> Result<UdpSocket, ReuniteError> {
+    pub fn reunite(self, other: RecvHalf) -> Result<UdpSocket, ReuniteError> {
         reunite(self, other)
     }
 
@@ -135,13 +135,13 @@ impl UdpSocketSendHalf {
     }
 }
 
-impl AsRef<UdpSocket> for UdpSocketSendHalf {
+impl AsRef<UdpSocket> for SendHalf {
     fn as_ref(&self) -> &UdpSocket {
         &self.0
     }
 }
 
-impl AsRef<UdpSocket> for UdpSocketRecvHalf {
+impl AsRef<UdpSocket> for RecvHalf {
     fn as_ref(&self) -> &UdpSocket {
         &self.0
     }

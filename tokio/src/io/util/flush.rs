@@ -5,12 +5,14 @@ use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// A future used to fully flush an I/O object.
-///
-/// Created by the [`AsyncWriteExt::flush`] function.
-#[derive(Debug)]
-pub struct Flush<'a, A: ?Sized> {
-    a: &'a mut A,
+cfg_io_util! {
+    /// A future used to fully flush an I/O object.
+    ///
+    /// Created by the [`AsyncWriteExt::flush`] function.
+    #[derive(Debug)]
+    pub struct Flush<'a, A: ?Sized> {
+        a: &'a mut A,
+    }
 }
 
 /// Creates a future which will entirely flush an I/O object.

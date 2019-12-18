@@ -5,39 +5,41 @@ use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// An async writer which will move data into the void.
-///
-/// This struct is generally created by calling [`sink`][sink]. Please
-/// see the documentation of `sink()` for more details.
-///
-/// This is an asynchronous version of `std::io::Sink`.
-///
-/// [sink]: fn.sink.html
-pub struct Sink {
-    _p: (),
-}
+cfg_io_util! {
+    /// An async writer which will move data into the void.
+    ///
+    /// This struct is generally created by calling [`sink`][sink]. Please
+    /// see the documentation of `sink()` for more details.
+    ///
+    /// This is an asynchronous version of `std::io::Sink`.
+    ///
+    /// [sink]: fn.sink.html
+    pub struct Sink {
+        _p: (),
+    }
 
-/// Creates an instance of an async writer which will successfully consume all
-/// data.
-///
-/// All calls to `poll_write` on the returned instance will return
-/// `Poll::Ready(Ok(buf.len()))` and the contents of the buffer will not be
-/// inspected.
-///
-/// This is an asynchronous version of `std::io::sink`.
-///
-/// # Examples
-///
-/// ```rust
-/// # use tokio::io::{self, AsyncWriteExt};
-/// # async fn dox() {
-/// let buffer = vec![1, 2, 3, 5, 8];
-/// let num_bytes = io::sink().write(&buffer).await.unwrap();
-/// assert_eq!(num_bytes, 5);
-/// # }
-/// ```
-pub fn sink() -> Sink {
-    Sink { _p: () }
+    /// Creates an instance of an async writer which will successfully consume all
+    /// data.
+    ///
+    /// All calls to `poll_write` on the returned instance will return
+    /// `Poll::Ready(Ok(buf.len()))` and the contents of the buffer will not be
+    /// inspected.
+    ///
+    /// This is an asynchronous version of `std::io::sink`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use tokio::io::{self, AsyncWriteExt};
+    /// # async fn dox() {
+    /// let buffer = vec![1, 2, 3, 5, 8];
+    /// let num_bytes = io::sink().write(&buffer).await.unwrap();
+    /// assert_eq!(num_bytes, 5);
+    /// # }
+    /// ```
+    pub fn sink() -> Sink {
+        Sink { _p: () }
+    }
 }
 
 impl AsyncWrite for Sink {

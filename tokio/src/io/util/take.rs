@@ -1,6 +1,7 @@
 use crate::io::{AsyncBufRead, AsyncRead};
 
 use pin_project_lite::pin_project;
+use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{cmp, io};
@@ -9,6 +10,7 @@ pin_project! {
     /// Stream for the [`take`](super::AsyncReadExt::take) method.
     #[derive(Debug)]
     #[must_use = "streams do nothing unless you `.await` or poll them"]
+    #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
     pub struct Take<R> {
         #[pin]
         inner: R,
@@ -74,7 +76,7 @@ impl<R: AsyncRead> Take<R> {
 }
 
 impl<R: AsyncRead> AsyncRead for Take<R> {
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
+    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [MaybeUninit<u8>]) -> bool {
         self.inner.prepare_uninitialized_buffer(buf)
     }
 

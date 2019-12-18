@@ -1,12 +1,12 @@
 use crate::loom::sync::atomic::AtomicU64;
 use crate::sync::AtomicWaker;
-use crate::time::driver::{HandlePriv, Inner};
+use crate::time::driver::{Handle, Inner};
 use crate::time::{Duration, Error, Instant};
 
 use std::cell::UnsafeCell;
 use std::ptr;
 use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering::{Relaxed, SeqCst};
+use std::sync::atomic::Ordering::SeqCst;
 use std::sync::{Arc, Weak};
 use std::task::{self, Poll};
 use std::u64;
@@ -31,7 +31,7 @@ pub(crate) struct Entry {
     /// without all `Delay` instances having completed.
     ///
     /// When `None`, the entry has not yet been linked with a timer instance.
-    inner: Option<Weak<Inner>>,
+    inner: Weak<Inner>,
 
     /// Tracks the entry state. This value contains the following information:
     ///
@@ -104,18 +104,29 @@ const ERROR: u64 = u64::MAX;
 // ===== impl Entry =====
 
 impl Entry {
-    pub(crate) fn new(deadline: Instant, duration: Duration) -> Entry {
-        Entry {
-            time: CachePadded(UnsafeCell::new(Time { deadline, duration })),
-            inner: None,
-            waker: AtomicWaker::new(),
-            state: AtomicU64::new(0),
-            queued: AtomicBool::new(false),
-            next_atomic: UnsafeCell::new(ptr::null_mut()),
-            when: UnsafeCell::new(None),
-            next_stack: UnsafeCell::new(None),
-            prev_stack: UnsafeCell::new(ptr::null_mut()),
+    pub(crate) fn new(deadline: Instant, duration: Duration) -> Arc<Entry> {
+        let inner = Handle::current().inner().unwrap();
+        let entry: Entry;
+
+        // Increment the number of active timeouts
+        if inner.increment().is_err() {
+            entry = Entry::new2(deadline, duration, Weak::new(), ERROR)
+        } else {
+            let when = inner.normalize_deadline(deadline);
+            let state = if when <= inner.elapsed() {
+                ELAPSED
+            } else {
+                when
+            };
+            entry = Entry::new2(deadline, duration, Arc::downgrade(&inner), state);
         }
+
+        let entry = Arc::new(entry);
+        if inner.queue(&entry).is_err() {
+            entry.error();
+        }
+
+        entry
     }
 
     /// Only called by `Registration`
@@ -127,77 +138,6 @@ impl Entry {
     #[allow(clippy::mut_from_ref)] // https://github.com/rust-lang/rust-clippy/issues/4281
     pub(crate) unsafe fn time_mut(&self) -> &mut Time {
         &mut *self.time.0.get()
-    }
-
-    /// Returns `true` if the `Entry` is currently associated with a timer
-    /// instance.
-    pub(crate) fn is_registered(&self) -> bool {
-        self.inner.is_some()
-    }
-
-    /// Only called by `Registration`
-    pub(crate) fn register(me: &mut Arc<Self>) {
-        let handle = match HandlePriv::try_current() {
-            Ok(handle) => handle,
-            Err(_) => {
-                // Could not associate the entry with a timer, transition the
-                // state to error
-                Arc::get_mut(me).unwrap().transition_to_error();
-
-                return;
-            }
-        };
-
-        Entry::register_with(me, handle)
-    }
-
-    /// Only called by `Registration`
-    pub(crate) fn register_with(me: &mut Arc<Self>, handle: HandlePriv) {
-        assert!(!me.is_registered(), "only register an entry once");
-
-        let deadline = me.time_ref().deadline;
-
-        let inner = match handle.inner() {
-            Some(inner) => inner,
-            None => {
-                // Could not associate the entry with a timer, transition the
-                // state to error
-                Arc::get_mut(me).unwrap().transition_to_error();
-
-                return;
-            }
-        };
-
-        // Increment the number of active timeouts
-        if inner.increment().is_err() {
-            Arc::get_mut(me).unwrap().transition_to_error();
-
-            return;
-        }
-
-        // Associate the entry with the timer
-        Arc::get_mut(me).unwrap().inner = Some(handle.into_inner());
-
-        let when = inner.normalize_deadline(deadline);
-
-        // Relaxed OK: At this point, there are no other threads that have
-        // access to this entry.
-        if when <= inner.elapsed() {
-            me.state.store(ELAPSED, Relaxed);
-            return;
-        } else {
-            me.state.store(when, Relaxed);
-        }
-
-        if inner.queue(me).is_err() {
-            // The timer has shutdown, transition the entry to the error state.
-            me.error();
-        }
-    }
-
-    fn transition_to_error(&mut self) {
-        self.inner = Some(Weak::new());
-        self.state = AtomicU64::new(ERROR);
     }
 
     /// The current entry state as known by the timer. This is not the value of
@@ -317,10 +257,6 @@ impl Entry {
 
     /// Only called by `Registration`
     pub(crate) fn reset(entry: &mut Arc<Entry>) {
-        if !entry.is_registered() {
-            return;
-        }
-
         let inner = match entry.upgrade_inner() {
             Some(inner) => inner,
             None => return,
@@ -366,8 +302,22 @@ impl Entry {
         }
     }
 
+    fn new2(deadline: Instant, duration: Duration, inner: Weak<Inner>, state: u64) -> Self {
+        Self {
+            time: CachePadded(UnsafeCell::new(Time { deadline, duration })),
+            inner,
+            waker: AtomicWaker::new(),
+            state: AtomicU64::new(state),
+            queued: AtomicBool::new(false),
+            next_atomic: UnsafeCell::new(ptr::null_mut()),
+            when: UnsafeCell::new(None),
+            next_stack: UnsafeCell::new(None),
+            prev_stack: UnsafeCell::new(ptr::null_mut()),
+        }
+    }
+
     fn upgrade_inner(&self) -> Option<Arc<Inner>> {
-        self.inner.as_ref().and_then(|inner| inner.upgrade())
+        self.inner.upgrade()
     }
 }
 

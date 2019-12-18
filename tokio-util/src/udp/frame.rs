@@ -27,6 +27,7 @@ use std::task::{Context, Poll};
 /// calling `split` on the `UdpFramed` returned by this method, which will break
 /// them into separate objects, allowing them to interact more easily.
 #[must_use = "sinks do nothing unless polled"]
+#[cfg_attr(docsrs, doc(feature = "codec-udp"))]
 #[derive(Debug)]
 pub struct UdpFramed<C> {
     socket: UdpSocket,
@@ -47,7 +48,14 @@ impl<C: Decoder + Unpin> Stream for UdpFramed<C> {
 
         let (_n, addr) = unsafe {
             // Read into the buffer without having to initialize the memory.
-            let res = ready!(Pin::new(&mut pin.socket).poll_recv_from(cx, pin.rd.bytes_mut()));
+            //
+            // safety: we know tokio::net::UdpSocket never reads from the memory
+            // during a recv
+            let res = {
+                let bytes = &mut *(pin.rd.bytes_mut() as *mut _ as *mut [u8]);
+                ready!(Pin::new(&mut pin.socket).poll_recv_from(cx, bytes))
+            };
+
             let (n, addr) = res?;
             pin.rd.advance_mut(n);
             (n, addr)

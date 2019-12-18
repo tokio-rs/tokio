@@ -1,3 +1,5 @@
+#![allow(clippy::unnecessary_operation)]
+
 use std::collections::VecDeque;
 use std::fmt;
 use std::fs::{Metadata, Permissions};
@@ -261,5 +263,19 @@ impl Seek for &'_ File {
 impl fmt::Debug for File {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("mock::File").finish()
+    }
+}
+
+#[cfg(unix)]
+impl std::os::unix::io::AsRawFd for File {
+    fn as_raw_fd(&self) -> std::os::unix::io::RawFd {
+        unimplemented!();
+    }
+}
+
+#[cfg(windows)]
+impl std::os::windows::io::AsRawHandle for File {
+    fn as_raw_handle(&self) -> std::os::windows::io::RawHandle {
+        unimplemented!();
     }
 }

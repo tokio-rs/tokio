@@ -1,14 +1,17 @@
 use bytes::BufMut;
 use std::io;
+use std::mem::MaybeUninit;
 use std::ops::DerefMut;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// Read bytes asynchronously.
+/// Read bytes from a source.
 ///
-/// This trait inherits from `std::io::Read` and indicates that an I/O object is
-/// **non-blocking**. All non-blocking I/O objects must return an error when
-/// bytes are unavailable instead of blocking the current thread.
+/// This trait is analogous to the [`std::io::Read`] trait, but integrates with
+/// the asynchronous task system. In particular, the [`poll_read`] method,
+/// unlike [`Read::read`], will automatically queue the current task for wakeup
+/// and return if data is not yet available, rather than blocking the calling
+/// thread.
 ///
 /// Specifically, this means that the `poll_read` function will return one of
 /// the following:
@@ -29,6 +32,14 @@ use std::task::{Context, Poll};
 ///
 /// This trait importantly means that the `read` method only works in the
 /// context of a future's task. The object may panic if used outside of a task.
+///
+/// Utilities for working with `AsyncRead` values are provided by
+/// [`AsyncReadExt`].
+///
+/// [`poll_read`]: AsyncRead::poll_read
+/// [`std::io::Read`]: std::io::Read
+/// [`Read::read`]: std::io::Read::read
+/// [`AsyncReadExt`]: crate::io::AsyncReadExt
 pub trait AsyncRead {
     /// Prepares an uninitialized buffer to be safe to pass to `read`. Returns
     /// `true` if the supplied buffer was zeroed out.
@@ -63,9 +74,9 @@ pub trait AsyncRead {
     ///
     /// [`io::Read`]: std::io::Read
     /// [`poll_read_buf`]: #method.poll_read_buf
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
+    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [MaybeUninit<u8>]) -> bool {
         for x in buf {
-            *x = 0;
+            *x.as_mut_ptr() = 0;
         }
 
         true
@@ -109,6 +120,9 @@ pub trait AsyncRead {
 
                 self.prepare_uninitialized_buffer(b);
 
+                // Convert to `&mut [u8]`
+                let b = &mut *(b as *mut [MaybeUninit<u8>] as *mut [u8]);
+
                 ready!(self.poll_read(cx, b))?
             };
 
@@ -120,7 +134,7 @@ pub trait AsyncRead {
 
 macro_rules! deref_async_read {
     () => {
-        unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
+        unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [MaybeUninit<u8>]) -> bool {
             (**self).prepare_uninitialized_buffer(buf)
         }
 
@@ -145,7 +159,7 @@ where
     P: DerefMut + Unpin,
     P::Target: AsyncRead,
 {
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
+    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [MaybeUninit<u8>]) -> bool {
         (**self).prepare_uninitialized_buffer(buf)
     }
 
@@ -159,7 +173,7 @@ where
 }
 
 impl AsyncRead for &[u8] {
-    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [u8]) -> bool {
+    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [MaybeUninit<u8>]) -> bool {
         false
     }
 
@@ -173,7 +187,7 @@ impl AsyncRead for &[u8] {
 }
 
 impl<T: AsRef<[u8]> + Unpin> AsyncRead for io::Cursor<T> {
-    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [u8]) -> bool {
+    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [MaybeUninit<u8>]) -> bool {
         false
     }
 

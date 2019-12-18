@@ -75,7 +75,7 @@ pub fn interval_at(start: Instant, period: Duration) -> Interval {
     }
 }
 
-/// Stream returned by [`instant`](instant) and [`instant_at`](instant_at).
+/// Stream returned by [`interval`](interval) and [`interval_at`](interval_at).
 #[derive(Debug)]
 pub struct Interval {
     /// Future that completes the next time the `Interval` yields a value.

@@ -47,7 +47,7 @@ where
             // Explicit drop of `future` silences the warning that `future` is
             // not used when neither rt-* feature flags are enabled.
             drop(future);
-            panic!("must be called from the context of Tokio runtime");
+            panic!("must be called from the context of Tokio runtime configured with either `basic_scheduler` or `threaded_scheduler`");
         }
     })
 }
@@ -63,13 +63,6 @@ where
         State::Basic(basic_scheduler as *const basic_scheduler::SchedulerPriv),
         f,
     )
-}
-
-pub(super) fn basic_scheduler_is_current(basic_scheduler: &basic_scheduler::SchedulerPriv) -> bool {
-    EXECUTOR.with(|current_executor| match current_executor.get() {
-        State::Basic(ptr) => ptr == basic_scheduler as *const _,
-        _ => false,
-    })
 }
 
 cfg_rt_threaded! {

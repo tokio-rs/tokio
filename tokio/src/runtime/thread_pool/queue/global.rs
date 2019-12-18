@@ -51,7 +51,7 @@ impl<T: 'static> Queue<T> {
     /// Close the worker queue
     pub(super) fn close(&self) -> bool {
         // Acquire the lock
-        let _p = self.pointers.lock().unwrap();
+        let p = self.pointers.lock().unwrap();
 
         let len = unsafe {
             // Set the queue as closed. Because all mutations are synchronized by
@@ -62,6 +62,8 @@ impl<T: 'static> Queue<T> {
         let ret = len & CLOSED == 0;
 
         self.len.store(len | CLOSED, Release);
+
+        drop(p);
 
         ret
     }
@@ -119,7 +121,10 @@ impl<T: 'static> Queue<T> {
             }
 
             self.len.store(len + 2, Release);
+
             f(Ok(()));
+
+            drop(p);
         }
     }
 
@@ -153,6 +158,8 @@ impl<T: 'static> Queue<T> {
             }
 
             self.len.store(len + (num << 1), Release);
+
+            drop(p);
         }
     }
 
@@ -184,6 +191,8 @@ impl<T: 'static> Queue<T> {
             //
             // Decrement by 2 to avoid touching the shutdown flag
             self.len.store(self.len.unsync_load() - 2, Release);
+
+            drop(p);
 
             Some(Task::from_raw(task))
         }

@@ -108,13 +108,11 @@ fn multi_delay_at_start() {
                 assert!(queue.is_woken());
                 assert_ready!(poll!(queue));
                 assert_pending!(poll!(queue));
-            } else {
-                if queue.is_woken() {
-                    let cascade = &[192, 960];
-                    assert!(cascade.contains(&elapsed), "elapsed={}", elapsed);
+            } else if queue.is_woken() {
+                let cascade = &[192, 960];
+                assert!(cascade.contains(&elapsed), "elapsed={}", elapsed);
 
-                    assert_pending!(poll!(queue));
-                }
+                assert_pending!(poll!(queue));
             }
         }
     });
@@ -288,14 +286,14 @@ fn multi_reset() {
 
         let epoch = clock.now();
 
-        let foo = queue.insert_at("foo", epoch + ms(200));
-        let bar = queue.insert_at("bar", epoch + ms(250));
+        let one = queue.insert_at("one", epoch + ms(200));
+        let two = queue.insert_at("two", epoch + ms(250));
 
         assert_pending!(poll!(queue));
 
-        queue.reset_at(&foo, epoch + ms(300));
-        queue.reset_at(&bar, epoch + ms(350));
-        queue.reset_at(&foo, epoch + ms(400));
+        queue.reset_at(&one, epoch + ms(300));
+        queue.reset_at(&two, epoch + ms(350));
+        queue.reset_at(&one, epoch + ms(400));
     })
 }
 
@@ -306,19 +304,19 @@ fn expire_first_key_when_reset_to_expire_earlier() {
 
         let epoch = clock.now();
 
-        let foo = queue.insert_at("foo", epoch + ms(200));
-        queue.insert_at("bar", epoch + ms(250));
+        let one = queue.insert_at("one", epoch + ms(200));
+        queue.insert_at("two", epoch + ms(250));
 
         assert_pending!(poll!(queue));
 
-        queue.reset_at(&foo, epoch + ms(100));
+        queue.reset_at(&one, epoch + ms(100));
 
         clock.advance(ms(100));
 
         assert!(queue.is_woken());
 
         let entry = assert_ready_ok!(poll!(queue)).into_inner();
-        assert_eq!(entry, "foo");
+        assert_eq!(entry, "one");
     })
 }
 
@@ -329,18 +327,18 @@ fn expire_second_key_when_reset_to_expire_earlier() {
 
         let epoch = clock.now();
 
-        queue.insert_at("foo", epoch + ms(200));
-        let bar = queue.insert_at("bar", epoch + ms(250));
+        queue.insert_at("one", epoch + ms(200));
+        let two = queue.insert_at("two", epoch + ms(250));
 
         assert_pending!(poll!(queue));
 
-        queue.reset_at(&bar, epoch + ms(100));
+        queue.reset_at(&two, epoch + ms(100));
 
         clock.advance(ms(100));
 
         assert!(queue.is_woken());
         let entry = assert_ready_ok!(poll!(queue)).into_inner();
-        assert_eq!(entry, "bar");
+        assert_eq!(entry, "two");
     })
 }
 
@@ -351,18 +349,18 @@ fn reset_first_expiring_item_to_expire_later() {
 
         let epoch = clock.now();
 
-        let foo = queue.insert_at("foo", epoch + ms(200));
-        let _bar = queue.insert_at("bar", epoch + ms(250));
+        let one = queue.insert_at("one", epoch + ms(200));
+        let _two = queue.insert_at("two", epoch + ms(250));
 
         assert_pending!(poll!(queue));
 
-        queue.reset_at(&foo, epoch + ms(300));
+        queue.reset_at(&one, epoch + ms(300));
         clock.advance(ms(250));
 
         assert!(queue.is_woken());
 
         let entry = assert_ready_ok!(poll!(queue)).into_inner();
-        assert_eq!(entry, "bar");
+        assert_eq!(entry, "two");
     })
 }
 

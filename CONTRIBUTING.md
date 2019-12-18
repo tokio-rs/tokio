@@ -15,7 +15,7 @@ It should be considered a map to help you navigate the process.
 The [dev channel][dev] is available for any concerns not covered in this guide, please join
 us!
 
-[dev]: https://gitter.im/tokio-rs/dev
+[dev]: https://discord.gg/6yGkFeN
 
 ## Conduct
 

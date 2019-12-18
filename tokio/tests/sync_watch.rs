@@ -1,4 +1,6 @@
+#![allow(clippy::cognitive_complexity)]
 #![warn(rust_2018_idioms)]
+#![cfg(feature = "full")]
 
 use tokio::sync::watch;
 use tokio_test::task::spawn;

@@ -2,11 +2,13 @@ use crate::io::AsyncRead;
 
 use std::future::Future;
 use std::io;
+use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
 #[derive(Debug)]
 #[must_use = "futures do nothing unless you `.await` or poll them"]
+#[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
 pub struct ReadToEnd<'a, R: ?Sized> {
     reader: &'a mut R,
     buf: &'a mut Vec<u8>,
@@ -64,7 +66,10 @@ pub(super) fn read_to_end_internal<R: AsyncRead + ?Sized>(
                 g.buf.reserve(32);
                 let capacity = g.buf.capacity();
                 g.buf.set_len(capacity);
-                rd.prepare_uninitialized_buffer(&mut g.buf[g.len..]);
+
+                let b = &mut *(&mut g.buf[g.len..] as *mut [u8] as *mut [MaybeUninit<u8>]);
+
+                rd.prepare_uninitialized_buffer(b);
             }
         }
 

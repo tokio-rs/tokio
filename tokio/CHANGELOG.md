@@ -1,46 +1,74 @@
-This changelog only applies to the `tokio` crate proper. Each sub crate
-maintains its own changelog tracking changes made in each respective sub crate.
+# 0.2.4 (December 6, 2019)
 
-# 0.2.0-alpha.6 (September 30, 2019)
+### Fixes
+- `sync::Mutex` deadlock when `lock()` future is dropped early (#1898).
 
-- Move to `futures-*-preview 0.3.0-alpha.19`
-- Move to `pin-project 0.4`
-
-# 0.2.0-alpha.5 (September 19, 2019)
-
-### Changed
-- rename `sleep` to `delay_for` (#1518).
-- rename `Lock` to `Mutex` and make it more like `std::sync::Mutex` (#1573).
+# 0.2.3 (December 6, 2019)
 
 ### Added
-- add generic `split` for `AsyncRead + AsyncWrite` (#1521).
+- read / write integers using `AsyncReadExt` and `AsyncWriteExt` (#1863).
+- `read_buf` / `write_buf` for reading / writing `Buf` / `BufMut` (#1881).
+- `TcpStream::poll_peek` - pollable API for performing TCP peek (#1864).
+- `sync::oneshot::error::TryRecvError` provides variants to detect the error
+  kind (#1874).
+- `LocalSet::block_on` accepts `!'static` task (#1882).
+- `task::JoinError` is now `Sync` (#1888).
+- impl conversions between `tokio::time::Instant` and
+  `std::time::Instant` (#1904).
 
-# 0.2.0-alpha.4 (August 29, 2019)
+### Fixes
+- calling `spawn_blocking` after runtime shutdown (#1875).
+- `LocalSet` drop inifinite loop (#1892).
+- `LocalSet` hang under load (#1905).
+- improved documentation (#1865, #1866, #1868, #1874, #1876, #1911).
 
-- Track tokio-net release.
+# 0.2.2 (November 29, 2019)
 
-# 0.2.0-alpha.3 (August 28, 2019)
-
-### Changed
-- `delay(...)` instead of `Delay::new(...)` (#1440).
-- use `tracing` instead of `log` (#1454).
+### Fixes
+- scheduling with `basic_scheduler` (#1861).
+- update `spawn` panic message to specify that a task scheduler is required (#1839).
+- API docs example for `runtime::Builder` to include a task scheduler (#1841).
+- general documentation (#1834).
+- building on illumos/solaris (#1772).
+- panic when dropping `LocalSet` (#1843).
+- API docs mention the required Cargo features for `Builder::{basic, threaded}_scheduler` (#1858).
 
 ### Added
-- re-export `tokio_net::signal::ctrl_c()` (#1491).
+- impl `Stream` for `signal::unix::Signal` (#1849).
+- API docs for platform specific behavior of `signal::ctrl_c` and `signal::unix::Signal` (#1854).
+- API docs for `signal::unix::Signal::{recv, poll_recv}` and `signal::windows::CtrlBreak::{recv, poll_recv}` (#1854).
+- `File::into_std` and `File::try_into_std` methods (#1856).
 
-# 0.2.0-alpha.2 (August 17, 2019)
+# 0.2.1 (November 26, 2019)
 
-### Changed
-- Update `futures` dependency to 0.3.0-alpha.18.
-- Remove `reactor` module.
+### Fixes
+- API docs for `TcpListener::incoming`, `UnixListener::incoming` (#1831).
 
 ### Added
-- Add `BufReader` / `BufWriter` (#1438).
-- Update `UdpFramed` to `std::future` (#1370).
+- `tokio::task::LocalSet` provides a strategy for spawning `!Send` tasks (#1733).
+- export `tokio::time::Elapsed` (#1826).
+- impl `AsRawFd`, `AsRawHandle` for `tokio::fs::File` (#1827).
 
-# 0.2.0-alpha.1 (August 8, 2019)
+# 0.2.0 (November 26, 2019)
 
-- Switch to `async`, `await`, and `std::future`.
+A major breaking change. Most implementation and APIs have changed one way or
+another. This changelog entry contains a highlight
+
+### Changed
+- APIs are updated to use `async / await`.
+- most `tokio-*` crates are collapsed into this crate.
+- Scheduler is rewritten.
+- `tokio::spawn` returns a `JoinHandle`.
+- A single I/O / timer is used per runtime.
+- I/O driver uses a concurrent slab for allocating state.
+- components are made available via feature flag.
+- Use `bytes` 0.5
+- `tokio::codec` is moved to `tokio-util`.
+
+### Removed
+- Standalone `timer` and `net` drivers are removed, use `Runtime` instead
+- `current_thread` runtime is removed, use `tokio::runtime::Runtime` with
+  `basic_scheduler` instead.
 
 # 0.1.21 (May 30, 2019)
 

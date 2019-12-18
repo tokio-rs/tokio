@@ -6,11 +6,13 @@ use std::mem;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-#[derive(Debug)]
-#[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct WriteAll<'a, W: ?Sized> {
-    writer: &'a mut W,
-    buf: &'a [u8],
+cfg_io_util! {
+    #[derive(Debug)]
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
+    pub struct WriteAll<'a, W: ?Sized> {
+        writer: &'a mut W,
+        buf: &'a [u8],
+    }
 }
 
 pub(crate) fn write_all<'a, W>(writer: &'a mut W, buf: &'a [u8]) -> WriteAll<'a, W>

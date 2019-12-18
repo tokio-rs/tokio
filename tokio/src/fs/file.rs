@@ -5,7 +5,7 @@
 use self::State::*;
 use crate::fs::{asyncify, sys};
 use crate::io::blocking::Buf;
-use crate::io::{AsyncRead, AsyncWrite};
+use crate::io::{AsyncRead, AsyncSeek, AsyncWrite};
 
 use std::fmt;
 use std::fs::{Metadata, Permissions};
@@ -176,63 +176,6 @@ impl File {
         }
     }
 
-    /// Seek to an offset, in bytes, in a stream.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::fs::File;
-    /// use tokio::prelude::*;
-    ///
-    /// use std::io::SeekFrom;
-    ///
-    /// # async fn dox() -> std::io::Result<()> {
-    /// let mut file = File::open("foo.txt").await?;
-    /// file.seek(SeekFrom::Start(6)).await?;
-    ///
-    /// let mut contents = vec![0u8; 10];
-    /// file.read_exact(&mut contents).await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub async fn seek(&mut self, mut pos: SeekFrom) -> io::Result<u64> {
-        self.complete_inflight().await;
-
-        let mut buf = match self.state {
-            Idle(ref mut buf_cell) => buf_cell.take().unwrap(),
-            _ => unreachable!(),
-        };
-
-        // Factor in any unread data from the buf
-        if !buf.is_empty() {
-            let n = buf.discard_read();
-
-            if let SeekFrom::Current(ref mut offset) = pos {
-                *offset += n;
-            }
-        }
-
-        let std = self.std.clone();
-
-        // Start the operation
-        self.state = Busy(sys::run(move || {
-            let res = (&*std).seek(pos);
-            (Operation::Seek(res), buf)
-        }));
-
-        let (op, buf) = match self.state {
-            Idle(_) => unreachable!(),
-            Busy(ref mut rx) => rx.await.unwrap(),
-        };
-
-        self.state = Idle(Some(buf));
-
-        match op {
-            Operation::Seek(res) => res,
-            _ => unreachable!(),
-        }
-    }
-
     /// Attempts to sync all OS-internal metadata to disk.
     ///
     /// This function will attempt to ensure that all in-core data reaches the
@@ -394,6 +337,55 @@ impl File {
         Ok(File::from_std(std_file))
     }
 
+    /// Destructures `File` into a [`std::fs::File`][std]. This function is
+    /// async to allow any in-flight operations to complete.
+    ///
+    /// Use `File::try_into_std` to attempt conversion immediately.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::fs::File;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let tokio_file = File::open("foo.txt").await?;
+    /// let std_file = tokio_file.into_std().await;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn into_std(mut self) -> sys::File {
+        self.complete_inflight().await;
+        Arc::try_unwrap(self.std).expect("Arc::try_unwrap failed")
+    }
+
+    /// Tries to immediately destructure `File` into a [`std::fs::File`][std].
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error containing the file if some
+    /// operation is in-flight.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::fs::File;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let tokio_file = File::open("foo.txt").await?;
+    /// let std_file = tokio_file.try_into_std().unwrap();
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn try_into_std(mut self) -> Result<sys::File, Self> {
+        match Arc::try_unwrap(self.std) {
+            Ok(file) => Ok(file),
+            Err(std_file_arc) => {
+                self.std = std_file_arc;
+                Err(self)
+            }
+        }
+    }
+
     /// Changes the permissions on the underlying file.
     ///
     /// # Platform-specific behavior
@@ -492,6 +484,82 @@ impl AsyncRead for File {
                             self.state = Idle(Some(buf));
                             continue;
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl AsyncSeek for File {
+    fn start_seek(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        mut pos: SeekFrom,
+    ) -> Poll<io::Result<()>> {
+        if let Some(e) = self.last_write_err.take() {
+            return Ready(Err(e.into()));
+        }
+
+        loop {
+            match self.state {
+                Idle(ref mut buf_cell) => {
+                    let mut buf = buf_cell.take().unwrap();
+
+                    // Factor in any unread data from the buf
+                    if !buf.is_empty() {
+                        let n = buf.discard_read();
+
+                        if let SeekFrom::Current(ref mut offset) = pos {
+                            *offset += n;
+                        }
+                    }
+
+                    let std = self.std.clone();
+
+                    self.state = Busy(sys::run(move || {
+                        let res = (&*std).seek(pos);
+                        (Operation::Seek(res), buf)
+                    }));
+
+                    return Ready(Ok(()));
+                }
+                Busy(ref mut rx) => {
+                    let (op, buf) = ready!(Pin::new(rx).poll(cx))?;
+                    self.state = Idle(Some(buf));
+
+                    match op {
+                        Operation::Read(_) => {}
+                        Operation::Write(Err(e)) => {
+                            self.last_write_err = Some(e.kind());
+                        }
+                        Operation::Write(_) => {}
+                        Operation::Seek(_) => {}
+                    }
+                }
+            }
+        }
+    }
+
+    fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
+        if let Some(e) = self.last_write_err.take() {
+            return Ready(Err(e.into()));
+        }
+
+        loop {
+            match self.state {
+                Idle(_) => panic!("must call start_seek before calling poll_complete"),
+                Busy(ref mut rx) => {
+                    let (op, buf) = ready!(Pin::new(rx).poll(cx))?;
+                    self.state = Idle(Some(buf));
+
+                    match op {
+                        Operation::Read(_) => {}
+                        Operation::Write(Err(e)) => {
+                            self.last_write_err = Some(e.kind());
+                        }
+                        Operation::Write(_) => {}
+                        Operation::Seek(res) => return Ready(res),
                     }
                 }
             }
@@ -598,5 +666,19 @@ impl fmt::Debug for File {
         fmt.debug_struct("tokio::fs::File")
             .field("std", &self.std)
             .finish()
+    }
+}
+
+#[cfg(unix)]
+impl std::os::unix::io::AsRawFd for File {
+    fn as_raw_fd(&self) -> std::os::unix::io::RawFd {
+        self.std.as_raw_fd()
+    }
+}
+
+#[cfg(windows)]
+impl std::os::windows::io::AsRawHandle for File {
+    fn as_raw_handle(&self) -> std::os::windows::io::RawHandle {
+        self.std.as_raw_handle()
     }
 }

@@ -1,4 +1,5 @@
 #![warn(rust_2018_idioms)]
+#![cfg(feature = "full")]
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -18,7 +19,8 @@ fn single_thread() {
     // No panic when starting a runtime w/ a single thread
     let _ = runtime::Builder::new()
         .threaded_scheduler()
-        .num_threads(1)
+        .enable_all()
+        .core_threads(1)
         .build();
 }
 
@@ -189,10 +191,11 @@ fn drop_threadpool_drops_futures() {
 
         let rt = runtime::Builder::new()
             .threaded_scheduler()
-            .after_start(move || {
+            .enable_all()
+            .on_thread_start(move || {
                 a.fetch_add(1, Relaxed);
             })
-            .before_stop(move || {
+            .on_thread_stop(move || {
                 b.fetch_add(1, Relaxed);
             })
             .build()
@@ -218,7 +221,7 @@ fn drop_threadpool_drops_futures() {
 }
 
 #[test]
-fn after_start_and_before_stop_is_called() {
+fn start_stop_callbacks_called() {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     let after_start = Arc::new(AtomicUsize::new(0));
@@ -228,10 +231,11 @@ fn after_start_and_before_stop_is_called() {
     let before_inner = before_stop.clone();
     let mut rt = tokio::runtime::Builder::new()
         .threaded_scheduler()
-        .after_start(move || {
+        .enable_all()
+        .on_thread_start(move || {
             after_inner.clone().fetch_add(1, Ordering::Relaxed);
         })
-        .before_stop(move || {
+        .on_thread_stop(move || {
             before_inner.clone().fetch_add(1, Ordering::Relaxed);
         })
         .build()

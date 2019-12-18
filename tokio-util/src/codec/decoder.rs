@@ -38,7 +38,7 @@ pub trait Decoder {
     /// Attempts to decode a frame from the provided buffer of bytes.
     ///
     /// This method is called by `FramedRead` whenever bytes are ready to be
-    /// parsed.  The provided buffer of bytes is what's been read so far, and
+    /// parsed. The provided buffer of bytes is what's been read so far, and
     /// this instance of `Decode` can determine whether an entire frame is in
     /// the buffer and is ready to be returned.
     ///

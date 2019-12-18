@@ -21,16 +21,18 @@ where
     }
 }
 
-/// Creates a future which will read exactly enough bytes to fill `buf`,
-/// returning an error if EOF is hit sooner.
-///
-/// On success the number of bytes is returned
-#[derive(Debug)]
-#[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct ReadExact<'a, A: ?Sized> {
-    reader: &'a mut A,
-    buf: &'a mut [u8],
-    pos: usize,
+cfg_io_util! {
+    /// Creates a future which will read exactly enough bytes to fill `buf`,
+    /// returning an error if EOF is hit sooner.
+    ///
+    /// On success the number of bytes is returned
+    #[derive(Debug)]
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
+    pub struct ReadExact<'a, A: ?Sized> {
+        reader: &'a mut A,
+        buf: &'a mut [u8],
+        pos: usize,
+    }
 }
 
 fn eof() -> io::Error {

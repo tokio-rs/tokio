@@ -1,5 +1,5 @@
 use crate::future::poll_fn;
-use crate::net::util::PollEvented;
+use crate::io::PollEvented;
 
 use std::convert::TryFrom;
 use std::fmt;
@@ -10,9 +10,11 @@ use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
 use std::task::{Context, Poll};
 
-/// An I/O object representing a Unix datagram socket.
-pub struct UnixDatagram {
-    io: PollEvented<mio_uds::UnixDatagram>,
+cfg_uds! {
+    /// An I/O object representing a Unix datagram socket.
+    pub struct UnixDatagram {
+        io: PollEvented<mio_uds::UnixDatagram>,
+    }
 }
 
 impl UnixDatagram {
@@ -201,7 +203,7 @@ impl TryFrom<UnixDatagram> for mio_uds::UnixDatagram {
     /// See [`PollEvented::into_inner`] for more details about
     /// resource deregistration that happens during the call.
     ///
-    /// [`PollEvented::into_inner`]: crate::util::PollEvented::into_inner
+    /// [`PollEvented::into_inner`]: crate::io::PollEvented::into_inner
     fn try_from(value: UnixDatagram) -> Result<Self, Self::Error> {
         value.io.into_inner()
     }

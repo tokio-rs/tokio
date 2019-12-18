@@ -73,7 +73,6 @@ impl Init for OsExtraData {
 ///   processed quickly enough. This means that if two notifications are
 ///   received back-to-back, then the stream may only receive one item about the
 ///   two notifications.
-// FIXME: refactor and combine with unix::Signal
 #[must_use = "streams do nothing unless polled"]
 #[derive(Debug)]
 pub(crate) struct Event {
@@ -139,7 +138,7 @@ unsafe extern "system" fn handler(ty: DWORD) -> BOOL {
 /// Represents a stream which receives "ctrl-break" notifications sent to the process
 /// via `SetConsoleCtrlHandler`.
 ///
-/// A notification to this process notifies *all* streams listening to
+/// A notification to this process notifies *all* streams listening for
 /// this event. Moreover, the notifications **are coalesced** if they aren't processed
 /// quickly enough. This means that if two notifications are received back-to-back,
 /// then the stream may only receive one item about the two notifications.
@@ -150,25 +149,95 @@ pub struct CtrlBreak {
 }
 
 impl CtrlBreak {
-    #[doc(hidden)] // TODO: document
+    /// Receive the next signal notification event.
+    ///
+    /// `None` is returned if no more events can be received by this stream.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use tokio::signal::windows::ctrl_break;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     // An infinite stream of CTRL-BREAK events.
+    ///     let mut stream = ctrl_break()?;
+    ///
+    ///     // Print whenever a CTRL-BREAK event is received
+    ///     loop {
+    ///         stream.recv().await;
+    ///         println!("got signal CTRL-BREAK");
+    ///     }
+    /// }
+    /// ```
+    pub async fn recv(&mut self) -> Option<()> {
+        use crate::future::poll_fn;
+        poll_fn(|cx| self.poll_recv(cx)).await
+    }
+
+    /// Poll to receive the next signal notification event, outside of an
+    /// `async` context.
+    ///
+    /// `None` is returned if no more events can be received by this stream.
+    ///
+    /// # Examples
+    ///
+    /// Polling from a manually implemented future
+    ///
+    /// ```rust,no_run
+    /// use std::pin::Pin;
+    /// use std::future::Future;
+    /// use std::task::{Context, Poll};
+    /// use tokio::signal::windows::CtrlBreak;
+    ///
+    /// struct MyFuture {
+    ///     ctrl_break: CtrlBreak,
+    /// }
+    ///
+    /// impl Future for MyFuture {
+    ///     type Output = Option<()>;
+    ///
+    ///     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    ///         println!("polling MyFuture");
+    ///         self.ctrl_break.poll_recv(cx)
+    ///     }
+    /// }
+    /// ```
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
         self.inner.rx.poll_recv(cx)
     }
 }
 
-#[cfg(feature = "stream")]
-impl futures_core::Stream for CtrlBreak {
-    type Item = ();
+cfg_stream! {
+    impl futures_core::Stream for CtrlBreak {
+        type Item = ();
 
-    fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<()>> {
-        self.poll_recv(cx)
+        fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<()>> {
+            self.poll_recv(cx)
+        }
     }
 }
 
 /// Creates a new stream which receives "ctrl-break" notifications sent to the
 /// process.
 ///
-/// This function binds to the default reactor.
+/// # Examples
+///
+/// ```rust,no_run
+/// use tokio::signal::windows::ctrl_break;
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     // An infinite stream of CTRL-BREAK events.
+///     let mut stream = ctrl_break()?;
+///
+///     // Print whenever a CTRL-BREAK event is received
+///     loop {
+///         stream.recv().await;
+///         println!("got signal CTRL-BREAK");
+///     }
+/// }
+/// ```
 pub fn ctrl_break() -> io::Result<CtrlBreak> {
     Event::new(CTRL_BREAK_EVENT).map(|inner| CtrlBreak { inner })
 }

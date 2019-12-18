@@ -1,7 +1,5 @@
 # Tokio
 
- _NOTE_: Tokio's [`master`](https://github.com/tokio-rs/tokio) branch is currently in the process of moving to [`std::future::Future`](https://doc.rust-lang.org/std/future/trait.Future.html), for `v0.1.x` based tokio releases please check out the [`v0.1.x`](https://github.com/tokio-rs/tokio/tree/v0.1.x) branch.
-
 A runtime for writing reliable, asynchronous, and slim applications with
 the Rust programming language. It is:
 
@@ -17,7 +15,7 @@ the Rust programming language. It is:
 [![Crates.io][crates-badge]][crates-url]
 [![MIT licensed][mit-badge]][mit-url]
 [![Build Status][azure-badge]][azure-url]
-[![Gitter chat][gitter-badge]][gitter-url]
+[![Discord chat][discord-badge]][discord-url]
 
 [crates-badge]: https://img.shields.io/crates/v/tokio.svg
 [crates-url]: https://crates.io/crates/tokio
@@ -25,13 +23,13 @@ the Rust programming language. It is:
 [mit-url]: LICENSE
 [azure-badge]: https://dev.azure.com/tokio-rs/Tokio/_apis/build/status/tokio-rs.tokio?branchName=master
 [azure-url]: https://dev.azure.com/tokio-rs/Tokio/_build/latest?definitionId=1&branchName=master
-[gitter-badge]: https://img.shields.io/gitter/room/tokio-rs/tokio.svg
-[gitter-url]: https://gitter.im/tokio-rs/tokio
+[discord-badge]: https://img.shields.io/discord/500028886025895936.svg?logo=discord&style=flat-square
+[discord-url]: https://discord.gg/6yGkFeN
 
 [Website](https://tokio.rs) |
 [Guides](https://tokio.rs/docs/) |
-[API Docs](https://docs.rs/tokio/0.2.0-alpha.2/tokio) |
-[Chat](https://gitter.im/tokio-rs/tokio)
+[API Docs](https://docs.rs/tokio/0.2/tokio) |
+[Chat](https://discord.gg/6yGkFeN)
 
 ## Overview
 
@@ -47,22 +45,29 @@ level, it provides a few major components:
 These components provide the runtime components necessary for building
 an asynchronous application.
 
-[net]: https://docs.rs/tokio/0.2.0-alpha.2/tokio/net/index.html
-[scheduler]: https://docs.rs/tokio/0.2.0-alpha.2/tokio/runtime/index.html
+[net]: https://docs.rs/tokio/0.2/tokio/net/index.html
+[scheduler]: https://docs.rs/tokio/0.2/tokio/runtime/index.html
 
 ## Example
 
+To get started, add the following to `Cargo.toml`.
+
+```toml
+tokio = { version = "0.2", features = ["full"] }
+```
+
+Tokio requires components to be explicitly enabled using feature flags. As a
+shorthand, the `full` feature enables all components.
+
 A basic TCP echo server with Tokio:
 
-```rust
-
+```rust,no_run
 use tokio::net::TcpListener;
 use tokio::prelude::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr = "127.0.0.1:8080".parse()?;
-    let mut listener = TcpListener::bind(&addr).unwrap();
+    let mut listener = TcpListener::bind("127.0.0.1:8080").await?;
 
     loop {
         let (mut socket, _) = listener.accept().await?;
@@ -77,14 +82,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Ok(n) if n == 0 => return,
                     Ok(n) => n,
                     Err(e) => {
-                        println!("failed to read from socket; err = {:?}", e);
+                        eprintln!("failed to read from socket; err = {:?}", e);
                         return;
                     }
                 };
 
                 // Write the data back
                 if let Err(e) = socket.write_all(&buf[0..n]).await {
-                    println!("failed to write to socket; err = {:?}", e);
+                    eprintln!("failed to write to socket; err = {:?}", e);
                     return;
                 }
             }
@@ -94,7 +99,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```
 
 More examples can be found [here](../examples). Note that the `master` branch
-is currently being updated to use `async` / `await`.  The examples are
+is currently being updated to use `async` / `await`. The examples are
 not fully ported. Examples for stable Tokio can be found
 [here](https://github.com/tokio-rs/tokio/tree/v0.1.x/tokio/examples).
 
@@ -103,12 +108,12 @@ not fully ported. Examples for stable Tokio can be found
 
 First, see if the answer to your question can be found in the [Guides] or the
 [API documentation]. If the answer is not there, there is an active community in
-the [Tokio Gitter channel][chat]. We would be happy to try to answer your
-question.  Last, if that doesn't work, try opening an [issue] with the question.
+the [Tokio Discord server][chat]. We would be happy to try to answer your
+question. Last, if that doesn't work, try opening an [issue] with the question.
 
 [Guides]: https://tokio.rs/docs/
-[API documentation]: https://docs.rs/tokio/0.2.0-alpha.2/tokio
-[chat]: https://gitter.im/tokio-rs/tokio
+[API documentation]: https://docs.rs/tokio/0.2
+[chat]: https://discord.gg/6yGkFeN
 [issue]: https://github.com/tokio-rs/tokio/issues/new
 
 ## Contributing
