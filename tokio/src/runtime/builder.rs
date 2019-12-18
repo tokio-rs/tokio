@@ -197,6 +197,7 @@ impl Builder {
     /// If `core_threads` is greater than `max_threads`, then core_threads is capped
     /// by `max_threads`
     pub fn max_threads(&mut self, val: usize) -> &mut Self {
+        assert_ne!(val, 0, "Thread limit cannot be zero");
         self.max_threads = val;
         self
     }
@@ -464,9 +465,9 @@ cfg_rt_threaded! {
             use crate::runtime::{Kind, ThreadPool};
             use crate::runtime::park::Parker;
 
-            let clock = time::create_clock();
-
             assert!(self.core_threads <= self.max_threads, "Core threads number cannot be above max limit");
+
+            let clock = time::create_clock();
 
             let (io_driver, io_handle) = io::create_driver(self.enable_io)?;
             let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone());
