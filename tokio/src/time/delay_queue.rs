@@ -730,6 +730,17 @@ impl<T> Default for DelayQueue<T> {
     }
 }
 
+#[cfg(feature = "stream")]
+impl<T> futures_core::Stream for DelayQueue<T> {
+    // DelayQueue seems much more specific, where a user may care that it
+    // has reached capacity, so return those errors instead of panicking.
+    type Item = Result<Expired<T>, Error>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {
+        DelayQueue::poll_expired(self.get_mut(), cx)
+    }
+}
+
 impl<T> wheel::Stack for Stack<T> {
     type Owned = usize;
     type Borrowed = usize;
