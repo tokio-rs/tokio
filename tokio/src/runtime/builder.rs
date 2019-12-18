@@ -52,7 +52,7 @@ pub struct Builder {
     /// Only used when not using the current-thread executor.
     core_threads: usize,
 
-    ///Cap on thread usage.
+    /// Cap on thread usage.
     max_threads: usize,
 
     /// Name used for threads spawned by the runtime.
@@ -182,20 +182,20 @@ impl Builder {
         self
     }
 
-    ///Specifies limit for threads, spawned by the Runtime.
+    /// Specifies limit for threads, spawned by the Runtime.
     ///
-    ///This is number of threads to be used outside of Runtime core threads.
-    ///In the current implementation it is used to cap number of threads spawned when using
-    ///blocking annotation
+    /// This is number of threads to be used outside of Runtime core threads.
+    /// In the current implementation it is used to cap number of threads spawned when using
+    /// blocking annotation
     ///
-    ///The default value is 512.
+    /// The default value is 512.
     ///
-    ///When multi-threaded runtime is not used, will act as limit on additional threads.
+    /// When multi-threaded runtime is not used, will act as limit on additional threads.
     ///
-    ///Otherwise it limits additional threads as following: `max_threads - core_threads`
+    /// Otherwise it limits additional threads as following: `max_threads - core_threads`
     ///
-    ///If `core_threads` is greater than `max_threads`, then core_threads is capped
-    ///by `max_threads`
+    /// If `core_threads` is greater than `max_threads`, then core_threads is capped
+    /// by `max_threads`
     pub fn max_threads(&mut self, val: usize) -> &mut Self {
         self.max_threads = val;
         self
@@ -466,19 +466,15 @@ cfg_rt_threaded! {
 
             let clock = time::create_clock();
 
-            let (core_threads, blocking_threads) = if self.core_threads > self.max_threads {
-                (self.max_threads, 0)
-            } else {
-                (self.core_threads, self.max_threads - self.core_threads)
-            };
+            assert!(self.core_threads <= self.max_threads, "Core threads number cannot be above max limit");
 
             let (io_driver, io_handle) = io::create_driver(self.enable_io)?;
             let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone());
-            let (scheduler, workers) = ThreadPool::new(core_threads, Parker::new(driver));
+            let (scheduler, workers) = ThreadPool::new(self.core_threads, Parker::new(driver));
             let spawner = Spawner::ThreadPool(scheduler.spawner().clone());
 
             // Create the blocking pool
-            let blocking_pool = blocking::create_blocking_pool(self, &spawner, &io_handle, &time_handle, &clock, blocking_threads);
+            let blocking_pool = blocking::create_blocking_pool(self, &spawner, &io_handle, &time_handle, &clock, self.max_threads);
             let blocking_spawner = blocking_pool.spawner().clone();
 
             // Spawn the thread pool workers
@@ -510,6 +506,7 @@ impl fmt::Debug for Builder {
         fmt.debug_struct("Builder")
             .field("kind", &self.kind)
             .field("core_threads", &self.core_threads)
+            .field("max_threads", &self.max_threads)
             .field("thread_name", &self.thread_name)
             .field("thread_stack_size", &self.thread_stack_size)
             .field("after_start", &self.after_start.as_ref().map(|_| "..."))
