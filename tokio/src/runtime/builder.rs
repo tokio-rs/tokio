@@ -142,17 +142,6 @@ impl Builder {
     /// this value on the smaller side.
     ///
     /// The default value is the number of cores available to the system.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio::runtime;
-    ///
-    /// let rt = runtime::Builder::new()
-    ///     .num_threads(4)
-    ///     .build()
-    ///     .unwrap();
-    /// ```
     pub fn num_threads(&mut self, val: usize) -> &mut Self {
         self.core_threads = val;
         self
