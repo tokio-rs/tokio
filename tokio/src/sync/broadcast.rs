@@ -155,7 +155,7 @@ pub struct Sender<T> {
 
 /// Receiving-half of the [`broadcast`] channel.
 ///
-/// May not be used concurrently. Messages may be retrieved using
+/// Must not be used concurrently. Messages may be retrieved using
 /// [`recv`][Receiver::recv].
 ///
 /// # Examples
@@ -721,7 +721,8 @@ where
     /// will return with `Err(TryRecvError::Lagged)` and the [`Receiver`]'s
     /// internal cursor is updated to point to the oldest value still held by
     /// the channel. A subsequent call to [`try_recv`] will return this value
-    /// **unless** it has been since overwritten.
+    /// **unless** it has been since overwritten. If there are no values to
+    /// receive, `Err(TryRecvError::Empty)` is returned.
     ///
     /// [`recv`]: crate::sync::broadcast::Receiver::recv
     /// [`Receiver`]: crate::sync::broadcast::Receiver
