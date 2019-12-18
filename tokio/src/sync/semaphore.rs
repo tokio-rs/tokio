@@ -1,17 +1,17 @@
-//! Thread-safe, asynchronous counting semaphore.
-//!
-//! A `Semaphore` instance holds a set of permits. Permits are used to
-//! synchronize access to a shared resource.
-//!
-//! Before accessing the shared resource, callers acquire a permit from the
-//! semaphore. Once the permit is acquired, the caller then enters the critical
-//! section. If no permits are available, then the task can wait until a
-//! permit becomes available.
-
 use super::semaphore_ll as ll; // low level implementation
 use crate::future::poll_fn;
 
-/// Futures-aware semaphore
+/// Counting semaphore performing asynchronous permit aquisition.
+///
+/// A semaphore maintains a set of permits. Permits are used to synchronize
+/// access to a shared resource. A semaphore differs from a mutex in that it
+/// can allow more than one concurrent caller to access the shared resource at a
+/// time.
+///
+/// When `acquire` is called and the semaphore has remaining permits, the
+/// function immediately returns a permit. However, if no remaining permits are
+/// available, `acquire` (asynchronously) waits until an outstanding permit is
+/// dropped. At this point, the freed permit is assigned to the caller.
 #[derive(Debug)]
 pub struct Semaphore {
     /// The low level semaphore
