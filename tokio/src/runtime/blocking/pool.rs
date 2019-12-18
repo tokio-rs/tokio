@@ -303,7 +303,9 @@ impl Inner {
                     break;
                 }
 
-                if timeout_result.timed_out() {
+                // Even if the condvar "timed out", if the pool is entering the
+                // shutdown phase, we want to perform the cleanup logic.
+                if !shared.shutdown && timeout_result.timed_out() {
                     break 'main;
                 }
 
@@ -311,6 +313,14 @@ impl Inner {
             }
 
             if shared.shutdown {
+                // Drain the queue
+                while let Some(task) = shared.queue.pop_front() {
+                    drop(shared);
+                    task.shutdown();
+
+                    shared = self.shared.lock().unwrap();
+                }
+
                 // Work was produced, and we "took" it (by decrementing num_notify).
                 // This means that num_idle was decremented once for our wakeup.
                 // But, since we are exiting, we need to "undo" that, as we'll stay idle.
