@@ -354,13 +354,6 @@ impl Inner {
     }
 }
 
-impl Drop for Inner {
-    fn drop(&mut self) {
-        let shared = self.shared.lock().unwrap();
-        assert!(shared.queue.is_empty());
-    }
-}
-
 impl fmt::Debug for Spawner {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("blocking::Spawner").finish()
