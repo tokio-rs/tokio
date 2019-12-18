@@ -1,7 +1,7 @@
 #![cfg(feature = "full")]
 
 use std::sync::Arc;
-use tokio::sync::semaphore::Semaphore;
+use tokio::sync::Semaphore;
 
 #[test]
 fn no_permits() {

@@ -18,6 +18,15 @@ pub struct Semaphore {
     ll_sem: ll::Semaphore,
 }
 
+/// A permit from the semaphore
+#[must_use]
+#[derive(Debug)]
+pub struct SemaphorePermit<'a> {
+    sem: &'a Semaphore,
+    // the low level permit
+    ll_permit: ll::Permit,
+}
+
 /// Error returned from the [`Semaphore::try_acquire`] function.
 ///
 /// A `try_acquire` operation can only fail if the semaphore has no available
@@ -46,8 +55,8 @@ impl Semaphore {
     }
 
     /// Acquire permit from the semaphore
-    pub async fn acquire(&self) -> Permit<'_> {
-        let mut permit = Permit {
+    pub async fn acquire(&self) -> SemaphorePermit<'_> {
+        let mut permit = SemaphorePermit {
             sem: &self,
             ll_permit: ll::Permit::new(),
         };
@@ -56,26 +65,17 @@ impl Semaphore {
     }
 
     /// Try to acquire a permit form the semaphore
-    pub fn try_acquire(&self) -> Result<Permit<'_>, TryAcquireError> {
+    pub fn try_acquire(&self) -> Result<SemaphorePermit<'_>, TryAcquireError> {
         let mut ll_permit = ll::Permit::new();
         match ll_permit.try_acquire(&self.ll_sem) {
-            Ok(_) => Ok(Permit { sem: self, ll_permit }),
+            Ok(_) => Ok(SemaphorePermit { sem: self, ll_permit }),
             Err(_) => Err(TryAcquireError(())),
         }
 
     }
 }
 
-/// A permit from the semaphore
-#[must_use]
-#[derive(Debug)]
-pub struct Permit<'a> {
-    sem: &'a Semaphore,
-    // the low level permit
-    ll_permit: ll::Permit,
-}
-
-impl<'a> Permit<'a> {
+impl<'a> SemaphorePermit<'a> {
     /// Forget the permit **without** releasing it back to the semaphore.
     /// This can be used to reduce the amount of permits available from a
     /// semaphore.
@@ -84,7 +84,7 @@ impl<'a> Permit<'a> {
     }
 }
 
-impl<'a> Drop for Permit<'_> {
+impl<'a> Drop for SemaphorePermit<'_> {
     fn drop(&mut self) {
         self.ll_permit.release(&self.sem.ll_sem);
     }
