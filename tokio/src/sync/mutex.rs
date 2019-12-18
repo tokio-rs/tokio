@@ -73,25 +73,17 @@ unsafe impl<T> Send for Mutex<T> where T: Send {}
 unsafe impl<T> Sync for Mutex<T> where T: Send {}
 unsafe impl<'a, T> Sync for MutexGuard<'a, T> where T: Send + Sync {}
 
-/// An enumeration of possible errors associated with a `TryLockResult`
-/// which can occur while trying to acquire a lock from the `try_lock`
-/// method on a `Mutex`.
+/// Error returned from the [`Mutex::try_lock`] function.
+///
+/// A `try_lock` operation can only fail if the mutex is already locked.
+///
+/// [`Mutex::try_lock`]: Mutex::try_lock
 #[derive(Debug)]
-pub enum TryLockError {
-    /// The lock could not be acquired at this time because the operation
-    /// would otherwise block.
-    WouldBlock,
-}
+pub struct TryLockError(());
 
 impl fmt::Display for TryLockError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            fmt,
-            "{}",
-            match self {
-                TryLockError::WouldBlock => "operation would block"
-            }
-        )
+        write!(fmt, "{}", "operation would block")
     }
 }
 
@@ -134,7 +126,7 @@ impl<T> Mutex<T> {
         let mut permit = semaphore::Permit::new();
         match permit.try_acquire(&self.s) {
             Ok(_) => Ok(MutexGuard { lock: self, permit }),
-            Err(_) => Err(TryLockError::WouldBlock),
+            Err(_) => Err(TryLockError(())),
         }
     }
 }
