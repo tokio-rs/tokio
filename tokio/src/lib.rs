@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio/0.2.5")]
+#![doc(html_root_url = "https://docs.rs/tokio/0.2.6")]
 #![allow(clippy::cognitive_complexity)]
 #![warn(
     missing_debug_implementations,

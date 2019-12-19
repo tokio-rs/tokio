@@ -1,3 +1,8 @@
+# 0.2.6 (December 19, 2019)
+
+### Fixes
+- `fs::File::seek` API regression (#1991).
+
 # 0.2.5 (December 18, 2019)
 
 ### Added
