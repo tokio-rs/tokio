@@ -176,10 +176,30 @@ impl File {
         }
     }
 
-    #[deprecated(note = "use `tokio::io::AsyncSeekExt::seek` instead")]
-    #[doc(hidden)]
+    /// Seek to an offset, in bytes, in a stream.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::fs::File;
+    /// use tokio::prelude::*;
+    ///
+    /// use std::io::SeekFrom;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let mut file = File::open("foo.txt").await?;
+    /// file.seek(SeekFrom::Start(6)).await?;
+    ///
+    /// let mut contents = vec![0u8; 10];
+    /// file.read_exact(&mut contents).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
-        crate::io::AsyncSeekExt::seek(self, pos).await
+        use crate::future::poll_fn;
+
+        poll_fn(|cx| Pin::new(&mut *self).start_seek(cx, pos)).await?;
+        poll_fn(|cx| AsyncSeek::poll_complete(Pin::new(&mut *self), cx)).await
     }
 
     /// Attempts to sync all OS-internal metadata to disk.
