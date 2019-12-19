@@ -195,11 +195,42 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
-        use crate::future::poll_fn;
+    pub async fn seek(&mut self, mut pos: SeekFrom) -> io::Result<u64> {
+        self.complete_inflight().await;
 
-        poll_fn(|cx| Pin::new(&mut *self).start_seek(cx, pos)).await?;
-        poll_fn(|cx| AsyncSeek::poll_complete(Pin::new(&mut *self), cx)).await
+        let mut buf = match self.state {
+            Idle(ref mut buf_cell) => buf_cell.take().unwrap(),
+            _ => unreachable!(),
+        };
+
+        // Factor in any unread data from the buf
+        if !buf.is_empty() {
+            let n = buf.discard_read();
+
+            if let SeekFrom::Current(ref mut offset) = pos {
+                *offset += n;
+            }
+        }
+
+        let std = self.std.clone();
+
+        // Start the operation
+        self.state = Busy(sys::run(move || {
+            let res = (&*std).seek(pos);
+            (Operation::Seek(res), buf)
+        }));
+
+        let (op, buf) = match self.state {
+            Idle(_) => unreachable!(),
+            Busy(ref mut rx) => rx.await.unwrap(),
+        };
+
+        self.state = Idle(Some(buf));
+
+        match op {
+            Operation::Seek(res) => res,
+            _ => unreachable!(),
+        }
     }
 
     /// Attempts to sync all OS-internal metadata to disk.
