@@ -176,6 +176,12 @@ impl File {
         }
     }
 
+    #[deprecated(note = "use `tokio::io::AsyncSeekExt::seek` instead")]
+    #[doc(hidden)]
+    pub async fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        crate::io::AsyncSeekExt::seek(self, pos).await
+    }
+
     /// Attempts to sync all OS-internal metadata to disk.
     ///
     /// This function will attempt to ensure that all in-core data reaches the
