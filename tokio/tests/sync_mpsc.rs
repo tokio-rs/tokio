@@ -452,3 +452,40 @@ fn try_recv_unbounded() {
         _ => panic!(),
     }
 }
+
+#[tokio::test(threaded_scheduler)]
+async fn try_send_try_recv() {
+    const PERMITS: usize = 16;
+    const TASKS: usize = 64;
+    const CYCLES: usize = 1024;
+    use std::sync::Arc;
+    use tokio::sync::Semaphore;
+    use tokio::sync::Mutex;
+    struct Context {
+        sem: Arc<Semaphore>,
+        tx: mpsc::Sender<()>,
+        rx: Mutex<mpsc::Receiver<()>>,
+    }
+    let (tx, rx) = mpsc::channel(PERMITS);
+    let sem = Arc::new(Semaphore::new(PERMITS));
+    let ctx = Arc::new(Context { sem, tx, rx: Mutex::new(rx) });
+    for _ in 0..PERMITS {
+        ctx.tx.clone().try_send(()).unwrap();
+    }
+    let mut tasks = Vec::new();
+    for _ in 0..TASKS {
+        let ctx = ctx.clone();
+        tasks.push(tokio::spawn(async move {
+            for _ in 0..CYCLES {
+                let permit = ctx.sem.acquire().await;
+                ctx.rx.lock().await.try_recv().unwrap();
+                tokio::task::yield_now().await;
+                ctx.tx.clone().try_send(()).unwrap();
+                drop(permit);
+            }
+        }));
+    }
+    for task in tasks {
+        task.await.unwrap();
+    }
+}
