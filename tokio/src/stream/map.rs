@@ -20,15 +20,14 @@ where
     St: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Map")
-            .field("stream", &self.stream)
-            .finish()
+        f.debug_struct("Map").field("stream", &self.stream).finish()
     }
 }
 
 impl<St, T, F> Map<St, F>
-    where St: Stream,
-          F: FnMut(St::Item) -> T,
+where
+    St: Stream,
+    F: FnMut(St::Item) -> T,
 {
     pub(super) fn new(stream: St, f: F) -> Map<St, F> {
         Map { stream, f }
@@ -36,17 +35,16 @@ impl<St, T, F> Map<St, F>
 }
 
 impl<St, F, T> Stream for Map<St, F>
-    where St: Stream,
-          F: FnMut(St::Item) -> T,
+where
+    St: Stream,
+    F: FnMut(St::Item) -> T,
 {
     type Item = T;
 
-    fn poll_next(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Option<T>> {
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
         self.as_mut()
-            .project().stream
+            .project()
+            .stream
             .poll_next(cx)
             .map(|opt| opt.map(|x| (self.as_mut().project().f)(x)))
     }

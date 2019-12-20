@@ -22,10 +22,7 @@ impl<'a, St: ?Sized + Stream + Unpin> Next<'a, St> {
 impl<St: ?Sized + Stream + Unpin> Future for Next<'_, St> {
     type Output = Option<St::Item>;
 
-    fn poll(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         Pin::new(&mut self.stream).poll_next(cx)
     }
 }

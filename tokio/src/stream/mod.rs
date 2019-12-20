@@ -1,6 +1,6 @@
 //! Stream utilities for Tokio.
 //!
-//! `Stream`s are an asynchoronous version of standard library's Iterator.
+//! A `Stream` is an asynchronous sequence of values. It can be thought of as an asynchronous version of the standard library's `Iterator` trait.
 //!
 //! This module provides helpers to work with them.
 

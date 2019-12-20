@@ -1,3 +1,4 @@
+#![allow(clippy::cognitive_complexity)]
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "sync")]
 
