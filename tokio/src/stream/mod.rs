@@ -4,6 +4,12 @@
 //!
 //! This module provides helpers to work with them.
 
+mod filter;
+use filter::Filter;
+
+mod filter_map;
+use filter_map::FilterMap;
+
 mod iter;
 pub use iter::{iter, Iter};
 
@@ -87,6 +93,74 @@ pub trait StreamExt: Stream {
         Self: Sized,
     {
         Map::new(self, f)
+    }
+
+    /// Filters the values produced by this stream according to the provided
+    /// predicate.
+    ///
+    /// As values of this stream are made available, the provided predicate `f`
+    /// will be run against them. If the predicate
+    /// resolves to `true`, then the stream will yield the value, but if the
+    /// predicate resolves to `false`, then the value
+    /// will be discarded and the next value will be produced.
+    ///
+    /// Note that this function consumes the stream passed into it and returns a
+    /// wrapped version of it, similar to the existing `filter` methods in the
+    /// standard library.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio::stream::{self, StreamExt};
+    ///
+    /// let stream = stream::iter(1..=10);
+    /// let evens = stream.filter(|x| x % 2 == 0);
+    ///
+    /// assert_eq!(vec![2, 4, 6, 8, 10], evens.collect::<Vec<_>>().await);
+    /// # }
+    /// ```
+    fn filter<F>(self, f: F) -> Filter<Self, F>
+    where
+        F: FnMut(&Self::Item) -> bool,
+        Self: Sized,
+    {
+        Filter::new(self, f)
+    }
+
+    /// Filters the values produced by this stream while simultaneously mapping
+    /// them to a different type according to the provided closure.
+    ///
+    /// As values of this stream are made available, the provided function will
+    /// be run on them. If the predicate `f` resolves to
+    /// [`Some(item)`](Some) then the stream will yield the value `item`, but if
+    /// it resolves to [`None`] then the next value will be produced.
+    ///
+    /// Note that this function consumes the stream passed into it and returns a
+    /// wrapped version of it, similar to the existing `filter_map` methods in
+    /// the standard library.
+    ///
+    /// # Examples
+    /// ```
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio::stream::{self, StreamExt};
+    ///
+    /// let stream = stream::iter(1..=10);
+    /// let evens = stream.filter_map(|x| {
+    ///     if x % 2 == 0 { Some(x + 1) } else { None }
+    /// });
+    ///
+    /// assert_eq!(vec![3, 5, 7, 9, 11], evens.collect::<Vec<_>>().await);
+    /// # }
+    /// ```
+    fn filter_map<T, F>(self, f: F) -> FilterMap<Self, F>
+    where
+        F: FnMut(Self::Item) -> Option<T>,
+        Self: Sized,
+    {
+        FilterMap::new(self, f)
     }
 }
 
