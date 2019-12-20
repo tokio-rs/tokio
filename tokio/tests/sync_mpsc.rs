@@ -452,3 +452,33 @@ fn try_recv_unbounded() {
         _ => panic!(),
     }
 }
+
+#[tokio::test]
+async fn try_send_try_recv() {
+    use std::sync::Arc;
+    use tokio::sync::Semaphore;
+    use tokio::sync::Mutex;
+    struct Context {
+        sem: Arc<Semaphore>,
+        tx: mpsc::Sender<()>,
+        rx: Mutex<mpsc::Receiver<()>>,
+    }
+    let (tx, rx) = mpsc::channel(1);
+    let sem = Arc::new(Semaphore::new(1));
+    let ctx = Arc::new(Context { sem, tx, rx: Mutex::new(rx) });
+    ctx.tx.clone().try_send(()).unwrap();
+    let mut tasks = Vec::new();
+    for _ in 0..2 {
+        let ctx = ctx.clone();
+        tasks.push(tokio::spawn(async move {
+            let permit = ctx.sem.acquire();
+            ctx.rx.lock().await.try_recv().unwrap();
+            tokio::task::yield_now().await;
+            ctx.tx.clone().try_send(()).unwrap();
+            drop(permit);
+        }));
+    }
+    for task in tasks {
+        task.await.unwrap();
+    }
+}
