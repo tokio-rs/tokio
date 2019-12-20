@@ -115,10 +115,14 @@ pub trait StreamExt: Stream {
     /// # async fn main() {
     /// use tokio::stream::{self, StreamExt};
     ///
-    /// let stream = stream::iter(1..=10);
-    /// let evens = stream.filter(|x| x % 2 == 0);
+    /// let stream = stream::iter(1..=8);
+    /// let mut evens = stream.filter(|x| x % 2 == 0);
     ///
-    /// assert_eq!(vec![2, 4, 6, 8, 10], evens.collect::<Vec<_>>().await);
+    /// assert_eq!(Some(2), evens.next().await);
+    /// assert_eq!(Some(4), evens.next().await);
+    /// assert_eq!(Some(6), evens.next().await);
+    /// assert_eq!(Some(8), evens.next().await);
+    /// assert_eq!(None, evens.next().await);
     /// # }
     /// ```
     fn filter<F>(self, f: F) -> Filter<Self, F>
@@ -147,12 +151,16 @@ pub trait StreamExt: Stream {
     /// # async fn main() {
     /// use tokio::stream::{self, StreamExt};
     ///
-    /// let stream = stream::iter(1..=10);
-    /// let evens = stream.filter_map(|x| {
+    /// let stream = stream::iter(1..=8);
+    /// let mut evens = stream.filter_map(|x| {
     ///     if x % 2 == 0 { Some(x + 1) } else { None }
     /// });
     ///
-    /// assert_eq!(vec![3, 5, 7, 9, 11], evens.collect::<Vec<_>>().await);
+    /// assert_eq!(Some(3), evens.next().await);
+    /// assert_eq!(Some(5), evens.next().await);
+    /// assert_eq!(Some(7), evens.next().await);
+    /// assert_eq!(Some(9), evens.next().await);
+    /// assert_eq!(None, evens.next().await);
     /// # }
     /// ```
     fn filter_map<T, F>(self, f: F) -> FilterMap<Self, F>
