@@ -30,7 +30,7 @@ use std::task::{Context, Poll};
 ///     interval.tick().await;
 ///     interval.tick().await;
 ///
-///     // approximately 30ms have elapsed.
+///     // approximately 20ms have elapsed.
 /// }
 /// ```
 pub fn interval(period: Duration) -> Interval {
@@ -120,7 +120,7 @@ impl Interval {
     ///     interval.tick().await;
     ///     interval.tick().await;
     ///
-    ///     // approximately 30ms have elapsed.
+    ///     // approximately 20ms have elapsed.
     /// }
     /// ```
     #[allow(clippy::should_implement_trait)] // TODO: rename (tokio-rs/tokio#1261)
