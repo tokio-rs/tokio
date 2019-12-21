@@ -730,7 +730,7 @@ impl Permit {
 
     /// Release a permit back to the semaphore
     pub(crate) fn release(&mut self, n: u16, semaphore: &Semaphore) {
-        self.forget(n);
+        let n = self.forget(n);
         semaphore.add_permits(n as usize);
     }
 
@@ -742,28 +742,34 @@ impl Permit {
     /// Repeatedly calling `forget` without associated calls to `add_permit`
     /// will result in the semaphore losing all permits.
     ///
-    /// # Panics
-    ///
-    /// Panics if `n` is greater than the number acquired
-    pub(crate) fn forget(&mut self, n: u16) {
+    /// Will forget **at most** the number of acquired permits. This number is
+    /// returned.
+    pub(crate) fn forget(&mut self, n: u16) -> u16 {
         use PermitState::*;
 
         match self.state {
             Waiting(requested) => {
-                assert!(n <= requested);
+                let n = cmp::min(n, requested);
 
                 // Decrement
-                self.waiter.as_ref().unwrap().try_dec_permits_to_acquire(n as usize);
+                let acquired = self.waiter.as_ref().unwrap().try_dec_permits_to_acquire(n as usize) as u16;
 
                 if n == requested {
                     self.state = Acquired(0);
                 } else {
-                    self.state = Waiting(requested - n);
+                    if acquired == requested - n {
+                        self.state = Waiting(acquired);
+                    } else {
+                        self.state = Waiting(requested - n);
+                    }
                 }
+
+                acquired
             }
             Acquired(acquired) => {
-                assert!(n <= acquired);
+                let n = cmp::min(n, acquired);
                 self.state = Acquired(acquired - n);
+                n
             }
         }
     }

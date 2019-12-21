@@ -263,17 +263,6 @@ fn validates_max_permits() {
 }
 
 #[test]
-#[should_panic]
-fn release_more_than_acquired() {
-    let s = Semaphore::new(5);
-    let mut permit = Permit::new();
-
-    assert_ok!(permit.try_acquire(1, &s));
-
-    permit.release(2, &s);
-}
-
-#[test]
 fn close_semaphore_prevents_acquire() {
     let s = Semaphore::new(5);
     s.close();
@@ -442,4 +431,41 @@ fn poll_acquire_fewer_permits_after_assigned() {
     assert_eq!(s.available_permits(), 1);
 
     assert_ready_ok!(permit2.enter(|cx, mut p| p.poll_acquire(cx, 1, &s)));
+}
+
+#[test]
+fn forget_partial_1() {
+    let s = Semaphore::new(0);
+
+    let mut permit = task::spawn(Permit::new());
+
+    assert_pending!(permit.enter(|cx, mut p| p.poll_acquire(cx, 2, &s)));
+    s.add_permits(1);
+
+    assert_eq!(0, s.available_permits());
+
+    permit.release(1, &s);
+
+    assert_ready_ok!(permit.enter(|cx, mut p| p.poll_acquire(cx, 1, &s)));
+
+    assert_eq!(s.available_permits(), 0);
+}
+
+#[test]
+fn forget_partial_2() {
+    let s = Semaphore::new(0);
+
+    let mut permit = task::spawn(Permit::new());
+
+    assert_pending!(permit.enter(|cx, mut p| p.poll_acquire(cx, 2, &s)));
+    s.add_permits(1);
+
+    assert_eq!(0, s.available_permits());
+
+    permit.release(1, &s);
+
+    s.add_permits(1);
+
+    assert_ready_ok!(permit.enter(|cx, mut p| p.poll_acquire(cx, 2, &s)));
+    assert_eq!(s.available_permits(), 0);
 }
