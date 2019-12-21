@@ -12,8 +12,8 @@ use std::cell::RefCell;
 use std::fmt;
 use std::io;
 use std::marker::PhantomData;
-use std::sync::{Arc, Weak};
 use std::sync::atomic::Ordering::SeqCst;
+use std::sync::{Arc, Weak};
 use std::task::Waker;
 use std::time::Duration;
 

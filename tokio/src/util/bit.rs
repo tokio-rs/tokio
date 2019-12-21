@@ -21,10 +21,7 @@ impl Pack {
     pub(crate) const fn least_significant(width: u32) -> Pack {
         let mask = mask_for(width);
 
-        Pack {
-            mask,
-            shift: 0,
-        }
+        Pack { mask, shift: 0 }
     }
 
     /// Value is packed in the `width` more-significant bits.
@@ -32,10 +29,7 @@ impl Pack {
         let shift = pointer_width() - self.mask.leading_zeros();
         let mask = mask_for(width) << shift;
 
-        Pack {
-            mask,
-            shift,
-        }
+        Pack { mask, shift }
     }
 
     /// Mask used to unpack value
@@ -65,7 +59,11 @@ impl Pack {
 
 impl fmt::Debug for Pack {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "Pack {{ mask: {:b}, shift: {} }}", self.mask, self.shift)
+        write!(
+            fmt,
+            "Pack {{ mask: {:b}, shift: {} }}",
+            self.mask, self.shift
+        )
     }
 }
 

@@ -60,7 +60,9 @@ impl Semaphore {
             sem: &self,
             ll_permit: ll::Permit::new(),
         };
-        poll_fn(|cx| permit.ll_permit.poll_acquire(cx, &self.ll_sem)).await.unwrap();
+        poll_fn(|cx| permit.ll_permit.poll_acquire(cx, &self.ll_sem))
+            .await
+            .unwrap();
         permit
     }
 
@@ -68,10 +70,12 @@ impl Semaphore {
     pub fn try_acquire(&self) -> Result<SemaphorePermit<'_>, TryAcquireError> {
         let mut ll_permit = ll::Permit::new();
         match ll_permit.try_acquire(&self.ll_sem) {
-            Ok(_) => Ok(SemaphorePermit { sem: self, ll_permit }),
+            Ok(_) => Ok(SemaphorePermit {
+                sem: self,
+                ll_permit,
+            }),
             Err(_) => Err(TryAcquireError(())),
         }
-
     }
 }
 

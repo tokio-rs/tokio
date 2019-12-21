@@ -102,8 +102,6 @@ impl<T: Entry> Slab<T> {
 
 impl<T> fmt::Debug for Slab<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Slab")
-            .field("shard", &self.shard)
-            .finish()
+        f.debug_struct("Slab").field("shard", &self.shard).finish()
     }
 }
