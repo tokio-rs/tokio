@@ -6,7 +6,7 @@ use core::task::{Context, Poll};
 use pin_project_lite::pin_project;
 
 pin_project! {
-    /// Stream for the [`filter_map`](super::StreamExt::filter_map) method.
+    /// Stream returned by the [`filter_map`](super::StreamExt::filter_map) method.
     #[must_use = "streams do nothing unless polled"]
     pub struct FilterMap<St, F> {
         #[pin]

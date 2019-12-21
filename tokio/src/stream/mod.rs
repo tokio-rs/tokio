@@ -105,7 +105,7 @@ pub trait StreamExt: Stream {
     /// will be discarded and the next value will be produced.
     ///
     /// Note that this function consumes the stream passed into it and returns a
-    /// wrapped version of it, similar to the existing `filter` methods in the
+    /// wrapped version of it, similar to [`Iterator::filter`] method in the
     /// standard library.
     ///
     /// # Examples
@@ -142,8 +142,8 @@ pub trait StreamExt: Stream {
     /// it resolves to [`None`] then the next value will be produced.
     ///
     /// Note that this function consumes the stream passed into it and returns a
-    /// wrapped version of it, similar to the existing `filter_map` methods in
-    /// the standard library.
+    /// wrapped version of it, similar to [`Iterator::filter_map`] method in the
+    /// standard library.
     ///
     /// # Examples
     /// ```
