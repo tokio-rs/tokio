@@ -9,12 +9,13 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::net::UdpSocket;
+use tokio::stream::StreamExt;
 use tokio::{io, time};
 use tokio_util::codec::BytesCodec;
 use tokio_util::udp::UdpFramed;
 
 use bytes::Bytes;
-use futures::{FutureExt, SinkExt, StreamExt};
+use futures::{FutureExt, SinkExt};
 use std::env;
 use std::error::Error;
 use std::net::SocketAddr;

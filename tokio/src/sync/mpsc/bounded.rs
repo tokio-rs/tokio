@@ -1,6 +1,6 @@
 use crate::sync::mpsc::chan;
 use crate::sync::mpsc::error::{ClosedError, SendError, TryRecvError, TrySendError};
-use crate::sync::semaphore;
+use crate::sync::semaphore_ll as semaphore;
 
 use std::fmt;
 use std::task::{Context, Poll};
@@ -177,7 +177,7 @@ impl<T> Receiver<T> {
 impl<T> Unpin for Receiver<T> {}
 
 cfg_stream! {
-    impl<T> futures_core::Stream for Receiver<T> {
+    impl<T> crate::stream::Stream for Receiver<T> {
         type Item = T;
 
         fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {

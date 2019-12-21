@@ -148,7 +148,7 @@ impl<T> UnboundedReceiver<T> {
 }
 
 #[cfg(feature = "stream")]
-impl<T> futures_core::Stream for UnboundedReceiver<T> {
+impl<T> crate::stream::Stream for UnboundedReceiver<T> {
     type Item = T;
 
     fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {

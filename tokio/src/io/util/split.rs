@@ -89,7 +89,7 @@ where
 }
 
 #[cfg(feature = "stream")]
-impl<R: AsyncBufRead> futures_core::Stream for Split<R> {
+impl<R: AsyncBufRead> crate::stream::Stream for Split<R> {
     type Item = io::Result<Vec<u8>>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {

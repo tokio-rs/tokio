@@ -19,13 +19,15 @@ cfg_blocking_impl! {
         io: &io::Handle,
         time: &time::Handle,
         clock: &time::Clock,
+        thread_cap: usize,
     ) -> BlockingPool {
         BlockingPool::new(
             builder,
             spawner,
             io,
             time,
-            clock)
+            clock,
+            thread_cap)
 
     }
 }
@@ -44,6 +46,7 @@ cfg_not_blocking_impl! {
         _io: &io::Handle,
         _time: &time::Handle,
         _clock: &time::Clock,
+        _thread_cap: usize,
     ) -> BlockingPool {
         BlockingPool {}
     }

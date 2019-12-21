@@ -28,7 +28,7 @@ impl Incoming<'_> {
 }
 
 #[cfg(feature = "stream")]
-impl futures_core::Stream for Incoming<'_> {
+impl crate::stream::Stream for Incoming<'_> {
     type Item = io::Result<TcpStream>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {

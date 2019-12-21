@@ -482,7 +482,7 @@ impl Signal {
 }
 
 cfg_stream! {
-    impl futures_core::Stream for Signal {
+    impl crate::stream::Stream for Signal {
         type Item = ();
 
         fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<()>> {
