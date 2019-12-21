@@ -206,7 +206,7 @@ impl Semaphore {
     /// Tries to acquire available permits first. If unable to acquire a
     /// sufficient number of permits, the caller's waiter is pushed onto the
     /// semaphore's wait queue.
-    fn poll_acquire2<'a, F>(
+    fn poll_acquire2<F>(
         &self,
         num_permits: u16,
         mut get_waiter: F,
@@ -295,7 +295,7 @@ impl Semaphore {
                         // to set the node's "next" pointer to return the wait
                         // queue into a consistent state.
 
-                        let prev_waiter = curr.waiter().unwrap_or(NonNull::from(&*self.stub));
+                        let prev_waiter = curr.waiter().unwrap_or_else(|| NonNull::from(&*self.stub));
 
                         let waiter = maybe_waiter.unwrap();
 
@@ -620,33 +620,38 @@ impl Permit {
         semaphore: &Semaphore,
     ) -> Poll<Result<(), AcquireError>> {
         use PermitState::*;
+        use std::cmp::Ordering::*;
 
         match self.state {
             Waiting(requested) => {
                 // There must be a waiter
                 let waiter = self.waiter.as_ref().unwrap();
 
-                if requested < num_permits {
-                    let delta = num_permits - requested;
+                match requested.cmp(&num_permits) {
+                    Less => {
+                        let delta = num_permits - requested;
 
-                    // Request additional permits. If the waiter has been
-                    // dequeued, it must be re-queued.
-                    if !waiter.try_inc_permits_to_acquire(delta as usize) {
-                        let waiter = NonNull::from(&**waiter);
+                        // Request additional permits. If the waiter has been
+                        // dequeued, it must be re-queued.
+                        if !waiter.try_inc_permits_to_acquire(delta as usize) {
+                            let waiter = NonNull::from(&**waiter);
 
-                        // Ignore the result. The check for
-                        // `permits_to_acquire()` will converge the state as
-                        // needed
-                        let _ = semaphore.poll_acquire2(delta, || Some(waiter))?;
+                            // Ignore the result. The check for
+                            // `permits_to_acquire()` will converge the state as
+                            // needed
+                            let _ = semaphore.poll_acquire2(delta, || Some(waiter))?;
+                        }
+
+                        self.state = Waiting(num_permits);
                     }
+                    Greater => {
+                        let delta = requested - num_permits;
+                        let to_release = waiter.try_dec_permits_to_acquire(delta as usize);
 
-                    self.state = Waiting(num_permits);
-                } else if requested > num_permits {
-                    let delta = requested - num_permits;
-                    let to_release = waiter.try_dec_permits_to_acquire(delta as usize);
-
-                    semaphore.add_permits(to_release);
-                    self.state = Waiting(num_permits);
+                        semaphore.add_permits(to_release);
+                        self.state = Waiting(num_permits);
+                    }
+                    Equal => {}
                 }
 
                 if waiter.permits_to_acquire()? == 0 {
@@ -761,12 +766,10 @@ impl Permit {
 
                 if n == requested {
                     self.state = Acquired(0);
+                } else if acquired == requested - n {
+                    self.state = Waiting(acquired);
                 } else {
-                    if acquired == requested - n {
-                        self.state = Waiting(acquired);
-                    } else {
-                        self.state = Waiting(requested - n);
-                    }
+                    self.state = Waiting(requested - n);
                 }
 
                 acquired
@@ -1196,7 +1199,7 @@ impl WaiterState {
         self.0 |= QUEUED;
     }
 
-    fn is_closed(&self) -> bool {
+    fn is_closed(self) -> bool {
         self.0 & CLOSED == CLOSED
     }
 
