@@ -65,6 +65,35 @@ impl fmt::Display for RecvError {
 
 impl Error for RecvError {}
 
+// ===== TryRecvError =====
+
+/// This enumeration is the list of the possible reasons that try_recv
+/// could not return data when called.
+#[derive(Debug)]
+pub enum TryRecvError {
+    /// This channel is currently empty, but the Sender(s) have not yet
+    /// disconnected, so data may yet become available.
+    Empty,
+    /// The channel's sending half has been closed, and there will
+    /// never be any more data received on it.
+    Closed,
+}
+
+impl fmt::Display for TryRecvError {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            fmt,
+            "{}",
+            match self {
+                TryRecvError::Empty => "channel empty",
+                TryRecvError::Closed => "channel closed",
+            }
+        )
+    }
+}
+
+impl Error for TryRecvError {}
+
 // ===== ClosedError =====
 
 /// Erorr returned by [`Sender::poll_ready`](super::Sender::poll_ready)].

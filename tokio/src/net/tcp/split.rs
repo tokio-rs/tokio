@@ -11,6 +11,7 @@
 use crate::io::{AsyncRead, AsyncWrite};
 use crate::net::TcpStream;
 
+use bytes::Buf;
 use std::io;
 use std::mem::MaybeUninit;
 use std::net::Shutdown;
@@ -53,6 +54,14 @@ impl AsyncWrite for WriteHalf<'_> {
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
         self.0.poll_write_priv(cx, buf)
+    }
+
+    fn poll_write_buf<B: Buf>(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut B,
+    ) -> Poll<io::Result<usize>> {
+        self.0.poll_write_buf_priv(cx, buf)
     }
 
     #[inline]

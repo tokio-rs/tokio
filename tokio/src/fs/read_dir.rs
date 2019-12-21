@@ -36,7 +36,7 @@ pub async fn read_dir(path: impl AsRef<Path>) -> io::Result<ReadDir> {
 ///
 /// [`read_dir`]: read_dir
 /// [`DirEntry`]: DirEntry
-/// [`Stream`]: futures_core::Stream
+/// [`Stream`]: crate::stream::Stream
 /// [`Err`]: std::result::Result::Err
 #[derive(Debug)]
 #[must_use = "streams do nothing unless polled"]
@@ -85,7 +85,7 @@ impl ReadDir {
 }
 
 #[cfg(feature = "stream")]
-impl futures_core::Stream for ReadDir {
+impl crate::stream::Stream for ReadDir {
     type Item = io::Result<DirEntry>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {

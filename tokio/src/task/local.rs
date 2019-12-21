@@ -1,18 +1,16 @@
 //! Runs `!Send` futures on the current thread.
 use crate::sync::AtomicWaker;
-use crate::task::{self, JoinHandle, Schedule, Task, TransferStack};
+use crate::task::{self, queue::MpscQueues, JoinHandle, Schedule, Task};
 
-use std::cell::{Cell, UnsafeCell};
-use std::collections::VecDeque;
-use std::fmt;
+use std::cell::Cell;
 use std::future::Future;
 use std::pin::Pin;
 use std::ptr::{self, NonNull};
 use std::rc::Rc;
-use std::sync::Mutex;
 use std::task::{Context, Poll};
 
 use pin_project_lite::pin_project;
+
 cfg_rt_util! {
     /// A set of tasks which are executed on the same thread.
     ///
@@ -81,33 +79,12 @@ cfg_rt_util! {
         scheduler: Rc<Scheduler>,
     }
 }
+
+#[derive(Debug)]
 struct Scheduler {
-    /// List of all active tasks spawned onto this executor.
-    ///
-    /// # Safety
-    ///
-    /// Must only be accessed from the primary thread
-    tasks: UnsafeCell<task::OwnedList<Scheduler>>,
-
-    /// Local run local_queue.
-    ///
-    /// Tasks notified from the current thread are pushed into this queue.
-    ///
-    /// # Safety
-    ///
-    /// References should not be handed out. Only call `push` / `pop` functions.
-    /// Only call from the owning thread.
-    local_queue: UnsafeCell<VecDeque<Task<Scheduler>>>,
-
     tick: Cell<u8>,
 
-    /// Remote run queue.
-    ///
-    /// Tasks notified from another thread are pushed into this queue.
-    remote_queue: Mutex<VecDeque<Task<Scheduler>>>,
-
-    /// Tasks pending drop
-    pending_drop: TransferStack<Self>,
+    queues: MpscQueues<Self>,
 
     /// Used to notify the `LocalFuture` when a task in the local task set is
     /// notified.
@@ -165,21 +142,23 @@ cfg_rt_util! {
         CURRENT_TASK_SET.with(|current| {
             let current = current
                 .get()
-                .expect("`spawn_local` called from outside of a local::LocalSet!");
+                .expect("`spawn_local` called from outside of a task::LocalSet!");
+            let (task, handle) = task::joinable_local(future);
             unsafe {
-                let (task, handle) = task::joinable_local(future);
-                current.as_ref().schedule_local(task);
-                handle
+                // safety: this function is unsafe to call outside of the local
+                // thread. Since the call above to get the current task set
+                // would not succeed if we were outside of a local set, this is
+                // safe.
+                current.as_ref().queues.push_local(task);
             }
+
+            handle
         })
     }
 }
 
 /// Max number of tasks to poll per tick.
 const MAX_TASKS_PER_TICK: usize = 61;
-
-/// How often to check the remote queue first
-const CHECK_REMOTE_INTERVAL: u8 = 13;
 
 impl LocalSet {
     /// Returns a new local task set.
@@ -231,9 +210,9 @@ impl LocalSet {
     {
         let (task, handle) = task::joinable_local(future);
         unsafe {
-            // This is safe: since `LocalSet` is not Send or Sync, this is
+            // safety: since `LocalSet` is not Send or Sync, this is
             // always being called from the local thread.
-            self.scheduler.schedule_local(task);
+            self.scheduler.queues.push_local(task);
         }
         handle
     }
@@ -302,8 +281,7 @@ impl LocalSet {
     /// [`spawn_blocking`]: ../blocking/fn.spawn_blocking.html
     pub fn block_on<F>(&self, rt: &mut crate::runtime::Runtime, future: F) -> F::Output
     where
-        F: Future + 'static,
-        F::Output: 'static,
+        F: Future,
     {
         let scheduler = self.scheduler.clone();
         self.scheduler
@@ -330,7 +308,12 @@ impl<F: Future> Future for LocalFuture<F> {
             return Poll::Ready(output);
         }
 
-        scheduler.tick();
+        if scheduler.tick() {
+            // If `tick` returns true, we need to notify the local future again:
+            // there are still tasks remaining in the run queue.
+            cx.waker().wake_by_ref();
+        }
+
         Poll::Pending
     }
 }
@@ -341,31 +324,32 @@ impl Schedule for Scheduler {
     fn bind(&self, task: &Task<Self>) {
         assert!(self.is_current());
         unsafe {
-            (*self.tasks.get()).insert(task);
+            self.queues.add_task(task);
         }
     }
 
     fn release(&self, task: Task<Self>) {
         // This will be called when dropping the local runtime.
-        self.pending_drop.push(task);
+        self.queues.release_remote(task);
     }
 
     fn release_local(&self, task: &Task<Self>) {
         debug_assert!(self.is_current());
         unsafe {
-            (*self.tasks.get()).remove(task);
+            self.queues.release_local(task);
         }
     }
 
     fn schedule(&self, task: Task<Self>) {
         if self.is_current() {
-            unsafe {
-                self.schedule_local(task);
-            }
+            unsafe { self.queues.push_local(task) };
         } else {
-            self.remote_queue.lock().unwrap().push_back(task);
+            let mut lock = self.queues.remote();
+            lock.schedule(task, false);
 
             self.waker.wake();
+
+            drop(lock);
         }
     }
 }
@@ -373,11 +357,8 @@ impl Schedule for Scheduler {
 impl Scheduler {
     fn new() -> Self {
         Self {
-            tasks: UnsafeCell::new(task::OwnedList::new()),
-            local_queue: UnsafeCell::new(VecDeque::with_capacity(64)),
             tick: Cell::new(0),
-            pending_drop: TransferStack::new(),
-            remote_queue: Mutex::new(VecDeque::with_capacity(64)),
+            queues: MpscQueues::new(),
             waker: AtomicWaker::new(),
         }
     }
@@ -401,10 +382,6 @@ impl Scheduler {
         })
     }
 
-    unsafe fn schedule_local(&self, task: Task<Self>) {
-        (*self.local_queue.get()).push_back(task);
-    }
-
     fn is_current(&self) -> bool {
         CURRENT_TASK_SET
             .try_with(|current| {
@@ -416,88 +393,60 @@ impl Scheduler {
             .unwrap_or(false)
     }
 
-    fn next_task(&self, tick: u8) -> Option<Task<Self>> {
-        if 0 == tick % CHECK_REMOTE_INTERVAL {
-            self.next_remote_task().or_else(|| self.next_local_task())
-        } else {
-            self.next_local_task().or_else(|| self.next_remote_task())
-        }
-    }
-
-    fn next_local_task(&self) -> Option<Task<Self>> {
-        unsafe { (*self.local_queue.get()).pop_front() }
-    }
-
-    fn next_remote_task(&self) -> Option<Task<Self>> {
-        // there is no semantic information in the `PoisonError`, and it
-        // doesn't implement `Debug`, but clippy thinks that it's bad to
-        // match all errors here...
-        #[allow(clippy::match_wild_err_arm)]
-        let mut lock = match self.remote_queue.lock() {
-            // If the lock is poisoned, but the thread is already panicking,
-            // avoid a double panic. This is necessary since `next_task` (which
-            // calls `next_remote_task`) can be called in the `Drop` impl.
-            Err(_) if std::thread::panicking() => return None,
-            Err(_) => panic!("mutex poisoned"),
-            Ok(lock) => lock,
-        };
-        lock.pop_front()
-    }
-
-    fn tick(&self) {
+    /// Tick the scheduler, returning whether the local future needs to be
+    /// notified again.
+    fn tick(&self) -> bool {
         assert!(self.is_current());
         for _ in 0..MAX_TASKS_PER_TICK {
             let tick = self.tick.get().wrapping_add(1);
             self.tick.set(tick);
-            let task = match self.next_task(tick) {
+
+            let task = match unsafe {
+                // safety: we must be on the local thread to call this. The assertion
+                // the top of this method ensures that `tick` is only called locally.
+                self.queues.next_task(tick)
+            } {
                 Some(task) => task,
-                None => return,
+                // We have fully drained the queue of notified tasks, so the
+                // local future doesn't need to be notified again — it can wait
+                // until something else wakes a task in the local set.
+                None => return false,
             };
 
             if let Some(task) = task.run(&mut || Some(self.into())) {
                 unsafe {
-                    // we are on the local thread, so this is okay.
-                    self.schedule_local(task);
+                    // safety: we must be on the local thread to call this. The
+                    // the top of this method ensures that `tick` is only called locally.
+                    self.queues.push_local(task);
                 }
             }
         }
-    }
 
-    fn drain_pending_drop(&self) {
-        for task in self.pending_drop.drain() {
-            unsafe {
-                (*self.tasks.get()).remove(&task);
-            }
-            drop(task);
-        }
-    }
-}
-
-impl fmt::Debug for Scheduler {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("Scheduler { .. }").finish()
+        true
     }
 }
 
 impl Drop for Scheduler {
     fn drop(&mut self) {
-        // Drain all local tasks
-        while let Some(task) = self.next_local_task() {
-            task.shutdown();
-        }
-
-        // Release owned tasks
         unsafe {
-            (*self.tasks.get()).shutdown();
-        }
+            // safety: these functions are unsafe to call outside of the local
+            // thread. Since the `Scheduler` type is not `Send` or `Sync`, we
+            // know it will be dropped only from the local thread.
+            self.queues.shutdown();
 
-        self.drain_pending_drop();
+            // Wait until all tasks have been released.
+            // XXX: this is a busy loop, but we don't really have any way to park
+            // the thread here?
+            loop {
+                self.queues.drain_pending_drop();
+                self.queues.drain_queues();
 
-        // Wait until all tasks have been released.
-        // XXX: this is a busy loop, but we don't really have any way to park
-        // the thread here?
-        while unsafe { !(*self.tasks.get()).is_empty() } {
-            self.drain_pending_drop();
+                if !self.queues.has_tasks_remaining() {
+                    break;
+                }
+
+                std::thread::yield_now();
+            }
         }
     }
 }
@@ -505,7 +454,12 @@ impl Drop for Scheduler {
 #[cfg(all(test, not(loom)))]
 mod tests {
     use super::*;
-    use crate::{runtime, task};
+    use crate::{
+        runtime,
+        sync::{mpsc, oneshot},
+        task, time,
+    };
+    use std::time::Duration;
 
     #[test]
     fn local_current_thread() {
@@ -538,7 +492,6 @@ mod tests {
     fn local_threadpool_timer() {
         // This test ensures that runtime services like the timer are properly
         // set for the local task set.
-        use std::time::Duration;
         thread_local! {
             static ON_RT_THREAD: Cell<bool> = Cell::new(false);
         }
@@ -728,9 +681,6 @@ mod tests {
     #[test]
     fn drop_cancels_tasks() {
         // This test reproduces issue #1842
-        use crate::sync::oneshot;
-        use std::time::Duration;
-
         let mut rt = runtime::Builder::new()
             .enable_time()
             .basic_scheduler()
@@ -743,7 +693,7 @@ mod tests {
         local.spawn_local(async move {
             started_tx.send(()).unwrap();
             loop {
-                crate::time::delay_for(Duration::from_secs(3600)).await;
+                time::delay_for(Duration::from_secs(3600)).await;
             }
         });
 
@@ -752,5 +702,123 @@ mod tests {
         });
         drop(local);
         drop(rt);
+    }
+
+    #[test]
+    fn drop_cancels_remote_tasks() {
+        // This test reproduces issue #1885.
+        use std::sync::mpsc::RecvTimeoutError;
+
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        let thread = std::thread::spawn(move || {
+            let (tx, mut rx) = crate::sync::mpsc::channel::<()>(1024);
+
+            let mut rt = runtime::Builder::new()
+                .enable_time()
+                .basic_scheduler()
+                .build()
+                .expect("building runtime should succeed");
+
+            let local = LocalSet::new();
+            local.spawn_local(async move { while let Some(_) = rx.recv().await {} });
+            local.block_on(&mut rt, async {
+                crate::time::delay_for(Duration::from_millis(1)).await;
+            });
+
+            drop(tx);
+
+            // This enters an infinite loop if the remote notified tasks are not
+            // properly cancelled.
+            drop(local);
+
+            // Send a message on the channel so that the test thread can
+            // determine if we have entered an infinite loop:
+            done_tx.send(()).unwrap();
+        });
+
+        // Since the failure mode of this test is an infinite loop, rather than
+        // something we can easily make assertions about, we'll run it in a
+        // thread. When the test thread finishes, it will send a message on a
+        // channel to this thread. We'll wait for that message with a fairly
+        // generous timeout, and if we don't recieve it, we assume the test
+        // thread has hung.
+        //
+        // Note that it should definitely complete in under a minute, but just
+        // in case CI is slow, we'll give it a long timeout.
+        match done_rx.recv_timeout(Duration::from_secs(60)) {
+            Err(RecvTimeoutError::Timeout) => panic!(
+                "test did not complete within 60 seconds, \
+                 we have (probably) entered an infinite loop!"
+            ),
+            // Did the test thread panic? We'll find out for sure when we `join`
+            // with it.
+            Err(RecvTimeoutError::Disconnected) => {
+                println!("done_rx dropped, did the test thread panic?");
+            }
+            // Test completed successfully!
+            Ok(()) => {}
+        }
+
+        thread.join().expect("test thread should not panic!")
+    }
+
+    #[test]
+    fn local_tasks_are_polled_after_tick() {
+        // Reproduces issues #1899 and #1900
+        use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
+
+        static RX1: AtomicUsize = AtomicUsize::new(0);
+        static RX2: AtomicUsize = AtomicUsize::new(0);
+        static EXPECTED: usize = 500;
+
+        let (tx, mut rx) = mpsc::unbounded_channel();
+
+        let mut rt = runtime::Builder::new()
+            .basic_scheduler()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        let local = LocalSet::new();
+
+        local.block_on(&mut rt, async {
+            let task2 = task::spawn(async move {
+                // Wait a bit
+                time::delay_for(Duration::from_millis(100)).await;
+
+                let mut oneshots = Vec::with_capacity(EXPECTED);
+
+                // Send values
+                for _ in 0..EXPECTED {
+                    let (oneshot_tx, oneshot_rx) = oneshot::channel();
+                    oneshots.push(oneshot_tx);
+                    tx.send(oneshot_rx).unwrap();
+                }
+
+                time::delay_for(Duration::from_millis(100)).await;
+
+                for tx in oneshots.drain(..) {
+                    tx.send(()).unwrap();
+                }
+
+                time::delay_for(Duration::from_millis(300)).await;
+                let rx1 = RX1.load(SeqCst);
+                let rx2 = RX2.load(SeqCst);
+                println!("EXPECT = {}; RX1 = {}; RX2 = {}", EXPECTED, rx1, rx2);
+                assert_eq!(EXPECTED, rx1);
+                assert_eq!(EXPECTED, rx2);
+            });
+
+            while let Some(oneshot) = rx.recv().await {
+                RX1.fetch_add(1, SeqCst);
+
+                task::spawn_local(async move {
+                    oneshot.await.unwrap();
+                    RX2.fetch_add(1, SeqCst);
+                });
+            }
+
+            task2.await.unwrap();
+        });
     }
 }

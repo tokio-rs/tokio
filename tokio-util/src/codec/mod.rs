@@ -6,8 +6,8 @@
 //!
 //! [`AsyncRead`]: https://docs.rs/tokio/*/tokio/io/trait.AsyncRead.html
 //! [`AsyncWrite`]: https://docs.rs/tokio/*/tokio/io/trait.AsyncWrite.html
+//! [`Stream`]: https://docs.rs/tokio/*/tokio/stream/trait.Stream.html
 //! [`Sink`]: https://docs.rs/futures-sink/*/futures_sink/trait.Sink.html
-//! [`Stream`]: https://docs.rs/futures-core/*/futures_core/stream/trait.Stream.html
 
 mod bytes_codec;
 pub use self::bytes_codec::BytesCodec;

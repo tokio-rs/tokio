@@ -18,7 +18,11 @@ cfg_tcp! {
     /// use tokio::net::TcpListener;
     ///
     /// use std::io;
-    /// # async fn process_socket<T>(_socket: T) {}
+    ///
+    /// async fn process_socket<T>(socket: T) {
+    ///     # drop(socket);
+    ///     // do work with socket here
+    /// }
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
@@ -246,9 +250,7 @@ impl TcpListener {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::net::TcpListener;
-    ///
-    /// use futures::StreamExt;
+    /// use tokio::{net::TcpListener, stream::StreamExt};
     ///
     /// #[tokio::main]
     /// async fn main() {

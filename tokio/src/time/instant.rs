@@ -126,6 +126,18 @@ impl Instant {
     }
 }
 
+impl From<std::time::Instant> for Instant {
+    fn from(time: std::time::Instant) -> Instant {
+        Instant::from_std(time)
+    }
+}
+
+impl From<Instant> for std::time::Instant {
+    fn from(time: Instant) -> std::time::Instant {
+        time.into_std()
+    }
+}
+
 impl ops::Add<Duration> for Instant {
     type Output = Instant;
 

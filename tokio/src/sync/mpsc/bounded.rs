@@ -1,6 +1,6 @@
 use crate::sync::mpsc::chan;
-use crate::sync::mpsc::error::{ClosedError, SendError, TrySendError};
-use crate::sync::semaphore;
+use crate::sync::mpsc::error::{ClosedError, SendError, TryRecvError, TrySendError};
+use crate::sync::semaphore_ll as semaphore;
 
 use std::fmt;
 use std::task::{Context, Poll};
@@ -150,6 +150,21 @@ impl<T> Receiver<T> {
         self.chan.recv(cx)
     }
 
+    /// Attempts to return a pending value on this receiver without blocking.
+    ///
+    /// This method will never block the caller in order to wait for data to
+    /// become available. Instead, this will always return immediately with
+    /// a possible option of pending data on the channel.
+    ///
+    /// This is useful for a flavor of "optimistic check" before deciding to
+    /// block on a receiver.
+    ///
+    /// Compared with recv, this function has two failure cases instead of
+    /// one (one for disconnection, one for an empty buffer).
+    pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
+        self.chan.try_recv()
+    }
+
     /// Closes the receiving half of a channel, without dropping it.
     ///
     /// This prevents any further messages from being sent on the channel while
@@ -162,7 +177,7 @@ impl<T> Receiver<T> {
 impl<T> Unpin for Receiver<T> {}
 
 cfg_stream! {
-    impl<T> futures_core::Stream for Receiver<T> {
+    impl<T> crate::stream::Stream for Receiver<T> {
         type Item = T;
 
         fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {

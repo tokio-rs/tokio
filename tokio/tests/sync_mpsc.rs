@@ -1,8 +1,9 @@
+#![allow(clippy::redundant_clone)]
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
 use tokio::sync::mpsc;
-use tokio::sync::mpsc::error::TrySendError;
+use tokio::sync::mpsc::error::{TryRecvError, TrySendError};
 use tokio_test::task;
 use tokio_test::{
     assert_err, assert_ok, assert_pending, assert_ready, assert_ready_err, assert_ready_ok,
@@ -41,7 +42,7 @@ fn send_recv_with_buffer() {
 
 #[tokio::test]
 async fn send_recv_stream_with_buffer() {
-    use futures::StreamExt;
+    use tokio::stream::StreamExt;
 
     let (mut tx, mut rx) = mpsc::channel::<i32>(16);
 
@@ -146,7 +147,7 @@ async fn async_send_recv_unbounded() {
 
 #[tokio::test]
 async fn send_recv_stream_unbounded() {
-    use futures::StreamExt;
+    use tokio::stream::StreamExt;
 
     let (tx, mut rx) = mpsc::unbounded_channel::<i32>();
 
@@ -412,4 +413,42 @@ fn unconsumed_messages_are_dropped() {
     drop((tx, rx));
 
     assert_eq!(1, Arc::strong_count(&msg));
+}
+
+#[test]
+fn try_recv() {
+    let (mut tx, mut rx) = mpsc::channel(1);
+    match rx.try_recv() {
+        Err(TryRecvError::Empty) => {}
+        _ => panic!(),
+    }
+    tx.try_send(42).unwrap();
+    match rx.try_recv() {
+        Ok(42) => {}
+        _ => panic!(),
+    }
+    drop(tx);
+    match rx.try_recv() {
+        Err(TryRecvError::Closed) => {}
+        _ => panic!(),
+    }
+}
+
+#[test]
+fn try_recv_unbounded() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    match rx.try_recv() {
+        Err(TryRecvError::Empty) => {}
+        _ => panic!(),
+    }
+    tx.send(42).unwrap();
+    match rx.try_recv() {
+        Ok(42) => {}
+        _ => panic!(),
+    }
+    drop(tx);
+    match rx.try_recv() {
+        Err(TryRecvError::Closed) => {}
+        _ => panic!(),
+    }
 }

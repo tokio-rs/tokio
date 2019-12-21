@@ -1,29 +1,42 @@
 use std::any::Any;
 use std::fmt;
 use std::io;
+use std::sync::Mutex;
 
-/// Task failed to execute to completion.
-pub struct JoinError {
-    repr: Repr,
+doc_rt_core! {
+    /// Task failed to execute to completion.
+    pub struct JoinError {
+        repr: Repr,
+    }
 }
 
 enum Repr {
     Cancelled,
-    Panic(Box<dyn Any + Send + 'static>),
+    Panic(Mutex<Box<dyn Any + Send + 'static>>),
 }
 
 impl JoinError {
-    /// Create a new `cancelled` error
+    #[doc(hidden)]
+    #[deprecated]
     pub fn cancelled() -> JoinError {
+        Self::cancelled2()
+    }
+
+    pub(crate) fn cancelled2() -> JoinError {
         JoinError {
             repr: Repr::Cancelled,
         }
     }
 
-    /// Create a new `panic` error
+    #[doc(hidden)]
+    #[deprecated]
     pub fn panic(err: Box<dyn Any + Send + 'static>) -> JoinError {
+        Self::panic2(err)
+    }
+
+    pub(crate) fn panic2(err: Box<dyn Any + Send + 'static>) -> JoinError {
         JoinError {
-            repr: Repr::Panic(err),
+            repr: Repr::Panic(Mutex::new(err)),
         }
     }
 }

@@ -3,7 +3,6 @@
 use cfg_if::cfg_if;
 use env_logger;
 use futures::join;
-use futures::stream::StreamExt;
 use native_tls;
 use native_tls::{Identity, TlsAcceptor, TlsConnector};
 use std::io::Write;
@@ -12,6 +11,7 @@ use std::process::Command;
 use std::ptr;
 use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt, Error, ErrorKind};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::stream::StreamExt;
 use tokio_tls;
 
 macro_rules! t {

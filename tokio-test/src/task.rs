@@ -1,12 +1,15 @@
 //! Futures task based helpers
 
-use futures_core::Stream;
+#![allow(clippy::mutex_atomic)]
+
 use std::future::Future;
 use std::mem;
 use std::ops;
 use std::pin::Pin;
 use std::sync::{Arc, Condvar, Mutex};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
+
+use tokio::stream::Stream;
 
 /// TOOD: dox
 pub fn spawn<T>(task: T) -> Spawn<T> {

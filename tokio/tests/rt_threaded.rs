@@ -20,7 +20,7 @@ fn single_thread() {
     let _ = runtime::Builder::new()
         .threaded_scheduler()
         .enable_all()
-        .num_threads(1)
+        .core_threads(1)
         .build();
 }
 

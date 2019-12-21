@@ -1,3 +1,56 @@
+# 0.2.6 (December 19, 2019)
+
+### Fixes
+- `fs::File::seek` API regression (#1991).
+
+# 0.2.5 (December 18, 2019)
+
+### Added
+- `io::AsyncSeek` trait (#1924).
+- `Mutex::try_lock` (#1939)
+- `mpsc::Receiver::try_recv` and `mpsc::UnboundedReceiver::try_recv` (#1939).
+- `writev` support for `TcpStream` (#1956).
+- `time::throttle` for throttling streams (#1949).
+- implement `Stream` for `time::DelayQueue` (#1975).
+- `sync::broadcast` provides a fan-out channel (#1943).
+- `sync::Semaphore` provides an async semaphore (#1973).
+- `stream::StreamExt` provides stream utilities (#1962).
+
+### Fixes
+- deadlock risk while shutting down the runtime (#1972).
+- panic while shutting down the runtime (#1978).
+- `sync::MutexGuard` debug output (#1961).
+- misc doc improvements (#1933, #1934, #1940, #1942).
+
+### Changes
+- runtime threads are configured with `runtime::Builder::core_threads` and
+  `runtime::Builder::max_threads`. `runtime::Builder::num_threads` is
+  deprecated (#1977).
+
+# 0.2.4 (December 6, 2019)
+
+### Fixes
+- `sync::Mutex` deadlock when `lock()` future is dropped early (#1898).
+
+# 0.2.3 (December 6, 2019)
+
+### Added
+- read / write integers using `AsyncReadExt` and `AsyncWriteExt` (#1863).
+- `read_buf` / `write_buf` for reading / writing `Buf` / `BufMut` (#1881).
+- `TcpStream::poll_peek` - pollable API for performing TCP peek (#1864).
+- `sync::oneshot::error::TryRecvError` provides variants to detect the error
+  kind (#1874).
+- `LocalSet::block_on` accepts `!'static` task (#1882).
+- `task::JoinError` is now `Sync` (#1888).
+- impl conversions between `tokio::time::Instant` and
+  `std::time::Instant` (#1904).
+
+### Fixes
+- calling `spawn_blocking` after runtime shutdown (#1875).
+- `LocalSet` drop inifinite loop (#1892).
+- `LocalSet` hang under load (#1905).
+- improved documentation (#1865, #1866, #1868, #1874, #1876, #1911).
+
 # 0.2.2 (November 29, 2019)
 
 ### Fixes

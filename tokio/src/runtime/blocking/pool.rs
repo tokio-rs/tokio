@@ -54,11 +54,13 @@ struct Inner {
     /// Source of `Instant::now()`
     clock: time::Clock,
 
+    thread_cap: usize,
+
 }
 
 struct Shared {
     queue: VecDeque<Task>,
-    num_th: u32,
+    num_th: usize,
     num_idle: u32,
     num_notify: u32,
     shutdown: bool,
@@ -72,7 +74,6 @@ thread_local! {
     static BLOCKING: Cell<Option<*const Spawner>> = Cell::new(None)
 }
 
-const MAX_THREADS: u32 = 1_000;
 const KEEP_ALIVE: Duration = Duration::from_secs(10);
 
 /// Run the provided function on an executor dedicated to blocking operations.
@@ -101,6 +102,7 @@ impl BlockingPool {
         io: &io::Handle,
         time: &time::Handle,
         clock: &time::Clock,
+        thread_cap: usize,
     ) -> BlockingPool {
         let (shutdown_tx, shutdown_rx) = shutdown::channel();
 
@@ -124,6 +126,7 @@ impl BlockingPool {
                     io_handle: io.clone(),
                     time_handle: time.clone(),
                     clock: clock.clone(),
+                    thread_cap,
                 }),
             },
             shutdown_rx,
@@ -197,6 +200,9 @@ impl Spawner {
             let mut shared = self.inner.shared.lock().unwrap();
 
             if shared.shutdown {
+                // Shutdown the task
+                task.shutdown();
+
                 // no need to even push this task; it would never get picked up
                 return;
             }
@@ -206,7 +212,7 @@ impl Spawner {
             if shared.num_idle == 0 {
                 // No threads are able to process the task.
 
-                if shared.num_th == MAX_THREADS {
+                if shared.num_th == self.inner.thread_cap {
                     // At max number of threads
                     None
                 } else {
@@ -300,7 +306,9 @@ impl Inner {
                     break;
                 }
 
-                if timeout_result.timed_out() {
+                // Even if the condvar "timed out", if the pool is entering the
+                // shutdown phase, we want to perform the cleanup logic.
+                if !shared.shutdown && timeout_result.timed_out() {
                     break 'main;
                 }
 
@@ -308,6 +316,14 @@ impl Inner {
             }
 
             if shared.shutdown {
+                // Drain the queue
+                while let Some(task) = shared.queue.pop_front() {
+                    drop(shared);
+                    task.shutdown();
+
+                    shared = self.shared.lock().unwrap();
+                }
+
                 // Work was produced, and we "took" it (by decrementing num_notify).
                 // This means that num_idle was decremented once for our wakeup.
                 // But, since we are exiting, we need to "undo" that, as we'll stay idle.

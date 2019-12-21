@@ -5,7 +5,7 @@
 use self::State::*;
 use crate::fs::{asyncify, sys};
 use crate::io::blocking::Buf;
-use crate::io::{AsyncRead, AsyncWrite};
+use crate::io::{AsyncRead, AsyncSeek, AsyncWrite};
 
 use std::fmt;
 use std::fs::{Metadata, Permissions};
@@ -541,6 +541,82 @@ impl AsyncRead for File {
                             self.state = Idle(Some(buf));
                             continue;
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl AsyncSeek for File {
+    fn start_seek(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        mut pos: SeekFrom,
+    ) -> Poll<io::Result<()>> {
+        if let Some(e) = self.last_write_err.take() {
+            return Ready(Err(e.into()));
+        }
+
+        loop {
+            match self.state {
+                Idle(ref mut buf_cell) => {
+                    let mut buf = buf_cell.take().unwrap();
+
+                    // Factor in any unread data from the buf
+                    if !buf.is_empty() {
+                        let n = buf.discard_read();
+
+                        if let SeekFrom::Current(ref mut offset) = pos {
+                            *offset += n;
+                        }
+                    }
+
+                    let std = self.std.clone();
+
+                    self.state = Busy(sys::run(move || {
+                        let res = (&*std).seek(pos);
+                        (Operation::Seek(res), buf)
+                    }));
+
+                    return Ready(Ok(()));
+                }
+                Busy(ref mut rx) => {
+                    let (op, buf) = ready!(Pin::new(rx).poll(cx))?;
+                    self.state = Idle(Some(buf));
+
+                    match op {
+                        Operation::Read(_) => {}
+                        Operation::Write(Err(e)) => {
+                            self.last_write_err = Some(e.kind());
+                        }
+                        Operation::Write(_) => {}
+                        Operation::Seek(_) => {}
+                    }
+                }
+            }
+        }
+    }
+
+    fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
+        if let Some(e) = self.last_write_err.take() {
+            return Ready(Err(e.into()));
+        }
+
+        loop {
+            match self.state {
+                Idle(_) => panic!("must call start_seek before calling poll_complete"),
+                Busy(ref mut rx) => {
+                    let (op, buf) = ready!(Pin::new(rx).poll(cx))?;
+                    self.state = Idle(Some(buf));
+
+                    match op {
+                        Operation::Read(_) => {}
+                        Operation::Write(Err(e)) => {
+                            self.last_write_err = Some(e.kind());
+                        }
+                        Operation::Write(_) => {}
+                        Operation::Seek(res) => return Ready(res),
                     }
                 }
             }
