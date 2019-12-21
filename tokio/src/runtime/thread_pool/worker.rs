@@ -1,9 +1,9 @@
 use crate::loom::cell::CausalCell;
 use crate::loom::sync::Arc;
 use crate::park::Park;
-use crate::runtime::{self, blocking};
 use crate::runtime::park::Parker;
 use crate::runtime::thread_pool::{current, slice, Owned, Shared, Spawner};
+use crate::runtime::{self, blocking};
 use crate::task::Task;
 
 use std::cell::Cell;
@@ -78,10 +78,7 @@ struct GenerationGuard<'a> {
 struct WorkerGone;
 
 // TODO: Move into slices
-pub(super) fn create_set(
-    pool_size: usize,
-    parker: Parker,
-) -> (Arc<slice::Set>, Vec<Worker>) {
+pub(super) fn create_set(pool_size: usize, parker: Parker) -> (Arc<slice::Set>, Vec<Worker>) {
     // Create the parks...
     let parkers: Vec<_> = (0..pool_size).map(|_| parker.clone()).collect();
 
@@ -95,13 +92,7 @@ pub(super) fn create_set(
     let workers = parkers
         .into_iter()
         .enumerate()
-        .map(|(index, parker)| {
-            Worker::new(
-                slices.clone(),
-                index,
-                parker,
-            )
-        })
+        .map(|(index, parker)| Worker::new(slices.clone(), index, parker))
         .collect();
 
     (slices, workers)
@@ -116,11 +107,7 @@ const GLOBAL_POLL_INTERVAL: u16 = 61;
 impl Worker {
     // Safe as aquiring a lock is required before doing anything potentially
     // dangerous.
-    pub(super) fn new(
-        slices: Arc<slice::Set>,
-        index: usize,
-        park: Parker,
-    ) -> Self {
+    pub(super) fn new(slices: Arc<slice::Set>, index: usize, park: Parker) -> Self {
         Worker {
             inner: Arc::new(Inner {
                 park: CausalCell::new(park),

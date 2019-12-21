@@ -4,8 +4,8 @@
 
 use crate::loom::rand::seed;
 use crate::park::Park;
-use crate::runtime::Parker;
 use crate::runtime::thread_pool::{current, queue, Idle, Owned, Shared};
+use crate::runtime::Parker;
 use crate::task::{self, JoinHandle, Task};
 use crate::util::{CachePadded, FastRand};
 

@@ -97,16 +97,11 @@ impl<T: Stream> Stream for Throttle<T> {
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {
         if !self.has_delayed && self.delay.is_some() {
-            ready!(Pin::new(self.as_mut()
-                .project().delay.as_mut().unwrap())
-                .poll(cx));
+            ready!(Pin::new(self.as_mut().project().delay.as_mut().unwrap()).poll(cx));
             *self.as_mut().project().has_delayed = true;
         }
 
-        let value = ready!(self
-            .as_mut()
-            .project().stream
-            .poll_next(cx));
+        let value = ready!(self.as_mut().project().stream.poll_next(cx));
 
         if value.is_some() {
             let dur = self.duration;
