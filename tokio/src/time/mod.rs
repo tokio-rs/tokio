@@ -94,7 +94,7 @@ pub use interval::{interval, interval_at, Interval};
 
 mod timeout;
 #[doc(inline)]
-pub use timeout::{timeout, timeout_at, Timeout, Elapsed};
+pub use timeout::{timeout, timeout_at, Elapsed, Timeout};
 
 cfg_stream! {
     mod throttle;

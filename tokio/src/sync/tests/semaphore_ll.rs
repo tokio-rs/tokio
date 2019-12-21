@@ -42,7 +42,6 @@ fn poll_acquire_many_available() {
     assert_eq!(s.available_permits(), 95);
     assert!(permit.is_acquired());
 
-
     // Polling for a larger number of permits acquires more
     assert_ready_ok!(permit.enter(|cx, mut p| p.poll_acquire(cx, 8, &s)));
     assert_eq!(s.available_permits(), 92);

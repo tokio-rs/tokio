@@ -167,9 +167,7 @@ fn batch() {
                 let mut permit = Permit::new();
 
                 for n in &[4, 10, 8] {
-                    block_on(poll_fn(|cx| {
-                        permit.poll_acquire(cx, *n, &semaphore)
-                    })).unwrap();
+                    block_on(poll_fn(|cx| permit.poll_acquire(cx, *n, &semaphore))).unwrap();
 
                     active.fetch_add(*n as usize, SeqCst);
 

@@ -183,13 +183,10 @@ impl Semaphore {
         &self,
         cx: &mut Context<'_>,
         num_permits: u16,
-        permit: &mut Permit
-    ) -> Poll<Result<(), AcquireError>>
-    {
+        permit: &mut Permit,
+    ) -> Poll<Result<(), AcquireError>> {
         self.poll_acquire2(num_permits, || {
-            let waiter = permit
-                .waiter
-                .get_or_insert_with(|| Box::new(Waiter::new()));
+            let waiter = permit.waiter.get_or_insert_with(|| Box::new(Waiter::new()));
 
             waiter.waker.register_by_ref(cx.waker());
 
@@ -298,8 +295,7 @@ impl Semaphore {
                         // to set the node's "next" pointer to return the wait
                         // queue into a consistent state.
 
-                        let prev_waiter = curr.waiter()
-                            .unwrap_or(NonNull::from(&*self.stub));
+                        let prev_waiter = curr.waiter().unwrap_or(NonNull::from(&*self.stub));
 
                         let waiter = maybe_waiter.unwrap();
 
@@ -518,7 +514,9 @@ impl Semaphore {
 
             if curr.permits_to_acquire() > 0 {
                 // More permits are requested. The waiter must be re-queued
-                unsafe { self.push_waiter(waiter, closed); }
+                unsafe {
+                    self.push_waiter(waiter, closed);
+                }
                 return;
             }
 
@@ -685,7 +683,11 @@ impl Permit {
     }
 
     /// Try to acquire the permit.
-    pub(crate) fn try_acquire(&mut self, num_permits: u16, semaphore: &Semaphore) -> Result<(), TryAcquireError> {
+    pub(crate) fn try_acquire(
+        &mut self,
+        num_permits: u16,
+        semaphore: &Semaphore,
+    ) -> Result<(), TryAcquireError> {
         use PermitState::*;
 
         match self.state {
@@ -701,8 +703,7 @@ impl Permit {
                     self.state = Waiting(num_permits);
                 }
 
-                let res = waiter.permits_to_acquire()
-                    .map_err(to_try_acquire)?;
+                let res = waiter.permits_to_acquire().map_err(to_try_acquire)?;
 
                 if res == 0 {
                     if requested < num_permits {
@@ -752,7 +753,11 @@ impl Permit {
                 let n = cmp::min(n, requested);
 
                 // Decrement
-                let acquired = self.waiter.as_ref().unwrap().try_dec_permits_to_acquire(n as usize) as u16;
+                let acquired = self
+                    .waiter
+                    .as_ref()
+                    .unwrap()
+                    .try_dec_permits_to_acquire(n as usize) as u16;
 
                 if n == requested {
                     self.state = Acquired(0);
@@ -838,10 +843,14 @@ impl TryAcquireError {
 
 impl fmt::Display for TryAcquireError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "{}", match self {
-            TryAcquireError::Closed => "semaphore closed",
-            TryAcquireError::NoPermits => "no permits available",
-        })
+        write!(
+            fmt,
+            "{}",
+            match self {
+                TryAcquireError::Closed => "semaphore closed",
+                TryAcquireError::NoPermits => "no permits available",
+            }
+        )
     }
 }
 

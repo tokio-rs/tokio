@@ -1,5 +1,5 @@
+use crate::io::driver::platform;
 use crate::io::{AsyncRead, AsyncWrite, Registration};
-use crate::io::driver::{platform};
 
 use mio::event::Evented;
 use std::fmt;

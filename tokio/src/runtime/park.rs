@@ -2,8 +2,8 @@
 //!
 //! A combination of the various resource driver park handles.
 
-use crate::loom::sync::{Arc, Mutex, Condvar};
 use crate::loom::sync::atomic::AtomicUsize;
+use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::loom::thread;
 use crate::park::{Park, Unpark};
 use crate::runtime::time;
@@ -84,7 +84,9 @@ impl Park for Parker {
     type Error = ();
 
     fn unpark(&self) -> Unparker {
-        Unparker { inner: self.inner.clone() }
+        Unparker {
+            inner: self.inner.clone(),
+        }
     }
 
     fn park(&mut self) -> Result<(), Self::Error> {
@@ -97,8 +99,7 @@ impl Park for Parker {
         assert_eq!(duration, Duration::from_millis(0));
 
         if let Some(mut driver) = self.inner.shared.driver.try_lock() {
-            driver.park_timeout(duration)
-                .map_err(|_| ())
+            driver.park_timeout(duration).map_err(|_| ())
         } else {
             Ok(())
         }
@@ -117,7 +118,11 @@ impl Inner {
         for _ in 0..3 {
             // If we were previously notified then we consume this notification and
             // return quickly.
-            if self.state.compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst).is_ok() {
+            if self
+                .state
+                .compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst)
+                .is_ok()
+            {
                 return;
             }
 
@@ -135,7 +140,10 @@ impl Inner {
         // Otherwise we need to coordinate going to sleep
         let mut m = self.mutex.lock().unwrap();
 
-        match self.state.compare_exchange(EMPTY, PARKED_CONDVAR, SeqCst, SeqCst) {
+        match self
+            .state
+            .compare_exchange(EMPTY, PARKED_CONDVAR, SeqCst, SeqCst)
+        {
             Ok(_) => {}
             Err(NOTIFIED) => {
                 // We must read here, even though we know it will be `NOTIFIED`.
@@ -155,7 +163,11 @@ impl Inner {
         loop {
             m = self.condvar.wait(m).unwrap();
 
-            if self.state.compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst).is_ok() {
+            if self
+                .state
+                .compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst)
+                .is_ok()
+            {
                 // got a notification
                 return;
             }
@@ -165,7 +177,10 @@ impl Inner {
     }
 
     fn park_driver(&self, driver: &mut time::Driver) {
-        match self.state.compare_exchange(EMPTY, PARKED_DRIVER, SeqCst, SeqCst) {
+        match self
+            .state
+            .compare_exchange(EMPTY, PARKED_DRIVER, SeqCst, SeqCst)
+        {
             Ok(_) => {}
             Err(NOTIFIED) => {
                 // We must read here, even though we know it will be `NOTIFIED`.
@@ -186,7 +201,7 @@ impl Inner {
         driver.park().unwrap();
 
         match self.state.swap(EMPTY, SeqCst) {
-            NOTIFIED => {} // got a notification, hurray!
+            NOTIFIED => {}      // got a notification, hurray!
             PARKED_DRIVER => {} // no notification, alas
             n => panic!("inconsistent park_timeout state: {}", n),
         }
@@ -199,8 +214,8 @@ impl Inner {
         // is already `NOTIFIED`. That is why this must be a swap rather than a
         // compare-and-swap that returns if it reads `NOTIFIED` on failure.
         match self.state.swap(NOTIFIED, SeqCst) {
-            EMPTY => {}, // no one was waiting
-            NOTIFIED => {}, // already unparked
+            EMPTY => {}    // no one was waiting
+            NOTIFIED => {} // already unparked
             PARKED_CONDVAR => self.unpark_condvar(),
             PARKED_DRIVER => self.unpark_driver(),
             actual => panic!("inconsistent state in unpark; actual = {}", actual),

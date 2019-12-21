@@ -54,20 +54,12 @@ pub(crate) struct Workers {
 }
 
 impl ThreadPool {
-    pub(crate) fn new(
-        pool_size: usize,
-        parker: Parker,
-    ) -> (ThreadPool, Workers) {
-        let (pool, workers) = worker::create_set(
-            pool_size,
-            parker,
-        );
+    pub(crate) fn new(pool_size: usize, parker: Parker) -> (ThreadPool, Workers) {
+        let (pool, workers) = worker::create_set(pool_size, parker);
 
         let spawner = Spawner::new(pool);
 
-        let pool = ThreadPool {
-            spawner,
-        };
+        let pool = ThreadPool { spawner };
 
         (pool, Workers { workers })
     }

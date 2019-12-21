@@ -13,5 +13,6 @@ jobs:
         cargo fmt --version
       displayName: Install rustfmt
     - script: |
-        cargo fmt --all -- --check
+        # Workaround for rust-lang/cargo#7732
+        rustfmt --check --edition 2018 $(find . -name '*.rs' -print)
       displayName: Check formatting
