@@ -26,7 +26,8 @@ mod addr;
 pub use addr::ToSocketAddrs;
 
 cfg_dns! {
-    pub use addr::{lookup_host, LookupHost};
+    mod lookup_host;
+    pub use lookup_host::lookup_host;
 }
 
 cfg_tcp! {
