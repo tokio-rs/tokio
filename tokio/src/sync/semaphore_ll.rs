@@ -295,7 +295,8 @@ impl Semaphore {
                         // to set the node's "next" pointer to return the wait
                         // queue into a consistent state.
 
-                        let prev_waiter = curr.waiter().unwrap_or_else(|| NonNull::from(&*self.stub));
+                        let prev_waiter =
+                            curr.waiter().unwrap_or_else(|| NonNull::from(&*self.stub));
 
                         let waiter = maybe_waiter.unwrap();
 
@@ -619,8 +620,8 @@ impl Permit {
         num_permits: u16,
         semaphore: &Semaphore,
     ) -> Poll<Result<(), AcquireError>> {
-        use PermitState::*;
         use std::cmp::Ordering::*;
+        use PermitState::*;
 
         match self.state {
             Waiting(requested) => {
