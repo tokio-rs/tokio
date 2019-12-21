@@ -91,8 +91,7 @@ impl ThreadPool {
     {
         self.spawner.enter(|| {
             let mut enter = crate::runtime::enter();
-            enter.block_on(future)
-                .expect("failed to park thread")
+            enter.block_on(future).expect("failed to park thread")
         })
     }
 }
