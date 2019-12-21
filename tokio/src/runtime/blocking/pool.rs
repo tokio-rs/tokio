@@ -244,32 +244,31 @@ impl Spawner {
             builder = builder.stack_size(stack_size);
         }
 
-        let inner = self.inner.clone();
+        let spawner = self.clone();
 
         builder
             .spawn(move || {
-                inner.run();
+                run_thread(spawner);
 
-                // Make sure `inner` drops first to ensure that the shutdown_rx
-                // sees all refs to `Inner` are dropped when the `shutdown_rx`
-                // resolves.
-                drop(inner);
                 drop(shutdown_tx);
             })
             .unwrap();
     }
 }
 
+fn run_thread(spawner: Spawner) {
+    spawner.enter(|| {
+        let inner = &*spawner.inner;
+        let _io = io::set_default(&inner.io_handle);
+
+        time::with_default(&inner.time_handle, &inner.clock, || {
+            inner.spawner.enter(|| inner.run());
+        });
+    });
+}
+
 impl Inner {
     fn run(&self) {
-        let _io = io::set_default(&self.io_handle);
-
-        time::with_default(&self.time_handle, &self.clock, || {
-            self.spawner.enter(|| self.run2());
-        });
-    }
-
-    fn run2(&self) {
         if let Some(f) = &self.after_start {
             f()
         }
