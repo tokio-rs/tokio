@@ -50,7 +50,7 @@ cfg_resource_drivers! {
 }
 
 mod thread;
-pub(crate) use self::thread::ParkThread;
+pub(crate) use self::thread::{ParkThread, ParkError};
 
 cfg_blocking_impl! {
     pub(crate) use self::thread::CachedParkThread;
