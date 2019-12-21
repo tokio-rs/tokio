@@ -556,7 +556,7 @@ impl Command {
         imp::spawn_child(&mut self.std).map(|spawned_child| Child {
             child: ChildDropGuard {
                 inner: spawned_child.child,
-                kill_on_drop: self.kill_on_drop
+                kill_on_drop: self.kill_on_drop,
             },
             stdin: spawned_child.stdin.map(|inner| ChildStdin { inner }),
             stdout: spawned_child.stdout.map(|inner| ChildStdout { inner }),

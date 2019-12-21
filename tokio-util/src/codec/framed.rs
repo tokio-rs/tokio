@@ -3,7 +3,10 @@ use crate::codec::encoder::Encoder;
 use crate::codec::framed_read::{framed_read2, framed_read2_with_buffer, FramedRead2};
 use crate::codec::framed_write::{framed_write2, framed_write2_with_buffer, FramedWrite2};
 
-use tokio::{io::{AsyncBufRead, AsyncRead, AsyncWrite}, stream::Stream};
+use tokio::{
+    io::{AsyncBufRead, AsyncRead, AsyncWrite},
+    stream::Stream,
+};
 
 use bytes::BytesMut;
 use futures_sink::Sink;

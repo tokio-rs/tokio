@@ -19,6 +19,9 @@ use map::Map;
 mod next;
 use next::Next;
 
+mod try_next;
+use try_next::TryNext;
+
 pub use futures_core::Stream;
 
 /// An extension trait for `Stream`s that provides a variety of convenient
@@ -59,6 +62,35 @@ pub trait StreamExt: Stream {
         Self: Unpin,
     {
         Next::new(self)
+    }
+
+    /// Creates a future that attempts to resolve the next item in the stream.
+    /// If an error is encountered before the next item, the error is returned instead.
+    ///
+    /// This is similar to the [`next`](StreamExt::next) combinator,
+    /// but returns a [`Result<Option<T>, E>`](Result) rather than
+    /// an [`Option<Result<T, E>>`](Option), making for easy use
+    /// with the [`?`](std::ops::Try) operator.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio::stream::{self, StreamExt};
+    ///
+    /// let mut stream = stream::iter(vec![Ok(1), Ok(2), Err("nope")]);
+    ///
+    /// assert_eq!(stream.try_next().await, Ok(Some(1)));
+    /// assert_eq!(stream.try_next().await, Ok(Some(2)));
+    /// assert_eq!(stream.try_next().await, Err("nope"));
+    /// # }
+    /// ```
+    fn try_next<T, E>(&mut self) -> TryNext<'_, Self>
+    where
+        Self: Stream<Item = Result<T, E>> + Unpin,
+    {
+        TryNext::new(self)
     }
 
     /// Maps this stream's items to a different type, returning a new stream of

@@ -1,5 +1,5 @@
-use crate::runtime::{self, Runtime};
 use crate::runtime::tests::loom_oneshot as oneshot;
+use crate::runtime::{self, Runtime};
 use crate::spawn;
 
 use loom::sync::atomic::{AtomicBool, AtomicUsize};
