@@ -38,9 +38,10 @@ use std::path::Path;
 ///
 /// ```no_run
 /// use tokio::fs;
+/// use std::io;
 ///
 /// #[tokio::main]
-/// async fn main() -> std::io::Result<()> {
+/// async fn main() -> io::Result<()> {
 ///     fs::create_dir("/some/dir").await?;
 ///     Ok(())
 /// }

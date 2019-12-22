@@ -226,8 +226,18 @@ impl OpenOptions {
     ///
     /// ```no_run
     /// use tokio::fs::OpenOptions;
+    /// use std::io;
     ///
-    /// let file = OpenOptions::new().write(true).truncate(true).open("foo.txt");
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let file = OpenOptions::new()
+    ///         .write(true)
+    ///         .truncate(true)
+    ///         .open("foo.txt")
+    ///         .await?;
+    ///
+    ///     Ok(())
+    /// }
     /// ```
     pub fn truncate(&mut self, truncate: bool) -> &mut OpenOptions {
         self.0.truncate(truncate);
