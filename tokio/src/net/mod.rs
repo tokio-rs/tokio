@@ -25,6 +25,11 @@
 mod addr;
 pub use addr::ToSocketAddrs;
 
+cfg_dns! {
+    mod lookup_host;
+    pub use lookup_host::lookup_host;
+}
+
 cfg_tcp! {
     pub mod tcp;
     pub use tcp::listener::TcpListener;

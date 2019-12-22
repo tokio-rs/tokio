@@ -45,7 +45,7 @@ async fn usage() {
 
 #[tokio::test]
 async fn usage_stream() {
-    use futures::StreamExt;
+    use tokio::stream::StreamExt;
 
     let start = Instant::now();
     let mut interval = time::interval(ms(10));

@@ -27,10 +27,11 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::net::{TcpListener, TcpStream};
+use tokio::stream::{Stream, StreamExt};
 use tokio::sync::{mpsc, Mutex};
 use tokio_util::codec::{Framed, LinesCodec, LinesCodecError};
 
-use futures::{SinkExt, Stream, StreamExt};
+use futures::SinkExt;
 use std::collections::HashMap;
 use std::env;
 use std::error::Error;
@@ -163,12 +164,12 @@ impl Stream for Peer {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         // First poll the `UnboundedReceiver`.
 
-        if let Poll::Ready(Some(v)) = self.rx.poll_next_unpin(cx) {
+        if let Poll::Ready(Some(v)) = Pin::new(&mut self.rx).poll_next(cx) {
             return Poll::Ready(Some(Ok(Message::Received(v))));
         }
 
         // Secondly poll the `Framed` stream.
-        let result: Option<_> = futures::ready!(self.lines.poll_next_unpin(cx));
+        let result: Option<_> = futures::ready!(Pin::new(&mut self.lines).poll_next(cx));
 
         Poll::Ready(match result {
             // We've received a message we should broadcast to others.

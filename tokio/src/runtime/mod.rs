@@ -313,7 +313,7 @@ impl Runtime {
     /// scheduler] is used, while if only the `rt-core` feature is enabled, the
     /// [basic scheduler] is used instead.
     ///
-    /// If the threaded cheduler is selected, it will not spawn
+    /// If the threaded scheduler is selected, it will not spawn
     /// any worker threads until it needs to, i.e. tasks are scheduled to run.
     ///
     /// Most applications will not need to call this function directly. Instead,

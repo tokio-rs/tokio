@@ -15,10 +15,10 @@ pub(crate) struct LockGuard<'a, T> {
     _p: PhantomData<std::rc::Rc<()>>,
 }
 
-unsafe impl<T: Send> Send for TryLock<T> { }
-unsafe impl<T: Send> Sync for TryLock<T> { }
+unsafe impl<T: Send> Send for TryLock<T> {}
+unsafe impl<T: Send> Sync for TryLock<T> {}
 
-unsafe impl<T: Sync> Sync for LockGuard<'_, T> { }
+unsafe impl<T: Sync> Sync for LockGuard<'_, T> {}
 
 impl<T> TryLock<T> {
     /// Create a new `TryLock`
@@ -31,7 +31,11 @@ impl<T> TryLock<T> {
 
     /// Attempt to acquire lock
     pub(crate) fn try_lock(&self) -> Option<LockGuard<'_, T>> {
-        if self.locked.compare_exchange(false, true, SeqCst, SeqCst).is_err() {
+        if self
+            .locked
+            .compare_exchange(false, true, SeqCst, SeqCst)
+            .is_err()
+        {
             return None;
         }
 

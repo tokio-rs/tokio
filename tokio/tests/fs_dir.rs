@@ -71,7 +71,7 @@ async fn read_inherent() {
 
 #[tokio::test]
 async fn read_stream() {
-    use futures::StreamExt;
+    use tokio::stream::StreamExt;
 
     let base_dir = tempdir().unwrap();
 

@@ -250,9 +250,7 @@ impl TcpListener {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::net::TcpListener;
-    ///
-    /// use futures::StreamExt;
+    /// use tokio::{net::TcpListener, stream::StreamExt};
     ///
     /// #[tokio::main]
     /// async fn main() {

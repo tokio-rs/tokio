@@ -345,7 +345,7 @@ impl Schedule for Scheduler {
             unsafe { self.queues.push_local(task) };
         } else {
             let mut lock = self.queues.remote();
-            lock.schedule(task);
+            lock.schedule(task, false);
 
             self.waker.wake();
 
@@ -437,8 +437,15 @@ impl Drop for Scheduler {
             // Wait until all tasks have been released.
             // XXX: this is a busy loop, but we don't really have any way to park
             // the thread here?
-            while self.queues.has_tasks_remaining() {
+            loop {
                 self.queues.drain_pending_drop();
+                self.queues.drain_queues();
+
+                if !self.queues.has_tasks_remaining() {
+                    break;
+                }
+
+                std::thread::yield_now();
             }
         }
     }

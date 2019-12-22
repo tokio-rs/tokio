@@ -397,6 +397,21 @@ rt_test! {
     }
 
     #[test]
+    fn spawn_blocking_from_blocking() {
+        let mut rt = rt();
+
+        let out = rt.block_on(async move {
+            let inner = assert_ok!(tokio::task::spawn_blocking(|| {
+                tokio::task::spawn_blocking(|| "hello")
+            }).await);
+
+            assert_ok!(inner.await)
+        });
+
+        assert_eq!(out, "hello")
+    }
+
+    #[test]
     fn delay_from_blocking() {
         let mut rt = rt();
 

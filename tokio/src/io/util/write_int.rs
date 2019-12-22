@@ -49,7 +49,8 @@ macro_rules! writer {
                 }
 
                 while *me.written < $bytes as u8 {
-                    *me.written += match me.dst
+                    *me.written += match me
+                        .dst
                         .as_mut()
                         .poll_write(cx, &me.buf[*me.written as usize..])
                     {
@@ -77,10 +78,7 @@ macro_rules! writer8 {
 
         impl<W> $name<W> {
             pub(crate) fn new(dst: W, byte: $ty) -> Self {
-                Self {
-                    dst,
-                    byte,
-                }
+                Self { dst, byte }
             }
         }
 

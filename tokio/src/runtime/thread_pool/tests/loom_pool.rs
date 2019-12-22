@@ -1,5 +1,5 @@
-use crate::runtime::{self, Runtime};
 use crate::runtime::tests::loom_oneshot as oneshot;
+use crate::runtime::{self, Runtime};
 use crate::spawn;
 
 use loom::sync::atomic::{AtomicBool, AtomicUsize};
@@ -171,7 +171,7 @@ fn complete_block_on_under_load() {
 fn mk_pool(num_threads: usize) -> Runtime {
     runtime::Builder::new()
         .threaded_scheduler()
-        .num_threads(num_threads)
+        .core_threads(num_threads)
         .build()
         .unwrap()
 }

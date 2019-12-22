@@ -3,8 +3,8 @@ use crate::io::util::shutdown::{shutdown, Shutdown};
 use crate::io::util::write::{write, Write};
 use crate::io::util::write_all::{write_all, WriteAll};
 use crate::io::util::write_buf::{write_buf, WriteBuf};
-use crate::io::util::write_int::{WriteU8, WriteU16, WriteU32, WriteU64, WriteU128};
-use crate::io::util::write_int::{WriteI8, WriteI16, WriteI32, WriteI64, WriteI128};
+use crate::io::util::write_int::{WriteI128, WriteI16, WriteI32, WriteI64, WriteI8};
+use crate::io::util::write_int::{WriteU128, WriteU16, WriteU32, WriteU64, WriteU8};
 use crate::io::AsyncWrite;
 
 use bytes::Buf;

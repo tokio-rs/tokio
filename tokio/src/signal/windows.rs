@@ -209,7 +209,7 @@ impl CtrlBreak {
 }
 
 cfg_stream! {
-    impl futures_core::Stream for CtrlBreak {
+    impl crate::stream::Stream for CtrlBreak {
         type Item = ();
 
         fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<()>> {
@@ -246,9 +246,9 @@ pub fn ctrl_break() -> io::Result<CtrlBreak> {
 mod tests {
     use super::*;
     use crate::runtime::Runtime;
-    use tokio_test::{assert_ok, assert_pending, assert_ready_ok, task};
+    use crate::stream::StreamExt;
 
-    use futures::stream::StreamExt;
+    use tokio_test::{assert_ok, assert_pending, assert_ready_ok, task};
 
     #[test]
     fn ctrl_c() {

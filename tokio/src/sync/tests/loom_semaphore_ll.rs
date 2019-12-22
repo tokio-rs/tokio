@@ -1,4 +1,4 @@
-use crate::sync::semaphore::*;
+use crate::sync::semaphore_ll::*;
 
 use futures::future::poll_fn;
 use loom::future::block_on;
