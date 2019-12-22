@@ -225,7 +225,7 @@ impl OpenOptions {
     /// # Examples
     ///
     /// ```no_run
-    /// use std::fs::OpenOptions;
+    /// use tokio::fs::OpenOptions;
     ///
     /// let file = OpenOptions::new().write(true).truncate(true).open("foo.txt");
     /// ```
