@@ -5,25 +5,24 @@
 //! This module provides a number of types for executing code after a set period
 //! of time.
 //!
-//! * [`Delay`][Delay] is a future that does no work and completes at a specific `Instant`
+//! * `Delay` is a future that does no work and completes at a specific `Instant`
 //!   in time.
 //!
-//! * [`Interval`][Interval] is a stream yielding a value at a fixed period. It
-//!   is initialized with a `Duration` and repeatedly yields each time the
-//!   duration elapses.
+//! * `Interval` is a stream yielding a value at a fixed period. It is
+//!   initialized with a `Duration` and repeatedly yields each time the duration
+//!   elapses.
 //!
-//! * [`Timeout`][Timeout]: Wraps a future or stream, setting an upper bound to the
-//!   amount of time it is allowed to execute. If the future or stream does not
+//! * `Timeout`: Wraps a future or stream, setting an upper bound to the amount
+//!   of time it is allowed to execute. If the future or stream does not
 //!   complete in time, then it is canceled and an error is returned.
 //!
-//! * [`DelayQueue`]: A queue where items are returned once the requested delay
+//! * `DelayQueue`: A queue where items are returned once the requested delay
 //!   has expired.
 //!
 //! These types are sufficient for handling a large number of scenarios
 //! involving time.
 //!
-//! These types must be used from within the context of the
-//! [`Runtime`][runtime].
+//! These types must be used from within the context of the `Runtime`.
 //!
 //! # Examples
 //!
@@ -43,8 +42,8 @@
 //! ```
 //!
 //! Require that an operation takes no more than 300ms. Note that this uses the
-//! [`timeout`][ext] function on the [`FutureExt`][ext] trait. This trait is
-//! included in the prelude.
+//! `timeout` function on the `FutureExt` trait. This trait is included in the
+//! prelude.
 //!
 //! ```
 //! use tokio::time::{timeout, Duration};
@@ -61,13 +60,6 @@
 //! }
 //! # }
 //! ```
-//!
-//! [runtime]: ../runtime/struct.Runtime.html
-//! [ext]: ../util/trait.FutureExt.html#method.timeout
-//! [Timeout]: struct.Timeout.html
-//! [Delay]: struct.Delay.html
-//! [Interval]: struct.Interval.html
-//! [`DelayQueue`]: struct.DelayQueue.html
 
 mod clock;
 pub(crate) use self::clock::Clock;

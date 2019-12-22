@@ -15,12 +15,12 @@
 //! over Unix Domain Datagram Socket **(available on Unix only)**
 
 //!
-//! [`TcpListener`]: struct.TcpListener.html
-//! [`TcpStream`]: struct.TcpStream.html
-//! [`UdpSocket`]: struct.UdpSocket.html
-//! [`UnixListener`]: struct.UnixListener.html
-//! [`UnixStream`]: struct.UnixStream.html
-//! [`UnixDatagram`]: struct.UnixDatagram.html
+//! [`TcpListener`]: TcpListener
+//! [`TcpStream`]: TcpStream
+//! [`UdpSocket`]: UdpSocket
+//! [`UnixListener`]: UnixListener
+//! [`UnixStream`]: UnixStream
+//! [`UnixDatagram`]: UnixDatagram
 
 mod addr;
 pub use addr::ToSocketAddrs;

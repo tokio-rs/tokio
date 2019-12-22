@@ -12,7 +12,7 @@ cfg_io_util! {
     /// This struct is generally created by calling [`copy`][copy]. Please
     /// see the documentation of `copy()` for more details.
     ///
-    /// [copy]: fn.copy.html
+    /// [copy]: copy()
     #[derive(Debug)]
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct Copy<'a, R: ?Sized, W: ?Sized> {
@@ -57,7 +57,7 @@ cfg_io_util! {
     /// # }
     /// ```
     ///
-    /// [std]: https://doc.rust-lang.org/std/io/fn.copy.html
+    /// [std]: std::io::copy
     pub fn copy<'a, R, W>(reader: &'a mut R, writer: &'a mut W) -> Copy<'a, R, W>
     where
         R: AsyncRead + Unpin + ?Sized,

@@ -10,11 +10,9 @@ pub(crate) struct ParkThread {
     inner: Arc<Inner>,
 }
 
-/// Error returned by [`ParkThread`]
+/// Error returned by `ParkThread`
 ///
 /// This currently is never returned, but might at some point in the future.
-///
-/// [`ParkThread`]: struct.ParkThread.html
 #[derive(Debug)]
 pub(crate) struct ParkError {
     _p: (),

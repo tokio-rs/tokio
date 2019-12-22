@@ -14,8 +14,8 @@ cfg_io_std! {
     ///
     /// Created by the [`stderr`] function.
     ///
-    /// [`stderr`]: fn.stderr.html
-    /// [`AsyncWrite`]: trait.AsyncWrite.html
+    /// [`stderr`]: stderr()
+    /// [`AsyncWrite`]: AsyncWrite
     #[derive(Debug)]
     pub struct Stderr {
         std: Blocking<std::io::Stderr>,

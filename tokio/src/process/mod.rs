@@ -348,6 +348,8 @@ impl Command {
     /// platform specific and unstable, and it's recommended to use
     /// [`canonicalize`] to get an absolute program path instead.
     ///
+    /// [`canonicalize`]: crate::fs::canonicalize()
+    ///
     /// # Examples
     ///
     /// Basic usage:
@@ -358,8 +360,6 @@ impl Command {
     /// let command = Command::new("ls")
     ///         .current_dir("/bin");
     /// ```
-    ///
-    /// [`canonicalize`]: ../fs/fn.canonicalize.html
     pub fn current_dir<P: AsRef<Path>>(&mut self, dir: P) -> &mut Command {
         self.std.current_dir(dir);
         self
