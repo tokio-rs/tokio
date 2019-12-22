@@ -230,12 +230,17 @@ cfg_blocking_impl! {
             }
         }
 
+        pub(crate) fn get_unpark(&self) -> Result<UnparkThread, ParkError> {
+            self.with_current(|park_thread| park_thread.unpark())
+        }
+
         /// Get a reference to the `ParkThread` handle for this thread.
-        fn with_current<F, R>(&self, f: F) -> R
+        fn with_current<F, R>(&self, f: F) -> Result<R, ParkError>
         where
             F: FnOnce(&ParkThread) -> R,
         {
-            CURRENT_PARKER.with(|inner| f(inner))
+            CURRENT_PARKER.try_with(|inner| f(inner))
+                .map_err(|_| ParkError { _p: () })
         }
     }
 
@@ -244,16 +249,16 @@ cfg_blocking_impl! {
         type Error = ParkError;
 
         fn unpark(&self) -> Self::Unpark {
-            self.with_current(|park_thread| park_thread.unpark())
+            self.get_unpark().unwrap()
         }
 
         fn park(&mut self) -> Result<(), Self::Error> {
-            self.with_current(|park_thread| park_thread.inner.park());
+            self.with_current(|park_thread| park_thread.inner.park())?;
             Ok(())
         }
 
         fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
-            self.with_current(|park_thread| park_thread.inner.park_timeout(duration));
+            self.with_current(|park_thread| park_thread.inner.park_timeout(duration))?;
             Ok(())
         }
     }

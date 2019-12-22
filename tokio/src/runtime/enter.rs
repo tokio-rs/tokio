@@ -74,10 +74,12 @@ pub(crate) fn exit<F: FnOnce() -> R, R>(f: F) -> R {
 }
 
 cfg_blocking_impl! {
+    use crate::park::ParkError;
+
     impl Enter {
         /// Blocks the thread on the specified future, returning the value with
         /// which that future completes.
-        pub(crate) fn block_on<F>(&mut self, mut f: F) -> F::Output
+        pub(crate) fn block_on<F>(&mut self, mut f: F) -> Result<F::Output, ParkError>
         where
             F: std::future::Future,
         {
@@ -87,7 +89,7 @@ cfg_blocking_impl! {
             use std::task::Poll::Ready;
 
             let mut park = CachedParkThread::new();
-            let waker = park.unpark().into_waker();
+            let waker = park.get_unpark()?.into_waker();
             let mut cx = Context::from_waker(&waker);
 
             // `block_on` takes ownership of `f`. Once it is pinned here, the original `f` binding can
@@ -96,9 +98,10 @@ cfg_blocking_impl! {
 
             loop {
                 if let Ready(v) = f.as_mut().poll(&mut cx) {
-                    return v;
+                    return Ok(v);
                 }
-                park.park().unwrap();
+
+                park.park()?;
             }
         }
     }

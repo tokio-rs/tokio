@@ -39,6 +39,10 @@ impl Receiver {
         };
 
         // The oneshot completes with an Err
+        //
+        // If blocking fails to wait, this indicates a problem parking the
+        // current thread (usually, shutting down a runtime stored in a
+        // thread-local).
         let _ = e.block_on(&mut self.rx);
     }
 }

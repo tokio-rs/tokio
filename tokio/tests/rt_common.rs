@@ -617,6 +617,24 @@ rt_test! {
         assert_ok!(drop_rx.recv());
     }
 
+    #[test]
+    fn runtime_in_thread_local() {
+        use std::cell::RefCell;
+        use std::thread;
+
+        thread_local!(
+            static R: RefCell<Option<Runtime>> = RefCell::new(None);
+        );
+
+        thread::spawn(|| {
+            R.with(|cell| {
+                *cell.borrow_mut() = Some(rt());
+            });
+
+            let _rt = rt();
+        }).join().unwrap();
+    }
+
     async fn client_server(tx: mpsc::Sender<()>) {
         let mut server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
 
