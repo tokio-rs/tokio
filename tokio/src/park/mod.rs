@@ -50,10 +50,10 @@ cfg_resource_drivers! {
 }
 
 mod thread;
-pub(crate) use self::thread::{ParkError, ParkThread};
+pub(crate) use self::thread::ParkThread;
 
 cfg_blocking_impl! {
-    pub(crate) use self::thread::CachedParkThread;
+    pub(crate) use self::thread::{CachedParkThread, ParkError};
 }
 
 use std::sync::Arc;
