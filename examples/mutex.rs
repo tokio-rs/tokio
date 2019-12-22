@@ -8,9 +8,12 @@
 //!
 //! Tokio's Mutex works in a simple FIFO (first in, first out) style where as requests for a lock are
 //! made Tokio will queue them up and provide a lock when it is that requester's turn. In that way
-//! the Mutex is "fair" and predictable in how it distributes the locks to inner data. Also, since
-//! there is only a single valid lock at any given time there is no possibility of a race condition
-//! when mutating the inner value.
+//! the Mutex is "fair" and predictable in how it distributes the locks to inner data. This is why
+//! the output of this program is an in-order count to 50. Locks are released and reacquired
+//! after every iteration, so basically, each thread goes to the back of the line after it increments
+//! the value once. Also, since there is only a single valid lock at any given time there is no
+//! possibility of a race condition when mutating the inner value.
+//!
 #![warn(rust_2018_idioms)]
 
 use tokio::sync::Mutex;
