@@ -346,7 +346,7 @@ impl Command {
     /// whether it should be interpreted relative to the parent's working
     /// directory or relative to `current_dir`. The behavior in this case is
     /// platform specific and unstable, and it's recommended to use
-    /// [`canonicalize`] to get an absolute program path instead.
+    /// `canonicalize` to get an absolute program path instead.
     ///
     /// # Examples
     ///
@@ -358,8 +358,6 @@ impl Command {
     /// let command = Command::new("ls")
     ///         .current_dir("/bin");
     /// ```
-    ///
-    /// [`canonicalize`]: ../fs/fn.canonicalize.html
     pub fn current_dir<P: AsRef<Path>>(&mut self, dir: P) -> &mut Command {
         self.std.current_dir(dir);
         self

@@ -1,6 +1,6 @@
 //! Types for working with [`File`].
 //!
-//! [`File`]: file/struct.File.html
+//! [`File`]: File
 
 use self::State::*;
 use crate::fs::{asyncify, sys};
@@ -29,7 +29,7 @@ use std::task::Poll::*;
 ///
 /// Files are automatically closed when they go out of scope.
 ///
-/// [std]: https://doc.rust-lang.org/std/fs/struct.File.html
+/// [std]: std::fs::File
 ///
 /// # Examples
 ///
@@ -90,7 +90,7 @@ impl File {
     ///
     /// See [`OpenOptions`] for more details.
     ///
-    /// [`OpenOptions`]: struct.OpenOptions.html
+    /// [`OpenOptions`]: super::OpenOptions
     ///
     /// # Errors
     ///
@@ -128,14 +128,14 @@ impl File {
     ///
     /// See [`OpenOptions`] for more details.
     ///
-    /// [`OpenOptions`]: struct.OpenOptions.html
+    /// [`OpenOptions`]: super::OpenOptions
     ///
     /// # Errors
     ///
     /// Results in an error if called from outside of the Tokio runtime or if
     /// the underlying [`create`] call results in an error.
     ///
-    /// [`create`]: https://doc.rust-lang.org/std/fs/struct.File.html#method.create
+    /// [`create`]: std::fs::File::create
     ///
     /// # Examples
     ///
@@ -155,10 +155,10 @@ impl File {
         Ok(File::from_std(std_file))
     }
 
-    /// Convert a [`std::fs::File`][std] to a [`tokio_fs::File`][file].
+    /// Convert a [`std::fs::File`][std] to a [`tokio::fs::File`][file].
     ///
-    /// [std]: https://doc.rust-lang.org/std/fs/struct.File.html
-    /// [file]: struct.File.html
+    /// [std]: std::fs::File
+    /// [file]: File
     ///
     /// # Examples
     ///
@@ -399,6 +399,8 @@ impl File {
     ///
     /// Use `File::try_into_std` to attempt conversion immediately.
     ///
+    /// [std]: std::fs::File
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -416,6 +418,8 @@ impl File {
     }
 
     /// Tries to immediately destructure `File` into a [`std::fs::File`][std].
+    ///
+    /// [std]: std::fs::File
     ///
     /// # Errors
     ///

@@ -7,7 +7,7 @@ use std::task::{Context, Poll};
 
 /// Send values to the associated `Receiver`.
 ///
-/// Instances are created by the [`channel`](fn.channel.html) function.
+/// Instances are created by the [`channel`](channel) function.
 pub struct Sender<T> {
     chan: chan::Tx<T, Semaphore>,
 }
@@ -30,7 +30,7 @@ impl<T> fmt::Debug for Sender<T> {
 
 /// Receive values from the associated `Sender`.
 ///
-/// Instances are created by the [`channel`](fn.channel.html) function.
+/// Instances are created by the [`channel`](channel) function.
 pub struct Receiver<T> {
     /// The channel receiver
     chan: chan::Rx<T, Semaphore>,

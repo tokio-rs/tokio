@@ -8,7 +8,7 @@ use std::task::{Context, Poll};
 /// Send values to the associated `UnboundedReceiver`.
 ///
 /// Instances are created by the
-/// [`unbounded_channel`](fn.unbounded_channel.html) function.
+/// [`unbounded_channel`](unbounded_channel) function.
 pub struct UnboundedSender<T> {
     chan: chan::Tx<T, Semaphore>,
 }
@@ -32,7 +32,7 @@ impl<T> fmt::Debug for UnboundedSender<T> {
 /// Receive values from the associated `UnboundedSender`.
 ///
 /// Instances are created by the
-/// [`unbounded_channel`](fn.unbounded_channel.html) function.
+/// [`unbounded_channel`](unbounded_channel) function.
 pub struct UnboundedReceiver<T> {
     /// The channel receiver
     chan: chan::Rx<T, Semaphore>,
