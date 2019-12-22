@@ -30,12 +30,12 @@ impl Handle {
     where
         F: FnOnce() -> R,
     {
-        let ctx = crate::runtime::context::ThreadContext::new();
-        let ctx = ctx.with_spawner(self.spawner.clone());
-        let ctx = ctx.with_io_handle(self.io_handle.clone());
-        let ctx = ctx.with_time_handle(self.time_handle.clone());
-        let ctx = ctx.with_clock(self.clock.clone());
-        let _e = ctx.enter();
+        crate::runtime::context::ThreadContext::new()
+            .with_spawner(self.spawner.clone())
+            .with_io_handle(self.io_handle.clone())
+            .with_time_handle(self.time_handle.clone())
+            .with_clock(self.clock.clone())
+            .enter();
         self.blocking_spawner.enter(|| self.spawner.enter(f))
     }
 }

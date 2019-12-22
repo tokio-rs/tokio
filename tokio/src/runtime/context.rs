@@ -12,7 +12,6 @@ thread_local! {
 /// ThreadContext makes Runtime context accessible to each Runtime thread.
 #[derive(Debug, Clone)]
 pub(crate) struct ThreadContext {
-    executing: bool,
     /// Handles to the executor.
     spawner: Spawner,
 
@@ -29,7 +28,6 @@ pub(crate) struct ThreadContext {
 impl ThreadContext {
     pub(crate) fn new() -> Self {
         ThreadContext {
-            executing: false,
             spawner: Spawner::Shell,
             io_handle: None,
             time_handle: None,
