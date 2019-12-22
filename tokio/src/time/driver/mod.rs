@@ -7,7 +7,7 @@ mod entry;
 use self::entry::Entry;
 
 mod handle;
-pub(crate) use self::handle::{set_default, Handle};
+pub(crate) use self::handle::Handle;
 
 mod registration;
 pub(crate) use self::registration::Registration;

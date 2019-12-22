@@ -34,14 +34,6 @@ mod variant {
             (Either::B(io_driver), None)
         }
     }
-
-    pub(crate) fn with_default<F, R>(handle: &Handle, clock: &Clock, f: F) -> R
-    where
-        F: FnOnce() -> R,
-    {
-        let _time = handle.as_ref().map(|handle| driver::set_default(handle));
-        clock.enter(f)
-    }
 }
 
 #[cfg(any(not(feature = "time"), loom))]
@@ -50,7 +42,7 @@ mod variant {
 
     pub(crate) type Clock = ();
     pub(crate) type Driver = io::Driver;
-    pub(crate) type Handle = ();
+    pub(crate) type Handle = Option<()>;
 
     pub(crate) fn create_clock() -> Clock {
         ()
@@ -62,13 +54,6 @@ mod variant {
         io_driver: io::Driver,
         _clock: Clock,
     ) -> (Driver, Handle) {
-        (io_driver, ())
-    }
-
-    pub(crate) fn with_default<F, R>(_handler: &Handle, _clock: &Clock, f: F) -> R
-    where
-        F: FnOnce() -> R,
-    {
-        f()
+        (io_driver, None)
     }
 }

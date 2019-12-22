@@ -38,10 +38,6 @@ mod variant {
             Ok((Either::B(driver), None))
         }
     }
-
-    pub(crate) fn set_default(handle: &Handle) -> Option<driver::DefaultGuard<'_>> {
-        handle.as_ref().map(|handle| driver::set_default(handle))
-    }
 }
 
 #[cfg(any(not(feature = "io-driver"), loom))]
@@ -54,13 +50,11 @@ mod variant {
     pub(crate) type Driver = ParkThread;
 
     /// There is no handle
-    pub(crate) type Handle = ();
+    pub(crate) type Handle = Option<()>;
 
     pub(crate) fn create_driver(_enable: bool) -> io::Result<(Driver, Handle)> {
         let driver = ParkThread::new();
 
-        Ok((driver, ()))
+        Ok((driver, None))
     }
-
-    pub(crate) fn set_default(_handle: &Handle) {}
 }
