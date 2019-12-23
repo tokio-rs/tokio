@@ -28,7 +28,8 @@ const MAX_READS: usize = 10;
 ///
 /// The type parameter `T` represents the data that this lock protects. It is
 /// required that `T` satisfies [`Send`] to be shared across threads. The RAII guards
-/// returned from the locking methods implement [`Deref`][] (and [`DerefMut`]
+/// returned from the locking methods implement [`Deref`](https://doc.rust-lang.org/std/ops/trait.Deref.html)
+/// (and [`DerefMut`](https://doc.rust-lang.org/std/ops/trait.DerefMut.html)
 /// for the `write` methods) to allow access to the content of the lock.
 ///
 /// # Examples
