@@ -59,7 +59,3 @@ path = "udp-codec.rs"
 [[example]]
 name = "tinyhttp"
 path = "tinyhttp.rs"
-
-[[example]]
-name = "mutex"
-path = "mutex.rs"
