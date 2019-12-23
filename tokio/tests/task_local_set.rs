@@ -7,117 +7,99 @@ use tokio::{
     task::{self, LocalSet},
     time,
 };
-use std::time::Duration;
+use std::{
+    cell::Cell,
+    time::Duration,
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering::{self, SeqCst}},
+};
 
-#[test]
-fn local_current_thread() {
-    let mut rt = runtime::Builder::new().basic_scheduler().build().unwrap();
-    LocalSet::new().block_on(&mut rt, async {
-        spawn_local(async {}).await.unwrap();
-    });
+#[tokio::test(basic_scheduler)]
+async fn local_basic_scheduler() {
+    LocalSet::new().run_until(async {
+        task::spawn_local(async {}).await.unwrap();
+    }).await;
 }
 
-#[test]
-fn local_threadpool() {
+#[tokio::test(threaded_scheduler)]
+async fn local_threadpool() {
     thread_local! {
         static ON_RT_THREAD: Cell<bool> = Cell::new(false);
     }
 
     ON_RT_THREAD.with(|cell| cell.set(true));
 
-    let mut rt = runtime::Runtime::new().unwrap();
-    LocalSet::new().block_on(&mut rt, async {
+    LocalSet::new().run_until(async {
         assert!(ON_RT_THREAD.with(|cell| cell.get()));
-        spawn_local(async {
+        task::spawn_local(async {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
         })
         .await
         .unwrap();
-    });
+    }).await;
 }
 
-#[test]
-fn localset_future_threadpool() {
+
+#[tokio::test(threaded_scheduler)]
+async fn localset_future_threadpool() {
     thread_local! {
         static ON_LOCAL_THREAD: Cell<bool> = Cell::new(false);
     }
 
     ON_LOCAL_THREAD.with(|cell| cell.set(true));
 
-    let mut rt = runtime::Builder::new()
-        .threaded_scheduler()
-        .enable_all()
-        .build()
-        .unwrap();
-    rt.block_on(async {
-        let local = LocalSet::new();
-        local.spawn_local(async move {
-            assert!(ON_LOCAL_THREAD.with(|cell| cell.get()));
-        });
-        local.await;
+    let local = LocalSet::new();
+    local.spawn_local(async move {
+        assert!(ON_LOCAL_THREAD.with(|cell| cell.get()));
     });
+    local.await;
 }
 
-#[test]
-fn localset_future_timers() {
-    use std::sync::atomic::{AtomicBool, Ordering};
+#[tokio::test(threaded_scheduler)]
+async fn localset_future_timers() {
     static RAN1: AtomicBool = AtomicBool::new(false);
     static RAN2: AtomicBool = AtomicBool::new(false);
 
-    let mut rt = runtime::Builder::new()
-        .threaded_scheduler()
-        .enable_all()
-        .build()
-        .unwrap();
-    rt.block_on(async {
-        let local = LocalSet::new();
-        local.spawn_local(async move {
-            crate::time::delay_for(Duration::from_millis(10)).await;
-            RAN1.store(true, Ordering::SeqCst);
-        });
-        local.spawn_local(async move {
-            crate::time::delay_for(Duration::from_millis(20)).await;
-            RAN2.store(true, Ordering::SeqCst);
-        });
-        local.await;
+    let local = LocalSet::new();
+    local.spawn_local(async move {
+        time::delay_for(Duration::from_millis(10)).await;
+        RAN1.store(true, Ordering::SeqCst);
     });
+    local.spawn_local(async move {
+        time::delay_for(Duration::from_millis(20)).await;
+        RAN2.store(true, Ordering::SeqCst);
+    });
+    local.await;
     assert!(RAN1.load(Ordering::SeqCst));
     assert!(RAN2.load(Ordering::SeqCst));
 }
 
-#[test]
-fn localset_future_drives_all_local_futs() {
-    use std::sync::atomic::{AtomicBool, Ordering};
+#[tokio::test]
+async fn localset_future_drives_all_local_futs() {
     static RAN1: AtomicBool = AtomicBool::new(false);
     static RAN2: AtomicBool = AtomicBool::new(false);
     static RAN3: AtomicBool = AtomicBool::new(false);
 
-    let mut rt = runtime::Builder::new()
-        .threaded_scheduler()
-        .build()
-        .unwrap();
-    rt.block_on(async {
-        let local = LocalSet::new();
-        local.spawn_local(async move {
-            spawn_local(async {
-                task::yield_now().await;
-                RAN3.store(true, Ordering::SeqCst);
-            });
+    let local = LocalSet::new();
+    local.spawn_local(async move {
+        task::spawn_local(async {
             task::yield_now().await;
-            RAN1.store(true, Ordering::SeqCst);
+            RAN3.store(true, Ordering::SeqCst);
         });
-        local.spawn_local(async move {
-            task::yield_now().await;
-            RAN2.store(true, Ordering::SeqCst);
-        });
-        local.await;
+        task::yield_now().await;
+        RAN1.store(true, Ordering::SeqCst);
     });
+    local.spawn_local(async move {
+        task::yield_now().await;
+        RAN2.store(true, Ordering::SeqCst);
+    });
+    local.await;
     assert!(RAN1.load(Ordering::SeqCst));
     assert!(RAN2.load(Ordering::SeqCst));
     assert!(RAN3.load(Ordering::SeqCst));
 }
-#[test]
-fn local_threadpool_timer() {
+
+#[tokio::test(threaded_scheduler)]
+async fn local_threadpool_timer() {
     // This test ensures that runtime services like the timer are properly
     // set for the local task set.
     thread_local! {
@@ -126,20 +108,15 @@ fn local_threadpool_timer() {
 
     ON_RT_THREAD.with(|cell| cell.set(true));
 
-    let mut rt = runtime::Builder::new()
-        .threaded_scheduler()
-        .enable_all()
-        .build()
-        .unwrap();
-    LocalSet::new().block_on(&mut rt, async {
+    LocalSet::new().run_until(async {
         assert!(ON_RT_THREAD.with(|cell| cell.get()));
-        let join = spawn_local(async move {
+        let join = task::spawn_local(async move {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
-            crate::time::delay_for(Duration::from_millis(10)).await;
+            time::delay_for(Duration::from_millis(10)).await;
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
         });
         join.await.unwrap();
-    });
+    }).await;
 }
 
 #[test]
@@ -160,7 +137,7 @@ fn local_threadpool_blocking_in_place() {
         .unwrap();
     LocalSet::new().block_on(&mut rt, async {
         assert!(ON_RT_THREAD.with(|cell| cell.get()));
-        let join = spawn_local(async move {
+        let join = task::spawn_local(async move {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
             task::block_in_place(|| {});
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
@@ -169,22 +146,18 @@ fn local_threadpool_blocking_in_place() {
     });
 }
 
-#[test]
-fn local_threadpool_blocking_run() {
+
+#[tokio::test(threaded_scheduler)]
+async fn local_threadpool_blocking_run() {
     thread_local! {
         static ON_RT_THREAD: Cell<bool> = Cell::new(false);
     }
 
     ON_RT_THREAD.with(|cell| cell.set(true));
 
-    let mut rt = runtime::Builder::new()
-        .threaded_scheduler()
-        .enable_all()
-        .build()
-        .unwrap();
-    LocalSet::new().block_on(&mut rt, async {
+    LocalSet::new().run_until(async {
         assert!(ON_RT_THREAD.with(|cell| cell.get()));
-        let join = spawn_local(async move {
+        let join = task::spawn_local(async move {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
             task::spawn_blocking(|| {
                 assert!(
@@ -197,11 +170,11 @@ fn local_threadpool_blocking_run() {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
         });
         join.await.unwrap();
-    });
+    }).await;
 }
 
-#[test]
-fn all_spawns_are_local() {
+#[tokio::test(threaded_scheduler)]
+async fn all_spawns_are_local() {
     use futures::future;
     thread_local! {
         static ON_RT_THREAD: Cell<bool> = Cell::new(false);
@@ -209,15 +182,11 @@ fn all_spawns_are_local() {
 
     ON_RT_THREAD.with(|cell| cell.set(true));
 
-    let mut rt = runtime::Builder::new()
-        .threaded_scheduler()
-        .build()
-        .unwrap();
-    LocalSet::new().block_on(&mut rt, async {
+    LocalSet::new().run_until(async {
         assert!(ON_RT_THREAD.with(|cell| cell.get()));
         let handles = (0..128)
             .map(|_| {
-                spawn_local(async {
+                task::spawn_local(async {
                     assert!(ON_RT_THREAD.with(|cell| cell.get()));
                 })
             })
@@ -225,30 +194,26 @@ fn all_spawns_are_local() {
         for joined in future::join_all(handles).await {
             joined.unwrap();
         }
-    })
+    }).await;
 }
 
-#[test]
-fn nested_spawn_is_local() {
+#[tokio::test(threaded_scheduler)]
+async fn nested_spawn_is_local() {
     thread_local! {
         static ON_RT_THREAD: Cell<bool> = Cell::new(false);
     }
 
     ON_RT_THREAD.with(|cell| cell.set(true));
 
-    let mut rt = runtime::Builder::new()
-        .threaded_scheduler()
-        .build()
-        .unwrap();
-    LocalSet::new().block_on(&mut rt, async {
+    LocalSet::new().run_until(async {
         assert!(ON_RT_THREAD.with(|cell| cell.get()));
-        spawn_local(async {
+        task::spawn_local(async {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
-            spawn_local(async {
+            task::spawn_local(async {
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
-                spawn_local(async {
+                task::spawn_local(async {
                     assert!(ON_RT_THREAD.with(|cell| cell.get()));
-                    spawn_local(async {
+                    task::spawn_local(async {
                         assert!(ON_RT_THREAD.with(|cell| cell.get()));
                     })
                     .await
@@ -262,8 +227,9 @@ fn nested_spawn_is_local() {
         })
         .await
         .unwrap();
-    })
+    }).await;
 }
+
 #[test]
 fn join_local_future_elsewhere() {
     thread_local! {
@@ -278,8 +244,8 @@ fn join_local_future_elsewhere() {
         .unwrap();
     let local = LocalSet::new();
     local.block_on(&mut rt, async move {
-        let (tx, rx) = crate::sync::oneshot::channel();
-        let join = spawn_local(async move {
+        let (tx, rx) = oneshot::channel();
+        let join = task::spawn_local(async move {
             println!("hello world running...");
             assert!(
                 ON_RT_THREAD.with(|cell| cell.get()),
@@ -309,11 +275,7 @@ fn join_local_future_elsewhere() {
 #[test]
 fn drop_cancels_tasks() {
     // This test reproduces issue #1842
-    let mut rt = runtime::Builder::new()
-        .enable_time()
-        .basic_scheduler()
-        .build()
-        .unwrap();
+    let mut rt = rt();
 
     let (started_tx, started_rx) = oneshot::channel();
 
@@ -339,18 +301,14 @@ fn drop_cancels_remote_tasks() {
 
     let (done_tx, done_rx) = std::sync::mpsc::channel();
     let thread = std::thread::spawn(move || {
-        let (tx, mut rx) = crate::sync::mpsc::channel::<()>(1024);
+        let (tx, mut rx) = mpsc::channel::<()>(1024);
 
-        let mut rt = runtime::Builder::new()
-            .enable_time()
-            .basic_scheduler()
-            .build()
-            .expect("building runtime should succeed");
+        let mut rt = rt();
 
         let local = LocalSet::new();
         local.spawn_local(async move { while let Some(_) = rx.recv().await {} });
         local.block_on(&mut rt, async {
-            crate::time::delay_for(Duration::from_millis(1)).await;
+            time::delay_for(Duration::from_millis(1)).await;
         });
 
         drop(tx);
@@ -390,10 +348,9 @@ fn drop_cancels_remote_tasks() {
     thread.join().expect("test thread should not panic!")
 }
 
-#[test]
-fn local_tasks_are_polled_after_tick() {
+#[tokio::test]
+async fn local_tasks_are_polled_after_tick() {
     // Reproduces issues #1899 and #1900
-    use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
 
     static RX1: AtomicUsize = AtomicUsize::new(0);
     static RX2: AtomicUsize = AtomicUsize::new(0);
@@ -401,15 +358,10 @@ fn local_tasks_are_polled_after_tick() {
 
     let (tx, mut rx) = mpsc::unbounded_channel();
 
-    let mut rt = runtime::Builder::new()
-        .basic_scheduler()
-        .enable_all()
-        .build()
-        .unwrap();
 
     let local = LocalSet::new();
 
-    local.block_on(&mut rt, async {
+    local.run_until(async {
         let task2 = task::spawn(async move {
             // Wait a bit
             time::delay_for(Duration::from_millis(100)).await;
@@ -447,17 +399,15 @@ fn local_tasks_are_polled_after_tick() {
         }
 
         task2.await.unwrap();
-    });
+    }).await;
 }
 
-#[test]
-fn acquire_mutex_in_drop() {
+#[tokio::test]
+async fn acquire_mutex_in_drop() {
     use futures::future::pending;
 
     let (tx1, rx1) = oneshot::channel();
     let (tx2, rx2) = oneshot::channel();
-
-    let mut rt = rt();
     let local = LocalSet::new();
 
     local.spawn_local(async move {
@@ -478,9 +428,9 @@ fn acquire_mutex_in_drop() {
     });
 
     // Tick the loop
-    local.block_on(&mut rt, async {
+    local.run_until(async {
         task::yield_now().await;
-    });
+    }).await;
 
     // Drop the LocalSet
     drop(local);
