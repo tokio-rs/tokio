@@ -124,11 +124,8 @@ struct Scheduler {
 }
 
 pin_project! {
-    /// The future returned by [`LocalSet::run`].
-    ///
-    /// [`LocalSet::run`]: struct.LocalSet.html#method.run
     #[derive(Debug)]
-    pub struct LocalFuture<F> {
+    struct LocalFuture<F> {
         scheduler: Rc<Scheduler>,
         #[pin]
         future: F,
