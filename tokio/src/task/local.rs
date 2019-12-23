@@ -57,7 +57,7 @@ cfg_rt_util! {
     ///     let local = task::LocalSet::new();
     ///
     ///     // Run the local task set.
-    ///     local.run(async move {
+    ///     local.run_until(async move {
     ///         let unsend_data = unsend_data.clone();
     ///         // `spawn_local` ensures that the future is spawned on the local
     ///         // task set.
@@ -162,7 +162,7 @@ cfg_rt_util! {
     ///     let local = task::LocalSet::new();
     ///
     ///     // Run the local task set.
-    ///     local.run(async move {
+    ///     local.run_until(async move {
     ///         let unsend_data = unsend_data.clone();
     ///         task::spawn_local(async move {
     ///             println!("{}", unsend_data);
@@ -219,23 +219,23 @@ impl LocalSet {
     ///     let local = task::LocalSet::new();
     ///
     ///     // Spawn a future on the local set. This future will be run when
-    ///     // we call `run` to drive the task set.
+    ///     // we call `run_until` to drive the task set.
     ///     local.spawn_local(async {
     ///        // ...
     ///     });
     ///
     ///     // Run the local task set.
-    ///     local.run(async move {
+    ///     local.run_until(async move {
     ///         // ...
     ///     });
     ///
     ///     // When `run` finishes, we can spawn _more_ futures, which will
-    ///     // run in subsequent calls to `run`.
+    ///     // run in subsequent calls to `run_until`.
     ///     local.spawn_local(async {
     ///        // ...
     ///     });
     ///
-    ///     local.run(async move {
+    ///     local.run_until(async move {
     ///         // ...
     ///     });
     /// }
@@ -321,7 +321,7 @@ impl LocalSet {
     where
         F: Future,
     {
-        rt.block_on(async { self.run(future).await })
+        rt.block_on(async { self.run_until(future).await })
     }
 
     /// Run a future to completion on the local set, returning its output.
@@ -329,10 +329,10 @@ impl LocalSet {
     /// This returns a future that runs the given future with a local set,
     /// allowing it to call [`spawn_local`] to spawn additional `!Send` futures.
     /// Any local futures spawned on the local set will be driven in the
-    /// background until the future passed to `run` completes. When the future
+    /// background until the future passed to `run_until` completes. When the future
     /// passed to `run` finishes, any local futures which have not completed
     /// will remain on the local set, and will be driven on subsequent calls to
-    /// `run` or when [awaiting the local set] itself.
+    /// `run_until` or when [awaiting the local set] itself.
     ///
     /// # Examples
     ///
@@ -341,7 +341,7 @@ impl LocalSet {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     task::LocalSet::new().run(async {
+    ///     task::LocalSet::new().run_until(async {
     ///         task::spawn_local(async move {
     ///             // ...
     ///         }).await.unwrap();
@@ -352,12 +352,13 @@ impl LocalSet {
     ///
     /// [`spawn_local`]: fn.spawn_local.html
     /// [awaiting the local set]: #awaiting-a-localset
-    pub fn run<F>(&self, future: F) -> LocalFuture<F>
+    pub async fn run_until<F>(&self, future: F) -> F::Output
     where
         F: Future,
     {
         let scheduler = self.scheduler.clone();
-        LocalFuture { scheduler, future }
+        let future = LocalFuture { scheduler, future };
+        future.await
     }
 }
 
