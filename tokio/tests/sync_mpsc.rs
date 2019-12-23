@@ -455,21 +455,18 @@ fn try_recv_unbounded() {
 
 #[tokio::test(threaded_scheduler)]
 async fn try_send_try_recv() {
-    const PERMITS: usize = 16;
-    const TASKS: usize = 64;
-    const CYCLES: usize = 1024;
+    const TASKS: usize = 16;
+    const CHANNEL_SIZE: usize = TASKS * 2;
+    const CYCLES: usize = 65536;
     use std::sync::Arc;
-    use tokio::sync::Semaphore;
     use tokio::sync::Mutex;
     struct Context {
-        sem: Arc<Semaphore>,
         tx: mpsc::Sender<()>,
         rx: Mutex<mpsc::Receiver<()>>,
     }
-    let (tx, rx) = mpsc::channel(PERMITS);
-    let sem = Arc::new(Semaphore::new(PERMITS));
-    let ctx = Arc::new(Context { sem, tx, rx: Mutex::new(rx) });
-    for _ in 0..PERMITS {
+    let (tx, rx) = mpsc::channel(CHANNEL_SIZE);
+    let ctx = Arc::new(Context { tx, rx: Mutex::new(rx) });
+    for _ in 0..CHANNEL_SIZE {
         ctx.tx.clone().try_send(()).unwrap();
     }
     let mut tasks = Vec::new();
@@ -477,11 +474,9 @@ async fn try_send_try_recv() {
         let ctx = ctx.clone();
         tasks.push(tokio::spawn(async move {
             for _ in 0..CYCLES {
-                let permit = ctx.sem.acquire().await;
                 ctx.rx.lock().await.try_recv().unwrap();
                 tokio::task::yield_now().await;
                 ctx.tx.clone().try_send(()).unwrap();
-                drop(permit);
             }
         }));
     }
