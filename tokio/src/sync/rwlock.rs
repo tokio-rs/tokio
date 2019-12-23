@@ -4,7 +4,11 @@ use crate::sync::Mutex;
 use std::cell::UnsafeCell;
 use std::ops;
 
+#[cfg(not(loom))]
 const MAX_READS: usize = 32;
+
+#[cfg(loom)]
+const MAX_READS: usize = 10;
 
 /// An asynchronous reader-writer lock
 ///
