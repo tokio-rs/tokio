@@ -71,10 +71,6 @@ impl ThreadContext {
         CONTEXT.with(|ctx| ctx.borrow_mut().take())
     }
 
-    pub(crate) fn entered() -> bool {
-        CONTEXT.with(|ctx| (*ctx.borrow()).is_some())
-    }
-
     pub(crate) fn io_handle() -> crate::runtime::io::Handle {
         CONTEXT.with(|ctx| match *ctx.borrow() {
             Some(ref ctx) => ctx.io_handle.clone(),
@@ -85,6 +81,13 @@ impl ThreadContext {
     pub(crate) fn time_handle() -> crate::runtime::time::Handle {
         CONTEXT.with(|ctx| match *ctx.borrow() {
             Some(ref ctx) => ctx.time_handle.clone(),
+            None => None,
+        })
+    }
+
+    pub(crate) fn spawn_handle() -> Option<Spawner> {
+        CONTEXT.with(|ctx| match *ctx.borrow() {
+            Some(ref ctx) => Some(ctx.spawner.clone()),
             None => None,
         })
     }

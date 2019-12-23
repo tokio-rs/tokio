@@ -217,20 +217,6 @@ impl SchedulerPriv {
             .expect("failed to park");
     }
 
-    /// # Safety
-    ///
-    /// Must be called from the same thread that holds the `BasicScheduler`
-    /// value.
-    pub(super) unsafe fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
-    where
-        F: Future + Send + 'static,
-        F::Output: Send + 'static,
-    {
-        let (task, handle) = task::joinable(future);
-        self.queues.push_local(task);
-        handle
-    }
-
     fn schedule(&self, task: Task<Self>, spawn: bool) {
         let is_current = ACTIVE.with(|cell| cell.get() == self as *const SchedulerPriv);
 

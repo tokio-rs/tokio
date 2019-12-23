@@ -30,26 +30,9 @@ where
     T: Future + Send + 'static,
     T::Output: Send + 'static,
 {
-    EXECUTOR.with(|current_executor| match current_executor.get() {
-        #[cfg(feature = "rt-threaded")]
-        State::ThreadPool(thread_pool_ptr) => {
-            let thread_pool = unsafe { &*thread_pool_ptr };
-            thread_pool.spawn(future)
-        }
-        State::Basic(basic_scheduler_ptr) => {
-            let basic_scheduler = unsafe { &*basic_scheduler_ptr };
-
-            // Safety: The `BasicScheduler` value set the thread-local (same
-            // thread).
-            unsafe { basic_scheduler.spawn(future) }
-        }
-        State::Empty => {
-            // Explicit drop of `future` silences the warning that `future` is
-            // not used when neither rt-* feature flags are enabled.
-            drop(future);
-            panic!("must be called from the context of Tokio runtime configured with either `basic_scheduler` or `threaded_scheduler`");
-        }
-    })
+    let spawn_handle = crate::runtime::context::ThreadContext::spawn_handle()
+    .expect("must be called from the context of Tokio runtime configured with either `basic_scheduler` or `threaded_scheduler`");
+    spawn_handle.spawn(future)
 }
 
 pub(super) fn with_basic_scheduler<F, R>(

@@ -30,7 +30,7 @@ impl Handle {
     where
         F: FnOnce() -> R,
     {
-        crate::runtime::context::ThreadContext::new()
+        let _e = crate::runtime::context::ThreadContext::new()
             .with_spawner(self.spawner.clone())
             .with_io_handle(self.io_handle.clone())
             .with_time_handle(self.time_handle.clone())
