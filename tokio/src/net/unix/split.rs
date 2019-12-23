@@ -105,9 +105,19 @@ impl RecvHalf<'_> {
         poll_fn(|cx| self.0.poll_recv_priv(cx, buf)).await
     }
 
+    /// Try to receive a datagram from the peer without waiting.
+    pub fn try_recv(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.0.try_recv_priv(buf)
+    }
+
     /// Receives a datagram with the source address from the socket.
     pub async fn recv_from(&mut self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         poll_fn(|cx| self.0.poll_recv_from_priv(cx, buf)).await
+    }
+
+    /// Try to receive data from the socket without waiting.
+    pub fn try_recv_from(&mut self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+        self.0.try_recv_from_priv(buf)
     }
 }
 
@@ -117,6 +127,11 @@ impl SendHalf<'_> {
         poll_fn(|cx| self.0.poll_send_priv(cx, buf)).await
     }
 
+    /// Try to send a datagram to the peer without waiting.
+    pub fn try_send(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.0.try_send_priv(buf)
+    }
+
     /// Sends a datagram to the specified address.
     pub async fn send_to<P>(&mut self, buf: &[u8], target: P) -> io::Result<usize>
     where
@@ -124,5 +139,12 @@ impl SendHalf<'_> {
     {
         poll_fn(|cx| self.0.poll_send_to_priv(cx, buf, target.as_ref())).await
     }
-}
 
+    /// Try to send a datagram to the peer without waiting.
+    pub fn try_send_to<P>(&mut self, buf: &[u8], target: P) -> io::Result<usize>
+    where
+        P: AsRef<Path>,
+    {
+        self.0.try_send_to_priv(buf, target)
+    }
+}

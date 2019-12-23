@@ -103,6 +103,13 @@ impl UnixDatagram {
         self.io.get_ref().send(buf)
     }
 
+    // Poll IO functions that takes `&self` are provided for the split API.
+    //
+    // See `poll_send_priv` for more info.
+    pub(crate) fn try_send_priv(&self, buf: &[u8]) -> io::Result<usize> {
+        self.io.get_ref().send(buf)
+    }
+
     /// Try to send a datagram to the peer without waiting.
     ///
     /// ```
@@ -145,6 +152,16 @@ impl UnixDatagram {
 
     // Poll IO functions that takes `&self` are provided for the split API.
     //
+    // See `poll_send_priv` for more info.
+    pub(crate) fn try_send_to_priv<P>(&self, buf: &[u8], target: P) -> io::Result<usize>
+    where
+        P: AsRef<Path>
+    {
+        self.io.get_ref().send_to(buf, target)
+    }
+
+    // Poll IO functions that takes `&self` are provided for the split API.
+    //
     // They are not public because (taken from the doc of `PollEvented`):
     //
     // While `PollEvented` is `Sync` (if the underlying I/O type is `Sync`), the
@@ -176,6 +193,13 @@ impl UnixDatagram {
 
     /// Try to receive a datagram from the peer without waiting.
     pub fn try_recv(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.io.get_ref().recv(buf)
+    }
+
+    // Poll IO functions that takes `&self` are provided for the split API.
+    //
+    // See `poll_send_priv` for more info.
+    pub(crate) fn try_recv_priv(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.io.get_ref().recv(buf)
     }
 
@@ -227,6 +251,13 @@ impl UnixDatagram {
 
     /// Try to receive data from the socket without waiting.
     pub fn try_recv_from(&mut self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+        self.io.get_ref().recv_from(buf)
+    }
+
+    // Poll IO functions that takes `&self` are provided for the split API.
+    //
+    // See `poll_send_priv` for more info.
+    pub(crate) fn try_recv_from_priv(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.io.get_ref().recv_from(buf)
     }
 
