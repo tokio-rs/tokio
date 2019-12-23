@@ -65,7 +65,7 @@ cfg_rt_util! {
     ///             println!("{}", unsend_data);
     ///             // ...
     ///         }).await.unwrap();
-    ///     });
+    ///     }).await;
     /// }
     /// ```
     ///
@@ -168,7 +168,7 @@ cfg_rt_util! {
     ///             println!("{}", unsend_data);
     ///             // ...
     ///         }).await.unwrap();
-    ///     });
+    ///     }).await;
     /// }
     /// ```
     pub fn spawn_local<F>(future: F) -> JoinHandle<F::Output>
@@ -227,7 +227,7 @@ impl LocalSet {
     ///     // Run the local task set.
     ///     local.run_until(async move {
     ///         // ...
-    ///     });
+    ///     }).await;
     ///
     ///     // When `run` finishes, we can spawn _more_ futures, which will
     ///     // run in subsequent calls to `run_until`.
@@ -237,7 +237,7 @@ impl LocalSet {
     ///
     ///     local.run_until(async move {
     ///         // ...
-    ///     });
+    ///     }).await;
     /// }
     /// ```
     /// [`spawn_local`]: fn.spawn_local.html
@@ -346,7 +346,7 @@ impl LocalSet {
     ///             // ...
     ///         }).await.unwrap();
     ///         // ...
-    ///     });
+    ///     }).await;
     /// }
     /// ```
     ///
