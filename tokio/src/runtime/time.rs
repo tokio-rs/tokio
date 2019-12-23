@@ -42,7 +42,7 @@ mod variant {
 
     pub(crate) type Clock = ();
     pub(crate) type Driver = io::Driver;
-    pub(crate) type Handle = Option<()>;
+    pub(crate) type Handle = ();
 
     pub(crate) fn create_clock() -> Clock {
         ()
@@ -54,6 +54,6 @@ mod variant {
         io_driver: io::Driver,
         _clock: Clock,
     ) -> (Driver, Handle) {
-        (io_driver, None)
+        (io_driver, ())
     }
 }

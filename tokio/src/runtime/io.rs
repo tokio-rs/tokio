@@ -50,11 +50,11 @@ mod variant {
     pub(crate) type Driver = ParkThread;
 
     /// There is no handle
-    pub(crate) type Handle = Option<()>;
+    pub(crate) type Handle = ();
 
     pub(crate) fn create_driver(_enable: bool) -> io::Result<(Driver, Handle)> {
         let driver = ParkThread::new();
 
-        Ok((driver, None))
+        Ok((driver, ()))
     }
 }

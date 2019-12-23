@@ -1,8 +1,5 @@
-//! Global runtime context
-#![allow(dead_code)]
-
-use crate::runtime::{time, Spawner};
-
+//! Thread local runtime context
+use crate::runtime::Spawner;
 use std::cell::RefCell;
 
 thread_local! {
@@ -25,41 +22,58 @@ pub(crate) struct ThreadContext {
     clock: Option<crate::runtime::time::Clock>,
 }
 
-impl ThreadContext {
-    pub(crate) fn new() -> Self {
+impl Default for ThreadContext {
+    fn default() -> Self {
         ThreadContext {
             spawner: Spawner::Shell,
+            #[cfg(all(feature = "io-driver", not(loom)))]
             io_handle: None,
+            #[cfg(any(not(feature = "io-driver"), loom))]
+            io_handle: (),
+            #[cfg(all(feature = "time", not(loom)))]
             time_handle: None,
+            #[cfg(any(not(feature = "time"), loom))]
+            time_handle: (),
             clock: None,
         }
     }
+}
 
+impl ThreadContext {
+    /// Construct a new [`ThreadContext`]
+    ///
+    /// [`ThreadContext`]: struct.ThreadContext.html
+    pub(crate) fn new(
+        spawner: Spawner,
+        io_handle: crate::runtime::io::Handle,
+        time_handle: crate::runtime::time::Handle,
+        clock: Option<crate::runtime::time::Clock>,
+    ) -> Self {
+        ThreadContext {
+            spawner,
+            #[cfg(all(feature = "io-driver", not(loom)))]
+            io_handle,
+            #[cfg(any(not(feature = "io-driver"), loom))]
+            io_handle,
+            #[cfg(all(feature = "time", not(loom)))]
+            time_handle,
+            #[cfg(any(not(feature = "time"), loom))]
+            time_handle,
+            clock,
+        }
+    }
+
+    /// Clone the current [`ThreadContext`] if one is set, otherwise construct a new [`ThreadContext`].
+    ///
+    /// [`ThreadContext`]: struct.ThreadContext.html
+    #[allow(dead_code)]
     pub(crate) fn clone_current() -> Self {
-        CONTEXT.with(|ctx| ctx.borrow().clone().unwrap_or(ThreadContext::new()))
+        CONTEXT.with(|ctx| ctx.borrow().clone().unwrap_or_else(|| Default::default()))
     }
 
-    pub(crate) fn with_spawner(mut self, spawner: Spawner) -> Self {
-        self.spawner = spawner;
-        self
-    }
-
-    pub(crate) fn with_io_handle(mut self, handle: crate::runtime::io::Handle) -> Self {
-        self.io_handle = handle;
-        self
-    }
-
-    pub(crate) fn with_time_handle(mut self, handle: crate::runtime::time::Handle) -> Self {
-        self.time_handle = handle;
-        self
-    }
-
-    pub(crate) fn with_clock(mut self, clock: time::Clock) -> Self {
-        self.clock.replace(clock);
-        self
-    }
-
-    /// Set this ThreadContext as the thread context for the runtime thread.
+    /// Set this [`ThreadContext`] as the current active [`ThreadContext`].
+    ///
+    /// [`ThreadContext`]: struct.ThreadContext.html
     pub(crate) fn enter(self) -> ThreadContextDropGuard {
         CONTEXT.with(|ctx| {
             let previous = ctx.replace(Some(self));
@@ -67,10 +81,19 @@ impl ThreadContext {
         })
     }
 
-    pub(crate) fn take_current() -> Option<ThreadContext> {
-        CONTEXT.with(|ctx| ctx.borrow_mut().take())
+    #[cfg(all(feature = "test-util", feature = "time"))]
+    pub(crate) fn with_time_handle(mut self, handle: crate::runtime::time::Handle) -> Self {
+        self.time_handle = handle;
+        self
     }
 
+    #[cfg(all(feature = "test-util", feature = "time"))]
+    pub(crate) fn with_clock(mut self, clock: crate::runtime::time::Clock) -> Self {
+        self.clock.replace(clock);
+        self
+    }
+
+    #[cfg(all(feature = "io-driver", not(loom)))]
     pub(crate) fn io_handle() -> crate::runtime::io::Handle {
         CONTEXT.with(|ctx| match *ctx.borrow() {
             Some(ref ctx) => ctx.io_handle.clone(),
@@ -78,6 +101,7 @@ impl ThreadContext {
         })
     }
 
+    #[cfg(all(feature = "time", not(loom)))]
     pub(crate) fn time_handle() -> crate::runtime::time::Handle {
         CONTEXT.with(|ctx| match *ctx.borrow() {
             Some(ref ctx) => ctx.time_handle.clone(),
@@ -85,6 +109,7 @@ impl ThreadContext {
         })
     }
 
+    #[cfg(feature = "rt-core")]
     pub(crate) fn spawn_handle() -> Option<Spawner> {
         CONTEXT.with(|ctx| match *ctx.borrow() {
             Some(ref ctx) => Some(ctx.spawner.clone()),
@@ -92,13 +117,20 @@ impl ThreadContext {
         })
     }
 
+    #[cfg(all(feature = "test-util", feature = "time"))]
     pub(crate) fn clock() -> Option<crate::runtime::time::Clock> {
-        CONTEXT
-            .with(|ctx| ctx.borrow().as_ref().map(|ctx| ctx.clock.clone()))
-            .flatten()
+        CONTEXT.with(
+            |ctx| match ctx.borrow().as_ref().map(|ctx| ctx.clock.clone()) {
+                Some(Some(clock)) => Some(clock),
+                _ => None,
+            },
+        )
     }
 }
 
+/// [`ThreadContextDropGuard`] will replace the `previous` thread context on drop.
+///
+/// [`ThreadContextDropGuard`]: struct.ThreadContextDropGuard.html
 #[derive(Debug)]
 pub(crate) struct ThreadContextDropGuard {
     previous: Option<ThreadContext>,

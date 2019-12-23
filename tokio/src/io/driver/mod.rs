@@ -5,15 +5,13 @@ pub(crate) use scheduled_io::ScheduledIo; // pub(crate) for tests
 
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::park::{Park, Unpark};
-use crate::{
-    runtime::context::ThreadContext,
-    util::slab::{Address, Slab},
-};
+#[cfg(all(feature = "io-driver", not(loom)))]
+use crate::runtime::context::ThreadContext;
+use crate::util::slab::{Address, Slab};
 
 use mio::event::Evented;
 use std::fmt;
 use std::io;
-
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::{Arc, Weak};
 use std::task::Waker;
@@ -200,8 +198,14 @@ impl Handle {
     /// # Panics
     ///
     /// This function panics if there is no current reactor set.
+    #[cfg(all(feature = "io-driver", not(loom)))]
     pub(super) fn current() -> Self {
         ThreadContext::io_handle().expect("no current reactor")
+    }
+
+    #[cfg(any(not(feature = "io-driver"), loom))]
+    pub(super) fn current() -> Self {
+        panic!("no current reactor")
     }
 
     /// Forces a reactor blocked in a call to `turn` to wakeup, or otherwise
