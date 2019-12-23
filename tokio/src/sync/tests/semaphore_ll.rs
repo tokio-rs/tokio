@@ -1,4 +1,4 @@
-use crate::sync::semaphore::{Permit, Semaphore};
+use crate::sync::semaphore_ll::{Permit, Semaphore};
 use tokio_test::task;
 use tokio_test::{assert_pending, assert_ready_err, assert_ready_ok};
 

@@ -2,10 +2,10 @@
 
 use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::loom::thread;
-use crate::runtime::{self, io, time, Builder, Callback};
-use crate::runtime::blocking::shutdown;
 use crate::runtime::blocking::schedule::NoopSchedule;
+use crate::runtime::blocking::shutdown;
 use crate::runtime::blocking::task::BlockingTask;
+use crate::runtime::{self, io, time, Builder, Callback};
 use crate::task::{self, JoinHandle};
 
 use std::cell::Cell;
@@ -54,11 +54,12 @@ struct Inner {
     /// Source of `Instant::now()`
     clock: time::Clock,
 
+    thread_cap: usize,
 }
 
 struct Shared {
     queue: VecDeque<Task>,
-    num_th: u32,
+    num_th: usize,
     num_idle: u32,
     num_notify: u32,
     shutdown: bool,
@@ -72,7 +73,6 @@ thread_local! {
     static BLOCKING: Cell<Option<*const Spawner>> = Cell::new(None)
 }
 
-const MAX_THREADS: u32 = 1_000;
 const KEEP_ALIVE: Duration = Duration::from_secs(10);
 
 /// Run the provided function on an executor dedicated to blocking operations.
@@ -101,6 +101,7 @@ impl BlockingPool {
         io: &io::Handle,
         time: &time::Handle,
         clock: &time::Clock,
+        thread_cap: usize,
     ) -> BlockingPool {
         let (shutdown_tx, shutdown_rx) = shutdown::channel();
 
@@ -124,6 +125,7 @@ impl BlockingPool {
                     io_handle: io.clone(),
                     time_handle: time.clone(),
                     clock: clock.clone(),
+                    thread_cap,
                 }),
             },
             shutdown_rx,
@@ -209,7 +211,7 @@ impl Spawner {
             if shared.num_idle == 0 {
                 // No threads are able to process the task.
 
-                if shared.num_th == MAX_THREADS {
+                if shared.num_th == self.inner.thread_cap {
                     // At max number of threads
                     None
                 } else {
@@ -242,32 +244,31 @@ impl Spawner {
             builder = builder.stack_size(stack_size);
         }
 
-        let inner = self.inner.clone();
+        let spawner = self.clone();
 
         builder
             .spawn(move || {
-                inner.run();
+                run_thread(spawner);
 
-                // Make sure `inner` drops first to ensure that the shutdown_rx
-                // sees all refs to `Inner` are dropped when the `shutdown_rx`
-                // resolves.
-                drop(inner);
                 drop(shutdown_tx);
             })
             .unwrap();
     }
 }
 
+fn run_thread(spawner: Spawner) {
+    spawner.enter(|| {
+        let inner = &*spawner.inner;
+        let _io = io::set_default(&inner.io_handle);
+
+        time::with_default(&inner.time_handle, &inner.clock, || {
+            inner.spawner.enter(|| inner.run());
+        });
+    });
+}
+
 impl Inner {
     fn run(&self) {
-        let _io = io::set_default(&self.io_handle);
-
-        time::with_default(&self.time_handle, &self.clock, || {
-            self.spawner.enter(|| self.run2());
-        });
-    }
-
-    fn run2(&self) {
         if let Some(f) = &self.after_start {
             f()
         }
@@ -303,7 +304,9 @@ impl Inner {
                     break;
                 }
 
-                if timeout_result.timed_out() {
+                // Even if the condvar "timed out", if the pool is entering the
+                // shutdown phase, we want to perform the cleanup logic.
+                if !shared.shutdown && timeout_result.timed_out() {
                     break 'main;
                 }
 
@@ -311,6 +314,14 @@ impl Inner {
             }
 
             if shared.shutdown {
+                // Drain the queue
+                while let Some(task) = shared.queue.pop_front() {
+                    drop(shared);
+                    task.shutdown();
+
+                    shared = self.shared.lock().unwrap();
+                }
+
                 // Work was produced, and we "took" it (by decrementing num_notify).
                 // This means that num_idle was decremented once for our wakeup.
                 // But, since we are exiting, we need to "undo" that, as we'll stay idle.

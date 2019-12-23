@@ -1,9 +1,9 @@
-use crate::io::driver::{Direction, Handle, platform};
+use crate::io::driver::{platform, Direction, Handle};
 use crate::util::slab::Address;
 
 use mio::{self, Evented};
-use std::task::{Context, Poll};
 use std::io;
+use std::task::{Context, Poll};
 
 cfg_io_driver! {
     /// Associates an I/O resource with the reactor instance that drives it.

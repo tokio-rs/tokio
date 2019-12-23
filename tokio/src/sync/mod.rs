@@ -19,6 +19,8 @@ cfg_sync! {
     mod barrier;
     pub use barrier::{Barrier, BarrierWaitResult};
 
+    pub mod broadcast;
+
     pub mod mpsc;
 
     mod mutex;
@@ -26,7 +28,9 @@ cfg_sync! {
 
     pub mod oneshot;
 
-    pub(crate) mod semaphore;
+    pub(crate) mod semaphore_ll;
+    mod semaphore;
+    pub use semaphore::{Semaphore, SemaphorePermit};
 
     mod task;
     pub(crate) use task::AtomicWaker;
@@ -48,7 +52,7 @@ cfg_not_sync! {
 
     cfg_signal! {
         pub(crate) mod mpsc;
-        pub(crate) mod semaphore;
+        pub(crate) mod semaphore_ll;
     }
 }
 

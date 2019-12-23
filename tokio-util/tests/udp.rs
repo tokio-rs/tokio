@@ -1,4 +1,4 @@
-use tokio::net::UdpSocket;
+use tokio::{net::UdpSocket, stream::StreamExt};
 use tokio_util::codec::{Decoder, Encoder};
 use tokio_util::udp::UdpFramed;
 
@@ -6,7 +6,6 @@ use bytes::{BufMut, BytesMut};
 use futures::future::try_join;
 use futures::future::FutureExt;
 use futures::sink::SinkExt;
-use futures::stream::StreamExt;
 use std::io;
 
 #[tokio::test]

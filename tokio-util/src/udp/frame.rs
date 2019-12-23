@@ -1,9 +1,9 @@
 use crate::codec::{Decoder, Encoder};
 
-use tokio::net::UdpSocket;
+use tokio::{net::UdpSocket, stream::Stream};
 
 use bytes::{BufMut, BytesMut};
-use futures_core::{ready, Stream};
+use futures_core::ready;
 use futures_sink::Sink;
 use std::io;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
@@ -27,7 +27,7 @@ use std::task::{Context, Poll};
 /// calling `split` on the `UdpFramed` returned by this method, which will break
 /// them into separate objects, allowing them to interact more easily.
 #[must_use = "sinks do nothing unless polled"]
-#[cfg_attr(docsrs, doc(feature = "codec-udp"))]
+#[cfg_attr(docsrs, doc(all(feature = "codec", feature = "udp")))]
 #[derive(Debug)]
 pub struct UdpFramed<C> {
     socket: UdpSocket,

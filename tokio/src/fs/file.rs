@@ -1,6 +1,6 @@
 //! Types for working with [`File`].
 //!
-//! [`File`]: file/struct.File.html
+//! [`File`]: File
 
 use self::State::*;
 use crate::fs::{asyncify, sys};
@@ -29,7 +29,7 @@ use std::task::Poll::*;
 ///
 /// Files are automatically closed when they go out of scope.
 ///
-/// [std]: https://doc.rust-lang.org/std/fs/struct.File.html
+/// [std]: std::fs::File
 ///
 /// # Examples
 ///
@@ -90,7 +90,7 @@ impl File {
     ///
     /// See [`OpenOptions`] for more details.
     ///
-    /// [`OpenOptions`]: struct.OpenOptions.html
+    /// [`OpenOptions`]: super::OpenOptions
     ///
     /// # Errors
     ///
@@ -128,14 +128,14 @@ impl File {
     ///
     /// See [`OpenOptions`] for more details.
     ///
-    /// [`OpenOptions`]: struct.OpenOptions.html
+    /// [`OpenOptions`]: super::OpenOptions
     ///
     /// # Errors
     ///
     /// Results in an error if called from outside of the Tokio runtime or if
     /// the underlying [`create`] call results in an error.
     ///
-    /// [`create`]: https://doc.rust-lang.org/std/fs/struct.File.html#method.create
+    /// [`create`]: std::fs::File::create
     ///
     /// # Examples
     ///
@@ -155,10 +155,10 @@ impl File {
         Ok(File::from_std(std_file))
     }
 
-    /// Convert a [`std::fs::File`][std] to a [`tokio_fs::File`][file].
+    /// Convert a [`std::fs::File`][std] to a [`tokio::fs::File`][file].
     ///
-    /// [std]: https://doc.rust-lang.org/std/fs/struct.File.html
-    /// [file]: struct.File.html
+    /// [std]: std::fs::File
+    /// [file]: File
     ///
     /// # Examples
     ///
@@ -173,6 +173,63 @@ impl File {
             std: Arc::new(std),
             state: State::Idle(Some(Buf::with_capacity(0))),
             last_write_err: None,
+        }
+    }
+
+    /// Seek to an offset, in bytes, in a stream.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::fs::File;
+    /// use tokio::prelude::*;
+    ///
+    /// use std::io::SeekFrom;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let mut file = File::open("foo.txt").await?;
+    /// file.seek(SeekFrom::Start(6)).await?;
+    ///
+    /// let mut contents = vec![0u8; 10];
+    /// file.read_exact(&mut contents).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn seek(&mut self, mut pos: SeekFrom) -> io::Result<u64> {
+        self.complete_inflight().await;
+
+        let mut buf = match self.state {
+            Idle(ref mut buf_cell) => buf_cell.take().unwrap(),
+            _ => unreachable!(),
+        };
+
+        // Factor in any unread data from the buf
+        if !buf.is_empty() {
+            let n = buf.discard_read();
+
+            if let SeekFrom::Current(ref mut offset) = pos {
+                *offset += n;
+            }
+        }
+
+        let std = self.std.clone();
+
+        // Start the operation
+        self.state = Busy(sys::run(move || {
+            let res = (&*std).seek(pos);
+            (Operation::Seek(res), buf)
+        }));
+
+        let (op, buf) = match self.state {
+            Idle(_) => unreachable!(),
+            Busy(ref mut rx) => rx.await.unwrap(),
+        };
+
+        self.state = Idle(Some(buf));
+
+        match op {
+            Operation::Seek(res) => res,
+            _ => unreachable!(),
         }
     }
 
@@ -342,6 +399,8 @@ impl File {
     ///
     /// Use `File::try_into_std` to attempt conversion immediately.
     ///
+    /// [std]: std::fs::File
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -359,6 +418,8 @@ impl File {
     }
 
     /// Tries to immediately destructure `File` into a [`std::fs::File`][std].
+    ///
+    /// [std]: std::fs::File
     ///
     /// # Errors
     ///

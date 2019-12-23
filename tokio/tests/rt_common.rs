@@ -397,6 +397,21 @@ rt_test! {
     }
 
     #[test]
+    fn spawn_blocking_from_blocking() {
+        let mut rt = rt();
+
+        let out = rt.block_on(async move {
+            let inner = assert_ok!(tokio::task::spawn_blocking(|| {
+                tokio::task::spawn_blocking(|| "hello")
+            }).await);
+
+            assert_ok!(inner.await)
+        });
+
+        assert_eq!(out, "hello")
+    }
+
+    #[test]
     fn delay_from_blocking() {
         let mut rt = rt();
 
@@ -600,6 +615,24 @@ rt_test! {
         drop(rt);
 
         assert_ok!(drop_rx.recv());
+    }
+
+    #[test]
+    fn runtime_in_thread_local() {
+        use std::cell::RefCell;
+        use std::thread;
+
+        thread_local!(
+            static R: RefCell<Option<Runtime>> = RefCell::new(None);
+        );
+
+        thread::spawn(|| {
+            R.with(|cell| {
+                *cell.borrow_mut() = Some(rt());
+            });
+
+            let _rt = rt();
+        }).join().unwrap();
     }
 
     async fn client_server(tx: mpsc::Sender<()>) {

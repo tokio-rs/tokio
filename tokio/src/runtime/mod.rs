@@ -4,7 +4,7 @@
 //! runtime support. In particular, the following runtime services are
 //! necessary:
 //!
-//! * An **I/O event loop**, called the [driver], which drives I/O resources and
+//! * An **I/O event loop**, called the driver, which drives I/O resources and
 //!   dispatches I/O events to tasks that depend on them.
 //! * A **scheduler** to execute [tasks] that use these I/O resources.
 //! * A **timer** for scheduling work to run after a set period of time.
@@ -172,13 +172,9 @@
 //! Any tasks that have not yet completed will be dropped.
 //!
 //! [tasks]: crate::task
-//! [driver]: crate::io::driver
-//! [executor]: https://tokio.rs/docs/internals/runtime-model/#executors
-//! [`Runtime`]: struct.Runtime.html
-//! [`Reactor`]: ../reactor/struct.Reactor.html
-//! [`run`]: fn.run.html
-//! [`tokio::spawn`]: ../executor/fn.spawn.html
-//! [`tokio::main`]: ../../tokio_macros/attr.main.html
+//! [`Runtime`]: Runtime
+//! [`tokio::spawn`]: crate::spawn
+//! [`tokio::main`]: ../attr.main.html
 //! [runtime builder]: crate::runtime::Builder
 //! [`Runtime::new`]: crate::runtime::Runtime::new
 //! [`Builder::basic_scheduler`]: crate::runtime::Builder::basic_scheduler
@@ -313,7 +309,7 @@ impl Runtime {
     /// scheduler] is used, while if only the `rt-core` feature is enabled, the
     /// [basic scheduler] is used instead.
     ///
-    /// If the threaded cheduler is selected, it will not spawn
+    /// If the threaded scheduler is selected, it will not spawn
     /// any worker threads until it needs to, i.e. tasks are scheduled to run.
     ///
     /// Most applications will not need to call this function directly. Instead,

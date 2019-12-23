@@ -1,5 +1,5 @@
-#![doc(html_root_url = "https://docs.rs/tokio/0.2.4")]
-#![allow(clippy::cognitive_complexity)]
+#![doc(html_root_url = "https://docs.rs/tokio/0.2.6")]
+#![allow(clippy::cognitive_complexity, clippy::needless_doctest_main)]
 #![warn(
     missing_debug_implementations,
     missing_docs,
@@ -83,7 +83,7 @@
 //! [blocking]: task/index.html#blocking-and-yielding
 //!
 //! The [`tokio::sync`] module contains synchronization primitives to use when
-//! need to communicate or share data. These include:
+//! needing to communicate or share data. These include:
 //!
 //! * channels ([`oneshot`], [`mpsc`], and [`watch`]), for sending values
 //!   between tasks,
@@ -239,6 +239,10 @@ pub mod runtime;
 
 cfg_signal! {
     pub mod signal;
+}
+
+cfg_stream! {
+    pub mod stream;
 }
 
 cfg_sync! {

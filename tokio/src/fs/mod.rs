@@ -24,6 +24,9 @@
 //!
 //! [`AsyncRead`]: https://docs.rs/tokio-io/0.1/tokio_io/trait.AsyncRead.html
 
+mod canonicalize;
+pub use self::canonicalize::canonicalize;
+
 mod create_dir;
 pub use self::create_dir::create_dir;
 

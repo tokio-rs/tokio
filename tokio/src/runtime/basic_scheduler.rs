@@ -84,7 +84,7 @@ where
         F::Output: Send + 'static,
     {
         let (task, handle) = task::joinable(future);
-        self.scheduler.schedule(task);
+        self.scheduler.schedule(task, true);
         handle
     }
 
@@ -161,7 +161,7 @@ impl Spawner {
         F::Output: Send + 'static,
     {
         let (task, handle) = task::joinable(future);
-        self.scheduler.schedule(task);
+        self.scheduler.schedule(task, true);
         handle
     }
 
@@ -230,6 +230,27 @@ impl SchedulerPriv {
         self.queues.push_local(task);
         handle
     }
+
+    fn schedule(&self, task: Task<Self>, spawn: bool) {
+        let is_current = ACTIVE.with(|cell| cell.get() == self as *const SchedulerPriv);
+
+        if is_current {
+            unsafe {
+                // safety: this function is safe to call only from the
+                // thread the basic scheduler is running on. If `is_current` is
+                // then we are on that thread.
+                self.queues.push_local(task)
+            };
+        } else {
+            let mut lock = self.queues.remote();
+            lock.schedule(task, spawn);
+
+            // while locked, call unpark
+            self.unpark.unpark();
+
+            drop(lock);
+        }
+    }
 }
 
 impl Schedule for SchedulerPriv {
@@ -260,24 +281,7 @@ impl Schedule for SchedulerPriv {
     }
 
     fn schedule(&self, task: Task<Self>) {
-        let is_current = ACTIVE.with(|cell| cell.get() == self as *const SchedulerPriv);
-
-        if is_current {
-            unsafe {
-                // safety: this function is safe to call only from the
-                // thread the basic scheduler is running on. If `is_current` is
-                // then we are on that thread.
-                self.queues.push_local(task)
-            };
-        } else {
-            let mut lock = self.queues.remote();
-            lock.schedule(task);
-
-            // while locked, call unpark
-            self.unpark.unpark();
-
-            drop(lock);
-        }
+        SchedulerPriv::schedule(self, task, false);
     }
 }
 
@@ -298,10 +302,16 @@ where
         }
 
         // Wait until all tasks have been released.
-        while unsafe { self.scheduler.queues.has_tasks_remaining() } {
-            self.local.park.park().ok().expect("park failed");
+        loop {
             unsafe {
                 self.scheduler.queues.drain_pending_drop();
+                self.scheduler.queues.drain_queues();
+
+                if !self.scheduler.queues.has_tasks_remaining() {
+                    break;
+                }
+
+                self.local.park.park().ok().expect("park failed");
             }
         }
     }

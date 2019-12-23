@@ -611,6 +611,26 @@ impl<T> DelayQueue<T> {
         self.slab.capacity()
     }
 
+    /// Returns the number of elements currently in the queue.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use tokio::time::DelayQueue;
+    /// use std::time::Duration;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    ///     let mut delay_queue: DelayQueue<i32> = DelayQueue::with_capacity(10);
+    ///     assert_eq!(delay_queue.len(), 0);
+    ///     delay_queue.insert(3, Duration::from_secs(5));
+    ///     assert_eq!(delay_queue.len(), 1);
+    /// # }
+    /// ```
+    pub fn len(&self) -> usize {
+        self.slab.len()
+    }
+
     /// Reserve capacity for at least `additional` more items to be queued
     /// without allocating.
     ///
@@ -727,6 +747,17 @@ impl<T> Unpin for DelayQueue<T> {}
 impl<T> Default for DelayQueue<T> {
     fn default() -> DelayQueue<T> {
         DelayQueue::new()
+    }
+}
+
+#[cfg(feature = "stream")]
+impl<T> futures_core::Stream for DelayQueue<T> {
+    // DelayQueue seems much more specific, where a user may care that it
+    // has reached capacity, so return those errors instead of panicking.
+    type Item = Result<Expired<T>, Error>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {
+        DelayQueue::poll_expired(self.get_mut(), cx)
     }
 }
 

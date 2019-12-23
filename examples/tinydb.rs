@@ -42,9 +42,10 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::net::TcpListener;
+use tokio::stream::StreamExt;
 use tokio_util::codec::{Framed, LinesCodec};
 
-use futures::{SinkExt, StreamExt};
+use futures::SinkExt;
 use std::collections::HashMap;
 use std::env;
 use std::error::Error;

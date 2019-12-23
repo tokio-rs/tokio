@@ -70,19 +70,11 @@ use std::{cmp, fmt};
 /// * Level 5: 64 x ~12 day slots.
 ///
 /// When the timer processes entries at level zero, it will notify all the
-/// [`Delay`] instances as their deadlines have been reached. For all higher
+/// `Delay` instances as their deadlines have been reached. For all higher
 /// levels, all entries will be redistributed across the wheel at the next level
 /// down. Eventually, as time progresses, entries will [`Delay`] instances will
 /// either be canceled (dropped) or their associated entries will reach level
 /// zero and be notified.
-///
-/// [`Delay`]: struct.Delay.html
-/// [`Interval`]: struct.Interval.html
-/// [`Timeout`]: struct.Timeout.html
-/// [paper]: http://www.cs.columbia.edu/~nahum/w6998/papers/ton97-timing-wheels.pdf
-/// [`handle`]: #method.handle
-/// [`turn`]: #method.turn
-/// [Handle.struct]: struct.Handle.html
 #[derive(Debug)]
 pub(crate) struct Driver<T> {
     /// Shared state
