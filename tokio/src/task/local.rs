@@ -321,7 +321,7 @@ impl LocalSet {
     where
         F: Future,
     {
-        rt.block_on(async { self.run_until(future).await })
+        rt.block_on(self.run_until(future))
     }
 
     /// Run a future to completion on the local set, returning its output.
