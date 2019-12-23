@@ -1,6 +1,6 @@
 use crate::future::poll_fn;
 use crate::io::{AsyncRead, AsyncWrite, PollEvented};
-use crate::net::unix::split::{split, ReadHalf, WriteHalf};
+use crate::net::unix::split::{split_stream, ReadHalf, WriteHalf};
 use crate::net::unix::ucred::{self, UCred};
 
 use std::convert::TryFrom;
@@ -107,7 +107,7 @@ impl UnixStream {
     /// See the module level documenation of [`split`](super::split) for more
     /// details.
     pub fn split(&mut self) -> (ReadHalf<'_>, WriteHalf<'_>) {
-        split(self)
+        split_stream(self)
     }
 }
 
