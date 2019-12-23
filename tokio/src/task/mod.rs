@@ -256,7 +256,7 @@ cfg_rt_core! {
 
 cfg_rt_util! {
     mod local;
-    pub use local::{spawn_local, LocalSet, LocalFuture};
+    pub use local::{spawn_local, LocalSet};
 }
 
 cfg_rt_core! {
