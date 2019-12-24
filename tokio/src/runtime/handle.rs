@@ -37,7 +37,7 @@ impl Handle {
             Some(self.clock.clone()),
         )
         .enter();
-        self.blocking_spawner.enter(|| self.spawner.enter(f))
+        self.blocking_spawner.enter(|| f())
     }
 }
 

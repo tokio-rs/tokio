@@ -263,7 +263,7 @@ impl Spawner {
 fn run_thread(spawner: Spawner) {
     spawner.enter(|| {
         let inner = &*spawner.inner;
-        inner.spawner.enter(|| inner.run());
+        inner.run()
     });
 }
 

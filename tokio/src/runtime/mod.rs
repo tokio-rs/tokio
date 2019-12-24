@@ -206,11 +206,6 @@ pub use self::builder::Builder;
 pub(crate) mod enter;
 use self::enter::enter;
 
-cfg_rt_core! {
-    mod global;
-    pub(crate) use global::spawn;
-}
-
 mod handle;
 pub use self::handle::Handle;
 
