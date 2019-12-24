@@ -129,9 +129,9 @@ impl TcpListener {
     }
 
     /// Attempts to poll `SocketAddr` and `TcpStream` bound to this address.
-    /// 
+    ///
     /// In case if I/O resource isn't ready yet, `Poll::Pending` is returned and current task will be notified by a waker.
-    /// 
+    ///
     pub fn poll_accept(
         &mut self,
         cx: &mut Context<'_>,
