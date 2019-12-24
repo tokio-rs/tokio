@@ -118,7 +118,7 @@ impl Drop for AtomicStackEntries {
     fn drop(&mut self) {
         for entry in self {
             // Flag the entry as errored
-            entry.error();
+            entry.error(Error::shutdown());
         }
     }
 }
