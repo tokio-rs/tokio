@@ -68,7 +68,7 @@ impl ThreadContext {
     /// [`ThreadContext`]: struct.ThreadContext.html
     #[allow(dead_code)]
     pub(crate) fn clone_current() -> Self {
-        CONTEXT.with(|ctx| ctx.borrow().clone().unwrap_or_else(|| Default::default()))
+        CONTEXT.with(|ctx| ctx.borrow().clone().unwrap_or_else(Default::default))
     }
 
     /// Set this [`ThreadContext`] as the current active [`ThreadContext`].
