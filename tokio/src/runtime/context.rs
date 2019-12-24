@@ -81,13 +81,13 @@ impl ThreadContext {
         })
     }
 
-    #[cfg(all(feature = "test-util", feature = "time"))]
+    #[cfg(all(feature = "test-util", feature = "time", test))]
     pub(crate) fn with_time_handle(mut self, handle: crate::runtime::time::Handle) -> Self {
         self.time_handle = handle;
         self
     }
 
-    #[cfg(all(feature = "test-util", feature = "time"))]
+    #[cfg(all(feature = "test-util", feature = "time", test))]
     pub(crate) fn with_clock(mut self, clock: crate::runtime::time::Clock) -> Self {
         self.clock.replace(clock);
         self
