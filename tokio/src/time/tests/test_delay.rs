@@ -310,7 +310,7 @@ fn very_long_delay() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "timer duration exceeds maximum duration")]
 fn greater_than_max() {
     const YR_5: u64 = 5 * 365 * 24 * 60 * 60 * 1000;
 

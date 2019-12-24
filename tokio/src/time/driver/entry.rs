@@ -2,6 +2,7 @@ use crate::loom::sync::atomic::AtomicU64;
 use crate::sync::AtomicWaker;
 use crate::time::driver::{Handle, Inner};
 use crate::time::{Duration, Error, Instant};
+use crate::time::wheel::MAX_DURATION;
 
 use std::cell::UnsafeCell;
 use std::ptr;
@@ -115,6 +116,8 @@ impl Entry {
             let when = inner.normalize_deadline(deadline);
             let state = if when <= inner.elapsed() {
                 ELAPSED
+            } else if when - inner.elapsed() > MAX_DURATION {
+                panic!("timer duration exceeds maximum duration");
             } else {
                 when
             };

@@ -43,7 +43,7 @@ pub(crate) struct Wheel<T> {
 const NUM_LEVELS: usize = 6;
 
 /// The maximum duration of a delay
-const MAX_DURATION: u64 = 1 << (6 * NUM_LEVELS);
+pub(crate) const MAX_DURATION: u64 = 1 << (6 * NUM_LEVELS);
 
 #[derive(Debug)]
 pub(crate) enum InsertError {
