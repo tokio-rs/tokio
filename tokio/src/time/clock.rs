@@ -101,16 +101,15 @@ cfg_test_util! {
 
     /// Return the current instant, factoring in frozen time.
     pub(crate) fn now() -> Instant {
-        Instant::from_std(
         if let Some(clock) = context::ThreadContext::clock() {
             if let Some(frozen) = *clock.inner.frozen.lock().unwrap() {
-                clock.inner.start + frozen
+                Instant::from_std(clock.inner.start + frozen)
             } else {
-                std::time::Instant::now()
+                Instant::from_std(std::time::Instant::now())
             }
         } else {
-            std::time::Instant::now()
-        })
+            Instant::from_std(std::time::Instant::now())
+        }
     }
 
     impl Clock {
