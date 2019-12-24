@@ -5,13 +5,13 @@ pub(crate) use scheduled_io::ScheduledIo; // pub(crate) for tests
 
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::park::{Park, Unpark};
+#[cfg(all(feature = "io-driver", not(loom)))]
+use crate::runtime::context;
 use crate::util::slab::{Address, Slab};
 
 use mio::event::Evented;
-use std::cell::RefCell;
 use std::fmt;
 use std::io;
-use std::marker::PhantomData;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::{Arc, Weak};
 use std::task::Waker;
@@ -54,11 +54,6 @@ pub(super) enum Direction {
     Write,
 }
 
-thread_local! {
-    /// Tracks the reactor for the current execution context.
-    static CURRENT_REACTOR: RefCell<Option<Handle>> = RefCell::new(None)
-}
-
 const TOKEN_WAKEUP: mio::Token = mio::Token(Address::NULL);
 
 fn _assert_kinds() {
@@ -68,40 +63,6 @@ fn _assert_kinds() {
 }
 
 // ===== impl Driver =====
-
-#[derive(Debug)]
-/// Guard that resets current reactor on drop.
-pub(crate) struct DefaultGuard<'a> {
-    _lifetime: PhantomData<&'a u8>,
-}
-
-impl Drop for DefaultGuard<'_> {
-    fn drop(&mut self) {
-        CURRENT_REACTOR.with(|current| {
-            let mut current = current.borrow_mut();
-            *current = None;
-        });
-    }
-}
-
-/// Sets handle for a default reactor, returning guard that unsets it on drop.
-pub(crate) fn set_default(handle: &Handle) -> DefaultGuard<'_> {
-    CURRENT_REACTOR.with(|current| {
-        let mut current = current.borrow_mut();
-
-        assert!(
-            current.is_none(),
-            "default Tokio reactor already set \
-             for execution context"
-        );
-
-        *current = Some(handle.clone());
-    });
-
-    DefaultGuard {
-        _lifetime: PhantomData,
-    }
-}
 
 impl Driver {
     /// Creates a new event loop, returning any error that happened during the
@@ -237,11 +198,14 @@ impl Handle {
     /// # Panics
     ///
     /// This function panics if there is no current reactor set.
+    #[cfg(all(feature = "io-driver", not(loom)))]
     pub(super) fn current() -> Self {
-        CURRENT_REACTOR.with(|current| match *current.borrow() {
-            Some(ref handle) => handle.clone(),
-            None => panic!("no current reactor"),
-        })
+        context::ThreadContext::io_handle().expect("no current reactor")
+    }
+
+    #[cfg(any(not(feature = "io-driver"), loom))]
+    pub(super) fn current() -> Self {
+        panic!("no current reactor")
     }
 
     /// Forces a reactor blocked in a call to `turn` to wakeup, or otherwise

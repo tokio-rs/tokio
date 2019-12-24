@@ -127,6 +127,7 @@ futures = { version = "0.3.0", features = ["async-await"] }
 loom = { version = "0.2.13", features = ["futures", "checkpoint"] }
 proptest = "0.9.4"
 tempfile = "3.1.0"
+bencher = "0.1.5"
 
 [package.metadata.docs.rs]
 all-features = true
@@ -134,3 +135,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [package.metadata.playground]
 features = ["full"]
+
+[[bench]]
+name = "spawn"
+harness = false

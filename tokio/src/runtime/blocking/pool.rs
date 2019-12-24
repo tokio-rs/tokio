@@ -5,7 +5,7 @@ use crate::loom::thread;
 use crate::runtime::blocking::schedule::NoopSchedule;
 use crate::runtime::blocking::shutdown;
 use crate::runtime::blocking::task::BlockingTask;
-use crate::runtime::{self, io, time, Builder, Callback};
+use crate::runtime::{self, context::ThreadContext, io, time, Builder, Callback};
 use crate::task::{self, JoinHandle};
 
 use std::cell::Cell;
@@ -243,13 +243,17 @@ impl Spawner {
         if let Some(stack_size) = self.inner.stack_size {
             builder = builder.stack_size(stack_size);
         }
-
+        let thread_context = ThreadContext::new(
+            self.inner.spawner.clone(),
+            self.inner.io_handle.clone(),
+            self.inner.time_handle.clone(),
+            Some(self.inner.clock.clone()),
+        );
         let spawner = self.clone();
-
         builder
             .spawn(move || {
+                let _e = thread_context.enter();
                 run_thread(spawner);
-
                 drop(shutdown_tx);
             })
             .unwrap();
@@ -259,11 +263,7 @@ impl Spawner {
 fn run_thread(spawner: Spawner) {
     spawner.enter(|| {
         let inner = &*spawner.inner;
-        let _io = io::set_default(&inner.io_handle);
-
-        time::with_default(&inner.time_handle, &inner.clock, || {
-            inner.spawner.enter(|| inner.run());
-        });
+        inner.run()
     });
 }
 
