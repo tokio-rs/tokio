@@ -101,7 +101,6 @@ impl BlockingPool {
         io: &io::Handle,
         time: &time::Handle,
         clock: &time::Clock,
-        thread_cap: usize,
     ) -> BlockingPool {
         let (shutdown_tx, shutdown_rx) = shutdown::channel();
 
@@ -125,7 +124,7 @@ impl BlockingPool {
                     io_handle: io.clone(),
                     time_handle: time.clone(),
                     clock: clock.clone(),
-                    thread_cap,
+                    thread_cap: builder.max_threads,
                 }),
             },
             shutdown_rx,
