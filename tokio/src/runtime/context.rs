@@ -76,7 +76,7 @@ impl ThreadContext {
     /// [`ThreadContext`]: struct.ThreadContext.html
     pub(crate) fn enter(self) -> ThreadContextDropGuard {
         CONTEXT.with(|ctx| {
-            let previous = ctx.replace(Some(self));
+            let previous = ctx.borrow_mut().replace(self);
             ThreadContextDropGuard { previous }
         })
     }
