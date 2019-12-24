@@ -1,4 +1,4 @@
-use crate::runtime::{blocking, io, time, Spawner};
+use crate::runtime::{blocking, context, io, time, Spawner};
 
 cfg_rt_core! {
     use crate::task::JoinHandle;
@@ -30,7 +30,7 @@ impl Handle {
     where
         F: FnOnce() -> R,
     {
-        let _e = crate::runtime::context::ThreadContext::new(
+        let _e = context::ThreadContext::new(
             self.spawner.clone(),
             self.io_handle.clone(),
             self.time_handle.clone(),

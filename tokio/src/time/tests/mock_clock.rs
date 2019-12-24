@@ -1,4 +1,5 @@
 use crate::park::{Park, Unpark};
+use crate::runtime::context;
 use crate::time::driver::Driver;
 use crate::time::{Clock, Duration, Instant};
 
@@ -81,7 +82,7 @@ impl MockClock {
         let park = self.time.mock_park();
         let timer = Driver::new(park, self.clock.clone());
         let handle = timer.handle();
-        let ctx = crate::runtime::context::ThreadContext::clone_current();
+        let ctx = context::ThreadContext::clone_current();
         let _e = ctx
             .with_clock(self.clock.clone())
             .with_time_handle(Some(handle.clone()))

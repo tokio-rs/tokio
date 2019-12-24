@@ -1,3 +1,4 @@
+use crate::runtime::context;
 use crate::time::driver::Inner;
 use std::fmt;
 use std::sync::{Arc, Weak};
@@ -20,7 +21,7 @@ impl Handle {
     ///
     /// This function panics if there is no current timer set.
     pub(crate) fn current() -> Self {
-        crate::runtime::context::ThreadContext::time_handle().expect("no current timer")
+        context::ThreadContext::time_handle().expect("no current timer")
     }
 
     /// Try to return a strong ref to the inner
