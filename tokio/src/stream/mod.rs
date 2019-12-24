@@ -22,6 +22,9 @@ use next::Next;
 mod try_next;
 use try_next::TryNext;
 
+mod take;
+use take::Take;
+
 pub use futures_core::Stream;
 
 /// An extension trait for `Stream`s that provides a variety of convenient
@@ -201,6 +204,33 @@ pub trait StreamExt: Stream {
         Self: Sized,
     {
         FilterMap::new(self, f)
+    }
+
+    /// Creates a new stream of at most `n` items of the underlying stream.
+    ///
+    /// Once `n` items have been yielded from this stream then it will always
+    /// return that the stream is done.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio::stream::{self, StreamExt};
+    ///
+    /// let mut stream = stream::iter(1..=10).take(3);
+    ///
+    /// assert_eq!(Some(1), stream.next().await);
+    /// assert_eq!(Some(2), stream.next().await);
+    /// assert_eq!(Some(3), stream.next().await);
+    /// assert_eq!(None, stream.next().await);
+    /// # }
+    /// ```
+    fn take(self, n: usize) -> Take<Self>
+    where
+        Self: Sized,
+    {
+        Take::new(self, n)
     }
 }
 
