@@ -365,7 +365,7 @@ impl Command {
         self
     }
 
-    /// Configuration for the child process's standard input (stdin) handle.
+    /// Sets configuration for the child process's standard input (stdin) handle.
     ///
     /// Defaults to [`inherit`] when used with `spawn` or `status`, and
     /// defaults to [`piped`] when used with `output`.
@@ -389,7 +389,7 @@ impl Command {
         self
     }
 
-    /// Configuration for the child process's standard output (stdout) handle.
+    /// Sets configuration for the child process's standard output (stdout) handle.
     ///
     /// Defaults to [`inherit`] when used with `spawn` or `status`, and
     /// defaults to [`piped`] when used with `output`.
@@ -413,7 +413,7 @@ impl Command {
         self
     }
 
-    /// Configuration for the child process's standard error (stderr) handle.
+    /// Sets configuration for the child process's standard error (stderr) handle.
     ///
     /// Defaults to [`inherit`] when used with `spawn` or `status`, and
     /// defaults to [`piped`] when used with `output`.
@@ -468,7 +468,7 @@ impl Command {
         self
     }
 
-    /// Similar to `uid`, but sets the group ID of the child process. This has
+    /// Similar to `uid` but sets the group ID of the child process. This has
     /// the same semantics as the `uid` field.
     #[cfg(unix)]
     pub fn gid(&mut self, id: u32) -> &mut Command {
@@ -514,7 +514,7 @@ impl Command {
         self
     }
 
-    /// Executes the command as a child process, returning a handle to it.
+    /// Executes command as a child process, returning a handle to it.
     ///
     /// By default, stdin, stdout and stderr are inherited from the parent.
     ///
@@ -564,7 +564,7 @@ impl Command {
         })
     }
 
-    /// Executes a command as a child process, waiting for it to finish and
+    /// Executes command as a child process, waiting for it to finish and
     /// collecting its exit status.
     ///
     /// By default, stdin, stdout and stderr are inherited from the parent.
@@ -612,7 +612,7 @@ impl Command {
         }
     }
 
-    /// Executes the command as a child process, waiting for it to finish and
+    /// Executes command as a child process, waiting for it to finish and
     /// collecting all of its output.
     ///
     /// > **Note**: this method, unlike the standard library, will

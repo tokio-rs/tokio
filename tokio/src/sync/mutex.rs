@@ -124,7 +124,7 @@ unsafe impl<'a, T> Sync for MutexGuard<'a, T> where T: Send + Sync {}
 ///
 /// [`Mutex::try_lock`]: Mutex::try_lock
 #[derive(Debug)]
-pub struct TryLockError(());
+pub struct TryLockError;
 
 impl fmt::Display for TryLockError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -166,12 +166,12 @@ impl<T> Mutex<T> {
         guard
     }
 
-    /// Try to acquire the lock
+    /// Tries to acquire the lock
     pub fn try_lock(&self) -> Result<MutexGuard<'_, T>, TryLockError> {
         let mut permit = semaphore::Permit::new();
         match permit.try_acquire(&self.s) {
             Ok(_) => Ok(MutexGuard { lock: self, permit }),
-            Err(_) => Err(TryLockError(())),
+            Err(_) => Err(TryLockError),
         }
     }
 }

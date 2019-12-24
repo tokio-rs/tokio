@@ -77,7 +77,7 @@ where
         }
     }
 
-    /// Spawn a future onto the thread pool
+    /// Spawns a future onto the thread pool
     pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
@@ -154,7 +154,7 @@ where
 }
 
 impl Spawner {
-    /// Spawn a future onto the thread pool
+    /// Spawns a future onto the thread pool
     pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
@@ -165,7 +165,7 @@ impl Spawner {
         handle
     }
 
-    /// Enter the executor context
+    /// Enters the executor context
     pub(crate) fn enter<F, R>(&self, f: F) -> R
     where
         F: FnOnce() -> R,

@@ -47,7 +47,7 @@ cfg_io_driver! {
 // ===== impl Registration =====
 
 impl Registration {
-    /// Register the I/O resource with the default reactor.
+    /// Registers the I/O resource with the default reactor.
     ///
     /// # Return
     ///
@@ -58,19 +58,19 @@ impl Registration {
         T: Evented,
     {
         let handle = Handle::current();
-        let address = if let Some(inner) = handle.inner() {
-            inner.add_source(io)?
+
+        if let Some(inner) = handle.inner() {
+            let address = inner.add_source(io)?;
+            Ok(Registration { handle, address })
         } else {
-            return Err(io::Error::new(
+            Err(io::Error::new(
                 io::ErrorKind::Other,
                 "failed to find event loop",
-            ));
-        };
-
-        Ok(Registration { handle, address })
+            ))
+        }
     }
 
-    /// Deregister the I/O resource from the reactor it is associated with.
+    /// Deregisters the I/O resource from the reactor it is associated with.
     ///
     /// This function must be called before the I/O resource associated with the
     /// registration is dropped.
@@ -90,14 +90,14 @@ impl Registration {
     where
         T: Evented,
     {
-        let inner = match self.handle.inner() {
-            Some(inner) => inner,
-            None => return Err(io::Error::new(io::ErrorKind::Other, "reactor gone")),
-        };
-        inner.deregister_source(io)
+        if let Some(inner) = self.handle.inner() {
+            inner.deregister_source(io)
+        } else {
+            Err(io::Error::new(io::ErrorKind::Other, "reactor gone"))
+        }
     }
 
-    /// Poll for events on the I/O resource's read readiness stream.
+    /// Polls for events on the I/O resource's read readiness stream.
     ///
     /// If the I/O resource receives a new read readiness event since the last
     /// call to `poll_read_ready`, it is returned. If it has not, the current
@@ -130,8 +130,7 @@ impl Registration {
     ///
     /// This function will panic if called from outside of a task context.
     pub fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<mio::Ready>> {
-        let v = self.poll_ready(Direction::Read, Some(cx))?;
-        match v {
+        match self.poll_ready(Direction::Read, Some(cx))? {
             Some(v) => Poll::Ready(Ok(v)),
             None => Poll::Pending,
         }
@@ -148,7 +147,7 @@ impl Registration {
         self.poll_ready(Direction::Read, None)
     }
 
-    /// Poll for events on the I/O resource's write readiness stream.
+    /// Polls for events on the I/O resource's write readiness stream.
     ///
     /// If the I/O resource receives a new write readiness event since the last
     /// call to `poll_write_ready`, it is returned. If it has not, the current
@@ -181,14 +180,13 @@ impl Registration {
     ///
     /// This function will panic if called from outside of a task context.
     pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<mio::Ready>> {
-        let v = self.poll_ready(Direction::Write, Some(cx))?;
-        match v {
+        match self.poll_ready(Direction::Write, Some(cx))? {
             Some(v) => Poll::Ready(Ok(v)),
             None => Poll::Pending,
         }
     }
 
-    /// Consume any pending write readiness event.
+    /// Consumes any pending write readiness event.
     ///
     /// This function is identical to [`poll_write_ready`] **except** that it
     /// will not notify the current task when a new event is received. As such,
@@ -199,7 +197,7 @@ impl Registration {
         self.poll_ready(Direction::Write, None)
     }
 
-    /// Poll for events on the I/O resource's `direction` readiness stream.
+    /// Polls for events on the I/O resource's `direction` readiness stream.
     ///
     /// If called with a task context, notify the task when a new event is
     /// received.

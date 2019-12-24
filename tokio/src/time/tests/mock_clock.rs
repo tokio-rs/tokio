@@ -100,21 +100,22 @@ impl Default for MockClock {
 }
 
 impl Handle {
+    /// Creates new `Handle`
     pub(self) fn new(timer: Driver<MockPark>, time: MockTime, clock: Clock) -> Self {
         Handle { timer, time, clock }
     }
 
-    /// Turn the internal timer and mock park for the provided duration.
+    /// Turns the internal timer and mock park for the provided duration.
     pub(crate) fn turn(&mut self) {
         self.timer.park().unwrap();
     }
 
-    /// Turn the internal timer and mock park for the provided duration.
+    /// Turns the internal timer and mock park for the provided duration.
     pub(crate) fn turn_for(&mut self, duration: Duration) {
         self.timer.park_timeout(duration).unwrap();
     }
 
-    /// Advance the `MockClock` by the provided duration.
+    /// Advances the `MockClock` by the provided duration.
     pub(crate) fn advance(&mut self, duration: Duration) {
         let now = Instant::now();
         let end = now + duration;
@@ -129,12 +130,12 @@ impl Handle {
         self.clock.advanced()
     }
 
-    /// Get the currently mocked time
+    /// Gets the currently mocked time
     pub(crate) fn now(&mut self) -> Instant {
         self.time.now()
     }
 
-    /// Turn the internal timer once, but force "parking" for `duration` regardless of any pending
+    /// Turns the internal timer once, but force "parking" for `duration` regardless of any pending
     /// timeouts
     pub(crate) fn park_for(&mut self, duration: Duration) {
         self.time.inner.lock().unwrap().park_for = Some(duration);

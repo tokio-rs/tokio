@@ -27,7 +27,7 @@ cfg_io_util! {
         inner: Arc<Inner<T>>,
     }
 
-    /// Split a single value implementing `AsyncRead + AsyncWrite` into separate
+    /// Splits a single value implementing `AsyncRead + AsyncWrite` into separate
     /// `AsyncRead` and `AsyncWrite` handles.
     ///
     /// To restore this read/write object from its `split::ReadHalf` and
@@ -61,7 +61,7 @@ struct Guard<'a, T> {
 }
 
 impl<T> ReadHalf<T> {
-    /// Reunite with a previously split `WriteHalf`.
+    /// Reunites with a previously split `WriteHalf`.
     ///
     /// # Panics
     ///
@@ -73,7 +73,7 @@ impl<T> ReadHalf<T> {
 
             let inner = Arc::try_unwrap(self.inner)
                 .ok()
-                .expect("Arc::try_unwrap failed");
+                .expect("`Arc::try_unwrap` failed");
 
             inner.stream.into_inner()
         } else {

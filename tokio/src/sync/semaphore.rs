@@ -34,7 +34,7 @@ pub struct SemaphorePermit<'a> {
 ///
 /// [`Semaphore::try_acquire`]: Semaphore::try_acquire
 #[derive(Debug)]
-pub struct TryAcquireError(());
+pub struct TryAcquireError;
 
 impl Semaphore {
     /// Creates a new semaphore with the initial number of permits
@@ -49,12 +49,12 @@ impl Semaphore {
         self.ll_sem.available_permits()
     }
 
-    /// Add `n` new permits to the semaphore.
+    /// Adds `n` new permits to the semaphore.
     pub fn add_permits(&self, n: usize) {
         self.ll_sem.add_permits(n);
     }
 
-    /// Acquire permit from the semaphore
+    /// Acquires permit from the semaphore
     pub async fn acquire(&self) -> SemaphorePermit<'_> {
         let mut permit = SemaphorePermit {
             sem: &self,
@@ -66,7 +66,7 @@ impl Semaphore {
         permit
     }
 
-    /// Try to acquire a permit form the semaphore
+    /// Tries to acquire a permit form the semaphore
     pub fn try_acquire(&self) -> Result<SemaphorePermit<'_>, TryAcquireError> {
         let mut ll_permit = ll::Permit::new();
         match ll_permit.try_acquire(&self.ll_sem) {
@@ -74,13 +74,13 @@ impl Semaphore {
                 sem: self,
                 ll_permit,
             }),
-            Err(_) => Err(TryAcquireError(())),
+            Err(_) => Err(TryAcquireError),
         }
     }
 }
 
 impl<'a> SemaphorePermit<'a> {
-    /// Forget the permit **without** releasing it back to the semaphore.
+    /// Forgets the permit **without** releasing it back to the semaphore.
     /// This can be used to reduce the amount of permits available from a
     /// semaphore.
     pub fn forget(mut self) {

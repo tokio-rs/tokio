@@ -25,7 +25,7 @@ pub(super) fn channel() -> (Sender, Receiver) {
 }
 
 impl Receiver {
-    /// Block the current thread until all `Sender` handles drop.
+    /// Blocks the current thread until all `Sender` handles drop.
     pub(crate) fn wait(&mut self) {
         use crate::runtime::enter::{enter, try_enter};
 

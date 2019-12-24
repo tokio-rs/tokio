@@ -19,7 +19,7 @@ pub(crate) enum Spawner {
 }
 
 impl Spawner {
-    /// Enter the scheduler context
+    /// Enters the scheduler context
     pub(crate) fn enter<F, R>(&self, f: F) -> R
     where
         F: FnOnce() -> R,

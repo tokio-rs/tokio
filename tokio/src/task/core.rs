@@ -75,7 +75,7 @@ enum Stage<T: Future> {
 }
 
 impl<T: Future> Cell<T> {
-    /// Allocate a new task cell, containing the header, trailer, and core
+    /// Allocates a new task cell, containing the header, trailer, and core
     /// structures.
     pub(super) fn new<S>(future: T, state: State) -> Box<Cell<T>>
     where

@@ -4,7 +4,7 @@ use std::cell::UnsafeCell;
 pub(crate) struct CausalCell<T>(UnsafeCell<T>);
 
 #[derive(Default)]
-pub(crate) struct CausalCheck(());
+pub(crate) struct CausalCheck;
 
 impl<T> CausalCell<T> {
     pub(crate) fn new(data: T) -> CausalCell<T> {

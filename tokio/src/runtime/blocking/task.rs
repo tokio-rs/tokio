@@ -8,7 +8,7 @@ pub(super) struct BlockingTask<T> {
 }
 
 impl<T> BlockingTask<T> {
-    /// Initialize a new blocking task from the given function
+    /// Initializes a new blocking task from the given function
     pub(super) fn new(func: T) -> BlockingTask<T> {
         BlockingTask { func: Some(func) }
     }

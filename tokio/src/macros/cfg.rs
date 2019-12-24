@@ -20,7 +20,7 @@ macro_rules! cfg_blocking {
     }
 }
 
-/// Enable blocking API internals
+/// Enables blocking API internals
 macro_rules! cfg_blocking_impl {
     ($($item:item)*) => {
         $(
@@ -36,7 +36,7 @@ macro_rules! cfg_blocking_impl {
     }
 }
 
-/// Enable blocking API internals
+/// Enables blocking API internals
 macro_rules! cfg_not_blocking_impl {
     ($($item:item)*) => {
         $(
@@ -52,7 +52,7 @@ macro_rules! cfg_not_blocking_impl {
     }
 }
 
-/// Enable internal `AtomicWaker` impl
+/// Enables internal `AtomicWaker` impl
 macro_rules! cfg_atomic_waker_impl {
     ($($item:item)*) => {
         $(

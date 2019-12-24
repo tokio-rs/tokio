@@ -30,7 +30,7 @@ unsafe impl Send for Set {}
 unsafe impl Sync for Set {}
 
 impl Set {
-    /// Create a new worker set using the provided queues.
+    /// Creates a new worker set using the provided queues.
     pub(crate) fn new(parkers: &[Parker]) -> Self {
         assert!(!parkers.is_empty());
 
@@ -115,7 +115,7 @@ impl Set {
         }
     }
 
-    /// Signal the pool is closed
+    /// Signals the pool is closed
     ///
     /// Returns `true` if the transition to closed is successful. `false`
     /// indicates the pool was already closed.
@@ -156,7 +156,7 @@ impl Set {
         &self.idle
     }
 
-    /// Wait for all locks on the injection queue to drop.
+    /// Waits for all locks on the injection queue to drop.
     ///
     /// This is done by locking w/o doing anything.
     pub(super) fn wait_for_unlocked(&self) {

@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 doc_rt_core! {
-    /// Yield execution back to the Tokio runtime.
+    /// Yields execution back to the Tokio runtime.
     pub async fn yield_now() {
         /// Yield implementation
         struct YieldNow {

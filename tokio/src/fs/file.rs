@@ -155,7 +155,7 @@ impl File {
         Ok(File::from_std(std_file))
     }
 
-    /// Convert a [`std::fs::File`][std] to a [`tokio::fs::File`][file].
+    /// Converts a [`std::fs::File`][std] to a [`tokio::fs::File`][file].
     ///
     /// [std]: std::fs::File
     /// [file]: File
@@ -176,7 +176,7 @@ impl File {
         }
     }
 
-    /// Seek to an offset, in bytes, in a stream.
+    /// Seeks to an offset, in bytes, in a stream.
     ///
     /// # Examples
     ///

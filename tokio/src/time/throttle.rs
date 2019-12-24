@@ -10,7 +10,7 @@ use std::task::{self, Poll};
 
 use pin_project_lite::pin_project;
 
-/// Slow down a stream by enforcing a delay between items.
+/// Slows down a stream by enforcing a delay between items.
 /// They will be produced not more often than the specified interval.
 ///
 /// # Example

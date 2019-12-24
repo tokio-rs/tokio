@@ -5,7 +5,7 @@ use std::ops::DerefMut;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// Read bytes from a source.
+/// Reads bytes from a source.
 ///
 /// This trait is analogous to the [`std::io::Read`] trait, but integrates with
 /// the asynchronous task system. In particular, the [`poll_read`] method,
@@ -82,7 +82,7 @@ pub trait AsyncRead {
         true
     }
 
-    /// Attempt to read from the `AsyncRead` into `buf`.
+    /// Attempts to read from the `AsyncRead` into `buf`.
     ///
     /// On success, returns `Poll::Ready(Ok(num_bytes_read))`.
     ///
@@ -96,7 +96,7 @@ pub trait AsyncRead {
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>>;
 
-    /// Pull some bytes from this source into the specified `BufMut`, returning
+    /// Pulls some bytes from this source into the specified `BufMut`, returning
     /// how many bytes were read.
     ///
     /// The `buf` provided will have bytes read into it and the internal cursor

@@ -2,7 +2,7 @@ use crate::fs::asyncify;
 
 use std::{io, path::Path};
 
-/// Read the entire contents of a file into a bytes vector.
+/// Reads the entire contents of a file into a bytes vector.
 ///
 /// This is an async version of [`std::fs::read`][std]
 ///

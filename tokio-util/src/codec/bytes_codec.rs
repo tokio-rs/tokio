@@ -6,12 +6,12 @@ use std::io;
 
 /// A simple `Codec` implementation that just ships bytes around.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
-pub struct BytesCodec(());
+pub struct BytesCodec;
 
 impl BytesCodec {
     /// Creates a new `BytesCodec` for shipping around raw bytes.
     pub fn new() -> BytesCodec {
-        BytesCodec(())
+        BytesCodec
     }
 }
 

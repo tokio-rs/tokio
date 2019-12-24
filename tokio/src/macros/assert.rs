@@ -1,4 +1,4 @@
-/// Assert option is some
+/// Asserts option is some
 macro_rules! assert_some {
     ($e:expr) => {{
         match $e {
@@ -8,7 +8,7 @@ macro_rules! assert_some {
     }};
 }
 
-/// Assert option is none
+/// Asserts option is none
 macro_rules! assert_none {
     ($e:expr) => {{
         if let Some(v) = $e {

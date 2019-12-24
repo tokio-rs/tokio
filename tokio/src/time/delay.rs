@@ -5,7 +5,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{self, Poll};
 
-/// Wait until `deadline` is reached.
+/// Waits until `deadline` is reached.
 ///
 /// No work is performed while awaiting on the delay to complete. The delay
 /// operates at millisecond granularity and should not be used for tasks that
@@ -20,7 +20,7 @@ pub fn delay_until(deadline: Instant) -> Delay {
     Delay { registration }
 }
 
-/// Wait until `duration` has elapsed.
+/// Waits until `duration` has elapsed.
 ///
 /// Equivalent to `delay_until(Instant::now() + duration)`. An asynchronous
 /// analog to `std::thread::sleep`.
@@ -59,14 +59,14 @@ impl Delay {
         self.registration.deadline()
     }
 
-    /// Returns true if the `Delay` has elapsed
+    /// Returns `true` if the `Delay` has elapsed
     ///
     /// A `Delay` is elapsed when the requested duration has elapsed.
     pub fn is_elapsed(&self) -> bool {
         self.registration.is_elapsed()
     }
 
-    /// Reset the `Delay` instance to a new deadline.
+    /// Resets the `Delay` instance to a new deadline.
     ///
     /// Calling this function allows changing the instant at which the `Delay`
     /// future completes without having to create new associated state.
