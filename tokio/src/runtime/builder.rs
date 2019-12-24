@@ -163,6 +163,7 @@ impl Builder {
     /// use tokio::runtime;
     ///
     /// let rt = runtime::Builder::new()
+    ///     .threaded_scheduler()
     ///     .core_threads(4)
     ///     .build()
     ///     .unwrap();
