@@ -59,10 +59,12 @@ fn threaded_scheduler_remote_spawn(bench: &mut Bencher) {
     });
 }
 
-bencher::benchmark_group!(benches,
+bencher::benchmark_group!(
+    benches,
     basic_scheduler_local_spawn,
     threaded_scheduler_local_spawn,
     basic_scheduler_remote_spawn,
-    threaded_scheduler_remote_spawn);
+    threaded_scheduler_remote_spawn
+);
 
 bencher::benchmark_main!(benches);
