@@ -8,6 +8,7 @@ members = [
   "tokio-util",
 
   # Internal
+  "benches",
   "examples",
   "tests-build",
   "tests-integration",

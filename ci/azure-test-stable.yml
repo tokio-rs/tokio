@@ -30,6 +30,11 @@ jobs:
       displayName: ${{ crate }} - cargo test --all-features
       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
 
+    # Check benches
+    - script: cargo check --all-features --benches
+      displayName: ${{ crate }} - cargo check --benches
+      workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
+
   - template: azure-patch-crates.yml
 
   - ${{ each crate in parameters.crates }}:
