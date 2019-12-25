@@ -26,11 +26,7 @@ where
     }
 }
 
-impl<St, F> Filter<St, F>
-where
-    St: Stream,
-    F: FnMut(&St::Item) -> bool,
-{
+impl<St, F> Filter<St, F> {
     pub(super) fn new(stream: St, f: F) -> Self {
         Self { stream, f }
     }

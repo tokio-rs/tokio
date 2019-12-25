@@ -7,7 +7,7 @@ use core::task::{Context, Poll};
 use pin_project_lite::pin_project;
 
 pin_project! {
-    /// Stream for the [`map`](super::StreamExt::map) method.
+    /// Stream for the [`take`](super::StreamExt::take) method.
     #[must_use = "streams do nothing unless polled"]
     pub struct Take<St> {
         #[pin]
@@ -27,7 +27,7 @@ where
     }
 }
 
-impl<St: Stream> Take<St> {
+impl<St> Take<St> {
     pub(super) fn new(stream: St, remaining: usize) -> Self {
         Self { stream, remaining }
     }
