@@ -69,7 +69,7 @@ impl State {
         Snapshot(self.val.load(Acquire))
     }
 
-    /// Transition a task to the `Running` state.
+    /// Transitions a task to the `Running` state.
     ///
     /// Returns a snapshot of the state **after** the transition.
     pub(super) fn transition_to_running(&self) -> Snapshot {
@@ -96,7 +96,7 @@ impl State {
         next
     }
 
-    /// Transition the task from `Running` -> `Idle`.
+    /// Transitions the task from `Running` -> `Idle`.
     ///
     /// Returns a snapshot of the state **after** the transition.
     pub(super) fn transition_to_idle(&self) -> Snapshot {
@@ -119,7 +119,7 @@ impl State {
         next
     }
 
-    /// Transition the task from `Running` -> `Complete`.
+    /// Transitions the task from `Running` -> `Complete`.
     ///
     /// Returns a snapshot of the state **after** the transition.
     pub(super) fn transition_to_complete(&self) -> Snapshot {
@@ -136,7 +136,7 @@ impl State {
         next
     }
 
-    /// Transition the task from `Running` -> `Released`.
+    /// Transitions the task from `Running` -> `Released`.
     ///
     /// Returns a snapshot of the state **after** the transition.
     pub(super) fn transition_to_released(&self) -> Snapshot {
@@ -157,7 +157,7 @@ impl State {
         next
     }
 
-    /// Transition the task to the canceled state.
+    /// Transitions the task to the canceled state.
     ///
     /// Returns the snapshot of the state **after** the transition **if** the
     /// transition was made successfully
@@ -212,7 +212,7 @@ impl State {
         }
     }
 
-    /// Final transition to `Released`. Called when primary task handle is
+    /// Finals transition to `Released`. Called when primary task handle is
     /// dropped. This is roughly a "ref decrement" operation.
     ///
     /// Returns a snapshot of the state **after** the transition.
@@ -239,7 +239,7 @@ impl State {
         next
     }
 
-    /// Transition the state to `Scheduled`.
+    /// Transitions the state to `Scheduled`.
     ///
     /// Returns `true` if the task needs to be submitted to the pool for
     /// execution
