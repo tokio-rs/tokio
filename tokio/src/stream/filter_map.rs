@@ -26,11 +26,7 @@ where
     }
 }
 
-impl<St, F, T> FilterMap<St, F>
-where
-    St: Stream,
-    F: FnMut(St::Item) -> Option<T>,
-{
+impl<St, F> FilterMap<St, F> {
     pub(super) fn new(stream: St, f: F) -> Self {
         Self { stream, f }
     }

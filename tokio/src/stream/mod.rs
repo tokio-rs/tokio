@@ -25,6 +25,9 @@ use try_next::TryNext;
 mod take;
 use take::Take;
 
+mod take_while;
+use take_while::TakeWhile;
+
 pub use futures_core::Stream;
 
 /// An extension trait for `Stream`s that provides a variety of convenient
@@ -232,6 +235,36 @@ pub trait StreamExt: Stream {
     {
         Take::new(self, n)
     }
+
+    /// Take elements from this stream while the provided predicate
+    /// resolves to `true`.
+    ///
+    /// This function, like `Iterator::take_while`, will take elements from the
+    /// stream until the predicate `f` resolves to `false`. Once one element
+    /// returns false it will always return that the stream is done.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio::stream::{self, StreamExt};
+    ///
+    /// let mut stream = stream::iter(1..=10).take_while(|x| *x <= 3);
+    ///
+    /// assert_eq!(Some(1), stream.next().await);
+    /// assert_eq!(Some(2), stream.next().await);
+    /// assert_eq!(Some(3), stream.next().await);
+    /// assert_eq!(None, stream.next().await);
+    /// # }
+    /// ```
+    fn take_while<F>(self, f: F) -> TakeWhile<Self, F>
+    where
+        F: FnMut(&Self::Item) -> bool,
+        Self: Sized,
+    {
+        TakeWhile::new(self, f)
+    }
 }
 
-impl<T: ?Sized> StreamExt for T where T: Stream {}
+impl<St: ?Sized> StreamExt for St where St: Stream {}

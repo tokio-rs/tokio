@@ -85,7 +85,7 @@ impl MockClock {
         let ctx = context::ThreadContext::clone_current();
         let _e = ctx
             .with_clock(self.clock.clone())
-            .with_time_handle(Some(handle.clone()))
+            .with_time_handle(Some(handle))
             .enter();
 
         let time = self.time.clone();

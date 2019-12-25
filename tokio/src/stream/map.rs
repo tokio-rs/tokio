@@ -24,12 +24,8 @@ where
     }
 }
 
-impl<St, T, F> Map<St, F>
-where
-    St: Stream,
-    F: FnMut(St::Item) -> T,
-{
-    pub(super) fn new(stream: St, f: F) -> Map<St, F> {
+impl<St, F> Map<St, F> {
+    pub(super) fn new(stream: St, f: F) -> Self {
         Map { stream, f }
     }
 }
