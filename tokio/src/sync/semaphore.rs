@@ -34,7 +34,7 @@ pub struct SemaphorePermit<'a> {
 ///
 /// [`Semaphore::try_acquire`]: Semaphore::try_acquire
 #[derive(Debug)]
-pub struct TryAcquireError;
+pub struct TryAcquireError(());
 
 impl Semaphore {
     /// Creates a new semaphore with the initial number of permits
@@ -74,7 +74,7 @@ impl Semaphore {
                 sem: self,
                 ll_permit,
             }),
-            Err(_) => Err(TryAcquireError),
+            Err(_) => Err(TryAcquireError(())),
         }
     }
 }
