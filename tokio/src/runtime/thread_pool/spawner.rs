@@ -36,15 +36,7 @@ impl Spawner {
         self.workers.spawn_typed(future)
     }
 
-    /// Enters the executor context
-    pub(crate) fn enter<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce() -> R,
-    {
-        crate::runtime::global::with_thread_pool(self, f)
-    }
-
-    /// References to the worker set. Used by `ThreadPool` to initiate shutdown.
+    /// Reference to the worker set. Used by `ThreadPool` to initiate shutdown.
     pub(super) fn workers(&self) -> &slice::Set {
         &*self.workers
     }

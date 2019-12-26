@@ -1,4 +1,4 @@
-use crate::runtime::{blocking, io, time, Spawner};
+use crate::runtime::{blocking, context, io, time, Spawner};
 
 cfg_rt_core! {
     use crate::task::JoinHandle;
@@ -30,11 +30,14 @@ impl Handle {
     where
         F: FnOnce() -> R,
     {
-        self.blocking_spawner.enter(|| {
-            let _io = io::set_default(&self.io_handle);
-
-            time::with_default(&self.time_handle, &self.clock, || self.spawner.enter(f))
-        })
+        let _e = context::ThreadContext::new(
+            self.spawner.clone(),
+            self.io_handle.clone(),
+            self.time_handle.clone(),
+            Some(self.clock.clone()),
+        )
+        .enter();
+        self.blocking_spawner.enter(|| f())
     }
 }
 
