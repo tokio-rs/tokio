@@ -54,7 +54,7 @@ io-driver = ["mio", "lazy_static"]
 io-util = ["memchr"]
 # stdin, stdout, stderr
 io-std = ["rt-core"]
-macros = ["tokio-macros"]
+macros = ["rt-core", "tokio-macros"]
 net = ["dns", "tcp", "udp", "uds"]
 process = [
   "io-driver",
@@ -92,7 +92,7 @@ uds = ["io-driver", "mio-uds", "libc"]
 
 
 [dependencies]
-tokio-macros = { version = "0.2.0", optional = true }
+tokio-macros = { version = "0.2.0", path = "../tokio-macros", optional = true }
 
 bytes = "0.5.0"
 pin-project-lite = "0.1.1"
