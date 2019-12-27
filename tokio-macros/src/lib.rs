@@ -29,6 +29,7 @@ fn parse_knobs(
     input: syn::ItemFn,
     args: syn::AttributeArgs,
     is_test: bool,
+    rt_threaded: bool,
 ) -> Result<TokenStream, syn::Error> {
     let ret = &input.sig.output;
     let name = &input.sig.ident;
@@ -55,33 +56,42 @@ fn parse_knobs(
                     return Err(syn::Error::new_spanned(namevalue, msg));
                 }
                 match ident.unwrap().to_string().to_lowercase().as_str() {
-                    "core_threads" => match &namevalue.lit {
-                        syn::Lit::Int(expr) => {
-                            let num = expr.base10_parse::<NonZeroUsize>().unwrap();
-                            if num.get() > 1 {
-                                runtime = Some(Runtime::Threaded);
-                            } else {
-                                runtime = Some(Runtime::Basic);
-                            }
+                    "core_threads" => {
+                        if rt_threaded {
+                            match &namevalue.lit {
+                                syn::Lit::Int(expr) => {
+                                    let num = expr.base10_parse::<NonZeroUsize>().unwrap();
+                                    if num.get() > 1 {
+                                        runtime = Some(Runtime::Threaded);
+                                    } else {
+                                        runtime = Some(Runtime::Basic);
+                                    }
 
-                            if let Some(v) = max_threads {
-                                if v < num {
+                                    if let Some(v) = max_threads {
+                                        if v < num {
+                                            return Err(syn::Error::new_spanned(
+                                                namevalue,
+                                                "max_threads cannot be less than core_threads",
+                                            ));
+                                        }
+                                    }
+
+                                    core_threads = Some(num);
+                                }
+                                _ => {
                                     return Err(syn::Error::new_spanned(
                                         namevalue,
-                                        "max_threads cannot be less than core_threads",
-                                    ));
+                                        "core_threads argument must be an int",
+                                    ))
                                 }
                             }
-
-                            core_threads = Some(num);
-                        }
-                        _ => {
+                        } else {
                             return Err(syn::Error::new_spanned(
                                 namevalue,
-                                "core_threads argument must be an int",
-                            ))
+                                "core_threads can only be set with rt-threaded feature flag enabled",
+                            ));
                         }
-                    },
+                    }
                     "max_threads" => match &namevalue.lit {
                         syn::Lit::Int(expr) => {
                             let num = expr.base10_parse::<NonZeroUsize>().unwrap();
@@ -137,10 +147,18 @@ fn parse_knobs(
 
     let mut rt = quote! { tokio::runtime::Builder::new() };
     match (runtime, is_test) {
-        (Some(Runtime::Threaded), _) => rt = quote! { #rt.threaded_scheduler() },
+        (Some(Runtime::Threaded), _) => {
+            if rt_threaded {
+                rt = quote! { #rt.threaded_scheduler() }
+            }
+        }
         (Some(Runtime::Basic), _) => rt = quote! { #rt.basic_scheduler() },
         (None, true) => rt = quote! { #rt.basic_scheduler() },
-        (None, false) => rt = quote! { #rt.threaded_scheduler() },
+        (None, false) => {
+            if rt_threaded {
+                rt = quote! { #rt.threaded_scheduler() }
+            }
+        }
     };
     if let Some(v) = core_threads.map(|v| v.get()) {
         rt = quote! { #rt.core_threads(#v) };
@@ -206,7 +224,37 @@ fn parse_knobs(
 /// ```
 #[proc_macro_attribute]
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
-pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
+pub fn main_threaded(args: TokenStream, item: TokenStream) -> TokenStream {
+    main(args, item, true)
+}
+
+/// Marks async function to be executed by selected runtime.
+///
+/// ## Options:
+///
+/// - `max_threads=n` - Sets max threads to `n`.
+///
+/// ## Function arguments:
+///
+/// Arguments are allowed for any functions aside from `main` which is special
+///
+/// ## Usage
+///
+/// ### Using default
+///
+/// ```rust
+/// #[tokio::main]
+/// async fn main() {
+///     println!("Hello world");
+/// }
+/// ```
+#[proc_macro_attribute]
+#[cfg(not(test))] // Work around for rust-lang/rust#62127
+pub fn main_basic(args: TokenStream, item: TokenStream) -> TokenStream {
+    main(args, item, false)
+}
+
+fn main(args: TokenStream, item: TokenStream, rt_threaded: bool) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::ItemFn);
     let args = syn::parse_macro_input!(args as syn::AttributeArgs);
 
@@ -217,7 +265,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
             .into();
     }
 
-    parse_knobs(input, args, false).unwrap_or_else(|e| e.to_compile_error().into())
+    parse_knobs(input, args, false, rt_threaded).unwrap_or_else(|e| e.to_compile_error().into())
 }
 
 /// Marks async function to be executed by runtime, suitable to test enviornment
@@ -247,7 +295,30 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 /// }
 /// ```
 #[proc_macro_attribute]
-pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
+pub fn test_threaded(args: TokenStream, item: TokenStream) -> TokenStream {
+    test(args, item, true)
+}
+
+/// Marks async function to be executed by runtime, suitable to test enviornment
+///
+/// ## Options:
+///
+/// - `max_threads=n` - Sets max threads to `n`.
+///
+/// ## Usage
+///
+/// ```no_run
+/// #[tokio::test]
+/// async fn my_test() {
+///     assert!(true);
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn test_basic(args: TokenStream, item: TokenStream) -> TokenStream {
+    test(args, item, false)
+}
+
+fn test(args: TokenStream, item: TokenStream, rt_threaded: bool) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::ItemFn);
     let args = syn::parse_macro_input!(args as syn::AttributeArgs);
 
@@ -267,5 +338,5 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
             .into();
     }
 
-    parse_knobs(input, args, true).unwrap_or_else(|e| e.to_compile_error().into())
+    parse_knobs(input, args, true, rt_threaded).unwrap_or_else(|e| e.to_compile_error().into())
 }
