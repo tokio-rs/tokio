@@ -54,7 +54,7 @@ io-driver = ["mio", "lazy_static"]
 io-util = ["memchr"]
 # stdin, stdout, stderr
 io-std = ["rt-core"]
-macros = ["rt-core", "tokio-macros"]
+macros = ["tokio-macros"]
 net = ["dns", "tcp", "udp", "uds"]
 process = [
   "io-driver",
