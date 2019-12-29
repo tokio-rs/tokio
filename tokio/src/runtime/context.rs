@@ -107,23 +107,32 @@ impl ThreadContext {
         self
     }
 
-    #[cfg(all(feature = "io-driver", not(loom)))]
     pub(crate) fn io_handle() -> crate::runtime::io::Handle {
+        #[cfg(any(not(feature = "io-driver"), loom))]
+        {
+            return ();
+        }
+
+        #[cfg(all(feature = "io-driver", not(loom)))]
         CONTEXT.with(|ctx| match *ctx.borrow() {
             Some(ref ctx) => ctx.io_handle.clone(),
             None => None,
         })
     }
 
-    #[cfg(all(feature = "time", not(loom)))]
     pub(crate) fn time_handle() -> crate::runtime::time::Handle {
+        #[cfg(any(not(feature = "time"), loom))]
+        {
+            return ();
+        }
+
+        #[cfg(all(feature = "time", not(loom)))]
         CONTEXT.with(|ctx| match *ctx.borrow() {
             Some(ref ctx) => ctx.time_handle.clone(),
             None => None,
         })
     }
 
-    #[cfg(feature = "rt-core")]
     pub(crate) fn spawn_handle() -> Option<Spawner> {
         CONTEXT.with(|ctx| match *ctx.borrow() {
             Some(ref ctx) => Some(ctx.spawner.clone()),
