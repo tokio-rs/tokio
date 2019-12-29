@@ -189,6 +189,10 @@ impl Spawner {
             }
 
             let _reset = Reset(cell, was);
+
+            let ctx = crate::runtime::context::ThreadContext::clone_current();
+            let _e = ctx.with_blocking_spawner(self.clone()).enter();
+
             cell.set(Some(self as *const Spawner));
             f()
         })
@@ -248,6 +252,7 @@ impl Spawner {
             self.inner.io_handle.clone(),
             self.inner.time_handle.clone(),
             Some(self.inner.clock.clone()),
+            Some(self.clone()),
         );
         let spawner = self.clone();
         builder

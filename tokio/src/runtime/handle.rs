@@ -35,9 +35,28 @@ impl Handle {
             self.io_handle.clone(),
             self.time_handle.clone(),
             Some(self.clock.clone()),
+            Some(self.blocking_spawner.clone()),
         )
         .enter();
         self.blocking_spawner.enter(|| f())
+    }
+
+    /// Returns a Handle view over the currently running Runtime
+    ///
+    /// # Panic
+    ///
+    /// A Runtime must have been started or this will panic
+    pub fn current() -> Self {
+        use crate::runtime::context::ThreadContext;
+
+        Handle {
+            spawner: ThreadContext::spawn_handle().expect("Spawner not registered"),
+            io_handle: ThreadContext::io_handle(),
+            time_handle: ThreadContext::time_handle(),
+            clock: ThreadContext::clock().expect("Clock not registered"),
+            blocking_spawner: ThreadContext::blocking_spawner()
+                .expect("BlockingSpawner not registered"),
+        }
     }
 }
 

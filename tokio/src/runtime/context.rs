@@ -20,6 +20,9 @@ pub(crate) struct ThreadContext {
 
     /// Source of `Instant::now()`
     clock: Option<crate::runtime::time::Clock>,
+
+    /// Blocking pool spawner
+    blocking_spawner: Option<crate::runtime::blocking::Spawner>,
 }
 
 impl Default for ThreadContext {
@@ -35,6 +38,7 @@ impl Default for ThreadContext {
             #[cfg(any(not(feature = "time"), loom))]
             time_handle: (),
             clock: None,
+            blocking_spawner: None,
         }
     }
 }
@@ -48,6 +52,7 @@ impl ThreadContext {
         io_handle: crate::runtime::io::Handle,
         time_handle: crate::runtime::time::Handle,
         clock: Option<crate::runtime::time::Clock>,
+        blocking_spawner: Option<crate::runtime::blocking::Spawner>,
     ) -> Self {
         ThreadContext {
             spawner,
@@ -60,6 +65,7 @@ impl ThreadContext {
             #[cfg(any(not(feature = "time"), loom))]
             time_handle,
             clock,
+            blocking_spawner,
         }
     }
 
@@ -93,6 +99,14 @@ impl ThreadContext {
         self
     }
 
+    pub(crate) fn with_blocking_spawner(
+        mut self,
+        blocking_spawner: crate::runtime::blocking::Spawner,
+    ) -> Self {
+        self.blocking_spawner.replace(blocking_spawner);
+        self
+    }
+
     #[cfg(all(feature = "io-driver", not(loom)))]
     pub(crate) fn io_handle() -> crate::runtime::io::Handle {
         CONTEXT.with(|ctx| match *ctx.borrow() {
@@ -117,7 +131,6 @@ impl ThreadContext {
         })
     }
 
-    #[cfg(all(feature = "test-util", feature = "time"))]
     pub(crate) fn clock() -> Option<crate::runtime::time::Clock> {
         CONTEXT.with(
             |ctx| match ctx.borrow().as_ref().map(|ctx| ctx.clock.clone()) {
@@ -125,6 +138,19 @@ impl ThreadContext {
                 _ => None,
             },
         )
+    }
+
+    pub(crate) fn blocking_spawner() -> Option<crate::runtime::blocking::Spawner> {
+        CONTEXT.with(|ctx| {
+            match ctx
+                .borrow()
+                .as_ref()
+                .map(|ctx| ctx.blocking_spawner.clone())
+            {
+                Some(Some(blocking_spawner)) => Some(blocking_spawner),
+                _ => None,
+            }
+        })
     }
 }
 
