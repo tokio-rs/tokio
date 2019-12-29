@@ -160,9 +160,6 @@ impl Spawner {
     where
         F: FnOnce() -> R,
     {
-        // While scary, this is safe. The function takes a `&BlockingPool`,
-        // which guarantees that the reference lives for the duration of
-        // `with_pool`.
         let ctx = crate::runtime::context::ThreadContext::clone_current();
         let _e = ctx.with_blocking_spawner(self.clone()).enter();
 
