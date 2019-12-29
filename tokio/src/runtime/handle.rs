@@ -50,12 +50,13 @@ impl Handle {
         use crate::runtime::context::ThreadContext;
 
         Handle {
-            spawner: ThreadContext::spawn_handle().expect("Spawner not registered"),
+            spawner: ThreadContext::spawn_handle()
+                .expect("not currently running on the Tokio runtime."),
             io_handle: ThreadContext::io_handle(),
             time_handle: ThreadContext::time_handle(),
-            clock: ThreadContext::clock().expect("Clock not registered"),
+            clock: ThreadContext::clock().expect("not currently running on the Tokio runtime."),
             blocking_spawner: ThreadContext::blocking_spawner()
-                .expect("BlockingSpawner not registered"),
+                .expect("not currently running on the Tokio runtime."),
         }
     }
 }
