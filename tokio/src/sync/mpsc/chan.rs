@@ -13,7 +13,7 @@ use std::task::{Context, Poll};
 
 /// Channel sender
 pub(crate) struct Tx<T, S: Semaphore> {
-    inner: Arc<Chan<T, S>>,
+    pub(crate) inner: Arc<Chan<T, S>>,
     permit: S::Permit,
 }
 
@@ -91,19 +91,19 @@ pub(crate) trait Semaphore {
 
     /// A value was sent into the channel and the permit held by `tx` is
     /// dropped. In this case, the permit should not immeditely be returned to
-    /// the semaphore. Instead, the permit is returnred to the semaphore once
+    /// the semaphore. Instead, the permit is returned to the semaphore once
     /// the sent value is read by the rx handle.
     fn forget(&self, permit: &mut Self::Permit);
 
     fn close(&self);
 }
 
-struct Chan<T, S> {
+pub(crate) struct Chan<T, S> {
     /// Handle to the push half of the lock-free list.
     tx: list::Tx<T>,
 
     /// Coordinates access to channel's capacity.
-    semaphore: S,
+    pub(crate) semaphore: S,
 
     /// Receiver waker. Notified when a value is pushed into the channel.
     rx_waker: AtomicWaker,
@@ -190,9 +190,25 @@ where
         self.inner.semaphore.poll_acquire(cx, &mut self.permit)
     }
 
+    pub(crate) fn poll_ready_with_permit(
+        &self,
+        cx: &mut Context<'_>,
+        permit: &mut S::Permit,
+    ) -> Poll<Result<(), ClosedError>> {
+        self.inner.semaphore.poll_acquire(cx, permit)
+    }
+
     /// Send a message and notify the receiver.
     pub(crate) fn try_send(&mut self, value: T) -> Result<(), (T, TrySendError)> {
         self.inner.try_send(value, &mut self.permit)
+    }
+
+    pub(crate) fn try_send_with_permit(
+        &self,
+        value: T,
+        permit: &mut S::Permit,
+    ) -> Result<(), (T, TrySendError)> {
+        self.inner.try_send(value, permit)
     }
 }
 

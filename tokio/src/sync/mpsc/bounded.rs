@@ -321,4 +321,88 @@ impl<T> Sender<T> {
             Err(TrySendError::Closed(value)) => Err(SendError(value)),
         }
     }
+
+    /// Send a value through a shared reference, waiting until there is
+    /// capacity.
+    ///
+    /// Behaves exactly like `send`, except that it performs some extra work to
+    /// synchronize through a shared reference. This is accomplished by creating
+    /// a new permit for every value sent over the channel. If possible, you
+    /// should prefer to use `send` since it has lower overhead.
+    ///
+    /// See [`send`] for more documentation.
+    ///
+    /// [`send`]: Sender::send
+    ///
+    /// # Examples
+    ///
+    /// In the following example, each call to `shared_send` will block until the
+    /// previously sent value was received.
+    ///
+    /// ```rust
+    /// use tokio::sync::mpsc;
+    /// use std::sync::Arc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::channel(1);
+    ///
+    ///     {
+    ///         let tx = Arc::new(tx);
+    ///
+    ///         for i in 0..10i32 {
+    ///             let tx = Arc::clone(&tx);
+    ///
+    ///             let _ = tokio::spawn(async move {
+    ///                 if let Err(_) = tx.shared_send(i).await {
+    ///                     println!("receiver dropped");
+    ///                 }
+    ///             });
+    ///         }
+    ///     }
+    ///
+    ///     while let Some(i) = rx.recv().await {
+    ///         println!("got = {}", i);
+    ///     }
+    /// }
+    /// ```
+    pub async fn shared_send(&self, value: T) -> Result<(), SendError<T>> {
+        use self::chan::Semaphore as _;
+        use crate::future::poll_fn;
+
+        let mut permit = Semaphore::new_permit();
+        let permit = Guard(&self.chan.inner.semaphore, &mut permit);
+
+        if poll_fn(|cx| self.chan.poll_ready_with_permit(cx, permit.1))
+            .await
+            .is_err()
+        {
+            return Err(SendError(value));
+        }
+
+        return match self
+            .chan
+            .try_send_with_permit(value, permit.1)
+            .map_err(TrySendError::<T>::from)
+        {
+            Ok(()) => Ok(()),
+            Err(TrySendError::Full(_)) => unreachable!(),
+            Err(TrySendError::Closed(value)) => Err(SendError(value)),
+        };
+
+        // A permit guard, making sure that the drop implementation is run as
+        // appropriate.
+        struct Guard<'a, S>(&'a S, &'a mut S::Permit)
+        where
+            S: chan::Semaphore;
+
+        impl<S> Drop for Guard<'_, S>
+        where
+            S: chan::Semaphore,
+        {
+            fn drop(&mut self) {
+                self.0.drop_permit(self.1);
+            }
+        }
+    }
 }
