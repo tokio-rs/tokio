@@ -38,7 +38,8 @@ impl Handle {
             Some(self.blocking_spawner.clone()),
         )
         .enter();
-        self.blocking_spawner.enter(|| f())
+
+        f()
     }
 
     /// Returns a Handle view over the currently running Runtime
