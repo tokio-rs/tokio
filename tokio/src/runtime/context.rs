@@ -99,6 +99,13 @@ impl ThreadContext {
         self
     }
 
+    #[cfg(any(
+        feature = "blocking",
+        feature = "dns",
+        feature = "fs",
+        feature = "io-std",
+        feature = "rt-threaded",
+    ))]
     pub(crate) fn with_blocking_spawner(
         mut self,
         blocking_spawner: crate::runtime::blocking::Spawner,
