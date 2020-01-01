@@ -112,11 +112,11 @@ impl<'a, T> Drop for ReleasingPermit<'a, T> {
     }
 }
 
-// As long as T: Send, it's fine to send and share RwLock<T> between threads.
+// As long as T: Send + Sync, it's fine to send and share RwLock<T> between threads.
 // If T were not Send, sending and sharing a RwLock<T> would be bad, since you can access T through
 // RwLock<T>.
 unsafe impl<T> Send for RwLock<T> where T: Send {}
-unsafe impl<T> Sync for RwLock<T> where T: Send {}
+unsafe impl<T> Sync for RwLock<T> where T: Send + Sync {}
 unsafe impl<'a, T> Sync for RwLockReadGuard<'a, T> where T: Send + Sync {}
 unsafe impl<'a, T> Sync for RwLockWriteGuard<'a, T> where T: Send + Sync {}
 
