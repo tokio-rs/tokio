@@ -109,8 +109,8 @@
 
 use crate::loom::cell::CausalCell;
 use crate::loom::future::AtomicWaker;
-use crate::loom::sync::{Mutex, Arc, Condvar};
-use crate::loom::sync::atomic::{AtomicBool, AtomicPtr, AtomicUsize, spin_loop_hint};
+use crate::loom::sync::atomic::{spin_loop_hint, AtomicBool, AtomicPtr, AtomicUsize};
+use crate::loom::sync::{Arc, Condvar, Mutex};
 
 use std::fmt;
 use std::ptr;
@@ -207,7 +207,7 @@ pub struct SendError<T>(pub T);
 ///
 /// [`recv`]: crate::sync::broadcast::Receiver::recv
 /// [`Receiver`]: crate::sync::broadcast::Receiver
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum RecvError {
     /// There are no more active senders implying no further messages will ever
     /// be sent.
@@ -225,7 +225,7 @@ pub enum RecvError {
 ///
 /// [`try_recv`]: crate::sync::broadcast::Receiver::try_recv
 /// [`Receiver`]: crate::sync::broadcast::Receiver
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum TryRecvError {
     /// The channel is currently empty. There are still active
     /// [`Sender`][Sender] handles, so data may yet become available.
@@ -387,10 +387,7 @@ pub fn channel<T>(mut capacity: usize) -> (Sender<T>, Receiver<T>) {
     let shared = Arc::new(Shared {
         buffer: buffer.into_boxed_slice(),
         mask: capacity - 1,
-        tail: Mutex::new(Tail {
-            pos: 0,
-            rx_cnt: 1,
-        }),
+        tail: Mutex::new(Tail { pos: 0, rx_cnt: 1 }),
         condvar: Condvar::new(),
         wait_stack: AtomicPtr::new(ptr::null_mut()),
         num_tx: AtomicUsize::new(1),
@@ -406,9 +403,7 @@ pub fn channel<T>(mut capacity: usize) -> (Sender<T>, Receiver<T>) {
         }),
     };
 
-    let tx = Sender {
-        shared,
-    };
+    let tx = Sender { shared };
 
     (tx, rx)
 }
@@ -852,7 +847,10 @@ where
                 // access to `self.wait.next`.
                 self.wait.next.with_mut(|ptr| unsafe { *ptr = curr });
 
-                let res = self.shared.wait_stack.compare_exchange(curr, node, SeqCst, SeqCst);
+                let res = self
+                    .shared
+                    .wait_stack
+                    .compare_exchange(curr, node, SeqCst, SeqCst);
 
                 match res {
                     Ok(_) => return,
@@ -860,6 +858,25 @@ where
                 }
             }
         }
+    }
+}
+
+#[cfg(feature = "stream")]
+impl<T> crate::stream::Stream for Receiver<T>
+where
+    T: Clone,
+{
+    type Item = Result<T, RecvError>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Result<T, RecvError>>> {
+        self.poll_recv(cx).map(|v| match v {
+            Ok(v) => Some(Ok(v)),
+            lag @ Err(RecvError::Lagged(_)) => Some(lag),
+            Err(RecvError::Closed) => None,
+        })
     }
 }
 

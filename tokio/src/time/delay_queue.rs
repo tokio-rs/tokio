@@ -611,6 +611,26 @@ impl<T> DelayQueue<T> {
         self.slab.capacity()
     }
 
+    /// Returns the number of elements currently in the queue.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use tokio::time::DelayQueue;
+    /// use std::time::Duration;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    ///     let mut delay_queue: DelayQueue<i32> = DelayQueue::with_capacity(10);
+    ///     assert_eq!(delay_queue.len(), 0);
+    ///     delay_queue.insert(3, Duration::from_secs(5));
+    ///     assert_eq!(delay_queue.len(), 1);
+    /// # }
+    /// ```
+    pub fn len(&self) -> usize {
+        self.slab.len()
+    }
+
     /// Reserve capacity for at least `additional` more items to be queued
     /// without allocating.
     ///

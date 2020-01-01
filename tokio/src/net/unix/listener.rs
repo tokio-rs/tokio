@@ -104,8 +104,7 @@ impl UnixListener {
     ///
     /// ```no_run
     /// use tokio::net::UnixListener;
-    ///
-    /// use futures::StreamExt;
+    /// use tokio::stream::StreamExt;
     ///
     /// #[tokio::main]
     /// async fn main() {

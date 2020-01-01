@@ -91,7 +91,7 @@ where
 }
 
 #[cfg(feature = "stream")]
-impl<R: AsyncBufRead> futures_core::Stream for Lines<R> {
+impl<R: AsyncBufRead> crate::stream::Stream for Lines<R> {
     type Item = io::Result<String>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {

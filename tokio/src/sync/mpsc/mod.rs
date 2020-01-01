@@ -33,8 +33,8 @@
 //! consumes the channel to completion, at which point the receiver can be
 //! dropped.
 //!
-//! [`Sender`]: struct.Sender.html
-//! [`Receiver`]: struct.Receiver.html
+//! [`Sender`]: crate::sync::mpsc::Sender
+//! [`Receiver`]: crate::sync::mpsc::Receiver
 
 pub(super) mod block;
 

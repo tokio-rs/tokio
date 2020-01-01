@@ -22,7 +22,7 @@ fn acquire_mutex_in_drop() {
 
     local.spawn_local(async move {
         let _ = rx1.await;
-        let _ = tx2.send(()).unwrap();
+        tx2.send(()).unwrap();
         unreachable!();
     });
 

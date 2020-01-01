@@ -20,7 +20,7 @@ async fn lines_inherent() {
 
 #[tokio::test]
 async fn lines_stream() {
-    use futures::StreamExt;
+    use tokio::stream::StreamExt;
 
     let rd: &[u8] = b"hello\r\nworld\n\n";
     let mut st = rd.lines();

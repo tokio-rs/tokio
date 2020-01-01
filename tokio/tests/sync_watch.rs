@@ -195,7 +195,7 @@ fn poll_close() {
 
 #[test]
 fn stream_impl() {
-    use futures::StreamExt;
+    use tokio::stream::StreamExt;
 
     let (tx, mut rx) = watch::channel("one");
 

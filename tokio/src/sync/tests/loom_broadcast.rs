@@ -66,9 +66,7 @@ fn broadcast_wrap() {
                     match rx1.recv().await {
                         Ok(_) => num += 1,
                         Err(Closed) => break,
-                        Err(Lagged(n)) => {
-                            num += n as usize
-                        },
+                        Err(Lagged(n)) => num += n as usize,
                     }
                 }
 
@@ -84,9 +82,7 @@ fn broadcast_wrap() {
                     match rx2.recv().await {
                         Ok(_) => num += 1,
                         Err(Closed) => break,
-                        Err(Lagged(n)) => {
-                            num += n as usize
-                        }
+                        Err(Lagged(n)) => num += n as usize,
                     }
                 }
 

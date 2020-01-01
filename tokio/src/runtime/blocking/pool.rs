@@ -2,10 +2,10 @@
 
 use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::loom::thread;
-use crate::runtime::{self, io, time, Builder, Callback};
-use crate::runtime::blocking::shutdown;
 use crate::runtime::blocking::schedule::NoopSchedule;
+use crate::runtime::blocking::shutdown;
 use crate::runtime::blocking::task::BlockingTask;
+use crate::runtime::{self, context::ThreadContext, io, time, Builder, Callback};
 use crate::task::{self, JoinHandle};
 
 use std::cell::Cell;
@@ -55,7 +55,6 @@ struct Inner {
     clock: time::Clock,
 
     thread_cap: usize,
-
 }
 
 struct Shared {
@@ -244,33 +243,32 @@ impl Spawner {
         if let Some(stack_size) = self.inner.stack_size {
             builder = builder.stack_size(stack_size);
         }
-
-        let inner = self.inner.clone();
-
+        let thread_context = ThreadContext::new(
+            self.inner.spawner.clone(),
+            self.inner.io_handle.clone(),
+            self.inner.time_handle.clone(),
+            Some(self.inner.clock.clone()),
+        );
+        let spawner = self.clone();
         builder
             .spawn(move || {
-                inner.run();
-
-                // Make sure `inner` drops first to ensure that the shutdown_rx
-                // sees all refs to `Inner` are dropped when the `shutdown_rx`
-                // resolves.
-                drop(inner);
+                let _e = thread_context.enter();
+                run_thread(spawner);
                 drop(shutdown_tx);
             })
             .unwrap();
     }
 }
 
+fn run_thread(spawner: Spawner) {
+    spawner.enter(|| {
+        let inner = &*spawner.inner;
+        inner.run()
+    });
+}
+
 impl Inner {
     fn run(&self) {
-        let _io = io::set_default(&self.io_handle);
-
-        time::with_default(&self.time_handle, &self.clock, || {
-            self.spawner.enter(|| self.run2());
-        });
-    }
-
-    fn run2(&self) {
         if let Some(f) = &self.after_start {
             f()
         }

@@ -38,10 +38,6 @@ mod variant {
             Ok((Either::B(driver), None))
         }
     }
-
-    pub(crate) fn set_default(handle: &Handle) -> Option<driver::DefaultGuard<'_>> {
-        handle.as_ref().map(|handle| driver::set_default(handle))
-    }
 }
 
 #[cfg(any(not(feature = "io-driver"), loom))]
@@ -61,6 +57,4 @@ mod variant {
 
         Ok((driver, ()))
     }
-
-    pub(crate) fn set_default(_handle: &Handle) {}
 }

@@ -1,4 +1,4 @@
-use crate::util::slab::{Address, Entry, page, MAX_PAGES};
+use crate::util::slab::{page, Address, Entry, MAX_PAGES};
 
 use std::fmt;
 
@@ -49,10 +49,7 @@ impl<T: Entry> Shard<T> {
 
         let local = (0..MAX_PAGES).map(|_| page::Local::new()).collect();
 
-        Shard {
-            local,
-            shared,
-        }
+        Shard { local, shared }
     }
 
     pub(super) fn alloc(&self) -> Option<Address> {

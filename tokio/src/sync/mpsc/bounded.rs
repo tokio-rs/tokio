@@ -7,7 +7,7 @@ use std::task::{Context, Poll};
 
 /// Send values to the associated `Receiver`.
 ///
-/// Instances are created by the [`channel`](fn.channel.html) function.
+/// Instances are created by the [`channel`](channel) function.
 pub struct Sender<T> {
     chan: chan::Tx<T, Semaphore>,
 }
@@ -30,7 +30,7 @@ impl<T> fmt::Debug for Sender<T> {
 
 /// Receive values from the associated `Sender`.
 ///
-/// Instances are created by the [`channel`](fn.channel.html) function.
+/// Instances are created by the [`channel`](channel) function.
 pub struct Receiver<T> {
     /// The channel receiver
     chan: chan::Rx<T, Semaphore>,
@@ -177,7 +177,7 @@ impl<T> Receiver<T> {
 impl<T> Unpin for Receiver<T> {}
 
 cfg_stream! {
-    impl<T> futures_core::Stream for Receiver<T> {
+    impl<T> crate::stream::Stream for Receiver<T> {
         type Item = T;
 
         fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {

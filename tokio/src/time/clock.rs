@@ -22,21 +22,13 @@ cfg_not_test_util! {
         pub(crate) fn now(&self) -> Instant {
             now()
         }
-
-        pub(crate) fn enter<F, R>(&self, f: F) -> R
-        where
-            F: FnOnce() -> R,
-        {
-            f()
-        }
     }
 }
 
 cfg_test_util! {
     use crate::time::{Duration, Instant};
-
-    use std::cell::Cell;
     use std::sync::{Arc, Mutex};
+    use crate::runtime::context;
 
     /// A handle to a source of time.
     #[derive(Debug, Clone)]
@@ -53,11 +45,6 @@ cfg_test_util! {
         frozen: Mutex<Option<Duration>>,
     }
 
-    thread_local! {
-        /// Thread-local tracking the current clock
-        static CLOCK: Cell<Option<*const Clock>> = Cell::new(None)
-    }
-
     /// Pause time
     ///
     /// The current value of `Instant::now()` is saved and all subsequent calls
@@ -69,21 +56,12 @@ cfg_test_util! {
     /// Panics if time is already frozen or if called from outside of the Tokio
     /// runtime.
     pub fn pause() {
-        CLOCK.with(|cell| {
-            let ptr = match cell.get() {
-                Some(ptr) => ptr,
-                None => panic!("time cannot be frozen from outside the Tokio runtime"),
-            };
-
-            let clock = unsafe { &*ptr };
-            let mut frozen = clock.inner.frozen.lock().unwrap();
-
-            if frozen.is_some() {
-                panic!("time is already frozen");
-            }
-
-            *frozen = Some(clock.inner.start.elapsed());
-        })
+        let clock = context::ThreadContext::clock().expect("time cannot be frozen from outside the Tokio runtime");
+        let mut frozen = clock.inner.frozen.lock().unwrap();
+        if frozen.is_some() {
+            panic!("time is already frozen");
+        }
+        *frozen = Some(clock.inner.start.elapsed());
     }
 
     /// Resume time
@@ -96,21 +74,14 @@ cfg_test_util! {
     /// Panics if time is not frozen or if called from outside of the Tokio
     /// runtime.
     pub fn resume() {
-        CLOCK.with(|cell| {
-            let ptr = match cell.get() {
-                Some(ptr) => ptr,
-                None => panic!("time cannot be frozen from outside the Tokio runtime"),
-            };
+        let clock = context::ThreadContext::clock().expect("time cannot be frozen from outside the Tokio runtime");
+        let mut frozen = clock.inner.frozen.lock().unwrap();
 
-            let clock = unsafe { &*ptr };
-            let mut frozen = clock.inner.frozen.lock().unwrap();
+        if frozen.is_none() {
+            panic!("time is not frozen");
+        }
 
-            if frozen.is_none() {
-                panic!("time is not frozen");
-            }
-
-            *frozen = None;
-        })
+        *frozen = None;
     }
 
     /// Advance time
@@ -123,35 +94,22 @@ cfg_test_util! {
     /// Panics if time is not frozen or if called from outside of the Tokio
     /// runtime.
     pub async fn advance(duration: Duration) {
-        CLOCK.with(|cell| {
-            let ptr = match cell.get() {
-                Some(ptr) => ptr,
-                None => panic!("time cannot be frozen from outside the Tokio runtime"),
-            };
-
-            let clock = unsafe { &*ptr };
-            clock.advance(duration);
-        });
-
+        let clock = context::ThreadContext::clock().expect("time cannot be frozen from outside the Tokio runtime");
+        clock.advance(duration);
         crate::task::yield_now().await;
     }
 
     /// Return the current instant, factoring in frozen time.
     pub(crate) fn now() -> Instant {
-        CLOCK.with(|cell| {
-            Instant::from_std(match cell.get() {
-                Some(ptr) => {
-                    let clock = unsafe { &*ptr };
-
-                    if let Some(frozen) = *clock.inner.frozen.lock().unwrap() {
-                        clock.inner.start + frozen
-                    } else {
-                        std::time::Instant::now()
-                    }
-                }
-                None => std::time::Instant::now(),
-            })
-        })
+        if let Some(clock) = context::ThreadContext::clock() {
+            if let Some(frozen) = *clock.inner.frozen.lock().unwrap() {
+                Instant::from_std(clock.inner.start + frozen)
+            } else {
+                Instant::from_std(std::time::Instant::now())
+            }
+        } else {
+            Instant::from_std(std::time::Instant::now())
+        }
     }
 
     impl Clock {
@@ -200,36 +158,6 @@ cfg_test_util! {
                 self.inner.start + frozen
             } else {
                 std::time::Instant::now()
-            })
-        }
-
-        /// Set the clock as the default source of time for the duration of the
-        /// closure
-        pub(crate) fn enter<F, R>(&self, f: F) -> R
-        where
-            F: FnOnce() -> R,
-        {
-            CLOCK.with(|cell| {
-                assert!(
-                    cell.get().is_none(),
-                    "default clock already set for execution context"
-                );
-
-                // Ensure that the clock is removed from the thread-local context
-                // when leaving the scope. This handles cases that involve panicking.
-                struct Reset<'a>(&'a Cell<Option<*const Clock>>);
-
-                impl Drop for Reset<'_> {
-                    fn drop(&mut self) {
-                        self.0.set(None);
-                    }
-                }
-
-                let _reset = Reset(cell);
-
-                cell.set(Some(self as *const Clock));
-
-                f()
             })
         }
     }

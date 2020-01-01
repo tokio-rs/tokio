@@ -44,7 +44,7 @@ fn acquire_mutex_in_drop() {
 
     rt.spawn(async move {
         let _ = rx1.await;
-        let _ = tx2.send(()).unwrap();
+        tx2.send(()).unwrap();
         unreachable!();
     });
 
