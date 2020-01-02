@@ -318,6 +318,7 @@ pub trait StreamExt: Stream {
     fn all<F>(&mut self, f: F) -> AllFuture<'_, Self, F>
     where
         Self: Unpin,
+        F: FnMut(Self::Item) -> bool,
     {
         AllFuture::new(self, f)
     }
