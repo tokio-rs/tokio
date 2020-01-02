@@ -4,6 +4,9 @@
 //!
 //! This module provides helpers to work with them.
 
+mod all;
+use all::AllFuture;
+
 mod filter;
 use filter::Filter;
 
@@ -264,6 +267,59 @@ pub trait StreamExt: Stream {
         Self: Sized,
     {
         TakeWhile::new(self, f)
+    }
+
+    /// Tests if every element of the stream matches a predicate.
+    /// `all()` takes a closure that returns `true` or `false`. It applies
+    /// this closure to each element of the stream, and if they all return
+    /// `true`, then so does `all`. If any of them return `false`, it
+    /// returns `false`. An empty stream returns `true`.
+    ///
+    /// `all()` is short-circuiting; in other words, it will stop processing
+    /// as soon as it finds a `false`, given that no matter what else happens,
+    /// the result will also be `false`.
+    ///
+    /// An empty stream returns `true`.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage:
+    ///
+    /// ```
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio::stream::{self, StreamExt};
+    ///
+    /// let a = [1, 2, 3];
+    ///
+    /// assert!(stream::iter(&a).all(|&x| x > 0).await);
+    ///
+    /// assert!(!stream::iter(&a).all(|&x| x > 2).await);
+    /// # }
+    /// ```
+    ///
+    /// Stopping at the first `false`:
+    ///
+    /// ```
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio::stream::{self, StreamExt};
+    ///
+    /// let a = [1, 2, 3];
+    ///
+    /// let mut iter = stream::iter(&a);
+    ///
+    /// assert!(!iter.all(|&x| x != 2).await);
+    ///
+    /// // we can still use `iter`, as there are more elements.
+    /// assert_eq!(iter.next().await, Some(&3));
+    /// # }
+    /// ```
+    fn all<F>(&mut self, f: F) -> AllFuture<'_, Self, F>
+    where
+        Self: Unpin,
+    {
+        AllFuture::new(self, f)
     }
 }
 
