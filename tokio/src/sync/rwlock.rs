@@ -1,8 +1,8 @@
 use crate::future::poll_fn;
-use crate::sync::semaphore_ll::{Permit, Semaphore};
-use crate::sync::Mutex;
+use crate::sync::semaphore_ll::{AcquireError, Permit, Semaphore};
 use std::cell::UnsafeCell;
 use std::ops;
+use std::task::{Context, Poll};
 
 #[cfg(not(loom))]
 const MAX_READS: usize = 32;
@@ -70,9 +70,6 @@ pub struct RwLock<T> {
 
     //inner data T
     c: UnsafeCell<T>,
-
-    //mutex to coordinate writes
-    w: Mutex<()>,
 }
 
 /// RAII structure used to release the shared read access of a lock when
@@ -98,17 +95,31 @@ pub struct RwLockReadGuard<'a, T> {
 /// [`RwLock`]: struct.RwLock.html
 #[derive(Debug)]
 pub struct RwLockWriteGuard<'a, T> {
-    permits: Vec<ReleasingPermit<'a, T>>,
+    permit: ReleasingPermit<'a, T>,
     lock: &'a RwLock<T>,
 }
 
 // Wrapper arround Permit that releases on Drop
 #[derive(Debug)]
-struct ReleasingPermit<'a, T>(Permit, &'a RwLock<T>);
+struct ReleasingPermit<'a, T> {
+    num_permits: u16,
+    permit: Permit,
+    lock: &'a RwLock<T>,
+}
+
+impl<'a, T> ReleasingPermit<'a, T> {
+    fn poll_acquire(
+        &mut self,
+        cx: &mut Context<'_>,
+        s: &Semaphore,
+    ) -> Poll<Result<(), AcquireError>> {
+        self.permit.poll_acquire(cx, self.num_permits, s)
+    }
+}
 
 impl<'a, T> Drop for ReleasingPermit<'a, T> {
     fn drop(&mut self) {
-        self.0.release(&self.1.s);
+        self.permit.release(self.num_permits, &self.lock.s);
     }
 }
 
@@ -134,7 +145,6 @@ impl<T> RwLock<T> {
         RwLock {
             c: UnsafeCell::new(value),
             s: Semaphore::new(MAX_READS),
-            w: Mutex::new(()),
         }
     }
 
@@ -166,8 +176,13 @@ impl<T> RwLock<T> {
     ///}
     /// ```
     pub async fn read(&self) -> RwLockReadGuard<'_, T> {
-        let mut permit = ReleasingPermit(Permit::new(), self);
-        poll_fn(|cx| permit.0.poll_acquire(cx, &self.s))
+        let mut permit = ReleasingPermit {
+            num_permits: 1,
+            permit: Permit::new(),
+            lock: self,
+        };
+
+        poll_fn(|cx| permit.poll_acquire(cx, &self.s))
             .await
             .unwrap_or_else(|_| {
                 // The semaphore was closed. but, we never explicitly close it, and we have a
@@ -200,20 +215,21 @@ impl<T> RwLock<T> {
     ///}
     /// ```
     pub async fn write(&self) -> RwLockWriteGuard<'_, T> {
-        let _lock = self.w.lock().await;
-
-        let mut permits = vec![];
-        for _ in 0..MAX_READS {
-            let mut permit = ReleasingPermit(Permit::new(), self);
-            poll_fn(|cx| permit.0.poll_acquire(cx, &self.s))
-                .await
-                .unwrap();
-            permits.push(permit);
-        }
-        RwLockWriteGuard {
+        let mut permit = ReleasingPermit {
+            num_permits: MAX_READS as u16,
+            permit: Permit::new(),
             lock: self,
-            permits,
-        }
+        };
+
+        poll_fn(|cx| permit.poll_acquire(cx, &self.s))
+            .await
+            .unwrap_or_else(|_| {
+                // The semaphore was closed. but, we never explicitly close it, and we have a
+                // handle to it through the Arc, which means that this can never happen.
+                unreachable!()
+            });
+
+        RwLockWriteGuard { lock: self, permit }
     }
 }
 
