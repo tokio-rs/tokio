@@ -513,6 +513,11 @@ impl Semaphore {
                 return;
             }
 
+            // The node is removed from the queue. We attempt to unset the
+            // queued bit, but concurrently the waiter has requested more
+            // permits. When the waiter requested more permits, it saw the
+            // queued bit set so took no further action. This requires us to
+            // push the node back into the queue.
             if curr.permits_to_acquire() > 0 {
                 // More permits are requested. The waiter must be re-queued
                 unsafe {
@@ -724,13 +729,12 @@ impl Permit {
                 }
             }
             Acquired(acquired) => {
-                if acquired >= num_permits {
-                    Ok(())
-                } else {
+                if acquired < num_permits {
                     semaphore.try_acquire(num_permits - acquired)?;
                     self.state = Acquired(num_permits);
-                    Ok(())
                 }
+
+                Ok(())
             }
         }
     }
@@ -847,14 +851,10 @@ impl TryAcquireError {
 
 impl fmt::Display for TryAcquireError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            fmt,
-            "{}",
-            match self {
-                TryAcquireError::Closed => "semaphore closed",
-                TryAcquireError::NoPermits => "no permits available",
-            }
-        )
+        match self {
+            TryAcquireError::Closed => write!(fmt, "{}", "semaphore closed"),
+            TryAcquireError::NoPermits => write!(fmt, "{}", "no permits available"),
+        }
     }
 }
 
