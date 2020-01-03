@@ -60,7 +60,7 @@ impl Semaphore {
             sem: &self,
             ll_permit: ll::Permit::new(),
         };
-        poll_fn(|cx| permit.ll_permit.poll_acquire(cx, &self.ll_sem))
+        poll_fn(|cx| permit.ll_permit.poll_acquire(cx, 1, &self.ll_sem))
             .await
             .unwrap();
         permit
@@ -69,7 +69,7 @@ impl Semaphore {
     /// Try to acquire a permit form the semaphore
     pub fn try_acquire(&self) -> Result<SemaphorePermit<'_>, TryAcquireError> {
         let mut ll_permit = ll::Permit::new();
-        match ll_permit.try_acquire(&self.ll_sem) {
+        match ll_permit.try_acquire(1, &self.ll_sem) {
             Ok(_) => Ok(SemaphorePermit {
                 sem: self,
                 ll_permit,
@@ -84,12 +84,12 @@ impl<'a> SemaphorePermit<'a> {
     /// This can be used to reduce the amount of permits available from a
     /// semaphore.
     pub fn forget(mut self) {
-        self.ll_permit.forget();
+        self.ll_permit.forget(1);
     }
 }
 
 impl<'a> Drop for SemaphorePermit<'_> {
     fn drop(&mut self) {
-        self.ll_permit.release(&self.sem.ll_sem);
+        self.ll_permit.release(1, &self.sem.ll_sem);
     }
 }
