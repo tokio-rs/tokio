@@ -264,16 +264,18 @@ cfg_time! {
 mod util;
 
 cfg_macros! {
-    cfg_rt_threaded! {
-        #[cfg(not(test))] // Work around for rust-lang/rust#62127
-        pub use tokio_macros::main_threaded as main;
-        pub use tokio_macros::test_threaded as test;
-    }
+    doc_rt_core! {
+        cfg_rt_threaded! {
+            #[cfg(not(test))] // Work around for rust-lang/rust#62127
+            pub use tokio_macros::main_threaded as main;
+            pub use tokio_macros::test_threaded as test;
+        }
 
-    cfg_not_rt_threaded! {
-        #[cfg(not(test))] // Work around for rust-lang/rust#62127
-        pub use tokio_macros::main_basic as main;
-        pub use tokio_macros::test_basic as test;
+        cfg_not_rt_threaded! {
+            #[cfg(not(test))] // Work around for rust-lang/rust#62127
+            pub use tokio_macros::main_basic as main;
+            pub use tokio_macros::test_basic as test;
+        }
     }
 }
 

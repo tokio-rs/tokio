@@ -156,7 +156,7 @@ impl<T> Mutex<T> {
             lock: self,
             permit: semaphore::Permit::new(),
         };
-        poll_fn(|cx| guard.permit.poll_acquire(cx, &self.s))
+        poll_fn(|cx| guard.permit.poll_acquire(cx, 1, &self.s))
             .await
             .unwrap_or_else(|_| {
                 // The semaphore was closed. but, we never explicitly close it, and we have a
@@ -169,7 +169,7 @@ impl<T> Mutex<T> {
     /// Try to acquire the lock
     pub fn try_lock(&self) -> Result<MutexGuard<'_, T>, TryLockError> {
         let mut permit = semaphore::Permit::new();
-        match permit.try_acquire(&self.s) {
+        match permit.try_acquire(1, &self.s) {
             Ok(_) => Ok(MutexGuard { lock: self, permit }),
             Err(_) => Err(TryLockError(())),
         }
@@ -178,7 +178,7 @@ impl<T> Mutex<T> {
 
 impl<'a, T> Drop for MutexGuard<'a, T> {
     fn drop(&mut self) {
-        self.permit.release(&self.lock.s);
+        self.permit.release(1, &self.lock.s);
     }
 }
 
