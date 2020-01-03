@@ -47,6 +47,26 @@ impl Handle {
     /// # Panic
     ///
     /// A Runtime must have been started or this will panic
+    ///
+    /// # Examples
+    ///
+    /// This allows for the current handle to be gotten when running in a `#`
+    ///
+    /// ```
+    /// # use tokio::runtime::Runtime;
+    ///
+    /// # fn dox() {
+    /// # let rt = Runtime::new().unwrap();
+    /// # rt.spawn(async {
+    /// use tokio::runtime::Handle;
+    ///
+    /// let handle = Handle::current();
+    /// handle.spawn(async {
+    ///     println!("now running in the existing Runtime");
+    /// })
+    /// # });
+    /// # }
+    /// ```
     pub fn current() -> Self {
         use crate::runtime::context::ThreadContext;
 

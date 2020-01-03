@@ -66,8 +66,6 @@ cfg_not_blocking_impl! {
         where
             F: FnOnce() -> R,
         {
-            let ctx = crate::runtime::context::ThreadContext::clone_current();
-            let _e = ctx.with_blocking_spawner(self.clone()).enter();
             f()
         }
     }

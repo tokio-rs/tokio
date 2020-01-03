@@ -99,21 +99,6 @@ impl ThreadContext {
         self
     }
 
-    #[cfg(any(
-        feature = "blocking",
-        feature = "dns",
-        feature = "fs",
-        feature = "io-std",
-        feature = "rt-threaded",
-    ))]
-    pub(crate) fn with_blocking_spawner(
-        mut self,
-        blocking_spawner: crate::runtime::blocking::Spawner,
-    ) -> Self {
-        self.blocking_spawner.replace(blocking_spawner);
-        self
-    }
-
     pub(crate) fn io_handle() -> crate::runtime::io::Handle {
         #[cfg(any(not(feature = "io-driver"), loom))]
         {
@@ -167,6 +152,18 @@ impl ThreadContext {
                 _ => None,
             }
         })
+    }
+}
+
+cfg_blocking_impl! {
+    impl ThreadContext {
+        pub(crate) fn with_blocking_spawner(
+            mut self,
+            blocking_spawner: crate::runtime::blocking::Spawner,
+        ) -> Self {
+            self.blocking_spawner.replace(blocking_spawner);
+            self
+        }
     }
 }
 
