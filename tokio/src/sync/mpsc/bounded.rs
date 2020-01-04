@@ -177,6 +177,12 @@ impl<T> Receiver<T> {
 impl<T> Unpin for Receiver<T> {}
 
 cfg_stream! {
+    impl<T> futures_core::FusedStream for Receiver<T> {
+        fn is_terminated(&self) -> bool {
+            self.chan.is_closed()
+        }
+    }
+
     impl<T> crate::stream::Stream for Receiver<T> {
         type Item = T;
 

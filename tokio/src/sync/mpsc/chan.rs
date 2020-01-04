@@ -322,6 +322,14 @@ where
             }
         })
     }
+
+    /// Test if this receiver side of the channel is closed.
+    pub(crate) fn is_closed(&self) -> bool {
+        self.inner
+            .rx_fields
+            .with(|rx_fields_ptr| unsafe { (*rx_fields_ptr).rx_closed })
+            && self.inner.semaphore.is_idle()
+    }
 }
 
 impl<T, S> Drop for Rx<T, S>
