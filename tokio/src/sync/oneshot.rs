@@ -57,7 +57,7 @@ pub mod error {
         }
     }
 
-    impl ::std::error::Error for RecvError {}
+    impl std::error::Error for RecvError {}
 
     // ===== impl TryRecvError =====
 
@@ -70,7 +70,7 @@ pub mod error {
         }
     }
 
-    impl ::std::error::Error for TryRecvError {}
+    impl std::error::Error for TryRecvError {}
 }
 
 use self::error::*;

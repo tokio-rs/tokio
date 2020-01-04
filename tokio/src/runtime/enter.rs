@@ -63,7 +63,7 @@ pub(crate) fn exit<F: FnOnce() -> R, R>(f: F) -> R {
 
     let reset = Reset;
     let ret = f();
-    ::std::mem::forget(reset);
+    std::mem::forget(reset);
 
     ENTERED.with(|c| {
         assert!(!c.get(), "closure claimed permanent executor");
