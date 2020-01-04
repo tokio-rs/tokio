@@ -80,7 +80,7 @@ impl MockClock {
         F: FnOnce(&mut Handle) -> R,
     {
         let park = self.time.mock_park();
-        let timer = Driver::new(park, self.clock.clone());
+        let timer = Driver::new(park, self.clock.clone(), false);
         let handle = timer.handle();
         let ctx = context::ThreadContext::clone_current();
         let _e = ctx

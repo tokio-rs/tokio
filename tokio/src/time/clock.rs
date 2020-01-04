@@ -100,7 +100,7 @@ cfg_test_util! {
     }
 
     /// Return the current instant, factoring in frozen time.
-    pub(crate) fn now() -> Instant {
+    pub fn now() -> Instant {
         if let Some(clock) = context::ThreadContext::clock() {
             if let Some(frozen) = *clock.inner.frozen.lock().unwrap() {
                 Instant::from_std(clock.inner.start + frozen)
@@ -125,7 +125,6 @@ cfg_test_util! {
         }
 
         // TODO: delete this. Some tests rely on this
-        #[cfg(all(test, not(loom)))]
         /// Return a new `Clock` instance that uses the current execution context's
         /// source of time.
         pub(crate) fn new_frozen() -> Clock {

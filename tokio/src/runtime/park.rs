@@ -6,21 +6,29 @@ use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::loom::thread;
 use crate::park::{Park, Unpark};
-use crate::runtime::time;
 use crate::util::TryLock;
 
 use std::sync::atomic::Ordering::SeqCst;
 use std::time::Duration;
 
-pub(crate) struct Parker {
-    inner: Arc<Inner>,
+pub(crate) struct Parker<P>
+where
+    P: Park,
+{
+    inner: Arc<Inner<P>>,
 }
 
-pub(crate) struct Unparker {
-    inner: Arc<Inner>,
+pub(crate) struct Unparker<P>
+where
+    P: Park,
+{
+    inner: Arc<Inner<P>>,
 }
 
-struct Inner {
+struct Inner<P>
+where
+    P: Park,
+{
     /// Avoids entering the park if possible
     state: AtomicUsize,
 
@@ -31,7 +39,7 @@ struct Inner {
     condvar: Condvar,
 
     /// Resource (I/O, time, ...) driver
-    shared: Arc<Shared>,
+    shared: Arc<Shared<P>>,
 }
 
 const EMPTY: usize = 0;
@@ -40,16 +48,22 @@ const PARKED_DRIVER: usize = 2;
 const NOTIFIED: usize = 3;
 
 /// Shared across multiple Parker handles
-struct Shared {
+struct Shared<P>
+where
+    P: Park,
+{
     /// Shared driver. Only one thread at a time can use this
-    driver: TryLock<time::Driver>,
+    driver: TryLock<P>,
 
     /// Unpark handle
-    handle: <time::Driver as Park>::Unpark,
+    handle: <P as Park>::Unpark,
 }
 
-impl Parker {
-    pub(crate) fn new(driver: time::Driver) -> Parker {
+impl<P> Parker<P>
+where
+    P: Park,
+{
+    pub(crate) fn new(driver: P) -> Parker<P> {
         let handle = driver.unpark();
 
         Parker {
@@ -66,24 +80,30 @@ impl Parker {
     }
 }
 
-impl Clone for Parker {
-    fn clone(&self) -> Parker {
+impl<P> Clone for Parker<P>
+where
+    P: Park,
+{
+    fn clone(&self) -> Parker<P> {
         Parker {
             inner: Arc::new(Inner {
                 state: AtomicUsize::new(EMPTY),
                 mutex: Mutex::new(()),
                 condvar: Condvar::new(),
-                shared: self.inner.shared.clone(),
+                shared: Arc::clone(&self.inner.shared),
             }),
         }
     }
 }
 
-impl Park for Parker {
-    type Unpark = Unparker;
+impl<P> Park for Parker<P>
+where
+    P: Park + Send + 'static,
+{
+    type Unpark = Unparker<P>;
     type Error = ();
 
-    fn unpark(&self) -> Unparker {
+    fn unpark(&self) -> Unparker<P> {
         Unparker {
             inner: self.inner.clone(),
         }
@@ -106,13 +126,19 @@ impl Park for Parker {
     }
 }
 
-impl Unpark for Unparker {
+impl<P> Unpark for Unparker<P>
+where
+    P: Park + Send + 'static,
+{
     fn unpark(&self) {
         self.inner.unpark();
     }
 }
 
-impl Inner {
+impl<P> Inner<P>
+where
+    P: Park,
+{
     /// Park the current thread for at most `dur`.
     fn park(&self) {
         for _ in 0..3 {
@@ -176,7 +202,7 @@ impl Inner {
         }
     }
 
-    fn park_driver(&self, driver: &mut time::Driver) {
+    fn park_driver(&self, driver: &mut P) {
         match self
             .state
             .compare_exchange(EMPTY, PARKED_DRIVER, SeqCst, SeqCst)
@@ -198,7 +224,9 @@ impl Inner {
         }
 
         // TODO: don't unwrap
-        driver.park().unwrap();
+        if let Err(_) = driver.park() {
+            todo!("handle park error")
+        }
 
         match self.state.swap(EMPTY, SeqCst) {
             NOTIFIED => {}      // got a notification, hurray!

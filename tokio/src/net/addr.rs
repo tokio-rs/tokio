@@ -144,10 +144,14 @@ cfg_dns! {
 
             // Run DNS lookup on the blocking pool
             let s = self.to_owned();
-
-            MaybeReady::Blocking(spawn_blocking(move || {
-                std::net::ToSocketAddrs::to_socket_addrs(&s)
-            }))
+            // TODO: Figure out how DNS resolution should work.
+            if let Some(sim) = crate::runtime::context::ThreadContext::simulation_handle() {
+                MaybeReady::Blocking(crate::spawn(async move { sim.resolve_hostport(&s) }))
+            } else {
+                MaybeReady::Blocking(spawn_blocking(move || {
+                    std::net::ToSocketAddrs::to_socket_addrs(&s)
+                }))
+            }
         }
     }
 
@@ -182,9 +186,13 @@ cfg_dns! {
 
             let host = host.to_owned();
 
-            MaybeReady::Blocking(spawn_blocking(move || {
-                std::net::ToSocketAddrs::to_socket_addrs(&(&host[..], port))
-            }))
+            if let Some(sim) = crate::runtime::context::ThreadContext::simulation_handle() {
+                MaybeReady::Blocking(crate::spawn(async move { sim.resolve_tuple(&(&host[..], port)) }))
+            } else {
+                MaybeReady::Blocking(spawn_blocking(move || {
+                    std::net::ToSocketAddrs::to_socket_addrs(&(&host[..], port))
+                }))
+            }
         }
     }
 

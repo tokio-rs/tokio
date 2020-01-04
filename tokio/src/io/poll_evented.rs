@@ -1,10 +1,13 @@
 use crate::io::driver::platform;
 use crate::io::{AsyncRead, AsyncWrite, Registration};
 
+use bytes::Buf;
+use iovec::IoVec;
 use mio::event::Evented;
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::marker::Unpin;
+use std::net;
 use std::pin::Pin;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
@@ -165,9 +168,8 @@ impl<E> PollEvented<E>
 where
     E: Evented,
 {
-    /// Creates a new `PollEvented` associated with the default reactor.
-    pub fn new(io: E) -> io::Result<Self> {
-        let registration = Registration::new(&io)?;
+    /// Creates a new `PollEvented` associated with the default reactor `Registration`.
+    pub(crate) fn new(io: E, registration: Registration) -> io::Result<Self> {
         Ok(Self {
             io: Some(io),
             inner: Inner {
@@ -410,6 +412,160 @@ impl<E: Evented> Drop for PollEvented<E> {
         if let Some(io) = self.io.take() {
             // Ignore errors
             let _ = self.inner.registration.deregister(&io);
+        }
+    }
+}
+
+// =========== Extra impls ========= //
+// TODO: Figure out where these impls should live, they probably need to be back
+// in the `net` crate.
+
+impl PollEvented<mio::net::TcpStream> {
+    // == Poll IO functions that takes `&self` ==
+    //
+    // They are not public because (taken from the doc of `PollEvented`):
+    //
+    // While `PollEvented` is `Sync` (if the underlying I/O type is `Sync`), the
+    // caller must ensure that there are at most two tasks that use a
+    // `PollEvented` instance concurrently. One for reading and one for writing.
+    // While violating this requirement is "safe" from a Rust memory model point
+    // of view, it will result in unexpected behavior in the form of lost
+    // notifications and tasks hanging.
+
+    pub(crate) fn poll_read_priv(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<io::Result<usize>> {
+        ready!(self.poll_read_ready(cx, mio::Ready::readable()))?;
+        match self.get_ref().read(buf) {
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.clear_read_ready(cx, mio::Ready::readable())?;
+                Poll::Pending
+            }
+            x => Poll::Ready(x),
+        }
+    }
+
+    pub(crate) fn poll_write_priv(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        ready!(self.poll_write_ready(cx))?;
+        match self.get_ref().write(buf) {
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.clear_write_ready(cx)?;
+                Poll::Pending
+            }
+            x => Poll::Ready(x),
+        }
+    }
+
+    pub(crate) fn shutdown(&self, how: net::Shutdown) -> io::Result<()> {
+        self.get_ref().shutdown(how)
+    }
+
+    pub(crate) fn poll_write_buf_priv<B: Buf>(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &mut B,
+    ) -> Poll<io::Result<usize>> {
+        use std::io::IoSlice;
+
+        ready!(self.poll_write_ready(cx))?;
+
+        // The `IoVec` (v0.1.x) type can't have a zero-length size, so create
+        // a dummy version from a 1-length slice which we'll overwrite with
+        // the `bytes_vectored` method.
+        static S: &[u8] = &[0];
+        const MAX_BUFS: usize = 64;
+
+        // IoSlice isn't Copy, so we must expand this manually ;_;
+        let mut slices: [IoSlice<'_>; MAX_BUFS] = [
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+            IoSlice::new(S),
+        ];
+        let cnt = buf.bytes_vectored(&mut slices);
+
+        let iovec = <&IoVec>::from(S);
+        let mut vecs = [iovec; MAX_BUFS];
+        for i in 0..cnt {
+            vecs[i] = (*slices[i]).into();
+        }
+
+        match self.get_ref().write_bufs(&vecs[..cnt]) {
+            Ok(n) => {
+                buf.advance(n);
+                Poll::Ready(Ok(n))
+            }
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.clear_write_ready(cx)?;
+                Poll::Pending
+            }
+            Err(e) => Poll::Ready(Err(e)),
         }
     }
 }

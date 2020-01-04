@@ -38,13 +38,16 @@ cfg_blocking! {
     }
 }
 
-pub(crate) struct Worker {
+pub(crate) struct Worker<P>
+where
+    P: Park + Send + 'static,
+{
     /// Parks the thread. Requires the calling worker to have obtained unique
     /// access via the generation synchronization action.
-    inner: Arc<Inner>,
+    inner: Arc<Inner<P>>,
 
     /// Scheduler slices
-    slices: Arc<slice::Set>,
+    slices: Arc<slice::Set<P>>,
 
     /// Slice assigned to this worker
     index: usize,
@@ -59,17 +62,23 @@ pub(crate) struct Worker {
 
 /// Internal worker state. This may be referenced from multiple threads, but the
 /// generation guard protects unsafe access
-struct Inner {
+struct Inner<P>
+where
+    P: Park + Send + 'static,
+{
     /// Used to park the thread
-    park: CausalCell<Parker>,
+    park: CausalCell<Parker<P>>,
 }
 
-unsafe impl Send for Worker {}
+unsafe impl<P> Send for Worker<P> where P: Park + Send + 'static {}
 
 /// Used to ensure the invariants are respected
-struct GenerationGuard<'a> {
+struct GenerationGuard<'a, P>
+where
+    P: Park + Send + 'static,
+{
     /// Worker reference
-    worker: &'a Worker,
+    worker: &'a Worker<P>,
 
     /// Prevent `Sync` access
     _p: PhantomData<Cell<()>>,
@@ -78,7 +87,13 @@ struct GenerationGuard<'a> {
 struct WorkerGone;
 
 // TODO: Move into slices
-pub(super) fn create_set(pool_size: usize, parker: Parker) -> (Arc<slice::Set>, Vec<Worker>) {
+pub(super) fn create_set<P>(
+    pool_size: usize,
+    parker: Parker<P>,
+) -> (Arc<slice::Set<P>>, Vec<Worker<P>>)
+where
+    P: Park + Send + 'static,
+{
     // Create the parks...
     let parkers: Vec<_> = (0..pool_size).map(|_| parker.clone()).collect();
 
@@ -104,10 +119,13 @@ pub(super) fn create_set(pool_size: usize, parker: Parker) -> (Arc<slice::Set>, 
 /// The number is fairly arbitrary. I believe this value was copied from golang.
 const GLOBAL_POLL_INTERVAL: u16 = 61;
 
-impl Worker {
+impl<P> Worker<P>
+where
+    P: Park + Send + 'static,
+{
     // Safe as aquiring a lock is required before doing anything potentially
     // dangerous.
-    pub(super) fn new(slices: Arc<slice::Set>, index: usize, park: Parker) -> Self {
+    pub(super) fn new(slices: Arc<slice::Set<P>>, index: usize, park: Parker<P>) -> Self {
         Worker {
             inner: Arc::new(Inner {
                 park: CausalCell::new(park),
@@ -183,7 +201,7 @@ impl Worker {
     }
 
     /// Acquire the lock
-    fn acquire_lock(&self) -> Option<GenerationGuard<'_>> {
+    fn acquire_lock(&self) -> Option<GenerationGuard<'_, P>> {
         // Safety: Only getting `&self` access to access atomic field
         let owned = unsafe { &*self.slices.owned()[self.index].get() };
 
@@ -264,7 +282,10 @@ impl Worker {
     }
 }
 
-impl GenerationGuard<'_> {
+impl<P> GenerationGuard<'_, P>
+where
+    P: Park + Send + 'static,
+{
     fn run(self) -> Result<(), WorkerGone> {
         let mut me = self;
 
@@ -329,7 +350,7 @@ impl GenerationGuard<'_> {
     }
 
     /// Find local work
-    fn find_local_work(&mut self) -> Option<Task<Shared>> {
+    fn find_local_work(&mut self) -> Option<Task<Shared<P>>> {
         let tick = self.tick_fetch_inc();
 
         if tick % GLOBAL_POLL_INTERVAL == 0 {
@@ -350,7 +371,7 @@ impl GenerationGuard<'_> {
         }
     }
 
-    fn steal_work(&mut self) -> Option<Task<Shared>> {
+    fn steal_work(&mut self) -> Option<Task<Shared<P>>> {
         let num_slices = self.worker.slices.len();
         let start = self.owned().rand.fastrand_n(num_slices as u32);
 
@@ -438,7 +459,7 @@ impl GenerationGuard<'_> {
     /// Runs the task. During the task execution, it is possible for worker to
     /// transition to a new thread. In this case, the caller loses the guard to
     /// access the generation and must stop processing.
-    fn run_task(mut self, task: Task<Shared>) -> Result<Self, WorkerGone> {
+    fn run_task(mut self, task: Task<Shared<P>>) -> Result<Self, WorkerGone> {
         if self.is_searching() {
             self.transition_from_searching();
         }
@@ -575,21 +596,21 @@ impl GenerationGuard<'_> {
         self.worker.index
     }
 
-    fn slices(&self) -> &slice::Set {
+    fn slices(&self) -> &slice::Set<P> {
         &self.worker.slices
     }
 
-    fn shared(&self) -> &Shared {
+    fn shared(&self) -> &Shared<P> {
         &self.slices().shared()[self.index()]
     }
 
-    fn owned(&self) -> &Owned {
+    fn owned(&self) -> &Owned<P> {
         let index = self.index();
         // safety: we own the slot
         unsafe { &*self.slices().owned()[index].get() }
     }
 
-    fn park_mut(&mut self) -> &mut Parker {
+    fn park_mut(&mut self) -> &mut Parker<P> {
         // Safety: `&mut self` on `GenerationGuard` implies it is safe to
         // perform the action.
         unsafe { self.worker.inner.park.with_mut(|ptr| &mut *ptr) }

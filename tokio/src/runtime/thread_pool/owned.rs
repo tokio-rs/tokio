@@ -1,13 +1,16 @@
 use crate::loom::sync::atomic::AtomicUsize;
+use crate::park::Park;
 use crate::runtime::thread_pool::{queue, Shared};
 use crate::task::{self, Task};
 use crate::util::FastRand;
-
 use std::cell::Cell;
 
 /// Per-worker data accessible only by the thread driving the worker.
 #[derive(Debug)]
-pub(super) struct Owned {
+pub(super) struct Owned<P>
+where
+    P: Park + Send + 'static,
+{
     /// Worker generation. This guards concurrent access to the `Owned` struct.
     /// When a worker starts running, it checks that the generation it has
     /// assigned matches the current generation. When it does, the worker has
@@ -36,14 +39,17 @@ pub(super) struct Owned {
     pub(super) rand: FastRand,
 
     /// Work queue
-    pub(super) work_queue: queue::Worker<Shared>,
+    pub(super) work_queue: queue::Worker<Shared<P>>,
 
     /// List of tasks owned by the worker
-    pub(super) owned_tasks: task::OwnedList<Shared>,
+    pub(super) owned_tasks: task::OwnedList<Shared<P>>,
 }
 
-impl Owned {
-    pub(super) fn new(work_queue: queue::Worker<Shared>, rand: FastRand) -> Owned {
+impl<P> Owned<P>
+where
+    P: Park + Send + 'static,
+{
+    pub(super) fn new(work_queue: queue::Worker<Shared<P>>, rand: FastRand) -> Owned<P> {
         Owned {
             generation: AtomicUsize::new(0),
             tick: Cell::new(1),
@@ -58,7 +64,7 @@ impl Owned {
     }
 
     /// Returns `true` if a worker should be notified
-    pub(super) fn submit_local(&self, task: Task<Shared>) -> bool {
+    pub(super) fn submit_local(&self, task: Task<Shared<P>>) -> bool {
         let ret = self.work_queue.push(task);
 
         if self.defer_notification.get() {
@@ -69,15 +75,15 @@ impl Owned {
         }
     }
 
-    pub(super) fn submit_local_yield(&self, task: Task<Shared>) {
+    pub(super) fn submit_local_yield(&self, task: Task<Shared<P>>) {
         self.work_queue.push_yield(task);
     }
 
-    pub(super) fn bind_task(&mut self, task: &Task<Shared>) {
+    pub(super) fn bind_task(&mut self, task: &Task<Shared<P>>) {
         self.owned_tasks.insert(task);
     }
 
-    pub(super) fn release_task(&mut self, task: &Task<Shared>) {
+    pub(super) fn release_task(&mut self, task: &Task<Shared<P>>) {
         self.owned_tasks.remove(task);
     }
 }

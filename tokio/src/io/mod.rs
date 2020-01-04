@@ -175,9 +175,7 @@ cfg_io_driver! {
 
     mod poll_evented;
     pub use poll_evented::PollEvented;
-
-    mod registration;
-    pub use registration::Registration;
+    pub use driver::Registration;
 }
 
 cfg_io_std! {

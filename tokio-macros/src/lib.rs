@@ -13,7 +13,7 @@
 ))]
 
 //! Macros for use with Tokio
-
+#[allow(unused_extern_crates)]
 extern crate proc_macro;
 
 use proc_macro::TokenStream;

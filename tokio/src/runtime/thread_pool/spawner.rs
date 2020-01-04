@@ -1,7 +1,7 @@
 use crate::loom::sync::Arc;
+use crate::park::Park;
 use crate::runtime::thread_pool::slice;
 use crate::task::JoinHandle;
-
 use std::fmt;
 use std::future::Future;
 
@@ -17,13 +17,32 @@ use std::future::Future;
 /// `Spawner` instances are obtained by calling [`ThreadPool::spawner`].
 ///
 /// [`ThreadPool::spawner`]: struct.ThreadPool.html#method.spawner
-#[derive(Clone)]
-pub(crate) struct Spawner {
-    workers: Arc<slice::Set>,
+
+pub(crate) struct Spawner<P>
+where
+    P: Park + Send + 'static,
+{
+    workers: Arc<slice::Set<P>>,
 }
 
-impl Spawner {
-    pub(super) fn new(workers: Arc<slice::Set>) -> Spawner {
+// TODO: (gardner) I don't think this should be nessesary if we are deriving clone above.
+// Figure out why this is necessary.
+impl<P> Clone for Spawner<P>
+where
+    P: Park + Send + 'static,
+{
+    fn clone(&self) -> Self {
+        Spawner {
+            workers: Arc::clone(&self.workers),
+        }
+    }
+}
+
+impl<P> Spawner<P>
+where
+    P: Park + Send + 'static,
+{
+    pub(super) fn new(workers: Arc<slice::Set<P>>) -> Spawner<P> {
         Spawner { workers }
     }
 
@@ -37,12 +56,15 @@ impl Spawner {
     }
 
     /// Reference to the worker set. Used by `ThreadPool` to initiate shutdown.
-    pub(super) fn workers(&self) -> &slice::Set {
+    pub(super) fn workers(&self) -> &slice::Set<P> {
         &*self.workers
     }
 }
 
-impl fmt::Debug for Spawner {
+impl<P> fmt::Debug for Spawner<P>
+where
+    P: Park + Send + 'static,
+{
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Spawner").finish()
     }

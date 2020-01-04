@@ -210,7 +210,7 @@ use self::enter::enter;
 mod handle;
 pub use self::handle::Handle;
 
-mod io;
+pub(crate) mod io;
 
 cfg_rt_threaded! {
     mod park;
@@ -221,9 +221,9 @@ mod shell;
 use self::shell::Shell;
 
 mod spawner;
-use self::spawner::Spawner;
+pub(crate) use self::spawner::Spawner;
 
-mod time;
+pub(crate) mod time;
 
 cfg_rt_threaded! {
     pub(crate) mod thread_pool;
@@ -269,7 +269,7 @@ use std::future::Future;
 pub struct Runtime {
     /// Task executor
     kind: Kind,
-
+    simulation: Option<crate::simulation::Simulation>,
     /// Handle to runtime, also contains driver handles
     handle: Handle,
 
@@ -282,7 +282,7 @@ pub struct Runtime {
 enum Kind {
     /// Not able to execute concurrent tasks. This variant is mostly used to get
     /// access to the driver handles.
-    Shell(Shell),
+    Shell(Shell<time::Driver>),
 
     /// Execute all tasks on the current-thread.
     #[cfg(feature = "rt-core")]
@@ -290,7 +290,9 @@ enum Kind {
 
     /// Execute tasks across multiple threads.
     #[cfg(feature = "rt-threaded")]
-    ThreadPool(ThreadPool),
+    ThreadPool(ThreadPool<time::Driver>),
+
+    Simulation(BasicScheduler<time::Driver>),
 }
 
 /// After thread starts / before thread stops
@@ -386,6 +388,7 @@ impl Runtime {
             #[cfg(feature = "rt-threaded")]
             Kind::ThreadPool(exec) => exec.spawn(future),
             Kind::Basic(exec) => exec.spawn(future),
+            Kind::Simulation(exec) => exec.spawn(future),
         }
     }
 
@@ -411,6 +414,7 @@ impl Runtime {
             Kind::Basic(exec) => exec.block_on(future),
             #[cfg(feature = "rt-threaded")]
             Kind::ThreadPool(exec) => exec.block_on(future),
+            Kind::Simulation(exec) => exec.block_on(future),
         })
     }
 

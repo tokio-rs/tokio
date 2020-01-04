@@ -15,7 +15,7 @@ pub(crate) enum Spawner {
     #[cfg(feature = "rt-core")]
     Basic(basic_scheduler::Spawner),
     #[cfg(feature = "rt-threaded")]
-    ThreadPool(thread_pool::Spawner),
+    ThreadPool(thread_pool::Spawner<crate::runtime::time::Driver>),
 }
 
 cfg_rt_core! {

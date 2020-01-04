@@ -44,7 +44,9 @@ impl UdpSocket {
     }
 
     fn new(socket: mio::net::UdpSocket) -> io::Result<UdpSocket> {
-        let io = PollEvented::new(socket)?;
+        let handle = crate::runtime::context::ThreadContext::io_handle().expect("no reactor");
+        let registration = handle.register_io(&socket)?;
+        let io = PollEvented::new(socket, registration)?;
         Ok(UdpSocket { io })
     }
 
@@ -59,7 +61,9 @@ impl UdpSocket {
     /// `reuse_address` or binding to multiple addresses.
     pub fn from_std(socket: net::UdpSocket) -> io::Result<UdpSocket> {
         let io = mio::net::UdpSocket::from_socket(socket)?;
-        let io = PollEvented::new(io)?;
+        let handle = crate::runtime::context::ThreadContext::io_handle().expect("no reactor");
+        let registration = handle.register_io(&io)?;
+        let io = PollEvented::new(io, registration)?;
         Ok(UdpSocket { io })
     }
 

@@ -38,23 +38,32 @@ const LOCAL_QUEUE_CAPACITY: usize = 256;
 #[cfg(loom)]
 const LOCAL_QUEUE_CAPACITY: usize = 2;
 
+use crate::park::Park;
 use crate::runtime::{self, blocking, Parker};
 use crate::task::JoinHandle;
-
 use std::fmt;
 use std::future::Future;
 
 /// Work-stealing based thread pool for executing futures.
-pub(crate) struct ThreadPool {
-    spawner: Spawner,
+pub(crate) struct ThreadPool<P>
+where
+    P: Park + Send + 'static,
+{
+    spawner: Spawner<P>,
 }
 
-pub(crate) struct Workers {
-    workers: Vec<Worker>,
+pub(crate) struct Workers<P>
+where
+    P: Park + Send + 'static,
+{
+    workers: Vec<Worker<P>>,
 }
 
-impl ThreadPool {
-    pub(crate) fn new(pool_size: usize, parker: Parker) -> (ThreadPool, Workers) {
+impl<P> ThreadPool<P>
+where
+    P: Park + Send + 'static,
+{
+    pub(crate) fn new(pool_size: usize, parker: Parker<P>) -> (ThreadPool<P>, Workers<P>) {
         let (pool, workers) = worker::create_set(pool_size, parker);
 
         let spawner = Spawner::new(pool);
@@ -68,7 +77,7 @@ impl ThreadPool {
     ///
     /// The `Spawner` handle can be cloned and enables spawning tasks from other
     /// threads.
-    pub(crate) fn spawner(&self) -> &Spawner {
+    pub(crate) fn spawner(&self) -> &Spawner<P> {
         &self.spawner
     }
 
@@ -94,19 +103,28 @@ impl ThreadPool {
     }
 }
 
-impl fmt::Debug for ThreadPool {
+impl<P> fmt::Debug for ThreadPool<P>
+where
+    P: Park + Send + 'static,
+{
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("ThreadPool").finish()
     }
 }
 
-impl Drop for ThreadPool {
+impl<P> Drop for ThreadPool<P>
+where
+    P: Park + Send + 'static,
+{
     fn drop(&mut self) {
         self.spawner.workers().close();
     }
 }
 
-impl Workers {
+impl<P> Workers<P>
+where
+    P: Park + Send + 'static,
+{
     pub(crate) fn spawn(self, blocking_pool: &blocking::Spawner) {
         blocking_pool.enter(|| {
             for worker in self.workers {

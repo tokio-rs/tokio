@@ -216,6 +216,7 @@
 // macros used internally
 #[macro_use]
 mod macros;
+mod simulation;
 
 cfg_fs! {
     pub mod fs;

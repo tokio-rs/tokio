@@ -2,6 +2,7 @@ use crate::future::poll_fn;
 use crate::io::PollEvented;
 use crate::net::tcp::{Incoming, TcpStream};
 use crate::net::ToSocketAddrs;
+use crate::runtime::context::ThreadContext;
 
 use std::convert::TryFrom;
 use std::fmt;
@@ -10,6 +11,11 @@ use std::net::{self, SocketAddr};
 use std::task::{Context, Poll};
 
 cfg_tcp! {
+
+    pub(crate) enum ListenerInner {
+        Mio(PollEvented<mio::net::TcpListener>),
+        Sim(crate::simulation::tcp::SimTcpListener),
+    }
     /// A TCP socket server, listening for connections.
     ///
     /// # Examples
@@ -34,8 +40,9 @@ cfg_tcp! {
     ///     }
     /// }
     /// ```
+    #[derive(Debug)]
     pub struct TcpListener {
-        io: PollEvented<mio::net::TcpListener>,
+        io: ListenerInner,
     }
 }
 
@@ -73,13 +80,14 @@ impl TcpListener {
     /// }
     /// ```
     pub async fn bind<A: ToSocketAddrs>(addr: A) -> io::Result<TcpListener> {
-        let addrs = addr.to_socket_addrs().await?;
+        let handle = ThreadContext::io_handle().expect("no reactor");
+        let addrs = handle.resolve_addrs(addr).await?;
 
         let mut last_err = None;
 
         for addr in addrs {
-            match TcpListener::bind_addr(addr) {
-                Ok(listener) => return Ok(listener),
+            match handle.tcp_listener_bind_addr(addr) {
+                Ok(listener) => return Ok(TcpListener { io: listener }),
                 Err(e) => last_err = Some(e),
             }
         }
@@ -90,11 +98,6 @@ impl TcpListener {
                 "could not resolve to any addresses",
             )
         }))
-    }
-
-    fn bind_addr(addr: SocketAddr) -> io::Result<TcpListener> {
-        let listener = mio::net::TcpListener::bind(&addr)?;
-        TcpListener::new(listener)
     }
 
     /// Accept a new incoming connection from this listener.
@@ -133,27 +136,31 @@ impl TcpListener {
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<io::Result<(TcpStream, SocketAddr)>> {
-        let (io, addr) = ready!(self.poll_accept_std(cx))?;
+        match &mut self.io {
+            ListenerInner::Mio(m) => {
+                // this used to be poll_accept_std
+                ready!(m.poll_read_ready(cx, mio::Ready::readable()))?;
+                let (io, addr) = match m.get_ref().accept_std() {
+                    Ok(pair) => pair,
+                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                        m.clear_read_ready(cx, mio::Ready::readable())?;
+                        return Poll::Pending;
+                    }
+                    Err(e) => return Poll::Ready(Err(e)),
+                };
 
-        let io = mio::net::TcpStream::from_stream(io)?;
-        let io = TcpStream::new(io)?;
+                let io = mio::net::TcpStream::from_stream(io)?;
+                let io = TcpStream::from_mio(io)?;
 
-        Poll::Ready(Ok((io, addr)))
-    }
-
-    fn poll_accept_std(
-        &mut self,
-        cx: &mut Context<'_>,
-    ) -> Poll<io::Result<(net::TcpStream, SocketAddr)>> {
-        ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
-
-        match self.io.get_ref().accept_std() {
-            Ok(pair) => Poll::Ready(Ok(pair)),
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(cx, mio::Ready::readable())?;
-                Poll::Pending
+                Poll::Ready(Ok((io, addr)))
             }
-            Err(e) => Poll::Ready(Err(e)),
+            ListenerInner::Sim(s) => match s.poll_accept(cx) {
+                Poll::Ready(Ok((stream, addr))) => {
+                    Poll::Ready(Ok((TcpStream::new(stream.into()), addr)))
+                }
+                Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
+                Poll::Pending => Poll::Pending,
+            },
         }
     }
 
@@ -196,14 +203,11 @@ impl TcpListener {
     /// }
     /// ```
     pub fn from_std(listener: net::TcpListener) -> io::Result<TcpListener> {
+        let handle = ThreadContext::io_handle().expect("no reactor");
         let io = mio::net::TcpListener::from_std(listener)?;
-        let io = PollEvented::new(io)?;
-        Ok(TcpListener { io })
-    }
-
-    fn new(listener: mio::net::TcpListener) -> io::Result<TcpListener> {
-        let io = PollEvented::new(listener)?;
-        Ok(TcpListener { io })
+        let registration = handle.register_io(&io)?;
+        let io = PollEvented::new(io, registration)?;
+        Ok(TcpListener { io: io.into() })
     }
 
     /// Returns the local address that this listener is bound to.
@@ -230,7 +234,10 @@ impl TcpListener {
     /// }
     /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        self.io.get_ref().local_addr()
+        match &self.io {
+            ListenerInner::Mio(m) => m.get_ref().local_addr(),
+            ListenerInner::Sim(s) => s.local_addr(),
+        }
     }
 
     /// Returns a stream over the connections being received on this listener.
@@ -295,7 +302,10 @@ impl TcpListener {
     /// }
     /// ```
     pub fn ttl(&self) -> io::Result<u32> {
-        self.io.get_ref().ttl()
+        match &self.io {
+            ListenerInner::Mio(m) => m.get_ref().ttl(),
+            ListenerInner::Sim(s) => s.ttl(),
+        }
     }
 
     /// Sets the value for the `IP_TTL` option on this socket.
@@ -320,7 +330,10 @@ impl TcpListener {
     /// }
     /// ```
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
-        self.io.get_ref().set_ttl(ttl)
+        match &self.io {
+            ListenerInner::Mio(m) => m.get_ref().set_ttl(ttl),
+            ListenerInner::Sim(s) => s.set_ttl(ttl),
+        }
     }
 }
 
@@ -334,7 +347,14 @@ impl TryFrom<TcpListener> for mio::net::TcpListener {
     ///
     /// [`PollEvented::into_inner`]: crate::io::PollEvented::into_inner
     fn try_from(value: TcpListener) -> Result<Self, Self::Error> {
-        value.io.into_inner()
+        if let ListenerInner::Mio(m) = value.io {
+            Ok(m.into_inner()?)
+        } else {
+            Err(io::Error::new(
+                io::ErrorKind::Other,
+                "cannot get mio listener from simulation type",
+            ))
+        }
     }
 }
 
@@ -350,20 +370,27 @@ impl TryFrom<net::TcpListener> for TcpListener {
     }
 }
 
-impl fmt::Debug for TcpListener {
+impl fmt::Debug for ListenerInner {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.io.get_ref().fmt(f)
+        match self {
+            ListenerInner::Mio(m) => m.get_ref().fmt(f),
+            ListenerInner::Sim(s) => s.fmt(f),
+        }
     }
 }
 
 #[cfg(unix)]
 mod sys {
-    use super::TcpListener;
+    use super::{ListenerInner, TcpListener};
     use std::os::unix::prelude::*;
 
     impl AsRawFd for TcpListener {
         fn as_raw_fd(&self) -> RawFd {
-            self.io.get_ref().as_raw_fd()
+            if let ListenerInner::Mio(m) = &self.io {
+                m.get_ref().as_raw_fd()
+            } else {
+                panic!("cannot get RawFd for simulation types")
+            }
         }
     }
 }
@@ -380,4 +407,18 @@ mod sys {
     //         self.listener.io().as_raw_handle()
     //     }
     // }
+}
+
+// ===== impl StreamInner =====
+
+impl From<PollEvented<mio::net::TcpListener>> for ListenerInner {
+    fn from(item: PollEvented<mio::net::TcpListener>) -> Self {
+        ListenerInner::Mio(item)
+    }
+}
+
+impl From<crate::simulation::tcp::SimTcpListener> for ListenerInner {
+    fn from(item: crate::simulation::tcp::SimTcpListener) -> Self {
+        ListenerInner::Sim(item)
+    }
 }

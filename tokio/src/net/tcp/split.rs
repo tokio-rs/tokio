@@ -9,7 +9,6 @@
 //! level.
 
 use crate::io::{AsyncRead, AsyncWrite};
-use crate::net::TcpStream;
 
 use bytes::Buf;
 use std::io;
@@ -20,16 +19,18 @@ use std::task::{Context, Poll};
 
 /// Read half of a `TcpStream`.
 #[derive(Debug)]
-pub struct ReadHalf<'a>(&'a TcpStream);
+pub struct ReadHalf<'a>(&'a crate::io::PollEvented<mio::net::TcpStream>);
 
 /// Write half of a `TcpStream`.
 ///
 /// Note that in the `AsyncWrite` implemenation of `TcpStreamWriteHalf`,
 /// `poll_shutdown` actually shuts down the TCP stream in the write direction.
 #[derive(Debug)]
-pub struct WriteHalf<'a>(&'a TcpStream);
+pub struct WriteHalf<'a>(&'a crate::io::PollEvented<mio::net::TcpStream>);
 
-pub(crate) fn split(stream: &mut TcpStream) -> (ReadHalf<'_>, WriteHalf<'_>) {
+pub(crate) fn split(
+    stream: &mut crate::io::PollEvented<mio::net::TcpStream>,
+) -> (ReadHalf<'_>, WriteHalf<'_>) {
     (ReadHalf(&*stream), WriteHalf(&*stream))
 }
 
@@ -76,14 +77,14 @@ impl AsyncWrite for WriteHalf<'_> {
     }
 }
 
-impl AsRef<TcpStream> for ReadHalf<'_> {
-    fn as_ref(&self) -> &TcpStream {
+impl AsRef<crate::io::PollEvented<mio::net::TcpStream>> for ReadHalf<'_> {
+    fn as_ref(&self) -> &crate::io::PollEvented<mio::net::TcpStream> {
         self.0
     }
 }
 
-impl AsRef<TcpStream> for WriteHalf<'_> {
-    fn as_ref(&self) -> &TcpStream {
+impl AsRef<crate::io::PollEvented<mio::net::TcpStream>> for WriteHalf<'_> {
+    fn as_ref(&self) -> &crate::io::PollEvented<mio::net::TcpStream> {
         self.0
     }
 }

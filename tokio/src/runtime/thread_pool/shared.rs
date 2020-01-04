@@ -1,8 +1,7 @@
-use crate::park::Unpark;
+use crate::park::{Park, Unpark};
 use crate::runtime::thread_pool::slice;
 use crate::runtime::Unparker;
 use crate::task::{self, Schedule, ScheduleSendOnly, Task};
-
 use std::ptr;
 
 /// Per-worker data accessible from any thread.
@@ -12,9 +11,12 @@ use std::ptr;
 /// - other workers
 /// - tasks
 ///
-pub(crate) struct Shared {
+pub(crate) struct Shared<P>
+where
+    P: Park + Send + 'static,
+{
     /// Thread unparker
-    unpark: Unparker,
+    unpark: Unparker<P>,
 
     /// Tasks pending drop. Any worker pushes tasks, only the "owning" worker
     /// pops.
@@ -24,14 +26,17 @@ pub(crate) struct Shared {
     ///
     /// The slice::Set itself is tracked by an `Arc`, but this pointer is not
     /// included in the ref count.
-    slices: *const slice::Set,
+    slices: *const slice::Set<P>,
 }
 
-unsafe impl Send for Shared {}
-unsafe impl Sync for Shared {}
+unsafe impl<P> Send for Shared<P> where P: Park + Send + 'static {}
+unsafe impl<P> Sync for Shared<P> where P: Park + Send + 'static {}
 
-impl Shared {
-    pub(super) fn new(unpark: Unparker) -> Shared {
+impl<P> Shared<P>
+where
+    P: Park + Send + 'static,
+{
+    pub(super) fn new(unpark: Unparker<P>) -> Shared<P> {
         Shared {
             unpark,
             pending_drop: task::TransferStack::new(),
@@ -47,16 +52,19 @@ impl Shared {
         self.unpark.unpark();
     }
 
-    fn slices(&self) -> &slice::Set {
+    fn slices(&self) -> &slice::Set<P> {
         unsafe { &*self.slices }
     }
 
-    pub(super) fn set_slices_ptr(&mut self, slices: *const slice::Set) {
+    pub(super) fn set_slices_ptr(&mut self, slices: *const slice::Set<P>) {
         self.slices = slices;
     }
 }
 
-impl Schedule for Shared {
+impl<P> Schedule for Shared<P>
+where
+    P: Park + Send + 'static,
+{
     fn bind(&self, task: &Task<Self>) {
         // Get access to the Owned component. This function can only be called
         // when on the worker.
@@ -91,4 +99,4 @@ impl Schedule for Shared {
     }
 }
 
-impl ScheduleSendOnly for Shared {}
+impl<P> ScheduleSendOnly for Shared<P> where P: Park + Send + 'static {}

@@ -1,13 +1,13 @@
 use crate::future::poll_fn;
-use crate::io::{AsyncRead, AsyncWrite, PollEvented};
+use crate::io::PollEvented;
+use crate::io::{AsyncRead, AsyncWrite};
 use crate::net::tcp::split::{split, ReadHalf, WriteHalf};
-use crate::net::ToSocketAddrs;
-
+use crate::{net::ToSocketAddrs, runtime::context::ThreadContext};
 use bytes::Buf;
-use iovec::IoVec;
+
 use std::convert::TryFrom;
 use std::fmt;
-use std::io::{self, Read, Write};
+use std::io;
 use std::mem::MaybeUninit;
 use std::net::{self, Shutdown, SocketAddr};
 use std::pin::Pin;
@@ -15,6 +15,10 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 
 cfg_tcp! {
+    pub(crate) enum StreamInner {
+        Mio(PollEvented<mio::net::TcpStream>),
+        Sim(crate::simulation::tcp::SimTcpStream),
+    }
     /// A TCP stream between a local and a remote socket.
     ///
     /// A TCP stream can either be created by connecting to an endpoint, via the
@@ -42,12 +46,16 @@ cfg_tcp! {
     ///     Ok(())
     /// }
     /// ```
+    #[derive(Debug)]
     pub struct TcpStream {
-        io: PollEvented<mio::net::TcpStream>,
+        io: StreamInner,
     }
 }
 
 impl TcpStream {
+    pub(crate) fn new(io: StreamInner) -> Self {
+        TcpStream { io }
+    }
     /// Opens a TCP connection to a remote host.
     ///
     /// `addr` is an address of the remote host. Anything which implements
@@ -77,48 +85,21 @@ impl TcpStream {
     /// }
     /// ```
     pub async fn connect<A: ToSocketAddrs>(addr: A) -> io::Result<TcpStream> {
-        let addrs = addr.to_socket_addrs().await?;
-
+        let handle = ThreadContext::io_handle().expect("no reactor");
+        let addrs = handle.resolve_addrs(addr).await?;
         let mut last_err = None;
-
         for addr in addrs {
-            match TcpStream::connect_addr(addr).await {
-                Ok(stream) => return Ok(stream),
+            match handle.tcp_stream_connect_addr(addr).await {
+                Ok(stream) => return Ok(TcpStream::new(stream)),
                 Err(e) => last_err = Some(e),
             }
         }
-
         Err(last_err.unwrap_or_else(|| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "could not resolve to any addresses",
             )
         }))
-    }
-
-    /// Establish a connection to the specified `addr`.
-    async fn connect_addr(addr: SocketAddr) -> io::Result<TcpStream> {
-        let sys = mio::net::TcpStream::connect(&addr)?;
-        let stream = TcpStream::new(sys)?;
-
-        // Once we've connected, wait for the stream to be writable as
-        // that's when the actual connection has been initiated. Once we're
-        // writable we check for `take_socket_error` to see if the connect
-        // actually hit an error or not.
-        //
-        // If all that succeeded then we ship everything on up.
-        poll_fn(|cx| stream.io.poll_write_ready(cx)).await?;
-
-        if let Some(e) = stream.io.get_ref().take_error()? {
-            return Err(e);
-        }
-
-        Ok(stream)
-    }
-
-    pub(crate) fn new(connected: mio::net::TcpStream) -> io::Result<TcpStream> {
-        let io = PollEvented::new(connected)?;
-        Ok(TcpStream { io })
     }
 
     /// Create a new `TcpStream` from a `std::net::TcpStream`.
@@ -140,9 +121,11 @@ impl TcpStream {
     /// }
     /// ```
     pub fn from_std(stream: net::TcpStream) -> io::Result<TcpStream> {
+        let handle = ThreadContext::io_handle().expect("no reactor");
         let io = mio::net::TcpStream::from_stream(stream)?;
-        let io = PollEvented::new(io)?;
-        Ok(TcpStream { io })
+        let registration = handle.register_io(&io)?;
+        let io = PollEvented::new(io, registration)?;
+        Ok(TcpStream::new(io.into()))
     }
 
     // Connect a TcpStream asynchronously that may be built with a net2 TcpBuilder.
@@ -150,23 +133,23 @@ impl TcpStream {
     // This should be removed in favor of some in-crate TcpSocket builder API.
     #[doc(hidden)]
     pub async fn connect_std(stream: net::TcpStream, addr: &SocketAddr) -> io::Result<TcpStream> {
+        let handle = ThreadContext::io_handle().expect("no reactor");
+
         let io = mio::net::TcpStream::connect_stream(stream, addr)?;
-        let io = PollEvented::new(io)?;
-        let stream = TcpStream { io };
-
-        // Once we've connected, wait for the stream to be writable as
-        // that's when the actual connection has been initiated. Once we're
-        // writable we check for `take_socket_error` to see if the connect
-        // actually hit an error or not.
-        //
-        // If all that succeeded then we ship everything on up.
-        poll_fn(|cx| stream.io.poll_write_ready(cx)).await?;
-
-        if let Some(e) = stream.io.get_ref().take_error()? {
+        let registration = handle.register_io(&io)?;
+        let io = PollEvented::new(io, registration)?;
+        poll_fn(|cx| io.poll_write_ready(cx)).await?;
+        if let Some(e) = io.get_ref().take_error()? {
             return Err(e);
         }
+        Ok(TcpStream { io: io.into() })
+    }
 
-        Ok(stream)
+    pub(crate) fn from_mio(stream: mio::net::TcpStream) -> io::Result<TcpStream> {
+        let handle = ThreadContext::io_handle().expect("no reactor");
+        let registration = handle.register_io(&stream)?;
+        let io = PollEvented::new(stream, registration)?;
+        Ok(TcpStream { io: io.into() })
     }
 
     /// Returns the local address that this stream is bound to.
@@ -184,7 +167,10 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        self.io.get_ref().local_addr()
+        match &self.io {
+            StreamInner::Mio(m) => m.get_ref().local_addr(),
+            StreamInner::Sim(s) => s.local_addr(),
+        }
     }
 
     /// Returns the remote address that this stream is connected to.
@@ -202,7 +188,10 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
-        self.io.get_ref().peer_addr()
+        match &self.io {
+            StreamInner::Mio(m) => m.get_ref().peer_addr(),
+            StreamInner::Sim(s) => s.peer_addr(),
+        }
     }
 
     /// Attempt to receive data on the socket, without removing that data from
@@ -242,15 +231,19 @@ impl TcpStream {
     /// }
     /// ```
     pub fn poll_peek(&mut self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
-        ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
-
-        match self.io.get_ref().peek(buf) {
-            Ok(ret) => Poll::Ready(Ok(ret)),
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(cx, mio::Ready::readable())?;
-                Poll::Pending
+        match &mut self.io {
+            StreamInner::Mio(m) => {
+                ready!(m.poll_read_ready(cx, mio::Ready::readable()))?;
+                match m.get_ref().peek(buf) {
+                    Ok(ret) => Poll::Ready(Ok(ret)),
+                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                        m.clear_read_ready(cx, mio::Ready::readable())?;
+                        Poll::Pending
+                    }
+                    Err(e) => Poll::Ready(Err(e)),
+                }
             }
-            Err(e) => Poll::Ready(Err(e)),
+            StreamInner::Sim(s) => s.poll_peek(cx, buf),
         }
     }
 
@@ -315,7 +308,10 @@ impl TcpStream {
     /// }
     /// ```
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
-        self.io.get_ref().shutdown(how)
+        match &self.io {
+            StreamInner::Mio(m) => m.get_ref().shutdown(how),
+            StreamInner::Sim(s) => s.shutdown(how),
+        }
     }
 
     /// Gets the value of the `TCP_NODELAY` option on this socket.
@@ -337,7 +333,10 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn nodelay(&self) -> io::Result<bool> {
-        self.io.get_ref().nodelay()
+        match &self.io {
+            StreamInner::Mio(m) => m.get_ref().nodelay(),
+            StreamInner::Sim(s) => s.nodelay(),
+        }
     }
 
     /// Sets the value of the `TCP_NODELAY` option on this socket.
@@ -361,7 +360,10 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
-        self.io.get_ref().set_nodelay(nodelay)
+        match &self.io {
+            StreamInner::Mio(m) => m.get_ref().set_nodelay(nodelay),
+            StreamInner::Sim(s) => s.set_nodelay(nodelay),
+        }
     }
 
     /// Gets the value of the `SO_RCVBUF` option on this socket.
@@ -383,7 +385,10 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn recv_buffer_size(&self) -> io::Result<usize> {
-        self.io.get_ref().recv_buffer_size()
+        match &self.io {
+            StreamInner::Mio(m) => m.get_ref().recv_buffer_size(),
+            StreamInner::Sim(s) => s.recv_buffer_size(),
+        }
     }
 
     /// Sets the value of the `SO_RCVBUF` option on this socket.
@@ -404,7 +409,10 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn set_recv_buffer_size(&self, size: usize) -> io::Result<()> {
-        self.io.get_ref().set_recv_buffer_size(size)
+        match &self.io {
+            StreamInner::Mio(m) => m.get_ref().set_recv_buffer_size(size),
+            StreamInner::Sim(s) => s.set_recv_buffer_size(size),
+        }
     }
 
     /// Gets the value of the `SO_SNDBUF` option on this socket.
@@ -435,7 +443,10 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn send_buffer_size(&self) -> io::Result<usize> {
-        self.io.get_ref().send_buffer_size()
+        match &self.io {
+            StreamInner::Mio(m) => m.get_ref().send_buffer_size(),
+            StreamInner::Sim(s) => s.send_buffer_size(),
+        }
     }
 
     /// Sets the value of the `SO_SNDBUF` option on this socket.
@@ -456,7 +467,10 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn set_send_buffer_size(&self, size: usize) -> io::Result<()> {
-        self.io.get_ref().set_send_buffer_size(size)
+        match &self.io {
+            StreamInner::Mio(m) => m.get_ref().set_send_buffer_size(size),
+            StreamInner::Sim(s) => s.set_send_buffer_size(size),
+        }
     }
 
     /// Returns whether keepalive messages are enabled on this socket, and if so
@@ -479,7 +493,10 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn keepalive(&self) -> io::Result<Option<Duration>> {
-        self.io.get_ref().keepalive()
+        match &self.io {
+            StreamInner::Mio(m) => m.get_ref().keepalive(),
+            StreamInner::Sim(s) => s.keepalive(),
+        }
     }
 
     /// Sets whether keepalive messages are enabled to be sent on this socket.
@@ -508,7 +525,10 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn set_keepalive(&self, keepalive: Option<Duration>) -> io::Result<()> {
-        self.io.get_ref().set_keepalive(keepalive)
+        match &self.io {
+            StreamInner::Mio(m) => m.get_ref().set_keepalive(keepalive),
+            StreamInner::Sim(s) => s.set_keepalive(keepalive),
+        }
     }
 
     /// Gets the value of the `IP_TTL` option for this socket.
@@ -530,7 +550,10 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn ttl(&self) -> io::Result<u32> {
-        self.io.get_ref().ttl()
+        match &self.io {
+            StreamInner::Mio(m) => m.get_ref().ttl(),
+            StreamInner::Sim(s) => s.ttl(),
+        }
     }
 
     /// Sets the value for the `IP_TTL` option on this socket.
@@ -551,7 +574,10 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
-        self.io.get_ref().set_ttl(ttl)
+        match &self.io {
+            StreamInner::Mio(m) => m.get_ref().set_ttl(ttl),
+            StreamInner::Sim(s) => s.set_ttl(ttl),
+        }
     }
 
     /// Reads the linger duration for this socket by getting the `SO_LINGER`
@@ -574,7 +600,10 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn linger(&self) -> io::Result<Option<Duration>> {
-        self.io.get_ref().linger()
+        match &self.io {
+            StreamInner::Mio(m) => m.get_ref().linger(),
+            StreamInner::Sim(s) => s.linger(),
+        }
     }
 
     /// Sets the linger duration of this socket by setting the `SO_LINGER`
@@ -602,7 +631,10 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
-        self.io.get_ref().set_linger(dur)
+        match &self.io {
+            StreamInner::Mio(m) => m.get_ref().set_linger(dur),
+            StreamInner::Sim(s) => s.set_linger(dur),
+        }
     }
 
     /// Split a `TcpStream` into a read half and a write half, which can be used
@@ -611,156 +643,14 @@ impl TcpStream {
     /// See the module level documenation of [`split`](super::split) for more
     /// details.
     pub fn split(&mut self) -> (ReadHalf<'_>, WriteHalf<'_>) {
-        split(self)
-    }
-
-    // == Poll IO functions that takes `&self` ==
-    //
-    // They are not public because (taken from the doc of `PollEvented`):
-    //
-    // While `PollEvented` is `Sync` (if the underlying I/O type is `Sync`), the
-    // caller must ensure that there are at most two tasks that use a
-    // `PollEvented` instance concurrently. One for reading and one for writing.
-    // While violating this requirement is "safe" from a Rust memory model point
-    // of view, it will result in unexpected behavior in the form of lost
-    // notifications and tasks hanging.
-
-    pub(crate) fn poll_read_priv(
-        &self,
-        cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
-        ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
-
-        match self.io.get_ref().read(buf) {
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(cx, mio::Ready::readable())?;
-                Poll::Pending
-            }
-            x => Poll::Ready(x),
-        }
-    }
-
-    pub(super) fn poll_write_priv(
-        &self,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
-        ready!(self.io.poll_write_ready(cx))?;
-
-        match self.io.get_ref().write(buf) {
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_write_ready(cx)?;
-                Poll::Pending
-            }
-            x => Poll::Ready(x),
-        }
-    }
-
-    pub(super) fn poll_write_buf_priv<B: Buf>(
-        &self,
-        cx: &mut Context<'_>,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        use std::io::IoSlice;
-
-        ready!(self.io.poll_write_ready(cx))?;
-
-        // The `IoVec` (v0.1.x) type can't have a zero-length size, so create
-        // a dummy version from a 1-length slice which we'll overwrite with
-        // the `bytes_vectored` method.
-        static S: &[u8] = &[0];
-        const MAX_BUFS: usize = 64;
-
-        // IoSlice isn't Copy, so we must expand this manually ;_;
-        let mut slices: [IoSlice<'_>; MAX_BUFS] = [
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-            IoSlice::new(S),
-        ];
-        let cnt = buf.bytes_vectored(&mut slices);
-
-        let iovec = <&IoVec>::from(S);
-        let mut vecs = [iovec; MAX_BUFS];
-        for i in 0..cnt {
-            vecs[i] = (*slices[i]).into();
-        }
-
-        match self.io.get_ref().write_bufs(&vecs[..cnt]) {
-            Ok(n) => {
-                buf.advance(n);
-                Poll::Ready(Ok(n))
-            }
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_write_ready(cx)?;
-                Poll::Pending
-            }
-            Err(e) => Poll::Ready(Err(e)),
+        match &mut self.io {
+            StreamInner::Mio(ref mut m) => split(m),
+            _ => todo!("figure out how to split simulated types"),
         }
     }
 }
 
+/*
 impl TryFrom<TcpStream> for mio::net::TcpStream {
     type Error = io::Error;
 
@@ -773,7 +663,7 @@ impl TryFrom<TcpStream> for mio::net::TcpStream {
     fn try_from(value: TcpStream) -> Result<Self, Self::Error> {
         value.io.into_inner()
     }
-}
+}*/
 
 impl TryFrom<net::TcpStream> for TcpStream {
     type Error = io::Error;
@@ -789,7 +679,10 @@ impl TryFrom<net::TcpStream> for TcpStream {
 
 // ===== impl Read / Write =====
 
-impl AsyncRead for TcpStream {
+impl AsyncRead for TcpStream
+where
+    Self: Unpin,
+{
     unsafe fn prepare_uninitialized_buffer(&self, _: &mut [MaybeUninit<u8>]) -> bool {
         false
     }
@@ -799,17 +692,30 @@ impl AsyncRead for TcpStream {
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
-        self.poll_read_priv(cx, buf)
+        // Projection should be safe here as TcpStream should be Unpin
+        let inner = unsafe { self.map_unchecked_mut(|i| &mut i.io) };
+        match inner.get_mut() {
+            StreamInner::Mio(mio) => mio.poll_read_priv(cx, buf),
+            StreamInner::Sim(ref mut s) => Pin::new(s).poll_read(cx, buf),
+        }
     }
 }
 
-impl AsyncWrite for TcpStream {
+impl AsyncWrite for TcpStream
+where
+    Self: Unpin,
+{
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        self.poll_write_priv(cx, buf)
+        // Projection should be safe here as TcpStream should be Unpin
+        let inner = unsafe { self.map_unchecked_mut(|i| &mut i.io) };
+        match inner.get_mut() {
+            StreamInner::Mio(m) => m.poll_write_priv(cx, buf),
+            StreamInner::Sim(s) => Pin::new(s).poll_write(cx, buf),
+        }
     }
 
     fn poll_write_buf<B: Buf>(
@@ -817,49 +723,51 @@ impl AsyncWrite for TcpStream {
         cx: &mut Context<'_>,
         buf: &mut B,
     ) -> Poll<io::Result<usize>> {
-        self.poll_write_buf_priv(cx, buf)
+        let inner = unsafe { self.map_unchecked_mut(|i| &mut i.io) };
+        match inner.get_mut() {
+            StreamInner::Mio(m) => m.poll_write_buf_priv(cx, buf),
+            StreamInner::Sim(s) => Pin::new(s).poll_write_buf(cx, buf),
+        }
     }
 
     #[inline]
-    fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        // tcp flush is a no-op
-        Poll::Ready(Ok(()))
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        let inner = unsafe { self.map_unchecked_mut(|i| &mut i.io) };
+        match inner.get_mut() {
+            // tcp flush is a no-op
+            StreamInner::Mio(_) => Poll::Ready(Ok(())),
+            StreamInner::Sim(s) => Pin::new(s).poll_flush(cx),
+        }
     }
 
-    fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.shutdown(std::net::Shutdown::Write)?;
-        Poll::Ready(Ok(()))
-    }
-}
-
-impl fmt::Debug for TcpStream {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.io.get_ref().fmt(f)
-    }
-}
-
-#[cfg(unix)]
-mod sys {
-    use super::TcpStream;
-    use std::os::unix::prelude::*;
-
-    impl AsRawFd for TcpStream {
-        fn as_raw_fd(&self) -> RawFd {
-            self.io.get_ref().as_raw_fd()
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        let inner = unsafe { self.map_unchecked_mut(|i| &mut i.io) };
+        match inner.get_mut() {
+            StreamInner::Mio(m) => Poll::Ready(m.shutdown(net::Shutdown::Write)),
+            StreamInner::Sim(s) => Pin::new(s).poll_shutdown(cx),
         }
     }
 }
 
-#[cfg(windows)]
-mod sys {
-    // TODO: let's land these upstream with mio and then we can add them here.
-    //
-    // use std::os::windows::prelude::*;
-    // use super::TcpStream;
-    //
-    // impl AsRawHandle for TcpStream {
-    //     fn as_raw_handle(&self) -> RawHandle {
-    //         self.io.get_ref().as_raw_handle()
-    //     }
-    // }
+// ===== impl StreamInner =====
+
+impl From<PollEvented<mio::net::TcpStream>> for StreamInner {
+    fn from(item: PollEvented<mio::net::TcpStream>) -> Self {
+        StreamInner::Mio(item)
+    }
+}
+
+impl From<crate::simulation::tcp::SimTcpStream> for StreamInner {
+    fn from(item: crate::simulation::tcp::SimTcpStream) -> Self {
+        StreamInner::Sim(item)
+    }
+}
+
+impl fmt::Debug for StreamInner {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StreamInner::Mio(m) => m.fmt(f),
+            StreamInner::Sim(s) => s.fmt(f),
+        }
+    }
 }

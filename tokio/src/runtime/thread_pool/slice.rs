@@ -12,26 +12,32 @@ use crate::util::{CachePadded, FastRand};
 use std::cell::UnsafeCell;
 use std::future::Future;
 
-pub(super) struct Set {
+pub(super) struct Set<P>
+where
+    P: Park + Send + 'static,
+{
     /// Data accessible from all workers.
-    shared: Box<[Shared]>,
+    shared: Box<[Shared<P>]>,
 
     /// Data owned by the worker.
-    owned: Box<[UnsafeCell<CachePadded<Owned>>]>,
+    owned: Box<[UnsafeCell<CachePadded<Owned<P>>>]>,
 
     /// Submit work to the pool while *not* currently on a worker thread.
-    inject: queue::Inject<Shared>,
+    inject: queue::Inject<Shared<P>>,
 
     /// Coordinates idle workers
     idle: Idle,
 }
 
-unsafe impl Send for Set {}
-unsafe impl Sync for Set {}
+unsafe impl<P> Send for Set<P> where P: Park + Send + 'static {}
+unsafe impl<P> Sync for Set<P> where P: Park + Send + 'static {}
 
-impl Set {
+impl<P> Set<P>
+where
+    P: Park + Send + 'static,
+{
     /// Create a new worker set using the provided queues.
-    pub(crate) fn new(parkers: &[Parker]) -> Self {
+    pub(crate) fn new(parkers: &[Parker<P>]) -> Self {
         assert!(!parkers.is_empty());
 
         let queues = queue::build(parkers.len());
@@ -65,7 +71,7 @@ impl Set {
         handle
     }
 
-    fn inject_task(&self, task: Task<Shared>) {
+    fn inject_task(&self, task: Task<Shared<P>>) {
         self.inject.push(task, |res| {
             if let Err(task) = res {
                 task.shutdown();
@@ -95,7 +101,7 @@ impl Set {
         }
     }
 
-    pub(crate) fn schedule(&self, task: Task<Shared>) {
+    pub(crate) fn schedule(&self, task: Task<Shared<P>>) {
         current::get(|current_worker| match current_worker.as_member(self) {
             Some(worker) => {
                 if worker.submit_local(task) {
@@ -136,19 +142,19 @@ impl Set {
         self.shared.len()
     }
 
-    pub(super) fn index_of(&self, shared: &Shared) -> usize {
+    pub(super) fn index_of(&self, shared: &Shared<P>) -> usize {
         use std::mem;
 
-        let size = mem::size_of::<Shared>();
+        let size = mem::size_of::<Shared<P>>();
 
         ((shared as *const _ as usize) - (&self.shared[0] as *const _ as usize)) / size
     }
 
-    pub(super) fn shared(&self) -> &[Shared] {
+    pub(super) fn shared(&self) -> &[Shared<P>] {
         &self.shared
     }
 
-    pub(super) fn owned(&self) -> &[UnsafeCell<CachePadded<Owned>>] {
+    pub(super) fn owned(&self) -> &[UnsafeCell<CachePadded<Owned<P>>>] {
         &self.owned
     }
 
@@ -164,7 +170,10 @@ impl Set {
     }
 }
 
-impl Drop for Set {
+impl<P> Drop for Set<P>
+where
+    P: Park + Send + 'static,
+{
     fn drop(&mut self) {
         // Before proceeding, wait for all concurrent wakers to exit
         self.wait_for_unlocked();

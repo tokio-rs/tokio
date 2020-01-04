@@ -47,6 +47,8 @@ pub struct Builder {
     /// Whether or not to enable the time driver
     enable_time: bool,
 
+    enable_simulation: Option<u64>,
+
     /// The number of worker threads, used by Runtime.
     ///
     /// Only used when not using the current-thread executor.
@@ -75,6 +77,7 @@ enum Kind {
     Basic,
     #[cfg(feature = "rt-threaded")]
     ThreadPool,
+    Simulation,
 }
 
 impl Builder {
@@ -92,6 +95,8 @@ impl Builder {
 
             // Time defaults to "off"
             enable_time: false,
+
+            enable_simulation: None,
 
             // Default to use an equal number of threads to number of CPU cores
             core_threads: crate::loom::sys::num_cpus(),
@@ -311,17 +316,20 @@ impl Builder {
             Kind::Basic => self.build_basic_runtime(),
             #[cfg(feature = "rt-threaded")]
             Kind::ThreadPool => self.build_threaded_runtime(),
+
+            Kind::Simulation => self.build_simulated_runtime(),
         }
     }
 
     fn build_shell_runtime(&mut self) -> io::Result<Runtime> {
         use crate::runtime::Kind;
 
-        let clock = time::create_clock();
+        let clock = time::create_clock(false);
 
         // Create I/O driver
-        let (io_driver, io_handle) = io::create_driver(self.enable_io)?;
-        let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone());
+        let (io_driver, io_handle) = io::create_driver(self.enable_io, None)?;
+        let (driver, time_handle) =
+            time::create_driver(self.enable_time, io_driver, clock.clone(), false);
 
         let spawner = Spawner::Shell;
 
@@ -337,12 +345,14 @@ impl Builder {
 
         Ok(Runtime {
             kind: Kind::Shell(Shell::new(driver)),
+            simulation: None,
             handle: Handle {
                 spawner,
                 io_handle,
                 time_handle,
                 clock,
                 blocking_spawner,
+                simulation: None,
             },
             blocking_pool,
         })
@@ -396,6 +406,64 @@ cfg_time! {
     }
 }
 
+impl Builder {
+    /// Build a simulated runtime
+    pub fn simulated_runtime(&mut self, seed: u64) -> &mut Self {
+        self.enable_simulation = Some(seed);
+        self.kind = Kind::Simulation;
+        self
+    }
+
+    fn build_simulated_runtime(&mut self) -> io::Result<Runtime> {
+        use crate::runtime::{BasicScheduler, Kind};
+
+        let sim = self
+            .enable_simulation
+            .map(|_seed| crate::simulation::Simulation::new())
+            .expect("");
+
+        let clock = time::create_clock(true);
+
+        // Create I/O driver
+        let (io_driver, io_handle) = io::create_driver(false, Some(sim.handle()))?;
+
+        let (driver, time_handle) =
+            time::create_driver(self.enable_time, io_driver, clock.clone(), true);
+
+        // And now put a single-threaded scheduler on top of the timer. When
+        // there are no futures ready to do something, it'll let the timer or
+        // the reactor to generate some new stimuli for the futures to continue
+        // in their life.
+        let scheduler = BasicScheduler::new(driver);
+        let spawner = Spawner::Basic(scheduler.spawner());
+
+        // Blocking pool
+        let blocking_pool = blocking::create_blocking_pool(
+            self,
+            &spawner,
+            &io_handle,
+            &time_handle,
+            &clock,
+            self.max_threads,
+        );
+        let blocking_spawner = blocking_pool.spawner().clone();
+        let simulation_handle = sim.handle();
+        Ok(Runtime {
+            kind: Kind::Simulation(scheduler),
+            simulation: Some(sim),
+            handle: Handle {
+                spawner,
+                io_handle,
+                time_handle: time_handle,
+                clock,
+                blocking_spawner,
+                simulation: Some(simulation_handle),
+            },
+            blocking_pool,
+        })
+    }
+}
+
 cfg_rt_core! {
     impl Builder {
         /// Use a simpler scheduler that runs all tasks on the current-thread.
@@ -410,12 +478,13 @@ cfg_rt_core! {
         fn build_basic_runtime(&mut self) -> io::Result<Runtime> {
             use crate::runtime::{BasicScheduler, Kind};
 
-            let clock = time::create_clock();
+
+            let clock = time::create_clock(false);
 
             // Create I/O driver
-            let (io_driver, io_handle) = io::create_driver(self.enable_io)?;
+            let (io_driver, io_handle) = io::create_driver(self.enable_io, None)?;
 
-            let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone());
+            let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone(), false);
 
             // And now put a single-threaded scheduler on top of the timer. When
             // there are no futures ready to do something, it'll let the timer or
@@ -430,12 +499,14 @@ cfg_rt_core! {
 
             Ok(Runtime {
                 kind: Kind::Basic(scheduler),
+                simulation: None,
                 handle: Handle {
                     spawner,
                     io_handle,
                     time_handle,
                     clock,
                     blocking_spawner,
+                    simulation: None
                 },
                 blocking_pool,
             })
@@ -454,13 +525,13 @@ cfg_rt_threaded! {
         fn build_threaded_runtime(&mut self) -> io::Result<Runtime> {
             use crate::runtime::{Kind, ThreadPool};
             use crate::runtime::park::Parker;
-
+            assert!(self.enable_simulation.is_none(), "simulation cannot be enabled for the threaded runtime");
             assert!(self.core_threads <= self.max_threads, "Core threads number cannot be above max limit");
 
-            let clock = time::create_clock();
+            let clock = time::create_clock(false);
 
-            let (io_driver, io_handle) = io::create_driver(self.enable_io)?;
-            let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone());
+            let (io_driver, io_handle) = io::create_driver(self.enable_io, None)?;
+            let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone(), false);
             let (scheduler, workers) = ThreadPool::new(self.core_threads, Parker::new(driver));
             let spawner = Spawner::ThreadPool(scheduler.spawner().clone());
 
@@ -473,12 +544,14 @@ cfg_rt_threaded! {
 
             Ok(Runtime {
                 kind: Kind::ThreadPool(scheduler),
+                simulation: None,
                 handle: Handle {
                     spawner,
                     io_handle,
                     time_handle,
                     clock,
                     blocking_spawner,
+                    simulation: None,
                 },
                 blocking_pool,
             })
@@ -502,6 +575,60 @@ impl fmt::Debug for Builder {
             .field("thread_stack_size", &self.thread_stack_size)
             .field("after_start", &self.after_start.as_ref().map(|_| "..."))
             .field("before_stop", &self.after_start.as_ref().map(|_| "..."))
+            .field("simulation", &self.enable_simulation)
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::io::AsyncReadExt;
+    use crate::io::AsyncWriteExt;
+    use std::error::Error;
+    #[test]
+    fn simulation_time() -> Result<(), Box<dyn Error>> {
+        let seed = 0;
+        let mut runtime = crate::runtime::Builder::new()
+            .simulated_runtime(seed)
+            .enable_all()
+            .build()
+            .unwrap();
+        // spawn a server
+
+        runtime.block_on(async {
+            // Spawn a server
+            crate::spawn(async {
+                let mut listener = crate::net::TcpListener::bind("localhost:9072")
+                    .await
+                    .unwrap();
+                let (mut conn, _) = listener.accept().await.unwrap();
+                conn.write_all("hello".as_bytes())
+                    .await
+                    .expect("writing response");
+            });
+
+            // Test that a 30 second timeout elapses instantly, this also allows
+            // the future spawned above to run until idle, setting up the network
+            // binding.
+            let time_before = crate::time::now();
+            crate::time::delay_for(std::time::Duration::from_secs(30)).await;
+            let time_after = crate::time::now();
+
+            assert!(
+                time_before + std::time::Duration::from_secs(30) >= time_after,
+                "expected at least 30s to elapse"
+            );
+
+            // Attempt to connect over the simulated network to the server spawned above,
+            // reading the "hello" response.
+            let mut stream = crate::net::TcpStream::connect("localhost:9072").await?;
+            let mut target = vec![0; 5];
+            stream.read_exact(&mut target[..]).await?;
+
+            let result = String::from_utf8(target)?;
+            assert_eq!(String::from("hello"), result);
+
+            Ok(())
+        })
     }
 }

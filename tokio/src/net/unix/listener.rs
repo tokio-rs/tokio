@@ -26,7 +26,9 @@ impl UnixListener {
         P: AsRef<Path>,
     {
         let listener = mio_uds::UnixListener::bind(path)?;
-        let io = PollEvented::new(listener)?;
+        let handle = crate::runtime::context::ThreadContext::io_handle().expect("no reactor");
+        let registration = handle.register_io(&listener)?;
+        let io = PollEvented::new(listener, registration)?;
         Ok(UnixListener { io })
     }
 
@@ -37,7 +39,9 @@ impl UnixListener {
     /// specified by `handle` and is ready to perform I/O.
     pub fn from_std(listener: net::UnixListener) -> io::Result<UnixListener> {
         let listener = mio_uds::UnixListener::from_listener(listener)?;
-        let io = PollEvented::new(listener)?;
+        let handle = crate::runtime::context::ThreadContext::io_handle().expect("no reactor");
+        let registration = handle.register_io(&listener)?;
+        let io = PollEvented::new(listener, registration)?;
         Ok(UnixListener { io })
     }
 

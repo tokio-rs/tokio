@@ -223,5 +223,8 @@ where
             return Err(io::Error::last_os_error());
         }
     }
-    Ok(Some(PollEvented::new(Fd { inner: io })?))
+    let io = Fd { inner: io };
+    let handle = crate::runtime::context::ThreadContext::io_handle().expect("no reactor");
+    let registration = handle.register_io(&io)?;
+    Ok(Some(PollEvented::new(io, registration)?))
 }

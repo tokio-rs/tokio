@@ -22,6 +22,8 @@ pub struct Handle {
 
     /// Blocking pool spawner
     pub(super) blocking_spawner: blocking::Spawner,
+
+    pub(super) simulation: Option<crate::simulation::SimulationHandle>,
 }
 
 impl Handle {
@@ -30,13 +32,14 @@ impl Handle {
     where
         F: FnOnce() -> R,
     {
-        let _e = context::ThreadContext::new(
+        let thread_context = context::ThreadContext::new(
             self.spawner.clone(),
             self.io_handle.clone(),
             self.time_handle.clone(),
             Some(self.clock.clone()),
-        )
-        .enter();
+            self.simulation.clone(),
+        );
+        let _e = thread_context.enter();
         self.blocking_spawner.enter(|| f())
     }
 }
