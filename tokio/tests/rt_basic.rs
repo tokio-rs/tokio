@@ -5,6 +5,8 @@ use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
 use tokio_test::{assert_err, assert_ok};
 
+use futures::stream;
+
 use std::thread;
 use std::time::Duration;
 
@@ -61,6 +63,14 @@ fn acquire_mutex_in_drop() {
 
     // Drop the rt
     drop(rt);
+}
+
+#[test]
+fn block_on_stream() {
+    let stream = stream::iter(vec![10, 20, 30]);
+
+    let items: Vec<u32> = rt().block_on_stream(stream).collect();
+    assert_eq!(vec![10, 20, 30], items);
 }
 
 fn rt() -> Runtime {

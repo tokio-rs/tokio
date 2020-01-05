@@ -234,6 +234,10 @@ cfg_rt_core! {
     use crate::task::JoinHandle;
 }
 
+#[cfg(feature = "stream")]
+use crate::stream::StreamExt;
+#[cfg(feature = "stream")]
+use futures_core::Stream;
 use std::future::Future;
 
 /// The Tokio runtime.
@@ -414,6 +418,23 @@ impl Runtime {
         })
     }
 
+    /// Create a blocking iterator from stream.
+    ///
+    /// This runs the given stream on the runtime on each call of `Iterator::next`.
+    ///
+    /// This function is a wrapper around [`Runtime#block_on`], it has the same
+    /// restrictions and panic behaviour as that functions.
+    #[cfg(feature = "stream")]
+    pub fn block_on_stream<S: Stream>(&mut self, stream: S) -> BlockOnStream<'_, S>
+    where
+        S: Stream + Unpin,
+    {
+        BlockOnStream {
+            runtime: self,
+            stream,
+        }
+    }
+
     /// Enter the runtime context
     pub fn enter<F, R>(&self, f: F) -> R
     where
@@ -440,5 +461,25 @@ impl Runtime {
     /// ```
     pub fn handle(&self) -> &Handle {
         &self.handle
+    }
+}
+
+/// Synchronous iterator over [`Stream`] created by [`Runtime::block_on_stream`].
+#[cfg(feature = "stream")]
+#[derive(Debug)]
+pub struct BlockOnStream<'r, S> {
+    runtime: &'r mut Runtime,
+    stream: S,
+}
+
+#[cfg(feature = "stream")]
+impl<'r, S> Iterator for BlockOnStream<'r, S>
+where
+    S: Stream + Unpin,
+{
+    type Item = S::Item;
+
+    fn next(&mut self) -> Option<S::Item> {
+        self.runtime.block_on(self.stream.next())
     }
 }
