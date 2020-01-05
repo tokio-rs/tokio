@@ -1,28 +1,60 @@
-//! I/O Driver backed by Mio
 pub(crate) mod platform;
-mod registration;
+
 mod scheduled_io;
+pub(crate) use scheduled_io::ScheduledIo; // pub(crate) for tests
+
+mod registration;
+pub(crate) use registration::Direction;
+pub use registration::Registration;
+
 use crate::future::poll_fn;
 use crate::io::PollEvented;
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::net::tcp::{listener::ListenerInner, stream::StreamInner};
+use crate::net::tcp::{ListenerInner, StreamInner};
 use crate::park::{Park, Unpark};
+#[cfg(all(feature = "io-driver", not(loom)))]
+use crate::simulation;
 use crate::util::slab::{Address, Slab};
+
 use mio::event::Evented;
-pub(crate) use registration::Direction;
-pub use registration::Registration;
-pub(crate) use scheduled_io::ScheduledIo; // pub(crate) for tests
 use std::fmt;
+use std::io;
+use std::net;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::{Arc, Weak};
 use std::task::Waker;
 use std::time::Duration;
-use std::{io, net, vec};
+use std::vec;
+
+/// I/O driver, backed by Mio
+pub(crate) struct Driver {
+    /// Reuse the `mio::Events` value across calls to poll.
+    events: mio::Events,
+
+    /// State shared between the reactor and the handles.
+    inner: Arc<Inner>,
+
+    _wakeup_registration: mio::Registration,
+}
 
 #[derive(Debug, Clone)]
 pub(crate) enum Handle {
     Mio(MioHandle),
-    Simulation(crate::simulation::SimulationHandle),
+    Simulation(simulation::SimulationHandle),
+}
+
+struct Inner {
+    /// The underlying system event queue.
+    io: mio::Poll,
+
+    /// Dispatch slabs for I/O and futures events
+    io_dispatch: Slab<ScheduledIo>,
+
+    /// The number of sources in `io_dispatch`.
+    n_sources: AtomicUsize,
+
+    /// Used to wake up the I/O driver from a call to `turn`
+    wakeup: mio::SetReadiness,
 }
 
 impl Handle {
@@ -54,7 +86,7 @@ impl Handle {
     }
 
     /// Kept around for types which do not have a simulation equivalent yet.
-    pub(crate) fn register_io<T>(&self, io: &T) -> io::Result<registration::Registration>
+    pub(crate) fn register_io<T>(&self, io: &T) -> io::Result<Registration>
     where
         T: Evented,
     {
@@ -103,19 +135,6 @@ impl Handle {
 }
 
 // ========= Inner Impl ========== //
-struct Inner {
-    /// The underlying system event queue.
-    io: mio::Poll,
-
-    /// Dispatch slabs for I/O and futures events
-    io_dispatch: Slab<ScheduledIo>,
-
-    /// The number of sources in `io_dispatch`.
-    n_sources: AtomicUsize,
-
-    /// Used to wake up the I/O driver from a call to `turn`
-    wakeup: mio::SetReadiness,
-}
 
 impl Inner {
     /// Register an I/O resource with the I/O driver.
@@ -148,16 +167,6 @@ impl fmt::Debug for Inner {
 // ========= Driver Impl ========= //
 
 const TOKEN_WAKEUP: mio::Token = mio::Token(Address::NULL);
-
-/// I/O driver backed by Mio. Progress is made via `Driver::turn`.
-pub(crate) struct Driver {
-    /// Reuse the `mio::Events` value across calls to poll.
-    events: mio::Events,
-    /// State shared between the I/O driver and the handles.
-    inner: Arc<Inner>,
-    /// Registration which can be used to wakeup the I/O driver.
-    _wakeup_registration: mio::Registration,
-}
 
 impl Driver {
     pub(crate) fn new() -> io::Result<Driver> {
@@ -307,6 +316,7 @@ impl MioHandle {
             inner.n_sources.fetch_sub(1, SeqCst);
         }
     }
+
     /// Registers interest in the I/O resource associated with `token`.
     fn register(&self, token: Address, dir: Direction, w: Waker) -> io::Result<()> {
         let inner = self.inner()?;
@@ -353,8 +363,6 @@ impl fmt::Debug for MioHandle {
         write!(f, "Handle")
     }
 }
-
-// ========= impl Registration ======== //
 
 #[cfg(all(test, loom))]
 mod tests {

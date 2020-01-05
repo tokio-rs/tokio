@@ -1,4 +1,5 @@
 use crate::future;
+use crate::runtime::context::ThreadContext;
 
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
@@ -146,7 +147,7 @@ cfg_dns! {
             let s = self.to_owned();
 
             MaybeReady::Blocking(spawn_blocking(move || {
-                if let Some(handle) = crate::runtime::context::ThreadContext::io_handle() {
+                if let Some(handle) = ThreadContext::io_handle() {
                     handle.resolve_str_addr(&s)
                 } else {
                     std::net::ToSocketAddrs::to_socket_addrs(&s)
@@ -187,7 +188,7 @@ cfg_dns! {
             let host = host.to_owned();
 
             MaybeReady::Blocking(spawn_blocking(move || {
-                if let Some(handle) = crate::runtime::context::ThreadContext::io_handle() {
+                if let Some(handle) = ThreadContext::io_handle() {
                     handle.resolve_tuple_addr(&(&host[..], port))
                 } else {
                     std::net::ToSocketAddrs::to_socket_addrs(&(&host[..], port))

@@ -417,6 +417,7 @@ impl<E: Evented> Drop for PollEvented<E> {
 }
 
 // =========== Extra impls ========= //
+
 // TODO: Figure out where these impls should live, they probably need to be back
 // in the `net` crate.
 
