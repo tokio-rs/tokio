@@ -1,10 +1,11 @@
 #![allow(dead_code, unused_variables, unreachable_pub)]
-use std::{collections, io, net, num, sync};
+use std::{collections, io, net, num, string::ToString, sync};
 mod machine;
 pub mod tcp;
-use machine::{LogicalMachine, LogicalMachineId};
-
 mod util;
+use crate::task::JoinHandle;
+use machine::{current_machineid, LogicalMachine, LogicalMachineId};
+use std::future::Future;
 
 #[derive(Debug)]
 pub(self) struct State {
@@ -26,6 +27,22 @@ impl State {
     }
 }
 
+impl State {
+    fn register_machine<T>(&mut self, hostname: T) -> LogicalMachineId
+    where
+        T: ToString,
+    {
+        let id = LogicalMachineId::new(self.next_machine_id);
+        self.next_machine_id += 1;
+        let machine_ipaddr = self.unused_ipaddr();
+        let machine = LogicalMachine::new(id, hostname.to_string(), machine_ipaddr);
+        self.id_to_machine.insert(id, machine);
+        self.hostname_to_machineid.insert(hostname.to_string(), id);
+        self.ipaddr_to_machineid.insert(machine_ipaddr, id);
+        id
+    }
+}
+
 /// Contains all state for a simulation run.
 #[derive(Debug)]
 pub struct Simulation {
@@ -42,27 +59,19 @@ impl Simulation {
         };
         let inner = sync::Arc::new(sync::Mutex::new(state));
         let mut simulation = Self { inner };
-        simulation.register("localhost");
+        // register a default logical machine at LogicalMachineId 0;
+        let machineid = simulation.register_machine("localhost");
+        machine::set_current_machineid(machineid);
         simulation
     }
 
     // Register a new logical machine with the simulation.
-    fn register<T>(&mut self, hostname: T) -> MachineContext
+    fn register_machine<T>(&mut self, hostname: T) -> LogicalMachineId
     where
-        T: std::string::ToString,
+        T: ToString,
     {
         let mut lock = self.inner.lock().unwrap();
-        let id = LogicalMachineId::new(lock.next_machine_id);
-        lock.next_machine_id += 1;
-        let machine_ipaddr = lock.unused_ipaddr();
-        let machine = LogicalMachine::new(id, hostname.to_string(), machine_ipaddr);
-        lock.id_to_machine.insert(id, machine);
-        lock.hostname_to_machineid.insert(hostname.to_string(), id);
-        lock.ipaddr_to_machineid.insert(machine_ipaddr, id);
-        MachineContext {
-            machineid: id,
-            inner: sync::Arc::clone(&self.inner),
-        }
+        lock.register_machine(hostname)
     }
 
     pub fn handle(&self) -> SimulationHandle {
@@ -100,15 +109,18 @@ impl SimulationHandle {
     ///
     /// Returns a TcpListener if the machineid is present and binding is successful.
     pub fn bind(&self, port: u16) -> io::Result<tcp::SimTcpListener> {
+        let current_machineid = current_machineid();
         let mut lock = self.inner.lock().unwrap();
         let machine = lock
             .id_to_machine
-            .get_mut(&LogicalMachineId::new(0))
+            .get_mut(&current_machineid)
             .expect("could not find associated logical machine");
         machine.bind_listener(port)
     }
 
     pub async fn connect(&self, addr: std::net::SocketAddr) -> io::Result<tcp::SimTcpStream> {
+        let current_machineid = current_machineid();
+
         let (ipaddr, port) = (addr.ip(), addr.port());
         let machineid = {
             let lock = self.inner.lock().unwrap();
@@ -123,58 +135,99 @@ impl SimulationHandle {
 
         let fut = {
             let mut lock = self.inner.lock().unwrap();
-            let client_ipaddr = lock
-                .id_to_machine
-                .get(&LogicalMachineId::new(0))
-                .unwrap()
-                .ipaddr();
-            let client_addr = net::SocketAddr::new(client_ipaddr, 9999);
+            let target_machine = lock.id_to_machine.get(&current_machineid).unwrap();
             let machine = lock.id_to_machine.get_mut(&machineid).unwrap();
-            machine.connect(client_addr, port)
+            machine.connect(port)
         };
         fut.await
     }
-}
 
-pub struct MachineContext {
-    machineid: LogicalMachineId,
-    inner: sync::Arc<sync::Mutex<State>>,
-}
-
-impl MachineContext {
-    /// Bind a new TcpListener to the provided machineid port. A port value of 0
-    /// will bind to a random port.
-    ///
-    /// Returns a TcpListener if the machineid is present and binding is successful.
-    pub fn bind(&self, port: u16) -> io::Result<tcp::SimTcpListener> {
+    fn register_machine<T>(&self, hostname: T) -> LogicalMachineId
+    where
+        T: ToString,
+    {
         let mut lock = self.inner.lock().unwrap();
-        let machine = lock
-            .id_to_machine
-            .get_mut(&self.machineid)
-            .expect("could not find associated logical machine");
-        machine.bind_listener(port)
+        lock.register_machine(hostname)
+    }
+}
+
+pub fn spawn_machine<T, F>(hostname: T, f: F) -> JoinHandle<F::Output>
+where
+    T: ToString,
+    F: Future + Send + 'static,
+    F::Output: Send + 'static,
+{
+    let handle = crate::runtime::context::ThreadContext::simulation_handle()
+        .expect("cannot spawn simulation machine from outside of a runtime context");
+    let machineid = handle.register_machine(hostname);
+    let wrap = machine::SimulatedFuture::new(f, machineid);
+    crate::spawn(wrap)
+}
+
+#[cfg(test)]
+mod test {
+    use crate::io::AsyncReadExt;
+    use crate::io::AsyncWriteExt;
+    use crate::simulation::spawn_machine;
+    use std::error::Error;
+    use std::io;
+
+    async fn hello_server(port: u16) -> io::Result<()> {
+        let mut listener = crate::net::TcpListener::bind(("0.0.0.0", port)).await?;
+        let (mut conn, _) = listener.accept().await?;
+        conn.write_all("hello".as_bytes()).await?;
+        Ok(())
     }
 
-    pub async fn connect(&self, addr: std::net::SocketAddr) -> io::Result<tcp::SimTcpStream> {
-        let (ipaddr, port) = (addr.ip(), addr.port());
-        let machineid = {
-            let lock = self.inner.lock().unwrap();
-            lock.ipaddr_to_machineid
-                .get(&ipaddr)
-                .ok_or(io::ErrorKind::ConnectionReset)
-                .map(|v| *v)
-        }?;
+    #[test]
+    fn simulation_time() -> Result<(), Box<dyn Error>> {
+        let mut runtime = crate::runtime::Builder::new()
+            .simulated_runtime(0)
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            // Test that a 30 second timeout elapses instantly, this also allows
+            // the future spawned above to run until idle, setting up the network
+            // binding.
+            let time_before = crate::time::now();
+            crate::time::delay_for(std::time::Duration::from_secs(30)).await;
+            let time_after = crate::time::now();
 
-        // TODO: Use the correct error for a 0 port
-        let port = num::NonZeroU16::new(port).ok_or(io::ErrorKind::InvalidInput)?;
+            assert!(
+                time_before + std::time::Duration::from_secs(30) >= time_after,
+                "expected at least 30s to elapse"
+            );
+            Ok(())
+        })
+    }
 
-        let fut = {
-            let mut lock = self.inner.lock().unwrap();
-            let client_ipaddr = lock.id_to_machine.get(&self.machineid).unwrap().ipaddr();
-            let client_addr = net::SocketAddr::new(client_ipaddr, 9999);
-            let machine = lock.id_to_machine.get_mut(&machineid).unwrap();
-            machine.connect(client_addr, port)
-        };
-        fut.await
+    #[test]
+    fn simulation_networking() -> Result<(), Box<dyn Error>> {
+        let seed = 0;
+        let mut runtime = crate::runtime::Builder::new()
+            .simulated_runtime(seed)
+            .enable_all()
+            .build()
+            .unwrap();
+        // spawn a server
+
+        runtime.block_on(async {
+            // Spawn a server
+            let server_port = 9092;
+            spawn_machine("server", hello_server(server_port));
+            // wait for the server to come up
+            crate::time::delay_for(std::time::Duration::from_secs(30)).await;
+
+            // Attempt to connect over the simulated network to the server spawned above,
+            // reading the "hello" response.
+            let mut stream = crate::net::TcpStream::connect(("server", server_port)).await?;
+            let mut target = vec![0; 5];
+            stream.read_exact(&mut target[..]).await?;
+
+            let result = String::from_utf8(target)?;
+            assert_eq!(String::from("hello"), result);
+            Ok(())
+        })
     }
 }

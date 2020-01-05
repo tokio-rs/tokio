@@ -248,6 +248,7 @@ impl Spawner {
             self.inner.io_handle.clone(),
             self.inner.time_handle.clone(),
             Some(self.inner.clock.clone()),
+            None,
         );
         let thread_context = Box::new(thread_context);
         let spawner = self.clone();

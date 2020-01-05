@@ -216,8 +216,11 @@
 // macros used internally
 #[macro_use]
 mod macros;
-mod simulation;
-mod syscall;
+
+cfg_test_util! {
+    mod simulation;
+}
+
 cfg_fs! {
     pub mod fs;
 }

@@ -3,8 +3,65 @@
 use crate::simulation::tcp::{
     SimTclListenerHandle, SimTcpListener, SimTcpStream, SimTcpStreamHandle,
 };
-use std::future::Future;
-use std::{collections, io, net, num, pin::Pin, string};
+use std::cell::RefCell;
+
+use std::{
+    collections,
+    future::Future,
+    io, net, num,
+    pin::Pin,
+    string,
+    task::{Context, Poll},
+};
+
+static DEFAULT_MACHINE_ID: LogicalMachineId = LogicalMachineId(0);
+
+thread_local! {
+    static CURRENT: RefCell<LogicalMachineId> = RefCell::new(DEFAULT_MACHINE_ID)
+}
+
+pub fn current_machineid() -> LogicalMachineId {
+    CURRENT.with(|c| *c.borrow())
+}
+
+pub(crate) fn set_current_machineid(machineid: LogicalMachineId) -> LogicalMachineId {
+    CURRENT.with(|c| c.replace(machineid))
+}
+
+pin_project_lite::pin_project! {
+    pub(crate) struct SimulatedFuture<F> {
+        machineid: LogicalMachineId,
+        #[pin]
+        inner: F
+    }
+}
+
+impl<F> std::future::Future for SimulatedFuture<F>
+where
+    F: Future,
+{
+    type Output = F::Output;
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        struct DropGuard(LogicalMachineId);
+        impl Drop for DropGuard {
+            fn drop(&mut self) {
+                set_current_machineid(self.0);
+            }
+        }
+        let this = self.project();
+        set_current_machineid(*this.machineid);
+        this.inner.poll(cx)
+    }
+}
+
+impl<F> SimulatedFuture<F>
+where
+    F: Future,
+{
+    pub(crate) fn new(inner: F, machineid: LogicalMachineId) -> Self {
+        SimulatedFuture { machineid, inner }
+    }
+}
 
 /// LogicalMachineId is a token used to tie spawned tasks to a particular logical machine.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -59,9 +116,10 @@ impl LogicalMachine {
 
     pub(crate) fn connect(
         &mut self,
-        client_addr: net::SocketAddr,
         port: num::NonZeroU16,
     ) -> Pin<Box<dyn Future<Output = Result<SimTcpStream, io::Error>> + Send + 'static>> {
+        // TODO: Use different ports for each connection to aid debugging.
+        let client_addr = net::SocketAddr::new(self.ipaddr(), 9999);
         self.gc_connections();
         let acceptor = self
             .acceptors

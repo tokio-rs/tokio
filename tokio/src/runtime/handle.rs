@@ -37,6 +37,7 @@ impl Handle {
             self.io_handle.clone(),
             self.time_handle.clone(),
             Some(self.clock.clone()),
+            self.simulation.clone(),
         );
         let _e = thread_context.enter();
         self.blocking_spawner.enter(|| f())
