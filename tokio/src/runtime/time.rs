@@ -21,7 +21,6 @@ mod variant {
         } else {
             Clock::new()
         }
-
     }
 
     /// Create a new timer driver / handle pair

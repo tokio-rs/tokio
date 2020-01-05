@@ -81,7 +81,7 @@ impl TcpListener {
     /// ```
     pub async fn bind<A: ToSocketAddrs>(addr: A) -> io::Result<TcpListener> {
         let handle = ThreadContext::io_handle().expect("no reactor");
-        let addrs = handle.resolve_addrs(addr).await?;
+        let addrs = addr.to_socket_addrs().await?;
 
         let mut last_err = None;
 

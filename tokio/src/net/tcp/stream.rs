@@ -86,7 +86,7 @@ impl TcpStream {
     /// ```
     pub async fn connect<A: ToSocketAddrs>(addr: A) -> io::Result<TcpStream> {
         let handle = ThreadContext::io_handle().expect("no reactor");
-        let addrs = handle.resolve_addrs(addr).await?;
+        let addrs = addr.to_socket_addrs().await?;
         let mut last_err = None;
         for addr in addrs {
             match handle.tcp_stream_connect_addr(addr).await {

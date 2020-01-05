@@ -1,17 +1,18 @@
-pub(crate) mod platform;
+mod mio_driver;
 
+pub(crate) mod platform;
 mod scheduled_io;
+
+pub(crate) use mio_driver::Driver;
 pub(crate) use scheduled_io::ScheduledIo; // pub(crate) for tests
 
-mod mio_driver;
 use crate::future::poll_fn;
 use crate::io::PollEvented;
 use crate::net::tcp::{listener::ListenerInner, stream::StreamInner};
-use crate::net::ToSocketAddrs;
 use mio::event::Evented;
-pub(crate) use mio_driver::Driver;
+
 pub use mio_driver::Registration;
-use std::{io, iter, net};
+use std::{io, net, vec};
 
 #[derive(Debug, Clone)]
 pub(crate) enum Handle {
@@ -20,6 +21,33 @@ pub(crate) enum Handle {
 }
 
 impl Handle {
+    pub(crate) fn resolve_str_addr(&self, s: &str) -> io::Result<vec::IntoIter<net::SocketAddr>> {
+        let s = s.to_owned();
+        match self {
+            Handle::Mio(_) => std::net::ToSocketAddrs::to_socket_addrs(&s),
+            Handle::Simulation(_) => {
+                fn err(msg: &str) -> io::Error {
+                    io::Error::new(io::ErrorKind::InvalidInput, msg)
+                }
+                let mut parts_iter = s.rsplitn(2, ':');
+                let port_str = parts_iter.next().ok_or(err("invalid socket address"))?;
+                let host = parts_iter.next().ok_or(err("invalid socket address"))?;
+                let port: u16 = port_str.parse().map_err(|_| err("invalid port value"))?;
+                self.resolve_tuple_addr(&(host, port))
+            }
+        }
+    }
+
+    pub(crate) fn resolve_tuple_addr(
+        &self,
+        addr: &(&str, u16),
+    ) -> io::Result<vec::IntoIter<net::SocketAddr>> {
+        match self {
+            Handle::Mio(_) => std::net::ToSocketAddrs::to_socket_addrs(addr),
+            Handle::Simulation(sim) => sim.resolve_tuple(addr),
+        }
+    }
+
     /// Kept around for types which do not have a simulation equivalent yet.
     pub(crate) fn register_io<T>(&self, io: &T) -> io::Result<Registration>
     where
@@ -28,15 +56,6 @@ impl Handle {
         match self {
             Handle::Mio(mio) => mio.register_io(io),
             Handle::Simulation(_) => panic!("cannot register std or mio io with simulation handle"),
-        }
-    }
-
-    pub(crate) async fn resolve_addrs<A: ToSocketAddrs>(
-        &self,
-        addr: A,
-    ) -> io::Result<impl iter::Iterator<Item = net::SocketAddr>> {
-        match self {
-            _ => addr.to_socket_addrs().await.into(),
         }
     }
 

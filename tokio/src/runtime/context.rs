@@ -20,9 +20,6 @@ pub(crate) struct ThreadContext {
 
     /// Source of `Instant::now()`
     clock: Option<crate::runtime::time::Clock>,
-
-    /// Handle to the current simulation
-    simulation: Option<crate::simulation::SimulationHandle>,
 }
 
 impl Default for ThreadContext {
@@ -38,7 +35,6 @@ impl Default for ThreadContext {
             #[cfg(any(not(feature = "time"), loom))]
             time_handle: (),
             clock: None,
-            simulation: None,
         }
     }
 }
@@ -52,7 +48,6 @@ impl ThreadContext {
         io_handle: crate::runtime::io::Handle,
         time_handle: crate::runtime::time::Handle,
         clock: Option<crate::runtime::time::Clock>,
-        simulation: Option<crate::simulation::SimulationHandle>,
     ) -> Self {
         ThreadContext {
             spawner,
@@ -65,7 +60,6 @@ impl ThreadContext {
             #[cfg(any(not(feature = "time"), loom))]
             time_handle,
             clock,
-            simulation,
         }
     }
 
@@ -131,13 +125,6 @@ impl ThreadContext {
                 _ => None,
             },
         )
-    }
-
-    pub(crate) fn simulation_handle() -> Option<crate::simulation::SimulationHandle> {
-        CONTEXT.with(|ctx| match *ctx.borrow() {
-            Some(ref ctx) => ctx.simulation.clone(),
-            None => None,
-        })
     }
 }
 

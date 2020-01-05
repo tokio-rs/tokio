@@ -124,7 +124,6 @@ cfg_test_util! {
             }
         }
 
-        // TODO: delete this. Some tests rely on this
         /// Return a new `Clock` instance that uses the current execution context's
         /// source of time.
         pub(crate) fn new_frozen() -> Clock {

@@ -168,7 +168,7 @@ impl<E> PollEvented<E>
 where
     E: Evented,
 {
-    /// Creates a new `PollEvented` associated with the default reactor `Registration`.
+    /// Creates a new `PollEvented` associated with the provided reactor `Registration`.
     pub(crate) fn new(io: E, registration: Registration) -> io::Result<Self> {
         Ok(Self {
             io: Some(io),

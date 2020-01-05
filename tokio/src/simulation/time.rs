@@ -14,9 +14,11 @@ impl SimTime {
             advance: time::Duration::from_millis(0),
         }
     }
+
     fn advance(&mut self, duration: time::Duration) {
         self.advance += duration;
     }
+
     pub(crate) fn now(&self) -> crate::time::Instant {
         crate::time::Instant::from_std(self.base + self.advance)
     }

@@ -84,29 +84,6 @@ impl SimulationHandle {
         lock.time.now()
     }
 
-    pub fn resolve_hostport(
-        &self,
-        addr: &str,
-    ) -> Result<std::vec::IntoIter<net::SocketAddr>, io::Error> {
-        // At this point, the ToSocketAddrs machinery would have already attempted
-        // to convert addr into a SocketAddr. We just need to split it into host/port.
-
-        let split = addr.split(':').collect::<Vec<_>>();
-        if split.len() != 2 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "invalid socket address",
-            ));
-        }
-
-        let hostname: &str = split[0];
-        let port: u16 = split[1]
-            .parse()
-            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid socket address"))?;
-
-        self.resolve_tuple(&(hostname, port))
-    }
-
     pub fn resolve_tuple(
         &self,
         &(addr, port): &(&str, u16),
