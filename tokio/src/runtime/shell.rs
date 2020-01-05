@@ -2,6 +2,7 @@
 
 use crate::park::Park;
 use crate::runtime::enter;
+use crate::runtime::time;
 
 use std::future::Future;
 use std::mem::ManuallyDrop;
@@ -11,30 +12,23 @@ use std::task::Poll::Ready;
 use std::task::{Context, RawWaker, RawWakerVTable, Waker};
 
 #[derive(Debug)]
-pub(super) struct Shell<P> {
-    driver: P,
+pub(super) struct Shell {
+    driver: time::Driver,
 
     /// TODO: don't store this
     waker: Waker,
 }
 
-impl<P> Shell<P>
-where
-    P: Park,
-    P::Error: std::fmt::Debug,
-{
-    pub(super) fn new(driver: P) -> Shell<P> {
+type Handle = <time::Driver as Park>::Unpark;
+
+impl Shell {
+    pub(super) fn new(driver: time::Driver) -> Shell {
         // Make sure we don't mess up types (as we do casts later)
-        let unpark: Arc<P::Unpark> = Arc::new(driver.unpark());
+        let unpark: Arc<Handle> = Arc::new(driver.unpark());
 
         let raw_waker = RawWaker::new(
-            Arc::into_raw(unpark) as *const P::Unpark as *const (),
-            &RawWakerVTable::new(
-                clone_waker::<P>,
-                wake::<P>,
-                wake_by_ref::<P>,
-                drop_waker::<P>,
-            ),
+            Arc::into_raw(unpark) as *const Handle as *const (),
+            &RawWakerVTable::new(clone_waker, wake, wake_by_ref, drop_waker),
         );
 
         let waker = unsafe { Waker::from_raw(raw_waker) };
@@ -61,46 +55,29 @@ where
     }
 }
 
-fn clone_waker<P>(ptr: *const ()) -> RawWaker
-where
-    P: Park,
-{
-    let w1 = unsafe { ManuallyDrop::new(Arc::from_raw(ptr as *const P::Unpark)) };
+fn clone_waker(ptr: *const ()) -> RawWaker {
+    let w1 = unsafe { ManuallyDrop::new(Arc::from_raw(ptr as *const Handle)) };
     let _w2 = ManuallyDrop::new(w1.clone());
 
     RawWaker::new(
         ptr,
-        &RawWakerVTable::new(
-            clone_waker::<P>,
-            wake::<P>,
-            wake_by_ref::<P>,
-            drop_waker::<P>,
-        ),
+        &RawWakerVTable::new(clone_waker, wake, wake_by_ref, drop_waker),
     )
 }
 
-fn wake<P>(ptr: *const ())
-where
-    P: Park,
-{
+fn wake(ptr: *const ()) {
     use crate::park::Unpark;
-    let unpark = unsafe { Arc::from_raw(ptr as *const P::Unpark) };
+    let unpark = unsafe { Arc::from_raw(ptr as *const Handle) };
     (unpark).unpark()
 }
 
-fn wake_by_ref<P>(ptr: *const ())
-where
-    P: Park,
-{
+fn wake_by_ref(ptr: *const ()) {
     use crate::park::Unpark;
 
-    let unpark = ptr as *const P::Unpark;
+    let unpark = ptr as *const Handle;
     unsafe { (*unpark).unpark() }
 }
 
-fn drop_waker<P>(ptr: *const ())
-where
-    P: Park,
-{
-    let _ = unsafe { Arc::from_raw(ptr as *const P::Unpark) };
+fn drop_waker(ptr: *const ()) {
+    let _ = unsafe { Arc::from_raw(ptr as *const Handle) };
 }

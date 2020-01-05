@@ -3,7 +3,7 @@ use std::{collections, io, net, num, sync};
 mod machine;
 pub mod tcp;
 use machine::{LogicalMachine, LogicalMachineId};
-pub(crate) mod time;
+
 mod util;
 
 #[derive(Debug)]
@@ -12,7 +12,6 @@ pub(self) struct State {
     id_to_machine: collections::HashMap<LogicalMachineId, LogicalMachine>,
     hostname_to_machineid: collections::HashMap<String, LogicalMachineId>,
     ipaddr_to_machineid: collections::HashMap<net::IpAddr, LogicalMachineId>,
-    time: time::SimTime,
 }
 
 impl State {
@@ -40,7 +39,6 @@ impl Simulation {
             id_to_machine: collections::HashMap::new(),
             hostname_to_machineid: collections::HashMap::new(),
             ipaddr_to_machineid: collections::HashMap::new(),
-            time: time::SimTime::new(),
         };
         let inner = sync::Arc::new(sync::Mutex::new(state));
         let mut simulation = Self { inner };
@@ -79,11 +77,6 @@ pub struct SimulationHandle {
 }
 
 impl SimulationHandle {
-    pub(crate) fn now(&self) -> crate::time::Instant {
-        let lock = self.inner.lock().unwrap();
-        lock.time.now()
-    }
-
     pub fn resolve_tuple(
         &self,
         &(addr, port): &(&str, u16),

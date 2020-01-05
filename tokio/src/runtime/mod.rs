@@ -282,7 +282,7 @@ pub struct Runtime {
 enum Kind {
     /// Not able to execute concurrent tasks. This variant is mostly used to get
     /// access to the driver handles.
-    Shell(Shell<time::Driver>),
+    Shell(Shell),
 
     /// Execute all tasks on the current-thread.
     #[cfg(feature = "rt-core")]
@@ -290,7 +290,7 @@ enum Kind {
 
     /// Execute tasks across multiple threads.
     #[cfg(feature = "rt-threaded")]
-    ThreadPool(ThreadPool<time::Driver>),
+    ThreadPool(ThreadPool),
 
     Simulation(BasicScheduler<time::Driver>),
 }
