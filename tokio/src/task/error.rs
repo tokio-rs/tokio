@@ -39,6 +39,32 @@ impl JoinError {
             repr: Repr::Panic(Mutex::new(err)),
         }
     }
+
+    ///Returns true iff the error was caused by the task being cancelled
+    pub fn is_cancelled(&self) -> bool {
+        match &self.repr {
+            Repr::Cancelled => true,
+            _ => false,
+        }
+    }
+
+    ///Returns true iff the error was caused by the task panicking
+    pub fn is_panic(&self) -> bool {
+        match &self.repr {
+            Repr::Panic(_) => true,
+            _ => false,
+        }
+    }
+
+    ///If the error was caused by a panic, consumes the error and
+    /// returns the payload of the panic. Otherwise, returns an error
+    /// result containing the original JoinError.
+    pub fn into_panic(self) -> Result<Box<dyn Any + Send + 'static>, JoinError> {
+        match self.repr {
+            Repr::Panic(p) => Ok(p.into_inner().expect("Extracting panic from mutex")),
+            _ => Err(self),
+        }
+    }
 }
 
 impl fmt::Display for JoinError {
