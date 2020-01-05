@@ -129,11 +129,19 @@ impl Interval {
     }
 }
 
-#[cfg(feature = "stream")]
-impl crate::stream::Stream for Interval {
-    type Item = Instant;
+cfg_stream! {
+    impl futures_core::FusedStream for Interval {
+        fn is_terminated(&self) -> bool {
+            // NB: intervals never terminate.
+            false
+        }
+    }
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Instant>> {
-        Poll::Ready(Some(ready!(self.poll_tick(cx))))
+    impl crate::stream::Stream for Interval {
+        type Item = Instant;
+
+        fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Instant>> {
+            Poll::Ready(Some(ready!(self.poll_tick(cx))))
+        }
     }
 }
