@@ -5,7 +5,9 @@ use crate::io::util::split::{split, Split};
 use crate::io::AsyncBufRead;
 
 cfg_io_util! {
-    /// An extension trait which adds utility methods to `AsyncBufRead` types.
+    /// An extension trait which adds utility methods to [`AsyncBufRead`] types.
+    ///
+    /// [`AsyncBufRead`]: crate::io::AsyncBufRead
     pub trait AsyncBufReadExt: AsyncBufRead {
         /// Read all bytes into `buf` until the delimiter `byte` or EOF is reached.
         ///

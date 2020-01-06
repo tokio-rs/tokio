@@ -5,9 +5,16 @@ use std::task::{Context, Poll};
 
 /// Seek bytes asynchronously.
 ///
-/// This trait is analogous to the `std::io::Seek` trait, but integrates
+/// This trait is analogous to the [`std::io::Seek`] trait, but integrates
 /// with the asynchronous task system. In particular, the `start_seek`
-/// method, unlike `Seek::seek`, will not block the calling thread.
+/// method, unlike [`Seek::seek`], will not block the calling thread.
+///
+/// Utilities for working with `AsyncSeek` values are provided by
+/// [`AsyncSeekExt`].
+///
+/// [`std::io::Seek`]: std::io::Seek
+/// [`Seek::seek`]: std::io::Seek::seek()
+/// [`AsyncSeekExt`]: crate::io::AsyncSeekExt
 pub trait AsyncSeek {
     /// Attempt to seek to an offset, in bytes, in a stream.
     ///
