@@ -408,7 +408,7 @@ impl Semaphore for (crate::sync::semaphore_ll::Semaphore, usize) {
     }
 
     fn drop_permit(&self, permit: &mut Permit) {
-        permit.release(&self.0);
+        permit.release(1, &self.0);
     }
 
     fn add_permit(&self) {
@@ -425,17 +425,17 @@ impl Semaphore for (crate::sync::semaphore_ll::Semaphore, usize) {
         permit: &mut Permit,
     ) -> Poll<Result<(), ClosedError>> {
         permit
-            .poll_acquire(cx, &self.0)
+            .poll_acquire(cx, 1, &self.0)
             .map_err(|_| ClosedError::new())
     }
 
     fn try_acquire(&self, permit: &mut Permit) -> Result<(), TrySendError> {
-        permit.try_acquire(&self.0)?;
+        permit.try_acquire(1, &self.0)?;
         Ok(())
     }
 
     fn forget(&self, permit: &mut Self::Permit) {
-        permit.forget()
+        permit.forget(1);
     }
 
     fn close(&self) {

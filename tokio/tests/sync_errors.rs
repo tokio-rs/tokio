@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-fn is_error<T: ::std::error::Error + Send + Sync>() {}
+fn is_error<T: std::error::Error + Send + Sync>() {}
 
 #[test]
 fn mpsc_error_bound() {

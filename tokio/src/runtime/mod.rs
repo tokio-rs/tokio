@@ -294,7 +294,7 @@ enum Kind {
 }
 
 /// After thread starts / before thread stops
-type Callback = ::std::sync::Arc<dyn Fn() + Send + Sync>;
+type Callback = std::sync::Arc<dyn Fn() + Send + Sync>;
 
 impl Runtime {
     /// Create a new runtime instance with default configuration values.

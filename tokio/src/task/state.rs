@@ -212,7 +212,7 @@ impl State {
         }
     }
 
-    /// Finals transition to `Released`. Called when primary task handle is
+    /// Transitions to `Released`. Called when primary task handle is
     /// dropped. This is roughly a "ref decrement" operation.
     ///
     /// Returns a snapshot of the state **after** the transition.

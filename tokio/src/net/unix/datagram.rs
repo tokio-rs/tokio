@@ -45,6 +45,14 @@ impl UnixDatagram {
     ///
     /// The returned datagram will be associated with the given event loop
     /// specified by `handle` and is ready to perform I/O.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if thread-local runtime is not set.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
     pub fn from_std(datagram: net::UnixDatagram) -> io::Result<UnixDatagram> {
         let socket = mio_uds::UnixDatagram::from_datagram(datagram)?;
         let io = PollEvented::new(socket)?;

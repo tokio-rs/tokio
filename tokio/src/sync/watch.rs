@@ -117,7 +117,7 @@ pub mod error {
         }
     }
 
-    impl<T: fmt::Debug> ::std::error::Error for SendError<T> {}
+    impl<T: fmt::Debug> std::error::Error for SendError<T> {}
 }
 
 #[derive(Debug)]

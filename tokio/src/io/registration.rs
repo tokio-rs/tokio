@@ -53,6 +53,15 @@ impl Registration {
     ///
     /// - `Ok` if the registration happened successfully
     /// - `Err` if an error was encountered during registration
+    ///
+    ///
+    /// # Panics
+    ///
+    /// This function panics if thread-local runtime is not set.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
     pub fn new<T>(io: &T) -> io::Result<Registration>
     where
         T: Evented,
