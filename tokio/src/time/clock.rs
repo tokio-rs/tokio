@@ -5,7 +5,7 @@
 //! configurable.
 
 cfg_not_test_util! {
-    use crate::time::Instant;
+    use crate::time::{Duration, Instant};
 
     #[derive(Debug, Clone)]
     pub(crate) struct Clock {}
@@ -21,6 +21,14 @@ cfg_not_test_util! {
 
         pub(crate) fn now(&self) -> Instant {
             now()
+        }
+
+        pub(crate) fn is_frozen(&self) -> bool {
+            false
+        }
+
+        pub(crate) fn advance(&self, _dur: Duration) {
+            unreachable!();
         }
     }
 }
@@ -135,6 +143,10 @@ cfg_test_util! {
                     frozen: Mutex::new(Some(Duration::from_millis(0))),
                 }),
             }
+        }
+
+        pub(crate) fn is_frozen(&self) -> bool {
+            self.inner.frozen.lock().unwrap().is_some()
         }
 
         pub(crate) fn advance(&self, duration: Duration) {
