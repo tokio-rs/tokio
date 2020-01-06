@@ -1,23 +1,28 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
+use std::{
+    cell::Cell,
+    sync::atomic::{
+        AtomicBool, AtomicUsize,
+        Ordering::{self, SeqCst},
+    },
+    time::Duration,
+};
 use tokio::{
     runtime::{self, Runtime},
     sync::{mpsc, oneshot},
     task::{self, LocalSet},
     time,
 };
-use std::{
-    cell::Cell,
-    time::Duration,
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering::{self, SeqCst}},
-};
 
 #[tokio::test(basic_scheduler)]
 async fn local_basic_scheduler() {
-    LocalSet::new().run_until(async {
-        task::spawn_local(async {}).await.unwrap();
-    }).await;
+    LocalSet::new()
+        .run_until(async {
+            task::spawn_local(async {}).await.unwrap();
+        })
+        .await;
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -28,16 +33,17 @@ async fn local_threadpool() {
 
     ON_RT_THREAD.with(|cell| cell.set(true));
 
-    LocalSet::new().run_until(async {
-        assert!(ON_RT_THREAD.with(|cell| cell.get()));
-        task::spawn_local(async {
+    LocalSet::new()
+        .run_until(async {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
+            task::spawn_local(async {
+                assert!(ON_RT_THREAD.with(|cell| cell.get()));
+            })
+            .await
+            .unwrap();
         })
-        .await
-        .unwrap();
-    }).await;
+        .await;
 }
-
 
 #[tokio::test(threaded_scheduler)]
 async fn localset_future_threadpool() {
@@ -108,15 +114,17 @@ async fn local_threadpool_timer() {
 
     ON_RT_THREAD.with(|cell| cell.set(true));
 
-    LocalSet::new().run_until(async {
-        assert!(ON_RT_THREAD.with(|cell| cell.get()));
-        let join = task::spawn_local(async move {
+    LocalSet::new()
+        .run_until(async {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
-            time::delay_for(Duration::from_millis(10)).await;
-            assert!(ON_RT_THREAD.with(|cell| cell.get()));
-        });
-        join.await.unwrap();
-    }).await;
+            let join = task::spawn_local(async move {
+                assert!(ON_RT_THREAD.with(|cell| cell.get()));
+                time::delay_for(Duration::from_millis(10)).await;
+                assert!(ON_RT_THREAD.with(|cell| cell.get()));
+            });
+            join.await.unwrap();
+        })
+        .await;
 }
 
 #[test]
@@ -146,7 +154,6 @@ fn local_threadpool_blocking_in_place() {
     });
 }
 
-
 #[tokio::test(threaded_scheduler)]
 async fn local_threadpool_blocking_run() {
     thread_local! {
@@ -155,22 +162,24 @@ async fn local_threadpool_blocking_run() {
 
     ON_RT_THREAD.with(|cell| cell.set(true));
 
-    LocalSet::new().run_until(async {
-        assert!(ON_RT_THREAD.with(|cell| cell.get()));
-        let join = task::spawn_local(async move {
+    LocalSet::new()
+        .run_until(async {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
-            task::spawn_blocking(|| {
-                assert!(
-                    !ON_RT_THREAD.with(|cell| cell.get()),
-                    "blocking must not run on the local task set's thread"
-                );
-            })
-            .await
-            .unwrap();
-            assert!(ON_RT_THREAD.with(|cell| cell.get()));
-        });
-        join.await.unwrap();
-    }).await;
+            let join = task::spawn_local(async move {
+                assert!(ON_RT_THREAD.with(|cell| cell.get()));
+                task::spawn_blocking(|| {
+                    assert!(
+                        !ON_RT_THREAD.with(|cell| cell.get()),
+                        "blocking must not run on the local task set's thread"
+                    );
+                })
+                .await
+                .unwrap();
+                assert!(ON_RT_THREAD.with(|cell| cell.get()));
+            });
+            join.await.unwrap();
+        })
+        .await;
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -182,19 +191,21 @@ async fn all_spawns_are_local() {
 
     ON_RT_THREAD.with(|cell| cell.set(true));
 
-    LocalSet::new().run_until(async {
-        assert!(ON_RT_THREAD.with(|cell| cell.get()));
-        let handles = (0..128)
-            .map(|_| {
-                task::spawn_local(async {
-                    assert!(ON_RT_THREAD.with(|cell| cell.get()));
+    LocalSet::new()
+        .run_until(async {
+            assert!(ON_RT_THREAD.with(|cell| cell.get()));
+            let handles = (0..128)
+                .map(|_| {
+                    task::spawn_local(async {
+                        assert!(ON_RT_THREAD.with(|cell| cell.get()));
+                    })
                 })
-            })
-            .collect::<Vec<_>>();
-        for joined in future::join_all(handles).await {
-            joined.unwrap();
-        }
-    }).await;
+                .collect::<Vec<_>>();
+            for joined in future::join_all(handles).await {
+                joined.unwrap();
+            }
+        })
+        .await;
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -205,9 +216,8 @@ async fn nested_spawn_is_local() {
 
     ON_RT_THREAD.with(|cell| cell.set(true));
 
-    LocalSet::new().run_until(async {
-        assert!(ON_RT_THREAD.with(|cell| cell.get()));
-        task::spawn_local(async {
+    LocalSet::new()
+        .run_until(async {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
             task::spawn_local(async {
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
@@ -215,6 +225,11 @@ async fn nested_spawn_is_local() {
                     assert!(ON_RT_THREAD.with(|cell| cell.get()));
                     task::spawn_local(async {
                         assert!(ON_RT_THREAD.with(|cell| cell.get()));
+                        task::spawn_local(async {
+                            assert!(ON_RT_THREAD.with(|cell| cell.get()));
+                        })
+                        .await
+                        .unwrap();
                     })
                     .await
                     .unwrap();
@@ -225,9 +240,7 @@ async fn nested_spawn_is_local() {
             .await
             .unwrap();
         })
-        .await
-        .unwrap();
-    }).await;
+        .await;
 }
 
 #[test]
@@ -358,48 +371,49 @@ async fn local_tasks_are_polled_after_tick() {
 
     let (tx, mut rx) = mpsc::unbounded_channel();
 
-
     let local = LocalSet::new();
 
-    local.run_until(async {
-        let task2 = task::spawn(async move {
-            // Wait a bit
-            time::delay_for(Duration::from_millis(100)).await;
+    local
+        .run_until(async {
+            let task2 = task::spawn(async move {
+                // Wait a bit
+                time::delay_for(Duration::from_millis(100)).await;
 
-            let mut oneshots = Vec::with_capacity(EXPECTED);
+                let mut oneshots = Vec::with_capacity(EXPECTED);
 
-            // Send values
-            for _ in 0..EXPECTED {
-                let (oneshot_tx, oneshot_rx) = oneshot::channel();
-                oneshots.push(oneshot_tx);
-                tx.send(oneshot_rx).unwrap();
-            }
+                // Send values
+                for _ in 0..EXPECTED {
+                    let (oneshot_tx, oneshot_rx) = oneshot::channel();
+                    oneshots.push(oneshot_tx);
+                    tx.send(oneshot_rx).unwrap();
+                }
 
-            time::delay_for(Duration::from_millis(100)).await;
+                time::delay_for(Duration::from_millis(100)).await;
 
-            for tx in oneshots.drain(..) {
-                tx.send(()).unwrap();
-            }
+                for tx in oneshots.drain(..) {
+                    tx.send(()).unwrap();
+                }
 
-            time::delay_for(Duration::from_millis(300)).await;
-            let rx1 = RX1.load(SeqCst);
-            let rx2 = RX2.load(SeqCst);
-            println!("EXPECT = {}; RX1 = {}; RX2 = {}", EXPECTED, rx1, rx2);
-            assert_eq!(EXPECTED, rx1);
-            assert_eq!(EXPECTED, rx2);
-        });
-
-        while let Some(oneshot) = rx.recv().await {
-            RX1.fetch_add(1, SeqCst);
-
-            task::spawn_local(async move {
-                oneshot.await.unwrap();
-                RX2.fetch_add(1, SeqCst);
+                time::delay_for(Duration::from_millis(300)).await;
+                let rx1 = RX1.load(SeqCst);
+                let rx2 = RX2.load(SeqCst);
+                println!("EXPECT = {}; RX1 = {}; RX2 = {}", EXPECTED, rx1, rx2);
+                assert_eq!(EXPECTED, rx1);
+                assert_eq!(EXPECTED, rx2);
             });
-        }
 
-        task2.await.unwrap();
-    }).await;
+            while let Some(oneshot) = rx.recv().await {
+                RX1.fetch_add(1, SeqCst);
+
+                task::spawn_local(async move {
+                    oneshot.await.unwrap();
+                    RX2.fetch_add(1, SeqCst);
+                });
+            }
+
+            task2.await.unwrap();
+        })
+        .await;
 }
 
 #[tokio::test]
@@ -428,9 +442,11 @@ async fn acquire_mutex_in_drop() {
     });
 
     // Tick the loop
-    local.run_until(async {
-        task::yield_now().await;
-    }).await;
+    local
+        .run_until(async {
+            task::yield_now().await;
+        })
+        .await;
 
     // Drop the LocalSet
     drop(local);
