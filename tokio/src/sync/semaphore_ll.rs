@@ -826,7 +826,7 @@ impl fmt::Display for AcquireError {
     }
 }
 
-impl ::std::error::Error for AcquireError {}
+impl std::error::Error for AcquireError {}
 
 // ===== impl TryAcquireError =====
 
@@ -858,7 +858,7 @@ impl fmt::Display for TryAcquireError {
     }
 }
 
-impl ::std::error::Error for TryAcquireError {}
+impl std::error::Error for TryAcquireError {}
 
 // ===== impl Waiter =====
 
