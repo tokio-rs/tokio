@@ -4,7 +4,7 @@ mod atomic_stack;
 use self::atomic_stack::AtomicStack;
 
 mod entry;
-use self::entry::Entry;
+pub(super) use self::entry::Entry;
 
 mod handle;
 pub(crate) use self::handle::Handle;
@@ -245,7 +245,14 @@ where
                 let deadline = self.expiration_instant(when);
 
                 if deadline > now {
-                    self.park.park_timeout(deadline - now)?;
+                    let dur = deadline - now;
+
+                    if self.clock.is_frozen() {
+                        self.park.park_timeout(Duration::from_secs(0))?;
+                        self.clock.advance(dur);
+                    } else {
+                        self.park.park_timeout(dur)?;
+                    }
                 } else {
                     self.park.park_timeout(Duration::from_secs(0))?;
                 }
@@ -269,7 +276,14 @@ where
                 let deadline = self.expiration_instant(when);
 
                 if deadline > now {
-                    self.park.park_timeout(cmp::min(deadline - now, duration))?;
+                    let duration = cmp::min(deadline - now, duration);
+
+                    if self.clock.is_frozen() {
+                        self.park.park_timeout(Duration::from_secs(0))?;
+                        self.clock.advance(duration);
+                    } else {
+                        self.park.park_timeout(duration)?;
+                    }
                 } else {
                     self.park.park_timeout(Duration::from_secs(0))?;
                 }

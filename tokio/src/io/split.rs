@@ -139,7 +139,7 @@ impl<T> Inner<T> {
         } else {
             // Spin... but investigate a better strategy
 
-            ::std::thread::yield_now();
+            std::thread::yield_now();
             cx.waker().wake_by_ref();
 
             Poll::Pending

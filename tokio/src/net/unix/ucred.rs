@@ -125,10 +125,7 @@ pub(crate) mod impl_solaris {
         fn ucred_geteuid(cred: *const ucred_t) -> super::uid_t;
         fn ucred_getegid(cred: *const ucred_t) -> super::gid_t;
 
-        fn getpeerucred(
-            fd: ::std::os::raw::c_int,
-            cred: *mut *mut ucred_t,
-        ) -> ::std::os::raw::c_int;
+        fn getpeerucred(fd: std::os::raw::c_int, cred: *mut *mut ucred_t) -> std::os::raw::c_int;
     }
 
     pub(crate) fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {

@@ -641,3 +641,21 @@ fn shutdown_from_task_after_notified() {
 
     assert_ready_err!(handle.poll());
 }
+
+#[test]
+fn waker_ref_will_wake_clone() {
+    use std::task::Poll::Ready;
+
+    let (task, handle) = task::joinable(poll_fn(|cx| {
+        let waker = cx.waker().clone();
+        assert!(cx.waker().will_wake(&waker));
+        Ready(())
+    }));
+    let mut handle = spawn(handle);
+
+    let mock = mock().bind(&task).release_local();
+    let mock = &mut || Some(From::from(&mock));
+
+    assert_none!(task.run(mock));
+    assert_ready_ok!(handle.poll());
+}

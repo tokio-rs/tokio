@@ -20,6 +20,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use std::num::NonZeroUsize;
 
+#[derive(Clone, Copy, PartialEq)]
 enum Runtime {
     Basic,
     Threaded,
@@ -145,21 +146,10 @@ fn parse_knobs(
         }
     }
 
-    let mut rt = quote! { tokio::runtime::Builder::new() };
-    match (runtime, is_test) {
-        (Some(Runtime::Threaded), _) => {
-            if rt_threaded {
-                rt = quote! { #rt.threaded_scheduler() }
-            }
-        }
-        (Some(Runtime::Basic), _) => rt = quote! { #rt.basic_scheduler() },
-        (None, true) => rt = quote! { #rt.basic_scheduler() },
-        (None, false) => {
-            if rt_threaded {
-                rt = quote! { #rt.threaded_scheduler() }
-            }
-        }
-    };
+    let mut rt = quote! { tokio::runtime::Builder::new().basic_scheduler() };
+    if rt_threaded && (runtime == Some(Runtime::Threaded) || (runtime.is_none() && !is_test)) {
+        rt = quote! { #rt.threaded_scheduler() };
+    }
     if let Some(v) = core_threads.map(|v| v.get()) {
         rt = quote! { #rt.core_threads(#v) };
     }

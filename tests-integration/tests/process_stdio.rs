@@ -25,8 +25,8 @@ fn cat() -> Command {
 }
 
 async fn feed_cat(mut cat: Child, n: usize) -> io::Result<ExitStatus> {
-    let mut stdin = cat.stdin().take().unwrap();
-    let stdout = cat.stdout().take().unwrap();
+    let mut stdin = cat.stdin.take().unwrap();
+    let stdout = cat.stdout.take().unwrap();
 
     // Produce n lines on the child's stdout.
     let write = async {
@@ -97,7 +97,7 @@ async fn feed_a_lot() {
 #[tokio::test]
 async fn wait_with_output_captures() {
     let mut child = cat().spawn().unwrap();
-    let mut stdin = child.stdin().take().unwrap();
+    let mut stdin = child.stdin.take().unwrap();
 
     let write_bytes = b"1234";
 
