@@ -324,6 +324,7 @@ where
     }
 
     /// Test if this receiver side of the channel is closed.
+    #[cfg(feature = "stream")]
     pub(crate) fn is_closed(&self) -> bool {
         self.inner
             .rx_fields
