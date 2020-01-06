@@ -30,16 +30,7 @@ impl Handle {
     where
         F: FnOnce() -> R,
     {
-        let _e = context::ThreadContext::new(
-            self.spawner.clone(),
-            self.io_handle.clone(),
-            self.time_handle.clone(),
-            Some(self.clock.clone()),
-            Some(self.blocking_spawner.clone()),
-        )
-        .enter();
-
-        f()
+        context::enter(self.clone(), f)
     }
 
     /// Returns a Handle view over the currently running Runtime
@@ -68,17 +59,7 @@ impl Handle {
     /// # }
     /// ```
     pub fn current() -> Self {
-        use crate::runtime::context::ThreadContext;
-
-        Handle {
-            spawner: ThreadContext::spawn_handle()
-                .expect("not currently running on the Tokio runtime."),
-            io_handle: ThreadContext::io_handle(),
-            time_handle: ThreadContext::time_handle(),
-            clock: ThreadContext::clock().expect("not currently running on the Tokio runtime."),
-            blocking_spawner: ThreadContext::blocking_spawner()
-                .expect("not currently running on the Tokio runtime."),
-        }
+        context::current().expect("not currently running on the Tokio runtime.")
     }
 }
 

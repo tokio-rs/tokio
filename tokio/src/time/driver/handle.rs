@@ -21,7 +21,7 @@ impl Handle {
     ///
     /// This function panics if there is no current timer set.
     pub(crate) fn current() -> Self {
-        context::ThreadContext::time_handle().expect("no current timer")
+        context::time_handle().expect("no current timer")
     }
 
     /// Try to return a strong ref to the inner
