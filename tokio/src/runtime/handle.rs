@@ -35,9 +35,50 @@ impl Handle {
             self.io_handle.clone(),
             self.time_handle.clone(),
             Some(self.clock.clone()),
+            Some(self.blocking_spawner.clone()),
         )
         .enter();
-        self.blocking_spawner.enter(|| f())
+
+        f()
+    }
+
+    /// Returns a Handle view over the currently running Runtime
+    ///
+    /// # Panic
+    ///
+    /// A Runtime must have been started or this will panic
+    ///
+    /// # Examples
+    ///
+    /// This allows for the current handle to be gotten when running in a `#`
+    ///
+    /// ```
+    /// # use tokio::runtime::Runtime;
+    ///
+    /// # fn dox() {
+    /// # let rt = Runtime::new().unwrap();
+    /// # rt.spawn(async {
+    /// use tokio::runtime::Handle;
+    ///
+    /// let handle = Handle::current();
+    /// handle.spawn(async {
+    ///     println!("now running in the existing Runtime");
+    /// })
+    /// # });
+    /// # }
+    /// ```
+    pub fn current() -> Self {
+        use crate::runtime::context::ThreadContext;
+
+        Handle {
+            spawner: ThreadContext::spawn_handle()
+                .expect("not currently running on the Tokio runtime."),
+            io_handle: ThreadContext::io_handle(),
+            time_handle: ThreadContext::time_handle(),
+            clock: ThreadContext::clock().expect("not currently running on the Tokio runtime."),
+            blocking_spawner: ThreadContext::blocking_spawner()
+                .expect("not currently running on the Tokio runtime."),
+        }
     }
 }
 

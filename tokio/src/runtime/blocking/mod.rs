@@ -56,6 +56,12 @@ cfg_not_blocking_impl! {
             self
         }
 
+        #[cfg(any(
+            feature = "blocking",
+            feature = "dns",
+            feature = "fs",
+            feature = "io-std",
+        ))]
         pub(crate) fn enter<F, R>(&self, f: F) -> R
         where
             F: FnOnce() -> R,
