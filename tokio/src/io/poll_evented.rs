@@ -166,6 +166,14 @@ where
     E: Evented,
 {
     /// Creates a new `PollEvented` associated with the default reactor.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if thread-local runtime is not set.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
     pub fn new(io: E) -> io::Result<Self> {
         let registration = Registration::new(&io)?;
         Ok(Self {
