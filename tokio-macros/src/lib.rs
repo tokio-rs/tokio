@@ -280,6 +280,7 @@ pub fn main_basic(args: TokenStream, item: TokenStream) -> TokenStream {
     main_impl(args, item, false)
 }
 
+#[cfg(not(test))] // Work around for rust-lang/rust#62127
 fn main_impl(args: TokenStream, item: TokenStream, rt_threaded: bool) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::ItemFn);
     let args = syn::parse_macro_input!(args as syn::AttributeArgs);
@@ -408,6 +409,7 @@ mod old {
         Auto,
     }
 
+    #[cfg(not(test))] // Work around for rust-lang/rust#62127
     pub(crate) fn main(args: TokenStream, item: TokenStream) -> TokenStream {
         let input = syn::parse_macro_input!(item as syn::ItemFn);
         let args = syn::parse_macro_input!(args as syn::AttributeArgs);
