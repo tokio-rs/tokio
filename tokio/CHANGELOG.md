@@ -1,3 +1,30 @@
+# 0.2.7 (January 7, 2019)
+
+### Fixes
+- potential deadlock when dropping `basic_scheduler` Runtime.
+- calling `spawn_blocking` from within a `spawn_blocking` (#2006).
+- storing a `Runtime` instance in a thread-local (#2011).
+- miscellaneous documentation fixes.
+- rt: fix `Waker::will_wake` to return true when tasks match (#2045).
+- test-util: `time::advance` runs pending tasks before changing the time (#2059).
+
+### Added
+- `net::lookup_host` maps a `T: ToSocketAddrs` to a stream of `SocketAddrs` (#1870).
+- `process::Child` fields are made public to match `std` (#2014).
+- impl `Stream` for `sync::broadcast::Receiver` (#2012).
+- `sync::RwLock` provides an asynchonous read-write lock (#1699).
+- `runtime::Handle::current` returns the handle for the current runtime (#2040).
+- `StreamExt::filter` filters stream values according to a predicate (#2001).
+- `StreamExt::filter_map` simultaneously filter and map stream values (#2001).
+- `StreamExt::try_next` convenience for streams of `Result<T, E>` (#2005).
+- `StreamExt::take` limits a stream to a specified number of values (#2025).
+- `StreamExt::take_while` limits a stream based on a predicate (#2029).
+- `StreamExt::all` tests if every element of the stream matches a predicate (#2035).
+- `StreamExt::any` tests if any element of the stream matches a predicate (#2034).
+- `task::LocalSet.await` runs spawned tasks until the set is idle (#1971).
+- `time::DelayQueue::len` returns the number entries in the queue (#1755).
+- expose runtime options from the `#[tokio::main]` and `#[tokio::test]` (#2022).
+
 # 0.2.6 (December 19, 2019)
 
 ### Fixes
