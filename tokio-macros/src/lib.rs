@@ -251,7 +251,7 @@ pub fn main_threaded(args: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
-    main_impl(args, item, true)
+    old::main(args, item)
 }
 
 /// Marks async function to be executed by selected runtime.
@@ -354,7 +354,7 @@ pub fn test_threaded(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_attribute]
 pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
-    test_impl(args, item, true)
+    old::test(args, item)
 }
 
 /// Marks async function to be executed by runtime, suitable to test enviornment
