@@ -17,12 +17,12 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 
 cfg_io_util! {
-    /// The readable half of a value returned from `split`.
+    /// The readable half of a value returned from [`split`](split()).
     pub struct ReadHalf<T> {
         inner: Arc<Inner<T>>,
     }
 
-    /// The writable half of a value returned from `split`.
+    /// The writable half of a value returned from [`split`](split()).
     pub struct WriteHalf<T> {
         inner: Arc<Inner<T>>,
     }
@@ -30,8 +30,8 @@ cfg_io_util! {
     /// Split a single value implementing `AsyncRead + AsyncWrite` into separate
     /// `AsyncRead` and `AsyncWrite` handles.
     ///
-    /// To restore this read/write object from its `split::ReadHalf` and
-    /// `split::WriteHalf` use `unsplit`.
+    /// To restore this read/write object from its `ReadHalf` and
+    /// `WriteHalf` use [`unsplit`](ReadHalf::unsplit()).
     pub fn split<T>(stream: T) -> (ReadHalf<T>, WriteHalf<T>)
     where
         T: AsyncRead + AsyncWrite,
