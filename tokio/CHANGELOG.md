@@ -1,3 +1,8 @@
+# 0.2.8 (January 8, 2019)
+
+### Fixes
+- depend on new version of `tokio-macros`.
+
 # 0.2.7 (January 7, 2019)
 
 ### Fixes
