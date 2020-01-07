@@ -1,3 +1,6 @@
+# 0.2.2 (January 7, 2019)
+- General refactoring and inclusion of additional runtime options (#2022 and #2038)
+
 # 0.2.1 (December 18, 2019)
 
 ### Fixes
