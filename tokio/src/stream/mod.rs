@@ -39,7 +39,8 @@ pub use futures_core::Stream;
 /// An extension trait for `Stream`s that provides a variety of convenient
 /// combinator functions.
 pub trait StreamExt: Stream {
-    /// Creates a future that resolves to the next item in the stream.
+    /// Consumes and returns the next value in the stream or `None` if the
+    /// stream is finished.
     ///
     /// Equivalent to:
     ///
@@ -76,8 +77,14 @@ pub trait StreamExt: Stream {
         Next::new(self)
     }
 
-    /// Creates a future that attempts to resolve the next item in the stream.
-    /// If an error is encountered before the next item, the error is returned instead.
+    /// Consumes and returns the next item in the stream. If an error is
+    /// encountered before the next item, the error is returned instead.
+    ///
+    /// Equivalent to:
+    ///
+    /// ```ignore
+    /// async fn try_next(&mut self) -> Result<Option<T>, E>;
+    /// ```
     ///
     /// This is similar to the [`next`](StreamExt::next) combinator,
     /// but returns a [`Result<Option<T>, E>`](Result) rather than
@@ -273,6 +280,7 @@ pub trait StreamExt: Stream {
     }
 
     /// Tests if every element of the stream matches a predicate.
+    ///
     /// `all()` takes a closure that returns `true` or `false`. It applies
     /// this closure to each element of the stream, and if they all return
     /// `true`, then so does `all`. If any of them return `false`, it
