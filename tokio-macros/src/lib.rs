@@ -294,7 +294,6 @@ fn main_impl(args: TokenStream, item: TokenStream, rt_threaded: bool) -> TokenSt
     parse_knobs(input, args, false, rt_threaded).unwrap_or_else(|e| e.to_compile_error().into())
 }
 
-
 /// Marks async function to be executed by runtime, suitable to test enviornment
 ///
 /// ## Options:
