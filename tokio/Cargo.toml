@@ -92,7 +92,7 @@ uds = ["io-driver", "mio-uds", "libc"]
 
 
 [dependencies]
-tokio-macros = { version = "0.2.0", path = "../tokio-macros", optional = true }
+tokio-macros = { version = "0.2.2", path = "../tokio-macros", optional = true }
 
 bytes = "0.5.0"
 pin-project-lite = "0.1.1"
