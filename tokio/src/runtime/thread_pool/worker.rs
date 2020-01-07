@@ -1,9 +1,9 @@
 use crate::loom::cell::CausalCell;
 use crate::loom::sync::Arc;
 use crate::park::Park;
+use crate::runtime;
 use crate::runtime::park::Parker;
 use crate::runtime::thread_pool::{current, slice, Owned, Shared};
-use crate::runtime::{self, blocking};
 use crate::task::Task;
 
 use std::cell::Cell;
@@ -119,7 +119,7 @@ impl Worker {
         }
     }
 
-    pub(super) fn run(self, blocking_pool: blocking::Spawner) {
+    pub(super) fn run(self) {
         // First, acquire a lock on the worker.
         let guard = match self.acquire_lock() {
             Some(guard) => guard,
@@ -131,37 +131,35 @@ impl Worker {
             // Enter a runtime context
             let _enter = crate::runtime::enter();
 
-            blocking_pool.enter(|| {
-                ON_BLOCK.with(|ob| {
-                    // Ensure that the ON_BLOCK is removed from the thread-local context
-                    // when leaving the scope. This handles cases that involve panicking.
-                    struct Reset<'a>(&'a Cell<Option<*const dyn Fn()>>);
+            ON_BLOCK.with(|ob| {
+                // Ensure that the ON_BLOCK is removed from the thread-local context
+                // when leaving the scope. This handles cases that involve panicking.
+                struct Reset<'a>(&'a Cell<Option<*const dyn Fn()>>);
 
-                    impl<'a> Drop for Reset<'a> {
-                        fn drop(&mut self) {
-                            self.0.set(None);
-                        }
+                impl<'a> Drop for Reset<'a> {
+                    fn drop(&mut self) {
+                        self.0.set(None);
                     }
+                }
 
-                    let _reset = Reset(ob);
+                let _reset = Reset(ob);
 
-                    let allow_blocking: &dyn Fn() = &|| self.block_in_place(&blocking_pool);
+                let allow_blocking: &dyn Fn() = &|| self.block_in_place();
 
-                    ob.set(Some(unsafe {
-                        // NOTE: We cannot use a safe cast to raw pointer here, since we are
-                        // _also_ erasing the lifetime of these pointers. That is safe here,
-                        // because we know that ob will set back to None before allow_blocking
-                        // is dropped.
-                        #[allow(clippy::useless_transmute)]
-                        std::mem::transmute::<_, *const dyn Fn()>(allow_blocking)
-                    }));
+                ob.set(Some(unsafe {
+                    // NOTE: We cannot use a safe cast to raw pointer here, since we are
+                    // _also_ erasing the lifetime of these pointers. That is safe here,
+                    // because we know that ob will set back to None before allow_blocking
+                    // is dropped.
+                    #[allow(clippy::useless_transmute)]
+                    std::mem::transmute::<_, *const dyn Fn()>(allow_blocking)
+                }));
 
-                    let _ = guard.run();
+                let _ = guard.run();
 
-                    // Ensure that we reset ob before allow_blocking is dropped.
-                    drop(_reset);
-                });
-            })
+                // Ensure that we reset ob before allow_blocking is dropped.
+                drop(_reset);
+            });
         });
 
         if self.gone.get() {
@@ -206,7 +204,7 @@ impl Worker {
     }
 
     /// Enter an in-place blocking section
-    fn block_in_place(&self, blocking_pool: &blocking::Spawner) {
+    fn block_in_place(&self) {
         // If our Worker has already been given away, then blocking is fine!
         if self.gone.get() {
             return;
@@ -259,8 +257,7 @@ impl Worker {
         };
 
         // Give away the worker
-        let b = blocking_pool.clone();
-        runtime::spawn_blocking(move || worker.run(b));
+        runtime::spawn_blocking(move || worker.run());
     }
 }
 

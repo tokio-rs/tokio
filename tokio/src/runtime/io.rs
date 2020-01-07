@@ -8,7 +8,7 @@ pub(crate) use std::io::Result;
 
 pub(crate) use variant::*;
 
-#[cfg(all(feature = "io-driver", not(loom)))]
+#[cfg(feature = "io-driver")]
 mod variant {
     use crate::io::driver;
     use crate::park::{Either, ParkThread};
@@ -28,6 +28,9 @@ mod variant {
     pub(crate) type Handle = Option<driver::Handle>;
 
     pub(crate) fn create_driver(enable: bool) -> io::Result<(Driver, Handle)> {
+        #[cfg(loom)]
+        assert!(!enable);
+
         if enable {
             let driver = driver::Driver::new()?;
             let handle = driver.handle();
@@ -40,7 +43,7 @@ mod variant {
     }
 }
 
-#[cfg(any(not(feature = "io-driver"), loom))]
+#[cfg(not(feature = "io-driver"))]
 mod variant {
     use crate::park::ParkThread;
 
