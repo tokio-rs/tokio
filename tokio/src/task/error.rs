@@ -40,7 +40,7 @@ impl JoinError {
         }
     }
 
-    ///Returns true iff the error was caused by the task being cancelled
+    /// Returns true iff the error was caused by the task being cancelled
     pub fn is_cancelled(&self) -> bool {
         match &self.repr {
             Repr::Cancelled => true,
@@ -48,7 +48,7 @@ impl JoinError {
         }
     }
 
-    ///Returns true iff the error was caused by the task panicking
+    /// Returns true iff the error was caused by the task panicking
     pub fn is_panic(&self) -> bool {
         match &self.repr {
             Repr::Panic(_) => true,
@@ -56,7 +56,7 @@ impl JoinError {
         }
     }
 
-    ///If the error was caused by a panic, consumes the error and
+    /// If the error was caused by a panic, consumes the error and
     /// returns the payload of the panic. Otherwise, returns an error
     /// result containing the original JoinError.
     pub fn into_panic(self) -> Result<Box<dyn Any + Send + 'static>, JoinError> {
