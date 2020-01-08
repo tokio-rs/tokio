@@ -2,8 +2,9 @@
 //! all consumers.
 //!
 //! A [`Sender`] is used to broadcast values to **all** connected [`Receiver`]
-//! values. Both [`Sender`] and [`Receiver`] handles are clone-able, allowing
-//! concurrent send and receive actions. Additionally, [`Sender`] is `Sync`.
+//! values. [`Sender`] handles are clone-able, allowing concurrent send and
+//! receive actions. [`Sender`] and [`Receiver`] are both `Send` and `Sync` as
+//! long as `T` is also `Send` or `Sync` respectively.
 //!
 //! When a value is sent, **all** [`Receiver`] handles are notified and will
 //! receive the value. The value is stored once inside the channel and cloned on

@@ -328,19 +328,11 @@ impl Builder {
 
         // Create I/O driver
         let (io_driver, io_handle) = io::create_driver(self.enable_io, None)?;
-        let (driver, time_handle) =
-            time::create_driver(self.enable_time, io_driver, clock.clone(), false);
+        let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone());
 
         let spawner = Spawner::Shell;
 
-        let blocking_pool = blocking::create_blocking_pool(
-            self,
-            &spawner,
-            &io_handle,
-            &time_handle,
-            &clock,
-            self.max_threads,
-        );
+        let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
         let blocking_spawner = blocking_pool.spawner().clone();
 
         Ok(Runtime {
@@ -422,13 +414,12 @@ impl Builder {
             .map(|_seed| crate::simulation::Simulation::new())
             .expect("");
 
-        let clock = time::create_clock(true);
+        let clock = crate::time::Clock::new_frozen();
 
         // Create I/O driver
         let (io_driver, io_handle) = io::create_driver(false, Some(sim.handle()))?;
 
-        let (driver, time_handle) =
-            time::create_driver(self.enable_time, io_driver, clock.clone(), true);
+        let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone());
 
         // And now put a single-threaded scheduler on top of the timer. When
         // there are no futures ready to do something, it'll let the timer or
@@ -438,14 +429,7 @@ impl Builder {
         let spawner = Spawner::Basic(scheduler.spawner());
 
         // Blocking pool
-        let blocking_pool = blocking::create_blocking_pool(
-            self,
-            &spawner,
-            &io_handle,
-            &time_handle,
-            &clock,
-            self.max_threads,
-        );
+        let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
         let blocking_spawner = blocking_pool.spawner().clone();
         let simulation_handle = sim.handle();
         Ok(Runtime {
@@ -484,7 +468,7 @@ cfg_rt_core! {
             // Create I/O driver
             let (io_driver, io_handle) = io::create_driver(self.enable_io, None)?;
 
-            let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone(), false);
+            let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone());
 
             // And now put a single-threaded scheduler on top of the timer. When
             // there are no futures ready to do something, it'll let the timer or
@@ -494,7 +478,7 @@ cfg_rt_core! {
             let spawner = Spawner::Basic(scheduler.spawner());
 
             // Blocking pool
-            let blocking_pool = blocking::create_blocking_pool(self, &spawner, &io_handle, &time_handle, &clock, self.max_threads);
+            let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
             let blocking_spawner = blocking_pool.spawner().clone();
 
             Ok(Runtime {
@@ -531,28 +515,31 @@ cfg_rt_threaded! {
             let clock = time::create_clock(false);
 
             let (io_driver, io_handle) = io::create_driver(self.enable_io, None)?;
-            let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone(), false);
+            let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone());
             let (scheduler, workers) = ThreadPool::new(self.core_threads, Parker::new(driver));
             let spawner = Spawner::ThreadPool(scheduler.spawner().clone());
 
             // Create the blocking pool
-            let blocking_pool = blocking::create_blocking_pool(self, &spawner, &io_handle, &time_handle, &clock, self.max_threads);
+            let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
             let blocking_spawner = blocking_pool.spawner().clone();
 
+            // Create the runtime handle
+            let handle = Handle {
+                spawner,
+                io_handle,
+                time_handle,
+                clock,
+                blocking_spawner,
+                simulation: None,
+            };
+
             // Spawn the thread pool workers
-            workers.spawn(&blocking_spawner);
+            workers.spawn(&handle);
 
             Ok(Runtime {
                 kind: Kind::ThreadPool(scheduler),
                 simulation: None,
-                handle: Handle {
-                    spawner,
-                    io_handle,
-                    time_handle,
-                    clock,
-                    blocking_spawner,
-                    simulation: None,
-                },
+                handle,
                 blocking_pool,
             })
         }

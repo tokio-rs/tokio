@@ -4,7 +4,7 @@ mod atomic_stack;
 use self::atomic_stack::AtomicStack;
 
 mod entry;
-use self::entry::Entry;
+pub(super) use self::entry::Entry;
 
 mod handle;
 pub(crate) use self::handle::Handle;
@@ -88,8 +88,6 @@ pub(crate) struct Driver<T> {
 
     /// Source of "now" instances
     clock: Clock,
-
-    simulation: bool,
 }
 
 /// Timer state shared between `Driver`, `Handle`, and `Registration`.
@@ -123,7 +121,7 @@ where
     /// thread and `now` to get the current `Instant`.
     ///
     /// Specifying the source of time is useful when testing.
-    pub(crate) fn new(park: T, clock: Clock, simulation: bool) -> Driver<T> {
+    pub(crate) fn new(park: T, clock: Clock) -> Driver<T> {
         let unpark = Box::new(park.unpark());
 
         Driver {
@@ -131,7 +129,6 @@ where
             wheel: wheel::Wheel::new(),
             park,
             clock,
-            simulation,
         }
     }
 
@@ -248,11 +245,13 @@ where
                 let deadline = self.expiration_instant(when);
 
                 if deadline > now {
-                    if self.simulation {
-                        self.clock.advance(deadline - now);
+                    let dur = deadline - now;
+
+                    if self.clock.is_frozen() {
                         self.park.park_timeout(Duration::from_secs(0))?;
+                        self.clock.advance(dur);
                     } else {
-                        self.park.park_timeout(deadline - now)?;
+                        self.park.park_timeout(dur)?;
                     }
                 } else {
                     self.park.park_timeout(Duration::from_secs(0))?;
@@ -277,24 +276,20 @@ where
                 let deadline = self.expiration_instant(when);
 
                 if deadline > now {
-                    let park_time = cmp::min(deadline - now, duration);
-                    if self.simulation {
-                        self.clock.advance(park_time);
+                    let duration = cmp::min(deadline - now, duration);
+
+                    if self.clock.is_frozen() {
                         self.park.park_timeout(Duration::from_secs(0))?;
+                        self.clock.advance(duration);
                     } else {
-                        self.park.park_timeout(park_time)?;
+                        self.park.park_timeout(duration)?;
                     }
                 } else {
                     self.park.park_timeout(Duration::from_secs(0))?;
                 }
             }
             None => {
-                if self.simulation {
-                    self.clock.advance(duration);
-                    self.park.park_timeout(Duration::from_secs(0))?;
-                } else {
-                    self.park.park_timeout(duration)?;
-                }
+                self.park.park_timeout(duration)?;
             }
         }
 

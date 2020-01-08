@@ -2,7 +2,7 @@ use crate::future::poll_fn;
 use crate::io::PollEvented;
 use crate::io::{AsyncRead, AsyncWrite};
 use crate::net::tcp::split::{split, ReadHalf, WriteHalf};
-use crate::{net::ToSocketAddrs, runtime::context::ThreadContext};
+use crate::{net::ToSocketAddrs, runtime::context};
 use bytes::Buf;
 
 use std::convert::TryFrom;
@@ -85,7 +85,7 @@ impl TcpStream {
     /// }
     /// ```
     pub async fn connect<A: ToSocketAddrs>(addr: A) -> io::Result<TcpStream> {
-        let handle = ThreadContext::io_handle().expect("no reactor");
+        let handle = context::io_handle().expect("no reactor");
         let addrs = addr.to_socket_addrs().await?;
         let mut last_err = None;
         for addr in addrs {
@@ -120,8 +120,24 @@ impl TcpStream {
     ///     Ok(())
     /// }
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function panics if thread-local runtime is not set.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if thread-local runtime is not set.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
     pub fn from_std(stream: net::TcpStream) -> io::Result<TcpStream> {
-        let handle = ThreadContext::io_handle().expect("no reactor");
+        let handle = context::io_handle().expect("no reactor");
         let io = mio::net::TcpStream::from_stream(stream)?;
         let registration = handle.register_io(&io)?;
         let io = PollEvented::new(io, registration)?;
@@ -133,7 +149,7 @@ impl TcpStream {
     // This should be removed in favor of some in-crate TcpSocket builder API.
     #[doc(hidden)]
     pub async fn connect_std(stream: net::TcpStream, addr: &SocketAddr) -> io::Result<TcpStream> {
-        let handle = ThreadContext::io_handle().expect("no reactor");
+        let handle = context::io_handle().expect("no reactor");
 
         let io = mio::net::TcpStream::connect_stream(stream, addr)?;
         let registration = handle.register_io(&io)?;
@@ -146,7 +162,7 @@ impl TcpStream {
     }
 
     pub(crate) fn from_mio(stream: mio::net::TcpStream) -> io::Result<TcpStream> {
-        let handle = ThreadContext::io_handle().expect("no reactor");
+        let handle = context::io_handle().expect("no reactor");
         let registration = handle.register_io(&stream)?;
         let io = PollEvented::new(stream, registration)?;
         Ok(TcpStream { io: io.into() })

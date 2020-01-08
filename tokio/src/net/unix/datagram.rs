@@ -1,6 +1,7 @@
 use crate::future::poll_fn;
 use crate::io::PollEvented;
 
+use crate::runtime::context;
 use std::convert::TryFrom;
 use std::fmt;
 use std::io;
@@ -45,16 +46,24 @@ impl UnixDatagram {
     ///
     /// The returned datagram will be associated with the given event loop
     /// specified by `handle` and is ready to perform I/O.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if thread-local runtime is not set.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
     pub fn from_std(datagram: net::UnixDatagram) -> io::Result<UnixDatagram> {
         let socket = mio_uds::UnixDatagram::from_datagram(datagram)?;
-        let handle = crate::runtime::context::ThreadContext::io_handle().expect("no reactor");
+        let handle = context::io_handle().expect("no reactor");
         let registration = handle.register_io(&socket)?;
         let io = PollEvented::new(socket, registration)?;
         Ok(UnixDatagram { io })
     }
 
     fn new(socket: mio_uds::UnixDatagram) -> io::Result<UnixDatagram> {
-        let handle = crate::runtime::context::ThreadContext::io_handle().expect("no reactor");
+        let handle = context::io_handle().expect("no reactor");
         let registration = handle.register_io(&socket)?;
         let io = PollEvented::new(socket, registration)?;
         Ok(UnixDatagram { io })

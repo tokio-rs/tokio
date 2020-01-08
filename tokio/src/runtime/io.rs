@@ -8,7 +8,7 @@ pub(crate) use std::io::Result;
 
 pub(crate) use variant::*;
 
-#[cfg(all(feature = "io-driver", not(loom)))]
+#[cfg(feature = "io-driver")]
 mod variant {
     use crate::io::driver;
     use crate::{
@@ -52,7 +52,7 @@ mod variant {
     }
 }
 
-#[cfg(any(not(feature = "io-driver"), loom))]
+#[cfg(not(feature = "io-driver"))]
 mod variant {
     use crate::park::ParkThread;
 

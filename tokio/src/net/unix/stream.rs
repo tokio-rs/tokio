@@ -2,6 +2,7 @@ use crate::future::poll_fn;
 use crate::io::{AsyncRead, AsyncWrite, PollEvented};
 use crate::net::unix::split::{split, ReadHalf, WriteHalf};
 use crate::net::unix::ucred::{self, UCred};
+use crate::runtime::context;
 
 use std::convert::TryFrom;
 use std::fmt;
@@ -47,9 +48,17 @@ impl UnixStream {
     ///
     /// The returned stream will be associated with the given event loop
     /// specified by `handle` and is ready to perform I/O.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if thread-local runtime is not set.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
     pub fn from_std(stream: net::UnixStream) -> io::Result<UnixStream> {
         let stream = mio_uds::UnixStream::from_stream(stream)?;
-        let handle = crate::runtime::context::ThreadContext::io_handle().expect("no reactor");
+        let handle = context::io_handle().expect("no reactor");
         let registration = handle.register_io(&stream)?;
         let io = PollEvented::new(stream, registration)?;
 
@@ -70,7 +79,7 @@ impl UnixStream {
     }
 
     pub(crate) fn new(stream: mio_uds::UnixStream) -> io::Result<UnixStream> {
-        let handle = crate::runtime::context::ThreadContext::io_handle().expect("no reactor");
+        let handle = context::io_handle().expect("no reactor");
         let registration = handle.register_io(&stream)?;
         let io = PollEvented::new(stream, registration)?;
         Ok(UnixStream { io })

@@ -30,6 +30,7 @@ use reap::Reaper;
 use crate::io::PollEvented;
 use crate::process::kill::Kill;
 use crate::process::SpawnedChild;
+use crate::runtime::context;
 use crate::signal::unix::{signal, Signal, SignalKind};
 
 use mio::event::Evented;
@@ -224,7 +225,7 @@ where
         }
     }
     let io = Fd { inner: io };
-    let handle = crate::runtime::context::ThreadContext::io_handle().expect("no reactor");
+    let handle = context::io_handle().expect("no reactor");
     let registration = handle.register_io(&io)?;
     Ok(Some(PollEvented::new(io, registration)?))
 }

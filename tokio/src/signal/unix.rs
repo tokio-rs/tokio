@@ -6,6 +6,7 @@
 #![cfg(unix)]
 
 use crate::io::{AsyncRead, PollEvented};
+use crate::runtime::context;
 use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
 use crate::sync::mpsc::{channel, Receiver};
 
@@ -286,7 +287,7 @@ impl Driver {
         // either, since we can't compare Handles or assume they will always
         // point to the exact same reactor.
         let stream = globals().receiver.try_clone()?;
-        let handle = crate::runtime::context::ThreadContext::io_handle().expect("no reactor");
+        let handle = context::io_handle().expect("no reactor");
         let registration = handle.register_io(&stream)?;
         let wakeup = PollEvented::new(stream, registration)?;
 

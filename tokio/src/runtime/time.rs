@@ -5,7 +5,7 @@
 
 pub(crate) use variant::*;
 
-#[cfg(all(feature = "time", not(loom)))]
+#[cfg(feature = "time")]
 mod variant {
     use crate::park::Either;
     use crate::runtime::io;
@@ -28,10 +28,9 @@ mod variant {
         enable: bool,
         io_driver: io::Driver,
         clock: Clock,
-        simulation: bool,
     ) -> (Driver, Handle) {
         if enable {
-            let driver = driver::Driver::new(io_driver, clock, simulation);
+            let driver = driver::Driver::new(io_driver, clock);
             let handle = driver.handle();
 
             (Either::A(driver), Some(handle))
@@ -41,7 +40,7 @@ mod variant {
     }
 }
 
-#[cfg(any(not(feature = "time"), loom))]
+#[cfg(not(feature = "time"))]
 mod variant {
     use crate::runtime::io;
 

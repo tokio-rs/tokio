@@ -1,6 +1,7 @@
 use crate::future::poll_fn;
 use crate::io::PollEvented;
 use crate::net::unix::{Incoming, UnixStream};
+use crate::runtime::context;
 
 use mio::Ready;
 use mio_uds;
@@ -21,12 +22,20 @@ cfg_uds! {
 
 impl UnixListener {
     /// Creates a new `UnixListener` bound to the specified path.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if thread-local runtime is not set.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
     pub fn bind<P>(path: P) -> io::Result<UnixListener>
     where
         P: AsRef<Path>,
     {
         let listener = mio_uds::UnixListener::bind(path)?;
-        let handle = crate::runtime::context::ThreadContext::io_handle().expect("no reactor");
+        let handle = context::io_handle().expect("no reactor");
         let registration = handle.register_io(&listener)?;
         let io = PollEvented::new(listener, registration)?;
         Ok(UnixListener { io })
@@ -37,9 +46,17 @@ impl UnixListener {
     ///
     /// The returned listener will be associated with the given event loop
     /// specified by `handle` and is ready to perform I/O.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if thread-local runtime is not set.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
     pub fn from_std(listener: net::UnixListener) -> io::Result<UnixListener> {
         let listener = mio_uds::UnixListener::from_listener(listener)?;
-        let handle = crate::runtime::context::ThreadContext::io_handle().expect("no reactor");
+        let handle = context::io_handle().expect("no reactor");
         let registration = handle.register_io(&listener)?;
         let io = PollEvented::new(listener, registration)?;
         Ok(UnixListener { io })

@@ -300,10 +300,6 @@ where
         self.drop_waker();
     }
 
-    pub(super) fn wake_by_local_ref(&self) {
-        self.wake_by_ref();
-    }
-
     pub(super) fn wake_by_ref(&self) {
         if self.header().state.transition_to_notified() {
             unsafe {

@@ -5,7 +5,7 @@
 //! configurable.
 
 cfg_not_test_util! {
-    use crate::time::Instant;
+    use crate::time::{Duration, Instant};
 
     #[derive(Debug, Clone)]
     pub(crate) struct Clock {}
@@ -21,6 +21,14 @@ cfg_not_test_util! {
 
         pub(crate) fn now(&self) -> Instant {
             now()
+        }
+
+        pub(crate) fn is_frozen(&self) -> bool {
+            false
+        }
+
+        pub(crate) fn advance(&self, _dur: Duration) {
+            unreachable!();
         }
     }
 }
@@ -56,7 +64,7 @@ cfg_test_util! {
     /// Panics if time is already frozen or if called from outside of the Tokio
     /// runtime.
     pub fn pause() {
-        let clock = context::ThreadContext::clock().expect("time cannot be frozen from outside the Tokio runtime");
+        let clock = context::clock().expect("time cannot be frozen from outside the Tokio runtime");
         let mut frozen = clock.inner.frozen.lock().unwrap();
         if frozen.is_some() {
             panic!("time is already frozen");
@@ -74,7 +82,7 @@ cfg_test_util! {
     /// Panics if time is not frozen or if called from outside of the Tokio
     /// runtime.
     pub fn resume() {
-        let clock = context::ThreadContext::clock().expect("time cannot be frozen from outside the Tokio runtime");
+        let clock = context::clock().expect("time cannot be frozen from outside the Tokio runtime");
         let mut frozen = clock.inner.frozen.lock().unwrap();
 
         if frozen.is_none() {
@@ -94,14 +102,15 @@ cfg_test_util! {
     /// Panics if time is not frozen or if called from outside of the Tokio
     /// runtime.
     pub async fn advance(duration: Duration) {
-        let clock = context::ThreadContext::clock().expect("time cannot be frozen from outside the Tokio runtime");
+        let clock = context::clock().expect("time cannot be frozen from outside the Tokio runtime");
         clock.advance(duration);
         crate::task::yield_now().await;
     }
 
     /// Return the current instant, factoring in frozen time.
-    pub fn now() -> Instant {
-        if let Some(clock) = context::ThreadContext::clock() {
+
+    pub(crate) fn now() -> Instant {
+        if let Some(clock) = context::clock() {
             if let Some(frozen) = *clock.inner.frozen.lock().unwrap() {
                 Instant::from_std(clock.inner.start + frozen)
             } else {
@@ -133,6 +142,10 @@ cfg_test_util! {
                     frozen: Mutex::new(Some(Duration::from_millis(0))),
                 }),
             }
+        }
+
+        pub(crate) fn is_frozen(&self) -> bool {
+            self.inner.frozen.lock().unwrap().is_some()
         }
 
         pub(crate) fn advance(&self, duration: Duration) {

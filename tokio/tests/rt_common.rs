@@ -535,7 +535,7 @@ rt_test! {
 
         impl Drop for Boom {
             fn drop(&mut self) {
-                assert!(::std::thread::panicking());
+                assert!(std::thread::panicking());
                 self.0.take().unwrap().send(()).unwrap();
             }
         }

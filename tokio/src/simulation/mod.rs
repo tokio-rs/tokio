@@ -1,4 +1,5 @@
 #![allow(dead_code, unused_variables, unreachable_pub)]
+use crate::runtime::context;
 use std::{collections, io, net, num, string::ToString, sync};
 mod machine;
 pub mod tcp;
@@ -158,7 +159,7 @@ where
     F: Future + Send + 'static,
     F::Output: Send + 'static,
 {
-    let handle = crate::runtime::context::ThreadContext::simulation_handle()
+    let handle = context::simulation_handle()
         .expect("cannot spawn simulation machine from outside of a runtime context");
     let machineid = handle.register_machine(hostname);
     let wrap = machine::SimulatedFuture::new(f, machineid);
@@ -191,9 +192,9 @@ mod test {
             // Test that a 30 second timeout elapses instantly, this also allows
             // the future spawned above to run until idle, setting up the network
             // binding.
-            let time_before = crate::time::now();
+            let time_before = crate::time::Instant::now();
             crate::time::delay_for(std::time::Duration::from_secs(30)).await;
-            let time_after = crate::time::now();
+            let time_after = crate::time::Instant::now();
 
             assert!(
                 time_before + std::time::Duration::from_secs(30) >= time_after,

@@ -2,8 +2,7 @@ use crate::future::poll_fn;
 use crate::io::PollEvented;
 use crate::net::tcp::{Incoming, TcpStream};
 use crate::net::ToSocketAddrs;
-use crate::runtime::context::ThreadContext;
-
+use crate::runtime::context;
 use std::convert::TryFrom;
 use std::fmt;
 use std::io;
@@ -80,7 +79,7 @@ impl TcpListener {
     /// }
     /// ```
     pub async fn bind<A: ToSocketAddrs>(addr: A) -> io::Result<TcpListener> {
-        let handle = ThreadContext::io_handle().expect("no reactor");
+        let handle = context::io_handle().expect("no reactor");
         let addrs = addr.to_socket_addrs().await?;
 
         let mut last_err = None;
@@ -202,8 +201,16 @@ impl TcpListener {
     ///     Ok(())
     /// }
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function panics if thread-local runtime is not set.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
     pub fn from_std(listener: net::TcpListener) -> io::Result<TcpListener> {
-        let handle = ThreadContext::io_handle().expect("no reactor");
+        let handle = context::io_handle().expect("no reactor");
         let io = mio::net::TcpListener::from_std(listener)?;
         let registration = handle.register_io(&io)?;
         let io = PollEvented::new(io, registration)?;

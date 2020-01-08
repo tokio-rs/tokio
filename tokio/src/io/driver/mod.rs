@@ -12,7 +12,6 @@ use crate::io::PollEvented;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::net::tcp::{ListenerInner, StreamInner};
 use crate::park::{Park, Unpark};
-#[cfg(all(feature = "io-driver", not(loom)))]
 use crate::simulation;
 use crate::util::slab::{Address, Slab};
 
@@ -284,7 +283,6 @@ impl fmt::Debug for Driver {
     }
 }
 // ========== Handle Impl ========== //
-
 #[derive(Clone)]
 pub(crate) struct MioHandle {
     inner: Weak<Inner>,

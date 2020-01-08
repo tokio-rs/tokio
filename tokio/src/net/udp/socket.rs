@@ -2,6 +2,7 @@ use crate::future::poll_fn;
 use crate::io::PollEvented;
 use crate::net::udp::split::{split, RecvHalf, SendHalf};
 use crate::net::ToSocketAddrs;
+use crate::runtime::context;
 
 use std::convert::TryFrom;
 use std::fmt;
@@ -44,7 +45,7 @@ impl UdpSocket {
     }
 
     fn new(socket: mio::net::UdpSocket) -> io::Result<UdpSocket> {
-        let handle = crate::runtime::context::ThreadContext::io_handle().expect("no reactor");
+        let handle = context::io_handle().expect("no reactor");
         let registration = handle.register_io(&socket)?;
         let io = PollEvented::new(socket, registration)?;
         Ok(UdpSocket { io })
@@ -59,9 +60,17 @@ impl UdpSocket {
     /// This can be used in conjunction with net2's `UdpBuilder` interface to
     /// configure a socket before it's handed off, such as setting options like
     /// `reuse_address` or binding to multiple addresses.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if thread-local runtime is not set.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
     pub fn from_std(socket: net::UdpSocket) -> io::Result<UdpSocket> {
         let io = mio::net::UdpSocket::from_socket(socket)?;
-        let handle = crate::runtime::context::ThreadContext::io_handle().expect("no reactor");
+        let handle = context::io_handle().expect("no reactor");
         let registration = handle.register_io(&io)?;
         let io = PollEvented::new(io, registration)?;
         Ok(UdpSocket { io })

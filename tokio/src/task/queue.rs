@@ -261,19 +261,26 @@ where
     /// If the mutex around the remote queue is poisoned _and_ the current
     /// thread is not already panicking. This is safe to call in a `Drop` impl.
     fn close_remote(&self) {
-        #[allow(clippy::match_wild_err_arm)]
-        let mut lock = match self.remote_queue.lock() {
-            // If the lock is poisoned, but the thread is already panicking,
-            // avoid a double panic. This is necessary since this fn can be
-            // called in a drop impl.
-            Err(_) if std::thread::panicking() => return,
-            Err(_) => panic!("mutex poisoned"),
-            Ok(lock) => lock,
-        };
-        lock.open = false;
+        loop {
+            #[allow(clippy::match_wild_err_arm)]
+            let mut lock = match self.remote_queue.lock() {
+                // If the lock is poisoned, but the thread is already panicking,
+                // avoid a double panic. This is necessary since this fn can be
+                // called in a drop impl.
+                Err(_) if std::thread::panicking() => return,
+                Err(_) => panic!("mutex poisoned"),
+                Ok(lock) => lock,
+            };
+            lock.open = false;
 
-        while let Some(task) = lock.queue.pop_front() {
-            task.shutdown();
+            if let Some(task) = lock.queue.pop_front() {
+                // Release lock before dropping task, in case
+                // task tries to re-schedule in its Drop.
+                drop(lock);
+                task.shutdown();
+            } else {
+                return;
+            }
         }
     }
 
