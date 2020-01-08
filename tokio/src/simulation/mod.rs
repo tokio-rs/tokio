@@ -4,7 +4,8 @@ mod machine;
 pub mod tcp;
 mod util;
 use crate::task::JoinHandle;
-use machine::{current_machineid, LogicalMachine, LogicalMachineId};
+use machine::LogicalMachine;
+pub use machine::{current_machineid, LogicalMachineId};
 use std::future::Future;
 
 #[derive(Debug)]
@@ -204,13 +205,11 @@ mod test {
 
     #[test]
     fn simulation_networking() -> Result<(), Box<dyn Error>> {
-        let seed = 0;
         let mut runtime = crate::runtime::Builder::new()
-            .simulated_runtime(seed)
+            .simulated_runtime(0)
             .enable_all()
             .build()
             .unwrap();
-        // spawn a server
 
         runtime.block_on(async {
             // Spawn a server
