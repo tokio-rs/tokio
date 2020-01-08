@@ -108,7 +108,6 @@ cfg_test_util! {
     }
 
     /// Return the current instant, factoring in frozen time.
-
     pub(crate) fn now() -> Instant {
         if let Some(clock) = context::clock() {
             if let Some(frozen) = *clock.inner.frozen.lock().unwrap() {

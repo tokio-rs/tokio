@@ -324,7 +324,7 @@ impl Builder {
     fn build_shell_runtime(&mut self) -> io::Result<Runtime> {
         use crate::runtime::Kind;
 
-        let clock = time::create_clock(false);
+        let clock = time::create_clock();
 
         // Create I/O driver
         let (io_driver, io_handle) = io::create_driver(self.enable_io, None)?;
@@ -463,7 +463,7 @@ cfg_rt_core! {
             use crate::runtime::{BasicScheduler, Kind};
 
 
-            let clock = time::create_clock(false);
+            let clock = time::create_clock();
 
             // Create I/O driver
             let (io_driver, io_handle) = io::create_driver(self.enable_io, None)?;
@@ -512,7 +512,7 @@ cfg_rt_threaded! {
             assert!(self.enable_simulation.is_none(), "simulation cannot be enabled for the threaded runtime");
             assert!(self.core_threads <= self.max_threads, "Core threads number cannot be above max limit");
 
-            let clock = time::create_clock(false);
+            let clock = time::create_clock();
 
             let (io_driver, io_handle) = io::create_driver(self.enable_io, None)?;
             let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone());

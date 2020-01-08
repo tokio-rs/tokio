@@ -15,12 +15,8 @@ mod variant {
     pub(crate) type Driver = Either<driver::Driver<io::Driver>, io::Driver>;
     pub(crate) type Handle = Option<driver::Handle>;
 
-    pub(crate) fn create_clock(simulation: bool) -> Clock {
-        if simulation {
-            Clock::new_frozen()
-        } else {
-            Clock::new()
-        }
+    pub(crate) fn create_clock() -> Clock {
+        Clock::new()
     }
 
     /// Create a new timer driver / handle pair
@@ -48,7 +44,7 @@ mod variant {
     pub(crate) type Driver = io::Driver;
     pub(crate) type Handle = ();
 
-    pub(crate) fn create_clock(_simulation: bool) -> Clock {
+    pub(crate) fn create_clock() -> Clock {
         ()
     }
 
