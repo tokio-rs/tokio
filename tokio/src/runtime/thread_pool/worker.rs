@@ -546,6 +546,11 @@ impl GenerationGuard<'_> {
             }
 
             if notify {
+                // If any tasks are shutdown, they may be pushed on another
+                // worker's `pending_drop` stack. However, we don't know which
+                // workers need to be notified, so we just notify all of them.
+                // Since this is a shutdown process, excessive notification is
+                // not a huge deal.
                 self.worker.slices.notify_all();
                 notify = false;
             }
