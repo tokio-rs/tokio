@@ -265,7 +265,7 @@ pub trait StreamExt: Stream {
     /// async fn main() {
     ///     let mut stream = Alternate { state: 0 };
     ///
-    ///     // we can see the stream going back and forth
+    ///     // the stream goes back and forth
     ///     assert_eq!(stream.next().await, Some(0));
     ///     assert_eq!(stream.next().await, None);
     ///     assert_eq!(stream.next().await, Some(2));
