@@ -188,8 +188,7 @@ fn shutdown_with_notification() {
                 let _ = done_rx.await;
             });
 
-            while let Some(_) = rx.next().await {
-            }
+            while let Some(_) = rx.next().await {}
 
             let _ = done_tx.send(());
         });
