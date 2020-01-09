@@ -533,27 +533,41 @@ impl GenerationGuard<'_> {
         // Transition all tasks owned by the worker to canceled.
         self.owned().owned_tasks.shutdown();
 
-        // First, drain all tasks from both the local & global queue.
-        while let Some(task) = self.owned().work_queue.pop_local_first() {
-            task.shutdown();
-        }
-
-        // Notify all workers in case they have pending tasks to drop
-        //
-        // Not super efficient, but we are also shutting down.
-        self.worker.slices.notify_all();
+        // Always notify the first time around. This flushes any released tasks
+        // that happened before the call to `Worker::shutdown`
+        let mut notify = true;
 
         // The worker can only shutdown once there are no further owned tasks.
-        while !self.owned().owned_tasks.is_empty() {
+        loop {
+            // First, drain all tasks from both the local & global queue.
+            while let Some(task) = self.owned().work_queue.pop_local_first() {
+                notify = true;
+                task.shutdown();
+            }
+
+            if notify {
+                // If any tasks are shutdown, they may be pushed on another
+                // worker's `pending_drop` stack. However, we don't know which
+                // workers need to be notified, so we just notify all of them.
+                // Since this is a shutdown process, excessive notification is
+                // not a huge deal.
+                self.worker.slices.notify_all();
+                notify = false;
+            }
+
+            // Try draining more tasks
+            self.drain_tasks_pending_drop();
+
+            if self.owned().owned_tasks.is_empty() {
+                break;
+            }
+
             // Wait until task that this worker owns are released.
             //
             // `transition_to_parked` is not called as we are not working
             // anymore. When a task is released, the owning worker is unparked
             // directly.
             self.park_mut().park().expect("park failed");
-
-            // Try draining more tasks
-            self.drain_tasks_pending_drop();
         }
     }
 
