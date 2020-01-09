@@ -7,7 +7,7 @@ use tokio::fs;
 async fn copy() {
     fs::write("foo.txt", b"Hello File!").await.unwrap();
     fs::copy("foo.txt", "bar.txt").await.unwrap();
-    
+
     let from = fs::read("foo.txt").await.unwrap();
     let to = fs::read("bar.txt").await.unwrap();
 
