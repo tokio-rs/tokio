@@ -12,5 +12,4 @@ async fn copy() {
     let to = fs::read("bar.txt").await.unwrap();
 
     assert_eq!(from, to);
-    assert_eq!(String::from_utf8(from), String::from_utf8(to));
 }
