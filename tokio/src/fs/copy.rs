@@ -18,9 +18,9 @@ use std::path::Path;
 /// # }
 /// ```
 
-pub async fn copy<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q)  -> Result<u64, std::io::Error> {
+pub async fn copy<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> Result<u64, std::io::Error> {
     let from = File::open(from).await?;
     let to = File::create(to).await?;
-    let (mut from,  mut to) = (io::BufReader::new(from), io::BufWriter::new(to));
+    let (mut from, mut to) = (io::BufReader::new(from), io::BufWriter::new(to));
     io::copy(&mut from, &mut to).await
 }
