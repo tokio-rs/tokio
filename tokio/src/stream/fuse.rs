@@ -45,10 +45,9 @@ where
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        if self.stream.is_none() {
-            (0, Some(0))
-        } else {
-            unimplemented!();
+        match self.stream {
+            Some(ref stream) => stream.size_hint(),
+            None => (0, Some(0)),
         }
     }
 }

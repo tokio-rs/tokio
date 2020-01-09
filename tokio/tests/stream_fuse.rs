@@ -37,11 +37,14 @@ async fn basic_usage() {
     // however, once it is fused
     let mut stream = stream.fuse();
 
+    assert_eq!(stream.size_hint(), (0, None));
     assert_eq!(stream.next().await, Some(4));
+
+    assert_eq!(stream.size_hint(), (0, None));
     assert_eq!(stream.next().await, None);
 
     // it will always return `None` after the first time.
+    assert_eq!(stream.size_hint(), (0, Some(0)));
     assert_eq!(stream.next().await, None);
-    assert_eq!(stream.next().await, None);
-    assert_eq!(stream.next().await, None);
+    assert_eq!(stream.size_hint(), (0, Some(0)));
 }
