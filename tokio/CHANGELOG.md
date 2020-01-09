@@ -1,4 +1,12 @@
-# 0.2.8 (January 8, 2019)
+# 0.2.9 (January 9, 2019)
+
+### Fixes
+- `AsyncSeek` impl for `File` (#1986).
+- rt: shutdown deadlock in `threaded_scheduler` (#2074, #2082).
+- rt: memory ordering when dropping `JoinHandle` (#2044).
+- docs: misc API documentation fixes and improvements.
+
+# 0.2.8 (January 7, 2019)
 
 ### Fixes
 - depend on new version of `tokio-macros`.
