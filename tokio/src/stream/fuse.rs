@@ -31,11 +31,9 @@ where
     type Item = T::Item;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T::Item>> {
-        let res = unsafe {
-            match self.as_mut().project().stream.get_unchecked_mut() {
-                Some(stream) => ready!(Pin::new_unchecked(stream).poll_next(cx)),
-                None => return Poll::Ready(None),
-            }
+        let res = match Option::as_pin_mut(self.as_mut().project().stream) {
+            Some(stream) => ready!(stream.poll_next(cx)),
+            None => return Poll::Ready(None),
         };
 
         if res.is_none() {
