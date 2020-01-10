@@ -24,13 +24,13 @@ the Rust programming language. It is:
 [azure-badge]: https://dev.azure.com/tokio-rs/Tokio/_apis/build/status/tokio-rs.tokio?branchName=master
 [azure-url]: https://dev.azure.com/tokio-rs/Tokio/_build/latest?definitionId=1&branchName=master
 [discord-badge]: https://img.shields.io/discord/500028886025895936.svg?logo=discord&style=flat-square
-[discord-url]: https://discord.gg/6yGkFeN
+[discord-url]: https://discord.gg/tokio
 
 [Website](https://tokio.rs) |
 [Guides](https://tokio.rs/docs/) |
 [API Docs](https://docs.rs/tokio/latest/tokio) |
 [Roadmap](https://github.com/tokio-rs/tokio/blob/master/ROADMAP.md) |
-[Chat](https://discord.gg/6yGkFeN)
+[Chat](https://discord.gg/tokio)
 
 ## Overview
 
@@ -101,7 +101,7 @@ question. Last, if that doesn't work, try opening an [issue] with the question.
 
 [Guides]: https://tokio.rs/docs/
 [API documentation]: https://docs.rs/tokio/latest/tokio
-[chat]: https://discord.gg/6yGkFeN
+[chat]: https://discord.gg/tokio
 [issue]: https://github.com/tokio-rs/tokio/issues/new
 
 ## Contributing
