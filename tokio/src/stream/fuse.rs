@@ -18,7 +18,9 @@ where
     T: Stream,
 {
     pub(crate) fn new(stream: T) -> Fuse<T> {
-        Fuse { stream: Some(stream) }
+        Fuse {
+            stream: Some(stream),
+        }
     }
 }
 
