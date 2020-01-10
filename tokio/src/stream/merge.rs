@@ -64,8 +64,11 @@ where
     }
 }
 
-fn poll_next<T, U>(first: Pin<&mut T>, second: Pin<&mut U>, cx: &mut Context<'_>)
-    -> Poll<Option<T::Item>>
+fn poll_next<T, U>(
+    first: Pin<&mut T>,
+    second: Pin<&mut U>,
+    cx: &mut Context<'_>,
+) -> Poll<Option<T::Item>>
 where
     T: Stream,
     U: Stream<Item = T::Item>,

@@ -1,12 +1,11 @@
 use tokio::stream::{self, Stream, StreamExt};
 use tokio::sync::mpsc;
 use tokio_test::task;
-use tokio_test::{assert_ready, assert_pending};
+use tokio_test::{assert_pending, assert_ready};
 
 #[tokio::test]
 async fn merge_sync_streams() {
-    let mut s = stream::iter(vec![0, 2, 4, 6])
-        .merge(stream::iter(vec![1, 3, 5]));
+    let mut s = stream::iter(vec![0, 2, 4, 6]).merge(stream::iter(vec![1, 3, 5]));
 
     for i in 0..7 {
         let rem = 7 - i;
