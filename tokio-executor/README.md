@@ -2,6 +2,12 @@
 
 Task execution related traits and utilities.
 
+This crate is **deprecated in tokio 0.2.x** and has been moved and refactored
+into various places in the [`tokio::runtime`] module of the [`tokio`] crate.
+
+[`tokio::runtime`]: https://docs.rs/tokio/latest/tokio/runtime/index.html
+[`tokio`]: https://docs.rs/tokio/latest/tokio/index.html
+
 [Documentation](https://docs.rs/tokio-executor/0.1.9/tokio_executor)
 
 ## Overview

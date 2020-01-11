@@ -3,6 +3,16 @@
 A library for scheduling execution of futures concurrently across a pool of
 threads.
 
+This crate is **deprecated in tokio 0.2.x** and has been moved and refactored
+into various places in the [`tokio::runtime`] module of the [`tokio`] crate.
+Note that there is no longer a `ThreadPool` type, you are instead encouraged to
+make use of the thread pool used by a `Runtime` configured to use the
+[threaded scheduler].
+
+[`tokio::runtime`]: https://docs.rs/tokio/latest/tokio/runtime/index.html
+[`tokio`]: https://docs.rs/tokio/latest/tokio/index.html
+[threaded scheduler]: https://docs.rs/tokio/latest/tokio/runtime/index.html#threaded-scheduler
+
 [Documentation](https://docs.rs/tokio-threadpool/0.1.17/tokio_threadpool)
 
 ### Why not Rayon?

@@ -2,6 +2,12 @@
 
 Unix signal handling for Tokio.
 
+This crate is **deprecated in tokio 0.2.x** and has been moved into
+[`tokio::signal`] behind the `signal` [feature flag].
+
+[`tokio::signal`]: https://docs.rs/tokio/latest/tokio/signal/index.html
+[feature flag]: https://docs.rs/tokio/latest/tokio/index.html#feature-flags
+
 [Documentation](https://docs.rs/tokio-signal/0.2.8/tokio_signal)
 
 ## Usage
