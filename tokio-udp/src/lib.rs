@@ -3,6 +3,12 @@
 
 //! UDP bindings for `tokio`.
 //!
+//! > **Note:** This crate is **deprecated in tokio 0.2.x** and has been moved
+//! > into[`tokio::udp`] behind the `udp` [feature flag].
+//!
+//! [`tokio::udp`]: https://docs.rs/tokio/latest/tokio/udp/index.html
+//! [feature flag]: https://docs.rs/tokio/latest/tokio/index.html#feature-flags
+//!
 //! This module contains the UDP networking types, similar to the standard
 //! library, which can be used to implement networking protocols.
 //!

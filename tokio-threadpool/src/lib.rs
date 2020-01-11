@@ -3,6 +3,16 @@
 
 //! A work-stealing based thread pool for executing futures.
 //!
+//! > **Note:** This crate is **deprecated in tokio 0.2.x** and has been moved
+//! > and refactored into various places in the [`tokio::runtime`] module of the
+//! > [`tokio`] crate. Note that there is no longer a `ThreadPool` type, you are
+//! > instead encouraged to make use of the thread pool used by a `Runtime`
+//! > configured to use the [threaded scheduler].
+//!
+//! [`tokio::runtime`]: https://docs.rs/tokio/latest/tokio/runtime/index.html
+//! [`tokio`]: https://docs.rs/tokio/latest/tokio/index.html
+//! [threaded scheduler]: https://docs.rs/tokio/latest/tokio/runtime/index.html#threaded-scheduler
+//!
 //! The Tokio thread pool supports scheduling futures and processing them on
 //! multiple CPU cores. It is optimized for the primary Tokio use case of many
 //! independent tasks with limited computation and with most tasks waiting on

@@ -3,6 +3,16 @@
 
 //! Event loop that drives Tokio I/O resources.
 //!
+//! > **Note:** This crate is **deprecated in tokio 0.2.x** and has been moved
+//! > and refactored into various places in the [`tokio::runtime`] and
+//! > [`tokio::io`] modules of the [`tokio`] crate. The Reactor has also been
+//! > renamed the "I/O Driver".
+//!
+//! [`tokio::runtime`]: https://docs.rs/tokio/latest/tokio/runtime/index.html
+//! [`tokio::io`]: https://docs.rs/tokio/latest/tokio/io/index.html
+//! [`tokio`]: https://docs.rs/tokio/latest/tokio/index.html
+//! [`io-driver` feature]: https://docs.rs/tokio/0.2.9/tokio/index.html#feature-flags
+//!
 //! The reactor is the engine that drives asynchronous I/O resources (like TCP and
 //! UDP sockets). It is backed by [`mio`] and acts as a bridge between [`mio`] and
 //! [`futures`].

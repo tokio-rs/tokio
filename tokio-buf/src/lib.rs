@@ -3,6 +3,8 @@
 
 //! Asynchronous stream of bytes.
 //!
+//! > **Note:** This crate has been **deprecated in tokio 0.2.x**.
+//!
 //! This crate contains the `BufStream` trait and a number of combinators for
 //! this trait. The trait is similar to `Stream` in the `futures` library, but
 //! instead of yielding arbitrary values, it only yields types that implement

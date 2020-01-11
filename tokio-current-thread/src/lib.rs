@@ -4,6 +4,14 @@
 //! A single-threaded executor which executes tasks on the same thread from which
 //! they are spawned.
 //!
+//! > **Note:** This crate is **deprecated in tokio 0.2.x** and has been moved
+//! > and refactored into various places in the [`tokio`] crate. The closest
+//! replacement is to make use of [`tokio::task::LocalSet::block_on`] which
+//! requires the [`rt-util` feature].
+//!
+//! [`tokio`]: https://docs.rs/tokio/latest/tokio/index.html
+//! [`tokio::task::LocalSet::block_on`]: https://docs.rs/tokio/latest/tokio/task/struct.LocalSet.html#method.block_on
+//! [`rt-util` feature]: https://docs.rs/tokio/latest/tokio/index.html#feature-flags
 //!
 //! The crate provides:
 //!

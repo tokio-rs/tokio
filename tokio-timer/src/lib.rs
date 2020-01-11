@@ -3,6 +3,12 @@
 
 //! Utilities for tracking time.
 //!
+//! > **Note:** This crate is **deprecated in tokio 0.2.x** and has been moved
+//! > into [`tokio::time`] behind the `time` [feature flag].
+//!
+//! [`tokio::time`]: https://docs.rs/tokio/latest/tokio/time/index.html
+//! [feature flag]: https://docs.rs/tokio/latest/tokio/index.html#feature-flags
+//!
 //! This crate provides a number of utilities for working with periods of time:
 //!
 //! * [`Delay`]: A future that completes at a specified instant in time.

@@ -3,6 +3,11 @@
 
 //! Core I/O traits and combinators when working with Tokio.
 //!
+//! > **Note:** This crate has been **deprecated in tokio 0.2.x** and has been
+//! > moved into [`tokio::io`].
+//!
+//! [`tokio::io`]: https://docs.rs/tokio/latest/tokio/io/index.html
+//!
 //! A description of the high-level I/O combinators can be [found online] in
 //! addition to a description of the [low level details].
 //!
