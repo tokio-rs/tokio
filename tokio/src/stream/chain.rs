@@ -36,9 +36,8 @@ where
 
         let me = self.project();
 
-        match ready!(me.a.poll_next(cx)) {
-            Some(v) => return Ready(Some(v)),
-            None => {}
+        if let Some(v) = ready!(me.a.poll_next(cx)) {
+            return Ready(Some(v));
         }
 
         me.b.poll_next(cx)
