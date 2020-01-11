@@ -2,6 +2,12 @@
 
 Utilities for encoding and decoding frames.
 
+This crate is **deprecated in tokio 0.2.x** and has been moved into
+[`tokio_util::codec`] of the [`tokio-utils` crate] behind the `codec` feature flag.
+
+[`tokio::codec`]: https://docs.rs/tokio-util/latest/tokio_util/codec/index.html
+[`tokio-utils` crate]: https://docs.rs/tokio-util/latest/tokio_util
+
 [Documentation](https://docs.rs/tokio-codec)
 
 ## Usage

@@ -2,6 +2,14 @@
 
 Event loop that drives Tokio I/O resources.
 
+This crate is **deprecated in tokio 0.2.x** and has been moved and refactored
+into various places in the [`tokio::runtime`] and [`tokio::io`] modules of the
+[`tokio`] crate.
+
+[`tokio::runtime`]: https://docs.rs/tokio/latest/tokio/runtime/index.html
+[`tokio::io`]: https://docs.rs/tokio/latest/tokio/io/index.html
+[`tokio`]: https://docs.rs/tokio/latest/tokio/index.html
+
 [Documentation](https://docs.rs/tokio-reactor/0.1.11/tokio_reactor)
 
 ## Overview

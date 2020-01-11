@@ -2,6 +2,12 @@
 
 Asynchronous filesystem manipulation operations (and stdin, stdout, stderr).
 
+This crate has been **deprecated in tokio 0.2.x** and has been moved into
+[`tokio::fs`] behind the `fs` [feature flag].
+
+[`tokio::fs`]: https://docs.rs/tokio/latest/tokio/fs/index.html
+[feature flag]: https://docs.rs/tokio/latest/tokio/index.html#feature-flags
+
 [Documentation](https://docs.rs/tokio-fs/0.1.6/tokio_fs)
 
 ## Overview

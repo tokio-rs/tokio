@@ -2,6 +2,12 @@
 
 Synchronization utilities
 
+This crate is **deprecated in tokio 0.2.x** and has been moved into
+[`tokio::sync`] behind the `sync` [feature flag].
+
+[`tokio::sync`]: https://docs.rs/tokio/latest/tokio/sync/index.html
+[feature flag]: https://docs.rs/tokio/latest/tokio/index.html#feature-flags
+
 [Documentation](https://docs.rs/tokio-sync/0.1.6/tokio_sync/)
 
 ## Overview
