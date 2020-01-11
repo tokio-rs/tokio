@@ -34,6 +34,9 @@ use merge::Merge;
 mod next;
 use next::Next;
 
+mod once;
+pub use once::{once, Once};
+
 mod pending;
 pub use pending::{pending, Pending};
 
