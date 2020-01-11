@@ -28,6 +28,9 @@ use map::Map;
 mod next;
 use next::Next;
 
+mod once;
+pub use once::{once, Once};
+
 mod try_next;
 use try_next::TryNext;
 
