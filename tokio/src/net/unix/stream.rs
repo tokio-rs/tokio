@@ -58,8 +58,7 @@ impl UnixStream {
     /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
     pub fn from_std(stream: net::UnixStream) -> io::Result<UnixStream> {
         let stream = mio_uds::UnixStream::from_stream(stream)?;
-        let handle = context::io_handle().expect("no reactor");
-        let registration = handle.register_io(&stream)?;
+        let registration = context::register_io(&stream).expect("no reactor")?;
         let io = PollEvented::new(stream, registration)?;
 
         Ok(UnixStream { io })
@@ -79,8 +78,7 @@ impl UnixStream {
     }
 
     pub(crate) fn new(stream: mio_uds::UnixStream) -> io::Result<UnixStream> {
-        let handle = context::io_handle().expect("no reactor");
-        let registration = handle.register_io(&stream)?;
+        let registration = context::register_io(&stream).expect("no reactor")?;
         let io = PollEvented::new(stream, registration)?;
         Ok(UnixStream { io })
     }

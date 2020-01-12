@@ -79,13 +79,12 @@ impl TcpListener {
     /// }
     /// ```
     pub async fn bind<A: ToSocketAddrs>(addr: A) -> io::Result<TcpListener> {
-        let handle = context::io_handle().expect("no reactor");
         let addrs = addr.to_socket_addrs().await?;
 
         let mut last_err = None;
 
         for addr in addrs {
-            match handle.tcp_listener_bind_addr(addr) {
+            match context::tcp_listener_bind_addr(addr).expect("no reactor") {
                 Ok(listener) => return Ok(TcpListener { io: listener }),
                 Err(e) => last_err = Some(e),
             }
@@ -210,9 +209,8 @@ impl TcpListener {
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
     pub fn from_std(listener: net::TcpListener) -> io::Result<TcpListener> {
-        let handle = context::io_handle().expect("no reactor");
         let io = mio::net::TcpListener::from_std(listener)?;
-        let registration = handle.register_io(&io)?;
+        let registration = context::register_io(&io).expect("no reactor")?;
         let io = PollEvented::new(io, registration)?;
         Ok(TcpListener { io: io.into() })
     }

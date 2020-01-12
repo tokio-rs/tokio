@@ -287,8 +287,7 @@ impl Driver {
         // either, since we can't compare Handles or assume they will always
         // point to the exact same reactor.
         let stream = globals().receiver.try_clone()?;
-        let handle = context::io_handle().expect("no reactor");
-        let registration = handle.register_io(&stream)?;
+        let registration = context::register_io(&stream).expect("no reactor")?;
         let wakeup = PollEvented::new(stream, registration)?;
 
         Ok(Driver { wakeup })

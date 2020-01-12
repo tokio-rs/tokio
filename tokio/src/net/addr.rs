@@ -146,8 +146,8 @@ cfg_dns! {
             let s = self.to_owned();
 
             MaybeReady::Blocking(spawn_blocking(move || {
-                if let Some(handle) = context::io_handle() {
-                    handle.resolve_str_addr(&s)
+                if let Some(addr) = context::resolve_str_addr(&s) {
+                    addr
                 } else {
                     std::net::ToSocketAddrs::to_socket_addrs(&s)
                 }
@@ -187,8 +187,8 @@ cfg_dns! {
             let host = host.to_owned();
 
             MaybeReady::Blocking(spawn_blocking(move || {
-                if let Some(handle) = context::io_handle() {
-                    handle.resolve_tuple_addr(&(&host[..], port))
+                if let Some(addr) = context::resolve_tuple_addr(&(&host[..], port)) {
+                    addr
                 } else {
                     std::net::ToSocketAddrs::to_socket_addrs(&(&host[..], port))
                 }

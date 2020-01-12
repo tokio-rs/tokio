@@ -56,15 +56,13 @@ impl UnixDatagram {
     /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
     pub fn from_std(datagram: net::UnixDatagram) -> io::Result<UnixDatagram> {
         let socket = mio_uds::UnixDatagram::from_datagram(datagram)?;
-        let handle = context::io_handle().expect("no reactor");
-        let registration = handle.register_io(&socket)?;
+        let registration = context::register_io(&socket).expect("no reactor")?;
         let io = PollEvented::new(socket, registration)?;
         Ok(UnixDatagram { io })
     }
 
     fn new(socket: mio_uds::UnixDatagram) -> io::Result<UnixDatagram> {
-        let handle = context::io_handle().expect("no reactor");
-        let registration = handle.register_io(&socket)?;
+        let registration = context::register_io(&socket).expect("no reactor")?;
         let io = PollEvented::new(socket, registration)?;
         Ok(UnixDatagram { io })
     }

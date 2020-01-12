@@ -85,11 +85,13 @@ impl TcpStream {
     /// }
     /// ```
     pub async fn connect<A: ToSocketAddrs>(addr: A) -> io::Result<TcpStream> {
-        let handle = context::io_handle().expect("no reactor");
         let addrs = addr.to_socket_addrs().await?;
         let mut last_err = None;
         for addr in addrs {
-            match handle.tcp_stream_connect_addr(addr).await {
+            match context::tcp_stream_connect_addr(addr)
+                .await
+                .expect("no reactor")
+            {
                 Ok(stream) => return Ok(TcpStream::new(stream)),
                 Err(e) => last_err = Some(e),
             }
@@ -137,9 +139,8 @@ impl TcpStream {
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
     pub fn from_std(stream: net::TcpStream) -> io::Result<TcpStream> {
-        let handle = context::io_handle().expect("no reactor");
         let io = mio::net::TcpStream::from_stream(stream)?;
-        let registration = handle.register_io(&io)?;
+        let registration = context::register_io(&io).expect("no reactor")?;
         let io = PollEvented::new(io, registration)?;
         Ok(TcpStream::new(io.into()))
     }
@@ -149,10 +150,8 @@ impl TcpStream {
     // This should be removed in favor of some in-crate TcpSocket builder API.
     #[doc(hidden)]
     pub async fn connect_std(stream: net::TcpStream, addr: &SocketAddr) -> io::Result<TcpStream> {
-        let handle = context::io_handle().expect("no reactor");
-
         let io = mio::net::TcpStream::connect_stream(stream, addr)?;
-        let registration = handle.register_io(&io)?;
+        let registration = context::register_io(&io).expect("no reactor")?;
         let io = PollEvented::new(io, registration)?;
         poll_fn(|cx| io.poll_write_ready(cx)).await?;
         if let Some(e) = io.get_ref().take_error()? {
@@ -162,8 +161,7 @@ impl TcpStream {
     }
 
     pub(crate) fn from_mio(stream: mio::net::TcpStream) -> io::Result<TcpStream> {
-        let handle = context::io_handle().expect("no reactor");
-        let registration = handle.register_io(&stream)?;
+        let registration = context::register_io(&stream).expect("no reactor")?;
         let io = PollEvented::new(stream, registration)?;
         Ok(TcpStream { io: io.into() })
     }

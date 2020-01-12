@@ -1,7 +1,11 @@
 //! Thread local runtime context
+use crate::io::Registration;
 use crate::runtime::Handle;
-
+use mio::Evented;
 use std::cell::RefCell;
+use std::io;
+use std::net;
+use std::vec;
 
 thread_local! {
     static CONTEXT: RefCell<Option<Handle>> = RefCell::new(None)
@@ -12,12 +16,43 @@ pub(crate) fn current() -> Option<Handle> {
 }
 
 cfg_io_driver! {
-    pub(crate) fn io_handle() -> crate::runtime::io::Handle {
+    fn io_handle() -> crate::runtime::io::Handle {
         CONTEXT.with(|ctx| match *ctx.borrow() {
             Some(ref ctx) => ctx.io_handle.clone(),
             None => Default::default(),
         })
     }
+
+    pub(crate) fn resolve_str_addr(addr: &str) -> Option<io::Result<vec::IntoIter<net::SocketAddr>>> {
+        let handle = io_handle();
+        handle.map(|h| h.resolve_str_addr(addr))
+    }
+
+    pub(crate) fn resolve_tuple_addr(addr: &(&str, u16)) -> Option<io::Result<vec::IntoIter<net::SocketAddr>>> {
+        let handle = io_handle();
+        handle.map(|h| h.resolve_tuple_addr(addr))
+    }
+
+    pub(crate) fn tcp_listener_bind_addr(addr: net::SocketAddr) -> Option<io::Result<crate::net::tcp::ListenerInner>> {
+        let handle = io_handle();
+        handle.map(|h| h.tcp_listener_bind_addr(addr))
+    }
+
+    pub(crate) async fn tcp_stream_connect_addr(addr: net::SocketAddr) -> Option<io::Result<crate::net::tcp::StreamInner>> {
+        let handle = io_handle();
+        if let Some(h) = handle {
+            Some(h.tcp_stream_connect_addr(addr).await)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn register_io<T>(io: &T) -> Option<io::Result<Registration>>
+    where
+        T: Evented, {
+            let handle = io_handle();
+            handle.map(|h| h.register_io(io))
+        }
 }
 
 cfg_time! {

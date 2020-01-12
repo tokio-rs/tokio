@@ -45,8 +45,7 @@ impl UdpSocket {
     }
 
     fn new(socket: mio::net::UdpSocket) -> io::Result<UdpSocket> {
-        let handle = context::io_handle().expect("no reactor");
-        let registration = handle.register_io(&socket)?;
+        let registration = context::register_io(&socket).expect("no reactor")?;
         let io = PollEvented::new(socket, registration)?;
         Ok(UdpSocket { io })
     }
@@ -70,8 +69,7 @@ impl UdpSocket {
     /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
     pub fn from_std(socket: net::UdpSocket) -> io::Result<UdpSocket> {
         let io = mio::net::UdpSocket::from_socket(socket)?;
-        let handle = context::io_handle().expect("no reactor");
-        let registration = handle.register_io(&io)?;
+        let registration = context::register_io(&io).expect("no reactor")?;
         let io = PollEvented::new(io, registration)?;
         Ok(UdpSocket { io })
     }

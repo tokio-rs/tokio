@@ -225,7 +225,7 @@ where
         }
     }
     let io = Fd { inner: io };
-    let handle = context::io_handle().expect("no reactor");
-    let registration = handle.register_io(&io)?;
+
+    let registration = context::register_io(&io).expect("no reactor")?;
     Ok(Some(PollEvented::new(io, registration)?))
 }
