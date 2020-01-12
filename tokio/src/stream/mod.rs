@@ -10,6 +10,9 @@ use all::AllFuture;
 mod any;
 use any::AnyFuture;
 
+mod chain;
+use chain::Chain;
+
 mod empty;
 pub use empty::{empty, Empty};
 
@@ -538,6 +541,41 @@ pub trait StreamExt: Stream {
         F: FnMut(Self::Item) -> bool,
     {
         AnyFuture::new(self, f)
+    }
+
+    /// Combine two streams into one by first returning all values from the
+    /// first stream then all values from the second stream.
+    ///
+    /// As long as `self` still has values to emit, no values from `other` are
+    /// emitted, even if some are ready.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::stream::{self, StreamExt};
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let one = stream::iter(vec![1, 2, 3]);
+    ///     let two = stream::iter(vec![4, 5, 6]);
+    ///
+    ///     let mut stream = one.chain(two);
+    ///
+    ///     assert_eq!(stream.next().await, Some(1));
+    ///     assert_eq!(stream.next().await, Some(2));
+    ///     assert_eq!(stream.next().await, Some(3));
+    ///     assert_eq!(stream.next().await, Some(4));
+    ///     assert_eq!(stream.next().await, Some(5));
+    ///     assert_eq!(stream.next().await, Some(6));
+    ///     assert_eq!(stream.next().await, None);
+    /// }
+    /// ```
+    fn chain<U>(self, other: U) -> Chain<Self, U>
+    where
+        U: Stream<Item = Self::Item>,
+        Self: Sized,
+    {
+        Chain::new(self, other)
     }
 }
 
