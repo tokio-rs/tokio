@@ -2,6 +2,12 @@
 
 An implementation of process management for Tokio
 
+> This crate has been **deprecated in tokio 0.2.x** and has been moved into
+> [`tokio::process`] behind the `process` [feature flag].
+
+[`tokio::process`]: https://docs.rs/tokio/latest/tokio/process/index.html
+[feature flag]: https://docs.rs/tokio/latest/tokio/index.html#feature-flags
+
 [Documentation](https://docs.rs/tokio-process/0.2.4/tokio_process)
 
 ## Usage

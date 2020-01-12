@@ -1,5 +1,11 @@
 //! An implementation of asynchronous process management for Tokio.
 //!
+//! > This crate has been **deprecated in tokio 0.2.x** and has been moved into
+//! > [`tokio::process`] behind the `process` [feature flag].
+//!
+//! [`tokio::process`]: https://docs.rs/tokio/latest/tokio/process/index.html
+//! [feature flag]: https://docs.rs/tokio/latest/tokio/index.html#feature-flags
+//!
 //! This crate provides a `CommandExt` trait to enhance the functionality of the
 //! `Command` type in the standard library. The three methods provided by this
 //! trait mirror the "spawning" methods in the standard library. The
