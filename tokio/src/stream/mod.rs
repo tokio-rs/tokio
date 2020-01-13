@@ -13,6 +13,10 @@ use any::AnyFuture;
 mod chain;
 use chain::Chain;
 
+mod collect;
+use collect::Collect;
+pub use collect::FromStream;
+
 mod empty;
 pub use empty::{empty, Empty};
 
@@ -576,6 +580,78 @@ pub trait StreamExt: Stream {
         Self: Sized,
     {
         Chain::new(self, other)
+    }
+
+    /// Drain stream pushing all emitted values into a collection.
+    ///
+    /// `collect` streams all values, awaiting as needed. Values are pushed into
+    /// a collection. A number of different target collection types are
+    /// supported, including [`Vec`](std::vec::Vec),
+    /// [`String`](std::string::String), and [`Bytes`](bytes::Bytes).
+    ///
+    /// # `Result`
+    ///
+    /// `collect()` can also be used with streams of type `Result<T, E>` where
+    /// `T: FromStream<_>`. In this case, `collect()` will stream as long as
+    /// values yielded from the stream are `Ok(_)`. If `Err(_)` is encountered,
+    /// streaming is terminated and `collect()` returns the `Err`.
+    ///
+    /// # Notes
+    ///
+    /// `FromStream` is currently a sealed trait. Stabilization is pending
+    /// enhancements to the Rust langague.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage:
+    ///
+    /// ```
+    /// use tokio::stream::{self, StreamExt};
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let doubled: Vec<i32> =
+    ///         stream::iter(vec![1, 2, 3])
+    ///             .map(|x| x * 2)
+    ///             .collect()
+    ///             .await;
+    ///
+    ///     assert_eq!(vec![2, 4, 6], doubled);
+    /// }
+    /// ```
+    ///
+    /// Collecting a stream of `Result` values
+    ///
+    /// ```
+    /// use tokio::stream::{self, StreamExt};
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     // A stream containing only `Ok` values will be collected
+    ///     let values: Result<Vec<i32>, &str> =
+    ///         stream::iter(vec![Ok(1), Ok(2), Ok(3)])
+    ///             .collect()
+    ///             .await;
+    ///
+    ///     assert_eq!(Ok(vec![1, 2, 3]), values);
+    ///
+    ///     // A stream containing `Err` values will return the first error.
+    ///     let results = vec![Ok(1), Err("no"), Ok(2), Ok(3), Err("nein")];
+    ///
+    ///     let values: Result<Vec<i32>, &str> =
+    ///         stream::iter(results)
+    ///             .collect()
+    ///             .await;
+    ///
+    ///     assert_eq!(Err("no"), values);
+    /// }
+    /// ```
+    fn collect<T>(self) -> Collect<Self, T>
+    where
+        T: FromStream<Self::Item>,
+        Self: Sized,
+    {
+        Collect::new(self)
     }
 }
 
