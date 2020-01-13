@@ -175,7 +175,7 @@ where
 
     fn finalize(collection: &mut Self::Collection) -> Result<U, E> {
         if let Ok(collection) = collection.as_mut() {
-            return Ok(U::finalize(collection));
+            Ok(U::finalize(collection))
         } else {
             let res = mem::replace(collection, Ok(U::initialize(0, Some(0))));
 
