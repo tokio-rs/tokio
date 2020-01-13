@@ -20,7 +20,7 @@ use crate::park::{Park, Unpark};
 use crate::time::{wheel, Error};
 use crate::time::{Clock, Duration, Instant};
 
-use std::sync::atomic::Ordering::SeqCst;
+use std::sync::atomic::Ordering::{Relaxed, Release, SeqCst};
 use std::sync::Arc;
 use std::usize;
 use std::{cmp, fmt};
@@ -335,20 +335,20 @@ impl Inner {
 
     /// Increment the number of active timeouts
     fn increment(&self) -> Result<(), Error> {
-        let mut curr = self.num.load(SeqCst);
-
         loop {
+            let curr = self.num.load(Relaxed);
             if curr == MAX_TIMEOUTS {
                 return Err(Error::at_capacity());
             }
 
-            let actual = self.num.compare_and_swap(curr, curr + 1, SeqCst);
-
-            if curr == actual {
-                return Ok(());
+            match self
+                .num
+                .compare_exchange_weak(curr, curr + 1, Release, Relaxed)
+            {
+                Err(MAX_TIMEOUTS) => return Err(Error::at_capacity()),
+                Ok(_) => return Ok(()),
+                Err(_) => continue,
             }
-
-            curr = actual;
         }
     }
 
