@@ -335,8 +335,8 @@ impl Inner {
 
     /// Increment the number of active timeouts
     fn increment(&self) -> Result<(), Error> {
+        let mut curr = self.num.load(Relaxed);
         loop {
-            let curr = self.num.load(Relaxed);
             if curr == MAX_TIMEOUTS {
                 return Err(Error::at_capacity());
             }
@@ -345,9 +345,8 @@ impl Inner {
                 .num
                 .compare_exchange_weak(curr, curr + 1, Release, Relaxed)
             {
-                Err(MAX_TIMEOUTS) => return Err(Error::at_capacity()),
                 Ok(_) => return Ok(()),
-                Err(_) => continue,
+                Err(next) => curr = next,
             }
         }
     }
