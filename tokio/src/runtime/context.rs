@@ -1,11 +1,77 @@
 //! Thread local runtime context
 use crate::io::Registration;
 use crate::runtime::Handle;
+use crate::task::JoinHandle;
 use mio::Evented;
 use std::cell::RefCell;
+use std::future::Future;
 use std::io;
 use std::net;
 use std::vec;
+
+trait Syscalls {
+    fn resolve_str_addr(&self, addr: &str) -> Option<io::Result<vec::IntoIter<net::SocketAddr>>>;
+
+    fn resolve_tuple_addr(
+        &self,
+        addr: &(&str, u16),
+    ) -> Option<io::Result<vec::IntoIter<net::SocketAddr>>>;
+
+    fn tcp_listener_bind_addr(
+        &self,
+        addr: net::SocketAddr,
+    ) -> Option<io::Result<crate::net::tcp::ListenerInner>>;
+
+    fn tcp_stream_connect_addr(
+        &self,
+        addr: net::SocketAddr,
+    ) -> Option<Box<dyn Future<Output = io::Result<crate::net::tcp::StreamInner>>>>;
+
+    fn register_io(&self, io: Box<dyn Evented>) -> Option<io::Result<Registration>>;
+}
+
+impl Syscalls for Handle {
+    fn resolve_str_addr(&self, addr: &str) -> Option<io::Result<vec::IntoIter<net::SocketAddr>>> {
+        self.io_handle.as_ref().map(|h| h.resolve_str_addr(addr))
+    }
+
+    fn resolve_tuple_addr(
+        &self,
+        addr: &(&str, u16),
+    ) -> Option<io::Result<vec::IntoIter<net::SocketAddr>>> {
+        self.io_handle.as_ref().map(|h| h.resolve_tuple_addr(addr))
+    }
+
+    fn tcp_listener_bind_addr(
+        &self,
+        addr: net::SocketAddr,
+    ) -> Option<io::Result<crate::net::tcp::ListenerInner>> {
+        self.io_handle
+            .as_ref()
+            .map(|h| h.tcp_listener_bind_addr(addr))
+    }
+
+    fn tcp_stream_connect_addr(
+        &self,
+        addr: net::SocketAddr,
+    ) -> Option<Box<dyn Future<Output = io::Result<crate::net::tcp::StreamInner>>>> {
+        if let Some(io_handle) = self.io_handle.clone().take() {
+            Some(Box::new(async move {
+                io_handle.tcp_stream_connect_addr(addr).await
+            }))
+        } else {
+            None
+        }
+    }
+
+    fn register_io(&self, io: Box<dyn Evented>) -> Option<io::Result<Registration>> {
+        self.io_handle.as_ref().map(|h| h.register_io(&io))
+    }
+}
+
+thread_local! {
+    static CONTEXTNEW: RefCell<Option<Box<dyn Syscalls>>> = RefCell::new(None)
+}
 
 thread_local! {
     static CONTEXT: RefCell<Option<Handle>> = RefCell::new(None)
@@ -41,6 +107,7 @@ cfg_io_driver! {
     pub(crate) async fn tcp_stream_connect_addr(addr: net::SocketAddr) -> Option<io::Result<crate::net::tcp::StreamInner>> {
         let handle = io_handle();
         if let Some(h) = handle {
+
             Some(h.tcp_stream_connect_addr(addr).await)
         } else {
             None
@@ -74,13 +141,6 @@ cfg_time! {
 }
 
 cfg_rt_core! {
-    pub(crate) fn spawn_handle() -> Option<crate::runtime::Spawner> {
-        CONTEXT.with(|ctx| match *ctx.borrow() {
-            Some(ref ctx) => Some(ctx.spawner.clone()),
-            None => None,
-        })
-    }
-
     pub(crate) fn simulation_handle() -> Option<crate::simulation::SimulationHandle> {
         CONTEXT.with(
             |ctx| match ctx.borrow().as_ref().map(|ctx| ctx.simulation.clone()) {
@@ -88,6 +148,17 @@ cfg_rt_core! {
                 _ => None
             }
         )
+    }
+
+    pub(crate) fn spawn<T>(task: T) -> JoinHandle<T::Output>
+    where
+        T: Future + Send + 'static,
+        T::Output: Send + 'static,
+    {
+        CONTEXT.with(|ctx| match *ctx.borrow() {
+            Some(ref ctx) => ctx.spawner.spawn(task),
+            None => panic!("must be called from the context of Tokio runtime configured with either `basic_scheduler` or `threaded_scheduler`")
+        })
     }
 }
 

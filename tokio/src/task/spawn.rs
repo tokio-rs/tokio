@@ -123,8 +123,6 @@ doc_rt_core! {
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        let spawn_handle = runtime::context::spawn_handle()
-        .expect("must be called from the context of Tokio runtime configured with either `basic_scheduler` or `threaded_scheduler`");
-        spawn_handle.spawn(task)
+        runtime::context::spawn(task)
     }
 }
