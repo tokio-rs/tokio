@@ -586,8 +586,8 @@ pub trait StreamExt: Stream {
     ///
     /// `collect` streams all values, awaiting as needed. Values are pushed into
     /// a collection. A number of different target collection types are
-    /// supported, including [`Vec`](std::collections::Vec),
-    /// [`String`](std::collections::String), and [`Bytes`](bytes::Bytes).
+    /// supported, including [`Vec`](std::vec::Vec),
+    /// [`String`](std::string::String), and [`Bytes`](bytes::Bytes).
     ///
     /// # `Result`
     ///

@@ -82,13 +82,13 @@ impl FromStream<()> for () {}
 impl sealed::FromStreamPriv<()> for () {
     type Collection = ();
 
-    fn initialize(_lower: usize, _upper: Option<usize>) -> () {}
+    fn initialize(_lower: usize, _upper: Option<usize>) {}
 
     fn extend(_collection: &mut (), _item: ()) -> bool {
         true
     }
 
-    fn finalize(_collection: &mut ()) -> () {}
+    fn finalize(_collection: &mut ()) {}
 }
 
 impl<T: AsRef<str>> FromStream<T> for String {}
