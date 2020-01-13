@@ -131,7 +131,7 @@ impl<RW: AsyncRead + AsyncWrite> AsyncRead for BufStream<RW> {
     }
 }
 
-impl<RW: AsyncBufRead + AsyncRead + AsyncWrite> AsyncBufRead for BufStream<RW> {
+impl<RW: AsyncRead + AsyncWrite> AsyncBufRead for BufStream<RW> {
     fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
         self.project().inner.poll_fill_buf(cx)
     }
