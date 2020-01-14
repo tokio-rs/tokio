@@ -1,10 +1,10 @@
 //! An example of using blocking funcion annotation.
 //!
 //! This example will create 8 "heavy computation" blocking futures and 8
-//! non-blocking futures with 4 threads core threads in runtime.
-//! Each non-blocking future will print it's id and return immideatly.
-//! Each blocking future will print it's id on start, sleep for 1000 ms, print
-//! it's id and return.
+//! non-blocking futures with 4 core threads in the runtime.
+//! Each non-blocking future will print its id and return immediately.
+//! Each blocking future will print its id on start, sleep for 1000ms, print
+//! its id and return.
 //!
 //! Note how non-blocking threads are executed before blocking threads finish
 //! their task.
@@ -43,7 +43,7 @@ impl Future for BlockingFuture {
     }
 }
 
-/// This future returns immideatly.
+/// This future returns immediately.
 struct NonBlockingFuture {
     value: i32,
 }
