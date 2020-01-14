@@ -35,10 +35,10 @@ use self::winapi::um::threadpoollegacyapiset::*;
 use self::winapi::um::winbase::*;
 use self::winapi::um::winnt::*;
 use super::SpawnedChild;
+use crate::kill::Kill;
 use futures::future::Fuse;
 use futures::sync::oneshot;
 use futures::{Async, Future, Poll};
-use kill::Kill;
 use tokio_reactor::{Handle, PollEvented};
 
 #[must_use = "futures do nothing unless polled"]

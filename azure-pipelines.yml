@@ -24,6 +24,7 @@ jobs:
     cross: true
     crates:
       - tokio-fs
+      - tokio-process
       - tokio-reactor
       - tokio-signal
       - tokio-tcp
