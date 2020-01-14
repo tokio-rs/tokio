@@ -2,6 +2,8 @@
 
 Asynchronous stream of byte buffers
 
+> **Note:** This crate has been **deprecated in tokio 0.2.x**.
+
 [Documenation](https://docs.rs/tokio-buf)
 
 ## Usage

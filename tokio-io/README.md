@@ -4,6 +4,11 @@ Core I/O abstractions for the Tokio stack.
 
 [![Build Status](https://travis-ci.org/tokio-rs/tokio-io.svg?branch=master)](https://travis-ci.org/tokio-rs/tokio-io)
 
+> **Note:** This crate has been **deprecated in tokio 0.2.x** and has been moved
+> into [`tokio::io`].
+
+[`tokio::io`]: https://docs.rs/tokio/latest/tokio/io/index.html
+
 [Documentation](https://docs.rs/tokio-io/0.1.12/tokio_io)
 
 ## Usage

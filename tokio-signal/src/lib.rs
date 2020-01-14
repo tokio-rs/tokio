@@ -3,6 +3,12 @@
 
 //! Asynchronous signal handling for Tokio
 //!
+//! > **Note:** This crate is **deprecated in tokio 0.2.x** and has been moved
+//! > into [`tokio::signal`] behind the `signal` [feature flag].
+//!
+//! [`tokio::signal`]: https://docs.rs/tokio/latest/tokio/signal/index.html
+//! [feature flag]: https://docs.rs/tokio/latest/tokio/index.html#feature-flags
+//!
 //! This crate implements asynchronous signal handling for Tokio, an
 //! asynchronous I/O framework in Rust. The primary type exported from this
 //! crate, `unix::Signal`, allows listening for arbitrary signals on Unix

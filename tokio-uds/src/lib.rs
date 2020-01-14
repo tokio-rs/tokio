@@ -4,6 +4,12 @@
 
 //! Unix Domain Sockets for Tokio.
 //!
+//! > **Note:** This crate is **deprecated in tokio 0.2.x** and has been moved
+//! > into [`tokio::uds`] behind the `uds` [feature flag].
+//!
+//! [`tokio::uds`]: https://docs.rs/tokio-util/latest/tokio/uds/index.html
+//! [feature flag]: https://docs.rs/tokio/latest/tokio/index.html#feature-flags
+//!
 //! This crate provides APIs for using Unix Domain Sockets with Tokio.
 
 extern crate bytes;

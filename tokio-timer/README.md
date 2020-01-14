@@ -2,8 +2,8 @@
 
 Timer facilities for Tokio
 
-This crate is **deprecated in tokio 0.2.x** and has been moved into
-[`tokio::time`] behind the `time` [feature flag].
+> **Note:** This crate is **deprecated in tokio 0.2.x** and has been moved into
+> [`tokio::time`] behind the `time` [feature flag].
 
 [`tokio::time`]: https://docs.rs/tokio/latest/tokio/time/index.html
 [feature flag]: https://docs.rs/tokio/latest/tokio/index.html#feature-flags

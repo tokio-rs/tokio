@@ -2,9 +2,10 @@
 
 Event loop that drives Tokio I/O resources.
 
-This crate is **deprecated in tokio 0.2.x** and has been moved and refactored
-into various places in the [`tokio::runtime`] and [`tokio::io`] modules of the
-[`tokio`] crate. The Reactor has also been renamed the "I/O Driver".
+> **Note:** This crate is **deprecated in tokio 0.2.x** and has been moved and
+> refactored into various places in the [`tokio::runtime`] and [`tokio::io`]
+> modules of the [`tokio`] crate. The Reactor has also been renamed the
+> "I/O Driver".
 
 [`tokio::runtime`]: https://docs.rs/tokio/latest/tokio/runtime/index.html
 [`tokio::io`]: https://docs.rs/tokio/latest/tokio/io/index.html
