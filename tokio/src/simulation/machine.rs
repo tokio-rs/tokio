@@ -29,14 +29,14 @@ pub(crate) fn set_current_machineid(machineid: LogicalMachineId) -> LogicalMachi
 }
 
 pin_project_lite::pin_project! {
-    pub(crate) struct SimulatedFuture<F> {
+    pub(crate) struct SimTask<F> {
         machineid: LogicalMachineId,
         #[pin]
         inner: F
     }
 }
 
-impl<F> std::future::Future for SimulatedFuture<F>
+impl<F> std::future::Future for SimTask<F>
 where
     F: Future,
 {
@@ -54,12 +54,12 @@ where
     }
 }
 
-impl<F> SimulatedFuture<F>
+impl<F> SimTask<F>
 where
     F: Future,
 {
     pub(crate) fn new(inner: F, machineid: LogicalMachineId) -> Self {
-        SimulatedFuture { machineid, inner }
+        SimTask { machineid, inner }
     }
 }
 

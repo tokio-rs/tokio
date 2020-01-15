@@ -12,7 +12,6 @@ use crate::io::PollEvented;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::net::tcp::{ListenerInner, StreamInner};
 use crate::park::{Park, Unpark};
-use crate::simulation;
 use crate::util::slab::{Address, Slab};
 
 use mio::event::Evented;
@@ -36,12 +35,6 @@ pub(crate) struct Driver {
     _wakeup_registration: mio::Registration,
 }
 
-#[derive(Debug, Clone)]
-pub(crate) enum Handle {
-    Mio(MioHandle),
-    Simulation(simulation::SimulationHandle),
-}
-
 struct Inner {
     /// The underlying system event queue.
     io: mio::Poll,
@@ -57,42 +50,18 @@ struct Inner {
 }
 
 impl Handle {
-    pub(crate) fn resolve_str_addr(&self, s: &str) -> io::Result<vec::IntoIter<net::SocketAddr>> {
-        let s = s.to_owned();
-        match self {
-            Handle::Mio(_) => std::net::ToSocketAddrs::to_socket_addrs(&s),
-            Handle::Simulation(_) => {
-                fn err(msg: &str) -> io::Error {
-                    io::Error::new(io::ErrorKind::InvalidInput, msg)
-                }
-                let mut parts_iter = s.rsplitn(2, ':');
-                let port_str = parts_iter.next().ok_or(err("invalid socket address"))?;
-                let host = parts_iter.next().ok_or(err("invalid socket address"))?;
-                let port: u16 = port_str.parse().map_err(|_| err("invalid port value"))?;
-                self.resolve_tuple_addr(&(host, port))
-            }
-        }
+    pub(crate) fn resolve_str_addr(
+        &self,
+        addr: &str,
+    ) -> io::Result<vec::IntoIter<net::SocketAddr>> {
+        std::net::ToSocketAddrs::to_socket_addrs(addr)
     }
 
     pub(crate) fn resolve_tuple_addr(
         &self,
         addr: &(&str, u16),
     ) -> io::Result<vec::IntoIter<net::SocketAddr>> {
-        match self {
-            Handle::Mio(_) => std::net::ToSocketAddrs::to_socket_addrs(addr),
-            Handle::Simulation(sim) => sim.resolve_tuple(addr),
-        }
-    }
-
-    /// Kept around for types which do not have a simulation equivalent yet.
-    pub(crate) fn register_io<T>(&self, io: &T) -> io::Result<Registration>
-    where
-        T: Evented,
-    {
-        match self {
-            Handle::Mio(mio) => mio.register_io(io),
-            Handle::Simulation(_) => panic!("cannot register std or mio io with simulation handle"),
-        }
+        std::net::ToSocketAddrs::to_socket_addrs(addr)
     }
 
     /// Establish a connection to the specified `addr`.
@@ -100,36 +69,26 @@ impl Handle {
         &self,
         addr: net::SocketAddr,
     ) -> io::Result<StreamInner> {
-        match self {
-            Handle::Mio(mio) => {
-                let sys = mio::net::TcpStream::connect(&addr)?;
-                let registration = mio.register_io(&sys)?;
-                let io = PollEvented::new(sys, registration)?;
+        let sys = mio::net::TcpStream::connect(&addr)?;
+        let registration = self.register_io(&sys)?;
+        let io = PollEvented::new(sys, registration)?;
 
-                poll_fn(|cx| io.poll_write_ready(cx)).await?;
+        poll_fn(|cx| io.poll_write_ready(cx)).await?;
 
-                if let Some(e) = io.get_ref().take_error()? {
-                    return Err(e);
-                }
-                Ok(StreamInner::Mio(io))
-            }
-            Handle::Simulation(sim) => sim.connect(addr).await.map(|s| StreamInner::Sim(s)),
+        if let Some(e) = io.get_ref().take_error()? {
+            return Err(e);
         }
+        Ok(StreamInner::Mio(io))
     }
 
     pub(crate) fn tcp_listener_bind_addr(
         &self,
         addr: net::SocketAddr,
     ) -> io::Result<ListenerInner> {
-        match self {
-            Handle::Mio(mio) => {
-                let listener = mio::net::TcpListener::bind(&addr)?;
-                let registration = mio.register_io(&listener)?;
-                let io = PollEvented::new(listener, registration)?;
-                Ok(ListenerInner::Mio(io))
-            }
-            Handle::Simulation(sim) => sim.bind(addr.port()).map(|s| ListenerInner::Sim(s)),
-        }
+        let listener = mio::net::TcpListener::bind(&addr)?;
+        let registration = self.register_io(&listener)?;
+        let io = PollEvented::new(listener, registration)?;
+        Ok(ListenerInner::Mio(io))
     }
 }
 
@@ -242,9 +201,9 @@ impl Driver {
         }
     }
 
-    pub(crate) fn handle(&self) -> MioHandle {
+    pub(crate) fn handle(&self) -> Handle {
         let inner = Arc::downgrade(&self.inner);
-        MioHandle::new(inner)
+        Handle::new(inner)
     }
 }
 
@@ -284,13 +243,13 @@ impl fmt::Debug for Driver {
 }
 // ========== Handle Impl ========== //
 #[derive(Clone)]
-pub(crate) struct MioHandle {
+pub(crate) struct Handle {
     inner: Weak<Inner>,
 }
 
-impl MioHandle {
+impl Handle {
     fn new(inner: Weak<Inner>) -> Self {
-        MioHandle { inner }
+        Handle { inner }
     }
 
     fn inner(&self) -> io::Result<Arc<Inner>> {
@@ -351,12 +310,12 @@ impl MioHandle {
     {
         let inner = self.inner()?;
         let address = inner.add_source(io)?;
-        let handle = MioHandle::new(Arc::downgrade(&inner));
+        let handle = Handle::new(Arc::downgrade(&inner));
         Ok(Registration::new(handle, address))
     }
 }
 
-impl fmt::Debug for MioHandle {
+impl fmt::Debug for Handle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Handle")
     }

@@ -2,7 +2,7 @@ use crate::util::slab::Address;
 use mio::event::Evented;
 
 use super::platform;
-use super::MioHandle;
+use super::Handle;
 
 use std::io;
 use std::task::Context;
@@ -42,13 +42,13 @@ cfg_io_driver! {
     /// [`poll_write_ready`]: #method.poll_write_ready`]
     #[derive(Debug)]
     pub struct Registration {
-        handle: MioHandle,
+        handle: Handle,
         address: Address,
     }
 }
 
 impl Registration {
-    pub(crate) fn new(handle: MioHandle, address: Address) -> Self {
+    pub(crate) fn new(handle: Handle, address: Address) -> Self {
         Registration { handle, address }
     }
 

@@ -327,7 +327,7 @@ impl Builder {
         let clock = time::create_clock();
 
         // Create I/O driver
-        let (io_driver, io_handle) = io::create_driver(self.enable_io, None)?;
+        let (io_driver, io_handle) = io::create_driver(self.enable_io)?;
         let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone());
 
         let spawner = Spawner::Shell;
@@ -417,7 +417,7 @@ impl Builder {
         let clock = crate::time::Clock::new_frozen();
 
         // Create I/O driver
-        let (io_driver, io_handle) = io::create_driver(false, Some(sim.handle()))?;
+        let (io_driver, io_handle) = io::create_driver(false)?;
 
         let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone());
 
@@ -466,7 +466,7 @@ cfg_rt_core! {
             let clock = time::create_clock();
 
             // Create I/O driver
-            let (io_driver, io_handle) = io::create_driver(self.enable_io, None)?;
+            let (io_driver, io_handle) = io::create_driver(self.enable_io)?;
 
             let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone());
 
@@ -514,7 +514,7 @@ cfg_rt_threaded! {
 
             let clock = time::create_clock();
 
-            let (io_driver, io_handle) = io::create_driver(self.enable_io, None)?;
+            let (io_driver, io_handle) = io::create_driver(self.enable_io)?;
             let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone());
             let (scheduler, workers) = ThreadPool::new(self.core_threads, Parker::new(driver));
             let spawner = Spawner::ThreadPool(scheduler.spawner().clone());

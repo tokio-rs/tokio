@@ -11,10 +11,7 @@ pub(crate) use variant::*;
 #[cfg(feature = "io-driver")]
 mod variant {
     use crate::io::driver;
-    use crate::{
-        park::{Either, ParkThread},
-        simulation::SimulationHandle,
-    };
+    use crate::park::{Either, ParkThread};
 
     use std::io;
 
@@ -30,24 +27,14 @@ mod variant {
     /// When the `io-driver` feature is **not** enabled, this is `()`.
     pub(crate) type Handle = Option<driver::Handle>;
 
-    pub(crate) fn create_driver(
-        enable: bool,
-        simulation: Option<SimulationHandle>,
-    ) -> io::Result<(Driver, Handle)> {
+    pub(crate) fn create_driver(enable: bool) -> io::Result<(Driver, Handle)> {
         if enable {
-            assert!(
-                simulation.is_none(),
-                "cannot enable the IO driver and simulation at the same time"
-            );
             let driver = driver::Driver::new()?;
             let handle = driver.handle();
-            Ok((Either::A(driver), Some(driver::Handle::Mio(handle))))
+            Ok((Either::A(driver), Some(handle)))
         } else {
             let driver = ParkThread::new();
-            Ok((
-                Either::B(driver),
-                simulation.map(|s| driver::Handle::Simulation(s)),
-            ))
+            Ok((Either::B(driver), None))
         }
     }
 }

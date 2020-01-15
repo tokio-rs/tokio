@@ -6,6 +6,7 @@ pub mod tcp;
 mod util;
 use crate::task::JoinHandle;
 use machine::LogicalMachine;
+pub(crate) use machine::SimTask;
 pub use machine::{current_machineid, LogicalMachineId};
 use std::future::Future;
 
@@ -162,7 +163,7 @@ where
     let handle = context::simulation_handle()
         .expect("cannot spawn simulation machine from outside of a runtime context");
     let machineid = handle.register_machine(hostname);
-    let wrap = machine::SimulatedFuture::new(f, machineid);
+    let wrap = machine::SimTask::new(f, machineid);
     crate::spawn(wrap)
 }
 
@@ -229,5 +230,27 @@ mod test {
             assert_eq!(String::from("hello"), result);
             Ok(())
         })
+    }
+
+    #[test]
+    fn simulation_spawn_inherits_machine() -> Result<(), Box<dyn Error>> {
+        let mut runtime = crate::runtime::Builder::new()
+            .simulated_runtime(0)
+            .enable_all()
+            .build()
+            .unwrap();
+
+        runtime.block_on(async {
+            let jh = spawn_machine("parent", async {
+                let parent_machine_id = crate::simulation::current_machineid();
+                let jh = crate::spawn(async move {
+                    let child_machineid = crate::simulation::current_machineid();
+                    assert_eq!(parent_machine_id, child_machineid)
+                })
+                .await;
+            })
+            .await;
+        });
+        Ok(())
     }
 }
