@@ -61,6 +61,15 @@ impl Handle {
     pub fn current() -> Self {
         context::current().expect("not currently running on the Tokio runtime.")
     }
+
+    /// Returns a Handle view over the currently running Runtime
+    ///
+    /// Returns `None` if no Runtime has been started
+    ///
+    /// Contrary to `current`, this never panics
+    pub fn try_current() -> Option<Self> {
+        context::current()
+    }
 }
 
 cfg_rt_core! {
