@@ -41,16 +41,18 @@ fn pool_multi_spawn() {
     });
 }
 
-#[test]
-fn only_blocking() {
-    loom::model(|| {
+fn only_blocking_inner(first_pending: bool) {
+    loom::model(move || {
         let pool = mk_pool(1);
         let (block_tx, block_rx) = oneshot::channel();
 
         pool.spawn(async move {
             crate::task::block_in_place(move || {
                 block_tx.send(());
-            })
+            });
+            if first_pending {
+                yield_once().await
+            }
         });
 
         block_rx.recv();
@@ -59,9 +61,18 @@ fn only_blocking() {
 }
 
 #[test]
-fn blocking_and_regular() {
+fn only_blocking() {
+    only_blocking_inner(false)
+}
+
+#[test]
+fn only_blocking_with_pending() {
+    only_blocking_inner(true)
+}
+
+fn blocking_and_regular_inner(first_pending: bool) {
     const NUM: usize = 3;
-    loom::model(|| {
+    loom::model(move || {
         let pool = mk_pool(1);
         let cnt = Arc::new(AtomicUsize::new(0));
 
@@ -72,7 +83,10 @@ fn blocking_and_regular() {
         pool.spawn(async move {
             crate::task::block_in_place(move || {
                 block_tx.send(());
-            })
+            });
+            if first_pending {
+                yield_once().await
+            }
         });
 
         for _ in 0..NUM {
@@ -91,6 +105,16 @@ fn blocking_and_regular() {
 
         drop(pool);
     });
+}
+
+#[test]
+fn blocking_and_regular() {
+    blocking_and_regular_inner(false);
+}
+
+#[test]
+fn blocking_and_regular_with_pending() {
+    blocking_and_regular_inner(true);
 }
 
 #[test]
