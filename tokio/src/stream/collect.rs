@@ -9,7 +9,7 @@ use pin_project_lite::pin_project;
 
 // Do not export this struct until `FromStream` can be unsealed.
 pin_project! {
-    /// Stream returned by the [`collect`](super::StreamExt::collect) method.
+    /// Future returned by the [`collect`](super::StreamExt::collect) method.
     #[must_use = "streams do nothing unless polled"]
     #[derive(Debug)]
     pub struct Collect<T, U>
