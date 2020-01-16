@@ -1,4 +1,5 @@
 use crate::runtime::{blocking, context, io, time, Spawner};
+use std::{error, fmt};
 
 cfg_rt_core! {
     use crate::task::JoinHandle;
@@ -64,11 +65,11 @@ impl Handle {
 
     /// Returns a Handle view over the currently running Runtime
     ///
-    /// Returns `None` if no Runtime has been started
+    /// Returns an error if no Runtime has been started
     ///
     /// Contrary to `current`, this never panics
-    pub fn try_current() -> Option<Self> {
-        context::current()
+    pub fn try_current() -> Result<Self, TryCurrentError> {
+        context::current().ok_or(TryCurrentError(()))
     }
 }
 
@@ -114,3 +115,20 @@ cfg_rt_core! {
         }
     }
 }
+
+/// Error returned by `try_current` when no Runtime has been started
+pub struct TryCurrentError(());
+
+impl fmt::Debug for TryCurrentError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TryCurrentError").finish()
+    }
+}
+
+impl fmt::Display for TryCurrentError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("no tokio Runtime has been initialized")
+    }
+}
+
+impl error::Error for TryCurrentError {}
