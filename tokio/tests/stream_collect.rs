@@ -4,6 +4,7 @@ use tokio_test::{assert_pending, assert_ready, assert_ready_err, assert_ready_ok
 
 use bytes::{Bytes, BytesMut};
 
+#[allow(clippy::let_unit_value)]
 #[tokio::test]
 async fn empty_unit() {
     // Drains the stream.
