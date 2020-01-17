@@ -32,7 +32,7 @@ async fn kill_on_drop() {
 
     delay_for(Duration::from_secs(2)).await;
 
-    let mut out = child.stdout().take().unwrap();
+    let mut out = child.stdout.take().unwrap();
     drop(child);
 
     let mut msg = String::new();

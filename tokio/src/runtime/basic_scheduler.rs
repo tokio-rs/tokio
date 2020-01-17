@@ -119,37 +119,35 @@ where
             guard
         });
 
-        runtime::global::with_basic_scheduler(scheduler, || {
-            let mut _enter = runtime::enter();
+        let mut _enter = runtime::enter();
 
-            let raw_waker = RawWaker::new(
-                scheduler as *const SchedulerPriv as *const (),
-                &RawWakerVTable::new(sched_clone_waker, sched_noop, sched_wake_by_ref, sched_noop),
-            );
+        let raw_waker = RawWaker::new(
+            scheduler as *const SchedulerPriv as *const (),
+            &RawWakerVTable::new(sched_clone_waker, sched_noop, sched_wake_by_ref, sched_noop),
+        );
 
-            let waker = ManuallyDrop::new(unsafe { Waker::from_raw(raw_waker) });
-            let mut cx = Context::from_waker(&waker);
+        let waker = ManuallyDrop::new(unsafe { Waker::from_raw(raw_waker) });
+        let mut cx = Context::from_waker(&waker);
 
-            // `block_on` takes ownership of `f`. Once it is pinned here, the
-            // original `f` binding can no longer be accessed, making the
-            // pinning safe.
-            let mut future = unsafe { Pin::new_unchecked(&mut future) };
+        // `block_on` takes ownership of `f`. Once it is pinned here, the
+        // original `f` binding can no longer be accessed, making the
+        // pinning safe.
+        let mut future = unsafe { Pin::new_unchecked(&mut future) };
 
-            loop {
-                if let Ready(v) = future.as_mut().poll(&mut cx) {
-                    return v;
-                }
-
-                scheduler.tick(local);
-
-                // Maintenance work
-                unsafe {
-                    // safety: this function is safe to call only from the
-                    // thread the basic scheduler is running on (which we are).
-                    scheduler.queues.drain_pending_drop();
-                }
+        loop {
+            if let Ready(v) = future.as_mut().poll(&mut cx) {
+                return v;
             }
-        })
+
+            scheduler.tick(local);
+
+            // Maintenance work
+            unsafe {
+                // safety: this function is safe to call only from the
+                // thread the basic scheduler is running on (which we are).
+                scheduler.queues.drain_pending_drop();
+            }
+        }
     }
 }
 
@@ -163,15 +161,6 @@ impl Spawner {
         let (task, handle) = task::joinable(future);
         self.scheduler.schedule(task, true);
         handle
-    }
-
-    /// Enter the executor context
-    pub(crate) fn enter<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce() -> R,
-    {
-        use crate::runtime::global;
-        global::with_basic_scheduler(&*self.scheduler, f)
     }
 }
 
@@ -217,20 +206,10 @@ impl SchedulerPriv {
             .expect("failed to park");
     }
 
-    /// # Safety
+    /// Schedule the provided task on the scheduler.
     ///
-    /// Must be called from the same thread that holds the `BasicScheduler`
-    /// value.
-    pub(super) unsafe fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
-    where
-        F: Future + Send + 'static,
-        F::Output: Send + 'static,
-    {
-        let (task, handle) = task::joinable(future);
-        self.queues.push_local(task);
-        handle
-    }
-
+    /// If this scheduler is the `ACTIVE` scheduler, enqueue this task on the local queue, otherwise
+    /// the task is enqueued on the remote queue.
     fn schedule(&self, task: Task<Self>, spawn: bool) {
         let is_current = ACTIVE.with(|cell| cell.get() == self as *const SchedulerPriv);
 

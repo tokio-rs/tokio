@@ -13,7 +13,7 @@ cfg_io_std! {
     /// reads of `Stdin` must be executed with care.
     ///
     /// As an additional caveat, reading from the handle may block the calling
-    /// future indefinitely, if there is not enough data available. This makes this
+    /// future indefinitely if there is not enough data available. This makes this
     /// handle unsuitable for use in any circumstance where immediate reaction to
     /// available data is required, e.g. interactive use or when implementing a
     /// subprocess driven by requests on the standard input.
@@ -31,6 +31,12 @@ cfg_io_std! {
     ///
     /// The returned handle allows reading from standard input from the within the
     /// Tokio runtime.
+    ///
+    /// As an additional caveat, reading from the handle may block the calling
+    /// future indefinitely if there is not enough data available. This makes this
+    /// handle unsuitable for use in any circumstance where immediate reaction to
+    /// available data is required, e.g. interactive use or when implementing a
+    /// subprocess driven by requests on the standard input.
     pub fn stdin() -> Stdin {
         let std = io::stdin();
         Stdin {

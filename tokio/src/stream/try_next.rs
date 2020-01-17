@@ -13,7 +13,7 @@ pub struct TryNext<'a, St: ?Sized> {
 
 impl<St: ?Sized + Unpin> Unpin for TryNext<'_, St> {}
 
-impl<'a, St: ?Sized + Stream + Unpin> TryNext<'a, St> {
+impl<'a, St: ?Sized> TryNext<'a, St> {
     pub(super) fn new(stream: &'a mut St) -> Self {
         Self {
             inner: Next::new(stream),

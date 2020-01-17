@@ -1,9 +1,9 @@
 use crate::loom::cell::CausalCell;
 use crate::loom::sync::Arc;
 use crate::park::Park;
+use crate::runtime;
 use crate::runtime::park::Parker;
-use crate::runtime::thread_pool::{current, slice, Owned, Shared, Spawner};
-use crate::runtime::{self, blocking};
+use crate::runtime::thread_pool::{current, slice, Owned, Shared};
 use crate::task::Task;
 
 use std::cell::Cell;
@@ -119,53 +119,47 @@ impl Worker {
         }
     }
 
-    pub(super) fn run(self, blocking_pool: blocking::Spawner) {
+    pub(super) fn run(self) {
         // First, acquire a lock on the worker.
         let guard = match self.acquire_lock() {
             Some(guard) => guard,
             None => return,
         };
 
-        let spawner = Spawner::new(self.slices.clone());
-
         // Track the current worker
         current::set(&self.slices, self.index, || {
             // Enter a runtime context
             let _enter = crate::runtime::enter();
 
-            crate::runtime::global::with_thread_pool(&spawner, || {
-                blocking_pool.enter(|| {
-                    ON_BLOCK.with(|ob| {
-                        // Ensure that the ON_BLOCK is removed from the thread-local context
-                        // when leaving the scope. This handles cases that involve panicking.
-                        struct Reset<'a>(&'a Cell<Option<*const dyn Fn()>>);
+            ON_BLOCK.with(|ob| {
+                // Ensure that the ON_BLOCK is removed from the thread-local context
+                // when leaving the scope. This handles cases that involve panicking.
+                struct Reset<'a>(&'a Cell<Option<*const dyn Fn()>>);
 
-                        impl<'a> Drop for Reset<'a> {
-                            fn drop(&mut self) {
-                                self.0.set(None);
-                            }
-                        }
+                impl<'a> Drop for Reset<'a> {
+                    fn drop(&mut self) {
+                        self.0.set(None);
+                    }
+                }
 
-                        let _reset = Reset(ob);
+                let _reset = Reset(ob);
 
-                        let allow_blocking: &dyn Fn() = &|| self.block_in_place(&blocking_pool);
+                let allow_blocking: &dyn Fn() = &|| self.block_in_place();
 
-                        ob.set(Some(unsafe {
-                            // NOTE: We cannot use a safe cast to raw pointer here, since we are
-                            // _also_ erasing the lifetime of these pointers. That is safe here,
-                            // because we know that ob will set back to None before allow_blocking
-                            // is dropped.
-                            #[allow(clippy::useless_transmute)]
-                            std::mem::transmute::<_, *const dyn Fn()>(allow_blocking)
-                        }));
+                ob.set(Some(unsafe {
+                    // NOTE: We cannot use a safe cast to raw pointer here, since we are
+                    // _also_ erasing the lifetime of these pointers. That is safe here,
+                    // because we know that ob will set back to None before allow_blocking
+                    // is dropped.
+                    #[allow(clippy::useless_transmute)]
+                    std::mem::transmute::<_, *const dyn Fn()>(allow_blocking)
+                }));
 
-                        let _ = guard.run();
+                let _ = guard.run();
 
-                        // Ensure that we reset ob before allow_blocking is dropped.
-                        drop(_reset);
-                    });
-                })
-            })
+                // Ensure that we reset ob before allow_blocking is dropped.
+                drop(_reset);
+            });
         });
 
         if self.gone.get() {
@@ -210,7 +204,7 @@ impl Worker {
     }
 
     /// Enter an in-place blocking section
-    fn block_in_place(&self, blocking_pool: &blocking::Spawner) {
+    fn block_in_place(&self) {
         // If our Worker has already been given away, then blocking is fine!
         if self.gone.get() {
             return;
@@ -263,8 +257,7 @@ impl Worker {
         };
 
         // Give away the worker
-        let b = blocking_pool.clone();
-        runtime::spawn_blocking(move || worker.run(b));
+        runtime::spawn_blocking(move || worker.run());
     }
 }
 
@@ -540,27 +533,41 @@ impl GenerationGuard<'_> {
         // Transition all tasks owned by the worker to canceled.
         self.owned().owned_tasks.shutdown();
 
-        // First, drain all tasks from both the local & global queue.
-        while let Some(task) = self.owned().work_queue.pop_local_first() {
-            task.shutdown();
-        }
-
-        // Notify all workers in case they have pending tasks to drop
-        //
-        // Not super efficient, but we are also shutting down.
-        self.worker.slices.notify_all();
+        // Always notify the first time around. This flushes any released tasks
+        // that happened before the call to `Worker::shutdown`
+        let mut notify = true;
 
         // The worker can only shutdown once there are no further owned tasks.
-        while !self.owned().owned_tasks.is_empty() {
+        loop {
+            // First, drain all tasks from both the local & global queue.
+            while let Some(task) = self.owned().work_queue.pop_local_first() {
+                notify = true;
+                task.shutdown();
+            }
+
+            if notify {
+                // If any tasks are shutdown, they may be pushed on another
+                // worker's `pending_drop` stack. However, we don't know which
+                // workers need to be notified, so we just notify all of them.
+                // Since this is a shutdown process, excessive notification is
+                // not a huge deal.
+                self.worker.slices.notify_all();
+                notify = false;
+            }
+
+            // Try draining more tasks
+            self.drain_tasks_pending_drop();
+
+            if self.owned().owned_tasks.is_empty() {
+                break;
+            }
+
             // Wait until task that this worker owns are released.
             //
             // `transition_to_parked` is not called as we are not working
             // anymore. When a task is released, the owning worker is unparked
             // directly.
             self.park_mut().park().expect("park failed");
-
-            // Try draining more tasks
-            self.drain_tasks_pending_drop();
         }
     }
 

@@ -38,7 +38,7 @@ const LOCAL_QUEUE_CAPACITY: usize = 256;
 #[cfg(loom)]
 const LOCAL_QUEUE_CAPACITY: usize = 2;
 
-use crate::runtime::{self, blocking, Parker};
+use crate::runtime::{self, Parker};
 use crate::task::JoinHandle;
 
 use std::fmt;
@@ -89,10 +89,8 @@ impl ThreadPool {
     where
         F: Future,
     {
-        self.spawner.enter(|| {
-            let mut enter = crate::runtime::enter();
-            enter.block_on(future).expect("failed to park thread")
-        })
+        let mut enter = crate::runtime::enter();
+        enter.block_on(future).expect("failed to park thread")
     }
 }
 
@@ -109,11 +107,10 @@ impl Drop for ThreadPool {
 }
 
 impl Workers {
-    pub(crate) fn spawn(self, blocking_pool: &blocking::Spawner) {
-        blocking_pool.enter(|| {
+    pub(crate) fn spawn(self, rt: &runtime::Handle) {
+        rt.enter(|| {
             for worker in self.workers {
-                let b = blocking_pool.clone();
-                runtime::spawn_blocking(move || worker.run(b));
+                runtime::spawn_blocking(move || worker.run());
             }
         });
     }

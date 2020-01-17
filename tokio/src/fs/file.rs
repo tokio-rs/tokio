@@ -558,10 +558,6 @@ impl AsyncSeek for File {
         cx: &mut Context<'_>,
         mut pos: SeekFrom,
     ) -> Poll<io::Result<()>> {
-        if let Some(e) = self.last_write_err.take() {
-            return Ready(Err(e.into()));
-        }
-
         loop {
             match self.state {
                 Idle(ref mut buf_cell) => {
@@ -592,6 +588,7 @@ impl AsyncSeek for File {
                     match op {
                         Operation::Read(_) => {}
                         Operation::Write(Err(e)) => {
+                            assert!(self.last_write_err.is_none());
                             self.last_write_err = Some(e.kind());
                         }
                         Operation::Write(_) => {}
@@ -603,10 +600,6 @@ impl AsyncSeek for File {
     }
 
     fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
-        if let Some(e) = self.last_write_err.take() {
-            return Ready(Err(e.into()));
-        }
-
         loop {
             match self.state {
                 Idle(_) => panic!("must call start_seek before calling poll_complete"),
@@ -617,6 +610,7 @@ impl AsyncSeek for File {
                     match op {
                         Operation::Read(_) => {}
                         Operation::Write(Err(e)) => {
+                            assert!(self.last_write_err.is_none());
                             self.last_write_err = Some(e.kind());
                         }
                         Operation::Write(_) => {}

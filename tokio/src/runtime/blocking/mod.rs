@@ -11,52 +11,29 @@ cfg_blocking_impl! {
     mod shutdown;
     mod task;
 
-    use crate::runtime::{self, Builder, io, time};
+    use crate::runtime::Builder;
 
-    pub(crate) fn create_blocking_pool(
-        builder: &Builder,
-        spawner: &runtime::Spawner,
-        io: &io::Handle,
-        time: &time::Handle,
-        clock: &time::Clock,
-    ) -> BlockingPool {
-        BlockingPool::new(
-            builder,
-            spawner,
-            io,
-            time,
-            clock)
+    pub(crate) fn create_blocking_pool(builder: &Builder) -> BlockingPool {
+        BlockingPool::new(builder)
+
     }
 }
 
 cfg_not_blocking_impl! {
-    use crate::runtime::{self, io, time, Builder};
+    use crate::runtime::Builder;
 
     #[derive(Debug, Clone)]
     pub(crate) struct BlockingPool {}
 
     pub(crate) use BlockingPool as Spawner;
 
-    pub(crate) fn create_blocking_pool(
-        _builder: &Builder,
-        _spawner: &runtime::Spawner,
-        _io: &io::Handle,
-        _time: &time::Handle,
-        _clock: &time::Clock,
-    ) -> BlockingPool {
+    pub(crate) fn create_blocking_pool(_builder: &Builder) -> BlockingPool {
         BlockingPool {}
     }
 
     impl BlockingPool {
         pub(crate) fn spawner(&self) -> &BlockingPool {
             self
-        }
-
-        pub(crate) fn enter<F, R>(&self, f: F) -> R
-        where
-            F: FnOnce() -> R,
-        {
-            f()
         }
     }
 }
