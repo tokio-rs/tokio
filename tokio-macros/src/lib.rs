@@ -206,8 +206,8 @@ fn parse_knobs(
 ///
 /// ### Set number of core threads
 ///
-/// ```rust
-/// #[tokio::main(core_threads = 1)]
+/// ```rust no_run
+/// #[tokio::main(threaded_scheduler, core_threads = 1)]
 /// async fn main() {
 ///     println!("Hello world");
 /// }
