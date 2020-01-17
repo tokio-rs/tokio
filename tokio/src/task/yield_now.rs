@@ -13,6 +13,7 @@ doc_rt_core! {
     /// the task to continue.
     ///
     /// See also the usage example in the [task module](index.html#yield_now).
+    #[must_use = "yield_now does nothing unless polled/`await`-ed"]
     pub async fn yield_now() {
         /// Yield implementation
         struct YieldNow {
