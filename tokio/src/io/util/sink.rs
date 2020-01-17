@@ -11,9 +11,10 @@ cfg_io_util! {
     /// This struct is generally created by calling [`sink`][sink]. Please
     /// see the documentation of `sink()` for more details.
     ///
-    /// This is an asynchronous version of `std::io::Sink`.
+    /// This is an asynchronous version of [`std::io::Sink`][std].
     ///
-    /// [sink]: fn.sink.html
+    /// [sink]: sink()
+    /// [std]: std::io::Sink
     pub struct Sink {
         _p: (),
     }
@@ -21,21 +22,27 @@ cfg_io_util! {
     /// Creates an instance of an async writer which will successfully consume all
     /// data.
     ///
-    /// All calls to `poll_write` on the returned instance will return
+    /// All calls to [`poll_write`] on the returned instance will return
     /// `Poll::Ready(Ok(buf.len()))` and the contents of the buffer will not be
     /// inspected.
     ///
-    /// This is an asynchronous version of `std::io::sink`.
+    /// This is an asynchronous version of [`std::io::sink`][std].
+    ///
+    /// [`poll_write`]: crate::io::AsyncWrite::poll_write()
+    /// [std]: std::io::sink
     ///
     /// # Examples
     ///
-    /// ```rust
-    /// # use tokio::io::{self, AsyncWriteExt};
-    /// # async fn dox() {
-    /// let buffer = vec![1, 2, 3, 5, 8];
-    /// let num_bytes = io::sink().write(&buffer).await.unwrap();
-    /// assert_eq!(num_bytes, 5);
-    /// # }
+    /// ```
+    /// use tokio::io::{self, AsyncWriteExt};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let buffer = vec![1, 2, 3, 5, 8];
+    ///     let num_bytes = io::sink().write(&buffer).await?;
+    ///     assert_eq!(num_bytes, 5);
+    ///     Ok(())
+    /// }
     /// ```
     pub fn sink() -> Sink {
         Sink { _p: () }

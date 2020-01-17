@@ -92,6 +92,7 @@ impl<T: 'static> Queue<T> {
             // Check if the queue is closed. This must happen in the lock.
             let len = self.len.unsync_load();
             if len & CLOSED == CLOSED {
+                drop(p);
                 f(Err(task));
                 return;
             }

@@ -266,7 +266,7 @@ impl State {
             .compare_exchange_weak(
                 INITIAL_STATE | JOIN_INTEREST,
                 INITIAL_STATE,
-                Relaxed,
+                Release,
                 Relaxed,
             )
             .is_ok()

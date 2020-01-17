@@ -14,12 +14,11 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV
 /// # Calling
 ///
 /// Currently, this trait is only used as an argument to Tokio functions that
-/// need to reference a target socket address.
+/// need to reference a target socket address. To perform a `SocketAddr`
+/// conversion directly, use [`lookup_host()`](super::lookup_host()).
 ///
-/// This trait is sealed and is intended to be opaque. Users of Tokio should
-/// only use `ToSocketAddrs` in trait bounds and __must not__ attempt to call
-/// the functions directly or reference associated types. Changing these is not
-/// considered a breaking change.
+/// This trait is sealed and is intended to be opaque. The details of the trait
+/// will change. Stabilization is pending enhancements to the Rust langague.
 pub trait ToSocketAddrs: sealed::ToSocketAddrsPriv {}
 
 type ReadyFuture<T> = future::Ready<io::Result<T>>;

@@ -5,7 +5,7 @@
 
 pub(crate) use variant::*;
 
-#[cfg(all(feature = "time", not(loom)))]
+#[cfg(feature = "time")]
 mod variant {
     use crate::park::Either;
     use crate::runtime::io;
@@ -36,7 +36,7 @@ mod variant {
     }
 }
 
-#[cfg(any(not(feature = "time"), loom))]
+#[cfg(not(feature = "time"))]
 mod variant {
     use crate::runtime::io;
 

@@ -36,6 +36,8 @@ cfg_io_util! {
     ///
     /// This is an asynchronous version of [`std::io::copy`][std].
     ///
+    /// [std]: std::io::copy
+    ///
     /// # Errors
     ///
     /// The returned future will finish with an error will return an error
@@ -56,8 +58,6 @@ cfg_io_util! {
     /// # Ok(())
     /// # }
     /// ```
-    ///
-    /// [std]: std::io::copy
     pub fn copy<'a, R, W>(reader: &'a mut R, writer: &'a mut W) -> Copy<'a, R, W>
     where
         R: AsyncRead + Unpin + ?Sized,

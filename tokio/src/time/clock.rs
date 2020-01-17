@@ -64,7 +64,7 @@ cfg_test_util! {
     /// Panics if time is already frozen or if called from outside of the Tokio
     /// runtime.
     pub fn pause() {
-        let clock = context::ThreadContext::clock().expect("time cannot be frozen from outside the Tokio runtime");
+        let clock = context::clock().expect("time cannot be frozen from outside the Tokio runtime");
         let mut frozen = clock.inner.frozen.lock().unwrap();
         if frozen.is_some() {
             panic!("time is already frozen");
@@ -82,7 +82,7 @@ cfg_test_util! {
     /// Panics if time is not frozen or if called from outside of the Tokio
     /// runtime.
     pub fn resume() {
-        let clock = context::ThreadContext::clock().expect("time cannot be frozen from outside the Tokio runtime");
+        let clock = context::clock().expect("time cannot be frozen from outside the Tokio runtime");
         let mut frozen = clock.inner.frozen.lock().unwrap();
 
         if frozen.is_none() {
@@ -102,14 +102,14 @@ cfg_test_util! {
     /// Panics if time is not frozen or if called from outside of the Tokio
     /// runtime.
     pub async fn advance(duration: Duration) {
-        let clock = context::ThreadContext::clock().expect("time cannot be frozen from outside the Tokio runtime");
+        let clock = context::clock().expect("time cannot be frozen from outside the Tokio runtime");
         clock.advance(duration);
         crate::task::yield_now().await;
     }
 
     /// Return the current instant, factoring in frozen time.
     pub(crate) fn now() -> Instant {
-        if let Some(clock) = context::ThreadContext::clock() {
+        if let Some(clock) = context::clock() {
             if let Some(frozen) = *clock.inner.frozen.lock().unwrap() {
                 Instant::from_std(clock.inner.start + frozen)
             } else {

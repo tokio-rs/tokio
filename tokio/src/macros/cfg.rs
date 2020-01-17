@@ -4,7 +4,6 @@ macro_rules! cfg_resource_drivers {
     ($($item:item)*) => {
         $(
             #[cfg(any(feature = "io-driver", feature = "time"))]
-            #[cfg(not(loom))]
             $item
         )*
     }

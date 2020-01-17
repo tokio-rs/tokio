@@ -294,9 +294,11 @@ impl Driver {
     /// Drain all data in the global receiver, ensuring we'll get woken up when
     /// there is a write on the other end.
     ///
-    /// We do *NOT* use the existence of any read bytes as evidence a sigal was
+    /// We do *NOT* use the existence of any read bytes as evidence a signal was
     /// received since the `pending` flags would have already been set if that
-    /// was the case. See #38 for more info.
+    /// was the case. See
+    /// [#38](https://github.com/alexcrichton/tokio-signal/issues/38) for more
+    /// info.
     fn drain(&mut self, cx: &mut Context<'_>) {
         loop {
             match Pin::new(&mut self.wakeup).poll_read(cx, &mut [0; 128]) {

@@ -325,14 +325,7 @@ impl Builder {
 
         let spawner = Spawner::Shell;
 
-        let blocking_pool = blocking::create_blocking_pool(
-            self,
-            &spawner,
-            &io_handle,
-            &time_handle,
-            &clock,
-            self.max_threads,
-        );
+        let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
         let blocking_spawner = blocking_pool.spawner().clone();
 
         Ok(Runtime {
@@ -425,7 +418,7 @@ cfg_rt_core! {
             let spawner = Spawner::Basic(scheduler.spawner());
 
             // Blocking pool
-            let blocking_pool = blocking::create_blocking_pool(self, &spawner, &io_handle, &time_handle, &clock, self.max_threads);
+            let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
             let blocking_spawner = blocking_pool.spawner().clone();
 
             Ok(Runtime {
@@ -465,21 +458,24 @@ cfg_rt_threaded! {
             let spawner = Spawner::ThreadPool(scheduler.spawner().clone());
 
             // Create the blocking pool
-            let blocking_pool = blocking::create_blocking_pool(self, &spawner, &io_handle, &time_handle, &clock, self.max_threads);
+            let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
             let blocking_spawner = blocking_pool.spawner().clone();
 
+            // Create the runtime handle
+            let handle = Handle {
+                spawner,
+                io_handle,
+                time_handle,
+                clock,
+                blocking_spawner,
+            };
+
             // Spawn the thread pool workers
-            workers.spawn(&blocking_spawner);
+            workers.spawn(&handle);
 
             Ok(Runtime {
                 kind: Kind::ThreadPool(scheduler),
-                handle: Handle {
-                    spawner,
-                    io_handle,
-                    time_handle,
-                    clock,
-                    blocking_spawner,
-                },
+                handle,
                 blocking_pool,
             })
         }
