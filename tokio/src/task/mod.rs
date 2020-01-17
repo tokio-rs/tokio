@@ -122,6 +122,8 @@
 //! Instead, Tokio provides two APIs for running blocking operations in an
 //! asynchronous context: [`task::spawn_blocking`] and [`task::block_in_place`].
 //!
+//! #### spawn_blocking
+//!
 //! The `task::spawn_blocking` function is similar to the `task::spawn` function
 //! discussed in the previous section, but rather than spawning an
 //! _non-blocking_ future on the Tokio runtime, it instead spawns a
@@ -155,6 +157,8 @@
 //! # }
 //! ```
 //!
+//! #### block_in_place
+//!
 //! When using the [threaded runtime][rt-threaded], the [`task::block_in_place`]
 //! function is also available. Like `task::spawn_blocking`, this function
 //! allows running a blocking operation from an asynchronous context. Unlike
@@ -178,11 +182,14 @@
 //! # }
 //! ```
 //!
-//! In addition, this module also provides a [`task::yield_now`] async function
-//! that is analogous to the standard library's [`thread::yield_now`]. Calling and
-//! `await`ing this function will cause the current task to yield to the Tokio
-//! runtime's scheduler, allowing another task to be scheduled. Eventually, the
-//! yielding task will be polled again, allowing it to execute. For example:
+//! #### yield_now
+//!
+//! In addition, this module provides a [`task::yield_now`] async function
+//! that is analogous to the standard library's [`thread::yield_now`]. Calling
+//! and `await`ing this function will cause the current task to yield to the
+//! Tokio runtime's scheduler, allowing other tasks to be
+//! scheduled. Eventually, the yielding task will be polled again, allowing it
+//! to execute. For example:
 //!
 //! ```rust
 //! use tokio::task;
