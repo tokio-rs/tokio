@@ -1,5 +1,5 @@
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::{Arc, Condvar, Mutex};
+use crate::loom::sync::{Arc, Condvar, IdentityUnwrap, Mutex};
 use crate::park::{Park, Unpark};
 
 use std::sync::atomic::Ordering::SeqCst;
@@ -109,7 +109,12 @@ impl Inner {
         }
 
         loop {
-            m = self.condvar.wait(m).unwrap();
+            #[cfg(not(feature = "parking_lot"))] {
+                m = self.condvar.wait(m).unwrap();
+            }
+            #[cfg(feature = "parking_lot")] {
+                self.condvar.wait(&mut m);
+            }
 
             if self
                 .state
@@ -135,7 +140,7 @@ impl Inner {
             return;
         }
 
-        let m = self.mutex.lock().unwrap();
+        let mut m = self.mutex.lock().unwrap();
 
         match self.state.compare_exchange(EMPTY, PARKED, SeqCst, SeqCst) {
             Ok(_) => {}
@@ -153,7 +158,12 @@ impl Inner {
         // from a notification, we just want to unconditionally set the state back to
         // empty, either consuming a notification or un-flagging ourselves as
         // parked.
-        let (_m, _result) = self.condvar.wait_timeout(m, dur).unwrap();
+        #[cfg(not(feature = "parking_lot"))] {
+            let (_m, _result) = self.condvar.wait_timeout(m, dur).unwrap();
+        }
+        #[cfg(feature = "parking_lot")] {
+            self.condvar.wait_for(&mut m, dur);
+        }
 
         match self.state.swap(EMPTY, SeqCst) {
             NOTIFIED => {} // got a notification, hurray!
@@ -188,7 +198,7 @@ impl Inner {
         // to release `lock`.
         drop(self.mutex.lock().unwrap());
 
-        self.condvar.notify_one()
+        self.condvar.notify_one();
     }
 }
 
@@ -262,7 +272,6 @@ cfg_blocking_impl! {
             Ok(())
         }
     }
-
 
     impl UnparkThread {
         pub(crate) fn into_waker(self) -> Waker {

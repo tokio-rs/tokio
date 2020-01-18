@@ -1,6 +1,6 @@
 //! Thread pool for blocking operations
 
-use crate::loom::sync::{Arc, Condvar, Mutex};
+use crate::loom::sync::{Arc, Condvar, IdentityUnwrap, Mutex};
 use crate::loom::thread;
 use crate::runtime::blocking::schedule::NoopSchedule;
 use crate::runtime::blocking::shutdown;
@@ -215,10 +215,18 @@ impl Inner {
             shared.num_idle += 1;
 
             while !shared.shutdown {
-                let lock_result = self.condvar.wait_timeout(shared, KEEP_ALIVE).unwrap();
-
-                shared = lock_result.0;
-                let timeout_result = lock_result.1;
+                let timeout_result = match &self.condvar {
+                    #[cfg(not(feature = "parking_lot"))]
+                    cv => {
+                        let (s, tr) = cv.wait_timeout(shared, KEEP_ALIVE).unwrap();
+                        shared = s;
+                        tr
+                    }
+                    #[cfg(feature = "parking_lot")]
+                    cv => {
+                        cv.wait_for(&mut shared, KEEP_ALIVE)
+                    }
+                };
 
                 if shared.num_notify != 0 {
                     // We have received a legitimate wakeup,

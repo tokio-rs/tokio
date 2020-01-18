@@ -1,6 +1,12 @@
 use loom::sync::Notify;
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+
+#[cfg(not(feature = "parking_lot"))]
+use std::sync::Mutex;
+
+#[cfg(feature = "parking_lot")]
+use parking_lot::Mutex;
 
 pub(crate) fn channel<T>() -> (Sender<T>, Receiver<T>) {
     let inner = Arc::new(Inner {

@@ -38,7 +38,19 @@ pub(crate) mod rand {
 }
 
 pub(crate) mod sync {
-    pub(crate) use std::sync::*;
+    pub(crate) use std::sync::{Arc};
+
+    #[cfg(feature = "parking_lot")]
+    pub(crate) use ::parking_lot::{Mutex, MutexGuard, Condvar};
+
+    #[cfg(feature = "parking_lot")]
+    mod identity_unwrap;
+
+    #[cfg(feature = "parking_lot")]
+    pub(crate) use self::identity_unwrap::IdentityUnwrap;
+
+    #[cfg(not(feature = "parking_lot"))]
+    pub(crate) use std::sync::{Mutex, MutexGuard, Condvar};
 
     pub(crate) mod atomic {
         pub(crate) use crate::loom::std::atomic_u32::AtomicU32;

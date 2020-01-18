@@ -111,7 +111,7 @@
 use crate::loom::cell::CausalCell;
 use crate::loom::future::AtomicWaker;
 use crate::loom::sync::atomic::{spin_loop_hint, AtomicBool, AtomicPtr, AtomicUsize};
-use crate::loom::sync::{Arc, Condvar, Mutex};
+use crate::loom::sync::{Arc, Condvar, IdentityUnwrap, Mutex};
 
 use std::fmt;
 use std::ptr;
@@ -583,7 +583,13 @@ impl<T> Sender<T> {
 
         while prev & !1 != 0 {
             // Concurrent readers, we must go to sleep
-            tail = self.shared.condvar.wait(tail).unwrap();
+            #[cfg(not(feature = "parking_lot"))] {
+                tail = self.shared.condvar.wait(tail).unwrap();
+            }
+
+            #[cfg(feature = "parking_lot")] {
+                self.shared.condvar.wait(&mut tail);
+            }
 
             prev = slot.lock.load(SeqCst);
         }

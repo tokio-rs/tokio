@@ -3,7 +3,7 @@
 //! A combination of the various resource driver park handles.
 
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::{Arc, Condvar, Mutex};
+use crate::loom::sync::{Arc, Condvar, IdentityUnwrap, Mutex};
 use crate::loom::thread;
 use crate::park::{Park, Unpark};
 use crate::runtime::time;
@@ -161,7 +161,13 @@ impl Inner {
         }
 
         loop {
-            m = self.condvar.wait(m).unwrap();
+            #[cfg(not(feature = "parking_lot"))] {
+                m = self.condvar.wait(m).unwrap();
+            }
+
+            #[cfg(feature = "parking_lot")] {
+                self.condvar.wait(&mut m);
+            }
 
             if self
                 .state
@@ -236,7 +242,7 @@ impl Inner {
         // to release `lock`.
         drop(self.mutex.lock().unwrap());
 
-        self.condvar.notify_one()
+        self.condvar.notify_one();
     }
 
     fn unpark_driver(&self) {
