@@ -109,10 +109,12 @@ impl Inner {
         }
 
         loop {
-            #[cfg(not(feature = "parking_lot"))] {
+            #[cfg(not(feature = "parking_lot"))]
+            {
                 m = self.condvar.wait(m).unwrap();
             }
-            #[cfg(feature = "parking_lot")] {
+            #[cfg(feature = "parking_lot")]
+            {
                 self.condvar.wait(&mut m);
             }
 
@@ -158,10 +160,12 @@ impl Inner {
         // from a notification, we just want to unconditionally set the state back to
         // empty, either consuming a notification or un-flagging ourselves as
         // parked.
-        #[cfg(not(feature = "parking_lot"))] {
+        #[cfg(not(feature = "parking_lot"))]
+        {
             let (_m, _result) = self.condvar.wait_timeout(m, dur).unwrap();
         }
-        #[cfg(feature = "parking_lot")] {
+        #[cfg(feature = "parking_lot")]
+        {
             self.condvar.wait_for(&mut m, dur);
         }
 

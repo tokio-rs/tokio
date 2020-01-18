@@ -223,9 +223,7 @@ impl Inner {
                         tr
                     }
                     #[cfg(feature = "parking_lot")]
-                    cv => {
-                        cv.wait_for(&mut shared, KEEP_ALIVE)
-                    }
+                    cv => cv.wait_for(&mut shared, KEEP_ALIVE),
                 };
 
                 if shared.num_notify != 0 {

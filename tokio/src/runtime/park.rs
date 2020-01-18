@@ -161,11 +161,13 @@ impl Inner {
         }
 
         loop {
-            #[cfg(not(feature = "parking_lot"))] {
+            #[cfg(not(feature = "parking_lot"))]
+            {
                 m = self.condvar.wait(m).unwrap();
             }
 
-            #[cfg(feature = "parking_lot")] {
+            #[cfg(feature = "parking_lot")]
+            {
                 self.condvar.wait(&mut m);
             }
 

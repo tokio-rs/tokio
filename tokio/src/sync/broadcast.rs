@@ -583,11 +583,13 @@ impl<T> Sender<T> {
 
         while prev & !1 != 0 {
             // Concurrent readers, we must go to sleep
-            #[cfg(not(feature = "parking_lot"))] {
+            #[cfg(not(feature = "parking_lot"))]
+            {
                 tail = self.shared.condvar.wait(tail).unwrap();
             }
 
-            #[cfg(feature = "parking_lot")] {
+            #[cfg(feature = "parking_lot")]
+            {
                 self.shared.condvar.wait(&mut tail);
             }
 

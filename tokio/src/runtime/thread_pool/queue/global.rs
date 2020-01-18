@@ -1,5 +1,5 @@
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::{Mutex, IdentityUnwrap};
+use crate::loom::sync::{IdentityUnwrap, Mutex};
 use crate::task::{Header, Task};
 
 use std::marker::PhantomData;

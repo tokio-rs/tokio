@@ -23,7 +23,7 @@ use stack::TransferStack;
 #[cfg(all(loom, test))]
 mod tests;
 
-use crate::loom::sync::{Mutex, IdentityUnwrap};
+use crate::loom::sync::{IdentityUnwrap, Mutex};
 use crate::util::bit;
 
 use std::fmt;
@@ -84,22 +84,13 @@ impl<T: Entry> Slab<T> {
 
         // if we were able to lock the slab, we are "local" and can use the fast
         // path; otherwise, we will use `remove_remote`.
-        #[cfg(not(feature = "parking_lot"))] {
-            if lock.is_ok() {
-                self.shard.remove_local(idx)
-            } else {
-                self.shard.remove_remote(idx)
-            }
+        match &lock {
+            #[cfg(not(feature = "parking_lot"))]
+            l if l.is_ok() => self.shard.remove_local(idx),
+            #[cfg(feature = "parking_lot")]
+            l if l.is_some() => self.shard.remove_local(idx),
+            _ => self.shard.remove_remote(idx),
         }
-
-        #[cfg(feature = "parking_lot")] {
-            if lock.is_some() {
-                self.shard.remove_local(idx)
-            } else {
-                self.shard.remove_remote(idx)
-            }
-        }
-
     }
 
     /// Return a reference to the value associated with the given key.
