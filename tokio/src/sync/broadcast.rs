@@ -214,9 +214,8 @@ pub enum RecvError {
     /// be sent.
     Closed,
 
-    /// The receiver lagged too far behind and has been forcibly disconnected.
-    /// Attempting to receive again will return the oldest message still
-    /// retained by the channel.
+    /// The receiver lagged too far behind. Attempting to receive again will
+    /// return the oldest message still retained by the channel.
     ///
     /// Includes the number of skipped messages.
     Lagged(u64),
@@ -274,9 +273,9 @@ struct Tail {
     rx_cnt: usize,
 }
 
-/// Node in the linked list
+/// Slot in the buffer
 struct Slot<T> {
-    /// Remaining numer of senders that are expected to see this value.
+    /// Remaining number of receivers that are expected to see this value.
     ///
     /// When this goes to zero, the value is released.
     rem: AtomicUsize,
