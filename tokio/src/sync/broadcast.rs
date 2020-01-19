@@ -579,17 +579,27 @@ impl<T> Sender<T> {
         let slot = &self.shared.buffer[idx];
 
         // Acquire the write lock
-        let mut prev = slot.lock.fetch_add(1, SeqCst);
+        let mut prev = slot.lock.fetch_or(1, SeqCst);
 
         while prev & !1 != 0 {
             // Concurrent readers, we must go to sleep
             tail = self.shared.condvar.wait(tail).unwrap();
 
             prev = slot.lock.load(SeqCst);
+
+            if prev & 1 == 0 {
+                // The writer lock bit was cleared while this thread was
+                // sleeping. This can only happen if a newer write happened on
+                // this slot by another thread. Bail early as an optimization,
+                // there is nothing left to do.
+                return Ok(rem);
+            }
         }
 
-        // Release the mutex
-        drop(tail);
+        if tail.pos.wrapping_sub(pos) > self.shared.buffer.len() as u64 {
+            // There is a newer pending write to the same slot.
+            return Ok(rem);
+        }
 
         // Slot lock acquired
         slot.write.pos.with_mut(|ptr| unsafe { *ptr = pos });
@@ -600,6 +610,11 @@ impl<T> Sender<T> {
 
         // Release the slot lock
         slot.lock.store(0, SeqCst);
+
+        // Release the mutex. This must happen after the slot lock is released,
+        // otherwise the writer lock bit could be cleared while another thread
+        // is in the critical section.
+        drop(tail);
 
         // Notify waiting receivers
         self.notify_rx();
