@@ -587,6 +587,7 @@ pub trait StreamExt: Stream {
 
     /// A combinator that applies a function to every element in a stream
     /// producing a single, final value.
+    ///
     /// # Examples
     /// Basic usage:
     /// ```
