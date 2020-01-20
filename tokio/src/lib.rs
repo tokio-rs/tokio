@@ -346,6 +346,13 @@ cfg_macros! {
             pub use tokio_macros::test_basic as test;
         }
     }
+
+    // Maintains old behavior
+    cfg_not_rt_core! {
+        #[cfg(not(test))]
+        pub use tokio_macros::main;
+        pub use tokio_macros::test;
+    }
 }
 
 // Tests
