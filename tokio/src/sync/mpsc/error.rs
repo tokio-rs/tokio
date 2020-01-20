@@ -69,7 +69,7 @@ impl Error for RecvError {}
 
 /// This enumeration is the list of the possible reasons that try_recv
 /// could not return data when called.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum TryRecvError {
     /// This channel is currently empty, but the Sender(s) have not yet
     /// disconnected, so data may yet become available.
