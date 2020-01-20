@@ -304,6 +304,7 @@ impl<T> Sender<T> {
     ///     let _ = time::timeout(Duration::from_secs(10), rx).await;
     /// }
     /// ```
+    #[must_use = "Sender::closed does nothing unless polled/`await`-ed"]
     pub async fn closed(&mut self) {
         use crate::future::poll_fn;
 

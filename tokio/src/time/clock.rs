@@ -101,6 +101,7 @@ cfg_test_util! {
     ///
     /// Panics if time is not frozen or if called from outside of the Tokio
     /// runtime.
+    #[must_use = "advance does nothing unless polled/`await`-ed"]
     pub async fn advance(duration: Duration) {
         let clock = context::clock().expect("time cannot be frozen from outside the Tokio runtime");
         clock.advance(duration);

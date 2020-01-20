@@ -348,6 +348,7 @@ impl<T> Sender<T> {
     ///
     /// This allows the producer to get notified when interest in the produced
     /// values is canceled and immediately stop doing work.
+    #[must_use = "Sender::closed does nothing unless polled/`await`-ed"]
     pub async fn closed(&mut self) {
         poll_fn(|cx| self.poll_close(cx)).await
     }
