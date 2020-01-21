@@ -1,7 +1,7 @@
 //! Coordinates idling workers
 
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::{IdentityUnwrap, Mutex};
+use crate::loom::sync::{ExpectPoison, Mutex};
 
 use std::fmt;
 use std::sync::atomic::Ordering::{self, SeqCst};
@@ -55,7 +55,7 @@ impl Idle {
         }
 
         // Acquire the lock
-        let mut sleepers = self.sleepers.lock().unwrap();
+        let mut sleepers = self.sleepers.lock().expect_poison();
 
         // Check again, now that the lock is acquired
         if !self.notify_should_wakeup() {
@@ -77,7 +77,7 @@ impl Idle {
     /// work.
     pub(super) fn transition_worker_to_parked(&self, worker: usize, is_searching: bool) -> bool {
         // Acquire the lock
-        let mut sleepers = self.sleepers.lock().unwrap();
+        let mut sleepers = self.sleepers.lock().expect_poison();
 
         // Decrement the number of unparked threads
         let ret = State::dec_num_unparked(&self.state, is_searching);
@@ -112,7 +112,7 @@ impl Idle {
     /// Unpark a specific worker. This happens if tasks are submitted from
     /// within the worker's park routine.
     pub(super) fn unpark_worker_by_id(&self, worker_id: usize) {
-        let mut sleepers = self.sleepers.lock().unwrap();
+        let mut sleepers = self.sleepers.lock().expect_poison();
 
         for index in 0..sleepers.len() {
             if sleepers[index] == worker_id {
@@ -128,7 +128,7 @@ impl Idle {
 
     /// Returns `true` if `worker_id` is contained in the sleep set
     pub(super) fn is_parked(&self, worker_id: usize) -> bool {
-        let sleepers = self.sleepers.lock().unwrap();
+        let sleepers = self.sleepers.lock().expect_poison();
         sleepers.contains(&worker_id)
     }
 

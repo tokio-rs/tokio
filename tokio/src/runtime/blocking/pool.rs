@@ -1,6 +1,6 @@
 //! Thread pool for blocking operations
 
-use crate::loom::sync::{Arc, Condvar, IdentityUnwrap, Mutex};
+use crate::loom::sync::{Arc, Condvar, ExpectPoison, Mutex};
 use crate::loom::thread;
 use crate::runtime::blocking::schedule::NoopSchedule;
 use crate::runtime::blocking::shutdown;
@@ -105,7 +105,7 @@ impl BlockingPool {
 
 impl Drop for BlockingPool {
     fn drop(&mut self) {
-        let mut shared = self.spawner.inner.shared.lock().unwrap();
+        let mut shared = self.spawner.inner.shared.lock().expect_poison();
 
         shared.shutdown = true;
         shared.shutdown_tx = None;
@@ -128,7 +128,7 @@ impl fmt::Debug for BlockingPool {
 impl Spawner {
     fn spawn(&self, task: Task, rt: &Handle) {
         let shutdown_tx = {
-            let mut shared = self.inner.shared.lock().unwrap();
+            let mut shared = self.inner.shared.lock().expect_poison();
 
             if shared.shutdown {
                 // Shutdown the task
@@ -197,7 +197,7 @@ impl Inner {
             f()
         }
 
-        let mut shared = self.shared.lock().unwrap();
+        let mut shared = self.shared.lock().expect_poison();
 
         'main: loop {
             // BUSY
@@ -205,7 +205,7 @@ impl Inner {
                 drop(shared);
                 run_task(task);
 
-                shared = self.shared.lock().unwrap();
+                shared = self.shared.lock().expect_poison();
                 if shared.shutdown {
                     break; // Need to increment idle before we exit
                 }
@@ -249,7 +249,7 @@ impl Inner {
                     drop(shared);
                     task.shutdown();
 
-                    shared = self.shared.lock().unwrap();
+                    shared = self.shared.lock().expect_poison();
                 }
 
                 // Work was produced, and we "took" it (by decrementing num_notify).

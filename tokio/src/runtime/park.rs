@@ -3,7 +3,7 @@
 //! A combination of the various resource driver park handles.
 
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::{Arc, Condvar, IdentityUnwrap, Mutex};
+use crate::loom::sync::{Arc, Condvar, ExpectPoison, Mutex};
 use crate::loom::thread;
 use crate::park::{Park, Unpark};
 use crate::runtime::time;
@@ -138,7 +138,7 @@ impl Inner {
 
     fn park_condvar(&self) {
         // Otherwise we need to coordinate going to sleep
-        let mut m = self.mutex.lock().unwrap();
+        let mut m = self.mutex.lock().expect_poison();
 
         match self
             .state
@@ -242,7 +242,7 @@ impl Inner {
         // Releasing `lock` before the call to `notify_one` means that when the
         // parked thread wakes it doesn't get woken only to have to wait for us
         // to release `lock`.
-        drop(self.mutex.lock().unwrap());
+        drop(self.mutex.lock().expect_poison());
 
         self.condvar.notify_one();
     }

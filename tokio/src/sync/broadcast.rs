@@ -111,7 +111,7 @@
 use crate::loom::cell::CausalCell;
 use crate::loom::future::AtomicWaker;
 use crate::loom::sync::atomic::{spin_loop_hint, AtomicBool, AtomicPtr, AtomicUsize};
-use crate::loom::sync::{Arc, Condvar, IdentityUnwrap, Mutex};
+use crate::loom::sync::{Arc, Condvar, ExpectPoison, Mutex};
 
 use std::fmt;
 use std::ptr;
@@ -497,7 +497,7 @@ impl<T> Sender<T> {
     pub fn subscribe(&self) -> Receiver<T> {
         let shared = self.shared.clone();
 
-        let mut tail = shared.tail.lock().unwrap();
+        let mut tail = shared.tail.lock().expect_poison();
 
         if tail.rx_cnt == MAX_RECEIVERS {
             panic!("max receivers");
@@ -556,12 +556,12 @@ impl<T> Sender<T> {
     /// }
     /// ```
     pub fn receiver_count(&self) -> usize {
-        let tail = self.shared.tail.lock().unwrap();
+        let tail = self.shared.tail.lock().expect_poison();
         tail.rx_cnt
     }
 
     fn send2(&self, value: Option<T>) -> Result<usize, SendError<Option<T>>> {
-        let mut tail = self.shared.tail.lock().unwrap();
+        let mut tail = self.shared.tail.lock().expect_poison();
 
         if tail.rx_cnt == 0 {
             return Err(SendError(value));
@@ -684,7 +684,7 @@ impl<T> Receiver<T> {
             if pos.wrapping_add(self.shared.buffer.len() as u64) == self.next {
                 return Err(TryRecvError::Empty);
             } else {
-                let tail = self.shared.tail.lock().unwrap();
+                let tail = self.shared.tail.lock().expect_poison();
 
                 // `tail.pos` points to the slot the **next** send writes to.
                 // Because a receiver is lagging, this slot also holds the
@@ -891,7 +891,7 @@ where
 
 impl<T> Drop for Receiver<T> {
     fn drop(&mut self) {
-        let mut tail = self.shared.tail.lock().unwrap();
+        let mut tail = self.shared.tail.lock().expect_poison();
 
         tail.rx_cnt -= 1;
         let until = tail.pos;

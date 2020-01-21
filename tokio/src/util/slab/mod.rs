@@ -23,7 +23,7 @@ use stack::TransferStack;
 #[cfg(all(loom, test))]
 mod tests;
 
-use crate::loom::sync::{IdentityUnwrap, Mutex};
+use crate::loom::sync::{ExpectPoison, Mutex};
 use crate::util::bit;
 
 use std::fmt;
@@ -73,7 +73,7 @@ impl<T: Entry> Slab<T> {
     /// number of shards has been reached.
     pub(crate) fn alloc(&self) -> Option<Address> {
         // we must lock the slab to alloc an item.
-        let _local = self.local.lock().unwrap();
+        let _local = self.local.lock().expect_poison();
         self.shard.alloc()
     }
 

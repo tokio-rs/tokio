@@ -1,5 +1,5 @@
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::{IdentityUnwrap, Mutex};
+use crate::loom::sync::{ExpectPoison, Mutex};
 use crate::task::{Header, Task};
 
 use std::marker::PhantomData;
@@ -51,7 +51,7 @@ impl<T: 'static> Queue<T> {
     /// Close the worker queue
     pub(super) fn close(&self) -> bool {
         // Acquire the lock
-        let p = self.pointers.lock().unwrap();
+        let p = self.pointers.lock().expect_poison();
 
         let len = unsafe {
             // Set the queue as closed. Because all mutations are synchronized by
@@ -76,7 +76,7 @@ impl<T: 'static> Queue<T> {
         // Acquire and release the lock immediately. This synchronizes the
         // caller **after** all external waiters are done w/ the scheduler
         // struct.
-        drop(self.pointers.lock().unwrap());
+        drop(self.pointers.lock().expect_poison());
     }
 
     /// Push a value into the queue and call the closure **while still holding
@@ -87,7 +87,7 @@ impl<T: 'static> Queue<T> {
     {
         unsafe {
             // Acquire queue lock
-            let mut p = self.pointers.lock().unwrap();
+            let mut p = self.pointers.lock().expect_poison();
 
             // Check if the queue is closed. This must happen in the lock.
             let len = self.len.unsync_load();
@@ -136,7 +136,7 @@ impl<T: 'static> Queue<T> {
 
             debug_assert!(get_next(batch_tail).is_null());
 
-            let mut p = self.pointers.lock().unwrap();
+            let mut p = self.pointers.lock().expect_poison();
 
             if let Some(tail) = NonNull::new(p.tail as *mut _) {
                 set_next(tail, batch_head);
@@ -171,7 +171,7 @@ impl<T: 'static> Queue<T> {
         }
 
         unsafe {
-            let mut p = self.pointers.lock().unwrap();
+            let mut p = self.pointers.lock().expect_poison();
 
             // It is possible to hit null here if another thread poped the last
             // task between us checking `len` and acquiring the lock.

@@ -43,8 +43,8 @@ pub(crate) mod sync {
     #[cfg(feature = "parking_lot")]
     pub(crate) use ::parking_lot::{Condvar, Mutex, MutexGuard};
 
-    mod identity_unwrap;
-    pub(crate) use self::identity_unwrap::IdentityUnwrap;
+    mod expect_poison;
+    pub(crate) use self::expect_poison::ExpectPoison;
 
     #[cfg(not(feature = "parking_lot"))]
     pub(crate) use std::sync::{Condvar, Mutex, MutexGuard};
