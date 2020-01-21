@@ -30,6 +30,13 @@ jobs:
       - tokio-util
       - examples
 
+# Run integration tests
+- template: ci/azure-test-integration.yml
+  parameters:
+    name: test_integration
+    displayName: Integration tests
+    rust: stable
+
 # Run tests from `tests-build`. This requires a different process
 - template: ci/azure-test-build.yml
   parameters:

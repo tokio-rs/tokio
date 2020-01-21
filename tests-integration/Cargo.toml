@@ -5,11 +5,16 @@ authors = ["Tokio Contributors <team@tokio.rs>"]
 edition = "2018"
 publish = false
 
+[features]
+full = ["tokio/full", "tokio-test"]
+macros = ["tokio/macros"]
+rt-core = ["tokio/rt-core"]
+rt-threaded = ["rt-core", "tokio/rt-threaded"]
+
 [dependencies]
-tokio = { path = "../tokio", features = ["full"] }
+tokio = { path = "../tokio" }
+tokio-test = { path = "../tokio-test", optional = true }
 doc-comment = "0.3.1"
 
 [dev-dependencies]
-tokio-test = { path = "../tokio-test" }
-
 futures = { version = "0.3.0", features = ["async-await"] }
