@@ -51,18 +51,6 @@ cfg_io_util! {
     }
 }
 
-/// An opaque ID for the parent stream of a split half.
-///
-/// If you keep a `SplitStreamId` around after both halves have been dropped or reunited,
-/// the stream ID is dangling.
-/// The same ID may then be used for other split streams.
-/// To avoid this, do not keep `SplitStreamId` around after both half have been dropped.
-///
-/// Note that it is still impossible to unsplit two halves from a different stream,
-/// since at-least one half has not been dropped in that scenario.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub struct SplitStreamId(usize);
-
 struct Inner<T> {
     locked: AtomicBool,
     stream: UnsafeCell<T>,
@@ -73,16 +61,10 @@ struct Guard<'a, T> {
 }
 
 impl<T> ReadHalf<T> {
-    /// Get an opaque ID for the parent stream.
-    ///
-    /// This can be used to check if two halves have been split from the
-    /// same stream.
-    /// The stream ID can also be used as key in associative containers.
-    ///
-    /// Note that stream IDs may dangle when both halves are dropped.
-    /// See [`SplitStreamId`] for more information.
-    pub fn stream_id(&self) -> SplitStreamId {
-        SplitStreamId(&*self.inner as *const Inner<T> as usize)
+    /// Check if this `ReadHalf` and some `WriteHalf` were split from the same
+    /// stream.
+    pub fn is_pair_of(&self, other: &WriteHalf<T>) -> bool {
+        other.is_pair_of(&self)
     }
 
     /// Reunite with a previously split `WriteHalf`.
@@ -94,7 +76,7 @@ impl<T> ReadHalf<T> {
     /// This can be checked ahead of time by comparing the stream ID
     /// of the two halves.
     pub fn unsplit(self, wr: WriteHalf<T>) -> T {
-        if self.stream_id() == wr.stream_id() {
+        if self.is_pair_of(&wr) {
             drop(wr);
 
             let inner = Arc::try_unwrap(self.inner)
@@ -109,16 +91,10 @@ impl<T> ReadHalf<T> {
 }
 
 impl<T> WriteHalf<T> {
-    /// Get an opaque ID for the parent stream.
-    ///
-    /// This can be used to check if two halves have been split from the
-    /// same stream.
-    /// The stream ID can also be used as key in associative containers.
-    ///
-    /// Note that stream IDs may dangle when both halves are dropped.
-    /// See [`SplitStreamId`] for more information.
-    pub fn stream_id(&self) -> SplitStreamId {
-        SplitStreamId(&*self.inner as *const Inner<T> as usize)
+    /// Check if this `WriteHalf` and some `ReadHalf` were split from the same
+    /// stream.
+    pub fn is_pair_of(&self, other: &ReadHalf<T>) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
     }
 }
 
