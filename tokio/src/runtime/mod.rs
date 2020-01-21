@@ -208,7 +208,7 @@ pub(crate) mod enter;
 use self::enter::enter;
 
 mod handle;
-pub use self::handle::Handle;
+pub use self::handle::{Handle, TryCurrentError};
 
 mod io;
 

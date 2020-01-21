@@ -46,6 +46,16 @@ fn is_send_and_sync() {
 }
 
 #[test]
+fn split_stream_id() {
+    let (r1, w1) = split(RW);
+    let (r2, w2) = split(RW);
+    assert_eq!(r1.stream_id(), w1.stream_id());
+    assert_eq!(r1.stream_id(), w1.stream_id());
+    assert_ne!(r1.stream_id(), w2.stream_id());
+    assert_ne!(r2.stream_id(), w1.stream_id());
+}
+
+#[test]
 fn unsplit_ok() {
     let (r, w) = split(RW);
     r.unsplit(w);
