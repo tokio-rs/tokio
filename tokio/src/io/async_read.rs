@@ -123,7 +123,9 @@ pub trait AsyncRead {
                 // Convert to `&mut [u8]`
                 let b = &mut *(b as *mut [MaybeUninit<u8>] as *mut [u8]);
 
-                ready!(self.poll_read(cx, b))?
+                let n = ready!(self.poll_read(cx, b))?;
+                assert!(n <= b.len(), "Bad AsyncRead implementation, more bytes were reported as read than the buffer can hold");
+                n
             };
 
             buf.advance_mut(n);
