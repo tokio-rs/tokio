@@ -1,11 +1,3 @@
-#![doc(html_root_url = "https://docs.rs/tokio-macros/0.2.3")]
-#![allow(clippy::needless_doctest_main)]
-#![warn(
-    missing_debug_implementations,
-    missing_docs,
-    rust_2018_idioms,
-    unreachable_pub
-)]
 use proc_macro::TokenStream;
 use quote::quote;
 use std::num::NonZeroUsize;
