@@ -41,10 +41,7 @@ pub(crate) mod sync {
     pub(crate) use std::sync::Arc;
 
     #[cfg(feature = "parking_lot")]
-    pub(crate) use ::parking_lot::{Condvar, Mutex, MutexGuard};
-
-    mod expect_poison;
-    pub(crate) use self::expect_poison::ExpectPoison;
+    pub(crate) use parking_lot::{Condvar, Mutex, MutexGuard};
 
     #[cfg(not(feature = "parking_lot"))]
     pub(crate) use std::sync::{Condvar, Mutex, MutexGuard};
