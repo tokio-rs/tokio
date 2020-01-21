@@ -1,3 +1,25 @@
+# 0.2.10 (January 21, 2019)
+
+### Fixes
+- `#[tokio::main]` when `rt-core` feature flag is not enabled (#2139).
+- remove `AsyncBufRead` from `BufStream` impl block (#2108).
+- potential undefined behavior when implementing `AsyncRead` incorrectly (#2030).
+
+### Added
+- `BufStream::with_capacity` (#2125).
+- impl `From` and `Default` for `RwLock` (#2089).
+- `io::ReadHalf::is_pair_of` checks if provided `WriteHalf` is for the same
+  underlying object (#1762, #2144).
+- `runtime::Handle::try_current()` returns a handle to the current runtime (#2118).
+- `stream::empty()` returns an immediately ready empty stream (#2092).
+- `stream::once(val)` returns a stream that yields a single value: `val` (#2094).
+- `stream::pending()` returns a stream that never becomes ready (#2092).
+- `StreamExt::chain()` sequences a second stream after the first completes (#2093).
+- `StreamExt::collect()` transform a stream into a collection (#2109).
+- `StreamExt::fuse` ends the stream after the first `None` (#2085).
+- `StreamExt::merge` combines two streams, yielding values as they become ready (#2091).
+- Task-local storage (#2126).
+
 # 0.2.9 (January 9, 2019)
 
 ### Fixes
