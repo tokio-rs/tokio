@@ -1005,3 +1005,26 @@ fn ok_empty<T>(res: Result<T, TryRecvError>) -> Result<Option<T>, RecvError> {
         Err(TryRecvError::Closed) => Err(RecvError::Closed),
     }
 }
+
+impl fmt::Display for RecvError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RecvError::Closed => write!(f, "channel closed"),
+            RecvError::Lagged(amt) => write!(f, "channel lagged by {}", amt),
+        }
+    }
+}
+
+impl std::error::Error for RecvError {}
+
+impl fmt::Display for TryRecvError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TryRecvError::Empty => write!(f, "channel empty"),
+            TryRecvError::Closed => write!(f, "channel closed"),
+            TryRecvError::Lagged(amt) => write!(f, "channel lagged by {}", amt),
+        }
+    }
+}
+
+impl std::error::Error for TryRecvError {}
