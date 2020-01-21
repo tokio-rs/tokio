@@ -37,7 +37,6 @@ full = [
   "io-std",
   "macros",
   "net",
-  "parking_lot",
   "process",
   "rt-core",
   "rt-util",
