@@ -1,11 +1,14 @@
 use super::MutexGuard;
 
-/// Extension trait for `MutexGuard` types (libstd or parking_lot), enabling
-/// consistent handling of Mutex posioning.
+/// Extension trait for `MutexGuard` related types (libstd, parking_lot, etc.),
+/// providing consistent handling of Mutex poisoning.
 pub(crate) trait ExpectPoison<T> {
-    /// An identify function, for compatibility with Mutex types that may be
-    /// poisoned (like `std::sync::Mutex`), and are thus usually `unwrap`d to
-    /// panic on poison. In this case they never panic.
+    /// Return the underlying `MutexGuard` or panic if the associated `Mutex`
+    /// was poisoned.
+    ///
+    /// Poisoning is only possible with some implementations. This provides
+    /// consistent access by replacing use of `lock().unwrap()` with
+    /// `lock().expect_poison()` (for all `Mutex` types).
     fn expect_poison(self) -> T;
 }
 
