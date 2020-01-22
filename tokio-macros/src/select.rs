@@ -1,11 +1,16 @@
-use proc_macro::TokenStream;
+use proc_macro::{TokenStream, TokenTree};
 use proc_macro2::Span;
 use quote::quote;
 use syn::Ident;
 
 pub(crate) fn declare_output_enum(input: TokenStream) -> TokenStream {
-    // passed in is: `!!!!` with one `!` per branch
-    let branches = input.into_iter().count();
+    // passed in is: `(_ _ _)` with one `_` per branch
+    let branches = match input.into_iter().next() {
+        Some(TokenTree::Group(group)) => {
+            group.stream().into_iter().count()
+        }
+        _ => panic!("unexpected macro input")
+    };
 
     let variants = (0..branches)
         .map(|num| Ident::new(&format!("_{}", num), Span::call_site()))

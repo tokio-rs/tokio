@@ -4,7 +4,7 @@
 /// The `select` macro accepts one or more branches with the following pattern:
 ///
 /// ```text
-/// <pattern> = <async expression> (, if <condition>)? => <handler>,
+/// <pattern> = <async expression> (, if <precondition>)? => <handler>,
 /// ```
 ///
 /// Additionally, the `select!` macro may include a single, optional `else`
@@ -20,16 +20,16 @@
 /// returns the result of evaluating the completed branch's `<handler>`
 /// expression.
 ///
-/// Additionally, each branch may include an optional `if` condition. This
-/// condition is evaluated **before** the <async expression>. If the condition
-/// returns `false`, the branch is entirely disabled. This capability is useful
-/// when using `select!` within a loop.
+/// Additionally, each branch may include an optional `if` precondition. This
+/// precondition is evaluated **before** the <async expression>. If the
+/// precondition returns `false`, the branch is entirely disabled. This
+/// capability is useful when using `select!` within a loop.
 ///
 /// The complete lifecycle of a `select!` expression is as follows:
 ///
-/// 1. Evaluate all provded `<condition>` expressions. If the condition returns
-///    `false`, disable the branch for the remainder of the current call to
-///    `select!`. Re-entering `select!` due to a loop clears the "disabled"
+/// 1. Evaluate all provded `<precondition>` expressions. If the precondition
+///    returns `false`, disable the branch for the remainder of the current call
+///    to `select!`. Re-entering `select!` due to a loop clears the "disabled"
 ///    state.
 /// 2. Aggregate the `<async expression>`s from each branch, including the
 ///    disabled ones. If the branch is disabled, `<async expression>` is still
@@ -49,11 +49,15 @@
 /// By running all async expressions on the current task, the expressions are
 /// able to run **concurrently** but not in **parallel**. This means all
 /// expressions are run on the same thread and if one branch blocks the thread,
-/// all other expressions will be unable to continue.
+/// all other expressions will be unable to continue. If parallelism is
+/// required, spawn each async expression using [`tokio::spawn`] and pass the
+/// join handle to `select!`.
 ///
-/// ### Avoid racy `if` conditions
+/// [`tokio::spawn`]: crate::spawn
 ///
-/// Given that `if` conditions are used to disable `select!` branches, some
+/// ### Avoid racy `if` preconditions
+///
+/// Given that `if` preconditions are used to disable `select!` branches, some
 /// caution must be used to avoid missing values.
 ///
 /// For example, here is **incorrect** usage of `delay` with `if`. The objective
@@ -127,8 +131,8 @@
 /// # Panics
 ///
 /// `select!` panics if all branches are disabled **and** there is no provided
-/// `else` branch. A branch is disabled when the provided `if` condition returns
-/// `false` **or** when the pattern does not match the result of `<async
+/// `else` branch. A branch is disabled when the provided `if` precondition
+/// returns `false` **or** when the pattern does not match the result of `<async
 /// expression>.
 ///
 /// # Examples
@@ -312,7 +316,7 @@ macro_rules! select {
         // macro.
         mod util {
             // Generate an enum with one variant per select branch
-            $crate::select_declare_output_enum!( $($count)* );
+            $crate::select_priv_declare_output_enum!( ( $($count)* ) );
         }
 
         // `tokio::macros::support` is a public, but doc(hidden) module
@@ -337,7 +341,8 @@ macro_rules! select {
         // Create a scope to separate polling from handling the output. This
         // adds borrow checker flexibility when using the macro.
         let mut output = {
-            // Safety: Nothing must be moved out of `futures`
+            // Safety: Nothing must be moved out of `futures`. This is to
+            // satisfy the requirement of `Pin::new_unchecked` called below.
             let mut futures = ( $( $fut , )+ );
 
             $crate::macros::support::poll_fn(|cx| {

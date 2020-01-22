@@ -282,7 +282,10 @@
 //! }
 //! ```
 
-// Includes re-exports used by macros
+// Includes re-exports used by macros.
+//
+// This module is not intended to be part of the public API. In general, any
+// `doc(hidden)` code is not part of Tokio's public and stable API.
 #[macro_use]
 #[doc(hidden)]
 pub mod macros;
@@ -335,8 +338,11 @@ cfg_time! {
 mod util;
 
 cfg_macros! {
+    /// Implementation detail of the `select!` macro. This macro is **not**
+    /// intended to be used as part of the public API and is permitted to
+    /// change.
     #[doc(hidden)]
-    pub use tokio_macros::select_declare_output_enum;
+    pub use tokio_macros::select_priv_declare_output_enum;
 
     doc_rt_core! {
         cfg_rt_threaded! {

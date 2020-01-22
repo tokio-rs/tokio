@@ -200,8 +200,10 @@ pub fn test_basic(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::test(args, item, false)
 }
 
+/// Implementation detail of the `select!` macro. This macro is **not** intended
+/// to be used as part of the public API and is permitted to change.
 #[proc_macro]
 #[doc(hidden)]
-pub fn select_declare_output_enum(input: TokenStream) -> TokenStream {
+pub fn select_priv_declare_output_enum(input: TokenStream) -> TokenStream {
     select::declare_output_enum(input)
 }
