@@ -59,11 +59,13 @@ use take::Take;
 mod take_while;
 use take_while::TakeWhile;
 
-mod timeout;
-pub use timeout::Timeout;
+cfg_time! {
+    mod timeout;
+    pub use timeout::Timeout;
+    use std::time::Duration;
+}
 
 pub use futures_core::Stream;
-use std::time::Duration;
 
 /// An extension trait for `Stream`s that provides a variety of convenient
 /// combinator functions.
@@ -736,6 +738,8 @@ pub trait StreamExt: Stream {
     /// assert_eq!(int_stream.try_next().await, Ok(None));
     /// # }
     /// ```
+    #[cfg(all(feature = "time"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
     fn timeout(self, duration: Duration) -> Timeout<Self>
     where
         Self: Sized,

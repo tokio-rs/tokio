@@ -111,6 +111,8 @@ pub struct Timeout<T> {
 pub struct Elapsed(());
 
 impl Elapsed {
+    // Used on StreamExt::timeout
+    #[allow(unused)]
     pub(crate) fn new() -> Self {
         Elapsed(())
     }

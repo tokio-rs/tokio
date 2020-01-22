@@ -1,46 +1,79 @@
-use std::time::Duration;
-use tokio::stream::{Stream, StreamExt};
-use tokio::sync::mpsc;
-use tokio::time::delay_for;
+#![cfg(feature = "full")]
+
+use tokio::stream::{self, StreamExt};
+use tokio::time::{self, delay_for, Duration};
+use tokio_test::*;
+
+use futures::StreamExt as _;
+
+async fn maybe_delay(idx: i32) -> i32 {
+    if idx % 2 == 0 {
+        delay_for(ms(200)).await;
+    }
+    idx
+}
+
+fn ms(n: u64) -> Duration {
+    Duration::from_millis(n)
+}
 
 #[tokio::test]
 async fn basic_usage() {
-    #[derive(Debug, PartialEq)]
-    struct TimedOut;
+    time::pause();
 
-    let actual = stream()
-        .timeout(Duration::from_millis(15))
-        .map(|item| item.map_err(|_| TimedOut))
-        .collect::<Vec<_>>()
-        .await;
+    // Items 2 and 4 time out. If we run the stream until it completes,
+    // we end up with the following items:
+    //
+    // [Ok(1), Err(Elapsed), Ok(2), Ok(3), Err(Elapsed), Ok(4)]
 
-    //              5ms    10ms   15ms                  20ms
-    let expected = [Ok(1), Ok(2), Err(TimedOut), Ok(3), Err(TimedOut), Ok(4)];
-    assert_eq!(actual, expected);
+    let stream = stream::iter(1..=4).then(maybe_delay).timeout(ms(100));
+    let mut stream = task::spawn(stream);
+
+    // First item completes immediately
+    assert_ready_eq!(stream.poll_next(), Some(Ok(1)));
+
+    // Second item is delayed 200ms, times out after 100ms
+    assert_pending!(stream.poll_next());
+
+    time::advance(ms(150)).await;
+    let v = assert_ready!(stream.poll_next());
+    assert!(v.unwrap().is_err());
+
+    assert_pending!(stream.poll_next());
+
+    time::advance(ms(100)).await;
+    assert_ready_eq!(stream.poll_next(), Some(Ok(2)));
+
+    // Third item is ready immediately
+    assert_ready_eq!(stream.poll_next(), Some(Ok(3)));
+
+    // Fourth item is delayed 200ms, times out after 100ms
+    assert_pending!(stream.poll_next());
+
+    time::advance(ms(60)).await;
+    assert_pending!(stream.poll_next()); // nothing ready yet
+
+    time::advance(ms(60)).await;
+    let v = assert_ready!(stream.poll_next());
+    assert!(v.unwrap().is_err()); // timeout!
+
+    time::advance(ms(120)).await;
+    assert_ready_eq!(stream.poll_next(), Some(Ok(4)));
+
+    // Done.
+    assert_ready_eq!(stream.poll_next(), None);
 }
 
 #[tokio::test]
-async fn no_timeout() {
-    assert!(
-        stream()
-            .timeout(Duration::from_millis(50))
-            .all(|item| item.is_ok())
-            .await
-    )
-}
+async fn no_timeouts() {
+    let stream = stream::iter(vec![1, 3, 5])
+        .then(maybe_delay)
+        .timeout(ms(100));
 
-fn stream() -> impl Stream<Item = u32> {
-    let (tx, rx) = mpsc::unbounded_channel();
+    let mut stream = task::spawn(stream);
 
-    tokio::spawn(async move {
-        let mut delay = 5;
-
-        for n in 1..=4 {
-            delay_for(Duration::from_millis(delay)).await;
-            tx.send(n).expect("send");
-            delay += 5;
-        }
-    });
-
-    rx
+    assert_ready_eq!(stream.poll_next(), Some(Ok(1)));
+    assert_ready_eq!(stream.poll_next(), Some(Ok(3)));
+    assert_ready_eq!(stream.poll_next(), Some(Ok(5)));
+    assert_ready_eq!(stream.poll_next(), None);
 }
