@@ -20,7 +20,7 @@ use crate::park::{Park, Unpark};
 use crate::time::{wheel, Error};
 use crate::time::{Clock, Duration, Instant};
 
-use std::sync::atomic::Ordering::{Relaxed, Release, SeqCst};
+use std::sync::atomic::Ordering::{self, Acquire, Relaxed, Release, SeqCst};
 use std::sync::Arc;
 use std::usize;
 use std::{cmp, fmt};
@@ -333,6 +333,12 @@ impl Inner {
         self.elapsed.load(SeqCst)
     }
 
+    #[cfg(test)]
+    #[cfg(loom)]
+    fn num(&self, ordering: Ordering) -> usize {
+        self.num.load(ordering)
+    }
+
     /// Increment the number of active timeouts
     fn increment(&self) -> Result<(), Error> {
         let mut curr = self.num.load(Relaxed);
@@ -353,7 +359,7 @@ impl Inner {
 
     /// Decrement the number of active timeouts
     fn decrement(&self) {
-        let prev = self.num.fetch_sub(1, SeqCst);
+        let prev = self.num.fetch_sub(1, Acquire);
         debug_assert!(prev <= MAX_TIMEOUTS);
     }
 
