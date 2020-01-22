@@ -354,16 +354,6 @@ async fn join_with_select() {
     assert_eq!(b, 456);
 }
 
-// TODO: Integration test
-#[tokio::test]
-async fn unused_variable() {
-    let v = tokio::select! {
-        foo = async { 1 } => 1,
-    };
-
-    assert_eq!(1, v);
-}
-
 #[tokio::test]
 async fn many_branches() {
     let num = tokio::select! {
