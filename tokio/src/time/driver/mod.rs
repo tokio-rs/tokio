@@ -20,7 +20,8 @@ use crate::park::{Park, Unpark};
 use crate::time::{wheel, Error};
 use crate::time::{Clock, Duration, Instant};
 
-use std::sync::atomic::Ordering::{self, Acquire, Relaxed, Release, SeqCst};
+use std::sync::atomic::Ordering::{Acquire, Relaxed, Release, SeqCst};
+
 use std::sync::Arc;
 use std::usize;
 use std::{cmp, fmt};
@@ -335,7 +336,7 @@ impl Inner {
 
     #[cfg(test)]
     #[cfg(loom)]
-    fn num(&self, ordering: Ordering) -> usize {
+    fn num(&self, ordering: ::std::sync::atomic::Ordering) -> usize {
         self.num.load(ordering)
     }
 
