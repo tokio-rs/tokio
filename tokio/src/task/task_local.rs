@@ -66,7 +66,7 @@ macro_rules! __task_local_inner {
 /// Unlike [`std::thread::LocalKey`], `tokio::task::LocalKey` will
 /// _not_ lazily initialize the value on first access. Instead, the
 /// value is first initialized when the future containing
-/// the task-local is first polled by the Tokio executor.
+/// the task-local is first polled by a futures executor, like Tokio.
 ///
 /// # Examples
 ///
@@ -77,7 +77,7 @@ macro_rules! __task_local_inner {
 /// }
 ///
 /// NUMBER.scope(1, async move {
-///     assert_eq!(FOO.get(), 1);
+///     assert_eq!(NUMBER.get(), 1);
 /// }).await;
 ///
 /// NUMBER.scope(2, async move {
