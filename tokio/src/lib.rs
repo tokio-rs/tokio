@@ -44,7 +44,7 @@
 //! [signal]: crate::signal
 //! [fs]: crate::fs
 //! [runtime]: crate::runtime
-//! [website]: https://tokio.rs/docs/
+//! [website]: https://tokio.rs/docs/overview/
 //!
 //! # A Tour of Tokio
 //!
