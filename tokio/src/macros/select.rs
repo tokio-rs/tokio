@@ -37,7 +37,7 @@
 /// 4. Once an `<async expression>` returns a value, attempt to apply the value
 ///    to the provided `<pattern>`, if the pattern matches, evaluate `<handler>`
 ///    and return. If the pattern **does not** match, disable the current branch
-///    and continue from step 3.
+///    and for the remainder of the current call to `select!. Continue from step 3.
 /// 5. If **all** branches are disabled, evaluate the `else` expression. If none
 ///    is provided, panic.
 ///
