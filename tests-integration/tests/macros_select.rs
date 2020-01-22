@@ -1,7 +1,7 @@
 #![cfg(feature = "macros")]
 
-use futures::executor::block_on;
 use futures::channel::oneshot;
+use futures::executor::block_on;
 use std::thread;
 
 #[test]
