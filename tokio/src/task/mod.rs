@@ -246,6 +246,9 @@ cfg_rt_core! {
     mod raw;
     use self::raw::RawTask;
 
+    mod scope;
+    pub use scope::{scope, scope_with_options, ScopeOptions, ScopedJoinHandle, ScopeHandle, ScopeCancelBehavior, ScopeDropBehavior};
+
     mod spawn;
     pub use spawn::spawn;
 
