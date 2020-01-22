@@ -214,9 +214,8 @@ pub enum RecvError {
     /// be sent.
     Closed,
 
-    /// The receiver lagged too far behind and has been forcibly disconnected.
-    /// Attempting to receive again will return the oldest message still
-    /// retained by the channel.
+    /// The receiver lagged too far behind. Attempting to receive again will
+    /// return the oldest message still retained by the channel.
     ///
     /// Includes the number of skipped messages.
     Lagged(u64),
@@ -274,9 +273,9 @@ struct Tail {
     rx_cnt: usize,
 }
 
-/// Node in the linked list
+/// Slot in the buffer
 struct Slot<T> {
-    /// Remaining numer of senders that are expected to see this value.
+    /// Remaining number of receivers that are expected to see this value.
     ///
     /// When this goes to zero, the value is released.
     rem: AtomicUsize,
@@ -314,6 +313,7 @@ struct WaitNode {
 
 struct RecvGuard<'a, T> {
     slot: &'a Slot<T>,
+    tail: &'a Mutex<Tail>,
     condvar: &'a Condvar,
 }
 
@@ -579,17 +579,27 @@ impl<T> Sender<T> {
         let slot = &self.shared.buffer[idx];
 
         // Acquire the write lock
-        let mut prev = slot.lock.fetch_add(1, SeqCst);
+        let mut prev = slot.lock.fetch_or(1, SeqCst);
 
         while prev & !1 != 0 {
             // Concurrent readers, we must go to sleep
             tail = self.shared.condvar.wait(tail).unwrap();
 
             prev = slot.lock.load(SeqCst);
+
+            if prev & 1 == 0 {
+                // The writer lock bit was cleared while this thread was
+                // sleeping. This can only happen if a newer write happened on
+                // this slot by another thread. Bail early as an optimization,
+                // there is nothing left to do.
+                return Ok(rem);
+            }
         }
 
-        // Release the mutex
-        drop(tail);
+        if tail.pos.wrapping_sub(pos) > self.shared.buffer.len() as u64 {
+            // There is a newer pending write to the same slot.
+            return Ok(rem);
+        }
 
         // Slot lock acquired
         slot.write.pos.with_mut(|ptr| unsafe { *ptr = pos });
@@ -600,6 +610,11 @@ impl<T> Sender<T> {
 
         // Release the slot lock
         slot.lock.store(0, SeqCst);
+
+        // Release the mutex. This must happen after the slot lock is released,
+        // otherwise the writer lock bit could be cleared while another thread
+        // is in the critical section.
+        drop(tail);
 
         // Notify waiting receivers
         self.notify_rx();
@@ -665,6 +680,7 @@ impl<T> Receiver<T> {
 
         let guard = RecvGuard {
             slot,
+            tail: &self.shared.tail,
             condvar: &self.shared.condvar,
         };
 
@@ -952,7 +968,7 @@ impl<T> Slot<T> {
         }
     }
 
-    fn rx_unlock(&self, condvar: &Condvar, rem_dec: bool) {
+    fn rx_unlock(&self, tail: &Mutex<Tail>, condvar: &Condvar, rem_dec: bool) {
         if rem_dec {
             // Decrement the remaining counter
             if 1 == self.rem.fetch_sub(1, SeqCst) {
@@ -961,11 +977,12 @@ impl<T> Slot<T> {
             }
         }
 
-        let prev = self.lock.fetch_sub(2, SeqCst);
-
-        if prev & 1 == 1 {
-            // Sender waiting for lock
-            condvar.notify_one();
+        if 1 == self.lock.fetch_sub(2, SeqCst) - 2 {
+            // First acquire the lock to make sure our sender is waiting on the
+            // condition variable, otherwise the notification could be lost.
+            let _ = tail.lock().unwrap();
+            // Wake up senders
+            condvar.notify_all();
         }
     }
 }
@@ -985,7 +1002,7 @@ impl<'a, T> RecvGuard<'a, T> {
     fn drop_no_rem_dec(self) {
         use std::mem;
 
-        self.slot.rx_unlock(self.condvar, false);
+        self.slot.rx_unlock(self.tail, self.condvar, false);
 
         mem::forget(self);
     }
@@ -993,7 +1010,7 @@ impl<'a, T> RecvGuard<'a, T> {
 
 impl<'a, T> Drop for RecvGuard<'a, T> {
     fn drop(&mut self) {
-        self.slot.rx_unlock(self.condvar, true)
+        self.slot.rx_unlock(self.tail, self.condvar, true)
     }
 }
 
