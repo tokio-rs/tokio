@@ -6,10 +6,8 @@ use syn::Ident;
 pub(crate) fn declare_output_enum(input: TokenStream) -> TokenStream {
     // passed in is: `(_ _ _)` with one `_` per branch
     let branches = match input.into_iter().next() {
-        Some(TokenTree::Group(group)) => {
-            group.stream().into_iter().count()
-        }
-        _ => panic!("unexpected macro input")
+        Some(TokenTree::Group(group)) => group.stream().into_iter().count(),
+        _ => panic!("unexpected macro input"),
     };
 
     let variants = (0..branches)
