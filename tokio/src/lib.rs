@@ -282,15 +282,17 @@
 //! }
 //! ```
 
-// macros used internally
+// Includes re-exports used by macros
 #[macro_use]
-mod macros;
+#[doc(hidden)]
+pub mod macros;
 
 cfg_fs! {
     pub mod fs;
 }
 
-mod future;
+#[doc(hidden)]
+pub mod future;
 
 pub mod io;
 pub mod net;
@@ -333,6 +335,9 @@ cfg_time! {
 mod util;
 
 cfg_macros! {
+    #[doc(hidden)]
+    pub use tokio_macros::select_declare_output_enum;
+
     doc_rt_core! {
         cfg_rt_threaded! {
             #[cfg(not(test))] // Work around for rust-lang/rust#62127
