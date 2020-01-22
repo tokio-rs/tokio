@@ -355,6 +355,20 @@ async fn join_with_select() {
 }
 
 #[tokio::test]
+async fn use_future_in_if_condition() {
+    use tokio::time::{self, Duration};
+
+    let mut delay = time::delay_for(Duration::from_millis(50));
+
+    tokio::select! {
+        _ = &mut delay, if !delay.is_elapsed() => {
+        }
+        _ = async { 1 } => {
+        }
+    }
+}
+
+#[tokio::test]
 async fn many_branches() {
     let num = tokio::select! {
         x = async { 1 } => x,

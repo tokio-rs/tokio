@@ -27,12 +27,13 @@
 ///
 /// The complete lifecycle of a `select!` expression is as follows:
 ///
-/// 1. Aggregate the `<async expression>`s from each branch. None of the
-///    resulting futures are polled yet.
-/// 2. Evaluate all provded `<condition>` expressions. If the condition returns
+/// 1. Evaluate all provded `<condition>` expressions. If the condition returns
 ///    `false`, disable the branch for the remainder of the current call to
 ///    `select!`. Re-entering `select!` due to a loop clears the "disabled"
 ///    state.
+/// 2. Aggregate the `<async expression>`s from each branch, including the
+///    disabled ones. If the branch is disabled, `<async expression>` is still
+///    evaluated, but the resulting future is not polled.
 /// 3. Concurrently await on the results for all remaining `<async expression>`s.
 /// 4. Once an `<async expression>` returns a value, attempt to apply the value
 ///    to the provided `<pattern>`, if the pattern matches, evaluate `<handler>`
@@ -71,7 +72,7 @@
 ///     let mut delay = time::delay_for(Duration::from_millis(50));
 ///
 ///     while !delay.is_elapsed() {
-///         select! {
+///         tokio::select! {
 ///             _ = &mut delay, if !delay.is_elapsed() => {
 ///                 println!("operation timed out");
 ///             }
@@ -104,7 +105,7 @@
 ///     let mut delay = time::delay_for(Duration::from_millis(50));
 ///
 ///     loop {
-///         select! {
+///         tokio::select! {
 ///             _ = &mut delay => {
 ///                 println!("operation timed out");
 ///                 break;
@@ -322,21 +323,22 @@ macro_rules! select {
 
         const BRANCHES: u32 = $crate::count!( $($count)* );
 
+        let mut disabled: util::Mask = Default::default();
+
+        // First, invoke all the pre-conditions. For any that return true,
+        // set the appropriate bit in `disabled`.
+        $(
+            if !$c {
+                let mask = 1 << $crate::count!( $($skip)* );
+                disabled |= mask;
+            }
+        )*
+
         // Create a scope to separate polling from handling the output. This
         // adds borrow checker flexibility when using the macro.
         let mut output = {
             // Safety: Nothing must be moved out of `futures`
             let mut futures = ( $( $fut , )+ );
-            let mut disabled: util::Mask = Default::default();
-
-            // First, invoke all the pre-conditions. For any that return true,
-            // set the appropriate bit in `disabled`.
-            $(
-                if !$c {
-                    let mask = 1 << $crate::count!( $($skip)* );
-                    disabled |= mask;
-                }
-            )*
 
             $crate::macros::support::poll_fn(|cx| {
                 // Track if any branch returns pending. If no branch completes
