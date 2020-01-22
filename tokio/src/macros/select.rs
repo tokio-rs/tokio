@@ -27,23 +27,95 @@
 ///
 /// The complete lifecycle of a `select!` expression is as follows:
 ///
-/// 1. Aggregate the `<async expression>`s from each branch.
+/// 1. Aggregate the `<async expression>`s from each branch. None of the
+///    resulting futures are polled yet.
 /// 2. Evaluate all provded `<condition>` expressions. If the condition returns
-///    `false`, disable the branch.
-/// 3. Concurrently await on the results for all remaining `<async expression>s.
+///    `false`, disable the branch for the remainder of the current call to
+///    `select!`. Re-entering `select!` due to a loop clears the "disabled"
+///    state.
+/// 3. Concurrently await on the results for all remaining `<async expression>`s.
 /// 4. Once an `<async expression>` returns a value, attempt to apply the value
 ///    to the provided `<pattern>`, if the pattern matches, evaluate `<handler>`
 ///    and return. If the pattern **does not** match, disable the current branch
 ///    and continue from step 3.
 /// 5. If **all** branches are disabled, evaluate the `else` expression. If none
-///    if provided, panic.
+///    is provided, panic.
 ///
 /// # Notes
+///
+/// ### Runtime characteristics
 ///
 /// By running all async expressions on the current task, the expressions are
 /// able to run **concurrently** but not in **parallel**. This means all
 /// expressions are run on the same thread and if one branch blocks the thread,
 /// all other expressions will be unable to continue.
+///
+/// ### Avoid racy `if` conditions
+///
+/// Given that `if` conditions are used to disable `select!` branches, some
+/// caution must be used to avoid missing values.
+///
+/// For example, here is **incorrect** usage of `delay` with `if`. The objective
+/// is to repeatedly run an asynchronous task for up to 50 milliseconds.
+/// However, there is a potential for the `delay` completion to be missed.
+///
+/// ```no_run
+/// use tokio::time::{self, Duration};
+///
+/// async fn some_async_work() {
+///     // do work
+/// }
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let mut delay = time::delay_for(Duration::from_millis(50));
+///
+///     while !delay.is_elapsed() {
+///         select! {
+///             _ = &mut delay, if !delay.is_elapsed() => {
+///                 println!("operation timed out");
+///             }
+///             _ = some_async_work() => {
+///                 println!("operation completed");
+///             }
+///         }
+///     }
+/// }
+/// ```
+///
+/// In the above example, `delay.is_elapsed()` may return `true` even if
+/// `delay.poll()` never returned `Ready`. This opens up a potential race
+/// condition where `delay` expires between the `while !delay.is_elapsed()`
+/// check and the call to `select!` resulting in the `some_async_work()` call to
+/// run uninterrupted despite the delay having elapsed.
+///
+/// One way to write the above example without the race would be:
+///
+/// ```
+/// use tokio::time::{self, Duration};
+///
+/// async fn some_async_work() {
+/// # time::delay_for(Duration::from_millis(10)).await;
+///     // do work
+/// }
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let mut delay = time::delay_for(Duration::from_millis(50));
+///
+///     loop {
+///         select! {
+///             _ = &mut delay => {
+///                 println!("operation timed out");
+///                 break;
+///             }
+///             _ = some_async_work() => {
+///                 println!("operation completed");
+///             }
+///         }
+///     }
+/// }
+/// ```
 ///
 /// ### Fairness
 ///
@@ -85,7 +157,7 @@
 ///
 /// ```
 ///
-/// Basic stream selecting
+/// Basic stream selecting.
 ///
 /// ```
 /// use tokio::stream::{self, StreamExt};
@@ -132,7 +204,13 @@
 /// ```
 ///
 /// Using the same future in multiple select! expressions can be done by passing
-/// a reference to the future. Here, a stream is consumed for at most 1 second.
+/// a reference to the future. Doing so requires the future to be [`Unpin`]. A
+/// future can be made [`Unpin`] by either using [`Box::pin`] or stack pinning.
+///
+/// [`Unpin`]: std::marker::Unpin
+/// [`Box::pin`]: std::boxed::Box::pin
+///
+/// Here, a stream is consumed for at most 1 second.
 ///
 /// ```
 /// use tokio::stream::{self, StreamExt};
@@ -161,7 +239,7 @@
 /// }
 /// ```
 ///
-/// Joining two values using `select!`
+/// Joining two values using `select!`.
 ///
 /// ```
 /// use tokio::sync::oneshot;
