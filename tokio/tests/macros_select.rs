@@ -207,7 +207,7 @@ async fn struct_size() {
         }
     };
 
-    assert_eq!(mem::size_of_val(&fut), 32);
+    assert!(mem::size_of_val(&fut) <= 32);
 
     let fut = async {
         let ready1 = future::ready(0i32);
@@ -219,7 +219,7 @@ async fn struct_size() {
         }
     };
 
-    assert_eq!(mem::size_of_val(&fut), 40);
+    assert!(mem::size_of_val(&fut) <= 40);
 
     let fut = async {
         let ready1 = future::ready(0i32);
@@ -233,7 +233,7 @@ async fn struct_size() {
         }
     };
 
-    assert_eq!(mem::size_of_val(&fut), 48);
+    assert!(mem::size_of_val(&fut) <= 48);
 }
 
 #[tokio::test]
@@ -332,8 +332,8 @@ async fn join_with_select() {
 
         while a.is_none() || b.is_none() {
             tokio::select! {
-                v1 = (&mut rx1), if a.is_none() => a = Some(assert_ok!(v1)),
-                v2 = (&mut rx2), if b.is_none() => b = Some(assert_ok!(v2)),
+                v1 = &mut rx1, if a.is_none() => a = Some(assert_ok!(v1)),
+                v2 = &mut rx2, if b.is_none() => b = Some(assert_ok!(v2))
             }
         }
 
