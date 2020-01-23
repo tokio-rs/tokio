@@ -282,15 +282,20 @@
 //! }
 //! ```
 
-// macros used internally
+// Includes re-exports used by macros.
+//
+// This module is not intended to be part of the public API. In general, any
+// `doc(hidden)` code is not part of Tokio's public and stable API.
 #[macro_use]
-mod macros;
+#[doc(hidden)]
+pub mod macros;
 
 cfg_fs! {
     pub mod fs;
 }
 
-mod future;
+#[doc(hidden)]
+pub mod future;
 
 pub mod io;
 pub mod net;
@@ -333,6 +338,12 @@ cfg_time! {
 mod util;
 
 cfg_macros! {
+    /// Implementation detail of the `select!` macro. This macro is **not**
+    /// intended to be used as part of the public API and is permitted to
+    /// change.
+    #[doc(hidden)]
+    pub use tokio_macros::select_priv_declare_output_enum;
+
     doc_rt_core! {
         cfg_rt_threaded! {
             #[cfg(not(test))] // Work around for rust-lang/rust#62127

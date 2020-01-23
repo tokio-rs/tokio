@@ -14,4 +14,13 @@ mod loom;
 mod ready;
 
 #[macro_use]
+mod select;
+
+#[macro_use]
 mod thread_local;
+
+cfg_macros! {
+    // Includes re-exports needed to implement macros
+    #[doc(hidden)]
+    pub mod support;
+}

@@ -14,9 +14,10 @@
 
 //! Macros for use with Tokio
 
-mod entry;
-
 extern crate proc_macro;
+
+mod entry;
+mod select;
 
 use proc_macro::TokenStream;
 
@@ -197,4 +198,12 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn test_basic(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::test(args, item, false)
+}
+
+/// Implementation detail of the `select!` macro. This macro is **not** intended
+/// to be used as part of the public API and is permitted to change.
+#[proc_macro]
+#[doc(hidden)]
+pub fn select_priv_declare_output_enum(input: TokenStream) -> TokenStream {
+    select::declare_output_enum(input)
 }

@@ -6,7 +6,14 @@ edition = "2018"
 publish = false
 
 [features]
-full = ["tokio/full", "tokio-test"]
+full = [
+    "macros",
+    "rt-core",
+    "rt-threaded",
+
+    "tokio/full",
+    "tokio-test"
+]
 macros = ["tokio/macros"]
 rt-core = ["tokio/rt-core"]
 rt-threaded = ["rt-core", "tokio/rt-threaded"]
