@@ -8,6 +8,9 @@ mod assert;
 mod cfg;
 
 #[macro_use]
+mod join;
+
+#[macro_use]
 mod loom;
 
 #[macro_use]

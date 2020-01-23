@@ -3,7 +3,7 @@
 //! Asynchronous values.
 
 mod maybe_done;
-pub(crate) use maybe_done::{maybe_done, MaybeDone};
+pub use maybe_done::{maybe_done, MaybeDone};
 
 mod poll_fn;
 pub use poll_fn::poll_fn;
