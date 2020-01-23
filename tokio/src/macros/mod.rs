@@ -13,8 +13,10 @@ mod loom;
 #[macro_use]
 mod ready;
 
-#[macro_use]
-mod select;
+cfg_macros! {
+    #[macro_use]
+    mod select;
+}
 
 #[macro_use]
 mod thread_local;
