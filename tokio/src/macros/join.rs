@@ -73,7 +73,7 @@ macro_rules! join {
                 let mut fut = unsafe { Pin::new_unchecked(fut) };
 
                 // Try polling
-                if !fut.poll(cx).is_ready() {
+                if fut.poll(cx).is_pending() {
                     is_pending = true;
                 }
             )*
