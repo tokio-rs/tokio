@@ -1,3 +1,8 @@
+//! A minimal adaption of the `parking_lot` synchronization primitives to the
+//! equivalent `std::sync` types.
+//!
+//! This can be extended to additional types/methods as required.
+
 use std::sync::{LockResult, TryLockResult, TryLockError};
 use std::time::Duration;
 
@@ -26,17 +31,8 @@ impl<T> Mutex<T> {
         }
     }
 
-    #[allow(unused)]
-    #[inline]
-    pub(crate) fn is_poisoned(&self) -> bool {
-        false
-    }
-
-    #[allow(unused)]
-    #[inline]
-    pub(crate) fn into_inner(self) -> LockResult<T> {
-        Ok(self.0.into_inner())
-    }
+    // Note: Additional methods `is_poisoned` and `into_inner`, can be
+    // provided here as needed.
 }
 
 /// Adapter for `parking_lot::Condvar` to the `std::sync::Condvar` interface.
