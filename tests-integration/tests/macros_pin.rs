@@ -1,7 +1,6 @@
 use futures::executor::block_on;
 
-async fn my_async_fn() {
-}
+async fn my_async_fn() {}
 
 #[test]
 fn pin() {
