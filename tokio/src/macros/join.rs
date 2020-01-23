@@ -10,6 +10,9 @@
 ///
 /// # Notes
 ///
+/// The supplied futures are stored inline and does not require allocating a
+/// `Vec`.
+///
 /// ### Runtime characteristics
 ///
 /// By running all async expressions on the current task, the expressions are
