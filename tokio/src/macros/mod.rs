@@ -11,6 +11,9 @@ mod cfg;
 mod loom;
 
 #[macro_use]
+mod pin;
+
+#[macro_use]
 mod ready;
 
 cfg_macros! {
@@ -21,8 +24,6 @@ cfg_macros! {
 #[macro_use]
 mod thread_local;
 
-cfg_macros! {
-    // Includes re-exports needed to implement macros
-    #[doc(hidden)]
-    pub mod support;
-}
+// Includes re-exports needed to implement macros
+#[doc(hidden)]
+pub mod support;
