@@ -30,13 +30,14 @@
 
 use std::env;
 use std::error::Error;
-use std::io::{stdin, Read};
 use std::net::SocketAddr;
+use tokio::io;
 use tokio::net::UdpSocket;
+use tokio::prelude::io::AsyncReadExt;
 
-fn get_stdin_data() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+async fn get_stdin_data() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut buf = Vec::new();
-    stdin().read_to_end(&mut buf)?;
+    io::stdin().read_to_end(&mut buf).await?;
     Ok(buf)
 }
 
@@ -58,7 +59,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut socket = UdpSocket::bind(local_addr).await?;
     const MAX_DATAGRAM_SIZE: usize = 65_507;
     socket.connect(&remote_addr).await?;
-    let data = get_stdin_data()?;
+    let data = get_stdin_data().await?;
     socket.send(&data).await?;
     let mut data = vec![0u8; MAX_DATAGRAM_SIZE];
     let len = socket.recv(&mut data).await?;
