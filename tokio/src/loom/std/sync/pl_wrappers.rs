@@ -3,7 +3,7 @@
 //!
 //! This can be extended to additional types/methods as required.
 
-use std::sync::{LockResult, TryLockResult, TryLockError};
+use std::sync::{LockResult, TryLockError, TryLockResult};
 use std::time::Duration;
 
 use parking_lot as pl;
@@ -56,9 +56,10 @@ impl Condvar {
     }
 
     #[inline]
-    pub(crate) fn wait<'a, T>(&self, mut guard: pl::MutexGuard<'a, T>)
-        -> LockResult<pl::MutexGuard<'a, T>>
-    {
+    pub(crate) fn wait<'a, T>(
+        &self,
+        mut guard: pl::MutexGuard<'a, T>,
+    ) -> LockResult<pl::MutexGuard<'a, T>> {
         self.0.wait(&mut guard);
         Ok(guard)
     }
@@ -67,9 +68,8 @@ impl Condvar {
     pub(crate) fn wait_timeout<'a, T>(
         &self,
         mut guard: pl::MutexGuard<'a, T>,
-        timeout: Duration)
-        -> LockResult<(pl::MutexGuard<'a, T>, pl::WaitTimeoutResult)>
-    {
+        timeout: Duration,
+    ) -> LockResult<(pl::MutexGuard<'a, T>, pl::WaitTimeoutResult)> {
         let wtr = self.0.wait_for(&mut guard, timeout);
         Ok((guard, wtr))
     }
