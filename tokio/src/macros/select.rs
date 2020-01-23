@@ -1,6 +1,9 @@
 /// Wait on multiple concurrent branches, returning when the **first** branch
 /// completes, cancelling the remaining branches.
 ///
+/// The `select!` macro must be used inside of async functions, closures, and
+/// blocks.
+///
 /// The `select` macro accepts one or more branches with the following pattern:
 ///
 /// ```text
@@ -159,7 +162,6 @@
 ///         }
 ///     };
 /// }
-///
 /// ```
 ///
 /// Basic stream selecting.
