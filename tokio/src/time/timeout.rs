@@ -107,8 +107,16 @@ pub struct Timeout<T> {
 }
 
 /// Error returned by `Timeout`.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Elapsed(());
+
+impl Elapsed {
+    // Used on StreamExt::timeout
+    #[allow(unused)]
+    pub(crate) fn new() -> Self {
+        Elapsed(())
+    }
+}
 
 impl<T> Timeout<T> {
     pub(crate) fn new_with_delay(value: T, delay: Delay) -> Timeout<T> {
