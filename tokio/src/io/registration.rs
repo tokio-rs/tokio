@@ -67,16 +67,16 @@ impl Registration {
         T: Evented,
     {
         let handle = Handle::current();
-
-        if let Some(inner) = handle.inner() {
-            let address = inner.add_source(io)?;
-            Ok(Registration { handle, address })
+        let address = if let Some(inner) = handle.inner() {
+            inner.add_source(io)?
         } else {
-            Err(io::Error::new(
+            return Err(io::Error::new(
                 io::ErrorKind::Other,
                 "failed to find event loop",
-            ))
-        }
+            ));
+        };
+
+        Ok(Registration { handle, address })
     }
 
     /// Deregisters the I/O resource from the reactor it is associated with.
@@ -99,11 +99,11 @@ impl Registration {
     where
         T: Evented,
     {
-        if let Some(inner) = self.handle.inner() {
-            inner.deregister_source(io)
-        } else {
-            Err(io::Error::new(io::ErrorKind::Other, "reactor gone"))
-        }
+        let inner = match self.handle.inner() {
+            Some(inner) => inner,
+            None => return Err(io::Error::new(io::ErrorKind::Other, "reactor gone")),
+        };
+        inner.deregister_source(io)
     }
 
     /// Polls for events on the I/O resource's read readiness stream.
@@ -139,7 +139,8 @@ impl Registration {
     ///
     /// This function will panic if called from outside of a task context.
     pub fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<mio::Ready>> {
-        match self.poll_ready(Direction::Read, Some(cx))? {
+        let v = self.poll_ready(Direction::Read, Some(cx))?;
+        match v {
             Some(v) => Poll::Ready(Ok(v)),
             None => Poll::Pending,
         }
@@ -189,7 +190,8 @@ impl Registration {
     ///
     /// This function will panic if called from outside of a task context.
     pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<mio::Ready>> {
-        match self.poll_ready(Direction::Write, Some(cx))? {
+        let v = self.poll_ready(Direction::Write, Some(cx))?;
+        match v {
             Some(v) => Poll::Ready(Ok(v)),
             None => Poll::Pending,
         }

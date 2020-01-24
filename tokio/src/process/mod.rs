@@ -514,7 +514,7 @@ impl Command {
         self
     }
 
-    /// Executes command as a child process, returning a handle to it.
+    /// Executes the command as a child process, returning a handle to it.
     ///
     /// By default, stdin, stdout and stderr are inherited from the parent.
     ///
@@ -564,7 +564,7 @@ impl Command {
         })
     }
 
-    /// Executes command as a child process, waiting for it to finish and
+    /// Executes the command as a child process, waiting for it to finish and
     /// collecting its exit status.
     ///
     /// By default, stdin, stdout and stderr are inherited from the parent.
@@ -612,7 +612,7 @@ impl Command {
         }
     }
 
-    /// Executes command as a child process, waiting for it to finish and
+    /// Executes the command as a child process, waiting for it to finish and
     /// collecting all of its output.
     ///
     /// > **Note**: this method, unlike the standard library, will

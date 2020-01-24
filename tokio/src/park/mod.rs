@@ -60,7 +60,7 @@ pub(crate) trait Park {
     /// Gets a new `Unpark` handle associated with this `Park` instance.
     fn unpark(&self) -> Self::Unpark;
 
-    /// Block sthe current thread unless or until the token is available.
+    /// Blocks the current thread unless or until the token is available.
     ///
     /// A call to `park` does not guarantee that the thread will remain blocked
     /// forever, and callers should be prepared for this possibility. This
