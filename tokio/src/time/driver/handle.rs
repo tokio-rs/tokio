@@ -21,7 +21,8 @@ impl Handle {
     ///
     /// This function panics if there is no current timer set.
     pub(crate) fn current() -> Self {
-        context::time_handle().expect("no current timer")
+        context::time_handle()
+            .expect("there is no timer running, must be called from the context of Tokio runtime")
     }
 
     /// Tries to return a strong ref to the inner
