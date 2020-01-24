@@ -36,11 +36,11 @@ pub mod error {
     use std::fmt;
 
     /// Error returned by the `Future` implementation for `Receiver`.
-    #[derive(Debug)]
+    #[derive(Debug, Eq, PartialEq)]
     pub struct RecvError(pub(super) ());
 
     /// Error returned by the `try_recv` function on `Receiver`.
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, Eq, PartialEq)]
     pub enum TryRecvError {
         /// The send half of the channel has not yet sent a value.
         Empty,
