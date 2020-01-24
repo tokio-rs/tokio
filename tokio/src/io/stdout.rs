@@ -9,13 +9,30 @@ use std::task::Poll;
 cfg_io_std! {
     /// A handle to the standard output stream of a process.
     ///
-    /// The handle implements the [`AsyncWrite`] trait, but beware that concurrent
-    /// writes to `Stdout` must be executed with care.
+    /// Concurrent writes to stdout must be executed with care: Only individual
+    /// writes to this [`AsyncWrite`] are guaranteed to be intact. In particular
+    /// you should be aware that writes using [`write_all`] are not guaranteed
+    /// to occur as a single write, so multiple threads writing data with
+    /// [`write_all`] may result in interleaved output.
     ///
     /// Created by the [`stdout`] function.
     ///
-    /// [`stdout`]: fn.stdout.html
-    /// [`AsyncWrite`]: trait.AsyncWrite.html
+    /// [`stdout`]: stdout()
+    /// [`AsyncWrite`]: AsyncWrite
+    /// [`write_all`]: crate::io::AsyncWriteExt::write_all()
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::io::{self, AsyncWriteExt};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let mut stdout = io::stdout();
+    ///     stdout.write_all(b"Hello world!").await?;
+    ///     Ok(())
+    /// }
+    /// ```
     #[derive(Debug)]
     pub struct Stdout {
         std: Blocking<std::io::Stdout>,
@@ -23,8 +40,30 @@ cfg_io_std! {
 
     /// Constructs a new handle to the standard output of the current process.
     ///
-    /// The returned handle allows writing to standard out from the within the Tokio
-    /// runtime.
+    /// The returned handle allows writing to standard out from the within the
+    /// Tokio runtime.
+    ///
+    /// Concurrent writes to stdout must be executed with care: Only individual
+    /// writes to this [`AsyncWrite`] are guaranteed to be intact. In particular
+    /// you should be aware that writes using [`write_all`] are not guaranteed
+    /// to occur as a single write, so multiple threads writing data with
+    /// [`write_all`] may result in interleaved output.
+    ///
+    /// [`AsyncWrite`]: AsyncWrite
+    /// [`write_all`]: crate::io::AsyncWriteExt::write_all()
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::io::{self, AsyncWriteExt};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let mut stdout = io::stdout();
+    ///     stdout.write_all(b"Hello world!").await?;
+    ///     Ok(())
+    /// }
+    /// ```
     pub fn stdout() -> Stdout {
         let std = io::stdout();
         Stdout {

@@ -16,7 +16,12 @@ impl Incoming<'_> {
         Incoming { inner: listener }
     }
 
-    #[doc(hidden)] // TODO: dox
+    /// Attempts to poll `UnixStream` by polling inner `UnixListener` to accept
+    /// connection.
+    ///
+    /// If `UnixListener` isn't ready yet, `Poll::Pending` is returned and
+    /// current task will be notified by a waker.  Otherwise `Poll::Ready` with
+    /// `Result` containing `UnixStream` will be returned.
     pub fn poll_accept(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,

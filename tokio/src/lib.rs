@@ -1,5 +1,9 @@
-#![doc(html_root_url = "https://docs.rs/tokio/0.2.6")]
-#![allow(clippy::cognitive_complexity, clippy::needless_doctest_main)]
+#![doc(html_root_url = "https://docs.rs/tokio/0.2.10")]
+#![allow(
+    clippy::cognitive_complexity,
+    clippy::large_enum_variant,
+    clippy::needless_doctest_main
+)]
 #![warn(
     missing_debug_implementations,
     missing_docs,
@@ -40,7 +44,7 @@
 //! [signal]: crate::signal
 //! [fs]: crate::fs
 //! [runtime]: crate::runtime
-//! [website]: https://tokio.rs/docs/
+//! [website]: https://tokio.rs/docs/overview/
 //!
 //! # A Tour of Tokio
 //!
@@ -49,10 +53,6 @@
 //! section, we will take a brief tour of Tokio, summarizing the major APIs and
 //! their uses.
 //!
-//! Note that Tokio uses [Cargo feature flags][features] to allow users to
-//! control what features are present, so that unused code can be eliminated.
-//! This documentation also lists what feature flags are necessary to enable each API.
-//!
 //! The easiest way to get started is to enable all features. Do this by
 //! enabling the `full` feature flag:
 //!
@@ -60,7 +60,86 @@
 //! tokio = { version = "0.2", features = ["full"] }
 //! ```
 //!
-//! [features]: https://doc.rust-lang.org/cargo/reference/manifest.html#the-features-section
+//! ## Feature flags
+//!
+//! Tokio uses a set of [feature flags] to reduce the amount of compiled code. It
+//! is possible to just enable certain features over others. By default, Tokio
+//! does not enable any features but allows one to enable a subset for their use
+//! case. Below is a list of the available feature flags. You may also notice
+//! above each function, struct and trait there is listed one or more feature flags
+//! that are required for that item to be used. If you are new to Tokio it is
+//! recommended that you use the `full` feature flag which will enable all public APIs.
+//! Beware though that this will pull in many extra dependencies that you may not
+//! need.
+//!
+//! - `full`: Enables all Tokio public API features listed below.
+//! - `rt-core`: Enables `tokio::spawn` and the basic (single-threaded) scheduler.
+//! - `rt-threaded`: Enables the heavier, multi-threaded, work-stealing scheduler.
+//! - `rt-util`: Enables non-scheduler utilities.
+//! - `io-driver`: Enables the `mio` based IO driver.
+//! - `io-util`: Enables the IO based `Ext` traits.
+//! - `io-std`: Enable `Stdout`, `Stdin` and `Stderr` types.
+//! - `net`: Enables `tokio::net` types such as `TcpStream`, `UnixStream` and `UdpSocket`.
+//! - `tcp`: Enables all `tokio::net::tcp` types.
+//! - `udp`: Enables all `tokio::net::udp` types.
+//! - `uds`: Enables all `tokio::net::unix` types.
+//! - `time`: Enables `tokio::time` types and allows the schedulers to enable
+//! the built in timer.
+//! - `process`: Enables `tokio::process` types.
+//! - `macros`: Enables `#[tokio::main]` and `#[tokio::test]` macros.
+//! - `sync`: Enables all `tokio::sync` types.
+//! - `stream`: Enables optional `Stream` implementations for types within Tokio.
+//! - `signal`: Enables all `tokio::signal` types.
+//! - `fs`: Enables `tokio::fs` types.
+//! - `dns`: Enables async `tokio::net::ToSocketAddrs`.
+//! - `test-util`: Enables testing based infrastructure for the Tokio runtime.
+//! - `blocking`: Enables `block_in_place` and `spawn_blocking`.
+//!
+//! _Note: `AsyncRead` and `AsyncWrite` traits do not require any features and are
+//! always available._
+//!
+//! ### Internal features
+//!
+//! These features do not expose any new API, but influence internal
+//! implementation aspects of Tokio, and can pull in additional
+//! dependencies. They are not included in `full`:
+//!
+//! - `parking_lot`: As a potential optimization, use the _parking_lot_ crate's
+//! synchronization primitives internally. MSRV may increase according to the
+//! _parking_lot_ release in use.
+//!
+//! [feature flags]: https://doc.rust-lang.org/cargo/reference/manifest.html#the-features-section
+//!
+//! ### Authoring applications
+//!
+//! Tokio is great for writing applications and most users in this case shouldn't
+//! worry too much about what features they should pick. If you're unsure, we suggest
+//! going with `full` to ensure that you don't run into any road blocks while you're
+//! building your application.
+//!
+//! #### Example
+//!
+//! This example shows the quickest way to get started with Tokio.
+//!
+//! ```toml
+//! tokio = { version = "0.2", features = ["full"] }
+//! ```
+//!
+//! ### Authoring libraries
+//!
+//! As a library author your goal should be to provide the lighest weight crate
+//! that is based on Tokio. To achieve this you should ensure that you only enable
+//! the features you need. This allows users to pick up your crate without having
+//! to enable unnecessary features.
+//!
+//! #### Example
+//!
+//! This example shows how you may want to import features for a library that just
+//! needs to `tokio::spawn` and use a `TcpStream`.
+//!
+//! ```toml
+//! tokio = { version = "0.2", features = ["rt-core", "tcp"] }
+//! ```
 //!
 //! ## Working With Tasks
 //!
@@ -213,15 +292,20 @@
 //! }
 //! ```
 
-// macros used internally
+// Includes re-exports used by macros.
+//
+// This module is not intended to be part of the public API. In general, any
+// `doc(hidden)` code is not part of Tokio's public and stable API.
 #[macro_use]
-mod macros;
+#[doc(hidden)]
+pub mod macros;
 
 cfg_fs! {
     pub mod fs;
 }
 
-mod future;
+#[doc(hidden)]
+pub mod future;
 
 pub mod io;
 pub mod net;
@@ -264,6 +348,12 @@ cfg_time! {
 mod util;
 
 cfg_macros! {
+    /// Implementation detail of the `select!` macro. This macro is **not**
+    /// intended to be used as part of the public API and is permitted to
+    /// change.
+    #[doc(hidden)]
+    pub use tokio_macros::select_priv_declare_output_enum;
+
     doc_rt_core! {
         cfg_rt_threaded! {
             #[cfg(not(test))] // Work around for rust-lang/rust#62127
@@ -276,6 +366,13 @@ cfg_macros! {
             pub use tokio_macros::main_basic as main;
             pub use tokio_macros::test_basic as test;
         }
+    }
+
+    // Maintains old behavior
+    cfg_not_rt_core! {
+        #[cfg(not(test))]
+        pub use tokio_macros::main;
+        pub use tokio_macros::test;
     }
 }
 

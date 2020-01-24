@@ -74,7 +74,7 @@
 //!     let mut child = cmd.spawn()
 //!         .expect("failed to spawn command");
 //!
-//!     let stdout = child.stdout().take()
+//!     let stdout = child.stdout.take()
 //!         .expect("child did not have a handle to stdout");
 //!
 //!     let mut reader = BufReader::new(stdout).lines();
@@ -365,7 +365,7 @@ impl Command {
         self
     }
 
-    /// Configuration for the child process's standard input (stdin) handle.
+    /// Sets configuration for the child process's standard input (stdin) handle.
     ///
     /// Defaults to [`inherit`] when used with `spawn` or `status`, and
     /// defaults to [`piped`] when used with `output`.
@@ -389,7 +389,7 @@ impl Command {
         self
     }
 
-    /// Configuration for the child process's standard output (stdout) handle.
+    /// Sets configuration for the child process's standard output (stdout) handle.
     ///
     /// Defaults to [`inherit`] when used with `spawn` or `status`, and
     /// defaults to [`piped`] when used with `output`.
@@ -413,7 +413,7 @@ impl Command {
         self
     }
 
-    /// Configuration for the child process's standard error (stderr) handle.
+    /// Sets configuration for the child process's standard error (stderr) handle.
     ///
     /// Defaults to [`inherit`] when used with `spawn` or `status`, and
     /// defaults to [`piped`] when used with `output`.
@@ -468,7 +468,7 @@ impl Command {
         self
     }
 
-    /// Similar to `uid`, but sets the group ID of the child process. This has
+    /// Similar to `uid` but sets the group ID of the child process. This has
     /// the same semantics as the `uid` field.
     #[cfg(unix)]
     pub fn gid(&mut self, id: u32) -> &mut Command {
@@ -564,7 +564,7 @@ impl Command {
         })
     }
 
-    /// Executes a command as a child process, waiting for it to finish and
+    /// Executes the command as a child process, waiting for it to finish and
     /// collecting its exit status.
     ///
     /// By default, stdin, stdout and stderr are inherited from the parent.
@@ -729,9 +729,18 @@ where
 #[derive(Debug)]
 pub struct Child {
     child: ChildDropGuard<imp::Child>,
-    stdin: Option<ChildStdin>,
-    stdout: Option<ChildStdout>,
-    stderr: Option<ChildStderr>,
+
+    /// The handle for writing to the child's standard input (stdin), if it has
+    /// been captured.
+    pub stdin: Option<ChildStdin>,
+
+    /// The handle for reading from the child's standard output (stdout), if it
+    /// has been captured.
+    pub stdout: Option<ChildStdout>,
+
+    /// The handle for reading from the child's standard error (stderr), if it
+    /// has been captured.
+    pub stderr: Option<ChildStderr>,
 }
 
 impl Child {
@@ -747,20 +756,20 @@ impl Child {
         self.child.kill()
     }
 
-    /// Returns a handle for writing to the child's stdin, if it has been
-    /// captured.
+    #[doc(hidden)]
+    #[deprecated(note = "please use `child.stdin` instead")]
     pub fn stdin(&mut self) -> &mut Option<ChildStdin> {
         &mut self.stdin
     }
 
-    /// Returns a handle for reading from the child's stdout, if it has been
-    /// captured.
+    #[doc(hidden)]
+    #[deprecated(note = "please use `child.stdout` instead")]
     pub fn stdout(&mut self) -> &mut Option<ChildStdout> {
         &mut self.stdout
     }
 
-    /// Returns a handle for reading from the child's stderr, if it has been
-    /// captured.
+    #[doc(hidden)]
+    #[deprecated(note = "please use `child.stderr` instead")]
     pub fn stderr(&mut self) -> &mut Option<ChildStderr> {
         &mut self.stderr
     }
@@ -792,7 +801,7 @@ impl Child {
             Ok(vec)
         }
 
-        drop(self.stdin().take());
+        drop(self.stdin.take());
         let stdout_fut = read_to_end(self.stdout.take());
         let stderr_fut = read_to_end(self.stderr.take());
 

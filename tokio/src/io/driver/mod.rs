@@ -5,7 +5,6 @@ pub(crate) use scheduled_io::ScheduledIo; // pub(crate) for tests
 
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::park::{Park, Unpark};
-#[cfg(all(feature = "io-driver", not(loom)))]
 use crate::runtime::context;
 use crate::util::slab::{Address, Slab};
 
@@ -198,14 +197,8 @@ impl Handle {
     /// # Panics
     ///
     /// This function panics if there is no current reactor set.
-    #[cfg(all(feature = "io-driver", not(loom)))]
     pub(super) fn current() -> Self {
-        context::ThreadContext::io_handle().expect("no current reactor")
-    }
-
-    #[cfg(any(not(feature = "io-driver"), loom))]
-    pub(super) fn current() -> Self {
-        panic!("no current reactor")
+        context::io_handle().expect("no current reactor")
     }
 
     /// Forces a reactor blocked in a call to `turn` to wakeup, or otherwise
@@ -243,7 +236,7 @@ impl fmt::Debug for Handle {
 // ===== impl Inner =====
 
 impl Inner {
-    /// Register an I/O resource with the reactor.
+    /// Registers an I/O resource with the reactor.
     ///
     /// The registration token is returned.
     pub(super) fn add_source(&self, source: &dyn Evented) -> io::Result<Address> {

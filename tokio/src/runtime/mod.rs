@@ -148,7 +148,7 @@
 //! ```
 //!
 //! If the `rt-threaded` feature flag is enabled, [`Runtime::new`] will return a
-//! basic scheduler runtime by default.
+//! threaded scheduler runtime by default.
 //!
 //! Most applications should use the threaded scheduler, except in some niche
 //! use-cases, such as when running only a single thread is required.
@@ -208,7 +208,7 @@ pub(crate) mod enter;
 use self::enter::enter;
 
 mod handle;
-pub use self::handle::Handle;
+pub use self::handle::{Handle, TryCurrentError};
 
 mod io;
 
@@ -294,7 +294,7 @@ enum Kind {
 }
 
 /// After thread starts / before thread stops
-type Callback = ::std::sync::Arc<dyn Fn() + Send + Sync>;
+type Callback = std::sync::Arc<dyn Fn() + Send + Sync>;
 
 impl Runtime {
     /// Create a new runtime instance with default configuration values.

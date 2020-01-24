@@ -28,7 +28,7 @@ use std::task::{self, Poll};
 ///
 /// Once delays have been configured, the `DelayQueue` is used via its
 /// [`Stream`] implementation. [`poll`] is called. If an entry has reached its
-/// deadline, it is returned. If not, `Async::NotReady` indicating that the
+/// deadline, it is returned. If not, `Poll::Pending` indicating that the
 /// current task will be notified once the deadline has been reached.
 ///
 /// # `Stream` implementation
@@ -203,7 +203,7 @@ struct Data<T> {
 const MAX_ENTRIES: usize = (1 << 30) - 1;
 
 impl<T> DelayQueue<T> {
-    /// Create a new, empty, `DelayQueue`
+    /// Creates a new, empty, `DelayQueue`
     ///
     /// The queue will not allocate storage until items are inserted into it.
     ///
@@ -217,7 +217,7 @@ impl<T> DelayQueue<T> {
         DelayQueue::with_capacity(0)
     }
 
-    /// Create a new, empty, `DelayQueue` with the specified capacity.
+    /// Creates a new, empty, `DelayQueue` with the specified capacity.
     ///
     /// The queue will be able to hold at least `capacity` elements without
     /// reallocating. If `capacity` is 0, the queue will not allocate for
@@ -253,7 +253,7 @@ impl<T> DelayQueue<T> {
         }
     }
 
-    /// Insert `value` into the queue set to expire at a specific instant in
+    /// Inserts `value` into the queue set to expire at a specific instant in
     /// time.
     ///
     /// This function is identical to `insert`, but takes an `Instant` instead
@@ -332,7 +332,7 @@ impl<T> DelayQueue<T> {
         Key::new(key)
     }
 
-    /// Attempt to pull out the next value of the delay queue, registering the
+    /// Attempts to pull out the next value of the delay queue, registering the
     /// current task for wakeup if the value is not yet available, and returning
     /// None if the queue is exhausted.
     pub fn poll_expired(
@@ -355,7 +355,7 @@ impl<T> DelayQueue<T> {
         }))
     }
 
-    /// Insert `value` into the queue set to expire after the requested duration
+    /// Inserts `value` into the queue set to expire after the requested duration
     /// elapses.
     ///
     /// This function is identical to `insert_at`, but takes a `Duration`
@@ -422,7 +422,7 @@ impl<T> DelayQueue<T> {
         }
     }
 
-    /// Remove the item associated with `key` from the queue.
+    /// Removes the item associated with `key` from the queue.
     ///
     /// There must be an item associated with `key`. The function returns the
     /// removed item as well as the `Instant` at which it will the delay will
@@ -631,7 +631,7 @@ impl<T> DelayQueue<T> {
         self.slab.len()
     }
 
-    /// Reserve capacity for at least `additional` more items to be queued
+    /// Reserves capacity for at least `additional` more items to be queued
     /// without allocating.
     ///
     /// `reserve` does nothing if the queue already has sufficient capacity for

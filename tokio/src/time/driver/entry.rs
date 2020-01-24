@@ -104,8 +104,8 @@ const ERROR: u64 = u64::MAX;
 // ===== impl Entry =====
 
 impl Entry {
-    pub(crate) fn new(deadline: Instant, duration: Duration) -> Arc<Entry> {
-        let inner = Handle::current().inner().unwrap();
+    pub(crate) fn new(handle: &Handle, deadline: Instant, duration: Duration) -> Arc<Entry> {
+        let inner = handle.inner().unwrap();
         let entry: Entry;
 
         // Increment the number of active timeouts

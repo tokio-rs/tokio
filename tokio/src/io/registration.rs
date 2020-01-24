@@ -47,12 +47,21 @@ cfg_io_driver! {
 // ===== impl Registration =====
 
 impl Registration {
-    /// Register the I/O resource with the default reactor.
+    /// Registers the I/O resource with the default reactor.
     ///
     /// # Return
     ///
     /// - `Ok` if the registration happened successfully
     /// - `Err` if an error was encountered during registration
+    ///
+    ///
+    /// # Panics
+    ///
+    /// This function panics if thread-local runtime is not set.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
     pub fn new<T>(io: &T) -> io::Result<Registration>
     where
         T: Evented,
@@ -70,7 +79,7 @@ impl Registration {
         Ok(Registration { handle, address })
     }
 
-    /// Deregister the I/O resource from the reactor it is associated with.
+    /// Deregisters the I/O resource from the reactor it is associated with.
     ///
     /// This function must be called before the I/O resource associated with the
     /// registration is dropped.
@@ -97,7 +106,7 @@ impl Registration {
         inner.deregister_source(io)
     }
 
-    /// Poll for events on the I/O resource's read readiness stream.
+    /// Polls for events on the I/O resource's read readiness stream.
     ///
     /// If the I/O resource receives a new read readiness event since the last
     /// call to `poll_read_ready`, it is returned. If it has not, the current
@@ -148,7 +157,7 @@ impl Registration {
         self.poll_ready(Direction::Read, None)
     }
 
-    /// Poll for events on the I/O resource's write readiness stream.
+    /// Polls for events on the I/O resource's write readiness stream.
     ///
     /// If the I/O resource receives a new write readiness event since the last
     /// call to `poll_write_ready`, it is returned. If it has not, the current
@@ -188,7 +197,7 @@ impl Registration {
         }
     }
 
-    /// Consume any pending write readiness event.
+    /// Consumes any pending write readiness event.
     ///
     /// This function is identical to [`poll_write_ready`] **except** that it
     /// will not notify the current task when a new event is received. As such,
@@ -199,7 +208,7 @@ impl Registration {
         self.poll_ready(Direction::Write, None)
     }
 
-    /// Poll for events on the I/O resource's `direction` readiness stream.
+    /// Polls for events on the I/O resource's `direction` readiness stream.
     ///
     /// If called with a task context, notify the task when a new event is
     /// received.

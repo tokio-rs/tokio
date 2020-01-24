@@ -307,7 +307,7 @@ where
         })
     }
 
-    /// Receive the next value without blocking
+    /// Receives the next value without blocking
     pub(crate) fn try_recv(&mut self) -> Result<T, TryRecvError> {
         use super::block::Read::*;
         self.inner.rx_fields.with_mut(|rx_fields_ptr| {

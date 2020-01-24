@@ -17,21 +17,21 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 
 cfg_io_util! {
-    /// The readable half of a value returned from `split`.
+    /// The readable half of a value returned from [`split`](split()).
     pub struct ReadHalf<T> {
         inner: Arc<Inner<T>>,
     }
 
-    /// The writable half of a value returned from `split`.
+    /// The writable half of a value returned from [`split`](split()).
     pub struct WriteHalf<T> {
         inner: Arc<Inner<T>>,
     }
 
-    /// Split a single value implementing `AsyncRead + AsyncWrite` into separate
+    /// Splits a single value implementing `AsyncRead + AsyncWrite` into separate
     /// `AsyncRead` and `AsyncWrite` handles.
     ///
-    /// To restore this read/write object from its `split::ReadHalf` and
-    /// `split::WriteHalf` use `unsplit`.
+    /// To restore this read/write object from its `ReadHalf` and
+    /// `WriteHalf` use [`unsplit`](ReadHalf::unsplit()).
     pub fn split<T>(stream: T) -> (ReadHalf<T>, WriteHalf<T>)
     where
         T: AsyncRead + AsyncWrite,
@@ -61,24 +61,40 @@ struct Guard<'a, T> {
 }
 
 impl<T> ReadHalf<T> {
-    /// Reunite with a previously split `WriteHalf`.
+    /// Checks if this `ReadHalf` and some `WriteHalf` were split from the same
+    /// stream.
+    pub fn is_pair_of(&self, other: &WriteHalf<T>) -> bool {
+        other.is_pair_of(&self)
+    }
+
+    /// Reunites with a previously split `WriteHalf`.
     ///
     /// # Panics
     ///
     /// If this `ReadHalf` and the given `WriteHalf` do not originate from the
     /// same `split` operation this method will panic.
+    /// This can be checked ahead of time by comparing the stream ID
+    /// of the two halves.
     pub fn unsplit(self, wr: WriteHalf<T>) -> T {
-        if Arc::ptr_eq(&self.inner, &wr.inner) {
+        if self.is_pair_of(&wr) {
             drop(wr);
 
             let inner = Arc::try_unwrap(self.inner)
                 .ok()
-                .expect("Arc::try_unwrap failed");
+                .expect("`Arc::try_unwrap` failed");
 
             inner.stream.into_inner()
         } else {
             panic!("Unrelated `split::Write` passed to `split::Read::unsplit`.")
         }
+    }
+}
+
+impl<T> WriteHalf<T> {
+    /// Check if this `WriteHalf` and some `ReadHalf` were split from the same
+    /// stream.
+    pub fn is_pair_of(&self, other: &ReadHalf<T>) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
     }
 }
 
@@ -139,7 +155,7 @@ impl<T> Inner<T> {
         } else {
             // Spin... but investigate a better strategy
 
-            ::std::thread::yield_now();
+            std::thread::yield_now();
             cx.waker().wake_by_ref();
 
             Poll::Pending

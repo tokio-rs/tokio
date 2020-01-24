@@ -1,4 +1,5 @@
 use crate::runtime::{blocking, context, io, time, Spawner};
+use std::{error, fmt};
 
 cfg_rt_core! {
     use crate::task::JoinHandle;
@@ -30,20 +31,51 @@ impl Handle {
     where
         F: FnOnce() -> R,
     {
-        let _e = context::ThreadContext::new(
-            self.spawner.clone(),
-            self.io_handle.clone(),
-            self.time_handle.clone(),
-            Some(self.clock.clone()),
-        )
-        .enter();
-        self.blocking_spawner.enter(|| f())
+        context::enter(self.clone(), f)
+    }
+
+    /// Returns a Handle view over the currently running Runtime
+    ///
+    /// # Panic
+    ///
+    /// A Runtime must have been started or this will panic
+    ///
+    /// # Examples
+    ///
+    /// This allows for the current handle to be gotten when running in a `#`
+    ///
+    /// ```
+    /// # use tokio::runtime::Runtime;
+    ///
+    /// # fn dox() {
+    /// # let rt = Runtime::new().unwrap();
+    /// # rt.spawn(async {
+    /// use tokio::runtime::Handle;
+    ///
+    /// let handle = Handle::current();
+    /// handle.spawn(async {
+    ///     println!("now running in the existing Runtime");
+    /// })
+    /// # });
+    /// # }
+    /// ```
+    pub fn current() -> Self {
+        context::current().expect("not currently running on the Tokio runtime.")
+    }
+
+    /// Returns a Handle view over the currently running Runtime
+    ///
+    /// Returns an error if no Runtime has been started
+    ///
+    /// Contrary to `current`, this never panics
+    pub fn try_current() -> Result<Self, TryCurrentError> {
+        context::current().ok_or(TryCurrentError(()))
     }
 }
 
 cfg_rt_core! {
     impl Handle {
-        /// Spawn a future onto the Tokio runtime.
+        /// Spawns a future onto the Tokio runtime.
         ///
         /// This spawns the given future onto the runtime's executor, usually a
         /// thread pool. The thread pool is then responsible for polling the future
@@ -83,3 +115,20 @@ cfg_rt_core! {
         }
     }
 }
+
+/// Error returned by `try_current` when no Runtime has been started
+pub struct TryCurrentError(());
+
+impl fmt::Debug for TryCurrentError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TryCurrentError").finish()
+    }
+}
+
+impl fmt::Display for TryCurrentError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("no tokio Runtime has been initialized")
+    }
+}
+
+impl error::Error for TryCurrentError {}
