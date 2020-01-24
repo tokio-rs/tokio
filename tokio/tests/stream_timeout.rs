@@ -65,6 +65,36 @@ async fn basic_usage() {
 }
 
 #[tokio::test]
+async fn return_elapsed_errors_only_once() {
+    time::pause();
+
+    let stream = stream::iter(1..=3).then(maybe_delay).timeout(ms(50));
+    let mut stream = task::spawn(stream);
+
+    // First item completes immediately
+    assert_ready_eq!(stream.poll_next(), Some(Ok(1)));
+
+    // Second item is delayed 200ms, times out after 50ms. Only one `Elapsed`
+    // error is returned.
+    assert_pending!(stream.poll_next());
+    //
+    time::advance(ms(50)).await;
+    let v = assert_ready!(stream.poll_next());
+    assert!(v.unwrap().is_err()); // timeout!
+
+    // deadline elapses again, but no error is returned
+    time::advance(ms(50)).await;
+    assert_pending!(stream.poll_next());
+
+    time::advance(ms(100)).await;
+    assert_ready_eq!(stream.poll_next(), Some(Ok(2)));
+    assert_ready_eq!(stream.poll_next(), Some(Ok(3)));
+
+    // Done
+    assert_ready_eq!(stream.poll_next(), None);
+}
+
+#[tokio::test]
 async fn no_timeouts() {
     let stream = stream::iter(vec![1, 3, 5])
         .then(maybe_delay)

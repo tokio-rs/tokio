@@ -61,7 +61,7 @@ use take_while::TakeWhile;
 
 cfg_time! {
     mod timeout;
-    pub use timeout::Timeout;
+    use timeout::Timeout;
     use std::time::Duration;
 }
 
@@ -693,7 +693,9 @@ pub trait StreamExt: Stream {
     /// time each element of the stream has to complete before timing out.
     ///
     /// If the wrapped stream yields a value before the deadline is reached, the
-    /// value is returned. Otherwise, an error is returned.
+    /// value is returned. Otherwise, an error is returned. The caller may decide
+    /// to continue consuming the stream and will eventually get the next source
+    /// stream value once it becomes available.
     ///
     /// # Notes
     ///
@@ -730,7 +732,8 @@ pub trait StreamExt: Stream {
     /// assert_eq!(int_stream.try_next().await, Ok(Some(3)));
     /// assert_eq!(int_stream.try_next().await, Ok(None));
     ///
-    /// // If we want to stop polling the first time an element times out:
+    /// // If we want to stop consuming the source stream the first time an
+    /// // element times out, we can use the `take_while` operator:
     /// # let int_stream = stream::iter(vec![Ok(1), Err(()), Ok(2), Ok(3)]);
     /// let mut int_stream = int_stream.take_while(Result::is_ok);
     ///
