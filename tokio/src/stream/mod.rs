@@ -702,8 +702,8 @@ pub trait StreamExt: Stream {
     /// This function consumes the stream passed into it and returns a
     /// wrapped version of it.
     ///
-    /// The wrapped stream will continue to be polled even if one or more items
-    /// time out.
+    /// Polling the returned stream will continue to poll the inner stream even
+    /// if one or more items time out.
     ///
     /// # Examples
     ///
