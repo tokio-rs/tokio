@@ -66,13 +66,13 @@
 //! is possible to just enable certain features over others. By default, Tokio
 //! does not enable any features but allows one to enable a subset for their use
 //! case. Below is a list of the available feature flags. You may also notice
-//! above each function, struct and trait there is a set of feature flags
-//! that are required for that item to be enabled. If you are new to Tokio it is
-//! recommended that you use the `full` feature flag which will enable everything.
+//! above each function, struct and trait there is listed one or more feature flags
+//! that are required for that item to be used. If you are new to Tokio it is
+//! recommended that you use the `full` feature flag which will enable all public APIs.
 //! Beware though that this will pull in many extra dependencies that you may not
 //! need.
 //!
-//! - `full`: Enables all Tokio features and every API will be available.
+//! - `full`: Enables all Tokio public API features listed below.
 //! - `rt-core`: Enables `tokio::spawn` and the basic (single-threaded) scheduler.
 //! - `rt-threaded`: Enables the heavier, multi-threaded, work-stealing scheduler.
 //! - `rt-util`: Enables non-scheduler utilities.
@@ -95,15 +95,25 @@
 //! - `test-util`: Enables testing based infrastructure for the Tokio runtime.
 //! - `blocking`: Enables `block_in_place` and `spawn_blocking`.
 //!
-//! _Note: `AsyncRead` and `AsyncWrite` do not require any features and are
-//! enabled by default._
+//! _Note: `AsyncRead` and `AsyncWrite` traits do not require any features and are
+//! always available._
+//!
+//! ### Internal features
+//!
+//! These features do not expose any new API, but influence internal
+//! implementation aspects of Tokio, and can pull in additional
+//! dependencies. They are not included in `full`:
+//!
+//! - `parking_lot`: As a potential optimization, use the _parking_lot_ crate's
+//! synchronization primitives internally. MSRV may increase according to the
+//! _parking_lot_ release in use.
 //!
 //! [feature flags]: https://doc.rust-lang.org/cargo/reference/manifest.html#the-features-section
 //!
 //! ### Authoring applications
 //!
 //! Tokio is great for writing applications and most users in this case shouldn't
-//! worry to much about what features they should pick. If you're unsure, we suggest
+//! worry too much about what features they should pick. If you're unsure, we suggest
 //! going with `full` to ensure that you don't run into any road blocks while you're
 //! building your application.
 //!
