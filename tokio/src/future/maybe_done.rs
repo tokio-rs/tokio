@@ -30,7 +30,7 @@ impl<Fut: Future> MaybeDone<Fut> {
     /// The output of this method will be [`Some`] if and only if the inner
     /// future has been completed and [`take_output`](MaybeDone::take_output)
     /// has not yet been called.
-    pub(crate) fn output_mut(self: Pin<&mut Self>) -> Option<&mut Fut::Output> {
+    pub fn output_mut(self: Pin<&mut Self>) -> Option<&mut Fut::Output> {
         unsafe {
             let this = self.get_unchecked_mut();
             match this {
