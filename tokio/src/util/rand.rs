@@ -50,3 +50,16 @@ impl FastRand {
         s0.wrapping_add(s1)
     }
 }
+
+// Used by the select macro
+cfg_macros! {
+    thread_local! {
+        static THREAD_RNG: FastRand = FastRand::new(crate::loom::rand::seed());
+    }
+
+    // Used by macros
+    #[doc(hidden)]
+    pub fn thread_rng_n(n: u32) -> u32 {
+        THREAD_RNG.with(|rng| rng.fastrand_n(n))
+    }
+}

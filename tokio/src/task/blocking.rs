@@ -10,6 +10,12 @@ cfg_rt_threaded! {
     /// (possibly new) thread, and only then poll the task. Note that this requires
     /// additional synchronization.
     ///
+    /// # Note
+    ///
+    /// This function can only be called from a spawned task when working with
+    /// the [threaded scheduler](https://docs.rs/tokio/0.2.10/tokio/runtime/index.html#threaded-scheduler).
+    /// Consider using [tokio::task::spawn_blocking](https://docs.rs/tokio/0.2.10/tokio/task/fn.spawn_blocking.html).
+    ///
     /// # Examples
     ///
     /// ```

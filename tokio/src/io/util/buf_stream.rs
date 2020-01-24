@@ -33,6 +33,23 @@ impl<RW: AsyncRead + AsyncWrite> BufStream<RW> {
         }
     }
 
+    /// Creates a `BufStream` with the specified [`BufReader`] capacity and [`BufWriter`]
+    /// capacity.
+    ///
+    /// See the documentation for those types and [`BufStream`] for details.
+    pub fn with_capacity(
+        reader_capacity: usize,
+        writer_capacity: usize,
+        stream: RW,
+    ) -> BufStream<RW> {
+        BufStream {
+            inner: BufReader::with_capacity(
+                reader_capacity,
+                BufWriter::with_capacity(writer_capacity, stream),
+            ),
+        }
+    }
+
     /// Gets a reference to the underlying I/O object.
     ///
     /// It is inadvisable to directly read from the underlying I/O object.

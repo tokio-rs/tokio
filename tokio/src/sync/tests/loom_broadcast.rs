@@ -6,6 +6,46 @@ use loom::sync::Arc;
 use loom::thread;
 use tokio_test::{assert_err, assert_ok};
 
+#[test]
+fn broadcast_send() {
+    loom::model(|| {
+        let (tx1, mut rx) = broadcast::channel(2);
+        let tx1 = Arc::new(tx1);
+        let tx2 = tx1.clone();
+
+        let th1 = thread::spawn(move || {
+            block_on(async {
+                assert_ok!(tx1.send("one"));
+                assert_ok!(tx1.send("two"));
+                assert_ok!(tx1.send("three"));
+            });
+        });
+
+        let th2 = thread::spawn(move || {
+            block_on(async {
+                assert_ok!(tx2.send("eins"));
+                assert_ok!(tx2.send("zwei"));
+                assert_ok!(tx2.send("drei"));
+            });
+        });
+
+        block_on(async {
+            let mut num = 0;
+            loop {
+                match rx.recv().await {
+                    Ok(_) => num += 1,
+                    Err(Closed) => break,
+                    Err(Lagged(n)) => num += n as usize,
+                }
+            }
+            assert_eq!(num, 6);
+        });
+
+        assert_ok!(th1.join());
+        assert_ok!(th2.join());
+    });
+}
+
 // An `Arc` is used as the value in order to detect memory leaks.
 #[test]
 fn broadcast_two() {

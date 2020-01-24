@@ -26,7 +26,9 @@ cfg_blocking! {
         ON_BLOCK.with(|ob| {
             let allow_blocking = ob
                 .get()
-                .expect("can only call blocking when on Tokio runtime");
+                // `block_in_place` can only be called from a spawned task when
+                // working with the threaded scheduler.
+                .expect("can call blocking only when running in a spawned task");
 
             // This is safe, because ON_BLOCK was set from an &mut dyn FnMut in the worker that wraps
             // the worker's operation, and is unset just prior to when the FnMut is dropped.

@@ -258,6 +258,14 @@ impl TcpStream {
     /// }
     /// ```
     pub fn poll_peek(&mut self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
+        self.poll_peek2(cx, buf)
+    }
+
+    pub(super) fn poll_peek2(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<io::Result<usize>> {
         ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
 
         match self.io.get_ref().peek(buf) {

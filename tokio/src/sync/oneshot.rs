@@ -40,7 +40,7 @@ pub mod error {
     pub struct RecvError(pub(super) ());
 
     /// Error returned by the `try_recv` function on `Receiver`.
-    #[derive(Debug)]
+    #[derive(Debug, PartialEq)]
     pub enum TryRecvError {
         /// The send half of the channel has not yet sent a value.
         Empty,

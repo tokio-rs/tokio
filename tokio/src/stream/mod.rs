@@ -26,6 +26,9 @@ use filter::Filter;
 mod filter_map;
 use filter_map::FilterMap;
 
+mod fold;
+use fold::FoldFuture;
+
 mod fuse;
 use fuse::Fuse;
 
@@ -580,6 +583,30 @@ pub trait StreamExt: Stream {
         Self: Sized,
     {
         Chain::new(self, other)
+    }
+
+    /// A combinator that applies a function to every element in a stream
+    /// producing a single, final value.
+    ///
+    /// # Examples
+    /// Basic usage:
+    /// ```
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio::stream::{self, *};
+    ///
+    /// let s = stream::iter(vec![1u8, 2, 3]);
+    /// let sum = s.fold(0, |acc, x| acc + x).await;
+    ///
+    /// assert_eq!(sum, 6);
+    /// # }
+    /// ```
+    fn fold<B, F>(self, init: B, f: F) -> FoldFuture<Self, B, F>
+    where
+        Self: Sized,
+        F: FnMut(B, Self::Item) -> B,
+    {
+        FoldFuture::new(self, init, f)
     }
 
     /// Drain stream pushing all emitted values into a collection.
