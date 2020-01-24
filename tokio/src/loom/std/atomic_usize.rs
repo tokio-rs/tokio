@@ -16,7 +16,7 @@ impl AtomicUsize {
         AtomicUsize { inner }
     }
 
-    /// Perform an unsynchronized load.
+    /// Performs an unsynchronized load.
     ///
     /// # Safety
     ///

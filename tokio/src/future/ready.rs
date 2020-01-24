@@ -21,7 +21,7 @@ impl<T> Future for Ready<T> {
     }
 }
 
-/// Create a future that is immediately ready with a success value.
+/// Creates a future that is immediately ready with a success value.
 pub(crate) fn ok<T, E>(t: T) -> Ready<Result<T, E>> {
     Ready(Some(Ok(t)))
 }

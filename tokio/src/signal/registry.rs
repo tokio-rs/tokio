@@ -22,10 +22,10 @@ pub(crate) struct EventInfo {
 
 /// An interface for retrieving the `EventInfo` for a particular eventId.
 pub(crate) trait Storage {
-    /// Get the `EventInfo` for `id` if it exists.
+    /// Gets the `EventInfo` for `id` if it exists.
     fn event_info(&self, id: EventId) -> Option<&EventInfo>;
 
-    /// Invoke `f` once for each defined `EventInfo` in this storage.
+    /// Invokes `f` once for each defined `EventInfo` in this storage.
     fn for_each<'a, F>(&'a self, f: F)
     where
         F: FnMut(&'a EventInfo);
@@ -66,7 +66,7 @@ impl<S> Registry<S> {
 }
 
 impl<S: Storage> Registry<S> {
-    /// Register a new listener for `event_id`.
+    /// Registers a new listener for `event_id`.
     fn register_listener(&self, event_id: EventId, listener: Sender<()>) {
         self.storage
             .event_info(event_id)
@@ -77,7 +77,7 @@ impl<S: Storage> Registry<S> {
             .push(listener);
     }
 
-    /// Mark `event_id` as having been delivered, without broadcasting it to
+    /// Marks `event_id` as having been delivered, without broadcasting it to
     /// any listeners.
     fn record_event(&self, event_id: EventId) {
         if let Some(event_info) = self.storage.event_info(event_id) {
@@ -85,9 +85,9 @@ impl<S: Storage> Registry<S> {
         }
     }
 
-    /// Broadcast all previously recorded events to their respective listeners.
+    /// Broadcasts all previously recorded events to their respective listeners.
     ///
-    /// Returns true if an event was delivered to at least one listener.
+    /// Returns `true` if an event was delivered to at least one listener.
     fn broadcast(&self) -> bool {
         use crate::sync::mpsc::error::TrySendError;
 
@@ -136,20 +136,20 @@ impl ops::Deref for Globals {
 }
 
 impl Globals {
-    /// Register a new listener for `event_id`.
+    /// Registers a new listener for `event_id`.
     pub(crate) fn register_listener(&self, event_id: EventId, listener: Sender<()>) {
         self.registry.register_listener(event_id, listener);
     }
 
-    /// Mark `event_id` as having been delivered, without broadcasting it to
+    /// Marks `event_id` as having been delivered, without broadcasting it to
     /// any listeners.
     pub(crate) fn record_event(&self, event_id: EventId) {
         self.registry.record_event(event_id);
     }
 
-    /// Broadcast all previously recorded events to their respective listeners.
+    /// Broadcasts all previously recorded events to their respective listeners.
     ///
-    /// Returns true if an event was delivered to at least one listener.
+    /// Returns `true` if an event was delivered to at least one listener.
     pub(crate) fn broadcast(&self) -> bool {
         self.registry.broadcast()
     }

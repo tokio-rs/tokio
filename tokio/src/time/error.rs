@@ -31,7 +31,7 @@ enum Kind {
 }
 
 impl Error {
-    /// Create an error representing a shutdown timer.
+    /// Creates an error representing a shutdown timer.
     pub fn shutdown() -> Error {
         Error(Shutdown)
     }
@@ -44,7 +44,7 @@ impl Error {
         }
     }
 
-    /// Create an error representing a timer at capacity.
+    /// Creates an error representing a timer at capacity.
     pub fn at_capacity() -> Error {
         Error(AtCapacity)
     }

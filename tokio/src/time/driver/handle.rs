@@ -10,12 +10,12 @@ pub(crate) struct Handle {
 }
 
 impl Handle {
-    /// Create a new timer `Handle` from a shared `Inner` timer state.
+    /// Creates a new timer `Handle` from a shared `Inner` timer state.
     pub(crate) fn new(inner: Weak<Inner>) -> Self {
         Handle { inner }
     }
 
-    /// Try to get a handle to the current timer.
+    /// Tries to get a handle to the current timer.
     ///
     /// # Panics
     ///
@@ -24,7 +24,7 @@ impl Handle {
         context::time_handle().expect("no current timer")
     }
 
-    /// Try to return a strong ref to the inner
+    /// Tries to return a strong ref to the inner
     pub(crate) fn inner(&self) -> Option<Arc<Inner>> {
         self.inner.upgrade()
     }

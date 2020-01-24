@@ -113,7 +113,7 @@ impl Unpark for Unparker {
 }
 
 impl Inner {
-    /// Park the current thread for at most `dur`.
+    /// Parks the current thread for at most `dur`.
     fn park(&self) {
         for _ in 0..3 {
             // If we were previously notified then we consume this notification and

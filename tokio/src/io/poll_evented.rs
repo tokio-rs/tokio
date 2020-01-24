@@ -212,7 +212,7 @@ where
         Ok(io)
     }
 
-    /// Check the I/O resource's read readiness state.
+    /// Checks the I/O resource's read readiness state.
     ///
     /// The mask argument allows specifying what readiness to notify on. This
     /// can be any value, including platform specific readiness, **except**
@@ -280,12 +280,12 @@ where
         Ok(())
     }
 
-    /// Check the I/O resource's write readiness state.
+    /// Checks the I/O resource's write readiness state.
     ///
     /// This always checks for writable readiness and also checks for HUP
     /// readiness on platforms that support it.
     ///
-    /// If the resource is not ready for a write then `Async::NotReady` is
+    /// If the resource is not ready for a write then `Poll::Pending` is
     /// returned and the current task is notified once a new event is received.
     ///
     /// The I/O resource will remain in a write-ready state until readiness is

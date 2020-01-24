@@ -236,7 +236,7 @@ impl fmt::Debug for Handle {
 // ===== impl Inner =====
 
 impl Inner {
-    /// Register an I/O resource with the reactor.
+    /// Registers an I/O resource with the reactor.
     ///
     /// The registration token is returned.
     pub(super) fn add_source(&self, source: &dyn Evented) -> io::Result<Address> {

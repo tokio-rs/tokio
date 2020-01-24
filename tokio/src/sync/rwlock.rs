@@ -254,3 +254,18 @@ impl<T> ops::DerefMut for RwLockWriteGuard<'_, T> {
         unsafe { &mut *self.lock.c.get() }
     }
 }
+
+impl<T> From<T> for RwLock<T> {
+    fn from(s: T) -> Self {
+        Self::new(s)
+    }
+}
+
+impl<T> Default for RwLock<T>
+where
+    T: Default,
+{
+    fn default() -> Self {
+        Self::new(T::default())
+    }
+}

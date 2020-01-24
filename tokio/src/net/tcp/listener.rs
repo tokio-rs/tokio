@@ -87,7 +87,7 @@ impl TcpListener {
         Err(last_err.unwrap_or_else(|| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "could not resolve to any addresses",
+                "could not resolve to any address",
             )
         }))
     }
@@ -97,7 +97,7 @@ impl TcpListener {
         TcpListener::new(listener)
     }
 
-    /// Accept a new incoming connection from this listener.
+    /// Accepts a new incoming connection from this listener.
     ///
     /// This function will yield once a new TCP connection is established. When
     /// established, the corresponding [`TcpStream`] and the remote peer's
@@ -128,7 +128,10 @@ impl TcpListener {
         poll_fn(|cx| self.poll_accept(cx)).await
     }
 
-    #[doc(hidden)] // TODO: document
+    /// Attempts to poll `SocketAddr` and `TcpStream` bound to this address.
+    ///
+    /// In case if I/O resource isn't ready yet, `Poll::Pending` is returned and
+    /// current task will be notified by a waker.
     pub fn poll_accept(
         &mut self,
         cx: &mut Context<'_>,
@@ -157,7 +160,7 @@ impl TcpListener {
         }
     }
 
-    /// Create a new TCP listener from the standard library's TCP listener.
+    /// Creates a new TCP listener from the standard library's TCP listener.
     ///
     /// This method can be used when the `Handle::tcp_listen` method isn't
     /// sufficient because perhaps some more configuration is needed in terms of

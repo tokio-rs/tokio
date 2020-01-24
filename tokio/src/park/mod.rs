@@ -57,10 +57,10 @@ pub(crate) trait Park {
     /// Error returned by `park`
     type Error;
 
-    /// Get a new `Unpark` handle associated with this `Park` instance.
+    /// Gets a new `Unpark` handle associated with this `Park` instance.
     fn unpark(&self) -> Self::Unpark;
 
-    /// Block the current thread unless or until the token is available.
+    /// Blocks the current thread unless or until the token is available.
     ///
     /// A call to `park` does not guarantee that the thread will remain blocked
     /// forever, and callers should be prepared for this possibility. This
@@ -73,7 +73,7 @@ pub(crate) trait Park {
     /// `Park` implementation
     fn park(&mut self) -> Result<(), Self::Error>;
 
-    /// Park the current thread for at most `duration`.
+    /// Parks the current thread for at most `duration`.
     ///
     /// This function is the same as `park` but allows specifying a maximum time
     /// to block the thread for.
@@ -92,7 +92,7 @@ pub(crate) trait Park {
 
 /// Unblock a thread blocked by the associated `Park` instance.
 pub(crate) trait Unpark: Sync + Send + 'static {
-    /// Unblock a thread that is blocked by the associated `Park` handle.
+    /// Unblocks a thread that is blocked by the associated `Park` handle.
     ///
     /// Calling `unpark` atomically makes available the unpark token, if it is
     /// not already available.

@@ -38,7 +38,26 @@ pub(crate) mod rand {
 }
 
 pub(crate) mod sync {
-    pub(crate) use std::sync::*;
+    pub(crate) use std::sync::Arc;
+
+    #[cfg(feature = "parking_lot")]
+    mod pl_wrappers;
+
+    // Below, make sure all the feature-influenced types are exported for
+    // internal use. Note however that some are not _currently_ named by
+    // consuming code.
+
+    #[cfg(feature = "parking_lot")]
+    #[allow(unused_imports)]
+    pub(crate) use pl_wrappers::{Condvar, Mutex};
+
+    #[cfg(feature = "parking_lot")]
+    #[allow(unused_imports)]
+    pub(crate) use parking_lot::{MutexGuard, WaitTimeoutResult};
+
+    #[cfg(not(feature = "parking_lot"))]
+    #[allow(unused_imports)]
+    pub(crate) use std::sync::{Condvar, Mutex, MutexGuard, WaitTimeoutResult};
 
     pub(crate) mod atomic {
         pub(crate) use crate::loom::std::atomic_u32::AtomicU32;

@@ -151,7 +151,7 @@ struct WatchInner {
 
 const CLOSED: usize = 1;
 
-/// Create a new watch channel, returning the "send" and "receive" handles.
+/// Creates a new watch channel, returning the "send" and "receive" handles.
 ///
 /// All values sent by [`Sender`] will become visible to the [`Receiver`] handles.
 /// Only the last value sent is made available to the [`Receiver`] half. All
@@ -320,7 +320,7 @@ impl WatchInner {
 }
 
 impl<T> Sender<T> {
-    /// Broadcast a new value via the channel, notifying all receivers.
+    /// Broadcasts a new value via the channel, notifying all receivers.
     pub fn broadcast(&self, value: T) -> Result<(), error::SendError<T>> {
         let shared = match self.shared.upgrade() {
             Some(shared) => shared,
@@ -363,7 +363,7 @@ impl<T> Sender<T> {
     }
 }
 
-/// Notify all watchers of a change
+/// Notifies all watchers of a change
 fn notify_all<T>(shared: &Shared<T>) {
     let watchers = shared.watchers.lock().unwrap();
 

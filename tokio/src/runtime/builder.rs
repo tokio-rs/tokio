@@ -110,7 +110,7 @@ impl Builder {
         }
     }
 
-    /// Enable both I/O and time drivers.
+    /// Enables both I/O and time drivers.
     ///
     /// Doing this is a shorthand for calling `enable_io` and `enable_time`
     /// individually. If additional components are added to Tokio in the future,
@@ -136,7 +136,7 @@ impl Builder {
     }
 
     #[deprecated(note = "In future will be replaced by core_threads method")]
-    /// Set the maximum number of worker threads for the `Runtime`'s thread pool.
+    /// Sets the maximum number of worker threads for the `Runtime`'s thread pool.
     ///
     /// This must be a number between 1 and 32,768 though it is advised to keep
     /// this value on the smaller side.
@@ -147,7 +147,7 @@ impl Builder {
         self
     }
 
-    /// Set the core number of worker threads for the `Runtime`'s thread pool.
+    /// Sets the core number of worker threads for the `Runtime`'s thread pool.
     ///
     /// This should be a number between 1 and 32,768 though it is advised to keep
     /// this value on the smaller side.
@@ -192,7 +192,7 @@ impl Builder {
         self
     }
 
-    /// Set name of threads spawned by the `Runtime`'s thread pool.
+    /// Sets name of threads spawned by the `Runtime`'s thread pool.
     ///
     /// The default name is "tokio-runtime-worker".
     ///
@@ -212,7 +212,7 @@ impl Builder {
         self
     }
 
-    /// Set the stack size (in bytes) for worker threads.
+    /// Sets the stack size (in bytes) for worker threads.
     ///
     /// The actual stack size may be greater than this value if the platform
     /// specifies minimal stack size.
@@ -236,7 +236,7 @@ impl Builder {
         self
     }
 
-    /// Execute function `f` after each thread is started but before it starts
+    /// Executes function `f` after each thread is started but before it starts
     /// doing work.
     ///
     /// This is intended for bookkeeping and monitoring use cases.
@@ -263,7 +263,7 @@ impl Builder {
         self
     }
 
-    /// Execute function `f` before each thread stops.
+    /// Executes function `f` before each thread stops.
     ///
     /// This is intended for bookkeeping and monitoring use cases.
     ///
@@ -289,7 +289,7 @@ impl Builder {
         self
     }
 
-    /// Create the configured `Runtime`.
+    /// Creates the configured `Runtime`.
     ///
     /// The returned `ThreadPool` instance is ready to spawn tasks.
     ///
@@ -344,7 +344,7 @@ impl Builder {
 
 cfg_io_driver! {
     impl Builder {
-        /// Enable the I/O driver.
+        /// Enables the I/O driver.
         ///
         /// Doing this enables using net, process, signal, and some I/O types on
         /// the runtime.
@@ -368,7 +368,7 @@ cfg_io_driver! {
 
 cfg_time! {
     impl Builder {
-        /// Enable the time driver.
+        /// Enables the time driver.
         ///
         /// Doing this enables using `tokio::time` on the runtime.
         ///
@@ -391,7 +391,7 @@ cfg_time! {
 
 cfg_rt_core! {
     impl Builder {
-        /// Use a simpler scheduler that runs all tasks on the current-thread.
+        /// Sets runtime to use a simpler scheduler that runs all tasks on the current-thread.
         ///
         /// The executor and all necessary drivers will all be run on the current
         /// thread during `block_on` calls.
@@ -438,7 +438,7 @@ cfg_rt_core! {
 
 cfg_rt_threaded! {
     impl Builder {
-        /// Use a multi-threaded scheduler for executing tasks.
+        /// Sets runtime to use a multi-threaded scheduler for executing tasks.
         pub fn threaded_scheduler(&mut self) -> &mut Self {
             self.kind = Kind::ThreadPool;
             self

@@ -177,7 +177,7 @@ impl Semaphore {
         curr.available_permits()
     }
 
-    /// Try to acquire the requested number of permits, registering the waiter
+    /// Tries to acquire the requested number of permits, registering the waiter
     /// if not enough permits are available.
     fn poll_acquire(
         &self,
@@ -201,7 +201,7 @@ impl Semaphore {
         }
     }
 
-    /// Poll for a permit
+    /// Polls for a permit
     ///
     /// Tries to acquire available permits first. If unable to acquire a
     /// sufficient number of permits, the caller's waiter is pushed onto the
@@ -319,7 +319,7 @@ impl Semaphore {
         }
     }
 
-    /// Close the semaphore. This prevents the semaphore from issuing new
+    /// Closes the semaphore. This prevents the semaphore from issuing new
     /// permits and notifies all pending waiters.
     pub(crate) fn close(&self) {
         // Acquire the `rx_lock`, setting the "closed" flag on the lock.
@@ -334,7 +334,7 @@ impl Semaphore {
         self.add_permits_locked(0, true);
     }
 
-    /// Add `n` new permits to the semaphore.
+    /// Adds `n` new permits to the semaphore.
     pub(crate) fn add_permits(&self, n: usize) {
         if n == 0 {
             return;
@@ -378,7 +378,7 @@ impl Semaphore {
         }
     }
 
-    /// Release a specific amount of permits to the semaphore
+    /// Releases a specific amount of permits to the semaphore
     ///
     /// This function is called by `add_permits` after the add lock has been
     /// acquired.
@@ -597,7 +597,7 @@ unsafe impl Sync for Semaphore {}
 // ===== impl Permit =====
 
 impl Permit {
-    /// Create a new `Permit`.
+    /// Creates a new `Permit`.
     ///
     /// The permit begins in the "unacquired" state.
     pub(crate) fn new() -> Permit {
@@ -609,7 +609,7 @@ impl Permit {
         }
     }
 
-    /// Returns true if the permit has been acquired
+    /// Returns `true` if the permit has been acquired
     pub(crate) fn is_acquired(&self) -> bool {
         match self.state {
             PermitState::Acquired(num) if num > 0 => true,
@@ -617,7 +617,7 @@ impl Permit {
         }
     }
 
-    /// Try to acquire the permit. If no permits are available, the current task
+    /// Tries to acquire the permit. If no permits are available, the current task
     /// is notified once a new permit becomes available.
     pub(crate) fn poll_acquire(
         &mut self,
@@ -693,7 +693,7 @@ impl Permit {
         }
     }
 
-    /// Try to acquire the permit.
+    /// Tries to acquire the permit.
     pub(crate) fn try_acquire(
         &mut self,
         num_permits: u16,
@@ -739,13 +739,13 @@ impl Permit {
         }
     }
 
-    /// Release a permit back to the semaphore
+    /// Releases a permit back to the semaphore
     pub(crate) fn release(&mut self, n: u16, semaphore: &Semaphore) {
         let n = self.forget(n);
         semaphore.add_permits(n as usize);
     }
 
-    /// Forget the permit **without** releasing it back to the semaphore.
+    /// Forgets the permit **without** releasing it back to the semaphore.
     ///
     /// After calling `forget`, `poll_acquire` is able to acquire new permit
     /// from the sempahore.
@@ -831,7 +831,7 @@ impl std::error::Error for AcquireError {}
 // ===== impl TryAcquireError =====
 
 impl TryAcquireError {
-    /// Returns true if the error was caused by a closed semaphore.
+    /// Returns `true` if the error was caused by a closed semaphore.
     pub(crate) fn is_closed(&self) -> bool {
         match self {
             TryAcquireError::Closed => true,
@@ -839,7 +839,7 @@ impl TryAcquireError {
         }
     }
 
-    /// Returns true if the error was caused by calling `try_acquire` on a
+    /// Returns `true` if the error was caused by calling `try_acquire` on a
     /// semaphore with no available permits.
     pub(crate) fn is_no_permits(&self) -> bool {
         match self {
@@ -1061,7 +1061,7 @@ impl SemState {
         self.0 >> NUM_SHIFT
     }
 
-    /// Returns true if the state has permits that can be claimed by a waiter.
+    /// Returns `true` if the state has permits that can be claimed by a waiter.
     fn has_available_permits(self) -> bool {
         self.0 & NUM_FLAG == NUM_FLAG
     }
@@ -1070,7 +1070,7 @@ impl SemState {
         !self.has_available_permits() && !self.is_stub(stub)
     }
 
-    /// Try to atomically acquire specified number of permits.
+    /// Tries to atomically acquire specified number of permits.
     ///
     /// # Return
     ///
@@ -1096,7 +1096,7 @@ impl SemState {
         true
     }
 
-    /// Release permits
+    /// Releases permits
     ///
     /// Returns `true` if the permits were accepted.
     fn release_permits(&mut self, permits: usize, stub: &Waiter) {
@@ -1132,7 +1132,7 @@ impl SemState {
         (self.0 & !CLOSED_FLAG) as *mut Waiter
     }
 
-    /// Set to a pointer to a waiter.
+    /// Sets to a pointer to a waiter.
     ///
     /// This can only be done from the full state.
     fn set_waiter(&mut self, waiter: NonNull<Waiter>) {
@@ -1146,7 +1146,7 @@ impl SemState {
         self.as_ptr() as usize == stub as *const _ as usize
     }
 
-    /// Load the state from an AtomicUsize.
+    /// Loads the state from an AtomicUsize.
     fn load(cell: &AtomicUsize, ordering: Ordering) -> SemState {
         let value = cell.load(ordering);
         SemState(value)

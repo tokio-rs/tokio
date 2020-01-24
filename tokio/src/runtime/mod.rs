@@ -107,7 +107,7 @@
 //!
 //! ## Runtime Configurations
 //!
-//! Tokio provides multiple task scheding strategies, suitable for different
+//! Tokio provides multiple task scheduling strategies, suitable for different
 //! applications. The [runtime builder] or `#[tokio::main]` attribute may be
 //! used to select which scheduler to use.
 //!
@@ -148,7 +148,7 @@
 //! ```
 //!
 //! If the `rt-threaded` feature flag is enabled, [`Runtime::new`] will return a
-//! basic scheduler runtime by default.
+//! threaded scheduler runtime by default.
 //!
 //! Most applications should use the threaded scheduler, except in some niche
 //! use-cases, such as when running only a single thread is required.
@@ -208,7 +208,7 @@ pub(crate) mod enter;
 use self::enter::enter;
 
 mod handle;
-pub use self::handle::Handle;
+pub use self::handle::{Handle, TryCurrentError};
 
 mod io;
 

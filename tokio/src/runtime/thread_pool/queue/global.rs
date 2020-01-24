@@ -79,7 +79,7 @@ impl<T: 'static> Queue<T> {
         drop(self.pointers.lock().unwrap());
     }
 
-    /// Push a value into the queue and call the closure **while still holding
+    /// Pushes a value into the queue and call the closure **while still holding
     /// the push lock**
     pub(super) fn push<F>(&self, task: Task<T>, f: F)
     where
@@ -92,6 +92,7 @@ impl<T: 'static> Queue<T> {
             // Check if the queue is closed. This must happen in the lock.
             let len = self.len.unsync_load();
             if len & CLOSED == CLOSED {
+                drop(p);
                 f(Err(task));
                 return;
             }

@@ -9,7 +9,7 @@ cfg_io_util! {
     ///
     /// [`AsyncBufRead`]: crate::io::AsyncBufRead
     pub trait AsyncBufReadExt: AsyncBufRead {
-        /// Read all bytes into `buf` until the delimiter `byte` or EOF is reached.
+        /// Reads all bytes into `buf` until the delimiter `byte` or EOF is reached.
         ///
         /// Equivalent to:
         ///
@@ -85,7 +85,7 @@ cfg_io_util! {
             read_until(self, byte, buf)
         }
 
-        /// Read all bytes until a newline (the 0xA byte) is reached, and append
+        /// Reads all bytes until a newline (the 0xA byte) is reached, and append
         /// them to the provided buffer.
         ///
         /// Equivalent to:

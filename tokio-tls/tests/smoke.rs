@@ -280,7 +280,7 @@ cfg_if! {
         use winapi::um::timezoneapi::*;
         use winapi::um::wincrypt::*;
 
-        const FRIENDLY_NAME: &'static str = "tokio-tls localhost testing cert";
+        const FRIENDLY_NAME: &str = "tokio-tls localhost testing cert";
 
         fn contexts() -> (tokio_tls::TlsAcceptor, tokio_tls::TlsConnector) {
             let cert = localhost_cert();
@@ -433,7 +433,7 @@ description should mention "tokio-tls".
                 let mut expiration_date: SYSTEMTIME = mem::zeroed();
                 GetSystemTime(&mut expiration_date);
                 let mut file_time: FILETIME = mem::zeroed();
-                let res = SystemTimeToFileTime(&mut expiration_date,
+                let res = SystemTimeToFileTime(&expiration_date,
                                                &mut file_time);
                 if res != TRUE {
                     return Err(Error::last_os_error());

@@ -5,7 +5,7 @@ use std::ops::DerefMut;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// Read bytes asynchronously.
+/// Reads bytes asynchronously.
 ///
 /// This trait inherits from [`std::io::BufRead`] and indicates that an I/O object is
 /// **non-blocking**. All non-blocking I/O objects must return an error when
@@ -17,7 +17,7 @@ use std::task::{Context, Poll};
 /// [`std::io::BufRead`]: std::io::BufRead
 /// [`AsyncBufReadExt`]: crate::io::AsyncBufReadExt
 pub trait AsyncBufRead: AsyncRead {
-    /// Attempt to return the contents of the internal buffer, filling it with more data
+    /// Attempts to return the contents of the internal buffer, filling it with more data
     /// from the inner reader if it is empty.
     ///
     /// On success, returns `Poll::Ready(Ok(buf))`.
