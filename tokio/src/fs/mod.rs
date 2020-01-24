@@ -80,6 +80,9 @@ pub use self::symlink_metadata::symlink_metadata;
 mod write;
 pub use self::write::write;
 
+mod copy;
+pub use self::copy::copy;
+
 use std::io;
 
 pub(crate) async fn asyncify<F, T>(f: F) -> io::Result<T>

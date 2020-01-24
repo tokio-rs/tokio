@@ -49,7 +49,7 @@ full = [
 
 blocking = ["rt-core"]
 dns = ["rt-core"]
-fs = ["rt-core"]
+fs = ["rt-core", "io-util"]
 io-driver = ["mio", "lazy_static"]
 io-util = ["memchr"]
 # stdin, stdout, stderr
