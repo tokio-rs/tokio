@@ -193,7 +193,7 @@ impl UnixDatagram {
         self.io.get_ref().take_error()
     }
 
-    /// Shut down the read, write, or both halves of this connection.
+    /// Shuts down the read, write, or both halves of this connection.
     ///
     /// This function will cause all pending and future I/O calls on the
     /// specified portions to immediately return with an appropriate value

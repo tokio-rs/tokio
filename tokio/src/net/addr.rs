@@ -3,7 +3,7 @@ use crate::future;
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 
-/// Convert or resolve without blocking to one or more `SocketAddr` values.
+/// Converts or resolves without blocking to one or more `SocketAddr` values.
 ///
 /// # DNS
 ///

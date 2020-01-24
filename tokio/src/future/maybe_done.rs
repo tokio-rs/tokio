@@ -40,7 +40,7 @@ impl<Fut: Future> MaybeDone<Fut> {
         }
     }
 
-    /// Attempt to take the output of a `MaybeDone` without driving it
+    /// Attempts to take the output of a `MaybeDone` without driving it
     /// towards completion.
     #[inline]
     pub fn take_output(self: Pin<&mut Self>) -> Option<Fut::Output> {

@@ -46,7 +46,7 @@ impl<T> fmt::Debug for UnboundedReceiver<T> {
     }
 }
 
-/// Create an unbounded mpsc channel for communicating between asynchronous
+/// Creates an unbounded mpsc channel for communicating between asynchronous
 /// tasks.
 ///
 /// A `send` on this channel will always succeed as long as the receive half has
@@ -78,7 +78,7 @@ impl<T> UnboundedReceiver<T> {
         self.chan.recv(cx)
     }
 
-    /// Receive the next value for this receiver.
+    /// Receives the next value for this receiver.
     ///
     /// `None` is returned when all `Sender` halves have dropped, indicating
     /// that no further values can be sent on the channel.

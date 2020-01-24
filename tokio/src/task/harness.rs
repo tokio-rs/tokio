@@ -48,7 +48,7 @@ where
     T: Future,
     S: Schedule,
 {
-    /// Poll the inner future.
+    /// Polls the inner future.
     ///
     /// All necessary state checks and transitions are performed.
     ///
@@ -450,7 +450,7 @@ where
         }
     }
 
-    /// Return `true` if the task structure should be deallocated
+    /// Returns `true` if the task structure should be deallocated
     fn transition_to_complete(&mut self, join_interest: bool) -> Snapshot {
         let res = self.header().state.transition_to_complete();
 
@@ -461,7 +461,7 @@ where
         res
     }
 
-    /// Return `true` if the task structure should be deallocated
+    /// Returns `true` if the task structure should be deallocated
     fn transition_to_released(&mut self, join_interest: bool) -> Snapshot {
         if join_interest {
             let res1 = self.transition_to_complete(join_interest);

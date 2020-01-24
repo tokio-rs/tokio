@@ -3,7 +3,7 @@ use crate::fs::asyncify;
 use std::io;
 use std::path::Path;
 
-/// Recursively create a directory and all of its parent components if they
+/// Recursively creates a directory and all of its parent components if they
 /// are missing.
 ///
 /// This is an async version of [`std::fs::create_dir_all`][std]

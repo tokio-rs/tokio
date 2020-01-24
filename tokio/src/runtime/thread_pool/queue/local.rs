@@ -41,7 +41,7 @@ impl<T: 'static> Queue<T> {
 }
 
 impl<T> Queue<T> {
-    /// Push a task onto the local queue.
+    /// Pushes a task onto the local queue.
     ///
     /// This **must** be called by the producer thread.
     pub(super) unsafe fn push(&self, mut task: Task<T>, global: &global::Queue<T>) {
@@ -78,7 +78,7 @@ impl<T> Queue<T> {
         }
     }
 
-    /// Move a batch of tasks into the global queue.
+    /// Moves a batch of tasks into the global queue.
     ///
     /// This will temporarily make some of the tasks unavailable to stealers.
     /// Once `push_overflow` is done, a notification is sent out, so if other
@@ -148,7 +148,7 @@ impl<T> Queue<T> {
         Ok(())
     }
 
-    /// Pop a task from the local queue.
+    /// Pops a task from the local queue.
     ///
     /// This **must** be called by the producer thread
     pub(super) unsafe fn pop(&self) -> Option<Task<T>> {
@@ -193,7 +193,7 @@ impl<T> Queue<T> {
         head == tail
     }
 
-    /// Steal half the tasks from self and place them into `dst`.
+    /// Steals half the tasks from self and place them into `dst`.
     pub(super) unsafe fn steal(&self, dst: &Queue<T>) -> Option<Task<T>> {
         let dst_tail = dst.tail.unsync_load();
 

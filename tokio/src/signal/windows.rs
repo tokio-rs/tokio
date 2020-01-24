@@ -149,7 +149,7 @@ pub struct CtrlBreak {
 }
 
 impl CtrlBreak {
-    /// Receive the next signal notification event.
+    /// Receives the next signal notification event.
     ///
     /// `None` is returned if no more events can be received by this stream.
     ///
@@ -175,7 +175,7 @@ impl CtrlBreak {
         poll_fn(|cx| self.poll_recv(cx)).await
     }
 
-    /// Poll to receive the next signal notification event, outside of an
+    /// Polls to receive the next signal notification event, outside of an
     /// `async` context.
     ///
     /// `None` is returned if no more events can be received by this stream.

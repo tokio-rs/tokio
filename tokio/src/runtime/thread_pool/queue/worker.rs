@@ -30,7 +30,7 @@ impl<T: 'static> Worker<T> {
         self.cluster.global.is_closed()
     }
 
-    /// Push to the local queue.
+    /// Pushes to the local queue.
     ///
     /// If the local queue is full, the task is pushed onto the global queue.
     ///
@@ -58,17 +58,17 @@ impl<T: 'static> Worker<T> {
         unsafe { self.local().push(task, &self.cluster.global) }
     }
 
-    /// Pop a task checking the local queue first.
+    /// Pops a task checking the local queue first.
     pub(crate) fn pop_local_first(&self) -> Option<Task<T>> {
         self.local_pop().or_else(|| self.cluster.global.pop())
     }
 
-    /// Pop a task checking the global queue first.
+    /// Pops a task checking the global queue first.
     pub(crate) fn pop_global_first(&self) -> Option<Task<T>> {
         self.cluster.global.pop().or_else(|| self.local_pop())
     }
 
-    /// Steal from other local queues.
+    /// Steals from other local queues.
     ///
     /// `start` specifies the queue from which to start stealing.
     pub(crate) fn steal(&self, start: usize) -> Option<Task<T>> {

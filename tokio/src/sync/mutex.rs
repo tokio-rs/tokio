@@ -166,7 +166,7 @@ impl<T> Mutex<T> {
         guard
     }
 
-    /// Try to acquire the lock
+    /// Tries to acquire the lock
     pub fn try_lock(&self) -> Result<MutexGuard<'_, T>, TryLockError> {
         let mut permit = semaphore::Permit::new();
         match permit.try_acquire(1, &self.s) {

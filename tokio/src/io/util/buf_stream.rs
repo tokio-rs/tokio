@@ -24,7 +24,7 @@ pin_project! {
 }
 
 impl<RW: AsyncRead + AsyncWrite> BufStream<RW> {
-    /// Wrap a type in both [`BufWriter`] and [`BufReader`].
+    /// Wraps a type in both [`BufWriter`] and [`BufReader`].
     ///
     /// See the documentation for those types and [`BufStream`] for details.
     pub fn new(stream: RW) -> BufStream<RW> {

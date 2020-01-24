@@ -301,7 +301,7 @@ struct Write<T> {
 /// Tracks a waiting receiver
 #[derive(Debug)]
 struct WaitNode {
-    /// True if queued
+    /// `true` if queued
     queued: AtomicBool,
 
     /// Task to wake when a permit is made available.
@@ -471,7 +471,7 @@ impl<T> Sender<T> {
             .map_err(|SendError(maybe_v)| SendError(maybe_v.unwrap()))
     }
 
-    /// Create a new [`Receiver`] handle that will receive values sent **after**
+    /// Creates a new [`Receiver`] handle that will receive values sent **after**
     /// this call to `subscribe`.
     ///
     /// # Examples
@@ -658,7 +658,7 @@ impl<T> Drop for Sender<T> {
 }
 
 impl<T> Receiver<T> {
-    /// Lock the next value if there is one.
+    /// Locks the next value if there is one.
     ///
     /// The caller is responsible for unlocking
     fn recv_ref(&mut self, spin: bool) -> Result<RecvGuard<'_, T>, TryRecvError> {
@@ -776,7 +776,7 @@ where
         }
     }
 
-    /// Receive the next value for this receiver.
+    /// Receives the next value for this receiver.
     ///
     /// Each [`Receiver`] handle will receive a clone of all values sent
     /// **after** it has subscribed.
@@ -946,7 +946,7 @@ impl<T> fmt::Debug for Receiver<T> {
 }
 
 impl<T> Slot<T> {
-    /// Try to lock the slot for a receiver. If `false`, then a sender holds the
+    /// Tries to lock the slot for a receiver. If `false`, then a sender holds the
     /// lock and the calling task will be notified once the sender has released
     /// the lock.
     fn try_rx_lock(&self) -> bool {

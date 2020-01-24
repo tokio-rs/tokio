@@ -64,12 +64,12 @@ impl State {
         }
     }
 
-    /// Load the current state, establishes `Acquire` ordering.
+    /// Loads the current state, establishes `Acquire` ordering.
     pub(super) fn load(&self) -> Snapshot {
         Snapshot(self.val.load(Acquire))
     }
 
-    /// Transition a task to the `Running` state.
+    /// Transitions a task to the `Running` state.
     ///
     /// Returns a snapshot of the state **after** the transition.
     pub(super) fn transition_to_running(&self) -> Snapshot {
@@ -96,7 +96,7 @@ impl State {
         next
     }
 
-    /// Transition the task from `Running` -> `Idle`.
+    /// Transitions the task from `Running` -> `Idle`.
     ///
     /// Returns a snapshot of the state **after** the transition.
     pub(super) fn transition_to_idle(&self) -> Snapshot {
@@ -119,7 +119,7 @@ impl State {
         next
     }
 
-    /// Transition the task from `Running` -> `Complete`.
+    /// Transitions the task from `Running` -> `Complete`.
     ///
     /// Returns a snapshot of the state **after** the transition.
     pub(super) fn transition_to_complete(&self) -> Snapshot {
@@ -136,7 +136,7 @@ impl State {
         next
     }
 
-    /// Transition the task from `Running` -> `Released`.
+    /// Transitions the task from `Running` -> `Released`.
     ///
     /// Returns a snapshot of the state **after** the transition.
     pub(super) fn transition_to_released(&self) -> Snapshot {
@@ -157,7 +157,7 @@ impl State {
         next
     }
 
-    /// Transition the task to the canceled state.
+    /// Transitions the task to the canceled state.
     ///
     /// Returns the snapshot of the state **after** the transition **if** the
     /// transition was made successfully
@@ -212,7 +212,7 @@ impl State {
         }
     }
 
-    /// Final transition to `Released`. Called when primary task handle is
+    /// Transitions to `Released`. Called when primary task handle is
     /// dropped. This is roughly a "ref decrement" operation.
     ///
     /// Returns a snapshot of the state **after** the transition.
@@ -239,7 +239,7 @@ impl State {
         next
     }
 
-    /// Transition the state to `Scheduled`.
+    /// Transitions the state to `Scheduled`.
     ///
     /// Returns `true` if the task needs to be submitted to the pool for
     /// execution
@@ -250,7 +250,7 @@ impl State {
         prev & MASK == 0
     }
 
-    /// Optimistically try to swap the state assuming the join handle is
+    /// Optimistically tries to swap the state assuming the join handle is
     /// __immediately__ dropped on spawn
     pub(super) fn drop_join_handle_fast(&self) -> bool {
         use std::sync::atomic::Ordering::Relaxed;
@@ -272,7 +272,7 @@ impl State {
             .is_ok()
     }
 
-    /// The join handle has completed by reading the output
+    /// The join handle has completed by reading the output.
     ///
     /// Returns a snapshot of the state **after** the transition.
     pub(super) fn complete_join_handle(&self) -> Snapshot {
@@ -328,7 +328,7 @@ impl State {
         }
     }
 
-    /// Store the join waker.
+    /// Stores the join waker.
     pub(super) fn store_join_waker(&self) -> Snapshot {
         use crate::loom::sync::atomic;
 

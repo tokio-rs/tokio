@@ -117,7 +117,7 @@ impl<T> Driver<T>
 where
     T: Park,
 {
-    /// Create a new `Driver` instance that uses `park` to block the current
+    /// Creates a new `Driver` instance that uses `park` to block the current
     /// thread and `now` to get the current `Instant`.
     ///
     /// Specifying the source of time is useful when testing.
@@ -147,7 +147,7 @@ where
         self.inner.start + Duration::from_millis(when)
     }
 
-    /// Run timer related logic
+    /// Runs timer related logic
     fn process(&mut self) {
         let now = crate::time::ms(
             self.clock.now() - self.inner.start,
@@ -169,7 +169,7 @@ where
         self.inner.elapsed.store(self.wheel.elapsed(), SeqCst);
     }
 
-    /// Process the entry queue
+    /// Processes the entry queue
     ///
     /// This handles adding and canceling timeouts.
     fn process_queue(&mut self) {
@@ -199,7 +199,7 @@ where
         entry.set_when_internal(None);
     }
 
-    /// Fire the entry if it needs to, otherwise queue it to be processed later.
+    /// Fires the entry if it needs to, otherwise queue it to be processed later.
     ///
     /// Returns `None` if the entry was fired.
     fn add_entry(&mut self, entry: Arc<Entry>, when: u64) {
@@ -333,7 +333,7 @@ impl Inner {
         self.elapsed.load(SeqCst)
     }
 
-    /// Increment the number of active timeouts
+    /// Increments the number of active timeouts
     fn increment(&self) -> Result<(), Error> {
         let mut curr = self.num.load(SeqCst);
 
@@ -352,7 +352,7 @@ impl Inner {
         }
     }
 
-    /// Decrement the number of active timeouts
+    /// Decrements the number of active timeouts
     fn decrement(&self) {
         let prev = self.num.fetch_sub(1, SeqCst);
         debug_assert!(prev <= MAX_TIMEOUTS);

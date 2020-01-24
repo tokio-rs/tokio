@@ -252,7 +252,7 @@ impl LocalSet {
         handle
     }
 
-    /// Run a future to completion on the provided runtime, driving any local
+    /// Runs a future to completion on the provided runtime, driving any local
     /// futures spawned on this task set on the current thread.
     ///
     /// This runs the given future on the runtime, blocking until it is
@@ -405,7 +405,7 @@ impl<F: Future> Future for LocalFuture<F> {
             }
 
             if scheduler.tick() {
-                // If `tick` returns true, we need to notify the local future again:
+                // If `tick` returns `true`, we need to notify the local future again:
                 // there are still tasks remaining in the run queue.
                 cx.waker().wake_by_ref();
             }

@@ -75,7 +75,7 @@ impl Handle {
 
 cfg_rt_core! {
     impl Handle {
-        /// Spawn a future onto the Tokio runtime.
+        /// Spawns a future onto the Tokio runtime.
         ///
         /// This spawns the given future onto the runtime's executor, usually a
         /// thread pool. The thread pool is then responsible for polling the future

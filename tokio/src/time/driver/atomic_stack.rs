@@ -29,7 +29,7 @@ impl AtomicStack {
         }
     }
 
-    /// Push an entry onto the stack.
+    /// Pushes an entry onto the stack.
     ///
     /// Returns `true` if the entry was pushed, `false` if the entry is already
     /// on the stack, `Err` if the timer is shutdown.
@@ -72,13 +72,13 @@ impl AtomicStack {
         Ok(true)
     }
 
-    /// Take all entries from the stack
+    /// Takes all entries from the stack
     pub(crate) fn take(&self) -> AtomicStackEntries {
         let ptr = self.head.swap(ptr::null_mut(), SeqCst);
         AtomicStackEntries { ptr }
     }
 
-    /// Drain all remaining nodes in the stack and prevent any new nodes from
+    /// Drains all remaining nodes in the stack and prevent any new nodes from
     /// being pushed onto the stack.
     pub(crate) fn shutdown(&self) {
         // Shutdown the processing queue

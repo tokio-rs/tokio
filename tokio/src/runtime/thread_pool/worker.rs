@@ -182,7 +182,7 @@ impl Worker {
         }
     }
 
-    /// Acquire the lock
+    /// Acquires the lock
     fn acquire_lock(&self) -> Option<GenerationGuard<'_>> {
         // Safety: Only getting `&self` access to access atomic field
         let owned = unsafe { &*self.slices.owned()[self.index].get() };
@@ -205,7 +205,7 @@ impl Worker {
         }
     }
 
-    /// Enter an in-place blocking section
+    /// Enters an in-place blocking section
     fn block_in_place(&self) {
         // If our Worker has already been given away, then blocking is fine!
         if self.gone.get() {
@@ -327,7 +327,7 @@ impl GenerationGuard<'_> {
         }
     }
 
-    /// Find local work
+    /// Finds local work
     fn find_local_work(&mut self) -> Option<Task<Shared>> {
         let tick = self.tick_fetch_inc();
 
@@ -527,7 +527,7 @@ impl GenerationGuard<'_> {
         }
     }
 
-    /// Shutdown the worker.
+    /// Shutdowns the worker.
     ///
     /// Once the shutdown flag has been observed, it is guaranteed that no
     /// further tasks may be pushed into the global queue.
@@ -573,7 +573,7 @@ impl GenerationGuard<'_> {
         }
     }
 
-    /// Increment the tick, returning the value from before the increment.
+    /// Increments the tick, returning the value from before the increment.
     fn tick_fetch_inc(&mut self) -> u16 {
         let tick = self.owned().tick.get();
         self.owned().tick.set(tick.wrapping_add(1));

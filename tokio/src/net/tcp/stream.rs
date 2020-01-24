@@ -91,12 +91,12 @@ impl TcpStream {
         Err(last_err.unwrap_or_else(|| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "could not resolve to any addresses",
+                "could not resolve to any address",
             )
         }))
     }
 
-    /// Establish a connection to the specified `addr`.
+    /// Establishes a connection to the specified `addr`.
     async fn connect_addr(addr: SocketAddr) -> io::Result<TcpStream> {
         let sys = mio::net::TcpStream::connect(&addr)?;
         let stream = TcpStream::new(sys)?;
@@ -121,7 +121,7 @@ impl TcpStream {
         Ok(TcpStream { io })
     }
 
-    /// Create a new `TcpStream` from a `std::net::TcpStream`.
+    /// Creates new `TcpStream` from a `std::net::TcpStream`.
     ///
     /// This function will convert a TCP stream created by the standard library
     /// to a TCP stream ready to be used with the provided event loop handle.
@@ -161,7 +161,7 @@ impl TcpStream {
         Ok(TcpStream { io })
     }
 
-    // Connect a TcpStream asynchronously that may be built with a net2 TcpBuilder.
+    // Connects `TcpStream` asynchronously that may be built with a net2 `TcpBuilder`.
     //
     // This should be removed in favor of some in-crate TcpSocket builder API.
     #[doc(hidden)]
@@ -221,7 +221,7 @@ impl TcpStream {
         self.io.get_ref().peer_addr()
     }
 
-    /// Attempt to receive data on the socket, without removing that data from
+    /// Attempts to receive data on the socket, without removing that data from
     /// the queue, registering the current task for wakeup if data is not yet
     /// available.
     ///
@@ -629,7 +629,7 @@ impl TcpStream {
         self.io.get_ref().set_linger(dur)
     }
 
-    /// Split a `TcpStream` into a read half and a write half, which can be used
+    /// Splits a `TcpStream` into a read half and a write half, which can be used
     /// to read and write the stream concurrently.
     ///
     /// See the module level documenation of [`split`](super::split) for more
