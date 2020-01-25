@@ -10,7 +10,7 @@
 /// multiplexed on the current task. The `try_join!` macro returns when **all**
 /// branches return with `Ok` or when the **first** branch returns with `Err`.
 ///
-/// [`join!`]: crate::join
+/// [`join!`]: macro@join
 ///
 /// # Notes
 ///
@@ -129,4 +129,3 @@ macro_rules! try_join {
         $crate::try_join!(@{ () } $($e,)*)
     };
 }
-

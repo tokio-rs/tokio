@@ -17,20 +17,14 @@ async fn sync_one_lit_expr_no_comma() {
 
 #[tokio::test]
 async fn sync_two_lit_expr_comma() {
-    let foo = tokio::try_join!(
-        async { ok(1) },
-        async { ok(2) },
-    );
+    let foo = tokio::try_join!(async { ok(1) }, async { ok(2) },);
 
     assert_eq!(foo, Ok((1, 2)));
 }
 
 #[tokio::test]
 async fn sync_two_lit_expr_no_comma() {
-    let foo = tokio::try_join!(
-        async { ok(1) },
-        async { ok(2) }
-    );
+    let foo = tokio::try_join!(async { ok(1) }, async { ok(2) });
 
     assert_eq!(foo, Ok((1, 2)));
 }
@@ -40,11 +34,8 @@ async fn two_await() {
     let (tx1, rx1) = oneshot::channel::<&str>();
     let (tx2, rx2) = oneshot::channel::<u32>();
 
-    let mut join = task::spawn(async {
-        tokio::try_join!(
-            async { rx1.await },
-            async { rx2.await })
-    });
+    let mut join =
+        task::spawn(async { tokio::try_join!(async { rx1.await }, async { rx2.await }) });
 
     assert_pending!(join.poll());
 
@@ -66,10 +57,9 @@ async fn err_abort_early() {
     let (_tx3, rx3) = oneshot::channel::<u32>();
 
     let mut join = task::spawn(async {
-        tokio::try_join!(
-            async { rx1.await },
-            async { rx2.await },
-            async { rx3.await })
+        tokio::try_join!(async { rx1.await }, async { rx2.await }, async {
+            rx3.await
+        })
     });
 
     assert_pending!(join.poll());
