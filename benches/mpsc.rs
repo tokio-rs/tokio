@@ -4,7 +4,6 @@ use tokio::sync::mpsc;
 type Medium = [usize; 64];
 type Large = [Medium; 64];
 
-
 fn create_1_medium(b: &mut Bencher) {
     b.iter(|| {
         black_box(&mpsc::channel::<Medium>(1));
@@ -45,6 +44,7 @@ fn send_large(b: &mut Bencher) {
 
 fn contention_bounded(b: &mut Bencher) {
     let mut rt = tokio::runtime::Builder::new()
+        .core_threads(6)
         .threaded_scheduler()
         .build()
         .unwrap();
@@ -71,6 +71,7 @@ fn contention_bounded(b: &mut Bencher) {
 
 fn contention_bounded_full(b: &mut Bencher) {
     let mut rt = tokio::runtime::Builder::new()
+        .core_threads(6)
         .threaded_scheduler()
         .build()
         .unwrap();
@@ -97,6 +98,7 @@ fn contention_bounded_full(b: &mut Bencher) {
 
 fn contention_unbounded(b: &mut Bencher) {
     let mut rt = tokio::runtime::Builder::new()
+        .core_threads(6)
         .threaded_scheduler()
         .build()
         .unwrap();
@@ -123,6 +125,7 @@ fn contention_unbounded(b: &mut Bencher) {
 
 fn uncontented_bounded(b: &mut Bencher) {
     let mut rt = tokio::runtime::Builder::new()
+        .core_threads(6)
         .threaded_scheduler()
         .build()
         .unwrap();
@@ -144,6 +147,7 @@ fn uncontented_bounded(b: &mut Bencher) {
 
 fn uncontented_unbounded(b: &mut Bencher) {
     let mut rt = tokio::runtime::Builder::new()
+        .core_threads(6)
         .threaded_scheduler()
         .build()
         .unwrap();
