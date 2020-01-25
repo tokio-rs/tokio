@@ -30,9 +30,9 @@ async fn sync_two_lit_expr_no_comma() {
 }
 
 #[tokio::test]
-async fn sync_two_await() {
-    let (tx1, rx1) = oneshot::channel();
-    let (tx2, rx2) = oneshot::channel();
+async fn two_await() {
+    let (tx1, rx1) = oneshot::channel::<&str>();
+    let (tx2, rx2) = oneshot::channel::<u32>();
 
     let mut join = task::spawn(async {
         tokio::join!(async { rx1.await.unwrap() }, async { rx2.await.unwrap() })

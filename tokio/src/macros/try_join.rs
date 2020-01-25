@@ -1,18 +1,16 @@
 /// Wait on multiple concurrent branches, returning when **all** branches
-/// complete.
+/// complete with `Ok(_)` or on the first `Err(_)`.
 ///
-/// The `join!` macro must be used inside of async functions, closures, and
+/// The `try_join!` macro must be used inside of async functions, closures, and
 /// blocks.
 ///
-/// The `join!` macro takes a list of async expressions and evaluates them
-/// concurrently on the same task. Each async expression evaluates to a future
-/// and the futures from each expression are multiplexed on the current task.
+/// Similar to [`join!`], the `try_join!` macro takes a list of async
+/// expressions and evaluates them concurrently on the same task. Each async
+/// expression evaluates to a future and the futures from each expression are
+/// multiplexed on the current task. The `try_join!` macro returns when **all**
+/// branches return with `Ok` or when the **first** branch returns with `Err`.
 ///
-/// When working with async expressions returning `Result`, `join!` will wait
-/// for **all** branches complete regardless if any complete with `Err`. Use
-/// [`try_join!`] to return early when `Err` is encountered.
-///
-/// [`try_join!`]: macro@try_join
+/// [`join!`]: macro@join
 ///
 /// # Notes
 ///
@@ -26,40 +24,49 @@
 /// expressions are run on the same thread and if one branch blocks the thread,
 /// all other expressions will be unable to continue. If parallelism is
 /// required, spawn each async expression using [`tokio::spawn`] and pass the
-/// join handle to `join!`.
+/// join handle to `try_join!`.
 ///
 /// [`tokio::spawn`]: crate::spawn
 ///
 /// # Examples
 ///
-/// Basic join with two branches
+/// Basic try_join with two branches.
 ///
 /// ```
-/// async fn do_stuff_async() {
+/// async fn do_stuff_async() -> Result<(), &'static str> {
 ///     // async work
+/// # Ok(())
 /// }
 ///
-/// async fn more_async_work() {
+/// async fn more_async_work() -> Result<(), &'static str> {
 ///     // more here
+/// # Ok(())
 /// }
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let (first, second) = tokio::join!(
+///     let res = tokio::try_join!(
 ///         do_stuff_async(),
 ///         more_async_work());
 ///
-///     // do something with the values
+///     match res {
+///          Ok((first, second)) => {
+///              // do something with the values
+///          }
+///          Err(err) => {
+///             println!("processing failed; error = {}", err);
+///          }
+///     }
 /// }
 /// ```
 #[macro_export]
-macro_rules! join {
+macro_rules! try_join {
     (@ {
-        // One `_` for each branch in the `join!` macro. This is not used once
+        // One `_` for each branch in the `try_join!` macro. This is not used once
         // normalization is complete.
         ( $($count:tt)* )
 
-        // Normalized join! branches
+        // Normalized try_join! branches
         $( ( $($skip:tt)* ) $e:expr, )*
 
     }) => {{
@@ -82,15 +89,17 @@ macro_rules! join {
                 let mut fut = unsafe { Pin::new_unchecked(fut) };
 
                 // Try polling
-                if fut.poll(cx).is_pending() {
+                if fut.as_mut().poll(cx).is_pending() {
                     is_pending = true;
+                } else if fut.as_mut().output_mut().expect("expected completed future").is_err() {
+                    return Ready(Err(fut.take_output().expect("expected completed future").err().unwrap()))
                 }
             )*
 
             if is_pending {
                 Pending
             } else {
-                Ready(($({
+                Ready(Ok(($({
                     // Extract the future for this branch from the tuple.
                     let ( $($skip,)* fut, .. ) = &mut futures;
 
@@ -98,8 +107,12 @@ macro_rules! join {
                     // and never moved.
                     let mut fut = unsafe { Pin::new_unchecked(fut) };
 
-                    fut.take_output().expect("expected completed future")
-                },)*))
+                    fut
+                        .take_output()
+                        .expect("expected completed future")
+                        .ok()
+                        .expect("expected Ok(_)")
+                },)*)))
             }
         }).await
     }};
@@ -107,12 +120,12 @@ macro_rules! join {
     // ===== Normalize =====
 
     (@ { ( $($s:tt)* ) $($t:tt)* } $e:expr, $($r:tt)* ) => {
-        $crate::join!(@{ ($($s)* _) $($t)* ($($s)*) $e, } $($r)*)
+        $crate::try_join!(@{ ($($s)* _) $($t)* ($($s)*) $e, } $($r)*)
     };
 
     // ===== Entry point =====
 
     ( $($e:expr),* $(,)?) => {
-        $crate::join!(@{ () } $($e,)*)
+        $crate::try_join!(@{ () } $($e,)*)
     };
 }
