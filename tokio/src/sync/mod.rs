@@ -61,7 +61,8 @@
 //! Note, if the task produces the the computation result as its final action
 //! before terminating, the [`JoinHandle`] can be used to receive the
 //! computation result instead of allocating resources for the `oneshot`
-//! channel.
+//! channel. Awaiting on [`JoinHandle`] returns `Result`. If the task panics,
+//! the `Joinhandle` yields `Err` with the panic cause.
 //!
 //! **Example:**
 //!
@@ -396,7 +397,7 @@
 //!
 //! The remainding synchronization primitives focus on synchronizing state.
 //! These are asynchronous equivalents to versions provided by `std`. They
-//! operate in a similar way as their `std` counter parts but will wait
+//! operate in a similar way as their `std` counterparts parts but will wait
 //! asynchronously instead of blocking the thread.
 //!
 //! * [`Barrier`][Barrier] Ensures multiple tasks will wait for each other to
