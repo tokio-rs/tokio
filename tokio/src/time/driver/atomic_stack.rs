@@ -103,7 +103,7 @@ impl Iterator for AtomicStackEntries {
         let entry = unsafe { Arc::from_raw(self.ptr) };
 
         // Update `self.ptr` to point to the next element of the stack
-        self.ptr = unsafe { (*entry.next_atomic.get()) };
+        self.ptr = unsafe { *entry.next_atomic.get() };
 
         // Unset the queued flag
         let res = entry.queued.fetch_and(false, SeqCst);
