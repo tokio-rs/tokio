@@ -9,22 +9,22 @@ enum Runtime {
 }
 
 fn parse_knobs(
-    input: syn::ItemFn,
+    mut input: syn::ItemFn,
     args: syn::AttributeArgs,
     is_test: bool,
     rt_threaded: bool,
 ) -> Result<TokenStream, syn::Error> {
-    let ret = &input.sig.output;
-    let name = &input.sig.ident;
-    let inputs = &input.sig.inputs;
+    let sig = &mut input.sig;
     let body = &input.block;
     let attrs = &input.attrs;
     let vis = input.vis;
 
-    if input.sig.asyncness.is_none() {
+    if sig.asyncness.is_none() {
         let msg = "the async keyword is missing from the function declaration";
-        return Err(syn::Error::new_spanned(input.sig.fn_token, msg));
+        return Err(syn::Error::new_spanned(sig.fn_token, msg));
     }
+
+    sig.asyncness = None;
 
     let mut runtime = None;
     let mut core_threads = None;
@@ -152,7 +152,7 @@ fn parse_knobs(
     let result = quote! {
         #header
         #(#attrs)*
-        #vis fn #name(#inputs) #ret {
+        #vis #sig {
             #rt
                 .enable_all()
                 .build()
@@ -214,27 +214,29 @@ pub(crate) mod old {
 
     #[cfg(not(test))] // Work around for rust-lang/rust#62127
     pub(crate) fn main(args: TokenStream, item: TokenStream) -> TokenStream {
-        let input = syn::parse_macro_input!(item as syn::ItemFn);
+        let mut input = syn::parse_macro_input!(item as syn::ItemFn);
         let args = syn::parse_macro_input!(args as syn::AttributeArgs);
 
-        let ret = &input.sig.output;
-        let name = &input.sig.ident;
-        let inputs = &input.sig.inputs;
+        let sig = &mut input.sig;
+        let name = &sig.ident;
+        let inputs = &sig.inputs;
         let body = &input.block;
         let attrs = &input.attrs;
         let vis = input.vis;
 
-        if input.sig.asyncness.is_none() {
+        if sig.asyncness.is_none() {
             let msg = "the async keyword is missing from the function declaration";
-            return syn::Error::new_spanned(input.sig.fn_token, msg)
+            return syn::Error::new_spanned(sig.fn_token, msg)
                 .to_compile_error()
                 .into();
         } else if name == "main" && !inputs.is_empty() {
             let msg = "the main function cannot accept arguments";
-            return syn::Error::new_spanned(&input.sig.inputs, msg)
+            return syn::Error::new_spanned(&sig.inputs, msg)
                 .to_compile_error()
                 .into();
         }
+
+        sig.asyncness = None;
 
         let mut runtime = Runtime::Auto;
 
@@ -259,13 +261,13 @@ pub(crate) mod old {
         let result = match runtime {
             Runtime::Threaded | Runtime::Auto => quote! {
                 #(#attrs)*
-                #vis fn #name(#inputs) #ret {
+                #vis #sig {
                     tokio::runtime::Runtime::new().unwrap().block_on(async { #body })
                 }
             },
             Runtime::Basic => quote! {
                 #(#attrs)*
-                #vis fn #name(#inputs) #ret {
+                #vis #sig {
                     tokio::runtime::Builder::new()
                         .basic_scheduler()
                         .enable_all()
