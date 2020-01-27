@@ -258,6 +258,38 @@ impl<T> Receiver<T> {
 
 impl<T: Clone> Receiver<T> {
     /// Attempts to clone the latest value sent via the channel.
+    ///
+    /// If this is the first time the function is called on a `Receiver`
+    /// instance, then the function completes immediately with the **current**
+    /// value held by the channel. On the next call, the function waits until
+    /// a new value is sent in the channel.
+    ///
+    /// `None` is returned if the `Sender` half is dropped.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::watch;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = watch::channel("hello");
+    ///
+    ///     let v = rx.recv().await.unwrap();
+    ///     assert_eq!(v, "hello");
+    ///
+    ///     tokio::spawn(async move {
+    ///         tx.broadcast("goodbye").unwrap();
+    ///     });
+    ///
+    ///     // Waits for the new task to spawn and send the value.
+    ///     let v = rx.recv().await.unwrap();
+    ///     assert_eq!(v, "goodbye");
+    ///
+    ///     let v = rx.recv().await;
+    ///     assert!(v.is_none());
+    /// }
+    /// ```
     pub async fn recv(&mut self) -> Option<T> {
         poll_fn(|cx| {
             let v_ref = ready!(self.poll_recv_ref(cx));
