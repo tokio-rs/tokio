@@ -3,7 +3,7 @@ pr: ["master"]
 
 variables:
   RUSTFLAGS: -Dwarnings
-  nightly: nightly-2019-11-16
+  nightly: nightly-2020-01-25
 
 jobs:
 # Test top level crate
