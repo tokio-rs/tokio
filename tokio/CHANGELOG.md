@@ -1,3 +1,24 @@
+# 0.2.11 (January 27, 2019)
+
+### Fixes
+- docs: misc fixes and tweaks (#2155, #2103, #2027, #2167, #2175).
+- macros: handle generics in `#[tokio::main]` method (#2177).
+- sync: `broadcast` potential lost notifications (#2135).
+- rt: improve "no runtime" panic messages (#2145).
+
+### Added
+- optional support for using `parking_lot` internally (#2164).
+- fs: `fs::copy`, an async version of `std::fs::copy` (#2079).
+- macros: `select!` waits for the first branch to complete (#2152).
+- macros: `join!` waits for all branches to complete (#2158).
+- macros: `try_join!` waits for all branches to complete or the first error (#2169).
+- macros: `pin!` pins a value to the stack (#2163).
+- net: `ReadHalf::poll()` and `ReadHalf::poll_peak` (#2151)
+- stream: `StreamExt::timeout()` sets a per-item max duration (#2149).
+- stream: `StreamExt::fold()` applies a function, producing a single value. (#2122).
+- sync: impl `Eq`, `PartialEq` for `oneshot::RecvError` (#2168).
+- task: methods for inspecting the `JoinError` cause (#2051).
+
 # 0.2.10 (January 21, 2019)
 
 ### Fixes
