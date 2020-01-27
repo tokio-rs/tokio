@@ -5,6 +5,11 @@ async fn basic_main() -> usize {
     1
 }
 
+#[tokio::main]
+async fn generic_fun<T: Default>() -> T {
+    T::default()
+}
+
 #[cfg(feature = "rt-core")]
 mod spawn {
     #[tokio::main]
@@ -22,4 +27,5 @@ mod spawn {
 #[test]
 fn shell() {
     assert_eq!(1, basic_main());
+    assert_eq!(bool::default(), generic_fun::<bool>())
 }
