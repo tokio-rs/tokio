@@ -44,8 +44,8 @@ use std::task::{Context, Poll};
 ///
 /// [`StreamExt::merge`]: crate::stream::StreamExt::merge
 /// [`mpsc`]: crate::sync::mpsc
-/// [`pin!`]: macro@crate::pin
-/// [`Box::pin`]: std::box::Box::pin
+/// [`pin!`]: macro@pin
+/// [`Box::pin`]: std::boxed::Box::pin
 ///
 /// # Examples
 ///
