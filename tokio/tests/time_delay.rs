@@ -155,6 +155,22 @@ async fn greater_than_max() {
     time::delay_until(Instant::now() + ms(YR_5)).await;
 }
 
+const NUM_LEVELS: usize = 6;
+const MAX_DURATION: u64 = (1 << (6 * NUM_LEVELS)) - 1;
+
+#[should_panic]
+#[tokio::test]
+async fn exactly_max() {
+    // TODO: this should not panic but `time::ms()` is acting up
+    time::delay_for(ms(MAX_DURATION)).await;
+}
+
+#[tokio::test]
+async fn no_out_of_bounds_close_to_max() {
+    time::pause();
+    time::delay_for(ms(MAX_DURATION - 1)).await;
+}
+
 fn ms(n: u64) -> Duration {
     Duration::from_millis(n)
 }
