@@ -1,6 +1,6 @@
 use tokio::stream::{self, pending, Stream, StreamExt, StreamMap};
 use tokio::sync::mpsc;
-use tokio_test::{task, assert_ok, assert_pending, assert_ready};
+use tokio_test::{assert_ok, assert_pending, assert_ready, task};
 
 macro_rules! assert_ready_some {
     ($($t:tt)*) => {
@@ -210,7 +210,6 @@ fn size_hint_without_upper() {
     assert_eq!(size_hint, (3, None));
 }
 
-
 #[test]
 fn new_capacity_zero() {
     let map = StreamMap::<&str, stream::Pending<()>>::new();
@@ -251,10 +250,7 @@ fn iter_values() {
     map.insert("b", stream::iter(vec![1, 2]));
     map.insert("c", stream::iter(vec![1, 2, 3]));
 
-    let mut size_hints = map
-        .values()
-        .map(|s| s.size_hint().0)
-        .collect::<Vec<_>>();
+    let mut size_hints = map.values().map(|s| s.size_hint().0).collect::<Vec<_>>();
 
     size_hints.sort();
 

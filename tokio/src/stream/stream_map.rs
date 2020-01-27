@@ -114,9 +114,7 @@ impl<K, V> StreamMap<K, V> {
     /// let map: StreamMap<&str, Pending<()>> = StreamMap::new();
     /// ```
     pub fn new() -> StreamMap<K, V> {
-        StreamMap {
-            entries: vec![],
-        }
+        StreamMap { entries: vec![] }
     }
 
     /// Creates an empty `StreamMap` with the specified capacity.
@@ -132,7 +130,9 @@ impl<K, V> StreamMap<K, V> {
     /// let map: StreamMap<&str, Pending<()>> = StreamMap::with_capacity(10);
     /// ```
     pub fn with_capacity(capacity: usize) -> StreamMap<K, V> {
-        StreamMap { entries: Vec::with_capacity(capacity) }
+        StreamMap {
+            entries: Vec::with_capacity(capacity),
+        }
     }
 
     /// Returns an iterator visiting all keys in arbitrary order.
