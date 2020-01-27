@@ -3,7 +3,7 @@ cfg_io_driver! {
     pub(crate) mod slab;
 }
 
-#[cfg(any(feature = "rt-threaded", feature = "macros"))]
+#[cfg(any(feature = "rt-threaded", feature = "macros", features = "stream"))]
 mod rand;
 
 cfg_rt_threaded! {
@@ -16,6 +16,5 @@ cfg_rt_threaded! {
     pub(crate) use try_lock::TryLock;
 }
 
-cfg_macros! {
-    pub use rand::thread_rng_n;
-}
+#[cfg(any(feature = "macros", features = "stream"))]
+pub use rand::thread_rng_n;
