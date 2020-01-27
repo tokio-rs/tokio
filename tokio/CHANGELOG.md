@@ -8,7 +8,7 @@
 
 ### Added
 - optional support for using `parking_lot` internally (#2164).
-- fs: `fs::copy` an async version of `std::fs::copy` (#2079).
+- fs: `fs::copy`, an async version of `std::fs::copy` (#2079).
 - macros: `select!` waits for the first branch to complete (#2152).
 - macros: `join!` waits for all branches to complete (#2158).
 - macros: `try_join!` waits for all branches to complete or the first error (#2169).
