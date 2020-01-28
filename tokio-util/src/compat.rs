@@ -5,13 +5,14 @@ use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// A compatibility layer that allows conversion between the
-/// `tokio::io` and `futures-io` `AsyncRead` and `AsyncWrite` traits.
-#[pin_project]
-#[derive(Copy, Clone, Debug)]
-pub struct Compat<T> {
-    #[pin]
-    inner: T,
+pin_project! {
+    /// A compatibility layer that allows conversion between the
+    /// `tokio::io` and `futures-io` `AsyncRead` and `AsyncWrite` traits.
+    #[derive(Copy, Clone, Debug)]
+    pub struct Compat<T> {
+        #[pin]
+        inner: T,
+    }
 }
 
 /// Extension trait that allows converting a type implementing
