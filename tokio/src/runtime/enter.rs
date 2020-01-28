@@ -1,7 +1,6 @@
 use std::cell::{Cell, RefCell};
 use std::fmt;
 use std::marker::PhantomData;
-use std::time::Duration;
 
 thread_local!(static ENTERED: Cell<bool> = Cell::new(false));
 
@@ -76,6 +75,7 @@ pub(crate) fn exit<F: FnOnce() -> R, R>(f: F) -> R {
 
 cfg_blocking_impl! {
     use crate::park::ParkError;
+    use std::time::Duration;
 
     impl Enter {
         /// Blocks the thread on the specified future, returning the value with

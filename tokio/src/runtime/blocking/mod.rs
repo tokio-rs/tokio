@@ -21,6 +21,7 @@ cfg_blocking_impl! {
 
 cfg_not_blocking_impl! {
     use crate::runtime::Builder;
+    use std::time::Duration;
 
     #[derive(Debug, Clone)]
     pub(crate) struct BlockingPool {}
@@ -34,6 +35,9 @@ cfg_not_blocking_impl! {
     impl BlockingPool {
         pub(crate) fn spawner(&self) -> &BlockingPool {
             self
+        }
+
+        pub(crate) fn shutdown(&mut self, _duration: Option<Duration>) {
         }
     }
 }
