@@ -27,7 +27,7 @@ impl<T> Unpin for Pending<T> {}
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let mut never = stream::empty::<i32>();
+///     let mut never = stream::pending::<i32>();
 ///
 ///     // This will never complete
 ///     never.next().await;
