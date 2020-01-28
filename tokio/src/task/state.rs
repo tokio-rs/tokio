@@ -76,7 +76,7 @@ impl State {
         const DELTA: usize = RUNNING | NOTIFIED;
 
         let prev = Snapshot(self.val.fetch_xor(DELTA, Acquire));
-        debug_assert!(prev.is_notified());
+        assert!(prev.is_notified());
 
         if prev.is_running() {
             // We were signalled to cancel
@@ -86,12 +86,12 @@ impl State {
             return Snapshot(prev | CANCELLED);
         }
 
-        debug_assert!(!prev.is_running());
+        assert!(!prev.is_running());
 
         let next = Snapshot(prev.0 ^ DELTA);
 
-        debug_assert!(next.is_running());
-        debug_assert!(!next.is_notified());
+        assert!(next.is_running());
+        assert!(!next.is_notified());
 
         next
     }
@@ -114,7 +114,7 @@ impl State {
 
         let next = Snapshot(prev.0 ^ DELTA);
 
-        debug_assert!(!next.is_running());
+        assert!(!next.is_running());
 
         next
     }
@@ -127,11 +127,11 @@ impl State {
 
         let prev = Snapshot(self.val.fetch_xor(DELTA, AcqRel));
 
-        debug_assert!(!prev.is_complete());
+        assert!(!prev.is_complete());
 
         let next = Snapshot(prev.0 ^ DELTA);
 
-        debug_assert!(next.is_complete());
+        assert!(next.is_complete());
 
         next
     }
@@ -144,15 +144,15 @@ impl State {
 
         let prev = Snapshot(self.val.fetch_xor(DELTA, AcqRel));
 
-        debug_assert!(prev.is_running());
-        debug_assert!(!prev.is_complete());
-        debug_assert!(!prev.is_released());
+        assert!(prev.is_running());
+        assert!(!prev.is_complete());
+        assert!(!prev.is_released());
 
         let next = Snapshot(prev.0 ^ DELTA);
 
-        debug_assert!(!next.is_running());
-        debug_assert!(next.is_complete());
-        debug_assert!(next.is_released());
+        assert!(!next.is_running());
+        assert!(next.is_complete());
+        assert!(next.is_released());
 
         next
     }
@@ -173,8 +173,8 @@ impl State {
     pub(super) fn transition_to_canceled_from_queue(&self) -> Snapshot {
         let prev = Snapshot(self.val.fetch_or(CANCELLED, AcqRel));
 
-        debug_assert!(!prev.is_complete());
-        debug_assert!(!prev.is_running() || prev.is_notified());
+        assert!(!prev.is_complete());
+        assert!(!prev.is_running() || prev.is_notified());
 
         Snapshot(prev.0 | CANCELLED)
     }
@@ -223,12 +223,12 @@ impl State {
 
         let prev = Snapshot(self.val.fetch_or(DELTA, Release));
 
-        debug_assert!(!prev.is_released());
-        debug_assert!(prev.is_terminal(), "state = {:?}", prev);
+        assert!(!prev.is_released());
+        assert!(prev.is_terminal(), "state = {:?}", prev);
 
         let next = Snapshot(prev.0 | DELTA);
 
-        debug_assert!(next.is_released());
+        assert!(next.is_released());
 
         if next.is_final_ref() || (next.has_join_waker() && !next.is_join_interested()) {
             // The final reference to the task was dropped, the caller must free the
@@ -282,7 +282,7 @@ impl State {
 
         let prev = Snapshot(self.val.fetch_sub(DELTA, Release));
 
-        debug_assert!(prev.is_join_interested());
+        assert!(prev.is_join_interested());
 
         let next = Snapshot(prev.0 - DELTA);
 
@@ -311,7 +311,7 @@ impl State {
                 return Err(Snapshot(prev));
             }
 
-            debug_assert!(prev & JOIN_INTEREST == JOIN_INTEREST);
+            assert!(prev & JOIN_INTEREST == JOIN_INTEREST);
 
             let next = (prev - JOIN_INTEREST) & !JOIN_WAKER;
 
@@ -336,11 +336,11 @@ impl State {
 
         let prev = Snapshot(self.val.fetch_xor(DELTA, Release));
 
-        debug_assert!(!prev.has_join_waker());
+        assert!(!prev.has_join_waker());
 
         let next = Snapshot(prev.0 ^ DELTA);
 
-        debug_assert!(next.has_join_waker());
+        assert!(next.has_join_waker());
 
         if next.is_complete() {
             atomic::fence(Acquire);
@@ -360,7 +360,7 @@ impl State {
                 return Snapshot(prev);
             }
 
-            debug_assert!(Snapshot(prev).has_join_waker());
+            assert!(Snapshot(prev).has_join_waker());
 
             let next = prev - JOIN_WAKER;
 
