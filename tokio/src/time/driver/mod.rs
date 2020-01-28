@@ -336,7 +336,7 @@ impl Inner {
 
     #[cfg(test)]
     #[cfg(loom)]
-    fn num(&self, ordering: ::std::sync::atomic::Ordering) -> usize {
+    fn num(&self, ordering: std::sync::atomic::Ordering) -> usize {
         self.num.load(ordering)
     }
 
