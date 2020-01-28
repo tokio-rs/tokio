@@ -479,7 +479,9 @@ impl Runtime {
     /// }
     /// ```
     pub fn shutdown_timeout(self, duration: Duration) {
-        let Runtime { mut blocking_pool, .. } = self;
+        let Runtime {
+            mut blocking_pool, ..
+        } = self;
         blocking_pool.shutdown(Some(duration));
     }
 }
