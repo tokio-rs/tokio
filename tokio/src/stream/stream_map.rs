@@ -94,7 +94,7 @@ use std::task::{Context, Poll};
 ///     }
 /// }
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct StreamMap<K, V> {
     /// Streams stored in the map
     entries: Vec<(K, V)>,
