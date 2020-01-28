@@ -94,6 +94,68 @@ use std::task::{Context, Poll};
 ///     }
 /// }
 /// ```
+///
+/// This example models a read-only client to a chat system with channels. The
+/// client sends commands to join and leave channels. `StreamMap` is used to
+/// manage active channel subscriptions.
+///
+/// For simplicity, messages are displayed with `println!`, but they could be
+/// sent to the client over a socket.
+///
+/// ```no_run
+/// use tokio::stream::{Stream, StreamExt, StreamMap};
+///
+/// enum Command {
+///     Join(String),
+///     Leave(String),
+/// }
+///
+/// fn commands() -> impl Stream<Item = Command> {
+///     // Streams in user commands by parsing `stdin`.
+/// # tokio::stream::pending()
+/// }
+///
+/// // Join a channel, returns a stream of messages received on the channel.
+/// fn join(channel: &str) -> impl Stream<Item = String> + Unpin {
+///     // left as an exercise to the reader
+/// # tokio::stream::pending()
+/// }
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let mut channels = StreamMap::new();
+///
+///     // Input commands (join / leave channels).
+///     let cmds = commands();
+///     tokio::pin!(cmds);
+///
+///     loop {
+///         tokio::select! {
+///             Some(cmd) = cmds.next() => {
+///                 match cmd {
+///                     Command::Join(chan) => {
+///                         // Join the channel and add it to the `channels`
+///                         // stream map
+///                         let msgs = join(&chan);
+///                         channels.insert(chan, msgs);
+///                     }
+///                     Command::Leave(chan) => {
+///                         channels.remove(&chan);
+///                     }
+///                 }
+///             }
+///             Some((chan, msg)) = channels.next() => {
+///                 // Received a message, display it on stdout with the channel
+///                 // it originated from.
+///                 println!("{}: {}", chan, msg);
+///             }
+///             // Both the `commands` stream and the `channels` stream are
+///             // complete. There is no more work to do, so leave the loop.
+///             else => break,
+///         }
+///     }
+/// }
+/// ```
 #[derive(Debug, Default)]
 pub struct StreamMap<K, V> {
     /// Streams stored in the map
