@@ -338,7 +338,7 @@ impl TcpStream {
     ///
     /// For more information about this option, see [`set_nodelay`].
     ///
-    /// [`set_nodelay`]: #method.set_nodelay
+    /// [`set_nodelay`]: TcpStream::set_nodelay
     ///
     /// # Examples
     ///
