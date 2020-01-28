@@ -26,13 +26,13 @@ The Tokio 1.0 release will be **no later** than Q3 2020. It will also come with
 
 When Tokio 1.0 is released in Q3 2020, on-going support, security fixes, and
 critical bug fixes are guaranteed until **at least** Q3 2025. Tokio 2.0 will not
-be released until **at least** Q3 2023 (though, ideally there will never been a
+be released until **at least** Q3 2023 (though, ideally there will never be a
 Tokio 2.0 release).
 
 ### How to get there
 
 While Tokio 0.1 probably should have been a 1.0, Tokio 0.2 will be a **true**
-0.2 release. There will breaking change releases every 2 ~ 3 months until 1.0.
+0.2 release. There will be breaking change releases every 2 ~ 3 months until 1.0.
 These changes will be **much** smaller than going from 0.1 -> 0.2. It is
 expected that the 1.0 release will look a lot like 0.2.
 
