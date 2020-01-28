@@ -47,7 +47,7 @@ impl<T: futures_io::AsyncWrite> FuturesAsyncWriteCompatExt for T {}
 
 /// Extension trait that allows converting a type implementing
 /// `tokio::io::AsyncRead` to implement `futures_io::AsyncRead`.
-pub trait Tokio02AsyncReadCompatExt: tokio_02::io::AsyncRead {
+pub trait Tokio02AsyncReadCompatExt: tokio::io::AsyncRead {
     /// Wraps `self` with a compatibility layer that implements
     /// `futures_io::AsyncRead`.
     fn compat(self) -> Compat<Self>
@@ -58,11 +58,11 @@ pub trait Tokio02AsyncReadCompatExt: tokio_02::io::AsyncRead {
     }
 }
 
-impl<T: tokio_02::io::AsyncRead> Tokio02AsyncReadCompatExt for T {}
+impl<T: tokio::io::AsyncRead> Tokio02AsyncReadCompatExt for T {}
 
 /// Extension trait that allows converting a type implementing
 /// `tokio::io::AsyncWrite` to implement `futures_io::AsyncWrite`.
-pub trait Tokio02AsyncWriteCompatExt: tokio_02::io::AsyncWrite {
+pub trait Tokio02AsyncWriteCompatExt: tokio::io::AsyncWrite {
     /// Wraps `self` with a compatibility layer that implements
     /// `futures_io::AsyncWrite`.
     fn compat_write(self) -> Compat<Self>
@@ -73,7 +73,7 @@ pub trait Tokio02AsyncWriteCompatExt: tokio_02::io::AsyncWrite {
     }
 }
 
-impl<T: tokio_02::io::AsyncWrite> Tokio02AsyncWriteCompatExt for T {}
+impl<T: tokio::io::AsyncWrite> Tokio02AsyncWriteCompatExt for T {}
 
 // === impl Compat ===
 
@@ -83,7 +83,7 @@ impl<T> Compat<T> {
     }
 }
 
-impl<T> tokio_02::io::AsyncRead for Compat<T>
+impl<T> tokio::io::AsyncRead for Compat<T>
 where
     T: futures_io::AsyncRead,
 {
@@ -98,18 +98,18 @@ where
 
 impl<T> futures_io::AsyncRead for Compat<T>
 where
-    T: tokio_02::io::AsyncRead,
+    T: tokio::io::AsyncRead,
 {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
-        tokio_02::io::AsyncRead::poll_read(self.project().inner, cx, buf)
+        tokio::io::AsyncRead::poll_read(self.project().inner, cx, buf)
     }
 }
 
-impl<T> tokio_02::io::AsyncBufRead for Compat<T>
+impl<T> tokio::io::AsyncBufRead for Compat<T>
 where
     T: futures_io::AsyncBufRead,
 {
@@ -127,21 +127,21 @@ where
 
 impl<T> futures_io::AsyncBufRead for Compat<T>
 where
-    T: tokio_02::io::AsyncBufRead,
+    T: tokio::io::AsyncBufRead,
 {
     fn poll_fill_buf<'a>(
         self: Pin<&'a mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<io::Result<&'a [u8]>> {
-        tokio_02::io::AsyncBufRead::poll_fill_buf(self.project().inner, cx)
+        tokio::io::AsyncBufRead::poll_fill_buf(self.project().inner, cx)
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {
-        tokio_02::io::AsyncBufRead::consume(self.project().inner, amt)
+        tokio::io::AsyncBufRead::consume(self.project().inner, amt)
     }
 }
 
-impl<T> tokio_02::io::AsyncWrite for Compat<T>
+impl<T> tokio::io::AsyncWrite for Compat<T>
 where
     T: futures_io::AsyncWrite,
 {
@@ -164,22 +164,22 @@ where
 
 impl<T> futures_io::AsyncWrite for Compat<T>
 where
-    T: tokio_02::io::AsyncWrite,
+    T: tokio::io::AsyncWrite,
 {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        tokio_02::io::AsyncWrite::poll_write(self.project().inner, cx, buf)
+        tokio::io::AsyncWrite::poll_write(self.project().inner, cx, buf)
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        tokio_02::io::AsyncWrite::poll_flush(self.project().inner, cx)
+        tokio::io::AsyncWrite::poll_flush(self.project().inner, cx)
     }
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        tokio_02::io::AsyncWrite::poll_shutdown(self.project().inner, cx)
+        tokio::io::AsyncWrite::poll_shutdown(self.project().inner, cx)
     }
 }
 
