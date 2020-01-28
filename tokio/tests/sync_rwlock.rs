@@ -103,7 +103,7 @@ fn write_read_shared_pending() {
     assert_ready!(t2.poll());
 
     let mut t3 = spawn(rwlock.write());
-    let mut _g2 = assert_pending!(t3.poll());
+    assert_pending!(t3.poll());
 
     let mut t4 = spawn(rwlock.read());
     assert_pending!(t4.poll());

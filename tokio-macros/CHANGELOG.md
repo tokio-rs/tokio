@@ -1,3 +1,11 @@
+# 0.2.4 (January 27, 2019)
+
+### Fixed
+- generics on `#[tokio::main]` function (#2177).
+
+### Added
+- support for `tokio::select!` (#2152).
+
 # 0.2.3 (January 7, 2019)
 
 ### Fixed

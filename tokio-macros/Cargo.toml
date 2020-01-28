@@ -7,7 +7,7 @@ name = "tokio-macros"
 #   - Cargo.toml
 # - Update CHANGELOG.md.
 # - Create "v0.1.x" git tag.
-version = "0.2.3"
+version = "0.2.4"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
@@ -25,6 +25,7 @@ proc-macro = true
 [features]
 
 [dependencies]
+proc-macro2 = "1.0.7"
 quote = "1"
 syn = { version = "1.0.3", features = ["full"] }
 

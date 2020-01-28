@@ -3,7 +3,7 @@ pr: ["master"]
 
 variables:
   RUSTFLAGS: -Dwarnings
-  nightly: nightly-2019-11-16
+  nightly: nightly-2020-01-25
 
 jobs:
 # Test top level crate
@@ -29,6 +29,13 @@ jobs:
       - tokio-tls
       - tokio-util
       - examples
+
+# Run integration tests
+- template: ci/azure-test-integration.yml
+  parameters:
+    name: test_integration
+    displayName: Integration tests
+    rust: stable
 
 # Run tests from `tests-build`. This requires a different process
 - template: ci/azure-test-build.yml

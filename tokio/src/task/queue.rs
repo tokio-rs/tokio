@@ -49,7 +49,7 @@ pub(crate) struct RemoteQueue<S: 'static> {
     /// FIFO list of tasks
     queue: VecDeque<Task<S>>,
 
-    /// `true` when a task can be pushed into the queue, false otherwise.
+    /// `true` when a task can be pushed into the queue, `false` otherwise.
     open: bool,
 }
 
@@ -76,7 +76,7 @@ where
         }
     }
 
-    /// Add a new task to the scheduler.
+    /// Adds a new task to the scheduler.
     ///
     /// # Safety
     ///
@@ -85,7 +85,7 @@ where
         (*self.owned_tasks.get()).insert(task);
     }
 
-    /// Push a task to the local queue.
+    /// Pushes a task to the local queue.
     ///
     /// # Safety
     ///
@@ -94,7 +94,7 @@ where
         (*self.local_queue.get()).push_back(task);
     }
 
-    /// Remove a task from the local queue.
+    /// Removes a task from the local queue.
     ///
     /// # Safety
     ///
@@ -103,7 +103,7 @@ where
         (*self.owned_tasks.get()).remove(task);
     }
 
-    /// Lock the remote queue, returning a `MutexGuard`.
+    /// Locks the remote queue, returning a `MutexGuard`.
     ///
     /// This can be used to push to the remote queue and perform other
     /// operations while holding the lock.
@@ -117,7 +117,7 @@ where
             .expect("failed to lock remote queue")
     }
 
-    /// Release a task from outside of the thread that owns the scheduler.
+    /// Releases a task from outside of the thread that owns the scheduler.
     ///
     /// This simply pushes the task to the pending drop queue.
     pub(crate) fn release_remote(&self, task: Task<S>) {
@@ -173,7 +173,7 @@ where
         lock.queue.pop_front()
     }
 
-    /// Returns true if any owned tasks are still bound to this scheduler.
+    /// Returns `true` if any owned tasks are still bound to this scheduler.
     ///
     /// # Safety
     ///
@@ -182,7 +182,7 @@ where
         !(*self.owned_tasks.get()).is_empty()
     }
 
-    /// Drain any tasks that have previously been released from other threads.
+    /// Drains any tasks that have previously been released from other threads.
     ///
     /// # Safety
     ///
@@ -194,7 +194,7 @@ where
         }
     }
 
-    /// Shut down the queues.
+    /// Shuts down the queues.
     ///
     /// This performs the following operations:
     ///
@@ -233,7 +233,7 @@ where
         self.drain_pending_drop();
     }
 
-    /// Drain both the local and remote run queues, shutting down any tasks.
+    /// Drains both the local and remote run queues, shutting down any tasks.
     ///
     /// # Safety
     ///
@@ -243,7 +243,7 @@ where
         self.close_remote();
     }
 
-    /// Shut down the scheduler's owned task list.
+    /// Shuts down the scheduler's owned task list.
     ///
     /// # Safety
     ///
@@ -252,7 +252,7 @@ where
         (*self.owned_tasks.get()).shutdown();
     }
 
-    /// Drain the remote queue, and shut down its tasks.
+    /// Drains the remote queue, and shut down its tasks.
     ///
     /// This closes the remote queue. Any additional tasks added to it will be
     /// shut down instead.
@@ -284,7 +284,7 @@ where
         }
     }
 
-    /// Drain the local queue, and shut down its tasks.
+    /// Drains the local queue, and shut down its tasks.
     ///
     /// # Safety
     ///

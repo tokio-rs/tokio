@@ -107,7 +107,7 @@
 //!
 //! ## Runtime Configurations
 //!
-//! Tokio provides multiple task scheding strategies, suitable for different
+//! Tokio provides multiple task scheduling strategies, suitable for different
 //! applications. The [runtime builder] or `#[tokio::main]` attribute may be
 //! used to select which scheduler to use.
 //!
@@ -208,7 +208,7 @@ pub(crate) mod enter;
 use self::enter::enter;
 
 mod handle;
-pub use self::handle::Handle;
+pub use self::handle::{Handle, TryCurrentError};
 
 mod io;
 

@@ -58,7 +58,7 @@ pub trait AsyncWrite {
         buf: &[u8],
     ) -> Poll<Result<usize, io::Error>>;
 
-    /// Attempt to flush the object, ensuring that any buffered data reach
+    /// Attempts to flush the object, ensuring that any buffered data reach
     /// their destination.
     ///
     /// On success, returns `Poll::Ready(Ok(()))`.
@@ -129,7 +129,7 @@ pub trait AsyncWrite {
     /// task.
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>>;
 
-    /// Write a `Buf` into this value, returning how many bytes were written.
+    /// Writes a `Buf` into this value, returning how many bytes were written.
     ///
     /// Note that this method will advance the `buf` provided automatically by
     /// the number of bytes written.

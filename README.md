@@ -117,14 +117,32 @@ project.
 In addition to the crates in this repository, the Tokio project also maintains
 several other libraries, including:
 
+* [`hyper`]: A fast and correct HTTP/1.1 and HTTP/2 implementation for Rust.
+
+* [`tonic`]: A gRPC over HTTP/2 implementation focused on high performance, interoperability, and flexibility.
+
+* [`warp`]: A super-easy, composable, web server framework for warp speeds.
+
+* [`tower`]: A library of modular and reusable components for building robust networking clients and servers.
+
 * [`tracing`] (formerly `tokio-trace`): A framework for application-level
   tracing and async-aware diagnostics.
+  
+* [`rdbc`]: A Rust database connectivity library for MySQL, Postgres and SQLite.
 
 * [`mio`]: A low-level, cross-platform abstraction over OS I/O APIs that powers
   `tokio`.
 
 * [`bytes`]: Utilities for working with bytes, including efficient byte buffers.
 
+* [`loom`]: A testing tool for concurrent Rust code
+
+[`warp`]: https://github.com/seanmonstar/warp
+[`hyper`]: https://github.com/hyperium/hyper
+[`tonic`]: https://github.com/hyperium/tonic
+[`tower`]: https://github.com/tower-rs/tower
+[`loom`]: https://github.com/tokio-rs/loom
+[`rdbc`]: https://github.com/tokio-rs/rdbc
 [`tracing`]: https://github.com/tokio-rs/tracing
 [`mio`]: https://github.com/tokio-rs/mio
 [`bytes`]: https://github.com/tokio-rs/bytes

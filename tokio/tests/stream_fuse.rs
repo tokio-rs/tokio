@@ -13,7 +13,7 @@ impl Stream for Alternate {
 
     fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<i32>> {
         let val = self.state;
-        self.state = self.state + 1;
+        self.state += 1;
 
         // if it's even, Some(i32), else None
         if val % 2 == 0 {

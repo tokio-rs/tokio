@@ -165,7 +165,7 @@ impl DirEntry {
         self.0.file_name()
     }
 
-    /// Return the metadata for the file that this entry points at.
+    /// Returns the metadata for the file that this entry points at.
     ///
     /// This function will not traverse symlinks if this entry points at a
     /// symlink.
@@ -200,7 +200,7 @@ impl DirEntry {
         asyncify(move || std.metadata()).await
     }
 
-    /// Return the file type for the file that this entry points at.
+    /// Returns the file type for the file that this entry points at.
     ///
     /// This function will not traverse symlinks if this entry points at a
     /// symlink.

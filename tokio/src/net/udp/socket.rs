@@ -33,7 +33,7 @@ impl UdpSocket {
         Err(last_err.unwrap_or_else(|| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "could not resolve to any addresses",
+                "could not resolve to any address",
             )
         }))
     }
@@ -71,7 +71,7 @@ impl UdpSocket {
         Ok(UdpSocket { io })
     }
 
-    /// Split the `UdpSocket` into a receive half and a send half. The two parts
+    /// Splits the `UdpSocket` into a receive half and a send half. The two parts
     /// can be used to receive and send datagrams concurrently, even from two
     /// different tasks.
     ///
@@ -103,7 +103,7 @@ impl UdpSocket {
         Err(last_err.unwrap_or_else(|| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "could not resolve to any addresses",
+                "could not resolve to any address",
             )
         }))
     }

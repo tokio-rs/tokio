@@ -12,3 +12,8 @@ bencher = "0.1.5"
 name = "spawn"
 path = "spawn.rs"
 harness = false
+
+[[bench]]
+name = "mpsc"
+path = "mpsc.rs"
+harness = false

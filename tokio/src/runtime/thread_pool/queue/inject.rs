@@ -11,7 +11,7 @@ impl<T: 'static> Inject<T> {
         Inject { cluster }
     }
 
-    /// Push a value onto the queue
+    /// Pushes a value onto the queue
     pub(crate) fn push<F>(&self, task: Task<T>, f: F)
     where
         F: FnOnce(Result<(), Task<T>>),
@@ -19,12 +19,12 @@ impl<T: 'static> Inject<T> {
         self.cluster.global.push(task, f)
     }
 
-    /// Check if the queue has been closed
+    /// Checks if the queue has been closed
     pub(crate) fn is_closed(&self) -> bool {
         self.cluster.global.is_closed()
     }
 
-    /// Close the queue
+    /// Closes the queue
     ///
     /// Returns `true` if the channel was closed. `false` indicates the pool was
     /// previously closed.
@@ -32,7 +32,7 @@ impl<T: 'static> Inject<T> {
         self.cluster.global.close()
     }
 
-    /// Wait for all locks on the queue to drop.
+    /// Waits for all locks on the queue to drop.
     ///
     /// This is done by locking w/o doing anything.
     pub(crate) fn wait_for_unlocked(&self) {

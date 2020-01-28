@@ -44,7 +44,7 @@ impl<T> fmt::Debug for Receiver<T> {
     }
 }
 
-/// Create a bounded mpsc channel for communicating between asynchronous tasks,
+/// Creates a bounded mpsc channel for communicating between asynchronous tasks,
 /// returning the sender/receiver halves.
 ///
 /// All data sent on `Sender` will become available on `Receiver` in the same
@@ -100,7 +100,7 @@ impl<T> Receiver<T> {
         Receiver { chan }
     }
 
-    /// Receive the next value for this receiver.
+    /// Receives the next value for this receiver.
     ///
     /// `None` is returned when all `Sender` halves have dropped, indicating
     /// that no further values can be sent on the channel.
@@ -263,7 +263,7 @@ impl<T> Sender<T> {
         Ok(())
     }
 
-    /// Send a value, waiting until there is capacity.
+    /// Sends a value, waiting until there is capacity.
     ///
     /// A successful send occurs when it is determined that the other end of the
     /// channel has not hung up already. An unsuccessful send would be one where

@@ -214,7 +214,7 @@ fn action(globals: Pin<&'static Globals>, signal: c_int) {
     drop(sender.write(&[1]));
 }
 
-/// Enable this module to receive signal notifications for the `signal`
+/// Enables this module to receive signal notifications for the `signal`
 /// provided.
 ///
 /// This will register the signal handler if it hasn't already been registered,
@@ -243,7 +243,7 @@ fn signal_enable(signal: c_int) -> io::Result<()> {
     });
     registered?;
     // If the call_once failed, it won't be retried on the next attempt to register the signal. In
-    // such case it is not run, registered is still `Ok(())`, initialized is still false.
+    // such case it is not run, registered is still `Ok(())`, initialized is still `false`.
     if siginfo.initialized.load(Ordering::Relaxed) {
         Ok(())
     } else {
@@ -421,7 +421,7 @@ pub fn signal(kind: SignalKind) -> io::Result<Signal> {
 }
 
 impl Signal {
-    /// Receive the next signal notification event.
+    /// Receives the next signal notification event.
     ///
     /// `None` is returned if no more events can be received by this stream.
     ///
@@ -449,7 +449,7 @@ impl Signal {
         poll_fn(|cx| self.poll_recv(cx)).await
     }
 
-    /// Poll to receive the next signal notification event, outside of an
+    /// Polls to receive the next signal notification event, outside of an
     /// `async` context.
     ///
     /// `None` is returned if no more events can be received by this stream.

@@ -13,6 +13,10 @@ use any::AnyFuture;
 mod chain;
 use chain::Chain;
 
+mod collect;
+use collect::Collect;
+pub use collect::FromStream;
+
 mod empty;
 pub use empty::{empty, Empty};
 
@@ -21,6 +25,9 @@ use filter::Filter;
 
 mod filter_map;
 use filter_map::FilterMap;
+
+mod fold;
+use fold::FoldFuture;
 
 mod fuse;
 use fuse::Fuse;
@@ -51,6 +58,12 @@ use take::Take;
 
 mod take_while;
 use take_while::TakeWhile;
+
+cfg_time! {
+    mod timeout;
+    use timeout::Timeout;
+    use std::time::Duration;
+}
 
 pub use futures_core::Stream;
 
@@ -576,6 +589,165 @@ pub trait StreamExt: Stream {
         Self: Sized,
     {
         Chain::new(self, other)
+    }
+
+    /// A combinator that applies a function to every element in a stream
+    /// producing a single, final value.
+    ///
+    /// # Examples
+    /// Basic usage:
+    /// ```
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio::stream::{self, *};
+    ///
+    /// let s = stream::iter(vec![1u8, 2, 3]);
+    /// let sum = s.fold(0, |acc, x| acc + x).await;
+    ///
+    /// assert_eq!(sum, 6);
+    /// # }
+    /// ```
+    fn fold<B, F>(self, init: B, f: F) -> FoldFuture<Self, B, F>
+    where
+        Self: Sized,
+        F: FnMut(B, Self::Item) -> B,
+    {
+        FoldFuture::new(self, init, f)
+    }
+
+    /// Drain stream pushing all emitted values into a collection.
+    ///
+    /// `collect` streams all values, awaiting as needed. Values are pushed into
+    /// a collection. A number of different target collection types are
+    /// supported, including [`Vec`](std::vec::Vec),
+    /// [`String`](std::string::String), and [`Bytes`](bytes::Bytes).
+    ///
+    /// # `Result`
+    ///
+    /// `collect()` can also be used with streams of type `Result<T, E>` where
+    /// `T: FromStream<_>`. In this case, `collect()` will stream as long as
+    /// values yielded from the stream are `Ok(_)`. If `Err(_)` is encountered,
+    /// streaming is terminated and `collect()` returns the `Err`.
+    ///
+    /// # Notes
+    ///
+    /// `FromStream` is currently a sealed trait. Stabilization is pending
+    /// enhancements to the Rust langague.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage:
+    ///
+    /// ```
+    /// use tokio::stream::{self, StreamExt};
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let doubled: Vec<i32> =
+    ///         stream::iter(vec![1, 2, 3])
+    ///             .map(|x| x * 2)
+    ///             .collect()
+    ///             .await;
+    ///
+    ///     assert_eq!(vec![2, 4, 6], doubled);
+    /// }
+    /// ```
+    ///
+    /// Collecting a stream of `Result` values
+    ///
+    /// ```
+    /// use tokio::stream::{self, StreamExt};
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     // A stream containing only `Ok` values will be collected
+    ///     let values: Result<Vec<i32>, &str> =
+    ///         stream::iter(vec![Ok(1), Ok(2), Ok(3)])
+    ///             .collect()
+    ///             .await;
+    ///
+    ///     assert_eq!(Ok(vec![1, 2, 3]), values);
+    ///
+    ///     // A stream containing `Err` values will return the first error.
+    ///     let results = vec![Ok(1), Err("no"), Ok(2), Ok(3), Err("nein")];
+    ///
+    ///     let values: Result<Vec<i32>, &str> =
+    ///         stream::iter(results)
+    ///             .collect()
+    ///             .await;
+    ///
+    ///     assert_eq!(Err("no"), values);
+    /// }
+    /// ```
+    fn collect<T>(self) -> Collect<Self, T>
+    where
+        T: FromStream<Self::Item>,
+        Self: Sized,
+    {
+        Collect::new(self)
+    }
+
+    /// Applies a per-item timeout to the passed stream.
+    ///
+    /// `timeout()` takes a `Duration` that represents the maximum amount of
+    /// time each element of the stream has to complete before timing out.
+    ///
+    /// If the wrapped stream yields a value before the deadline is reached, the
+    /// value is returned. Otherwise, an error is returned. The caller may decide
+    /// to continue consuming the stream and will eventually get the next source
+    /// stream value once it becomes available.
+    ///
+    /// # Notes
+    ///
+    /// This function consumes the stream passed into it and returns a
+    /// wrapped version of it.
+    ///
+    /// Polling the returned stream will continue to poll the inner stream even
+    /// if one or more items time out.
+    ///
+    /// # Examples
+    ///
+    /// Suppose we have a stream `int_stream` that yields 3 numbers (1, 2, 3):
+    ///
+    /// ```
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio::stream::{self, StreamExt};
+    /// use std::time::Duration;
+    /// # let int_stream = stream::iter(1..=3);
+    ///
+    /// let mut int_stream = int_stream.timeout(Duration::from_secs(1));
+    ///
+    /// // When no items time out, we get the 3 elements in succession:
+    /// assert_eq!(int_stream.try_next().await, Ok(Some(1)));
+    /// assert_eq!(int_stream.try_next().await, Ok(Some(2)));
+    /// assert_eq!(int_stream.try_next().await, Ok(Some(3)));
+    /// assert_eq!(int_stream.try_next().await, Ok(None));
+    ///
+    /// // If the second item times out, we get an error and continue polling the stream:
+    /// # let mut int_stream = stream::iter(vec![Ok(1), Err(()), Ok(2), Ok(3)]);
+    /// assert_eq!(int_stream.try_next().await, Ok(Some(1)));
+    /// assert!(int_stream.try_next().await.is_err());
+    /// assert_eq!(int_stream.try_next().await, Ok(Some(2)));
+    /// assert_eq!(int_stream.try_next().await, Ok(Some(3)));
+    /// assert_eq!(int_stream.try_next().await, Ok(None));
+    ///
+    /// // If we want to stop consuming the source stream the first time an
+    /// // element times out, we can use the `take_while` operator:
+    /// # let int_stream = stream::iter(vec![Ok(1), Err(()), Ok(2), Ok(3)]);
+    /// let mut int_stream = int_stream.take_while(Result::is_ok);
+    ///
+    /// assert_eq!(int_stream.try_next().await, Ok(Some(1)));
+    /// assert_eq!(int_stream.try_next().await, Ok(None));
+    /// # }
+    /// ```
+    #[cfg(all(feature = "time"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+    fn timeout(self, duration: Duration) -> Timeout<Self>
+    where
+        Self: Sized,
+    {
+        Timeout::new(self, duration)
     }
 }
 

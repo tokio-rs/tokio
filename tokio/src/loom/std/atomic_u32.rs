@@ -16,7 +16,7 @@ impl AtomicU32 {
         AtomicU32 { inner }
     }
 
-    /// Perform an unsynchronized load.
+    /// Performs an unsynchronized load.
     ///
     /// # Safety
     ///
