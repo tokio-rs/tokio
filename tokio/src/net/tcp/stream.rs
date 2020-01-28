@@ -384,7 +384,7 @@ impl TcpStream {
     ///
     /// For more information about this option, see [`set_recv_buffer_size`].
     ///
-    /// [`set_recv_buffer_size`]: #method.set_recv_buffer_size
+    /// [`set_recv_buffer_size`]: TcpStream::set_recv_buffer_size
     ///
     /// # Examples
     ///
@@ -427,7 +427,7 @@ impl TcpStream {
     ///
     /// For more information about this option, see [`set_send_buffer_size`].
     ///
-    /// [`set_send_buffer_size`]: #method.set_send_buffer_size
+    /// [`set_send_buffer_size`]: TcpStream::set_send_buffer_size
     ///
     /// # Examples
     ///
@@ -471,7 +471,7 @@ impl TcpStream {
     ///
     /// For more information about this option, see [`set_keepalive`].
     ///
-    /// [`set_keepalive`]: #method.set_keepalive
+    /// [`set_keepalive`]: TcpStream::set_keepalive
     ///
     /// # Examples
     ///
@@ -522,7 +522,7 @@ impl TcpStream {
     ///
     /// For more information about this option, see [`set_ttl`].
     ///
-    /// [`set_ttl`]: #method.set_ttl
+    /// [`set_ttl`]: TcpStream::set_ttl
     ///
     /// # Examples
     ///
@@ -566,7 +566,7 @@ impl TcpStream {
     ///
     /// For more information about this option, see [`set_linger`].
     ///
-    /// [`set_linger`]: #method.set_linger
+    /// [`set_linger`]: TcpStream::set_linger
     ///
     /// # Examples
     ///
