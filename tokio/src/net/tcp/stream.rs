@@ -147,14 +147,6 @@ impl TcpStream {
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
-    ///
-    /// # Panics
-    ///
-    /// This function panics if thread-local runtime is not set.
-    ///
-    /// The runtime is usually set implicitly when this function is called
-    /// from a future driven by a tokio runtime, otherwise runtime can be set
-    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
     pub fn from_std(stream: net::TcpStream) -> io::Result<TcpStream> {
         let io = mio::net::TcpStream::from_stream(stream)?;
         let io = PollEvented::new(io)?;
@@ -346,7 +338,7 @@ impl TcpStream {
     ///
     /// For more information about this option, see [`set_nodelay`].
     ///
-    /// [`set_nodelay`]: #method.set_nodelay
+    /// [`set_nodelay`]: TcpStream::set_nodelay
     ///
     /// # Examples
     ///
@@ -392,7 +384,7 @@ impl TcpStream {
     ///
     /// For more information about this option, see [`set_recv_buffer_size`].
     ///
-    /// [`set_recv_buffer_size`]: #tymethod.set_recv_buffer_size
+    /// [`set_recv_buffer_size`]: TcpStream::set_recv_buffer_size
     ///
     /// # Examples
     ///
@@ -433,18 +425,9 @@ impl TcpStream {
 
     /// Gets the value of the `SO_SNDBUF` option on this socket.
     ///
-    /// For more information about this option, see [`set_send_buffer`].
+    /// For more information about this option, see [`set_send_buffer_size`].
     ///
-    /// [`set_send_buffer`]: #tymethod.set_send_buffer
-    ///
-    /// # Examples
-    ///
-    /// Returns whether keepalive messages are enabled on this socket, and if so
-    /// the duration of time between them.
-    ///
-    /// For more information about this option, see [`set_keepalive`].
-    ///
-    /// [`set_keepalive`]: #tymethod.set_keepalive
+    /// [`set_send_buffer_size`]: TcpStream::set_send_buffer_size
     ///
     /// # Examples
     ///
@@ -488,7 +471,7 @@ impl TcpStream {
     ///
     /// For more information about this option, see [`set_keepalive`].
     ///
-    /// [`set_keepalive`]: #tymethod.set_keepalive
+    /// [`set_keepalive`]: TcpStream::set_keepalive
     ///
     /// # Examples
     ///
@@ -539,7 +522,7 @@ impl TcpStream {
     ///
     /// For more information about this option, see [`set_ttl`].
     ///
-    /// [`set_ttl`]: #tymethod.set_ttl
+    /// [`set_ttl`]: TcpStream::set_ttl
     ///
     /// # Examples
     ///
@@ -583,7 +566,7 @@ impl TcpStream {
     ///
     /// For more information about this option, see [`set_linger`].
     ///
-    /// [`set_linger`]: #tymethod.set_linger
+    /// [`set_linger`]: TcpStream::set_linger
     ///
     /// # Examples
     ///
