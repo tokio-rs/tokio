@@ -182,3 +182,22 @@ where
         tokio_02::io::AsyncWrite::poll_shutdown(self.project().inner, cx)
     }
 }
+
+impl<T> Compat<T> {
+    /// Get a reference to the `Future`, `Stream`, `AsyncRead`, or `AsyncWrite` object
+    /// contained within.
+    pub fn get_ref(&self) -> &T {
+        &self.inner
+    }
+
+    /// Get a mutable reference to the `Future`, `Stream`, `AsyncRead`, or `AsyncWrite` object
+    /// contained within.
+    pub fn get_mut(&mut self) -> &mut T {
+        &mut self.inner
+    }
+
+    /// Returns the wrapped item.
+    pub fn into_inner(self) -> T {
+        self.inner
+    }
+}
