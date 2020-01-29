@@ -57,7 +57,7 @@ use crate::sync::task::AtomicWaker;
 use fnv::FnvHashSet;
 use std::ops;
 use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::SeqCst;
+use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard, Weak};
 use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll};
@@ -230,7 +230,7 @@ impl<T> Receiver<T> {
         let state = self.shared.version.load(SeqCst);
         let version = state & !CLOSED;
 
-        if self.inner.version.swap(version, SeqCst) != version {
+        if self.inner.version.swap(version, Relaxed) != version {
             let inner = self.shared.value.read().unwrap();
 
             return Ready(Some(Ref { inner }));
@@ -301,7 +301,7 @@ impl<T: Clone> crate::stream::Stream for Receiver<T> {
 
 impl<T> Clone for Receiver<T> {
     fn clone(&self) -> Self {
-        let ver = self.inner.version.load(SeqCst);
+        let ver = self.inner.version.load(Relaxed);
         let inner = Watcher::new_version(ver);
         let shared = self.shared.clone();
 
