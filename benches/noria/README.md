@@ -7,7 +7,7 @@ benchmark that covers many aspects of tokio's performance profile.
 
 ```console
 $ ./run.sh
-# go get tea/coffee
+# this takes a while, so go get tea/coffee
 $ ls noria-*.log
 ```
 
