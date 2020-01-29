@@ -81,6 +81,23 @@ impl<T> Compat<T> {
     fn new(inner: T) -> Self {
         Self { inner }
     }
+
+    /// Get a reference to the `Future`, `Stream`, `AsyncRead`, or `AsyncWrite` object
+    /// contained within.
+    pub fn get_ref(&self) -> &T {
+        &self.inner
+    }
+
+    /// Get a mutable reference to the `Future`, `Stream`, `AsyncRead`, or `AsyncWrite` object
+    /// contained within.
+    pub fn get_mut(&mut self) -> &mut T {
+        &mut self.inner
+    }
+
+    /// Returns the wrapped item.
+    pub fn into_inner(self) -> T {
+        self.inner
+    }
 }
 
 impl<T> tokio::io::AsyncRead for Compat<T>
@@ -180,24 +197,5 @@ where
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         tokio::io::AsyncWrite::poll_shutdown(self.project().inner, cx)
-    }
-}
-
-impl<T> Compat<T> {
-    /// Get a reference to the `Future`, `Stream`, `AsyncRead`, or `AsyncWrite` object
-    /// contained within.
-    pub fn get_ref(&self) -> &T {
-        &self.inner
-    }
-
-    /// Get a mutable reference to the `Future`, `Stream`, `AsyncRead`, or `AsyncWrite` object
-    /// contained within.
-    pub fn get_mut(&mut self) -> &mut T {
-        &mut self.inner
-    }
-
-    /// Returns the wrapped item.
-    pub fn into_inner(self) -> T {
-        self.inner
     }
 }
