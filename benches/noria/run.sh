@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-commit="0e1d9e2641ec11ae4fdc3f6bed8da94879d8c917"
+commit="88c4086c0e82d6f1ef427460144d2ecde7ab1725"
 
 # get the right version of noria
 if [[ ! -d checkout ]]; then
