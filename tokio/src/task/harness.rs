@@ -1,5 +1,4 @@
 use crate::loom::alloc::Track;
-use crate::loom::cell::CausalCheck;
 use crate::task::core::{Cell, Core, Header, Trailer};
 use crate::task::state::Snapshot;
 use crate::task::{JoinError, Schedule, Task};
@@ -151,8 +150,12 @@ where
     pub(super) unsafe fn drop_task(mut self) {
         let might_drop_join_waker_on_release = self.might_drop_join_waker_on_release();
 
-        // Read the join waker cell just to have it
-        let (join_waker, check) = self.read_join_waker();
+        let join_waker = if might_drop_join_waker_on_release {
+            // Read the join waker cell just to have it
+            self.read_join_waker()
+        } else {
+            MaybeUninit::uninit()
+        };
 
         // transition the task to released
         let res = self.header().state.release_task();
@@ -163,7 +166,6 @@ where
             debug_assert!(res.has_join_waker());
 
             // Its our responsibility to drop the waker
-            check.check();
             let _ = join_waker.assume_init();
         }
 
@@ -201,14 +203,13 @@ where
         // possible that, after the transition, we are responsible for dropping
         // the waker but before the waker can be read from the struct, the
         // struct is deallocated.
-        let (waker, check) = self.read_join_waker();
+        let waker = self.read_join_waker();
 
         // The operation counts as dropping the join handle
         let res = self.header().state.complete_join_handle();
 
         if res.is_released() {
             // We are responsible for freeing the waker handle
-            check.check();
             drop(waker.assume_init());
         }
 
@@ -264,7 +265,7 @@ where
             // possible that, after the transition, we are responsible for dropping
             // the waker but before the waker can be read from the struct, the
             // struct is deallocated.
-            let (waker, check) = self.read_join_waker();
+            let waker = self.read_join_waker();
 
             // The operation counts as dropping the join handle
             let res = match self.header().state.drop_join_handle_slow() {
@@ -283,7 +284,6 @@ where
 
             if !(res.is_complete() | res.is_canceled()) || res.is_released() {
                 // We are responsible for freeing the waker handle
-                check.check();
                 drop(waker.assume_init());
             }
 
@@ -466,11 +466,15 @@ where
         if join_interest {
             let res1 = self.transition_to_complete(join_interest);
 
-            // At this point, the join waker may not be changed. Once we perform
-            // `release_task` we may no longer read from the struct but we
-            // **may** be responsible for dropping the waker. We do an
-            // optimistic read here.
-            let (join_waker, check) = unsafe { self.read_join_waker() };
+            let join_waker = if res1.has_join_waker() {
+                // At this point, the join waker may not be changed. Once we perform
+                // `release_task` we may no longer read from the struct but we
+                // **may** be responsible for dropping the waker. We do an
+                // optimistic read here.
+                unsafe { self.read_join_waker() }
+            } else {
+                MaybeUninit::uninit()
+            };
 
             let res2 = self.header().state.release_task();
 
@@ -478,7 +482,6 @@ where
                 debug_assert!(res2.has_join_waker());
 
                 // Its our responsibility to drop the waker
-                check.check();
                 unsafe {
                     drop(join_waker.assume_init());
                 }
@@ -544,8 +547,8 @@ where
         });
     }
 
-    unsafe fn read_join_waker(&mut self) -> (MaybeUninit<Option<Waker>>, CausalCheck) {
-        self.trailer().waker.with_deferred(|ptr| ptr.read())
+    unsafe fn read_join_waker(&mut self) -> MaybeUninit<Option<Waker>> {
+        self.trailer().waker.with(|ptr| ptr.read())
     }
 
     unsafe fn to_task(&self) -> Task<S> {
