@@ -387,5 +387,5 @@ impl fmt::Debug for Inner {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, loom))]
 mod tests;
