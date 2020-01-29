@@ -1,4 +1,6 @@
 #!/usr/bin/bash
+set -o nounset
+set -o errexit
 
 commit="88c4086c0e82d6f1ef427460144d2ecde7ab1725"
 
@@ -33,11 +35,15 @@ for shards in 0 4; do
 			name="noria-s${shards}-$load"
 		fi
 		echo "run --target $load --shards $shards"
-		cargo run --release --bin vote -- --warmup 10 --runtime 20 --target $load -d skewed localsoup --shards $shards > ../$name.log 2> ../$name.err
-		if [[ $? -ne 0 ]]; then
+		if ! cargo run --release --bin vote -- \
+			--warmup 10 --runtime 20 --target $load -d skewed \
+			localsoup --shards $shards \
+			> ../$name.log 2> ../$name.err; then
+			echo " -> run command failed"
 			break
 		fi
 		if grep 'clients are falling behind' ../$name.err > /dev/null; then
+			echo " -> cancelling early as server is not keeping up"
 			break;
 		fi
 	done
