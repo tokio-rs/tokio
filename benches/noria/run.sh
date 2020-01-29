@@ -14,11 +14,11 @@ if grep -E '^tokio =' checkout/Cargo.toml > /dev/null; then
 	# in case there's already an override in Cargo.toml
 	sed -i '/^tokio /d' checkout/Cargo.toml
 fi
-if ! grep '[patch.crates-io]' checkout/Cargo.toml > /dev/null; then
+if ! grep 'patch.crates-io' checkout/Cargo.toml > /dev/null; then
 	# in case there are _no_ overrides in Cargo.toml
 	echo '[patch.crates-io]' >> checkout/Cargo.toml
 fi
-sed -i '/patch.crates-io/a tokio = { path = "../../tokio/" }' checkout/Cargo.toml
+sed -i '/patch.crates-io/a tokio = { path = "../../../tokio/" }' checkout/Cargo.toml
 
 # time to build! sit back and relax
 cd checkout
