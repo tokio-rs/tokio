@@ -26,7 +26,7 @@ cargo build --release --bin vote
 
 # let's run some benchmarks
 for shards in 0 4; do
-	for load in 1000000 2000000 3000000 4000000 5000000; do
+	for load in {1,2,3,4,5,6,7,8,9,10}000000; do
 		if [[ $shards -eq 0 ]]; then
 			name="noria-unsharded-$load"
 		else
