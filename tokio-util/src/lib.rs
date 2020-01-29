@@ -25,3 +25,7 @@ cfg_codec! {
 cfg_udp! {
     pub mod udp;
 }
+
+cfg_compat! {
+    pub mod compat;
+}
