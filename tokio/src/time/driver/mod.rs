@@ -334,8 +334,7 @@ impl Inner {
         self.elapsed.load(SeqCst)
     }
 
-    #[cfg(test)]
-    #[cfg(loom)]
+    #[cfg(all(test, loom))]
     fn num(&self, ordering: std::sync::atomic::Ordering) -> usize {
         self.num.load(ordering)
     }
