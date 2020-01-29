@@ -451,7 +451,7 @@ impl Runtime {
     /// indefinitely for all tasks to terminate, and there are cases where a long
     /// blocking task has been spawned which can block dropping `Runtime`.
     ///
-    /// In this case calling `shutdown_timeout` with an explicit wait timeout
+    /// In this case, calling `shutdown_timeout` with an explicit wait timeout
     /// can work. The `shutdown_timeout` will signal all tasks to shutdown and
     /// wil wait for at most `duration` for all spawned tasks to terminate. If
     /// `timeout` elapses before all tasks are dropped, the function returns and
