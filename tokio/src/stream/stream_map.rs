@@ -453,16 +453,16 @@ where
                     }
                 }
                 Pending => {
-                    idx  = idx.wrapping_add(1) % self.entries.len();
+                    idx = idx.wrapping_add(1) % self.entries.len();
                 }
             }
         }
 
         // If the map is empty, then the stream is complete.
         if self.entries.is_empty() {
-            Poll::Ready(None)
+            Ready(None)
         } else {
-            Poll::Pending
+            Pending
         }
     }
 }

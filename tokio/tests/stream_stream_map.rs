@@ -369,8 +369,6 @@ proptest::proptest! {
     }
 }
 
-fn pin_box<T: Stream<Item = U> + 'static, U>(s: T)
-    -> Pin<Box<dyn Stream<Item = U>>>
-{
+fn pin_box<T: Stream<Item = U> + 'static, U>(s: T) -> Pin<Box<dyn Stream<Item = U>>> {
     Box::pin(s)
 }
