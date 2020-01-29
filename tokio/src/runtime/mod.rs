@@ -235,6 +235,7 @@ cfg_rt_core! {
 }
 
 use std::future::Future;
+use std::time::Duration;
 
 /// The Tokio runtime.
 ///
@@ -440,5 +441,47 @@ impl Runtime {
     /// ```
     pub fn handle(&self) -> &Handle {
         &self.handle
+    }
+
+    /// Shutdown the runtime, waiting for at most `duration` for all spawned
+    /// task to shutdown.
+    ///
+    /// Usually, dropping a `Runtime` handle is sufficient as tasks are able to
+    /// shutdown in a timely fashion. However, dropping a `Runtime` will wait
+    /// indefinitely for all tasks to terminate, and there are cases where a long
+    /// blocking task has been spawned which can block dropping `Runtime`.
+    ///
+    /// In this case, calling `shutdown_timeout` with an explicit wait timeout
+    /// can work. The `shutdown_timeout` will signal all tasks to shutdown and
+    /// will wait for at most `duration` for all spawned tasks to terminate. If
+    /// `timeout` elapses before all tasks are dropped, the function returns and
+    /// outstanding tasks are potentially leaked.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Runtime;
+    /// use tokio::task;
+    ///
+    /// use std::thread;
+    /// use std::time::Duration;
+    ///
+    /// fn main() {
+    ///    let mut runtime = Runtime::new().unwrap();
+    ///
+    ///    runtime.block_on(async move {
+    ///        task::spawn_blocking(move || {
+    ///            thread::sleep(Duration::from_secs(10_000));
+    ///        });
+    ///    });
+    ///
+    ///    runtime.shutdown_timeout(Duration::from_millis(100));
+    /// }
+    /// ```
+    pub fn shutdown_timeout(self, duration: Duration) {
+        let Runtime {
+            mut blocking_pool, ..
+        } = self;
+        blocking_pool.shutdown(Some(duration));
     }
 }

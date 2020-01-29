@@ -710,6 +710,23 @@ rt_test! {
     }
 
     #[test]
+    fn shutdown_timeout() {
+        let (tx, rx) = oneshot::channel();
+        let mut runtime = rt();
+
+        runtime.block_on(async move {
+            task::spawn_blocking(move || {
+                tx.send(()).unwrap();
+                thread::sleep(Duration::from_secs(10_000));
+            });
+
+            rx.await.unwrap();
+        });
+
+        runtime.shutdown_timeout(Duration::from_millis(100));
+    }
+
+    #[test]
     fn runtime_in_thread_local() {
         use std::cell::RefCell;
         use std::thread;

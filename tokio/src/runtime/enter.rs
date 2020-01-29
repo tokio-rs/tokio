@@ -75,6 +75,7 @@ pub(crate) fn exit<F: FnOnce() -> R, R>(f: F) -> R {
 
 cfg_blocking_impl! {
     use crate::park::ParkError;
+    use std::time::Duration;
 
     impl Enter {
         /// Blocks the thread on the specified future, returning the value with
@@ -102,6 +103,44 @@ cfg_blocking_impl! {
                 }
 
                 park.park()?;
+            }
+        }
+
+        /// Blocks the thread on the specified future for **at most** `timeout`
+        ///
+        /// If the future completes before `timeout`, the result is returned. If
+        /// `timeout` elapses, then `Err` is returned.
+        pub(crate) fn block_on_timeout<F>(&mut self, mut f: F, timeout: Duration) -> Result<F::Output, ParkError>
+        where
+            F: std::future::Future,
+        {
+            use crate::park::{CachedParkThread, Park};
+            use std::pin::Pin;
+            use std::task::Context;
+            use std::task::Poll::Ready;
+            use std::time::Instant;
+
+            let mut park = CachedParkThread::new();
+            let waker = park.get_unpark()?.into_waker();
+            let mut cx = Context::from_waker(&waker);
+
+            // `block_on` takes ownership of `f`. Once it is pinned here, the original `f` binding can
+            // no longer be accessed, making the pinning safe.
+            let mut f = unsafe { Pin::new_unchecked(&mut f) };
+            let when = Instant::now() + timeout;
+
+            loop {
+                if let Ready(v) = f.as_mut().poll(&mut cx) {
+                    return Ok(v);
+                }
+
+                let now = Instant::now();
+
+                if now >= when {
+                    return Err(());
+                }
+
+                park.park_timeout(when - now)?;
             }
         }
     }
