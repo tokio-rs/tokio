@@ -106,8 +106,10 @@ cfg_blocking_impl! {
             }
         }
 
-        /// Blocks the thread on the specified future, returning the value with
-        /// which that future completes.
+        /// Blocks the thread on the specified future for **at most** `timeout`
+        ///
+        /// If the future completes before `timeout`, the result is returned. If
+        /// `timeout` elapses, then `Err` is returned.
         pub(crate) fn block_on_timeout<F>(&mut self, mut f: F, timeout: Duration) -> Result<F::Output, ParkError>
         where
             F: std::future::Future,

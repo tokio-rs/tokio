@@ -105,6 +105,9 @@ impl BlockingPool {
     pub(crate) fn shutdown(&mut self, timeout: Option<Duration>) {
         let mut shared = self.spawner.inner.shared.lock().unwrap();
 
+        // The function can be called multiple times. First, by explicitly
+        // calling `shutdown` then by the drop handler calling `shutdown`. This
+        // prevents shutting down twice.
         if shared.shutdown {
             return;
         }

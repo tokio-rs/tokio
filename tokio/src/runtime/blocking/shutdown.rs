@@ -28,6 +28,10 @@ pub(super) fn channel() -> (Sender, Receiver) {
 
 impl Receiver {
     /// Blocks the current thread until all `Sender` handles drop.
+    ///
+    /// If `timeout` is `Some`, the thread is blocked for **at most** `timeout`
+    /// duration. If `timeout` is `None`, then the thread is blocked until the
+    /// shutdown signal is received.
     pub(crate) fn wait(&mut self, timeout: Option<Duration>) {
         use crate::runtime::enter::{enter, try_enter};
 
