@@ -2,6 +2,8 @@ use tokio::stream::{self, pending, Stream, StreamExt, StreamMap};
 use tokio::sync::mpsc;
 use tokio_test::{assert_ok, assert_pending, assert_ready, task};
 
+use std::pin::Pin;
+
 macro_rules! assert_ready_some {
     ($($t:tt)*) => {
         match assert_ready!($($t)*) {
@@ -196,15 +198,11 @@ fn size_hint_with_upper() {
 
 #[test]
 fn size_hint_without_upper() {
-    use std::pin::Pin;
-
     let mut map = StreamMap::new();
 
-    type B = Pin<Box<dyn Stream<Item = i32>>>;
-
-    map.insert("a", Box::pin(stream::iter(vec![1])) as B);
-    map.insert("b", Box::pin(stream::iter(vec![1, 2])) as B);
-    map.insert("c", Box::pin(pending()) as B);
+    map.insert("a", pin_box(stream::iter(vec![1])));
+    map.insert("b", pin_box(stream::iter(vec![1, 2])));
+    map.insert("c", pin_box(pending()));
 
     let size_hint = map.size_hint();
     assert_eq!(size_hint, (3, None));
@@ -297,4 +295,82 @@ fn contains_key_borrow() {
     map.insert("foo".to_string(), pending::<()>());
 
     assert!(map.contains_key("foo"));
+}
+
+#[test]
+fn one_ready_many_none() {
+    // Run a few times because of randomness
+    for _ in 0..100 {
+        let mut map = task::spawn(StreamMap::new());
+
+        map.insert(0, pin_box(stream::empty()));
+        map.insert(1, pin_box(stream::empty()));
+        map.insert(2, pin_box(stream::once("hello")));
+        map.insert(3, pin_box(stream::pending()));
+
+        let v = assert_ready_some!(map.poll_next());
+        assert_eq!(v, (2, "hello"));
+    }
+}
+
+proptest::proptest! {
+    #[test]
+    fn fuzz_pending_complete_mix(kinds: Vec<bool>) {
+        use std::task::{Context, Poll};
+
+        struct DidPoll<T> {
+            did_poll: bool,
+            inner: T,
+        }
+
+        impl<T: Stream + Unpin> Stream for DidPoll<T> {
+            type Item = T::Item;
+
+            fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>)
+                -> Poll<Option<T::Item>>
+            {
+                self.did_poll = true;
+                Pin::new(&mut self.inner).poll_next(cx)
+            }
+        }
+
+        for _ in 0..10 {
+            let mut map = task::spawn(StreamMap::new());
+            let mut expect = 0;
+
+            for (i, &is_empty) in kinds.iter().enumerate() {
+                let inner = if is_empty {
+                    pin_box(stream::empty::<()>())
+                } else {
+                    expect += 1;
+                    pin_box(stream::pending::<()>())
+                };
+
+                let stream = DidPoll {
+                    did_poll: false,
+                    inner,
+                };
+
+                map.insert(i, stream);
+            }
+
+            if expect == 0 {
+                assert_ready_none!(map.poll_next());
+            } else {
+                assert_pending!(map.poll_next());
+
+                assert_eq!(expect, map.values().count());
+
+                for stream in map.values() {
+                    assert!(stream.did_poll);
+                }
+            }
+        }
+    }
+}
+
+fn pin_box<T: Stream<Item = U> + 'static, U>(s: T)
+    -> Pin<Box<dyn Stream<Item = U>>>
+{
+    Box::pin(s)
 }

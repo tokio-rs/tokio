@@ -430,24 +430,30 @@ where
     fn poll_next_entry(&mut self, cx: &mut Context<'_>) -> Poll<Option<(usize, V::Item)>> {
         use Poll::*;
 
-        let poll_first = crate::util::thread_rng_n(self.entries.len() as u32) as usize;
+        let start = crate::util::thread_rng_n(self.entries.len() as u32) as usize;
+        let mut idx = start;
 
-        let mut i = 0;
-        while i < self.entries.len() {
-            let idx = i.wrapping_add(poll_first) % self.entries.len();
-
+        for _ in 0..self.entries.len() {
             let (_, stream) = &mut self.entries[idx];
 
             match Pin::new(stream).poll_next(cx) {
                 Ready(Some(val)) => return Ready(Some((idx, val))),
                 Ready(None) => {
-                    // Remove the entry and continue iterating. `i` does not
-                    // need to be incremented as `i` now refs a different
-                    // stream.
+                    // Remove the entry
                     self.entries.swap_remove(idx);
+
+                    // Check if this was the last entry, if so the cursor needs
+                    // to wrap
+                    if idx == self.entries.len() {
+                        idx = 0;
+                    } else if idx < start && start <= self.entries.len() {
+                        // The stream being swapped into the current index has
+                        // already been polled, so skip it.
+                        idx = idx.wrapping_add(1) % self.entries.len();
+                    }
                 }
                 Pending => {
-                    i += 1;
+                    idx  = idx.wrapping_add(1) % self.entries.len();
                 }
             }
         }
