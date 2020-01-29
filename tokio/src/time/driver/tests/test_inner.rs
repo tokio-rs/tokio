@@ -1,5 +1,3 @@
-#![warn(rust_2018_idioms)]
-
 use crate::park::Unpark;
 use crate::time::driver::Inner;
 use crate::time::Instant;
