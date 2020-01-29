@@ -448,7 +448,7 @@ impl Runtime {
     ///
     /// Usually, dropping a `Runtime` handle is sufficient as tasks are able to
     /// shutdown in a timely fashion. However, dropping a `Runtime` will wait
-    /// indefinitely for all tasks to terminate and there are cases where a long
+    /// indefinitely for all tasks to terminate, and there are cases where a long
     /// blocking task has been spawned which can block dropping `Runtime`.
     ///
     /// In this case calling `shutdown_timeout` with an explicit wait timeout
