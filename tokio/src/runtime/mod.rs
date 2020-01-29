@@ -453,7 +453,7 @@ impl Runtime {
     ///
     /// In this case, calling `shutdown_timeout` with an explicit wait timeout
     /// can work. The `shutdown_timeout` will signal all tasks to shutdown and
-    /// wil wait for at most `duration` for all spawned tasks to terminate. If
+    /// will wait for at most `duration` for all spawned tasks to terminate. If
     /// `timeout` elapses before all tasks are dropped, the function returns and
     /// outstanding tasks are potentially leaked.
     ///
