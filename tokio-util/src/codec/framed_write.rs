@@ -7,7 +7,7 @@ use tokio::{
     stream::Stream,
 };
 
-use bytes::BytesMut;
+use bytes::{Buf, BytesMut};
 use futures_core::ready;
 use futures_sink::Sink;
 use log::trace;
@@ -239,8 +239,7 @@ where
                 .into()));
             }
 
-            // TODO: Add a way to `bytes` to do this w/o returning the drained data.
-            let _ = pinned.buffer.split_to(n);
+            pinned.buffer.advance(n);
         }
 
         // Try flushing the underlying IO
