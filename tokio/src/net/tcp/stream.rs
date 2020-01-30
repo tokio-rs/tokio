@@ -783,6 +783,114 @@ impl TcpStream {
             Err(e) => Poll::Ready(Err(e)),
         }
     }
+
+    /// Checks if the socket has data avaiable for reading and otherwise
+    /// registers the current task for wakeup.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if data is not yet available.
+    /// * `Poll::Ready(Ok(()))` if data is available.
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    pub fn poll_read_ready(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
+        self.io.clear_read_ready(cx, mio::Ready::readable())?;
+        Poll::Ready(Ok(()))
+    }
+
+    /// Checks if the socket is ready for writing and otherwise registers the
+    /// current task for wakeup.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if data cannot yet be written to the socket.
+    /// * `Poll::Ready(Ok(()))` if data can be written to the socket.
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    pub fn poll_write_ready(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        ready!(self.io.poll_write_ready(cx))?;
+        self.io.clear_write_ready(cx)?;
+        Poll::Ready(Ok(()))
+    }
+
+    /// Waits until the socket is ready for reading.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Ok(())` if data is available.
+    /// * `Err(e)` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::io;
+    /// use tokio::net::TcpStream;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let mut stream = TcpStream::connect("127.0.0.1:8000").await?;
+    ///
+    ///     stream.read_ready().await?;
+    ///     // Ready for reading
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn read_ready(&mut self) -> io::Result<()> {
+        poll_fn(|cx| self.poll_read_ready(cx)).await?;
+        Ok(())
+    }
+
+    /// Waits until the socket is ready for writing.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Ok(())` if data is available.
+    /// * `Err(e)` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::io;
+    /// use tokio::net::TcpStream;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let mut stream = TcpStream::connect("127.0.0.1:8000").await?;
+    ///
+    ///     stream.write_ready().await?;
+    ///     // Ready for writing
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn write_ready(&mut self) -> io::Result<()> {
+        poll_fn(|cx| self.poll_write_ready(cx)).await?;
+        Ok(())
+    }
 }
 
 impl TryFrom<TcpStream> for mio::net::TcpStream {
