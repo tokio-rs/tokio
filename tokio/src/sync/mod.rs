@@ -232,7 +232,7 @@
 //!
 //! ## `broadcast` channel
 //!
-//! The [`broadcast` channel[broadcast] supports sending **many** values from
+//! The [`broadcast` channel][broadcast] supports sending **many** values from
 //! **many** producers to **many** consumers. Each consumer will receive
 //! **each** value. This channel can be used to implement "fan out" style
 //! patterns common with pub / sub or "chat" systems.
