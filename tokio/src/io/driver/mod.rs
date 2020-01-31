@@ -102,6 +102,11 @@ impl Driver {
     }
 
     fn turn(&mut self, max_wait: Option<Duration>) -> io::Result<()> {
+        // If there is nothing for us to wait for, don't try to wait, as we would never wake
+        if self.events.is_empty() && max_wait.is_none() {
+            return Ok(());
+        }
+
         // Block waiting for an event to happen, peeling out how many events
         // happened.
         match self.inner.io.poll(&mut self.events, max_wait) {
