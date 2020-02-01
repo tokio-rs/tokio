@@ -11,8 +11,7 @@ pin_project! {
     pub struct SkipWhile<St, F> {
         #[pin]
         stream: St,
-        predicate: F,
-        ready: bool,
+        predicate: Option<F>,
     }
 }
 
@@ -23,7 +22,6 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SkipWhile")
             .field("stream", &self.stream)
-            .field("ready", &self.ready)
             .finish()
     }
 }
@@ -32,8 +30,7 @@ impl<St, F> SkipWhile<St, F> {
     pub(super) fn new(stream: St, predicate: F) -> Self {
         Self {
             stream,
-            predicate,
-            ready: false,
+            predicate: Some(predicate),
         }
     }
 }
@@ -46,30 +43,30 @@ where
     type Item = St::Item;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if self.ready {
-            self.as_mut().project().stream.poll_next(cx)
-        } else {
+        if self.predicate.is_some() {
             loop {
                 match ready!(self.as_mut().project().stream.poll_next(cx)) {
                     Some(item) => {
-                        if !(*self.as_mut().project().predicate)(&item) {
-                            *self.as_mut().project().ready = true;
+                        if !(self.as_mut().project().predicate.as_mut().unwrap())(&item) {
+                            *self.as_mut().project().predicate = None;
                             return Poll::Ready(Some(item));
                         }
                     }
                     None => return Poll::Ready(None),
                 }
             }
+        } else {
+            self.as_mut().project().stream.poll_next(cx)
         }
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         let (lower, upper) = self.stream.size_hint();
 
-        if self.ready {
-            return (lower, upper);
+        if self.predicate.is_some() {
+            return (0, upper);
         }
 
-        (0, upper)
+        (lower, upper)
     }
 }
