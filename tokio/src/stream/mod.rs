@@ -53,6 +53,9 @@ pub use pending::{pending, Pending};
 mod stream_map;
 pub use stream_map::StreamMap;
 
+mod skip_while;
+use skip_while::SkipWhile;
+
 mod try_next;
 use try_next::TryNext;
 
@@ -449,6 +452,35 @@ pub trait StreamExt: Stream {
         Self: Sized,
     {
         TakeWhile::new(self, f)
+    }
+
+    /// Skip elements from the underlying stream while the provided predicate
+    /// resolves to `true`.
+    ///
+    /// This function, like `Iterator::skip_while`, will ignore elemets from the
+    /// stream until the predicate `f` resolves to `false`. Once one element
+    /// returns false, the rest of the elements will be yielded.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio::stream::{self, StreamExt};
+    /// let mut stream = stream::iter(vec![1,2,3,4,1]).skip_while(|x| *x < 3);
+    ///
+    /// assert_eq!(Some(3), stream.next().await);
+    /// assert_eq!(Some(4), stream.next().await);
+    /// assert_eq!(Some(1), stream.next().await);
+    /// assert_eq!(None, stream.next().await);
+    /// # }
+    /// ```
+    fn skip_while<F>(self, f: F) -> SkipWhile<Self, F>
+    where
+        F: FnMut(&Self::Item) -> bool,
+        Self: Sized,
+    {
+        SkipWhile::new(self, f)
     }
 
     /// Tests if every element of the stream matches a predicate.
