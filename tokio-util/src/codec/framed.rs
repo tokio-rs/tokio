@@ -18,10 +18,16 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 pin_project! {
-    /// A unified `Stream` and `Sink` interface to an underlying I/O object, using
+    /// A unified [`Stream`] and [`Sink`] interface to an underlying I/O object, using
     /// the `Encoder` and `Decoder` traits to encode and decode frames.
     ///
-    /// You can create a `Framed` instance by using the `AsyncRead::framed` adapter.
+    /// You can create a `Framed` instance by using the [`Decoder::framed`] adapter, or
+    /// by using the `new` function seen below.
+    ///
+    /// [`Stream`]: tokio::stream::Stream
+    /// [`Sink`]: futures_sink::Sink
+    /// [`AsyncRead`]: tokio::io::AsyncRead
+    /// [`Decoder::framed`]: crate::codec::Decoder::framed()
     pub struct Framed<T, U> {
         #[pin]
         inner: FramedRead2<FramedWrite2<Fuse<T, U>>>,
@@ -63,23 +69,29 @@ where
     T: AsyncRead + AsyncWrite,
     U: Decoder + Encoder,
 {
-    /// Provides a `Stream` and `Sink` interface for reading and writing to this
-    /// `Io` object, using `Decode` and `Encode` to read and write the raw data.
+    /// Provides a [`Stream`] and [`Sink`] interface for reading and writing to this
+    /// I/O object, using [`Decoder`] and [`Encoder`] to read and write the raw data.
     ///
     /// Raw I/O objects work with byte sequences, but higher-level code usually
     /// wants to batch these into meaningful chunks, called "frames". This
-    /// method layers framing on top of an I/O object, by using the `Codec`
+    /// method layers framing on top of an I/O object, by using the codec
     /// traits to handle encoding and decoding of messages frames. Note that
     /// the incoming and outgoing frame types may be distinct.
     ///
-    /// This function returns a *single* object that is both `Stream` and
-    /// `Sink`; grouping this into a single object is often useful for layering
+    /// This function returns a *single* object that is both [`Stream`] and
+    /// [`Sink`]; grouping this into a single object is often useful for layering
     /// things like gzip or TLS, which require both read and write access to the
     /// underlying object.
     ///
     /// If you want to work more directly with the streams and sink, consider
-    /// calling `split` on the `Framed` returned by this method, which will
+    /// calling [`split`] on the `Framed` returned by this method, which will
     /// break them into separate objects, allowing them to interact more easily.
+    ///
+    /// [`Stream`]: tokio::stream::Stream
+    /// [`Sink`]: futures_sink::Sink
+    /// [`Decode`]: crate::codec::Decoder
+    /// [`Encoder`]: crate::codec::Encoder
+    /// [`split`]: https://docs.rs/futures/0.3/futures/stream/trait.StreamExt.html#method.split
     pub fn new(inner: T, codec: U) -> Framed<T, U> {
         Framed {
             inner: framed_read2(framed_write2(Fuse { io: inner, codec })),
@@ -88,8 +100,8 @@ where
 }
 
 impl<T, U> Framed<T, U> {
-    /// Provides a `Stream` and `Sink` interface for reading and writing to this
-    /// `Io` object, using `Decode` and `Encode` to read and write the raw data.
+    /// Provides a [`Stream`] and [`Sink`] interface for reading and writing to this
+    /// I/O object, using [`Decoder`] and [`Encoder`] to read and write the raw data.
     ///
     /// Raw I/O objects work with byte sequences, but higher-level code usually
     /// wants to batch these into meaningful chunks, called "frames". This
@@ -97,17 +109,24 @@ impl<T, U> Framed<T, U> {
     /// traits to handle encoding and decoding of messages frames. Note that
     /// the incoming and outgoing frame types may be distinct.
     ///
-    /// This function returns a *single* object that is both `Stream` and
-    /// `Sink`; grouping this into a single object is often useful for layering
+    /// This function returns a *single* object that is both [`Stream`] and
+    /// [`Sink`]; grouping this into a single object is often useful for layering
     /// things like gzip or TLS, which require both read and write access to the
     /// underlying object.
     ///
     /// This objects takes a stream and a readbuffer and a writebuffer. These field
-    /// can be obtained from an existing `Framed` with the `into_parts` method.
+    /// can be obtained from an existing `Framed` with the [`into_parts`] method.
     ///
     /// If you want to work more directly with the streams and sink, consider
-    /// calling `split` on the `Framed` returned by this method, which will
+    /// calling [`split`] on the `Framed` returned by this method, which will
     /// break them into separate objects, allowing them to interact more easily.
+    ///
+    /// [`Stream`]: tokio::stream::Stream
+    /// [`Sink`]: futures_sink::Sink
+    /// [`Decoder`]: crate::codec::Decoder
+    /// [`Encoder`]: crate::codec::Encoder
+    /// [`into_parts`]: crate::codec::Framed::into_parts()
+    /// [`split`]: https://docs.rs/futures/0.3/futures/stream/trait.StreamExt.html#method.split
     pub fn from_parts(parts: FramedParts<T, U>) -> Framed<T, U> {
         Framed {
             inner: framed_read2_with_buffer(
@@ -124,7 +143,7 @@ impl<T, U> Framed<T, U> {
     }
 
     /// Returns a reference to the underlying I/O stream wrapped by
-    /// `Frame`.
+    /// `Framed`.
     ///
     /// Note that care should be taken to not tamper with the underlying stream
     /// of data coming in as it may corrupt the stream of frames otherwise
@@ -134,7 +153,7 @@ impl<T, U> Framed<T, U> {
     }
 
     /// Returns a mutable reference to the underlying I/O stream wrapped by
-    /// `Frame`.
+    /// `Framed`.
     ///
     /// Note that care should be taken to not tamper with the underlying stream
     /// of data coming in as it may corrupt the stream of frames otherwise
@@ -144,7 +163,7 @@ impl<T, U> Framed<T, U> {
     }
 
     /// Returns a reference to the underlying codec wrapped by
-    /// `Frame`.
+    /// `Framed`.
     ///
     /// Note that care should be taken to not tamper with the underlying codec
     /// as it may corrupt the stream of frames otherwise being worked with.
@@ -153,7 +172,7 @@ impl<T, U> Framed<T, U> {
     }
 
     /// Returns a mutable reference to the underlying codec wrapped by
-    /// `Frame`.
+    /// `Framed`.
     ///
     /// Note that care should be taken to not tamper with the underlying codec
     /// as it may corrupt the stream of frames otherwise being worked with.
@@ -166,7 +185,7 @@ impl<T, U> Framed<T, U> {
         self.inner.buffer()
     }
 
-    /// Consumes the `Frame`, returning its underlying I/O stream.
+    /// Consumes the `Framed`, returning its underlying I/O stream.
     ///
     /// Note that care should be taken to not tamper with the underlying stream
     /// of data coming in as it may corrupt the stream of frames otherwise
@@ -175,7 +194,7 @@ impl<T, U> Framed<T, U> {
         self.inner.into_inner().into_inner().io
     }
 
-    /// Consumes the `Frame`, returning its underlying I/O stream, the buffer
+    /// Consumes the `Framed`, returning its underlying I/O stream, the buffer
     /// with unprocessed data, and the codec.
     ///
     /// Note that care should be taken to not tamper with the underlying stream
@@ -338,8 +357,10 @@ impl<T, U: Encoder> Encoder for Fuse<T, U> {
 }
 
 /// `FramedParts` contains an export of the data of a Framed transport.
-/// It can be used to construct a new `Framed` with a different codec.
+/// It can be used to construct a new [`Framed`] with a different codec.
 /// It contains all current buffers and the inner transport.
+///
+/// [`Framed`]: crate::codec::Framed
 #[derive(Debug)]
 pub struct FramedParts<T, U> {
     /// The inner transport used to read bytes to and write bytes to
@@ -360,7 +381,7 @@ pub struct FramedParts<T, U> {
 }
 
 impl<T, U> FramedParts<T, U> {
-    /// Create a new, default, `FramedParts`
+    /// Create a new, default, `FramedParts`.
     pub fn new(io: T, codec: U) -> FramedParts<T, U> {
         FramedParts {
             io,
