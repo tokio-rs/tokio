@@ -50,6 +50,9 @@ pub use once::{once, Once};
 mod pending;
 pub use pending::{pending, Pending};
 
+mod stream_map;
+pub use stream_map::StreamMap;
+
 mod try_next;
 use try_next::TryNext;
 
