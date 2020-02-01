@@ -53,6 +53,9 @@ pub use pending::{pending, Pending};
 mod stream_map;
 pub use stream_map::StreamMap;
 
+mod skip;
+use skip::Skip;
+
 mod skip_while;
 use skip_while::SkipWhile;
 
@@ -452,6 +455,31 @@ pub trait StreamExt: Stream {
         Self: Sized,
     {
         TakeWhile::new(self, f)
+    }
+
+    /// Creates a new stream that will skip the `n` first items of the
+    /// underlying stream.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio::stream::{self, StreamExt};
+    ///
+    /// let mut stream = stream::iter(1..=10).skip(7);
+    ///
+    /// assert_eq!(Some(8), stream.next().await);
+    /// assert_eq!(Some(9), stream.next().await);
+    /// assert_eq!(Some(10), stream.next().await);
+    /// assert_eq!(None, stream.next().await);
+    /// # }
+    /// ```
+    fn skip(self, n: usize) -> Skip<Self>
+    where
+        Self: Sized,
+    {
+        Skip::new(self, n)
     }
 
     /// Skip elements from the underlying stream while the provided predicate

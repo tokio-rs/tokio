@@ -12,7 +12,10 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 pin_project! {
-    /// A `Stream` of messages decoded from an `AsyncRead`.
+    /// A [`Stream`] of messages decoded from an [`AsyncRead`].
+    ///
+    /// [`Stream`]: tokio::stream::Stream
+    /// [`AsyncRead`]: tokio::io::AsyncRead
     pub struct FramedRead<T, D> {
         #[pin]
         inner: FramedRead2<Fuse<T, D>>,

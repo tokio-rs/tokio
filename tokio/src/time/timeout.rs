@@ -14,7 +14,8 @@ use std::task::{self, Poll};
 /// Require a `Future` to complete before the specified duration has elapsed.
 ///
 /// If the future completes before the duration has elapsed, then the completed
-/// value is returned. Otherwise, an error is returned.
+/// value is returned. Otherwise, an error is returned and the future is
+/// canceled.
 ///
 /// # Cancelation
 ///

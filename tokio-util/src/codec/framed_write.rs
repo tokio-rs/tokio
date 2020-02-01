@@ -19,7 +19,9 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 pin_project! {
-    /// A `Sink` of frames encoded to an `AsyncWrite`.
+    /// A [`Sink`] of frames encoded to an `AsyncWrite`.
+    ///
+    /// [`Sink`]: futures_sink::Sink
     pub struct FramedWrite<T, E> {
         #[pin]
         inner: FramedWrite2<Fuse<T, E>>,
