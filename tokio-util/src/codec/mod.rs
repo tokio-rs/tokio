@@ -4,10 +4,10 @@
 //! [`AsyncWrite`], to framed streams implementing [`Sink`] and [`Stream`].
 //! Framed streams are also known as transports.
 //!
-//! [`AsyncRead`]: https://docs.rs/tokio/*/tokio/io/trait.AsyncRead.html
-//! [`AsyncWrite`]: https://docs.rs/tokio/*/tokio/io/trait.AsyncWrite.html
-//! [`Stream`]: https://docs.rs/tokio/*/tokio/stream/trait.Stream.html
-//! [`Sink`]: https://docs.rs/futures-sink/*/futures_sink/trait.Sink.html
+//! [`AsyncRead`]: tokio::io::AsyncRead
+//! [`AsyncWrite`]: tokio::io::AsyncWrite
+//! [`Stream`]: tokio::stream::Stream
+//! [`Sink`]: futures_sink::Sink
 
 mod bytes_codec;
 pub use self::bytes_codec::BytesCodec;
