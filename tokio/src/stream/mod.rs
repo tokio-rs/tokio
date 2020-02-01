@@ -54,7 +54,7 @@ mod stream_map;
 pub use stream_map::StreamMap;
 
 mod skip;
-pub use skip::Skip;
+use skip::Skip;
 
 mod try_next;
 use try_next::TryNext;
@@ -455,7 +455,7 @@ pub trait StreamExt: Stream {
     }
 
     /// Creates a new stream that will skip the `n` first items of the
-    /// undelaying stream.
+    /// underlying stream.
     ///
     /// # Examples
     ///

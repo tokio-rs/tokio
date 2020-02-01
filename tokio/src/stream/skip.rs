@@ -42,7 +42,7 @@ where
         loop {
             match ready!(self.as_mut().project().stream.poll_next(cx)) {
                 Some(e) => {
-                    if *self.as_mut().project().remaining == 0 {
+                    if self.remaining == 0 {
                         return Poll::Ready(Some(e))
                     }
                     *self.as_mut().project().remaining -= 1;
