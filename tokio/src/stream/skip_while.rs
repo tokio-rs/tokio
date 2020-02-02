@@ -42,13 +42,14 @@ where
 {
     type Item = St::Item;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if self.predicate.is_some() {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut this = self.project();
+        if let Some(predicate) = this.predicate {
             loop {
-                match ready!(self.as_mut().project().stream.poll_next(cx)) {
+                match ready!(this.stream.as_mut().poll_next(cx)) {
                     Some(item) => {
-                        if !(self.as_mut().project().predicate.as_mut().unwrap())(&item) {
-                            *self.as_mut().project().predicate = None;
+                        if !(predicate)(&item) {
+                            *this.predicate = None;
                             return Poll::Ready(Some(item));
                         }
                     }
@@ -56,7 +57,7 @@ where
                 }
             }
         } else {
-            self.as_mut().project().stream.poll_next(cx)
+            this.stream.poll_next(cx)
         }
     }
 
