@@ -43,13 +43,14 @@
 
 use tokio::net::TcpListener;
 use tokio::stream::StreamExt;
+use tokio::sync::Mutex;
 use tokio_util::codec::{Framed, LinesCodec};
 
 use futures::SinkExt;
 use std::collections::HashMap;
 use std::env;
 use std::error::Error;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 /// The in-memory database shared amongst all clients.
 ///
@@ -126,7 +127,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     while let Some(result) = lines.next().await {
                         match result {
                             Ok(line) => {
-                                let response = handle_request(&line, &db);
+                                let response = handle_request(&line, &db).await;
 
                                 let response = response.serialize();
 
@@ -148,13 +149,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 }
 
-fn handle_request(line: &str, db: &Arc<Database>) -> Response {
+async fn handle_request(line: &str, db: &Arc<Database>) -> Response {
     let request = match Request::parse(&line) {
         Ok(req) => req,
         Err(e) => return Response::Error { msg: e },
     };
 
-    let mut db = db.map.lock().unwrap();
+    let mut db = db.map.lock().await;
     match request {
         Request::Get { key } => match db.get(&key) {
             Some(value) => Response::Value {
