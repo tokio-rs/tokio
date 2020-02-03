@@ -198,7 +198,7 @@ mod blocking;
 use blocking::BlockingPool;
 
 cfg_blocking_impl! {
-    pub(crate) use blocking::spawn_blocking;
+    pub(crate) use blocking::{spawn_blocking, try_spawn_blocking};
 }
 
 mod builder;
