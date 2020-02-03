@@ -103,7 +103,7 @@ impl<T> LinkedList<T> {
 
     /// Returns whether the linked list doesn not contain any node
     pub(crate) fn is_empty(&self) -> bool {
-        if !self.head.is_none() {
+        if self.head.is_some() {
             return false;
         }
 

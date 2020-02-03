@@ -87,7 +87,6 @@ use std::task::{Context, Poll, Waker};
 ///         }
 ///     }
 /// }
-///
 /// ```
 ///
 /// [park]: std::thread::park
@@ -228,24 +227,19 @@ impl Notify {
         let mut curr = self.state.load(SeqCst);
 
         // If the state is `EMPTY`, transition to `NOTIFIED` and return.
-        loop {
-            match curr {
-                EMPTY | NOTIFIED => {
-                    // The compare-exchange from `NOTIFIED` -> `NOTIFIED` is
-                    // intended a happens-before synchronization must happen
-                    // between this atomic operation and a task calling
-                    // `recv()`.
-                    let res = self.state.compare_exchange(curr, NOTIFIED, SeqCst, SeqCst);
+        while let EMPTY | NOTIFIED = curr {
+            // The compare-exchange from `NOTIFIED` -> `NOTIFIED` is
+            // intended a happens-before synchronization must happen
+            // between this atomic operation and a task calling
+            // `recv()`.
+            let res = self.state.compare_exchange(curr, NOTIFIED, SeqCst, SeqCst);
 
-                    match res {
-                        // No waiters, no further work to do
-                        Ok(_) => return,
-                        Err(actual) => {
-                            curr = actual;
-                        }
-                    }
+            match res {
+                // No waiters, no further work to do
+                Ok(_) => return,
+                Err(actual) => {
+                    curr = actual;
                 }
-                _ => break,
             }
         }
 
@@ -260,6 +254,12 @@ impl Notify {
             drop(waiters);
             waker.wake();
         }
+    }
+}
+
+impl Default for Notify {
+    fn default() -> Notify {
+        Notify::new()
     }
 }
 
