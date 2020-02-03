@@ -8,6 +8,7 @@ cfg_loom! {
     mod loom_broadcast;
     mod loom_list;
     mod loom_mpsc;
+    mod loom_notify;
     mod loom_oneshot;
     mod loom_semaphore_ll;
 }

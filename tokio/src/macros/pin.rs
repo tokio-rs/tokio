@@ -108,5 +108,13 @@ macro_rules! pin {
         let mut $x = unsafe {
             $crate::macros::support::Pin::new_unchecked(&mut $x)
         };
-    )* }
+    )* };
+    ($(
+            let $x:ident = $init:expr;
+    )*) => {
+        $(
+            let $x = $init;
+            crate::pin!($x);
+        )*
+    }
 }
