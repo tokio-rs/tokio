@@ -69,6 +69,7 @@ where
     handle
 }
 
+#[allow(dead_code)]
 pub(crate) fn try_spawn_blocking<F, R>(func: F) -> Result<(), ()>
 where
     F: FnOnce() -> R + Send + 'static,
