@@ -42,7 +42,7 @@ impl<C: Decoder> Stream for UdpFramed<C> {
     type Item = (C::Item, SocketAddr);
     type Error = C::Error;
 
-    fn poll(&mut self) -> Poll<Option<(Self::Item)>, Self::Error> {
+    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         self.rd.reserve(INITIAL_RD_CAPACITY);
 
         if self.repeat_decode {
