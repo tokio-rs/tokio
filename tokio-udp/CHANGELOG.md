@@ -1,3 +1,7 @@
+# 0.1.6 (February 4, 2020)
+
+* Add `tokio 0.2.x` deprecation notice.
+
 # 0.1.5 (August 30, 2019)
 
 * Allow `UdpFramed::new` to revert to previous behavior for decoding frames (#1517)

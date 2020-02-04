@@ -1,3 +1,7 @@
+# 0.1.18 (February 4, 2020)
+
+* Add `tokio 0.2.x` deprecation notice.
+
 # 0.1.17 (December 3, 2019)
 
 ### Added

@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-signal/0.2.8")]
+#![doc(html_root_url = "https://docs.rs/tokio-signal/0.2.9")]
 #![deny(missing_docs)]
 
 //! Asynchronous signal handling for Tokio

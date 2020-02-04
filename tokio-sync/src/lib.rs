@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-sync/0.1.7")]
+#![doc(html_root_url = "https://docs.rs/tokio-sync/0.1.8")]
 #![deny(missing_debug_implementations, missing_docs, unreachable_pub)]
 
 //! Asynchronous synchronization primitives.

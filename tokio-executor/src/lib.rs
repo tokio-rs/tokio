@@ -1,5 +1,5 @@
 #![deny(missing_docs, missing_debug_implementations)]
-#![doc(html_root_url = "https://docs.rs/tokio-executor/0.1.9")]
+#![doc(html_root_url = "https://docs.rs/tokio-executor/0.1.10")]
 
 //! Task execution related traits and utilities.
 //!
