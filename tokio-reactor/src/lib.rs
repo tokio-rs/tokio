@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-reactor/0.1.11")]
+#![doc(html_root_url = "https://docs.rs/tokio-reactor/0.1.12")]
 #![deny(missing_docs, missing_debug_implementations)]
 
 //! Event loop that drives Tokio I/O resources.

@@ -1,3 +1,7 @@
+## 0.2.5 - 2020-02-04
+
+* Add `tokio 0.2.x` deprecation notice.
+
 ## 0.2.4 - 2019-06-21
 ### Fixed
 * Proccesses "leaked" via `Child::forget` now reaped rather than left as zombies

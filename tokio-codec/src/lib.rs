@@ -1,5 +1,5 @@
 #![deny(missing_docs, missing_debug_implementations)]
-#![doc(html_root_url = "https://docs.rs/tokio-codec/0.1.1")]
+#![doc(html_root_url = "https://docs.rs/tokio-codec/0.1.2")]
 
 //! Utilities for encoding and decoding frames.
 //!

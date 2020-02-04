@@ -4,13 +4,13 @@ name = "tokio-process"
 # - Update html_root_url.
 # - Update CHANGELOG.md.
 # - Create "X.Y.Z" git tag.
-version = "0.2.4"
+version = "0.2.5"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://github.com/tokio-rs/tokio"
-documentation = "https://docs.rs/tokio-process/0.2.4/tokio_process"
+documentation = "https://docs.rs/tokio-process/0.2.5/tokio_process"
 description = """
 An implementation of an asynchronous process management backed futures.
 """
