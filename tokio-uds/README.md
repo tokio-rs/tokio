@@ -3,9 +3,9 @@
 An implementation of Unix Domain Sockets for Tokio
 
 > **Note:** This crate is **deprecated in tokio 0.2.x** and has been moved into
-> [`tokio::uds`] behind the `uds` [feature flag].
+> [`tokio::net`] behind the `uds` [feature flag].
 
-[`tokio::uds`]: https://docs.rs/tokio-util/latest/tokio/uds/index.html
+[`tokio::net`]: https://docs.rs/tokio/latest/tokio/net/index.html
 [feature flag]: https://docs.rs/tokio/latest/tokio/index.html#feature-flags
 
 [Documentation](https://docs.rs/tokio-uds/0.2.5/tokio_uds/)
