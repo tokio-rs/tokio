@@ -17,9 +17,6 @@ mod collect;
 use collect::Collect;
 pub use collect::FromStream;
 
-mod debounce;
-use debounce::Debounce;
-
 mod empty;
 pub use empty::{empty, Empty};
 
@@ -72,8 +69,12 @@ mod take_while;
 use take_while::TakeWhile;
 
 cfg_time! {
+    mod debounce;
+    use debounce::Debounce;
+
     mod timeout;
     use timeout::Timeout;
+
     use std::time::Duration;
 }
 
