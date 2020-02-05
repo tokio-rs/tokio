@@ -17,6 +17,9 @@ mod collect;
 use collect::Collect;
 pub use collect::FromStream;
 
+mod debounce;
+use debounce::Debounce;
+
 mod empty;
 pub use empty::{empty, Empty};
 
@@ -813,6 +816,53 @@ pub trait StreamExt: Stream {
         Self: Sized,
     {
         Timeout::new(self, duration)
+    }
+
+    /// Debounce filters out items from the underlying stream that are rapidly
+    /// followed by another item.
+    ///
+    /// `debounce()` takes a `Duration` that represents the maximum amount of
+    /// time each item will wait for another item, before it will be yielded.
+    ///
+    /// Items that are followed by another item within the given `Duration`
+    /// will be suppressed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::stream::StreamExt;
+    /// use tokio::time::delay_for;
+    /// use tokio::sync::mpsc;
+    ///
+    /// use std::time::Duration;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let (mut tx, rx) = mpsc::channel(100);
+    /// let delays = vec![200, 900, 400, 700, 100];
+    ///
+    /// let mut rx = rx.debounce(Duration::from_millis(500));
+    ///
+    /// tokio::spawn(async move {
+    ///     for (index, delay) in delays.iter().enumerate() {
+    ///         delay_for(Duration::from_millis(*delay)).await;
+    ///         tx.send(index).await.unwrap();
+    ///     }
+    /// });
+    ///
+    /// assert_eq!(Some(0), rx.next().await);
+    /// assert_eq!(Some(2), rx.next().await);
+    /// assert_eq!(Some(4), rx.next().await);
+    /// assert_eq!(None, rx.next().await);
+    /// # }
+    /// ```
+    #[cfg(all(feature = "time"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+    fn debounce(self, duration: Duration) -> Debounce<Self>
+    where
+        Self: Sized,
+    {
+        Debounce::new(self, duration)
     }
 }
 
