@@ -28,8 +28,9 @@ use proc_macro::TokenStream;
 ///
 /// ## Options:
 ///
-/// - `core_threads=n` - Sets core threads to `n`.
-/// - `max_threads=n` - Sets max threads to `n`.
+///
+/// - `core_threads=n` - Sets core threads to `n` (requires `rt-threaded` feature).
+/// - `max_threads=n` - Sets max threads to `n` (requires `rt-core` or `rt-threaded` feature).
 ///
 /// ## Function arguments:
 ///
@@ -65,7 +66,7 @@ pub fn main_threaded(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ## Options:
 ///
 /// - `basic_scheduler` - All tasks are executed on the current thread.
-/// - `threaded_scheduler` - Uses the multi-threaded scheduler. Used by default.
+/// - `threaded_scheduler` - Uses the multi-threaded scheduler. Used by default (requires `rt-threaded` feature).
 ///
 /// ## Function arguments:
 ///
@@ -126,15 +127,15 @@ pub fn main_basic(args: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ## Options:
 ///
-/// - `basic_scheduler` - All tasks are executed on the current thread. Used by default.
-/// - `threaded_scheduler` - Use multi-threaded scheduler.
+/// - `core_threads=n` - Sets core threads to `n` (requires `rt-threaded` feature).
+/// - `max_threads=n` - Sets max threads to `n` (requires `rt-core` or `rt-threaded` feature).
 ///
 /// ## Usage
 ///
 /// ### Select runtime
 ///
 /// ```no_run
-/// #[tokio::test(threaded_scheduler)]
+/// #[tokio::test(core_threads = 1)]
 /// async fn my_test() {
 ///     assert!(true);
 /// }
@@ -157,15 +158,15 @@ pub fn test_threaded(args: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ## Options:
 ///
-/// - `core_threads=n` - Sets core threads to `n`.
-/// - `max_threads=n` - Sets max threads to `n`.
+/// - `basic_scheduler` - All tasks are executed on the current thread. Used by default.
+/// - `threaded_scheduler` - Use multi-threaded scheduler (requires `rt-threaded` feature).
 ///
 /// ## Usage
 ///
 /// ### Select runtime
 ///
 /// ```no_run
-/// #[tokio::test(core_threads = 1)]
+/// #[tokio::test(threaded_scheduler)]
 /// async fn my_test() {
 ///     assert!(true);
 /// }
