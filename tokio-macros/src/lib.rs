@@ -26,6 +26,8 @@ use proc_macro::TokenStream;
 
 /// Marks async function to be executed by selected runtime.
 ///
+/// Available if the "macros" feature flag is enabled.
+///
 /// ## Options:
 ///
 /// - `core_threads=n` - Sets core threads to `n`.
@@ -62,6 +64,8 @@ pub fn main_threaded(args: TokenStream, item: TokenStream) -> TokenStream {
 
 /// Marks async function to be executed by selected runtime.
 ///
+/// Available if the "macros" feature flag is enabled.
+///
 /// ## Options:
 ///
 /// - `basic_scheduler` - All tasks are executed on the current thread.
@@ -97,6 +101,8 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 /// Marks async function to be executed by selected runtime.
+///
+/// Available if the "macros" feature flag is enabled.
 ///
 /// ## Options:
 ///
@@ -155,6 +161,8 @@ pub fn test_threaded(args: TokenStream, item: TokenStream) -> TokenStream {
 
 /// Marks async function to be executed by runtime, suitable to test enviornment
 ///
+/// Available if the "macros" feature flag is enabled.
+///
 /// ## Options:
 ///
 /// - `core_threads=n` - Sets core threads to `n`.
@@ -185,6 +193,8 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 /// Marks async function to be executed by runtime, suitable to test enviornment
+///
+/// Available if the "macros" feature flag is enabled.
 ///
 /// ## Options:
 ///
