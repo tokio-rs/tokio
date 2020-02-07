@@ -1,5 +1,6 @@
 use crate::future::poll_fn;
 use crate::sync::semaphore_ll::{AcquireError, Permit, Semaphore};
+use stable_deref_trait::StableDeref;
 use std::cell::UnsafeCell;
 use std::ops;
 use std::task::{Context, Poll};
@@ -130,6 +131,8 @@ unsafe impl<T> Send for RwLock<T> where T: Send {}
 unsafe impl<T> Sync for RwLock<T> where T: Send + Sync {}
 unsafe impl<'a, T> Sync for RwLockReadGuard<'a, T> where T: Send + Sync {}
 unsafe impl<'a, T> Sync for RwLockWriteGuard<'a, T> where T: Send + Sync {}
+unsafe impl<'a, T> StableDeref for RwLockReadGuard<'a, T> {}
+unsafe impl<'a, T> StableDeref for RwLockWriteGuard<'a, T> {}
 
 impl<T> RwLock<T> {
     /// Creates a new instance of an `RwLock<T>` which is unlocked.

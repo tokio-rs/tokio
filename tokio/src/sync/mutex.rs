@@ -82,6 +82,7 @@
 use crate::future::poll_fn;
 use crate::sync::semaphore_ll as semaphore;
 
+use stable_deref_trait::StableDeref;
 use std::cell::UnsafeCell;
 use std::error::Error;
 use std::fmt;
@@ -117,6 +118,7 @@ pub struct MutexGuard<'a, T> {
 unsafe impl<T> Send for Mutex<T> where T: Send {}
 unsafe impl<T> Sync for Mutex<T> where T: Send {}
 unsafe impl<'a, T> Sync for MutexGuard<'a, T> where T: Send + Sync {}
+unsafe impl<'a, T> StableDeref for MutexGuard<'a, T> {}
 
 /// Error returned from the [`Mutex::try_lock`] function.
 ///
