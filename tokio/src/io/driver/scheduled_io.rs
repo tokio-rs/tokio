@@ -56,7 +56,7 @@ impl Default for ScheduledIo {
 }
 
 impl ScheduledIo {
-    #[allow(dead_code)]
+    #[cfg(all(test, loom))]
     /// Returns the current readiness value of this `ScheduledIo`, if the
     /// provided `token` is still a valid access.
     ///
