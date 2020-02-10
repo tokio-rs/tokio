@@ -2,7 +2,7 @@
 set -o nounset
 set -o errexit
 
-commit="e5be3fea69e1785a54b7e0ca7d3f4f6a877e162b"
+commit="77098a819fafd20a8d65c675d0fd0b5012daea22"
 
 # get the right version of noria
 if [[ ! -d checkout ]]; then
