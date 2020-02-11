@@ -122,7 +122,7 @@ pub fn main_basic(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::main(args, item, false)
 }
 
-/// Marks async function to be executed by runtime, suitable to test enviornment
+/// Marks async function to be executed by runtime, suitable to test environment
 ///
 /// ## Options:
 ///
@@ -153,7 +153,7 @@ pub fn test_threaded(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::test(args, item, true)
 }
 
-/// Marks async function to be executed by runtime, suitable to test enviornment
+/// Marks async function to be executed by runtime, suitable to test environment
 ///
 /// ## Options:
 ///
@@ -184,7 +184,7 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::old::test(args, item)
 }
 
-/// Marks async function to be executed by runtime, suitable to test enviornment
+/// Marks async function to be executed by runtime, suitable to test environment
 ///
 /// ## Options:
 ///
