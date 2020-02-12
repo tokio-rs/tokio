@@ -2,7 +2,7 @@
 #![cfg(feature = "full")]
 
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::oneshot;
+use tokio::sync::{mpsc, oneshot};
 use tokio_test::assert_ok;
 
 use std::net::{IpAddr, SocketAddr};
@@ -72,6 +72,7 @@ async fn no_extra_poll() {
     let addr = listener.local_addr().unwrap();
 
     let (tx, rx) = oneshot::channel();
+    let (accepted_tx, mut accepted_rx) = mpsc::unbounded_channel();
 
     tokio::spawn(async move {
         let mut incoming = TrackPolls {
@@ -79,7 +80,9 @@ async fn no_extra_poll() {
             s: listener.incoming(),
         };
         assert_ok!(tx.send(Arc::clone(&incoming.npolls)));
-        while let Some(_) = incoming.next().await {}
+        while let Some(_) = incoming.next().await {
+            accepted_tx.send(()).unwrap();
+        }
     });
 
     let npolls = assert_ok!(rx.await);
@@ -89,7 +92,7 @@ async fn no_extra_poll() {
     assert_eq!(npolls.load(SeqCst), 1);
 
     let _ = assert_ok!(TcpStream::connect(&addr).await);
-    tokio::task::yield_now().await;
+    accepted_rx.next().await.unwrap();
 
     // should have been polled twice more: once to yield Some(), then once to yield Pending
     assert_eq!(npolls.load(SeqCst), 1 + 2);
