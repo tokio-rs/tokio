@@ -50,7 +50,7 @@ pub struct Builder {
     /// The number of worker threads, used by Runtime.
     ///
     /// Only used when not using the current-thread executor.
-    core_threads: usize,
+    core_threads: Option<usize>,
 
     /// Cap on thread usage.
     max_threads: usize,
@@ -93,8 +93,8 @@ impl Builder {
             // Time defaults to "off"
             enable_time: false,
 
-            // Default to use an equal number of threads to number of CPU cores
-            core_threads: crate::loom::sys::num_cpus(),
+            // Default to lazy auto-detection (one thread per CPU core)
+            core_threads: None,
 
             max_threads: 512,
 
@@ -143,7 +143,7 @@ impl Builder {
     ///
     /// The default value is the number of cores available to the system.
     pub fn num_threads(&mut self, val: usize) -> &mut Self {
-        self.core_threads = val;
+        self.core_threads = Some(val);
         self
     }
 
@@ -168,7 +168,7 @@ impl Builder {
     /// ```
     pub fn core_threads(&mut self, val: usize) -> &mut Self {
         assert_ne!(val, 0, "Core threads cannot be zero");
-        self.core_threads = val;
+        self.core_threads = Some(val);
         self
     }
 
@@ -448,13 +448,14 @@ cfg_rt_threaded! {
             use crate::runtime::{Kind, ThreadPool};
             use crate::runtime::park::Parker;
 
-            assert!(self.core_threads <= self.max_threads, "Core threads number cannot be above max limit");
+            let core_threads = self.core_threads.unwrap_or_else(crate::loom::sys::num_cpus);
+            assert!(core_threads <= self.max_threads, "Core threads number cannot be above max limit");
 
             let clock = time::create_clock();
 
             let (io_driver, io_handle) = io::create_driver(self.enable_io)?;
             let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone());
-            let (scheduler, workers) = ThreadPool::new(self.core_threads, Parker::new(driver));
+            let (scheduler, workers) = ThreadPool::new(core_threads, Parker::new(driver));
             let spawner = Spawner::ThreadPool(scheduler.spawner().clone());
 
             // Create the blocking pool
