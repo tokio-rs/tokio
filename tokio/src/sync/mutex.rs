@@ -174,6 +174,11 @@ impl<T> Mutex<T> {
             Err(_) => Err(TryLockError(())),
         }
     }
+
+    /// Consumes the mutex, returning the underlying data.
+    pub fn into_inner(self) -> T {
+        self.c.into_inner()
+    }
 }
 
 impl<'a, T> Drop for MutexGuard<'a, T> {
