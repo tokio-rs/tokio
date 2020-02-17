@@ -18,9 +18,9 @@ const MAX_READS: usize = 10;
 /// typically allows for read-only access (shared access).
 ///
 /// In comparison, a [`Mutex`] does not distinguish between readers or writers
-/// that acquire the lock, therefore blocking any tasks waiting for the lock to
-/// become available. An `RwLock` will allow any number of readers to acquire the
-/// lock as long as a writer is not holding the lock.
+/// that acquire the lock, therefore causing any tasks waiting for the lock to
+/// become available to yield. An `RwLock` will allow any number of readers to
+/// acquire the lock as long as a writer is not holding the lock.
 ///
 /// The priority policy of Tokio's read-write lock is _fair_ (or
 /// [_write-preferring_]), in order to ensure that readers cannot starve
@@ -157,7 +157,7 @@ impl<T> RwLock<T> {
     /// Locks this rwlock with shared read access, blocking the current task
     /// until it can be acquired.
     ///
-    /// The calling task will be blocked until there are no more writers which
+    /// The calling task will yield until there are no more writers which
     /// hold the lock. There may be other readers currently inside the lock when
     /// this method returns.
     ///
@@ -198,8 +198,8 @@ impl<T> RwLock<T> {
         RwLockReadGuard { lock: self, permit }
     }
 
-    /// Locks this rwlock with exclusive write access, blocking the current
-    /// task until it can be acquired.
+    /// Locks this rwlock with exclusive write access, causing the current task
+    /// to yield it can be acquired.
     ///
     /// This function will not return while other writers or other readers
     /// currently have access to the lock.
