@@ -165,6 +165,10 @@ impl<T> Entry<T> {
     pub(crate) fn get(&self) -> *mut T {
         self.data.get()
     }
+
+    pub(crate) fn is_unlinked(&self) -> bool {
+        self.prev.is_none() && self.next.is_none()
+    }
 }
 
 #[cfg(test)]
