@@ -101,6 +101,17 @@ impl<T> LinkedList<T> {
         }
     }
 
+    /// Borrows the last element and returns it, or `None` if the list is empty.
+    ///
+    /// The function is safe as the lifetime of the entry is bound to `&self`.
+    pub(crate) fn last_mut(&self) -> Option<Pin<&mut T>> {
+        unsafe {
+            let last = self.tail.as_ref()?.as_ref();
+            let val = &mut *last.data.get();
+            Some(Pin::new_unchecked(val))
+        }
+    }
+
     /// Returns whether the linked list doesn not contain any node
     pub(crate) fn is_empty(&self) -> bool {
         if self.head.is_some() {
