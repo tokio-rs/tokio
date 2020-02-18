@@ -66,7 +66,7 @@ cfg_test_util! {
     ///
     /// [`advance()`]: fn.advance.html
     /// [`resume()`]: fn.resume.html
-    /// 
+    ///
     /// # Panics
     ///
     /// Panics if time is already frozen or if called from outside of the Tokio
@@ -90,14 +90,14 @@ cfg_test_util! {
     ///
     /// [`advance()`]: fn.advance.html
     /// [`pause()`]: fn.pause.html
-    /// 
+    ///
     /// # Panics
     ///
     /// Panics if time is not frozen or if called from outside of the Tokio
     /// runtime.
     pub fn resume() {
         let clock = context::clock().expect("time cannot be frozen from outside the Tokio runtime");
-        
+
         //to prevent deadlock, lock frozen first, always
         if let Some(frozen) = clock.inner.frozen.lock().unwrap().take() {
             let mut start = clock.inner.start.lock().unwrap();
@@ -116,7 +116,7 @@ cfg_test_util! {
     ///
     /// [`resume()`]: fn.resume.html
     /// [`pause()`]: fn.pause.html
-    /// 
+    ///
     /// # Panics
     ///
     /// Panics if time is not frozen or if called from outside of the Tokio
