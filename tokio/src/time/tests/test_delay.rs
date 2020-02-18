@@ -17,6 +17,14 @@ macro_rules! poll {
 }
 
 #[test]
+fn frozen_utility_returns_correct_advanced_duration() {
+    let clock = Clock::new_frozen();
+    assert_eq!(clock.advanced(), ms(0));
+    clock.advance(ms(10));
+    assert_eq!(clock.advanced(), ms(10));
+}
+
+#[test]
 fn immediate_delay() {
     let (mut driver, clock, handle) = setup();
 
