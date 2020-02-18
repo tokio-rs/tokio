@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::time::{self, Instant, Duration};
+use tokio::time::{self, Duration, Instant};
 
 #[tokio::test]
 async fn resume_lets_time_move_forward_instead_of_resetting_it() {
