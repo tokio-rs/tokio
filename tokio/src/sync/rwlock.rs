@@ -18,13 +18,18 @@ const MAX_READS: usize = 10;
 /// typically allows for read-only access (shared access).
 ///
 /// In comparison, a [`Mutex`] does not distinguish between readers or writers
-/// that acquire the lock, therefore blocking any tasks waiting for the lock to
-/// become available. An `RwLock` will allow any number of readers to acquire the
-/// lock as long as a writer is not holding the lock.
+/// that acquire the lock, therefore causing any tasks waiting for the lock to
+/// become available to yield. An `RwLock` will allow any number of readers to
+/// acquire the lock as long as a writer is not holding the lock.
 ///
-/// The priority policy of the lock is dependent on the underlying operating
-/// system's implementation, and this type does not guarantee that any
-/// particular policy will be used.
+/// The priority policy of Tokio's read-write lock is _fair_ (or
+/// [_write-preferring_]), in order to ensure that readers cannot starve
+/// writers. Fairness is ensured using a first-in, first-out queue for the tasks
+/// awaiting the lock; if a task that wishes to acquire the write lock is at the
+/// head of the queue, read locks will not be given out until the write lock has
+/// been released. This is in contrast to the Rust standard library's
+/// `std::sync::RwLock`, where the priority policy is dependent on the
+/// operating system's implementation.
 ///
 /// The type parameter `T` represents the data that this lock protects. It is
 /// required that `T` satisfies [`Send`] to be shared across threads. The RAII guards
@@ -63,6 +68,7 @@ const MAX_READS: usize = 10;
 /// [`RwLockReadGuard`]: struct.RwLockReadGuard.html
 /// [`RwLockWriteGuard`]: struct.RwLockWriteGuard.html
 /// [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
+/// [_write-preferring_]: https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock#Priority_policies
 #[derive(Debug)]
 pub struct RwLock<T> {
     //semaphore to coordinate read and write access to T
@@ -151,7 +157,7 @@ impl<T> RwLock<T> {
     /// Locks this rwlock with shared read access, blocking the current task
     /// until it can be acquired.
     ///
-    /// The calling task will be blocked until there are no more writers which
+    /// The calling task will yield until there are no more writers which
     /// hold the lock. There may be other readers currently inside the lock when
     /// this method returns.
     ///
@@ -192,8 +198,8 @@ impl<T> RwLock<T> {
         RwLockReadGuard { lock: self, permit }
     }
 
-    /// Locks this rwlock with exclusive write access, blocking the current
-    /// task until it can be acquired.
+    /// Locks this rwlock with exclusive write access, causing the current task
+    /// to yield it can be acquired.
     ///
     /// This function will not return while other writers or other readers
     /// currently have access to the lock.
