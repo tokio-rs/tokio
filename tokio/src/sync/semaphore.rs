@@ -56,14 +56,16 @@ impl Semaphore {
 
     /// Acquires permit from the semaphore
     pub async fn acquire(&self) -> SemaphorePermit<'_> {
-        let mut permit = SemaphorePermit {
-            sem: &self,
-            ll_permit: ll::Permit::new(),
-        };
-        poll_fn(|cx| permit.ll_permit.poll_acquire(cx, 1, &self.ll_sem))
+        let mut ll_permit = ll::Permit::new();
+        let pinned = ll_permit;
+        pin!(pinned);
+        poll_fn(|cx| pinned.poll_acquire(cx, 1, &self.ll_sem))
             .await
             .unwrap();
-        permit
+        SemaphorePermit {
+            sem: &self,
+            ll_permit,
+        }
     }
 
     /// Tries to acquire a permit form the semaphore
