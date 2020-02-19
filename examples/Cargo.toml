@@ -37,6 +37,10 @@ name = "hello_world"
 path = "hello_world.rs"
 
 [[example]]
+name = "no-async-main"
+path = "no-async-main.rs"
+
+[[example]]
 name = "print_each_packet"
 path = "print_each_packet.rs"
 

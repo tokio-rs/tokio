@@ -5,8 +5,7 @@
 //! -- it does not compile 
 //! -- may not be using the best idioms for what I'm attempting to illustrate
 //!
-//!
-//! And then in another terminal run:
+//! To run the example:
 //!
 //!     cargo run --example no-async-main
 
