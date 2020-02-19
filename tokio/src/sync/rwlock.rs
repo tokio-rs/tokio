@@ -46,7 +46,7 @@ const MAX_READS: usize = 10;
 /// async fn main() {
 ///     let lock = RwLock::new(5);
 ///
-/// // many reader locks can be held at once
+///     // many reader locks can be held at once
 ///     {
 ///         let r1 = lock.read().await;
 ///         let r2 = lock.read().await;
@@ -54,7 +54,7 @@ const MAX_READS: usize = 10;
 ///         assert_eq!(*r2, 5);
 ///     } // read locks are dropped at this point
 ///
-/// // only one write lock may be held, however
+///     // only one write lock may be held, however
 ///     {
 ///         let mut w = lock.write().await;
 ///         *w += 1;
@@ -154,8 +154,8 @@ impl<T> RwLock<T> {
         }
     }
 
-    /// Locks this rwlock with shared read access, blocking the current task
-    /// until it can be acquired.
+    /// Locks this rwlock with shared read access, causing the current task
+    /// to yield until the lock has been acquired.
     ///
     /// The calling task will yield until there are no more writers which
     /// hold the lock. There may be other readers currently inside the lock when
@@ -176,9 +176,13 @@ impl<T> RwLock<T> {
     ///     assert_eq!(*n, 1);
     ///
     ///     tokio::spawn(async move {
+    ///         // While main has an active read lock, we acquire one too.
     ///         let r = c_lock.read().await;
     ///         assert_eq!(*r, 1);
-    ///     });
+    ///     }).await.expect("The spawned task has paniced");
+    ///
+    ///     // Drop the guard after the spawned task finishes.
+    ///     drop(n);
     ///}
     /// ```
     pub async fn read(&self) -> RwLockReadGuard<'_, T> {
@@ -199,7 +203,7 @@ impl<T> RwLock<T> {
     }
 
     /// Locks this rwlock with exclusive write access, causing the current task
-    /// to yield it can be acquired.
+    /// to yield until the lock has been acquired.
     ///
     /// This function will not return while other writers or other readers
     /// currently have access to the lock.
