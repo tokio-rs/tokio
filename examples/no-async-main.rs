@@ -9,9 +9,8 @@
 //!
 //!     cargo run --example no-async-main
 
-use std::net::SocketAddr;
 use tokio::sync::{oneshot, mpsc};
-use tokio::runtime::Runtime;
+use tokio::runtime::{Handle, Runtime};
 use Command::Increment;
 
 #[derive(Debug)]
@@ -27,46 +26,24 @@ enum Response {
 
 struct Commander {
   runtime: Runtime,
-  cmd_tx: Option<mpsc::Sender<(Command, oneshot::Sender<Response>)>>
-  // join_handles: Vec<>  = vec![]
+}
+
+#[derive(Clone)]
+struct Sender {
+  handle: Handle,
+  cmd_tx: mpsc::Sender<(Command, oneshot::Sender<Response>)>
 }
 
 impl Commander {
   pub fn new() -> Commander {
     Commander {
       runtime: Runtime::new().unwrap(),
-      cmd_tx: None
     }
   }
-
-  pub fn send_command(&mut self, cmd: Command, f: impl Fn(Response) -> () + Send + 'static)
-  {
-    if let Some(self_cmd_tx) = &self.cmd_tx {
-      let (resp_tx, resp_rx) = oneshot::channel::<Response>();
-
-      let mut cmd_tx = self_cmd_tx.clone();
-      self.runtime.spawn(async move {
-
-            cmd_tx.send((cmd, resp_tx)).await.ok().unwrap();
-            let res: Response = resp_rx.await.unwrap();
-
-            println!("=> {:?}", res);
-            f(res);
-        });
-    } else {
-      panic!("need to connect before calling send_command")
-    }
-  }
-
-  pub fn connect(&mut self, _addr: SocketAddr,
-                            f: impl FnMut(bool) -> () + Send + 'static) {
+  pub fn connect(&mut self, mut ready_callback: impl FnMut(Sender) -> () + Send + 'static) {
     let (cmd_tx, mut cmd_rx) = mpsc::channel::<(Command, oneshot::Sender<Response>)>(100);
-    self.cmd_tx = Some(cmd_tx);
-
     // Spawn a task to manage the counter
     self.runtime.spawn(async move {
-      // imagine we connect TCPsocket or something other slow thing here
-      f(true);
       let mut counter: u64 = 0;
       while let Some((cmd, response)) = cmd_rx.recv().await {
         match cmd {
@@ -77,21 +54,43 @@ impl Commander {
         }
       }
     });
+    ready_callback(Sender::new(cmd_tx, self.runtime.handle().clone()));
   }
-} // impl Commander
+
+}
+
+impl Sender {
+  pub fn new(cmd_tx: mpsc::Sender<(Command, oneshot::Sender<Response>)>,
+             handle: Handle) -> Self {
+    Sender {
+      handle,
+      cmd_tx
+    }
+  }
+
+  pub fn send_command(&mut self, cmd: Command, f: impl Fn(Response) -> () + Send + 'static)
+  {
+    let (resp_tx, resp_rx) = oneshot::channel::<Response>();
+    let mut cmd_tx = self.cmd_tx.clone();
+    self.handle.spawn(async move {
+
+      cmd_tx.send((cmd, resp_tx)).await.ok().unwrap();
+      let res: Response = resp_rx.await.unwrap();
+
+      println!("  => {:?}", res);
+      f(res);
+    });
+  }
+} // impl Sender
+
 
 fn main() {
-  let addr: SocketAddr = "127.0.0.1:1234".parse().unwrap();
   let mut c = Commander::new();
-  c.connect(addr, move |connected| {
-    if connected {
+  c.connect(move |mut sender| {
       println!("Yay!");
-      c.send_command(Increment, |response| {
-        println!("received response {:?}", response);
+      sender.send_command(Increment, |response| {
+        println!("  ==> received response {:?}", response);
       })
-    } else {
-      println!("sorry.. try again later");
-    }
   });
 
   let mut input = String::new();
