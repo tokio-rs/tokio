@@ -1,10 +1,6 @@
 //! A simple client that does some work and triggers a callback asynchronously
 //! with an API can be called from no-async code and uses async tokio inside
 //!
-//!  THIS DOES NOT WORK YET 
-//! -- it does not compile 
-//! -- may not be using the best idioms for what I'm attempting to illustrate
-//!
 //! To run the example:
 //!
 //!     cargo run --example no-async-main
