@@ -36,7 +36,7 @@ impl Commander {
       runtime: Runtime::new().unwrap(),
     }
   }
-  pub fn connect(&mut self, mut ready_callback: impl FnMut(Sender) -> () + Send + 'static) {
+  pub fn connect(&self, ready_callback: impl Fn(Sender) -> () + Send + 'static) {
     let (cmd_tx, mut cmd_rx) = mpsc::channel::<(Command, oneshot::Sender<Response>)>(100);
     // Spawn a task to manage the counter
     self.runtime.spawn(async move {
@@ -81,7 +81,7 @@ impl Sender {
 
 
 fn main() {
-  let mut c = Commander::new();
+  let c = Commander::new();
   c.connect(move |mut sender| {
       println!("Yay!");
       sender.send_command(Increment, |response| {
