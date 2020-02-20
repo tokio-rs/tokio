@@ -240,3 +240,13 @@ cfg_rt_util! {
     mod task_local;
     pub use task_local::LocalKey;
 }
+
+cfg_scope! {
+    // scope requires `CancellationToken`
+    cfg_sync! {
+        cfg_unstable! {
+            mod scope;
+            pub use scope::{scope, Scope, ScopeConfig, ScopeConfigBuilder, ScopeHandle, ScopedJoinHandle};
+        }
+    }
+}

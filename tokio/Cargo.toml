@@ -41,10 +41,12 @@ full = [
   "rt-core",
   "rt-util",
   "rt-threaded",
+  "scope",
   "signal",
   "stream",
   "sync",
   "time",
+  "futures"
 ]
 
 blocking = ["rt-core"]
@@ -73,6 +75,7 @@ rt-threaded = [
   "num_cpus",
   "rt-core",
 ]
+scope = []
 signal = [
   "io-driver",
   "lazy_static",
@@ -99,6 +102,7 @@ pin-project-lite = "0.1.1"
 # Everything else is optional...
 fnv = { version = "1.0.6", optional = true }
 futures-core = { version = "0.3.0", optional = true }
+futures = { version = "0.3.0", optional = true }
 lazy_static = { version = "1.0.2", optional = true }
 memchr = { version = "2.2", optional = true }
 mio = { version = "0.6.20", optional = true }
@@ -122,7 +126,7 @@ optional = true
 
 [dev-dependencies]
 tokio-test = { version = "0.2.0", path = "../tokio-test" }
-futures = { version = "0.3.0", features = ["async-await"] }
+futures = { version = "0.3.0", features = ["async-await", "executor"] }
 futures-test = "0.3.0"
 proptest = "0.9.4"
 tempfile = "3.1.0"
