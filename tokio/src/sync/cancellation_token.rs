@@ -568,10 +568,14 @@ impl Drop for CancellationToken {
         // Safety: The state inside a `CancellationToken` is always valid, since
         // is reference counted
         let inner = unsafe { &mut *self.inner.as_ptr() };
-        inner.unregister_from_parent();
+
+        let current_state = StateSnapshot::unpack(inner.state.load(Ordering::SeqCst));
+        if current_state.refcount == 1 {
+            inner.unregister_from_parent();
+        }
 
         // Drop our own refcount after we unregistered from the parent
-        inner.decrement_refcount(StateSnapshot::unpack(inner.state.load(Ordering::SeqCst)));
+        inner.decrement_refcount(current_state);
     }
 }
 
@@ -968,6 +972,28 @@ mod tests {
                 drop(child_token);
             }
         }
+    }
+
+    #[test]
+    fn drop_multiple_child_tokens() {
+        let token = CancellationToken::new();
+        let child1 = token.child_token();
+        let child2 = token.child_token();
+
+        drop(child1);
+        drop(child2);
+        drop(token);
+    }
+
+    #[test]
+    fn drop_parent_before_child_tokens() {
+        let token = CancellationToken::new();
+        let child1 = token.child_token();
+        let child2 = token.child_token();
+
+        drop(token);
+        drop(child1);
+        drop(child2);
     }
 
     #[test]

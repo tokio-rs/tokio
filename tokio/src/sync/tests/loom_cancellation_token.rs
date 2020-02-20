@@ -64,6 +64,39 @@ fn drop_token() {
         let token1 = token.clone();
         let token2 = token.clone();
         let child_token = token.child_token();
+        let child_token2 = token.child_token();
+
+        let th1 = thread::spawn(move || {
+            drop(token1);
+        });
+
+        let th2 = thread::spawn(move || {
+            drop(token2);
+        });
+
+        let th3 = thread::spawn(move || {
+            drop(child_token);
+        });
+
+        let th4 = thread::spawn(move || {
+            drop(child_token2);
+        });
+
+        assert_ok!(th1.join());
+        assert_ok!(th2.join());
+        assert_ok!(th3.join());
+        assert_ok!(th4.join());
+    });
+}
+
+#[test]
+fn drop_and_cancel_token() {
+    loom::model(|| {
+        let token = CancellationToken::new();
+        let token1 = token.clone();
+        let token2 = token.clone();
+        let child_token = token.child_token();
+        let child_token2 = token.child_token();
 
         let th1 = thread::spawn(move || {
             drop(token1);
@@ -77,8 +110,13 @@ fn drop_token() {
             drop(child_token);
         });
 
+        let th4 = thread::spawn(move || {
+            child_token2.cancel();
+        });
+
         assert_ok!(th1.join());
         assert_ok!(th2.join());
         assert_ok!(th3.join());
+        assert_ok!(th4.join());
     });
 }
