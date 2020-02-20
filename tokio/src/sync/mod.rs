@@ -460,6 +460,11 @@ cfg_sync! {
     mod task;
     pub(crate) use task::AtomicWaker;
 
+    cfg_unstable! {
+        mod wait_group;
+        pub(crate) use wait_group::{SharedWaitGroup};
+    }
+
     pub mod watch;
 }
 
