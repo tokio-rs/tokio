@@ -1,5 +1,6 @@
 use super::semaphore_ll as ll; // low level implementation
 use crate::future::poll_fn;
+use std::pin::Pin;
 
 /// Counting semaphore performing asynchronous permit aquisition.
 ///
@@ -57,11 +58,11 @@ impl Semaphore {
     /// Acquires permit from the semaphore
     pub async fn acquire(&self) -> SemaphorePermit<'_> {
         let mut ll_permit = ll::Permit::new();
-        let pinned = ll_permit;
-        pin!(pinned);
-        poll_fn(|cx| pinned.poll_acquire(cx, 1, &self.ll_sem))
-            .await
-            .unwrap();
+        poll_fn(|cx| {
+            unsafe { Pin::new_unchecked(&mut ll_permit) }.poll_acquire(cx, 1, &self.ll_sem)
+        })
+        .await
+        .unwrap();
         SemaphorePermit {
             sem: &self,
             ll_permit,
@@ -86,7 +87,7 @@ impl<'a> SemaphorePermit<'a> {
     /// This can be used to reduce the amount of permits available from a
     /// semaphore.
     pub fn forget(mut self) {
-        self.ll_permit.forget(1);
+        self.ll_permit.forget(1, &self.sem.ll_sem);
     }
 }
 

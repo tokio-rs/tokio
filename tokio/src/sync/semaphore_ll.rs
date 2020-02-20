@@ -6,8 +6,7 @@ use crate::loom::{
 use crate::util::linked_list::{self, LinkedList};
 
 use std::{
-    cmp,
-    fmt,
+    cmp, fmt,
     pin::Pin,
     ptr::NonNull,
     sync::atomic::Ordering,
@@ -34,7 +33,7 @@ pub(crate) enum TryAcquireError {
 pub(crate) struct AcquireError(());
 
 pin_project_lite::pin_project! {
-    #[derive(Debug)]
+    // #[derive(Debug)]
     pub(crate) struct Permit {
         #[pin]
         node: linked_list::Entry<Waiter>,
@@ -114,7 +113,6 @@ impl Semaphore {
 
     fn add_permits_locked(&self, mut rem: usize, mut closed: bool) {
         while rem > 0 || closed {
-
             // Release the permits and notify
             let mut waiters = self.waiters.lock().unwrap();
             while rem > 0 {
@@ -150,7 +148,7 @@ impl Semaphore {
         &self,
         cx: &mut Context<'_>,
         needed: u16,
-        node: Pin<&mut Waiter>,
+        node: Pin<&mut linked_list::Entry<Waiter>>,
     ) -> Poll<Result<(), AcquireError>> {
         let mut curr = self.permits.load(Ordering::Acquire);
         let remaining = loop {
@@ -174,7 +172,10 @@ impl Semaphore {
         assert!(node.is_unlinked());
         {
             let mut waiter = unsafe { &*node.get() };
-            waiter.state.compare_exchange(0, remaining, Ordering::Release).expect("unlinked node should not want permits!");
+            waiter
+                .state
+                .compare_exchange(0, remaining as usize, Ordering::AcqRel, Ordering::Acquire)
+                .expect("unlinked node should not want permits!");
             waiter.waker.register_by_ref(cx.waker());
         }
 
@@ -184,6 +185,21 @@ impl Semaphore {
         }
 
         Pending
+    }
+}
+
+impl Drop for Semaphore {
+    fn drop(&mut self) {
+        self.close();
+    }
+}
+
+impl fmt::Debug for Semaphore {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("Semaphore")
+            .field("permits", &self.add_lock.load(Ordering::Relaxed))
+            .field("add_lock", &self.add_lock.load(Ordering::Relaxed))
+            .finish()
     }
 }
 
@@ -197,7 +213,7 @@ impl Permit {
         Permit {
             node: linked_list::Entry::new(Waiter {
                 waker: AtomicWaker::new(),
-                needed: 0,
+                state: AtomicUsize::new(0),
             }),
             state: Acquired(0),
         }
@@ -210,7 +226,6 @@ impl Permit {
             _ => false,
         }
     }
-
 
     /// Tries to acquire the permit. If no permits are available, the current task
     /// is notified once a new permit becomes available.
@@ -254,16 +269,14 @@ impl Permit {
         match self.state {
             Waiting(requested) => {
                 let n = cmp::min(n, requested);
-
+                let node = unsafe { &*self.node.get() };
                 // Decrement
-                let acquired = self
-                    .node
-                    .try_dec_permits_to_acquire(n as usize) as u16;
+                let acquired = node.try_dec_permits_to_acquire(n as usize) as u16;
 
                 if n == requested {
                     self.state = Acquired(0);
-                    // TODO: rm from wait list here!
-                    semaphore
+                // // TODO: rm from wait list here!
+                // semaphore
                 } else if acquired == requested - n {
                     self.state = Waiting(acquired);
                 } else {
@@ -278,6 +291,14 @@ impl Permit {
                 n
             }
         }
+    }
+}
+
+impl fmt::Debug for Permit {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("Permit")
+            .field("state", &self.state)
+            .finish()
     }
 }
 
@@ -298,7 +319,10 @@ impl Waiter {
             // Number of permits to assign to this waiter
             let assign = cmp::min(curr, *n);
             let next = curr - assign;
-            match self.state.compare_exchange(curr, next, Ordering::AcqRel, Ordering::Acquire) {
+            match self
+                .state
+                .compare_exchange(curr, next, Ordering::AcqRel, Ordering::Acquire)
+            {
                 Ok(_) => {
                     // Update `n`
                     *n -= assign;
@@ -326,14 +350,17 @@ impl Waiter {
         let mut curr = self.state.load(Ordering::Acquire);
 
         loop {
-            if !curr.is_queued() {
-                assert_eq!(0, curr.permits_to_acquire());
-            }
+            // if !curr.is_queued() {
+            //     assert_eq!(0, curr.permits_to_acquire());
+            // }
 
-            let delta = cmp::min(n, curr.permits_to_acquire());
-            let rem = curr.permits_to_acquire() - delta;
+            let delta = cmp::min(n, curr);
+            let rem = curr - delta;
 
-            match self.state.compare_exchange(curr, rem, Ordering::AcqRel, Ordering::Acquire) {
+            match self
+                .state
+                .compare_exchange(curr, rem, Ordering::AcqRel, Ordering::Acquire)
+            {
                 Ok(_) => return n - delta,
                 Err(actual) => curr = actual,
             }

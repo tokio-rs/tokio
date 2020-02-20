@@ -6,6 +6,7 @@ use crate::sync::mpsc::error::{ClosedError, TryRecvError};
 use crate::sync::mpsc::{error, list};
 
 use std::fmt;
+use std::pin::Pin;
 use std::process;
 use std::sync::atomic::Ordering::{AcqRel, Relaxed};
 use std::task::Poll::{Pending, Ready};
@@ -84,7 +85,7 @@ pub(crate) trait Semaphore {
     fn poll_acquire(
         &self,
         cx: &mut Context<'_>,
-        permit: &mut Self::Permit,
+        permit: Pin<&mut Self::Permit>,
     ) -> Poll<Result<(), ClosedError>>;
 
     fn try_acquire(&self, permit: &mut Self::Permit) -> Result<(), TrySendError>;
@@ -186,8 +187,15 @@ where
         }
     }
 
-    pub(crate) fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), ClosedError>> {
-        self.inner.semaphore.poll_acquire(cx, &mut self.permit)
+    pub(crate) fn poll_ready(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), ClosedError>> {
+        let (inner, permit) = unsafe {
+            let this = self.get_unchecked_mut();
+            (&this.inner, Pin::new_unchecked(&mut this.permit))
+        };
+        inner.semaphore.poll_acquire(cx, permit)
     }
 
     /// Send a message and notify the receiver.
@@ -422,7 +430,7 @@ impl Semaphore for (crate::sync::semaphore_ll::Semaphore, usize) {
     fn poll_acquire(
         &self,
         cx: &mut Context<'_>,
-        permit: &mut Permit,
+        permit: Pin<&mut Permit>,
     ) -> Poll<Result<(), ClosedError>> {
         permit
             .poll_acquire(cx, 1, &self.0)
@@ -435,7 +443,7 @@ impl Semaphore for (crate::sync::semaphore_ll::Semaphore, usize) {
     }
 
     fn forget(&self, permit: &mut Self::Permit) {
-        permit.forget(1);
+        permit.forget(1, &self.0);
     }
 
     fn close(&self) {
@@ -471,9 +479,9 @@ impl Semaphore for AtomicUsize {
     fn poll_acquire(
         &self,
         _cx: &mut Context<'_>,
-        permit: &mut (),
+        permit: Pin<&mut ()>,
     ) -> Poll<Result<(), ClosedError>> {
-        Ready(self.try_acquire(permit).map_err(|_| ClosedError::new()))
+        Ready(self.try_acquire(&mut ()).map_err(|_| ClosedError::new()))
     }
 
     fn try_acquire(&self, _permit: &mut ()) -> Result<(), TrySendError> {

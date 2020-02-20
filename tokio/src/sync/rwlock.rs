@@ -2,6 +2,7 @@ use crate::future::poll_fn;
 use crate::sync::semaphore_ll::{AcquireError, Permit, Semaphore};
 use std::cell::UnsafeCell;
 use std::ops;
+use std::pin::Pin;
 use std::task::{Context, Poll};
 
 #[cfg(not(loom))]
@@ -109,11 +110,15 @@ struct ReleasingPermit<'a, T> {
 
 impl<'a, T> ReleasingPermit<'a, T> {
     fn poll_acquire(
-        &mut self,
+        self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         s: &Semaphore,
     ) -> Poll<Result<(), AcquireError>> {
-        self.permit.poll_acquire(cx, self.num_permits, s)
+        let (num_permits, permit) = unsafe {
+            let this = self.get_unchecked_mut();
+            (this.num_permits, Pin::new_unchecked(&mut this.permit))
+        };
+        permit.poll_acquire(cx, num_permits, s)
     }
 }
 
@@ -181,8 +186,7 @@ impl<T> RwLock<T> {
             permit: Permit::new(),
             lock: self,
         };
-
-        poll_fn(|cx| permit.poll_acquire(cx, &self.s))
+        poll_fn(|cx| unsafe { Pin::new_unchecked(&mut permit) }.poll_acquire(cx, &self.s))
             .await
             .unwrap_or_else(|_| {
                 // The semaphore was closed. but, we never explicitly close it, and we have a
@@ -221,7 +225,7 @@ impl<T> RwLock<T> {
             lock: self,
         };
 
-        poll_fn(|cx| permit.poll_acquire(cx, &self.s))
+        poll_fn(|cx| unsafe { Pin::new_unchecked(&mut permit) }.poll_acquire(cx, &self.s))
             .await
             .unwrap_or_else(|_| {
                 // The semaphore was closed. but, we never explicitly close it, and we have a

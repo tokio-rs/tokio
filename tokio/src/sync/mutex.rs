@@ -152,20 +152,17 @@ impl<T> Mutex<T> {
 
     /// A future that resolves on acquiring the lock and returns the `MutexGuard`.
     pub async fn lock(&self) -> MutexGuard<'_, T> {
-        let permit = semaphore::Permit::new();
-        let pinned = permit;
-        pin!(pinned);
-        poll_fn(|cx| pinned.poll_acquire(cx, 1, &self.s))
-            .await
-            .unwrap_or_else(|_| {
-                // The semaphore was closed. but, we never explicitly close it, and we have a
-                // handle to it through the Arc, which means that this can never happen.
-                unreachable!()
-            });
-            MutexGuard {
-                lock: self,
-                permit,
-            }
+        let mut permit = semaphore::Permit::new();
+        poll_fn(|cx| {
+            unsafe { std::pin::Pin::new_unchecked(&mut permit) }.poll_acquire(cx, 1, &self.s)
+        })
+        .await
+        .unwrap_or_else(|_| {
+            // The semaphore was closed. but, we never explicitly close it, and we have a
+            // handle to it through the Arc, which means that this can never happen.
+            unreachable!()
+        });
+        MutexGuard { lock: self, permit }
     }
 
     /// Tries to acquire the lock

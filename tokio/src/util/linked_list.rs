@@ -104,7 +104,7 @@ impl<T> LinkedList<T> {
     /// Borrows the last element and returns it, or `None` if the list is empty.
     ///
     /// The function is safe as the lifetime of the entry is bound to `&self`.
-    pub(crate) fn last_mut(&self) -> Option<Pin<&T>> {
+    pub(crate) fn last(&self) -> Option<Pin<&T>> {
         unsafe {
             let last = self.tail.as_ref()?.as_ref();
             let val = &*last.data.get();
