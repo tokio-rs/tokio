@@ -267,10 +267,12 @@ impl CancellationTokenState {
             }
         }
 
+        // We are not allowed to touch `self` here anymore, since it might have
+        // been freed in `self.remove_parent_ref()`!
+
         // Decrement the refcount on the parent and free it if necessary
         parent.decrement_refcount(StateSnapshot::unpack(parent.state.load(Ordering::SeqCst)));
 
-        self.parent = None;
         current_state
     }
 
@@ -576,14 +578,13 @@ impl Drop for CancellationToken {
 
         let mut current_state = StateSnapshot::unpack(inner.state.load(Ordering::SeqCst));
 
-        current_state = if current_state.refcount == 1 {
-            inner.unregister_from_parent(current_state)
-        } else {
-            current_state
-        };
+        // Drop our own refcount
+        current_state = inner.decrement_refcount(current_state);
 
-        // Drop our own refcount after we unregistered from the parent
-        inner.decrement_refcount(current_state);
+        // If this was the last reference, unregister from the parent
+        if current_state.refcount == 0 {
+            inner.unregister_from_parent(current_state);
+        }
     }
 }
 
