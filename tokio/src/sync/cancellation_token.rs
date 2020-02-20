@@ -222,12 +222,12 @@ impl CancellationTokenState {
         return current_state;
     }
 
-    fn unregister_from_parent(&mut self) {
+    fn unregister_from_parent(&mut self, mut current_state: StateSnapshot) -> StateSnapshot {
         // If there is any parent token, we need to unregister from it
         let mut parent_ptr = if let Some(parent_ptr) = self.parent {
             parent_ptr
         } else {
-            return;
+            return current_state;
         };
 
         // Safety: Since we still retain a reference on the parent, it must be valid.
@@ -252,6 +252,10 @@ impl CancellationTokenState {
                 }
                 self.from_parent.prev_peer = None;
                 self.from_parent.next_peer = None;
+
+                // We are no longer referenced by the parent, since we were able
+                // to remove our reference from the parents list.
+                current_state = self.remove_parent_ref(current_state);
             } else {
                 // Do not touch the linked list anymore. If the parent is cancelled
                 // it will move all childs outside of the Mutex and manipulate
@@ -267,6 +271,7 @@ impl CancellationTokenState {
         parent.decrement_refcount(StateSnapshot::unpack(parent.state.load(Ordering::SeqCst)));
 
         self.parent = None;
+        current_state
     }
 
     fn cancel(&self) {
@@ -569,10 +574,13 @@ impl Drop for CancellationToken {
         // is reference counted
         let inner = unsafe { &mut *self.inner.as_ptr() };
 
-        let current_state = StateSnapshot::unpack(inner.state.load(Ordering::SeqCst));
-        if current_state.refcount == 1 {
-            inner.unregister_from_parent();
-        }
+        let mut current_state = StateSnapshot::unpack(inner.state.load(Ordering::SeqCst));
+
+        current_state = if current_state.refcount == 1 {
+            inner.unregister_from_parent(current_state)
+        } else {
+            current_state
+        };
 
         // Drop our own refcount after we unregistered from the parent
         inner.decrement_refcount(current_state);
