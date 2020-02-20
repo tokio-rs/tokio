@@ -365,7 +365,7 @@ const MAX_RECEIVERS: usize = usize::MAX >> 1;
 ///     tx.send(20).unwrap();
 /// }
 /// ```
-pub fn channel<T>(mut capacity: usize) -> (Sender<T>, Receiver<T>) {
+pub fn channel<T: Clone>(mut capacity: usize) -> (Sender<T>, Receiver<T>) {
     assert!(capacity > 0, "capacity is empty");
     assert!(capacity <= usize::MAX >> 1, "requested capacity too large");
 
