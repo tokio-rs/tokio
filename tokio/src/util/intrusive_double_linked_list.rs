@@ -25,7 +25,7 @@ pub struct ListNode<T> {
 impl<T> ListNode<T> {
     /// Creates a new node with the associated data
     pub fn new(data: T) -> ListNode<T> {
-        ListNode::<T> {
+        Self {
             prev: None,
             next: None,
             data,
