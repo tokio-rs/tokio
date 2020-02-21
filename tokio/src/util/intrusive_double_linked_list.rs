@@ -231,7 +231,7 @@ impl<T> LinkedList<T> {
 
     /// Removes the given `node` from the linked list.
     /// Returns whether the `node` was removed.
-    /// It is also only save if it is known that the `node` is either part of this
+    /// It is also only safe if it is known that the `node` is either part of this
     /// list, or of no list at all. If `node` is part of another list, the
     /// behavior is undefined.
     pub unsafe fn remove(&mut self, node: &mut ListNode<T>) -> bool {
