@@ -164,27 +164,45 @@ impl Semaphore {
         node: Pin<&mut linked_list::Entry<Waiter>>,
     ) -> Poll<Result<(), AcquireError>> {
         let mut curr = self.permits.load(Ordering::Acquire);
-        loop {
+        let needed = needed as usize;
+        let (acquired, remaining) = loop {
+            dbg!(needed, curr);
             if curr == CLOSED {
                 return Ready(Err(AcquireError(())));
             }
-            let next = curr.saturating_sub(needed as usize);
+            let mut remaining = 0;
+            let (next, acquired) = if dbg!(curr) >= dbg!(needed) {
+                (curr - needed, needed)
+            } else {
+                remaining = needed - curr;
+                (0, curr)
+            };
             match self.permits.compare_exchange_weak(
                 curr,
                 next,
                 Ordering::AcqRel,
                 Ordering::Acquire,
             ) {
-                Ok(_) => break,
+                Ok(_) => break (acquired, remaining),
                 Err(actual) => curr = actual,
             }
+        };
+        dbg!(acquired, remaining);
+        if remaining == 0 {
+            return Ready(Ok(()));
         }
 
         assert!(node.is_unlinked());
         let waiter = unsafe { &*node.get() };
-        if waiter.state.fetch_sub(curr, Ordering::AcqRel) == curr {
-            return Ready(Ok(())); // yay!
-        };
+        waiter
+            .state
+            .compare_exchange(
+                Waiter::UNQUEUED,
+                remaining,
+                Ordering::Release,
+                Ordering::Relaxed,
+            )
+            .expect("not unqueued");
         // otherwise, register the waker & enqueue the node.
         waiter.waker.register_by_ref(cx.waker());
 
@@ -244,10 +262,7 @@ impl Permit {
             PermitState::Acquired(n) => PermitState::Acquired(n),
         };
         Acquire {
-            node: linked_list::Entry::new(Waiter {
-                waker: AtomicWaker::new(),
-                state: AtomicUsize::new(num_permits as usize),
-            }),
+            node: linked_list::Entry::new(Waiter::new()),
             semaphore,
             permit: self,
             num_permits,
@@ -320,7 +335,13 @@ impl Default for Permit {
 }
 
 impl Waiter {
-    const QUEUED: usize = 0b1;
+    const UNQUEUED: usize = 1 << 16;
+    fn new() -> Self {
+        Waiter {
+            waker: AtomicWaker::new(),
+            state: AtomicUsize::new(Self::UNQUEUED),
+        }
+    }
 
     /// Assign permits to the waiter.
     ///
@@ -390,7 +411,7 @@ impl Future for Acquire<'_> {
         permit.state = match permit.state {
             PermitState::Acquired(n) if n >= needed => return Ready(Ok(())),
             PermitState::Acquired(n) => {
-                ready!(semaphore.poll_acquire(cx, needed, node))?;
+                ready!(semaphore.poll_acquire(cx, needed - n, node))?;
                 PermitState::Acquired(needed)
             }
             PermitState::Waiting(_n) => {
