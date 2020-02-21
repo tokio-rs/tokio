@@ -58,11 +58,7 @@ impl Semaphore {
     /// Acquires permit from the semaphore
     pub async fn acquire(&self) -> SemaphorePermit<'_> {
         let mut ll_permit = ll::Permit::new();
-        poll_fn(|cx| {
-            unsafe { Pin::new_unchecked(&mut ll_permit) }.poll_acquire(cx, 1, &self.ll_sem)
-        })
-        .await
-        .unwrap();
+        ll_permit.acquire(1, &self.ll_sem).await.unwrap();
         SemaphorePermit {
             sem: &self,
             ll_permit,

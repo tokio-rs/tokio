@@ -109,16 +109,8 @@ struct ReleasingPermit<'a, T> {
 }
 
 impl<'a, T> ReleasingPermit<'a, T> {
-    fn poll_acquire(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        s: &Semaphore,
-    ) -> Poll<Result<(), AcquireError>> {
-        let (num_permits, permit) = unsafe {
-            let this = self.get_unchecked_mut();
-            (this.num_permits, Pin::new_unchecked(&mut this.permit))
-        };
-        permit.poll_acquire(cx, num_permits, s)
+    async fn acquire(&mut self) -> Result<(), AcquireError> {
+        self.permit.acquire(self.num_permits, &self.lock.s).await
     }
 }
 
@@ -186,13 +178,11 @@ impl<T> RwLock<T> {
             permit: Permit::new(),
             lock: self,
         };
-        poll_fn(|cx| unsafe { Pin::new_unchecked(&mut permit) }.poll_acquire(cx, &self.s))
-            .await
-            .unwrap_or_else(|_| {
-                // The semaphore was closed. but, we never explicitly close it, and we have a
-                // handle to it through the Arc, which means that this can never happen.
-                unreachable!()
-            });
+        permit.acquire().await.unwrap_or_else(|_| {
+            // The semaphore was closed. but, we never explicitly close it, and we have a
+            // handle to it through the Arc, which means that this can never happen.
+            unreachable!()
+        });
         RwLockReadGuard { lock: self, permit }
     }
 
@@ -225,13 +215,11 @@ impl<T> RwLock<T> {
             lock: self,
         };
 
-        poll_fn(|cx| unsafe { Pin::new_unchecked(&mut permit) }.poll_acquire(cx, &self.s))
-            .await
-            .unwrap_or_else(|_| {
-                // The semaphore was closed. but, we never explicitly close it, and we have a
-                // handle to it through the Arc, which means that this can never happen.
-                unreachable!()
-            });
+        permit.acquire().await.unwrap_or_else(|_| {
+            // The semaphore was closed. but, we never explicitly close it, and we have a
+            // handle to it through the Arc, which means that this can never happen.
+            unreachable!()
+        });
 
         RwLockWriteGuard { lock: self, permit }
     }

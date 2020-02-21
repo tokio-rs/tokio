@@ -432,9 +432,10 @@ impl Semaphore for (crate::sync::semaphore_ll::Semaphore, usize) {
         cx: &mut Context<'_>,
         permit: Pin<&mut Permit>,
     ) -> Poll<Result<(), ClosedError>> {
-        permit
-            .poll_acquire(cx, 1, &self.0)
-            .map_err(|_| ClosedError::new())
+        // permit
+        //     .poll_acquire(cx, 1, &self.0)
+        //     .map_err(|_| ClosedError::new())
+        unimplemented!()
     }
 
     fn try_acquire(&self, permit: &mut Permit) -> Result<(), TrySendError> {

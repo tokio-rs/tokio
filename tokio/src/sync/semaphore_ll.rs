@@ -1,12 +1,13 @@
 use crate::loom::{
     alloc,
     future::AtomicWaker,
-    sync::{atomic::AtomicUsize, Mutex},
+    sync::{atomic::AtomicUsize, Mutex, MutexGuard},
 };
 use crate::util::linked_list::{self, LinkedList};
 
 use std::{
     cmp, fmt,
+    future::Future,
     pin::Pin,
     ptr::NonNull,
     sync::atomic::Ordering,
@@ -32,13 +33,16 @@ pub(crate) enum TryAcquireError {
 #[derive(Debug)]
 pub(crate) struct AcquireError(());
 
-pin_project_lite::pin_project! {
-    // #[derive(Debug)]
-    pub(crate) struct Permit {
-        #[pin]
-        node: linked_list::Entry<Waiter>,
-        state: PermitState,
-    }
+#[derive(Debug)]
+pub(crate) struct Permit {
+    state: PermitState,
+}
+
+pub(crate) struct Acquire<'a> {
+    node: linked_list::Entry<Waiter>,
+    semaphore: &'a Semaphore,
+    permit: &'a mut Permit,
+    num_permits: u16,
 }
 
 /// Permit state
@@ -91,7 +95,7 @@ impl Semaphore {
             return;
         }
 
-        self.add_permits_locked(0, true);
+        self.add_permits_locked(0, true, self.waiters.lock().unwrap());
     }
 
     /// Adds `n` new permits to the semaphore.
@@ -108,19 +112,28 @@ impl Semaphore {
             // pending waiters.
             return;
         }
-        self.add_permits_locked(n, false);
+
+        self.add_permits_locked(n, false, self.waiters.lock().unwrap());
     }
 
-    fn add_permits_locked(&self, mut rem: usize, mut closed: bool) {
+    fn add_permits_locked(
+        &self,
+        mut rem: usize,
+        mut closed: bool,
+        mut waiters: MutexGuard<'_, LinkedList<Waiter>>,
+    ) {
         while rem > 0 || closed {
+            // how many permits are we releasing on this pass?
+
+            let initial = rem;
             // Release the permits and notify
-            let mut waiters = self.waiters.lock().unwrap();
-            while rem > 0 {
+            while dbg!(rem > 0) {
                 let pop = match waiters.last() {
-                    Some(last) => last.assign_permits(&mut rem, closed),
+                    Some(last) => dbg!(last.assign_permits(&mut rem, closed)),
                     None => {
                         self.permits.fetch_add(rem, Ordering::Release);
                         break;
+                        // false
                     }
                 };
                 if pop {
@@ -128,7 +141,7 @@ impl Semaphore {
                 }
             }
 
-            let n = rem << 1;
+            let n = (initial - rem) << 1;
 
             let actual = if closed {
                 let actual = self.add_lock.fetch_sub(n | 1, Ordering::AcqRel);
@@ -140,7 +153,7 @@ impl Semaphore {
                 actual
             };
 
-            rem = (actual >> 1) - rem;
+            rem = (actual - initial) >> 1;
         }
     }
 
@@ -151,7 +164,7 @@ impl Semaphore {
         node: Pin<&mut linked_list::Entry<Waiter>>,
     ) -> Poll<Result<(), AcquireError>> {
         let mut curr = self.permits.load(Ordering::Acquire);
-        let remaining = loop {
+        loop {
             if curr == CLOSED {
                 return Ready(Err(AcquireError(())));
             }
@@ -162,26 +175,23 @@ impl Semaphore {
                 Ordering::AcqRel,
                 Ordering::Acquire,
             ) {
-                Ok(_) if curr >= needed as usize => return Ready(Ok(())),
-                Ok(_) => break needed - curr as u16,
+                Ok(_) => break,
                 Err(actual) => curr = actual,
             }
-        };
-        // if we've not returned already, then we need to push the waiter to the
-        // wait queue.
-        assert!(node.is_unlinked());
-        {
-            let mut waiter = unsafe { &*node.get() };
-            waiter
-                .state
-                .compare_exchange(0, remaining as usize, Ordering::AcqRel, Ordering::Acquire)
-                .expect("unlinked node should not want permits!");
-            waiter.waker.register_by_ref(cx.waker());
         }
+
+        assert!(node.is_unlinked());
+        let waiter = unsafe { &*node.get() };
+        if waiter.state.fetch_sub(curr, Ordering::AcqRel) == curr {
+            return Ready(Ok(())); // yay!
+        };
+        // otherwise, register the waker & enqueue the node.
+        waiter.waker.register_by_ref(cx.waker());
 
         let mut queue = self.waiters.lock().unwrap();
         unsafe {
             queue.push_front(node);
+            println!("enqueue");
         }
 
         Pending
@@ -210,13 +220,7 @@ impl Permit {
     pub(crate) fn new() -> Permit {
         use PermitState::Acquired;
 
-        Permit {
-            node: linked_list::Entry::new(Waiter {
-                waker: AtomicWaker::new(),
-                state: AtomicUsize::new(0),
-            }),
-            state: Acquired(0),
-        }
+        Permit { state: Acquired(0) }
     }
 
     /// Returns `true` if the permit has been acquired
@@ -227,15 +231,27 @@ impl Permit {
         }
     }
 
-    /// Tries to acquire the permit. If no permits are available, the current task
+    /// Returns a future that tries to acquire the permit. If no permits are available, the current task
     /// is notified once a new permit becomes available.
-    pub(crate) fn poll_acquire(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
+    pub(crate) fn acquire<'a>(
+        &'a mut self,
         num_permits: u16,
-        semaphore: &Semaphore,
-    ) -> Poll<Result<(), AcquireError>> {
-        semaphore.poll_acquire(cx, num_permits, self.project().node)
+        semaphore: &'a Semaphore,
+    ) -> Acquire<'a> {
+        self.state = match self.state {
+            PermitState::Acquired(0) => PermitState::Waiting(num_permits),
+            PermitState::Waiting(n) => PermitState::Waiting(cmp::max(n, num_permits)),
+            PermitState::Acquired(n) => PermitState::Acquired(n),
+        };
+        Acquire {
+            node: linked_list::Entry::new(Waiter {
+                waker: AtomicWaker::new(),
+                state: AtomicUsize::new(num_permits as usize),
+            }),
+            semaphore,
+            permit: self,
+            num_permits,
+        }
     }
 
     /// Tries to acquire the permit.
@@ -268,37 +284,32 @@ impl Permit {
 
         match self.state {
             Waiting(requested) => {
-                let n = cmp::min(n, requested);
-                let node = unsafe { &*self.node.get() };
-                // Decrement
-                let acquired = node.try_dec_permits_to_acquire(n as usize) as u16;
+                panic!(
+                    "cannot forget permits while in wait queue; we are already borrowed mutably?"
+                )
+                // let n = cmp::min(n, requested);
+                // let node = unsafe { &*self.node.get() };
+                // // Decrement
+                // let acquired = node.try_dec_permits_to_acquire(n as usize) as u16;
 
-                if n == requested {
-                    self.state = Acquired(0);
-                // // TODO: rm from wait list here!
-                // semaphore
-                } else if acquired == requested - n {
-                    self.state = Waiting(acquired);
-                } else {
-                    self.state = Waiting(requested - n);
-                }
+                // if n == requested {
+                //     self.state = Acquired(0);
+                // // // TODO: rm from wait list here!
+                // // semaphore
+                // } else if acquired == requested - n {
+                //     self.state = Waiting(acquired);
+                // } else {
+                //     self.state = Waiting(requested - n);
+                // }
 
-                acquired
+                // acquired
             }
             Acquired(acquired) => {
                 let n = cmp::min(n, acquired);
                 self.state = Acquired(acquired - n);
-                n
+                dbg!(n)
             }
         }
-    }
-}
-
-impl fmt::Debug for Permit {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("Permit")
-            .field("state", &self.state)
-            .finish()
     }
 }
 
@@ -309,6 +320,8 @@ impl Default for Permit {
 }
 
 impl Waiter {
+    const QUEUED: usize = 0b1;
+
     /// Assign permits to the waiter.
     ///
     /// Returns `true` if the waiter should be removed from the queue
@@ -365,6 +378,84 @@ impl Waiter {
                 Err(actual) => curr = actual,
             }
         }
+    }
+}
+
+impl Future for Acquire<'_> {
+    type Output = Result<(), AcquireError>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let (node, semaphore, permit, mut needed) = self.project();
+        dbg!(&semaphore, &permit, &needed);
+        permit.state = match permit.state {
+            PermitState::Acquired(n) if n >= needed => return Ready(Ok(())),
+            PermitState::Acquired(n) => {
+                ready!(semaphore.poll_acquire(cx, needed, node))?;
+                PermitState::Acquired(needed)
+            }
+            PermitState::Waiting(_n) => {
+                assert_eq!(_n, needed, "how the heck did you get in this state?");
+                if unsafe { &*node.get() }.state.load(Ordering::Acquire) > 0 {
+                    ready!(semaphore.poll_acquire(cx, needed, node))?;
+                }
+                PermitState::Acquired(needed)
+            }
+        };
+        Ready(Ok(()))
+    }
+}
+
+impl Acquire<'_> {
+    fn project(
+        self: Pin<&mut Self>,
+    ) -> (
+        Pin<&mut linked_list::Entry<Waiter>>,
+        &Semaphore,
+        &mut Permit,
+        u16,
+    ) {
+        fn is_unpin<T: Unpin>() {}
+        unsafe {
+            // Safety: all fields other than `node` are `Unpin`
+
+            is_unpin::<&Semaphore>();
+            is_unpin::<&mut Permit>();
+            is_unpin::<u16>();
+
+            let this = self.get_unchecked_mut();
+            (
+                Pin::new_unchecked(&mut this.node),
+                &this.semaphore,
+                &mut this.permit,
+                this.num_permits,
+            )
+        }
+    }
+}
+
+impl Drop for Acquire<'_> {
+    fn drop(&mut self) {
+        dbg!("drop acquire");
+        if dbg!(self.node.is_unlinked()) {
+            // don't need to release permits
+            return;
+        }
+
+        // Safety: if the node is linked, then we are already pinned
+        let (mut node, semaphore, permit, needed) = unsafe { Pin::new_unchecked(self).project() };
+
+        // This is where we ensure safety. The future is being dropped,
+        // which means we must ensure that the waiter entry is no longer stored
+        // in the linked list.
+        let mut waiters = semaphore.waiters.lock().unwrap();
+
+        // remove the entry from the list
+        //
+        // safety: the waiter is only added to `waiters` by virtue of it
+        // being the only `LinkedList` available to the type.
+        unsafe { waiters.remove(node.as_mut()) };
+
+        // TODO(eliza): release permits to next waiter
     }
 }
 
