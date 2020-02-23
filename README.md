@@ -110,7 +110,7 @@ question. Last, if that doesn't work, try opening an [issue] with the question.
 you! We have a [contributing guide][guide] to help you get involved in the Tokio
 project.
 
-[guide]: CONTRIBUTING.md
+[guide]: https://github.com/tokio-rs/tokio/blob/master/CONTRIBUTING.md
 
 ## Related Projects
 
