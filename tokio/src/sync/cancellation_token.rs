@@ -232,7 +232,7 @@ impl CancellationTokenState {
 
         // Safety: Since we still retain a reference on the parent, it must be valid.
         let parent = unsafe { parent_ptr.as_mut() };
-        {
+        let removed_from_parent = {
             // Remove the token from the parents linked list
             let mut guard = parent.synchronized.lock().unwrap();
             if !guard.is_cancelled {
@@ -255,7 +255,7 @@ impl CancellationTokenState {
 
                 // We are no longer referenced by the parent, since we were able
                 // to remove our reference from the parents list.
-                current_state = self.remove_parent_ref(current_state);
+                true
             } else {
                 // Do not touch the linked list anymore. If the parent is cancelled
                 // it will move all childs outside of the Mutex and manipulate
@@ -264,7 +264,17 @@ impl CancellationTokenState {
                 // parent deal with it. The parent will make sure to retain a
                 // reference to this state as long as it manipulates the list
                 // pointers. Therefore the pointers are not dangling.
+                false
             }
+        };
+
+        if removed_from_parent {
+            // If the token removed itself from the parents list, it can reset
+            // the the parent ref status. If it is isn't able to do so, because the
+            // parent removed it from the list, there is no need to do this.
+            // The parent ref acts as as another reference count. Therefore
+            // removing this reference can free the object.
+            current_state = self.remove_parent_ref(current_state);
         }
 
         // We are not allowed to touch `self` here anymore, since it might have
