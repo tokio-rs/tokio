@@ -157,6 +157,11 @@ impl CancellationTokenState {
         }
     }
 
+    /// Returns a snapshot of the current atomic state of the token
+    fn snapshot(&self) -> StateSnapshot {
+        StateSnapshot::unpack(self.state.load(Ordering::SeqCst))
+    }
+
     fn atomic_update_state<F>(&self, mut current_state: StateSnapshot, func: F) -> StateSnapshot
     where
         F: Fn(StateSnapshot) -> StateSnapshot,
@@ -281,17 +286,16 @@ impl CancellationTokenState {
         // been freed in `self.remove_parent_ref()`!
 
         // Decrement the refcount on the parent and free it if necessary
-        parent.decrement_refcount(StateSnapshot::unpack(parent.state.load(Ordering::SeqCst)));
+        parent.decrement_refcount(parent.snapshot());
 
         current_state
     }
 
     fn cancel(&self) {
         // Move the state of the CancellationToken from `NotCancelled` to `Cancelling`
-        let mut current_packed_state = self.state.load(Ordering::SeqCst);
+        let mut current_state = self.snapshot();
 
         let state_after_cancellation = loop {
-            let current_state = StateSnapshot::unpack(current_packed_state);
             if current_state.cancel_state != CancellationState::NotCancelled {
                 // Another task already initiated the cancellation
                 return;
@@ -300,13 +304,13 @@ impl CancellationTokenState {
             let mut next_state = current_state;
             next_state.cancel_state = CancellationState::Cancelling;
             match self.state.compare_exchange(
-                current_packed_state,
+                current_state.pack(),
                 next_state.pack(),
                 Ordering::SeqCst,
                 Ordering::SeqCst,
             ) {
                 Ok(_) => break next_state,
-                Err(actual) => current_packed_state = actual,
+                Err(actual) => current_state = StateSnapshot::unpack(actual),
             }
         };
 
@@ -376,9 +380,7 @@ impl CancellationTokenState {
             // in interacting with the child anymore.
             // This is ONLY allowed once we promised not to touch the state anymore
             // after this interaction.
-            mut_child.remove_parent_ref(StateSnapshot::unpack(
-                mut_child.state.load(Ordering::SeqCst),
-            ));
+            mut_child.remove_parent_ref(mut_child.snapshot());
         }
 
         // The cancellation has completed
@@ -393,7 +395,7 @@ impl CancellationTokenState {
 
     /// Returns `true` if the `CancellationToken` had been cancelled
     fn is_cancelled(&self) -> bool {
-        let current_state = StateSnapshot::unpack(self.state.load(Ordering::Relaxed));
+        let current_state = self.snapshot();
         current_state.cancel_state != CancellationState::NotCancelled
     }
 
@@ -406,7 +408,7 @@ impl CancellationTokenState {
         cx: &mut Context<'_>,
     ) -> Poll<()> {
         debug_assert_eq!(PollState::New, wait_node.state);
-        let current_state = StateSnapshot::unpack(self.state.load(Ordering::SeqCst));
+        let current_state = self.snapshot();
 
         // Perform an optimistic cancellation check before. This is not strictly
         // necessary since we also check for cancellation in the Mutex, but
@@ -443,7 +445,7 @@ impl CancellationTokenState {
             "Method can only be called after task had been registered"
         );
 
-        let current_state = StateSnapshot::unpack(self.state.load(Ordering::SeqCst));
+        let current_state = self.snapshot();
 
         if current_state.cancel_state != CancellationState::NotCancelled {
             // If the cancellation had been fully completed we know that our `Waker`
@@ -573,7 +575,7 @@ impl Clone for CancellationToken {
         let inner = self.state();
 
         // Tokens are cloned by increasing their refcount
-        let current_state = StateSnapshot::unpack(inner.state.load(Ordering::SeqCst));
+        let current_state = inner.snapshot();
         inner.increment_refcount(current_state);
 
         CancellationToken { inner: self.inner }
@@ -586,7 +588,7 @@ impl Drop for CancellationToken {
         // is reference counted
         let inner = unsafe { &mut *self.inner.as_ptr() };
 
-        let mut current_state = StateSnapshot::unpack(inner.state.load(Ordering::SeqCst));
+        let mut current_state = inner.snapshot();
 
         // Drop our own refcount
         current_state = inner.decrement_refcount(current_state);
@@ -659,8 +661,7 @@ impl CancellationToken {
         // Increment the refcount of this token. It will be referenced by the
         // child, independent of whether the child is immediately cancelled or
         // not.
-        let _current_state =
-            inner.increment_refcount(StateSnapshot::unpack(inner.state.load(Ordering::SeqCst)));
+        let _current_state = inner.increment_refcount(inner.snapshot());
 
         let mut unpacked_child_state = StateSnapshot {
             has_parent_ref: true,
@@ -860,6 +861,14 @@ mod tests {
         let token = CancellationToken::new();
 
         let child_token = token.child_token();
+        assert_eq!(
+            StateSnapshot {
+                refcount: 1,
+                has_parent_ref: true,
+                cancel_state: CancellationState::NotCancelled,
+            },
+            child_token.state().snapshot()
+        );
 
         let child_fut = child_token.wait_for_cancellation();
         pin!(child_fut);
@@ -880,6 +889,14 @@ mod tests {
         assert_eq!(wake_counter, 2);
         assert_eq!(true, token.is_cancelled());
         assert_eq!(true, child_token.is_cancelled());
+        assert_eq!(
+            StateSnapshot {
+                refcount: 1,
+                has_parent_ref: false,
+                cancel_state: CancellationState::Cancelled,
+            },
+            child_token.state().snapshot()
+        );
 
         assert_eq!(
             Poll::Ready(()),
@@ -917,6 +934,14 @@ mod tests {
         assert_eq!(wake_counter, 1);
         assert_eq!(false, token.is_cancelled());
         assert_eq!(true, child_token_1.is_cancelled());
+        assert_eq!(
+            StateSnapshot {
+                refcount: 1,
+                has_parent_ref: true,
+                cancel_state: CancellationState::Cancelled,
+            },
+            child_token_1.state().snapshot()
+        );
 
         assert_eq!(
             Poll::Ready(()),
@@ -963,6 +988,15 @@ mod tests {
             token.cancel();
 
             let child_token = token.child_token();
+            assert_eq!(
+                StateSnapshot {
+                    refcount: 1,
+                    has_parent_ref: false,
+                    cancel_state: CancellationState::Cancelled,
+                },
+                child_token.state().snapshot()
+            );
+
             {
                 let child_fut = child_token.wait_for_cancellation();
                 pin!(child_fut);
@@ -999,8 +1033,43 @@ mod tests {
         let child1 = token.child_token();
         let child2 = token.child_token();
 
+        assert_eq!(
+            StateSnapshot {
+                refcount: 3,
+                has_parent_ref: false,
+                cancel_state: CancellationState::NotCancelled,
+            },
+            token.state().snapshot()
+        );
+        assert_eq!(
+            StateSnapshot {
+                refcount: 1,
+                has_parent_ref: true,
+                cancel_state: CancellationState::NotCancelled,
+            },
+            child1.state().snapshot()
+        );
+
         drop(child1);
+        assert_eq!(
+            StateSnapshot {
+                refcount: 2,
+                has_parent_ref: false,
+                cancel_state: CancellationState::NotCancelled,
+            },
+            token.state().snapshot()
+        );
+
         drop(child2);
+        assert_eq!(
+            StateSnapshot {
+                refcount: 1,
+                has_parent_ref: false,
+                cancel_state: CancellationState::NotCancelled,
+            },
+            token.state().snapshot()
+        );
+
         drop(token);
     }
 
@@ -1011,6 +1080,15 @@ mod tests {
         let child2 = token.child_token();
 
         drop(token);
+        assert_eq!(
+            StateSnapshot {
+                refcount: 1,
+                has_parent_ref: true,
+                cancel_state: CancellationState::NotCancelled,
+            },
+            child1.state().snapshot()
+        );
+
         drop(child1);
         drop(child2);
     }
