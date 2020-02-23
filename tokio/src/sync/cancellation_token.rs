@@ -1094,6 +1094,20 @@ mod tests {
     }
 
     #[test]
+    fn parent_refcoutn_only_decreases_if_all_child_clones_are_released() {
+        let token = CancellationToken::new();
+        let child1 = token.child_token();
+        let child2 = child1.clone();
+
+        assert_eq!(2, token.state().snapshot().refcount);
+
+        drop(child1);
+        assert_eq!(2, token.state().snapshot().refcount);
+        drop(child2);
+        assert_eq!(1, token.state().snapshot().refcount);
+    }
+
+    #[test]
     fn cancellation_future_is_send() {
         let token = CancellationToken::new();
         let fut = token.wait_for_cancellation();
