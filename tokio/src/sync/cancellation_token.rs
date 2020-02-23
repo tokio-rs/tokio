@@ -227,39 +227,36 @@ impl CancellationTokenState {
         return current_state;
     }
 
-    fn unregister_from_parent(&mut self, mut current_state: StateSnapshot) -> StateSnapshot {
-        // If there is any parent token, we need to unregister from it
-        let mut parent_ptr = if let Some(parent_ptr) = self.parent {
-            parent_ptr
-        } else {
-            return current_state;
-        };
-
-        // Safety: Since we still retain a reference on the parent, it must be valid.
-        let parent = unsafe { parent_ptr.as_mut() };
-        let removed_from_parent = {
-            // Remove the token from the parents linked list
-            let mut guard = parent.synchronized.lock().unwrap();
+    fn unregister_child(
+        &mut self,
+        child_state: &mut CancellationTokenState,
+        current_child_state: StateSnapshot,
+    ) {
+        let removed_child = {
+            // Remove the child toke from the parents linked list
+            let mut guard = self.synchronized.lock().unwrap();
             if !guard.is_cancelled {
-                if guard.first_child == Some(self.into()) {
-                    guard.first_child = self.from_parent.next_peer;
+                if guard.first_child == Some(child_state.into()) {
+                    guard.first_child = child_state.from_parent.next_peer;
                 }
                 // Safety: If peers wouldn't be valid anymore, they would try
                 // to remove themselves from the list. This would require locking
                 // the Mutex that we currently own.
                 unsafe {
-                    if let Some(mut prev_peer) = self.from_parent.prev_peer {
-                        prev_peer.as_mut().from_parent.next_peer = self.from_parent.next_peer;
+                    if let Some(mut prev_peer) = child_state.from_parent.prev_peer {
+                        prev_peer.as_mut().from_parent.next_peer =
+                            child_state.from_parent.next_peer;
                     }
-                    if let Some(mut next_peer) = self.from_parent.next_peer {
-                        next_peer.as_mut().from_parent.prev_peer = self.from_parent.prev_peer;
+                    if let Some(mut next_peer) = child_state.from_parent.next_peer {
+                        next_peer.as_mut().from_parent.prev_peer =
+                            child_state.from_parent.prev_peer;
                     }
                 }
-                self.from_parent.prev_peer = None;
-                self.from_parent.next_peer = None;
+                child_state.from_parent.prev_peer = None;
+                child_state.from_parent.next_peer = None;
 
-                // We are no longer referenced by the parent, since we were able
-                // to remove our reference from the parents list.
+                // The child is no longer referenced by the parent, since we were able
+                // to remove its reference from the parents list.
                 true
             } else {
                 // Do not touch the linked list anymore. If the parent is cancelled
@@ -273,22 +270,17 @@ impl CancellationTokenState {
             }
         };
 
-        if removed_from_parent {
+        if removed_child {
             // If the token removed itself from the parents list, it can reset
             // the the parent ref status. If it is isn't able to do so, because the
             // parent removed it from the list, there is no need to do this.
             // The parent ref acts as as another reference count. Therefore
             // removing this reference can free the object.
-            current_state = self.remove_parent_ref(current_state);
+            child_state.remove_parent_ref(current_child_state);
         }
 
-        // We are not allowed to touch `self` here anymore, since it might have
-        // been freed in `self.remove_parent_ref()`!
-
         // Decrement the refcount on the parent and free it if necessary
-        parent.decrement_refcount(parent.snapshot());
-
-        current_state
+        self.decrement_refcount(self.snapshot());
     }
 
     fn cancel(&self) {
@@ -590,12 +582,20 @@ impl Drop for CancellationToken {
 
         let mut current_state = inner.snapshot();
 
+        // We need to safe the parent, since the state might be released by the
+        // next call
+        let parent = inner.parent;
+
         // Drop our own refcount
         current_state = inner.decrement_refcount(current_state);
 
         // If this was the last reference, unregister from the parent
         if current_state.refcount == 0 {
-            inner.unregister_from_parent(current_state);
+            if let Some(mut parent) = parent {
+                // Safety: Since we still retain a reference on the parent, it must be valid.
+                let parent = unsafe { parent.as_mut() };
+                parent.unregister_child(inner.into(), current_state);
+            }
         }
     }
 }
