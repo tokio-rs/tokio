@@ -25,8 +25,8 @@ pub struct ReadHalf<'a>(&'a TcpStream);
 
 /// Write half of a `TcpStream`.
 ///
-/// Note that in the `AsyncWrite` implemenation of `TcpStreamWriteHalf`,
-/// `poll_shutdown` actually shuts down the TCP stream in the write direction.
+/// Note that in the `AsyncWrite` implemenation of this type, `poll_shutdown` will
+/// shut down the TCP stream in the write direction.
 #[derive(Debug)]
 pub struct WriteHalf<'a>(&'a TcpStream);
 

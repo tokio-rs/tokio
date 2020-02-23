@@ -22,14 +22,20 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-/// Owned read half of a `TcpStream`.
+/// Owned read half of a [`TcpStream`], created by [`split_owned`].
+///
+/// [`TcpStream`]: TcpStream
+/// [`split_owned`]: TcpStream::split_owned()
 #[derive(Debug)]
 pub struct OwnedReadHalf(Arc<TcpStream>);
 
-/// Owned write half of a `TcpStream`.
+/// Owned write half of a [`TcpStream`], created by [`split_owned`].
 ///
-/// Note that in the `AsyncWrite` implemenation of `TcpStreamWriteHalf`,
-/// `poll_shutdown` actually shuts down the TCP stream in the write direction.
+/// Note that in the `AsyncWrite` implemenation of this type, `poll_shutdown` will
+/// shut down the TCP stream in the write direction.
+///
+/// [`TcpStream`]: TcpStream
+/// [`split_owned`]: TcpStream::split_owned()
 #[derive(Debug)]
 pub struct OwnedWriteHalf(Arc<TcpStream>);
 
@@ -51,7 +57,7 @@ pub(crate) fn reunite(read: OwnedReadHalf, write: OwnedWriteHalf) -> Result<TcpS
 }
 
 /// Error indicating two halves were not from the same socket, and thus could
-/// not be `reunite`d.
+/// not be reunited.
 #[derive(Debug)]
 pub struct ReuniteError(pub OwnedReadHalf, pub OwnedWriteHalf);
 
@@ -69,7 +75,9 @@ impl Error for ReuniteError {}
 impl OwnedReadHalf {
     /// Attempts to put the two halves of a `TcpStream` back together and
     /// recover the original socket. Succeeds only if the two halves
-    /// originated from the same call to `TcpStream::split_owned`.
+    /// originated from the same call to [`split_owned`].
+    ///
+    /// [`split_owned`]: TcpStream::split_owned()
     pub fn reunite(self, other: OwnedWriteHalf) -> Result<TcpStream, ReuniteError> {
         reunite(self, other)
     }
@@ -163,7 +171,9 @@ impl AsyncRead for OwnedReadHalf {
 impl OwnedWriteHalf {
     /// Attempts to put the two halves of a `TcpStream` back together and
     /// recover the original socket. Succeeds only if the two halves
-    /// originated from the same call to `TcpStream::split_owned`.
+    /// originated from the same call to [`split_owned`].
+    ///
+    /// [`split_owned`]: TcpStream::split_owned()
     pub fn reunite(self, other: OwnedReadHalf) -> Result<TcpStream, ReuniteError> {
         reunite(other, self)
     }
