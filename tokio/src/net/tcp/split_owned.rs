@@ -14,7 +14,8 @@ use crate::io::{AsyncRead, AsyncWrite};
 use crate::net::TcpStream;
 
 use bytes::Buf;
-use std::io;
+use std::{fmt, io};
+use std::error::Error;
 use std::mem::MaybeUninit;
 use std::net::Shutdown;
 use std::pin::Pin;
@@ -38,7 +39,41 @@ pub(crate) fn split_owned(stream: TcpStream) -> (OwnedReadHalf, OwnedWriteHalf) 
     (OwnedReadHalf(arc), OwnedWriteHalf(arc2))
 }
 
+pub(crate) fn reunite(read: OwnedReadHalf, write: OwnedWriteHalf) -> Result<TcpStream, ReuniteError> {
+    if Arc::ptr_eq(&read.0, &write.0) {
+        drop(write);
+        // This unwrap cannot fail as the api does not allow creating more than two Arcs,
+        // and we just dropped the other half.
+        Ok(Arc::try_unwrap(read.0).expect("Too many handles to Arc"))
+    } else {
+        Err(ReuniteError(read, write))
+    }
+}
+
+/// Error indicating two halves were not from the same socket, and thus could
+/// not be `reunite`d.
+#[derive(Debug)]
+pub struct ReuniteError(pub OwnedReadHalf, pub OwnedWriteHalf);
+
+impl fmt::Display for ReuniteError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "tried to reunite halves that are not from the same socket"
+        )
+    }
+}
+
+impl Error for ReuniteError {}
+
 impl OwnedReadHalf {
+    /// Attempts to put the two halves of a `TcpStream` back together and
+    /// recover the original socket. Succeeds only if the two halves
+    /// originated from the same call to `TcpStream::split_owned`.
+    pub fn reunite(self, other: OwnedWriteHalf) -> Result<TcpStream, ReuniteError> {
+        reunite(self, other)
+    }
+
     /// Attempt to receive data on the socket, without removing that data from
     /// the queue, registering the current task for wakeup if data is not yet
     /// available.
@@ -122,6 +157,15 @@ impl AsyncRead for OwnedReadHalf {
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
         self.0.poll_read_priv(cx, buf)
+    }
+}
+
+impl OwnedWriteHalf {
+    /// Attempts to put the two halves of a `TcpStream` back together and
+    /// recover the original socket. Succeeds only if the two halves
+    /// originated from the same call to `TcpStream::split_owned`.
+    pub fn reunite(self, other: OwnedReadHalf) -> Result<TcpStream, ReuniteError> {
+        reunite(other, self)
     }
 }
 
