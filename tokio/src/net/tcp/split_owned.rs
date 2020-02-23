@@ -14,13 +14,13 @@ use crate::io::{AsyncRead, AsyncWrite};
 use crate::net::TcpStream;
 
 use bytes::Buf;
-use std::{fmt, io};
 use std::error::Error;
 use std::mem::MaybeUninit;
 use std::net::Shutdown;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use std::{fmt, io};
 
 /// Owned read half of a [`TcpStream`], created by [`split_owned`].
 ///
@@ -45,7 +45,10 @@ pub(crate) fn split_owned(stream: TcpStream) -> (OwnedReadHalf, OwnedWriteHalf) 
     (OwnedReadHalf(arc), OwnedWriteHalf(arc2))
 }
 
-pub(crate) fn reunite(read: OwnedReadHalf, write: OwnedWriteHalf) -> Result<TcpStream, ReuniteError> {
+pub(crate) fn reunite(
+    read: OwnedReadHalf,
+    write: OwnedWriteHalf,
+) -> Result<TcpStream, ReuniteError> {
     if Arc::ptr_eq(&read.0, &write.0) {
         drop(write);
         // This unwrap cannot fail as the api does not allow creating more than two Arcs,
