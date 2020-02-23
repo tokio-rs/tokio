@@ -1,8 +1,9 @@
-//! `TcpStream` split support.
+//! `TcpStream` owned split support.
 //!
-//! A `TcpStream` can be split into a `ReadHalf` and a
-//! `WriteHalf` with the `TcpStream::split` method. `ReadHalf`
-//! implements `AsyncRead` while `WriteHalf` implements `AsyncWrite`.
+//! A `TcpStream` can be split into an `OwnedReadHalf` and a
+//! `OwnedWriteHalf` with the `TcpStream::split_owned` method.
+//! `OwnedReadHalf` implements `AsyncRead` while `OwnedWriteHalf`
+//! implements `AsyncWrite`.
 //!
 //! Compared to the generic split of `AsyncRead + AsyncWrite`, this specialized
 //! split has no associated overhead and enforces all invariants at the type
@@ -17,24 +18,27 @@ use std::io;
 use std::mem::MaybeUninit;
 use std::net::Shutdown;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
-/// Read half of a `TcpStream`.
+/// Owned read half of a `TcpStream`.
 #[derive(Debug)]
-pub struct ReadHalf<'a>(&'a TcpStream);
+pub struct OwnedReadHalf(Arc<TcpStream>);
 
-/// Write half of a `TcpStream`.
+/// Owned write half of a `TcpStream`.
 ///
 /// Note that in the `AsyncWrite` implemenation of `TcpStreamWriteHalf`,
 /// `poll_shutdown` actually shuts down the TCP stream in the write direction.
 #[derive(Debug)]
-pub struct WriteHalf<'a>(&'a TcpStream);
+pub struct OwnedWriteHalf(Arc<TcpStream>);
 
-pub(crate) fn split(stream: &mut TcpStream) -> (ReadHalf<'_>, WriteHalf<'_>) {
-    (ReadHalf(&*stream), WriteHalf(&*stream))
+pub(crate) fn split_owned(stream: TcpStream) -> (OwnedReadHalf, OwnedWriteHalf) {
+    let arc = Arc::new(stream);
+    let arc2 = Arc::clone(&arc);
+    (OwnedReadHalf(arc), OwnedWriteHalf(arc2))
 }
 
-impl ReadHalf<'_> {
+impl OwnedReadHalf {
     /// Attempt to receive data on the socket, without removing that data from
     /// the queue, registering the current task for wakeup if data is not yet
     /// available.
@@ -51,8 +55,8 @@ impl ReadHalf<'_> {
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
-    ///     let mut stream = TcpStream::connect("127.0.0.1:8000").await?;
-    ///     let (mut read_half, _) = stream.split();
+    ///     let stream = TcpStream::connect("127.0.0.1:8000").await?;
+    ///     let (mut read_half, _) = stream.split_owned();
     ///     let mut buf = [0; 10];
     ///
     ///     poll_fn(|cx| {
@@ -84,8 +88,8 @@ impl ReadHalf<'_> {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     // Connect to a peer
-    ///     let mut stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///     let (mut read_half, _) = stream.split();
+    ///     let stream = TcpStream::connect("127.0.0.1:8080").await?;
+    ///     let (mut read_half, _) = stream.split_owned();
     ///
     ///     let mut b1 = [0; 10];
     ///     let mut b2 = [0; 10];
@@ -107,7 +111,7 @@ impl ReadHalf<'_> {
     }
 }
 
-impl AsyncRead for ReadHalf<'_> {
+impl AsyncRead for OwnedReadHalf {
     unsafe fn prepare_uninitialized_buffer(&self, _: &mut [MaybeUninit<u8>]) -> bool {
         false
     }
@@ -121,7 +125,7 @@ impl AsyncRead for ReadHalf<'_> {
     }
 }
 
-impl AsyncWrite for WriteHalf<'_> {
+impl AsyncWrite for OwnedWriteHalf {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -150,14 +154,14 @@ impl AsyncWrite for WriteHalf<'_> {
     }
 }
 
-impl AsRef<TcpStream> for ReadHalf<'_> {
+impl AsRef<TcpStream> for OwnedReadHalf {
     fn as_ref(&self) -> &TcpStream {
-        self.0
+        &*self.0
     }
 }
 
-impl AsRef<TcpStream> for WriteHalf<'_> {
+impl AsRef<TcpStream> for OwnedWriteHalf {
     fn as_ref(&self) -> &TcpStream {
-        self.0
+        &*self.0
     }
 }
