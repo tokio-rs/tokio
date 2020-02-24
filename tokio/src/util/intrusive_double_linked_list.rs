@@ -73,9 +73,8 @@ impl<T> LinkedList<T> {
     pub unsafe fn add_front(&mut self, node: &mut ListNode<T>) {
         node.next = self.head;
         node.prev = None;
-        match self.head {
-            Some(mut head) => head.as_mut().prev = Some(node.into()),
-            None => {}
+        if let Some(mut head) = self.head {
+            head.as_mut().prev = Some(node.into())
         };
         self.head = Some(node.into());
         if self.tail.is_none() {
@@ -169,6 +168,8 @@ impl<T> LinkedList<T> {
 
     /// Removes the first node from the linked list
     pub fn remove_first(&mut self) -> Option<&mut ListNode<T>> {
+        #![allow(clippy::debug_assert_with_mut_call)]
+
         // Safety: When the node was inserted it was promised that it is alive
         // until it gets removed from the list
         unsafe {
@@ -195,6 +196,8 @@ impl<T> LinkedList<T> {
 
     /// Removes the last node from the linked list and returns it
     pub fn remove_last(&mut self) -> Option<&mut ListNode<T>> {
+        #![allow(clippy::debug_assert_with_mut_call)]
+
         // Safety: When the node was inserted it was promised that it is alive
         // until it gets removed from the list
         unsafe {
@@ -221,7 +224,7 @@ impl<T> LinkedList<T> {
 
     /// Returns whether the linked list doesn not contain any node
     pub fn is_empty(&self) -> bool {
-        if !self.head.is_none() {
+        if self.head.is_some() {
             return false;
         }
 
@@ -235,6 +238,8 @@ impl<T> LinkedList<T> {
     /// list, or of no list at all. If `node` is part of another list, the
     /// behavior is undefined.
     pub unsafe fn remove(&mut self, node: &mut ListNode<T>) -> bool {
+        #![allow(clippy::debug_assert_with_mut_call)]
+
         match node.prev {
             None => {
                 // This might be the first node in the list. If it is not, the
