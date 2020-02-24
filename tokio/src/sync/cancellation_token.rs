@@ -125,7 +125,7 @@ impl StateSnapshot {
     /// Whether this `CancellationTokenState` is still referenced by any
     /// `CancellationToken`.
     fn has_refs(&self) -> bool {
-        self.refcount != 0 || !self.has_parent_ref
+        self.refcount != 0 || self.has_parent_ref
     }
 }
 
@@ -244,6 +244,7 @@ impl CancellationTokenState {
                 // Safety: Since the token was not cancelled, the child must
                 // still be in the list and valid.
                 let mut child_state = unsafe { child_state.as_mut() };
+                debug_assert!(child_state.snapshot().has_parent_ref);
 
                 if guard.first_child == Some(child_state.into()) {
                     guard.first_child = child_state.from_parent.next_peer;
