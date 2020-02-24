@@ -534,8 +534,9 @@ impl CancellationTokenState {
 ///
 /// # Examples
 ///
-/// ```
-/// use tokio::sync::CancellationToken;
+/// ```ignore
+/// use tokio::select;
+/// use tokio::scope::CancellationToken;
 ///
 /// #[tokio::main]
 /// async fn main() {
@@ -543,8 +544,16 @@ impl CancellationTokenState {
 ///     let cloned_token = token.clone();
 ///
 ///     let join_handle = tokio::spawn(async move {
-///         cloned_token.wait_for_cancellation().await;
-///         5
+///         // Wait for either cancellation or a very long time
+///         select! {
+///             _ = cloned_token.wait_for_cancellation() => {
+///                 // The token was cancelled
+///                 5
+///             }
+///             _ = tokio::time::delay_for(std::time::Duration::from_secs(9999)) => {
+///                 99
+///             }
+///         }
 ///     });
 ///
 ///     tokio::spawn(async move {
@@ -616,7 +625,8 @@ impl Drop for CancellationToken {
 
 impl CancellationToken {
     /// Creates a new CancellationToken in the non-cancelled state.
-    pub fn new() -> CancellationToken {
+    #[allow(dead_code)]
+    pub(crate) fn new() -> CancellationToken {
         let state = Box::new(CancellationTokenState::new(
             None,
             StateSnapshot {
@@ -646,10 +656,11 @@ impl CancellationToken {
     /// If the current token is already cancelled, the child token will get
     /// returned in cancelled state.
     ///
-    /// /// # Examples
+    /// # Examples
     ///
-    /// ```
-    /// use tokio::sync::CancellationToken;
+    /// ```ignore
+    /// use tokio::select;
+    /// use tokio::scope::CancellationToken;
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -657,8 +668,16 @@ impl CancellationToken {
     ///     let child_token = token.child_token();
     ///
     ///     let join_handle = tokio::spawn(async move {
-    ///         child_token.wait_for_cancellation().await;
-    ///         5
+    ///         // Wait for either cancellation or a very long time
+    ///         select! {
+    ///             _ = child_token.wait_for_cancellation() => {
+    ///                 // The token was cancelled
+    ///                 5
+    ///             }
+    ///             _ = tokio::time::delay_for(std::time::Duration::from_secs(9999)) => {
+    ///                 99
+    ///             }
+    ///         }
     ///     });
     ///
     ///     tokio::spawn(async move {
@@ -669,7 +688,8 @@ impl CancellationToken {
     ///     assert_eq!(5, join_handle.await.unwrap());
     /// }
     /// ```
-    pub fn child_token(&self) -> CancellationToken {
+    #[allow(dead_code)]
+    pub(crate) fn child_token(&self) -> CancellationToken {
         let inner = self.state();
 
         // Increment the refcount of this token. It will be referenced by the
@@ -746,7 +766,8 @@ impl CancellationToken {
     /// derived from it.
     ///
     /// This will wake up all tasks which are waiting for cancellation.
-    pub fn cancel(&self) {
+    #[allow(dead_code)]
+    pub(crate) fn cancel(&self) {
         self.state().cancel();
     }
 

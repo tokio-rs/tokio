@@ -41,6 +41,7 @@ full = [
   "rt-core",
   "rt-util",
   "rt-threaded",
+  "scope",
   "signal",
   "stream",
   "sync",
@@ -73,6 +74,7 @@ rt-threaded = [
   "num_cpus",
   "rt-core",
 ]
+scope = []
 signal = [
   "io-driver",
   "lazy_static",

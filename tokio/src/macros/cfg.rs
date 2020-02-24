@@ -187,6 +187,16 @@ macro_rules! cfg_process {
     }
 }
 
+macro_rules! cfg_scope {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "scope")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "scope")))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_signal {
     ($($item:item)*) => {
         $(

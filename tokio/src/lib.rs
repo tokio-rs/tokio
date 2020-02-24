@@ -368,6 +368,10 @@ pub mod runtime;
 
 pub(crate) mod coop;
 
+cfg_scope! {
+    pub mod scope;
+}
+
 cfg_signal! {
     pub mod signal;
 }
