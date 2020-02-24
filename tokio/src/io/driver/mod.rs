@@ -277,20 +277,12 @@ impl Inner {
             .get(token)
             .unwrap_or_else(|| panic!("IO resource for token {:?} does not exist!", token));
 
-        let readiness = sched
-            .get_readiness(token)
-            .unwrap_or_else(|| panic!("token {:?} no longer valid!", token));
-
-        let (waker, ready) = match dir {
-            Direction::Read => (&sched.reader, !mio::Ready::writable()),
-            Direction::Write => (&sched.writer, mio::Ready::writable()),
+        let waker = match dir {
+            Direction::Read => &sched.reader,
+            Direction::Write => &sched.writer,
         };
 
         waker.register(w);
-
-        if readiness & ready.as_usize() != 0 {
-            waker.wake();
-        }
     }
 }
 
