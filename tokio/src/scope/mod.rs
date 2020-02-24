@@ -13,3 +13,7 @@
 
 mod cancellation_token;
 pub use cancellation_token::{CancellationToken, WaitForCancellationFuture};
+
+/// Unit tests
+#[cfg(test)]
+mod tests;
