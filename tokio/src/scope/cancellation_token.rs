@@ -209,7 +209,8 @@ impl CancellationTokenState {
             // Boxes
             let _ = unsafe { Box::from_raw(self as *const Self as *mut Self) };
         }
-        return current_state;
+
+        current_state
     }
 
     fn remove_parent_ref(&self, current_state: StateSnapshot) -> StateSnapshot {
@@ -224,7 +225,8 @@ impl CancellationTokenState {
             // Boxes
             let _ = unsafe { Box::from_raw(self as *const Self as *mut Self) };
         }
-        return current_state;
+
+        current_state
     }
 
     /// Unregisters a child from the parent token.
@@ -429,13 +431,13 @@ impl CancellationTokenState {
         if guard.is_cancelled {
             // Cancellation was signalled
             wait_node.state = PollState::Done;
-            return Poll::Ready(());
+            Poll::Ready(())
         } else {
             // Added the task to the wait queue
             wait_node.task = Some(cx.waker().clone());
             wait_node.state = PollState::Waiting;
             guard.waiters.add_front(wait_node);
-            return Poll::Pending;
+            Poll::Pending
         }
     }
 
@@ -482,7 +484,7 @@ impl CancellationTokenState {
                     // been removed from the waiting list
                     debug_assert_eq!(PollState::Done, wait_node.state);
                     wait_node.task = None;
-                    return Poll::Ready(());
+                    Poll::Ready(())
                 } else {
                     // The WaitForCancellationFuture is already in the queue.
                     // The CancellationToken can't have been cancelled,
@@ -490,7 +492,7 @@ impl CancellationTokenState {
                     // Therefore we just have to update the Waker. A follow-up
                     // cancellation will always use the new waker.
                     wait_node.task = Some(cx.waker().clone());
-                    return Poll::Pending;
+                    Poll::Pending
                 }
             } else {
                 // Do nothing. If the token gets cancelled, this task will get
