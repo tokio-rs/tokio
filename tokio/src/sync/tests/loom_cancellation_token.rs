@@ -58,13 +58,11 @@ fn cancel_with_child() {
 }
 
 #[test]
-fn drop_token() {
+fn drop_token_no_child() {
     loom::model(|| {
         let token = CancellationToken::new();
         let token1 = token.clone();
         let token2 = token.clone();
-        let child_token = token.child_token();
-        let child_token2 = token.child_token();
 
         let th1 = thread::spawn(move || {
             drop(token1);
@@ -75,28 +73,46 @@ fn drop_token() {
         });
 
         let th3 = thread::spawn(move || {
-            drop(child_token);
+            drop(token);
         });
 
-        let th4 = thread::spawn(move || {
+        assert_ok!(th1.join());
+        assert_ok!(th2.join());
+        assert_ok!(th3.join());
+    });
+}
+
+#[test]
+fn drop_token_with_childs() {
+    loom::model(|| {
+        let token1 = CancellationToken::new();
+        let child_token1 = token1.child_token();
+        let child_token2 = token1.child_token();
+
+        let th1 = thread::spawn(move || {
+            drop(token1);
+        });
+
+        let th2 = thread::spawn(move || {
+            drop(child_token1);
+        });
+
+        let th3 = thread::spawn(move || {
             drop(child_token2);
         });
 
         assert_ok!(th1.join());
         assert_ok!(th2.join());
         assert_ok!(th3.join());
-        assert_ok!(th4.join());
     });
 }
 
 #[test]
 fn drop_and_cancel_token() {
     loom::model(|| {
-        let token = CancellationToken::new();
-        let token1 = token.clone();
-        let token2 = token.clone();
-        let child_token = token.child_token();
-        let child_token2 = token.child_token();
+        let token1 = CancellationToken::new();
+        let token2 = token1.clone();
+        let child_token = token1.child_token();
 
         let th1 = thread::spawn(move || {
             drop(token1);
@@ -110,13 +126,33 @@ fn drop_and_cancel_token() {
             drop(child_token);
         });
 
-        let th4 = thread::spawn(move || {
-            child_token2.cancel();
+        assert_ok!(th1.join());
+        assert_ok!(th2.join());
+        assert_ok!(th3.join());
+    });
+}
+
+#[test]
+fn cancel_parent_and_child() {
+    loom::model(|| {
+        let token1 = CancellationToken::new();
+        let token2 = token1.clone();
+        let child_token = token1.child_token();
+
+        let th1 = thread::spawn(move || {
+            drop(token1);
+        });
+
+        let th2 = thread::spawn(move || {
+            token2.cancel();
+        });
+
+        let th3 = thread::spawn(move || {
+            child_token.cancel();
         });
 
         assert_ok!(th1.join());
         assert_ok!(th2.join());
         assert_ok!(th3.join());
-        assert_ok!(th4.join());
     });
 }
