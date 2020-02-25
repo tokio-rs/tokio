@@ -29,7 +29,7 @@ pub(crate) struct ThreadPool {
 
 /// Submit futures to the associated thread pool for execution.
 ///
-/// A `Spawner` instance is a handle to a single thread pool, allowing the owner
+/// A `Spawner` instance is a handle to a single thread pool that allows the owner
 /// of the handle to spawn futures onto the thread pool.
 ///
 /// The `Spawner` handle is *only* used for spawning new futures. It does not
