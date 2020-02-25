@@ -218,6 +218,8 @@ where
 {
     fn drop(&mut self) {
         enter(self, |scheduler, context| {
+            // Loop required here to ensure borrow is dropped between iterations
+            #[allow(clippy::while_let_loop)]
             loop {
                 let task = match context.tasks.borrow_mut().owned.pop() {
                     Some(task) => task,

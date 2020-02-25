@@ -54,6 +54,7 @@ unsafe fn inc_ref_count<T: Wake>(data: *const ()) {
     let arc = ManuallyDrop::new(Arc::<T>::from_raw(data as *const T));
 
     // Now increase refcount, but don't drop new refcount either
+    #[allow(clippy::redundant_clone)]
     let _arc_clone: mem::ManuallyDrop<_> = arc.clone();
 }
 

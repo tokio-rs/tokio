@@ -474,6 +474,8 @@ impl Default for LocalSet {
 impl Drop for LocalSet {
     fn drop(&mut self) {
         self.with(|| {
+            // Loop required here to ensure borrow is dropped between iterations
+            #[allow(clippy::while_let_loop)]
             loop {
                 let task = match self.context.tasks.borrow_mut().owned.pop() {
                     Some(task) => task,
