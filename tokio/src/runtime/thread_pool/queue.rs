@@ -223,7 +223,7 @@ impl<T> Local<T> {
                 })
             };
 
-            // safety: THe above CAS prevents a stealer from accessing these
+            // safety: the above CAS prevents a stealer from accessing these
             // tasks and we are the only producer.
             self.inner.buffer[i_idx].with_mut(|ptr| unsafe {
                 let ptr = (*ptr).as_ptr();
@@ -231,6 +231,8 @@ impl<T> Local<T> {
             });
         }
 
+        // safety: the above CAS prevents a stealer from accessing these tasks
+        // and we are the only producer.
         let head = self.inner.buffer[head as usize & MASK]
             .with(|ptr| unsafe { ptr::read((*ptr).as_ptr()) });
 
@@ -265,6 +267,7 @@ impl<T> Local<T> {
                 // Tentatively read the task at the head position. Note that we
                 // have not yet claimed the task.
                 //
+                // safety: reading this as uninitialized memory.
                 unsafe { ptr::read(ptr) }
             });
 
@@ -275,6 +278,8 @@ impl<T> Local<T> {
                 .compare_and_swap(head, head.wrapping_add(1), Release);
 
             if actual == head {
+                // safety: we claimed the task and the data we read is
+                // initialized memory.
                 return Some(unsafe { task.assume_init() });
             }
 
@@ -538,7 +543,7 @@ impl<T: 'static> Inject<T> {
         // such, a non-atomic load followed by a store is safe.
         self.len.store(unsafe { self.len.unsync_load() } - 1, Release);
 
-        // a `Notified` is pushed into the queue and now it is popped!
+        // safety: a `Notified` is pushed into the queue and now it is popped!
         Some(unsafe { task::Notified::from_raw(task) })
     }
 }
