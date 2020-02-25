@@ -11,8 +11,8 @@ macro_rules! scoped_thread_local {
         $vis static $name: $crate::macros::scoped_tls::ScopedKey<$ty>
             = $crate::macros::scoped_tls::ScopedKey {
                 inner: {
-                    thread_local!(static FOO: ::std::cell::Cell<usize> = {
-                        ::std::cell::Cell::new(0)
+                    thread_local!(static FOO: ::std::cell::Cell<*const ()> = {
+                        ::std::cell::Cell::new(::std::ptr::null())
                     });
                     &FOO
                 },
@@ -25,7 +25,7 @@ macro_rules! scoped_thread_local {
 /// to the type parameter `T`.
 pub(crate) struct ScopedKey<T> {
     #[doc(hidden)]
-    pub(crate) inner: &'static LocalKey<Cell<usize>>,
+    pub(crate) inner: &'static LocalKey<Cell<*const ()>>,
     #[doc(hidden)]
     pub(crate) _marker: marker::PhantomData<T>,
 }
@@ -40,8 +40,8 @@ impl<T> ScopedKey<T> {
         F: FnOnce() -> R,
     {
         struct Reset {
-            key: &'static LocalKey<Cell<usize>>,
-            val: usize,
+            key: &'static LocalKey<Cell<*const ()>>,
+            val: *const (),
         }
 
         impl Drop for Reset {
@@ -52,7 +52,7 @@ impl<T> ScopedKey<T> {
 
         let prev = self.inner.with(|c| {
             let prev = c.get();
-            c.set(t as *const T as usize);
+            c.set(t as *const _ as *const ());
             prev
         });
 
@@ -71,7 +71,7 @@ impl<T> ScopedKey<T> {
     {
         let val = self.inner.with(|c| c.get());
 
-        if val == 0 {
+        if val.is_null() {
             f(None)
         } else {
             unsafe { f(Some(&*(val as *const T))) }
