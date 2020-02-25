@@ -229,18 +229,26 @@ impl Registration {
         }
 
         let mask = direction.mask();
-        let mask_no_hup = (mask - platform::hup()).as_usize();
+        let mask_no_hup = (mask - platform::hup() - platform::error()).as_usize();
 
         let sched = inner.io_dispatch.get(self.address).unwrap();
 
-        // This consumes the current readiness state **except** for HUP. HUP is
-        // excluded because a) it is a final state and never transitions out of
-        // HUP and b) both the read AND the write directions need to be able to
-        // observe this state.
+        // This consumes the current readiness state **except** for HUP and
+        // error. HUP and error are excluded because a) they are final states
+        // and never transitition out and b) both the read AND the write
+        // directions need to be able to obvserve these states.
         //
-        // If HUP were to be cleared when `direction` is `Read`, then when
-        // `poll_ready` is called again with a _`direction` of `Write`, the HUP
-        // state would not be visible.
+        // # Platform-specific behavior
+        //
+        // HUP and error readiness are platform-specific. On epoll platforms,
+        // HUP has specific conditions that must be met by both peers of a
+        // connection in order to be triggered.
+        //
+        // On epoll platforms, `EPOLLERR` is signaled through
+        // `UnixReady::error()` and is important to be observable by both read
+        // AND write. A specific case that `EPOLLERR` occurs is when the read
+        // end of a pipe is closed. When this occurs, a peer blocked by
+        // writing to the pipe should be notified.
         let curr_ready = sched
             .set_readiness(self.address, |curr| curr & (!mask_no_hup))
             .unwrap_or_else(|_| panic!("address {:?} no longer valid!", self.address));

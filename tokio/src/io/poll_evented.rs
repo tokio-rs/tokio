@@ -123,7 +123,7 @@ macro_rules! poll_ready {
     ($me:expr, $mask:expr, $cache:ident, $take:ident, $poll:expr) => {{
         // Load cached & encoded readiness.
         let mut cached = $me.inner.$cache.load(Relaxed);
-        let mask = $mask | platform::hup();
+        let mask = $mask | platform::hup() | platform::error();
 
         // See if the current readiness matches any bits.
         let mut ret = mio::Ready::from_usize(cached) & $mask;

@@ -146,7 +146,7 @@ impl Driver {
             return;
         }
 
-        if ready.is_writable() || platform::is_hup(ready) {
+        if ready.is_writable() || platform::is_hup(ready) || platform::is_error(ready) {
             wr = io.writer.take_waker();
         }
 
@@ -293,7 +293,7 @@ impl Direction {
                 // Everything except writable is signaled through read.
                 mio::Ready::all() - mio::Ready::writable()
             }
-            Direction::Write => mio::Ready::writable() | platform::hup(),
+            Direction::Write => mio::Ready::writable() | platform::hup() | platform::error(),
         }
     }
 }
