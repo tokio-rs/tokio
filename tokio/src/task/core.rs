@@ -245,9 +245,7 @@ impl<T: Future, S: Schedule> Core<T, S> {
             // Safety: Can only be called after initial `poll`, which is the
             // only time the field is mutated.
             match unsafe { &*ptr } {
-                Some(scheduler) => {
-                    scheduler.release(task)
-                }
+                Some(scheduler) => scheduler.release(task),
                 // Task was never polled
                 //
                 // Safety: this is called from `poll` which requires the same
