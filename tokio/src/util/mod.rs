@@ -12,11 +12,6 @@ cfg_rt_core! {
 }
 
 cfg_rt_threaded! {
-    /*
-    mod pad;
-    pub(crate) use pad::CachePadded;
-    */
-
     pub(crate) use rand::FastRand;
 
     mod try_lock;

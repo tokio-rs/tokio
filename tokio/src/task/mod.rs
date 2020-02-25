@@ -383,17 +383,17 @@ cfg_rt_core! {
         }
     }
 
-    impl<S: 'static> Notified<S> {
-        pub(crate) unsafe fn from_raw(ptr: NonNull<Header>) -> Notified<S> {
-            Notified(Task::from_raw(ptr))
-        }
-
-        pub(crate) fn header(&self) -> &Header {
-            self.0.header()
-        }
-    }
-
     cfg_rt_threaded! {
+        impl<S: 'static> Notified<S> {
+            pub(crate) unsafe fn from_raw(ptr: NonNull<Header>) -> Notified<S> {
+                Notified(Task::from_raw(ptr))
+            }
+
+            pub(crate) fn header(&self) -> &Header {
+                self.0.header()
+            }
+        }
+
         impl<S: 'static> Task<S> {
             pub(crate) fn into_raw(self) -> NonNull<Header> {
                 let ret = self.header().into();
