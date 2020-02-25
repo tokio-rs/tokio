@@ -303,10 +303,11 @@ impl task::Schedule for Arc<Shared> {
         })
     }
 
-    fn release(&self, task: Task<Self>) {
+    fn release(&self, task: Task<Self>) -> Option<Task<Self>> {
         CURRENT.with(|maybe_cx| {
             let cx = maybe_cx.expect("scheduler context missing");
             cx.tasks.borrow_mut().owned.remove(&task);
+            Some(task)
         })
     }
 

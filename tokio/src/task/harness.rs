@@ -4,6 +4,7 @@ use crate::task::{JoinError, Notified, Schedule, Task};
 
 use std::future::Future;
 use std::marker::PhantomData;
+use std::mem;
 use std::panic;
 use std::ptr::NonNull;
 use std::task::{Poll, Waker};
@@ -52,11 +53,16 @@ where
     ///
     /// Panics raised while polling the future are handled.
     pub(super) fn poll(self) {
+        // If this is the first time the task is polled, the task will be bound
+        // to the scheduler, in which case the task ref count must be
+        // incremented.
+        let ref_inc = !self.core().is_bound();
+
         // Transition the task to the running state.
         //
         // A failure to transition here indicates the task has been cancelled
         // while in the run queue pending execution.
-        let snapshot = match self.header().state.transition_to_running() {
+        let snapshot = match self.header().state.transition_to_running(ref_inc) {
             Ok(snapshot) => snapshot,
             Err(_) => {
                 // The task was shutdown while in the run queue. At this point,
@@ -65,6 +71,16 @@ where
                 return;
             }
         };
+
+        // Ensure the task is bound to a scheduler instance. If this is the
+        // first time polling the task, a scheduler instance is pulled from the
+        // local context and assigned to the task.
+        //
+        // The scheduler maintains ownership of the task and responds to `wake`
+        // calls.
+        //
+        // The task reference count has been incremented.
+        self.core().bind_scheduler(self.to_task());
 
         // The transition to `Running` done above ensures that a lock on the
         // future has been obtained. This also ensures the `*mut T` pointer
@@ -108,24 +124,8 @@ where
                 self.complete(out, snapshot.is_join_interested());
             }
             Ok(Poll::Pending) => {
-                // If this is the first time the task is polled, the task will be bound
-                // to the scheduler, in which case the task ref count must be
-                // incremented.
-                let ref_inc = !self.core().is_bound();
-
-                match self.header().state.transition_to_idle(ref_inc) {
+                match self.header().state.transition_to_idle() {
                     Ok(snapshot) => {
-                        // Ensure the task is bound to a scheduler instance. If
-                        // this is the first time polling the task, a scheduler
-                        // instance is pulled from the local context and
-                        // assigned to the task.
-                        //
-                        // The scheduler maintains ownership of the task and
-                        // responds to `wake` calls.
-                        //
-                        // The task reference count has been incremented.
-                        self.core().bind_scheduler(self.to_task());
-
                         if snapshot.is_notified() {
                             // Signal yield
                             self.core().yield_now(Notified(self.to_task()));
@@ -319,15 +319,24 @@ where
         }
 
         // The task has completed execution and will no longer be scheduled.
-        if self.core().is_bound() {
-            self.core().release(self.to_task());
-        }
+        //
+        // Attempts to batch a ref-dec with the state transition below.
+        let ref_dec = if self.core().is_bound() {
+            if let Some(task) = self.core().release(self.to_task()) {
+                mem::forget(task);
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        };
 
         // This might deallocate
         let snapshot = self
             .header()
             .state
-            .transition_to_terminal(!is_join_interested);
+            .transition_to_terminal(!is_join_interested, ref_dec);
 
         if snapshot.ref_count() == 0 {
             self.dealloc()

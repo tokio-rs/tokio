@@ -82,7 +82,7 @@ impl State {
     /// If `ref_inc` is set, the reference count is also incremented.
     ///
     /// The `NOTIFIED` bit is always unset.
-    pub(super) fn transition_to_running(&self) -> UpdateResult {
+    pub(super) fn transition_to_running(&self, ref_inc: bool) -> UpdateResult {
         self.fetch_update(|curr| {
             assert!(curr.is_notified());
 
@@ -90,6 +90,10 @@ impl State {
 
             if !next.is_idle() {
                 return None;
+            }
+
+            if ref_inc {
+                next.ref_inc();
             }
 
             next.set_running();
@@ -106,7 +110,7 @@ impl State {
     ///
     /// The transition to `Idle` fails if the task has been flagged to be
     /// cancelled.
-    pub(super) fn transition_to_idle(&self, ref_inc: bool) -> UpdateResult {
+    pub(super) fn transition_to_idle(&self) -> UpdateResult {
         self.fetch_update(|curr| {
             assert!(curr.is_running());
 
@@ -115,11 +119,6 @@ impl State {
             }
 
             let mut next = curr;
-
-            if ref_inc {
-                next.ref_inc();
-            }
-
             next.unset_running();
             Some(next)
         })
@@ -138,7 +137,7 @@ impl State {
 
     /// Transition from `Complete` -> `Terminal`, decrementing the reference
     /// count by 1.
-    pub(super) fn transition_to_terminal(&self, complete: bool) -> Snapshot {
+    pub(super) fn transition_to_terminal(&self, complete: bool, ref_dec: bool) -> Snapshot {
         self.fetch_update(|mut snapshot| {
             if complete {
                 snapshot.set_complete();
@@ -146,7 +145,14 @@ impl State {
                 assert!(snapshot.is_complete());
             }
 
+            // Decrement the primary handle
             snapshot.ref_dec();
+
+            if ref_dec {
+                // Decrement a second time
+                snapshot.ref_dec();
+            }
+
             Some(snapshot)
         })
         .unwrap()

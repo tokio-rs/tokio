@@ -532,7 +532,7 @@ impl task::Schedule for Arc<Worker> {
         })
     }
 
-    fn release(&self, task: Task) {
+    fn release(&self, task: Task) -> Option<Task> {
         CURRENT.with(|maybe_cx| {
             let cx = maybe_cx.expect("scheduler context missing");
 
@@ -542,7 +542,7 @@ impl task::Schedule for Arc<Worker> {
                 if let Some(core) = &mut *maybe_core {
                     // Directly remove the task
                     core.tasks.remove(&task);
-                    return;
+                    return Some(task);
                 }
             }
 
@@ -550,7 +550,7 @@ impl task::Schedule for Arc<Worker> {
             self.remote().pending_drop.push(task);
 
             if cx.core.borrow().is_some() {
-                return;
+                return None;
             }
 
             // The worker core has been handed off to another thread. In the
@@ -560,7 +560,9 @@ impl task::Schedule for Arc<Worker> {
             if self.inject().is_closed() {
                 self.remote().unpark.unpark();
             }
-        });
+
+            None
+        })
     }
 
     fn schedule(&self, task: Notified) {

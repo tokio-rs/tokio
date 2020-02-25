@@ -240,20 +240,19 @@ impl<T: Future, S: Schedule> Core<T, S> {
     /// Returns `true` if the task was released. `false` implies the task has
     /// not been bound to a scheduler and the caller must call `shutdown()`
     /// directly.
-    pub(super) fn release(&self, task: Task<S>) -> bool {
+    pub(super) fn release(&self, task: Task<S>) -> Option<Task<S>> {
         self.scheduler.with(|ptr| {
             // Safety: Can only be called after initial `poll`, which is the
             // only time the field is mutated.
             match unsafe { &*ptr } {
                 Some(scheduler) => {
-                    scheduler.release(task);
-                    true
+                    scheduler.release(task)
                 }
                 // Task was never polled
                 //
                 // Safety: this is called from `poll` which requires the same
                 // invariant as `shutdown`.
-                None => false,
+                None => None,
             }
         })
     }

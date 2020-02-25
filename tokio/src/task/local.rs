@@ -559,7 +559,7 @@ impl task::Schedule for Arc<Shared> {
         })
     }
 
-    fn release(&self, task: Task<Self>) {
+    fn release(&self, task: Task<Self>) -> Option<Task<Self>> {
         CURRENT.with(|maybe_cx| {
             let cx = match maybe_cx {
                 Some(cx) => cx,
@@ -569,6 +569,7 @@ impl task::Schedule for Arc<Shared> {
             assert!(cx.shared.ptr_eq(self));
 
             cx.tasks.borrow_mut().owned.remove(&task);
+            Some(task)
         })
     }
 

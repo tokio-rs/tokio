@@ -309,7 +309,11 @@ cfg_rt_core! {
 
         /// The task has completed work and is ready to be released. The scheduler
         /// is free to drop it whenever.
-        fn release(&self, task: Task<Self>);
+        ///
+        /// If the scheduler can immediately release the task, it should return
+        /// it as part of the function. This enables the task module to batch
+        /// the ref-dec with other options.
+        fn release(&self, task: Task<Self>) -> Option<Task<Self>>;
 
         /// Schedule the task
         fn schedule(&self, task: Notified<Self>);
