@@ -20,7 +20,6 @@ async fn local_basic_scheduler() {
         .await;
 }
 
-/*
 #[tokio::test(threaded_scheduler)]
 async fn local_threadpool() {
     thread_local! {
@@ -74,7 +73,6 @@ async fn localset_future_timers() {
     assert!(RAN1.load(Ordering::SeqCst));
     assert!(RAN2.load(Ordering::SeqCst));
 }
-*/
 
 #[tokio::test]
 async fn localset_future_drives_all_local_futs() {
@@ -101,7 +99,6 @@ async fn localset_future_drives_all_local_futs() {
     assert!(RAN3.load(Ordering::SeqCst));
 }
 
-/*
 #[tokio::test(threaded_scheduler)]
 async fn local_threadpool_timer() {
     // This test ensures that runtime services like the timer are properly
@@ -283,7 +280,6 @@ fn join_local_future_elsewhere() {
         join2.await.unwrap()
     });
 }
-*/
 
 #[test]
 fn drop_cancels_tasks() {
@@ -298,11 +294,13 @@ fn drop_cancels_tasks() {
 
     let local = LocalSet::new();
     local.spawn_local(async move {
+        // Move this in
+        let _rc2 = rc2;
+
         started_tx.send(()).unwrap();
         loop {
             time::delay_for(Duration::from_secs(3600)).await;
         }
-        drop(rc2);
     });
 
     local.block_on(&mut rt, async {
