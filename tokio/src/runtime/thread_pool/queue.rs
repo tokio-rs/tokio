@@ -183,7 +183,7 @@ impl<T> Local<T> {
         const BATCH_LEN: usize = LOCAL_QUEUE_CAPACITY / 2 + 1;
 
         let n = tail.wrapping_sub(head) / 2;
-        assert_eq!(n as usize, LOCAL_QUEUE_CAPACITY / 2, "queue is not full");
+        debug_assert_eq!(n as usize, LOCAL_QUEUE_CAPACITY / 2, "queue is not full");
 
         // Claim a bunch of tasks
         //
@@ -215,12 +215,16 @@ impl<T> Local<T> {
                 // The last task in the local queue being moved
                 task.header().into()
             } else {
+                // safety: THe above CAS prevents a stealer from accessing these
+                // tasks and we are the only producer.
                 self.inner.buffer[j_idx].with(|ptr| unsafe {
                     let value = (*ptr).as_ptr();
                     (*value).header().into()
                 })
             };
 
+            // safety: THe above CAS prevents a stealer from accessing these
+            // tasks and we are the only producer.
             self.inner.buffer[i_idx].with_mut(|ptr| unsafe {
                 let ptr = (*ptr).as_ptr();
                 *(*ptr).header().queue_next.get() = Some(next);
@@ -286,6 +290,8 @@ impl<T> Steal<T> {
 
     /// Steals half the tasks from self and place them into `dst`.
     pub(super) fn steal_into(&self, dst: &mut Local<T>) -> Option<task::Notified<T>> {
+        // Safety: the caller is the only thread that mutates `dst.tail` and
+        // holds a mutable reference.
         let dst_tail = unsafe { dst.inner.tail.unsync_load() };
 
         // Steal the tasks into `dst`'s buffer. This does not yet expose the
@@ -303,6 +309,8 @@ impl<T> Steal<T> {
         let ret_pos = dst_tail.wrapping_add(n);
         let ret_idx = ret_pos as usize & MASK;
 
+        // safety: the value was written as part of `steal_into2` and not
+        // exposed to stealers, so no other thread can access it.
         let ret = dst.inner.buffer[ret_idx].with(|ptr| unsafe { ptr::read((*ptr).as_ptr()) });
 
         if n == 0 {
@@ -354,12 +362,20 @@ impl<T> Steal<T> {
                 let dst_idx = dst_pos as usize & MASK;
 
                 // Read the task
+                //
+                // safety: this is being read as MaybeUninit -- potentially
+                // uninitialized memory (in the case a producer wraps). We don't
+                // assume it is initialized, but will just write the
+                // `MaybeUninit` in our slot below.
                 let (task, ch) = self.0.buffer[src_idx]
                     .with_deferred(|ptr| unsafe { ptr::read((*ptr).as_ptr()) });
 
                 check.join(ch);
 
                 // Write the task to the new slot
+                //
+                // safety: `dst` queue is empty and we are the only producer to
+                // this queue.
                 dst.inner.buffer[dst_idx]
                     .with_mut(|ptr| unsafe { ptr::write((*ptr).as_mut_ptr(), task) });
             }
@@ -435,36 +451,65 @@ impl<T: 'static> Inject<T> {
         self.len.load(Acquire)
     }
 
+    /// Pushes a value into the queue.
+    pub(super) fn push(&self, task: task::Notified<T>) {
+        // Acquire queue lock
+        let mut p = self.pointers.lock().unwrap();
+
+        if p.is_closed {
+            // Drop the mutex to avoid a potential deadlock when
+            // re-entering.
+            drop(p);
+            drop(task);
+            return;
+        }
+
+        // safety: only mutated with the lock held
+        let len = unsafe { self.len.unsync_load() };
+        let task = task.into_raw();
+
+        // The next pointer should already be null
+        debug_assert!(get_next(task).is_none());
+
+        if let Some(tail) = p.tail {
+            set_next(tail, Some(task));
+        } else {
+            p.head = Some(task);
+        }
+
+        p.tail = Some(task);
+
+        self.len.store(len + 1, Release);
+    }
+
     pub(super) fn push_batch(
         &self,
         batch_head: task::Notified<T>,
         batch_tail: task::Notified<T>,
         num: usize,
     ) {
-        unsafe {
-            let batch_head = batch_head.into_raw();
-            let batch_tail = batch_tail.into_raw();
+        let batch_head = batch_head.into_raw();
+        let batch_tail = batch_tail.into_raw();
 
-            debug_assert!(get_next(batch_tail).is_none());
+        debug_assert!(get_next(batch_tail).is_none());
 
-            let mut p = self.pointers.lock().unwrap();
+        let mut p = self.pointers.lock().unwrap();
 
-            if let Some(tail) = p.tail {
-                set_next(tail, Some(batch_head));
-            } else {
-                p.head = Some(batch_head);
-            }
-
-            p.tail = Some(batch_tail);
-
-            // Increment the count.
-            //
-            // All updates to the len atomic are guarded by the mutex. As such,
-            // a non-atomic load followed by a store is safe.
-            let len = self.len.unsync_load();
-
-            self.len.store(len + num, Release);
+        if let Some(tail) = p.tail {
+            set_next(tail, Some(batch_head));
+        } else {
+            p.head = Some(batch_head);
         }
+
+        p.tail = Some(batch_tail);
+
+        // Increment the count.
+        //
+        // safety: All updates to the len atomic are guarded by the mutex. As
+        // such, a non-atomic load followed by a store is safe.
+        let len = unsafe { self.len.unsync_load() };
+
+        self.len.store(len + num, Release);
     }
 
     pub(super) fn pop(&self) -> Option<task::Notified<T>> {
@@ -473,64 +518,28 @@ impl<T: 'static> Inject<T> {
             return None;
         }
 
-        unsafe {
-            let mut p = self.pointers.lock().unwrap();
+        let mut p = self.pointers.lock().unwrap();
 
-            // It is possible to hit null here if another thread poped the last
-            // task between us checking `len` and acquiring the lock.
-            let task = p.head?;
+        // It is possible to hit null here if another thread poped the last
+        // task between us checking `len` and acquiring the lock.
+        let task = p.head?;
 
-            p.head = get_next(task);
+        p.head = get_next(task);
 
-            if p.head.is_none() {
-                p.tail = None;
-            }
-
-            set_next(task, None);
-
-            // Decrement the count.
-            //
-            // All updates to the len atomic are guarded by the mutex. As such,
-            // a non-atomic load followed by a store is safe.
-            self.len.store(self.len.unsync_load() - 1, Release);
-
-            Some(task::Notified::from_raw(task))
+        if p.head.is_none() {
+            p.tail = None;
         }
-    }
-}
 
-impl<T: task::ScheduleSendOnly> Inject<T> {
-    /// Pushes a value into the queue.
-    pub(super) fn push(&self, task: task::Notified<T>) {
-        unsafe {
-            // Acquire queue lock
-            let mut p = self.pointers.lock().unwrap();
+        set_next(task, None);
 
-            if p.is_closed {
-                // Drop the mutex to avoid a potential deadlock when
-                // re-entering.
-                drop(p);
-                drop(task);
-                return;
-            }
+        // Decrement the count.
+        //
+        // safety: All updates to the len atomic are guarded by the mutex. As
+        // such, a non-atomic load followed by a store is safe.
+        self.len.store(unsafe { self.len.unsync_load() } - 1, Release);
 
-            // Check if the queue is closed. This must happen in the lock.
-            let len = self.len.unsync_load();
-            let task = task.into_raw();
-
-            // The next pointer should already be null
-            debug_assert!(get_next(task).is_none());
-
-            if let Some(tail) = p.tail {
-                set_next(tail, Some(task));
-            } else {
-                p.head = Some(task);
-            }
-
-            p.tail = Some(task);
-
-            self.len.store(len + 1, Release);
-        }
+        // a `Notified` is pushed into the queue and now it is popped!
+        Some(unsafe { task::Notified::from_raw(task) })
     }
 }
 
