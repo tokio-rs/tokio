@@ -71,7 +71,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         // Spawn our handler to be run asynchronously.
         tokio::spawn(async move {
             if let Err(e) = process(state, stream, addr).await {
-                println!("an error occured; error = {:?}", e);
+                println!("an error occurred; error = {:?}", e);
             }
         });
     }
@@ -175,7 +175,7 @@ impl Stream for Peer {
             // We've received a message we should broadcast to others.
             Some(Ok(message)) => Some(Ok(Message::Broadcast(message))),
 
-            // An error occured.
+            // An error occurred.
             Some(Err(e)) => Some(Err(e)),
 
             // The stream has been exhausted.
@@ -236,7 +236,7 @@ async fn process(
             }
             Err(e) => {
                 println!(
-                    "an error occured while processing messages for {}; error = {:?}",
+                    "an error occurred while processing messages for {}; error = {:?}",
                     username, e
                 );
             }

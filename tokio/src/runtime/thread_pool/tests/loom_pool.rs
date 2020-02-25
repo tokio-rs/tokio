@@ -9,6 +9,28 @@ use std::future::Future;
 use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 
 #[test]
+fn racy_shutdown() {
+    loom::model(|| {
+        let pool = mk_pool(1);
+
+        // here's the case we want to exercise:
+        //
+        // a worker that still has tasks in its local queue gets sent to the blocking pool (due to
+        // block_in_place). the blocking pool is shut down, so drops the worker. the worker's
+        // shutdown method never gets run.
+        //
+        // we do this by spawning two tasks on one worker, the first of which does block_in_place,
+        // and then immediately drop the pool.
+
+        pool.spawn(async {
+            crate::task::block_in_place(|| {});
+        });
+        pool.spawn(async {});
+        drop(pool);
+    });
+}
+
+#[test]
 fn pool_multi_spawn() {
     loom::model(|| {
         let pool = mk_pool(2);
