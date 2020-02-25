@@ -3,7 +3,7 @@ use crate::loom::thread::LocalKey;
 use std::cell::Cell;
 use std::marker;
 
-/// The macro. See the module level documentation for the description and examples.
+/// Set a reference as a thread-local
 #[macro_export]
 macro_rules! scoped_thread_local {
     ($(#[$attrs:meta])* $vis:vis static $name:ident: $ty:ty) => (
