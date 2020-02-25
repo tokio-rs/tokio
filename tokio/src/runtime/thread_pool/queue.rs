@@ -29,8 +29,6 @@ pub(super) struct Inject<T: 'static> {
 
     /// Number of pending tasks in the queue. This helps prevent unnecessary
     /// locking in the hot path.
-    ///
-    /// The LSB is a flag tracking whether or not the queue is open or not.
     len: AtomicUsize,
 
     _p: PhantomData<T>,

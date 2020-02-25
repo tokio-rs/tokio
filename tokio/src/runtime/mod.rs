@@ -216,7 +216,7 @@ mod io;
 
 cfg_rt_threaded! {
     mod park;
-    use park::{Parker/*, Unparker*/};
+    use park::Parker;
 }
 
 mod shell;
@@ -336,10 +336,6 @@ impl Runtime {
     /// [basic scheduler]: index.html#basic-scheduler
     /// [runtime builder]: crate::runtime::Builder
     pub fn new() -> io::Result<Runtime> {
-        fn bounds<T: Send + Sync>() {}
-
-        bounds::<Runtime>();
-
         #[cfg(feature = "rt-threaded")]
         let ret = Builder::new().threaded_scheduler().enable_all().build();
 
