@@ -270,12 +270,6 @@ cfg_rt_threaded! {
 }
 
 cfg_rt_core! {
-    /*
-    /// Unit tests
-    #[cfg(test)]
-    mod tests;
-    */
-
     use std::future::Future;
     use std::marker::PhantomData;
     use std::ptr::NonNull;
