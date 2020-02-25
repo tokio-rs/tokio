@@ -138,12 +138,17 @@ impl<T> Local<T> {
 
                 self.inner.buffer[idx].with_mut(|ptr| {
                     // Write the task to the slot
+                    //
+                    // Safety: There is only one producer and the above `if`
+                    // condition ensures we don't touch a cell if there is a
+                    // value, thus no consumer.
                     unsafe {
                         ptr::write((*ptr).as_mut_ptr(), task);
                     }
                 });
 
-                // Make the task available
+                // Make the task available. Synchronizes with a load in
+                // `steal_into2`.
                 self.inner.tail.store(tail.wrapping_add(1), Release);
 
                 return;
