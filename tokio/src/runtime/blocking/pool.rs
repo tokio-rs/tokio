@@ -53,7 +53,7 @@ struct Shared {
     shutdown_tx: Option<shutdown::Sender>,
 }
 
-type Task = task::Task<NoopSchedule>;
+type Task = task::Notified<NoopSchedule>;
 
 const KEEP_ALIVE: Duration = Duration::from_secs(10);
 
@@ -227,7 +227,7 @@ impl Inner {
             // BUSY
             while let Some(task) = shared.queue.pop_front() {
                 drop(shared);
-                run_task(task);
+                task.run();
 
                 shared = self.shared.lock().unwrap();
             }
@@ -304,10 +304,4 @@ impl fmt::Debug for Spawner {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("blocking::Spawner").finish()
     }
-}
-
-fn run_task(f: Task) {
-    let scheduler: &'static NoopSchedule = &NoopSchedule;
-    let res = f.run(|| Some(scheduler.into()));
-    assert!(res.is_none());
 }

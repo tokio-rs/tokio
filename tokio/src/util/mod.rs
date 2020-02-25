@@ -6,9 +6,16 @@ cfg_io_driver! {
 #[cfg(any(feature = "rt-threaded", feature = "macros", feature = "stream"))]
 mod rand;
 
+cfg_rt_core! {
+    mod wake;
+    pub(crate) use wake::{waker_ref, Wake};
+}
+
 cfg_rt_threaded! {
+    /*
     mod pad;
     pub(crate) use pad::CachePadded;
+    */
 
     pub(crate) use rand::FastRand;
 

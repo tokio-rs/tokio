@@ -17,3 +17,8 @@ harness = false
 name = "mpsc"
 path = "mpsc.rs"
 harness = false
+
+[[bench]]
+name = "scheduler"
+path = "scheduler.rs"
+harness = false

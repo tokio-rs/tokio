@@ -376,10 +376,6 @@ cfg_macros! {
     }
 }
 
-// Tests
-#[cfg(test)]
-mod tests;
-
 // TODO: rm
 #[cfg(feature = "io-util")]
 #[cfg(test)]

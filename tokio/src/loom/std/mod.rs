@@ -5,8 +5,6 @@ mod atomic_u64;
 mod atomic_usize;
 mod causal_cell;
 
-pub(crate) mod alloc;
-
 pub(crate) mod cell {
     pub(crate) use super::causal_cell::{CausalCell, CausalCheck};
 }

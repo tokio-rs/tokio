@@ -1,4 +1,4 @@
-use crate::task::{Header, Task};
+use crate::task::{self, Header, Task};
 
 use std::fmt;
 use std::marker::PhantomData;
@@ -9,7 +9,10 @@ pub(crate) struct OwnedList<T: 'static> {
     _p: PhantomData<T>,
 }
 
-impl<T: 'static> OwnedList<T> {
+unsafe impl<T: task::ScheduleSendOnly + 'static> Send for OwnedList<T> {}
+unsafe impl<T: task::ScheduleSendOnly + 'static> Sync for OwnedList<T> {}
+
+impl<T: task::Schedule> OwnedList<T> {
     pub(crate) fn new() -> OwnedList<T> {
         OwnedList {
             head: None,
@@ -37,9 +40,14 @@ impl<T: 'static> OwnedList<T> {
     }
 
     pub(crate) fn remove(&mut self, task: &Task<T>) {
-        debug_assert!(self.head.is_some());
-
         unsafe {
+            if !self.in_list(task) {
+                // The task is not in the list
+                return;
+            }
+
+            assert!(self.head.is_some());
+
             if let Some(next) = *task.header().owned_next.get() {
                 *next.as_ref().owned_prev.get() = *task.header().owned_prev.get();
             }
@@ -47,9 +55,12 @@ impl<T: 'static> OwnedList<T> {
             if let Some(prev) = *task.header().owned_prev.get() {
                 *prev.as_ref().owned_next.get() = *task.header().owned_next.get();
             } else {
-                debug_assert_eq!(self.head, Some(task.header().into()));
+                assert_eq!(self.head, Some(task.header().into()));
                 self.head = *task.header().owned_next.get();
             }
+
+            *task.header().owned_next.get() = None;
+            *task.header().owned_prev.get() = None;
         }
     }
 
@@ -57,18 +68,16 @@ impl<T: 'static> OwnedList<T> {
         self.head.is_none()
     }
 
-    /// Transition all tasks in the list to canceled as part of the shutdown
-    /// process.
-    pub(crate) fn shutdown(&self) {
-        let mut curr = self.head;
+    /// Pop a task
+    pub(crate) fn pop(&mut self) -> Option<Task<T>> {
+        let head = match self.head {
+            Some(head) => head,
+            None => return None,
+        };
 
-        while let Some(task) = curr {
-            unsafe {
-                let vtable = task.as_ref().vtable;
-                (vtable.cancel)(task.as_ptr() as *mut (), false);
-                curr = *task.as_ref().owned_next.get();
-            }
-        }
+        let task = unsafe { Task::<T>::from_raw(head) };
+        self.remove(&task);
+        Some(task)
     }
 
     /// Only used by debug assertions
@@ -86,6 +95,11 @@ impl<T: 'static> OwnedList<T> {
         }
 
         false
+    }
+
+    fn in_list(&self, task: &Task<T>) -> bool {
+        self.head == Some(task.header().into())
+            || unsafe { (*task.header().owned_prev.get()).is_some() }
     }
 }
 

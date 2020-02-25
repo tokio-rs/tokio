@@ -12,55 +12,63 @@ pub(super) struct State {
 #[derive(Copy, Clone)]
 pub(super) struct Snapshot(usize);
 
-/// The task is currently being run.
-const RUNNING: usize = 0b00_0001;
+type UpdateResult = Result<Snapshot, Snapshot>;
 
-/// The task has been notified by a waker.
-const NOTIFIED: usize = 0b00_0010;
+/// The task is currently being run.
+const RUNNING: usize = 0b0001;
 
 /// The task is complete.
 ///
 /// Once this bit is set, it is never unset
-const COMPLETE: usize = 0b00_0100;
+const COMPLETE: usize = 0b0010;
 
-/// The primary task handle has been dropped.
-const RELEASED: usize = 0b00_1000;
+/// Extracts the task's lifecycle value from the state
+const LIFECYCLE_MASK: usize = 0b11;
+
+/// Flag tracking if the task has been pushed into a run queue.
+const NOTIFIED: usize = 0b100;
 
 /// The join handle is still around
-const JOIN_INTEREST: usize = 0b01_0000;
+const JOIN_INTEREST: usize = 0b1_000;
 
 /// A join handle waker has been set
-const JOIN_WAKER: usize = 0b10_0000;
+const JOIN_WAKER: usize = 0b10_000;
 
-/// The task has been forcibly canceled.
-const CANCELLED: usize = 0b100_0000;
+/// The task has been forcibly cancelled.
+const CANCELLED: usize = 0b100_000;
 
 /// All bits
-const LIFECYCLE_MASK: usize =
-    RUNNING | NOTIFIED | COMPLETE | RELEASED | JOIN_INTEREST | JOIN_WAKER | CANCELLED;
+const STATE_MASK: usize = LIFECYCLE_MASK | NOTIFIED | JOIN_INTEREST | JOIN_WAKER | CANCELLED;
 
-/// Bits used by the waker ref count portion of the state.
-///
-/// Ref counts only cover **wakers**. Other handles are tracked with other state
-/// bits.
-const WAKER_COUNT_MASK: usize = usize::MAX - LIFECYCLE_MASK;
+/// Bits used by the ref count portion of the state.
+const REF_COUNT_MASK: usize = !STATE_MASK;
 
 /// Number of positions to shift the ref count
-const WAKER_COUNT_SHIFT: usize = WAKER_COUNT_MASK.count_zeros() as usize;
+const REF_COUNT_SHIFT: usize = REF_COUNT_MASK.count_zeros() as usize;
 
 /// One ref count
-const WAKER_ONE: usize = 1 << WAKER_COUNT_SHIFT;
+const REF_ONE: usize = 1 << REF_COUNT_SHIFT;
 
-/// Initial state
-const INITIAL_STATE: usize = NOTIFIED;
+/// State a task is initialized with
+///
+/// A task is initialized with two references: one for the scheduler and one for
+/// the `JoinHandle`. As the task starts with a `JoinHandle`, `JOIN_INTERST` is
+/// set. A new task is immediately pushed into the run queue for execution and
+/// starts with the `NOTIFIED` flag set.
+const INITIAL_STATE: usize = (REF_ONE * 2) | JOIN_INTEREST | NOTIFIED;
 
 /// All transitions are performed via RMW operations. This establishes an
 /// unambiguous modification order.
 impl State {
-    /// Starts with a ref count of 2
-    pub(super) fn new_joinable() -> State {
+    /// Return a task's initial state
+    pub(super) fn new() -> State {
+        // A task is initialized with three references: one for the scheduler,
+        // one for the `JoinHandle`, one for the task handle made available in
+        // release. As the task starts with a `JoinHandle`, `JOIN_INTERST` is
+        // set. A new task is immediately pushed into the run queue for
+        // execution and starts with the `NOTIFIED` flag set.
         State {
-            val: AtomicUsize::new(INITIAL_STATE | JOIN_INTEREST),
+            val: AtomicUsize::new(INITIAL_STATE),
         }
     }
 
@@ -69,190 +77,122 @@ impl State {
         Snapshot(self.val.load(Acquire))
     }
 
-    /// Transitions a task to the `Running` state.
+    /// Attempt to transition the lifecycle to `Running`.
     ///
-    /// Returns a snapshot of the state **after** the transition.
-    pub(super) fn transition_to_running(&self) -> Snapshot {
-        const DELTA: usize = RUNNING | NOTIFIED;
+    /// If `ref_inc` is set, the reference count is also incremented.
+    ///
+    /// The `NOTIFIED` bit is always unset.
+    pub(super) fn transition_to_running(&self) -> UpdateResult {
+        self.fetch_update(|curr| {
+            assert!(curr.is_notified());
 
-        let prev = Snapshot(self.val.fetch_xor(DELTA, Acquire));
-        assert!(prev.is_notified());
+            let mut next = curr;
 
-        if prev.is_running() {
-            // We were signalled to cancel
-            //
-            // Apply the state
-            let prev = self.val.fetch_or(CANCELLED, AcqRel);
-            return Snapshot(prev | CANCELLED);
-        }
+            if !next.is_idle() {
+                return None;
+            }
 
-        assert!(!prev.is_running());
-
-        let next = Snapshot(prev.0 ^ DELTA);
-
-        assert!(next.is_running());
-        assert!(!next.is_notified());
-
-        next
+            next.set_running();
+            next.unset_notified();
+            Some(next)
+        })
     }
 
     /// Transitions the task from `Running` -> `Idle`.
     ///
-    /// Returns a snapshot of the state **after** the transition.
-    pub(super) fn transition_to_idle(&self) -> Snapshot {
-        const DELTA: usize = RUNNING;
+    /// Returns `Ok` if the transition to `Idle` is successful, `Err` otherwise.
+    /// In both cases, a snapshot of the state from **after** the transition is
+    /// returned.
+    ///
+    /// The transition to `Idle` fails if the task has been flagged to be
+    /// cancelled.
+    pub(super) fn transition_to_idle(&self, ref_inc: bool) -> UpdateResult {
+        self.fetch_update(|curr| {
+            assert!(curr.is_running());
 
-        let prev = Snapshot(self.val.fetch_xor(DELTA, AcqRel));
+            if curr.is_cancelled() {
+                return None;
+            }
 
-        if !prev.is_running() {
-            // We were signaled to cancel.
-            //
-            // Apply the state
-            let prev = self.val.fetch_or(CANCELLED, AcqRel);
-            return Snapshot(prev | CANCELLED);
-        }
+            let mut next = curr;
 
-        let next = Snapshot(prev.0 ^ DELTA);
+            if ref_inc {
+                next.ref_inc();
+            }
 
-        assert!(!next.is_running());
-
-        next
+            next.unset_running();
+            Some(next)
+        })
     }
 
     /// Transitions the task from `Running` -> `Complete`.
-    ///
-    /// Returns a snapshot of the state **after** the transition.
     pub(super) fn transition_to_complete(&self) -> Snapshot {
         const DELTA: usize = RUNNING | COMPLETE;
 
         let prev = Snapshot(self.val.fetch_xor(DELTA, AcqRel));
-
-        assert!(!prev.is_complete());
-
-        let next = Snapshot(prev.0 ^ DELTA);
-
-        assert!(next.is_complete());
-
-        next
-    }
-
-    /// Transitions the task from `Running` -> `Released`.
-    ///
-    /// Returns a snapshot of the state **after** the transition.
-    pub(super) fn transition_to_released(&self) -> Snapshot {
-        const DELTA: usize = RUNNING | COMPLETE | RELEASED;
-
-        let prev = Snapshot(self.val.fetch_xor(DELTA, AcqRel));
-
         assert!(prev.is_running());
         assert!(!prev.is_complete());
-        assert!(!prev.is_released());
 
-        let next = Snapshot(prev.0 ^ DELTA);
-
-        assert!(!next.is_running());
-        assert!(next.is_complete());
-        assert!(next.is_released());
-
-        next
+        Snapshot(prev.0 ^ DELTA)
     }
 
-    /// Transitions the task to the canceled state.
-    ///
-    /// Returns the snapshot of the state **after** the transition **if** the
-    /// transition was made successfully
-    ///
-    /// # States
-    ///
-    /// - Notifed: task may be in a queue, caller must not release.
-    /// - Running: cannot drop. The poll handle will handle releasing.
-    /// - Other prior states do not require cancellation.
-    ///
-    /// If the task has been notified, then it may still be in a queue. The
-    /// caller must not release the task.
-    pub(super) fn transition_to_canceled_from_queue(&self) -> Snapshot {
-        let prev = Snapshot(self.val.fetch_or(CANCELLED, AcqRel));
-
-        assert!(!prev.is_complete());
-        assert!(!prev.is_running() || prev.is_notified());
-
-        Snapshot(prev.0 | CANCELLED)
-    }
-
-    pub(super) fn transition_to_canceled_from_list(&self) -> Option<Snapshot> {
-        let mut prev = self.load();
-
-        loop {
-            if !prev.is_active() {
-                return None;
-            }
-
-            let mut next = prev;
-
-            // Use the running flag to signal cancellation
-            if prev.is_running() {
-                next.0 -= RUNNING;
-                next.0 |= NOTIFIED;
-            } else if prev.is_notified() {
-                next.0 += RUNNING;
-                next.0 |= NOTIFIED;
+    /// Transition from `Complete` -> `Terminal`, decrementing the reference
+    /// count by 1.
+    pub(super) fn transition_to_terminal(&self, complete: bool) -> Snapshot {
+        self.fetch_update(|mut snapshot| {
+            if complete {
+                snapshot.set_complete();
             } else {
-                next.0 |= CANCELLED;
+                assert!(snapshot.is_complete());
             }
 
-            let res = self.val.compare_exchange(prev.0, next.0, AcqRel, Acquire);
-
-            match res {
-                Ok(_) if next.is_canceled() => return Some(next),
-                Ok(_) => return None,
-                Err(actual) => {
-                    prev = Snapshot(actual);
-                }
-            }
-        }
+            snapshot.ref_dec();
+            Some(snapshot)
+        })
+        .unwrap()
     }
 
-    /// Transitions to `Released`. Called when primary task handle is
-    /// dropped. This is roughly a "ref decrement" operation.
-    ///
-    /// Returns a snapshot of the state **after** the transition.
-    pub(super) fn release_task(&self) -> Snapshot {
-        use crate::loom::sync::atomic;
-
-        const DELTA: usize = RELEASED;
-
-        let prev = Snapshot(self.val.fetch_or(DELTA, Release));
-
-        assert!(!prev.is_released());
-        assert!(prev.is_terminal(), "state = {:?}", prev);
-
-        let next = Snapshot(prev.0 | DELTA);
-
-        assert!(next.is_released());
-
-        if next.is_final_ref() || (next.has_join_waker() && !next.is_join_interested()) {
-            // The final reference to the task was dropped, the caller must free the
-            // memory. Establish an acquire ordering.
-            atomic::fence(Acquire);
-        }
-
-        next
-    }
-
-    /// Transitions the state to `Scheduled`.
+    /// Transitions the state to `NOTIFIED`.
     ///
     /// Returns `true` if the task needs to be submitted to the pool for
     /// execution
     pub(super) fn transition_to_notified(&self) -> bool {
-        const MASK: usize = RUNNING | NOTIFIED | COMPLETE | CANCELLED;
+        let prev = Snapshot(self.val.fetch_or(NOTIFIED, AcqRel));
+        prev.will_need_queueing()
+    }
 
-        let prev = self.val.fetch_or(NOTIFIED, Release);
-        prev & MASK == 0
+    /// Set the `CANCELLED` bit and attempt to transition to `Running`.
+    ///
+    /// Returns `true` if the transition to `Running` succeeded.
+    pub(super) fn transition_to_shutdown(&self) -> bool {
+        let mut prev = Snapshot(0);
+
+        let _ = self.fetch_update(|mut snapshot| {
+            prev = snapshot;
+
+            if snapshot.is_idle() {
+                snapshot.set_running();
+
+                if snapshot.is_notified() {
+                    // If the task is idle and notified, this indicates the task is
+                    // in the run queue and is considered owned by the scheduler.
+                    // The shutdown operation claims ownership of the task, which
+                    // means we need to assign an additional ref-count to the task
+                    // in the queue.
+                    snapshot.ref_inc();
+                }
+            }
+
+            snapshot.set_cancelled();
+            Some(snapshot)
+        });
+
+        prev.is_idle()
     }
 
     /// Optimistically tries to swap the state assuming the join handle is
     /// __immediately__ dropped on spawn
-    pub(super) fn drop_join_handle_fast(&self) -> bool {
+    pub(super) fn drop_join_handle_fast(&self) -> Result<(), ()> {
         use std::sync::atomic::Ordering::Relaxed;
 
         // Relaxed is acceptable as if this function is called and succeeds,
@@ -264,115 +204,72 @@ impl State {
         // Given this, there is no risk if this operation is reordered.
         self.val
             .compare_exchange_weak(
-                INITIAL_STATE | JOIN_INTEREST,
                 INITIAL_STATE,
+                (INITIAL_STATE - REF_ONE) & !JOIN_INTEREST,
                 Release,
                 Relaxed,
             )
-            .is_ok()
+            .map(|_| ())
+            .map_err(|_| ())
     }
 
-    /// The join handle has completed by reading the output.
+    /// Try to unset the JOIN_INTEREST flag.
     ///
-    /// Returns a snapshot of the state **after** the transition.
-    pub(super) fn complete_join_handle(&self) -> Snapshot {
-        use crate::loom::sync::atomic;
+    /// Returns `Ok` if the operation happens before the task transitions to a
+    /// completed state, `Err` otherwise.
+    pub(super) fn unset_join_interested(&self) -> UpdateResult {
+        self.fetch_update(|curr| {
+            assert!(curr.is_join_interested());
 
-        const DELTA: usize = JOIN_INTEREST;
+            if curr.is_complete() {
+                return None;
+            }
 
-        let prev = Snapshot(self.val.fetch_sub(DELTA, Release));
+            let mut next = curr;
+            next.unset_join_interested();
 
-        assert!(prev.is_join_interested());
-
-        let next = Snapshot(prev.0 - DELTA);
-
-        if !next.is_final_ref() {
-            return next;
-        }
-
-        atomic::fence(Acquire);
-
-        next
+            Some(next)
+        })
     }
 
-    /// The join handle is being dropped, this fails if the task has been
-    /// completed and the output must be dropped first then
-    /// `complete_join_handle` should be called.
+    /// Set the `JOIN_WAKER` bit.
     ///
-    /// Returns a snapshot of the state **after** the transition.
-    pub(super) fn drop_join_handle_slow(&self) -> Result<Snapshot, Snapshot> {
-        const MASK: usize = COMPLETE | CANCELLED;
+    /// Returns `Ok` if the bit is set, `Err` otherwise. This operation fails if
+    /// the task has completed.
+    pub(super) fn set_join_waker(&self) -> UpdateResult {
+        self.fetch_update(|curr| {
+            assert!(curr.is_join_interested());
+            assert!(!curr.has_join_waker());
 
-        let mut prev = self.val.load(Acquire);
-
-        loop {
-            // Once the complete bit is set, it is never unset.
-            if prev & MASK != 0 {
-                return Err(Snapshot(prev));
+            if curr.is_complete() {
+                return None;
             }
 
-            assert!(prev & JOIN_INTEREST == JOIN_INTEREST);
+            let mut next = curr;
+            next.set_join_waker();
 
-            let next = (prev - JOIN_INTEREST) & !JOIN_WAKER;
-
-            let res = self.val.compare_exchange(prev, next, AcqRel, Acquire);
-
-            match res {
-                Ok(_) => {
-                    return Ok(Snapshot(next));
-                }
-                Err(actual) => {
-                    prev = actual;
-                }
-            }
-        }
+            Some(next)
+        })
     }
 
-    /// Stores the join waker.
-    pub(super) fn store_join_waker(&self) -> Snapshot {
-        use crate::loom::sync::atomic;
+    /// Unsets the `JOIN_WAKER` bit.
+    ///
+    /// Returns `Ok` has been unset, `Err` otherwise. This operation fails if
+    /// the task has completed.
+    pub(super) fn unset_waker(&self) -> UpdateResult {
+        self.fetch_update(|curr| {
+            assert!(curr.is_join_interested());
+            assert!(curr.has_join_waker());
 
-        const DELTA: usize = JOIN_WAKER;
-
-        let prev = Snapshot(self.val.fetch_xor(DELTA, Release));
-
-        assert!(!prev.has_join_waker());
-
-        let next = Snapshot(prev.0 ^ DELTA);
-
-        assert!(next.has_join_waker());
-
-        if next.is_complete() {
-            atomic::fence(Acquire);
-        }
-
-        next
-    }
-
-    pub(super) fn unset_waker(&self) -> Snapshot {
-        const MASK: usize = COMPLETE | CANCELLED;
-
-        let mut prev = self.val.load(Acquire);
-
-        loop {
-            // Once the `COMPLETE` bit is set, it is never unset
-            if prev & MASK != 0 {
-                return Snapshot(prev);
+            if curr.is_complete() {
+                return None;
             }
 
-            assert!(Snapshot(prev).has_join_waker());
+            let mut next = curr;
+            next.unset_join_waker();
 
-            let next = prev - JOIN_WAKER;
-
-            let res = self.val.compare_exchange(prev, next, AcqRel, Acquire);
-
-            match res {
-                Ok(_) => return Snapshot(next),
-                Err(actual) => {
-                    prev = actual;
-                }
-            }
-        }
+            Some(next)
+        })
     }
 
     pub(super) fn ref_inc(&self) {
@@ -390,7 +287,7 @@ impl State {
         // another must already provide any required synchronization.
         //
         // [1]: (www.boost.org/doc/libs/1_55_0/doc/html/atomic/usage_examples.html)
-        let prev = self.val.fetch_add(WAKER_ONE, Relaxed);
+        let prev = self.val.fetch_add(REF_ONE, Relaxed);
 
         // If the reference count overflowed, abort.
         if prev > isize::max_value() as usize {
@@ -402,82 +299,127 @@ impl State {
     pub(super) fn ref_dec(&self) -> bool {
         use crate::loom::sync::atomic;
 
-        let prev = self.val.fetch_sub(WAKER_ONE, Release);
-        let next = Snapshot(prev - WAKER_ONE);
+        let prev = Snapshot(self.val.fetch_sub(REF_ONE, Release));
+        let is_final_ref = prev.ref_count() == 1;
 
-        if next.is_final_ref() {
+        if is_final_ref {
             atomic::fence(Acquire);
         }
 
-        next.is_final_ref()
+        is_final_ref
+    }
+
+    fn fetch_update<F>(&self, mut f: F) -> Result<Snapshot, Snapshot>
+    where
+        F: FnMut(Snapshot) -> Option<Snapshot>,
+    {
+        let mut curr = self.load();
+
+        loop {
+            let next = match f(curr) {
+                Some(next) => next,
+                None => return Err(curr),
+            };
+
+            let res = self.val.compare_exchange(curr.0, next.0, AcqRel, Acquire);
+
+            match res {
+                Ok(_) => return Ok(next),
+                Err(actual) => curr = Snapshot(actual),
+            }
+        }
     }
 }
 
+// ===== impl Snapshot =====
+
 impl Snapshot {
-    pub(super) fn is_running(self) -> bool {
-        self.0 & RUNNING == RUNNING
+    /// Returns `true` if the task is in an idle state.
+    pub(super) fn is_idle(self) -> bool {
+        self.0 & (RUNNING | COMPLETE) == 0
     }
 
+    /// Returns `true` if the task has been flagged as notified.
     pub(super) fn is_notified(self) -> bool {
         self.0 & NOTIFIED == NOTIFIED
     }
 
-    pub(super) fn is_released(self) -> bool {
-        self.0 & RELEASED == RELEASED
+    fn unset_notified(&mut self) {
+        self.0 &= !NOTIFIED
     }
 
-    pub(super) fn is_complete(self) -> bool {
-        self.0 & COMPLETE == COMPLETE
+    pub(super) fn is_running(self) -> bool {
+        self.0 & RUNNING == RUNNING
     }
 
-    pub(super) fn is_canceled(self) -> bool {
+    fn set_running(&mut self) {
+        self.0 |= RUNNING;
+    }
+
+    fn unset_running(&mut self) {
+        self.0 &= !RUNNING;
+    }
+
+    pub(super) fn is_cancelled(self) -> bool {
         self.0 & CANCELLED == CANCELLED
     }
 
-    /// Used during normal runtime.
-    pub(super) fn is_active(self) -> bool {
-        self.0 & (COMPLETE | CANCELLED) == 0
+    fn set_cancelled(&mut self) {
+        self.0 |= CANCELLED;
     }
 
-    /// Used before dropping the task
-    pub(super) fn is_terminal(self) -> bool {
-        // When both the notified & running flags are set, the task was canceled
-        // after being notified, before it was run.
-        //
-        // There is a race where:
-        // - The task state transitions to notified
-        // - The global queue is shutdown
-        // - The waker attempts to push into the global queue and fails.
-        // - The waker holds the last reference to the task, thus drops it.
-        //
-        // In this scenario, the cancelled bit will never get set.
-        !self.is_active() || (self.is_notified() && self.is_running())
+    fn set_complete(&mut self) {
+        self.0 |= COMPLETE;
+    }
+
+    /// Returns `true` if the task's future has completed execution.
+    pub(super) fn is_complete(self) -> bool {
+        self.0 & COMPLETE == COMPLETE
     }
 
     pub(super) fn is_join_interested(self) -> bool {
         self.0 & JOIN_INTEREST == JOIN_INTEREST
     }
 
+    fn unset_join_interested(&mut self) {
+        self.0 &= !JOIN_INTEREST
+    }
+
     pub(super) fn has_join_waker(self) -> bool {
         self.0 & JOIN_WAKER == JOIN_WAKER
     }
 
-    pub(super) fn is_final_ref(self) -> bool {
-        const MASK: usize = WAKER_COUNT_MASK | RELEASED | JOIN_INTEREST;
+    fn set_join_waker(&mut self) {
+        self.0 |= JOIN_WAKER;
+    }
 
-        (self.0 & MASK) == RELEASED
+    fn unset_join_waker(&mut self) {
+        self.0 &= !JOIN_WAKER
+    }
+
+    pub(super) fn ref_count(self) -> usize {
+        (self.0 & REF_COUNT_MASK) >> REF_COUNT_SHIFT
+    }
+
+    fn ref_inc(&mut self) {
+        assert!(self.0 <= isize::max_value() as usize);
+        self.0 += REF_ONE;
+    }
+
+    pub(super) fn ref_dec(&mut self) {
+        assert!(self.ref_count() > 0);
+        self.0 -= REF_ONE
+    }
+
+    fn will_need_queueing(self) -> bool {
+        !self.is_notified() && self.is_idle()
     }
 }
 
 impl fmt::Debug for State {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use std::sync::atomic::Ordering::SeqCst;
-
-        let snapshot = Snapshot(self.val.load(SeqCst));
-
-        fmt.debug_struct("State")
-            .field("snapshot", &snapshot)
-            .finish()
+        let snapshot = self.load();
+        snapshot.fmt(fmt)
     }
 }
 
@@ -485,13 +427,12 @@ impl fmt::Debug for Snapshot {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Snapshot")
             .field("is_running", &self.is_running())
-            .field("is_notified", &self.is_notified())
-            .field("is_released", &self.is_released())
             .field("is_complete", &self.is_complete())
-            .field("is_canceled", &self.is_canceled())
+            .field("is_notified", &self.is_notified())
+            .field("is_cancelled", &self.is_cancelled())
             .field("is_join_interested", &self.is_join_interested())
             .field("has_join_waker", &self.has_join_waker())
-            .field("is_final_ref", &self.is_final_ref())
+            .field("ref_count", &self.ref_count())
             .finish()
     }
 }
