@@ -12,10 +12,10 @@ use std::task::{Context, Poll};
 cfg_tcp! {
     /// A TCP socket server, listening for connections.
     ///
-    /// Also implements a stream over the connections being received on this listener.
-    ///
-    /// The stream will never return `None` and will also not yield the peer's
-    /// `SocketAddr` structure. Iterating over it is equivalent to calling accept in a loop.
+    /// You can accept a new connection by using the [`accept`](`TcpListener::accept`) method. Alternatively `TcpListener`
+    /// implements the [`Stream`](`crate::stream::Stream`) trait, which allows you to use the listener in places that want a
+    /// stream. The stream will never return `None` and will also not yield the peer's `SocketAddr` structure.  Iterating over
+    /// it is equivalent to calling accept in a loop.
     ///
     /// # Errors
     ///
@@ -27,7 +27,7 @@ cfg_tcp! {
     ///
     /// # Examples
     ///
-    /// Using [`TcpListener::accept`]:
+    /// Using `accept`:
     /// ```no_run
     /// use tokio::net::TcpListener;
     ///
@@ -277,6 +277,8 @@ impl TcpListener {
     }
 
     /// Returns a stream over the connections being received on this listener.
+    ///
+    /// Note that `TcpListener` also directly implements `Stream`.
     ///
     /// The returned stream will never return `None` and will also not yield the
     /// peer's `SocketAddr` structure. Iterating over it is equivalent to
