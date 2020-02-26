@@ -14,7 +14,7 @@ use std::task::{Context, Poll, Waker};
 /// another task to perform an operation.
 ///
 /// `Notify` can be thought of as a [`Semaphore`] starting with 0 permits.
-/// [`notfied().await`] waits for a permit to become available and [`notify()`]
+/// [`notified().await`] waits for a permit to become available, and [`notify()`]
 /// sets a permit **if there currently are no available permits**.
 ///
 /// The synchronization details of `Notify` are similar to
