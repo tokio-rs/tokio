@@ -161,7 +161,7 @@ impl Notify {
     /// Each `Notify` value holds a single permit. If a permit is available from
     /// an earlier call to [`notify()`], then `notified().await` will complete
     /// immediately, consuming that permit. Otherwise, `notified().await` waits
-    /// for a permit to be made available by the next call to `notify()`
+    /// for a permit to be made available by the next call to `notify()`.
     ///
     /// [`notify()`]: Notify::notify
     ///
