@@ -1,7 +1,7 @@
 use crate::future::poll_fn;
 use crate::io::{AsyncRead, AsyncWrite, PollEvented};
+use crate::net::tcp::into_split::{into_split, IntoReadHalf, IntoWriteHalf};
 use crate::net::tcp::split::{split, ReadHalf, WriteHalf};
-use crate::net::tcp::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
 use crate::net::ToSocketAddrs;
 
 use bytes::Buf;
@@ -616,10 +616,10 @@ impl TcpStream {
     /// Splits a `TcpStream` into a read half and a write half, which can be used
     /// to read and write the stream concurrently.
     ///
-    /// This method is more efficient than [`split_owned`], but the halves cannot be
+    /// This method is more efficient than [`into_split`], but the halves cannot be
     /// moved into independently spawned tasks.
     ///
-    /// [`split_owned`]: TcpStream::split_owned()
+    /// [`into_split`]: TcpStream::into_split()
     pub fn split(&mut self) -> (ReadHalf<'_>, WriteHalf<'_>) {
         split(self)
     }
@@ -631,8 +631,8 @@ impl TcpStream {
     /// this comes at the cost of a heap allocation.
     ///
     /// [`split`]: TcpStream::split()
-    pub fn split_owned(self) -> (OwnedReadHalf, OwnedWriteHalf) {
-        split_owned(self)
+    pub fn into_split(self) -> (IntoReadHalf, IntoWriteHalf) {
+        into_split(self)
     }
 
     // == Poll IO functions that takes `&self` ==

@@ -25,7 +25,7 @@ async fn split() -> Result<()> {
     });
 
     let stream = TcpStream::connect(&addr).await?;
-    let (mut read_half, mut write_half) = stream.split_owned();
+    let (mut read_half, mut write_half) = stream.into_split();
 
     let write_join = tokio::spawn(async move { write_half.write(MSG).await });
 
@@ -54,10 +54,10 @@ async fn reunite() -> Result<()> {
     });
 
     let stream1 = TcpStream::connect(&addr).await?;
-    let (read1, write1) = stream1.split_owned();
+    let (read1, write1) = stream1.into_split();
 
     let stream2 = TcpStream::connect(&addr).await?;
-    let (_, write2) = stream2.split_owned();
+    let (_, write2) = stream2.into_split();
 
     let read1 = match read1.reunite(write2) {
         Ok(_) => panic!("Reunite should not succeed"),

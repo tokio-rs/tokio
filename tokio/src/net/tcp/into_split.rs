@@ -1,8 +1,8 @@
 //! `TcpStream` owned split support.
 //!
-//! A `TcpStream` can be split into an `OwnedReadHalf` and a
-//! `OwnedWriteHalf` with the `TcpStream::split_owned` method.
-//! `OwnedReadHalf` implements `AsyncRead` while `OwnedWriteHalf`
+//! A `TcpStream` can be split into an `IntoReadHalf` and a
+//! `IntoWriteHalf` with the `TcpStream::into_split` method.
+//! `IntoReadHalf` implements `AsyncRead` while `IntoWriteHalf`
 //! implements `AsyncWrite`.
 //!
 //! Compared to the generic split of `AsyncRead + AsyncWrite`, this specialized
@@ -22,33 +22,30 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::{fmt, io};
 
-/// Owned read half of a [`TcpStream`], created by [`split_owned`].
+/// Owned read half of a [`TcpStream`], created by [`into_split`].
 ///
 /// [`TcpStream`]: TcpStream
-/// [`split_owned`]: TcpStream::split_owned()
+/// [`into_split`]: TcpStream::into_split()
 #[derive(Debug)]
-pub struct OwnedReadHalf(Arc<TcpStream>);
+pub struct IntoReadHalf(Arc<TcpStream>);
 
-/// Owned write half of a [`TcpStream`], created by [`split_owned`].
+/// Owned write half of a [`TcpStream`], created by [`into_split`].
 ///
 /// Note that in the `AsyncWrite` implemenation of this type, `poll_shutdown` will
 /// shut down the TCP stream in the write direction.
 ///
 /// [`TcpStream`]: TcpStream
-/// [`split_owned`]: TcpStream::split_owned()
+/// [`into_split`]: TcpStream::into_split()
 #[derive(Debug)]
-pub struct OwnedWriteHalf(Arc<TcpStream>);
+pub struct IntoWriteHalf(Arc<TcpStream>);
 
-pub(crate) fn split_owned(stream: TcpStream) -> (OwnedReadHalf, OwnedWriteHalf) {
+pub(crate) fn into_split(stream: TcpStream) -> (IntoReadHalf, IntoWriteHalf) {
     let arc = Arc::new(stream);
     let arc2 = Arc::clone(&arc);
-    (OwnedReadHalf(arc), OwnedWriteHalf(arc2))
+    (IntoReadHalf(arc), IntoWriteHalf(arc2))
 }
 
-pub(crate) fn reunite(
-    read: OwnedReadHalf,
-    write: OwnedWriteHalf,
-) -> Result<TcpStream, ReuniteError> {
+pub(crate) fn reunite(read: IntoReadHalf, write: IntoWriteHalf) -> Result<TcpStream, ReuniteError> {
     if Arc::ptr_eq(&read.0, &write.0) {
         drop(write);
         // This unwrap cannot fail as the api does not allow creating more than two Arcs,
@@ -62,7 +59,7 @@ pub(crate) fn reunite(
 /// Error indicating two halves were not from the same socket, and thus could
 /// not be reunited.
 #[derive(Debug)]
-pub struct ReuniteError(pub OwnedReadHalf, pub OwnedWriteHalf);
+pub struct ReuniteError(pub IntoReadHalf, pub IntoWriteHalf);
 
 impl fmt::Display for ReuniteError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -75,13 +72,13 @@ impl fmt::Display for ReuniteError {
 
 impl Error for ReuniteError {}
 
-impl OwnedReadHalf {
+impl IntoReadHalf {
     /// Attempts to put the two halves of a `TcpStream` back together and
     /// recover the original socket. Succeeds only if the two halves
-    /// originated from the same call to [`split_owned`].
+    /// originated from the same call to [`into_split`].
     ///
-    /// [`split_owned`]: TcpStream::split_owned()
-    pub fn reunite(self, other: OwnedWriteHalf) -> Result<TcpStream, ReuniteError> {
+    /// [`into_split`]: TcpStream::into_split()
+    pub fn reunite(self, other: IntoWriteHalf) -> Result<TcpStream, ReuniteError> {
         reunite(self, other)
     }
 
@@ -102,7 +99,7 @@ impl OwnedReadHalf {
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
     ///     let stream = TcpStream::connect("127.0.0.1:8000").await?;
-    ///     let (mut read_half, _) = stream.split_owned();
+    ///     let (mut read_half, _) = stream.into_split();
     ///     let mut buf = [0; 10];
     ///
     ///     poll_fn(|cx| {
@@ -135,7 +132,7 @@ impl OwnedReadHalf {
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     // Connect to a peer
     ///     let stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///     let (mut read_half, _) = stream.split_owned();
+    ///     let (mut read_half, _) = stream.into_split();
     ///
     ///     let mut b1 = [0; 10];
     ///     let mut b2 = [0; 10];
@@ -157,7 +154,7 @@ impl OwnedReadHalf {
     }
 }
 
-impl AsyncRead for OwnedReadHalf {
+impl AsyncRead for IntoReadHalf {
     unsafe fn prepare_uninitialized_buffer(&self, _: &mut [MaybeUninit<u8>]) -> bool {
         false
     }
@@ -171,18 +168,18 @@ impl AsyncRead for OwnedReadHalf {
     }
 }
 
-impl OwnedWriteHalf {
+impl IntoWriteHalf {
     /// Attempts to put the two halves of a `TcpStream` back together and
     /// recover the original socket. Succeeds only if the two halves
-    /// originated from the same call to [`split_owned`].
+    /// originated from the same call to [`into_split`].
     ///
-    /// [`split_owned`]: TcpStream::split_owned()
-    pub fn reunite(self, other: OwnedReadHalf) -> Result<TcpStream, ReuniteError> {
+    /// [`into_split`]: TcpStream::into_split()
+    pub fn reunite(self, other: IntoReadHalf) -> Result<TcpStream, ReuniteError> {
         reunite(other, self)
     }
 }
 
-impl AsyncWrite for OwnedWriteHalf {
+impl AsyncWrite for IntoWriteHalf {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -211,13 +208,13 @@ impl AsyncWrite for OwnedWriteHalf {
     }
 }
 
-impl AsRef<TcpStream> for OwnedReadHalf {
+impl AsRef<TcpStream> for IntoReadHalf {
     fn as_ref(&self) -> &TcpStream {
         &*self.0
     }
 }
 
-impl AsRef<TcpStream> for OwnedWriteHalf {
+impl AsRef<TcpStream> for IntoWriteHalf {
     fn as_ref(&self) -> &TcpStream {
         &*self.0
     }
