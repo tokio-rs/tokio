@@ -64,6 +64,7 @@ pub(crate) mod sync {
         pub(crate) use crate::loom::std::atomic_u64::AtomicU64;
         pub(crate) use crate::loom::std::atomic_usize::AtomicUsize;
 
+        pub(crate) use std::sync::atomic::AtomicU8;
         pub(crate) use std::sync::atomic::{fence, AtomicPtr};
         pub(crate) use std::sync::atomic::{spin_loop_hint, AtomicBool};
     }

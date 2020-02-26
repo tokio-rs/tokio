@@ -406,9 +406,18 @@
 //! * [`Mutex`][Mutex] Mutual Exclusion mechanism, which ensures that at most
 //!   one thread at a time is able to access some data.
 //!
+//! * [`Notify`][Notify] Basic task notification. `Notify` supports notifying a
+//!   receiving task without sending data. In this case, the task wakes up and
+//!   resumes processing.
+//!
 //! * [`RwLock`][RwLock] Provides a mutual exclusion mechanism which allows
 //!   multiple readers at the same time, while allowing only one writer at a
 //!   time. In some cases, this can be more efficient than a mutex.
+//!
+//! * [`Semaphore`][Semaphore] Limits the amount of concurrency. A semaphore
+//!   holds a number of permits, which tasks may request in order to enter a
+//!   critical section. Semaphores are useful for implementing limiting of
+//!   bounding of any kind.
 
 cfg_sync! {
     mod barrier;
@@ -420,6 +429,9 @@ cfg_sync! {
 
     mod mutex;
     pub use mutex::{Mutex, MutexGuard};
+
+    mod notify;
+    pub use notify::Notify;
 
     pub mod oneshot;
 
