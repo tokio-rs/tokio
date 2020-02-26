@@ -12,11 +12,10 @@ use std::task::{Context, Poll};
 cfg_tcp! {
     /// A TCP socket server, listening for connections.
     ///
-    /// You can accept a new connection by using the accept method. Alternatively this type
-    /// implements the `Stream` trait, which allows you to use the listener in places that want a
-    /// stream.
-    /// The stream will never return `None` and will also not yield the peer's
-    /// `SocketAddr` structure. Iterating over it is equivalent to calling accept in a loop.
+    /// You can accept a new connection by using the [`accept`](`TcpListener::accept`) method. Alternatively `TcpListener`
+    /// implements the [`Stream`](`crate::stream::Stream`) trait, which allows you to use the listener in places that want a
+    /// stream. The stream will never return `None` and will also not yield the peer's `SocketAddr` structure.  Iterating over
+    /// it is equivalent to calling accept in a loop.
     ///
     /// # Errors
     ///
@@ -279,7 +278,7 @@ impl TcpListener {
 
     /// Returns a stream over the connections being received on this listener.
     ///
-    /// Note that this type also directly implements `Stream`.
+    /// Note that `TcpListener` also directly implements `Stream`.
     ///
     /// The returned stream will never return `None` and will also not yield the
     /// peer's `SocketAddr` structure. Iterating over it is equivalent to
