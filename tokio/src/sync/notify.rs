@@ -416,7 +416,7 @@ impl Future for RecvFuture<'_> {
                     // `notify.waiters`). In order to access the waker fields,
                     // we must hold the lock.
 
-                    let mut waiters = notify.waiters.lock().unwrap();
+                    let waiters = notify.waiters.lock().unwrap();
 
                     // Safety: called while locked
                     let w = unsafe { &mut *waiter.as_mut().get() };
