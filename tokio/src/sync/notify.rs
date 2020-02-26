@@ -201,13 +201,15 @@ impl Notify {
     ///
     /// If a task is currently waiting, that task is notified. Otherwise, a
     /// permit is stored in this `Notify` value and the **next** call to
-    /// `notified().await` will complete immediately consuming the permit made
+    /// [`notified().await`] will complete immediately consuming the permit made
     /// available by this call to `notify()`.
     ///
     /// At most one permit may be stored by `Notify`. Many sequential calls to
     /// `notify` will result in a single permit being stored. The next call to
     /// `notified().await` will complete immediately, but the one after that
     /// will wait.
+    ///
+    /// [`notified().await`]: Notify::notified()
     ///
     /// # Examples
     ///
@@ -315,6 +317,8 @@ fn notify_locked(waiters: &mut LinkedList<Waiter>, state: &AtomicU8, curr: u8) -
 // ===== impl Notified =====
 
 impl Notified<'_> {
+    /// A custom `project` implementation is used in place of `pin-project-lite`
+    /// as a custom drop implementation is needed.
     fn project(
         self: Pin<&mut Self>,
     ) -> (&Notify, &mut State, Pin<&mut linked_list::Entry<Waiter>>) {
