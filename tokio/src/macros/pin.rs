@@ -97,6 +97,30 @@
 ///     }
 /// }
 /// ```
+///
+/// Because assigning to a variable followed by pinning is common, there is also
+/// a variant of the macro that supports doing both in one go.
+///
+/// ```
+/// use tokio::{pin, select};
+///
+/// async fn my_async_fn() {
+///     // async logic here
+/// }
+///
+/// #[tokio::main]
+/// async fn main() {
+///     pin! {
+///         let future1 = my_async_fn();
+///         let future2 = my_async_fn();
+///     }
+///
+///     select! {
+///         _ = &mut future1 => {}
+///         _ = &mut future2 => {}
+///     }
+/// }
+/// ```
 #[macro_export]
 macro_rules! pin {
     ($($x:ident),*) => { $(
