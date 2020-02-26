@@ -470,6 +470,20 @@ impl Drop for RecvFuture<'_> {
             let mut notify_state = WAITING;
             let mut waiters = notify.waiters.lock().unwrap();
 
+            // `Notify.state` may be in any of the three states (Empty, Waiting,
+            // Notified). It doesn't actually matter what the atomic is set to
+            // at this point. We hold the lock and will ensure the atomic is in
+            // the correct state once th elock is dropped.
+            //
+            // Because the atomic state is not checked, at first glance, it may
+            // seem like this routine does not handle the case where the
+            // receiver is notified but has not yet observed the notification.
+            // If this happens, no matter how many notifications happen between
+            // this receiver being notified and the receive future dropping, all
+            // we need to do is ensure that one notification is returned back to
+            // the `Notify`. This is done by calling `notify_locked` if `self`
+            // has the `notified` flag set.
+
             // remove the entry from the list
             //
             // safety: the waiter is only added to `waiters` by virtue of it
@@ -478,6 +492,12 @@ impl Drop for RecvFuture<'_> {
 
             if waiters.is_empty() {
                 notify_state = EMPTY;
+                // If the state *should* be `NOTIFIED`, the call to
+                // `notify_locked` below will end up doing the
+                // `store(NOTIFIED)`. If a concurrent receiver races and
+                // observes the incorrect `EMPTY` state, it will then obtain the
+                // lock and block until `notify.state` is in the correct final
+                // state.
                 notify.state.store(EMPTY, SeqCst);
             }
 

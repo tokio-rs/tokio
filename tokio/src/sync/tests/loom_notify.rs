@@ -63,19 +63,21 @@ fn notify_drop() {
         let rx2 = notify.clone();
 
         let th1 = thread::spawn(move || {
-            let mut recv = Box::pin(async {
-                rx1.recv().await;
-                rx1.notify_one();
-            });
+            let mut recv = Box::pin(rx1.recv());
 
             block_on(poll_fn(|cx| {
-                let _ = recv.as_mut().poll(cx);
+                if recv.as_mut().poll(cx).is_ready() {
+                    rx1.notify_one();
+                }
                 Poll::Ready(())
             }));
         });
 
         let th2 = thread::spawn(move || {
             block_on(async {
+                rx2.recv().await;
+                // Trigger second notification
+                rx2.notify_one();
                 rx2.recv().await;
             });
         });
