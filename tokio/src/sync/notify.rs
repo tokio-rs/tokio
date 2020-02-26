@@ -13,16 +13,16 @@ use std::task::{Context, Poll, Waker};
 /// `Notify` itself does not carry any data. Instead, it is to be used to signal
 /// another task to perform an operation.
 ///
+/// `Notify` can be thought of as a [`Semaphore`] starting with 0 permits.
+/// [`Notify::recv`] waits for a permit to become available and
+/// [`Notify::notify_one`] sets a permit **if there currently are no available
+/// permits**.
+///
 /// The synchronization details of `Notify` are similar to
 /// [`thread::park`][park] and [`Thread::unpark`][unpark] from std. A [`Notify`]
 /// value contains a single permit. [`Notify::recv`] waits for the permit to be
 /// made available, consumes the permit, and resumes. [`Notify::notify_one`]
 /// sets the permit, waking a pending task if there is one.
-///
-/// `Notify` can be thought of as a [`Semaphore`] starting with 0 permits.
-/// [`Notify::recv`] waits for a permit to become available and
-/// [`Notify::notify_one`] sets a permit **if there currently are no available
-/// permits**.
 ///
 /// If `notify_one` is called **before** `recv()`, then the next call to
 /// `recv()` will complete immediately, consuming the permit. Any subsequent
@@ -47,9 +47,10 @@ use std::task::{Context, Poll, Waker};
 ///
 ///     tokio::spawn(async move {
 ///         notify2.recv().await;
-///         println!("received a notification");
+///         println!("received notification");
 ///     });
 ///
+///     println!("sending notification");
 ///     notify.notify_one();
 /// }
 /// ```
@@ -228,10 +229,9 @@ impl Notify {
 
         // If the state is `EMPTY`, transition to `NOTIFIED` and return.
         while let EMPTY | NOTIFIED = curr {
-            // The compare-exchange from `NOTIFIED` -> `NOTIFIED` is
-            // intended a happens-before synchronization must happen
-            // between this atomic operation and a task calling
-            // `recv()`.
+            // The compare-exchange from `NOTIFIED` -> `NOTIFIED` is intended. A
+            // happens-before synchronization must happen between this atomic
+            // operation and a task calling `recv()`.
             let res = self.state.compare_exchange(curr, NOTIFIED, SeqCst, SeqCst);
 
             match res {
@@ -266,7 +266,7 @@ impl Default for Notify {
 fn notify_locked(
     waiters: &mut LinkedList<Waiter>,
     state: &AtomicU8,
-    mut curr: u8,
+    curr: u8,
 ) -> Option<Waker> {
     loop {
         match curr {
@@ -276,7 +276,9 @@ fn notify_locked(
                 match res {
                     Ok(_) => return None,
                     Err(actual) => {
-                        curr = actual;
+                        assert!(actual == EMPTY || actual == NOTIFIED);
+                        state.store(NOTIFIED, SeqCst);
+                        return None;
                     }
                 }
             }
@@ -342,7 +344,7 @@ impl Future for RecvFuture<'_> {
 
         let (notify, state, mut waiter) = self.project();
 
-        'outer: loop {
+        loop {
             match *state {
                 Init => {
                     // Optimistically try acquiring a pending notification
@@ -353,7 +355,7 @@ impl Future for RecvFuture<'_> {
                     if res.is_ok() {
                         // Acquired the notification
                         *state = Done;
-                        continue 'outer;
+                        return Poll::Ready(());
                     }
 
                     // Acquire the lock and attempt to transition to the waiting
@@ -373,11 +375,13 @@ impl Future for RecvFuture<'_> {
                                     .compare_exchange(EMPTY, WAITING, SeqCst, SeqCst);
 
                                 if let Err(actual) = res {
+                                    assert_eq!(actual, NOTIFIED);
                                     curr = actual;
-                                    continue;
+                                } else {
+                                    break;
                                 }
                             }
-                            WAITING => {}
+                            WAITING => break,
                             NOTIFIED => {
                                 // Try consuming the notification
                                 let res = notify
@@ -388,19 +392,16 @@ impl Future for RecvFuture<'_> {
                                     Ok(_) => {
                                         // Acquired the notification
                                         *state = Done;
-                                        continue 'outer;
+                                        return Poll::Ready(());
                                     }
                                     Err(actual) => {
+                                        assert_eq!(actual, EMPTY);
                                         curr = actual;
-                                        continue;
                                     }
                                 }
                             }
                             _ => unreachable!(),
                         }
-
-                        // The state has been transitioned to waiting
-                        break;
                     }
 
                     // Safety: called while locked.
@@ -414,34 +415,38 @@ impl Future for RecvFuture<'_> {
                     *state = Waiting;
                 }
                 Waiting => {
+                    // Currently in the "Waiting" state, implying the caller has
+                    // a waiter stored in the waiter list (guarded by
+                    // `notify.waiters`). In order to access the waker fields,
+                    // we must hold the lock.
+
                     let mut waiters = notify.waiters.lock().unwrap();
 
-                    {
-                        // Safety: called while locked
-                        let w = unsafe { &mut *waiter.as_mut().get() };
+                    // Safety: called while locked
+                    let w = unsafe { &mut *waiter.as_mut().get() };
 
-                        if w.notified {
-                            w.waker = None;
-                            w.notified = false;
+                    if w.notified {
+                        // Our waker has been notified. Reset the fields and
+                        // remove it from the list.
+                        w.waker = None;
+                        w.notified = false;
 
-                            // Remove the entry from the linked list. The entry
-                            // may only be in the linked list while the state is
-                            // `Waiting`.
-                            //
-                            // Safety: called while the lock is held
-                            unsafe {
-                                waiters.remove(waiter.as_mut());
-                            }
-
-                            *state = Done;
-                        } else {
-                            if !w.waker.as_ref().unwrap().will_wake(cx.waker()) {
-                                w.waker = Some(cx.waker().clone());
-                            }
-
-                            return Poll::Pending;
+                        *state = Done;
+                    } else {
+                        // Update the waker, if necessary.
+                        if !w.waker.as_ref().unwrap().will_wake(cx.waker()) {
+                            w.waker = Some(cx.waker().clone());
                         }
+
+                        return Poll::Pending;
                     }
+
+                    // Explicit drop of the lock to indicate the scope that the
+                    // lock is held. Because holding the lock is required to
+                    // ensure safe access to fields not held within the lock, it
+                    // is helpful to visualize the scope of the critical
+                    // section.
+                    drop(waiters);
                 }
                 Done => {
                     return Poll::Ready(());

@@ -2,7 +2,7 @@
 //!
 //! The data structure supports tracking pinned nodes. Most of the data
 //! structure's APIs are `unsafe` as they require the caller to ensure the
-//! specified node is actually
+//! specified node is actually contained by the list.
 
 use core::cell::UnsafeCell;
 use core::marker::PhantomPinned;
@@ -78,13 +78,8 @@ impl<T> LinkedList<T> {
     /// self`.
     pub(crate) fn pop_back(&mut self) -> Option<Pin<&mut T>> {
         unsafe {
-            let mut last = match self.tail {
-                Some(tail) => {
-                    self.tail = tail.as_ref().prev;
-                    tail
-                }
-                None => return None,
-            };
+            let mut last = self.tail?;
+            self.tail = last.as_ref().prev;
 
             if let Some(mut prev) = last.as_mut().prev {
                 prev.as_mut().next = None;
