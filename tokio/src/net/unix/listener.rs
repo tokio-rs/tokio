@@ -15,8 +15,9 @@ use std::task::{Context, Poll};
 cfg_uds! {
     /// A Unix socket which can accept connections from other Unix sockets.
     ///
-    /// Also implements a stream over the connections being received on this listener.
-    ///
+    /// You can accept a new connection by using the accept method. Alternatively this type
+    /// implements the `Stream` trait, which allows you to use the listener in places that want a
+    /// stream.
     /// The stream will never return `None` and will also not yield the peer's
     /// `SocketAddr` structure. Iterating over it is equivalent to calling accept in a loop.
     ///
@@ -136,6 +137,8 @@ impl UnixListener {
     }
 
     /// Returns a stream over the connections being received on this listener.
+    ///
+    /// Note that this type also directly implements `Stream`.
     ///
     /// The returned stream will never return `None` and will also not yield the
     /// peer's `SocketAddr` structure. Iterating over it is equivalent to
