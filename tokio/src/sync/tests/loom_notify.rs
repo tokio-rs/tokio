@@ -12,11 +12,11 @@ fn notify_one() {
 
         let th = thread::spawn(move || {
             block_on(async {
-                rx.recv().await;
+                rx.notified().await;
             });
         });
 
-        tx.notify_one();
+        tx.notify();
         th.join().unwrap();
     });
 }
@@ -33,20 +33,20 @@ fn notify_multi() {
 
             ths.push(thread::spawn(move || {
                 block_on(async {
-                    notify.recv().await;
-                    notify.notify_one();
+                    notify.notified().await;
+                    notify.notify();
                 })
             }));
         }
 
-        notify.notify_one();
+        notify.notify();
 
         for th in ths.drain(..) {
             th.join().unwrap();
         }
 
         block_on(async {
-            notify.recv().await;
+            notify.notified().await;
         });
     });
 }
@@ -63,11 +63,11 @@ fn notify_drop() {
         let rx2 = notify.clone();
 
         let th1 = thread::spawn(move || {
-            let mut recv = Box::pin(rx1.recv());
+            let mut recv = Box::pin(rx1.notified());
 
             block_on(poll_fn(|cx| {
                 if recv.as_mut().poll(cx).is_ready() {
-                    rx1.notify_one();
+                    rx1.notify();
                 }
                 Poll::Ready(())
             }));
@@ -75,14 +75,14 @@ fn notify_drop() {
 
         let th2 = thread::spawn(move || {
             block_on(async {
-                rx2.recv().await;
+                rx2.notified().await;
                 // Trigger second notification
-                rx2.notify_one();
-                rx2.recv().await;
+                rx2.notify();
+                rx2.notified().await;
             });
         });
 
-        notify.notify_one();
+        notify.notify();
 
         th1.join().unwrap();
         th2.join().unwrap();

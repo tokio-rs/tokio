@@ -19,9 +19,9 @@ use std::task::{Context, Poll, Waker};
 ///
 /// The synchronization details of `Notify` are similar to
 /// [`thread::park`][park] and [`Thread::unpark`][unpark] from std. A [`Notify`]
-/// value contains a single permit. [`Notify::notfied`] waits for the permit to
-/// be made available, consumes the permit, and resumes. [`Notify::notify_one`]
-/// sets the permit, waking a pending task if there is one.
+/// value contains a single permit. [`notfied().await`] waits for the permit to
+/// be made available, consumes the permit, and resumes.  [`notify()`] sets the
+/// permit, waking a pending task if there is one.
 ///
 /// If `notify()` is called **before** `notfied().await`, then the next call to
 /// `notified().await` will complete immediately, consuming the permit. Any
@@ -93,7 +93,7 @@ use std::task::{Context, Poll, Waker};
 /// [park]: std::thread::park
 /// [unpark]: std::thread::Thread::unpark
 /// [`notified().await`]: Notify::notified()
-/// [`notify`]: Notify::notify()
+/// [`notify()`]: Notify::notify()
 /// [`Semaphore`]: crate::sync::Semaphore
 #[derive(Debug)]
 pub struct Notify {
