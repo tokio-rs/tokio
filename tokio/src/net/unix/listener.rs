@@ -10,7 +10,6 @@ use std::io;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
-use std::pin::Pin;
 use std::task::{Context, Poll};
 
 cfg_uds! {
@@ -180,7 +179,10 @@ impl UnixListener {
 impl crate::stream::Stream for UnixListener {
     type Item = io::Result<UnixStream>;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
         let (socket, _) = ready!(self.poll_accept(cx))?;
         Poll::Ready(Some(Ok(socket)))
     }
