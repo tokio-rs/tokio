@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-macros/0.2.3")]
+#![doc(html_root_url = "https://docs.rs/tokio-macros/0.2.5")]
 #![allow(clippy::needless_doctest_main)]
 #![warn(
     missing_debug_implementations,
