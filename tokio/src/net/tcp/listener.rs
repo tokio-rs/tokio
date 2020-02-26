@@ -12,8 +12,22 @@ use std::task::{Context, Poll};
 cfg_tcp! {
     /// A TCP socket server, listening for connections.
     ///
+    /// Also implements a stream over the connections being received on this listener.
+    ///
+    /// The stream will never return `None` and will also not yield the peer's
+    /// `SocketAddr` structure. Iterating over it is equivalent to calling accept in a loop.
+    ///
+    /// # Errors
+    ///
+    /// Note that accepting a connection can lead to various errors and not all
+    /// of them are necessarily fatal ‒ for example having too many open file
+    /// descriptors or the other side closing the connection while it waits in
+    /// an accept queue. These would terminate the stream if not handled in any
+    /// way.
+    ///
     /// # Examples
     ///
+    /// Using [`TcpListener::accept`]:
     /// ```no_run
     /// use tokio::net::TcpListener;
     ///
@@ -31,6 +45,24 @@ cfg_tcp! {
     ///     loop {
     ///         let (socket, _) = listener.accept().await?;
     ///         process_socket(socket).await;
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// Using `impl Stream`:
+    /// ```no_run
+    /// use tokio::{net::TcpListener, stream::StreamExt};
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
+    ///     while let Some(stream) = listener.next().await {
+    ///         match stream {
+    ///             Ok(stream) => {
+    ///                 println!("new client!");
+    ///             }
+    ///             Err(e) => { /* connection failed */ }
+    ///         }
     ///     }
     /// }
     /// ```
@@ -332,6 +364,19 @@ impl TcpListener {
     /// ```
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.io.get_ref().set_ttl(ttl)
+    }
+}
+
+#[cfg(feature = "stream")]
+impl crate::stream::Stream for TcpListener {
+    type Item = io::Result<TcpStream>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        let (socket, _) = ready!(self.poll_accept(cx))?;
+        Poll::Ready(Some(Ok(socket)))
     }
 }
 

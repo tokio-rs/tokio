@@ -14,6 +14,39 @@ use std::task::{Context, Poll};
 
 cfg_uds! {
     /// A Unix socket which can accept connections from other Unix sockets.
+    ///
+    /// Also implements a stream over the connections being received on this listener.
+    ///
+    /// The stream will never return `None` and will also not yield the peer's
+    /// `SocketAddr` structure. Iterating over it is equivalent to calling accept in a loop.
+    ///
+    /// # Errors
+    ///
+    /// Note that accepting a connection can lead to various errors and not all
+    /// of them are necessarily fatal ‒ for example having too many open file
+    /// descriptors or the other side closing the connection while it waits in
+    /// an accept queue. These would terminate the stream if not handled in any
+    /// way.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::UnixListener;
+    /// use tokio::stream::StreamExt;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut listener = UnixListener::bind("/path/to/the/socket").unwrap();
+    ///     while let Some(stream) = listener.next().await {
+    ///         match stream {
+    ///             Ok(stream) => {
+    ///                 println!("new client!");
+    ///             }
+    ///             Err(e) => { /* connection failed */ }
+    ///         }
+    ///     }
+    /// }
+    /// ```
     pub struct UnixListener {
         io: PollEvented<mio_uds::UnixListener>,
     }
@@ -139,6 +172,19 @@ impl UnixListener {
     /// ```
     pub fn incoming(&mut self) -> Incoming<'_> {
         Incoming::new(self)
+    }
+}
+
+#[cfg(feature = "stream")]
+impl crate::stream::Stream for UnixListener {
+    type Item = io::Result<UnixStream>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        let (socket, _) = ready!(self.poll_accept(cx))?;
+        Poll::Ready(Some(Ok(socket)))
     }
 }
 
