@@ -1,5 +1,4 @@
 use tokio::pin;
-use tokio::select;
 
 async fn one() {}
 async fn two() {}
