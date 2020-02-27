@@ -215,7 +215,7 @@ impl<T> Local<T> {
                 // The last task in the local queue being moved
                 task.header().into()
             } else {
-                // safety: THe above CAS prevents a stealer from accessing these
+                // safety: The above CAS prevents a stealer from accessing these
                 // tasks and we are the only producer.
                 self.inner.buffer[j_idx].with(|ptr| unsafe {
                     let value = (*ptr).as_ptr();
