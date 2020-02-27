@@ -137,6 +137,9 @@ impl State {
 
     /// Transition from `Complete` -> `Terminal`, decrementing the reference
     /// count by 1.
+    ///
+    /// When `ref_dec` is set, an additional ref count decrement is performed.
+    /// This is used to batch atomic ops when possible.
     pub(super) fn transition_to_terminal(&self, complete: bool, ref_dec: bool) -> Snapshot {
         self.fetch_update(|mut snapshot| {
             if complete {
