@@ -61,16 +61,12 @@ struct Waiter {
     state: AtomicUsize,
 }
 
-const CLOSED: usize = std::usize::MAX;
+const CLOSED: usize = 1 << 17;
 
 impl Semaphore {
     /// Creates a new semaphore with the initial number of permits
-    ///
-    /// # Panics
-    ///
-    /// Panics if `permits` is zero.
     pub(crate) fn new(permits: usize) -> Self {
-        assert!(permits > 0, "number of permits must be greater than 0");
+        assert!(permits <= std::u16::MAX as usize);
         Self {
             permits: AtomicUsize::new(permits),
             waiters: Mutex::new(LinkedList::new()),
@@ -80,7 +76,7 @@ impl Semaphore {
 
     /// Returns the current number of available permits
     pub(crate) fn available_permits(&self) -> usize {
-        self.permits.load(Ordering::Acquire)
+        self.permits.load(Ordering::Acquire) & std::u16::MAX as usize
     }
 
     /// Closes the semaphore. This prevents the semaphore from issuing new
@@ -88,6 +84,7 @@ impl Semaphore {
     pub(crate) fn close(&self) {
         // Acquire the `add_lock`, setting the "closed" flag on the lock.
         let prev = self.add_lock.fetch_or(1, Ordering::AcqRel);
+        self.permits.fetch_or(CLOSED, Ordering::Release);
 
         if prev != 0 {
             // Another thread has the lock and will be responsible for notifying
@@ -100,6 +97,7 @@ impl Semaphore {
 
     /// Adds `n` new permits to the semaphore.
     pub(crate) fn add_permits(&self, n: usize) {
+        dbg!(n);
         if n == 0 {
             return;
         }
@@ -107,11 +105,18 @@ impl Semaphore {
         // TODO: Handle overflow. A panic is not sufficient, the process must
         // abort.
         let prev = self.add_lock.fetch_add(n << 1, Ordering::AcqRel);
-        if prev != 0 {
+
+        let closed = match dbg!(prev) {
+            1 => true,
+            0 => false,
             // Another thread has the lock and will be responsible for notifying
             // pending waiters.
-            return;
-        }
+            _ => return,
+        };
+
+        // if self.permits.load(Ordering::Acquire) & CLOSED == 1 {
+
+        // }
 
         self.add_permits_locked(n, false, self.waiters.lock().unwrap());
     }
@@ -127,7 +132,7 @@ impl Semaphore {
 
             let initial = rem;
             // Release the permits and notify
-            while dbg!(rem > 0) {
+            while dbg!(rem > 0) || dbg!(closed) {
                 let pop = match waiters.last() {
                     Some(last) => dbg!(last.assign_permits(&mut rem, closed)),
                     None => {
@@ -153,7 +158,7 @@ impl Semaphore {
                 actual
             };
 
-            rem = (actual - initial) >> 1;
+            rem = actual.saturating_sub(initial) >> 1;
         }
     }
 
@@ -167,7 +172,7 @@ impl Semaphore {
         let needed = needed as usize;
         let (acquired, remaining) = loop {
             dbg!(needed, curr);
-            if curr == CLOSED {
+            if dbg!(curr & CLOSED == CLOSED) {
                 return Ready(Err(AcquireError(())));
             }
             let mut remaining = 0;
@@ -353,6 +358,7 @@ impl Waiter {
             // Number of permits to assign to this waiter
             let assign = cmp::min(curr, *n);
             let next = curr - assign;
+            let next = if closed { next | CLOSED } else { next };
             match self
                 .state
                 .compare_exchange(curr, next, Ordering::AcqRel, Ordering::Acquire)
@@ -366,6 +372,9 @@ impl Waiter {
                             self.waker.wake();
                         }
 
+                        return true;
+                    } else if closed {
+                        self.waker.wake();
                         return true;
                     } else {
                         return false;
