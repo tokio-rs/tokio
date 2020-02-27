@@ -1,4 +1,4 @@
-use crate::runtime::task::{Cell, Harness, State, Header, Schedule};
+use crate::runtime::task::{Cell, Harness, Header, Schedule, State};
 
 use std::future::Future;
 use std::ptr::NonNull;

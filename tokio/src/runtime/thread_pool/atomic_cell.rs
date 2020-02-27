@@ -12,7 +12,9 @@ unsafe impl<T: Send> Sync for AtomicCell<T> {}
 
 impl<T> AtomicCell<T> {
     pub(super) fn new(data: Option<Box<T>>) -> AtomicCell<T> {
-        AtomicCell { data: AtomicPtr::new(to_raw(data)) }
+        AtomicCell {
+            data: AtomicPtr::new(to_raw(data)),
+        }
     }
 
     pub(super) fn swap(&self, val: Option<Box<T>>) -> Option<Box<T>> {
@@ -31,7 +33,8 @@ impl<T> AtomicCell<T> {
 }
 
 fn to_raw<T>(data: Option<Box<T>>) -> *mut T {
-    data.map(|boxed| Box::into_raw(boxed)).unwrap_or(ptr::null_mut())
+    data.map(|boxed| Box::into_raw(boxed))
+        .unwrap_or(ptr::null_mut())
 }
 
 fn from_raw<T>(val: *mut T) -> Option<Box<T>> {

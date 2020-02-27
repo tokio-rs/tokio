@@ -16,8 +16,8 @@ cfg_blocking! {
 }
 
 use crate::loom::sync::Arc;
-use crate::runtime::Parker;
 use crate::runtime::task::{self, JoinHandle};
+use crate::runtime::Parker;
 
 use std::fmt;
 use std::future::Future;

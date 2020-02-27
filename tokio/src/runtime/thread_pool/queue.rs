@@ -541,7 +541,8 @@ impl<T: 'static> Inject<T> {
         //
         // safety: All updates to the len atomic are guarded by the mutex. As
         // such, a non-atomic load followed by a store is safe.
-        self.len.store(unsafe { self.len.unsync_load() } - 1, Release);
+        self.len
+            .store(unsafe { self.len.unsync_load() } - 1, Release);
 
         // safety: a `Notified` is pushed into the queue and now it is popped!
         Some(unsafe { task::Notified::from_raw(task) })
