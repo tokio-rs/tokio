@@ -197,7 +197,7 @@ mod tests {
         }
 
         unsafe fn from_raw(ptr: NonNull<Entry>) -> Pin<&'a Entry> {
-            unsafe { Pin::new(&*ptr.as_ptr()) }
+            Pin::new(&*ptr.as_ptr())
         }
 
         unsafe fn pointers(mut target: NonNull<Entry>) -> NonNull<Pointers<Entry>> {
