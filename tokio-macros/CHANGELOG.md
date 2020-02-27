@@ -1,3 +1,8 @@
+# 0.2.5 (February 27, 2019)
+
+### Fixed
+- doc improvements (#2225).
+
 # 0.2.4 (January 27, 2019)
 
 ### Fixed
