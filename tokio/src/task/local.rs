@@ -551,11 +551,7 @@ impl Shared {
 impl task::Schedule for Arc<Shared> {
     fn bind(task: &Task<Self>) -> Arc<Shared> {
         CURRENT.with(|maybe_cx| {
-            let cx = match maybe_cx {
-                Some(cx) => cx,
-                None => panic!("scheduler context missing"),
-            };
-
+            let cx = maybe_cx.expect("scheduler context missing");
             cx.tasks.borrow_mut().owned.insert(task);
             cx.shared.clone()
         })
@@ -563,10 +559,7 @@ impl task::Schedule for Arc<Shared> {
 
     fn release(&self, task: Task<Self>) -> Option<Task<Self>> {
         CURRENT.with(|maybe_cx| {
-            let cx = match maybe_cx {
-                Some(cx) => cx,
-                None => panic!("scheduler context missing"),
-            };
+            let cx = maybe_cx.expect("scheduler context missing");
 
             assert!(cx.shared.ptr_eq(self));
 
