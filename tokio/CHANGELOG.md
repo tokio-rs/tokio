@@ -1,3 +1,30 @@
+# 0.2.12 (February 27, 2019)
+
+### Fixes
+- net: `UnixStream::poll_shutdown` should call `shutdown(Write)` (#2245).
+- process: Wake up read and write on `EPOLLERR` (#2218).
+- rt: potential deadlock when using `block_in_place` and shutting down the
+  runtime (#2119).
+- rt: only detect number of CPUs if `core_threads` not specified (#2238).
+- sync: reduce `watch::Receiver` struct size (#2191).
+- time: succeed when setting delay of `$MAX-1` (#2184).
+- time: avoid having to poll `DelayQueue` after inserting new delay (#2217).
+
+### Added
+- macros: `pin!` variant that assigns to identifier and pins (#2274).
+- net: impl `Stream` for `Listener` types (#2275).
+- rt: `Runtime::shutdown_timeout` waits for runtime to shutdown for specified
+  duration (#2186).
+- stream: `StreamMap` merges streams and can insert / remove streams at
+  runtime (#2185).
+- stream: `StreamExt::skip()` skips a fixed number of items (#2204).
+- stream: `StreamExt::skip_while()` skips items based on a predicate (#2205).
+- sync: `Notify` provides basic `async` / `await` task notification (#2210).
+- sync: `Mutex::into_inner` retrieves guarded data (#2250).
+- sync: `mpsc::Sender::send_timeout` sends, waiting for up to specified duration
+  for channel capacity (#2227).
+- time: impl `Ord` and `Hash` for `Instant` (#2239).
+
 # 0.2.11 (January 27, 2019)
 
 ### Fixes
