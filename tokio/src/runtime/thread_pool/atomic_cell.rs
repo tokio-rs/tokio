@@ -1,11 +1,10 @@
-use crate::loom::sync::atomic::AtomicUsize;
+use crate::loom::sync::atomic::AtomicPtr;
 
-use std::marker::PhantomData;
+use std::ptr;
 use std::sync::atomic::Ordering::AcqRel;
 
 pub(super) struct AtomicCell<T> {
-    data: AtomicUsize,
-    _p: PhantomData<Option<Box<T>>>,
+    data: AtomicPtr<T>,
 }
 
 unsafe impl<T: Send> Send for AtomicCell<T> {}
@@ -13,15 +12,12 @@ unsafe impl<T: Send> Sync for AtomicCell<T> {}
 
 impl<T> AtomicCell<T> {
     pub(super) fn new(data: Option<Box<T>>) -> AtomicCell<T> {
-        AtomicCell {
-            data: AtomicUsize::new(to_usize(data)),
-            _p: PhantomData,
-        }
+        AtomicCell { data: AtomicPtr::new(to_raw(data)) }
     }
 
     pub(super) fn swap(&self, val: Option<Box<T>>) -> Option<Box<T>> {
-        let old = self.data.swap(to_usize(val), AcqRel);
-        from_usize(old)
+        let old = self.data.swap(to_raw(val), AcqRel);
+        from_raw(old)
     }
 
     #[cfg(feature = "blocking")]
@@ -34,15 +30,15 @@ impl<T> AtomicCell<T> {
     }
 }
 
-fn to_usize<T>(data: Option<Box<T>>) -> usize {
-    data.map(|boxed| Box::into_raw(boxed) as usize).unwrap_or(0)
+fn to_raw<T>(data: Option<Box<T>>) -> *mut T {
+    data.map(|boxed| Box::into_raw(boxed)).unwrap_or(ptr::null_mut())
 }
 
-fn from_usize<T>(val: usize) -> Option<Box<T>> {
-    if val == 0 {
+fn from_raw<T>(val: *mut T) -> Option<Box<T>> {
+    if val.is_null() {
         None
     } else {
-        Some(unsafe { Box::from_raw(val as *mut T) })
+        Some(unsafe { Box::from_raw(val) })
     }
 }
 

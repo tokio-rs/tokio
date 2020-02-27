@@ -705,7 +705,7 @@ rt_test! {
     fn io_notify_while_shutting_down() {
         use std::net::Ipv6Addr;
 
-        for _ in 1..100 {
+        for _ in 1..10 {
             let mut runtime = rt();
 
             runtime.block_on(async {
