@@ -1,6 +1,6 @@
 use crate::park::{Park, Unpark};
 use crate::runtime;
-use crate::runtime::task::{self, JoinHandle, Task};
+use crate::runtime::task::{self, Schedule, JoinHandle, Task};
 use crate::util::{waker_ref, Wake};
 
 use std::cell::RefCell;
@@ -277,26 +277,7 @@ impl fmt::Debug for Spawner {
 
 // ===== impl Shared =====
 
-impl Shared {
-    /// Schedule the provided task on the scheduler.
-    fn schedule(&self, task: task::Notified<Arc<Self>>) {
-        CURRENT.with(|maybe_cx| match maybe_cx {
-            Some(cx) if cx.shared.ptr_eq(self) => {
-                cx.tasks.borrow_mut().queue.push_back(task);
-            }
-            _ => {
-                self.queue.lock().unwrap().push_back(task);
-                self.unpark.unpark();
-            }
-        });
-    }
-
-    fn ptr_eq(&self, other: &Shared) -> bool {
-        self as *const _ == other as *const _
-    }
-}
-
-impl task::Schedule for Arc<Shared> {
+impl Schedule for Arc<Shared> {
     fn bind(task: &Task<Self>) -> Arc<Shared> {
         CURRENT.with(|maybe_cx| {
             let cx = maybe_cx.expect("scheduler context missing");
@@ -314,7 +295,16 @@ impl task::Schedule for Arc<Shared> {
     }
 
     fn schedule(&self, task: task::Notified<Self>) {
-        Shared::schedule(self, task);
+        CURRENT.with(|maybe_cx| match maybe_cx {
+            Some(cx) if Arc::ptr_eq(self, &cx.shared) => {
+                cx.tasks.borrow_mut().queue.push_back(task);
+            }
+            _ => {
+                self.queue.lock().unwrap().push_back(task);
+                self.unpark.unpark();
+            }
+        });
+        // Shared::schedule(self, task);
     }
 }
 
