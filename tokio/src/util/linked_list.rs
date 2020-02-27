@@ -4,7 +4,6 @@
 //! structure's APIs are `unsafe` as they require the caller to ensure the
 //! specified node is actually contained by the list.
 
-use core::marker::PhantomData;
 use core::ptr::NonNull;
 
 /// An intrusive linked list.
@@ -18,9 +17,6 @@ pub(crate) struct LinkedList<T: Link> {
 
     /// Linked list tail
     tail: Option<NonNull<T::Target>>,
-
-    /// Linker
-    _p: PhantomData<T>,
 }
 
 unsafe impl<T: Link> Send for LinkedList<T> where T::Target: Send {}
@@ -51,7 +47,7 @@ pub(crate) unsafe trait Link {
     fn to_raw(handle: Self::Handle) -> NonNull<Self::Target>;
 
     /// Convert the raw pointer to a handle
-    fn from_raw(ptr: NonNull<Self::Target>) -> Self::Handle;
+    unsafe fn from_raw(ptr: NonNull<Self::Target>) -> Self::Handle;
 
     /// Return the pointers for a node
     unsafe fn pointers(target: NonNull<Self::Target>) -> NonNull<Pointers<Self::Target>>;
@@ -78,7 +74,6 @@ impl<T: Link> LinkedList<T> {
         LinkedList {
             head: None,
             tail: None,
-            _p: PhantomData,
         }
     }
 
@@ -201,7 +196,7 @@ mod tests {
             NonNull::from(handle.get_ref())
         }
 
-        fn from_raw(ptr: NonNull<Entry>) -> Pin<&'a Entry> {
+        unsafe fn from_raw(ptr: NonNull<Entry>) -> Pin<&'a Entry> {
             unsafe { Pin::new(&*ptr.as_ptr()) }
         }
 

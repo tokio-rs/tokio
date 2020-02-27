@@ -543,7 +543,7 @@ unsafe impl linked_list::Link for Waiter {
         unsafe { NonNull::new_unchecked(handle) }
     }
 
-    fn from_raw(ptr: NonNull<Waiter>) -> *mut Waiter {
+    unsafe fn from_raw(ptr: NonNull<Waiter>) -> *mut Waiter {
         ptr.as_ptr()
     }
 
