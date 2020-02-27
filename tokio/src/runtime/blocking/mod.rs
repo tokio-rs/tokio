@@ -5,7 +5,7 @@
 
 cfg_blocking_impl! {
     mod pool;
-    pub(crate) use pool::{spawn_blocking, BlockingPool, Spawner};
+    pub(crate) use pool::{spawn_blocking, try_spawn_blocking, BlockingPool, Spawner};
 
     mod schedule;
     mod shutdown;

@@ -395,7 +395,7 @@
 //!
 //! # State synchronization
 //!
-//! The remainding synchronization primitives focus on synchronizing state.
+//! The remaining synchronization primitives focus on synchronizing state.
 //! These are asynchronous equivalents to versions provided by `std`. They
 //! operate in a similar way as their `std` counterparts parts but will wait
 //! asynchronously instead of blocking the thread.

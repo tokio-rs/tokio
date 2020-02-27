@@ -2,8 +2,11 @@ use crate::loom::sync::atomic::AtomicU8;
 use crate::loom::sync::Mutex;
 use crate::util::linked_list::{self, LinkedList};
 
+use std::cell::UnsafeCell;
 use std::future::Future;
+use std::marker::PhantomPinned;
 use std::pin::Pin;
+use std::ptr::NonNull;
 use std::sync::atomic::Ordering::SeqCst;
 use std::task::{Context, Poll, Waker};
 
@@ -13,24 +16,23 @@ use std::task::{Context, Poll, Waker};
 /// `Notify` itself does not carry any data. Instead, it is to be used to signal
 /// another task to perform an operation.
 ///
+/// `Notify` can be thought of as a [`Semaphore`] starting with 0 permits.
+/// [`notified().await`] waits for a permit to become available, and [`notify()`]
+/// sets a permit **if there currently are no available permits**.
+///
 /// The synchronization details of `Notify` are similar to
 /// [`thread::park`][park] and [`Thread::unpark`][unpark] from std. A [`Notify`]
-/// value contains a single permit. [`Notify::recv`] waits for the permit to be
-/// made available, consumes the permit, and resumes. [`Notify::notify_one`]
-/// sets the permit, waking a pending task if there is one.
+/// value contains a single permit. [`notfied().await`] waits for the permit to
+/// be made available, consumes the permit, and resumes.  [`notify()`] sets the
+/// permit, waking a pending task if there is one.
 ///
-/// `Notify` can be thought of as a [`Semaphore`] starting with 0 permits.
-/// [`Notify::recv`] waits for a permit to become available and
-/// [`Notify::notify_one`] sets a permit **if there currently are no available
-/// permits**.
+/// If `notify()` is called **before** `notfied().await`, then the next call to
+/// `notified().await` will complete immediately, consuming the permit. Any
+/// subsequent calls to `notified().await` will wait for a new permit.
 ///
-/// If `notify_one` is called **before** `recv()`, then the next call to
-/// `recv()` will complete immediately, consuming the permit. Any subsequent
-/// calls to `recv()` will wait for a new permit.
-///
-/// If `notify_one` is called **multiple** times before `recv()`, only a
-/// **single** permit is stored. The next call to `recv()` will complete
-/// immediately, but the one after will wait for a new permit.
+/// If `notify()` is called **multiple** times before `notified().await`, only a
+/// **single** permit is stored. The next call to `notified().await` will
+/// complete immediately, but the one after will wait for a new permit.
 ///
 /// # Examples
 ///
@@ -46,11 +48,12 @@ use std::task::{Context, Poll, Waker};
 ///     let notify2 = notify.clone();
 ///
 ///     tokio::spawn(async move {
-///         notify2.recv().await;
-///         println!("received a notification");
+///         notify2.notified().await;
+///         println!("received notification");
 ///     });
 ///
-///     notify.notify_one();
+///     println!("sending notification");
+///     notify.notify();
 /// }
 /// ```
 ///
@@ -58,6 +61,7 @@ use std::task::{Context, Poll, Waker};
 ///
 /// ```
 /// use tokio::sync::Notify;
+///
 /// use std::collections::VecDeque;
 /// use std::sync::Mutex;
 ///
@@ -72,7 +76,7 @@ use std::task::{Context, Poll, Waker};
 ///             .push_back(value);
 ///
 ///         // Notify the consumer a value is available
-///         self.notify.notify_one();
+///         self.notify.notify();
 ///     }
 ///
 ///     pub async fn recv(&self) -> T {
@@ -83,7 +87,7 @@ use std::task::{Context, Poll, Waker};
 ///             }
 ///
 ///             // Wait for values to be available
-///             self.notify.recv().await;
+///             self.notify.notified().await;
 ///         }
 ///     }
 /// }
@@ -91,8 +95,8 @@ use std::task::{Context, Poll, Waker};
 ///
 /// [park]: std::thread::park
 /// [unpark]: std::thread::Thread::unpark
-/// [`Notify::recv`]: Notify::recv()
-/// [`Notify::notify_one`]: Notify::notify_one()
+/// [`notified().await`]: Notify::notified()
+/// [`notify()`]: Notify::notify()
 /// [`Semaphore`]: crate::sync::Semaphore
 #[derive(Debug)]
 pub struct Notify {
@@ -102,27 +106,37 @@ pub struct Notify {
 
 #[derive(Debug)]
 struct Waiter {
+    /// Intrusive linked-list pointers
+    pointers: linked_list::Pointers<Waiter>,
+
     /// Waiting task's waker
     waker: Option<Waker>,
 
     /// `true` if the notification has been assigned to this waiter.
     notified: bool,
+
+    /// Should not be `Unpin`.
+    _p: PhantomPinned,
 }
 
+/// Future returned from `notified()`
 #[derive(Debug)]
-struct RecvFuture<'a> {
+struct Notified<'a> {
     /// The `Notify` being received on.
     notify: &'a Notify,
 
     /// The current state of the receiving process.
-    state: RecvState,
+    state: State,
 
     /// Entry in the waiter `LinkedList`.
-    waiter: linked_list::Entry<Waiter>,
+    waiter: UnsafeCell<Waiter>,
 }
 
+unsafe impl<'a> Send for Notified<'a> {}
+unsafe impl<'a> Sync for Notified<'a> {}
+
 #[derive(Debug)]
-enum RecvState {
+enum State {
     Init,
     Waiting,
     Done,
@@ -157,9 +171,11 @@ impl Notify {
     /// Wait for a notification.
     ///
     /// Each `Notify` value holds a single permit. If a permit is available from
-    /// an earlier call to `notify_one`, then `recv` will complete immediately,
-    /// consuming that permit. Otherwise, `recv()` waits for a permit to be made
-    /// available by the next call to `notify_one`
+    /// an earlier call to [`notify()`], then `notified().await` will complete
+    /// immediately, consuming that permit. Otherwise, `notified().await` waits
+    /// for a permit to be made available by the next call to `notify()`.
+    ///
+    /// [`notify()`]: Notify::notify
     ///
     /// # Examples
     ///
@@ -173,20 +189,23 @@ impl Notify {
     ///     let notify2 = notify.clone();
     ///
     ///     tokio::spawn(async move {
-    ///         notify2.recv().await;
-    ///         println!("received a notification");
+    ///         notify2.notified().await;
+    ///         println!("received notification");
     ///     });
     ///
-    ///     notify.notify_one();
+    ///     println!("sending notification");
+    ///     notify.notify();
     /// }
     /// ```
-    pub async fn recv(&self) {
-        RecvFuture {
+    pub async fn notified(&self) {
+        Notified {
             notify: self,
-            state: RecvState::Init,
-            waiter: linked_list::Entry::new(Waiter {
+            state: State::Init,
+            waiter: UnsafeCell::new(Waiter {
+                pointers: linked_list::Pointers::new(),
                 waker: None,
                 notified: false,
+                _p: PhantomPinned,
             }),
         }
         .await
@@ -196,12 +215,15 @@ impl Notify {
     ///
     /// If a task is currently waiting, that task is notified. Otherwise, a
     /// permit is stored in this `Notify` value and the **next** call to
-    /// `recv()` will complete immediately consuming the permit made available
-    /// by this call to `notify_one()`.
+    /// [`notified().await`] will complete immediately consuming the permit made
+    /// available by this call to `notify()`.
     ///
     /// At most one permit may be stored by `Notify`. Many sequential calls to
-    /// `notify_one` will result in a single permit being stored. The next call
-    /// to `recv()` will complete immediately, but the one after that will wait.
+    /// `notify` will result in a single permit being stored. The next call to
+    /// `notified().await` will complete immediately, but the one after that
+    /// will wait.
+    ///
+    /// [`notified().await`]: Notify::notified()
     ///
     /// # Examples
     ///
@@ -215,23 +237,23 @@ impl Notify {
     ///     let notify2 = notify.clone();
     ///
     ///     tokio::spawn(async move {
-    ///         notify2.recv().await;
-    ///         println!("received a notification");
+    ///         notify2.notified().await;
+    ///         println!("received notification");
     ///     });
     ///
-    ///     notify.notify_one();
+    ///     println!("sending notification");
+    ///     notify.notify();
     /// }
     /// ```
-    pub fn notify_one(&self) {
+    pub fn notify(&self) {
         // Load the current state
         let mut curr = self.state.load(SeqCst);
 
         // If the state is `EMPTY`, transition to `NOTIFIED` and return.
         while let EMPTY | NOTIFIED = curr {
-            // The compare-exchange from `NOTIFIED` -> `NOTIFIED` is
-            // intended a happens-before synchronization must happen
-            // between this atomic operation and a task calling
-            // `recv()`.
+            // The compare-exchange from `NOTIFIED` -> `NOTIFIED` is intended. A
+            // happens-before synchronization must happen between this atomic
+            // operation and a task calling `notified().await`.
             let res = self.state.compare_exchange(curr, NOTIFIED, SeqCst, SeqCst);
 
             match res {
@@ -263,11 +285,7 @@ impl Default for Notify {
     }
 }
 
-fn notify_locked(
-    waiters: &mut LinkedList<Waiter>,
-    state: &AtomicU8,
-    mut curr: u8,
-) -> Option<Waker> {
+fn notify_locked(waiters: &mut LinkedList<Waiter>, state: &AtomicU8, curr: u8) -> Option<Waker> {
     loop {
         match curr {
             EMPTY | NOTIFIED => {
@@ -276,7 +294,9 @@ fn notify_locked(
                 match res {
                     Ok(_) => return None,
                     Err(actual) => {
-                        curr = actual;
+                        assert!(actual == EMPTY || actual == NOTIFIED);
+                        state.store(NOTIFIED, SeqCst);
+                        return None;
                     }
                 }
             }
@@ -286,7 +306,10 @@ fn notify_locked(
                 // transition **out** of `WAITING`.
                 //
                 // Get a pending waiter
-                let mut waiter = waiters.pop_back().unwrap();
+                let waiter = waiters.pop_back().unwrap();
+
+                // Safety: `waiters` lock is still held.
+                let waiter = unsafe { &mut *waiter };
 
                 assert!(!waiter.notified);
 
@@ -308,16 +331,12 @@ fn notify_locked(
     }
 }
 
-// ===== impl RecvFuture =====
+// ===== impl Notified =====
 
-impl RecvFuture<'_> {
-    fn project(
-        self: Pin<&mut Self>,
-    ) -> (
-        &Notify,
-        &mut RecvState,
-        Pin<&mut linked_list::Entry<Waiter>>,
-    ) {
+impl Notified<'_> {
+    /// A custom `project` implementation is used in place of `pin-project-lite`
+    /// as a custom drop implementation is needed.
+    fn project(self: Pin<&mut Self>) -> (&Notify, &mut State, &UnsafeCell<Waiter>) {
         unsafe {
             // Safety: both `notify` and `state` are `Unpin`.
 
@@ -325,24 +344,20 @@ impl RecvFuture<'_> {
             is_unpin::<AtomicU8>();
 
             let me = self.get_unchecked_mut();
-            (
-                &me.notify,
-                &mut me.state,
-                Pin::new_unchecked(&mut me.waiter),
-            )
+            (&me.notify, &mut me.state, &me.waiter)
         }
     }
 }
 
-impl Future for RecvFuture<'_> {
+impl Future for Notified<'_> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-        use RecvState::*;
+        use State::*;
 
-        let (notify, state, mut waiter) = self.project();
+        let (notify, state, waiter) = self.project();
 
-        'outer: loop {
+        loop {
             match *state {
                 Init => {
                     // Optimistically try acquiring a pending notification
@@ -353,7 +368,7 @@ impl Future for RecvFuture<'_> {
                     if res.is_ok() {
                         // Acquired the notification
                         *state = Done;
-                        continue 'outer;
+                        return Poll::Ready(());
                     }
 
                     // Acquire the lock and attempt to transition to the waiting
@@ -373,11 +388,13 @@ impl Future for RecvFuture<'_> {
                                     .compare_exchange(EMPTY, WAITING, SeqCst, SeqCst);
 
                                 if let Err(actual) = res {
+                                    assert_eq!(actual, NOTIFIED);
                                     curr = actual;
-                                    continue;
+                                } else {
+                                    break;
                                 }
                             }
-                            WAITING => {}
+                            WAITING => break,
                             NOTIFIED => {
                                 // Try consuming the notification
                                 let res = notify
@@ -388,60 +405,61 @@ impl Future for RecvFuture<'_> {
                                     Ok(_) => {
                                         // Acquired the notification
                                         *state = Done;
-                                        continue 'outer;
+                                        return Poll::Ready(());
                                     }
                                     Err(actual) => {
+                                        assert_eq!(actual, EMPTY);
                                         curr = actual;
-                                        continue;
                                     }
                                 }
                             }
                             _ => unreachable!(),
                         }
-
-                        // The state has been transitioned to waiting
-                        break;
                     }
 
                     // Safety: called while locked.
                     unsafe {
-                        (*waiter.as_mut().get()).waker = Some(cx.waker().clone());
-
-                        // Insert the waiter into the linked list
-                        waiters.push_front(waiter.as_mut());
+                        (*waiter.get()).waker = Some(cx.waker().clone());
                     }
+
+                    // Insert the waiter into the linked list
+                    waiters.push_front(waiter.get());
 
                     *state = Waiting;
                 }
                 Waiting => {
-                    let mut waiters = notify.waiters.lock().unwrap();
+                    // Currently in the "Waiting" state, implying the caller has
+                    // a waiter stored in the waiter list (guarded by
+                    // `notify.waiters`). In order to access the waker fields,
+                    // we must hold the lock.
 
-                    {
-                        // Safety: called while locked
-                        let w = unsafe { &mut *waiter.as_mut().get() };
+                    let waiters = notify.waiters.lock().unwrap();
 
-                        if w.notified {
-                            w.waker = None;
-                            w.notified = false;
+                    // Safety: called while locked
+                    let w = unsafe { &mut *waiter.get() };
 
-                            // Remove the entry from the linked list. The entry
-                            // may only be in the linked list while the state is
-                            // `Waiting`.
-                            //
-                            // Safety: called while the lock is held
-                            unsafe {
-                                waiters.remove(waiter.as_mut());
-                            }
+                    if w.notified {
+                        // Our waker has been notified. Reset the fields and
+                        // remove it from the list.
+                        w.waker = None;
+                        w.notified = false;
 
-                            *state = Done;
-                        } else {
-                            if !w.waker.as_ref().unwrap().will_wake(cx.waker()) {
-                                w.waker = Some(cx.waker().clone());
-                            }
-
-                            return Poll::Pending;
+                        *state = Done;
+                    } else {
+                        // Update the waker, if necessary.
+                        if !w.waker.as_ref().unwrap().will_wake(cx.waker()) {
+                            w.waker = Some(cx.waker().clone());
                         }
+
+                        return Poll::Pending;
                     }
+
+                    // Explicit drop of the lock to indicate the scope that the
+                    // lock is held. Because holding the lock is required to
+                    // ensure safe access to fields not held within the lock, it
+                    // is helpful to visualize the scope of the critical
+                    // section.
+                    drop(waiters);
                 }
                 Done => {
                     return Poll::Ready(());
@@ -451,28 +469,48 @@ impl Future for RecvFuture<'_> {
     }
 }
 
-impl Drop for RecvFuture<'_> {
+impl Drop for Notified<'_> {
     fn drop(&mut self) {
-        use RecvState::*;
+        use State::*;
 
         // Safety: The type only transitions to a "Waiting" state when pinned.
-        let (notify, state, mut waiter) = unsafe { Pin::new_unchecked(self).project() };
+        let (notify, state, waiter) = unsafe { Pin::new_unchecked(self).project() };
 
-        // This is where we ensure safety. The `RecvFuture` is being dropped,
-        // which means we must ensure that the waiter entry is no longer stored
-        // in the linked list.
+        // This is where we ensure safety. The `Notified` value is being
+        // dropped, which means we must ensure that the waiter entry is no
+        // longer stored in the linked list.
         if let Waiting = *state {
             let mut notify_state = WAITING;
             let mut waiters = notify.waiters.lock().unwrap();
+
+            // `Notify.state` may be in any of the three states (Empty, Waiting,
+            // Notified). It doesn't actually matter what the atomic is set to
+            // at this point. We hold the lock and will ensure the atomic is in
+            // the correct state once th elock is dropped.
+            //
+            // Because the atomic state is not checked, at first glance, it may
+            // seem like this routine does not handle the case where the
+            // receiver is notified but has not yet observed the notification.
+            // If this happens, no matter how many notifications happen between
+            // this receiver being notified and the receive future dropping, all
+            // we need to do is ensure that one notification is returned back to
+            // the `Notify`. This is done by calling `notify_locked` if `self`
+            // has the `notified` flag set.
 
             // remove the entry from the list
             //
             // safety: the waiter is only added to `waiters` by virtue of it
             // being the only `LinkedList` available to the type.
-            unsafe { waiters.remove(waiter.as_mut()) };
+            unsafe { waiters.remove(NonNull::new_unchecked(waiter.get())) };
 
             if waiters.is_empty() {
                 notify_state = EMPTY;
+                // If the state *should* be `NOTIFIED`, the call to
+                // `notify_locked` below will end up doing the
+                // `store(NOTIFIED)`. If a concurrent receiver races and
+                // observes the incorrect `EMPTY` state, it will then obtain the
+                // lock and block until `notify.state` is in the correct final
+                // state.
                 notify.state.store(EMPTY, SeqCst);
             }
 
@@ -481,7 +519,7 @@ impl Drop for RecvFuture<'_> {
             //
             // Safety: with the entry removed from the linked list, there can be
             // no concurrent access to the entry
-            let notified = unsafe { (*waiter.as_mut().get()).notified };
+            let notified = unsafe { (*waiter.get()).notified };
 
             if notified {
                 if let Some(waker) = notify_locked(&mut waiters, &notify.state, notify_state) {
@@ -490,6 +528,27 @@ impl Drop for RecvFuture<'_> {
                 }
             }
         }
+    }
+}
+
+/// # Safety
+///
+/// `Waiter` is forced to be !Unpin.
+unsafe impl linked_list::Link for Waiter {
+    type Handle = *mut Waiter;
+    type Target = Waiter;
+
+    fn to_raw(handle: *mut Waiter) -> NonNull<Waiter> {
+        debug_assert!(!handle.is_null());
+        unsafe { NonNull::new_unchecked(handle) }
+    }
+
+    unsafe fn from_raw(ptr: NonNull<Waiter>) -> *mut Waiter {
+        ptr.as_ptr()
+    }
+
+    unsafe fn pointers(mut target: NonNull<Waiter>) -> NonNull<linked_list::Pointers<Waiter>> {
+        NonNull::from(&mut target.as_mut().pointers)
     }
 }
 

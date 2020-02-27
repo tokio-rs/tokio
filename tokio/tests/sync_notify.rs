@@ -9,94 +9,94 @@ trait AssertSend: Send + Sync {}
 impl AssertSend for Notify {}
 
 #[test]
-fn notify_recv_one() {
+fn notify_notified_one() {
     let notify = Notify::new();
-    let mut recv = spawn(async { notify.recv().await });
+    let mut notified = spawn(async { notify.notified().await });
 
-    notify.notify_one();
-    assert_ready!(recv.poll());
+    notify.notify();
+    assert_ready!(notified.poll());
 }
 
 #[test]
-fn recv_one_notify() {
+fn notified_one_notify() {
     let notify = Notify::new();
-    let mut recv = spawn(async { notify.recv().await });
+    let mut notified = spawn(async { notify.notified().await });
 
-    assert_pending!(recv.poll());
+    assert_pending!(notified.poll());
 
-    notify.notify_one();
-    assert!(recv.is_woken());
-    assert_ready!(recv.poll());
+    notify.notify();
+    assert!(notified.is_woken());
+    assert_ready!(notified.poll());
 }
 
 #[test]
-fn recv_multi_notify() {
+fn notified_multi_notify() {
     let notify = Notify::new();
-    let mut recv1 = spawn(async { notify.recv().await });
-    let mut recv2 = spawn(async { notify.recv().await });
+    let mut notified1 = spawn(async { notify.notified().await });
+    let mut notified2 = spawn(async { notify.notified().await });
 
-    assert_pending!(recv1.poll());
-    assert_pending!(recv2.poll());
+    assert_pending!(notified1.poll());
+    assert_pending!(notified2.poll());
 
-    notify.notify_one();
-    assert!(recv1.is_woken());
-    assert!(!recv2.is_woken());
+    notify.notify();
+    assert!(notified1.is_woken());
+    assert!(!notified2.is_woken());
 
-    assert_ready!(recv1.poll());
-    assert_pending!(recv2.poll());
+    assert_ready!(notified1.poll());
+    assert_pending!(notified2.poll());
 }
 
 #[test]
-fn notify_recv_multi() {
+fn notify_notified_multi() {
     let notify = Notify::new();
 
-    notify.notify_one();
+    notify.notify();
 
-    let mut recv1 = spawn(async { notify.recv().await });
-    let mut recv2 = spawn(async { notify.recv().await });
+    let mut notified1 = spawn(async { notify.notified().await });
+    let mut notified2 = spawn(async { notify.notified().await });
 
-    assert_ready!(recv1.poll());
-    assert_pending!(recv2.poll());
+    assert_ready!(notified1.poll());
+    assert_pending!(notified2.poll());
 
-    notify.notify_one();
+    notify.notify();
 
-    assert!(recv2.is_woken());
-    assert_ready!(recv2.poll());
+    assert!(notified2.is_woken());
+    assert_ready!(notified2.poll());
 }
 
 #[test]
-fn recv_drop_recv_notify() {
+fn notified_drop_notified_notify() {
     let notify = Notify::new();
-    let mut recv1 = spawn(async { notify.recv().await });
-    let mut recv2 = spawn(async { notify.recv().await });
+    let mut notified1 = spawn(async { notify.notified().await });
+    let mut notified2 = spawn(async { notify.notified().await });
 
-    assert_pending!(recv1.poll());
+    assert_pending!(notified1.poll());
 
-    drop(recv1);
+    drop(notified1);
 
-    assert_pending!(recv2.poll());
+    assert_pending!(notified2.poll());
 
-    notify.notify_one();
-    assert!(recv2.is_woken());
-    assert_ready!(recv2.poll());
+    notify.notify();
+    assert!(notified2.is_woken());
+    assert_ready!(notified2.poll());
 }
 
 #[test]
-fn recv_multi_notify_drop_one() {
+fn notified_multi_notify_drop_one() {
     let notify = Notify::new();
-    let mut recv1 = spawn(async { notify.recv().await });
-    let mut recv2 = spawn(async { notify.recv().await });
+    let mut notified1 = spawn(async { notify.notified().await });
+    let mut notified2 = spawn(async { notify.notified().await });
 
-    assert_pending!(recv1.poll());
-    assert_pending!(recv2.poll());
+    assert_pending!(notified1.poll());
+    assert_pending!(notified2.poll());
 
-    notify.notify_one();
+    notify.notify();
 
-    assert!(recv1.is_woken());
-    assert!(!recv2.is_woken());
+    assert!(notified1.is_woken());
+    assert!(!notified2.is_woken());
 
-    drop(recv1);
+    drop(notified1);
 
-    assert!(recv2.is_woken());
-    assert_ready!(recv2.poll());
+    assert!(notified2.is_woken());
+    assert_ready!(notified2.poll());
 }

@@ -384,6 +384,32 @@ async fn reset_first_expiring_item_to_expire_later() {
     assert_eq!(entry, "two");
 }
 
+#[tokio::test]
+async fn insert_before_first_after_poll() {
+    time::pause();
+
+    let mut queue = task::spawn(DelayQueue::new());
+
+    let now = Instant::now();
+
+    let _one = queue.insert_at("one", now + ms(200));
+
+    assert_pending!(poll!(queue));
+
+    let _two = queue.insert_at("two", now + ms(100));
+
+    delay_for(ms(99)).await;
+
+    assert!(!queue.is_woken());
+
+    delay_for(ms(1)).await;
+
+    assert!(queue.is_woken());
+
+    let entry = assert_ready_ok!(poll!(queue)).into_inner();
+    assert_eq!(entry, "two");
+}
+
 fn ms(n: u64) -> Duration {
     Duration::from_millis(n)
 }
