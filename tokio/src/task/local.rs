@@ -209,7 +209,7 @@ const INITIAL_CAPACITY: usize = 64;
 /// Max number of tasks to poll per tick.
 const MAX_TASKS_PER_TICK: usize = 61;
 
-/// How often ot check the remote queue first
+/// How often it check the remote queue first
 const REMOTE_FIRST_INTERVAL: u8 = 31;
 
 impl LocalSet {
