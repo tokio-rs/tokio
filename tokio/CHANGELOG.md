@@ -1,4 +1,4 @@
-# 0.2.12 (February 26, 2019)
+# 0.2.12 (February 27, 2019)
 
 ### Fixes
 - net: `UnixStream::poll_shutdown` should call `shutdown(Write)` (#2245).
