@@ -122,6 +122,7 @@ impl Builder {
     /// use tokio::runtime;
     ///
     /// let rt = runtime::Builder::new()
+    ///     .threaded_scheduler()
     ///     .enable_all()
     ///     .build()
     ///     .unwrap();
@@ -162,6 +163,7 @@ impl Builder {
     /// use tokio::runtime;
     ///
     /// let rt = runtime::Builder::new()
+    ///     .threaded_scheduler()
     ///     .core_threads(4)
     ///     .build()
     ///     .unwrap();
@@ -227,6 +229,7 @@ impl Builder {
     ///
     /// # pub fn main() {
     /// let rt = runtime::Builder::new()
+    ///     .threaded_scheduler()
     ///     .thread_stack_size(32 * 1024)
     ///     .build();
     /// # }
@@ -248,6 +251,7 @@ impl Builder {
     ///
     /// # pub fn main() {
     /// let runtime = runtime::Builder::new()
+    ///     .threaded_scheduler()
     ///     .on_thread_start(|| {
     ///         println!("thread started");
     ///     })
@@ -274,6 +278,7 @@ impl Builder {
     ///
     /// # pub fn main() {
     /// let runtime = runtime::Builder::new()
+    ///     .threaded_scheduler()
     ///     .on_thread_stop(|| {
     ///         println!("thread stopping");
     ///     })
@@ -395,6 +400,11 @@ cfg_rt_core! {
         ///
         /// The executor and all necessary drivers will all be run on the current
         /// thread during `block_on` calls.
+        ///
+        /// See also [the module level documentation][1], which has a section on scheduler
+        /// types.
+        ///
+        /// [1]: index.html#runtime-configurations
         pub fn basic_scheduler(&mut self) -> &mut Self {
             self.kind = Kind::Basic;
             self
@@ -439,6 +449,11 @@ cfg_rt_core! {
 cfg_rt_threaded! {
     impl Builder {
         /// Sets runtime to use a multi-threaded scheduler for executing tasks.
+        ///
+        /// See also [the module level documentation][1], which has a section on scheduler
+        /// types.
+        ///
+        /// [1]: index.html#runtime-configurations
         pub fn threaded_scheduler(&mut self) -> &mut Self {
             self.kind = Kind::ThreadPool;
             self
