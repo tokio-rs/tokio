@@ -1,6 +1,6 @@
-use crate::task::core::{Cell, Core, Header, Trailer};
-use crate::task::state::Snapshot;
-use crate::task::{JoinError, Notified, Schedule, Task};
+use crate::runtime::task::core::{Cell, Core, Header, Trailer};
+use crate::runtime::task::state::Snapshot;
+use crate::runtime::task::{JoinError, Notified, Schedule, Task};
 
 use std::future::Future;
 use std::marker::PhantomData;

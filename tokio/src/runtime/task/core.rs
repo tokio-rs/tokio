@@ -1,8 +1,8 @@
 use crate::loom::cell::CausalCell;
-use crate::task::raw::{self, Vtable};
-use crate::task::state::State;
-use crate::task::waker::waker_ref;
-use crate::task::{Notified, Schedule, Task};
+use crate::runtime::task::raw::{self, Vtable};
+use crate::runtime::task::state::State;
+use crate::runtime::task::waker::waker_ref;
+use crate::runtime::task::{Notified, Schedule, Task};
 
 use std::cell::UnsafeCell;
 use std::future::Future;

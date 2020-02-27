@@ -1,6 +1,6 @@
 use crate::park::{Park, Unpark};
 use crate::runtime;
-use crate::task::{self, JoinHandle, Task};
+use crate::runtime::task::{self, JoinHandle, Task};
 use crate::util::{waker_ref, Wake};
 
 use std::cell::RefCell;

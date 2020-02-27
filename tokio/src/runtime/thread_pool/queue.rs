@@ -3,7 +3,7 @@
 use crate::loom::cell::{CausalCell, CausalCheck};
 use crate::loom::sync::atomic::{self, AtomicU32, AtomicUsize};
 use crate::loom::sync::{Arc, Mutex};
-use crate::task;
+use crate::runtime::task;
 
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;

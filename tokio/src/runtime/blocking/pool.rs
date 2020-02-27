@@ -6,7 +6,7 @@ use crate::runtime::blocking::schedule::NoopSchedule;
 use crate::runtime::blocking::shutdown;
 use crate::runtime::blocking::task::BlockingTask;
 use crate::runtime::{Builder, Callback, Handle};
-use crate::task::{self, JoinHandle};
+use crate::runtime::task::{self, JoinHandle};
 
 use std::collections::VecDeque;
 use std::fmt;

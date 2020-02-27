@@ -193,6 +193,8 @@ pub(crate) mod context;
 cfg_rt_core! {
     mod basic_scheduler;
     use basic_scheduler::BasicScheduler;
+
+    pub(crate) mod task;
 }
 
 mod blocking;

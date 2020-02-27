@@ -1,5 +1,5 @@
-use crate::task::harness::Harness;
-use crate::task::{Header, Schedule};
+use crate::runtime::task::{Header, Schedule};
+use crate::runtime::task::harness::Harness;
 
 use std::future::Future;
 use std::marker::PhantomData;

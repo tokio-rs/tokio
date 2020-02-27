@@ -8,8 +8,8 @@ use crate::loom::sync::{Arc, Mutex};
 use crate::park::{Park, Unpark};
 use crate::runtime;
 use crate::runtime::park::{Parker, Unparker};
+use crate::runtime::task;
 use crate::runtime::thread_pool::{queue, AtomicCell, Idle};
-use crate::task;
 use crate::util::FastRand;
 
 use std::cell::RefCell;

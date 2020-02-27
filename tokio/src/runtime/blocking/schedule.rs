@@ -1,4 +1,4 @@
-use crate::task::{self, Task};
+use crate::runtime::task::{self, Task};
 
 /// `task::Schedule` implementation that does nothing. This is unique to the
 /// blocking scheduler as tasks scheduled are not really futures but blocking

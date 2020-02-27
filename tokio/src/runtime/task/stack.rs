@@ -1,5 +1,5 @@
 use crate::loom::sync::atomic::AtomicPtr;
-use crate::task::{Header, Task};
+use crate::runtime::task::{Header, Task};
 
 use std::marker::PhantomData;
 use std::ptr::{self, NonNull};
