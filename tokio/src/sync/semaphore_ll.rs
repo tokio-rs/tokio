@@ -1,5 +1,4 @@
 use crate::loom::{
-    alloc,
     future::AtomicWaker,
     sync::{atomic::AtomicUsize, Mutex, MutexGuard},
 };
@@ -8,6 +7,7 @@ use crate::util::linked_list::{self, LinkedList};
 use std::{
     cmp, fmt,
     future::Future,
+    marker::PhantomPinned,
     pin::Pin,
     ptr::NonNull,
     sync::atomic::Ordering,
@@ -39,7 +39,7 @@ pub(crate) struct Permit {
 }
 
 pub(crate) struct Acquire<'a> {
-    node: linked_list::Entry<Waiter>,
+    node: Waiter,
     semaphore: &'a Semaphore,
     permit: &'a mut Permit,
     num_permits: u16,
@@ -59,6 +59,12 @@ enum PermitState {
 struct Waiter {
     waker: AtomicWaker,
     state: AtomicUsize,
+
+    /// Intrusive linked-list pointers
+    pointers: linked_list::Pointers<Waiter>,
+
+    /// Should not be `Unpin`.
+    _p: PhantomPinned,
 }
 
 const CLOSED: usize = 1 << 17;
@@ -166,7 +172,7 @@ impl Semaphore {
         &self,
         cx: &mut Context<'_>,
         needed: u16,
-        node: Pin<&mut linked_list::Entry<Waiter>>,
+        node: Pin<&mut Waiter>,
     ) -> Poll<Result<(), AcquireError>> {
         let mut curr = self.permits.load(Ordering::Acquire);
         let needed = needed as usize;
@@ -198,9 +204,7 @@ impl Semaphore {
         }
 
         assert!(node.is_unlinked());
-        let waiter = unsafe { &*node.get() };
-        waiter
-            .state
+        node.state
             .compare_exchange(
                 Waiter::UNQUEUED,
                 remaining,
@@ -209,10 +213,12 @@ impl Semaphore {
             )
             .expect("not unqueued");
         // otherwise, register the waker & enqueue the node.
-        waiter.waker.register_by_ref(cx.waker());
+        node.waker.register_by_ref(cx.waker());
 
         let mut queue = self.waiters.lock().unwrap();
         unsafe {
+            // XXX(eliza) T_T
+            let node = Pin::into_inner_unchecked(node) as *mut _;
             queue.push_front(node);
             println!("enqueue");
         }
@@ -267,7 +273,7 @@ impl Permit {
             PermitState::Acquired(n) => PermitState::Acquired(n),
         };
         Acquire {
-            node: linked_list::Entry::new(Waiter::new()),
+            node: Waiter::new(),
             semaphore,
             permit: self,
             num_permits,
@@ -345,7 +351,13 @@ impl Waiter {
         Waiter {
             waker: AtomicWaker::new(),
             state: AtomicUsize::new(Self::UNQUEUED),
+            pointers: linked_list::Pointers::new(),
+            _p: PhantomPinned,
         }
+    }
+
+    fn is_unlinked(&self) -> bool {
+        self.pointers.is_unlinked()
     }
 
     /// Assign permits to the waiter.
@@ -425,7 +437,7 @@ impl Future for Acquire<'_> {
             }
             PermitState::Waiting(_n) => {
                 assert_eq!(_n, needed, "how the heck did you get in this state?");
-                if unsafe { &*node.get() }.state.load(Ordering::Acquire) > 0 {
+                if node.state.load(Ordering::Acquire) > 0 {
                     ready!(semaphore.poll_acquire(cx, needed, node))?;
                 }
                 PermitState::Acquired(needed)
@@ -436,14 +448,7 @@ impl Future for Acquire<'_> {
 }
 
 impl Acquire<'_> {
-    fn project(
-        self: Pin<&mut Self>,
-    ) -> (
-        Pin<&mut linked_list::Entry<Waiter>>,
-        &Semaphore,
-        &mut Permit,
-        u16,
-    ) {
+    fn project(self: Pin<&mut Self>) -> (Pin<&mut Waiter>, &Semaphore, &mut Permit, u16) {
         fn is_unpin<T: Unpin>() {}
         unsafe {
             // Safety: all fields other than `node` are `Unpin`
@@ -470,20 +475,16 @@ impl Drop for Acquire<'_> {
             // don't need to release permits
             return;
         }
-
-        // Safety: if the node is linked, then we are already pinned
-        let (mut node, semaphore, permit, needed) = unsafe { Pin::new_unchecked(self).project() };
-
         // This is where we ensure safety. The future is being dropped,
         // which means we must ensure that the waiter entry is no longer stored
         // in the linked list.
-        let mut waiters = semaphore.waiters.lock().unwrap();
+        let mut waiters = self.semaphore.waiters.lock().unwrap();
 
         // remove the entry from the list
         //
         // safety: the waiter is only added to `waiters` by virtue of it
         // being the only `LinkedList` available to the type.
-        unsafe { waiters.remove(node.as_mut()) };
+        unsafe { waiters.remove(NonNull::from(&mut self.node)) };
 
         // TODO(eliza): release permits to next waiter
     }
@@ -540,3 +541,24 @@ impl fmt::Display for TryAcquireError {
 }
 
 impl std::error::Error for TryAcquireError {}
+
+/// # Safety
+///
+/// `Waiter` is forced to be !Unpin.
+unsafe impl linked_list::Link for Waiter {
+    type Handle = *mut Waiter;
+    type Target = Waiter;
+
+    fn to_raw(handle: *mut Waiter) -> NonNull<Waiter> {
+        debug_assert!(!handle.is_null());
+        unsafe { NonNull::new_unchecked(handle) }
+    }
+
+    unsafe fn from_raw(ptr: NonNull<Waiter>) -> *mut Waiter {
+        ptr.as_ptr()
+    }
+
+    unsafe fn pointers(mut target: NonNull<Waiter>) -> NonNull<linked_list::Pointers<Waiter>> {
+        NonNull::from(&mut target.as_mut().pointers)
+    }
+}

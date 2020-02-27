@@ -117,6 +117,10 @@ impl<T: Link> LinkedList<T> {
         }
     }
 
+    pub(crate) fn last<'a>(&'a self) -> Option<&'a T::Target> {
+        unsafe { Some(&*self.tail?.as_ptr()) }
+    }
+
     /// Returns whether the linked list doesn not contain any node
     pub(crate) fn is_empty(&self) -> bool {
         if self.head.is_some() {
@@ -173,6 +177,11 @@ impl<T> Pointers<T> {
             prev: None,
             next: None,
         }
+    }
+
+    /// Returns `true` if this set of pointers is not part of a list.
+    pub(crate) fn is_unlinked(&self) -> bool {
+        self.prev.is_none() && self.next.is_none()
     }
 }
 
