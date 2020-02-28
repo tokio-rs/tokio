@@ -8,6 +8,7 @@ use futures::future::FutureExt;
 use futures::sink::SinkExt;
 use std::io;
 
+#[cfg_attr(any(target_os = "macos", target_os = "ios"), allow(unused_assignments))]
 #[tokio::test]
 async fn send_framed() -> std::io::Result<()> {
     let mut a_soc = UdpSocket::bind("127.0.0.1:0").await?;
@@ -35,6 +36,7 @@ async fn send_framed() -> std::io::Result<()> {
         b_soc = b.into_inner();
     }
 
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     // test sending & receiving an empty message
     {
         let mut a = UdpFramed::new(a_soc, ByteCodec);
