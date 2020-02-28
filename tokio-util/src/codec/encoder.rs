@@ -5,10 +5,7 @@ use std::io;
 /// [`FramedWrite`].
 ///
 /// [`FramedWrite`]: crate::codec::FramedWrite
-pub trait Encoder {
-    /// The type of items consumed by the `Encoder`
-    type Item;
-
+pub trait Encoder<Item> {
     /// The type of encoding errors.
     ///
     /// [`FramedWrite`] requires `Encoder`s errors to implement `From<io::Error>`
@@ -24,5 +21,5 @@ pub trait Encoder {
     /// will be written out when possible.
     ///
     /// [`FramedWrite`]: crate::codec::FramedWrite
-    fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error>;
+    fn encode(&mut self, item: Item, dst: &mut BytesMut) -> Result<(), Self::Error>;
 }
