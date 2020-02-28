@@ -1,5 +1,5 @@
 use std::marker::PhantomData;
-use std::mem::{self, ManuallyDrop};
+use std::mem::ManuallyDrop;
 use std::ops::Deref;
 use std::sync::Arc;
 use std::task::{RawWaker, RawWakerVTable, Waker};
@@ -54,8 +54,7 @@ unsafe fn inc_ref_count<T: Wake>(data: *const ()) {
     let arc = ManuallyDrop::new(Arc::<T>::from_raw(data as *const T));
 
     // Now increase refcount, but don't drop new refcount either
-    #[allow(clippy::redundant_clone)]
-    let _arc_clone: mem::ManuallyDrop<_> = arc.clone();
+    drop(arc.clone());
 }
 
 unsafe fn clone_arc_raw<T: Wake>(data: *const ()) -> RawWaker {
