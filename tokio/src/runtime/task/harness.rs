@@ -19,7 +19,9 @@ where
     S: 'static,
 {
     pub(super) unsafe fn from_raw(ptr: NonNull<Header>) -> Harness<T, S> {
-        Harness { cell: ptr.cast::<Cell<T, S>>() }
+        Harness {
+            cell: ptr.cast::<Cell<T, S>>(),
+        }
     }
 
     fn header(&self) -> &Header {

@@ -10,8 +10,8 @@ use crate::runtime;
 use crate::runtime::park::{Parker, Unparker};
 use crate::runtime::task;
 use crate::runtime::thread_pool::{queue, AtomicCell, Idle};
-use crate::util::FastRand;
 use crate::util::linked_list::LinkedList;
+use crate::util::FastRand;
 
 use std::cell::RefCell;
 use std::time::Duration;
@@ -513,7 +513,9 @@ impl Core {
             // not ref-dec here.
             //
             // See `bind` and `release` implementations.
-            unsafe { self.tasks.remove(task.header().into()); }
+            unsafe {
+                self.tasks.remove(task.header().into());
+            }
         }
     }
 }

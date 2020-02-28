@@ -1,8 +1,8 @@
 use crate::park::{Park, Unpark};
 use crate::runtime;
 use crate::runtime::task::{self, JoinHandle, Schedule, Task};
-use crate::util::{waker_ref, Wake};
 use crate::util::linked_list::LinkedList;
+use crate::util::{waker_ref, Wake};
 
 use std::cell::RefCell;
 use std::collections::VecDeque;

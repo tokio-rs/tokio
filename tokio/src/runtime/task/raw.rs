@@ -107,7 +107,11 @@ unsafe fn dealloc<T: Future, S: Schedule>(ptr: NonNull<Header>) {
     harness.dealloc();
 }
 
-unsafe fn try_read_output<T: Future, S: Schedule>(ptr: NonNull<Header>, dst: *mut (), waker: &Waker) {
+unsafe fn try_read_output<T: Future, S: Schedule>(
+    ptr: NonNull<Header>,
+    dst: *mut (),
+    waker: &Waker,
+) {
     let out = &mut *(dst as *mut Poll<super::Result<T::Output>>);
 
     let harness = Harness::<T, S>::from_raw(ptr);
