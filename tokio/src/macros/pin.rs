@@ -138,7 +138,7 @@ macro_rules! pin {
     )*) => {
         $(
             let $x = $init;
-            crate::pin!($x);
+            $crate::pin!($x);
         )*
     };
 }
