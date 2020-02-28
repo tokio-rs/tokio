@@ -131,7 +131,7 @@ impl<T: Future, S: Schedule> Core<T, S> {
     ///
     /// # Safety
     ///
-    /// The caller must ensure it is safe to mutate the `state field. This
+    /// The caller must ensure it is safe to mutate the `state` field. This
     /// requires ensuring mutal exclusion between any concurrent thread that
     /// might modify the future or output field.
     ///
@@ -236,9 +236,9 @@ impl<T: Future, S: Schedule> Core<T, S> {
 
     /// Release the task
     ///
-    /// Returns `true` if the task was released. `false` implies the task has
-    /// not been bound to a scheduler and the caller must call `shutdown()`
-    /// directly.
+    /// If the `Scheduler` implementation is able to, it returns the `Task`
+    /// handle immediately. The caller of this function will batch a ref-dec
+    /// with a state change.
     pub(super) fn release(&self, task: Task<S>) -> Option<Task<S>> {
         use std::mem::ManuallyDrop;
 
@@ -250,9 +250,6 @@ impl<T: Future, S: Schedule> Core<T, S> {
             match unsafe { &*ptr } {
                 Some(scheduler) => scheduler.release(&*task),
                 // Task was never polled
-                //
-                // Safety: this is called from `poll` which requires the same
-                // invariant as `shutdown`.
                 None => None,
             }
         })

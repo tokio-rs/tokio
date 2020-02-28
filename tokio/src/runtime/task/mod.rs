@@ -57,6 +57,8 @@ pub(crate) trait Schedule: Sync + Sized + 'static {
     /// Bind a task to the executor.
     ///
     /// Guaranteed to be called from the thread that called `poll` on the task.
+    /// The returned `Schedule` instance is associated with the task and is used
+    /// as `&self` in the other methods on this trait.
     fn bind(task: Task<Self>) -> Self;
 
     /// The task has completed work and is ready to be released. The scheduler

@@ -73,6 +73,8 @@ impl RawTask {
         }
     }
 
+    /// Safety: `dst` must be a `*mut Poll<super::Result<T::Output>>` where `T`
+    /// is the future stored by the task.
     pub(super) unsafe fn try_read_output(self, dst: *mut (), waker: &Waker) {
         let vtable = self.header().vtable;
         (vtable.try_read_output)(self.ptr, dst, waker);
