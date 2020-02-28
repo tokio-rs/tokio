@@ -33,7 +33,7 @@ impl<T> AtomicCell<T> {
 }
 
 fn to_raw<T>(data: Option<Box<T>>) -> *mut T {
-    data.map(|boxed| Box::into_raw(boxed))
+    data.map(Box::into_raw)
         .unwrap_or(ptr::null_mut())
 }
 

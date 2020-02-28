@@ -4,7 +4,6 @@
 //! structure's APIs are `unsafe` as they require the caller to ensure the
 //! specified node is actually contained by the list.
 
-use core::marker::PhantomData;
 use core::mem::ManuallyDrop;
 use core::ptr::NonNull;
 
@@ -53,11 +52,6 @@ pub(crate) unsafe trait Link {
     unsafe fn pointers(target: NonNull<Self::Target>) -> NonNull<Pointers<Self::Target>>;
 }
 
-pub(crate) struct Iter<'a, T: Link> {
-    curr: Option<NonNull<T::Target>>,
-    _p: PhantomData<&'a T>,
-}
-
 /// Previous / next pointers
 #[derive(Debug)]
 pub(crate) struct Pointers<T> {
@@ -79,13 +73,6 @@ impl<T: Link> LinkedList<T> {
         LinkedList {
             head: None,
             tail: None,
-        }
-    }
-
-    pub(crate) fn iter(&self) -> Iter<'_, T> {
-        Iter {
-            curr: self.head,
-            _p: PhantomData,
         }
     }
 
@@ -180,16 +167,34 @@ impl<T: Link> LinkedList<T> {
 
 // ===== impl Iter =====
 
-impl<'a, T: Link> Iterator for Iter<'a, T> {
-    type Item = &'a T::Target;
+cfg_rt_threaded! {
+    use core::marker::PhantomData;
 
-    fn next(&mut self) -> Option<&'a T::Target> {
-        let curr = self.curr?;
-        // safety: the pointer references data contained by the list
-        self.curr = unsafe { T::pointers(curr).as_ref() }.next;
+    pub(crate) struct Iter<'a, T: Link> {
+        curr: Option<NonNull<T::Target>>,
+        _p: PhantomData<&'a T>,
+    }
 
-        // safety: the value is still owned by the linked list.
-        Some(unsafe { &*curr.as_ptr() })
+    impl<T: Link> LinkedList<T> {
+        pub(crate) fn iter(&self) -> Iter<'_, T> {
+            Iter {
+                curr: self.head,
+                _p: PhantomData,
+            }
+        }
+    }
+
+    impl<'a, T: Link> Iterator for Iter<'a, T> {
+        type Item = &'a T::Target;
+
+        fn next(&mut self) -> Option<&'a T::Target> {
+            let curr = self.curr?;
+            // safety: the pointer references data contained by the list
+            self.curr = unsafe { T::pointers(curr).as_ref() }.next;
+
+            // safety: the value is still owned by the linked list.
+            Some(unsafe { &*curr.as_ptr() })
+        }
     }
 }
 
