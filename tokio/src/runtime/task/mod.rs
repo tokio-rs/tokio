@@ -178,8 +178,6 @@ impl<S: Schedule> Notified<S> {
     }
 
     /// Pre-emptively cancel the task as part of the shutdown process.
-    ///
-    /// TODO: Not `Schedule`
     pub(crate) fn shutdown(self) {
         self.0.shutdown();
     }
