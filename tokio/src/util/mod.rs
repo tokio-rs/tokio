@@ -3,9 +3,8 @@ cfg_io_driver! {
     pub(crate) mod slab;
 }
 
-cfg_sync! {
-    pub(crate) mod linked_list;
-}
+#[cfg(any(feature = "sync", feature = "rt-core"))]
+pub(crate) mod linked_list;
 
 #[cfg(any(feature = "rt-threaded", feature = "macros", feature = "stream"))]
 mod rand;

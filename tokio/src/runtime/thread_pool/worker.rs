@@ -11,6 +11,7 @@ use crate::runtime::park::{Parker, Unparker};
 use crate::runtime::task;
 use crate::runtime::thread_pool::{queue, AtomicCell, Idle};
 use crate::util::FastRand;
+use crate::util::linked_list::LinkedList;
 
 use std::cell::RefCell;
 use std::time::Duration;
@@ -43,7 +44,7 @@ struct Core {
     is_shutdown: bool,
 
     /// Tasks owned by the core
-    tasks: task::OwnedList<Arc<Worker>>,
+    tasks: LinkedList<Task>,
 
     /// Parker
     ///
@@ -128,7 +129,7 @@ pub(super) fn create(size: usize, park: Parker) -> (Arc<Shared>, Launch) {
             run_queue,
             is_searching: false,
             is_shutdown: false,
-            tasks: task::OwnedList::new(),
+            tasks: LinkedList::new(),
             park: Some(park),
             rand: FastRand::new(seed()),
         }));
@@ -456,9 +457,7 @@ impl Core {
     /// Runs maintenance work such as free pending tasks and check the pool's
     /// state.
     fn maintenance(&mut self, worker: &Worker) {
-        for task in worker.remote().pending_drop.drain() {
-            self.tasks.remove(&task);
-        }
+        self.drain_pending_drop(worker);
 
         if !self.is_shutdown {
             // Check if the scheduler has been shutdown
@@ -468,24 +467,29 @@ impl Core {
 
     // Shutdown the core
     fn shutdown(&mut self, worker: &Worker) {
-        let mut rem = 0;
+        use std::mem::ManuallyDrop;
 
         // Take the core
         let mut park = self.park.take().expect("park missing");
 
-        // Shutdown all remaining tasks, tracking how many there are. For each
-        // task shut down here, an entry will be pushed into `pending_drop`.
-        while let Some(task) = self.tasks.pop() {
-            rem += 1;
+        // Signal to all tasks to shut down.
+        for header in self.tasks.iter() {
+            // We need to get a `&Task` here but the linked list gives us
+            // `&Header`. To transition, we need to convert the header into a
+            // task, but cannot drop it because we don't want the ref-dec
+            //
+            // safety: the `Header` references a valid task.
+            //
+            // TODO: avoid doing this. Fixing this will require linked-list
+            // changes.
+            let task = ManuallyDrop::new(unsafe { Task::from_raw(header.into()) });
             task.shutdown();
         }
 
         loop {
-            for _ in worker.remote().pending_drop.drain() {
-                rem -= 1;
-            }
+            self.drain_pending_drop(worker);
 
-            if rem == 0 {
+            if self.tasks.is_empty() {
                 break;
             }
 
@@ -495,6 +499,22 @@ impl Core {
 
         // Drain the queue
         while let Some(_) = self.run_queue.pop() {}
+    }
+
+    fn drain_pending_drop(&mut self, worker: &Worker) {
+        use std::mem::ManuallyDrop;
+
+        for task in worker.remote().pending_drop.drain() {
+            let task = ManuallyDrop::new(task);
+
+            // safety: tasks are only pushed into the `pending_drop` stacks that
+            // are associated with the list they are inserted into. When a task
+            // is pushed into `pending_drop`, the ref-inc is skipped, so we must
+            // not ref-dec here.
+            //
+            // See `bind` and `release` implementations.
+            unsafe { self.tasks.remove(task.header().into()); }
+        }
     }
 }
 
@@ -515,7 +535,7 @@ impl Worker {
 }
 
 impl task::Schedule for Arc<Worker> {
-    fn bind(task: &Task) -> Arc<Worker> {
+    fn bind(task: Task) -> Arc<Worker> {
         CURRENT.with(|maybe_cx| {
             let cx = maybe_cx.expect("scheduler context missing");
 
@@ -525,14 +545,16 @@ impl task::Schedule for Arc<Worker> {
                 .as_mut()
                 .expect("scheduler core missing")
                 .tasks
-                .insert(task);
+                .push_front(task);
 
             // Return a clone of the worker
             cx.worker.clone()
         })
     }
 
-    fn release(&self, task: Task) -> Option<Task> {
+    fn release(&self, task: &Task) -> Option<Task> {
+        use std::ptr::NonNull;
+
         CURRENT.with(|maybe_cx| {
             let cx = maybe_cx.expect("scheduler context missing");
 
@@ -541,12 +563,28 @@ impl task::Schedule for Arc<Worker> {
 
                 if let Some(core) = &mut *maybe_core {
                     // Directly remove the task
-                    core.tasks.remove(&task);
-                    return Some(task);
+                    //
+                    // safety: the task is inserted in the list in `bind`.
+                    unsafe {
+                        let ptr = NonNull::from(task.header());
+                        return core.tasks.remove(ptr);
+                    }
                 }
             }
 
             // Track the task to be released by the worker that owns it
+            //
+            // Safety: We get a new handle without incrementing the ref-count.
+            // A ref-count is held by the "owned" linked list and it is only
+            // ever removed from that list as part of the release process: this
+            // method or popping the task from `pending_drop`. Thus, we can rely
+            // on the ref-count held by the linked-list to keep the memory
+            // alive.
+            //
+            // When the task is removed from the stack, it is forgotten instead
+            // of dropped.
+            let task = unsafe { Task::from_raw(task.header().into()) };
+
             self.remote().pending_drop.push(task);
 
             if cx.core.borrow().is_some() {

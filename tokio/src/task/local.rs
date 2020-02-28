@@ -1,6 +1,7 @@
 //! Runs `!Send` futures on the current thread.
 use crate::runtime::task::{self, JoinHandle, Task};
 use crate::sync::AtomicWaker;
+use crate::util::linked_list::LinkedList;
 
 use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
@@ -127,7 +128,7 @@ struct Context {
 
 struct Tasks {
     /// Collection of all active tasks spawned onto this executor.
-    owned: task::OwnedList<Arc<Shared>>,
+    owned: LinkedList<Task<Arc<Shared>>>,
 
     /// Local run queue sender and receiver.
     queue: VecDeque<task::Notified<Arc<Shared>>>,
@@ -219,7 +220,7 @@ impl LocalSet {
             tick: Cell::new(0),
             context: Context {
                 tasks: RefCell::new(Tasks {
-                    owned: task::OwnedList::new(),
+                    owned: LinkedList::new(),
                     queue: VecDeque::with_capacity(INITIAL_CAPACITY),
                 }),
                 shared: Arc::new(Shared {
@@ -477,7 +478,7 @@ impl Drop for LocalSet {
             // Loop required here to ensure borrow is dropped between iterations
             #[allow(clippy::while_let_loop)]
             loop {
-                let task = match self.context.tasks.borrow_mut().owned.pop() {
+                let task = match self.context.tasks.borrow_mut().owned.pop_back() {
                     Some(task) => task,
                     None => break,
                 };
@@ -549,22 +550,26 @@ impl Shared {
 }
 
 impl task::Schedule for Arc<Shared> {
-    fn bind(task: &Task<Self>) -> Arc<Shared> {
+    fn bind(task: Task<Self>) -> Arc<Shared> {
         CURRENT.with(|maybe_cx| {
             let cx = maybe_cx.expect("scheduler context missing");
-            cx.tasks.borrow_mut().owned.insert(task);
+            cx.tasks.borrow_mut().owned.push_front(task);
             cx.shared.clone()
         })
     }
 
-    fn release(&self, task: Task<Self>) -> Option<Task<Self>> {
+    fn release(&self, task: &Task<Self>) -> Option<Task<Self>> {
+        use std::ptr::NonNull;
+
         CURRENT.with(|maybe_cx| {
             let cx = maybe_cx.expect("scheduler context missing");
 
             assert!(cx.shared.ptr_eq(self));
 
-            cx.tasks.borrow_mut().owned.remove(&task);
-            Some(task)
+            let ptr = NonNull::from(task.header());
+            // safety: task must be contained by list. It is inserted into the
+            // list in `bind`.
+            unsafe { cx.tasks.borrow_mut().owned.remove(ptr) }
         })
     }
 

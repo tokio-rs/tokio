@@ -3,6 +3,7 @@ use crate::runtime::task::raw::{self, Vtable};
 use crate::runtime::task::state::State;
 use crate::runtime::task::waker::waker_ref;
 use crate::runtime::task::{Notified, Schedule, Task};
+use crate::util::linked_list;
 
 use std::cell::UnsafeCell;
 use std::future::Future;
@@ -43,18 +44,17 @@ pub(crate) struct Header {
     /// Task state
     pub(super) state: State,
 
+    pub(crate) owned: UnsafeCell<linked_list::Pointers<Header>>,
+
     /// Pointer to next task, used for misc task linked lists.
     pub(crate) queue_next: UnsafeCell<Option<NonNull<Header>>>,
-
-    /// Pointer to the next task in the ownership list.
-    pub(crate) owned_next: UnsafeCell<Option<NonNull<Header>>>,
-
-    /// Pointer to the previous task in the ownership list.
-    pub(crate) owned_prev: UnsafeCell<Option<NonNull<Header>>>,
 
     /// Table of function pointers for executing actions on the task.
     pub(super) vtable: &'static Vtable,
 }
+
+unsafe impl Send for Header {}
+unsafe impl Sync for Header {}
 
 /// Cold data is stored after the future.
 pub(super) struct Trailer {
@@ -76,9 +76,8 @@ impl<T: Future, S: Schedule> Cell<T, S> {
         Box::new(Cell {
             header: Header {
                 state,
+                owned: UnsafeCell::new(linked_list::Pointers::new()),
                 queue_next: UnsafeCell::new(None),
-                owned_next: UnsafeCell::new(None),
-                owned_prev: UnsafeCell::new(None),
                 vtable: raw::vtable::<T, S>(),
             },
             core: Core {
@@ -114,7 +113,7 @@ impl<T: Future, S: Schedule> Core<T, S> {
         }
 
         // Bind the task to the scheduler
-        let scheduler = S::bind(&*task);
+        let scheduler = S::bind(ManuallyDrop::into_inner(task));
 
         // Safety: As `scheduler` is not set, this is the first poll
         self.scheduler.with_mut(|ptr| unsafe {
@@ -241,11 +240,15 @@ impl<T: Future, S: Schedule> Core<T, S> {
     /// not been bound to a scheduler and the caller must call `shutdown()`
     /// directly.
     pub(super) fn release(&self, task: Task<S>) -> Option<Task<S>> {
+        use std::mem::ManuallyDrop;
+
+        let task = ManuallyDrop::new(task);
+
         self.scheduler.with(|ptr| {
             // Safety: Can only be called after initial `poll`, which is the
             // only time the field is mutated.
             match unsafe { &*ptr } {
-                Some(scheduler) => scheduler.release(task),
+                Some(scheduler) => scheduler.release(&*task),
                 // Task was never polled
                 //
                 // Safety: this is called from `poll` which requires the same

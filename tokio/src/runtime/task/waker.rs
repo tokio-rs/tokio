@@ -5,6 +5,7 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
 use std::ops;
+use std::ptr::NonNull;
 use std::task::{RawWaker, RawWakerVTable, Waker};
 
 pub(super) struct WakerRef<'a, S: 'static> {
@@ -58,7 +59,8 @@ where
     T: Future,
     S: Schedule,
 {
-    let harness = Harness::<T, S>::from_raw(ptr as *mut _);
+    let ptr = NonNull::new_unchecked(ptr as *mut Header);
+    let harness = Harness::<T, S>::from_raw(ptr);
     harness.drop_reference();
 }
 
@@ -67,7 +69,8 @@ where
     T: Future,
     S: Schedule,
 {
-    let harness = Harness::<T, S>::from_raw(ptr as *mut _);
+    let ptr = NonNull::new_unchecked(ptr as *mut Header);
+    let harness = Harness::<T, S>::from_raw(ptr);
     harness.wake_by_val();
 }
 
@@ -77,7 +80,8 @@ where
     T: Future,
     S: Schedule,
 {
-    let harness = Harness::<T, S>::from_raw(ptr as *mut _);
+    let ptr = NonNull::new_unchecked(ptr as *mut Header);
+    let harness = Harness::<T, S>::from_raw(ptr);
     harness.wake_by_ref();
 }
 

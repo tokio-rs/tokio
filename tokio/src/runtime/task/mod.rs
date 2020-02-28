@@ -13,9 +13,6 @@ mod join;
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::join::JoinHandle;
 
-mod list;
-pub(crate) use self::list::OwnedList;
-
 mod raw;
 use self::raw::RawTask;
 
@@ -28,6 +25,8 @@ cfg_rt_threaded! {
     mod stack;
     pub(crate) use self::stack::TransferStack;
 }
+
+use crate::util::linked_list;
 
 use std::future::Future;
 use std::marker::PhantomData;
@@ -58,7 +57,7 @@ pub(crate) trait Schedule: Sync + Sized + 'static {
     /// Bind a task to the executor.
     ///
     /// Guaranteed to be called from the thread that called `poll` on the task.
-    fn bind(task: &Task<Self>) -> Self;
+    fn bind(task: Task<Self>) -> Self;
 
     /// The task has completed work and is ready to be released. The scheduler
     /// is free to drop it whenever.
@@ -66,7 +65,7 @@ pub(crate) trait Schedule: Sync + Sized + 'static {
     /// If the scheduler can immediately release the task, it should return
     /// it as part of the function. This enables the task module to batch
     /// the ref-dec with other options.
-    fn release(&self, task: Task<Self>) -> Option<Task<Self>>;
+    fn release(&self, task: &Task<Self>) -> Option<Task<Self>>;
 
     /// Schedule the task
     fn schedule(&self, task: Notified<Self>);
@@ -124,7 +123,7 @@ cfg_rt_util! {
 }
 
 impl<S: 'static> Task<S> {
-    unsafe fn from_raw(ptr: NonNull<Header>) -> Task<S> {
+    pub(crate) unsafe fn from_raw(ptr: NonNull<Header>) -> Task<S> {
         Task {
             raw: RawTask::from_raw(ptr),
             _p: PhantomData,
@@ -164,9 +163,8 @@ cfg_rt_threaded! {
 
 impl<S: Schedule> Task<S> {
     /// Pre-emptively cancel the task as part of the shutdown process.
-    pub(crate) fn shutdown(self) {
+    pub(crate) fn shutdown(&self) {
         self.raw.shutdown();
-        mem::forget(self);
     }
 }
 
@@ -181,13 +179,15 @@ impl<S: Schedule> Notified<S> {
     ///
     /// TODO: Not `Schedule`
     pub(crate) fn shutdown(self) {
-        self.0.raw.shutdown();
+        self.0.shutdown();
     }
 }
 
 impl<S: 'static> Drop for Task<S> {
     fn drop(&mut self) {
+        // Decrement the ref count
         if self.header().state.ref_dec() {
+            // Deallocate if this is the final ref count
             self.raw.dealloc();
         }
     }
@@ -202,5 +202,25 @@ impl<S> fmt::Debug for Task<S> {
 impl<S> fmt::Debug for Notified<S> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "task::Notified({:p})", self.0.header())
+    }
+}
+
+/// # Safety
+///
+/// Tasks are pinned
+unsafe impl<S> linked_list::Link for Task<S> {
+    type Handle = Task<S>;
+    type Target = Header;
+
+    fn as_raw(handle: &Task<S>) -> NonNull<Header> {
+        handle.header().into()
+    }
+
+    unsafe fn from_raw(ptr: NonNull<Header>) -> Task<S> {
+        Task::from_raw(ptr)
+    }
+
+    unsafe fn pointers(target: NonNull<Header>) -> NonNull<linked_list::Pointers<Header>> {
+        NonNull::from(&mut *target.as_ref().owned.get())
     }
 }

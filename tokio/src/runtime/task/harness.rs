@@ -3,7 +3,6 @@ use crate::runtime::task::state::Snapshot;
 use crate::runtime::task::{JoinError, Notified, Schedule, Task};
 
 use std::future::Future;
-use std::marker::PhantomData;
 use std::mem;
 use std::panic;
 use std::ptr::NonNull;
@@ -12,7 +11,6 @@ use std::task::{Poll, Waker};
 /// Typed raw task handle
 pub(super) struct Harness<T: Future, S: 'static> {
     cell: NonNull<Cell<T, S>>,
-    _p: PhantomData<S>,
 }
 
 impl<T, S> Harness<T, S>
@@ -20,13 +18,8 @@ where
     T: Future,
     S: 'static,
 {
-    pub(super) unsafe fn from_raw(ptr: *mut ()) -> Harness<T, S> {
-        debug_assert!(!ptr.is_null());
-
-        Harness {
-            cell: NonNull::new_unchecked(ptr as *mut Cell<T, S>),
-            _p: PhantomData,
-        }
+    pub(super) unsafe fn from_raw(ptr: NonNull<Header>) -> Harness<T, S> {
+        Harness { cell: ptr.cast::<Cell<T, S>>() }
     }
 
     fn header(&self) -> &Header {

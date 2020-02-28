@@ -2,6 +2,7 @@ use crate::park::{Park, Unpark};
 use crate::runtime;
 use crate::runtime::task::{self, JoinHandle, Schedule, Task};
 use crate::util::{waker_ref, Wake};
+use crate::util::linked_list::LinkedList;
 
 use std::cell::RefCell;
 use std::collections::VecDeque;
@@ -41,7 +42,7 @@ pub(crate) struct Spawner {
 
 struct Tasks {
     /// Collection of all active tasks spawned onto this executor.
-    owned: task::OwnedList<Arc<Shared>>,
+    owned: LinkedList<Task<Arc<Shared>>>,
 
     /// Local run queue.
     ///
@@ -88,7 +89,7 @@ where
 
         BasicScheduler {
             tasks: Some(Tasks {
-                owned: task::OwnedList::new(),
+                owned: LinkedList::new(),
                 queue: VecDeque::with_capacity(INITIAL_CAPACITY),
             }),
             spawner: Spawner {
@@ -221,7 +222,7 @@ where
             // Loop required here to ensure borrow is dropped between iterations
             #[allow(clippy::while_let_loop)]
             loop {
-                let task = match context.tasks.borrow_mut().owned.pop() {
+                let task = match context.tasks.borrow_mut().owned.pop_back() {
                     Some(task) => task,
                     None => break,
                 };
@@ -278,19 +279,25 @@ impl fmt::Debug for Spawner {
 // ===== impl Shared =====
 
 impl Schedule for Arc<Shared> {
-    fn bind(task: &Task<Self>) -> Arc<Shared> {
+    fn bind(task: Task<Self>) -> Arc<Shared> {
         CURRENT.with(|maybe_cx| {
             let cx = maybe_cx.expect("scheduler context missing");
-            cx.tasks.borrow_mut().owned.insert(task);
+            cx.tasks.borrow_mut().owned.push_front(task);
             cx.shared.clone()
         })
     }
 
-    fn release(&self, task: Task<Self>) -> Option<Task<Self>> {
+    fn release(&self, task: &Task<Self>) -> Option<Task<Self>> {
+        use std::ptr::NonNull;
+
         CURRENT.with(|maybe_cx| {
             let cx = maybe_cx.expect("scheduler context missing");
-            cx.tasks.borrow_mut().owned.remove(&task);
-            Some(task)
+
+            // safety: the task is inserted in the list in `bind`.
+            unsafe {
+                let ptr = NonNull::from(task.header());
+                cx.tasks.borrow_mut().owned.remove(ptr)
+            }
         })
     }
 
@@ -304,7 +311,6 @@ impl Schedule for Arc<Shared> {
                 self.unpark.unpark();
             }
         });
-        // Shared::schedule(self, task);
     }
 }
 
