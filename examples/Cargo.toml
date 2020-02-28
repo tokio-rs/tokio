@@ -6,7 +6,7 @@ edition = "2018"
 
 [dev-dependencies]
 tokio = { version = "0.2.0", path = "../tokio", features = ["full"] }
-tokio-util = { version = "0.2.0", path = "../tokio-util", features = ["full"] }
+tokio-util = { version = "0.3.0", path = "../tokio-util", features = ["full"] }
 bytes = "0.5"
 futures = "0.3.0"
 http = "0.2"
