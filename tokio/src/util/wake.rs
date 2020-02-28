@@ -54,7 +54,11 @@ unsafe fn inc_ref_count<T: Wake>(data: *const ()) {
     let arc = ManuallyDrop::new(Arc::<T>::from_raw(data as *const T));
 
     // Now increase refcount, but don't drop new refcount either
-    drop(arc.clone());
+    let arc_clone: ManuallyDrop<_> = arc.clone();
+
+    // Drop explicitly to avoid clippy warnings
+    drop(arc);
+    drop(arc_clone);
 }
 
 unsafe fn clone_arc_raw<T: Wake>(data: *const ()) -> RawWaker {
