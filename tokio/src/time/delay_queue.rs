@@ -724,6 +724,9 @@ impl<T> DelayQueue<T> {
             self.delay = None;
 
             if let Some(idx) = self.wheel.poll(&mut self.poll, &mut self.slab) {
+                if let Some(deadline) = self.next_deadline() {
+                    self.delay = Some(delay_until(deadline));
+                }
                 return Poll::Ready(Some(Ok(idx)));
             }
 
