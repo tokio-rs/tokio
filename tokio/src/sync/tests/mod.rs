@@ -1,6 +1,7 @@
 cfg_not_loom! {
     mod atomic_waker;
     mod semaphore_ll;
+    mod semaphore_batch;
 }
 
 cfg_loom! {

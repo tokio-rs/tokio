@@ -1,4 +1,4 @@
-use super::semaphore_ll as ll; // low level implementation
+use super::batch_semaphore as ll; // low level implementation
 use crate::future::poll_fn;
 use std::pin::Pin;
 

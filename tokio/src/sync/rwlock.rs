@@ -1,5 +1,5 @@
 use crate::future::poll_fn;
-use crate::sync::semaphore_ll::{AcquireError, Permit, Semaphore};
+use crate::sync::batch_semaphore::{AcquireError, Permit, Semaphore};
 use std::cell::UnsafeCell;
 use std::ops;
 use std::pin::Pin;
