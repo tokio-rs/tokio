@@ -3,14 +3,14 @@ jobs:
   displayName: Loom tests
   strategy:
     matrix:
-      io:
-        scope: io::driver
       runtime:
-        scope: runtime::tests
-      sync:
-        scope: sync::tests
-      slab:
-        scope: util::slab
+        scope:
+          - "runtime::tests"
+      rest:
+        scope:
+          - "io::driver"
+          - "sync::tests"
+          - "util::slab"
   pool:
     vmImage: ubuntu-16.04
 
@@ -19,9 +19,10 @@ jobs:
     parameters:
       rust_version: ${{ parameters.rust }}
 
-  - script: RUSTFLAGS="--cfg loom" cargo test --lib --release --features "full" -- --nocapture $(scope)
-    env:
-      LOOM_MAX_PREEMPTIONS: 2
-      CI: 'True'
-    displayName: $(scope)
-    workingDirectory: $(Build.SourcesDirectory)/tokio
+  - ${{ each s in scope }}:
+    - script: RUSTFLAGS="--cfg loom" cargo test --lib --release --features "full" -- --nocapture $(s)
+      env:
+        LOOM_MAX_PREEMPTIONS: 2
+        CI: 'True'
+      displayName: $(s)
+      workingDirectory: $(Build.SourcesDirectory)/tokio
