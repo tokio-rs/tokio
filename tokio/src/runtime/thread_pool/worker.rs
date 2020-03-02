@@ -110,7 +110,7 @@ type Task = task::Task<Arc<Worker>>;
 /// A notified task handle
 type Notified = task::Notified<Arc<Worker>>;
 
-/// Tracks thread-local state
+// Tracks thread-local state
 scoped_thread_local!(static CURRENT: Context);
 
 pub(super) fn create(size: usize, park: Parker) -> (Arc<Shared>, Launch) {
@@ -467,23 +467,12 @@ impl Core {
 
     // Shutdown the core
     fn shutdown(&mut self, worker: &Worker) {
-        use std::mem::ManuallyDrop;
-
         // Take the core
         let mut park = self.park.take().expect("park missing");
 
         // Signal to all tasks to shut down.
         for header in self.tasks.iter() {
-            // We need to get a `&Task` here but the linked list gives us
-            // `&Header`. To transition, we need to convert the header into a
-            // task, but cannot drop it because we don't want the ref-dec
-            //
-            // safety: the `Header` references a valid task.
-            //
-            // TODO: avoid doing this. Fixing this will require linked-list
-            // changes.
-            let task = ManuallyDrop::new(unsafe { Task::from_raw(header.into()) });
-            task.shutdown();
+            header.shutdown();
         }
 
         loop {

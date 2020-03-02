@@ -3,3 +3,6 @@ cfg_loom! {
     mod loom_oneshot;
     mod loom_pool;
 }
+
+#[cfg(miri)]
+mod task;

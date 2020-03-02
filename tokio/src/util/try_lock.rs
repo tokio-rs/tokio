@@ -22,7 +22,7 @@ unsafe impl<T: Sync> Sync for LockGuard<'_, T> {}
 
 impl<T> TryLock<T> {
     /// Create a new `TryLock`
-    pub(crate) fn new(data: T) -> TryLock<T> {
+    pub(crate) const fn new(data: T) -> TryLock<T> {
         TryLock {
             locked: AtomicBool::new(false),
             data: UnsafeCell::new(data),

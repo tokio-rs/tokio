@@ -77,7 +77,7 @@ const MAX_TASKS_PER_TICK: usize = 61;
 /// How often ot check the remote queue first
 const REMOTE_FIRST_INTERVAL: u8 = 31;
 
-/// Tracks the current BasicScheduler
+// Tracks the current BasicScheduler
 scoped_thread_local!(static CURRENT: Context);
 
 impl<P> BasicScheduler<P>
