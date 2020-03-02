@@ -13,6 +13,7 @@ jobs:
       rustup component add miri
       cargo miri setup
       rm -rf $(Build.SourcesDirectory)/tokio/tests
+    displayName: Install miri
 
   - script: cargo miri test --features rt-core,rt-threaded,rt-util,sync
     env:
