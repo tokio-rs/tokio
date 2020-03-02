@@ -16,7 +16,7 @@ jobs:
     displayName: Install miri
 
   # TODO: enable all tests once they pass
-  - script: cargo miri test --features rt-core,rt-threaded,rt-util,sync -- task
+  - script: cargo miri test --features rt-core,rt-threaded,rt-util,sync -- -- task
     env:
       CI: 'True'
     displayName: cargo miri test
