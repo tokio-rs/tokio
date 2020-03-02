@@ -47,6 +47,9 @@ pub struct Builder {
     /// Whether or not to enable the time driver
     enable_time: bool,
 
+    /// Whether or not to start time in "frozen" mode.
+    freeze_time: bool,
+
     /// The number of worker threads, used by Runtime.
     ///
     /// Only used when not using the current-thread executor.
@@ -92,6 +95,9 @@ impl Builder {
 
             // Time defaults to "off"
             enable_time: false,
+
+            // Frozen time defaults to "off"
+            freeze_time: false,
 
             // Default to lazy auto-detection (one thread per CPU core)
             core_threads: None,
@@ -317,7 +323,7 @@ impl Builder {
     fn build_shell_runtime(&mut self) -> io::Result<Runtime> {
         use crate::runtime::Kind;
 
-        let clock = time::create_clock();
+        let clock = time::create_clock(self.freeze_time);
 
         // Create I/O driver
         let (io_driver, io_handle) = io::create_driver(self.enable_io)?;
@@ -389,6 +395,30 @@ cfg_time! {
     }
 }
 
+cfg_test_util! {
+    impl Builder {
+        /// Use the runtimes deterministic time source by default.
+        ///
+        /// Doing this enables deterministic progression of time for
+        /// the runtime.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new()
+        ///     .freeze_time()
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        pub fn freeze_time(&mut self) -> &mut Self {
+            self.freeze_time = true;
+            self
+        }
+    }
+}
+
 cfg_rt_core! {
     impl Builder {
         /// Sets runtime to use a simpler scheduler that runs all tasks on the current-thread.
@@ -403,7 +433,7 @@ cfg_rt_core! {
         fn build_basic_runtime(&mut self) -> io::Result<Runtime> {
             use crate::runtime::{BasicScheduler, Kind};
 
-            let clock = time::create_clock();
+            let clock = time::create_clock(self.freeze_time);
 
             // Create I/O driver
             let (io_driver, io_handle) = io::create_driver(self.enable_io)?;
@@ -451,7 +481,7 @@ cfg_rt_threaded! {
             let core_threads = self.core_threads.unwrap_or_else(crate::loom::sys::num_cpus);
             assert!(core_threads <= self.max_threads, "Core threads number cannot be above max limit");
 
-            let clock = time::create_clock();
+            let clock = time::create_clock(self.freeze_time);
 
             let (io_driver, io_handle) = io::create_driver(self.enable_io)?;
             let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone());
