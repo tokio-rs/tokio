@@ -1,61 +1,81 @@
 use crate::runtime::task::{self, Schedule, Task};
 use crate::util::TryLock;
+use crate::util::linked_list::LinkedList;
 
 use std::collections::VecDeque;
 use std::sync::Arc;
 
 #[test]
 fn create_drop() {
-    let _ = task::joinable::<_, Arc<RunQueue>>(async { unreachable!() });
+    let _ = task::joinable::<_, Runtime>(async { unreachable!() });
 }
 
 #[test]
 fn schedule() {
-    with(|queue| {
+    with(|rt| {
         let (task, _) = task::joinable(async {
             crate::task::yield_now().await;
         });
 
-        queue.schedule(task);
+        rt.schedule(task);
 
-        assert_eq!(2, queue.tick());
+        assert_eq!(2, rt.tick());
     })
 }
 
 #[test]
 fn shutdown() {
-    with(|queue| {
+    with(|rt| {
         let (task, _) = task::joinable(async {
             loop {
                 crate::task::yield_now().await;
             }
         });
 
-        queue.schedule(task);
+        rt.schedule(task);
+        rt.tick_max(1);
     })
 }
 
-fn with(f: impl FnOnce(Arc<RunQueue>)) {
+fn with(f: impl FnOnce(Runtime)) {
     struct Reset;
 
     impl Drop for Reset {
         fn drop(&mut self) {
-            QUEUE.try_lock().unwrap().take();
+            let _rt = CURRENT.try_lock().unwrap().take();
         }
     }
 
-    let _r = Reset;
+    let _reset = Reset;
 
-    let queue = Arc::new(RunQueue(TryLock::new(VecDeque::new())));
-    *QUEUE.try_lock().unwrap() = Some(queue.clone());
-    f(queue)
+    let rt = Runtime(Arc::new(Inner {
+        released: task::TransferStack::new(),
+        core: TryLock::new(Core {
+            queue: VecDeque::new(),
+            tasks: LinkedList::new(),
+        }),
+    }));
+
+    *CURRENT.try_lock().unwrap() = Some(rt.clone());
+    f(rt)
 }
 
-struct RunQueue(TryLock<VecDeque<task::Notified<Arc<RunQueue>>>>);
+#[derive(Clone)]
+struct Runtime(Arc<Inner>);
 
-static QUEUE: TryLock<Option<Arc<RunQueue>>> = TryLock::new(None);
+struct Inner {
+    released: task::TransferStack<Runtime>,
+    core: TryLock<Core>,
+}
 
-impl RunQueue {
+struct Core {
+    queue: VecDeque<task::Notified<Runtime>>,
+    tasks: LinkedList<Task<Runtime>>,
+}
+
+static CURRENT: TryLock<Option<Runtime>> = TryLock::new(None);
+
+impl Runtime {
     fn tick(&self) -> usize {
         self.tick_max(usize::max_value())
     }
@@ -69,30 +89,73 @@ impl RunQueue {
             task.run();
         }
 
+        self.0.maintenance();
+
         n
     }
 
     fn is_empty(&self) -> bool {
-        self.0.try_lock().unwrap().is_empty()
+        self.0.core.try_lock().unwrap().queue.is_empty()
     }
 
-    fn next_task(&self) -> task::Notified<Arc<RunQueue>> {
-        self.0.try_lock().unwrap().pop_front().unwrap()
+    fn next_task(&self) -> task::Notified<Runtime> {
+        self.0.core.try_lock().unwrap().queue.pop_front().unwrap()
     }
 }
 
-impl Schedule for Arc<RunQueue> {
-    fn bind(_task: Task<Self>) -> Arc<RunQueue> {
-        QUEUE.try_lock().unwrap().as_ref().unwrap().clone()
+impl Inner {
+    fn maintenance(&self) {
+        use std::mem::ManuallyDrop;
+
+        for task in self.released.drain() {
+            let task = ManuallyDrop::new(task);
+
+            // safety: see worker.rs
+            unsafe {
+                let ptr = task.header().into();
+                self.core.try_lock().unwrap().tasks.remove(ptr);
+            }
+        }
+    }
+}
+
+impl Schedule for Runtime {
+    fn bind(task: Task<Self>) -> Runtime {
+        let rt = CURRENT.try_lock().unwrap().as_ref().unwrap().clone();
+        rt.0.core.try_lock().unwrap().tasks.push_front(task);
+        rt
     }
 
-    fn release(&self, _task: &Task<Self>) -> Option<Task<Self>> {
+    fn release(&self, task: &Task<Self>) -> Option<Task<Self>> {
+        // safety: copying worker.rs
+        let task = unsafe { Task::from_raw(task.header().into()) };
+        self.0.released.push(task);
         None
     }
 
     fn schedule(&self, task: task::Notified<Self>) {
-        self.0.try_lock().unwrap().push_back(task);
+        self.0.core.try_lock().unwrap().queue.push_back(task);
     }
 }
 
-impl task::ScheduleSendOnly for Arc<RunQueue> {}
+impl task::ScheduleSendOnly for Runtime {}
+
+impl Drop for Inner {
+    fn drop(&mut self) {
+        let mut core = self.core.try_lock().unwrap();
+
+        for task in core.tasks.iter() {
+            task.shutdown();
+        }
+
+        while let Some(task) = core.queue.pop_back() {
+            task.shutdown();
+        }
+
+        drop(core);
+
+        while !self.core.try_lock().unwrap().tasks.is_empty() {
+            self.maintenance();
+        }
+    }
+}
