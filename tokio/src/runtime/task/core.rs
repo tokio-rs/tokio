@@ -256,12 +256,14 @@ impl<T: Future, S: Schedule> Core<T, S> {
     }
 }
 
-impl Header {
-    pub(crate) fn shutdown(&self) {
-        use crate::runtime::task::RawTask;
+cfg_rt_threaded! {
+    impl Header {
+        pub(crate) fn shutdown(&self) {
+            use crate::runtime::task::RawTask;
 
-        let task = unsafe { RawTask::from_raw(self.into()) };
-        task.shutdown();
+            let task = unsafe { RawTask::from_raw(self.into()) };
+            task.shutdown();
+        }
     }
 }
 
