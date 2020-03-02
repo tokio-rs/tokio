@@ -1,6 +1,6 @@
 use crate::runtime::task::{self, Schedule, Task};
-use crate::util::TryLock;
 use crate::util::linked_list::LinkedList;
+use crate::util::TryLock;
 
 use std::collections::VecDeque;
 use std::sync::Arc;
