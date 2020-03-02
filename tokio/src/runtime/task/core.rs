@@ -268,6 +268,7 @@ cfg_rt_threaded! {
 }
 
 #[test]
+#[cfg(not(loom))]
 fn header_lte_cache_line() {
     use std::mem::size_of;
 
