@@ -50,6 +50,11 @@ jobs:
     name: loom
     rust: stable
 
+# Run miri tests
+- template: ci/azure-miri.yml
+  parameters:
+    name: miri
+
 # Try cross compiling
 - template: ci/azure-cross-compile.yml
   parameters:
@@ -102,11 +107,14 @@ jobs:
     rust: stable
     dependsOn:
       - rustfmt
+      - docs
       - clippy
       - test_tokio
       - test_linux
+      - test_integration
       - test_build
       - loom
+      - miri
       - cross
       - minrust
       - check_features
