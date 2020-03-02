@@ -26,7 +26,7 @@ macro_rules! new {
             locked: AtomicBool::new(false),
             data: UnsafeCell::new($data),
         }
-    }
+    };
 }
 
 impl<T> TryLock<T> {

@@ -5,7 +5,7 @@ jobs:
     matrix:
       io:
         scope: io::driver
-      blocking:
+      runtime:
         scope: runtime::tests
       sync:
         scope: sync::tests
