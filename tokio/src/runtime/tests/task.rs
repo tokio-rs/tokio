@@ -34,6 +34,8 @@ fn shutdown() {
 
         rt.schedule(task);
         rt.tick_max(1);
+
+        rt.shutdown();
     })
 }
 
@@ -101,6 +103,24 @@ impl Runtime {
     fn next_task(&self) -> task::Notified<Runtime> {
         self.0.core.try_lock().unwrap().queue.pop_front().unwrap()
     }
+
+    fn shutdown(&self) {
+        let mut core = self.0.core.try_lock().unwrap();
+
+        for task in core.tasks.iter() {
+            task.shutdown();
+        }
+
+        while let Some(task) = core.queue.pop_back() {
+            task.shutdown();
+        }
+
+        drop(core);
+
+        while !self.0.core.try_lock().unwrap().tasks.is_empty() {
+            self.0.maintenance();
+        }
+    }
 }
 
 impl Inner {
@@ -139,23 +159,3 @@ impl Schedule for Runtime {
 }
 
 impl task::ScheduleSendOnly for Runtime {}
-
-impl Drop for Inner {
-    fn drop(&mut self) {
-        let mut core = self.core.try_lock().unwrap();
-
-        for task in core.tasks.iter() {
-            task.shutdown();
-        }
-
-        while let Some(task) = core.queue.pop_back() {
-            task.shutdown();
-        }
-
-        drop(core);
-
-        while !self.core.try_lock().unwrap().tasks.is_empty() {
-            self.maintenance();
-        }
-    }
-}
