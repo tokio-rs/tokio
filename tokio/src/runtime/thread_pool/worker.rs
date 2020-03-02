@@ -1,7 +1,8 @@
-//! Drives a slice of the scheduler on a thread.
-//!
 //! A scheduler is initialized with a fixed number of workers. Each worker is
-//! driven by a thread and may be migrated from one thread to another.
+//! driven by a thread. Each worker has a "core" which contains data such as the
+//! run queue and other state. When `block_in_place` is called, the worker's
+//! "core" is handed off to a new thread allowing the scheduler to continue to
+//! make progress while the originating thread blocks.
 
 use crate::loom::rand::seed;
 use crate::loom::sync::{Arc, Mutex};
@@ -24,7 +25,7 @@ pub(super) struct Worker {
     /// Index holding this worker's remote state
     index: usize,
 
-    /// Used to hand-off a slice to another worker.
+    /// Used to hand-off a worker's core to another thread.
     core: AtomicCell<Core>,
 }
 
@@ -33,11 +34,11 @@ struct Core {
     /// Used to schedule bookkeeping tasks every so often.
     tick: u8,
 
-    /// Slice-local run queue.
+    /// The worker-local run queue.
     run_queue: queue::Local<Arc<Worker>>,
 
     /// True if the worker is currently searching for more work. Searching
-    /// involves attempting to steal from other slices.
+    /// involves attempting to steal from other workers.
     is_searching: bool,
 
     /// True if the scheduler is being shutdown
@@ -58,7 +59,8 @@ struct Core {
 
 /// State shared across all workers
 pub(super) struct Shared {
-    /// Per-slice remote state
+    /// Per-worker remote state. All other workers have access to this and is
+    /// how they communicate between each other.
     remotes: Box<[Remote]>,
 
     /// Submit work to the scheduler while **not** currently on a worker thread.
@@ -74,9 +76,9 @@ pub(super) struct Shared {
     shutdown_workers: Mutex<Vec<(Box<Core>, Arc<Worker>)>>,
 }
 
-/// Used to interact with a slice from other threads.
+/// Used to communicate with a worker from other threads.
 struct Remote {
-    /// Steal tasks from this slice
+    /// Steal tasks from this worker.
     steal: queue::Steal<Arc<Worker>>,
 
     /// Transfers tasks to be released. Any worker pushes tasks, only the owning
@@ -363,7 +365,7 @@ impl Core {
         self.tick = self.tick.wrapping_add(1);
     }
 
-    /// Return the next notified task available to this slice.
+    /// Return the next notified task available to this worker.
     fn next_task(&mut self, worker: &Worker) -> Option<Notified> {
         if self.tick % GLOBAL_POLL_INTERVAL == 0 {
             worker.inject().pop().or_else(|| self.run_queue.pop())
