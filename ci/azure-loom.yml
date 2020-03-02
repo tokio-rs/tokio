@@ -19,9 +19,8 @@ jobs:
     parameters:
       rust_version: ${{ parameters.rust }}
 
-  - script: cargo test --lib --release --features "full" -- --nocapture $(scope)
+  - script: RUSTFLAGS="--cfg loom" cargo test --lib --release --features "full" -- --nocapture $(scope)
     env:
-      RUSTFLAGS: '--cfg loom'
       LOOM_MAX_PREEMPTIONS: 2
       CI: 'True'
     displayName: $(scope)
