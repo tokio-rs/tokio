@@ -60,8 +60,10 @@ cfg_io_util! {
     mod split;
     pub use split::Split;
 
-    mod stream_reader;
-    pub use stream_reader::{stream_reader, StreamReader};
+    cfg_stream! {
+        mod stream_reader;
+        pub use stream_reader::{stream_reader, StreamReader};
+    }
 
     mod take;
     pub use take::Take;
