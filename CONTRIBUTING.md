@@ -138,6 +138,13 @@ rustfmt --check --edition 2018 $(find . -name '*.rs' -print)
 The `--check` argument prints the things that need to be fixed. If you remove
 it, `rustfmt` will update your files locally instead.
 
+You can run loom tests with
+```
+cd tokio # tokio crate in workspace
+LOOM_MAX_PREEMPTIONS=1 RUSTFLAGS="--cfg loom" \
+    cargo test --lib --release --features full -- --test-threads=1 --nocapture
+```
+
 ### Tests
 
 If the change being proposed alters code (as opposed to only documentation for
