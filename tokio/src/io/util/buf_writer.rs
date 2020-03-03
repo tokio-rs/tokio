@@ -1,9 +1,9 @@
 use crate::io::util::DEFAULT_BUF_SIZE;
-use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite, AsyncSeek};
+use crate::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite};
 
 use pin_project_lite::pin_project;
 use std::fmt;
-use std::io::{self, Write, SeekFrom};
+use std::io::{self, SeekFrom, Write};
 use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::task::{Context, Poll};

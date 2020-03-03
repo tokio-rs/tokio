@@ -1,5 +1,5 @@
 use crate::io::util::DEFAULT_BUF_SIZE;
-use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite, AsyncSeek};
+use crate::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite};
 
 use pin_project_lite::pin_project;
 use std::io::{self, Read, SeekFrom};
@@ -185,14 +185,22 @@ impl<R: AsyncRead + AsyncSeek> AsyncSeek for BufReader<R> {
             // support seeking by i64::min_value() so we need to handle underflow when subtracting
             // remainder.
             if let Some(offset) = n.checked_sub(remainder) {
-                ready!(self.as_mut().get_pin_mut().start_seek(cx, SeekFrom::Current(offset)))?;
+                ready!(self
+                    .as_mut()
+                    .get_pin_mut()
+                    .start_seek(cx, SeekFrom::Current(offset)))?;
             } else {
                 // seek backwards by our remainder, and then by the offset
-                ready!(self.as_mut().get_pin_mut().start_seek(cx, SeekFrom::Current(-remainder)))?;
+                ready!(self
+                    .as_mut()
+                    .get_pin_mut()
+                    .start_seek(cx, SeekFrom::Current(-remainder)))?;
                 self.as_mut().discard_buffer();
-                ready!(self.as_mut().get_pin_mut().start_seek(cx, SeekFrom::Current(n)))?;
+                ready!(self
+                    .as_mut()
+                    .get_pin_mut()
+                    .start_seek(cx, SeekFrom::Current(n)))?;
             }
-
         } else {
             ready!(self.as_mut().get_pin_mut().start_seek(cx, position))?;
         }
