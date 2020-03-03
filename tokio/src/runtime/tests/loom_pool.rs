@@ -4,7 +4,6 @@
 /// Use `LOOM_MAX_PREEMPTIONS=1` to do a "quick" run as a smoke test.
 ///
 /// In order to speed up the C
-
 use crate::future::poll_fn;
 use crate::runtime::tests::loom_oneshot as oneshot;
 use crate::runtime::{self, Runtime};
