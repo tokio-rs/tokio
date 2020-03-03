@@ -605,8 +605,6 @@ impl task::Schedule for Arc<Worker> {
     }
 }
 
-impl task::ScheduleSendOnly for Arc<Worker> {}
-
 impl Shared {
     pub(super) fn schedule(&self, task: Notified, is_yield: bool) {
         CURRENT.with(|maybe_cx| {

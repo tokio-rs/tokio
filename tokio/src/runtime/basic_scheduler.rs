@@ -314,8 +314,6 @@ impl Schedule for Arc<Shared> {
     }
 }
 
-impl task::ScheduleSendOnly for Arc<Shared> {}
-
 impl Wake for Shared {
     fn wake(self: Arc<Self>) {
         Wake::wake_by_ref(&self)

@@ -157,5 +157,3 @@ impl Schedule for Runtime {
         self.0.core.try_lock().unwrap().queue.push_back(task);
     }
 }
-
-impl task::ScheduleSendOnly for Runtime {}

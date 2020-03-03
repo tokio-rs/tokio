@@ -22,5 +22,3 @@ impl task::Schedule for NoopSchedule {
         unreachable!();
     }
 }
-
-impl task::ScheduleSendOnly for NoopSchedule {}

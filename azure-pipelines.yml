@@ -44,12 +44,6 @@ jobs:
     displayName: Test build permutations
     rust: stable
 
-# Run loom tests
-- template: ci/azure-loom.yml
-  parameters:
-    name: loom
-    rust: stable
-
 # Run miri tests
 - template: ci/azure-miri.yml
   parameters:
@@ -101,6 +95,12 @@ jobs:
 #   parameters:
 #     name: tsan
 #     rust: stable
+
+# Run loom tests
+- template: ci/azure-loom.yml
+  parameters:
+    name: loom
+    rust: stable
 
 - template: ci/azure-deploy-docs.yml
   parameters:

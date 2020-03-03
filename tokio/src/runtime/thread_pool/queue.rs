@@ -56,10 +56,10 @@ struct Pointers {
     tail: Option<NonNull<task::Header>>,
 }
 
-unsafe impl<T: task::ScheduleSendOnly> Send for Inner<T> {}
-unsafe impl<T: task::ScheduleSendOnly> Sync for Inner<T> {}
-unsafe impl<T: task::ScheduleSendOnly> Send for Inject<T> {}
-unsafe impl<T: task::ScheduleSendOnly> Sync for Inject<T> {}
+unsafe impl<T> Send for Inner<T> {}
+unsafe impl<T> Sync for Inner<T> {}
+unsafe impl<T> Send for Inject<T> {}
+unsafe impl<T> Sync for Inject<T> {}
 
 #[cfg(not(loom))]
 const LOCAL_QUEUE_CAPACITY: usize = 256;
