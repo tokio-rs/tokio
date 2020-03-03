@@ -1,9 +1,9 @@
 use crate::io::util::DEFAULT_BUF_SIZE;
-use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite};
+use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite, AsyncSeek};
 
 use pin_project_lite::pin_project;
 use std::fmt;
-use std::io::{self, Write};
+use std::io::{self, Write, SeekFrom};
 use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -140,6 +140,24 @@ impl<W: AsyncWrite> AsyncWrite for BufWriter<W> {
     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         ready!(self.as_mut().flush_buf(cx))?;
         self.get_pin_mut().poll_shutdown(cx)
+    }
+}
+
+impl<W: AsyncWrite + AsyncSeek> AsyncSeek for BufWriter<W> {
+    /// Seek to the offset, in bytes, in the underlying writer.
+    ///
+    /// Seeking always writes out the internal buffer before seeking.
+    fn start_seek(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        position: SeekFrom,
+    ) -> Poll<io::Result<()>> {
+        ready!(self.as_mut().flush_buf(cx))?;
+        self.get_pin_mut().start_seek(cx, position)
+    }
+
+    fn poll_complete(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
+        self.get_pin_mut().poll_complete(cx)
     }
 }
 
