@@ -200,8 +200,9 @@ cfg_io_util! {
 
     pub(crate) mod util;
     pub use util::{
-        copy, empty, repeat, sink, AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt, BufReader,
-        BufStream, BufWriter, Copy, Empty, Lines, Repeat, Sink, Split, Take,
+        copy, empty, repeat, sink, stream_reader, AsyncBufReadExt, AsyncReadExt, AsyncSeekExt,
+        AsyncWriteExt, BufReader, BufStream, BufWriter, Copy, Empty, Lines, Repeat, Sink, Split,
+        StreamReader, Take,
     };
 
     // Re-export io::Error so that users don't have to deal with conflicts when

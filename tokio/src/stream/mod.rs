@@ -13,9 +13,6 @@ use filter::Filter;
 mod filter_map;
 use filter_map::FilterMap;
 
-mod into_async_read;
-pub use into_async_read::IntoAsyncRead;
-
 mod iter;
 pub use iter::{iter, Iter};
 

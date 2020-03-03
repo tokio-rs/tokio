@@ -1,6 +1,6 @@
 use crate::io::{AsyncBufRead, AsyncRead};
 use crate::stream::Stream;
-use bytes::{BufMut, Bytes};
+use bytes::{Buf, BufMut};
 use pin_project_lite::pin_project;
 use std::io;
 use std::mem::MaybeUninit;
@@ -8,26 +8,42 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 pin_project! {
+    /// Convert a stream of byte chunks into an [`AsyncRead`].
+    ///
+    /// This type is usually created using the [`stream_reader`] function.
+    ///
+    /// [`AsyncRead`]: crate::io::AsyncRead
+    /// [`stream_reader`]: crate::io::stream_reader
+    #[derive(Debug)]
+    pub struct StreamReader<S, B> {
+        #[pin]
+        inner: S,
+        chunk: Option<B>,
+    }
+}
+
+cfg_io_util! {
     /// Convert a stream of byte chunks into an [`AsyncRead`](crate::io::AsyncRead).
     ///
     /// # Example
     ///
     /// ```
     /// use bytes::Bytes;
-    /// use tokio::stream::{iter, IntoAsyncRead};
-    /// use tokio::io::AsyncReadExt;
+    /// use tokio::io::{stream_reader, AsyncReadExt};
     /// # #[tokio::main]
     /// # async fn main() -> std::io::Result<()> {
     ///
-    /// let stream = iter(vec![
+    /// // Create a stream from an iterator.
+    /// let stream = tokio::stream::iter(vec![
     ///     Ok(Bytes::from_static(&[0, 1, 2, 3])),
     ///     Ok(Bytes::from_static(&[4, 5, 6, 7])),
     ///     Ok(Bytes::from_static(&[8, 9, 10, 11])),
     /// ]);
     ///
-    /// let mut read = IntoAsyncRead::new(stream);
+    /// // Convert it to an AsyncRead.
+    /// let mut read = stream_reader(stream);
     ///
-    /// // Read five bytes from the stream:
+    /// // Read five bytes from the stream.
     /// let mut buf = [0; 5];
     /// read.read_exact(&mut buf).await?;
     /// assert_eq!(buf, [0, 1, 2, 3, 4]);
@@ -46,30 +62,41 @@ pin_project! {
     /// # Ok(())
     /// # }
     /// ```
-    #[derive(Debug)]
-    pub struct IntoAsyncRead<S> {
-        #[pin]
-        inner: S,
-        chunk: Bytes,
+    pub fn stream_reader<S, B>(stream: S) -> StreamReader<S, B>
+    where
+        S: Stream<Item = Result<B, io::Error>>,
+        B: Buf,
+    {
+        StreamReader::new(stream)
     }
-}
 
-impl<S> IntoAsyncRead<S>
-where
-    S: Stream<Item = Result<Bytes, io::Error>>,
-{
-    /// Convert the provided stream into an [`AsyncRead`](crate::io::AsyncRead).
-    pub fn new(stream: S) -> Self {
-        IntoAsyncRead {
-            inner: stream,
-            chunk: Bytes::new(),
+    impl<S, B> StreamReader<S, B>
+    where
+        S: Stream<Item = Result<B, io::Error>>,
+        B: Buf,
+    {
+        /// Convert the provided stream into an `AsyncRead`.
+        fn new(stream: S) -> Self {
+            Self {
+                inner: stream,
+                chunk: None,
+            }
+        }
+        /// Do we have a chunk and is it non-empty?
+        fn has_chunk(self: Pin<&mut Self>) -> bool {
+            if let Some(chunk) = self.project().chunk {
+                chunk.remaining() > 0
+            } else {
+                false
+            }
         }
     }
 }
 
-impl<S> AsyncRead for IntoAsyncRead<S>
+impl<S, B> AsyncRead for StreamReader<S, B>
 where
-    S: Stream<Item = Result<Bytes, io::Error>>,
+    S: Stream<Item = Result<B, io::Error>>,
+    B: Buf,
 {
     fn poll_read(
         mut self: Pin<&mut Self>,
@@ -91,10 +118,10 @@ where
         self.consume(len);
         Poll::Ready(Ok(len))
     }
-    fn poll_read_buf<B: BufMut>(
+    fn poll_read_buf<BM: BufMut>(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut B,
+        buf: &mut BM,
     ) -> Poll<io::Result<usize>>
     where
         Self: Sized,
@@ -119,27 +146,35 @@ where
     }
 }
 
-impl<S> AsyncBufRead for IntoAsyncRead<S>
+impl<S, B> AsyncBufRead for StreamReader<S, B>
 where
-    S: Stream<Item = Result<Bytes, io::Error>>,
+    S: Stream<Item = Result<B, io::Error>>,
+    B: Buf,
 {
     fn poll_fill_buf(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
-        let brw_project = self.as_mut().project();
-        if brw_project.chunk.is_empty() {
-            match brw_project.inner.poll_next(cx) {
+        if self.as_mut().has_chunk() {
+            // This unwrap is very sad, but it can't be avoided.
+            let buf = self.project().chunk.as_ref().unwrap().bytes();
+            Poll::Ready(Ok(buf))
+        } else {
+            match self.as_mut().project().inner.poll_next(cx) {
                 Poll::Ready(Some(Ok(chunk))) => {
-                    *brw_project.chunk = chunk;
-                    Poll::Ready(Ok(&*self.project().chunk))
+                    *self.as_mut().project().chunk = Some(chunk);
+                    Poll::Ready(Ok(self.project().chunk.as_ref().unwrap().bytes()))
                 }
                 Poll::Ready(Some(Err(err))) => Poll::Ready(Err(err)),
                 Poll::Ready(None) => Poll::Ready(Ok(&[])),
                 Poll::Pending => Poll::Pending,
             }
-        } else {
-            Poll::Ready(Ok(&*self.project().chunk))
         }
     }
     fn consume(self: Pin<&mut Self>, amt: usize) {
-        let _ = self.project().chunk.split_to(amt);
+        if amt > 0 {
+            self.project()
+                .chunk
+                .as_mut()
+                .expect("No chunk present")
+                .advance(amt);
+        }
     }
 }
