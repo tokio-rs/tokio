@@ -3,14 +3,16 @@ jobs:
   displayName: Loom tests
   strategy:
     matrix:
-      io:
-        scope: io::driver
-      runtime:
-        scope: runtime::tests
-      sync:
-        scope: sync::tests
-      slab:
-        scope: util::slab
+      rest:
+        scope: --skip loom_pool
+      pool_group_a:
+        scope: loom_pool::group_a
+      pool_group_b:
+        scope: loom_pool::group_b
+      pool_group_c:
+        scope: loom_pool::group_c
+      pool_group_d:
+        scope: loom_pool::group_d
   pool:
     vmImage: ubuntu-16.04
 

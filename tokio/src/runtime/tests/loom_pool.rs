@@ -1,3 +1,10 @@
+/// Full runtime loom tests. These are heavy tests and take significant time to
+/// run on CI.
+///
+/// Use `LOOM_MAX_PREEMPTIONS=1` to do a "quick" run as a smoke test.
+///
+/// In order to speed up the C
+
 use crate::future::poll_fn;
 use crate::runtime::tests::loom_oneshot as oneshot;
 use crate::runtime::{self, Runtime};
@@ -13,276 +20,281 @@ use std::pin::Pin;
 use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 use std::task::{Context, Poll};
 
-#[test]
-fn racy_shutdown() {
-    loom::model(|| {
-        let pool = mk_pool(1);
+/// Tests are divided into groups to make the runs faster on CI.
+mod group_a {
+    use super::*;
 
-        // here's the case we want to exercise:
-        //
-        // a worker that still has tasks in its local queue gets sent to the blocking pool (due to
-        // block_in_place). the blocking pool is shut down, so drops the worker. the worker's
-        // shutdown method never gets run.
-        //
-        // we do this by spawning two tasks on one worker, the first of which does block_in_place,
-        // and then immediately drop the pool.
+    #[test]
+    fn racy_shutdown() {
+        loom::model(|| {
+            let pool = mk_pool(1);
 
-        pool.spawn(track(async {
-            crate::task::block_in_place(|| {});
-        }));
-        pool.spawn(track(async {}));
-        drop(pool);
-    });
-}
+            // here's the case we want to exercise:
+            //
+            // a worker that still has tasks in its local queue gets sent to the blocking pool (due to
+            // block_in_place). the blocking pool is shut down, so drops the worker. the worker's
+            // shutdown method never gets run.
+            //
+            // we do this by spawning two tasks on one worker, the first of which does block_in_place,
+            // and then immediately drop the pool.
 
-#[test]
-fn pool_multi_spawn() {
-    let mut model = loom::model::Builder::new();
-    // TODO: rewrite the test to work with 2
-    model.preemption_bound = Some(1);
-
-    model.check(|| {
-        let pool = mk_pool(2);
-        let c1 = Arc::new(AtomicUsize::new(0));
-
-        let (tx, rx) = oneshot::channel();
-        let tx1 = Arc::new(Mutex::new(Some(tx)));
-
-        // Spawn a task
-        let c2 = c1.clone();
-        let tx2 = tx1.clone();
-        pool.spawn(track(async move {
-            spawn(track(async move {
-                if 1 == c1.fetch_add(1, Relaxed) {
-                    tx1.lock().unwrap().take().unwrap().send(());
-                }
+            pool.spawn(track(async {
+                crate::task::block_in_place(|| {});
             }));
-        }));
+            pool.spawn(track(async {}));
+            drop(pool);
+        });
+    }
 
-        // Spawn a second task
-        pool.spawn(track(async move {
-            spawn(track(async move {
-                if 1 == c2.fetch_add(1, Relaxed) {
-                    tx2.lock().unwrap().take().unwrap().send(());
-                }
+    #[test]
+    fn pool_multi_spawn() {
+        loom::model(|| {
+            let pool = mk_pool(2);
+            let c1 = Arc::new(AtomicUsize::new(0));
+
+            let (tx, rx) = oneshot::channel();
+            let tx1 = Arc::new(Mutex::new(Some(tx)));
+
+            // Spawn a task
+            let c2 = c1.clone();
+            let tx2 = tx1.clone();
+            pool.spawn(track(async move {
+                spawn(track(async move {
+                    if 1 == c1.fetch_add(1, Relaxed) {
+                        tx1.lock().unwrap().take().unwrap().send(());
+                    }
+                }));
             }));
-        }));
 
-        rx.recv();
-    });
-}
+            // Spawn a second task
+            pool.spawn(track(async move {
+                spawn(track(async move {
+                    if 1 == c2.fetch_add(1, Relaxed) {
+                        tx2.lock().unwrap().take().unwrap().send(());
+                    }
+                }));
+            }));
 
-fn only_blocking_inner(first_pending: bool) {
-    loom::model(move || {
-        let pool = mk_pool(1);
-        let (block_tx, block_rx) = oneshot::channel();
+            rx.recv();
+        });
+    }
 
-        pool.spawn(track(async move {
-            crate::task::block_in_place(move || {
-                block_tx.send(());
-            });
-            if first_pending {
-                yield_once().await
-            }
-        }));
-
-        block_rx.recv();
-        drop(pool);
-    });
-}
-
-#[test]
-fn only_blocking_without_pending() {
-    only_blocking_inner(false)
-}
-
-#[test]
-fn only_blocking_with_pending() {
-    only_blocking_inner(true)
-}
-
-fn blocking_and_regular_inner(first_pending: bool) {
-    const NUM: usize = 3;
-    loom::model(move || {
-        let pool = mk_pool(1);
-        let cnt = Arc::new(AtomicUsize::new(0));
-
-        let (block_tx, block_rx) = oneshot::channel();
-        let (done_tx, done_rx) = oneshot::channel();
-        let done_tx = Arc::new(Mutex::new(Some(done_tx)));
-
-        pool.spawn(track(async move {
-            crate::task::block_in_place(move || {
-                block_tx.send(());
-            });
-            if first_pending {
-                yield_once().await
-            }
-        }));
-
-        for _ in 0..NUM {
-            let cnt = cnt.clone();
-            let done_tx = done_tx.clone();
+    fn only_blocking_inner(first_pending: bool) {
+        loom::model(move || {
+            let pool = mk_pool(1);
+            let (block_tx, block_rx) = oneshot::channel();
 
             pool.spawn(track(async move {
-                if NUM == cnt.fetch_add(1, Relaxed) + 1 {
-                    done_tx.lock().unwrap().take().unwrap().send(());
-                }
-            }));
-        }
-
-        done_rx.recv();
-        block_rx.recv();
-
-        drop(pool);
-    });
-}
-
-#[test]
-fn blocking_and_regular() {
-    blocking_and_regular_inner(false);
-}
-
-#[test]
-fn blocking_and_regular_with_pending() {
-    blocking_and_regular_inner(true);
-}
-
-#[test]
-fn pool_multi_notify() {
-    let mut model = loom::model::Builder::new();
-    // TODO: rewrite the test to work with 2
-    model.preemption_bound = Some(1);
-
-    model.check(|| {
-        let pool = mk_pool(2);
-
-        let c1 = Arc::new(AtomicUsize::new(0));
-
-        let (done_tx, done_rx) = oneshot::channel();
-        let done_tx1 = Arc::new(Mutex::new(Some(done_tx)));
-
-        // Spawn a task
-        let c2 = c1.clone();
-        let done_tx2 = done_tx1.clone();
-        pool.spawn(track(async move {
-            gated().await;
-            gated().await;
-
-            if 1 == c1.fetch_add(1, Relaxed) {
-                done_tx1.lock().unwrap().take().unwrap().send(());
-            }
-        }));
-
-        // Spawn a second task
-        pool.spawn(track(async move {
-            gated().await;
-            gated().await;
-
-            if 1 == c2.fetch_add(1, Relaxed) {
-                done_tx2.lock().unwrap().take().unwrap().send(());
-            }
-        }));
-
-        done_rx.recv();
-    });
-}
-
-#[test]
-fn pool_shutdown() {
-    loom::model(|| {
-        let pool = mk_pool(2);
-
-        pool.spawn(track(async move {
-            gated2(true).await;
-        }));
-
-        pool.spawn(track(async move {
-            gated2(false).await;
-        }));
-
-        drop(pool);
-    });
-}
-
-#[test]
-fn complete_block_on_under_load() {
-    let mut model = loom::model::Builder::new();
-    // TODO: rewrite the test to work with 2
-    model.preemption_bound = Some(1);
-
-    model.check(|| {
-        let mut pool = mk_pool(2);
-
-        pool.block_on(async {
-            // Spin hard
-            crate::spawn(track(async {
-                for _ in 0..2 {
-                    yield_once().await;
+                crate::task::block_in_place(move || {
+                    block_tx.send(());
+                });
+                if first_pending {
+                    yield_once().await
                 }
             }));
 
-            gated2(true).await
+            block_rx.recv();
+            drop(pool);
         });
-    });
+    }
+
+    #[test]
+    fn only_blocking_without_pending() {
+        only_blocking_inner(false)
+    }
+
+    #[test]
+    fn only_blocking_with_pending() {
+        only_blocking_inner(true)
+    }
 }
 
-#[test]
-fn shutdown_with_notification() {
-    use crate::stream::StreamExt;
-    use crate::sync::{mpsc, oneshot};
+mod group_b {
+    use super::*;
 
-    loom::model(|| {
-        let rt = mk_pool(2);
-        let (done_tx, done_rx) = oneshot::channel::<()>();
+    fn blocking_and_regular_inner(first_pending: bool) {
+        const NUM: usize = 3;
+        loom::model(move || {
+            let pool = mk_pool(1);
+            let cnt = Arc::new(AtomicUsize::new(0));
 
-        rt.spawn(track(async move {
-            let (mut tx, mut rx) = mpsc::channel::<()>(10);
+            let (block_tx, block_rx) = oneshot::channel();
+            let (done_tx, done_rx) = oneshot::channel();
+            let done_tx = Arc::new(Mutex::new(Some(done_tx)));
 
-            crate::spawn(async move {
-                crate::task::spawn_blocking(move || {
-                    let _ = tx.try_send(());
+            pool.spawn(track(async move {
+                crate::task::block_in_place(move || {
+                    block_tx.send(());
+                });
+                if first_pending {
+                    yield_once().await
+                }
+            }));
+
+            for _ in 0..NUM {
+                let cnt = cnt.clone();
+                let done_tx = done_tx.clone();
+
+                pool.spawn(track(async move {
+                    if NUM == cnt.fetch_add(1, Relaxed) + 1 {
+                        done_tx.lock().unwrap().take().unwrap().send(());
+                    }
+                }));
+            }
+
+            done_rx.recv();
+            block_rx.recv();
+
+            drop(pool);
+        });
+    }
+
+    #[test]
+    fn blocking_and_regular() {
+        blocking_and_regular_inner(false);
+    }
+
+    #[test]
+    fn blocking_and_regular_with_pending() {
+        blocking_and_regular_inner(true);
+    }
+
+    #[test]
+    fn pool_multi_notify() {
+        loom::model(|| {
+            let pool = mk_pool(2);
+
+            let c1 = Arc::new(AtomicUsize::new(0));
+
+            let (done_tx, done_rx) = oneshot::channel();
+            let done_tx1 = Arc::new(Mutex::new(Some(done_tx)));
+
+            // Spawn a task
+            let c2 = c1.clone();
+            let done_tx2 = done_tx1.clone();
+            pool.spawn(track(async move {
+                gated().await;
+                gated().await;
+
+                if 1 == c1.fetch_add(1, Relaxed) {
+                    done_tx1.lock().unwrap().take().unwrap().send(());
+                }
+            }));
+
+            // Spawn a second task
+            pool.spawn(track(async move {
+                gated().await;
+                gated().await;
+
+                if 1 == c2.fetch_add(1, Relaxed) {
+                    done_tx2.lock().unwrap().take().unwrap().send(());
+                }
+            }));
+
+            done_rx.recv();
+        });
+    }
+}
+
+mod group_c {
+    use super::*;
+
+    #[test]
+    fn pool_shutdown() {
+        loom::model(|| {
+            let pool = mk_pool(2);
+
+            pool.spawn(track(async move {
+                gated2(true).await;
+            }));
+
+            pool.spawn(track(async move {
+                gated2(false).await;
+            }));
+
+            drop(pool);
+        });
+    }
+
+    #[test]
+    fn join_output() {
+        loom::model(|| {
+            let mut rt = mk_pool(1);
+
+            rt.block_on(async {
+                let t = crate::spawn(track(async { "hello" }));
+
+                let out = assert_ok!(t.await);
+                assert_eq!("hello", out.into_inner());
+            });
+        });
+    }
+
+    #[test]
+    fn poll_drop_handle_then_drop() {
+        loom::model(|| {
+            let mut rt = mk_pool(1);
+
+            rt.block_on(async move {
+                let mut t = crate::spawn(track(async { "hello" }));
+
+                poll_fn(|cx| {
+                    let _ = Pin::new(&mut t).poll(cx);
+                    Poll::Ready(())
+                })
+                .await;
+            });
+        })
+    }
+}
+
+mod group_d {
+    use super::*;
+
+    #[test]
+    fn complete_block_on_under_load() {
+        loom::model(|| {
+            let mut pool = mk_pool(2);
+
+            pool.block_on(async {
+                // Spin hard
+                crate::spawn(track(async {
+                    for _ in 0..2 {
+                        yield_once().await;
+                    }
+                }));
+
+                gated2(true).await
+            });
+        });
+    }
+
+    #[test]
+    fn shutdown_with_notification() {
+        use crate::stream::StreamExt;
+        use crate::sync::{mpsc, oneshot};
+
+        loom::model(|| {
+            let rt = mk_pool(2);
+            let (done_tx, done_rx) = oneshot::channel::<()>();
+
+            rt.spawn(track(async move {
+                let (mut tx, mut rx) = mpsc::channel::<()>(10);
+
+                crate::spawn(async move {
+                    crate::task::spawn_blocking(move || {
+                        let _ = tx.try_send(());
+                    });
+
+                    let _ = done_rx.await;
                 });
 
-                let _ = done_rx.await;
-            });
+                while let Some(_) = rx.next().await {}
 
-            while let Some(_) = rx.next().await {}
-
-            let _ = done_tx.send(());
-        }));
-    });
-}
-
-#[test]
-fn join_output() {
-    loom::model(|| {
-        let mut rt = mk_pool(1);
-
-        rt.block_on(async {
-            let t = crate::spawn(track(async { "hello" }));
-
-            let out = assert_ok!(t.await);
-            assert_eq!("hello", out.into_inner());
+                let _ = done_tx.send(());
+            }));
         });
-    });
-}
-
-#[test]
-fn poll_drop_handle_then_drop() {
-    loom::model(|| {
-        let mut rt = mk_pool(1);
-
-        rt.block_on(async move {
-            let mut t = crate::spawn(track(async { "hello" }));
-
-            poll_fn(|cx| {
-                let _ = Pin::new(&mut t).poll(cx);
-                Poll::Ready(())
-            })
-            .await;
-        });
-    })
+    }
 }
 
 fn mk_pool(num_threads: usize) -> Runtime {
