@@ -199,7 +199,11 @@ fn pool_shutdown() {
 
 #[test]
 fn complete_block_on_under_load() {
-    loom::model(|| {
+    let mut model = loom::model::Builder::new();
+    // TODO: rewrite the test to work with 2
+    model.preemption_bound = Some(1);
+
+    model.check(|| {
         let mut pool = mk_pool(2);
 
         pool.block_on(async {
@@ -210,7 +214,7 @@ fn complete_block_on_under_load() {
                 }
             }));
 
-            gated2(true).await;
+            gated2(true).await
         });
     });
 }
