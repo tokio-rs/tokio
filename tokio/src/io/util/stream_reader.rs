@@ -152,19 +152,21 @@ where
     B: Buf,
 {
     fn poll_fill_buf(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
-        if self.as_mut().has_chunk() {
-            // This unwrap is very sad, but it can't be avoided.
-            let buf = self.project().chunk.as_ref().unwrap().bytes();
-            Poll::Ready(Ok(buf))
-        } else {
-            match self.as_mut().project().inner.poll_next(cx) {
-                Poll::Ready(Some(Ok(chunk))) => {
-                    *self.as_mut().project().chunk = Some(chunk);
-                    Poll::Ready(Ok(self.project().chunk.as_ref().unwrap().bytes()))
+        loop {
+            if self.as_mut().has_chunk() {
+                // This unwrap is very sad, but it can't be avoided.
+                let buf = self.project().chunk.as_ref().unwrap().bytes();
+                return Poll::Ready(Ok(buf));
+            } else {
+                match self.as_mut().project().inner.poll_next(cx) {
+                    Poll::Ready(Some(Ok(chunk))) => {
+                        // Go around the loop in case the chunk is empty.
+                        *self.as_mut().project().chunk = Some(chunk);
+                    }
+                    Poll::Ready(Some(Err(err))) => return Poll::Ready(Err(err)),
+                    Poll::Ready(None) => return Poll::Ready(Ok(&[])),
+                    Poll::Pending => return Poll::Pending,
                 }
-                Poll::Ready(Some(Err(err))) => Poll::Ready(Err(err)),
-                Poll::Ready(None) => Poll::Ready(Ok(&[])),
-                Poll::Pending => Poll::Pending,
             }
         }
     }
