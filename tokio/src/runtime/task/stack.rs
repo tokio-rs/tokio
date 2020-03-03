@@ -31,7 +31,7 @@ impl<T: 'static> TransferStack<T> {
 
         loop {
             unsafe {
-                *task.as_ref().queue_next.get() = NonNull::new(curr);
+                *task.as_ref().stack_next.get() = NonNull::new(curr);
             }
 
             let res = self
@@ -57,7 +57,7 @@ impl<T: 'static> TransferStack<T> {
                 let task = self.0?;
 
                 // Move the cursor forward
-                self.0 = unsafe { *task.as_ref().queue_next.get() };
+                self.0 = unsafe { *task.as_ref().stack_next.get() };
 
                 // Return the task
                 unsafe { Some(Task::from_raw(task)) }

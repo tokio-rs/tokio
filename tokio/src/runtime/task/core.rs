@@ -46,8 +46,11 @@ pub(crate) struct Header {
 
     pub(crate) owned: UnsafeCell<linked_list::Pointers<Header>>,
 
-    /// Pointer to next task, used for misc task linked lists.
+    /// Pointer to next task, used with the injection queue
     pub(crate) queue_next: UnsafeCell<Option<NonNull<Header>>>,
+
+    /// Pointer to the next task in the transfer stack
+    pub(super) stack_next: UnsafeCell<Option<NonNull<Header>>>,
 
     /// Table of function pointers for executing actions on the task.
     pub(super) vtable: &'static Vtable,
@@ -78,6 +81,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 state,
                 owned: UnsafeCell::new(linked_list::Pointers::new()),
                 queue_next: UnsafeCell::new(None),
+                stack_next: UnsafeCell::new(None),
                 vtable: raw::vtable::<T, S>(),
             },
             core: Core {
