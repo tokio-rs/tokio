@@ -13,6 +13,10 @@ jobs:
         scope: loom_pool::group_c
       pool_group_d:
         scope: loom_pool::group_d
+      pool_group_e:
+        scope: loom_pool::group_e
+      pool_group_f:
+        scope: loom_pool::group_f
   pool:
     vmImage: ubuntu-16.04
 

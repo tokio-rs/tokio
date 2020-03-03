@@ -157,42 +157,6 @@ mod group_b {
     fn blocking_and_regular_with_pending() {
         blocking_and_regular_inner(true);
     }
-
-    #[test]
-    fn pool_multi_notify() {
-        loom::model(|| {
-            let pool = mk_pool(2);
-
-            let c1 = Arc::new(AtomicUsize::new(0));
-
-            let (done_tx, done_rx) = oneshot::channel();
-            let done_tx1 = Arc::new(Mutex::new(Some(done_tx)));
-
-            // Spawn a task
-            let c2 = c1.clone();
-            let done_tx2 = done_tx1.clone();
-            pool.spawn(track(async move {
-                gated().await;
-                gated().await;
-
-                if 1 == c1.fetch_add(1, Relaxed) {
-                    done_tx1.lock().unwrap().take().unwrap().send(());
-                }
-            }));
-
-            // Spawn a second task
-            pool.spawn(track(async move {
-                gated().await;
-                gated().await;
-
-                if 1 == c2.fetch_add(1, Relaxed) {
-                    done_tx2.lock().unwrap().take().unwrap().send(());
-                }
-            }));
-
-            done_rx.recv();
-        });
-    }
 }
 
 mod group_c {
@@ -267,6 +231,10 @@ mod group_d {
             });
         });
     }
+}
+
+mod group_e {
+    use super::*;
 
     #[test]
     fn shutdown_with_notification() {
@@ -292,6 +260,46 @@ mod group_d {
 
                 let _ = done_tx.send(());
             }));
+        });
+    }
+}
+
+mod group_f {
+    use super::*;
+
+    #[test]
+    fn pool_multi_notify() {
+        loom::model(|| {
+            let pool = mk_pool(2);
+
+            let c1 = Arc::new(AtomicUsize::new(0));
+
+            let (done_tx, done_rx) = oneshot::channel();
+            let done_tx1 = Arc::new(Mutex::new(Some(done_tx)));
+
+            // Spawn a task
+            let c2 = c1.clone();
+            let done_tx2 = done_tx1.clone();
+            pool.spawn(track(async move {
+                gated().await;
+                gated().await;
+
+                if 1 == c1.fetch_add(1, Relaxed) {
+                    done_tx1.lock().unwrap().take().unwrap().send(());
+                }
+            }));
+
+            // Spawn a second task
+            pool.spawn(track(async move {
+                gated().await;
+                gated().await;
+
+                if 1 == c2.fetch_add(1, Relaxed) {
+                    done_tx2.lock().unwrap().take().unwrap().send(());
+                }
+            }));
+
+            done_rx.recv();
         });
     }
 }
