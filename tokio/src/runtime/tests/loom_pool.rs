@@ -217,12 +217,14 @@ mod group_d {
     #[test]
     fn complete_block_on_under_load() {
         loom::model(|| {
-            let mut pool = mk_pool(2);
+            let mut pool = mk_pool(1);
 
             pool.block_on(async {
                 // Trigger a re-schedule
                 crate::spawn(track(async {
-                    yield_once().await;
+                    for _ in 0..2 {
+                        yield_once().await;
+                    }
                 }));
 
                 gated2(true).await
