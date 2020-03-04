@@ -191,7 +191,7 @@ impl<T: Future, S: Schedule> Core<T, S> {
     /// The caller must ensure it is safe to mutate the `stage` field.
     pub(super) fn store_output(&self, output: super::Result<T::Output>) {
         self.stage.with_mut(|ptr| {
-            // Safety: the caller ensures mutal exclusion to the field.
+            // Safety: the caller ensures mutual exclusion to the field.
             unsafe { *ptr = Stage::Finished(output) };
         });
     }
