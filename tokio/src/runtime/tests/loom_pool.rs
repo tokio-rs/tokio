@@ -16,7 +16,7 @@ use loom::sync::{Arc, Mutex};
 use pin_project_lite::pin_project;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
+use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 use std::task::{Context, Poll};
 
 /// Tests are divided into groups to make the runs faster on CI.
@@ -343,12 +343,12 @@ fn gated2(thread: bool) -> impl Future<Output = &'static str> {
 
             if thread {
                 thread::spawn(move || {
-                    gate.store(true, Release);
+                    gate.store(true, SeqCst);
                     waker.wake_by_ref();
                 });
             } else {
                 spawn(track(async move {
-                    gate.store(true, Release);
+                    gate.store(true, SeqCst);
                     waker.wake_by_ref();
                 }));
             }
@@ -358,7 +358,7 @@ fn gated2(thread: bool) -> impl Future<Output = &'static str> {
             return Poll::Pending;
         }
 
-        if gate.load(Acquire) {
+        if gate.load(SeqCst) {
             Poll::Ready("hello world")
         } else {
             Poll::Pending
