@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-util/0.2.0")]
+#![doc(html_root_url = "https://docs.rs/tokio-util/0.3.0")]
 #![allow(clippy::needless_doctest_main)]
 #![warn(
     missing_debug_implementations,
@@ -14,6 +14,10 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 //! Utilities for working with Tokio.
+//!
+//! This crate contains items that are not semantically versioned
+//! with the core `tokio` crate. Things within this crate are subject
+//! to change.
 
 #[macro_use]
 mod cfg;
