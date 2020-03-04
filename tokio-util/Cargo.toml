@@ -13,7 +13,7 @@ authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-util/0.2.0/tokio_util"
+documentation = "https://docs.rs/tokio-util/0.3.0/tokio_util"
 description = """
 Additional utilities for working with Tokio.
 """

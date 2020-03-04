@@ -1,13 +1,18 @@
-# 0.3.0 (February 28, 2020)
+# 0.3.0 (March 4, 2020)
 
-Breaking changes:
+### Changed
 
-- Change codec::Encoder trait to take a generic Item parameter (#1746), which allows
-  codec writers to pass references into `Framed` and `FramedWrite` types.
+- **Breaking Change**: Change `Encoder` trait to take a generic `Item` parameter, which allows
+  codec writers to pass references into `Framed` and `FramedWrite` types. (#1746)
 
-Other additions:
+### Added
 
-- Add futures-io/tokio::io compatibility layer (#2117)
+- Add futures-io/tokio::io compatibility layer. (#2117)
+- Add `Framed::with_capacity`. (#2215)
+
+### Fixed
+
+- Use advance over split_to when data is not needed. (#2198)
 
 # 0.2.0 (November 26, 2019)
 
