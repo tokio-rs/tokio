@@ -2,7 +2,7 @@
 
 ### Changed
 
-- Change `Encoder` trait to take a generic `Item` parameter, which allows
+- **Breaking Change**: Change `Encoder` trait to take a generic `Item` parameter, which allows
   codec writers to pass references into `Framed` and `FramedWrite` types. (#1746)
 
 ### Added
