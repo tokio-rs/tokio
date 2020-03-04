@@ -2,7 +2,7 @@
 
 ### Changed
 
-- Change `Encoder1 trait to take a generic Item parameter (#1746)
+- Change `Encoder` trait to take a generic `Item` parameter (#1746)
 
 ### Added
 
