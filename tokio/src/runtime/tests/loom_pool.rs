@@ -220,11 +220,9 @@ mod group_d {
             let mut pool = mk_pool(2);
 
             pool.block_on(async {
-                // Spin hard
+                // Trigger a re-schedule
                 crate::spawn(track(async {
-                    for _ in 0..2 {
-                        yield_once().await;
-                    }
+                    yield_once().await;
                 }));
 
                 gated2(true).await
