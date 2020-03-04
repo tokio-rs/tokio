@@ -67,7 +67,6 @@ impl<T, U> ProjectFuse for Fuse<T, U> {
 impl<T, U> Framed<T, U>
 where
     T: AsyncRead + AsyncWrite,
-    U: Decoder + Encoder,
 {
     /// Provides a [`Stream`] and [`Sink`] interface for reading and writing to this
     /// I/O object, using [`Decoder`] and [`Encoder`] to read and write the raw data.
@@ -262,7 +261,7 @@ where
 impl<T, I, U> Sink<I> for Framed<T, U>
 where
     T: AsyncWrite,
-    U: Encoder<Item = I>,
+    U: Encoder<I>,
     U::Error: From<io::Error>,
 {
     type Error = U::Error;
@@ -380,11 +379,10 @@ impl<T, U: Decoder> Decoder for Fuse<T, U> {
     }
 }
 
-impl<T, U: Encoder> Encoder for Fuse<T, U> {
-    type Item = U::Item;
+impl<T, I, U: Encoder<I>> Encoder<I> for Fuse<T, U> {
     type Error = U::Error;
 
-    fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, item: I, dst: &mut BytesMut) -> Result<(), Self::Error> {
         self.codec.encode(item, dst)
     }
 }
@@ -414,8 +412,11 @@ pub struct FramedParts<T, U> {
 }
 
 impl<T, U> FramedParts<T, U> {
-    /// Create a new, default, `FramedParts`.
-    pub fn new(io: T, codec: U) -> FramedParts<T, U> {
+    /// Create a new, default, `FramedParts`
+    pub fn new<I>(io: T, codec: U) -> FramedParts<T, U>
+    where
+        U: Encoder<I>,
+    {
         FramedParts {
             io,
             codec,

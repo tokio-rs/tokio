@@ -130,7 +130,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
                                 let response = response.serialize();
 
-                                if let Err(e) = lines.send(response).await {
+                                if let Err(e) = lines.send(response.as_str()).await {
                                     println!("error on sending response; error = {:?}", e);
                                 }
                             }

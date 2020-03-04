@@ -30,7 +30,7 @@ tokio = { version = "0.2.0", path = "../tokio" }
 
 [dev-dependencies]
 tokio = { version = "0.2.0", path = "../tokio", features = ["macros", "stream", "rt-core", "io-util", "net"] }
-tokio-util = { version = "0.2.0", path = "../tokio-util", features = ["full"] }
+tokio-util = { version = "0.3.0", path = "../tokio-util", features = ["full"] }
 
 cfg-if = "0.1"
 env_logger = { version = "0.6", default-features = false }
