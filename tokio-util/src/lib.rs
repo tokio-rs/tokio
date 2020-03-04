@@ -16,8 +16,10 @@
 //! Utilities for working with Tokio.
 //!
 //! This crate contains items that are not semantically versioned
-//! with the core `tokio` crate. Things within this crate are subject
-//! to change.
+//! with the core [`tokio`] crate. Things within this crate are subject
+//! to change beyond the core `tokio` versioning scheme.
+//!
+//! [`tokio`]: https://docs.rs/tokio
 
 #[macro_use]
 mod cfg;
