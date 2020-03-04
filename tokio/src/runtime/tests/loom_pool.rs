@@ -7,7 +7,7 @@
 use crate::future::poll_fn;
 use crate::runtime::tests::loom_oneshot as oneshot;
 use crate::runtime::{self, Runtime};
-use crate::spawn;
+use crate::{spawn, task};
 use tokio_test::assert_ok;
 
 use loom::sync::atomic::{AtomicBool, AtomicUsize};
@@ -88,7 +88,7 @@ mod group_a {
                     block_tx.send(());
                 });
                 if first_pending {
-                    yield_once().await
+                    task::yield_now().await
                 }
             }));
 
@@ -126,7 +126,7 @@ mod group_b {
                     block_tx.send(());
                 });
                 if first_pending {
-                    yield_once().await
+                    task::yield_now().await
                 }
             }));
 
@@ -157,10 +157,6 @@ mod group_b {
     fn blocking_and_regular_with_pending() {
         blocking_and_regular_inner(true);
     }
-}
-
-mod group_c {
-    use super::*;
 
     #[test]
     fn pool_shutdown() {
@@ -209,10 +205,6 @@ mod group_c {
             });
         })
     }
-}
-
-mod group_d {
-    use super::*;
 
     #[test]
     fn complete_block_on_under_load() {
@@ -223,7 +215,7 @@ mod group_d {
                 // Trigger a re-schedule
                 crate::spawn(track(async {
                     for _ in 0..2 {
-                        yield_once().await;
+                        task::yield_now().await;
                     }
                 }));
 
@@ -233,7 +225,7 @@ mod group_d {
     }
 }
 
-mod group_e {
+mod group_c {
     use super::*;
 
     #[test]
@@ -264,7 +256,7 @@ mod group_e {
     }
 }
 
-mod group_f {
+mod group_d {
     use super::*;
 
     #[test]
@@ -310,21 +302,6 @@ fn mk_pool(num_threads: usize) -> Runtime {
         .core_threads(num_threads)
         .build()
         .unwrap()
-}
-
-async fn yield_once() {
-    let mut yielded = false;
-    poll_fn(|cx| {
-        if yielded {
-            Poll::Ready(())
-        } else {
-            loom::thread::yield_now();
-            yielded = true;
-            cx.waker().wake_by_ref();
-            Poll::Pending
-        }
-    })
-    .await
 }
 
 fn gated() -> impl Future<Output = &'static str> {
