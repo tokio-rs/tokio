@@ -15,9 +15,9 @@
 
 //! Utilities for working with Tokio.
 //!
-//! This crate contains items that are not semantically versioned
-//! with the core [`tokio`] crate. Things within this crate are subject
-//! to change beyond the core `tokio` versioning scheme.
+//! This crate is not versioned in lockstep with the core
+//! [`tokio`] crate. However, `tokio-util` _will_ respect Rust's
+//! semantic versioning policy, especially with regard to breaking changes.
 //!
 //! [`tokio`]: https://docs.rs/tokio
 
