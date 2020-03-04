@@ -152,7 +152,7 @@ where
 
     /// Read the task output into `dst`.
     pub(super) fn try_read_output(self, dst: &mut Poll<super::Result<T::Output>>, waker: &Waker) {
-        // Load a s napshot of the current task state
+        // Load a snapshot of the current task state
         let snapshot = self.header().state.load();
 
         debug_assert!(snapshot.is_join_interested());
