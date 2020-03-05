@@ -119,6 +119,9 @@ impl<'a, T> ReleasingPermit<'a, T> {
         cx: &mut Context<'_>,
         s: &Semaphore,
     ) -> Poll<Result<(), AcquireError>> {
+        // Keep track of task budget
+        ready!(crate::coop::poll_proceed(cx));
+
         self.permit.poll_acquire(cx, self.num_permits, s)
     }
 }
