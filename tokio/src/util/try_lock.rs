@@ -20,13 +20,26 @@ unsafe impl<T: Send> Sync for TryLock<T> {}
 
 unsafe impl<T: Sync> Sync for LockGuard<'_, T> {}
 
-impl<T> TryLock<T> {
-    /// Create a new `TryLock`
-    pub(crate) fn new(data: T) -> TryLock<T> {
+macro_rules! new {
+    ($data:ident) => {
         TryLock {
             locked: AtomicBool::new(false),
-            data: UnsafeCell::new(data),
+            data: UnsafeCell::new($data),
         }
+    };
+}
+
+impl<T> TryLock<T> {
+    #[cfg(not(loom))]
+    /// Create a new `TryLock`
+    pub(crate) const fn new(data: T) -> TryLock<T> {
+        new!(data)
+    }
+
+    #[cfg(loom)]
+    /// Create a new `TryLock`
+    pub(crate) fn new(data: T) -> TryLock<T> {
+        new!(data)
     }
 
     /// Attempt to acquire lock

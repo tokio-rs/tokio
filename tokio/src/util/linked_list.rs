@@ -4,6 +4,7 @@
 //! structure's APIs are `unsafe` as they require the caller to ensure the
 //! specified node is actually contained by the list.
 
+use core::mem::ManuallyDrop;
 use core::ptr::NonNull;
 
 /// An intrusive linked list.
@@ -41,10 +42,8 @@ pub(crate) unsafe trait Link {
     /// Node type
     type Target;
 
-    /// Convert the handle to a raw pointer
-    ///
-    /// Consumes ownership of the handle.
-    fn to_raw(handle: Self::Handle) -> NonNull<Self::Target>;
+    /// Convert the handle to a raw pointer without consuming the handle
+    fn as_raw(handle: &Self::Handle) -> NonNull<Self::Target>;
 
     /// Convert the raw pointer to a handle
     unsafe fn from_raw(ptr: NonNull<Self::Target>) -> Self::Handle;
@@ -79,7 +78,9 @@ impl<T: Link> LinkedList<T> {
 
     /// Adds an element first in the list.
     pub(crate) fn push_front(&mut self, val: T::Handle) {
-        let ptr = T::to_raw(val);
+        // The value should not be dropped, it is being inserted into the list
+        let val = ManuallyDrop::new(val);
+        let ptr = T::as_raw(&*val);
 
         unsafe {
             T::pointers(ptr).as_mut().next = self.head;
@@ -133,13 +134,13 @@ impl<T: Link> LinkedList<T> {
     ///
     /// The caller **must** ensure that `node` is currently contained by
     /// `self` or not contained by any other list.
-    pub(crate) unsafe fn remove(&mut self, node: NonNull<T::Target>) -> bool {
+    pub(crate) unsafe fn remove(&mut self, node: NonNull<T::Target>) -> Option<T::Handle> {
         if let Some(prev) = T::pointers(node).as_ref().prev {
             debug_assert_eq!(T::pointers(prev).as_ref().next, Some(node));
             T::pointers(prev).as_mut().next = T::pointers(node).as_ref().next;
         } else {
             if self.head != Some(node) {
-                return false;
+                return None;
             }
 
             self.head = T::pointers(node).as_ref().next;
@@ -151,7 +152,7 @@ impl<T: Link> LinkedList<T> {
         } else {
             // This might be the last item in the list
             if self.tail != Some(node) {
-                return false;
+                return None;
             }
 
             self.tail = T::pointers(node).as_ref().prev;
@@ -160,7 +161,40 @@ impl<T: Link> LinkedList<T> {
         T::pointers(node).as_mut().next = None;
         T::pointers(node).as_mut().prev = None;
 
-        true
+        Some(T::from_raw(node))
+    }
+}
+
+// ===== impl Iter =====
+
+cfg_rt_threaded! {
+    use core::marker::PhantomData;
+
+    pub(crate) struct Iter<'a, T: Link> {
+        curr: Option<NonNull<T::Target>>,
+        _p: PhantomData<&'a T>,
+    }
+
+    impl<T: Link> LinkedList<T> {
+        pub(crate) fn iter(&self) -> Iter<'_, T> {
+            Iter {
+                curr: self.head,
+                _p: PhantomData,
+            }
+        }
+    }
+
+    impl<'a, T: Link> Iterator for Iter<'a, T> {
+        type Item = &'a T::Target;
+
+        fn next(&mut self) -> Option<&'a T::Target> {
+            let curr = self.curr?;
+            // safety: the pointer references data contained by the list
+            self.curr = unsafe { T::pointers(curr).as_ref() }.next;
+
+            // safety: the value is still owned by the linked list.
+            Some(unsafe { &*curr.as_ptr() })
+        }
     }
 }
 
@@ -192,7 +226,7 @@ mod tests {
         type Handle = Pin<&'a Entry>;
         type Target = Entry;
 
-        fn to_raw(handle: Pin<&'_ Entry>) -> NonNull<Entry> {
+        fn as_raw(handle: &Pin<&'_ Entry>) -> NonNull<Entry> {
             NonNull::from(handle.get_ref())
         }
 
@@ -299,22 +333,22 @@ mod tests {
             let mut list = LinkedList::new();
 
             push_all(&mut list, &[c.as_ref(), b.as_ref(), a.as_ref()]);
-            assert!(list.remove(ptr(&a)));
+            assert!(list.remove(ptr(&a)).is_some());
             assert_clean!(a);
             // `a` should be no longer there and can't be removed twice
-            assert!(!list.remove(ptr(&a)));
+            assert!(list.remove(ptr(&a)).is_none());
             assert!(!list.is_empty());
 
-            assert!(list.remove(ptr(&b)));
+            assert!(list.remove(ptr(&b)).is_some());
             assert_clean!(b);
             // `b` should be no longer there and can't be removed twice
-            assert!(!list.remove(ptr(&b)));
+            assert!(list.remove(ptr(&b)).is_none());
             assert!(!list.is_empty());
 
-            assert!(list.remove(ptr(&c)));
+            assert!(list.remove(ptr(&c)).is_some());
             assert_clean!(c);
             // `b` should be no longer there and can't be removed twice
-            assert!(!list.remove(ptr(&c)));
+            assert!(list.remove(ptr(&c)).is_none());
             assert!(list.is_empty());
         }
 
@@ -324,7 +358,7 @@ mod tests {
 
             push_all(&mut list, &[c.as_ref(), b.as_ref(), a.as_ref()]);
 
-            assert!(list.remove(ptr(&a)));
+            assert!(list.remove(ptr(&a)).is_some());
             assert_clean!(a);
 
             assert_ptr_eq!(b, list.head);
@@ -341,7 +375,7 @@ mod tests {
 
             push_all(&mut list, &[c.as_ref(), b.as_ref(), a.as_ref()]);
 
-            assert!(list.remove(ptr(&b)));
+            assert!(list.remove(ptr(&b)).is_some());
             assert_clean!(b);
 
             assert_ptr_eq!(c, a.pointers.next);
@@ -358,7 +392,7 @@ mod tests {
 
             push_all(&mut list, &[c.as_ref(), b.as_ref(), a.as_ref()]);
 
-            assert!(list.remove(ptr(&c)));
+            assert!(list.remove(ptr(&c)).is_some());
             assert_clean!(c);
 
             assert!(b.pointers.next.is_none());
@@ -374,12 +408,12 @@ mod tests {
 
             push_all(&mut list, &[b.as_ref(), a.as_ref()]);
 
-            assert!(list.remove(ptr(&a)));
+            assert!(list.remove(ptr(&a)).is_some());
 
             assert_clean!(a);
 
             // a should be no longer there and can't be removed twice
-            assert!(!list.remove(ptr(&a)));
+            assert!(list.remove(ptr(&a)).is_none());
 
             assert_ptr_eq!(b, list.head);
             assert_ptr_eq!(b, list.tail);
@@ -397,7 +431,7 @@ mod tests {
 
             push_all(&mut list, &[b.as_ref(), a.as_ref()]);
 
-            assert!(list.remove(ptr(&b)));
+            assert!(list.remove(ptr(&b)).is_some());
 
             assert_clean!(b);
 
@@ -417,7 +451,7 @@ mod tests {
 
             push_all(&mut list, &[a.as_ref()]);
 
-            assert!(list.remove(ptr(&a)));
+            assert!(list.remove(ptr(&a)).is_some());
             assert_clean!(a);
 
             assert!(list.head.is_none());
@@ -433,8 +467,26 @@ mod tests {
             list.push_front(b.as_ref());
             list.push_front(a.as_ref());
 
-            assert!(!list.remove(ptr(&c)));
+            assert!(list.remove(ptr(&c)).is_none());
         }
+    }
+
+    #[test]
+    fn iter() {
+        let a = entry(5);
+        let b = entry(7);
+
+        let mut list = LinkedList::<&Entry>::new();
+
+        assert_eq!(0, list.iter().count());
+
+        list.push_front(a.as_ref());
+        list.push_front(b.as_ref());
+
+        let mut i = list.iter();
+        assert_eq!(7, i.next().unwrap().val);
+        assert_eq!(5, i.next().unwrap().val);
+        assert!(i.next().is_none());
     }
 
     proptest::proptest! {
@@ -493,10 +545,11 @@ mod tests {
                     }
 
                     let idx = n % reference.len();
-                    let v = reference.remove(idx).unwrap();
+                    let expect = reference.remove(idx).unwrap();
 
                     unsafe {
-                        assert!(ll.remove(ptr(&entries[v as usize])));
+                        let entry = ll.remove(ptr(&entries[expect as usize])).unwrap();
+                        assert_eq!(expect, entry.val);
                     }
                 }
             }

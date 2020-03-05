@@ -1,5 +1,4 @@
-use crate::loom::alloc::Track;
-use crate::task::RawTask;
+use crate::runtime::task::RawTask;
 
 use std::fmt;
 use std::future::Future;
@@ -99,46 +98,39 @@ impl<T> Unpin for JoinHandle<T> {}
 impl<T> Future for JoinHandle<T> {
     type Output = super::Result<T>;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        use std::mem::MaybeUninit;
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut ret = Poll::Pending;
 
-        // Raw should always be set
-        let raw = self.raw.as_ref().unwrap();
+        // Raw should always be set. If it is not, this is due to polling after
+        // completion
+        let raw = self
+            .raw
+            .as_ref()
+            .expect("polling after `JoinHandle` already completed");
 
-        // Load the current task state
-        let mut state = raw.header().state.load();
-
-        debug_assert!(state.is_join_interested());
-
-        if state.is_active() {
-            state = if state.has_join_waker() {
-                raw.swap_join_waker(cx.waker(), state)
-            } else {
-                raw.store_join_waker(cx.waker())
-            };
-
-            if state.is_active() {
-                return Poll::Pending;
-            }
-        }
-
-        let mut out = MaybeUninit::<Track<Self::Output>>::uninit();
-
+        // Try to read the task output. If the task is not yet complete, the
+        // waker is stored and is notified once the task does complete.
+        //
+        // The function must go via the vtable, which requires erasing generic
+        // types. To do this, the function "return" is placed on the stack
+        // **before** calling the function and is passed into the function using
+        // `*mut ()`.
+        //
+        // Safety:
+        //
+        // The type of `T` must match the task's output type.
         unsafe {
-            // This could result in the task being freed.
-            raw.read_output(out.as_mut_ptr() as *mut (), state);
-
-            self.raw = None;
-
-            Poll::Ready(out.assume_init().into_inner())
+            raw.try_read_output(&mut ret as *mut _ as *mut (), cx.waker());
         }
+
+        ret
     }
 }
 
 impl<T> Drop for JoinHandle<T> {
     fn drop(&mut self) {
         if let Some(raw) = self.raw.take() {
-            if raw.header().state.drop_join_handle_fast() {
+            if raw.header().state.drop_join_handle_fast().is_ok() {
                 return;
             }
 

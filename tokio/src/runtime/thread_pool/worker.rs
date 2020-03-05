@@ -1,19 +1,166 @@
-use crate::loom::cell::CausalCell;
-use crate::loom::sync::Arc;
-use crate::park::Park;
-use crate::runtime;
-use crate::runtime::park::Parker;
-use crate::runtime::thread_pool::{current, slice, Owned, Shared};
-use crate::task::Task;
+//! A scheduler is initialized with a fixed number of workers. Each worker is
+//! driven by a thread. Each worker has a "core" which contains data such as the
+//! run queue and other state. When `block_in_place` is called, the worker's
+//! "core" is handed off to a new thread allowing the scheduler to continue to
+//! make progress while the originating thread blocks.
 
-use std::cell::Cell;
-use std::marker::PhantomData;
-use std::sync::atomic::Ordering::Relaxed;
+use crate::loom::rand::seed;
+use crate::loom::sync::{Arc, Mutex};
+use crate::park::{Park, Unpark};
+use crate::runtime;
+use crate::runtime::park::{Parker, Unparker};
+use crate::runtime::task;
+use crate::runtime::thread_pool::{queue, AtomicCell, Idle};
+use crate::util::linked_list::LinkedList;
+use crate::util::FastRand;
+
+use std::cell::RefCell;
 use std::time::Duration;
 
-thread_local! {
-    /// Used to handle block_in_place
-    static ON_BLOCK: Cell<Option<*const dyn Fn()>> = Cell::new(None)
+/// A scheduler worker
+pub(super) struct Worker {
+    /// Reference to shared state
+    shared: Arc<Shared>,
+
+    /// Index holding this worker's remote state
+    index: usize,
+
+    /// Used to hand-off a worker's core to another thread.
+    core: AtomicCell<Core>,
+}
+
+/// Core data
+struct Core {
+    /// Used to schedule bookkeeping tasks every so often.
+    tick: u8,
+
+    /// The worker-local run queue.
+    run_queue: queue::Local<Arc<Worker>>,
+
+    /// True if the worker is currently searching for more work. Searching
+    /// involves attempting to steal from other workers.
+    is_searching: bool,
+
+    /// True if the scheduler is being shutdown
+    is_shutdown: bool,
+
+    /// Tasks owned by the core
+    tasks: LinkedList<Task>,
+
+    /// Parker
+    ///
+    /// Stored in an `Option` as the parker is added / removed to make the
+    /// borrow checker happy.
+    park: Option<Parker>,
+
+    /// Fast random number generator.
+    rand: FastRand,
+}
+
+/// State shared across all workers
+pub(super) struct Shared {
+    /// Per-worker remote state. All other workers have access to this and is
+    /// how they communicate between each other.
+    remotes: Box<[Remote]>,
+
+    /// Submit work to the scheduler while **not** currently on a worker thread.
+    inject: queue::Inject<Arc<Worker>>,
+
+    /// Coordinates idle workers
+    idle: Idle,
+
+    /// Workers have have observed the shutdown signal
+    ///
+    /// The core is **not** placed back in the worker to avoid it from being
+    /// stolen by a thread that was spawned as part of `block_in_place`.
+    shutdown_workers: Mutex<Vec<(Box<Core>, Arc<Worker>)>>,
+}
+
+/// Used to communicate with a worker from other threads.
+struct Remote {
+    /// Steal tasks from this worker.
+    steal: queue::Steal<Arc<Worker>>,
+
+    /// Transfers tasks to be released. Any worker pushes tasks, only the owning
+    /// worker pops.
+    pending_drop: task::TransferStack<Arc<Worker>>,
+
+    /// Unparks the associated worker thread
+    unpark: Unparker,
+}
+
+/// Thread-local context
+struct Context {
+    /// Worker
+    worker: Arc<Worker>,
+
+    /// Core data
+    core: RefCell<Option<Box<Core>>>,
+}
+
+/// Starts the workers
+pub(crate) struct Launch(Vec<Arc<Worker>>);
+
+/// Running a task may consume the core. If the core is still available when
+/// running the task completes, it is returned. Otherwise, the worker will need
+/// to stop processing.
+type RunResult = Result<Box<Core>, ()>;
+
+/// A task handle
+type Task = task::Task<Arc<Worker>>;
+
+/// A notified task handle
+type Notified = task::Notified<Arc<Worker>>;
+
+// Tracks thread-local state
+scoped_thread_local!(static CURRENT: Context);
+
+pub(super) fn create(size: usize, park: Parker) -> (Arc<Shared>, Launch) {
+    let mut cores = vec![];
+    let mut remotes = vec![];
+
+    // Create the local queues
+    for _ in 0..size {
+        let (steal, run_queue) = queue::local();
+
+        let park = park.clone();
+        let unpark = park.unpark();
+
+        cores.push(Box::new(Core {
+            tick: 0,
+            run_queue,
+            is_searching: false,
+            is_shutdown: false,
+            tasks: LinkedList::new(),
+            park: Some(park),
+            rand: FastRand::new(seed()),
+        }));
+
+        remotes.push(Remote {
+            steal,
+            pending_drop: task::TransferStack::new(),
+            unpark,
+        });
+    }
+
+    let shared = Arc::new(Shared {
+        remotes: remotes.into_boxed_slice(),
+        inject: queue::Inject::new(),
+        idle: Idle::new(size),
+        shutdown_workers: Mutex::new(vec![]),
+    });
+
+    let mut launch = Launch(vec![]);
+
+    for (index, core) in cores.drain(..).enumerate() {
+        launch.0.push(Arc::new(Worker {
+            shared: shared.clone(),
+            index,
+            core: AtomicCell::new(Some(core)),
+        }));
+    }
+
+    (shared, launch)
 }
 
 cfg_blocking! {
@@ -21,597 +168,543 @@ cfg_blocking! {
     where
         F: FnOnce() -> R,
     {
-        // Make the current worker give away its Worker to another thread so that we can safely block
-        // this one without preventing progress on other futures the worker owns.
-        ON_BLOCK.with(|ob| {
-            let allow_blocking = ob
-                .get()
-                // `block_in_place` can only be called from a spawned task when
-                // working with the threaded scheduler.
-                .expect("can call blocking only when running in a spawned task");
+        // Try to steal the worker core back
+        struct Reset;
 
-            // This is safe, because ON_BLOCK was set from an &mut dyn FnMut in the worker that wraps
-            // the worker's operation, and is unset just prior to when the FnMut is dropped.
-            let allow_blocking = unsafe { &*allow_blocking };
+        impl Drop for Reset {
+            fn drop(&mut self) {
+                CURRENT.with(|maybe_cx| {
+                    if let Some(cx) = maybe_cx {
+                        let core = cx.worker.core.take();
+                        *cx.core.borrow_mut() = core;
+                    }
+                });
+            }
+        }
 
-            allow_blocking();
-            f()
-        })
+        CURRENT.with(|maybe_cx| {
+            let cx = maybe_cx.expect("can call blocking only when running in a spawned task");
+
+            // Get the worker core. If none is set, then blocking is fine!
+            let core = match cx.core.borrow_mut().take() {
+                Some(core) => core,
+                None => return,
+            };
+
+            // The parker should be set here
+            assert!(core.park.is_some());
+
+            // In order to block, the core must be sent to another thread for
+            // execution.
+            //
+            // First, move the core back into the worker's shared core slot.
+            cx.worker.core.set(core);
+
+            // Next, clone the worker handle and send it to a new thread for
+            // processing.
+            //
+            // Once the blocking task is done executing, we will attempt to
+            // steal the core back.
+            let worker = cx.worker.clone();
+            runtime::spawn_blocking(move || run(worker));
+        });
+
+        let _reset = Reset;
+
+        f()
     }
-}
-
-pub(crate) struct Worker {
-    /// Parks the thread. Requires the calling worker to have obtained unique
-    /// access via the generation synchronization action.
-    inner: Arc<Inner>,
-
-    /// Scheduler slices
-    slices: Arc<slice::Set>,
-
-    /// Slice assigned to this worker
-    index: usize,
-
-    /// Worker generation. This is used to synchronize access to the internal
-    /// data.
-    generation: usize,
-
-    /// To indicate that the Worker has been given away and should no longer be used
-    gone: Cell<bool>,
-}
-
-/// Internal worker state. This may be referenced from multiple threads, but the
-/// generation guard protects unsafe access
-struct Inner {
-    /// Used to park the thread
-    park: CausalCell<Parker>,
-}
-
-unsafe impl Send for Worker {}
-
-/// Used to ensure the invariants are respected
-struct GenerationGuard<'a> {
-    /// Worker reference
-    worker: &'a Worker,
-
-    /// Prevent `Sync` access
-    _p: PhantomData<Cell<()>>,
-}
-
-struct WorkerGone;
-
-// TODO: Move into slices
-pub(super) fn create_set(pool_size: usize, parker: Parker) -> (Arc<slice::Set>, Vec<Worker>) {
-    // Create the parks...
-    let parkers: Vec<_> = (0..pool_size).map(|_| parker.clone()).collect();
-
-    let mut slices = Arc::new(slice::Set::new(&parkers));
-
-    // Establish the circular link between the individual worker state
-    // structure and the container.
-    Arc::get_mut(&mut slices).unwrap().set_ptr();
-
-    // This will contain each worker.
-    let workers = parkers
-        .into_iter()
-        .enumerate()
-        .map(|(index, parker)| Worker::new(slices.clone(), index, parker))
-        .collect();
-
-    (slices, workers)
 }
 
 /// After how many ticks is the global queue polled. This helps to ensure
 /// fairness.
 ///
 /// The number is fairly arbitrary. I believe this value was copied from golang.
-const GLOBAL_POLL_INTERVAL: u16 = 61;
+const GLOBAL_POLL_INTERVAL: u8 = 61;
 
-impl Worker {
-    // Safe as aquiring a lock is required before doing anything potentially
-    // dangerous.
-    pub(super) fn new(slices: Arc<slice::Set>, index: usize, park: Parker) -> Self {
-        Worker {
-            inner: Arc::new(Inner {
-                park: CausalCell::new(park),
-            }),
-            slices,
-            index,
-            generation: 0,
-            gone: Cell::new(false),
-        }
-    }
-
-    pub(super) fn run(self) {
-        // First, acquire a lock on the worker.
-        let guard = match self.acquire_lock() {
-            Some(guard) => guard,
-            None => return,
-        };
-
-        // Track the current worker
-        current::set(&self.slices, self.index, || {
-            // Enter a runtime context
-            let _enter = crate::runtime::enter();
-
-            ON_BLOCK.with(|ob| {
-                // Ensure that the ON_BLOCK is removed from the thread-local context
-                // when leaving the scope. This handles cases that involve panicking.
-                struct Reset<'a>(&'a Cell<Option<*const dyn Fn()>>);
-
-                impl<'a> Drop for Reset<'a> {
-                    fn drop(&mut self) {
-                        self.0.set(None);
-                    }
-                }
-
-                let _reset = Reset(ob);
-
-                let allow_blocking: &dyn Fn() = &|| self.block_in_place();
-
-                ob.set(Some(unsafe {
-                    // NOTE: We cannot use a safe cast to raw pointer here, since we are
-                    // _also_ erasing the lifetime of these pointers. That is safe here,
-                    // because we know that ob will set back to None before allow_blocking
-                    // is dropped.
-                    #[allow(clippy::useless_transmute)]
-                    std::mem::transmute::<_, *const dyn Fn()>(allow_blocking)
-                }));
-
-                let _ = guard.run();
-
-                // Ensure that we reset ob before allow_blocking is dropped.
-                drop(_reset);
-            });
-        });
-
-        if self.gone.get() {
-            // Synchronize with the pool for load(Acquire) in is_closed to get
-            // up-to-date value.
-            self.slices.wait_for_unlocked();
-
-            if self.slices.is_closed() {
-                // If the pool is shutting down, some other thread may be
-                // waiting to clean up after the task that we were holding on
-                // to. If we completed that task, we did nothing (because
-                // task.run() returned None), and so crucially we did not wait
-                // up any such thread.
-                //
-                // So, we have to do that here.
-                self.slices.notify_all();
-            }
-        }
-    }
-
-    /// Acquires the lock
-    fn acquire_lock(&self) -> Option<GenerationGuard<'_>> {
-        // Safety: Only getting `&self` access to access atomic field
-        let owned = unsafe { &*self.slices.owned()[self.index].get() };
-
-        // The lock is only to establish mutual exclusion. Other synchronization
-        // handles memory orderings
-        let prev = owned.generation.compare_and_swap(
-            self.generation,
-            self.generation.wrapping_add(1),
-            Relaxed,
-        );
-
-        if prev == self.generation {
-            Some(GenerationGuard {
-                worker: self,
-                _p: PhantomData,
-            })
-        } else {
-            None
-        }
-    }
-
-    /// Enters an in-place blocking section
-    fn block_in_place(&self) {
-        // If our Worker has already been given away, then blocking is fine!
-        if self.gone.get() {
-            return;
-        }
-
-        // If this method is called, we need to move the entire worker onto a
-        // separate (blocking) thread before returning. Once we return, the
-        // caller is going to execute some blocking code which would otherwise
-        // block our reactor from making progress. Since we are _in the middle_
-        // of running a task, this isn't trivial, as the Worker is "active".
-        // We do have the luxury of knowing that we are on the worker thread,
-        // so we can assert exclusive access to any Worker-specific state.
-        //
-        // More specifically, the caller is _currently_ "stuck" in
-        // Entry::run_task at:
-        //
-        //   if let Some(task) = task.run(self.shared().into()) {
-        //
-        // And _we_ get to decide when it continues (specifically, by choosing
-        // when we return from the second callback (i.e., after the FnOnce
-        // passed to blocking has returned).
-        //
-        // Here's what we'll have to do:
-        //
-        //  - Reconstruct our `Worker` struct
-        //  - Spawn the reconstructed `Worker` on another blocking thread
-        //  - Clear any state indicating what worker we are on, since at this
-        //    point we are effectively no longer "on" that worker.
-        //  - Allow the caller of `blocking` to continue.
-        //
-        // Once the caller completes the blocking operations, we need to ensure
-        // that async code can continue running in that context. Luckily, since
-        // `Arc<slice::Set>` has a fallback for when
-        // current::get() is None, we can just let the task
-        // run until it yields, and then put it back into
-        // the pool.
-
-        let worker = Worker {
-            inner: self.inner.clone(),
-            slices: self.slices.clone(),
-            index: self.index,
-            generation: self.generation + 1,
-            gone: Cell::new(false),
-        };
-
-        // Give away the worker
-        //
-        // Returns `Err` if the spawn failed due to the runtime shutting down
-        let res = runtime::try_spawn_blocking(move || worker.run());
-
-        // If the worker hand-off was successful, clear the local state.
-        // Otherwise, the runtime is in the process of shutting down, so we will
-        // just block on the worker.
-        if res.is_ok() {
-            // make sure no subsequent code thinks that it is on a worker
-            current::clear();
-
-            // Track that the worker is gone
-            self.gone.set(true);
+impl Launch {
+    pub(crate) fn launch(mut self) {
+        for worker in self.0.drain(..) {
+            runtime::spawn_blocking(move || run(worker));
         }
     }
 }
 
-impl GenerationGuard<'_> {
-    fn run(self) -> Result<(), WorkerGone> {
-        let mut me = self;
+fn run(worker: Arc<Worker>) {
+    // Acquire a core. If this fails, then another thread is running this
+    // worker and there is nothing further to do.
+    let core = match worker.core.take() {
+        Some(core) => core,
+        None => return,
+    };
 
-        while me.is_running() {
-            me = me.process_available_work()?;
+    // Set the worker context.
+    let cx = Context {
+        worker,
+        core: RefCell::new(None),
+    };
 
-            if me.is_running() {
-                me.park();
-            }
-        }
+    let _enter = crate::runtime::enter();
 
-        me.shutdown();
-        Ok(())
-    }
+    CURRENT.set(&cx, || {
+        // This should always be an error. It only returns a `Result` to support
+        // using `?` to short circuit.
+        assert!(cx.run(core).is_err());
+    });
+}
 
-    fn is_running(&self) -> bool {
-        self.owned().is_running.get()
-    }
+impl Context {
+    fn run(&self, mut core: Box<Core>) -> RunResult {
+        while !core.is_shutdown {
+            // Increment the tick
+            core.tick();
 
-    /// Returns `true` if the worker needs to park
-    fn process_available_work(self) -> Result<Self, WorkerGone> {
-        let mut me = self;
+            // Run maintenance, if needed
+            core = self.maintenance(core);
 
-        loop {
-            // Local queue loop
-            loop {
-                let task = match me.find_local_work() {
-                    Some(task) => task,
-                    None => {
-                        if !me.is_running() {
-                            // The scheduler is in the process of shutting down.
-                            return Ok(me);
-                        }
-
-                        // Break out of the local task loop and try to steal
-                        break;
-                    }
-                };
-
-                me = me.run_task(task)?;
+            // First, check work available to the current worker.
+            if let Some(task) = core.next_task(&self.worker) {
+                core = self.run_task(task, core)?;
+                continue;
             }
 
-            // No more **local** work to process, try transitioning to searching
-            // in order to attempt to steal work from other workers.
-            //
-            // On `false`, the worker has entered the parked state
-            if me.transition_to_searching() {
-                // Try to steal tasks from other workers
-                if let Some(task) = me.steal_work() {
-                    me = me.run_task(task)?;
-                } else {
-                    // No work to steal, perform some routine work
-                    me.drain_tasks_pending_drop();
-                    return Ok(me);
-                }
+            // There is no more **local** work to process, try to steal work
+            // from other workers.
+            if let Some(task) = core.steal_work(&self.worker) {
+                core = self.run_task(task, core)?;
             } else {
-                return Ok(me);
+                // Wait for work
+                core = self.park(core);
             }
+        }
 
-            // Start checking the local queue again
+        // Signal shutdown
+        self.worker.shared.shutdown(core, self.worker.clone());
+        Err(())
+    }
+
+    fn run_task(&self, task: Notified, mut core: Box<Core>) -> RunResult {
+        // Make sure thew orker is not in the **searching** state. This enables
+        // another idle worker to try to steal work.
+        core.transition_from_searching(&self.worker);
+
+        // Make the core available to the runtime context
+        *self.core.borrow_mut() = Some(core);
+
+        // Run the task
+        task.run();
+
+        // Try to take the core back
+        match self.core.borrow_mut().take() {
+            Some(core) => Ok(core),
+            None => Err(()),
         }
     }
 
-    /// Finds local work
-    fn find_local_work(&mut self) -> Option<Task<Shared>> {
-        let tick = self.tick_fetch_inc();
+    fn maintenance(&self, mut core: Box<Core>) -> Box<Core> {
+        if core.tick % GLOBAL_POLL_INTERVAL == 0 {
+            // Call `park` with a 0 timeout. This enables the I/O driver, timer, ...
+            // to run without actually putting the thread to sleep.
+            core = self.park_timeout(core, Some(Duration::from_millis(0)));
 
-        if tick % GLOBAL_POLL_INTERVAL == 0 {
-            // Sleep light...
-            self.park_light();
+            // Run regularly scheduled maintenance
+            core.maintenance(&self.worker);
+        }
 
-            // Perform regularly scheduled maintenance work.
-            self.maintenance();
+        core
+    }
 
-            if !self.is_running() {
-                return None;
+    fn park(&self, mut core: Box<Core>) -> Box<Core> {
+        core.transition_to_parked(&self.worker);
+
+        while !core.is_shutdown {
+            core = self.park_timeout(core, None);
+
+            // Run regularly scheduled maintenance
+            core.maintenance(&self.worker);
+
+            if core.transition_from_parked(&self.worker) {
+                return core;
             }
+        }
 
-            // Check the global queue
-            self.owned().work_queue.pop_global_first()
+        core
+    }
+
+    fn park_timeout(&self, mut core: Box<Core>, duration: Option<Duration>) -> Box<Core> {
+        // Take the parker out of core
+        let mut park = core.park.take().expect("park missing");
+
+        // Store `core` in context
+        *self.core.borrow_mut() = Some(core);
+
+        // Park thread
+        if let Some(timeout) = duration {
+            park.park_timeout(timeout).expect("park failed");
         } else {
-            self.owned().work_queue.pop_local_first()
+            park.park().expect("park failed");
+        }
+
+        // Remove `core` from context
+        core = self.core.borrow_mut().take().expect("core missing");
+
+        // Place `park` back in `core`
+        core.park = Some(park);
+
+        // If there are tasks available to steal, notify a worker
+        if core.run_queue.is_stealable() {
+            self.worker.shared.notify_parked();
+        }
+
+        core
+    }
+}
+
+impl Core {
+    /// Increment the tick
+    fn tick(&mut self) {
+        self.tick = self.tick.wrapping_add(1);
+    }
+
+    /// Return the next notified task available to this worker.
+    fn next_task(&mut self, worker: &Worker) -> Option<Notified> {
+        if self.tick % GLOBAL_POLL_INTERVAL == 0 {
+            worker.inject().pop().or_else(|| self.run_queue.pop())
+        } else {
+            self.run_queue.pop().or_else(|| worker.inject().pop())
         }
     }
 
-    fn steal_work(&mut self) -> Option<Task<Shared>> {
-        let num_slices = self.worker.slices.len();
-        let start = self.owned().rand.fastrand_n(num_slices as u32);
+    fn steal_work(&mut self, worker: &Worker) -> Option<Notified> {
+        if !self.transition_to_searching(worker) {
+            return None;
+        }
 
-        self.owned()
-            .work_queue
-            .steal(start as usize)
-            // Fallback on checking the local queue, which will also check the
-            // injector.
-            .or_else(|| self.owned().work_queue.pop_global_first())
+        let num = worker.shared.remotes.len();
+        // Start from a random worker
+        let start = self.rand.fastrand_n(num as u32) as usize;
+
+        for i in 0..num {
+            let i = (start + i) % num;
+
+            // Don't steal from ourself! We know we don't have work.
+            if i == worker.index {
+                continue;
+            }
+
+            let target = &worker.shared.remotes[i];
+            if let Some(task) = target.steal.steal_into(&mut self.run_queue) {
+                return Some(task);
+            }
+        }
+
+        // Fallback on checking the global queue
+        worker.shared.inject.pop()
+    }
+
+    fn transition_to_searching(&mut self, worker: &Worker) -> bool {
+        if !self.is_searching {
+            self.is_searching = worker.shared.idle.transition_worker_to_searching();
+        }
+
+        self.is_searching
+    }
+
+    fn transition_from_searching(&mut self, worker: &Worker) {
+        if !self.is_searching {
+            return;
+        }
+
+        self.is_searching = false;
+        worker.shared.transition_worker_from_searching();
+    }
+
+    /// Prepare the worker state for parking
+    fn transition_to_parked(&mut self, worker: &Worker) {
+        // When the final worker transitions **out** of searching to parked, it
+        // must check all the queues one last time in case work materialized
+        // between the last work scan and transitioning out of searching.
+        let is_last_searcher = worker
+            .shared
+            .idle
+            .transition_worker_to_parked(worker.index, self.is_searching);
+
+        // The worker is no longer searching. Setting this is the local cache
+        // only.
+        self.is_searching = false;
+
+        if is_last_searcher {
+            worker.shared.notify_if_work_pending();
+        }
+    }
+
+    /// Returns `true` if the transition happened.
+    fn transition_from_parked(&mut self, worker: &Worker) -> bool {
+        // If there is a non-stealable task, then we must unpark regardless of
+        // being notified
+        if self.run_queue.has_unstealable() {
+            worker.shared.idle.unpark_worker_by_id(worker.index);
+            self.is_searching = true;
+            return true;
+        }
+
+        if worker.shared.idle.is_parked(worker.index) {
+            return false;
+        }
+
+        // When unparked, the worker is in the searching state.
+        self.is_searching = true;
+        true
     }
 
     /// Runs maintenance work such as free pending tasks and check the pool's
     /// state.
-    fn maintenance(&mut self) {
-        // Free any completed tasks
-        self.drain_tasks_pending_drop();
+    fn maintenance(&mut self, worker: &Worker) {
+        self.drain_pending_drop(worker);
 
-        // Update the pool state cache
-        let closed = self.owned().work_queue.is_closed();
-        self.owned().is_running.set(!closed)
-    }
-
-    fn transition_to_searching(&mut self) -> bool {
-        if self.is_searching() {
-            return true;
-        }
-
-        let ret = self.slices().idle().transition_worker_to_searching();
-        self.owned().is_searching.set(ret);
-        ret
-    }
-
-    fn transition_from_searching(&mut self) {
-        self.owned().is_searching.set(false);
-
-        if self.slices().idle().transition_worker_from_searching() {
-            // We are the final searching worker. Because work was found, we
-            // need to notify another worker.
-            self.slices().notify_work();
+        if !self.is_shutdown {
+            // Check if the scheduler has been shutdown
+            self.is_shutdown = worker.inject().is_closed();
         }
     }
 
-    /// Returns `true` if the worker must check for any work.
-    fn transition_to_parked(&mut self) -> bool {
-        let idx = self.index();
-        let is_searching = self.is_searching();
-        let ret = self
-            .slices()
-            .idle()
-            .transition_worker_to_parked(idx, is_searching);
+    // Shutdown the core
+    fn shutdown(&mut self, worker: &Worker) {
+        // Take the core
+        let mut park = self.park.take().expect("park missing");
 
-        // The worker is no longer searching. Setting this is the local cache
-        // only.
-        self.owned().is_searching.set(false);
-
-        // When tasks are submitted locally (from the parker), defer any
-        // notifications in hopes that the curent worker will grab those tasks.
-        self.owned().defer_notification.set(true);
-
-        ret
-    }
-
-    /// Returns `true` if the transition happened.
-    fn transition_from_parked(&mut self) -> bool {
-        if self.owned().did_submit_task.get() || !self.is_running() {
-            // Remove the worker from the sleep set.
-            self.slices().idle().unpark_worker_by_id(self.index());
-
-            self.owned().is_searching.set(true);
-            self.owned().defer_notification.set(false);
-
-            true
-        } else {
-            let ret = !self.slices().idle().is_parked(self.index());
-
-            if ret {
-                self.owned().is_searching.set(true);
-                self.owned().defer_notification.set(false);
-            }
-
-            ret
-        }
-    }
-
-    /// Runs the task. During the task execution, it is possible for worker to
-    /// transition to a new thread. In this case, the caller loses the guard to
-    /// access the generation and must stop processing.
-    fn run_task(mut self, task: Task<Shared>) -> Result<Self, WorkerGone> {
-        if self.is_searching() {
-            self.transition_from_searching();
+        // Signal to all tasks to shut down.
+        for header in self.tasks.iter() {
+            header.shutdown();
         }
 
-        let gone = &self.worker.gone;
-        let executor = self.shared();
-
-        let task = task.run(&mut || {
-            if gone.get() {
-                None
-            } else {
-                Some(executor.into())
-            }
-        });
-
-        if gone.get() {
-            // The Worker disappeared from under us.
-            // We need to return, because we no longer own all of our state!
-            // Make sure the task gets picked up again eventually.
-            if let Some(task) = task {
-                self.worker.slices.schedule(task);
-            }
-
-            Err(WorkerGone)
-        } else {
-            if let Some(task) = task {
-                self.owned().submit_local_yield(task);
-                self.slices().notify_work();
-            }
-
-            Ok(self)
-        }
-    }
-
-    fn final_work_sweep(&mut self) {
-        if !self.owned().work_queue.is_empty() {
-            self.slices().notify_work();
-        }
-    }
-
-    fn park(&mut self) {
-        if self.transition_to_parked() {
-            // We are the final searching worker, check if any work arrived
-            // before parking
-            self.final_work_sweep();
-        }
-
-        // The state has been transitioned to parked, we can now wait by
-        // calling the parker. This is done in a loop as spurious wakeups are
-        // permitted.
         loop {
-            self.park_mut().park().expect("park failed");
+            self.drain_pending_drop(worker);
 
-            // We might have been woken to clean up a dropped task
-            self.maintenance();
-
-            if self.transition_from_parked() {
-                return;
-            }
-        }
-    }
-
-    fn park_light(&mut self) {
-        // When tasks are submitted locally (from the parker), defer any
-        // notifications in hopes that the curent worker will grab those tasks.
-        self.owned().defer_notification.set(true);
-
-        self.park_mut()
-            .park_timeout(Duration::from_millis(0))
-            .expect("park failed");
-
-        self.owned().defer_notification.set(false);
-
-        if self.owned().did_submit_task.get() {
-            self.slices().notify_work();
-            self.owned().did_submit_task.set(false)
-        }
-    }
-
-    fn drain_tasks_pending_drop(&mut self) {
-        for task in self.shared().pending_drop.drain() {
-            unsafe {
-                let owned = &mut *self.slices().owned()[self.index()].get();
-                owned.release_task(&task);
-            }
-            drop(task);
-        }
-    }
-
-    /// Shutdowns the worker.
-    ///
-    /// Once the shutdown flag has been observed, it is guaranteed that no
-    /// further tasks may be pushed into the global queue.
-    fn shutdown(&mut self) {
-        // Transition all tasks owned by the worker to canceled.
-        self.owned().owned_tasks.shutdown();
-
-        // Always notify the first time around. This flushes any released tasks
-        // that happened before the call to `Worker::shutdown`
-        let mut notify = true;
-
-        // The worker can only shutdown once there are no further owned tasks.
-        loop {
-            // First, drain all tasks from both the local & global queue.
-            while let Some(task) = self.owned().work_queue.pop_local_first() {
-                notify = true;
-                task.shutdown();
-            }
-
-            if notify {
-                // If any tasks are shutdown, they may be pushed on another
-                // worker's `pending_drop` stack. However, we don't know which
-                // workers need to be notified, so we just notify all of them.
-                // Since this is a shutdown process, excessive notification is
-                // not a huge deal.
-                self.worker.slices.notify_all();
-                notify = false;
-            }
-
-            // Try draining more tasks
-            self.drain_tasks_pending_drop();
-
-            if self.owned().owned_tasks.is_empty() {
+            if self.tasks.is_empty() {
                 break;
             }
 
-            // Wait until task that this worker owns are released.
+            // Wait until signalled
+            park.park().expect("park failed");
+        }
+
+        // Drain the queue
+        while let Some(_) = self.run_queue.pop() {}
+    }
+
+    fn drain_pending_drop(&mut self, worker: &Worker) {
+        use std::mem::ManuallyDrop;
+
+        for task in worker.remote().pending_drop.drain() {
+            let task = ManuallyDrop::new(task);
+
+            // safety: tasks are only pushed into the `pending_drop` stacks that
+            // are associated with the list they are inserted into. When a task
+            // is pushed into `pending_drop`, the ref-inc is skipped, so we must
+            // not ref-dec here.
             //
-            // `transition_to_parked` is not called as we are not working
-            // anymore. When a task is released, the owning worker is unparked
-            // directly.
-            self.park_mut().park().expect("park failed");
+            // See `bind` and `release` implementations.
+            unsafe {
+                self.tasks.remove(task.header().into());
+            }
+        }
+    }
+}
+
+impl Worker {
+    /// Returns a reference to the scheduler's injection queue
+    fn inject(&self) -> &queue::Inject<Arc<Worker>> {
+        &self.shared.inject
+    }
+
+    /// Return a reference to this worker's remote data
+    fn remote(&self) -> &Remote {
+        &self.shared.remotes[self.index]
+    }
+
+    fn eq(&self, other: &Worker) -> bool {
+        self.shared.ptr_eq(&other.shared) && self.index == other.index
+    }
+}
+
+impl task::Schedule for Arc<Worker> {
+    fn bind(task: Task) -> Arc<Worker> {
+        CURRENT.with(|maybe_cx| {
+            let cx = maybe_cx.expect("scheduler context missing");
+
+            // Track the task
+            cx.core
+                .borrow_mut()
+                .as_mut()
+                .expect("scheduler core missing")
+                .tasks
+                .push_front(task);
+
+            // Return a clone of the worker
+            cx.worker.clone()
+        })
+    }
+
+    fn release(&self, task: &Task) -> Option<Task> {
+        use std::ptr::NonNull;
+
+        CURRENT.with(|maybe_cx| {
+            let cx = maybe_cx.expect("scheduler context missing");
+
+            if self.eq(&cx.worker) {
+                let mut maybe_core = cx.core.borrow_mut();
+
+                if let Some(core) = &mut *maybe_core {
+                    // Directly remove the task
+                    //
+                    // safety: the task is inserted in the list in `bind`.
+                    unsafe {
+                        let ptr = NonNull::from(task.header());
+                        return core.tasks.remove(ptr);
+                    }
+                }
+            }
+
+            // Track the task to be released by the worker that owns it
+            //
+            // Safety: We get a new handle without incrementing the ref-count.
+            // A ref-count is held by the "owned" linked list and it is only
+            // ever removed from that list as part of the release process: this
+            // method or popping the task from `pending_drop`. Thus, we can rely
+            // on the ref-count held by the linked-list to keep the memory
+            // alive.
+            //
+            // When the task is removed from the stack, it is forgotten instead
+            // of dropped.
+            let task = unsafe { Task::from_raw(task.header().into()) };
+
+            self.remote().pending_drop.push(task);
+
+            if cx.core.borrow().is_some() {
+                return None;
+            }
+
+            // The worker core has been handed off to another thread. In the
+            // event that the scheduler is currently shutting down, the thread
+            // that owns the task may be waiting on the release to complete
+            // shutdown.
+            if self.inject().is_closed() {
+                self.remote().unpark.unpark();
+            }
+
+            None
+        })
+    }
+
+    fn schedule(&self, task: Notified) {
+        self.shared.schedule(task, false);
+    }
+
+    fn yield_now(&self, task: Notified) {
+        self.shared.schedule(task, true);
+    }
+}
+
+impl Shared {
+    pub(super) fn schedule(&self, task: Notified, is_yield: bool) {
+        CURRENT.with(|maybe_cx| {
+            if let Some(cx) = maybe_cx {
+                // Make sure the task is part of the **current** scheduler.
+                if self.ptr_eq(&cx.worker.shared) {
+                    // And the current thread still holds a core
+                    if let Some(core) = cx.core.borrow_mut().as_mut() {
+                        self.schedule_local(core, task, is_yield);
+                        return;
+                    }
+                }
+            }
+
+            // Otherwise, use the inject queue
+            self.inject.push(task);
+            self.notify_parked();
+        });
+    }
+
+    fn schedule_local(&self, core: &mut Core, task: Notified, is_yield: bool) {
+        // Spawning from the worker thread. If scheduling a "yield" then the
+        // task must always be pushed to the back of the queue, enabling other
+        // tasks to be executed. If **not** a yield, then there is more
+        // flexibility and the task may go to the front of the queue.
+        let should_notify = if is_yield {
+            core.run_queue.push_back(task, &self.inject);
+            true
+        } else {
+            core.run_queue.push(task, &self.inject)
+        };
+
+        // Only notify if not currently parked. If `park` is `None`, then the
+        // scheduling is from a resource driver. As notifications often come in
+        // batches, the notification is delayed until the park is complete.
+        if should_notify && core.park.is_some() {
+            self.notify_parked();
         }
     }
 
-    /// Increments the tick, returning the value from before the increment.
-    fn tick_fetch_inc(&mut self) -> u16 {
-        let tick = self.owned().tick.get();
-        self.owned().tick.set(tick.wrapping_add(1));
-        tick
+    pub(super) fn close(&self) {
+        if self.inject.close() {
+            self.notify_all();
+        }
     }
 
-    fn is_searching(&self) -> bool {
-        self.owned().is_searching.get()
+    fn notify_parked(&self) {
+        if let Some(index) = self.idle.worker_to_notify() {
+            self.remotes[index].unpark.unpark();
+        }
     }
 
-    fn index(&self) -> usize {
-        self.worker.index
+    fn notify_all(&self) {
+        for remote in &self.remotes[..] {
+            remote.unpark.unpark();
+        }
     }
 
-    fn slices(&self) -> &slice::Set {
-        &self.worker.slices
+    fn notify_if_work_pending(&self) {
+        for remote in &self.remotes[..] {
+            if !remote.steal.is_empty() {
+                self.notify_parked();
+                return;
+            }
+        }
+
+        if !self.inject.is_empty() {
+            self.notify_parked();
+        }
     }
 
-    fn shared(&self) -> &Shared {
-        &self.slices().shared()[self.index()]
+    fn transition_worker_from_searching(&self) {
+        if self.idle.transition_worker_from_searching() {
+            // We are the final searching worker. Because work was found, we
+            // need to notify another worker.
+            self.notify_parked();
+        }
     }
 
-    fn owned(&self) -> &Owned {
-        let index = self.index();
-        // safety: we own the slot
-        unsafe { &*self.slices().owned()[index].get() }
+    /// Signals that a worker has observed the shutdown signal and has replaced
+    /// its core back into its handle.
+    ///
+    /// If all workers have reached this point, the final cleanup is performed.
+    fn shutdown(&self, core: Box<Core>, worker: Arc<Worker>) {
+        let mut workers = self.shutdown_workers.lock().unwrap();
+        workers.push((core, worker));
+
+        if workers.len() != self.remotes.len() {
+            return;
+        }
+
+        for (mut core, worker) in workers.drain(..) {
+            core.shutdown(&worker);
+        }
+
+        // Drain the injection queue
+        while let Some(_) = self.inject.pop() {}
     }
 
-    fn park_mut(&mut self) -> &mut Parker {
-        // Safety: `&mut self` on `GenerationGuard` implies it is safe to
-        // perform the action.
-        unsafe { self.worker.inner.park.with_mut(|ptr| &mut *ptr) }
+    fn ptr_eq(&self, other: &Shared) -> bool {
+        self as *const _ == other as *const _
     }
 }

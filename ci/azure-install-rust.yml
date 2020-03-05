@@ -2,6 +2,13 @@ steps:
   # Linux and macOS.
   - script: |
       set -e
+
+      if [ "$RUSTUP_TOOLCHAIN" == "nightly" ]; then
+        echo "++ getting latest miri version"
+        export RUSTUP_TOOLCHAIN="nightly-$(curl -s https://rust-lang.github.io/rustup-components-history/x86_64-unknown-linux-gnu/miri)"
+        echo "$RUSTUP_TOOLCHAIN"
+      fi
+
       curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain none
       export PATH=$PATH:$HOME/.cargo/bin
       rustup toolchain install $RUSTUP_TOOLCHAIN
