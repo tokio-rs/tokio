@@ -17,6 +17,11 @@ use std::{
     },
 };
 
+macro_rules! ddbg {
+    ($x:expr) => { $x };
+    ($($x:expr),+) => {}
+}
+
 pub(crate) struct Semaphore {
     waiters: Mutex<LinkedList<Waiter>>,
     permits: AtomicUsize,
@@ -103,7 +108,7 @@ impl Semaphore {
 
     /// Adds `n` new permits to the semaphore.
     pub(crate) fn add_permits(&self, n: usize) {
-        dbg!(n);
+        ddbg!(n);
         if n == 0 {
             return;
         }
@@ -112,7 +117,7 @@ impl Semaphore {
         // abort.
         let prev = self.add_lock.fetch_add(n << 1, Ordering::AcqRel);
 
-        let closed = match dbg!(prev) {
+        let closed = match ddbg!(prev) {
             1 => true,
             0 => false,
             // Another thread has the lock and will be responsible for notifying
@@ -120,7 +125,7 @@ impl Semaphore {
             _ => return,
         };
 
-        // if self.permits.load(Ordering::Acquire) & CLOSED == 1 {
+        // if self.permits.load(Ordering::Acquire) & CLOgpg*SED == 1 {
 
         // }
 
@@ -138,11 +143,12 @@ impl Semaphore {
 
             let initial = rem;
             // Release the permits and notify
-            while dbg!(rem > 0) || dbg!(closed) {
+            while ddbg!(rem > 0) || ddbg!(closed) {
                 let pop = match waiters.last() {
-                    Some(last) => dbg!(last.assign_permits(&mut rem, closed)),
+                    Some(last) => ddbg!(last.assign_permits(&mut rem, closed)),
                     None => {
                         self.permits.fetch_add(rem, Ordering::Release);
+                        rem = 0;
                         break;
                         // false
                     }
@@ -157,15 +163,15 @@ impl Semaphore {
             let actual = if closed {
                 let actual = self.add_lock.fetch_sub(n | 1, Ordering::AcqRel);
                 closed = false;
-                actual
+                actual >> 1
             } else {
                 let actual = self.add_lock.fetch_sub(n, Ordering::AcqRel);
                 closed = actual & 1 == 1;
-                actual
+                actual >> 1
             };
 
-            rem = actual.saturating_sub(initial) >> 1;
-            dbg!(rem);
+            rem = (actual >> 1) - rem;
+            ddbg!(rem);
         }
     }
 
@@ -178,12 +184,12 @@ impl Semaphore {
         let mut curr = self.permits.load(Ordering::Acquire);
         let needed = needed as usize;
         let (acquired, remaining) = loop {
-            dbg!(needed, curr);
-            if dbg!(curr & CLOSED == CLOSED) {
+            ddbg!(needed, curr);
+            if ddbg!(curr & CLOSED == CLOSED) {
                 return Ready(Err(AcquireError(())));
             }
             let mut remaining = 0;
-            let (next, acquired) = if dbg!(curr) >= dbg!(needed) {
+            let (next, acquired) = if ddbg!(curr) >= ddbg!(needed) {
                 (curr - needed, needed)
             } else {
                 remaining = needed - curr;
@@ -199,7 +205,7 @@ impl Semaphore {
                 Err(actual) => curr = actual,
             }
         };
-        dbg!(acquired, remaining);
+        ddbg!(acquired, remaining);
         if remaining == 0 {
             return Ready(Ok(()));
         }
@@ -334,7 +340,7 @@ impl Permit {
             Acquired(acquired) => {
                 let n = cmp::min(n, acquired);
                 self.state = Acquired(acquired - n);
-                dbg!(n)
+                ddbg!(n)
             }
         }
     }
@@ -430,7 +436,7 @@ impl Future for Acquire<'_> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let (node, semaphore, permit, mut needed) = self.project();
-        dbg!(&semaphore, &permit, &needed);
+        ddbg!(&semaphore, &permit, &needed);
         permit.state = match permit.state {
             PermitState::Acquired(n) if n >= needed => return Ready(Ok(())),
             PermitState::Acquired(n) => {
@@ -472,8 +478,8 @@ impl Acquire<'_> {
 
 impl Drop for Acquire<'_> {
     fn drop(&mut self) {
-        dbg!("drop acquire");
-        if dbg!(self.node.is_unlinked()) {
+        ddbg!("drop acquire");
+        if ddbg!(self.node.is_unlinked()) {
             // don't need to release permits
             return;
         }
