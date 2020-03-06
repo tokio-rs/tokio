@@ -879,8 +879,8 @@ impl<T> Expired<T> {
         self.data
     }
 
-    /// Returns a reference to the deadline that the expiration was set to.
-    pub fn deadline(&self) -> &Instant {
-        &self.deadline
+    /// Returns the deadline that the expiration was set to.
+    pub fn deadline(&self) -> Instant {
+        self.deadline
     }
 }
