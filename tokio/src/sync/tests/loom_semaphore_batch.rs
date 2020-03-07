@@ -80,6 +80,7 @@ fn basic_closing() {
     const NUM: usize = 2;
 
     loom::model(|| {
+        println!("-- iter --");
         let semaphore = Arc::new(Semaphore::new(1));
 
         for _ in 0..NUM {

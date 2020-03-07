@@ -23,9 +23,14 @@ macro_rules! ddbg {
 }
 
 pub(crate) struct Semaphore {
-    waiters: Mutex<LinkedList<Waiter>>,
+    waiters: Mutex<Waitlist>,
     permits: AtomicUsize,
     add_lock: AtomicUsize,
+}
+
+struct Waitlist {
+    queue: LinkedList<Waiter>,
+    closed: bool,
 }
 
 /// Error returned by `Permit::try_acquire`.
@@ -80,7 +85,10 @@ impl Semaphore {
         assert!(permits <= std::u16::MAX as usize);
         Self {
             permits: AtomicUsize::new(permits),
-            waiters: Mutex::new(LinkedList::new()),
+            waiters: Mutex::new(Waitlist { 
+                queue: LinkedList::new(),
+                closed: false,
+            }),
             add_lock: AtomicUsize::new(0),
         }
     }
@@ -95,7 +103,7 @@ impl Semaphore {
     pub(crate) fn close(&self) {
         // Acquire the `add_lock`, setting the "closed" flag on the lock.
         let prev = self.add_lock.fetch_or(1, Ordering::AcqRel);
-        self.permits.fetch_or(CLOSED, Ordering::Release);
+        println!("closed");
 
         if prev != 0 {
             // Another thread has the lock and will be responsible for notifying
@@ -103,7 +111,9 @@ impl Semaphore {
             return;
         }
 
-        self.add_permits_locked(0, true, self.waiters.lock().unwrap());
+        let mut lock = self.waiters.lock().unwrap();
+        lock.closed = true;
+        self.add_permits_locked(0, true, lock);
     }
 
     /// Adds `n` new permits to the semaphore.
@@ -136,7 +146,7 @@ impl Semaphore {
         &self,
         mut rem: usize,
         mut closed: bool,
-        mut waiters: MutexGuard<'_, LinkedList<Waiter>>,
+        mut waiters: MutexGuard<'_, Waitlist>,
     ) {
         while rem > 0 || closed {
             // how many permits are we releasing on this pass?
@@ -144,7 +154,7 @@ impl Semaphore {
             let initial = rem;
             // Release the permits and notify
             while ddbg!(rem > 0) || ddbg!(closed) {
-                let pop = match waiters.last() {
+                let pop = match waiters.queue.last() {
                     Some(last) => ddbg!(last.assign_permits(&mut rem, closed)),
                     None => {
                         self.permits.fetch_add(rem, Ordering::Release);
@@ -154,7 +164,7 @@ impl Semaphore {
                     }
                 };
                 if pop {
-                    waiters.pop_back().unwrap();
+                    waiters.queue.pop_back().unwrap();
                 }
             }
 
@@ -185,9 +195,6 @@ impl Semaphore {
         let needed = needed as usize;
         let (acquired, remaining) = loop {
             ddbg!(needed, curr);
-            if ddbg!(curr & CLOSED == CLOSED) {
-                return Ready(Err(AcquireError(())));
-            }
             let mut remaining = 0;
             let (next, acquired) = if ddbg!(curr) >= ddbg!(needed) {
                 (curr - needed, needed)
@@ -222,11 +229,14 @@ impl Semaphore {
         // otherwise, register the waker & enqueue the node.
         node.waker.register_by_ref(cx.waker());
 
-        let mut queue = self.waiters.lock().unwrap();
+        let mut waiters = self.waiters.lock().unwrap();
+        if waiters.closed {
+            return Ready(Err(AcquireError(())));
+        }
         unsafe {
             // XXX(eliza) T_T
             let node = Pin::into_inner_unchecked(node) as *mut _;
-            queue.push_front(node);
+            waiters.queue.push_front(node);
             println!("enqueue");
         }
 
@@ -492,7 +502,7 @@ impl Drop for Acquire<'_> {
         //
         // safety: the waiter is only added to `waiters` by virtue of it
         // being the only `LinkedList` available to the type.
-        unsafe { waiters.remove(NonNull::from(&mut self.node)) };
+        unsafe { waiters.queue.remove(NonNull::from(&mut self.node)) };
 
         // TODO(eliza): release permits to next waiter
     }
