@@ -397,10 +397,10 @@ cfg_time! {
 
 cfg_test_util! {
     impl Builder {
-        /// Use the runtimes deterministic time source by default.
+        /// Use the runtime's deterministic time source by default.
         ///
-        /// Doing this enables deterministic progression of time for
-        /// the runtime.
+        /// Toggling `freeze_time()` enables deterministic progression of time in
+        /// the Tokio runtime, which is useful for testing time-based code.
         ///
         /// # Examples
         ///
@@ -410,7 +410,7 @@ cfg_test_util! {
         /// let rt = runtime::Builder::new()
         ///     .freeze_time()
         ///     .build()
-        ///     .unwrap();
+        ///     .expect("Unable to build Tokio runtime");
         /// ```
         pub fn freeze_time(&mut self) -> &mut Self {
             self.freeze_time = true;
