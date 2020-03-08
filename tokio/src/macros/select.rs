@@ -359,7 +359,7 @@ macro_rules! select {
                 let start = $crate::macros::support::thread_rng_n(BRANCHES);
 
                 for i in 0..BRANCHES {
-                    let branch = (start + i) % BRANCHES;
+                    let branch = if BRANCHES == 1 { 0 } else { (start + i) % BRANCHES };
 
                     match branch {
                         $(
