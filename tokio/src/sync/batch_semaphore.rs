@@ -159,7 +159,13 @@ impl Semaphore {
             // Release the permits and notify
             while dbg!(rem) > 0 || dbg!(waiters.closed) {
                 let pop = match waiters.queue.last() {
-                    Some(last) => ddbg!(last.assign_permits(&mut rem, waiters.closed)),
+                    Some(last) => {
+                        
+                         ddbg!(format_args!("assign permits to {:p}", last));
+                        let res = ddbg!(last.assign_permits(&mut rem, waiters.closed));
+                        dbg!(last.is_unlinked());
+                        res
+                    }
                     None => {
                         println!("queue empty");
                         self.permits.fetch_add(rem, Ordering::Release);
@@ -169,7 +175,9 @@ impl Semaphore {
                     }
                 };
                 if pop {
+                    println!("popping");
                     waiters.queue.pop_back().unwrap();
+                    println!("popped");
                 }
             }
 
@@ -528,7 +536,7 @@ impl Acquire<'_> {
 
 impl Drop for Acquire<'_> {
     fn drop(&mut self) {
-        ddbg!("drop acquire");
+        ddbg!(format_args!("drop acquire {:p}", self));
         if ddbg!(self.node.is_unlinked()) {
             // don't need to release permits
             return;

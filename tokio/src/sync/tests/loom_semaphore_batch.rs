@@ -23,7 +23,7 @@ fn basic_usage() {
     async fn actor(shared: Arc<Shared>) {
         let mut permit = Permit::new();
         permit.acquire(1, &shared.semaphore).await.unwrap();
-
+        println!("acquired!");
         let actual = shared.active.fetch_add(1, SeqCst);
         assert!(actual <= NUM - 1);
 
