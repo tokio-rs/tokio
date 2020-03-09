@@ -281,7 +281,7 @@ impl Semaphore {
             unsafe {
                 // XXX(eliza) T_T
                 let node = Pin::into_inner_unchecked(node) as *mut _;
-                waiters.queue.push_front(node);
+                waiters.queue.push_front(NonNull::new_unchecked(node));
                 println!("enqueue");
             }
         }
@@ -612,16 +612,15 @@ impl std::error::Error for TryAcquireError {}
 ///
 /// `Waiter` is forced to be !Unpin.
 unsafe impl linked_list::Link for Waiter {
-    type Handle = *mut Waiter;
+    type Handle = NonNull<Waiter>;
     type Target = Waiter;
 
-    fn to_raw(handle: *mut Waiter) -> NonNull<Waiter> {
-        debug_assert!(!handle.is_null());
-        unsafe { NonNull::new_unchecked(handle) }
+    fn as_raw(handle: &Self::Handle) -> NonNull<Waiter> {
+        *handle
     }
 
-    unsafe fn from_raw(ptr: NonNull<Waiter>) -> *mut Waiter {
-        ptr.as_ptr()
+    unsafe fn from_raw(ptr: NonNull<Waiter>) -> NonNull<Waiter> {
+        ptr
     }
 
     unsafe fn pointers(mut target: NonNull<Waiter>) -> NonNull<linked_list::Pointers<Waiter>> {
