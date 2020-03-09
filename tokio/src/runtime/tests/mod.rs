@@ -1,7 +1,8 @@
-//! Testing utilities
+cfg_loom! {
+    mod loom_blocking;
+    mod loom_oneshot;
+    mod loom_pool;
+}
 
-#[cfg(loom)]
-pub(crate) mod loom_oneshot;
-
-#[cfg(loom)]
-pub(crate) mod loom_blocking;
+#[cfg(miri)]
+mod task;

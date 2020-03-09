@@ -1,15 +1,21 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
+use tempfile::tempdir;
 use tokio::fs;
 
 #[tokio::test]
 async fn copy() {
-    fs::write("foo.txt", b"Hello File!").await.unwrap();
-    fs::copy("foo.txt", "bar.txt").await.unwrap();
+    let dir = tempdir().unwrap();
 
-    let from = fs::read("foo.txt").await.unwrap();
-    let to = fs::read("bar.txt").await.unwrap();
+    let source_path = dir.path().join("foo.txt");
+    let dest_path = dir.path().join("bar.txt");
+
+    fs::write(&source_path, b"Hello File!").await.unwrap();
+    fs::copy(&source_path, &dest_path).await.unwrap();
+
+    let from = fs::read(&source_path).await.unwrap();
+    let to = fs::read(&dest_path).await.unwrap();
 
     assert_eq!(from, to);
 }

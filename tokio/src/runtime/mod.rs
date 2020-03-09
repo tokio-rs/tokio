@@ -187,11 +187,14 @@
 #[cfg(test)]
 #[macro_use]
 mod tests;
+
 pub(crate) mod context;
 
 cfg_rt_core! {
     mod basic_scheduler;
     use basic_scheduler::BasicScheduler;
+
+    pub(crate) mod task;
 }
 
 mod blocking;
@@ -215,7 +218,7 @@ mod io;
 
 cfg_rt_threaded! {
     mod park;
-    use park::{Parker, Unparker};
+    use park::Parker;
 }
 
 mod shell;
@@ -334,7 +337,7 @@ impl Runtime {
     /// [threaded scheduler]: index.html#threaded-scheduler
     /// [basic scheduler]: index.html#basic-scheduler
     /// [runtime builder]: crate::runtime::Builder
-    pub fn new() -> io::Result<Self> {
+    pub fn new() -> io::Result<Runtime> {
         #[cfg(feature = "rt-threaded")]
         let ret = Builder::new().threaded_scheduler().enable_all().build();
 

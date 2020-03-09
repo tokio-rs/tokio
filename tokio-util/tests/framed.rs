@@ -28,8 +28,7 @@ impl Decoder for U32Codec {
     }
 }
 
-impl Encoder for U32Codec {
-    type Item = u32;
+impl Encoder<u32> for U32Codec {
     type Error = io::Error;
 
     fn encode(&mut self, item: u32, dst: &mut BytesMut) -> io::Result<()> {

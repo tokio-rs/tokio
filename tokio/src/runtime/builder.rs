@@ -425,7 +425,7 @@ cfg_rt_core! {
             // the reactor to generate some new stimuli for the futures to continue
             // in their life.
             let scheduler = BasicScheduler::new(driver);
-            let spawner = Spawner::Basic(scheduler.spawner());
+            let spawner = Spawner::Basic(scheduler.spawner().clone());
 
             // Blocking pool
             let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
@@ -470,7 +470,7 @@ cfg_rt_threaded! {
 
             let (io_driver, io_handle) = io::create_driver(self.enable_io)?;
             let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone());
-            let (scheduler, workers) = ThreadPool::new(core_threads, Parker::new(driver));
+            let (scheduler, launch) = ThreadPool::new(core_threads, Parker::new(driver));
             let spawner = Spawner::ThreadPool(scheduler.spawner().clone());
 
             // Create the blocking pool
@@ -487,7 +487,7 @@ cfg_rt_threaded! {
             };
 
             // Spawn the thread pool workers
-            workers.spawn(&handle);
+            handle.enter(|| launch.launch());
 
             Ok(Runtime {
                 kind: Kind::ThreadPool(scheduler),

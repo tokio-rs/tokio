@@ -1,20 +1,15 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use std::{
-    cell::Cell,
-    sync::atomic::{
-        AtomicBool, AtomicUsize,
-        Ordering::{self, SeqCst},
-    },
-    time::Duration,
-};
-use tokio::{
-    runtime::{self, Runtime},
-    sync::{mpsc, oneshot},
-    task::{self, LocalSet},
-    time,
-};
+use tokio::runtime::{self, Runtime};
+use tokio::sync::{mpsc, oneshot};
+use tokio::task::{self, LocalSet};
+use tokio::time;
+
+use std::cell::Cell;
+use std::sync::atomic::Ordering::{self, SeqCst};
+use std::sync::atomic::{AtomicBool, AtomicUsize};
+use std::time::Duration;
 
 #[tokio::test(basic_scheduler)]
 async fn local_basic_scheduler() {
@@ -285,15 +280,23 @@ fn join_local_future_elsewhere() {
         join2.await.unwrap()
     });
 }
+
 #[test]
 fn drop_cancels_tasks() {
+    use std::rc::Rc;
+
     // This test reproduces issue #1842
     let mut rt = rt();
+    let rc1 = Rc::new(());
+    let rc2 = rc1.clone();
 
     let (started_tx, started_rx) = oneshot::channel();
 
     let local = LocalSet::new();
     local.spawn_local(async move {
+        // Move this in
+        let _rc2 = rc2;
+
         started_tx.send(()).unwrap();
         loop {
             time::delay_for(Duration::from_secs(3600)).await;
@@ -305,6 +308,8 @@ fn drop_cancels_tasks() {
     });
     drop(local);
     drop(rt);
+
+    assert_eq!(1, Rc::strong_count(&rc1));
 }
 
 #[test]

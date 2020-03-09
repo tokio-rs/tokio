@@ -546,12 +546,11 @@ impl Decoder for LengthDelimitedCodec {
     }
 }
 
-impl Encoder for LengthDelimitedCodec {
-    type Item = Bytes;
+impl Encoder<Bytes> for LengthDelimitedCodec {
     type Error = io::Error;
 
     fn encode(&mut self, data: Bytes, dst: &mut BytesMut) -> Result<(), io::Error> {
-        let n = (&data).remaining();
+        let n = data.len();
 
         if n > self.builder.max_frame_len {
             return Err(io::Error::new(

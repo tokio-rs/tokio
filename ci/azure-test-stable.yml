@@ -8,7 +8,7 @@ jobs:
 
       ${{ if parameters.cross }}:
         MacOS:
-          vmImage: macOS-10.13
+          vmImage: macos-latest
         Windows:
           vmImage: vs2017-win2016
   pool:

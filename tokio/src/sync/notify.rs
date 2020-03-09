@@ -306,10 +306,10 @@ fn notify_locked(waiters: &mut LinkedList<Waiter>, state: &AtomicU8, curr: u8) -
                 // transition **out** of `WAITING`.
                 //
                 // Get a pending waiter
-                let waiter = waiters.pop_back().unwrap();
+                let mut waiter = waiters.pop_back().unwrap();
 
                 // Safety: `waiters` lock is still held.
-                let waiter = unsafe { &mut *waiter };
+                let waiter = unsafe { waiter.as_mut() };
 
                 assert!(!waiter.notified);
 
@@ -423,7 +423,9 @@ impl Future for Notified<'_> {
                     }
 
                     // Insert the waiter into the linked list
-                    waiters.push_front(waiter.get());
+                    //
+                    // safety: pointers from `UnsafeCell` are never null.
+                    waiters.push_front(unsafe { NonNull::new_unchecked(waiter.get()) });
 
                     *state = Waiting;
                 }
@@ -535,16 +537,15 @@ impl Drop for Notified<'_> {
 ///
 /// `Waiter` is forced to be !Unpin.
 unsafe impl linked_list::Link for Waiter {
-    type Handle = *mut Waiter;
+    type Handle = NonNull<Waiter>;
     type Target = Waiter;
 
-    fn to_raw(handle: *mut Waiter) -> NonNull<Waiter> {
-        debug_assert!(!handle.is_null());
-        unsafe { NonNull::new_unchecked(handle) }
+    fn as_raw(handle: &NonNull<Waiter>) -> NonNull<Waiter> {
+        *handle
     }
 
-    unsafe fn from_raw(ptr: NonNull<Waiter>) -> *mut Waiter {
-        ptr.as_ptr()
+    unsafe fn from_raw(ptr: NonNull<Waiter>) -> NonNull<Waiter> {
+        ptr
     }
 
     unsafe fn pointers(mut target: NonNull<Waiter>) -> NonNull<linked_list::Pointers<Waiter>> {

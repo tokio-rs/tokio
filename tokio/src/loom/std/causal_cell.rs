@@ -18,15 +18,6 @@ impl<T> CausalCell<T> {
         f(self.0.get())
     }
 
-    pub(crate) fn with_unchecked<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(*const T) -> R,
-    {
-        f(self.0.get())
-    }
-
-    pub(crate) fn check(&self) {}
-
     pub(crate) fn with_deferred<F, R>(&self, f: F) -> (R, CausalCheck)
     where
         F: FnOnce(*const T) -> R,

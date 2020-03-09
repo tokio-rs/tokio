@@ -1,0 +1,23 @@
+jobs:
+- job: ${{ parameters.name }}
+  displayName: Miri
+  pool:
+    vmImage: ubuntu-16.04
+
+  steps:
+  - template: azure-install-rust.yml
+    parameters:
+      rust_version: nightly
+
+  - script: |
+      rustup component add miri
+      cargo miri setup
+      rm -rf $(Build.SourcesDirectory)/tokio/tests
+    displayName: Install miri
+
+  # TODO: enable all tests once they pass
+  - script: cargo miri test --features rt-core,rt-threaded,rt-util,sync -- -- task
+    env:
+      CI: 'True'
+    displayName: cargo miri test
+    workingDirectory: $(Build.SourcesDirectory)/tokio

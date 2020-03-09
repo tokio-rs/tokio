@@ -129,6 +129,10 @@ impl Inner {
             return;
         }
 
+        if dur == Duration::from_millis(0) {
+            return;
+        }
+
         let m = self.mutex.lock().unwrap();
 
         match self.state.compare_exchange(EMPTY, PARKED, SeqCst, SeqCst) {

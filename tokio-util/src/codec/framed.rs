@@ -67,7 +67,6 @@ impl<T, U> ProjectFuse for Fuse<T, U> {
 impl<T, U> Framed<T, U>
 where
     T: AsyncRead + AsyncWrite,
-    U: Decoder + Encoder,
 {
     /// Provides a [`Stream`] and [`Sink`] interface for reading and writing to this
     /// I/O object, using [`Decoder`] and [`Encoder`] to read and write the raw data.
@@ -95,6 +94,39 @@ where
     pub fn new(inner: T, codec: U) -> Framed<T, U> {
         Framed {
             inner: framed_read2(framed_write2(Fuse { io: inner, codec })),
+        }
+    }
+
+    /// Provides a [`Stream`] and [`Sink`] interface for reading and writing to this
+    /// I/O object, using [`Decoder`] and [`Encoder`] to read and write the raw data,
+    /// with a specific read buffer initial capacity.
+    ///
+    /// Raw I/O objects work with byte sequences, but higher-level code usually
+    /// wants to batch these into meaningful chunks, called "frames". This
+    /// method layers framing on top of an I/O object, by using the codec
+    /// traits to handle encoding and decoding of messages frames. Note that
+    /// the incoming and outgoing frame types may be distinct.
+    ///
+    /// This function returns a *single* object that is both [`Stream`] and
+    /// [`Sink`]; grouping this into a single object is often useful for layering
+    /// things like gzip or TLS, which require both read and write access to the
+    /// underlying object.
+    ///
+    /// If you want to work more directly with the streams and sink, consider
+    /// calling [`split`] on the `Framed` returned by this method, which will
+    /// break them into separate objects, allowing them to interact more easily.
+    ///
+    /// [`Stream`]: tokio::stream::Stream
+    /// [`Sink`]: futures_sink::Sink
+    /// [`Decode`]: crate::codec::Decoder
+    /// [`Encoder`]: crate::codec::Encoder
+    /// [`split`]: https://docs.rs/futures/0.3/futures/stream/trait.StreamExt.html#method.split
+    pub fn with_capacity(inner: T, codec: U, capacity: usize) -> Framed<T, U> {
+        Framed {
+            inner: framed_read2_with_buffer(
+                framed_write2(Fuse { io: inner, codec }),
+                BytesMut::with_capacity(capacity),
+            ),
         }
     }
 }
@@ -229,7 +261,7 @@ where
 impl<T, I, U> Sink<I> for Framed<T, U>
 where
     T: AsyncWrite,
-    U: Encoder<Item = I>,
+    U: Encoder<I>,
     U::Error: From<io::Error>,
 {
     type Error = U::Error;
@@ -347,11 +379,10 @@ impl<T, U: Decoder> Decoder for Fuse<T, U> {
     }
 }
 
-impl<T, U: Encoder> Encoder for Fuse<T, U> {
-    type Item = U::Item;
+impl<T, I, U: Encoder<I>> Encoder<I> for Fuse<T, U> {
     type Error = U::Error;
 
-    fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, item: I, dst: &mut BytesMut) -> Result<(), Self::Error> {
         self.codec.encode(item, dst)
     }
 }
@@ -381,8 +412,11 @@ pub struct FramedParts<T, U> {
 }
 
 impl<T, U> FramedParts<T, U> {
-    /// Create a new, default, `FramedParts`.
-    pub fn new(io: T, codec: U) -> FramedParts<T, U> {
+    /// Create a new, default, `FramedParts`
+    pub fn new<I>(io: T, codec: U) -> FramedParts<T, U>
+    where
+        U: Encoder<I>,
+    {
         FramedParts {
             io,
             codec,

@@ -1,11 +1,9 @@
-use tokio::pin;
-
 async fn one() {}
 async fn two() {}
 
 #[tokio::test]
 async fn multi_pin() {
-    pin! {
+    tokio::pin! {
         let f1 = one();
         let f2 = two();
     }

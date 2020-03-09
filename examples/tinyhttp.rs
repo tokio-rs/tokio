@@ -96,8 +96,7 @@ struct Http;
 
 /// Implementation of encoding an HTTP response into a `BytesMut`, basically
 /// just writing out an HTTP/1.1 response.
-impl Encoder for Http {
-    type Item = Response<String>;
+impl Encoder<Response<String>> for Http {
     type Error = io::Error;
 
     fn encode(&mut self, item: Response<String>, dst: &mut BytesMut) -> io::Result<()> {

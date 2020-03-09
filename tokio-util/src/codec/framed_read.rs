@@ -50,6 +50,20 @@ where
             }),
         }
     }
+
+    /// Creates a new `FramedRead` with the given `decoder` and a buffer of `capacity`
+    /// initial size.
+    pub fn with_capacity(inner: T, decoder: D, capacity: usize) -> FramedRead<T, D> {
+        FramedRead {
+            inner: framed_read2_with_buffer(
+                Fuse {
+                    io: inner,
+                    codec: decoder,
+                },
+                BytesMut::with_capacity(capacity),
+            ),
+        }
+    }
 }
 
 impl<T, D> FramedRead<T, D> {

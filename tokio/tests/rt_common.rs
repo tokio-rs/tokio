@@ -307,7 +307,7 @@ rt_test! {
     }
 
     #[test]
-    fn spawn_from_other_thread() {
+    fn spawn_from_other_thread_idle() {
         let mut rt = rt();
         let handle = rt.handle().clone();
 
@@ -322,6 +322,31 @@ rt_test! {
         });
 
         rt.block_on(async move {
+            assert_ok!(rx.await);
+        });
+    }
+
+    #[test]
+    fn spawn_from_other_thread_under_load() {
+        let mut rt = rt();
+        let handle = rt.handle().clone();
+
+        let (tx, rx) = oneshot::channel();
+
+        thread::spawn(move || {
+            handle.spawn(async move {
+                assert_ok!(tx.send(()));
+            });
+        });
+
+        rt.block_on(async move {
+            // Spin hard
+            tokio::spawn(async {
+                loop {
+                    yield_once().await;
+                }
+            });
+
             assert_ok!(rx.await);
         });
     }
@@ -680,7 +705,7 @@ rt_test! {
     fn io_notify_while_shutting_down() {
         use std::net::Ipv6Addr;
 
-        for _ in 1..100 {
+        for _ in 1..10 {
             let mut runtime = rt();
 
             runtime.block_on(async {
@@ -768,66 +793,61 @@ rt_test! {
         tx.send(()).unwrap();
     }
 
-    mod local_set {
-        use tokio::task;
-        use super::*;
+    #[test]
+    fn local_set_block_on_socket() {
+        let mut rt = rt();
+        let local = task::LocalSet::new();
 
-        #[test]
-        fn block_on_socket() {
-            let mut rt = rt();
-            let local = task::LocalSet::new();
+        local.block_on(&mut rt, async move {
+            let (tx, rx) = oneshot::channel();
 
-            local.block_on(&mut rt, async move {
-                let (tx, rx) = oneshot::channel();
+            let mut listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
 
-                let mut listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-                let addr = listener.local_addr().unwrap();
-
-                task::spawn_local(async move {
-                    let _ = listener.accept().await;
-                    tx.send(()).unwrap();
-                });
-
-                TcpStream::connect(&addr).await.unwrap();
-                rx.await.unwrap();
-            });
-        }
-
-        #[test]
-        fn client_server_block_on() {
-            let mut rt = rt();
-            let (tx, rx) = mpsc::channel();
-
-            let local = task::LocalSet::new();
-
-            local.block_on(&mut rt, async move { client_server_local(tx).await });
-
-            assert_ok!(rx.try_recv());
-            assert_err!(rx.try_recv());
-        }
-
-        async fn client_server_local(tx: mpsc::Sender<()>) {
-            let mut server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
-
-            // Get the assigned address
-            let addr = assert_ok!(server.local_addr());
-
-            // Spawn the server
             task::spawn_local(async move {
-                // Accept a socket
-                let (mut socket, _) = server.accept().await.unwrap();
-
-                // Write some data
-                socket.write_all(b"hello").await.unwrap();
+                let _ = listener.accept().await;
+                tx.send(()).unwrap();
             });
 
-            let mut client = TcpStream::connect(&addr).await.unwrap();
+            TcpStream::connect(&addr).await.unwrap();
+            rx.await.unwrap();
+        });
+    }
 
-            let mut buf = vec![];
-            client.read_to_end(&mut buf).await.unwrap();
+    #[test]
+    fn local_set_client_server_block_on() {
+        let mut rt = rt();
+        let (tx, rx) = mpsc::channel();
 
-            assert_eq!(buf, b"hello");
-            tx.send(()).unwrap();
-        }
+        let local = task::LocalSet::new();
+
+        local.block_on(&mut rt, async move { client_server_local(tx).await });
+
+        assert_ok!(rx.try_recv());
+        assert_err!(rx.try_recv());
+    }
+
+    async fn client_server_local(tx: mpsc::Sender<()>) {
+        let mut server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+
+        // Get the assigned address
+        let addr = assert_ok!(server.local_addr());
+
+        // Spawn the server
+        task::spawn_local(async move {
+            // Accept a socket
+            let (mut socket, _) = server.accept().await.unwrap();
+
+            // Write some data
+            socket.write_all(b"hello").await.unwrap();
+        });
+
+        let mut client = TcpStream::connect(&addr).await.unwrap();
+
+        let mut buf = vec![];
+        client.read_to_end(&mut buf).await.unwrap();
+
+        assert_eq!(buf, b"hello");
+        tx.send(()).unwrap();
     }
 }

@@ -1,3 +1,8 @@
+# 0.2.13 (February 28, 2019)
+
+### Fixes
+- macros: unresolved import in `pin!` (#2281).
+
 # 0.2.12 (February 27, 2019)
 
 ### Fixes
