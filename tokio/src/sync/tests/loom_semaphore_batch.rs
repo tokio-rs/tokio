@@ -34,6 +34,8 @@ fn basic_usage() {
     }
 
     loom::model(|| {
+
+        println!("\n ------ iter ------ \n");
         let shared = Arc::new(Shared {
             semaphore: Semaphore::new(NUM),
             active: AtomicUsize::new(0),

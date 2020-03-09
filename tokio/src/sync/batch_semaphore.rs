@@ -18,7 +18,7 @@ use std::{
 };
 
 macro_rules! ddbg {
-    ($x:expr) => { $x };
+    ($x:expr) => { dbg!($x) };
     ($($x:expr),+) => {}
 }
 
@@ -105,58 +105,63 @@ impl Semaphore {
         let prev = self.add_lock.fetch_or(1, Ordering::AcqRel);
         println!("closed");
 
-        if prev != 0 {
+        if dbg!(prev) != 0 {
             // Another thread has the lock and will be responsible for notifying
             // pending waiters.
             return;
         }
-
         let mut lock = self.waiters.lock().unwrap();
         lock.closed = true;
-        self.add_permits_locked(0, true, lock);
+        println!("locked");
+        self.add_permits_locked(0, lock, true);
     }
 
     /// Adds `n` new permits to the semaphore.
-    pub(crate) fn add_permits(&self, n: usize) {
-        ddbg!(n);
-        if n == 0 {
+    pub(crate) fn add_permits(&self, added: usize) {
+        ddbg!(added);
+        if added == 0 {
             return;
         }
 
         // TODO: Handle overflow. A panic is not sufficient, the process must
         // abort.
-        let prev = self.add_lock.fetch_add(n << 1, Ordering::AcqRel);
-
-        let closed = match ddbg!(prev) {
-            1 => true,
-            0 => false,
-            // Another thread has the lock and will be responsible for notifying
-            // pending waiters.
-            _ => return,
-        };
+        let prev = self.add_lock.fetch_add(added << 1, Ordering::AcqRel);
+        if prev > 0 {
+            return
+        }
+        // let closed = match ddbg!(prev) {
+        //     1 => true,
+        //     0 => false,
+        //     // Another thread has the lock and will be responsible for notifying
+        //     // pending waiters.
+        //     _ => return,
+        // };
 
         // if self.permits.load(Ordering::Acquire) & CLOgpg*SED == 1 {
 
         // }
 
-        self.add_permits_locked(n, false, self.waiters.lock().unwrap());
+        self.add_permits_locked(added, self.waiters.lock().unwrap(), false);
     }
 
     fn add_permits_locked(
         &self,
         mut rem: usize,
-        mut closed: bool,
         mut waiters: MutexGuard<'_, Waitlist>,
+        mut closed: bool,
     ) {
-        while rem > 0 || closed {
-            // how many permits are we releasing on this pass?
 
+        println!(" ADD PERMITS LOCKED ");
+
+        loop {
+            // how many permits are we releasing on this pass?
             let initial = rem;
             // Release the permits and notify
-            while ddbg!(rem > 0) || ddbg!(closed) {
+            while dbg!(rem) > 0 || dbg!(waiters.closed) {
                 let pop = match waiters.queue.last() {
-                    Some(last) => ddbg!(last.assign_permits(&mut rem, closed)),
+                    Some(last) => ddbg!(last.assign_permits(&mut rem, waiters.closed)),
                     None => {
+                        println!("queue empty");
                         self.permits.fetch_add(rem, Ordering::Release);
                         rem = 0;
                         break;
@@ -168,21 +173,33 @@ impl Semaphore {
                 }
             }
 
-            let n = (initial - rem) << 1;
 
+            let n = (dbg!(initial).saturating_sub(dbg!(rem))) << 1;
+
+            dbg!(n);
             let actual = if closed {
-                let actual = self.add_lock.fetch_sub(n | 1, Ordering::AcqRel);
+                let actual = dbg!(self.add_lock.fetch_sub(n | 1, Ordering::AcqRel));
+                assert!(actual < std::usize::MAX);
                 closed = false;
                 actual >> 1
             } else {
-                let actual = self.add_lock.fetch_sub(n, Ordering::AcqRel);
-                closed = actual & 1 == 1;
+                let actual = dbg!(self.add_lock.fetch_sub(n, Ordering::AcqRel));
+                assert!(actual < std::usize::MAX);
+                if actual & 1 == 1 {
+                    waiters.closed = true;
+                    closed = true;
+                }
                 actual >> 1
             };
 
-            rem = (actual >> 1) - rem;
-            ddbg!(rem);
+            rem = dbg!(actual.saturating_sub(n >> 1));
+
+            if dbg!(rem) == 0 && !dbg!(closed) {
+                break;
+            }
         }
+
+        println!("DONE ADDING PERMITS");
     }
 
     fn poll_acquire(
@@ -191,6 +208,7 @@ impl Semaphore {
         needed: u16,
         node: Pin<&mut Waiter>,
     ) -> Poll<Result<(), AcquireError>> {
+        loop {
         let mut curr = self.permits.load(Ordering::Acquire);
         let needed = needed as usize;
         let (acquired, remaining) = loop {
@@ -208,6 +226,7 @@ impl Semaphore {
                 Ordering::AcqRel,
                 Ordering::Acquire,
             ) {
+
                 Ok(_) => break (acquired, remaining),
                 Err(actual) => curr = actual,
             }
@@ -217,31 +236,52 @@ impl Semaphore {
             return Ready(Ok(()));
         }
 
-        assert!(node.is_unlinked());
-        node.state
-            .compare_exchange(
-                Waiter::UNQUEUED,
-                remaining,
-                Ordering::Release,
-                Ordering::Relaxed,
-            )
-            .expect("not unqueued");
-        // otherwise, register the waker & enqueue the node.
-        node.waker.register_by_ref(cx.waker());
-
-        let mut waiters = self.waiters.lock().unwrap();
-        if waiters.closed {
+        let mut waiters = if let Ok(lock) = self.waiters.try_lock() {
+            lock
+        } else {
+            // "fence" to wait until permits are not being added and retry
+            let _ = self.waiters.lock().unwrap();
+            continue;
+        };
+        if dbg!(waiters.closed) {
             return Ready(Err(AcquireError(())));
         }
-        unsafe {
-            // XXX(eliza) T_T
-            let node = Pin::into_inner_unchecked(node) as *mut _;
-            waiters.queue.push_front(node);
-            println!("enqueue");
+
+        let mut state = dbg!(node.state.load(Ordering::Acquire));
+        let mut next = state;
+        loop {
+            // were we assigned permits while blocking on the lock?
+            next = if dbg!(state >= Waiter::UNQUEUED) {
+                dbg!(remaining)
+            } else {
+                dbg!(state.saturating_sub(acquired))
+            };
+            match node.state.compare_exchange(state, next, Ordering::AcqRel, Ordering::Acquire) {
+                Ok(_) => break,
+                Err(actual) => state = actual,
+            }
+
+        }
+        
+        if next & std::u16::MAX as usize == 0 {
+            return Ready(Ok(()));
+        }
+        if node.is_unlinked() {
+            // otherwise, register the waker & enqueue the node.
+            node.waker.register_by_ref(cx.waker());
+
+            unsafe {
+                // XXX(eliza) T_T
+                let node = Pin::into_inner_unchecked(node) as *mut _;
+                waiters.queue.push_front(node);
+                println!("enqueue");
+            }
         }
 
-        Pending
+    
+        return Pending
     }
+}
 }
 
 impl Drop for Semaphore {
@@ -381,7 +421,7 @@ impl Waiter {
     ///
     /// Returns `true` if the waiter should be removed from the queue
     fn assign_permits(&self, n: &mut usize, closed: bool) -> bool {
-        if closed {
+        if dbg!(closed) {
             self.waker.wake();
             return true;
         }
@@ -398,7 +438,7 @@ impl Waiter {
             {
                 Ok(_) => {
                     // Update `n`
-                    *n -= assign;
+                    *n = n.saturating_sub(assign);
 
                     if next == 0 {
                         if curr > 0 {
