@@ -980,7 +980,7 @@ impl<T> Slot<T> {
         if 1 == self.lock.fetch_sub(2, SeqCst) - 2 {
             // First acquire the lock to make sure our sender is waiting on the
             // condition variable, otherwise the notification could be lost.
-            let _ = tail.lock().unwrap();
+            let _lock = tail.lock().unwrap();
             // Wake up senders
             condvar.notify_all();
         }
