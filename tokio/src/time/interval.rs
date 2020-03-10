@@ -103,6 +103,21 @@ impl Interval {
         Poll::Ready(now)
     }
 
+    /// Resets the `Interval` instance to a new deadline.
+    ///
+    /// Calling this function allows changing the instant at which the `Interval`
+    /// will start ticking without having to create new associated state.
+    ///
+    /// This function can be called at any time.
+    pub fn reset(&mut self, deadline: Instant) {
+        self.delay.reset(deadline);
+    }
+
+    /// Returns the period of this `Interval`
+    pub fn period(&self) -> Duration {
+        self.period
+    }
+
     /// Completes when the next instant in the interval has been reached.
     ///
     /// # Examples

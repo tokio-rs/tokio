@@ -1,5 +1,5 @@
 use crate::stream::{Fuse, Stream};
-use crate::time::{Delay, Elapsed, Instant};
+use crate::time::{interval_at, Delay, Elapsed, Instant, Interval};
 
 use core::future::Future;
 use core::pin::Pin;
@@ -57,6 +57,49 @@ impl<S: Stream> Stream for Timeout<S> {
         }
 
         Poll::Pending
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.stream.size_hint()
+    }
+}
+
+pin_project! {
+    /// Stream returned by the [`timeout`](super::StreamExt::timeout) method.
+    #[must_use = "streams do nothing unless polled"]
+    #[derive(Debug)]
+    pub struct RepeatedTimeout<S> {
+        #[pin]
+        stream: Fuse<S>,
+        interval: Interval,
+    }
+}
+
+impl<S: Stream> RepeatedTimeout<S> {
+    pub(super) fn new(stream: S, duration: Duration) -> Self {
+        RepeatedTimeout {
+            stream: Fuse::new(stream),
+            interval: interval_at(Instant::now() + duration, duration),
+        }
+    }
+}
+
+impl<S: Stream> Stream for RepeatedTimeout<S> {
+    type Item = Result<S::Item, Elapsed>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.as_mut().project();
+        match this.stream.poll_next(cx) {
+            Poll::Ready(v) => {
+                if v.is_some() {
+                    this.interval.reset(Instant::now() + this.interval.period());
+                }
+                Poll::Ready(v.map(Ok))
+            }
+            Poll::Pending => Pin::new(this.interval)
+                .poll_next(cx)
+                .map(|_| Some(Err(Elapsed::new()))),
+        }
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {

@@ -5,44 +5,43 @@
 //! This module provides helpers to work with them.
 
 mod all;
-use all::AllFuture;
+pub use all::AllFuture;
 
 mod any;
-use any::AnyFuture;
+pub use any::AnyFuture;
 
 mod chain;
-use chain::Chain;
+pub use chain::Chain;
 
 mod collect;
-use collect::Collect;
-pub use collect::FromStream;
+pub use collect::{Collect, FromStream};
 
 mod empty;
 pub use empty::{empty, Empty};
 
 mod filter;
-use filter::Filter;
+pub use filter::Filter;
 
 mod filter_map;
-use filter_map::FilterMap;
+pub use filter_map::FilterMap;
 
 mod fold;
-use fold::FoldFuture;
+pub use fold::FoldFuture;
 
 mod fuse;
-use fuse::Fuse;
+pub use fuse::Fuse;
 
 mod iter;
 pub use iter::{iter, Iter};
 
 mod map;
-use map::Map;
+pub use map::Map;
 
 mod merge;
-use merge::Merge;
+pub use merge::Merge;
 
 mod next;
-use next::Next;
+pub use next::Next;
 
 mod once;
 pub use once::{once, Once};
@@ -54,23 +53,23 @@ mod stream_map;
 pub use stream_map::StreamMap;
 
 mod skip;
-use skip::Skip;
+pub use skip::Skip;
 
 mod skip_while;
-use skip_while::SkipWhile;
+pub use skip_while::SkipWhile;
 
 mod try_next;
-use try_next::TryNext;
+pub use try_next::TryNext;
 
 mod take;
-use take::Take;
+pub use take::Take;
 
 mod take_while;
-use take_while::TakeWhile;
+pub use take_while::TakeWhile;
 
 cfg_time! {
     mod timeout;
-    use timeout::Timeout;
+    pub use timeout::{Timeout, RepeatedTimeout};
     use std::time::Duration;
 }
 
@@ -813,6 +812,22 @@ pub trait StreamExt: Stream {
         Self: Sized,
     {
         Timeout::new(self, duration)
+    }
+
+    /// Applies a per-item repeated timeout to the passed stream.
+    ///
+    /// This function behaves identically to `timeout` except that the stream
+    /// will keep returning errors at the specified interval until the wrapped
+    /// stream returns an item.
+    ///
+    /// Each time the wrapped stream yields an item, the timeout is reset.
+    #[cfg(all(feature = "time"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+    fn repeated_timeout(self, duration: Duration) -> RepeatedTimeout<Self>
+    where
+        Self: Sized,
+    {
+        RepeatedTimeout::new(self, duration)
     }
 }
 
