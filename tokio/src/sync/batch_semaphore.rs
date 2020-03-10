@@ -18,8 +18,10 @@ use std::{
 };
 
 macro_rules! ddbg {
-    ($x:expr) => { dbg!($x) };
-    ($($x:expr),+) => {}
+    ($x:expr) => {
+        dbg!($x)
+    };
+    ($($x:expr),+) => {};
 }
 
 pub(crate) struct Semaphore {
@@ -85,7 +87,7 @@ impl Semaphore {
         assert!(permits <= std::u16::MAX as usize);
         Self {
             permits: AtomicUsize::new(permits),
-            waiters: Mutex::new(Waitlist { 
+            waiters: Mutex::new(Waitlist {
                 queue: LinkedList::new(),
                 closed: false,
             }),
@@ -127,7 +129,7 @@ impl Semaphore {
         // abort.
         let prev = self.add_lock.fetch_add(added << 1, Ordering::AcqRel);
         if prev > 0 {
-            return
+            return;
         }
         // let closed = match ddbg!(prev) {
         //     1 => true,
@@ -150,7 +152,6 @@ impl Semaphore {
         mut waiters: MutexGuard<'_, Waitlist>,
         mut closed: bool,
     ) {
-
         println!(" ADD PERMITS LOCKED ");
 
         loop {
@@ -159,30 +160,33 @@ impl Semaphore {
             // Release the permits and notify
             while dbg!(rem) > 0 || dbg!(waiters.closed) {
                 let pop = match waiters.queue.last() {
+                    Some(_) if waiters.closed => true,
                     Some(last) => {
-                        
-                         ddbg!(format_args!("assign permits to {:p}", last));
+                        ddbg!(format_args!("assign permits to {:p}", last));
                         let res = ddbg!(last.assign_permits(&mut rem, waiters.closed));
-                        dbg!(last.is_unlinked());
+                        // dbg!(last.is_unlinked());
                         res
                     }
                     None => {
-                        println!("queue empty");
-                        self.permits.fetch_add(rem, Ordering::Release);
-                        rem = 0;
+                        dbg!("queue empty");
+                        let _prev = self.permits.fetch_add(rem, Ordering::Release);
+                        dbg!(_prev + rem);
                         break;
                         // false
                     }
                 };
                 if pop {
-                    println!("popping");
-                    waiters.queue.pop_back().unwrap();
-                    println!("popped");
+                    dbg!("popping");
+                    let waiter = waiters.queue.pop_back().unwrap();
+                    dbg!(format_args!("popped {:?}", waiter));
+                    unsafe {
+                        waiter.as_ref().waker.wake();
+                    }
+                    dbg!("woke");
                 }
             }
 
-
-            let n = (dbg!(initial).saturating_sub(dbg!(rem))) << 1;
+            let n = initial << 1;
 
             dbg!(n);
             let actual = if closed {
@@ -200,7 +204,7 @@ impl Semaphore {
                 actual >> 1
             };
 
-            rem = dbg!(actual.saturating_sub(n >> 1));
+            rem = actual - initial;
 
             if dbg!(rem) == 0 && !dbg!(closed) {
                 break;
@@ -216,80 +220,91 @@ impl Semaphore {
         needed: u16,
         node: Pin<&mut Waiter>,
     ) -> Poll<Result<(), AcquireError>> {
+        let mut lock = None;
+        let mut acquired = 0;
+        let mut should_push = false;
         loop {
-        let mut curr = self.permits.load(Ordering::Acquire);
-        let needed = needed as usize;
-        let (acquired, remaining) = loop {
-            ddbg!(needed, curr);
-            let mut remaining = 0;
-            let (next, acquired) = if ddbg!(curr) >= ddbg!(needed) {
-                (curr - needed, needed)
-            } else {
-                remaining = needed - curr;
-                (0, curr)
+            let mut curr = self.permits.load(Ordering::Acquire);
+            let needed = needed as usize;
+            let remaining = loop {
+                ddbg!(needed, curr);
+                let mut remaining = 0;
+                let (next, acq) = if ddbg!(curr + acquired) >= ddbg!(needed) {
+                    let next = curr - (needed - acquired);
+                    (dbg!(next), needed)
+                } else {
+                    remaining = (needed - acquired) - curr;
+                    (0, curr)
+                };
+                match self.permits.compare_exchange_weak(
+                    curr,
+                    next,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                ) {
+                    Ok(_) => {
+                        acquired += acq;
+                        break remaining;
+                    }
+                    Err(actual) => curr = actual,
+                }
             };
-            match self.permits.compare_exchange_weak(
-                curr,
-                next,
-                Ordering::AcqRel,
-                Ordering::Acquire,
-            ) {
-
-                Ok(_) => break (acquired, remaining),
-                Err(actual) => curr = actual,
-            }
-        };
-        ddbg!(acquired, remaining);
-        if remaining == 0 {
-            return Ready(Ok(()));
-        }
-
-        let mut waiters = if let Ok(lock) = self.waiters.try_lock() {
-            lock
-        } else {
-            // "fence" to wait until permits are not being added and retry
-            let _ = self.waiters.lock().unwrap();
-            continue;
-        };
-        if dbg!(waiters.closed) {
-            return Ready(Err(AcquireError(())));
-        }
-
-        let mut state = dbg!(node.state.load(Ordering::Acquire));
-        let mut next = state;
-        loop {
-            // were we assigned permits while blocking on the lock?
-            next = if dbg!(state >= Waiter::UNQUEUED) {
-                dbg!(remaining)
-            } else {
-                dbg!(state.saturating_sub(acquired))
-            };
-            match node.state.compare_exchange(state, next, Ordering::AcqRel, Ordering::Acquire) {
-                Ok(_) => break,
-                Err(actual) => state = actual,
+            ddbg!(acquired, remaining);
+            if remaining == 0 {
+                return Ready(Ok(()));
             }
 
-        }
-        
-        if next & std::u16::MAX as usize == 0 {
-            return Ready(Ok(()));
-        }
-        if node.is_unlinked() {
+            let mut waiters = match lock {
+                Some(lock) => lock,
+                None => {
+                    lock = Some(self.waiters.lock().unwrap());
+                    continue;
+                }
+            };
+            if dbg!(waiters.closed) {
+                return Ready(Err(AcquireError(())));
+            }
+
+            let mut state = dbg!(node.state.load(Ordering::Acquire));
+            let mut next = state;
+            loop {
+                // were we assigned permits while blocking on the lock?
+                next = if dbg!(state >= Waiter::UNQUEUED) {
+                    should_push = true;
+                    dbg!(remaining)
+                } else {
+                    dbg!(state.saturating_sub(acquired))
+                };
+                match node
+                    .state
+                    .compare_exchange(state, next, Ordering::AcqRel, Ordering::Acquire)
+                {
+                    Ok(_) => break,
+                    Err(actual) => state = actual,
+                }
+            }
+
+            if next & std::u16::MAX as usize == 0 {
+                return Ready(Ok(()));
+            }
+
             // otherwise, register the waker & enqueue the node.
             node.waker.register_by_ref(cx.waker());
 
             unsafe {
                 // XXX(eliza) T_T
                 let node = Pin::into_inner_unchecked(node) as *mut _;
-                waiters.queue.push_front(NonNull::new_unchecked(node));
-                println!("enqueue");
-            }
-        }
+                let node = NonNull::new_unchecked(node);
 
-    
-        return Pending
+                if !waiters.queue.is_linked(&node) {
+                    waiters.queue.push_front(node);
+                    println!("enqueue");
+                }
+            }
+
+            return Pending;
+        }
     }
-}
 }
 
 impl Drop for Semaphore {
@@ -421,19 +436,18 @@ impl Waiter {
         }
     }
 
-    fn is_unlinked(&self) -> bool {
-        self.pointers.is_unlinked()
-    }
-
     /// Assign permits to the waiter.
     ///
     /// Returns `true` if the waiter should be removed from the queue
     fn assign_permits(&self, n: &mut usize, closed: bool) -> bool {
         if dbg!(closed) {
-            self.waker.wake();
             return true;
         }
         let mut curr = self.state.load(Ordering::Acquire);
+        dbg!(format_args!(
+            "assigning {} permits to {:p} (curr: {})",
+            n, self, curr
+        ));
 
         loop {
             // Number of permits to assign to this waiter
@@ -448,15 +462,7 @@ impl Waiter {
                     // Update `n`
                     *n = n.saturating_sub(assign);
 
-                    if next == 0 {
-                        if curr > 0 {
-                            self.waker.wake();
-                        }
-
-                        return true;
-                    } else {
-                        return false;
-                    }
+                    return next == 0;
                 }
                 Err(actual) => curr = actual,
             }
@@ -537,20 +543,21 @@ impl Acquire<'_> {
 impl Drop for Acquire<'_> {
     fn drop(&mut self) {
         ddbg!(format_args!("drop acquire {:p}", self));
-        if ddbg!(self.node.is_unlinked()) {
-            // don't need to release permits
-            return;
-        }
+
         // This is where we ensure safety. The future is being dropped,
         // which means we must ensure that the waiter entry is no longer stored
         // in the linked list.
         let mut waiters = self.semaphore.waiters.lock().unwrap();
-
+        let node = NonNull::from(&mut self.node);
+        if ddbg!(!waiters.queue.is_linked(&node)) {
+            // don't need to release permits
+            return;
+        }
         // remove the entry from the list
         //
         // safety: the waiter is only added to `waiters` by virtue of it
         // being the only `LinkedList` available to the type.
-        unsafe { waiters.queue.remove(NonNull::from(&mut self.node)) };
+        unsafe { waiters.queue.remove(node) };
 
         // TODO(eliza): release permits to next waiter
     }

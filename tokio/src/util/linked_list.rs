@@ -83,6 +83,16 @@ impl<T: Link> LinkedList<T> {
         let ptr = T::as_raw(&*val);
 
         unsafe {
+            dbg!(format_args!(
+                "ptr={:p}; head={:p}; tail={:p}",
+                ptr,
+                self.head
+                    .map(NonNull::as_ptr)
+                    .unwrap_or_else(std::ptr::null_mut),
+                self.tail
+                    .map(NonNull::as_ptr)
+                    .unwrap_or_else(std::ptr::null_mut)
+            ));
             T::pointers(ptr).as_mut().next = self.head;
             T::pointers(ptr).as_mut().prev = None;
 
@@ -130,6 +140,24 @@ impl<T: Link> LinkedList<T> {
 
         assert!(self.tail.is_none());
         true
+    }
+
+    pub(crate) fn is_linked(&self, node: &T::Handle) -> bool {
+        let node = T::as_raw(node);
+        unsafe {
+            if T::pointers(node).as_ref().next.is_some()
+                || T::pointers(node).as_ref().prev.is_some()
+            {
+                return true;
+            }
+        }
+        if let Some(head) = self.head {
+            if head == node {
+                assert_eq!(self.tail, Some(node));
+                return true;
+            }
+        }
+        false
     }
 
     /// Removes the specified node from the list

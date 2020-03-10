@@ -5,7 +5,7 @@ use loom::future::block_on;
 use loom::thread;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::AtomicUsize;
+use loom::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use std::task::Poll::Ready;
