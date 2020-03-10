@@ -81,18 +81,8 @@ impl<T: Link> LinkedList<T> {
         // The value should not be dropped, it is being inserted into the list
         let val = ManuallyDrop::new(val);
         let ptr = T::as_raw(&*val);
-
+        assert_ne!(self.head, Some(ptr));
         unsafe {
-            dbg!(format_args!(
-                "ptr={:p}; head={:p}; tail={:p}",
-                ptr,
-                self.head
-                    .map(NonNull::as_ptr)
-                    .unwrap_or_else(std::ptr::null_mut),
-                self.tail
-                    .map(NonNull::as_ptr)
-                    .unwrap_or_else(std::ptr::null_mut)
-            ));
             T::pointers(ptr).as_mut().next = self.head;
             T::pointers(ptr).as_mut().prev = None;
 

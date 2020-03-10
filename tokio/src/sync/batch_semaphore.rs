@@ -1,4 +1,5 @@
 use crate::loom::{
+    cell::CausalCell,
     future::AtomicWaker,
     sync::{atomic::AtomicUsize, Mutex, MutexGuard},
 };
@@ -103,6 +104,7 @@ impl Semaphore {
     /// Closes the semaphore. This prevents the semaphore from issuing new
     /// permits and notifies all pending waiters.
     pub(crate) fn close(&self) {
+        self.permits.fetch_or(CLOSED, Ordering::Release);
         // Acquire the `add_lock`, setting the "closed" flag on the lock.
         let prev = self.add_lock.fetch_or(1, Ordering::AcqRel);
         println!("closed");
@@ -169,7 +171,7 @@ impl Semaphore {
                     }
                     None => {
                         dbg!("queue empty");
-                        let _prev = self.permits.fetch_add(rem, Ordering::Release);
+                        let _prev = self.permits.fetch_add(rem, Ordering::AcqRel);
                         dbg!(_prev + rem);
                         break;
                         // false
@@ -220,11 +222,20 @@ impl Semaphore {
         needed: u16,
         node: Pin<&mut Waiter>,
     ) -> Poll<Result<(), AcquireError>> {
+        let mut state = dbg!(node.state.load(Ordering::Acquire));
+        if state == 0 {
+            return Ready(Ok(()));
+        }
+
         let mut lock = None;
         let mut acquired = 0;
-        let mut should_push = false;
-        loop {
+        let mut waiters = loop {
             let mut curr = self.permits.load(Ordering::Acquire);
+
+            if dbg!(curr & CLOSED > 0) {
+                return Ready(Err(AcquireError(())));
+            }
+
             let needed = needed as usize;
             let remaining = loop {
                 ddbg!(needed, curr);
@@ -254,56 +265,75 @@ impl Semaphore {
                 return Ready(Ok(()));
             }
 
-            let mut waiters = match lock {
-                Some(lock) => lock,
+            // No permits were immediately available, so this permit will (probably) need to wait.
+            // We'll need to acquire a lock on the wait queue.
+            match lock {
                 None => {
+                    // We haven't acquired the lock yet. If it isn't contended, we can continue.
+                    if let Ok(lock) = self.waiters.try_lock() {
+                        break lock;
+                    }
+                    // Otherwise, the wait list is currently locked. In that case, we'll need to
+                    // check the available permits a second time before we enqueue the node to wait
+                    // --- someone else might be in the process of releasing permits.
                     lock = Some(self.waiters.lock().unwrap());
                     continue;
                 }
+                Some(lock) => break lock,
             };
-            if dbg!(waiters.closed) {
-                return Ready(Err(AcquireError(())));
-            }
+        };
 
-            let mut state = dbg!(node.state.load(Ordering::Acquire));
-            let mut next = state;
-            loop {
-                // were we assigned permits while blocking on the lock?
-                next = if dbg!(state >= Waiter::UNQUEUED) {
-                    should_push = true;
-                    dbg!(remaining)
-                } else {
-                    dbg!(state.saturating_sub(acquired))
-                };
-                match node
-                    .state
-                    .compare_exchange(state, next, Ordering::AcqRel, Ordering::Acquire)
-                {
-                    Ok(_) => break,
-                    Err(actual) => state = actual,
-                }
-            }
-
-            if next & std::u16::MAX as usize == 0 {
-                return Ready(Ok(()));
-            }
-
-            // otherwise, register the waker & enqueue the node.
-            node.waker.register_by_ref(cx.waker());
-
-            unsafe {
-                // XXX(eliza) T_T
-                let node = Pin::into_inner_unchecked(node) as *mut _;
-                let node = NonNull::new_unchecked(node);
-
-                if !waiters.queue.is_linked(&node) {
-                    waiters.queue.push_front(node);
-                    println!("enqueue");
-                }
-            }
-
-            return Pending;
+        if dbg!(waiters.closed) {
+            return Ready(Err(AcquireError(())));
         }
+
+        let mut next = state;
+        let mut leftover = 0;
+        loop {
+            leftover = 0;
+            // were we assigned permits while blocking on the lock?
+            next = if dbg!(state >= Waiter::UNQUEUED) {
+                dbg!(needed as usize - acquired)
+            } else if acquired > state {
+                leftover = dbg!(acquired - state);
+                0
+            } else {
+                state - acquired
+            };
+            match node
+                .state
+                .compare_exchange(state, next, Ordering::AcqRel, Ordering::Acquire)
+            {
+                Ok(_) => break,
+                Err(actual) => state = actual,
+            }
+        }
+
+        if next & std::u16::MAX as usize == 0 {
+            // we may have been assigned "bonus permits", and we have to give them back!
+            drop(waiters);
+            if leftover > 0 {
+                self.add_permits(leftover);
+            }
+
+            return Ready(Ok(()));
+        }
+
+        // otherwise, register the waker & enqueue the node.
+        node.waker.register_by_ref(cx.waker());
+
+        unsafe {
+            // XXX(eliza) T_T
+            let node = Pin::into_inner_unchecked(node) as *mut _;
+            let node = NonNull::new_unchecked(node);
+
+            if !waiters.queue.is_linked(&node) {
+                waiters.queue.push_front(node);
+                println!("enqueue");
+            }
+        }
+
+        Pending
     }
 }
 
