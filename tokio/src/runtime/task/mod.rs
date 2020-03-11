@@ -214,6 +214,7 @@ unsafe impl<S> linked_list::Link for Task<S> {
     }
 
     unsafe fn pointers(target: NonNull<Header>) -> NonNull<linked_list::Pointers<Header>> {
-        NonNull::from(&mut *target.as_ref().owned.get())
+        // Not super great as it avoids some of looms checking...
+        NonNull::from(target.as_ref().owned.with_mut(|ptr| &mut *ptr))
     }
 }

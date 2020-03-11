@@ -1,11 +1,10 @@
-use crate::loom::cell::CausalCell;
+use crate::loom::cell::UnsafeCell;
 use crate::runtime::task::raw::{self, Vtable};
 use crate::runtime::task::state::State;
 use crate::runtime::task::waker::waker_ref;
 use crate::runtime::task::{Notified, Schedule, Task};
 use crate::util::linked_list;
 
-use std::cell::UnsafeCell;
 use std::future::Future;
 use std::pin::Pin;
 use std::ptr::NonNull;
@@ -32,10 +31,10 @@ pub(super) struct Cell<T: Future, S> {
 /// Holds the future or output, depending on the stage of execution.
 pub(super) struct Core<T: Future, S> {
     /// Scheduler used to drive this future
-    pub(super) scheduler: CausalCell<Option<S>>,
+    pub(super) scheduler: UnsafeCell<Option<S>>,
 
     /// Either the future or the output
-    pub(super) stage: CausalCell<Stage<T>>,
+    pub(super) stage: UnsafeCell<Stage<T>>,
 }
 
 /// Crate public as this is also needed by the pool.
@@ -62,7 +61,7 @@ unsafe impl Sync for Header {}
 /// Cold data is stored after the future.
 pub(super) struct Trailer {
     /// Consumer task waiting on completion of this task.
-    pub(super) waker: CausalCell<Option<Waker>>,
+    pub(super) waker: UnsafeCell<Option<Waker>>,
 }
 
 /// Either the future or the output.
@@ -85,11 +84,11 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 vtable: raw::vtable::<T, S>(),
             },
             core: Core {
-                scheduler: CausalCell::new(None),
-                stage: CausalCell::new(Stage::Running(future)),
+                scheduler: UnsafeCell::new(None),
+                stage: UnsafeCell::new(Stage::Running(future)),
             },
             trailer: Trailer {
-                waker: CausalCell::new(None),
+                waker: UnsafeCell::new(None),
             },
         })
     }

@@ -230,6 +230,8 @@ use self::spawner::Spawner;
 mod time;
 
 cfg_rt_threaded! {
+    mod queue;
+
     pub(crate) mod thread_pool;
     use self::thread_pool::ThreadPool;
 }

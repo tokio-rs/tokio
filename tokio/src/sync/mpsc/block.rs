@@ -1,5 +1,5 @@
 use crate::loom::{
-    cell::CausalCell,
+    cell::UnsafeCell,
     sync::atomic::{AtomicPtr, AtomicUsize},
     thread,
 };
@@ -26,7 +26,7 @@ pub(crate) struct Block<T> {
 
     /// The observed `tail_position` value *after* the block has been passed by
     /// `block_tail`.
-    observed_tail_position: CausalCell<usize>,
+    observed_tail_position: UnsafeCell<usize>,
 
     /// Array containing values pushed into the block. Values are stored in a
     /// continuous array in order to improve cache line behavior when reading.
@@ -39,7 +39,7 @@ pub(crate) enum Read<T> {
     Closed,
 }
 
-struct Values<T>([CausalCell<MaybeUninit<T>>; BLOCK_CAP]);
+struct Values<T>([UnsafeCell<MaybeUninit<T>>; BLOCK_CAP]);
 
 use super::BLOCK_CAP;
 
@@ -85,7 +85,7 @@ impl<T> Block<T> {
 
             ready_slots: AtomicUsize::new(0),
 
-            observed_tail_position: CausalCell::new(0),
+            observed_tail_position: UnsafeCell::new(0),
 
             // Value storage
             values: unsafe { Values::uninitialized() },
@@ -365,12 +365,12 @@ impl<T> Values<T> {
     unsafe fn uninitialized() -> Values<T> {
         let mut vals = MaybeUninit::uninit();
 
-        // When fuzzing, `CausalCell` needs to be initialized.
+        // When fuzzing, `UnsafeCell` needs to be initialized.
         if_loom! {
-            let p = vals.as_mut_ptr() as *mut CausalCell<MaybeUninit<T>>;
+            let p = vals.as_mut_ptr() as *mut UnsafeCell<MaybeUninit<T>>;
             for i in 0..BLOCK_CAP {
                 p.add(i)
-                    .write(CausalCell::new(MaybeUninit::uninit()));
+                    .write(UnsafeCell::new(MaybeUninit::uninit()));
             }
         }
 
@@ -379,7 +379,7 @@ impl<T> Values<T> {
 }
 
 impl<T> ops::Index<usize> for Values<T> {
-    type Output = CausalCell<MaybeUninit<T>>;
+    type Output = UnsafeCell<MaybeUninit<T>>;
 
     fn index(&self, index: usize) -> &Self::Output {
         self.0.index(index)

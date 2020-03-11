@@ -124,6 +124,9 @@ where
                         if snapshot.is_notified() {
                             // Signal yield
                             self.core().yield_now(Notified(self.to_task()));
+                            // The ref-count was incremented as part of
+                            // `transition_to_idle`.
+                            self.drop_reference();
                         }
                     }
                     Err(_) => self.cancel_task(),

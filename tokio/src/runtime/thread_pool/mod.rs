@@ -6,8 +6,6 @@ use atomic_cell::AtomicCell;
 mod idle;
 use self::idle::Idle;
 
-mod queue;
-
 mod worker;
 pub(crate) use worker::Launch;
 

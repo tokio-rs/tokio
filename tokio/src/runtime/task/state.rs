@@ -120,6 +120,13 @@ impl State {
 
             let mut next = curr;
             next.unset_running();
+
+            if next.is_notified() {
+                // The caller needs to schedule the task. To do this, it needs a
+                // waker. The waker requires a ref count.
+                next.ref_inc();
+            }
+
             Some(next)
         })
     }
@@ -306,16 +313,8 @@ impl State {
 
     /// Returns `true` if the task should be released.
     pub(super) fn ref_dec(&self) -> bool {
-        use crate::loom::sync::atomic;
-
-        let prev = Snapshot(self.val.fetch_sub(REF_ONE, Release));
-        let is_final_ref = prev.ref_count() == 1;
-
-        if is_final_ref {
-            atomic::fence(Acquire);
-        }
-
-        is_final_ref
+        let prev = Snapshot(self.val.fetch_sub(REF_ONE, AcqRel));
+        prev.ref_count() == 1
     }
 
     fn fetch_update<F>(&self, mut f: F) -> Result<Snapshot, Snapshot>

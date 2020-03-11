@@ -30,9 +30,7 @@ impl<T: 'static> TransferStack<T> {
         let mut curr = self.head.load(Relaxed);
 
         loop {
-            unsafe {
-                *task.as_ref().stack_next.get() = NonNull::new(curr);
-            }
+            unsafe { task.as_ref().stack_next.with_mut(|ptr| *ptr = NonNull::new(curr)) };
 
             let res = self
                 .head
@@ -57,7 +55,7 @@ impl<T: 'static> TransferStack<T> {
                 let task = self.0?;
 
                 // Move the cursor forward
-                self.0 = unsafe { *task.as_ref().stack_next.get() };
+                self.0 = unsafe { task.as_ref().stack_next.with(|ptr| *ptr) };
 
                 // Return the task
                 unsafe { Some(Task::from_raw(task)) }
