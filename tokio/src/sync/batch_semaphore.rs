@@ -1,5 +1,4 @@
 use crate::loom::{
-    cell::CausalCell,
     future::AtomicWaker,
     sync::{atomic::AtomicUsize, Mutex, MutexGuard},
 };
@@ -227,7 +226,7 @@ impl Semaphore {
         let mut acquired = 0;
         let mut lock = None;
         let mut curr = self.permits.load(Ordering::Acquire);
-        let mut waiters = loop {
+        let waiters = loop {
             state = dbg!(node.state.load(Ordering::Acquire));
             if state == 0 {
                 return Ready(Ok(()));
@@ -281,10 +280,8 @@ impl Semaphore {
             return Ready(Err(AcquireError(())));
         }
 
-        let mut next = state;
-        let mut leftover = 0;
+        let mut next;
         loop {
-            leftover = 0;
             // were we assigned permits while blocking on the lock?
             next = if dbg!(state >= Waiter::UNQUEUED) {
                 dbg!(needed as usize - acquired)
@@ -305,14 +302,7 @@ impl Semaphore {
             }
         }
 
-        if leftover > 0 {
-            panic!("unexpected bonus permits {:?}", leftover);
-        }
-
         if next & std::u16::MAX as usize == 0 {
-            // we may have been assigned "bonus permits", and we have to give them back!
-            drop(waiters);
-
             return Ready(Ok(()));
         }
 
@@ -326,7 +316,6 @@ impl Semaphore {
 
             if !waiters.queue.is_linked(&node) {
                 waiters.queue.push_front(node);
-                println!("enqueue");
             }
         }
 
@@ -398,7 +387,6 @@ impl Permit {
 
     /// Releases a permit back to the semaphore
     pub(crate) fn release(&mut self, n: u16, semaphore: &Semaphore) {
-        dbg!("release", n);
         let n = self.forget(n, semaphore);
         semaphore.add_permits(n as usize);
     }
