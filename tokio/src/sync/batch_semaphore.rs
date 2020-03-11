@@ -257,10 +257,12 @@ impl Semaphore {
                 dbg!("LOCK ACQUIRED");
                 continue;
             }
-            match self
-                .permits
-                .compare_exchange_weak(curr, next, Ordering::AcqRel, Ordering::AcqRel)
-            {
+            match self.permits.compare_exchange_weak(
+                curr,
+                next,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            ) {
                 Ok(_) => {
                     ddbg!(acquired, remaining);
                     acquired += acq;
