@@ -104,10 +104,11 @@ impl Semaphore {
     /// Closes the semaphore. This prevents the semaphore from issuing new
     /// permits and notifies all pending waiters.
     pub(crate) fn close(&self) {
+        dbg!("closing...");
         self.permits.fetch_or(CLOSED, Ordering::Release);
         // Acquire the `add_lock`, setting the "closed" flag on the lock.
         let prev = self.add_lock.fetch_or(1, Ordering::AcqRel);
-        println!("closed");
+        dbg!("closed");
 
         if dbg!(prev) != 0 {
             // Another thread has the lock and will be responsible for notifying
@@ -222,67 +223,58 @@ impl Semaphore {
         needed: u16,
         node: Pin<&mut Waiter>,
     ) -> Poll<Result<(), AcquireError>> {
-        let mut state = dbg!(node.state.load(Ordering::Acquire));
-        if state == 0 {
-            return Ready(Ok(()));
-        }
-
-        let mut lock = None;
+        let mut state;
         let mut acquired = 0;
+        let mut lock = None;
+        let mut curr = self.permits.load(Ordering::Acquire);
         let mut waiters = loop {
-            let mut curr = self.permits.load(Ordering::Acquire);
+            state = dbg!(node.state.load(Ordering::Acquire));
+            if state == 0 {
+                return Ready(Ok(()));
+            }
 
             if dbg!(curr & CLOSED > 0) {
                 return Ready(Err(AcquireError(())));
             }
 
-            let needed = needed as usize;
-            let remaining = loop {
-                ddbg!(needed, curr);
-                let mut remaining = 0;
-                let (next, acq) = if ddbg!(curr + acquired) >= ddbg!(needed) {
-                    let next = curr - (needed - acquired);
-                    (dbg!(next), needed)
-                } else {
-                    remaining = (needed - acquired) - curr;
-                    (0, curr)
-                };
-                match self.permits.compare_exchange_weak(
-                    curr,
-                    next,
-                    Ordering::AcqRel,
-                    Ordering::Acquire,
-                ) {
-                    Ok(_) => {
-                        acquired += acq;
-                        break remaining;
-                    }
-                    Err(actual) => curr = actual,
-                }
+            let needed = cmp::min(state, needed as usize);
+            ddbg!(needed, curr);
+            let mut remaining = 0;
+            let (next, acq) = if ddbg!(curr + acquired) >= ddbg!(needed) {
+                let next = curr - (needed - acquired);
+                (dbg!(next), needed)
+            } else {
+                remaining = (needed - acquired) - curr;
+                (0, curr)
             };
-            ddbg!(acquired, remaining);
-            if remaining == 0 {
-                return Ready(Ok(()));
+            if remaining > 0 && lock.is_none() {
+                // No permits were immediately available, so this permit will (probably) need to wait.
+                // We'll need to acquire a lock on the wait queue.
+                // Otherwise, the wait list is currently locked. In that case, we'll need to
+                // check the available permits a second time before we enqueue the node to wait
+                // --- someone else might be in the process of releasing permits.
+                lock = Some(self.waiters.lock().unwrap());
+                dbg!("LOCK ACQUIRED");
+                continue;
             }
-
-            // No permits were immediately available, so this permit will (probably) need to wait.
-            // We'll need to acquire a lock on the wait queue.
-            match lock {
-                None => {
-                    // We haven't acquired the lock yet. If it isn't contended, we can continue.
-                    if let Ok(lock) = self.waiters.try_lock() {
-                        break lock;
+            match self
+                .permits
+                .compare_exchange_weak(curr, next, Ordering::AcqRel, Ordering::AcqRel)
+            {
+                Ok(_) => {
+                    ddbg!(acquired, remaining);
+                    acquired += acq;
+                    if remaining == 0 {
+                        return Ready(Ok(()));
                     }
-                    // Otherwise, the wait list is currently locked. In that case, we'll need to
-                    // check the available permits a second time before we enqueue the node to wait
-                    // --- someone else might be in the process of releasing permits.
-                    lock = Some(self.waiters.lock().unwrap());
-                    continue;
+                    break lock;
                 }
-                Some(lock) => break lock,
-            };
+                Err(actual) => curr = actual,
+            }
         };
+        let mut waiters = waiters.unwrap();
 
+        dbg!("LOCKED");
         if dbg!(waiters.closed) {
             return Ready(Err(AcquireError(())));
         }
@@ -300,21 +292,24 @@ impl Semaphore {
             } else {
                 state - acquired
             };
-            match node
-                .state
-                .compare_exchange(state, next, Ordering::AcqRel, Ordering::Acquire)
-            {
+            match node.state.compare_exchange(
+                dbg!(state),
+                dbg!(next),
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            ) {
                 Ok(_) => break,
                 Err(actual) => state = actual,
             }
         }
 
+        if leftover > 0 {
+            panic!("unexpected bonus permits {:?}", leftover);
+        }
+
         if next & std::u16::MAX as usize == 0 {
             // we may have been assigned "bonus permits", and we have to give them back!
             drop(waiters);
-            if leftover > 0 {
-                self.add_permits(leftover);
-            }
 
             return Ready(Ok(()));
         }
@@ -401,6 +396,7 @@ impl Permit {
 
     /// Releases a permit back to the semaphore
     pub(crate) fn release(&mut self, n: u16, semaphore: &Semaphore) {
+        dbg!("release", n);
         let n = self.forget(n, semaphore);
         semaphore.add_permits(n as usize);
     }
