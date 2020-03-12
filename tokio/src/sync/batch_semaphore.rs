@@ -252,7 +252,7 @@ impl Semaphore {
 
             // Has the semaphore closed?
             if curr & CLOSED > 0 {
-                return Ready(Err(AcquireError(())));
+                return Ready(Err(AcquireError::closed()));
             }
 
             let needed = cmp::min(state, needed as usize);
@@ -269,10 +269,10 @@ impl Semaphore {
             if remaining > 0 && lock.is_none() {
                 // No permits were immediately available, so this permit will (probably) need to wait.
                 // We'll need to acquire a lock on the wait queue.
-                // Otherwise, the wait list is currently locked. In that case, we'll need to
-                // check the available permits a second time before we enqueue the node to wait
-                // --- someone else might be in the process of releasing permits.
                 lock = Some(self.waiters.lock().unwrap());
+                // While we were waiting to lock the wait list, additional permits may have been
+                // released. Therefore, we will acquire a new snapshot of the current state of the
+                // semaphore before actually enqueueing the waiter..
                 continue;
             }
 
@@ -300,28 +300,27 @@ impl Semaphore {
             return Ready(Err(AcquireError(())));
         }
 
-        let mut next;
-        loop {
-            // were we assigned permits while blocking on the lock?
-            next = if dbg!(state >= Waiter::UNQUEUED) {
-                dbg!(needed as usize - acquired)
-            } else if acquired > state {
-                0
-            } else {
-                state - acquired
-            };
-            match node.state.compare_exchange(
-                dbg!(state),
-                dbg!(next),
-                Ordering::AcqRel,
-                Ordering::Acquire,
-            ) {
-                Ok(_) => break,
-                Err(actual) => state = actual,
+        let next = match acquired.cmp(&state) {
+            // if the waiter is in the unqueued state, we need all the requested permits, minus the amount we just acquired.
+            _ if state >= Waiter::UNQUEUED => needed as usize - acquired,
+            // We have acquired all the needed permits!
+            cmp::Ordering::Equal => 0,
+            cmp::Ordering::Less => state - acquired,
+            cmp::Ordering::Greater => {
+                unreachable!("cannot have been assigned more than needed permits")
             }
-        }
+        };
 
-        if next & std::u16::MAX as usize == 0 {
+        // Typically, one would probably expect to see a compare-and-swap loop here. However, in
+        // this case, we don't need to loop. Our most snapshot of the node's current state
+        // was acquired after we acquired the lock on the wait list. Because releasing permits to
+        // waiters also requires locking the wait list, the state cannot have changed since we
+        // acquired this snapshot.
+        node.state
+            .compare_exchange(state, next, Ordering::AcqRel, Ordering::Acquire)
+            .expect("state cannot have changed while the wait list was locked");
+
+        if next == 0 {
             return Ready(Ok(()));
         }
 
@@ -495,31 +494,6 @@ impl Waiter {
 
                     return next == 0;
                 }
-                Err(actual) => curr = actual,
-            }
-        }
-    }
-
-    /// Try to decrement the number of permits to acquire. This returns the
-    /// actual number of permits that were decremented. The delta betweeen `n`
-    /// and the return has been assigned to the permit and the caller must
-    /// assign these back to the semaphore.
-    fn try_dec_permits_to_acquire(&self, n: usize) -> usize {
-        let mut curr = self.state.load(Ordering::Acquire);
-
-        loop {
-            // if !curr.is_queued() {
-            //     assert_eq!(0, curr.permits_to_acquire());
-            // }
-
-            let delta = cmp::min(n, curr);
-            let rem = curr - delta;
-
-            match self
-                .state
-                .compare_exchange(curr, rem, Ordering::AcqRel, Ordering::Acquire)
-            {
-                Ok(_) => return n - delta,
                 Err(actual) => curr = actual,
             }
         }
