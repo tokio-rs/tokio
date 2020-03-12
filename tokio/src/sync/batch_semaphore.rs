@@ -561,17 +561,27 @@ impl Drop for Acquire<'_> {
         // in the linked list.
         let mut waiters = self.semaphore.waiters.lock().unwrap();
         let node = NonNull::from(&mut self.node);
-        if ddbg!(!waiters.queue.is_linked(&node)) {
-            // don't need to release permits
-            return;
-        }
-        // remove the entry from the list
-        //
-        // safety: the waiter is only added to `waiters` by virtue of it
-        // being the only `LinkedList` available to the type.
-        unsafe { waiters.queue.remove(node) };
+        if waiters.queue.is_linked(&node) {
+            // remove the entry from the list
+            //
+            // safety: the waiter is only added to `waiters` by virtue of it
+            // being the only `LinkedList` available to the type.
+            unsafe { waiters.queue.remove(node) };
 
-        // TODO(eliza): release permits to next waiter
+            let acquired_permits = self.num_permits as usize - self.node.state.load(Ordering::Acquire);
+            // we have already locked the mutex, so we know we will be the one to release these
+            // permits, but it's necessary to add them since we will try to subtract them once we have
+            // finished permit assignment.
+            self.semaphore.add_lock.fetch_add(acquired_permits << 1, Ordering::AcqRel);
+            self.semaphore.add_permits_locked(acquired_permits, waiters, false);
+        } else {
+            drop(waiters);
+        };
+
+        // If the permit had transitioned to the `Waiting` state, put it back into `Acquired`.
+        if let PermitState::Waiting(_) = self.permit.state {
+            self.permit.state = PermitState::Acquired(0);
+        }
     }
 }
 
