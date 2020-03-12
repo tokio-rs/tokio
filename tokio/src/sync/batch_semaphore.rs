@@ -104,26 +104,23 @@ impl Semaphore {
     /// Closes the semaphore. This prevents the semaphore from issuing new
     /// permits and notifies all pending waiters.
     pub(crate) fn close(&self) {
-        dbg!("closing...");
         self.permits.fetch_or(CLOSED, Ordering::Release);
         // Acquire the `add_lock`, setting the "closed" flag on the lock.
         let prev = self.add_lock.fetch_or(1, Ordering::AcqRel);
-        dbg!("closed");
 
-        if dbg!(prev) != 0 {
+        if prev != 0 {
             // Another thread has the lock and will be responsible for notifying
             // pending waiters.
             return;
         }
+
         let mut lock = self.waiters.lock().unwrap();
         lock.closed = true;
-        println!("locked");
         self.add_permits_locked(0, lock, true);
     }
 
     /// Adds `n` new permits to the semaphore.
     pub(crate) fn add_permits(&self, added: usize) {
-        ddbg!(added);
         if added == 0 {
             return;
         }
@@ -144,8 +141,6 @@ impl Semaphore {
         mut waiters: MutexGuard<'_, Waitlist>,
         mut closed: bool,
     ) {
-        println!(" ADD PERMITS LOCKED ");
-
         loop {
             // how many permits are we releasing on this pass?
             let initial = rem;
@@ -153,31 +148,20 @@ impl Semaphore {
             while dbg!(rem) > 0 || dbg!(waiters.closed) {
                 let pop = match waiters.queue.last() {
                     Some(_) if waiters.closed => true,
-                    Some(last) => {
-                        ddbg!(format_args!("assign permits to {:p}", last));
-                        let res = ddbg!(last.assign_permits(&mut rem, waiters.closed));
-                        // dbg!(last.is_unlinked());
-                        res
-                    }
+                    Some(last) => last.assign_permits(&mut rem, waiters.closed),
                     None => {
-                        dbg!("queue empty");
-                        let _prev = self.permits.fetch_add(rem, Ordering::AcqRel);
-                        dbg!(_prev + rem);
+                        self.permits.fetch_add(rem, Ordering::AcqRel);
                         break;
-                        // false
                     }
                 };
                 if pop {
-                    dbg!("popping");
                     let mut waiter = waiters.queue.pop_back().unwrap();
-                    dbg!(format_args!("popped {:?}", waiter));
                     let waker = unsafe {
                         waiter.as_mut().waker.with_mut(|waker| {
                             (*waker).take()
                         })
                     };
                     waker.expect("if a node is in the wait list, it must have a waker").wake();
-                    dbg!("woke");
                 }
             }
 
@@ -185,13 +169,13 @@ impl Semaphore {
 
             dbg!(n);
             let actual = if closed {
-                let actual = dbg!(self.add_lock.fetch_sub(n | 1, Ordering::AcqRel));
-                assert!(actual < std::usize::MAX);
+                let actual = self.add_lock.fetch_sub(n | 1, Ordering::AcqRel);
+                assert!(actual <= CLOSED);
                 closed = false;
                 actual >> 1
             } else {
-                let actual = dbg!(self.add_lock.fetch_sub(n, Ordering::AcqRel));
-                assert!(actual < std::usize::MAX);
+                let actual = self.add_lock.fetch_sub(n, Ordering::AcqRel);
+                assert!(actual <= CLOSED);
                 if actual & 1 == 1 {
                     waiters.closed = true;
                     closed = true;
@@ -201,12 +185,11 @@ impl Semaphore {
 
             rem = actual - initial;
 
-            if dbg!(rem) == 0 && !dbg!(closed) {
+            if rem == 0 && !closed {
                 break;
             }
         }
 
-        println!("DONE ADDING PERMITS");
     }
 
     fn try_acquire(&self, num_permits: u16) -> Result<(), TryAcquireError> {
