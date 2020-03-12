@@ -83,7 +83,7 @@ impl<'a> SemaphorePermit<'a> {
     /// This can be used to reduce the amount of permits available from a
     /// semaphore.
     pub fn forget(mut self) {
-        self.ll_permit.forget(1, &self.sem.ll_sem);
+        self.ll_permit.forget(1);
     }
 }
 

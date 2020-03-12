@@ -230,11 +230,6 @@ impl<T> Pointers<T> {
             next: None,
         }
     }
-
-    /// Returns `true` if this set of pointers is not part of a list.
-    pub(crate) fn is_unlinked(&self) -> bool {
-        self.prev.is_none() && self.next.is_none()
-    }
 }
 
 #[cfg(test)]

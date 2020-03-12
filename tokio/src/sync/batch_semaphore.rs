@@ -420,7 +420,7 @@ impl Permit {
 
     /// Releases a permit back to the semaphore
     pub(crate) fn release(&mut self, n: u16, semaphore: &Semaphore) {
-        let n = self.forget(n, semaphore);
+        let n = self.forget(n);
         semaphore.add_permits(n as usize);
     }
 
@@ -434,11 +434,11 @@ impl Permit {
     ///
     /// Will forget **at most** the number of acquired permits. This number is
     /// returned.
-    pub(crate) fn forget(&mut self, n: u16, semaphore: &Semaphore) -> u16 {
+    pub(crate) fn forget(&mut self, n: u16) -> u16 {
         use PermitState::*;
 
         match self.state {
-            Waiting(requested) => panic!(
+            Waiting(_) => unreachable!(
                 "cannot forget permits while in wait queue; we are already borrowed mutably?"
             ),
             Acquired(acquired) => {
@@ -530,7 +530,7 @@ impl Future for Acquire<'_> {
     type Output = Result<(), AcquireError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let (node, semaphore, permit, mut needed) = self.project();
+        let (node, semaphore, permit, needed) = self.project();
         ddbg!(&semaphore, &permit, &needed);
         permit.state = match permit.state {
             PermitState::Acquired(n) if n >= needed => return Ready(Ok(())),

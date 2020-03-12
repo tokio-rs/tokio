@@ -132,7 +132,7 @@ fn forget_acquired() {
 
     assert_eq!(s.available_permits(), 0);
 
-    permit.forget(1, &s);
+    permit.forget(1);
     assert_eq!(s.available_permits(), 0);
 }
 
