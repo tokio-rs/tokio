@@ -556,6 +556,11 @@ impl Drop for Acquire<'_> {
     fn drop(&mut self) {
         ddbg!(format_args!("drop acquire {:p}", self));
 
+        // fast path: if we aren't actually waiting, no need to acquire the lock.
+        if self.node.state.load(Ordering::Acquire) & Waiter::UNQUEUED == Waiter::UNQUEUED {
+            return;
+        }
+
         // This is where we ensure safety. The future is being dropped,
         // which means we must ensure that the waiter entry is no longer stored
         // in the linked list.
