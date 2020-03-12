@@ -1,5 +1,5 @@
 use crate::loom::{
-    future::AtomicWaker,
+    cell::CausalCell,
     sync::{atomic::AtomicUsize, Mutex, MutexGuard},
 };
 use crate::util::linked_list::{self, LinkedList};
@@ -14,6 +14,7 @@ use std::{
     task::{
         Context, Poll,
         Poll::{Pending, Ready},
+        Waker,
     },
 };
 
@@ -69,7 +70,7 @@ enum PermitState {
 }
 
 struct Waiter {
-    waker: AtomicWaker,
+    waker: CausalCell<Option<Waker>>,
     state: AtomicUsize,
 
     /// Intrusive linked-list pointers
@@ -168,11 +169,14 @@ impl Semaphore {
                 };
                 if pop {
                     dbg!("popping");
-                    let waiter = waiters.queue.pop_back().unwrap();
+                    let mut waiter = waiters.queue.pop_back().unwrap();
                     dbg!(format_args!("popped {:?}", waiter));
-                    unsafe {
-                        waiter.as_ref().waker.wake();
-                    }
+                    let waker = unsafe {
+                        waiter.as_mut().waker.with_mut(|waker| {
+                            (*waker).take()
+                        })
+                    };
+                    waker.expect("if a node is in the wait list, it must have a waker").wake();
                     dbg!("woke");
                 }
             }
@@ -325,7 +329,10 @@ impl Semaphore {
         }
 
         // otherwise, register the waker & enqueue the node.
-        node.waker.register_by_ref(cx.waker());
+        node.waker.with_mut(|waker| 
+            // safety: the wait list is locked, so we may modify the waker.
+            unsafe { *waker = Some(cx.waker().clone()) }
+        );
 
         unsafe {
             // XXX(eliza) T_T
@@ -459,7 +466,7 @@ impl Waiter {
     const UNQUEUED: usize = 1 << 16;
     fn new() -> Self {
         Waiter {
-            waker: AtomicWaker::new(),
+            waker: CausalCell::new(None),
             state: AtomicUsize::new(Self::UNQUEUED),
             pointers: linked_list::Pointers::new(),
             _p: PhantomPinned,
