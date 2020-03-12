@@ -229,8 +229,8 @@ impl Semaphore {
         // First, try to take the requested number of permits from the semaphore.
         let mut lock = None;
         let mut curr = self.permits.load(Ordering::Acquire);
-        let waiters = loop {
-            state = dbg!(node.state.load(Ordering::Acquire));
+        let mut waiters = loop {
+            state = node.state.load(Ordering::Acquire);
 
             // Has the waiter already acquired all its needed permits? If so, we're done!
             if state == 0 {
@@ -243,11 +243,10 @@ impl Semaphore {
             }
 
             let needed = cmp::min(state, needed as usize);
-            ddbg!(needed, curr);
             let mut remaining = 0;
-            let (next, acq) = if ddbg!(curr + acquired) >= ddbg!(needed) {
+            let (next, acq) = if curr + acquired >= needed {
                 let next = curr - (needed - acquired);
-                (dbg!(next), needed)
+                (next, needed)
             } else {
                 remaining = (needed - acquired) - curr;
                 (0, curr)
@@ -270,20 +269,17 @@ impl Semaphore {
                 Ordering::Acquire,
             ) {
                 Ok(_) => {
-                    ddbg!(acquired, remaining);
                     acquired += acq;
                     if remaining == 0 {
                         return Ready(Ok(()));
                     }
-                    break lock;
+                    break lock.unwrap();
                 }
                 Err(actual) => curr = actual,
             }
         };
-        let mut waiters = waiters.unwrap();
 
-        dbg!("LOCKED");
-        if dbg!(waiters.closed) {
+        if waiters.closed {
             return Ready(Err(AcquireError(())));
         }
 
@@ -460,14 +456,11 @@ impl Waiter {
     ///
     /// Returns `true` if the waiter should be removed from the queue
     fn assign_permits(&self, n: &mut usize, closed: bool) -> bool {
-        if dbg!(closed) {
+        if closed {
             return true;
         }
         let mut curr = self.state.load(Ordering::Acquire);
-        dbg!(format_args!(
-            "assigning {} permits to {:p} (curr: {})",
-            n, self, curr
-        ));
+
 
         loop {
             // Number of permits to assign to this waiter
