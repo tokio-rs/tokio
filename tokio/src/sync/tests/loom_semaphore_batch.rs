@@ -171,3 +171,23 @@ fn batch() {
         assert_eq!(10, semaphore.available_permits());
     });
 }
+
+#[test]
+fn release_during_acquire() {
+    loom::model(|| {
+        let semaphore = Arc::new(Semaphore::new(10));
+        let mut permit1 = Permit::new();
+        permit1.try_acquire(8, &semaphore).expect("try_acquire should succeed; semaphore uncontended");
+        let semaphore2 = semaphore.clone();
+        let thread = thread::spawn(move || {
+            let mut permit = Permit::new();
+            block_on(permit.acquire(4, &semaphore2)).unwrap();
+            permit
+        });
+
+        permit1.release(8, &semaphore);
+        let mut permit2 = thread.join().unwrap();
+        permit2.release(4, &semaphore);
+        assert_eq!(10, semaphore.available_permits());
+    })
+}
