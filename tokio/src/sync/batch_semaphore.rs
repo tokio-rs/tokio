@@ -18,13 +18,6 @@ use std::{
     },
 };
 
-macro_rules! ddbg {
-    ($x:expr) => {
-        dbg!($x)
-    };
-    ($($x:expr),+) => {};
-}
-
 pub(crate) struct Semaphore {
     waiters: Mutex<Waitlist>,
     permits: AtomicUsize,
@@ -145,7 +138,7 @@ impl Semaphore {
             // how many permits are we releasing on this pass?
             let initial = rem;
             // Release the permits and notify
-            while dbg!(rem) > 0 || dbg!(waiters.closed) {
+            while rem > 0 || waiters.closed {
                 let pop = match waiters.queue.last() {
                     Some(_) if waiters.closed => true,
                     Some(last) => last.assign_permits(&mut rem, waiters.closed),
@@ -167,7 +160,6 @@ impl Semaphore {
 
             let n = initial << 1;
 
-            dbg!(n);
             let actual = if closed {
                 let actual = self.add_lock.fetch_sub(n | 1, Ordering::AcqRel);
                 assert!(actual <= CLOSED);
@@ -429,7 +421,7 @@ impl Permit {
             Acquired(acquired) => {
                 let n = cmp::min(n, acquired);
                 self.state = Acquired(acquired - n);
-                ddbg!(n)
+                n
             }
         }
     }
@@ -456,25 +448,25 @@ impl Waiter {
     ///
     /// Returns `true` if the waiter should be removed from the queue
     fn assign_permits(&self, n: &mut usize, closed: bool) -> bool {
+        // If the wait list has closed, consume no permits but pop the node.
         if closed {
             return true;
         }
+
         let mut curr = self.state.load(Ordering::Acquire);
 
-
         loop {
-            // Number of permits to assign to this waiter
+            // Assign up to `n` permits.
             let assign = cmp::min(curr, *n);
             let next = curr - assign;
-            let next = if closed { next | CLOSED } else { next };
             match self
                 .state
                 .compare_exchange(curr, next, Ordering::AcqRel, Ordering::Acquire)
             {
                 Ok(_) => {
-                    // Update `n`
                     *n = n.saturating_sub(assign);
 
+                    // If we have assigned all remaining permits, return true.
                     return next == 0;
                 }
                 Err(actual) => curr = actual,
@@ -488,7 +480,6 @@ impl Future for Acquire<'_> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let (node, semaphore, permit, needed) = self.project();
-        ddbg!(&semaphore, &permit, &needed);
         permit.state = match permit.state {
             PermitState::Acquired(n) if n >= needed => return Ready(Ok(())),
             PermitState::Acquired(n) => {
@@ -530,8 +521,6 @@ impl Acquire<'_> {
 
 impl Drop for Acquire<'_> {
     fn drop(&mut self) {
-        ddbg!(format_args!("drop acquire {:p}", self));
-
         // fast path: if we aren't actually waiting, no need to acquire the lock.
         if self.node.state.load(Ordering::Acquire) & Waiter::UNQUEUED == Waiter::UNQUEUED {
             return;
@@ -545,8 +534,7 @@ impl Drop for Acquire<'_> {
         if waiters.queue.is_linked(&node) {
             // remove the entry from the list
             //
-            // safety: the waiter is only added to `waiters` by virtue of it
-            // being the only `LinkedList` available to the type.
+            // safety: we have locked the wait list.
             unsafe { waiters.queue.remove(node) };
 
             let acquired_permits = self.num_permits as usize - self.node.state.load(Ordering::Acquire);
