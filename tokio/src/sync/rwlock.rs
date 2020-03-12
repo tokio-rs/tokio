@@ -1,9 +1,6 @@
-use crate::future::poll_fn;
 use crate::sync::batch_semaphore::{AcquireError, Permit, Semaphore};
 use std::cell::UnsafeCell;
 use std::ops;
-use std::pin::Pin;
-use std::task::{Context, Poll};
 
 #[cfg(not(loom))]
 const MAX_READS: usize = 32;

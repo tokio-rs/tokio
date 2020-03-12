@@ -1,6 +1,4 @@
 use super::batch_semaphore as ll; // low level implementation
-use crate::future::poll_fn;
-use std::pin::Pin;
 
 /// Counting semaphore performing asynchronous permit aquisition.
 ///
