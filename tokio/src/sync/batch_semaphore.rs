@@ -133,17 +133,6 @@ impl Semaphore {
         if prev > 0 {
             return;
         }
-        // let closed = match ddbg!(prev) {
-        //     1 => true,
-        //     0 => false,
-        //     // Another thread has the lock and will be responsible for notifying
-        //     // pending waiters.
-        //     _ => return,
-        // };
-
-        // if self.permits.load(Ordering::Acquire) & CLOgpg*SED == 1 {
-
-        // }
 
         self.add_permits_locked(added, self.waiters.lock().unwrap(), false);
     }
@@ -216,6 +205,31 @@ impl Semaphore {
         println!("DONE ADDING PERMITS");
     }
 
+    fn try_acquire(&self, num_permits: u16) -> Result<(), TryAcquireError> {
+        let mut curr = self.permits.load(Ordering::Acquire);
+        loop {
+            // Has the semaphore closed?
+            if curr & CLOSED > 0 {
+                return Err(TryAcquireError::Closed);
+            }
+
+            // Are there enough permits remaining?
+            if (curr as u16) < num_permits {
+                return Err(TryAcquireError::NoPermits);
+            }
+
+            let next = curr - num_permits as usize;
+
+            match self
+                .permits
+                .compare_exchange(curr, next, Ordering::AcqRel, Ordering::Acquire)
+            {
+                Ok(_) => return Ok(()),
+                Err(actual) => curr = actual,
+            }
+        }
+    }
+
     fn poll_acquire(
         &self,
         cx: &mut Context<'_>,
@@ -224,15 +238,20 @@ impl Semaphore {
     ) -> Poll<Result<(), AcquireError>> {
         let mut state;
         let mut acquired = 0;
+
+        // First, try to take the requested number of permits from the semaphore.
         let mut lock = None;
         let mut curr = self.permits.load(Ordering::Acquire);
         let waiters = loop {
             state = dbg!(node.state.load(Ordering::Acquire));
+
+            // Has the waiter already acquired all its needed permits? If so, we're done!
             if state == 0 {
                 return Ready(Ok(()));
             }
 
-            if dbg!(curr & CLOSED > 0) {
+            // Has the semaphore closed?
+            if curr & CLOSED > 0 {
                 return Ready(Err(AcquireError(())));
             }
 
@@ -246,6 +265,7 @@ impl Semaphore {
                 remaining = (needed - acquired) - curr;
                 (0, curr)
             };
+
             if remaining > 0 && lock.is_none() {
                 // No permits were immediately available, so this permit will (probably) need to wait.
                 // We'll need to acquire a lock on the wait queue.
@@ -253,9 +273,9 @@ impl Semaphore {
                 // check the available permits a second time before we enqueue the node to wait
                 // --- someone else might be in the process of releasing permits.
                 lock = Some(self.waiters.lock().unwrap());
-                dbg!("LOCK ACQUIRED");
                 continue;
             }
+
             match self.permits.compare_exchange_weak(
                 curr,
                 next,
@@ -286,7 +306,6 @@ impl Semaphore {
             next = if dbg!(state >= Waiter::UNQUEUED) {
                 dbg!(needed as usize - acquired)
             } else if acquired > state {
-                leftover = dbg!(acquired - state);
                 0
             } else {
                 state - acquired
@@ -382,7 +401,21 @@ impl Permit {
         num_permits: u16,
         semaphore: &Semaphore,
     ) -> Result<(), TryAcquireError> {
-        unimplemented!()
+        use PermitState::*;
+
+        match self.state {
+            Waiting(_) => unreachable!(
+                "if a permit is waiting, then it has been borrowed mutably by an `Acquire` future"
+            ),
+            Acquired(acquired) => {
+                if acquired < num_permits {
+                    semaphore.try_acquire(num_permits - acquired)?;
+                    self.state = Acquired(num_permits);
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Releases a permit back to the semaphore
@@ -405,27 +438,9 @@ impl Permit {
         use PermitState::*;
 
         match self.state {
-            Waiting(requested) => {
-                panic!(
-                    "cannot forget permits while in wait queue; we are already borrowed mutably?"
-                )
-                // let n = cmp::min(n, requested);
-                // let node = unsafe { &*self.node.get() };
-                // // Decrement
-                // let acquired = node.try_dec_permits_to_acquire(n as usize) as u16;
-
-                // if n == requested {
-                //     self.state = Acquired(0);
-                // // // TODO: rm from wait list here!
-                // // semaphore
-                // } else if acquired == requested - n {
-                //     self.state = Waiting(acquired);
-                // } else {
-                //     self.state = Waiting(requested - n);
-                // }
-
-                // acquired
-            }
+            Waiting(requested) => panic!(
+                "cannot forget permits while in wait queue; we are already borrowed mutably?"
+            ),
             Acquired(acquired) => {
                 let n = cmp::min(n, acquired);
                 self.state = Acquired(acquired - n);
