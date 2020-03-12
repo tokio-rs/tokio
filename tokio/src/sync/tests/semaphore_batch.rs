@@ -197,52 +197,52 @@ fn poll_acquire_many_unavailable() {
     assert_ready_ok!(acquire_3.poll());
 }
 
-// #[test]
-// fn try_acquire_one_unavailable() {
-//     let s = Semaphore::new(1);
+#[test]
+fn try_acquire_one_unavailable() {
+    let s = Semaphore::new(1);
 
-//     let mut permit_1 = Permit::new();
-//     let mut permit_2 = Permit::new();
+    let mut permit_1 = Permit::new();
+    let mut permit_2 = Permit::new();
 
-//     // Acquire the first permit
-//     assert_ok!(permit_1.try_acquire(1, &s));
-//     assert_eq!(s.available_permits(), 0);
+    // Acquire the first permit
+    assert_ok!(permit_1.try_acquire(1, &s));
+    assert_eq!(s.available_permits(), 0);
 
-//     assert_err!(permit_2.try_acquire(1, &s));
+    assert_err!(permit_2.try_acquire(1, &s));
 
-//     permit_1.release(1, &s);
+    permit_1.release(1, &s);
 
-//     assert_eq!(s.available_permits(), 1);
-//     assert_ok!(permit_2.try_acquire(1, &s));
+    assert_eq!(s.available_permits(), 1);
+    assert_ok!(permit_2.try_acquire(1, &s));
 
-//     permit_2.release(1, &s);
-//     assert_eq!(s.available_permits(), 1);
-// }
+    permit_2.release(1, &s);
+    assert_eq!(s.available_permits(), 1);
+}
 
-// #[test]
-// fn try_acquire_many_unavailable() {
-//     let s = Semaphore::new(5);
+#[test]
+fn try_acquire_many_unavailable() {
+    let s = Semaphore::new(5);
 
-//     let mut permit_1 = Permit::new();
-//     let mut permit_2 = Permit::new();
+    let mut permit_1 = Permit::new();
+    let mut permit_2 = Permit::new();
 
-//     // Acquire the first permit
-//     assert_ok!(permit_1.try_acquire(1, &s));
-//     assert_eq!(s.available_permits(), 4);
+    // Acquire the first permit
+    assert_ok!(permit_1.try_acquire(1, &s));
+    assert_eq!(s.available_permits(), 4);
 
-//     assert_err!(permit_2.try_acquire(5, &s));
+    assert_err!(permit_2.try_acquire(5, &s));
 
-//     permit_1.release(1, &s);
-//     assert_eq!(s.available_permits(), 5);
+    permit_1.release(1, &s);
+    assert_eq!(s.available_permits(), 5);
 
-//     assert_ok!(permit_2.try_acquire(5, &s));
+    assert_ok!(permit_2.try_acquire(5, &s));
 
-//     permit_2.release(1, &s);
-//     assert_eq!(s.available_permits(), 1);
+    permit_2.release(1, &s);
+    assert_eq!(s.available_permits(), 1);
 
-//     permit_2.release(1, &s);
-//     assert_eq!(s.available_permits(), 2);
-// }
+    permit_2.release(1, &s);
+    assert_eq!(s.available_permits(), 2);
+}
 
 #[test]
 fn poll_acquire_one_zero_permits() {
@@ -478,3 +478,25 @@ fn close_semaphore_notifies_permit2() {
 //     assert_ready_ok!(permit.enter(|cx, mut p| p.as_mut().poll_acquire(cx, 2, &s)));
 //     assert_eq!(s.available_permits(), 0);
 // }
+
+#[test]
+fn cancel_acquire_releases_permits() {
+    let s = Semaphore::new(10);
+    let mut permit1 = Permit::new();
+    permit1
+        .try_acquire(4, &s)
+        .expect("uncontended try_acquire succeeds");
+    assert_eq!(6, s.available_permits());
+
+    let mut permit2 = Permit::new();
+    let mut acquire = task::spawn(permit2.acquire(8, &s));
+    assert_pending!(acquire.poll());
+
+    assert_eq!(0, s.available_permits());
+    drop(acquire);
+
+    assert_eq!(6, s.available_permits());
+    permit2
+        .try_acquire(6, &s)
+        .expect("should acquire successfully");
+}
