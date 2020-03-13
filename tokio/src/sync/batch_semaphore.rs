@@ -39,13 +39,17 @@ pub(crate) struct Semaphore {
     waiters: Mutex<Waitlist>,
     /// The current number of available permits in the semaphore.
     permits: AtomicUsize,
+
     /// Permits in the process of being released.
     /// 
     /// When releasing permits, if the lock on the semaphore's wait list is held by another task,
     /// the task releasing permits adds them to this counter. The task holding the lock will
     /// continue releasing permits until the counter is drained, allowing the `release` operation
     /// to be wait free.
-    add_lock: AtomicUsize,
+    /// 
+    /// The first bit of this counter indicates that the semaphore is closing. Therefore, all
+    /// values are shifted over one bit.
+    adding: AtomicUsize,
 }
 
 struct Waitlist {
@@ -86,11 +90,27 @@ enum PermitState {
     Acquired(u16),
 }
 
+/// An entry in the wait queue.
 struct Waiter {
-    waker: CausalCell<Option<Waker>>,
+    /// The current state of the waiter. 
+    /// 
+    /// This is either the number of remaining permits required by
+    /// the waiter, or a flag indicating that the waiter is not yet queued.
     state: AtomicUsize,
 
-    /// Intrusive linked-list pointers
+    /// The waker to notify the task awaiting permits.
+    /// 
+    /// # Safety
+    /// 
+    /// This may only be accessed while the wait queue is locked.
+    /// XXX: it would be nice if we could enforce this...
+    waker: CausalCell<Option<Waker>>,
+
+    /// Intrusive linked-list pointers.
+    /// 
+    /// # Safety
+    /// 
+    /// This may only be accessed while the wait queue is locked.
     pointers: linked_list::Pointers<Waiter>,
 
     /// Should not be `Unpin`.
@@ -109,7 +129,7 @@ impl Semaphore {
                 queue: LinkedList::new(),
                 closed: false,
             }),
-            add_lock: AtomicUsize::new(0),
+            adding: AtomicUsize::new(0),
         }
     }
 
@@ -118,12 +138,47 @@ impl Semaphore {
         self.permits.load(Ordering::SeqCst) & std::u16::MAX as usize
     }
 
+
+    /// Adds `n` new permits to the semaphore.
+    pub(crate) fn add_permits(&self, added: usize) {
+        // Assigning permits to waiters requires locking the wait list, so that any waiters which
+        // receive their required number of permits can be dequeued and notified. However, if
+        // multiple threads attempt to add permits concurrently, we are able to make this operation
+        // wait-free. By tracking an atomic counter of permits added to the semaphore, we are able
+        // to determine if another thread is currently holding the lock to assign permits. If
+        // this is the case, we simply add our permits to the counter and return, so we don't need
+        // to acquire the lock. Otherwise, no other thread is adding permits, so we lock the wait
+        // and loop until the counter of added permits is drained.
+
+        if added == 0 {
+            return;
+        }
+
+        // TODO: Handle overflow. A panic is not sufficient, the process must
+        // abort.
+        let prev = self.adding.fetch_add(added << 1, Ordering::AcqRel);
+        if prev > 0 {
+            // Another thread is already assigning permits. It will continue to do so until
+            // `added` is drained, so we don't need to block on the lock.
+            return;
+        }
+
+        // Otherwise, no other thread is assigning permits. Thus, we must lock the semaphore's wait
+        // list and assign permits until `added` is drained.
+        self.add_permits_locked(added, self.waiters.lock().unwrap(), false);
+    }
+
     /// Closes the semaphore. This prevents the semaphore from issuing new
     /// permits and notifies all pending waiters.
     pub(crate) fn close(&self) {
+        // Closing the semaphore works similarly to adding permits: if another thread is already
+        // holding the lock on the wait list to assign permits, we simply set a bit in the counter
+        // of permits being added. The thread holding the lock will see that bit has been set, and
+        // begin closing the semaphore.
+
         self.permits.fetch_or(CLOSED, Ordering::Release);
-        // Acquire the `add_lock`, setting the "closed" flag on the lock.
-        let prev = self.add_lock.fetch_or(1, Ordering::AcqRel);
+        // Acquire the `added`, setting the "closed" flag on the lock.
+        let prev = self.adding.fetch_or(1, Ordering::AcqRel);
 
         if prev != 0 {
             // Another thread has the lock and will be responsible for notifying
@@ -136,36 +191,20 @@ impl Semaphore {
         self.add_permits_locked(0, lock, true);
     }
 
-    /// Adds `n` new permits to the semaphore.
-    pub(crate) fn add_permits(&self, added: usize) {
-        if added == 0 {
-            return;
-        }
-
-        // TODO: Handle overflow. A panic is not sufficient, the process must
-        // abort.
-        let prev = self.add_lock.fetch_add(added << 1, Ordering::AcqRel);
-        if prev > 0 {
-            // Another thread is already assigning permits. It will continue to do so until
-            // `add_lock` is drained, so we don't need to block on the lock.
-            return;
-        }
-
-        // Otherwise, no other thread is assigning permits. Thus, we must lock the semaphore's wait
-        // list and assign permits until `add_lock` is drained.
-        self.add_permits_locked(added, self.waiters.lock().unwrap(), false);
-    }
-
     fn add_permits_locked(
         &self,
         mut rem: usize,
         mut waiters: MutexGuard<'_, Waitlist>,
         mut closed: bool,
     ) {
+        // The thread adding permits will loop until the counter of added permits is drained. If
+        // threads add permits (or close the semaphore) while we are holding the lock, we will add
+        // those permits as well, so that the other thread does not need to block.
+
         loop {
-            // how many permits are we releasing on this pass?
+            // How many permits are we releasing on this iteration?
             let initial = rem;
-            // Release the permits and notify
+            // Assign permits to the wait queue and notify any satisfied waiters.
             while rem > 0 || waiters.closed {
                 let pop = match waiters.queue.last() {
                     Some(_) if waiters.closed => true,
@@ -177,10 +216,11 @@ impl Semaphore {
                 };
                 if pop {
                     let node = waiters.queue.pop_back().unwrap();
-                    let waiter = unsafe { node.as_ref() };
-                    let waker = waiter.waker.with_mut(|waker| unsafe {
-                        (*waker).take()
-                    });
+                    // Safety: we are holding the lock on the wait queue, and thus have exclusive
+                    // access to the nodes' wakers.
+                    let waker = unsafe { 
+                        node.as_ref().waker.with_mut(|waker| (*waker).take())
+                    };
 
                     waker.expect("if a node is in the wait list, it must have a waker").wake();
 
@@ -190,12 +230,12 @@ impl Semaphore {
             let n = initial << 1;
 
             let actual = if closed {
-                let actual = self.add_lock.fetch_sub(n | 1, Ordering::AcqRel);
+                let actual = self.adding.fetch_sub(n | 1, Ordering::AcqRel);
                 assert!(actual <= CLOSED, "permits to add overflowed! {}", actual);
                 closed = false;
                 actual >> 1
             } else {
-                let actual = self.add_lock.fetch_sub(n, Ordering::AcqRel);
+                let actual = self.adding.fetch_sub(n, Ordering::AcqRel);
                 assert!(actual <= CLOSED, "permits to add overflowed! {}", actual);
                 if actual & 1 == 1 {
                     waiters.closed = true;
@@ -356,8 +396,8 @@ impl Drop for Semaphore {
 impl fmt::Debug for Semaphore {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Semaphore")
-            .field("permits", &self.add_lock.load(Ordering::Relaxed))
-            .field("add_lock", &self.add_lock.load(Ordering::Relaxed))
+            .field("permits", &self.adding.load(Ordering::Relaxed))
+            .field("added", &self.adding.load(Ordering::Relaxed))
             .finish()
     }
 }
@@ -463,6 +503,7 @@ impl Default for Permit {
 
 impl Waiter {
     const UNQUEUED: usize = 1 << 16;
+    
     fn new() -> Self {
         Waiter {
             waker: CausalCell::new(None),
@@ -571,7 +612,7 @@ impl Drop for Acquire<'_> {
                 // we have already locked the mutex, so we know we will be the one to release these
                 // permits, but it's necessary to add them since we will try to subtract them once we have
                 // finished permit assignment.
-                self.semaphore.add_lock.fetch_add(acquired_permits << 1, Ordering::AcqRel);
+                self.semaphore.added.fetch_add(acquired_permits << 1, Ordering::AcqRel);
                 self.semaphore.add_permits_locked(acquired_permits, waiters, false);
             }
 
