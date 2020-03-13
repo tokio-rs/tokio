@@ -1,3 +1,19 @@
+//! # Implementation Details
+//! 
+//! The semaphore is implemented using an intrusive linked list of waiters. An atomic counter
+//! tracks the number of available permits. If the semaphore does not contain the required number
+//! of permits, the task attempting to acquire permits places its waker at the end of a queue. When
+//! new permits are made available (such as by releasing an initial acquisition), they are assigned
+//! to the task at the front of the queue, waking that task if its requested number of permits is
+//! met. 
+//! 
+//! Because waiters are enqueued at the back of the linked list and dequeued from the front, the
+//! semaphore is fair. Tasks trying to acquire large numbers of permits at a time will always be
+//! woken eventually, even if many other tasks are acquiring smaller numbers of permits. This means
+//! that in a use-case like tokio's read-write lock, writers will not be starved by readers.
+//! 
+//! The linked list is guarded by a mutex, which must be acquired before enqueueing or dequeueing a
+//! task. However, some operations are always wait-free.
 use crate::loom::{
     cell::CausalCell,
     sync::{atomic::AtomicUsize, Mutex, MutexGuard},
@@ -18,9 +34,17 @@ use std::{
     },
 };
 
+/// An asynchronous counting semaphore which permits waiting on multiple permits at once.
 pub(crate) struct Semaphore {
     waiters: Mutex<Waitlist>,
+    /// The current number of available permits in the semaphore.
     permits: AtomicUsize,
+    /// Permits in the process of being released.
+    /// 
+    /// When releasing permits, if the lock on the semaphore's wait list is held by another task,
+    /// the task releasing permits adds them to this counter. The task holding the lock will
+    /// continue releasing permits until the counter is drained, allowing the `release` operation
+    /// to be wait free.
     add_lock: AtomicUsize,
 }
 
@@ -91,7 +115,7 @@ impl Semaphore {
 
     /// Returns the current number of available permits
     pub(crate) fn available_permits(&self) -> usize {
-        self.permits.load(Ordering::Acquire) & std::u16::MAX as usize
+        self.permits.load(Ordering::SeqCst) & std::u16::MAX as usize
     }
 
     /// Closes the semaphore. This prevents the semaphore from issuing new
@@ -122,9 +146,13 @@ impl Semaphore {
         // abort.
         let prev = self.add_lock.fetch_add(added << 1, Ordering::AcqRel);
         if prev > 0 {
+            // Another thread is already assigning permits. It will continue to do so until
+            // `add_lock` is drained, so we don't need to block on the lock.
             return;
         }
 
+        // Otherwise, no other thread is assigning permits. Thus, we must lock the semaphore's wait
+        // list and assign permits until `add_lock` is drained.
         self.add_permits_locked(added, self.waiters.lock().unwrap(), false);
     }
 
@@ -148,13 +176,14 @@ impl Semaphore {
                     }
                 };
                 if pop {
-                    let mut waiter = waiters.queue.pop_back().unwrap();
-                    let waker = unsafe {
-                        waiter.as_mut().waker.with_mut(|waker| {
-                            (*waker).take()
-                        })
-                    };
+                    let node = waiters.queue.pop_back().unwrap();
+                    let waiter = unsafe { node.as_ref() };
+                    let waker = waiter.waker.with_mut(|waker| unsafe {
+                        (*waker).take()
+                    });
+
                     waker.expect("if a node is in the wait list, it must have a waker").wake();
+
                 }
             }
 
@@ -162,12 +191,12 @@ impl Semaphore {
 
             let actual = if closed {
                 let actual = self.add_lock.fetch_sub(n | 1, Ordering::AcqRel);
-                assert!(actual <= CLOSED);
+                assert!(actual <= CLOSED, "permits to add overflowed! {}", actual);
                 closed = false;
                 actual >> 1
             } else {
                 let actual = self.add_lock.fetch_sub(n, Ordering::AcqRel);
-                assert!(actual <= CLOSED);
+                assert!(actual <= CLOSED, "permits to add overflowed! {}", actual);
                 if actual & 1 == 1 {
                     waiters.closed = true;
                     closed = true;
@@ -181,7 +210,6 @@ impl Semaphore {
                 break;
             }
         }
-
     }
 
     fn try_acquire(&self, num_permits: u16) -> Result<(), TryAcquireError> {
@@ -223,7 +251,6 @@ impl Semaphore {
         let mut curr = self.permits.load(Ordering::Acquire);
         let mut waiters = loop {
             state = node.state.load(Ordering::Acquire);
-
             // Has the waiter already acquired all its needed permits? If so, we're done!
             if state == 0 {
                 return Ready(Ok(()));
@@ -269,6 +296,7 @@ impl Semaphore {
                 }
                 Err(actual) => curr = actual,
             }
+            drop(lock.take());
         };
 
         if waiters.closed {
@@ -285,10 +313,10 @@ impl Semaphore {
                 unreachable!("cannot have been assigned more than needed permits")
             }
         };
-
+        
         // Typically, one would probably expect to see a compare-and-swap loop here. However, in
         // this case, we don't need to loop. Our most snapshot of the node's current state
-        // was acquired after we acquired the lock on the wait list. Because releasing permits to
+        // was acquired after we acquired the lock on the wait list. Because releasing permits tPPo
         // waiters also requires locking the wait list, the state cannot have changed since we
         // acquired this snapshot.
         node.state
@@ -521,28 +549,32 @@ impl Acquire<'_> {
 
 impl Drop for Acquire<'_> {
     fn drop(&mut self) {
+        let state = self.node.state.load(Ordering::Acquire);
         // fast path: if we aren't actually waiting, no need to acquire the lock.
-        if self.node.state.load(Ordering::Acquire) & Waiter::UNQUEUED == Waiter::UNQUEUED {
+        if state & Waiter::UNQUEUED == Waiter::UNQUEUED {
             return;
         }
-
         // This is where we ensure safety. The future is being dropped,
         // which means we must ensure that the waiter entry is no longer stored
         // in the linked list.
         let mut waiters = self.semaphore.waiters.lock().unwrap();
         let node = NonNull::from(&mut self.node);
         if waiters.queue.is_linked(&node) {
+    
+            let acquired_permits = self.num_permits as usize - state;
             // remove the entry from the list
             //
             // safety: we have locked the wait list.
             unsafe { waiters.queue.remove(node) };
 
-            let acquired_permits = self.num_permits as usize - self.node.state.load(Ordering::Acquire);
-            // we have already locked the mutex, so we know we will be the one to release these
-            // permits, but it's necessary to add them since we will try to subtract them once we have
-            // finished permit assignment.
-            self.semaphore.add_lock.fetch_add(acquired_permits << 1, Ordering::AcqRel);
-            self.semaphore.add_permits_locked(acquired_permits, waiters, false);
+            if acquired_permits > 0 {
+                // we have already locked the mutex, so we know we will be the one to release these
+                // permits, but it's necessary to add them since we will try to subtract them once we have
+                // finished permit assignment.
+                self.semaphore.add_lock.fetch_add(acquired_permits << 1, Ordering::AcqRel);
+                self.semaphore.add_permits_locked(acquired_permits, waiters, false);
+            }
+
         } else {
             drop(waiters);
         };
@@ -560,10 +592,6 @@ impl AcquireError {
     fn closed() -> AcquireError {
         AcquireError(())
     }
-}
-
-fn to_try_acquire(_: AcquireError) -> TryAcquireError {
-    TryAcquireError::Closed
 }
 
 impl fmt::Display for AcquireError {
@@ -610,6 +638,11 @@ impl std::error::Error for TryAcquireError {}
 ///
 /// `Waiter` is forced to be !Unpin.
 unsafe impl linked_list::Link for Waiter {
+    // XXX: ideally, we would be able to use `Pin` here, to enforce the invariant that list entries
+    // may not move while in the list. However, we can't do this currently, as using `Pin<&'a mut
+    // Waiter>` as the `Handle` type would require `Semaphore` to be generic over a lifetime. We
+    // can't use `Pin<*mut Waiter>`, as raw pointers are `Unpin` regardless of whether or not they
+    // dereference to an `!Unpin` target.
     type Handle = NonNull<Waiter>;
     type Target = Waiter;
 
