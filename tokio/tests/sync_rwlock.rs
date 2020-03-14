@@ -11,6 +11,12 @@ use tokio::sync::{Barrier, RwLock};
 use tokio_test::task::spawn;
 use tokio_test::{assert_pending, assert_ready};
 
+#[test]
+fn into_inner() {
+    let rwlock = RwLock::new(42);
+    assert_eq!(rwlock.into_inner(), 42);
+}
+
 // multiple reads should be Ready
 #[test]
 fn read_shared() {
