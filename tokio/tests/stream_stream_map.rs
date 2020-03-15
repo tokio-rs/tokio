@@ -141,7 +141,7 @@ async fn insert_remove() {
 
     assert_ok!(tx.send(1));
 
-    assert!(!map.is_woken());
+    assert!(map.is_woken());
     assert_ready_none!(map.poll_next());
 
     assert!(map.insert("bar", rx).is_none());
@@ -179,6 +179,45 @@ async fn replace() {
     let v = assert_ready_some!(map.poll_next());
     assert_eq!(v.0, "foo");
     assert_eq!(v.1, 2);
+}
+
+#[tokio::test]
+async fn insert_notify() {
+    use std::time::{Duration, Instant};
+
+    let mut map = StreamMap::new();
+
+    // This stream is added immediately.
+    let (timeout_tx, timeout_rx) = mpsc::unbounded_channel();
+    map.insert("timeout", timeout_rx);
+
+    // Signal timeout after 250 ms.
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(250));
+        let _ = timeout_tx.send(10);
+    });
+
+    // This stream is added after first poll.
+    let (item_tx, item_rx) = mpsc::unbounded_channel();
+    item_tx.send(5).unwrap();
+    drop(item_tx);
+
+    let mut item_rx = Some(item_rx);
+
+    let poll = futures::future::poll_fn(|cx| {
+        let poll = Pin::new(&mut map).poll_next(cx);
+
+        // Insert channel after first poll.
+        if let Some(item_rx) = item_rx.take() {
+            map.insert("channel", item_rx);
+        }
+
+        poll
+    });
+
+    let now = Instant::now();
+    assert_eq!(poll.await, Some(("channel", 5)));
+    assert!(now.elapsed().as_millis() < 180);
 }
 
 #[test]

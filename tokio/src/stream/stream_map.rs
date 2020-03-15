@@ -3,7 +3,7 @@ use crate::stream::Stream;
 use std::borrow::Borrow;
 use std::hash::Hash;
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{Context, Poll, Waker};
 
 /// Combine many streams into one, indexing each source stream with a unique
 /// key.
@@ -160,6 +160,8 @@ use std::task::{Context, Poll};
 pub struct StreamMap<K, V> {
     /// Streams stored in the map
     entries: Vec<(K, V)>,
+    /// When new streams are added, the executor is notified using this waker.
+    new_stream_wake: Option<Waker>,
 }
 
 impl<K, V> StreamMap<K, V> {
@@ -176,7 +178,10 @@ impl<K, V> StreamMap<K, V> {
     /// let map: StreamMap<&str, Pending<()>> = StreamMap::new();
     /// ```
     pub fn new() -> StreamMap<K, V> {
-        StreamMap { entries: vec![] }
+        StreamMap {
+            entries: vec![],
+            new_stream_wake: None,
+        }
     }
 
     /// Creates an empty `StreamMap` with the specified capacity.
@@ -194,6 +199,7 @@ impl<K, V> StreamMap<K, V> {
     pub fn with_capacity(capacity: usize) -> StreamMap<K, V> {
         StreamMap {
             entries: Vec::with_capacity(capacity),
+            new_stream_wake: None,
         }
     }
 
@@ -263,6 +269,10 @@ impl<K, V> StreamMap<K, V> {
     /// }
     /// ```
     pub fn values_mut(&mut self) -> impl Iterator<Item = &mut V> {
+        if let Some(waker) = self.new_stream_wake.take() {
+            waker.wake();
+        }
+
         self.entries.iter_mut().map(|(_, v)| v)
     }
 
@@ -359,6 +369,10 @@ impl<K, V> StreamMap<K, V> {
         let ret = self.remove(&k);
         self.entries.push((k, stream));
 
+        if let Some(waker) = self.new_stream_wake.take() {
+            waker.wake();
+        }
+
         ret
     }
 
@@ -432,6 +446,16 @@ where
 
         let start = crate::util::thread_rng_n(self.entries.len() as u32) as usize;
         let mut idx = start;
+
+        // Store a copy of the waker.
+        if let Some(new_stream_wake) = self.new_stream_wake.as_mut() {
+            let waker = cx.waker();
+            if !new_stream_wake.will_wake(waker) {
+                *new_stream_wake = waker.clone();
+            }
+        } else {
+            self.new_stream_wake = Some(cx.waker().clone());
+        }
 
         for _ in 0..self.entries.len() {
             let (_, stream) = &mut self.entries[idx];
