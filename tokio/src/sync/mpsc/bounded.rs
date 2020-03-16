@@ -10,14 +10,11 @@ cfg_time! {
 use std::fmt;
 use std::task::{Context, Poll};
 
-pin_project_lite::pin_project! {
-    /// Send values to the associated `Receiver`.
-    ///
-    /// Instances are created by the [`channel`](channel) function.
-    pub struct Sender<T> {
-        #[pin]
-        chan: chan::Tx<T, Semaphore>,
-    }
+/// Send values to the associated `Receiver`.
+///
+/// Instances are created by the [`channel`](channel) function.
+pub struct Sender<T> {
+    chan: chan::Tx<T, Semaphore>,
 }
 
 impl<T> Clone for Sender<T> {
@@ -201,9 +198,7 @@ impl<T> Sender<T> {
 
     #[doc(hidden)] // TODO: document
     pub fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), ClosedError>> {
-        unsafe { std::pin::Pin::new_unchecked(&mut self.chan) }
-            .poll_ready(cx)
-            .map_err(|_| ClosedError::new())
+        self.chan.poll_ready(cx).map_err(|_| ClosedError::new())
     }
 
     /// Attempts to immediately send a message on this `Sender`
@@ -320,10 +315,8 @@ impl<T> Sender<T> {
     /// ```
     pub async fn send(&mut self, value: T) -> Result<(), SendError<T>> {
         use crate::future::poll_fn;
-        if poll_fn(|cx| unsafe { std::pin::Pin::new_unchecked(&mut self.chan) }.poll_ready(cx))
-            .await
-            .is_err()
-        {
+
+        if poll_fn(|cx| self.poll_ready(cx)).await.is_err() {
             return Err(SendError(value));
         }
 
