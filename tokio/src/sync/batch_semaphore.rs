@@ -18,25 +18,18 @@
 //! The linked list is guarded by a mutex, which must be acquired before
 //! enqueueing or dequeueing a task. However, some operations are always
 //! wait-free.
-use crate::loom::{
-    cell::CausalCell,
-    sync::{atomic::AtomicUsize, Mutex, MutexGuard},
-};
+use crate::loom::cell::CausalCell;
+use crate::loom::sync::{atomic::AtomicUsize, Mutex, MutexGuard};
 use crate::util::linked_list::{self, LinkedList};
 
-use std::{
-    cmp, fmt,
-    future::Future,
-    marker::PhantomPinned,
-    pin::Pin,
-    ptr::NonNull,
-    sync::atomic::Ordering::*,
-    task::{
-        Context, Poll,
-        Poll::{Pending, Ready},
-        Waker,
-    },
-};
+use std::{cmp, fmt};
+use std::future::Future;
+use std::marker::PhantomPinned;
+use std::pin::Pin;
+use std::ptr::NonNull;
+use std::sync::atomic::Ordering::*;
+use std::task::{Context, Poll, Waker};
+use std::task::Poll::*;
 
 /// An asynchronous counting semaphore which permits waiting on multiple permits at once.
 pub(crate) struct Semaphore {
