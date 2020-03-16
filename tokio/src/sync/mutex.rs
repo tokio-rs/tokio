@@ -135,8 +135,10 @@ impl Error for TryLockError {}
 #[test]
 #[cfg(not(loom))]
 fn bounds() {
-    fn check<T: Send>() {}
-    check::<MutexGuard<'_, u32>>();
+    fn check_send<T: Send>() {}
+    fn check_unpin<T: Unpin>() {}
+    check_send::<MutexGuard<'_, u32>>();
+    check_unpin::<Mutex<u32>>();
 }
 
 impl<T> Mutex<T> {

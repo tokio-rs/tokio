@@ -123,6 +123,23 @@ impl<'a, T> Drop for ReleasingPermit<'a, T> {
     }
 }
 
+#[test]
+#[cfg(not(loom))]
+fn bounds() {
+    fn check_send<T: Send>() {}
+    fn check_sync<T: Sync>() {}
+    fn check_unpin<T: Unpin>() {}
+    check_send::<RwLock<u32>>();
+    check_sync::<RwLock<u32>>();
+    check_unpin::<RwLock<u32>>();
+
+    check_sync::<RwLockReadGuard<'_, u32>>();
+    check_unpin::<RwLockReadGuard<'_, u32>>();
+
+    check_sync::<RwLockWriteGuard<'_, u32>>();
+    check_unpin::<RwLockWriteGuard<'_, u32>>();
+}
+
 // As long as T: Send + Sync, it's fine to send and share RwLock<T> between threads.
 // If T were not Send, sending and sharing a RwLock<T> would be bad, since you can access T through
 // RwLock<T>.

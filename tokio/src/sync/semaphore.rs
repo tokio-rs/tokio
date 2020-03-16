@@ -35,6 +35,14 @@ pub struct SemaphorePermit<'a> {
 #[derive(Debug)]
 pub struct TryAcquireError(());
 
+#[test]
+#[cfg(not(loom))]
+fn bounds() {
+    fn check_unpin<T: Unpin>() {}
+    check_unpin::<Semaphore>();
+    check_unpin::<SemaphorePermit<'_>>();
+}
+
 impl Semaphore {
     /// Creates a new semaphore with the initial number of permits
     pub fn new(permits: usize) -> Self {
