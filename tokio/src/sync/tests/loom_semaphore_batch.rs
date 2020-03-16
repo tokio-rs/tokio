@@ -23,7 +23,6 @@ fn basic_usage() {
     async fn actor(shared: Arc<Shared>) {
         let mut permit = Permit::new();
         permit.acquire(1, &shared.semaphore).await.unwrap();
-        println!("acquired!");
         let actual = shared.active.fetch_add(1, SeqCst);
         assert!(actual <= NUM - 1);
 
@@ -35,7 +34,6 @@ fn basic_usage() {
 
     loom::model(|| {
 
-        println!("\n ------ iter ------ \n");
         let shared = Arc::new(Shared {
             semaphore: Semaphore::new(NUM),
             active: AtomicUsize::new(0),
@@ -82,7 +80,6 @@ fn basic_closing() {
     const NUM: usize = 2;
 
     loom::model(|| {
-        println!("-- iter --");
         let semaphore = Arc::new(Semaphore::new(1));
 
         for _ in 0..NUM {
