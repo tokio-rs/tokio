@@ -141,14 +141,16 @@ impl Semaphore {
 
     /// Adds `n` new permits to the semaphore.
     pub(crate) fn add_permits(&self, added: usize) {
-        // Assigning permits to waiters requires locking the wait list, so that any waiters which
-        // receive their required number of permits can be dequeued and notified. However, if
-        // multiple threads attempt to add permits concurrently, we are able to make this operation
-        // wait-free. By tracking an atomic counter of permits added to the semaphore, we are able
-        // to determine if another thread is currently holding the lock to assign permits. If
-        // this is the case, we simply add our permits to the counter and return, so we don't need
-        // to acquire the lock. Otherwise, no other thread is adding permits, so we lock the wait
-        // and loop until the counter of added permits is drained.
+        // Assigning permits to waiters requires locking the wait list, so that
+        // any waiters which receive their required number of permits can be
+        // dequeued and notified. However, if multiple threads attempt to add
+        // permits concurrently, we are able to make this operation wait-free.
+        // By tracking an atomic counter of permits added to the semaphore, we
+        // are able to determine if another thread is currently holding the lock
+        // to assign permits. If this is the case, we simply add our permits to
+        // the counter and return, so we don't need to acquire the lock.
+        // Otherwise, no other thread is adding permits, so we lock the wait and
+        // loop until the counter of added permits is drained.
 
         if added == 0 {
             return;
@@ -158,23 +160,26 @@ impl Semaphore {
         // abort.
         let prev = self.adding.fetch_add(added << 1, Ordering::AcqRel);
         if prev > 0 {
-            // Another thread is already assigning permits. It will continue to do so until
-            // `added` is drained, so we don't need to block on the lock.
+            // Another thread is already assigning permits. It will continue to
+            // do so until `added` is drained, so we don't need to block on the
+            // lock.
             return;
         }
 
-        // Otherwise, no other thread is assigning permits. Thus, we must lock the semaphore's wait
-        // list and assign permits until `added` is drained.
+        // Otherwise, no other thread is assigning permits. Thus, we must lock
+        // the semaphore's wait list and assign permits until `added` is
+        // drained.
         self.add_permits_locked(added, self.waiters.lock().unwrap(), false);
     }
 
     /// Closes the semaphore. This prevents the semaphore from issuing new
     /// permits and notifies all pending waiters.
     pub(crate) fn close(&self) {
-        // Closing the semaphore works similarly to adding permits: if another thread is already
-        // holding the lock on the wait list to assign permits, we simply set a bit in the counter
-        // of permits being added. The thread holding the lock will see that bit has been set, and
-        // begin closing the semaphore.
+        // Closing the semaphore works similarly to adding permits: if another
+        // thread is already holding the lock on the wait list to assign
+        // permits, we simply set a bit in the counter of permits being added.
+        // The thread holding the lock will see that bit has been set, and begin
+        // closing the semaphore.
 
         self.permits.fetch_or(CLOSED, Ordering::Release);
         // Acquire the `added`, setting the "closed" flag on the lock.
@@ -197,14 +202,16 @@ impl Semaphore {
         mut waiters: MutexGuard<'_, Waitlist>,
         mut closed: bool,
     ) {
-        // The thread adding permits will loop until the counter of added permits is drained. If
-        // threads add permits (or close the semaphore) while we are holding the lock, we will add
-        // those permits as well, so that the other thread does not need to block.
+        // The thread adding permits will loop until the counter of added
+        // permits is drained. If threads add permits (or close the semaphore)
+        // while we are holding the lock, we will add those permits as well, so
+        // that the other thread does not need to block.
 
         loop {
             // How many permits are we releasing on this iteration?
             let initial = rem;
-            // Assign permits to the wait queue and notify any satisfied waiters.
+            // Assign permits to the wait queue and notify any satisfied
+            // waiters.
             while rem > 0 || waiters.closed {
                 let pop = match waiters.queue.last() {
                     Some(_) if waiters.closed => true,
@@ -216,8 +223,8 @@ impl Semaphore {
                 };
                 if pop {
                     let node = waiters.queue.pop_back().unwrap();
-                    // Safety: we are holding the lock on the wait queue, and thus have exclusive
-                    // access to the nodes' wakers.
+                    // Safety: we are holding the lock on the wait queue, and
+                    // thus have exclusive access to the nodes' wakers.
                     let waker = unsafe { 
                         node.as_ref().waker.with_mut(|waker| (*waker).take())
                     };
@@ -286,12 +293,14 @@ impl Semaphore {
         let mut state;
         let mut acquired = 0;
 
-        // First, try to take the requested number of permits from the semaphore.
+        // First, try to take the requested number of permits from the
+        // semaphore.
         let mut lock = None;
         let mut curr = self.permits.load(Ordering::Acquire);
         let mut waiters = loop {
             state = node.state.load(Ordering::Acquire);
-            // Has the waiter already acquired all its needed permits? If so, we're done!
+            // Has the waiter already acquired all its needed permits? If so,
+            // we're done!
             if state == 0 {
                 return Ready(Ok(()));
             }
@@ -312,12 +321,14 @@ impl Semaphore {
             };
 
             if remaining > 0 && lock.is_none() {
-                // No permits were immediately available, so this permit will (probably) need to wait.
-                // We'll need to acquire a lock on the wait queue.
+                // No permits were immediately available, so this permit will
+                // (probably) need to wait. We'll need to acquire a lock on the
+                // wait queue.
                 lock = Some(self.waiters.lock().unwrap());
-                // While we were waiting to lock the wait list, additional permits may have been
-                // released. Therefore, we will acquire a new snapshot of the current state of the
-                // semaphore before actually enqueueing the waiter..
+                // While we were waiting to lock the wait list, additional
+                // permits may have been released. Therefore, we will acquire a
+                // new snapshot of the current state of the semaphore before
+                // actually enqueueing the waiter..
                 continue;
             }
 
@@ -344,7 +355,8 @@ impl Semaphore {
         }
 
         let next = match acquired.cmp(&state) {
-            // if the waiter is in the unqueued state, we need all the requested permits, minus the amount we just acquired.
+            // if the waiter is in the unqueued state, we need all the requested
+            // permits, minus the amount we just acquired.
             _ if state >= Waiter::UNQUEUED => needed as usize - acquired,
             // We have acquired all the needed permits!
             cmp::Ordering::Equal => 0,
@@ -354,11 +366,12 @@ impl Semaphore {
             }
         };
         
-        // Typically, one would probably expect to see a compare-and-swap loop here. However, in
-        // this case, we don't need to loop. Our most snapshot of the node's current state
-        // was acquired after we acquired the lock on the wait list. Because releasing permits tPPo
-        // waiters also requires locking the wait list, the state cannot have changed since we
-        // acquired this snapshot.
+        // Typically, one would probably expect to see a compare-and-swap loop
+        // here. However, in this case, we don't need to loop. Our most snapshot
+        // of the node's current state was acquired after we acquired the lock
+        // on the wait list. Because releasing permits tPPo waiters also
+        // requires locking the wait list, the state cannot have changed since
+        // we acquired this snapshot.
         node.state
             .compare_exchange(state, next, Ordering::AcqRel, Ordering::Acquire)
             .expect("state cannot have changed while the wait list was locked");
@@ -420,8 +433,9 @@ impl Permit {
         }
     }
 
-    /// Returns a future that tries to acquire the permit. If no permits are available, the current task
-    /// is notified once a new permit becomes available.
+    /// Returns a future that tries to acquire the permit. If no permits are
+    /// available, the current task is notified once a new permit becomes
+    /// available.
     pub(crate) fn acquire<'a>(
         &'a mut self,
         num_permits: u16,
@@ -503,7 +517,7 @@ impl Default for Permit {
 
 impl Waiter {
     const UNQUEUED: usize = 1 << 16;
-    
+
     fn new() -> Self {
         Waiter {
             waker: CausalCell::new(None),
@@ -609,10 +623,11 @@ impl Drop for Acquire<'_> {
             unsafe { waiters.queue.remove(node) };
 
             if acquired_permits > 0 {
-                // we have already locked the mutex, so we know we will be the one to release these
-                // permits, but it's necessary to add them since we will try to subtract them once we have
-                // finished permit assignment.
-                self.semaphore.added.fetch_add(acquired_permits << 1, Ordering::AcqRel);
+                // we have already locked the mutex, so we know we will be the
+                // one to release these permits, but it's necessary to add them
+                // since we will try to subtract them once we have finished
+                // permit assignment.
+                self.semaphore.adding.fetch_add(acquired_permits << 1, Ordering::AcqRel);
                 self.semaphore.add_permits_locked(acquired_permits, waiters, false);
             }
 
@@ -647,6 +662,7 @@ impl std::error::Error for AcquireError {}
 
 impl TryAcquireError {
     /// Returns `true` if the error was caused by a closed semaphore.
+    #[allow(dead_code)] // may be used later!
     pub(crate) fn is_closed(&self) -> bool {
         match self {
             TryAcquireError::Closed => true,
@@ -656,6 +672,7 @@ impl TryAcquireError {
 
     /// Returns `true` if the error was caused by calling `try_acquire` on a
     /// semaphore with no available permits.
+    #[allow(dead_code)] // may be used later!
     pub(crate) fn is_no_permits(&self) -> bool {
         match self {
             TryAcquireError::NoPermits => true,
