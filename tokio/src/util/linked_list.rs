@@ -132,22 +132,14 @@ impl<T: Link> LinkedList<T> {
         true
     }
 
-    pub(crate) fn is_linked(&self, node: &T::Handle) -> bool {
-        let node = T::as_raw(node);
-        unsafe {
-            if T::pointers(node).as_ref().next.is_some()
-                || T::pointers(node).as_ref().prev.is_some()
-            {
-                return true;
-            }
-        }
-        if let Some(head) = self.head {
-            if head == node {
-                assert_eq!(self.tail, Some(node));
-                return true;
-            }
-        }
-        false
+    /// Returns `true` if `node` is the first node in this list.
+    pub(crate) fn is_first(&self, node: &T::Handle) -> bool {
+        self.head == Some(T::as_raw(node))
+    }
+
+    /// Returns `true` if `node` is the last node in this list.
+    pub(crate) fn is_last(&self, node: &T::Handle) -> bool {
+        self.tail == Some(T::as_raw(node))
     }
 
     /// Removes the specified node from the list
@@ -229,6 +221,19 @@ impl<T> Pointers<T> {
             prev: None,
             next: None,
         }
+    }
+
+    /// Returns `true` if this set of `Pointers` is linked to a previous or next
+    /// node.
+    ///
+    /// # Notes
+    /// - This does _not_ test for membership in a given list; simply
+    ///   whether the pointers are null or not.
+    /// - If a node is the _only_ node in a list, calling `is_linked` on its
+    ///   `Pointers` will return `false`, but `LinkedList::is_first` and
+    ///   `LinkedList::is_last` will return `true`.
+    pub(crate) fn is_linked(&self) -> bool {
+        self.prev.is_some() || self.next.is_some()
     }
 }
 

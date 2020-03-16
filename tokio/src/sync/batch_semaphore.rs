@@ -366,7 +366,7 @@ impl Semaphore {
         // Typically, one would probably expect to see a compare-and-swap loop
         // here. However, in this case, we don't need to loop. Our most snapshot
         // of the node's current state was acquired after we acquired the lock
-        // on the wait list. Because releasing permits tPPo waiters also
+        // on the wait list. Because releasing permits to waiters also
         // requires locking the wait list, the state cannot have changed since
         // we acquired this snapshot.
         node.state
@@ -387,7 +387,8 @@ impl Semaphore {
             let node = Pin::into_inner_unchecked(node) as *mut _;
             let node = NonNull::new_unchecked(node);
 
-            if !waiters.queue.is_linked(&node) {
+            // If the waiter is not already in the wait queue, enqueue it.
+            if !waiters.contains(node) {
                 waiters.queue.push_front(node);
             }
         }
@@ -610,7 +611,7 @@ impl Drop for Acquire<'_> {
         // in the linked list.
         let mut waiters = self.semaphore.waiters.lock().unwrap();
         let node = NonNull::from(&mut self.node);
-        if waiters.queue.is_linked(&node) {
+        if waiters.contains(node) {
     
             let acquired_permits = self.num_permits as usize - state;
             // remove the entry from the list
@@ -715,5 +716,29 @@ unsafe impl linked_list::Link for Waiter {
 
     unsafe fn pointers(mut target: NonNull<Waiter>) -> NonNull<linked_list::Pointers<Waiter>> {
         NonNull::from(&mut target.as_mut().pointers)
+    }
+}
+
+impl Waitlist {
+    /// Returns true if this waitlist already contains the given waiter
+    fn contains(&self, node: NonNull<Waiter>) -> bool {
+        use linked_list::Link;
+        // Note: `is_linked` does not necessarily indicate that the node is
+        // linked with _this_ list. However, because nodes are only
+        // added/removed inside of `Acquire` futures, and a reference to the
+        // same `Semaphore` is present whenever the `Acquire` future calls this
+        // we know that the node cannot be linked with another list.
+        if unsafe { Waiter::pointers(node).as_ref() }.is_linked() {
+            true
+        } else if self.queue.is_first(&node) {
+            debug_assert!(
+                self.queue.is_last(&node), 
+                "if a node is unlinked but is the head of a queue, it must \
+                also be the tail of the queue"
+            );
+            true
+        } else {
+            false
+        }
     }
 }
