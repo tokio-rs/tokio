@@ -21,11 +21,12 @@ pub(crate) mod rand {
     use std::sync::atomic::Ordering::Relaxed;
 
     static COUNTER: AtomicU32 = AtomicU32::new(1);
+    lazy_static::lazy_static! {
+        static ref RAND_STATE: RandomState = RandomState::new();
+    }
 
     pub(crate) fn seed() -> u64 {
-        let rand_state = RandomState::new();
-
-        let mut hasher = rand_state.build_hasher();
+        let mut hasher = RAND_STATE.build_hasher();
 
         // Hash some unique-ish data to generate some new state
         COUNTER.fetch_add(1, Relaxed).hash(&mut hasher);
