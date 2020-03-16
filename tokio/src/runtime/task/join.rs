@@ -101,6 +101,9 @@ impl<T> Future for JoinHandle<T> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut ret = Poll::Pending;
 
+        // Keep track of task budget
+        ready!(crate::coop::poll_proceed(cx));
+
         // Raw should always be set. If it is not, this is due to polling after
         // completion
         let raw = self

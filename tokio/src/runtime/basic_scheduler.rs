@@ -128,7 +128,7 @@ where
             pin!(future);
 
             'outer: loop {
-                if let Ready(v) = future.as_mut().poll(&mut cx) {
+                if let Ready(v) = crate::coop::budget(|| future.as_mut().poll(&mut cx)) {
                     return v;
                 }
 

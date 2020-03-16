@@ -60,9 +60,14 @@ impl Semaphore {
             sem: &self,
             ll_permit: ll::Permit::new(),
         };
-        poll_fn(|cx| permit.ll_permit.poll_acquire(cx, 1, &self.ll_sem))
-            .await
-            .unwrap();
+        poll_fn(|cx| {
+            // Keep track of task budget
+            ready!(crate::coop::poll_proceed(cx));
+
+            permit.ll_permit.poll_acquire(cx, 1, &self.ll_sem)
+        })
+        .await
+        .unwrap();
         permit
     }
 

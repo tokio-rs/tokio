@@ -156,13 +156,18 @@ impl<T> Mutex<T> {
             lock: self,
             permit: semaphore::Permit::new(),
         };
-        poll_fn(|cx| guard.permit.poll_acquire(cx, 1, &self.s))
-            .await
-            .unwrap_or_else(|_| {
-                // The semaphore was closed. but, we never explicitly close it, and we have a
-                // handle to it through the Arc, which means that this can never happen.
-                unreachable!()
-            });
+        poll_fn(|cx| {
+            // Keep track of task budget
+            ready!(crate::coop::poll_proceed(cx));
+
+            guard.permit.poll_acquire(cx, 1, &self.s)
+        })
+        .await
+        .unwrap_or_else(|_| {
+            // The semaphore was closed. but, we never explicitly close it, and we have a
+            // handle to it through the Arc, which means that this can never happen.
+            unreachable!()
+        });
         guard
     }
 
