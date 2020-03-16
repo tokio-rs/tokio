@@ -352,7 +352,7 @@ impl Semaphore {
         }
 
         let next = match acquired.cmp(&state) {
-            // if the waiter is in the unqueued state, we need all the requested
+            // If the waiter is in the unqueued state, we need all the requested
             // permits, minus the amount we just acquired.
             _ if state >= Waiter::UNQUEUED => needed as usize - acquired,
             // We have acquired all the needed permits!
@@ -377,14 +377,13 @@ impl Semaphore {
             return Ready(Ok(()));
         }
 
-        // otherwise, register the waker & enqueue the node.
+        // Otherwise, register the waker & enqueue the node.
         node.waker.with_mut(|waker| 
-            // safety: the wait list is locked, so we may modify the waker.
+            // Safety: the wait list is locked, so we may modify the waker.
             unsafe { *waker = Some(cx.waker().clone()) }
         );
 
         unsafe {
-            // XXX(eliza) T_T
             let node = Pin::into_inner_unchecked(node) as *mut _;
             let node = NonNull::new_unchecked(node);
 
@@ -616,7 +615,7 @@ impl Drop for Acquire<'_> {
             let acquired_permits = self.num_permits as usize - state;
             // remove the entry from the list
             //
-            // safety: we have locked the wait list.
+            // Safety: we have locked the wait list.
             unsafe { waiters.queue.remove(node) };
 
             if acquired_permits > 0 {
