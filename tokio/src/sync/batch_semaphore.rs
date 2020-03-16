@@ -30,7 +30,7 @@ use std::{
     marker::PhantomPinned,
     pin::Pin,
     ptr::NonNull,
-    sync::atomic::Ordering,
+    sync::atomic::Ordering::*,
     task::{
         Context, Poll,
         Poll::{Pending, Ready},
@@ -139,7 +139,7 @@ impl Semaphore {
 
     /// Returns the current number of available permits
     pub(crate) fn available_permits(&self) -> usize {
-        self.permits.load(Ordering::SeqCst) & std::u16::MAX as usize
+        self.permits.load(SeqCst) & std::u16::MAX as usize
     }
 
 
@@ -162,7 +162,7 @@ impl Semaphore {
 
         // TODO: Handle overflow. A panic is not sufficient, the process must
         // abort.
-        let prev = self.adding.fetch_add(added << 1, Ordering::AcqRel);
+        let prev = self.adding.fetch_add(added << 1, AcqRel);
         if prev > 0 {
             // Another thread is already assigning permits. It will continue to
             // do so until `added` is drained, so we don't need to block on the
@@ -185,9 +185,9 @@ impl Semaphore {
         // The thread holding the lock will see that bit has been set, and begin
         // closing the semaphore.
 
-        self.permits.fetch_or(CLOSED, Ordering::Release);
+        self.permits.fetch_or(CLOSED, Release);
         // Acquire the `added`, setting the "closed" flag on the lock.
-        let prev = self.adding.fetch_or(1, Ordering::AcqRel);
+        let prev = self.adding.fetch_or(1, AcqRel);
 
         if prev != 0 {
             // Another thread has the lock and will be responsible for notifying
@@ -221,7 +221,7 @@ impl Semaphore {
                     Some(_) if waiters.closed => true,
                     Some(last) => last.assign_permits(&mut rem, waiters.closed),
                     None => {
-                        self.permits.fetch_add(rem, Ordering::AcqRel);
+                        self.permits.fetch_add(rem, AcqRel);
                         break;
                     }
                 };
@@ -241,12 +241,12 @@ impl Semaphore {
             let n = initial << 1;
 
             let actual = if closed {
-                let actual = self.adding.fetch_sub(n | 1, Ordering::AcqRel);
+                let actual = self.adding.fetch_sub(n | 1, AcqRel);
                 assert!(actual <= CLOSED, "permits to add overflowed! {}", actual);
                 closed = false;
                 actual >> 1
             } else {
-                let actual = self.adding.fetch_sub(n, Ordering::AcqRel);
+                let actual = self.adding.fetch_sub(n, AcqRel);
                 assert!(actual <= CLOSED, "permits to add overflowed! {}", actual);
                 if actual & 1 == 1 {
                     waiters.closed = true;
@@ -264,7 +264,7 @@ impl Semaphore {
     }
 
     fn try_acquire(&self, num_permits: u16) -> Result<(), TryAcquireError> {
-        let mut curr = self.permits.load(Ordering::Acquire);
+        let mut curr = self.permits.load(Acquire);
         loop {
             // Has the semaphore closed?
             if curr & CLOSED > 0 {
@@ -280,7 +280,7 @@ impl Semaphore {
 
             match self
                 .permits
-                .compare_exchange(curr, next, Ordering::AcqRel, Ordering::Acquire)
+                .compare_exchange(curr, next, AcqRel, Acquire)
             {
                 Ok(_) => return Ok(()),
                 Err(actual) => curr = actual,
@@ -300,9 +300,9 @@ impl Semaphore {
         // First, try to take the requested number of permits from the
         // semaphore.
         let mut lock = None;
-        let mut curr = self.permits.load(Ordering::Acquire);
+        let mut curr = self.permits.load(Acquire);
         let mut waiters = loop {
-            state = node.state.load(Ordering::Acquire);
+            state = node.state.load(Acquire);
             // Has the waiter already acquired all its needed permits? If so,
             // we're done!
             if state == 0 {
@@ -339,8 +339,8 @@ impl Semaphore {
             match self.permits.compare_exchange_weak(
                 curr,
                 next,
-                Ordering::AcqRel,
-                Ordering::Acquire,
+                AcqRel,
+                Acquire,
             ) {
                 Ok(_) => {
                     acquired += acq;
@@ -377,7 +377,7 @@ impl Semaphore {
         // requires locking the wait list, the state cannot have changed since
         // we acquired this snapshot.
         node.state
-            .compare_exchange(state, next, Ordering::AcqRel, Ordering::Acquire)
+            .compare_exchange(state, next, AcqRel, Acquire)
             .expect("state cannot have changed while the wait list was locked");
 
         if next == 0 {
@@ -413,8 +413,8 @@ impl Drop for Semaphore {
 impl fmt::Debug for Semaphore {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Semaphore")
-            .field("permits", &self.adding.load(Ordering::Relaxed))
-            .field("added", &self.adding.load(Ordering::Relaxed))
+            .field("permits", &self.adding.load(Relaxed))
+            .field("added", &self.adding.load(Relaxed))
             .finish()
     }
 }
@@ -540,7 +540,7 @@ impl Waiter {
             return true;
         }
 
-        let mut curr = self.state.load(Ordering::Acquire);
+        let mut curr = self.state.load(Acquire);
 
         loop {
             // Assign up to `n` permits.
@@ -548,7 +548,7 @@ impl Waiter {
             let next = curr - assign;
             match self
                 .state
-                .compare_exchange(curr, next, Ordering::AcqRel, Ordering::Acquire)
+                .compare_exchange(curr, next, AcqRel, Acquire)
             {
                 Ok(_) => {
                     *n = n.saturating_sub(assign);
@@ -573,9 +573,9 @@ impl Future for Acquire<'_> {
                 ready!(semaphore.poll_acquire(cx, needed - n, node))?;
                 PermitState::Acquired(needed)
             }
-            PermitState::Waiting(_n) => {
-                assert_eq!(_n, needed, "how the heck did you get in this state?");
-                if node.state.load(Ordering::Acquire) > 0 {
+            PermitState::Waiting(n) => {
+                assert_eq!(n, needed, "permit cannot be modified while waiting");
+                if node.state.load(Acquire) > 0 {
                     ready!(semaphore.poll_acquire(cx, needed, node))?;
                 }
                 PermitState::Acquired(needed)
@@ -608,7 +608,7 @@ impl Acquire<'_> {
 
 impl Drop for Acquire<'_> {
     fn drop(&mut self) {
-        let state = self.node.state.load(Ordering::Acquire);
+        let state = self.node.state.load(Acquire);
         // fast path: if we aren't actually waiting, no need to acquire the lock.
         if state & Waiter::UNQUEUED == Waiter::UNQUEUED {
             return;
@@ -631,13 +631,16 @@ impl Drop for Acquire<'_> {
                 // one to release these permits, but it's necessary to add them
                 // since we will try to subtract them once we have finished
                 // permit assignment.
-                self.semaphore.adding.fetch_add(acquired_permits << 1, Ordering::AcqRel);
+                self.semaphore.adding.fetch_add(acquired_permits << 1, AcqRel);
                 self.semaphore.add_permits_locked(acquired_permits, waiters, false);
             }
 
         } else {
+            // We don't need to continue holding the lock while modifying the 
+            // permit's local state.
             drop(waiters);
-        };
+        }
+
 
         // If the permit had transitioned to the `Waiting` state, put it back
         // into `Acquired`.
