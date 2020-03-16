@@ -1,19 +1,23 @@
 //! # Implementation Details
-//! 
-//! The semaphore is implemented using an intrusive linked list of waiters. An atomic counter
-//! tracks the number of available permits. If the semaphore does not contain the required number
-//! of permits, the task attempting to acquire permits places its waker at the end of a queue. When
-//! new permits are made available (such as by releasing an initial acquisition), they are assigned
-//! to the task at the front of the queue, waking that task if its requested number of permits is
-//! met. 
-//! 
-//! Because waiters are enqueued at the back of the linked list and dequeued from the front, the
-//! semaphore is fair. Tasks trying to acquire large numbers of permits at a time will always be
-//! woken eventually, even if many other tasks are acquiring smaller numbers of permits. This means
-//! that in a use-case like tokio's read-write lock, writers will not be starved by readers.
-//! 
-//! The linked list is guarded by a mutex, which must be acquired before enqueueing or dequeueing a
-//! task. However, some operations are always wait-free.
+//!
+//! The semaphore is implemented using an intrusive linked list of waiters. An
+//! atomic counter tracks the number of available permits. If the semaphore does
+//! not contain the required number of permits, the task attempting to acquire
+//! permits places its waker at the end of a queue. When new permits are made
+//! available (such as by releasing an initial acquisition), they are assigned
+//! to the task at the front of the queue, waking that task if its requested
+//! number of permits is met. 
+//!
+//! Because waiters are enqueued at the back of the linked list and dequeued
+//! from the front, the semaphore is fair. Tasks trying to acquire large numbers
+//! of permits at a time will always be woken eventually, even if many other
+//! tasks are acquiring smaller numbers of permits. This means that in a
+//! use-case like tokio's read-write lock, writers will not be starved by
+//! readers.
+//!
+//! The linked list is guarded by a mutex, which must be acquired before
+//! enqueueing or dequeueing a task. However, some operations are always
+//! wait-free.
 use crate::loom::{
     cell::CausalCell,
     sync::{atomic::AtomicUsize, Mutex, MutexGuard},
@@ -41,14 +45,14 @@ pub(crate) struct Semaphore {
     permits: AtomicUsize,
 
     /// Permits in the process of being released.
-    /// 
-    /// When releasing permits, if the lock on the semaphore's wait list is held by another task,
-    /// the task releasing permits adds them to this counter. The task holding the lock will
-    /// continue releasing permits until the counter is drained, allowing the `release` operation
-    /// to be wait free.
-    /// 
-    /// The first bit of this counter indicates that the semaphore is closing. Therefore, all
-    /// values are shifted over one bit.
+    ///
+    /// When releasing permits, if the lock on the semaphore's wait list is held
+    /// by another task, the task releasing permits adds them to this counter.
+    /// The task holding the lock will continue releasing permits until the
+    /// counter is drained, allowing the `release` operation to be wait free.
+    ///
+    /// The first bit of this counter indicates that the semaphore is closing.
+    /// Therefore, all values are shifted over one bit.
     adding: AtomicUsize,
 }
 
@@ -635,7 +639,8 @@ impl Drop for Acquire<'_> {
             drop(waiters);
         };
 
-        // If the permit had transitioned to the `Waiting` state, put it back into `Acquired`.
+        // If the permit had transitioned to the `Waiting` state, put it back
+        // into `Acquired`.
         if let PermitState::Waiting(_) = self.permit.state {
             self.permit.state = PermitState::Acquired(0);
         }
@@ -696,11 +701,12 @@ impl std::error::Error for TryAcquireError {}
 ///
 /// `Waiter` is forced to be !Unpin.
 unsafe impl linked_list::Link for Waiter {
-    // XXX: ideally, we would be able to use `Pin` here, to enforce the invariant that list entries
-    // may not move while in the list. However, we can't do this currently, as using `Pin<&'a mut
-    // Waiter>` as the `Handle` type would require `Semaphore` to be generic over a lifetime. We
-    // can't use `Pin<*mut Waiter>`, as raw pointers are `Unpin` regardless of whether or not they
-    // dereference to an `!Unpin` target.
+    // XXX: ideally, we would be able to use `Pin` here, to enforce the
+    // invariant that list entries may not move while in the list. However, we
+    // can't do this currently, as using `Pin<&'a mut Waiter>` as the `Handle`
+    // type would require `Semaphore` to be generic over a lifetime. We can't
+    // use `Pin<*mut Waiter>`, as raw pointers are `Unpin` regardless of whether
+    // or not they dereference to an `!Unpin` target.
     type Handle = NonNull<Waiter>;
     type Target = Waiter;
 
