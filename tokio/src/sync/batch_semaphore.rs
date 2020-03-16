@@ -16,7 +16,7 @@
 //! readers.
 //!
 //! The linked list is guarded by a mutex, which must be acquired before
-//! enqueueing or dequeueing a task. However, some operations are always
+//! enqueueing or dequeueing a task. However, some operations are often
 //! wait-free.
 use crate::loom::cell::CausalCell;
 use crate::loom::sync::{atomic::AtomicUsize, Mutex, MutexGuard};
