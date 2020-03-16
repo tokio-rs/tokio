@@ -118,6 +118,7 @@ impl<T: Link> LinkedList<T> {
         }
     }
 
+    #[cfg(feature = "sync")] // used only by `batch_semaphore`
     pub(crate) fn last<'a>(&'a self) -> Option<&'a T::Target> {
         unsafe { Some(&*self.tail?.as_ptr()) }
     }
@@ -133,11 +134,13 @@ impl<T: Link> LinkedList<T> {
     }
 
     /// Returns `true` if `node` is the first node in this list.
+    #[cfg(feature = "sync")] // used only by `batch_semaphore`
     pub(crate) fn is_first(&self, node: &T::Handle) -> bool {
         self.head == Some(T::as_raw(node))
     }
 
     /// Returns `true` if `node` is the last node in this list.
+    #[cfg(feature = "sync")] // used only by `batch_semaphore`
     pub(crate) fn is_last(&self, node: &T::Handle) -> bool {
         self.tail == Some(T::as_raw(node))
     }
@@ -232,6 +235,7 @@ impl<T> Pointers<T> {
     /// - If a node is the _only_ node in a list, calling `is_linked` on its
     ///   `Pointers` will return `false`, but `LinkedList::is_first` and
     ///   `LinkedList::is_last` will return `true`.
+    #[cfg(feature = "sync")] // used only by `batch_semaphore`
     pub(crate) fn is_linked(&self) -> bool {
         self.prev.is_some() || self.next.is_some()
     }
