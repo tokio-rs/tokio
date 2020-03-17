@@ -210,34 +210,50 @@ impl<T: Link> LinkedList<T> {
 
 // ===== impl Iter =====
 
-cfg_rt_threaded! {
-    use core::marker::PhantomData;
+#[cfg(any(feature = "sync", feature = "rt-threaded"))]
+pub(crate) struct Iter<'a, T: Link> {
+    curr: Option<NonNull<T::Target>>,
+    #[cfg(feature = "sync")]
+    curr_back: Option<NonNull<T::Target>>,
+    _p: core::marker::PhantomData<&'a T>,
+}
 
-    pub(crate) struct Iter<'a, T: Link> {
-        curr: Option<NonNull<T::Target>>,
-        _p: PhantomData<&'a T>,
-    }
-
-    impl<T: Link> LinkedList<T> {
-        pub(crate) fn iter(&self) -> Iter<'_, T> {
-            Iter {
-                curr: self.head,
-                _p: PhantomData,
-            }
+#[cfg(any(feature = "sync", feature = "rt-threaded"))]
+impl<T: Link> LinkedList<T> {
+    pub(crate) fn iter(&self) -> Iter<'_, T> {
+        Iter {
+            curr: self.head,
+            #[cfg(feature = "sync")]
+            curr_back: self.tail,
+            _p: core::marker::PhantomData,
         }
     }
+}
 
-    impl<'a, T: Link> Iterator for Iter<'a, T> {
-        type Item = &'a T::Target;
+#[cfg(any(feature = "sync", feature = "rt-threaded"))]
+impl<'a, T: Link> Iterator for Iter<'a, T> {
+    type Item = &'a T::Target;
 
-        fn next(&mut self) -> Option<&'a T::Target> {
-            let curr = self.curr?;
-            // safety: the pointer references data contained by the list
-            self.curr = unsafe { T::pointers(curr).as_ref() }.next;
+    fn next(&mut self) -> Option<&'a T::Target> {
+        let curr = self.curr?;
+        // safety: the pointer references data contained by the list
+        self.curr = unsafe { T::pointers(curr).as_ref() }.next;
 
-            // safety: the value is still owned by the linked list.
-            Some(unsafe { &*curr.as_ptr() })
-        }
+        // safety: the value is still owned by the linked list.
+        Some(unsafe { &*curr.as_ptr() })
+    }
+}
+
+#[cfg(feature = "sync")]
+impl<'a, T: Link> DoubleEndedIterator for Iter<'a, T> {
+    fn next_back(&mut self) -> Option<&'a T::Target> {
+        let curr = self.curr_back?;
+
+        // safety: the pointer references data contained by the list
+        self.curr_back = unsafe { T::pointers(curr).as_ref() }.prev;
+
+        // safety: the value is still owned by the linked list.
+        Some(unsafe { &*curr.as_ptr() })
     }
 }
 
