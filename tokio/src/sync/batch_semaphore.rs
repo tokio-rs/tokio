@@ -343,8 +343,7 @@ impl Drop for Semaphore {
 impl fmt::Debug for Semaphore {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Semaphore")
-            .field("permits", &self.adding.load(Relaxed))
-            .field("added", &self.adding.load(Relaxed))
+            .field("permits", &self.permits.load(Relaxed))
             .finish()
     }
 }
@@ -553,11 +552,8 @@ impl Drop for Acquire<'_> {
             unsafe { waiters.queue.remove(node) };
 
             if acquired_permits > 0 {
-                // we have already locked the mutex, so we know we will be the
-                // one to release these permits, but it's necessary to add them
-                // since we will try to subtract them once we have finished
-                // permit assignment.
-                self.semaphore.add_permits_locked(acquired_permits, waiters);
+                let mut notified = self.semaphore.add_permits_locked(acquired_permits, waiters);
+                notify_all(&mut notified);
             }
 
         } else {
