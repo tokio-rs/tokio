@@ -14,10 +14,6 @@
 //! tasks are acquiring smaller numbers of permits. This means that in a
 //! use-case like tokio's read-write lock, writers will not be starved by
 //! readers.
-//!
-//! The linked list is guarded by a mutex, which must be acquired before
-//! enqueueing or dequeueing a task. However, some operations are often
-//! wait-free.
 use crate::loom::cell::CausalCell;
 use crate::loom::sync::{atomic::AtomicUsize, Mutex, MutexGuard};
 use crate::util::linked_list::{self, LinkedList};
@@ -36,17 +32,6 @@ pub(crate) struct Semaphore {
     waiters: Mutex<Waitlist>,
     /// The current number of available permits in the semaphore.
     permits: AtomicUsize,
-
-    /// Permits in the process of being released.
-    ///
-    /// When releasing permits, if the lock on the semaphore's wait list is held
-    /// by another task, the task releasing permits adds them to this counter.
-    /// The task holding the lock will continue releasing permits until the
-    /// counter is drained, allowing the `release` operation to be wait free.
-    ///
-    /// The first bit of this counter indicates that the semaphore is closing.
-    /// Therefore, all values are shifted over one bit.
-    adding: AtomicUsize,
 }
 
 struct Waitlist {
@@ -136,7 +121,6 @@ impl Semaphore {
                 queue: LinkedList::new(),
                 closed: false,
             }),
-            adding: AtomicUsize::new(0),
         }
     }
 
@@ -148,36 +132,16 @@ impl Semaphore {
 
     /// Adds `n` new permits to the semaphore.
     pub(crate) fn add_permits(&self, added: usize) {
-        // Assigning permits to waiters requires locking the wait list, so that
-        // any waiters which receive their required number of permits can be
-        // dequeued and notified. However, if multiple threads attempt to add
-        // permits concurrently, we are able to make this operation wait-free.
-        // By tracking an atomic counter of permits added to the semaphore, we
-        // are able to determine if another thread is currently holding the lock
-        // to assign permits. If this is the case, we simply add our permits to
-        // the counter and return, so we don't need to acquire the lock.
-        // Otherwise, no other thread is adding permits, so we lock the wait and
-        // loop until the counter of added permits is drained.
-
         if added == 0 {
             return;
         }
 
-        // // TODO: Handle overflow. A panic is not sufficient, the process must
-        // // abort.
-        // let prev = self.adding.fetch_add(added << 1, AcqRel);
-        // if prev > 0 {
-        //     // Another thread is already assigning permits. It will continue to
-        //     // do so until `added` is drained, so we don't need to block on the
-        //     // lock.
-        //     return;
-        // }
-
-        // Otherwise, no other thread is assigning permits. Thus, we must lock
-        // the semaphore's wait list and assign permits until `added` is
-        // drained.
+        // Assign permits to the wait queue, returning a list containing all the
+        // waiters at the back of the queue that received enough permits to wake
+        // up.
         let mut notified = self.add_permits_locked(added, self.waiters.lock().unwrap());
-
+        
+        // Once we release the lock, notify all woken waiters.
         notify_all(&mut notified);
 
     }
@@ -185,28 +149,11 @@ impl Semaphore {
     /// Closes the semaphore. This prevents the semaphore from issuing new
     /// permits and notifies all pending waiters.
     pub(crate) fn close(&self) {
-        // Closing the semaphore works similarly to adding permits: if another
-        // thread is already holding the lock on the wait list to assign
-        // permits, we simply set a bit in the counter of permits being added.
-        // The thread holding the lock will see that bit has been set, and begin
-        // closing the semaphore.
-
         self.permits.fetch_or(CLOSED, Release);
-        // // Acquire the `added`, setting the "closed" flag on the lock.
-        // let prev = self.adding.fetch_or(1, AcqRel);
 
-        // if prev != 0 {
-        //     // Another thread has the lock and will be responsible for notifying
-        //     // pending waiters.
-        //     return;
-        // }
-
-        {
-            let mut waiters = self.waiters.lock().unwrap();
-            waiters.closed = true;
-            notify_all(&mut waiters.queue)
-        };
-
+        let mut waiters = self.waiters.lock().unwrap();
+        waiters.closed = true;
+        notify_all(&mut waiters.queue)
     }
 
     fn add_permits_locked(
@@ -214,16 +161,8 @@ impl Semaphore {
         mut rem: usize,
         mut waiters: MutexGuard<'_, Waitlist>,
     ) -> LinkedList<Waiter> {
-        // The thread adding permits will loop until the counter of added
-        // permits is drained. If threads add permits (or close the semaphore)
-        // while we are holding the lock, we will add those permits as well, so
-        // that the other thread does not need to block.
-
-        // loop {
-        //     // How many permits are we releasing on this iteration?
-        //     let initial = rem;
-            // Assign permits to the wait queue and notify any satisfied
-            // waiters.\
+        // Starting from the back of the wait queue, assign each waiter as many
+        // permits as it needs until we run out of permits to assign.
         let mut last = None;
         for waiter in waiters.queue.iter().rev() {
             if waiter.assign_permits(&mut rem) {
@@ -232,39 +171,26 @@ impl Semaphore {
                 break;
             }
         }
+
+        // If we assigned permits to all the waiters in the queue, and there are
+        // still permits left over, assign them back to the semaphore.
         if rem > 0 {
             self.permits.fetch_add(rem, Release);
         }
+
+        // Split off the queue at the last waiter that was satisfied, creating a
+        // new list. Once we release the lock, we'll drain this list and notify
+        // the waiters in it.
         if let Some(waiter) = last {
+            // Safety: it's only safe to call `split_back` with a pointer to a
+            // node in the same list as the one we call `split_back` on. Since 
+            // we got the waiter pointer from the list's iterator, this is fine.
             unsafe {
                 waiters.queue.split_back(waiter)
             }
         } else {
             LinkedList::new()
         }
-        //     let n = initial << 1;
-
-        //     let actual = if closed {
-        //         let actual = self.adding.fetch_sub(n | 1, AcqRel);
-        //         assert!(actual <= CLOSED, "permits to add overflowed! {}", actual);
-        //         closed = false;
-        //         actual >> 1
-        //     } else {
-        //         let actual = self.adding.fetch_sub(n, AcqRel);
-        //         assert!(actual <= CLOSED, "permits to add overflowed! {}", actual);
-        //         if actual & 1 == 1 {
-        //             waiters.closed = true;
-        //             closed = true;
-        //         }
-        //         actual >> 1
-        //     };
-
-        //     rem = actual - initial;
-
-        //     if rem == 0 && !closed {
-        //         break;
-        //     }
-        // }
     }
 
     fn try_acquire(&self, num_permits: u16) -> Result<(), TryAcquireError> {
