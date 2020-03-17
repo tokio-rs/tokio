@@ -118,6 +118,32 @@ impl<T: Link> LinkedList<T> {
         }
     }
 
+    /// Splits this list off at `node`, returning a new list with `node` at its
+    /// front.
+    ///
+    /// If `node` is at the the front of this list, then this list will be empty after
+    /// splitting. If `node` is the last node in this list, then the returned
+    /// list will contain only `node`.
+    ///
+    /// # Safety
+    ///
+    /// The caller **must** ensure that `node` is currently contained by
+    /// `self` or not contained by any other list.
+    pub(crate) unsafe fn split_back(&mut self, node: NonNull<T::Target>) -> Self {
+        let new_tail = T::pointers(node).as_mut().prev.take().map(|prev| {
+            T::pointers(prev).as_mut().next = None;
+            prev
+        });
+        if new_tail.is_none() {
+            self.head = None;
+        }
+        let tail = std::mem::replace(&mut self.tail, new_tail);
+        Self {
+            head: Some(node),
+            tail,
+        }
+    }
+
     #[cfg(feature = "sync")] // used only by `batch_semaphore`
     pub(crate) fn last<'a>(&'a self) -> Option<&'a T::Target> {
         unsafe { Some(&*self.tail?.as_ptr()) }
@@ -248,6 +274,7 @@ mod tests {
 
     use std::pin::Pin;
 
+    #[derive(Debug)]
     struct Entry {
         pointers: Pointers<Entry>,
         val: i32,
@@ -518,6 +545,66 @@ mod tests {
         assert_eq!(7, i.next().unwrap().val);
         assert_eq!(5, i.next().unwrap().val);
         assert!(i.next().is_none());
+    }
+
+    #[test]
+    fn split_back() {
+        let a = entry(1);
+        let b = entry(2);
+        let c = entry(3);
+        let d = entry(4);
+
+        {
+            let mut list1 = LinkedList::<&Entry>::new();
+
+            push_all(
+                &mut list1,
+                &[a.as_ref(), b.as_ref(), c.as_ref(), d.as_ref()],
+            );
+            let mut list2 = unsafe { list1.split_back(ptr(&a)) };
+
+            assert_eq!([2, 3, 4].to_vec(), collect_list(&mut list1));
+            assert_eq!([1].to_vec(), collect_list(&mut list2));
+        }
+
+        {
+            let mut list1 = LinkedList::<&Entry>::new();
+
+            push_all(
+                &mut list1,
+                &[a.as_ref(), b.as_ref(), c.as_ref(), d.as_ref()],
+            );
+            let mut list2 = unsafe { list1.split_back(ptr(&b)) };
+
+            assert_eq!([3, 4].to_vec(), collect_list(&mut list1));
+            assert_eq!([1, 2].to_vec(), collect_list(&mut list2));
+        }
+
+        {
+            let mut list1 = LinkedList::<&Entry>::new();
+
+            push_all(
+                &mut list1,
+                &[a.as_ref(), b.as_ref(), c.as_ref(), d.as_ref()],
+            );
+            let mut list2 = unsafe { list1.split_back(ptr(&c)) };
+
+            assert_eq!([4].to_vec(), collect_list(&mut list1));
+            assert_eq!([1, 2, 3].to_vec(), collect_list(&mut list2));
+        }
+
+        {
+            let mut list1 = LinkedList::<&Entry>::new();
+
+            push_all(
+                &mut list1,
+                &[a.as_ref(), b.as_ref(), c.as_ref(), d.as_ref()],
+            );
+            let mut list2 = unsafe { list1.split_back(ptr(&d)) };
+
+            assert_eq!(Vec::<i32>::new(), collect_list(&mut list1));
+            assert_eq!([1, 2, 3, 4].to_vec(), collect_list(&mut list2));
+        }
     }
 
     proptest::proptest! {
