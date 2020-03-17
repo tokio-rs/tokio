@@ -116,6 +116,16 @@ struct Waiter {
 
 const CLOSED: usize = 1 << 17;
 
+fn notify_all(list: &mut LinkedList<Waiter>) {
+    while let Some(waiter) = list.pop_back() {
+        let waker = unsafe { 
+            waiter.as_ref().waker.with_mut(|waker| (*waker).take())
+        };
+
+        waker.expect("if a node is in the wait list, it must have a waker").wake();
+    }
+}
+
 impl Semaphore {
     /// Creates a new semaphore with the initial number of permits
     pub(crate) fn new(permits: usize) -> Self {
@@ -153,20 +163,23 @@ impl Semaphore {
             return;
         }
 
-        // TODO: Handle overflow. A panic is not sufficient, the process must
-        // abort.
-        let prev = self.adding.fetch_add(added << 1, AcqRel);
-        if prev > 0 {
-            // Another thread is already assigning permits. It will continue to
-            // do so until `added` is drained, so we don't need to block on the
-            // lock.
-            return;
-        }
+        // // TODO: Handle overflow. A panic is not sufficient, the process must
+        // // abort.
+        // let prev = self.adding.fetch_add(added << 1, AcqRel);
+        // if prev > 0 {
+        //     // Another thread is already assigning permits. It will continue to
+        //     // do so until `added` is drained, so we don't need to block on the
+        //     // lock.
+        //     return;
+        // }
 
         // Otherwise, no other thread is assigning permits. Thus, we must lock
         // the semaphore's wait list and assign permits until `added` is
         // drained.
-        self.add_permits_locked(added, self.waiters.lock().unwrap(), false);
+        let mut notified = self.add_permits_locked(added, self.waiters.lock().unwrap());
+
+        notify_all(&mut notified);
+
     }
 
     /// Closes the semaphore. This prevents the semaphore from issuing new
@@ -179,81 +192,79 @@ impl Semaphore {
         // closing the semaphore.
 
         self.permits.fetch_or(CLOSED, Release);
-        // Acquire the `added`, setting the "closed" flag on the lock.
-        let prev = self.adding.fetch_or(1, AcqRel);
+        // // Acquire the `added`, setting the "closed" flag on the lock.
+        // let prev = self.adding.fetch_or(1, AcqRel);
 
-        if prev != 0 {
-            // Another thread has the lock and will be responsible for notifying
-            // pending waiters.
-            return;
-        }
+        // if prev != 0 {
+        //     // Another thread has the lock and will be responsible for notifying
+        //     // pending waiters.
+        //     return;
+        // }
 
-        let mut lock = self.waiters.lock().unwrap();
-        lock.closed = true;
-        self.add_permits_locked(0, lock, true);
+        {
+            let mut waiters = self.waiters.lock().unwrap();
+            waiters.closed = true;
+            notify_all(&mut waiters.queue)
+        };
+
     }
 
     fn add_permits_locked(
         &self,
         mut rem: usize,
         mut waiters: MutexGuard<'_, Waitlist>,
-        mut closed: bool,
-    ) {
+    ) -> LinkedList<Waiter> {
         // The thread adding permits will loop until the counter of added
         // permits is drained. If threads add permits (or close the semaphore)
         // while we are holding the lock, we will add those permits as well, so
         // that the other thread does not need to block.
 
-        loop {
-            // How many permits are we releasing on this iteration?
-            let initial = rem;
+        // loop {
+        //     // How many permits are we releasing on this iteration?
+        //     let initial = rem;
             // Assign permits to the wait queue and notify any satisfied
-            // waiters.
-            while rem > 0 || waiters.closed {
-                let pop = match waiters.queue.last() {
-                    Some(_) if waiters.closed => true,
-                    Some(last) => last.assign_permits(&mut rem, waiters.closed),
-                    None => {
-                        self.permits.fetch_add(rem, AcqRel);
-                        break;
-                    }
-                };
-                if pop {
-                    let node = waiters.queue.pop_back().unwrap();
-                    // Safety: we are holding the lock on the wait queue, and
-                    // thus have exclusive access to the nodes' wakers.
-                    let waker = unsafe { 
-                        node.as_ref().waker.with_mut(|waker| (*waker).take())
-                    };
-
-                    waker.expect("if a node is in the wait list, it must have a waker").wake();
-
-                }
-            }
-
-            let n = initial << 1;
-
-            let actual = if closed {
-                let actual = self.adding.fetch_sub(n | 1, AcqRel);
-                assert!(actual <= CLOSED, "permits to add overflowed! {}", actual);
-                closed = false;
-                actual >> 1
+            // waiters.\
+        let mut last = None;
+        for waiter in waiters.queue.iter().rev() {
+            if waiter.assign_permits(&mut rem) {
+                last = Some(NonNull::from(waiter));
             } else {
-                let actual = self.adding.fetch_sub(n, AcqRel);
-                assert!(actual <= CLOSED, "permits to add overflowed! {}", actual);
-                if actual & 1 == 1 {
-                    waiters.closed = true;
-                    closed = true;
-                }
-                actual >> 1
-            };
-
-            rem = actual - initial;
-
-            if rem == 0 && !closed {
                 break;
             }
         }
+        if rem > 0 {
+            self.permits.fetch_add(rem, Release);
+        }
+        if let Some(waiter) = last {
+            unsafe {
+                waiters.queue.split_back(waiter)
+            }
+        } else {
+            LinkedList::new()
+        }
+        //     let n = initial << 1;
+
+        //     let actual = if closed {
+        //         let actual = self.adding.fetch_sub(n | 1, AcqRel);
+        //         assert!(actual <= CLOSED, "permits to add overflowed! {}", actual);
+        //         closed = false;
+        //         actual >> 1
+        //     } else {
+        //         let actual = self.adding.fetch_sub(n, AcqRel);
+        //         assert!(actual <= CLOSED, "permits to add overflowed! {}", actual);
+        //         if actual & 1 == 1 {
+        //             waiters.closed = true;
+        //             closed = true;
+        //         }
+        //         actual >> 1
+        //     };
+
+        //     rem = actual - initial;
+
+        //     if rem == 0 && !closed {
+        //         break;
+        //     }
+        // }
     }
 
     fn try_acquire(&self, num_permits: u16) -> Result<(), TryAcquireError> {
@@ -527,11 +538,7 @@ impl Waiter {
     /// Assign permits to the waiter.
     ///
     /// Returns `true` if the waiter should be removed from the queue
-    fn assign_permits(&self, n: &mut usize, closed: bool) -> bool {
-        // If the wait list has closed, consume no permits but pop the node.
-        if closed {
-            return true;
-        }
+    fn assign_permits(&self, n: &mut usize) -> bool {
 
         let mut curr = self.state.load(Acquire);
 
@@ -624,8 +631,7 @@ impl Drop for Acquire<'_> {
                 // one to release these permits, but it's necessary to add them
                 // since we will try to subtract them once we have finished
                 // permit assignment.
-                self.semaphore.adding.fetch_add(acquired_permits << 1, AcqRel);
-                self.semaphore.add_permits_locked(acquired_permits, waiters, false);
+                self.semaphore.add_permits_locked(acquired_permits, waiters);
             }
 
         } else {

@@ -22,14 +22,17 @@ fn basic_usage() {
 
     async fn actor(shared: Arc<Shared>) {
         let mut permit = Permit::new();
+        dbg!("acquiring");
         permit.acquire(1, &shared.semaphore).await.unwrap();
+        dbg!("acquired");
         let actual = shared.active.fetch_add(1, SeqCst);
         assert!(actual <= NUM - 1);
 
         let actual = shared.active.fetch_sub(1, SeqCst);
         assert!(actual <= NUM);
-
+        dbg!("releasing");
         permit.release(1, &shared.semaphore);
+        dbg!("released");
     }
 
     loom::model(|| {
