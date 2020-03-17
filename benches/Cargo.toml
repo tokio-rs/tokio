@@ -28,3 +28,8 @@ harness = false
 name = "sync_rwlock"
 path = "sync_rwlock.rs"
 harness = false
+
+[[bench]]
+name = "sync_semaphore"
+path = "sync_semaphore.rs"
+harness = false
