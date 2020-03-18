@@ -244,6 +244,11 @@ impl<T> RwLock<T> {
 
         RwLockWriteGuard { lock: self, permit }
     }
+
+    /// Consumes the lock, returning the underlying data.
+    pub fn into_inner(self) -> T {
+        self.c.into_inner()
+    }
 }
 
 impl<T> ops::Deref for RwLockReadGuard<'_, T> {
