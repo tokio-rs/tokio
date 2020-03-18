@@ -144,11 +144,6 @@ impl<T: Link> LinkedList<T> {
         }
     }
 
-    #[cfg(feature = "sync")] // used only by `batch_semaphore`
-    pub(crate) fn last<'a>(&'a self) -> Option<&'a T::Target> {
-        unsafe { Some(&*self.tail?.as_ptr()) }
-    }
-
     /// Returns whether the linked list doesn not contain any node
     pub(crate) fn is_empty(&self) -> bool {
         if self.head.is_some() {
