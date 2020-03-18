@@ -275,7 +275,8 @@ pin_project_lite::pin_project! {
     ///
     /// [`poll_proceed`]: fn.poll_proceed.html
     #[derive(Debug)]
-    pub(crate) struct CoopFuture<F> {
+    #[allow(unreachable_pub, dead_code)]
+    pub struct CoopFuture<F> {
         #[pin]
         future: F,
     }
@@ -291,27 +292,33 @@ impl<F: Future> Future for CoopFuture<F> {
 
 impl<F: Future> CoopFuture<F> {
     /// Returns a new `CoopFuture` wrapping the given future.
-    fn new(future: F) -> Self {
+    ///
+    #[allow(unreachable_pub, dead_code)]
+    pub fn new(future: F) -> Self {
         Self { future }
     }
 }
 
-/// Extension trait providing `Future::cooperate` extension method.
-///
-/// Note: if/when the co-op API becomes public, this method should probably be
-/// provided by `FutureExt`, instead.
-pub(crate) trait CoopFutureExt: Future {
-    /// Wrap `self` to cooperatively yield to the scheduler when polling, if the
-    /// task's budget is exhausted.
-    fn cooperate(self) -> CoopFuture<Self>
-    where
-        Self: Sized,
-    {
-        CoopFuture::new(self)
+// Currently only used by `tokio::sync`; and if we make this combinator public,
+// it should probably be on the `FutureExt` trait instead.
+cfg_sync! {
+    /// Extension trait providing `Future::cooperate` extension method.
+    ///
+    /// Note: if/when the co-op API becomes public, this method should probably be
+    /// provided by `FutureExt`, instead.
+    pub(crate) trait CoopFutureExt: Future {
+        /// Wrap `self` to cooperatively yield to the scheduler when polling, if the
+        /// task's budget is exhausted.
+        fn cooperate(self) -> CoopFuture<Self>
+        where
+            Self: Sized,
+        {
+            CoopFuture::new(self)
+        }
     }
-}
 
-impl<F> CoopFutureExt for F where F: Future {}
+    impl<F> CoopFutureExt for F where F: Future {}
+}
 
 #[cfg(all(test, not(loom)))]
 mod test {

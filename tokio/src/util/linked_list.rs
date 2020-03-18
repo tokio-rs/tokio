@@ -129,6 +129,7 @@ impl<T: Link> LinkedList<T> {
     ///
     /// The caller **must** ensure that `node` is currently contained by
     /// `self` or not contained by any other list.
+    #[cfg(feature = "sync")]
     pub(crate) unsafe fn split_back(&mut self, node: NonNull<T::Target>) -> Self {
         let new_tail = T::pointers(node).as_mut().prev.take().map(|prev| {
             T::pointers(prev).as_mut().next = None;
