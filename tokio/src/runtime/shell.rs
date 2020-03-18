@@ -46,7 +46,7 @@ impl Shell {
         let mut cx = Context::from_waker(&self.waker);
 
         loop {
-            if let Ready(v) = f.as_mut().poll(&mut cx) {
+            if let Ready(v) = crate::coop::budget(|| f.as_mut().poll(&mut cx)) {
                 return v;
             }
 

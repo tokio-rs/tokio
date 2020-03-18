@@ -98,7 +98,7 @@ cfg_blocking_impl! {
             let mut f = unsafe { Pin::new_unchecked(&mut f) };
 
             loop {
-                if let Ready(v) = f.as_mut().poll(&mut cx) {
+                if let Ready(v) = crate::coop::budget(|| f.as_mut().poll(&mut cx)) {
                     return Ok(v);
                 }
 
@@ -130,7 +130,7 @@ cfg_blocking_impl! {
             let when = Instant::now() + timeout;
 
             loop {
-                if let Ready(v) = f.as_mut().poll(&mut cx) {
+                if let Ready(v) = crate::coop::budget(|| f.as_mut().poll(&mut cx)) {
                     return Ok(v);
                 }
 

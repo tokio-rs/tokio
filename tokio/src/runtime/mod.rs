@@ -419,7 +419,7 @@ impl Runtime {
         })
     }
 
-    /// Enter the runtime context
+    /// Enter the runtime context.
     pub fn enter<F, R>(&self, f: F) -> R
     where
         F: FnOnce() -> R,
@@ -429,7 +429,8 @@ impl Runtime {
 
     /// Return a handle to the runtime's spawner.
     ///
-    /// The returned handle can be used to spawn tasks that run on this runtime.
+    /// The returned handle can be used to spawn tasks that run on this runtime, and can
+    /// be cloned to allow moving the `Handle` to other threads.
     ///
     /// # Examples
     ///
