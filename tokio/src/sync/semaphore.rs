@@ -1,4 +1,5 @@
 use super::batch_semaphore as ll; // low level implementation
+use crate::coop::CoopFutureExt;
 
 /// Counting semaphore performing asynchronous permit aquisition.
 ///
@@ -64,7 +65,11 @@ impl Semaphore {
     /// Acquires permit from the semaphore
     pub async fn acquire(&self) -> SemaphorePermit<'_> {
         let mut ll_permit = ll::Permit::new();
-        ll_permit.acquire(1, &self.ll_sem).await.unwrap();
+        ll_permit
+            .acquire(1, &self.ll_sem)
+            .cooperate()
+            .await
+            .unwrap();
         SemaphorePermit {
             sem: &self,
             ll_permit,

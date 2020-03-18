@@ -1,3 +1,4 @@
+use crate::coop::CoopFutureExt;
 use crate::sync::batch_semaphore::{AcquireError, Permit, Semaphore};
 use std::cell::UnsafeCell;
 use std::ops;
@@ -113,7 +114,10 @@ struct ReleasingPermit<'a, T> {
 
 impl<'a, T> ReleasingPermit<'a, T> {
     async fn acquire(&mut self) -> Result<(), AcquireError> {
-        self.permit.acquire(self.num_permits, &self.lock.s).await
+        self.permit
+            .acquire(self.num_permits, &self.lock.s)
+            .cooperate()
+            .await
     }
 }
 

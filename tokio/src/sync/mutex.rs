@@ -78,6 +78,7 @@
 //!
 //! [`Mutex`]: struct.Mutex.html
 //! [`MutexGuard`]: struct.MutexGuard.html
+use crate::coop::CoopFutureExt;
 use crate::sync::batch_semaphore as semaphore;
 
 use std::cell::UnsafeCell;
@@ -153,11 +154,15 @@ impl<T> Mutex<T> {
     /// A future that resolves on acquiring the lock and returns the `MutexGuard`.
     pub async fn lock(&self) -> MutexGuard<'_, T> {
         let mut permit = semaphore::Permit::new();
-        permit.acquire(1, &self.s).await.unwrap_or_else(|_| {
-            // The semaphore was closed. but, we never explicitly close it, and we have a
-            // handle to it through the Arc, which means that this can never happen.
-            unreachable!()
-        });
+        permit
+            .acquire(1, &self.s)
+            .cooperate()
+            .await
+            .unwrap_or_else(|_| {
+                // The semaphore was closed. but, we never explicitly close it, and we have a
+                // handle to it through the Arc, which means that this can never happen.
+                unreachable!()
+            });
         MutexGuard { lock: self, permit }
     }
 

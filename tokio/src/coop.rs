@@ -46,6 +46,8 @@
 // NOTE: The doctests in this module are ignored since the whole module is (currently) private.
 
 use std::cell::Cell;
+use std::future::Future;
+use std::pin::Pin;
 use std::task::{Context, Poll};
 
 /// Constant used to determine how much "work" a task is allowed to do without yielding.
@@ -249,6 +251,67 @@ pub async fn proceed() {
     use crate::future::poll_fn;
     poll_fn(|cx| poll_proceed(cx)).await;
 }
+
+pin_project_lite::pin_project! {
+    /// A future that cooperatively yields to the task scheduler when polling,
+    /// if the task's budget is exhausted.
+    ///
+    /// Internally, this is simply a future combinator which calls
+    /// [`poll_proceed`] in its `poll` implementation before polling the wrapped
+    /// future.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio::coop::CoopFutureExt;
+    ///
+    /// async {  /* ... */ }
+    ///     .cooperate()
+    ///     .await;
+    /// # }
+    /// ```
+    ///
+    /// [`poll_proceed`]: fn.poll_proceed.html
+    #[derive(Debug)]
+    pub(crate) struct CoopFuture<F> {
+        #[pin]
+        future: F,
+    }
+}
+
+impl<F: Future> Future for CoopFuture<F> {
+    type Output = F::Output;
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        ready!(poll_proceed(cx));
+        self.project().future.poll(cx)
+    }
+}
+
+impl<F: Future> CoopFuture<F> {
+    /// Returns a new `CoopFuture` wrapping the given future.
+    fn new(future: F) -> Self {
+        Self { future }
+    }
+}
+
+/// Extension trait providing `Future::cooperate` extension method.
+///
+/// Note: if/when the co-op API becomes public, this method should probably be
+/// provided by `FutureExt`, instead.
+pub(crate) trait CoopFutureExt: Future {
+    /// Wrap `self` to cooperatively yield to the scheduler when polling, if the
+    /// task's budget is exhausted.
+    fn cooperate(self) -> CoopFuture<Self>
+    where
+        Self: Sized,
+    {
+        CoopFuture::new(self)
+    }
+}
+
+impl<F> CoopFutureExt for F where F: Future {}
 
 #[cfg(all(test, not(loom)))]
 mod test {
