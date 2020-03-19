@@ -7,5 +7,7 @@ cfg_loom! {
 
 cfg_not_loom! {
     mod queue;
+
+    #[cfg(miri)]
     mod task;
 }
