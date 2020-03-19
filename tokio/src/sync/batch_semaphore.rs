@@ -296,8 +296,8 @@ impl Semaphore {
             }
         });
 
-        if dbg!(node.assign_permits(&mut acquired)) {
-            if dbg!(acquired) > 0 {
+        if node.assign_permits(&mut acquired) {
+            if acquired > 0 {
                 // We ended up with more permits than we needed. Release the
                 // back to the semaphore.
                 self.add_permits_locked(acquired, waiters);
@@ -465,7 +465,6 @@ impl Waiter {
         self.state.with_mut(|curr| {
             let curr = unsafe {&mut *curr};
 
-            dbg!(*n, *curr);
             // Assign up to `n` permits.
             let assign = cmp::min(*curr, *n);
             *curr -= assign;
