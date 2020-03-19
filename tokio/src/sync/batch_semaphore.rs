@@ -6,7 +6,7 @@
 //! permits places its waker at the end of a queue. When new permits are made
 //! available (such as by releasing an initial acquisition), they are assigned
 //! to the task at the front of the queue, waking that task if its requested
-//! number of permits is met. 
+//! number of permits is met.
 //!
 //! Because waiters are enqueued at the back of the linked list and dequeued
 //! from the front, the semaphore is fair. Tasks trying to acquire large numbers
@@ -18,14 +18,14 @@ use crate::loom::cell::CausalCell;
 use crate::loom::sync::{atomic::AtomicUsize, Mutex, MutexGuard};
 use crate::util::linked_list::{self, LinkedList};
 
-use std::{cmp, fmt};
 use std::future::Future;
 use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering::*;
-use std::task::{Context, Poll, Waker};
 use std::task::Poll::*;
+use std::task::{Context, Poll, Waker};
+use std::{cmp, fmt};
 
 /// An asynchronous counting semaphore which permits waiting on multiple permits at once.
 pub(crate) struct Semaphore {
@@ -66,7 +66,12 @@ pub(crate) struct Acquire<'a> {
 enum PermitState {
     /// Currently waiting for permits to be made available and assigned to the
     /// waiter.
-    Waiting(u16, u16),
+    Waiting {
+        /// We are waiting to acquire this many permits.
+        needed: u16,
+        /// We have previously acquired this many permits.
+        acquired: u16,
+    },
 
     /// The number of acquired permits
     Acquired(u16),
@@ -74,24 +79,24 @@ enum PermitState {
 
 /// An entry in the wait queue.
 struct Waiter {
-    /// The current state of the waiter. 
-    /// 
+    /// The current state of the waiter.
+    ///
     /// This is either the number of remaining permits required by
     /// the waiter, or a flag indicating that the waiter is not yet queued.
     state: CausalCell<usize>,
 
     /// The waker to notify the task awaiting permits.
-    /// 
+    ///
     /// # Safety
-    /// 
+    ///
     /// This may only be accessed while the wait queue is locked.
     /// XXX: it would be nice if we could enforce this...
     waker: CausalCell<Option<Waker>>,
 
     /// Intrusive linked-list pointers.
-    /// 
+    ///
     /// # Safety
-    /// 
+    ///
     /// This may only be accessed while the wait queue is locked.
     pointers: linked_list::Pointers<Waiter>,
 
@@ -103,11 +108,11 @@ const CLOSED: usize = 1 << 17;
 
 fn notify_all(list: &mut LinkedList<Waiter>) {
     while let Some(waiter) = list.pop_back() {
-        let waker = unsafe { 
-            waiter.as_ref().waker.with_mut(|waker| (*waker).take())
-        };
+        let waker = unsafe { waiter.as_ref().waker.with_mut(|waker| (*waker).take()) };
 
-        waker.expect("if a node is in the wait list, it must have a waker").wake();
+        waker
+            .expect("if a node is in the wait list, it must have a waker")
+            .wake();
     }
 }
 
@@ -129,7 +134,6 @@ impl Semaphore {
         self.permits.load(SeqCst) & std::u16::MAX as usize
     }
 
-
     /// Adds `n` new permits to the semaphore.
     pub(crate) fn add_permits(&self, added: usize) {
         if added == 0 {
@@ -140,10 +144,9 @@ impl Semaphore {
         // waiters at the back of the queue that received enough permits to wake
         // up.
         let mut notified = self.add_permits_locked(added, self.waiters.lock().unwrap());
-        
+
         // Once we release the lock, notify all woken waiters.
         notify_all(&mut notified);
-
     }
 
     /// Closes the semaphore. This prevents the semaphore from issuing new
@@ -183,11 +186,9 @@ impl Semaphore {
         // the waiters in it.
         if let Some(waiter) = last {
             // Safety: it's only safe to call `split_back` with a pointer to a
-            // node in the same list as the one we call `split_back` on. Since 
+            // node in the same list as the one we call `split_back` on. Since
             // we got the waiter pointer from the list's iterator, this is fine.
-            unsafe {
-                waiters.queue.split_back(waiter)
-            }
+            unsafe { waiters.queue.split_back(waiter) }
         } else {
             LinkedList::new()
         }
@@ -208,10 +209,7 @@ impl Semaphore {
 
             let next = curr - num_permits as usize;
 
-            match self
-                .permits
-                .compare_exchange(curr, next, AcqRel, Acquire)
-            {
+            match self.permits.compare_exchange(curr, next, AcqRel, Acquire) {
                 Ok(_) => return Ok(()),
                 Err(actual) => curr = actual,
             }
@@ -227,28 +225,27 @@ impl Semaphore {
     ) -> Poll<Result<(), AcquireError>> {
         let mut acquired = 0;
 
+        // If we are already in the wait queue, we need to lock the queue so we
+        // can access the wait queue entry's current state.
         let (needed, mut lock) = if queued {
             let lock = self.waiters.lock().unwrap();
-            let needed = node.state.with(|curr| unsafe {*curr});
+            // Safety: since we have acquired the lock, it is safe to look at
+            // the waiter's state.
+            let needed = node.state.with(|curr| unsafe { *curr });
             (needed, Some(lock))
         } else {
             (needed as usize, None)
         };
+
         // First, try to take the requested number of permits from the
         // semaphore.
         let mut curr = self.permits.load(Acquire);
         let mut waiters = loop {
-            // state = node.state.load(Acquire);
-            // // Has the waiter already acquired all its needed permits? If so,
-            // // we're done!
-            // if state == 0 {
-            //     return Ready(Ok(()));
-            // }
-
             // Has the semaphore closed?
             if curr & CLOSED > 0 {
                 return Ready(Err(AcquireError::closed()));
             }
+
             let mut remaining = 0;
             let (next, acq) = if curr + acquired >= needed {
                 let next = curr - (needed - acquired);
@@ -262,21 +259,25 @@ impl Semaphore {
                 // No permits were immediately available, so this permit will
                 // (probably) need to wait. We'll need to acquire a lock on the
                 // wait queue.
-                lock = Some(self.waiters.lock().unwrap());
-                // While we were waiting to lock the wait list, additional
-                // permits may have been released. Therefore, we will acquire a
-                // new snapshot of the current state of the semaphore before
-                // actually enqueueing the waiter..
-                curr = self.permits.load(Acquire);
-                continue;
+                if let Ok(l) = self.waiters.try_lock() {
+                    // If we were able to acquire the lock *now* without
+                    // blocking, we don't need to reload the semaphore's permit state.
+                    lock = Some(l)
+                } else {
+                    lock = Some(self.waiters.lock().unwrap());
+                    // While we were waiting to lock the wait list, additional
+                    // permits may have been released. Therefore, we will acquire a
+                    // new snapshot of the current state of the semaphore before
+                    // actually enqueueing the waiter..
+                    curr = self.permits.load(Acquire);
+                    continue;
+                }
             }
 
-            match self.permits.compare_exchange_weak(
-                curr,
-                next,
-                AcqRel,
-                Acquire,
-            ) {
+            match self
+                .permits
+                .compare_exchange_weak(curr, next, AcqRel, Acquire)
+            {
                 Ok(_) => {
                     acquired += acq;
                     if remaining == 0 && !queued {
@@ -288,13 +289,6 @@ impl Semaphore {
             }
             drop(lock.take());
         };
-
-        node.state.with_mut(|curr| {
-            let curr = unsafe { &mut *curr };
-            if *curr & Waiter::UNQUEUED == Waiter::UNQUEUED {
-                *curr = needed;
-            }
-        });
 
         if node.assign_permits(&mut acquired) {
             if acquired > 0 {
@@ -308,12 +302,12 @@ impl Semaphore {
         assert_eq!(acquired, 0);
 
         // Otherwise, register the waker & enqueue the node.
-        node.waker.with_mut(|waker| 
-            // Safety: the wait list is locked, so we may modify the waker.
-            unsafe { *waker = Some(cx.waker().clone()) }
-        );
-
         unsafe {
+            node.waker.with_mut(|waker| {
+                // Safety: the wait list is locked, so we may modify the waker.
+                *waker = Some(cx.waker().clone());
+            });
+
             let node = Pin::into_inner_unchecked(node) as *mut _;
             let node = NonNull::new_unchecked(node);
 
@@ -358,7 +352,7 @@ impl Permit {
             _ => false,
         }
     }
-    
+
     /// Returns a future that tries to acquire the permit. If no permits are
     /// available, the current task is notified once a new permit becomes
     /// available.
@@ -368,14 +362,24 @@ impl Permit {
         semaphore: &'a Semaphore,
     ) -> Acquire<'a> {
         self.state = match self.state {
-            PermitState::Acquired(0) => PermitState::Waiting(num_permits, 0),
-            PermitState::Waiting(n, n2) => {
-                num_permits = cmp::max(n, num_permits - n2);
-                PermitState::Waiting(num_permits, n2)
-            },
-            PermitState::Acquired(n) => {
-                PermitState::Acquired(n)
-            },
+            PermitState::Waiting { needed, acquired } => {
+                num_permits = cmp::max(needed, num_permits - acquired);
+                PermitState::Waiting {
+                    needed: num_permits,
+                    acquired,
+                }
+            }
+            PermitState::Acquired(acquired) => {
+                num_permits -= acquired;
+                if num_permits > 0 {
+                    PermitState::Waiting {
+                        needed: num_permits,
+                        acquired,
+                    }
+                } else {
+                    PermitState::Acquired(acquired)
+                }
+            }
         };
         Acquire {
             node: Waiter::new(num_permits),
@@ -394,7 +398,7 @@ impl Permit {
         use PermitState::*;
 
         match self.state {
-            Waiting(_, _) => unreachable!(
+            Waiting { .. } => unreachable!(
                 "if a permit is waiting, then it has been borrowed mutably by an `Acquire` future"
             ),
             Acquired(acquired) => {
@@ -428,7 +432,7 @@ impl Permit {
         use PermitState::*;
 
         match self.state {
-            Waiting(_, _) => unreachable!(
+            Waiting { .. } => unreachable!(
                 "cannot forget permits while in wait queue; we are already borrowed mutably?"
             ),
             Acquired(acquired) => {
@@ -447,8 +451,6 @@ impl Default for Permit {
 }
 
 impl Waiter {
-    const UNQUEUED: usize = 1 << 16;
-
     fn new(num_permits: u16) -> Self {
         Waiter {
             waker: CausalCell::new(None),
@@ -463,7 +465,7 @@ impl Waiter {
     /// Returns `true` if the waiter should be removed from the queue
     fn assign_permits(&self, n: &mut usize) -> bool {
         self.state.with_mut(|curr| {
-            let curr = unsafe {&mut *curr};
+            let curr = unsafe { &mut *curr };
 
             // Assign up to `n` permits.
             let assign = cmp::min(*curr, *n);
@@ -478,33 +480,38 @@ impl Future for Acquire<'_> {
     type Output = Result<(), AcquireError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        use PermitState::*;
+
         let (node, semaphore, permit, needed) = self.project();
         let mut res = Pending;
         permit.state = match permit.state {
-            PermitState::Acquired(n) if n >= needed => return Ready(Ok(())),
-            PermitState::Acquired(n) => {
-                match semaphore.poll_acquire(cx, needed - n, node, false) {
-                    Ready(r) => { 
+            Acquired(acquired) if acquired >= needed => return Ready(Ok(())),
+            Acquired(acquired) => {
+                match semaphore.poll_acquire(cx, needed - acquired, node, false) {
+                    Ready(r) => {
                         r?;
                         res = Ready(Ok(()));
                         PermitState::Acquired(needed)
-                    },
-                    Pending => {
-                        PermitState::Waiting(needed, n)
-                    },
+                    }
+                    Pending => PermitState::Waiting { needed, acquired },
                 }
             }
-            PermitState::Waiting(n, n2) => {
-                assert_eq!(n + n2, needed, "permit cannot be modified while waiting");
-                match semaphore.poll_acquire(cx, n - n2, node, true) {
-                    Ready(r) => { 
+            PermitState::Waiting {
+                needed: n,
+                acquired,
+            } => {
+                assert_eq!(
+                    n + acquired,
+                    needed,
+                    "permit cannot be modified while waiting"
+                );
+                match semaphore.poll_acquire(cx, n - acquired, node, true) {
+                    Ready(r) => {
                         r?;
                         res = Ready(Ok(()));
                         PermitState::Acquired(needed)
-                    },
-                    Pending => {
-                        PermitState::Waiting(needed, n2)
-                    },
+                    }
+                    Pending => PermitState::Waiting { needed, acquired },
                 }
             }
         };
@@ -535,20 +542,20 @@ impl Acquire<'_> {
 
 impl Drop for Acquire<'_> {
     fn drop(&mut self) {
+        // If the future is completed, there is no node in the wait list, so we
+        // can skip acquiring the lock.
+        if let PermitState::Acquired(_) = self.permit.state {
+            return;
+        }
+
         // This is where we ensure safety. The future is being dropped,
         // which means we must ensure that the waiter entry is no longer stored
         // in the linked list.
         let mut waiters = self.semaphore.waiters.lock().unwrap();
         let state = self.node.state.with(|curr| unsafe { *curr });
 
-        // are we even waiting?
-        if state & Waiter::UNQUEUED == Waiter::UNQUEUED {
-            return;
-        }
-
         let node = NonNull::from(&mut self.node);
         if waiters.contains(node) {
-    
             let acquired_permits = self.num_permits as usize - state;
             // remove the entry from the list
             //
@@ -559,18 +566,16 @@ impl Drop for Acquire<'_> {
                 let mut notified = self.semaphore.add_permits_locked(acquired_permits, waiters);
                 notify_all(&mut notified);
             }
-
         } else {
-            // We don't need to continue holding the lock while modifying the 
+            // We don't need to continue holding the lock while modifying the
             // permit's local state.
             drop(waiters);
         }
 
-
         // If the permit had transitioned to the `Waiting` state, put it back
         // into `Acquired`.
-        if let PermitState::Waiting(_, prior) = self.permit.state {
-            self.permit.state = PermitState::Acquired(prior);
+        if let PermitState::Waiting { acquired, .. } = self.permit.state {
+            self.permit.state = PermitState::Acquired(acquired);
         }
     }
 }
@@ -664,7 +669,7 @@ impl Waitlist {
             true
         } else if self.queue.is_first(&node) {
             debug_assert!(
-                self.queue.is_last(&node), 
+                self.queue.is_last(&node),
                 "if a node is unlinked but is the head of a queue, it must \
                 also be the tail of the queue"
             );
