@@ -28,7 +28,7 @@ impl AtomicUsize {
 
     pub(crate) fn with_mut<R>(&mut self, f: impl FnOnce(&mut usize) -> R) -> R {
         // safety: we have mutable access
-        f( unsafe { (*self.inner.get()).get_mut() } )
+        f(unsafe { (*self.inner.get()).get_mut() })
     }
 }
 

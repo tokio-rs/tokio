@@ -29,7 +29,7 @@ fn multi_stealer() {
 
         // Push work
         for _ in 0..NUM_TASKS {
-            let (task, _) = task::joinable::<_, Runtime>(async { });
+            let (task, _) = task::joinable::<_, Runtime>(async {});
             local.push_back(task, &inject);
         }
 

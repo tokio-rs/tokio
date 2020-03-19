@@ -1,7 +1,7 @@
 //! Run-queue structures to support a work-stealing scheduler
 
 use crate::loom::cell::UnsafeCell;
-use crate::loom::sync::atomic::{AtomicU8, AtomicU16, AtomicUsize};
+use crate::loom::sync::atomic::{AtomicU16, AtomicU8, AtomicUsize};
 use crate::loom::sync::{Arc, Mutex};
 use crate::runtime::task;
 
@@ -188,7 +188,13 @@ impl<T> Local<T> {
         const BATCH_LEN: usize = LOCAL_QUEUE_CAPACITY / 2 + 1;
 
         let n = LOCAL_QUEUE_CAPACITY as u8 / 2;
-        assert_eq!(tail.wrapping_sub(head) as usize, LOCAL_QUEUE_CAPACITY - 1, "queue is not full; tail = {}; head = {}", tail, head);
+        assert_eq!(
+            tail.wrapping_sub(head) as usize,
+            LOCAL_QUEUE_CAPACITY - 1,
+            "queue is not full; tail = {}; head = {}",
+            tail,
+            head
+        );
 
         let prev = join(head, head);
 
@@ -205,7 +211,8 @@ impl<T> Local<T> {
         let actual = self.inner.head.compare_and_swap(
             prev,
             join(head.wrapping_add(n), head.wrapping_add(n)),
-            Release);
+            Release,
+        );
 
         if actual != prev {
             // We failed to claim the tasks, losing the race. Return out of
@@ -294,9 +301,7 @@ impl<T> Local<T> {
             }
         };
 
-        Some(self.inner.buffer[idx].with(|ptr| {
-            unsafe { ptr::read(ptr).assume_init() }
-        }))
+        Some(self.inner.buffer[idx].with(|ptr| unsafe { ptr::read(ptr).assume_init() }))
     }
 }
 
@@ -401,8 +406,7 @@ impl<T> Steal<T> {
             // Read the task
             //
             // safety: We acquired the task with the atomic exchange above.
-            let task = self.0.buffer[src_idx]
-                .with(|ptr| unsafe { ptr::read((*ptr).as_ptr()) });
+            let task = self.0.buffer[src_idx].with(|ptr| unsafe { ptr::read((*ptr).as_ptr()) });
 
             // Write the task to the new slot
             //
@@ -420,7 +424,10 @@ impl<T> Steal<T> {
             let head = split(prev_packed).1;
             next_packed = join(head, head);
 
-            let res = self.0.head.compare_exchange(prev_packed, next_packed, AcqRel, Acquire);
+            let res = self
+                .0
+                .head
+                .compare_exchange(prev_packed, next_packed, AcqRel, Acquire);
 
             match res {
                 Ok(_) => return n,
@@ -604,7 +611,7 @@ fn get_next(header: NonNull<task::Header>) -> Option<NonNull<task::Header>> {
 
 fn set_next(header: NonNull<task::Header>, val: Option<NonNull<task::Header>>) {
     unsafe {
-        header.as_ref().queue_next.with_mut(|ptr| *ptr = val );
+        header.as_ref().queue_next.with_mut(|ptr| *ptr = val);
     }
 }
 

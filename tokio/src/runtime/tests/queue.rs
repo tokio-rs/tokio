@@ -8,7 +8,7 @@ fn steal_batch() {
     let inject = queue::Inject::new();
 
     for _ in 0..4 {
-        let (task, _) = task::joinable::<_, Runtime>(async { });
+        let (task, _) = task::joinable::<_, Runtime>(async {});
         local1.push_back(task, &inject);
     }
 
@@ -26,7 +26,6 @@ fn steal_batch() {
 
     assert!(local1.pop().is_none());
 }
-
 
 struct Runtime;
 
