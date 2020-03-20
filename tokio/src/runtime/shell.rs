@@ -3,12 +3,12 @@
 use crate::park::{Park, Unpark};
 use crate::runtime::enter;
 use crate::runtime::time;
-use crate::util::{Wake, waker_ref};
+use crate::util::{waker_ref, Wake};
 
 use std::future::Future;
 use std::sync::Arc;
-use std::task::Poll::Ready;
 use std::task::Context;
+use std::task::Poll::Ready;
 
 #[derive(Debug)]
 pub(super) struct Shell {
