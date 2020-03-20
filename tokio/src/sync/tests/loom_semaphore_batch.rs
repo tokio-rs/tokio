@@ -21,13 +21,13 @@ fn basic_usage() {
     }
 
     async fn actor(shared: Arc<Shared>) {
-        let mut permit = shared.semaphore.acquire(1).await.unwrap();
+        shared.semaphore.acquire(1).await.unwrap();
         let actual = shared.active.fetch_add(1, SeqCst);
         assert!(actual <= NUM - 1);
 
         let actual = shared.active.fetch_sub(1, SeqCst);
         assert!(actual <= NUM);
-        permit.release(1, &shared.semaphore);
+        shared.semaphore.release(1);
     }
 
     loom::model(|| {
@@ -57,15 +57,14 @@ fn release() {
         {
             let semaphore = semaphore.clone();
             thread::spawn(move || {
-                let mut permit = block_on(semaphore.acquire(1)).unwrap();
-
-                permit.release(1, &semaphore);
+                block_on(semaphore.acquire(1)).unwrap();
+                semaphore.release(1);
             });
         }
 
-        let mut permit = block_on(semaphore.acquire(1)).unwrap();
+        block_on(semaphore.acquire(1)).unwrap();
 
-        permit.release(1, &semaphore);
+        semaphore.release(1);
     });
 }
 
@@ -81,9 +80,9 @@ fn basic_closing() {
 
             thread::spawn(move || {
                 for _ in 0..2 {
-                    let mut permit = block_on(semaphore.acquire(1)).map_err(|_|())?;
+                    block_on(semaphore.acquire(1)).map_err(|_|())?;
 
-                    permit.release(1, &semaphore);
+                    semaphore.release(1);
                 }
 
                 Ok::<(), ()>(())
@@ -105,10 +104,8 @@ fn concurrent_close() {
             let semaphore = semaphore.clone();
 
             thread::spawn(move || {
-                let mut permit = block_on(semaphore.acquire(1)).map_err(|_|())?;
-
-                permit.release(1, &semaphore);
-
+                block_on(semaphore.acquire(1)).map_err(|_|())?;
+                semaphore.release(1);
                 semaphore.close();
 
                 Ok::<(), ()>(())
@@ -133,7 +130,7 @@ fn batch() {
 
             ths.push(thread::spawn(move || {
                 for n in &[4, 10, 8] {
-                    let mut permit = block_on(semaphore.acquire(*n)).unwrap();
+                    block_on(semaphore.acquire(*n)).unwrap();
 
                     active.fetch_add(*n as usize, SeqCst);
 
@@ -144,7 +141,7 @@ fn batch() {
 
                     active.fetch_sub(*n as usize, SeqCst);
 
-                    permit.release(*n, &semaphore);
+                    semaphore.release(*n);
                 }
             }));
         }
@@ -161,15 +158,15 @@ fn batch() {
 fn release_during_acquire() {
     loom::model(|| {
         let semaphore = Arc::new(Semaphore::new(10));
-        let mut permit1 = semaphore.try_acquire(8).expect("try_acquire should succeed; semaphore uncontended");
+        lsemaphore.try_acquire(8).expect("try_acquire should succeed; semaphore uncontended");
         let semaphore2 = semaphore.clone();
         let thread = thread::spawn(move || {
             block_on(semaphore2.acquire(4)).unwrap()
         });
 
-        permit1.release(8, &semaphore);
-        let mut permit2 = thread.join().unwrap();
-        permit2.release(4, &semaphore);
+        semaphore.release(8);
+        thread.join().unwrap();
+        semaphore.release(4);
         assert_eq!(10, semaphore.available_permits());
     })
 }

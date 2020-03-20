@@ -39,20 +39,15 @@ struct Waitlist {
     closed: bool,
 }
 
-/// Error returned by `Permit::try_acquire`.
+/// Error returned by `Semaphore::try_acquire`.
 #[derive(Debug)]
 pub(crate) enum TryAcquireError {
     Closed,
     NoPermits,
 }
-/// Error returned by `Permit::poll_acquire`.
+/// Error returned by `Semaphore::acquire`.
 #[derive(Debug)]
 pub(crate) struct AcquireError(());
-
-#[derive(Debug)]
-pub(crate) struct Permit {
-    num_permits: u16,
-}
 
 pub(crate) struct Acquire<'a> {
     node: Waiter,
@@ -119,7 +114,7 @@ impl Semaphore {
     }
 
     /// Adds `n` new permits to the semaphore.
-    pub(crate) fn add_permits(&self, added: usize) {
+    pub(crate) fn release(&self, added: usize) {
         if added == 0 {
             return;
         }
@@ -146,7 +141,7 @@ impl Semaphore {
         notify_all(notified)
     }
 
-    pub(crate) fn try_acquire(&self, num_permits: u16) -> Result<Permit, TryAcquireError> {
+    pub(crate) fn try_acquire(&self, num_permits: u16) -> Result<(), TryAcquireError> {
         let mut curr = self.permits.load(Acquire);
         loop {
             // Has the semaphore closed?
@@ -162,7 +157,7 @@ impl Semaphore {
             let next = curr - num_permits as usize;
 
             match self.permits.compare_exchange(curr, next, AcqRel, Acquire) {
-                Ok(_) => return Ok(Permit { num_permits }),
+                Ok(_) => return Ok(()),
                 Err(actual) => curr = actual,
             }
         }
@@ -213,7 +208,7 @@ impl Semaphore {
         num_permits: u16,
         node: Pin<&mut Waiter>,
         queued: bool,
-    ) -> Poll<Result<Permit, AcquireError>> {
+    ) -> Poll<Result<(), AcquireError>> {
         let mut acquired = 0;
 
         // If we are already in the wait queue, we need to lock the queue so we
@@ -264,7 +259,7 @@ impl Semaphore {
                 Ok(_) => {
                     acquired += acq;
                     if remaining == 0 && !queued {
-                        return Ready(Ok(Permit { num_permits }));
+                        return Ready(Ok(()));
                     }
                     break lock.unwrap();
                 }
@@ -278,7 +273,7 @@ impl Semaphore {
                 // back to the semaphore.
                 self.add_permits_locked(acquired, waiters);
             }
-            return Ready(Ok(Permit { num_permits }));
+            return Ready(Ok(()));
         }
 
         assert_eq!(acquired, 0);
@@ -317,62 +312,6 @@ impl fmt::Debug for Semaphore {
     }
 }
 
-impl Permit {
-    /// Returns a future that tries to acquire the permit. If no permits are
-    /// available, the current task is notified once a new permit becomes
-    /// available.
-    pub(crate) async fn acquire(
-        &mut self,
-        num_permits: u16,
-        semaphore: &Semaphore,
-    ) -> Result<(), AcquireError> {
-        if num_permits <= self.num_permits {
-            return Ok(());
-        }
-        let num_permits = num_permits - self.num_permits;
-        let acquired = semaphore.acquire(num_permits).await?;
-        self.num_permits += acquired.num_permits;
-        Ok(())
-    }
-
-    /// Tries to acquire the permit.
-    pub(crate) fn try_acquire(
-        &mut self,
-        num_permits: u16,
-        semaphore: &Semaphore,
-    ) -> Result<(), TryAcquireError> {
-        if num_permits <= self.num_permits {
-            return Ok(());
-        }
-        let num_permits = num_permits - self.num_permits;
-        let acquired = semaphore.try_acquire(num_permits)?;
-        self.num_permits += acquired.num_permits;
-        Ok(())
-    }
-
-    /// Releases a permit back to the semaphore
-    pub(crate) fn release(&mut self, n: u16, semaphore: &Semaphore) {
-        let n = self.forget(n);
-        semaphore.add_permits(n as usize);
-    }
-
-    /// Forgets the permit **without** releasing it back to the semaphore.
-    ///
-    /// After calling `forget`, `poll_acquire` is able to acquire new permit
-    /// from the sempahore.
-    ///
-    /// Repeatedly calling `forget` without associated calls to `add_permit`
-    /// will result in the semaphore losing all permits.
-    ///
-    /// Will forget **at most** the number of acquired permits. This number is
-    /// returned.
-    pub(crate) fn forget(&mut self, n: u16) -> u16 {
-        let n = cmp::min(n, self.num_permits);
-        self.num_permits -= n;
-        n
-    }
-}
-
 impl Waiter {
     fn new(num_permits: u16) -> Self {
         Waiter {
@@ -399,7 +338,7 @@ impl Waiter {
 }
 
 impl Future for Acquire<'_> {
-    type Output = Result<Permit, AcquireError>;
+    type Output = Result<(), AcquireError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let (node, semaphore, needed, queued) = self.project();

@@ -23,8 +23,7 @@ pub struct Semaphore {
 #[derive(Debug)]
 pub struct SemaphorePermit<'a> {
     sem: &'a Semaphore,
-    // the low level permit
-    ll_permit: ll::Permit,
+    permits: u16,
 }
 
 /// Error returned from the [`Semaphore::try_acquire`] function.
@@ -59,24 +58,24 @@ impl Semaphore {
 
     /// Adds `n` new permits to the semaphore.
     pub fn add_permits(&self, n: usize) {
-        self.ll_sem.add_permits(n);
+        self.ll_sem.release(n);
     }
 
     /// Acquires permit from the semaphore
     pub async fn acquire(&self) -> SemaphorePermit<'_> {
-        let ll_permit = self.ll_sem.acquire(1).cooperate().await.unwrap();
+        self.ll_sem.acquire(1).cooperate().await.unwrap();
         SemaphorePermit {
             sem: &self,
-            ll_permit,
+            permits: 1,
         }
     }
 
     /// Tries to acquire a permit form the semaphore
     pub fn try_acquire(&self) -> Result<SemaphorePermit<'_>, TryAcquireError> {
         match self.ll_sem.try_acquire(1) {
-            Ok(ll_permit) => Ok(SemaphorePermit {
+            Ok(_) => Ok(SemaphorePermit {
                 sem: self,
-                ll_permit,
+                permits: 1,
             }),
             Err(_) => Err(TryAcquireError(())),
         }
@@ -88,12 +87,12 @@ impl<'a> SemaphorePermit<'a> {
     /// This can be used to reduce the amount of permits available from a
     /// semaphore.
     pub fn forget(mut self) {
-        self.ll_permit.forget(1);
+        self.permits = 0;
     }
 }
 
 impl<'a> Drop for SemaphorePermit<'_> {
     fn drop(&mut self) {
-        self.ll_permit.release(1, &self.sem.ll_sem);
+        self.sem.add_permits(self.permits as usize);
     }
 }

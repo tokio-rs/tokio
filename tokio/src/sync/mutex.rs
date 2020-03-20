@@ -107,7 +107,6 @@ pub struct Mutex<T> {
 /// will succeed yet again.
 pub struct MutexGuard<'a, T> {
     lock: &'a Mutex<T>,
-    permit: semaphore::Permit,
 }
 
 // As long as T: Send, it's fine to send and share Mutex<T> between threads.
@@ -153,18 +152,18 @@ impl<T> Mutex<T> {
 
     /// A future that resolves on acquiring the lock and returns the `MutexGuard`.
     pub async fn lock(&self) -> MutexGuard<'_, T> {
-        let permit = self.s.acquire(1).cooperate().await.unwrap_or_else(|_| {
+        self.s.acquire(1).cooperate().await.unwrap_or_else(|_| {
             // The semaphore was closed. but, we never explicitly close it, and we have a
             // handle to it through the Arc, which means that this can never happen.
             unreachable!()
         });
-        MutexGuard { lock: self, permit }
+        MutexGuard { lock: self }
     }
 
     /// Tries to acquire the lock
     pub fn try_lock(&self) -> Result<MutexGuard<'_, T>, TryLockError> {
         match self.s.try_acquire(1) {
-            Ok(permit) => Ok(MutexGuard { lock: self, permit }),
+            Ok(_) => Ok(MutexGuard { lock: self }),
             Err(_) => Err(TryLockError(())),
         }
     }
@@ -177,7 +176,7 @@ impl<T> Mutex<T> {
 
 impl<'a, T> Drop for MutexGuard<'a, T> {
     fn drop(&mut self) {
-        self.permit.release(1, &self.lock.s);
+        self.lock.s.release(1)
     }
 }
 

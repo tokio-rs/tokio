@@ -1,5 +1,5 @@
 use crate::coop::CoopFutureExt;
-use crate::sync::batch_semaphore::{AcquireError, Permit, Semaphore};
+use crate::sync::batch_semaphore::{AcquireError, Semaphore};
 use std::cell::UnsafeCell;
 use std::ops;
 
@@ -108,7 +108,6 @@ pub struct RwLockWriteGuard<'a, T> {
 #[derive(Debug)]
 struct ReleasingPermit<'a, T> {
     num_permits: u16,
-    permit: Permit,
     lock: &'a RwLock<T>,
 }
 
@@ -117,18 +116,14 @@ impl<'a, T> ReleasingPermit<'a, T> {
         lock: &'a RwLock<T>,
         num_permits: u16,
     ) -> Result<ReleasingPermit<'a, T>, AcquireError> {
-        let permit = lock.s.acquire(num_permits).cooperate().await?;
-        Ok(Self {
-            permit,
-            num_permits,
-            lock,
-        })
+        lock.s.acquire(num_permits).cooperate().await?;
+        Ok(Self { num_permits, lock })
     }
 }
 
 impl<'a, T> Drop for ReleasingPermit<'a, T> {
     fn drop(&mut self) {
-        self.permit.release(self.num_permits, &self.lock.s);
+        self.lock.s.release(self.num_permits as usize);
     }
 }
 
