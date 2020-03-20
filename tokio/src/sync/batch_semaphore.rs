@@ -106,7 +106,7 @@ struct Waiter {
 
 const CLOSED: usize = 1 << 17;
 
-fn notify_all(list: &mut LinkedList<Waiter>) {
+fn notify_all(list: LinkedList<Waiter>) {
     while let Some(waiter) = list.pop_back() {
         let waker = unsafe { waiter.as_ref().waker.with_mut(|waker| (*waker).take()) };
 
@@ -146,7 +146,7 @@ impl Semaphore {
         let mut notified = self.add_permits_locked(added, self.waiters.lock().unwrap());
 
         // Once we release the lock, notify all woken waiters.
-        notify_all(&mut notified);
+        notify_all(notified);
     }
 
     /// Closes the semaphore. This prevents the semaphore from issuing new
@@ -154,9 +154,12 @@ impl Semaphore {
     pub(crate) fn close(&self) {
         self.permits.fetch_or(CLOSED, Release);
 
-        let mut waiters = self.waiters.lock().unwrap();
-        waiters.closed = true;
-        notify_all(&mut waiters.queue)
+        let mut notified = {
+            let mut waiters = self.waiters.lock().unwrap();
+            waiters.closed = true;
+            waiters.queue.take_all()
+        };
+        notify_all(notified)
     }
 
     fn add_permits_locked(

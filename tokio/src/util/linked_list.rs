@@ -145,6 +145,17 @@ impl<T: Link> LinkedList<T> {
         }
     }
 
+    /// Takes all entries from this list, returning a new list.
+    ///
+    /// This list will be left empty.
+    #[cfg(feature = "sync")]
+    pub(crate) fn take_all(&mut self) -> Self {
+        Self {
+            head: self.head.take(),
+            tail: self.tail.take(),
+        }
+    }
+
     /// Returns whether the linked list doesn not contain any node
     pub(crate) fn is_empty(&self) -> bool {
         if self.head.is_some() {
@@ -617,6 +628,26 @@ mod tests {
             assert_eq!(Vec::<i32>::new(), collect_list(&mut list1));
             assert_eq!([1, 2, 3, 4].to_vec(), collect_list(&mut list2));
         }
+    }
+
+    #[test]
+    fn take_all() {
+        let mut list1 = LinkedList::<&Entry>::new();
+        let a = entry(1);
+        let b = entry(2);
+
+        list1.push_front(a.as_ref());
+        list1.push_front(b.as_ref());
+
+        assert!(!list1.is_empty());
+
+        let mut list2 = list1.take_all();
+
+        assert!(!list1.is_empty());
+        assert!(list2.is_empty());
+
+        assert_eq!(Vec::<i32>::new(), collect_list(&mut list1));
+        assert_eq!([1, 2].to_vec(), collect_list(&mut list2));
     }
 
     proptest::proptest! {
