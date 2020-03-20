@@ -614,9 +614,6 @@ impl TcpStream {
 
     /// Splits a `TcpStream` into a read half and a write half, which can be used
     /// to read and write the stream concurrently.
-    ///
-    /// See the module level documenation of [`split`](super::split) for more
-    /// details.
     pub fn split(&mut self) -> (ReadHalf<'_>, WriteHalf<'_>) {
         split(self)
     }
