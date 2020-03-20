@@ -118,44 +118,6 @@ impl<T: Link> LinkedList<T> {
         }
     }
 
-    /// Splits this list off at `node`, returning a new list with `node` at its
-    /// front.
-    ///
-    /// If `node` is at the the front of this list, then this list will be empty after
-    /// splitting. If `node` is the last node in this list, then the returned
-    /// list will contain only `node`.
-    ///
-    /// # Safety
-    ///
-    /// The caller **must** ensure that `node` is currently contained by
-    /// `self` or not contained by any other list.
-    #[cfg(feature = "sync")]
-    pub(crate) unsafe fn split_back(&mut self, node: NonNull<T::Target>) -> Self {
-        let new_tail = T::pointers(node).as_mut().prev.take().map(|prev| {
-            T::pointers(prev).as_mut().next = None;
-            prev
-        });
-        if new_tail.is_none() {
-            self.head = None;
-        }
-        let tail = std::mem::replace(&mut self.tail, new_tail);
-        Self {
-            head: Some(node),
-            tail,
-        }
-    }
-
-    /// Takes all entries from this list, returning a new list.
-    ///
-    /// This list will be left empty.
-    #[cfg(feature = "sync")]
-    pub(crate) fn take_all(&mut self) -> Self {
-        Self {
-            head: self.head.take(),
-            tail: self.tail.take(),
-        }
-    }
-
     /// Returns whether the linked list doesn not contain any node
     pub(crate) fn is_empty(&self) -> bool {
         if self.head.is_some() {
@@ -164,18 +126,6 @@ impl<T: Link> LinkedList<T> {
 
         assert!(self.tail.is_none());
         true
-    }
-
-    /// Returns `true` if `node` is the first node in this list.
-    #[cfg(feature = "sync")] // used only by `batch_semaphore`
-    pub(crate) fn is_first(&self, node: &T::Handle) -> bool {
-        self.head == Some(T::as_raw(node))
-    }
-
-    /// Returns `true` if `node` is the last node in this list.
-    #[cfg(feature = "sync")] // used only by `batch_semaphore`
-    pub(crate) fn is_last(&self, node: &T::Handle) -> bool {
-        self.tail == Some(T::as_raw(node))
     }
 
     /// Removes the specified node from the list
@@ -215,6 +165,56 @@ impl<T: Link> LinkedList<T> {
     }
 }
 
+cfg_sync! {
+    impl<T: Link> LinkedList<T> {
+        /// Returns `true` if `node` is the first node in this list.
+        pub(crate) fn is_first(&self, node: &T::Handle) -> bool {
+            self.head == Some(T::as_raw(node))
+        }
+
+        /// Returns `true` if `node` is the last node in this list.
+        pub(crate) fn is_last(&self, node: &T::Handle) -> bool {
+            self.tail == Some(T::as_raw(node))
+        }
+
+        /// Splits this list off at `node`, returning a new list with `node` at its
+        /// front.
+        ///
+        /// If `node` is at the the front of this list, then this list will be empty after
+        /// splitting. If `node` is the last node in this list, then the returned
+        /// list will contain only `node`.
+        ///
+        /// # Safety
+        ///
+        /// The caller **must** ensure that `node` is currently contained by
+        /// `self` or not contained by any other list.
+        pub(crate) unsafe fn split_back(&mut self, node: NonNull<T::Target>) -> Self {
+            let new_tail = T::pointers(node).as_mut().prev.take().map(|prev| {
+                T::pointers(prev).as_mut().next = None;
+                prev
+            });
+            if new_tail.is_none() {
+                self.head = None;
+            }
+            let tail = std::mem::replace(&mut self.tail, new_tail);
+            Self {
+                head: Some(node),
+                tail,
+            }
+        }
+
+        /// Takes all entries from this list, returning a new list.
+        ///
+        /// This list will be left empty.
+        pub(crate) fn take_all(&mut self) -> Self {
+            Self {
+                head: self.head.take(),
+                tail: self.tail.take(),
+            }
+        }
+    }
+}
+
 // ===== impl Iter =====
 
 #[cfg(any(feature = "sync", feature = "rt-threaded"))]
@@ -251,16 +251,17 @@ impl<'a, T: Link> Iterator for Iter<'a, T> {
     }
 }
 
-#[cfg(feature = "sync")]
-impl<'a, T: Link> DoubleEndedIterator for Iter<'a, T> {
-    fn next_back(&mut self) -> Option<&'a T::Target> {
-        let curr = self.curr_back?;
+cfg_sync! {
+    impl<'a, T: Link> DoubleEndedIterator for Iter<'a, T> {
+        fn next_back(&mut self) -> Option<&'a T::Target> {
+            let curr = self.curr_back?;
 
-        // safety: the pointer references data contained by the list
-        self.curr_back = unsafe { T::pointers(curr).as_ref() }.prev;
+            // safety: the pointer references data contained by the list
+            self.curr_back = unsafe { T::pointers(curr).as_ref() }.prev;
 
-        // safety: the value is still owned by the linked list.
-        Some(unsafe { &*curr.as_ptr() })
+            // safety: the value is still owned by the linked list.
+            Some(unsafe { &*curr.as_ptr() })
+        }
     }
 }
 
@@ -274,19 +275,22 @@ impl<T> Pointers<T> {
             next: None,
         }
     }
+}
 
-    /// Returns `true` if this set of `Pointers` is linked to a previous or next
-    /// node.
-    ///
-    /// # Notes
-    /// - This does _not_ test for membership in a given list; simply
-    ///   whether the pointers are null or not.
-    /// - If a node is the _only_ node in a list, calling `is_linked` on its
-    ///   `Pointers` will return `false`, but `LinkedList::is_first` and
-    ///   `LinkedList::is_last` will return `true`.
-    #[cfg(feature = "sync")] // used only by `batch_semaphore`
-    pub(crate) fn is_linked(&self) -> bool {
-        self.prev.is_some() || self.next.is_some()
+cfg_sync! {
+    impl<T> Pointers<T> {
+        /// Returns `true` if this set of `Pointers` is linked to a previous or next
+        /// node.
+        ///
+        /// # Notes
+        /// - This does _not_ test for membership in a given list; simply
+        ///   whether the pointers are null or not.
+        /// - If a node is the _only_ node in a list, calling `is_linked` on its
+        ///   `Pointers` will return `false`, but `LinkedList::is_first` and
+        ///   `LinkedList::is_last` will return `true`.
+        pub(crate) fn is_linked(&self) -> bool {
+            self.prev.is_some() || self.next.is_some()
+        }
     }
 }
 
