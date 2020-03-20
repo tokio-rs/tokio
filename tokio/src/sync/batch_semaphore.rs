@@ -252,10 +252,7 @@ impl Semaphore {
                 lock = Some(self.waiters.lock().unwrap());
             }
 
-            match self
-                .permits
-                .compare_exchange_weak(curr, next, AcqRel, Acquire)
-            {
+            match self.permits.compare_exchange(curr, next, AcqRel, Acquire) {
                 Ok(_) => {
                     acquired += acq;
                     if remaining == 0 && !queued {
