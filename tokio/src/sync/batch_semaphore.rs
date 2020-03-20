@@ -567,7 +567,7 @@ impl Drop for Acquire<'_> {
 
             if acquired_permits > 0 {
                 let mut notified = self.semaphore.add_permits_locked(acquired_permits, waiters);
-                notify_all(&mut notified);
+                notify_all(notified);
             }
         } else {
             // We don't need to continue holding the lock while modifying the
