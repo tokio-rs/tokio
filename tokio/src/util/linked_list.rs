@@ -647,8 +647,8 @@ mod tests {
 
         let mut list2 = list1.take_all();
 
-        assert!(!list1.is_empty());
-        assert!(list2.is_empty());
+        assert!(list1.is_empty());
+        assert!(!list2.is_empty());
 
         assert_eq!(Vec::<i32>::new(), collect_list(&mut list1));
         assert_eq!([1, 2].to_vec(), collect_list(&mut list2));
