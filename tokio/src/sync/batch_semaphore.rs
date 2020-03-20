@@ -270,7 +270,6 @@ impl Semaphore {
                 }
                 Err(actual) => curr = actual,
             }
-            drop(lock.take());
         };
 
         if node.assign_permits(&mut acquired) {
