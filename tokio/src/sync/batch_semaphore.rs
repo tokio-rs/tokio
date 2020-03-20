@@ -131,7 +131,7 @@ impl Semaphore {
 
     /// Returns the current number of available permits
     pub(crate) fn available_permits(&self) -> usize {
-        self.permits.load(SeqCst) & std::u16::MAX as usize
+        self.permits.load(Acquire) & std::u16::MAX as usize
     }
 
     /// Adds `n` new permits to the semaphore.
