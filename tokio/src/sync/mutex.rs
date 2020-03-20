@@ -153,24 +153,18 @@ impl<T> Mutex<T> {
 
     /// A future that resolves on acquiring the lock and returns the `MutexGuard`.
     pub async fn lock(&self) -> MutexGuard<'_, T> {
-        let mut permit = semaphore::Permit::new();
-        permit
-            .acquire(1, &self.s)
-            .cooperate()
-            .await
-            .unwrap_or_else(|_| {
-                // The semaphore was closed. but, we never explicitly close it, and we have a
-                // handle to it through the Arc, which means that this can never happen.
-                unreachable!()
-            });
+        let permit = self.s.acquire(1).cooperate().await.unwrap_or_else(|_| {
+            // The semaphore was closed. but, we never explicitly close it, and we have a
+            // handle to it through the Arc, which means that this can never happen.
+            unreachable!()
+        });
         MutexGuard { lock: self, permit }
     }
 
     /// Tries to acquire the lock
     pub fn try_lock(&self) -> Result<MutexGuard<'_, T>, TryLockError> {
-        let mut permit = semaphore::Permit::new();
-        match permit.try_acquire(1, &self.s) {
-            Ok(_) => Ok(MutexGuard { lock: self, permit }),
+        match self.s.try_acquire(1) {
+            Ok(permit) => Ok(MutexGuard { lock: self, permit }),
             Err(_) => Err(TryLockError(())),
         }
     }
@@ -205,14 +199,12 @@ where
 impl<'a, T> Deref for MutexGuard<'a, T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
-        assert!(self.permit.is_acquired());
         unsafe { &*self.lock.c.get() }
     }
 }
 
 impl<'a, T> DerefMut for MutexGuard<'a, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        assert!(self.permit.is_acquired());
         unsafe { &mut *self.lock.c.get() }
     }
 }

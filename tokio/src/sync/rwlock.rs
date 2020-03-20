@@ -113,11 +113,16 @@ struct ReleasingPermit<'a, T> {
 }
 
 impl<'a, T> ReleasingPermit<'a, T> {
-    async fn acquire(&mut self) -> Result<(), AcquireError> {
-        self.permit
-            .acquire(self.num_permits, &self.lock.s)
-            .cooperate()
-            .await
+    async fn acquire(
+        lock: &'a RwLock<T>,
+        num_permits: u16,
+    ) -> Result<ReleasingPermit<'a, T>, AcquireError> {
+        let permit = lock.s.acquire(num_permits).cooperate().await?;
+        Ok(Self {
+            permit,
+            num_permits,
+            lock,
+        })
     }
 }
 
@@ -201,12 +206,7 @@ impl<T> RwLock<T> {
     ///}
     /// ```
     pub async fn read(&self) -> RwLockReadGuard<'_, T> {
-        let mut permit = ReleasingPermit {
-            num_permits: 1,
-            permit: Permit::new(),
-            lock: self,
-        };
-        permit.acquire().await.unwrap_or_else(|_| {
+        let permit = ReleasingPermit::acquire(self, 1).await.unwrap_or_else(|_| {
             // The semaphore was closed. but, we never explicitly close it, and we have a
             // handle to it through the Arc, which means that this can never happen.
             unreachable!()
@@ -237,17 +237,13 @@ impl<T> RwLock<T> {
     ///}
     /// ```
     pub async fn write(&self) -> RwLockWriteGuard<'_, T> {
-        let mut permit = ReleasingPermit {
-            num_permits: MAX_READS as u16,
-            permit: Permit::new(),
-            lock: self,
-        };
-
-        permit.acquire().await.unwrap_or_else(|_| {
-            // The semaphore was closed. but, we never explicitly close it, and we have a
-            // handle to it through the Arc, which means that this can never happen.
-            unreachable!()
-        });
+        let permit = ReleasingPermit::acquire(self, MAX_READS as u16)
+            .await
+            .unwrap_or_else(|_| {
+                // The semaphore was closed. but, we never explicitly close it, and we have a
+                // handle to it through the Arc, which means that this can never happen.
+                unreachable!()
+            });
 
         RwLockWriteGuard { lock: self, permit }
     }

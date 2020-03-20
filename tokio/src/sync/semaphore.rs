@@ -64,12 +64,7 @@ impl Semaphore {
 
     /// Acquires permit from the semaphore
     pub async fn acquire(&self) -> SemaphorePermit<'_> {
-        let mut ll_permit = ll::Permit::new();
-        ll_permit
-            .acquire(1, &self.ll_sem)
-            .cooperate()
-            .await
-            .unwrap();
+        let ll_permit = self.ll_sem.acquire(1).cooperate().await.unwrap();
         SemaphorePermit {
             sem: &self,
             ll_permit,
@@ -78,9 +73,8 @@ impl Semaphore {
 
     /// Tries to acquire a permit form the semaphore
     pub fn try_acquire(&self) -> Result<SemaphorePermit<'_>, TryAcquireError> {
-        let mut ll_permit = ll::Permit::new();
-        match ll_permit.try_acquire(1, &self.ll_sem) {
-            Ok(_) => Ok(SemaphorePermit {
+        match self.ll_sem.try_acquire(1) {
+            Ok(ll_permit) => Ok(SemaphorePermit {
                 sem: self,
                 ll_permit,
             }),
