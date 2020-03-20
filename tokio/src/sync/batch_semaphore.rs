@@ -249,20 +249,12 @@ impl Semaphore {
             if remaining > 0 && lock.is_none() {
                 // No permits were immediately available, so this permit will
                 // (probably) need to wait. We'll need to acquire a lock on the
-                // wait queue.
-                if let Ok(l) = self.waiters.try_lock() {
-                    // If we were able to acquire the lock *now* without
-                    // blocking, we don't need to reload the semaphore's permit state.
-                    lock = Some(l)
-                } else {
-                    lock = Some(self.waiters.lock().unwrap());
-                    // While we were waiting to lock the wait list, additional
-                    // permits may have been released. Therefore, we will acquire a
-                    // new snapshot of the current state of the semaphore before
-                    // actually enqueueing the waiter..
-                    curr = self.permits.load(Acquire);
-                    continue;
-                }
+                // wait queue before continuing. We need to do this _before_ the
+                // CAS that sets the new value of the semaphore's `permits`
+                // counter. Otherwise, if we subtract the permits and then
+                // acquire the lock, we might miss additional permits being
+                // added while waiting for the lock.
+                lock = Some(self.waiters.lock().unwrap());
             }
 
             match self
