@@ -2,10 +2,10 @@ use crate::sync::batch_semaphore::*;
 
 use futures::future::poll_fn;
 use loom::future::block_on;
+use loom::sync::atomic::AtomicUsize;
 use loom::thread;
 use std::future::Future;
 use std::pin::Pin;
-use loom::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use std::task::Poll::Ready;
@@ -31,7 +31,6 @@ fn basic_usage() {
     }
 
     loom::model(|| {
-
         let shared = Arc::new(Shared {
             semaphore: Semaphore::new(NUM),
             active: AtomicUsize::new(0),
@@ -80,7 +79,7 @@ fn basic_closing() {
 
             thread::spawn(move || {
                 for _ in 0..2 {
-                    block_on(semaphore.acquire(1)).map_err(|_|())?;
+                    block_on(semaphore.acquire(1)).map_err(|_| ())?;
 
                     semaphore.release(1);
                 }
@@ -104,7 +103,7 @@ fn concurrent_close() {
             let semaphore = semaphore.clone();
 
             thread::spawn(move || {
-                block_on(semaphore.acquire(1)).map_err(|_|())?;
+                block_on(semaphore.acquire(1)).map_err(|_| ())?;
                 semaphore.release(1);
                 semaphore.close();
 
@@ -158,11 +157,11 @@ fn batch() {
 fn release_during_acquire() {
     loom::model(|| {
         let semaphore = Arc::new(Semaphore::new(10));
-        semaphore.try_acquire(8).expect("try_acquire should succeed; semaphore uncontended");
+        semaphore
+            .try_acquire(8)
+            .expect("try_acquire should succeed; semaphore uncontended");
         let semaphore2 = semaphore.clone();
-        let thread = thread::spawn(move || {
-            block_on(semaphore2.acquire(4)).unwrap()
-        });
+        let thread = thread::spawn(move || block_on(semaphore2.acquire(4)).unwrap());
 
         semaphore.release(8);
         thread.join().unwrap();
