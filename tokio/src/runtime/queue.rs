@@ -187,7 +187,7 @@ impl<T> Local<T> {
     ) -> Result<(), task::Notified<T>> {
         const BATCH_LEN: usize = LOCAL_QUEUE_CAPACITY / 2 + 1;
 
-        let n = LOCAL_QUEUE_CAPACITY as u8 / 2;
+        let n = (LOCAL_QUEUE_CAPACITY / 2) as u8;
         assert_eq!(
             tail.wrapping_sub(head) as usize,
             LOCAL_QUEUE_CAPACITY - 1,
