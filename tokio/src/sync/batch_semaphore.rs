@@ -131,10 +131,9 @@ impl Semaphore {
     /// Closes the semaphore. This prevents the semaphore from issuing new
     /// permits and notifies all pending waiters.
     pub(crate) fn close(&self) {
-        self.permits.fetch_or(CLOSED, Release);
-
         let notified = {
             let mut waiters = self.waiters.lock().unwrap();
+            self.permits.fetch_or(CLOSED, Release);
             waiters.closed = true;
             waiters.queue.take_all()
         };
