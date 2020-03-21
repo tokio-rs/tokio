@@ -1,6 +1,6 @@
 use bencher::{black_box, Bencher};
-use tokio::{task, sync::RwLock};
 use std::sync::Arc;
+use tokio::{sync::RwLock, task};
 
 fn read_uncontended(b: &mut Bencher) {
     let mut rt = tokio::runtime::Builder::new()
@@ -11,7 +11,6 @@ fn read_uncontended(b: &mut Bencher) {
 
     let lock = Arc::new(RwLock::new(()));
     b.iter(|| {
-
         let lock = lock.clone();
         rt.block_on(async move {
             for _ in 0..6 {
@@ -38,7 +37,7 @@ fn read_concurrent_uncontended_multi(b: &mut Bencher) {
     b.iter(|| {
         let lock = lock.clone();
         rt.block_on(async move {
-            let j = tokio::try_join!{
+            let j = tokio::try_join! {
                 task::spawn(task(lock.clone())),
                 task::spawn(task(lock.clone())),
                 task::spawn(task(lock.clone())),
@@ -47,7 +46,6 @@ fn read_concurrent_uncontended_multi(b: &mut Bencher) {
                 task::spawn(task(lock.clone()))
             };
             j.unwrap();
-
         })
     });
 }
@@ -67,7 +65,7 @@ fn read_concurrent_uncontended(b: &mut Bencher) {
     b.iter(|| {
         let lock = lock.clone();
         rt.block_on(async move {
-            tokio::join!{
+            tokio::join! {
                 task(lock.clone()),
                 task(lock.clone()),
                 task(lock.clone()),
@@ -75,7 +73,6 @@ fn read_concurrent_uncontended(b: &mut Bencher) {
                 task(lock.clone()),
                 task(lock.clone())
             };
-
         })
     });
 }
@@ -97,7 +94,7 @@ fn read_concurrent_contended_multi(b: &mut Bencher) {
         let lock = lock.clone();
         rt.block_on(async move {
             let write = lock.write().await;
-            let j = tokio::try_join!{
+            let j = tokio::try_join! {
                 async move { drop(write); Ok(()) },
                 task::spawn(task(lock.clone())),
                 task::spawn(task(lock.clone())),
@@ -106,7 +103,6 @@ fn read_concurrent_contended_multi(b: &mut Bencher) {
                 task::spawn(task(lock.clone())),
             };
             j.unwrap();
-
         })
     });
 }
@@ -127,7 +123,7 @@ fn read_concurrent_contended(b: &mut Bencher) {
         let lock = lock.clone();
         rt.block_on(async move {
             let write = lock.write().await;
-            tokio::join!{
+            tokio::join! {
                 async move { drop(write) },
                 task(lock.clone()),
                 task(lock.clone()),
@@ -138,7 +134,6 @@ fn read_concurrent_contended(b: &mut Bencher) {
         })
     });
 }
-
 
 bencher::benchmark_group!(
     sync_rwlock,

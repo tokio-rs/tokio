@@ -1,6 +1,6 @@
-use bencher::{black_box, Bencher};
-use tokio::{task, sync::Semaphore};
+use bencher::Bencher;
 use std::sync::Arc;
+use tokio::{sync::Semaphore, task};
 
 fn uncontended(b: &mut Bencher) {
     let mut rt = tokio::runtime::Builder::new()
@@ -11,7 +11,6 @@ fn uncontended(b: &mut Bencher) {
 
     let s = Arc::new(Semaphore::new(10));
     b.iter(|| {
-
         let s = s.clone();
         rt.block_on(async move {
             for _ in 0..6 {
@@ -38,7 +37,7 @@ fn uncontended_concurrent_multi(b: &mut Bencher) {
     b.iter(|| {
         let s = s.clone();
         rt.block_on(async move {
-            let j = tokio::try_join!{
+            let j = tokio::try_join! {
                 task::spawn(task(s.clone())),
                 task::spawn(task(s.clone())),
                 task::spawn(task(s.clone())),
@@ -47,7 +46,6 @@ fn uncontended_concurrent_multi(b: &mut Bencher) {
                 task::spawn(task(s.clone()))
             };
             j.unwrap();
-
         })
     });
 }
@@ -62,7 +60,7 @@ fn uncontended_concurrent_single(b: &mut Bencher) {
     b.iter(|| {
         let s = s.clone();
         rt.block_on(async move {
-            tokio::join!{
+            tokio::join! {
                 task(s.clone()),
                 task(s.clone()),
                 task(s.clone()),
@@ -70,11 +68,9 @@ fn uncontended_concurrent_single(b: &mut Bencher) {
                 task(s.clone()),
                 task(s.clone())
             };
-
         })
     });
 }
-
 
 fn contended_concurrent_multi(b: &mut Bencher) {
     let mut rt = tokio::runtime::Builder::new()
@@ -87,7 +83,7 @@ fn contended_concurrent_multi(b: &mut Bencher) {
     b.iter(|| {
         let s = s.clone();
         rt.block_on(async move {
-            let j = tokio::try_join!{
+            let j = tokio::try_join! {
                 task::spawn(task(s.clone())),
                 task::spawn(task(s.clone())),
                 task::spawn(task(s.clone())),
@@ -96,7 +92,6 @@ fn contended_concurrent_multi(b: &mut Bencher) {
                 task::spawn(task(s.clone()))
             };
             j.unwrap();
-
         })
     });
 }
@@ -111,7 +106,7 @@ fn contended_concurrent_single(b: &mut Bencher) {
     b.iter(|| {
         let s = s.clone();
         rt.block_on(async move {
-            tokio::join!{
+            tokio::join! {
                 task(s.clone()),
                 task(s.clone()),
                 task(s.clone()),
@@ -119,7 +114,6 @@ fn contended_concurrent_single(b: &mut Bencher) {
                 task(s.clone()),
                 task(s.clone())
             };
-
         })
     });
 }
