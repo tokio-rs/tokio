@@ -4,6 +4,7 @@
 //! structure's APIs are `unsafe` as they require the caller to ensure the
 //! specified node is actually contained by the list.
 
+use core::fmt;
 use core::mem::ManuallyDrop;
 use core::ptr::NonNull;
 
@@ -11,7 +12,6 @@ use core::ptr::NonNull;
 ///
 /// Currently, the list is not emptied on drop. It is the caller's
 /// responsibility to ensure the list is empty before dropping it.
-#[derive(Debug)]
 pub(crate) struct LinkedList<T: Link> {
     /// Linked list head
     head: Option<NonNull<T::Target>>,
@@ -53,7 +53,6 @@ pub(crate) unsafe trait Link {
 }
 
 /// Previous / next pointers
-#[derive(Debug)]
 pub(crate) struct Pointers<T> {
     /// The previous node in the list. null if there is no previous node.
     prev: Option<NonNull<T>>,
@@ -215,6 +214,15 @@ cfg_sync! {
     }
 }
 
+impl<T: Link> fmt::Debug for LinkedList<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LinkedList")
+            .field("head", &self.head)
+            .field("tail", &self.tail)
+            .finish()
+    }
+}
+
 // ===== impl Iter =====
 
 #[cfg(any(feature = "sync", feature = "rt-threaded"))]
@@ -291,6 +299,15 @@ cfg_sync! {
         pub(crate) fn is_linked(&self) -> bool {
             self.prev.is_some() || self.next.is_some()
         }
+    }
+}
+
+impl<T> fmt::Debug for Pointers<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Pointers")
+            .field("prev", &self.prev)
+            .field("next", &self.next)
+            .finish()
     }
 }
 
