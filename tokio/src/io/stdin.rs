@@ -45,6 +45,20 @@ cfg_io_std! {
     }
 }
 
+#[cfg(unix)]
+impl std::os::unix::io::AsRawFd for Stdin {
+    fn as_raw_fd(&self) -> std::os::unix::io::RawFd {
+        std::io::stdin().as_raw_fd()
+    }
+}
+
+#[cfg(windows)]
+impl std::os::windows::io::AsRawHandle for Stdin {
+    fn as_raw_handle(&self) -> std::os::windows::io::RawHandle {
+        std::io::stdin().as_raw_handle()
+    }
+}
+
 impl AsyncRead for Stdin {
     fn poll_read(
         mut self: Pin<&mut Self>,
