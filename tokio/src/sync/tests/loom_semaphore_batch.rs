@@ -141,7 +141,7 @@ fn batch() {
 
                     active.fetch_sub(*n as usize, SeqCst);
 
-                    semaphore.release(*n);
+                    semaphore.release(*n as usize);
                 }
             }));
         }
@@ -158,7 +158,7 @@ fn batch() {
 fn release_during_acquire() {
     loom::model(|| {
         let semaphore = Arc::new(Semaphore::new(10));
-        lsemaphore.try_acquire(8).expect("try_acquire should succeed; semaphore uncontended");
+        semaphore.try_acquire(8).expect("try_acquire should succeed; semaphore uncontended");
         let semaphore2 = semaphore.clone();
         let thread = thread::spawn(move || {
             block_on(semaphore2.acquire(4)).unwrap()
