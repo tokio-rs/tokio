@@ -56,7 +56,9 @@ macro_rules! writer {
                     {
                         Poll::Pending => return Poll::Pending,
                         Poll::Ready(Err(e)) => return Poll::Ready(Err(e.into())),
-                        Poll::Ready(Ok(0)) => return Poll::Ready(Err(io::ErrorKind::WriteZero.into())),
+                        Poll::Ready(Ok(0)) => {
+                            return Poll::Ready(Err(io::ErrorKind::WriteZero.into()));
+                        }
                         Poll::Ready(Ok(n)) => n as u8,
                     };
                 }
