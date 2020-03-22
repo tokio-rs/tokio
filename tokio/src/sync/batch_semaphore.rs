@@ -130,6 +130,9 @@ impl Semaphore {
 
     /// Closes the semaphore. This prevents the semaphore from issuing new
     /// permits and notifies all pending waiters.
+    // This will be used once the bounded MPSC is updated to use the new
+    // semaphore implementation.
+    #[allow(dead_code)]
     pub(crate) fn close(&self) {
         let notified = {
             let mut waiters = self.waiters.lock().unwrap();
@@ -264,6 +267,10 @@ impl Semaphore {
             }
         };
 
+        if waiters.closed {
+            return Ready(Err(AcquireError::closed()));
+        }
+
         if node.assign_permits(&mut acquired) {
             self.add_permits_locked(acquired, waiters);
             return Ready(Ok(()));
@@ -278,22 +285,16 @@ impl Semaphore {
                 *waker = Some(cx.waker().clone());
             });
 
-            let node = Pin::into_inner_unchecked(node) as *mut _;
-            let node = NonNull::new_unchecked(node);
-
             // If the waiter is not already in the wait queue, enqueue it.
-            if !waiters.contains(node) {
+            if !queued {
+                let node = Pin::into_inner_unchecked(node) as *mut _;
+                let node = NonNull::new_unchecked(node);
+
                 waiters.queue.push_front(node);
             }
         }
 
         Pending
-    }
-}
-
-impl Drop for Semaphore {
-    fn drop(&mut self) {
-        self.close();
     }
 }
 
@@ -398,17 +399,15 @@ impl Drop for Acquire<'_> {
         let state = self.node.state.load(Acquire);
 
         let node = NonNull::from(&mut self.node);
-        if waiters.contains(node) {
-            let acquired_permits = self.num_permits as usize - state;
-            // remove the entry from the list
-            //
-            // Safety: we have locked the wait list.
-            unsafe { waiters.queue.remove(node) };
+        let acquired_permits = self.num_permits as usize - state;
+        // remove the entry from the list
+        //
+        // Safety: we have locked the wait list.
+        unsafe { waiters.queue.remove(node) };
 
-            if acquired_permits > 0 {
-                let notified = self.semaphore.add_permits_locked(acquired_permits, waiters);
-                notify_all(notified);
-            }
+        if acquired_permits > 0 {
+            let notified = self.semaphore.add_permits_locked(acquired_permits, waiters);
+            notify_all(notified);
         }
     }
 }
@@ -486,29 +485,5 @@ unsafe impl linked_list::Link for Waiter {
 
     unsafe fn pointers(mut target: NonNull<Waiter>) -> NonNull<linked_list::Pointers<Waiter>> {
         NonNull::from(&mut target.as_mut().pointers)
-    }
-}
-
-impl Waitlist {
-    /// Returns true if this waitlist already contains the given waiter
-    fn contains(&self, node: NonNull<Waiter>) -> bool {
-        use linked_list::Link;
-        // Note: `is_linked` does not necessarily indicate that the node is
-        // linked with _this_ list. However, because nodes are only
-        // added/removed inside of `Acquire` futures, and a reference to the
-        // same `Semaphore` is present whenever the `Acquire` future calls this
-        // we know that the node cannot be linked with another list.
-        if unsafe { Waiter::pointers(node).as_ref() }.is_linked() {
-            true
-        } else if self.queue.is_first(&node) {
-            debug_assert!(
-                self.queue.is_last(&node),
-                "if a node is unlinked but is the head of a queue, it must \
-                also be the tail of the queue"
-            );
-            true
-        } else {
-            false
-        }
     }
 }

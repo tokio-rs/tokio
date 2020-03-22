@@ -166,16 +166,6 @@ impl<T: Link> LinkedList<T> {
 
 cfg_sync! {
     impl<T: Link> LinkedList<T> {
-        /// Returns `true` if `node` is the first node in this list.
-        pub(crate) fn is_first(&self, node: &T::Handle) -> bool {
-            self.head == Some(T::as_raw(node))
-        }
-
-        /// Returns `true` if `node` is the last node in this list.
-        pub(crate) fn is_last(&self, node: &T::Handle) -> bool {
-            self.tail == Some(T::as_raw(node))
-        }
-
         /// Splits this list off at `node`, returning a new list with `node` at its
         /// front.
         ///
@@ -281,23 +271,6 @@ impl<T> Pointers<T> {
         Pointers {
             prev: None,
             next: None,
-        }
-    }
-}
-
-cfg_sync! {
-    impl<T> Pointers<T> {
-        /// Returns `true` if this set of `Pointers` is linked to a previous or next
-        /// node.
-        ///
-        /// # Notes
-        /// - This does _not_ test for membership in a given list; simply
-        ///   whether the pointers are null or not.
-        /// - If a node is the _only_ node in a list, calling `is_linked` on its
-        ///   `Pointers` will return `false`, but `LinkedList::is_first` and
-        ///   `LinkedList::is_last` will return `true`.
-        pub(crate) fn is_linked(&self) -> bool {
-            self.prev.is_some() || self.next.is_some()
         }
     }
 }
