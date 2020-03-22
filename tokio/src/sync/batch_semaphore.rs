@@ -62,7 +62,7 @@ struct Waiter {
     ///
     /// This is either the number of remaining permits required by
     /// the waiter, or a flag indicating that the waiter is not yet queued.
-    state: CausalCell<usize>,
+    state: AtomicUsize,
 
     /// The waker to notify the task awaiting permits.
     ///
@@ -212,16 +212,13 @@ impl Semaphore {
 
         // If we are already in the wait queue, we need to lock the queue so we
         // can access the wait queue entry's current state.
-        let (needed, mut lock) = if queued {
-            let lock = self.waiters.lock().unwrap();
-            // Safety: since we have acquired the lock, it is safe to look at
-            // the waiter's state.
-            let needed = node.state.with(|curr| unsafe { *curr });
-            (needed, Some(lock))
+        let needed = if queued {
+            node.state.load(Acquire)
         } else {
-            (num_permits as usize, None)
+            num_permits as usize
         };
 
+        let mut lock = None;
         // First, try to take the requested number of permits from the
         // semaphore.
         let mut curr = self.permits.load(Acquire);
@@ -254,8 +251,12 @@ impl Semaphore {
             match self.permits.compare_exchange(curr, next, AcqRel, Acquire) {
                 Ok(_) => {
                     acquired += acq;
-                    if remaining == 0 && !queued {
-                        return Ready(Ok(()));
+                    if remaining == 0 {
+                        if !queued {
+                            return Ready(Ok(()));
+                        } else if lock.is_none() {
+                            break self.waiters.lock().unwrap();
+                        }
                     }
                     break lock.unwrap();
                 }
@@ -264,11 +265,7 @@ impl Semaphore {
         };
 
         if node.assign_permits(&mut acquired) {
-            if acquired > 0 {
-                // We ended up with more permits than we needed. Release the
-                // back to the semaphore.
-                self.add_permits_locked(acquired, waiters);
-            }
+            self.add_permits_locked(acquired, waiters);
             return Ready(Ok(()));
         }
 
@@ -312,7 +309,7 @@ impl Waiter {
     fn new(num_permits: u16) -> Self {
         Waiter {
             waker: CausalCell::new(None),
-            state: CausalCell::new(num_permits as usize),
+            state: AtomicUsize::new(num_permits as usize),
             pointers: linked_list::Pointers::new(),
             _p: PhantomPinned,
         }
@@ -322,14 +319,18 @@ impl Waiter {
     ///
     /// Returns `true` if the waiter should be removed from the queue
     fn assign_permits(&self, n: &mut usize) -> bool {
-        self.state.with_mut(|curr| {
-            let curr = unsafe { &mut *curr };
-            // Assign up to `n` permits.
-            let assign = cmp::min(*curr, *n);
-            *curr -= assign;
-            *n -= assign;
-            *curr == 0
-        })
+        let mut curr = self.state.load(Acquire);
+        loop {
+            let assign = cmp::min(curr, *n);
+            let next = curr - assign;
+            match self.state.compare_exchange(curr, next, AcqRel, Acquire) {
+                Ok(_) => {
+                    *n -= assign;
+                    return next == 0;
+                }
+                Err(actual) => curr = actual,
+            }
+        }
     }
 }
 
@@ -394,7 +395,7 @@ impl Drop for Acquire<'_> {
         // which means we must ensure that the waiter entry is no longer stored
         // in the linked list.
         let mut waiters = self.semaphore.waiters.lock().unwrap();
-        let state = self.node.state.with(|curr| unsafe { *curr });
+        let state = self.node.state.load(Acquire);
 
         let node = NonNull::from(&mut self.node);
         if waiters.contains(node) {
