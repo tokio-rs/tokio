@@ -261,7 +261,7 @@ impl Semaphore {
                             break self.waiters.lock().unwrap();
                         }
                     }
-                    break lock.unwrap();
+                    break lock.expect("lock must be acquired before waiting");
                 }
                 Err(actual) => curr = actual,
             }
