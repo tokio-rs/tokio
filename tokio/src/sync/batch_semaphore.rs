@@ -136,6 +136,13 @@ impl Semaphore {
     pub(crate) fn close(&self) {
         let notified = {
             let mut waiters = self.waiters.lock().unwrap();
+            // If the semaphore's permits counter has enough permits for an
+            // unqueued waiter to acquire all the permits it needs immediately,
+            // it won't touch the wait list. Therefore, we have to set a bit on
+            // the permit counter as well. However, we must do this while
+            // holding the lock --- otherwise, if we set the bit and then wait
+            // to acquire the lock we'll enter an inconsistent state where the
+            // permit counter is closed, but the wait list is not.
             self.permits.fetch_or(CLOSED, Release);
             waiters.closed = true;
             waiters.queue.take_all()
@@ -178,11 +185,11 @@ impl Semaphore {
         // permits as it needs until we run out of permits to assign.
         let mut last = None;
         for waiter in waiters.queue.iter().rev() {
-            if waiter.assign_permits(&mut rem) {
-                last = Some(NonNull::from(waiter));
-            } else {
+            // Was the waiter assigned enough permits to wake it?
+            if !waiter.assign_permits(&mut rem) {
                 break;
             }
+            last = Some(NonNull::from(waiter));
         }
 
         // If we assigned permits to all the waiters in the queue, and there are
@@ -213,8 +220,6 @@ impl Semaphore {
     ) -> Poll<Result<(), AcquireError>> {
         let mut acquired = 0;
 
-        // If we are already in the wait queue, we need to lock the queue so we
-        // can access the wait queue entry's current state.
         let needed = if queued {
             node.state.load(Acquire)
         } else {
@@ -404,15 +409,12 @@ impl Drop for Acquire<'_> {
             Err(e) => e.into_inner(),
         };
 
-        let state = self.node.state.load(Acquire);
-
-        let node = NonNull::from(&mut self.node);
-        let acquired_permits = self.num_permits as usize - state;
         // remove the entry from the list
-        //
+        let node = NonNull::from(&mut self.node);
         // Safety: we have locked the wait list.
         unsafe { waiters.queue.remove(node) };
 
+        let acquired_permits = self.num_permits as usize - self.node.state.load(Acquire);
         if acquired_permits > 0 {
             let notified = self.semaphore.add_permits_locked(acquired_permits, waiters);
             notify_all(notified);
