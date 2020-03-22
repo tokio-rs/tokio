@@ -395,7 +395,15 @@ impl Drop for Acquire<'_> {
         // This is where we ensure safety. The future is being dropped,
         // which means we must ensure that the waiter entry is no longer stored
         // in the linked list.
-        let mut waiters = self.semaphore.waiters.lock().unwrap();
+        let mut waiters = match self.semaphore.waiters.lock() {
+            Ok(lock) => lock,
+            // Removing the node from the linked list is necessary to ensure
+            // safety. Even if the lock was poisoned, we need to make sure it is
+            // removed from the linked list before dropping it --- otherwise,
+            // the list will contain a dangling pointer to this node.
+            Err(e) => e.into_inner(),
+        };
+
         let state = self.node.state.load(Acquire);
 
         let node = NonNull::from(&mut self.node);
