@@ -344,8 +344,9 @@ impl Future for Acquire<'_> {
                 Pending
             }
             Ready(r) => {
+                r?;
                 *queued = false;
-                Ready(r)
+                Ready(Ok(()))
             }
         }
     }
