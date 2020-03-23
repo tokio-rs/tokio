@@ -2,10 +2,7 @@
 #![cfg(feature = "full")]
 
 use tokio::io::{AsyncWrite, AsyncWriteExt};
-use tokio_test::assert_ok;
 
-use bytes::BytesMut;
-use std::cmp;
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -17,7 +14,7 @@ async fn write_int_should_err_if_write_count_0() {
 
     impl AsyncWrite for Wr {
         fn poll_write(
-            mut self: Pin<&mut Self>,
+            self: Pin<&mut Self>,
             _cx: &mut Context<'_>,
             _buf: &[u8],
         ) -> Poll<io::Result<usize>> {
