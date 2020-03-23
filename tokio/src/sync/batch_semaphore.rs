@@ -210,7 +210,7 @@ impl Semaphore {
         if rem > 0 {
             let permits = rem << Self::PERMIT_SHIFT;
             assert!(
-                permits > Self::MAX_PERMITS,
+                permits < Self::MAX_PERMITS,
                 "cannot add more than MAX_PERMITS permits ({})",
                 Self::MAX_PERMITS
             );
