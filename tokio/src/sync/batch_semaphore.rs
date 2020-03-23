@@ -163,7 +163,7 @@ impl Semaphore {
         let mut curr = self.permits.load(Acquire);
         let num_permits = (num_permits as usize) << Self::PERMIT_SHIFT;
         loop {
-            // Has the semaphore closed?
+            // Has the semaphore closed?git
             if curr & Self::CLOSED > 0 {
                 return Err(TryAcquireError::Closed);
             }
@@ -294,19 +294,27 @@ impl Semaphore {
         assert_eq!(acquired, 0);
 
         // Otherwise, register the waker & enqueue the node.
-        unsafe {
-            node.waker.with_mut(|waker| {
-                // Safety: the wait list is locked, so we may modify the waker.
+        node.waker.with_mut(|waker| {
+            // Safety: the wait list is locked, so we may modify the waker.
+            let waker = unsafe { &mut *waker };
+            // Do we need to register the new waker?
+            if waker
+                .as_ref()
+                .map(|waker| !waker.will_wake(cx.waker()))
+                .unwrap_or(true)
+            {
                 *waker = Some(cx.waker().clone());
-            });
-
-            // If the waiter is not already in the wait queue, enqueue it.
-            if !queued {
-                let node = Pin::into_inner_unchecked(node) as *mut _;
-                let node = NonNull::new_unchecked(node);
-
-                waiters.queue.push_front(node);
             }
+        });
+
+        // If the waiter is not already in the wait queue, enqueue it.
+        if !queued {
+            let node = unsafe {
+                let node = Pin::into_inner_unchecked(node) as *mut _;
+                NonNull::new_unchecked(node)
+            };
+
+            waiters.queue.push_front(node);
         }
 
         Pending
