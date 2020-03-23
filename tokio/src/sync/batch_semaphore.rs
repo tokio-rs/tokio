@@ -83,7 +83,7 @@ struct Waiter {
     _p: PhantomPinned,
 }
 
-const CLOSED: usize = 1 << 17;
+const CLOSED: usize = 1;
 
 fn notify_all(mut list: LinkedList<Waiter>) {
     while let Some(waiter) = list.pop_back() {
@@ -96,11 +96,20 @@ fn notify_all(mut list: LinkedList<Waiter>) {
 }
 
 impl Semaphore {
+    /// The maximum number of permits which a semaphore can hold.
+    ///
+    /// Note that this reserves three bits of flags in the permit counter, but
+    /// we only actually use one of them. However, the previous semaphore
+    /// implementation used three bits, so we will continue to reserve them to
+    /// avoid a breaking change if additional flags need to be aadded in the
+    /// future.
+    pub(crate) const MAX_PERMITS: usize = std::usize::MAX >> 3;
+
     /// Creates a new semaphore with the initial number of permits
     pub(crate) fn new(permits: usize) -> Self {
-        assert!(permits <= std::u16::MAX as usize);
+        assert!(permits <= Self::MAX_PERMITS);
         Self {
-            permits: AtomicUsize::new(permits),
+            permits: AtomicUsize::new(permits << 1),
             waiters: Mutex::new(Waitlist {
                 queue: LinkedList::new(),
                 closed: false,
@@ -110,7 +119,7 @@ impl Semaphore {
 
     /// Returns the current number of available permits
     pub(crate) fn available_permits(&self) -> usize {
-        self.permits.load(Acquire) & std::u16::MAX as usize
+        self.permits.load(Acquire) >> 1
     }
 
     /// Adds `n` new permits to the semaphore.
@@ -152,6 +161,7 @@ impl Semaphore {
 
     pub(crate) fn try_acquire(&self, num_permits: u16) -> Result<(), TryAcquireError> {
         let mut curr = self.permits.load(Acquire);
+        let num_permits = (num_permits as usize) << 1;
         loop {
             // Has the semaphore closed?
             if curr & CLOSED > 0 {
@@ -159,11 +169,11 @@ impl Semaphore {
             }
 
             // Are there enough permits remaining?
-            if (curr as u16) < num_permits {
+            if curr < num_permits {
                 return Err(TryAcquireError::NoPermits);
             }
 
-            let next = curr - num_permits as usize;
+            let next = curr - num_permits;
 
             match self.permits.compare_exchange(curr, next, AcqRel, Acquire) {
                 Ok(_) => return Ok(()),
@@ -195,7 +205,7 @@ impl Semaphore {
         // If we assigned permits to all the waiters in the queue, and there are
         // still permits left over, assign them back to the semaphore.
         if rem > 0 {
-            self.permits.fetch_add(rem, Release);
+            self.permits.fetch_add(rem << 1, Release);
         }
 
         // Split off the queue at the last waiter that was satisfied, creating a
@@ -221,9 +231,9 @@ impl Semaphore {
         let mut acquired = 0;
 
         let needed = if queued {
-            node.state.load(Acquire)
+            node.state.load(Acquire) << 1
         } else {
-            num_permits as usize
+            (num_permits as usize) << 1
         };
 
         let mut lock = None;
@@ -239,10 +249,10 @@ impl Semaphore {
             let mut remaining = 0;
             let (next, acq) = if curr + acquired >= needed {
                 let next = curr - (needed - acquired);
-                (next, needed)
+                (next, needed >> 1)
             } else {
                 remaining = (needed - acquired) - curr;
-                (0, curr)
+                (0, curr >> 1)
             };
 
             if remaining > 0 && lock.is_none() {
