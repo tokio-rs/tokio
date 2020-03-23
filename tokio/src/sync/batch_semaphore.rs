@@ -69,7 +69,6 @@ struct Waiter {
     /// # Safety
     ///
     /// This may only be accessed while the wait queue is locked.
-    /// XXX: it would be nice if we could enforce this...
     waker: CausalCell<Option<Waker>>,
 
     /// Intrusive linked-list pointers.
@@ -77,6 +76,13 @@ struct Waiter {
     /// # Safety
     ///
     /// This may only be accessed while the wait queue is locked.
+    ///
+    /// TODO: Ideally, we would be able to use loom to enforce that
+    /// this isn't accessed concurrently. However, it is difficult to
+    /// use a `CausalCell` here, since the `Link` trait requires _returning_
+    /// references to `Pointers`, and `CausalCell` requires that checked access
+    /// take place inside a closure. We should consider changing `Pointers` to
+    /// use `CausalCell` internally.
     pointers: linked_list::Pointers<Waiter>,
 
     /// Should not be `Unpin`.
