@@ -83,16 +83,6 @@ struct Waiter {
     _p: PhantomPinned,
 }
 
-fn notify_all(mut list: LinkedList<Waiter>) {
-    while let Some(waiter) = list.pop_back() {
-        let waker = unsafe { waiter.as_ref().waker.with_mut(|waker| (*waker).take()) };
-
-        waker
-            .expect("if a node is in the wait list, it must have a waker")
-            .wake();
-    }
-}
-
 impl Semaphore {
     /// The maximum number of permits which a semaphore can hold.
     ///
@@ -190,6 +180,15 @@ impl Semaphore {
         Acquire::new(self, num_permits)
     }
 
+    /// Release `rem` permits to the semaphore's wait list, starting from the
+    /// end of the queue.
+    ///
+    /// This returns a new `LinkedList` containing all the waiters that received
+    /// enough permits to be notified. Once the lock on the wait list is
+    /// released, this list should be drained and the waiters in it notified.
+    ///  
+    /// If `rem` exceeds the number of permits needed by the wait list, the
+    /// remainder are assigned back to the semaphore.
     fn add_permits_locked(
         &self,
         mut rem: usize,
@@ -345,6 +344,18 @@ impl fmt::Debug for Semaphore {
         fmt.debug_struct("Semaphore")
             .field("permits", &self.permits.load(Relaxed))
             .finish()
+    }
+}
+
+/// Pop all waiters from `list`, starting at the end of the queue, and notify
+/// them.
+fn notify_all(mut list: LinkedList<Waiter>) {
+    while let Some(waiter) = list.pop_back() {
+        let waker = unsafe { waiter.as_ref().waker.with_mut(|waker| (*waker).take()) };
+
+        waker
+            .expect("if a node is in the wait list, it must have a waker")
+            .wake();
     }
 }
 
