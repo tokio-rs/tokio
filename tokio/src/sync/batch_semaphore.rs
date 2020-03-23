@@ -107,7 +107,11 @@ impl Semaphore {
 
     /// Creates a new semaphore with the initial number of permits
     pub(crate) fn new(permits: usize) -> Self {
-        assert!(permits <= Self::MAX_PERMITS);
+        assert!(
+            permits <= Self::MAX_PERMITS,
+            "a semaphore may not have more than MAX_PERMITS permits ({})",
+            Self::MAX_PERMITS
+        );
         Self {
             permits: AtomicUsize::new(permits << Self::PERMIT_SHIFT),
             waiters: Mutex::new(Waitlist {
@@ -205,7 +209,19 @@ impl Semaphore {
         // If we assigned permits to all the waiters in the queue, and there are
         // still permits left over, assign them back to the semaphore.
         if rem > 0 {
-            self.permits.fetch_add(rem << Self::PERMIT_SHIFT, Release);
+            let permits = rem << Self::PERMIT_SHIFT;
+            assert!(
+                permits > Self::MAX_PERMITS,
+                "cannot add more than MAX_PERMITS permits ({})",
+                Self::MAX_PERMITS
+            );
+            let prev = self.permits.fetch_add(rem << Self::PERMIT_SHIFT, Release);
+            assert!(
+                prev + permits <= Self::MAX_PERMITS,
+                "number of added permits ({}) would overflow MAX_PERMITS ({})",
+                rem,
+                Self::MAX_PERMITS
+            );
         }
 
         // Split off the queue at the last waiter that was satisfied, creating a
@@ -247,7 +263,10 @@ impl Semaphore {
             }
 
             let mut remaining = 0;
-            let (next, acq) = if curr + acquired >= needed {
+            let total = curr
+                .checked_add(acquired)
+                .expect("number of permits must not overflow");
+            let (next, acq) = if total >= needed {
                 let next = curr - (needed - acquired);
                 (next, needed >> Self::PERMIT_SHIFT)
             } else {
