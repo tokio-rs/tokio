@@ -610,6 +610,7 @@ impl Permit {
     }
 
     /// Returns `true` if the permit has been acquired
+    #[allow(dead_code)] // may be used later
     pub(crate) fn is_acquired(&self) -> bool {
         match self.state {
             PermitState::Acquired(num) if num > 0 => true,
