@@ -23,7 +23,7 @@ cfg_not_test_util! {
             now()
         }
 
-        pub(crate) fn is_frozen(&self) -> bool {
+        pub(crate) fn is_paused(&self) -> bool {
             false
         }
 
@@ -41,16 +41,16 @@ cfg_test_util! {
     /// A handle to a source of time.
     #[derive(Debug, Clone)]
     pub(crate) struct Clock {
-        inner: Arc<Inner>,
+        inner: Arc<Mutex<Inner>>,
     }
 
     #[derive(Debug)]
     struct Inner {
-        /// Instant at which the clock was created
-        start: std::time::Instant,
+        /// Instant to use as the clock's base instant.
+        base: std::time::Instant,
 
-        /// Current, "frozen" time as an offset from `start`.
-        frozen: Mutex<Option<Duration>>,
+        /// Instant at which the clock was last unfrozen
+        unfrozen: Option<std::time::Instant>,
     }
 
     /// Pause time
@@ -65,11 +65,7 @@ cfg_test_util! {
     /// runtime.
     pub fn pause() {
         let clock = context::clock().expect("time cannot be frozen from outside the Tokio runtime");
-        let mut frozen = clock.inner.frozen.lock().unwrap();
-        if frozen.is_some() {
-            panic!("time is already frozen");
-        }
-        *frozen = Some(clock.inner.start.elapsed());
+        clock.pause();
     }
 
     /// Resume time
@@ -83,13 +79,13 @@ cfg_test_util! {
     /// runtime.
     pub fn resume() {
         let clock = context::clock().expect("time cannot be frozen from outside the Tokio runtime");
-        let mut frozen = clock.inner.frozen.lock().unwrap();
+        let mut inner = clock.inner.lock().unwrap();
 
-        if frozen.is_none() {
+        if inner.unfrozen.is_some() {
             panic!("time is not frozen");
         }
 
-        *frozen = None;
+        inner.unfrozen = Some(std::time::Instant::now());
     }
 
     /// Advance time
@@ -110,11 +106,7 @@ cfg_test_util! {
     /// Return the current instant, factoring in frozen time.
     pub(crate) fn now() -> Instant {
         if let Some(clock) = context::clock() {
-            if let Some(frozen) = *clock.inner.frozen.lock().unwrap() {
-                Instant::from_std(clock.inner.start + frozen)
-            } else {
-                Instant::from_std(std::time::Instant::now())
-            }
+            clock.now()
         } else {
             Instant::from_std(std::time::Instant::now())
         }
@@ -124,53 +116,49 @@ cfg_test_util! {
         /// Return a new `Clock` instance that uses the current execution context's
         /// source of time.
         pub(crate) fn new() -> Clock {
+            let now = std::time::Instant::now();
+
             Clock {
-                inner: Arc::new(Inner {
-                    start: std::time::Instant::now(),
-                    frozen: Mutex::new(None),
-                }),
+                inner: Arc::new(Mutex::new(Inner {
+                    base: now,
+                    unfrozen: Some(now),
+                })),
             }
         }
 
-        // TODO: delete this. Some tests rely on this
-        #[cfg(all(test, not(loom)))]
-        /// Return a new `Clock` instance that uses the current execution context's
-        /// source of time.
-        pub(crate) fn new_frozen() -> Clock {
-            Clock {
-                inner: Arc::new(Inner {
-                    start: std::time::Instant::now(),
-                    frozen: Mutex::new(Some(Duration::from_millis(0))),
-                }),
-            }
+        pub(crate) fn pause(&self) {
+            let mut inner = self.inner.lock().unwrap();
+
+            let elapsed = inner.unfrozen.as_ref().expect("time is already frozen").elapsed();
+            inner.base += elapsed;
+            inner.unfrozen = None;
         }
 
-        pub(crate) fn is_frozen(&self) -> bool {
-            self.inner.frozen.lock().unwrap().is_some()
+        pub(crate) fn is_paused(&self) -> bool {
+            let inner = self.inner.lock().unwrap();
+            inner.unfrozen.is_none()
         }
 
         pub(crate) fn advance(&self, duration: Duration) {
-            let mut frozen = self.inner.frozen.lock().unwrap();
+            let mut inner = self.inner.lock().unwrap();
 
-            if let Some(ref mut elapsed) = *frozen {
-                *elapsed += duration;
-            } else {
+            if inner.unfrozen.is_some() {
                 panic!("time is not frozen");
             }
-        }
 
-        // TODO: delete this as well
-        #[cfg(all(test, not(loom)))]
-        pub(crate) fn advanced(&self) -> Duration {
-            self.inner.frozen.lock().unwrap().unwrap()
+            inner.base += duration;
         }
 
         pub(crate) fn now(&self) -> Instant {
-            Instant::from_std(if let Some(frozen) = *self.inner.frozen.lock().unwrap() {
-                self.inner.start + frozen
-            } else {
-                std::time::Instant::now()
-            })
+            let inner = self.inner.lock().unwrap();
+
+            let mut ret = inner.base;
+
+            if let Some(unfrozen) = inner.unfrozen {
+                ret += unfrozen.elapsed();
+            }
+
+            Instant::from_std(ret)
         }
     }
 }

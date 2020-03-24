@@ -9,10 +9,8 @@ pub(crate) mod linked_list;
 #[cfg(any(feature = "rt-threaded", feature = "macros", feature = "stream"))]
 mod rand;
 
-cfg_rt_core! {
-    mod wake;
-    pub(crate) use wake::{waker_ref, Wake};
-}
+mod wake;
+pub(crate) use wake::{waker_ref, Wake};
 
 cfg_rt_threaded! {
     pub(crate) use rand::FastRand;

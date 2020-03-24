@@ -15,6 +15,7 @@ full = [
     "tokio-test"
 ]
 macros = ["tokio/macros"]
+sync = ["tokio/sync"]
 rt-core = ["tokio/rt-core"]
 rt-threaded = ["rt-core", "tokio/rt-threaded"]
 

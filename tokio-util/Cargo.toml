@@ -7,13 +7,13 @@ name = "tokio-util"
 #   - Cargo.toml
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.3.0"
+version = "0.3.1"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-util/0.3.0/tokio_util"
+documentation = "https://docs.rs/tokio-util/0.3.1/tokio_util"
 description = """
 Additional utilities for working with Tokio.
 """
@@ -31,7 +31,7 @@ codec = ["tokio/stream"]
 udp = ["tokio/udp"]
 
 [dependencies]
-tokio = { version = "0.2.0", path = "../tokio" }
+tokio = { version = "0.2.5", path = "../tokio" }
 
 bytes = "0.5.0"
 futures-core = "0.3.0"

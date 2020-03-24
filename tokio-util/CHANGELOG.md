@@ -1,3 +1,10 @@
+# 0.3.1 (March 18, 2020)
+
+### Fixed
+
+- Adjust minimum-supported Tokio version to v0.2.5 to account for an internal
+  dependency on features in that version of Tokio. (#2326)
+
 # 0.3.0 (March 4, 2020)
 
 ### Changed

@@ -187,7 +187,12 @@ cfg_blocking! {
 
             // Get the worker core. If none is set, then blocking is fine!
             let core = match cx.core.borrow_mut().take() {
-                Some(core) => core,
+                Some(core) => {
+                    // We are effectively leaving the executor, so we need to
+                    // forcibly end budgeting.
+                    crate::coop::stop();
+                    core
+                },
                 None => return,
             };
 

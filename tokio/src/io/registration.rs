@@ -139,6 +139,9 @@ impl Registration {
     ///
     /// This function will panic if called from outside of a task context.
     pub fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<mio::Ready>> {
+        // Keep track of task budget
+        ready!(crate::coop::poll_proceed(cx));
+
         let v = self.poll_ready(Direction::Read, Some(cx))?;
         match v {
             Some(v) => Poll::Ready(Ok(v)),
@@ -190,6 +193,9 @@ impl Registration {
     ///
     /// This function will panic if called from outside of a task context.
     pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<mio::Ready>> {
+        // Keep track of task budget
+        ready!(crate::coop::poll_proceed(cx));
+
         let v = self.poll_ready(Direction::Write, Some(cx))?;
         match v {
             Some(v) => Poll::Ready(Ok(v)),
