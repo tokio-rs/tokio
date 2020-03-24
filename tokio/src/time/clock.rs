@@ -23,7 +23,7 @@ cfg_not_test_util! {
             now()
         }
 
-        pub(crate) fn is_frozen(&self) -> bool {
+        pub(crate) fn is_paused(&self) -> bool {
             false
         }
 
