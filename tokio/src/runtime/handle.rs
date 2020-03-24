@@ -120,6 +120,15 @@ cfg_rt_core! {
             self.spawner.spawn(future)
         }
     }
+
+    #[cfg(feature = "futures-task")]
+    impl futures_task::Spawn for Handle {
+        fn spawn_obj(&self, f: futures_task::FutureObj<'static, ()>) -> Result<(), futures_task::SpawnError> {
+            self.spawn(f);
+            Ok(())
+        }
+    }
+
 }
 
 /// Error returned by `try_current` when no Runtime has been started

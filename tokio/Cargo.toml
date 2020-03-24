@@ -32,6 +32,7 @@ full = [
   "blocking",
   "dns",
   "fs",
+  "futures-task",
   "io-driver",
   "io-util",
   "io-std",
@@ -99,6 +100,7 @@ pin-project-lite = "0.1.1"
 # Everything else is optional...
 fnv = { version = "1.0.6", optional = true }
 futures-core = { version = "0.3.0", optional = true }
+futures-task = { version = "0.3.0", optional = true }
 lazy_static = { version = "1.0.2", optional = true }
 memchr = { version = "2.2", optional = true }
 mio = { version = "0.6.20", optional = true }

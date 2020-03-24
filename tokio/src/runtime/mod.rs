@@ -490,3 +490,11 @@ impl Runtime {
         blocking_pool.shutdown(Some(duration));
     }
 }
+
+#[cfg(all(feature = "futures-task", feature = "rt-core"))]
+impl futures_task::Spawn for Runtime {
+    fn spawn_obj(&self, f: futures_task::FutureObj<'static, ()>) -> Result<(), futures_task::SpawnError> {
+        self.spawn(f);
+        Ok(())
+    }
+}
