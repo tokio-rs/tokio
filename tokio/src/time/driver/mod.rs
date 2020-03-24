@@ -247,7 +247,7 @@ where
                 if deadline > now {
                     let dur = deadline - now;
 
-                    if self.clock.is_frozen() {
+                    if self.clock.is_paused() {
                         self.park.park_timeout(Duration::from_secs(0))?;
                         self.clock.advance(dur);
                     } else {
@@ -278,7 +278,7 @@ where
                 if deadline > now {
                     let duration = cmp::min(deadline - now, duration);
 
-                    if self.clock.is_frozen() {
+                    if self.clock.is_paused() {
                         self.park.park_timeout(Duration::from_secs(0))?;
                         self.clock.advance(duration);
                     } else {
