@@ -20,9 +20,15 @@ use std::path::Path;
 
 pub async fn copy<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> Result<u64, std::io::Error> {
     let from = File::open(from).await?;
-    let from_permissions = from.metadata().await?.permissions();
     let to = File::create(to).await?;
-    to.set_permissions(from_permissions).await?;
+
+    // Do not set permissions on already existing non-files like pipes and
+    // fifos.
+    if to.metadata().await?.is_file() {
+        let from_permissions = from.metadata().await?.permissions();
+        to.set_permissions(from_permissions).await?;
+    }
+
     let (mut from, mut to) = (io::BufReader::new(from), io::BufWriter::new(to));
     io::copy(&mut from, &mut to).await
 }
