@@ -36,6 +36,14 @@ pub(super) struct Inject<T: 'static> {
 
 pub(super) struct Inner<T: 'static> {
     /// Concurrently updated by many threads.
+    ///
+    /// Contains two `u8` values. The LSB byte is the "real" head of the queue.
+    /// The `u8` in the MSB is set by a stealer in process of stealing values.
+    /// It represents the first value being stolen in the batch.
+    ///
+    /// When both `u8` values are the same, there is no active stealer.
+    ///
+    /// Tracking an in-progress stealer prevents a wrapping scenario.
     head: AtomicU16,
 
     /// Only updated by producer thread but read by many threads.
@@ -126,7 +134,7 @@ impl<T> Local<T> {
     pub(super) fn push_back(&mut self, mut task: task::Notified<T>, inject: &Inject<T>) {
         let tail = loop {
             let head = self.inner.head.load(Acquire);
-            let (steal, real) = split(head);
+            let (steal, real) = unpack(head);
 
             // safety: this is the **only** thread that updates this cell.
             let tail = unsafe { self.inner.tail.unsync_load() };
@@ -196,7 +204,7 @@ impl<T> Local<T> {
             head
         );
 
-        let prev = join(head, head);
+        let prev = pack(head, head);
 
         // Claim a bunch of tasks
         //
@@ -210,7 +218,7 @@ impl<T> Local<T> {
         // moved).
         let actual = self.inner.head.compare_and_swap(
             prev,
-            join(head.wrapping_add(n), head.wrapping_add(n)),
+            pack(head.wrapping_add(n), head.wrapping_add(n)),
             Release,
         );
 
@@ -270,7 +278,7 @@ impl<T> Local<T> {
         let mut head = self.inner.head.load(Acquire);
 
         let idx = loop {
-            let (steal, real) = split(head);
+            let (steal, real) = unpack(head);
 
             // safety: this is the **only** thread that updates this cell.
             let tail = unsafe { self.inner.tail.unsync_load() };
@@ -284,9 +292,9 @@ impl<T> Local<T> {
 
             // Only update `steal` component if it differs from `real`.
             let next = if steal == real {
-                join(next_real, next_real)
+                pack(next_real, next_real)
             } else {
-                join(steal, next_real)
+                pack(steal, next_real)
             };
 
             // Attempt to claim a task.
@@ -341,7 +349,7 @@ impl<T> Steal<T> {
         }
 
         // Synchronize with stealers
-        let (dst_steal, dst_real) = split(dst.inner.head.load(Acquire));
+        let (dst_steal, dst_real) = unpack(dst.inner.head.load(Acquire));
         assert_eq!(dst_steal, dst_real);
 
         // Make the stolen items available to consumers
@@ -350,12 +358,14 @@ impl<T> Steal<T> {
         Some(ret)
     }
 
+    // Steal tasks from `self`, placing them into `dst`. Returns the number of
+    // tasks that were stolen.
     fn steal_into2(&self, dst: &mut Local<T>, dst_tail: u8) -> u8 {
         let mut prev_packed = self.0.head.load(Acquire);
         let mut next_packed;
 
         let n = loop {
-            let (src_head_steal, src_head_real) = split(prev_packed);
+            let (src_head_steal, src_head_real) = unpack(prev_packed);
             let src_tail = self.0.tail.load(Acquire);
 
             // If these two do not match, another thread is concurrently
@@ -375,7 +385,7 @@ impl<T> Steal<T> {
 
             // Update the real head index to acquire the tasks.
             let steal_to = src_head_real.wrapping_add(n);
-            next_packed = join(src_head_steal, steal_to);
+            next_packed = pack(src_head_steal, steal_to);
 
             // Claim all those tasks. This is done by incrementing the "real"
             // head but not the steal. By doing this, no other thread is able to
@@ -391,7 +401,7 @@ impl<T> Steal<T> {
             }
         };
 
-        let (first, _) = split(next_packed);
+        let (first, _) = unpack(next_packed);
 
         // Take all the tasks
         for i in 0..n {
@@ -421,8 +431,8 @@ impl<T> Steal<T> {
         // Update `src_head_steal` to match `src_head_real` signalling that the
         // stealing routine is complete.
         loop {
-            let head = split(prev_packed).1;
-            next_packed = join(head, head);
+            let head = unpack(prev_packed).1;
+            next_packed = pack(head, head);
 
             let res = self
                 .0
@@ -432,7 +442,7 @@ impl<T> Steal<T> {
             match res {
                 Ok(_) => return n,
                 Err(actual) => {
-                    let (actual_steal, actual_real) = split(actual);
+                    let (actual_steal, actual_real) = unpack(actual);
 
                     assert_ne!(actual_steal, actual_real);
 
@@ -459,7 +469,7 @@ impl<T> Drop for Local<T> {
 
 impl<T> Inner<T> {
     fn is_empty(&self) -> bool {
-        let (_, head) = split(self.head.load(Acquire));
+        let (_, head) = unpack(self.head.load(Acquire));
         let tail = self.tail.load(Acquire);
 
         head == tail
@@ -617,7 +627,7 @@ fn set_next(header: NonNull<task::Header>, val: Option<NonNull<task::Header>>) {
 
 /// Split the head value into the real head and the index a stealer is working
 /// on.
-fn split(n: u16) -> (u8, u8) {
+fn unpack(n: u16) -> (u8, u8) {
     let real = n & u8::max_value() as u16;
     let steal = n >> 8;
 
@@ -625,7 +635,7 @@ fn split(n: u16) -> (u8, u8) {
 }
 
 /// Join the two head values
-fn join(steal: u8, real: u8) -> u16 {
+fn pack(steal: u8, real: u8) -> u16 {
     (real as u16) | ((steal as u16) << 8)
 }
 
