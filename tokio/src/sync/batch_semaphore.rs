@@ -15,8 +15,8 @@
 //! use-case like tokio's read-write lock, writers will not be starved by
 //! readers.
 use crate::loom::cell::UnsafeCell;
-use crate::loom::sync::{Mutex, MutexGuard};
 use crate::loom::sync::atomic::AtomicUsize;
+use crate::loom::sync::{Mutex, MutexGuard};
 use crate::util::linked_list::{self, LinkedList};
 
 use std::future::Future;
