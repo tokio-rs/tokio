@@ -615,7 +615,7 @@ fn set_next(header: NonNull<task::Header>, val: Option<NonNull<task::Header>>) {
     }
 }
 
-/// Split the head value into the real head and the index a stealer is workin
+/// Split the head value into the real head and the index a stealer is working
 /// on.
 fn split(n: u16) -> (u8, u8) {
     let real = n & u8::max_value() as u16;
