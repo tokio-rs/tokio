@@ -16,4 +16,3 @@ async fn coop() {
 
     panic!("did not yield");
 }
-
