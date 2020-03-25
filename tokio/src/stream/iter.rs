@@ -44,7 +44,8 @@ where
 {
     type Item = I::Item;
 
-    fn poll_next(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Option<I::Item>> {
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<I::Item>> {
+        ready!(crate::coop::poll_proceed(cx));
         Poll::Ready(self.iter.next())
     }
 
