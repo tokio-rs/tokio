@@ -850,4 +850,32 @@ rt_test! {
         assert_eq!(buf, b"hello");
         tx.send(()).unwrap();
     }
+
+    #[test]
+    fn coop() {
+        use std::task::Poll::Ready;
+
+        let mut rt = rt();
+
+        rt.block_on(async {
+            // Create a bunch of tasks
+            let mut tasks = (0..1_000).map(|_| {
+                tokio::spawn(async { })
+            }).collect::<Vec<_>>();
+
+            // Hope that all the tasks complete...
+            time::delay_for(Duration::from_millis(100)).await;
+
+            poll_fn(|cx| {
+                // At least one task should not be ready
+                for task in &mut tasks {
+                    if Pin::new(task).poll(cx).is_pending() {
+                        return Ready(());
+                    }
+                }
+
+                panic!("did not yield");
+            }).await;
+        });
+    }
 }
