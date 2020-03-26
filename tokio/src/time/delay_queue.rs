@@ -721,15 +721,16 @@ impl<T> DelayQueue<T> {
                 self.poll = wheel::Poll::new(now);
             }
 
-            self.delay = None;
+            // We poll the wheel to get the next value out before finding the next deadline.
+            let wheel_idx = self.wheel.poll(&mut self.poll, &mut self.slab);
 
-            if let Some(idx) = self.wheel.poll(&mut self.poll, &mut self.slab) {
+            self.delay = self.next_deadline().map(delay_until);
+
+            if let Some(idx) = wheel_idx {
                 return Poll::Ready(Some(Ok(idx)));
             }
 
-            if let Some(deadline) = self.next_deadline() {
-                self.delay = Some(delay_until(deadline));
-            } else {
+            if self.delay.is_none() {
                 return Poll::Ready(None);
             }
         }
