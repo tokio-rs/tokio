@@ -230,25 +230,24 @@ mod group_c {
 
     #[test]
     fn shutdown_with_notification() {
-        use crate::stream::StreamExt;
-        use crate::sync::{mpsc, oneshot};
+        use crate::sync::oneshot;
 
         loom::model(|| {
             let rt = mk_pool(2);
             let (done_tx, done_rx) = oneshot::channel::<()>();
 
             rt.spawn(track(async move {
-                let (mut tx, mut rx) = mpsc::channel::<()>(10);
+                let (tx, rx) = oneshot::channel::<()>();
 
                 crate::spawn(async move {
                     crate::task::spawn_blocking(move || {
-                        let _ = tx.try_send(());
+                        let _ = tx.send(());
                     });
 
                     let _ = done_rx.await;
                 });
 
-                while let Some(_) = rx.next().await {}
+                let _ = rx.await;
 
                 let _ = done_tx.send(());
             }));

@@ -2,7 +2,7 @@
 
 //! A channel for sending a single message between asynchronous tasks.
 
-use crate::loom::cell::CausalCell;
+use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Arc;
 
@@ -81,13 +81,13 @@ struct Inner<T> {
 
     /// The value. This is set by `Sender` and read by `Receiver`. The state of
     /// the cell is tracked by `state`.
-    value: CausalCell<Option<T>>,
+    value: UnsafeCell<Option<T>>,
 
     /// The task to notify when the receiver drops without consuming the value.
-    tx_task: CausalCell<MaybeUninit<Waker>>,
+    tx_task: UnsafeCell<MaybeUninit<Waker>>,
 
     /// The task to notify when the value is sent.
-    rx_task: CausalCell<MaybeUninit<Waker>>,
+    rx_task: UnsafeCell<MaybeUninit<Waker>>,
 }
 
 #[derive(Clone, Copy)]
@@ -127,9 +127,9 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
     #[allow(deprecated)]
     let inner = Arc::new(Inner {
         state: AtomicUsize::new(State::new().as_usize()),
-        value: CausalCell::new(None),
-        tx_task: CausalCell::new(MaybeUninit::uninit()),
-        rx_task: CausalCell::new(MaybeUninit::uninit()),
+        value: UnsafeCell::new(None),
+        tx_task: UnsafeCell::new(MaybeUninit::uninit()),
+        rx_task: UnsafeCell::new(MaybeUninit::uninit()),
     });
 
     let tx = Sender {
@@ -675,7 +675,7 @@ unsafe impl<T: Send> Sync for Inner<T> {}
 
 impl<T> Drop for Inner<T> {
     fn drop(&mut self) {
-        let state = State(*self.state.get_mut());
+        let state = State(self.state.with_mut(|v| *v));
 
         if state.is_rx_task_set() {
             unsafe {

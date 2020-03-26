@@ -1,9 +1,9 @@
-use crate::loom::cell::CausalCell;
+use crate::loom::cell::UnsafeCell;
 use crate::util::slab::{Entry, Generation};
 
 /// Stores an entry in the slab.
 pub(super) struct Slot<T> {
-    next: CausalCell<usize>,
+    next: UnsafeCell<usize>,
     entry: T,
 }
 
@@ -13,7 +13,7 @@ impl<T: Entry> Slot<T> {
     /// The entry is initialized to a default value.
     pub(super) fn new(next: usize) -> Slot<T> {
         Slot {
-            next: CausalCell::new(next),
+            next: UnsafeCell::new(next),
             entry: T::default(),
         }
     }

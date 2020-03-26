@@ -129,7 +129,7 @@ tempfile = "3.1.0"
 # loom is currently not compiling on windows.
 # See: https://github.com/Xudong-Huang/generator-rs/issues/19
 [target.'cfg(not(windows))'.dev-dependencies]
-loom = { version = "0.2.13", features = ["futures", "checkpoint"] }
+loom = { version = "0.3.0", features = ["futures", "checkpoint"] }
 
 [package.metadata.docs.rs]
 all-features = true

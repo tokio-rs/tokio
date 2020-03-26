@@ -25,7 +25,7 @@ jobs:
     # Run with all crate features
     - script: cargo test --all-features
       env:
-        LOOM_MAX_PREEMPTIONS: 2
+        RUST_BACKTRACE: 1
         CI: 'True'
       displayName: ${{ crate }} - cargo test --all-features
       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}
@@ -41,7 +41,7 @@ jobs:
     # Run with all crate features
     - script: cargo test --all-features
       env:
-        LOOM_MAX_PREEMPTIONS: 2
+        RUST_BACKTRACE: 1
         CI: 'True'
       displayName: ${{ crate }} - cargo test --all-features
       workingDirectory: $(Build.SourcesDirectory)/${{ crate }}

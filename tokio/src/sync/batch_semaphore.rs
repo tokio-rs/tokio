@@ -14,8 +14,9 @@
 //! tasks are acquiring smaller numbers of permits. This means that in a
 //! use-case like tokio's read-write lock, writers will not be starved by
 //! readers.
-use crate::loom::cell::CausalCell;
-use crate::loom::sync::{atomic::AtomicUsize, Mutex, MutexGuard};
+use crate::loom::cell::UnsafeCell;
+use crate::loom::sync::atomic::AtomicUsize;
+use crate::loom::sync::{Mutex, MutexGuard};
 use crate::util::linked_list::{self, LinkedList};
 
 use std::future::Future;
@@ -69,7 +70,7 @@ struct Waiter {
     /// # Safety
     ///
     /// This may only be accessed while the wait queue is locked.
-    waker: CausalCell<Option<Waker>>,
+    waker: UnsafeCell<Option<Waker>>,
 
     /// Intrusive linked-list pointers.
     ///
@@ -79,10 +80,10 @@ struct Waiter {
     ///
     /// TODO: Ideally, we would be able to use loom to enforce that
     /// this isn't accessed concurrently. However, it is difficult to
-    /// use a `CausalCell` here, since the `Link` trait requires _returning_
-    /// references to `Pointers`, and `CausalCell` requires that checked access
+    /// use a `UnsafeCell` here, since the `Link` trait requires _returning_
+    /// references to `Pointers`, and `UnsafeCell` requires that checked access
     /// take place inside a closure. We should consider changing `Pointers` to
-    /// use `CausalCell` internally.
+    /// use `UnsafeCell` internally.
     pointers: linked_list::Pointers<Waiter>,
 
     /// Should not be `Unpin`.
@@ -368,7 +369,7 @@ fn notify_all(mut list: LinkedList<Waiter>) {
 impl Waiter {
     fn new(num_permits: u16) -> Self {
         Waiter {
-            waker: CausalCell::new(None),
+            waker: UnsafeCell::new(None),
             state: AtomicUsize::new(num_permits as usize),
             pointers: linked_list::Pointers::new(),
             _p: PhantomPinned,

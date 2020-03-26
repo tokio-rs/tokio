@@ -1,4 +1,4 @@
-use crate::loom::cell::CausalCell;
+use crate::loom::cell::UnsafeCell;
 use crate::loom::future::AtomicWaker;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Arc;
@@ -114,7 +114,7 @@ struct Chan<T, S> {
     tx_count: AtomicUsize,
 
     /// Only accessed by `Rx` handle.
-    rx_fields: CausalCell<RxFields<T>>,
+    rx_fields: UnsafeCell<RxFields<T>>,
 }
 
 impl<T, S> fmt::Debug for Chan<T, S>
@@ -164,7 +164,7 @@ where
         semaphore,
         rx_waker: AtomicWaker::new(),
         tx_count: AtomicUsize::new(1),
-        rx_fields: CausalCell::new(RxFields {
+        rx_fields: UnsafeCell::new(RxFields {
             list: rx,
             rx_closed: false,
         }),

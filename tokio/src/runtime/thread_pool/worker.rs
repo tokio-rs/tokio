@@ -9,8 +9,8 @@ use crate::loom::sync::{Arc, Mutex};
 use crate::park::{Park, Unpark};
 use crate::runtime;
 use crate::runtime::park::{Parker, Unparker};
-use crate::runtime::task;
-use crate::runtime::thread_pool::{queue, AtomicCell, Idle};
+use crate::runtime::thread_pool::{AtomicCell, Idle};
+use crate::runtime::{queue, task};
 use crate::util::linked_list::LinkedList;
 use crate::util::FastRand;
 
