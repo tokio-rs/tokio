@@ -15,7 +15,7 @@ impl Unpark for MockUnpark {
 
 #[test]
 fn balanced_incr_and_decr() {
-    const OPS: usize = 100;
+    const OPS: usize = 5;
 
     fn incr(inner: Arc<Inner>) {
         for _ in 0..OPS {
