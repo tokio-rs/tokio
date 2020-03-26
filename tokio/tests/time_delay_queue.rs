@@ -410,6 +410,39 @@ async fn insert_before_first_after_poll() {
     assert_eq!(entry, "two");
 }
 
+#[tokio::test]
+async fn insert_after_ready_poll() {
+    time::pause();
+
+    let mut queue = task::spawn(DelayQueue::new());
+
+    let now = Instant::now();
+
+    queue.insert_at("1", now + ms(100));
+    queue.insert_at("2", now + ms(100));
+    queue.insert_at("3", now + ms(100));
+
+    assert_pending!(poll!(queue));
+
+    delay_for(ms(100)).await;
+
+    assert!(queue.is_woken());
+
+    let mut res = vec![];
+
+    while res.len() < 3 {
+        let entry = assert_ready_ok!(poll!(queue));
+        res.push(entry.into_inner());
+        queue.insert_at("foo", now + ms(500));
+    }
+
+    res.sort();
+
+    assert_eq!("1", res[0]);
+    assert_eq!("2", res[1]);
+    assert_eq!("3", res[2]);
+}
+
 fn ms(n: u64) -> Duration {
     Duration::from_millis(n)
 }
