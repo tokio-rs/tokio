@@ -235,6 +235,8 @@ impl Semaphore {
             for slot in &mut wakers[..] {
                 if let Some(waker) = slot.take() {
                     waker.wake();
+                } else {
+                    break;
                 }
             }
         }
