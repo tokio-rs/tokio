@@ -189,7 +189,7 @@ impl Semaphore {
     /// If `rem` exceeds the number of permits needed by the wait list, the
     /// remainder are assigned back to the semaphore.
     fn add_permits_locked(&self, mut rem: usize, waiters: MutexGuard<'_, Waitlist>) {
-        let mut wakers = [None, None, None, None, None, None, None, None];
+        let mut wakers: [Option<Waker>; 8] = Default::default();
         let mut lock = Some(waiters);
         let mut is_empty = false;
         while rem > 0 {
@@ -232,13 +232,9 @@ impl Semaphore {
 
             drop(waiters); // release the lock
 
-            for slot in &mut wakers[..] {
-                if let Some(waker) = slot.take() {
-                    waker.wake();
-                } else {
-                    break;
-                }
-            }
+            wakers.iter_mut()
+                .filter_map(Option::take)
+                .for_each(Waker::wake);
         }
 
         assert_eq!(rem, 0);
