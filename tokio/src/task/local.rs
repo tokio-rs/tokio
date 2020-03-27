@@ -398,7 +398,7 @@ impl LocalSet {
                 // task initially. Because `LocalSet` itself is `!Send`, and
                 // `spawn_local` spawns into the `LocalSet` on the current
                 // thread, the invariant is maintained.
-                Some(task) => task.run(),
+                Some(task) => crate::coop::budget(|| task.run()),
                 // We have fully drained the queue of notified tasks, so the
                 // local future doesn't need to be notified again — it can wait
                 // until something else wakes a task in the local set.

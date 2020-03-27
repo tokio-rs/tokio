@@ -13,9 +13,6 @@ use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 /// Producer handle. May only be used from a single thread.
 pub(super) struct Local<T: 'static> {
     inner: Arc<Inner<T>>,
-
-    /// LIFO slot. Cannot be stolen.
-    next: Option<task::Notified<T>>,
 }
 
 /// Consumer handle. May be used from many threads.
@@ -96,7 +93,6 @@ pub(super) fn local<T: 'static>() -> (Steal<T>, Local<T>) {
 
     let local = Local {
         inner: inner.clone(),
-        next: None,
     };
 
     let remote = Steal(inner);
@@ -108,26 +104,6 @@ impl<T> Local<T> {
     /// Returns true if the queue has entries that can be stealed.
     pub(super) fn is_stealable(&self) -> bool {
         !self.inner.is_empty()
-    }
-
-    /// Returns true if the queue has an unstealable entry.
-    pub(super) fn has_unstealable(&self) -> bool {
-        self.next.is_some()
-    }
-
-    /// Push a task to the local queue. Returns `true` if a stealer should be
-    /// notified.
-    pub(super) fn push(&mut self, task: task::Notified<T>, inject: &Inject<T>) -> bool {
-        let prev = self.next.take();
-        let ret = prev.is_some();
-
-        if let Some(prev) = prev {
-            self.push_back(prev, inject);
-        }
-
-        self.next = Some(task);
-
-        ret
     }
 
     /// Pushes a task to the back of the local queue, skipping the LIFO slot.
@@ -270,11 +246,6 @@ impl<T> Local<T> {
 
     /// Pops a task from the local queue.
     pub(super) fn pop(&mut self) -> Option<task::Notified<T>> {
-        // If a task is available in the FIFO slot, return that.
-        if let Some(task) = self.next.take() {
-            return Some(task);
-        }
-
         let mut head = self.inner.head.load(Acquire);
 
         let idx = loop {

@@ -878,4 +878,58 @@ rt_test! {
             }).await;
         });
     }
+
+    // Tests that the "next task" scheduler optimization is not able to starve
+    // other tasks.
+    #[test]
+    fn ping_pong_saturation() {
+        use tokio::sync::mpsc;
+
+        const NUM: usize = 100;
+
+        let mut rt = rt();
+
+        rt.block_on(async {
+            let (spawned_tx, mut spawned_rx) = mpsc::unbounded_channel();
+
+            // Spawn a bunch of tasks that ping ping between each other to
+            // saturate the runtime.
+            for _ in 0..NUM {
+                let (tx1, mut rx1) = mpsc::unbounded_channel();
+                let (tx2, mut rx2) = mpsc::unbounded_channel();
+                let spawned_tx = spawned_tx.clone();
+
+                task::spawn(async move {
+                    spawned_tx.send(()).unwrap();
+
+                    tx1.send(()).unwrap();
+
+                    loop {
+                        rx2.recv().await.unwrap();
+                        tx1.send(()).unwrap();
+                    }
+                });
+
+                task::spawn(async move {
+                    loop {
+                        rx1.recv().await.unwrap();
+                        tx2.send(()).unwrap();
+                    }
+                });
+            }
+
+            for _ in 0..NUM {
+                spawned_rx.recv().await.unwrap();
+            }
+
+            // spawn another task and wait for it to complete
+            let handle = task::spawn(async {
+                for _ in 0..5 {
+                    // Yielding forces it back into the local queue.
+                    task::yield_now().await;
+                }
+            });
+            handle.await.unwrap();
+        });
+    }
 }
