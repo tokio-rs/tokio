@@ -150,10 +150,9 @@ impl Semaphore {
         waiters.closed = true;
         while let Some(mut waiter) = waiters.queue.pop_back() {
             let waker = unsafe { waiter.as_mut().waker.with_mut(|waker| (*waker).take()) };
-
-            waker
-                .expect("if a node is in the wait list, it must have a waker")
-                .wake();
+            if let Some(waker) = waker {
+                waker.wake();
+            }
         }
     }
 
@@ -189,44 +188,58 @@ impl Semaphore {
     ///  
     /// If `rem` exceeds the number of permits needed by the wait list, the
     /// remainder are assigned back to the semaphore.
-    fn add_permits_locked(&self, mut rem: usize, mut waiters: MutexGuard<'_, Waitlist>) {
-        // Starting from the back of the wait queue, assign each waiter as many
-        // permits as it needs until we run out of permits to assign.
-        loop {
-            // Was the waiter assigned enough permits to wake it?
-            let woken = waiters
-                .queue
-                .last()
-                .map(|waiter| waiter.assign_permits(&mut rem))
-                .unwrap_or(false);
-            if !woken {
-                break;
+    fn add_permits_locked(&self, mut rem: usize, waiters: MutexGuard<'_, Waitlist>) {
+        let mut wakers = [None, None, None, None, None, None, None, None];
+        let mut lock = Some(waiters);
+        let mut is_empty = false;
+        while rem > 0 {
+            let mut waiters = lock.take().unwrap_or_else(|| self.waiters.lock().unwrap());
+            'inner: for slot in &mut wakers[..] {
+                // Was the waiter assigned enough permits to wake it?
+                match waiters.queue.last() {
+                    Some(waiter) => {
+                        if !waiter.assign_permits(&mut rem) {
+                            break 'inner;
+                        }
+                    }
+                    None => {
+                        is_empty = true;
+                        // If we assigned permits to all the waiters in the queue, and there are
+                        // still permits left over, assign them back to the semaphore.
+                        break 'inner;
+                    }
+                };
+                let mut waiter = waiters.queue.pop_back().unwrap();
+                *slot = unsafe { waiter.as_mut().waker.with_mut(|waker| (*waker).take()) };
             }
-            let mut waiter = waiters.queue.pop_back().unwrap();
-            let waker = unsafe { waiter.as_mut().waker.with_mut(|waker| (*waker).take()) };
 
-            waker
-                .expect("if a node is in the wait list, it must have a waker")
-                .wake();
+            if rem > 0 && is_empty {
+                let permits = rem << Self::PERMIT_SHIFT;
+                assert!(
+                    permits < Self::MAX_PERMITS,
+                    "cannot add more than MAX_PERMITS permits ({})",
+                    Self::MAX_PERMITS
+                );
+                let prev = self.permits.fetch_add(rem << Self::PERMIT_SHIFT, Release);
+                assert!(
+                    prev + permits <= Self::MAX_PERMITS,
+                    "number of added permits ({}) would overflow MAX_PERMITS ({})",
+                    rem,
+                    Self::MAX_PERMITS
+                );
+                rem = 0;
+            }
+
+            drop(waiters); // release the lock
+
+            for slot in &mut wakers[..] {
+                if let Some(waker) = slot.take() {
+                    waker.wake();
+                }
+            }
         }
 
-        // If we assigned permits to all the waiters in the queue, and there are
-        // still permits left over, assign them back to the semaphore.
-        if rem > 0 {
-            let permits = rem << Self::PERMIT_SHIFT;
-            assert!(
-                permits < Self::MAX_PERMITS,
-                "cannot add more than MAX_PERMITS permits ({})",
-                Self::MAX_PERMITS
-            );
-            let prev = self.permits.fetch_add(rem << Self::PERMIT_SHIFT, Release);
-            assert!(
-                prev + permits <= Self::MAX_PERMITS,
-                "number of added permits ({}) would overflow MAX_PERMITS ({})",
-                rem,
-                Self::MAX_PERMITS
-            );
-        }
+        assert_eq!(rem, 0);
     }
 
     fn poll_acquire(
