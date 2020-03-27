@@ -114,6 +114,50 @@ fn concurrent_close() {
 }
 
 #[test]
+fn concurrent_cancel() {
+    async fn poll_and_cancel(semaphore: Arc<Semaphore>) {
+        let mut acquire1 = Some(semaphore.acquire(1));
+        let mut acquire2 = Some(semaphore.acquire(1));
+        poll_fn(|cx| {
+            // poll the acquire future once, and then immediately throw
+            // it away. this simulates a situation where a future is
+            // polled and then cancelled, such as by a timeout.
+            if let Some(acquire) = acquire1.take() {
+                pin!(acquire);
+                let _ = acquire.poll(cx);
+            }
+            if let Some(acquire) = acquire2.take() {
+                pin!(acquire);
+                let _ = acquire.poll(cx);
+            }
+            Poll::Ready(())
+        })
+        .await
+    }
+
+    loom::model(|| {
+        let semaphore = Arc::new(Semaphore::new(0));
+        let t1 = {
+            let semaphore = semaphore.clone();
+            thread::spawn(move || block_on(poll_and_cancel(semaphore)))
+        };
+        let t2 = {
+            let semaphore = semaphore.clone();
+            thread::spawn(move || block_on(poll_and_cancel(semaphore)))
+        };
+        let t3 = {
+            let semaphore = semaphore.clone();
+            thread::spawn(move || block_on(poll_and_cancel(semaphore)))
+        };
+
+        t1.join().unwrap();
+        semaphore.release(10);
+        t2.join().unwrap();
+        t3.join().unwrap();
+    });
+}
+
+#[test]
 fn batch() {
     let mut b = loom::model::Builder::new();
     b.preemption_bound = Some(1);

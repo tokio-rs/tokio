@@ -164,46 +164,6 @@ impl<T: Link> LinkedList<T> {
     }
 }
 
-cfg_sync! {
-    impl<T: Link> LinkedList<T> {
-        /// Splits this list off at `node`, returning a new list with `node` at its
-        /// front.
-        ///
-        /// If `node` is at the the front of this list, then this list will be empty after
-        /// splitting. If `node` is the last node in this list, then the returned
-        /// list will contain only `node`.
-        ///
-        /// # Safety
-        ///
-        /// The caller **must** ensure that `node` is currently contained by
-        /// `self` or not contained by any other list.
-        pub(crate) unsafe fn split_back(&mut self, node: NonNull<T::Target>) -> Self {
-            let new_tail = T::pointers(node).as_mut().prev.take().map(|prev| {
-                T::pointers(prev).as_mut().next = None;
-                prev
-            });
-            if new_tail.is_none() {
-                self.head = None;
-            }
-            let tail = std::mem::replace(&mut self.tail, new_tail);
-            Self {
-                head: Some(node),
-                tail,
-            }
-        }
-
-        /// Takes all entries from this list, returning a new list.
-        ///
-        /// This list will be left empty.
-        pub(crate) fn take_all(&mut self) -> Self {
-            Self {
-                head: self.head.take(),
-                tail: self.tail.take(),
-            }
-        }
-    }
-}
-
 impl<T: Link> fmt::Debug for LinkedList<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("LinkedList")
@@ -213,49 +173,41 @@ impl<T: Link> fmt::Debug for LinkedList<T> {
     }
 }
 
-// ===== impl Iter =====
-
-#[cfg(any(feature = "sync", feature = "rt-threaded"))]
-pub(crate) struct Iter<'a, T: Link> {
-    curr: Option<NonNull<T::Target>>,
-    #[cfg(feature = "sync")]
-    curr_back: Option<NonNull<T::Target>>,
-    _p: core::marker::PhantomData<&'a T>,
-}
-
-#[cfg(any(feature = "sync", feature = "rt-threaded"))]
-impl<T: Link> LinkedList<T> {
-    pub(crate) fn iter(&self) -> Iter<'_, T> {
-        Iter {
-            curr: self.head,
-            #[cfg(feature = "sync")]
-            curr_back: self.tail,
-            _p: core::marker::PhantomData,
+cfg_sync! {
+    impl<T: Link> LinkedList<T> {
+        pub(crate) fn last(&self) -> Option<&T::Target> {
+            let tail = self.tail.as_ref()?;
+            unsafe {
+                Some(&*tail.as_ptr())
+            }
         }
     }
 }
 
-#[cfg(any(feature = "sync", feature = "rt-threaded"))]
-impl<'a, T: Link> Iterator for Iter<'a, T> {
-    type Item = &'a T::Target;
+// ===== impl Iter =====
 
-    fn next(&mut self) -> Option<&'a T::Target> {
-        let curr = self.curr?;
-        // safety: the pointer references data contained by the list
-        self.curr = unsafe { T::pointers(curr).as_ref() }.next;
-
-        // safety: the value is still owned by the linked list.
-        Some(unsafe { &*curr.as_ptr() })
+cfg_rt_threaded! {
+    pub(crate) struct Iter<'a, T: Link> {
+        curr: Option<NonNull<T::Target>>,
+        _p: core::marker::PhantomData<&'a T>,
     }
-}
 
-cfg_sync! {
-    impl<'a, T: Link> DoubleEndedIterator for Iter<'a, T> {
-        fn next_back(&mut self) -> Option<&'a T::Target> {
-            let curr = self.curr_back?;
+    impl<T: Link> LinkedList<T> {
+        pub(crate) fn iter(&self) -> Iter<'_, T> {
+            Iter {
+                curr: self.head,
+                _p: core::marker::PhantomData,
+            }
+        }
+    }
 
+    impl<'a, T: Link> Iterator for Iter<'a, T> {
+        type Item = &'a T::Target;
+
+        fn next(&mut self) -> Option<&'a T::Target> {
+            let curr = self.curr?;
             // safety: the pointer references data contained by the list
-            self.curr_back = unsafe { T::pointers(curr).as_ref() }.prev;
+            self.curr = unsafe { T::pointers(curr).as_ref() }.next;
 
             // safety: the value is still owned by the linked list.
             Some(unsafe { &*curr.as_ptr() })
@@ -562,86 +514,6 @@ mod tests {
         assert_eq!(7, i.next().unwrap().val);
         assert_eq!(5, i.next().unwrap().val);
         assert!(i.next().is_none());
-    }
-
-    #[test]
-    fn split_back() {
-        let a = entry(1);
-        let b = entry(2);
-        let c = entry(3);
-        let d = entry(4);
-
-        {
-            let mut list1 = LinkedList::<&Entry>::new();
-
-            push_all(
-                &mut list1,
-                &[a.as_ref(), b.as_ref(), c.as_ref(), d.as_ref()],
-            );
-            let mut list2 = unsafe { list1.split_back(ptr(&a)) };
-
-            assert_eq!([2, 3, 4].to_vec(), collect_list(&mut list1));
-            assert_eq!([1].to_vec(), collect_list(&mut list2));
-        }
-
-        {
-            let mut list1 = LinkedList::<&Entry>::new();
-
-            push_all(
-                &mut list1,
-                &[a.as_ref(), b.as_ref(), c.as_ref(), d.as_ref()],
-            );
-            let mut list2 = unsafe { list1.split_back(ptr(&b)) };
-
-            assert_eq!([3, 4].to_vec(), collect_list(&mut list1));
-            assert_eq!([1, 2].to_vec(), collect_list(&mut list2));
-        }
-
-        {
-            let mut list1 = LinkedList::<&Entry>::new();
-
-            push_all(
-                &mut list1,
-                &[a.as_ref(), b.as_ref(), c.as_ref(), d.as_ref()],
-            );
-            let mut list2 = unsafe { list1.split_back(ptr(&c)) };
-
-            assert_eq!([4].to_vec(), collect_list(&mut list1));
-            assert_eq!([1, 2, 3].to_vec(), collect_list(&mut list2));
-        }
-
-        {
-            let mut list1 = LinkedList::<&Entry>::new();
-
-            push_all(
-                &mut list1,
-                &[a.as_ref(), b.as_ref(), c.as_ref(), d.as_ref()],
-            );
-            let mut list2 = unsafe { list1.split_back(ptr(&d)) };
-
-            assert_eq!(Vec::<i32>::new(), collect_list(&mut list1));
-            assert_eq!([1, 2, 3, 4].to_vec(), collect_list(&mut list2));
-        }
-    }
-
-    #[test]
-    fn take_all() {
-        let mut list1 = LinkedList::<&Entry>::new();
-        let a = entry(1);
-        let b = entry(2);
-
-        list1.push_front(a.as_ref());
-        list1.push_front(b.as_ref());
-
-        assert!(!list1.is_empty());
-
-        let mut list2 = list1.take_all();
-
-        assert!(list1.is_empty());
-        assert!(!list2.is_empty());
-
-        assert_eq!(Vec::<i32>::new(), collect_list(&mut list1));
-        assert_eq!([1, 2].to_vec(), collect_list(&mut list2));
     }
 
     proptest::proptest! {
