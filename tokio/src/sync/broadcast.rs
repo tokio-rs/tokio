@@ -114,6 +114,7 @@ use crate::loom::sync::atomic::{spin_loop_hint, AtomicBool, AtomicPtr, AtomicUsi
 use crate::loom::sync::{Arc, Condvar, Mutex};
 
 use std::fmt;
+use std::mem;
 use std::ptr;
 use std::sync::atomic::Ordering::SeqCst;
 use std::task::{Context, Poll, Waker};
@@ -980,7 +981,7 @@ impl<T> Slot<T> {
         if 1 == self.lock.fetch_sub(2, SeqCst) - 2 {
             // First acquire the lock to make sure our sender is waiting on the
             // condition variable, otherwise the notification could be lost.
-            let _lock = tail.lock().unwrap();
+            mem::drop(tail.lock().unwrap());
             // Wake up senders
             condvar.notify_all();
         }
@@ -1000,8 +1001,6 @@ impl<'a, T> RecvGuard<'a, T> {
     }
 
     fn drop_no_rem_dec(self) {
-        use std::mem;
-
         self.slot.rx_unlock(self.tail, self.condvar, false);
 
         mem::forget(self);
