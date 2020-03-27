@@ -411,7 +411,7 @@ impl Core {
         }
     }
 
-    fn next_local_task(&mut self) ->  Option<Notified> {
+    fn next_local_task(&mut self) -> Option<Notified> {
         self.lifo_slot.take().or_else(|| self.run_queue.pop())
     }
 
