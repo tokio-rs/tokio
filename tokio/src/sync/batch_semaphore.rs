@@ -232,7 +232,8 @@ impl Semaphore {
 
             drop(waiters); // release the lock
 
-            wakers.iter_mut()
+            wakers
+                .iter_mut()
                 .filter_map(Option::take)
                 .for_each(Waker::wake);
         }
