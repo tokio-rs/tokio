@@ -98,8 +98,10 @@ where
     })
 }
 
-pub(crate) fn has_budget_remaining() -> bool {
-    HITS.with(|hits| hits.get() > 0)
+cfg_rt_threaded! {
+    pub(crate) fn has_budget_remaining() -> bool {
+        HITS.with(|hits| hits.get() > 0)
+    }
 }
 
 cfg_blocking_impl! {
