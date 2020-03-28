@@ -34,6 +34,13 @@ struct Core {
     /// Used to schedule bookkeeping tasks every so often.
     tick: u8,
 
+    /// When a task is scheduled from a worker, it is stored in this slot. The
+    /// worker will check this slot for a task **before** checking the run
+    /// queue. This effectively results in the **last** scheduled task to be run
+    /// next (LIFO). This is an optimization for message passing patterns and
+    /// helps to reduce latency.
+    lifo_slot: Option<Notified>,
+
     /// The worker-local run queue.
     run_queue: queue::Local<Arc<Worker>>,
 
@@ -128,6 +135,7 @@ pub(super) fn create(size: usize, park: Parker) -> (Arc<Shared>, Launch) {
 
         cores.push(Box::new(Core {
             tick: 0,
+            lifo_slot: None,
             run_queue,
             is_searching: false,
             is_shutdown: false,
@@ -296,13 +304,37 @@ impl Context {
         *self.core.borrow_mut() = Some(core);
 
         // Run the task
-        task.run();
+        crate::coop::budget(|| {
+            task.run();
 
-        // Try to take the core back
-        match self.core.borrow_mut().take() {
-            Some(core) => Ok(core),
-            None => Err(()),
-        }
+            // As long as there is budget remaining and a task exists in the
+            // `lifo_slot`, then keep running.
+            loop {
+                // Check if we still have the core. If not, the core was stolen
+                // by another worker.
+                let mut core = match self.core.borrow_mut().take() {
+                    Some(core) => core,
+                    None => return Err(()),
+                };
+
+                // Check for a task in the LIFO slot
+                let task = match core.lifo_slot.take() {
+                    Some(task) => task,
+                    None => return Ok(core),
+                };
+
+                if crate::coop::has_budget_remaining() {
+                    // Run the LIFO task, then loop
+                    *self.core.borrow_mut() = Some(core);
+                    task.run();
+                } else {
+                    // Not enough budget left to run the LIFO task, push it to
+                    // the back of the queue and return.
+                    core.run_queue.push_back(task, self.worker.inject());
+                    return Ok(core);
+                }
+            }
+        })
     }
 
     fn maintenance(&self, mut core: Box<Core>) -> Box<Core> {
@@ -373,10 +405,14 @@ impl Core {
     /// Return the next notified task available to this worker.
     fn next_task(&mut self, worker: &Worker) -> Option<Notified> {
         if self.tick % GLOBAL_POLL_INTERVAL == 0 {
-            worker.inject().pop().or_else(|| self.run_queue.pop())
+            worker.inject().pop().or_else(|| self.next_local_task())
         } else {
-            self.run_queue.pop().or_else(|| worker.inject().pop())
+            self.next_local_task().or_else(|| worker.inject().pop())
         }
+    }
+
+    fn next_local_task(&mut self) -> Option<Notified> {
+        self.lifo_slot.take().or_else(|| self.run_queue.pop())
     }
 
     fn steal_work(&mut self, worker: &Worker) -> Option<Notified> {
@@ -444,9 +480,9 @@ impl Core {
 
     /// Returns `true` if the transition happened.
     fn transition_from_parked(&mut self, worker: &Worker) -> bool {
-        // If there is a non-stealable task, then we must unpark regardless of
+        // If a task is in the lifo slot, then we must unpark regardless of
         // being notified
-        if self.run_queue.has_unstealable() {
+        if self.lifo_slot.is_some() {
             worker.shared.idle.unpark_worker_by_id(worker.index);
             self.is_searching = true;
             return true;
@@ -494,7 +530,7 @@ impl Core {
         }
 
         // Drain the queue
-        while let Some(_) = self.run_queue.pop() {}
+        while let Some(_) = self.next_local_task() {}
     }
 
     fn drain_pending_drop(&mut self, worker: &Worker) {
@@ -639,7 +675,17 @@ impl Shared {
             core.run_queue.push_back(task, &self.inject);
             true
         } else {
-            core.run_queue.push(task, &self.inject)
+            // Push to the LIFO slot
+            let prev = core.lifo_slot.take();
+            let ret = prev.is_some();
+
+            if let Some(prev) = prev {
+                core.run_queue.push_back(prev, &self.inject);
+            }
+
+            core.lifo_slot = Some(task);
+
+            ret
         };
 
         // Only notify if not currently parked. If `park` is `None`, then the

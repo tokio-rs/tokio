@@ -152,7 +152,7 @@ where
                     };
 
                     match next {
-                        Some(task) => task.run(),
+                        Some(task) => crate::coop::budget(|| task.run()),
                         None => {
                             // Park until the thread is signaled
                             scheduler.park.park().ok().expect("failed to park");

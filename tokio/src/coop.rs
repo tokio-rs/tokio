@@ -98,6 +98,13 @@ where
     })
 }
 
+cfg_rt_threaded! {
+    #[inline(always)]
+    pub(crate) fn has_budget_remaining() -> bool {
+        HITS.with(|hits| hits.get() > 0)
+    }
+}
+
 cfg_blocking_impl! {
     /// Forcibly remove the budgeting constraints early.
     pub(crate) fn stop() {
