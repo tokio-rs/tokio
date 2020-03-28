@@ -22,7 +22,7 @@ use std::task::{Context, Poll, Waker};
 ///
 /// The synchronization details of `Notify` are similar to
 /// [`thread::park`][park] and [`Thread::unpark`][unpark] from std. A [`Notify`]
-/// value contains a single permit. [`notfied().await`] waits for the permit to
+/// value contains a single permit. [`notified().await`] waits for the permit to
 /// be made available, consumes the permit, and resumes.  [`notify()`] sets the
 /// permit, waking a pending task if there is one.
 ///
