@@ -160,8 +160,6 @@ impl<T: Future, S: Schedule> Core<T, S> {
                 let waker_ref = waker_ref::<T, S>(header);
                 let mut cx = Context::from_waker(&*waker_ref);
 
-                debug_assert!(crate::coop::is_budgeting());
-
                 future.poll(&mut cx)
             })
         };

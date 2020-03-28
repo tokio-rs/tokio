@@ -98,12 +98,6 @@ where
     })
 }
 
-cfg_rt_core! {
-    pub(crate) fn is_budgeting() -> bool {
-        HITS.with(|hits| hits.get() != UNCONSTRAINED)
-    }
-}
-
 cfg_rt_threaded! {
     #[inline(always)]
     pub(crate) fn has_budget_remaining() -> bool {
