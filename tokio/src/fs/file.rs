@@ -27,9 +27,11 @@ use std::task::Poll::*;
 /// it was opened with. Files also implement Seek to alter the logical cursor
 /// that the file contains internally.
 ///
-/// Files are automatically closed when they go out of scope.
+/// Files are automatically closed when they go out of scope, but you should always call
+/// [`flush`][flush] to ensure changes are written to disk.
 ///
 /// [std]: std::fs::File
+/// [flush]: crate::io::AsyncWriteExt::flush
 ///
 /// # Examples
 ///
