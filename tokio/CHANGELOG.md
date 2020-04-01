@@ -1,9 +1,25 @@
-# 0.2.13 (February 28, 2019)
+# 0.2.14 (April 1, 2020)
+
+### Fixes
+- rt: concurrency bug in scheduler (#2273).
+- rt: concurrency bug with shell runtime (#2333).
+- test-util: correct pause/resume of time (#2253).
+- time: `DelayQueue` correct wakeup after `insert` (#2285).
+
+### Added
+- io: impl `RawFd`, `AsRawHandle` for std io types (#2335).
+- rt: automatic cooperative task yielding (#2160, #2343, #2349).
+- sync: `RwLock::into_inner` (#2321).
+
+### Changed
+- sync: semaphore, mutex internals rewritten to avoid allocations (#2325).
+
+# 0.2.13 (February 28, 2020)
 
 ### Fixes
 - macros: unresolved import in `pin!` (#2281).
 
-# 0.2.12 (February 27, 2019)
+# 0.2.12 (February 27, 2020)
 
 ### Fixes
 - net: `UnixStream::poll_shutdown` should call `shutdown(Write)` (#2245).
@@ -30,7 +46,7 @@
   for channel capacity (#2227).
 - time: impl `Ord` and `Hash` for `Instant` (#2239).
 
-# 0.2.11 (January 27, 2019)
+# 0.2.11 (January 27, 2020)
 
 ### Fixes
 - docs: misc fixes and tweaks (#2155, #2103, #2027, #2167, #2175).
@@ -51,7 +67,7 @@
 - sync: impl `Eq`, `PartialEq` for `oneshot::RecvError` (#2168).
 - task: methods for inspecting the `JoinError` cause (#2051).
 
-# 0.2.10 (January 21, 2019)
+# 0.2.10 (January 21, 2020)
 
 ### Fixes
 - `#[tokio::main]` when `rt-core` feature flag is not enabled (#2139).
@@ -73,7 +89,7 @@
 - `StreamExt::merge` combines two streams, yielding values as they become ready (#2091).
 - Task-local storage (#2126).
 
-# 0.2.9 (January 9, 2019)
+# 0.2.9 (January 9, 2020)
 
 ### Fixes
 - `AsyncSeek` impl for `File` (#1986).
@@ -81,12 +97,12 @@
 - rt: memory ordering when dropping `JoinHandle` (#2044).
 - docs: misc API documentation fixes and improvements.
 
-# 0.2.8 (January 7, 2019)
+# 0.2.8 (January 7, 2020)
 
 ### Fixes
 - depend on new version of `tokio-macros`.
 
-# 0.2.7 (January 7, 2019)
+# 0.2.7 (January 7, 2020)
 
 ### Fixes
 - potential deadlock when dropping `basic_scheduler` Runtime.
