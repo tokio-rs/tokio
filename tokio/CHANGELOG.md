@@ -12,7 +12,7 @@
 - sync: `RwLock::into_inner` (#2321).
 
 ### Changed
-- sync: semaphore, mutex internals rewriten to avoid allocations (#2325).
+- sync: semaphore, mutex internals rewritten to avoid allocations (#2325).
 
 # 0.2.13 (February 28, 2020)
 
