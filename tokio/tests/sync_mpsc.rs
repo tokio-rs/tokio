@@ -70,8 +70,12 @@ fn disarm() {
     assert_pending!(tx1.enter(|cx, mut tx| tx.poll_ready(cx)));
 
     // Explicitly disarming a handle should also open a slot
-    tx3.disarm();
+    assert!(tx3.disarm());
     assert_ready_ok!(tx1.enter(|cx, mut tx| tx.poll_ready(cx)));
+
+    // Disarming a non-armed sender does not free up a slot
+    assert!(!tx3.disarm());
+    assert_pending!(tx3.enter(|cx, mut tx| tx.poll_ready(cx)));
 }
 
 #[tokio::test]

@@ -224,6 +224,9 @@ impl<T> Sender<T> {
     /// decide you do not wish to send an item after all. After calling `disarm`, you must call
     /// `poll_ready` until it returns `Poll::Ready(Ok(()))` before attempting to send again.
     ///
+    /// Returns `false` if no slot is reserved for this sender (usually because `poll_ready` was
+    /// not previously called, or did not succeed).
+    ///
     /// # Motivation
     ///
     /// Since `poll_ready` takes up one of the finite number of slots in a bounded channel, callers
@@ -256,6 +259,7 @@ impl<T> Sender<T> {
     ///   ready!(tx.poll_ready(cx))?;
     ///   let item = rx.poll_recv(cx);
     ///   if let Poll::Ready(Ok(_)) = item {
+    ///     // we're going to send the item below, so don't disarm
     ///   } else {
     ///     // give up our send slot, we won't need it for a while
     ///     tx.disarm();
@@ -268,9 +272,13 @@ impl<T> Sender<T> {
     /// }
     /// ```
     #[doc(hidden)]
-    pub fn disarm(&mut self) {
-        // TODO: should this error if not acquired?
-        self.chan.disarm()
+    pub fn disarm(&mut self) -> bool {
+        if self.chan.is_ready() {
+            self.chan.disarm();
+            true
+        } else {
+            false
+        }
     }
 
     /// Attempts to immediately send a message on this `Sender`

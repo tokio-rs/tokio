@@ -201,6 +201,12 @@ where
     }
 }
 
+impl<T> Tx<T, (crate::sync::semaphore_ll::Semaphore, usize)> {
+    pub(crate) fn is_ready(&self) -> bool {
+        self.permit.is_acquired()
+    }
+}
+
 impl<T> Tx<T, AtomicUsize> {
     pub(crate) fn send_unbounded(&self, value: T) -> Result<(), (T, TrySendError)> {
         self.inner.try_send(value, &mut ())
