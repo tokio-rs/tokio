@@ -3,6 +3,9 @@
 ### Fixes
 
 - rt: fix queue regression (#2362).
+
+### Added
+
 - sync: Add disarm to `mpsc::Sender` (#2358).
 
 # 0.2.14 (April 1, 2020)
