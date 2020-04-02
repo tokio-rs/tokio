@@ -208,10 +208,11 @@ impl<T> Sender<T> {
     /// `poll_ready` but before sending an element.
     ///
     /// If, after `poll_ready` succeeds, you decide you do not wish to send an item after all, you
-    /// can use [`disarm`] to release the reserved slot.
+    /// can use [`disarm`](Sender::disarm) to release the reserved slot.
     ///
-    /// Until an item is sent or [`disarm`] is called, repeated calls to `poll_ready` will return
-    /// either `Poll::Ready(Ok(()))` or `Poll::Ready(Err(_))` if channel is closed.
+    /// Until an item is sent or [`disarm`](Sender::disarm) is called, repeated calls to
+    /// `poll_ready` will return either `Poll::Ready(Ok(()))` or `Poll::Ready(Err(_))` if channel
+    /// is closed.
     pub fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), ClosedError>> {
         self.chan.poll_ready(cx).map_err(|_| ClosedError::new())
     }
