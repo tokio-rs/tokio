@@ -18,12 +18,26 @@ macro_rules! rt_test {
             }
         }
 
-        mod threaded_scheduler {
+        mod threaded_scheduler_4_threads {
             $($t)*
 
             fn rt() -> Runtime {
                 tokio::runtime::Builder::new()
                     .threaded_scheduler()
+                    .core_threads(4)
+                    .enable_all()
+                    .build()
+                    .unwrap()
+            }
+        }
+
+        mod threaded_scheduler_1_thread {
+            $($t)*
+
+            fn rt() -> Runtime {
+                tokio::runtime::Builder::new()
+                    .threaded_scheduler()
+                    .core_threads(1)
                     .enable_all()
                     .build()
                     .unwrap()
@@ -150,10 +164,10 @@ rt_test! {
     }
 
     #[test]
-    fn spawn_many() {
+    fn spawn_many_from_block_on() {
         use tokio::sync::mpsc;
 
-        const ITER: usize = 20;
+        const ITER: usize = 200;
 
         let mut rt = rt();
 
@@ -190,6 +204,66 @@ rt_test! {
 
             out.sort();
             out
+        });
+
+        assert_eq!(ITER, out.len());
+
+        for i in 0..ITER {
+            assert_eq!(i, out[i]);
+        }
+    }
+
+    #[test]
+    fn spawn_many_from_task() {
+        use tokio::sync::mpsc;
+
+        const ITER: usize = 500;
+
+        let mut rt = rt();
+
+        let out = rt.block_on(async {
+            tokio::spawn(async move {
+                let (done_tx, mut done_rx) = mpsc::unbounded_channel();
+
+                /*
+                for _ in 0..100 {
+                    tokio::spawn(async move { });
+                }
+
+                tokio::task::yield_now().await;
+                */
+
+                let mut txs = (0..ITER)
+                    .map(|i| {
+                        let (tx, rx) = oneshot::channel();
+                        let done_tx = done_tx.clone();
+
+                        tokio::spawn(async move {
+                            let msg = assert_ok!(rx.await);
+                            assert_eq!(i, msg);
+                            assert_ok!(done_tx.send(msg));
+                        });
+
+                        tx
+                    })
+                    .collect::<Vec<_>>();
+
+                drop(done_tx);
+
+                thread::spawn(move || {
+                    for (i, tx) in txs.drain(..).enumerate() {
+                        assert_ok!(tx.send(i));
+                    }
+                });
+
+                let mut out = vec![];
+                while let Some(i) = done_rx.recv().await {
+                    out.push(i);
+                }
+
+                out.sort();
+                out
+            }).await.unwrap()
         });
 
         assert_eq!(ITER, out.len());

@@ -209,8 +209,8 @@ impl<T> Local<T> {
         for i in 0..n {
             let j = i + 1;
 
-            let i_idx = (i + head) as usize & MASK;
-            let j_idx = (j + head) as usize & MASK;
+            let i_idx = i.wrapping_add(head) as usize & MASK;
+            let j_idx = j.wrapping_add(head) as usize & MASK;
 
             // Get the next pointer
             let next = if j == n {
@@ -318,10 +318,6 @@ impl<T> Steal<T> {
             // The `dst` queue is empty, but a single task was stolen
             return Some(ret);
         }
-
-        // Synchronize with stealers
-        let (dst_steal, dst_real) = unpack(dst.inner.head.load(Acquire));
-        assert_eq!(dst_steal, dst_real);
 
         // Make the stolen items available to consumers
         dst.inner.tail.store(dst_tail.wrapping_add(n), Release);
