@@ -190,9 +190,20 @@ where
         self.inner.semaphore.poll_acquire(cx, &mut self.permit)
     }
 
+    pub(crate) fn disarm(&mut self) {
+        // TODO: should this error if not acquired?
+        self.inner.semaphore.drop_permit(&mut self.permit)
+    }
+
     /// Send a message and notify the receiver.
     pub(crate) fn try_send(&mut self, value: T) -> Result<(), (T, TrySendError)> {
         self.inner.try_send(value, &mut self.permit)
+    }
+}
+
+impl<T> Tx<T, (crate::sync::semaphore_ll::Semaphore, usize)> {
+    pub(crate) fn is_ready(&self) -> bool {
+        self.permit.is_acquired()
     }
 }
 

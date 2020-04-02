@@ -196,9 +196,88 @@ impl<T> Sender<T> {
         Sender { chan }
     }
 
-    #[doc(hidden)] // TODO: document
+    /// Returns `Poll::Ready(Ok(()))` when the channel is able to accept another item.
+    ///
+    /// If the channel is full, then `Poll::Pending` is returned and the task is notified when a
+    /// slot becomes available.
+    ///
+    /// Once `poll_ready` returns `Poll::Ready(Ok(()))`, a call to `try_send` will succeed unless
+    /// the channel has since been closed. To provide this guarantee, the channel reserves one slot
+    /// in the channel for the coming send. This reserved slot is not available to other `Sender`
+    /// instances, so you need to be careful to not end up with deadlocks by blocking after calling
+    /// `poll_ready` but before sending an element.
+    ///
+    /// If, after `poll_ready` succeeds, you decide you do not wish to send an item after all, you
+    /// can use [`disarm`](Sender::disarm) to release the reserved slot.
+    ///
+    /// Until an item is sent or [`disarm`](Sender::disarm) is called, repeated calls to
+    /// `poll_ready` will return either `Poll::Ready(Ok(()))` or `Poll::Ready(Err(_))` if channel
+    /// is closed.
     pub fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), ClosedError>> {
         self.chan.poll_ready(cx).map_err(|_| ClosedError::new())
+    }
+
+    /// Undo a successful call to `poll_ready`.
+    ///
+    /// Once a call to `poll_ready` returns `Poll::Ready(Ok(()))`, it holds up one slot in the
+    /// channel to make room for the coming send. `disarm` allows you to give up that slot if you
+    /// decide you do not wish to send an item after all. After calling `disarm`, you must call
+    /// `poll_ready` until it returns `Poll::Ready(Ok(()))` before attempting to send again.
+    ///
+    /// Returns `false` if no slot is reserved for this sender (usually because `poll_ready` was
+    /// not previously called, or did not succeed).
+    ///
+    /// # Motivation
+    ///
+    /// Since `poll_ready` takes up one of the finite number of slots in a bounded channel, callers
+    /// need to send an item shortly after `poll_ready` succeeds. If they do not, idle senders may
+    /// take up all the slots of the channel, and prevent active senders from getting any requests
+    /// through. Consider this code that forwards from one channel to another:
+    ///
+    /// ```rust,ignore
+    /// loop {
+    ///   ready!(tx.poll_ready(cx))?;
+    ///   if let Some(item) = ready!(rx.poll_recv(cx)) {
+    ///     tx.try_send(item)?;
+    ///   } else {
+    ///     break;
+    ///   }
+    /// }
+    /// ```
+    ///
+    /// If many such forwarders exist, and they all forward into a single (cloned) `Sender`, then
+    /// any number of forwarders may be waiting for `rx.poll_recv` at the same time. While they do,
+    /// they are effectively each reducing the channel's capacity by 1. If enough of these
+    /// forwarders are idle, forwarders whose `rx` _do_ have elements will be unable to find a spot
+    /// for them through `poll_ready`, and the system will deadlock.
+    ///
+    /// `disarm` solves this problem by allowing you to give up the reserved slot if you find that
+    /// you have to block. We can then fix the code above by writing:
+    ///
+    /// ```rust,ignore
+    /// loop {
+    ///   ready!(tx.poll_ready(cx))?;
+    ///   let item = rx.poll_recv(cx);
+    ///   if let Poll::Ready(Ok(_)) = item {
+    ///     // we're going to send the item below, so don't disarm
+    ///   } else {
+    ///     // give up our send slot, we won't need it for a while
+    ///     tx.disarm();
+    ///   }
+    ///   if let Some(item) = ready!(item) {
+    ///     tx.try_send(item)?;
+    ///   } else {
+    ///     break;
+    ///   }
+    /// }
+    /// ```
+    pub fn disarm(&mut self) -> bool {
+        if self.chan.is_ready() {
+            self.chan.disarm();
+            true
+        } else {
+            false
+        }
     }
 
     /// Attempts to immediately send a message on this `Sender`
