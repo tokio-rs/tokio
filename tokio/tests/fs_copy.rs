@@ -19,3 +19,21 @@ async fn copy() {
 
     assert_eq!(from, to);
 }
+
+#[tokio::test]
+async fn copy_permissions() {
+    let dir = tempdir().unwrap();
+    let from_path = dir.path().join("foo.txt");
+    let to_path = dir.path().join("bar.txt");
+
+    let from = tokio::fs::File::create(&from_path).await.unwrap();
+    let mut from_perms = from.metadata().await.unwrap().permissions();
+    from_perms.set_readonly(true);
+    from.set_permissions(from_perms.clone()).await.unwrap();
+
+    tokio::fs::copy(from_path, &to_path).await.unwrap();
+
+    let to_perms = tokio::fs::metadata(to_path).await.unwrap().permissions();
+
+    assert_eq!(from_perms, to_perms);
+}
