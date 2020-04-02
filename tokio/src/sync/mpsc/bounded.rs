@@ -212,7 +212,6 @@ impl<T> Sender<T> {
     ///
     /// Until an item is sent or [`disarm`] is called, repeated calls to `poll_ready` will return
     /// either `Poll::Ready(Ok(()))` or `Poll::Ready(Err(_))` if channel is closed.
-    #[doc(hidden)]
     pub fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), ClosedError>> {
         self.chan.poll_ready(cx).map_err(|_| ClosedError::new())
     }
@@ -271,7 +270,6 @@ impl<T> Sender<T> {
     ///   }
     /// }
     /// ```
-    #[doc(hidden)]
     pub fn disarm(&mut self) -> bool {
         if self.chan.is_ready() {
             self.chan.disarm();
