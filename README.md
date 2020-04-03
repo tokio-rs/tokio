@@ -99,7 +99,7 @@ First, see if the answer to your question can be found in the [Guides] or the
 the [Tokio Discord server][chat]. We would be happy to try to answer your
 question. Last, if that doesn't work, try opening an [issue] with the question.
 
-[Guides]: https://tokio.rs/docs/
+[Guides]: https://tokio.rs/docs/overview/
 [API documentation]: https://docs.rs/tokio/latest/tokio
 [chat]: https://discord.gg/tokio
 [issue]: https://github.com/tokio-rs/tokio/issues/new
@@ -127,7 +127,7 @@ several other libraries, including:
 
 * [`tracing`] (formerly `tokio-trace`): A framework for application-level
   tracing and async-aware diagnostics.
-  
+
 * [`rdbc`]: A Rust database connectivity library for MySQL, Postgres and SQLite.
 
 * [`mio`]: A low-level, cross-platform abstraction over OS I/O APIs that powers
