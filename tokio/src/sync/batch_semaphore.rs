@@ -463,6 +463,13 @@ impl Drop for Acquire<'_> {
     }
 }
 
+// Safety: the `Acquire` future is not `Sync` automatically because it contains
+// a `Waiter`, which, in turn, contains an `UnsafeCell`. However, the
+// `UnsafeCell` is only accessed when the future is borrowed mutably (either in
+// `poll` or in `drop`). Therefore, it is safe (although not particularly
+// _useful_) for the future to be borrowed immutably across threads.
+unsafe impl Sync for Acquire<'_> {}
+
 // ===== impl AcquireError ====
 
 impl AcquireError {
