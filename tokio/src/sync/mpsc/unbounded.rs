@@ -162,6 +162,13 @@ impl<T> UnboundedSender<T> {
     }
 
     /// Attempts to send a message on this `UnboundedSender` without blocking.
+    ///
+    /// If the receive half of the channel is closed, either due to [`close`]
+    /// being called or the [`UnboundedReceiver`] having been dropped,
+    /// the function returns an error. The error includes the value passed to `send`.
+    ///
+    /// [`close`]: UnboundedReceiver::close
+    /// [`UnboundedReceiver`]: UnboundedReceiver
     pub fn send(&self, message: T) -> Result<(), SendError<T>> {
         self.chan.send_unbounded(message)?;
         Ok(())
