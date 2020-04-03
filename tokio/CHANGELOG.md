@@ -1,3 +1,11 @@
+# 0.2.16 (April 3, 2020)
+
+### Fixes
+
+- sync: fix a regression where `Mutex`, `Semaphore`, and `RwLock` futures no
+  longer implement `Sync` (#2375)
+
+
 # 0.2.15 (April 2, 2020)
 
 ### Fixes
