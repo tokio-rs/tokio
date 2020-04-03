@@ -40,7 +40,7 @@ pub struct TryAcquireError(());
 fn bounds() {
     fn check_unpin<T: Unpin>() {}
     // This has to take a value, since the async fn's return type is unnameable.
-    fn check_send_sync_val<T: Send + Sync>(t: T) {}
+    fn check_send_sync_val<T: Send + Sync>(_t: T) {}
     fn check_send_sync<T: Send + Sync>() {}
     check_unpin::<Semaphore>();
     check_unpin::<SemaphorePermit<'_>>();

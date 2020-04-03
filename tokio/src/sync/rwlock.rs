@@ -134,7 +134,7 @@ fn bounds() {
     fn check_sync<T: Sync>() {}
     fn check_unpin<T: Unpin>() {}
     // This has to take a value, since the async fn's return type is unnameable.
-    fn check_send_sync_val<T: Send + Sync>(t: T) {}
+    fn check_send_sync_val<T: Send + Sync>(_t: T) {}
 
     check_send::<RwLock<u32>>();
     check_sync::<RwLock<u32>>();
