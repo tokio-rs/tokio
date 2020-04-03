@@ -133,6 +133,9 @@ fn bounds() {
     fn check_send<T: Send>() {}
     fn check_sync<T: Sync>() {}
     fn check_unpin<T: Unpin>() {}
+    // This has to take a value, since the async fn's return type is unnameable.
+    fn check_send_sync_val<T: Send + Sync>(_t: T) {}
+
     check_send::<RwLock<u32>>();
     check_sync::<RwLock<u32>>();
     check_unpin::<RwLock<u32>>();
@@ -142,6 +145,10 @@ fn bounds() {
 
     check_sync::<RwLockWriteGuard<'_, u32>>();
     check_unpin::<RwLockWriteGuard<'_, u32>>();
+
+    let rwlock = RwLock::new(0);
+    check_send_sync_val(rwlock.read());
+    check_send_sync_val(rwlock.write());
 }
 
 // As long as T: Send + Sync, it's fine to send and share RwLock<T> between threads.

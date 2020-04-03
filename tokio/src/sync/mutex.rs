@@ -137,8 +137,15 @@ impl Error for TryLockError {}
 fn bounds() {
     fn check_send<T: Send>() {}
     fn check_unpin<T: Unpin>() {}
+    // This has to take a value, since the async fn's return type is unnameable.
+    fn check_send_sync_val<T: Send + Sync>(_t: T) {}
+    fn check_send_sync<T: Send + Sync>() {}
     check_send::<MutexGuard<'_, u32>>();
     check_unpin::<Mutex<u32>>();
+    check_send_sync::<Mutex<u32>>();
+
+    let mutex = Mutex::new(1);
+    check_send_sync_val(mutex.lock());
 }
 
 impl<T> Mutex<T> {
