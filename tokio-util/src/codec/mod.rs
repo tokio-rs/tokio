@@ -18,6 +18,10 @@ pub use self::decoder::Decoder;
 mod encoder;
 pub use self::encoder::Encoder;
 
+mod framed_impl;
+#[allow(unused_imports)]
+pub(crate) use self::framed_impl::{FramedImpl, RWFrames, ReadFrame, WriteFrame};
+
 mod framed;
 pub use self::framed::{Framed, FramedParts};
 
