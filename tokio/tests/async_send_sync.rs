@@ -123,7 +123,6 @@ async_assert_fn!(tokio::fs::File::try_clone(_): Send & Sync);
 async_assert_fn!(tokio::fs::File::into_std(_): Send & Sync);
 async_assert_fn!(tokio::fs::File::set_permissions(_, std::fs::Permissions): Send & Sync);
 
-
 async_assert_fn!(tokio::net::lookup_host(SocketAddr): Send & Sync);
 async_assert_fn!(tokio::net::TcpListener::bind(SocketAddr): Send & Sync);
 async_assert_fn!(tokio::net::TcpListener::accept(_): Send & Sync);
@@ -148,7 +147,6 @@ async_assert_fn!(tokio::net::UnixDatagram::send_to(_, &[u8], &str): Send & Sync)
 async_assert_fn!(tokio::net::UnixDatagram::recv_from(_, &mut [u8]): Send & Sync);
 async_assert_fn!(tokio::net::UnixStream::connect(&str): Send & Sync);
 
-
 async_assert_fn!(tokio::process::Child::wait_with_output(_): Send & Sync);
 async_assert_fn!(tokio::signal::ctrl_c(): Send & Sync);
 #[cfg(unix)]
@@ -157,7 +155,6 @@ async_assert_fn!(tokio::signal::unix::Signal::recv(_): Send & Sync);
 async_assert_fn!(tokio::stream::empty<Rc<u8>>(): Send & Sync);
 async_assert_fn!(tokio::stream::pending<Rc<u8>>(): Send & Sync);
 async_assert_fn!(tokio::stream::iter(std::vec::IntoIter<u8>): Send & Sync);
-
 
 async_assert_fn!(tokio::sync::Barrier::wait(_): Send & Sync);
 async_assert_fn!(tokio::sync::Mutex<u8>::lock(_): Send & Sync);
@@ -194,7 +191,6 @@ async_assert_fn!(tokio::sync::watch::Sender<u8>::closed(_): Send & Sync);
 async_assert_fn!(tokio::sync::watch::Sender<Cell<u8>>::closed(_): !Send & !Sync);
 async_assert_fn!(tokio::sync::watch::Sender<Rc<u8>>::closed(_): !Send & !Sync);
 
-
 async_assert_fn!(tokio::task::LocalKey<u32>::scope(_, u32, BoxFutureSync<()>): Send & Sync);
 async_assert_fn!(tokio::task::LocalKey<u32>::scope(_, u32, BoxFutureSend<()>): Send & !Sync);
 async_assert_fn!(tokio::task::LocalKey<u32>::scope(_, u32, BoxFuture<()>): !Send & !Sync);
@@ -205,7 +201,6 @@ async_assert_fn!(tokio::task::LocalKey<Rc<u32>>::scope(_, Rc<u32>, BoxFutureSync
 async_assert_fn!(tokio::task::LocalKey<Rc<u32>>::scope(_, Rc<u32>, BoxFutureSend<()>): !Send & !Sync);
 async_assert_fn!(tokio::task::LocalKey<Rc<u32>>::scope(_, Rc<u32>, BoxFuture<()>): !Send & !Sync);
 async_assert_fn!(tokio::task::LocalSet::run_until(_, BoxFutureSync<()>): !Send & !Sync);
-
 
 async_assert_fn!(tokio::time::advance(Duration): Send & Sync);
 async_assert_fn!(tokio::time::delay_for(Duration): Send & Sync);
