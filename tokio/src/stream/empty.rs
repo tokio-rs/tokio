@@ -10,6 +10,8 @@ use core::task::{Context, Poll};
 pub struct Empty<T>(PhantomData<T>);
 
 impl<T> Unpin for Empty<T> {}
+unsafe impl<T> Send for Empty<T> {}
+unsafe impl<T> Sync for Empty<T> {}
 
 /// Creates a stream that yields nothing.
 ///
