@@ -7,11 +7,9 @@ use core::task::{Context, Poll};
 /// Stream for the [`empty`] function.
 #[derive(Debug)]
 #[must_use = "streams do nothing unless polled"]
-pub struct Empty<T>(PhantomData<T>);
+pub struct Empty<T>(PhantomData<std::iter::Empty<T>>);
 
 impl<T> Unpin for Empty<T> {}
-unsafe impl<T> Send for Empty<T> {}
-unsafe impl<T> Sync for Empty<T> {}
 
 /// Creates a stream that yields nothing.
 ///

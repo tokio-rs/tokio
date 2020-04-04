@@ -7,11 +7,9 @@ use core::task::{Context, Poll};
 /// Stream for the [`pending`] function.
 #[derive(Debug)]
 #[must_use = "streams do nothing unless polled"]
-pub struct Pending<T>(PhantomData<T>);
+pub struct Pending<T>(PhantomData<std::iter::Empty<T>>);
 
 impl<T> Unpin for Pending<T> {}
-unsafe impl<T> Send for Pending<T> {}
-unsafe impl<T> Sync for Pending<T> {}
 
 /// Creates a stream that is never ready
 ///
