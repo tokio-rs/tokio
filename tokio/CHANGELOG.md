@@ -4,7 +4,12 @@
 
 - sync: fix a regression where `Mutex`, `Semaphore`, and `RwLock` futures no
   longer implement `Sync` (#2375)
+- fs: fix `fs::copy` not copying file permissions (#2354)
 
+### Added
+
+- time: added `deadline` method to `delay_queue::Expired` (#2300)
+- io: added `StreamReader` (#2052) 
 
 # 0.2.15 (April 2, 2020)
 
