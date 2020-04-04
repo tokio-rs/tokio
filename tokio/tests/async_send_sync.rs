@@ -139,13 +139,18 @@ async_assert_fn!(tokio::net::udp::RecvHalf::recv(_, &mut [u8]): Send & Sync);
 async_assert_fn!(tokio::net::udp::RecvHalf::recv_from(_, &mut [u8]): Send & Sync);
 async_assert_fn!(tokio::net::udp::SendHalf::send(_, &[u8]): Send & Sync);
 async_assert_fn!(tokio::net::udp::SendHalf::send_to(_, &[u8], &SocketAddr): Send & Sync);
-async_assert_fn!(tokio::net::UnixListener::bind(&str): Send & Sync);
-async_assert_fn!(tokio::net::UnixListener::accept(_): Send & Sync);
-async_assert_fn!(tokio::net::UnixDatagram::send(_, &[u8]): Send & Sync);
-async_assert_fn!(tokio::net::UnixDatagram::recv(_, &mut [u8]): Send & Sync);
-async_assert_fn!(tokio::net::UnixDatagram::send_to(_, &[u8], &str): Send & Sync);
-async_assert_fn!(tokio::net::UnixDatagram::recv_from(_, &mut [u8]): Send & Sync);
-async_assert_fn!(tokio::net::UnixStream::connect(&str): Send & Sync);
+
+#[cfg(unix)]
+mod unix_datagram {
+    use super::*;
+    async_assert_fn!(tokio::net::UnixListener::bind(&str): Send & Sync);
+    async_assert_fn!(tokio::net::UnixListener::accept(_): Send & Sync);
+    async_assert_fn!(tokio::net::UnixDatagram::send(_, &[u8]): Send & Sync);
+    async_assert_fn!(tokio::net::UnixDatagram::recv(_, &mut [u8]): Send & Sync);
+    async_assert_fn!(tokio::net::UnixDatagram::send_to(_, &[u8], &str): Send & Sync);
+    async_assert_fn!(tokio::net::UnixDatagram::recv_from(_, &mut [u8]): Send & Sync);
+    async_assert_fn!(tokio::net::UnixStream::connect(&str): Send & Sync);
+}
 
 async_assert_fn!(tokio::process::Child::wait_with_output(_): Send & Sync);
 async_assert_fn!(tokio::signal::ctrl_c(): Send & Sync);
