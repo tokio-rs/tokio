@@ -21,8 +21,8 @@ cfg_tcp! {
     /// [`connect`] method, or by [accepting] a connection from a [listener].
     ///
     /// [`connect`]: method@TcpStream::connect
-    /// [accepting]: method@TcpListener::accept
-    /// [listener]: struct@TcpListener
+    /// [accepting]: method@super::TcpListener::accept
+    /// [listener]: struct@super::TcpListener
     ///
     /// # Examples
     ///

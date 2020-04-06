@@ -62,7 +62,7 @@ const MAX_READS: usize = 10;
 /// }
 /// ```
 ///
-/// [`Mutex`]: struct@Mutex
+/// [`Mutex`]: struct@super::Mutex
 /// [`RwLock`]: struct@RwLock
 /// [`RwLockReadGuard`]: struct@RwLockReadGuard
 /// [`RwLockWriteGuard`]: struct@RwLockWriteGuard
