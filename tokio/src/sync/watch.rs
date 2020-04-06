@@ -62,9 +62,9 @@ use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard, Weak};
 use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll};
 
-/// Receives values from the associated [`Sender`](struct.Sender.html).
+/// Receives values from the associated [`Sender`](struct@Sender).
 ///
-/// Instances are created by the [`channel`](fn.channel.html) function.
+/// Instances are created by the [`channel`](fn@channel) function.
 #[derive(Debug)]
 pub struct Receiver<T> {
     /// Pointer to the shared state
@@ -74,9 +74,9 @@ pub struct Receiver<T> {
     inner: Watcher,
 }
 
-/// Sends values to the associated [`Receiver`](struct.Receiver.html).
+/// Sends values to the associated [`Receiver`](struct@Receiver).
 ///
-/// Instances are created by the [`channel`](fn.channel.html) function.
+/// Instances are created by the [`channel`](fn@channel) function.
 #[derive(Debug)]
 pub struct Sender<T> {
     shared: Weak<Shared<T>>,
@@ -172,8 +172,8 @@ const CLOSED: usize = 1;
 /// # }
 /// ```
 ///
-/// [`Sender`]: struct.Sender.html
-/// [`Receiver`]: struct.Receiver.html
+/// [`Sender`]: struct@Sender
+/// [`Receiver`]: struct@Receiver
 pub fn channel<T: Clone>(init: T) -> (Sender<T>, Receiver<T>) {
     const VERSION_0: usize = 0;
     const VERSION_1: usize = 2;

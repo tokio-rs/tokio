@@ -364,9 +364,9 @@
 //! +------------+--------------+
 //! ```
 //!
-//! [`LengthDelimitedCodec::new()`]: struct.LengthDelimitedCodec.html#method.new
-//! [`FramedRead`]: struct.FramedRead.html
-//! [`FramedWrite`]: struct.FramedWrite.html
+//! [`LengthDelimitedCodec::new()`]: method@LengthDelimitedCodec::new
+//! [`FramedRead`]: struct@FramedRead
+//! [`FramedWrite`]: struct@FramedWrite
 //! [`AsyncRead`]: ../../trait.AsyncRead.html
 //! [`AsyncWrite`]: ../../trait.AsyncWrite.html
 //! [`Encoder`]: ../trait.Encoder.html

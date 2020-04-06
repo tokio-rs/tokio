@@ -2,7 +2,7 @@
 //!
 //! See [`DelayQueue`] for more details.
 //!
-//! [`DelayQueue`]: struct.DelayQueue.html
+//! [`DelayQueue`]: struct@DelayQueue
 
 use crate::time::wheel::{self, Wheel};
 use crate::time::{delay_until, Delay, Duration, Error, Instant};
@@ -114,7 +114,7 @@ use std::task::{self, Poll};
 ///
 /// [`insert`]: #method.insert
 /// [`insert_at`]: #method.insert_at
-/// [`Key`]: struct.Key.html
+/// [`Key`]: struct@Key
 /// [`Stream`]: https://docs.rs/futures/0.1/futures/stream/trait.Stream.html
 /// [`poll`]: #method.poll
 /// [`Stream::poll`]: #method.poll
@@ -148,7 +148,7 @@ pub struct DelayQueue<T> {
 ///
 /// Values are returned by [`DelayQueue::poll`].
 ///
-/// [`DelayQueue::poll`]: struct.DelayQueue.html#method.poll
+/// [`DelayQueue::poll`]: method@DelayQueue::poll
 #[derive(Debug)]
 pub struct Expired<T> {
     /// The data stored in the queue
@@ -166,8 +166,8 @@ pub struct Expired<T> {
 /// Instances of `Key` are returned by [`DelayQueue::insert`]. See [`DelayQueue`]
 /// documentation for more details.
 ///
-/// [`DelayQueue`]: struct.DelayQueue.html
-/// [`DelayQueue::insert`]: struct.DelayQueue.html#method.insert
+/// [`DelayQueue`]: struct@DelayQueue
+/// [`DelayQueue::insert`]: method@DelayQueue::insert
 #[derive(Debug, Clone)]
 pub struct Key {
     index: usize,
@@ -298,7 +298,7 @@ impl<T> DelayQueue<T> {
     /// [`poll`]: #method.poll
     /// [`remove`]: #method.remove
     /// [`reset`]: #method.reset
-    /// [`Key`]: struct.Key.html
+    /// [`Key`]: struct@Key
     /// [type]: #
     pub fn insert_at(&mut self, value: T, when: Instant) -> Key {
         assert!(self.slab.len() < MAX_ENTRIES, "max entries exceeded");
@@ -406,7 +406,7 @@ impl<T> DelayQueue<T> {
     /// [`poll`]: #method.poll
     /// [`remove`]: #method.remove
     /// [`reset`]: #method.reset
-    /// [`Key`]: struct.Key.html
+    /// [`Key`]: struct@Key
     /// [type]: #
     pub fn insert(&mut self, value: T, timeout: Duration) -> Key {
         self.insert_at(value, Instant::now() + timeout)

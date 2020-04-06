@@ -16,7 +16,7 @@ use std::task::{Context, Poll, Waker};
 
 /// Sends a value to the associated `Receiver`.
 ///
-/// Instances are created by the [`channel`](fn.channel.html) function.
+/// Instances are created by the [`channel`](fn@channel) function.
 #[derive(Debug)]
 pub struct Sender<T> {
     inner: Option<Arc<Inner<T>>>,
@@ -24,7 +24,7 @@ pub struct Sender<T> {
 
 /// Receive a value from the associated `Sender`.
 ///
-/// Instances are created by the [`channel`](fn.channel.html) function.
+/// Instances are created by the [`channel`](fn@channel) function.
 #[derive(Debug)]
 pub struct Receiver<T> {
     inner: Option<Arc<Inner<T>>>,

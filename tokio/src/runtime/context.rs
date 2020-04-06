@@ -49,7 +49,7 @@ cfg_rt_core! {
 
 /// Set this [`ThreadContext`] as the current active [`ThreadContext`].
 ///
-/// [`ThreadContext`]: struct.ThreadContext.html
+/// [`ThreadContext`]: struct@ThreadContext
 pub(crate) fn enter<F, R>(new: Handle, f: F) -> R
 where
     F: FnOnce() -> R,

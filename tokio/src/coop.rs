@@ -280,7 +280,7 @@ pin_project_lite::pin_project! {
     /// # }
     /// ```
     ///
-    /// [`poll_proceed`]: fn.poll_proceed.html
+    /// [`poll_proceed`]: fn@poll_proceed
     #[derive(Debug)]
     #[allow(unreachable_pub, dead_code)]
     pub struct CoopFuture<F> {

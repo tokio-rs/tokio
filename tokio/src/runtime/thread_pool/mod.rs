@@ -36,7 +36,7 @@ pub(crate) struct ThreadPool {
 ///
 /// `Spawner` instances are obtained by calling [`ThreadPool::spawner`].
 ///
-/// [`ThreadPool::spawner`]: struct.ThreadPool.html#method.spawner
+/// [`ThreadPool::spawner`]: method@ThreadPool::spawner
 #[derive(Clone)]
 pub(crate) struct Spawner {
     shared: Arc<worker::Shared>,

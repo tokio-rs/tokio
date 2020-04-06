@@ -13,7 +13,7 @@ cfg_io_util! {
     ///
     /// This is an asynchronous version of [`std::io::empty`][std].
     ///
-    /// [`empty`]: fn.empty.html
+    /// [`empty`]: fn@empty
     /// [std]: std::io::empty
     pub struct Empty {
         _p: (),

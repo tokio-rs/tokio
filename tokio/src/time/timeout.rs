@@ -2,7 +2,7 @@
 //!
 //! See [`Timeout`] documentation for more details.
 //!
-//! [`Timeout`]: struct.Timeout.html
+//! [`Timeout`]: struct@Timeout
 
 use crate::time::{delay_until, Delay, Duration, Instant};
 

@@ -270,8 +270,8 @@ use std::time::Duration;
 /// [timer]: crate::time
 /// [mod]: index.html
 /// [`new`]: #method.new
-/// [`Builder`]: struct.Builder.html
-/// [`tokio::run`]: fn.run.html
+/// [`Builder`]: struct@Builder
+/// [`tokio::run`]: fn@run
 #[derive(Debug)]
 pub struct Runtime {
     /// Task executor

@@ -95,7 +95,7 @@ cfg_io_driver! {
     /// [`AsyncRead`]: ../io/trait.AsyncRead.html
     /// [`AsyncWrite`]: ../io/trait.AsyncWrite.html
     /// [`mio::Evented`]: https://docs.rs/mio/0.6/mio/trait.Evented.html
-    /// [`Registration`]: struct.Registration.html
+    /// [`Registration`]: struct@Registration
     /// [`TcpListener`]: ../net/struct.TcpListener.html
     /// [`clear_read_ready`]: #method.clear_read_ready
     /// [`clear_write_ready`]: #method.clear_write_ready
