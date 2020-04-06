@@ -332,10 +332,9 @@ impl<T> Sender<T> {
     ///
     /// # Errors
     ///
-    /// If the receive half of the channel is closed, either due to [`close`] being
-    /// called or the [`Receiver`] handle dropping, or if the timeout specified
-    /// elapses before the capacity is available the function returns an error.
-    /// The error includes the value passed to `send_timeout`.
+    /// If the receive half of the channel is closed, either due to [`close`]
+    /// being called or the [`Receiver`] having been dropped,
+    /// the function returns an error. The error includes the value passed to `send`.
     ///
     /// [`close`]: Receiver::close
     /// [`Receiver`]: Receiver

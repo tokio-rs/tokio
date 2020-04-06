@@ -10,6 +10,8 @@ use core::task::{Context, Poll};
 pub struct Pending<T>(PhantomData<T>);
 
 impl<T> Unpin for Pending<T> {}
+unsafe impl<T> Send for Pending<T> {}
+unsafe impl<T> Sync for Pending<T> {}
 
 /// Creates a stream that is never ready
 ///
