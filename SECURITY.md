@@ -1,6 +1,6 @@
 ## Report a security issue
 
-The tokio project team welcomes security reports and is committed to providing prompt attention to security issues. Security issues should be reported privately via [security@tokio.rs](mailto:security@tokio.rs).
+The Tokio project team welcomes security reports and is committed to providing prompt attention to security issues. Security issues should be reported privately via [security@tokio.rs](mailto:security@tokio.rs).
 
 ## Vulnerability coordination
 
@@ -8,4 +8,4 @@ Remediation of security vulnerabilities is prioritized by the project team. The 
 
 ## Security advisories
 
-The project team is committed to transparency in the security issue disclosure process. The tokio team announces security issues via [project Github Release notes](https://github.com/tokio-rs/tokio/releases) and the [RustSec advisory database](https://github.com/RustSec/advisory-db) (i.e. `cargo-audit`).
+The project team is committed to transparency in the security issue disclosure process. The Tokio team announces security issues via [project Github Release notes](https://github.com/tokio-rs/tokio/releases) and the [RustSec advisory database](https://github.com/RustSec/advisory-db) (i.e. `cargo-audit`).
