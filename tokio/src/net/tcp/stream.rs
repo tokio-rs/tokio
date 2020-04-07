@@ -1,6 +1,6 @@
 use crate::future::poll_fn;
 use crate::io::{AsyncRead, AsyncWrite, PollEvented};
-use crate::net::tcp::into_split::{into_split, IntoReadHalf, IntoWriteHalf};
+use crate::net::tcp::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
 use crate::net::tcp::split::{split, ReadHalf, WriteHalf};
 use crate::net::ToSocketAddrs;
 
@@ -631,8 +631,8 @@ impl TcpStream {
     /// this comes at the cost of a heap allocation.
     ///
     /// [`split`]: TcpStream::split()
-    pub fn into_split(self) -> (IntoReadHalf, IntoWriteHalf) {
-        into_split(self)
+    pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
+        split_owned(self)
     }
 
     // == Poll IO functions that takes `&self` ==

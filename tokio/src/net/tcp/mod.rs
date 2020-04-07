@@ -9,8 +9,8 @@ pub use incoming::Incoming;
 mod split;
 pub use split::{ReadHalf, WriteHalf};
 
-mod into_split;
-pub use into_split::{IntoReadHalf, IntoWriteHalf, ReuniteError};
+mod split_owned;
+pub use split_owned::{OwnedReadHalf, OwnedWriteHalf, ReuniteError};
 
 pub(crate) mod stream;
 pub(crate) use stream::TcpStream;

@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use std::io::Result;
+use std::io::{Result, Error, ErrorKind};
 use std::io::{Read, Write};
 use std::{net, thread};
 
@@ -67,5 +67,49 @@ async fn reunite() -> Result<()> {
     read1.reunite(write1).expect("Reunite should succeed");
 
     handle.join().unwrap();
+    Ok(())
+}
+
+/// Test that dropping the write half actually closes the stream.
+#[tokio::test]
+async fn drop_write() -> Result<()> {
+    const MSG: &[u8] = b"split";
+
+    let listener = net::TcpListener::bind("127.0.0.1:0")?;
+    let addr = listener.local_addr()?;
+
+    let handle = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        stream.write(MSG).unwrap();
+
+        let mut read_buf = [0u8; 32];
+        match stream.read(&mut read_buf) {
+            Ok(0) => Ok(()),
+            Ok(len) => Err(Error::new(ErrorKind::Other,
+                format!("Unexpected read: {} bytes.", len))),
+            Err(err) => Err(err)
+        }
+    });
+
+    let stream = TcpStream::connect(&addr).await?;
+    let (mut read_half, write_half) = stream.into_split();
+
+    let mut read_buf = [0u8; 32];
+    let read_len = read_half.read(&mut read_buf[..]).await?;
+    assert_eq!(&read_buf[..read_len], MSG);
+
+    // drop it while the read is in progress
+    std::thread::spawn(move || {
+        thread::sleep(std::time::Duration::from_millis(50));
+        drop(write_half);
+    });
+
+    match read_half.read(&mut read_buf[..]).await {
+        Ok(0) => {},
+        Ok(len) => panic!("Unexpected read: {} bytes.", len),
+        Err(err) => panic!("Unexpected error: {}.", err),
+    }
+
+    handle.join().unwrap().unwrap();
     Ok(())
 }
