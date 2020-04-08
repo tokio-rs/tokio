@@ -38,18 +38,20 @@ fn read_to_string_internal<R: AsyncRead + ?Sized>(
     bytes: &mut Vec<u8>,
     start_len: usize,
 ) -> Poll<io::Result<usize>> {
-    let ret = ready!(read_to_end_internal(reader, cx, bytes, start_len));
-    if let Ok(string) = String::from_utf8(mem::take(bytes)) {
-        debug_assert!(buf.is_empty());
-        *bytes = mem::replace(buf, string).into_bytes();
-        Poll::Ready(ret)
-    } else {
-        Poll::Ready(ret.and_then(|_| {
-            Err(io::Error::new(
+    let ret = ready!(read_to_end_internal(reader, cx, bytes, start_len))?;
+    match String::from_utf8(mem::take(bytes)) {
+        Ok(string) => {
+            debug_assert!(buf.is_empty());
+            *buf = string;
+            Poll::Ready(Ok(ret))
+        }
+        Err(e) => {
+            *bytes = e.into_bytes();
+            Poll::Ready(Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "stream did not contain valid UTF-8",
-            ))
-        }))
+            )))
+        }
     }
 }
 
@@ -66,7 +68,13 @@ where
             bytes,
             start_len,
         } = &mut *self;
-        read_to_string_internal(Pin::new(reader), cx, buf, bytes, *start_len)
+        let ret = read_to_string_internal(Pin::new(reader), cx, buf, bytes, *start_len);
+        if let Poll::Ready(Err(_)) = ret {
+            // Put back the original string.
+            bytes.truncate(*start_len);
+            **buf = String::from_utf8(mem::take(bytes)).expect("original string no longer utf-8");
+        }
+        ret
     }
 }
 
