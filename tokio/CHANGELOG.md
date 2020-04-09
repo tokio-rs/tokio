@@ -1,3 +1,11 @@
+# 0.2.17 (April 9, 2020)
+
+### Fixes
+- rt: bug in work-stealing queue (#2387) 
+
+### Changes
+- rt: threadpool uses logical CPU count instead of physical by default (#2391)
+
 # 0.2.16 (April 3, 2020)
 
 ### Fixes
