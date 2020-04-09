@@ -15,16 +15,6 @@ impl AtomicU8 {
         let inner = UnsafeCell::new(std::sync::atomic::AtomicU8::new(val));
         AtomicU8 { inner }
     }
-
-    /// Performs an unsynchronized load.
-    ///
-    /// # Safety
-    ///
-    /// All mutations must have happened before the unsynchronized load.
-    /// Additionally, there must be no concurrent mutations.
-    pub(crate) unsafe fn unsync_load(&self) -> u8 {
-        *(*self.inner.get()).get_mut()
-    }
 }
 
 impl Deref for AtomicU8 {
