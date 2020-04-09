@@ -75,7 +75,7 @@ pub(crate) mod sync {
 pub(crate) mod sys {
     #[cfg(feature = "rt-threaded")]
     pub(crate) fn num_cpus() -> usize {
-        usize::max(1, num_cpus::get_physical())
+        usize::max(1, num_cpus::get())
     }
 
     #[cfg(not(feature = "rt-threaded"))]
