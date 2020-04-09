@@ -186,8 +186,7 @@ fn chained_steal() {
         });
 
         // Drain our tasks, then attempt to steal
-        while l1.pop().is_some() {
-        }
+        while l1.pop().is_some() {}
 
         s2.steal_into(&mut l1);
 

@@ -36,7 +36,9 @@ pub(super) struct Inner<T: 'static> {
     ///
     /// Contains two `u16` values. The LSB byte is the "real" head of the queue.
     /// The `u16` in the MSB is set by a stealer in process of stealing values.
-    /// It represents the first value being stolen in the batch.
+    /// It represents the first value being stolen in the batch. `u16` is used
+    /// in order to distinguish between `head == tail` and `head == tail -
+    /// capacity`.
     ///
     /// When both `u16` values are the same, there is no active stealer.
     ///
@@ -382,7 +384,7 @@ impl<T> Steal<T> {
             }
         };
 
-        assert!(n <= 128, "actual = {}", n);
+        assert!(n <= LOCAL_QUEUE_CAPACITY as u16 / 2, "actual = {}", n);
 
         let (first, _) = unpack(next_packed);
 
