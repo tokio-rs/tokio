@@ -39,7 +39,7 @@ fn read_to_string_internal<R: AsyncRead + ?Sized>(
     start_len: usize,
 ) -> Poll<io::Result<usize>> {
     let ret = ready!(read_to_end_internal(reader, cx, bytes, start_len))?;
-    match String::from_utf8(mem::take(bytes)) {
+    match String::from_utf8(mem::replace(bytes, Vec::new())) {
         Ok(string) => {
             debug_assert!(buf.is_empty());
             *buf = string;
@@ -72,7 +72,8 @@ where
         if let Poll::Ready(Err(_)) = ret {
             // Put back the original string.
             bytes.truncate(*start_len);
-            **buf = String::from_utf8(mem::take(bytes)).expect("original string no longer utf-8");
+            **buf = String::from_utf8(mem::replace(bytes, Vec::new()))
+                .expect("original string no longer utf-8");
         }
         ret
     }
