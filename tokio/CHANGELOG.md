@@ -1,4 +1,83 @@
-# 0.2.11 (January 27, 2019)
+# 0.2.17 (April 9, 2020)
+
+### Fixes
+- rt: bug in work-stealing queue (#2387) 
+
+### Changes
+- rt: threadpool uses logical CPU count instead of physical by default (#2391)
+
+# 0.2.16 (April 3, 2020)
+
+### Fixes
+
+- sync: fix a regression where `Mutex`, `Semaphore`, and `RwLock` futures no
+  longer implement `Sync` (#2375)
+- fs: fix `fs::copy` not copying file permissions (#2354)
+
+### Added
+
+- time: added `deadline` method to `delay_queue::Expired` (#2300)
+- io: added `StreamReader` (#2052) 
+
+# 0.2.15 (April 2, 2020)
+
+### Fixes
+
+- rt: fix queue regression (#2362).
+
+### Added
+
+- sync: Add disarm to `mpsc::Sender` (#2358).
+
+# 0.2.14 (April 1, 2020)
+
+### Fixes
+- rt: concurrency bug in scheduler (#2273).
+- rt: concurrency bug with shell runtime (#2333).
+- test-util: correct pause/resume of time (#2253).
+- time: `DelayQueue` correct wakeup after `insert` (#2285).
+
+### Added
+- io: impl `RawFd`, `AsRawHandle` for std io types (#2335).
+- rt: automatic cooperative task yielding (#2160, #2343, #2349).
+- sync: `RwLock::into_inner` (#2321).
+
+### Changed
+- sync: semaphore, mutex internals rewritten to avoid allocations (#2325).
+
+# 0.2.13 (February 28, 2020)
+
+### Fixes
+- macros: unresolved import in `pin!` (#2281).
+
+# 0.2.12 (February 27, 2020)
+
+### Fixes
+- net: `UnixStream::poll_shutdown` should call `shutdown(Write)` (#2245).
+- process: Wake up read and write on `EPOLLERR` (#2218).
+- rt: potential deadlock when using `block_in_place` and shutting down the
+  runtime (#2119).
+- rt: only detect number of CPUs if `core_threads` not specified (#2238).
+- sync: reduce `watch::Receiver` struct size (#2191).
+- time: succeed when setting delay of `$MAX-1` (#2184).
+- time: avoid having to poll `DelayQueue` after inserting new delay (#2217).
+
+### Added
+- macros: `pin!` variant that assigns to identifier and pins (#2274).
+- net: impl `Stream` for `Listener` types (#2275).
+- rt: `Runtime::shutdown_timeout` waits for runtime to shutdown for specified
+  duration (#2186).
+- stream: `StreamMap` merges streams and can insert / remove streams at
+  runtime (#2185).
+- stream: `StreamExt::skip()` skips a fixed number of items (#2204).
+- stream: `StreamExt::skip_while()` skips items based on a predicate (#2205).
+- sync: `Notify` provides basic `async` / `await` task notification (#2210).
+- sync: `Mutex::into_inner` retrieves guarded data (#2250).
+- sync: `mpsc::Sender::send_timeout` sends, waiting for up to specified duration
+  for channel capacity (#2227).
+- time: impl `Ord` and `Hash` for `Instant` (#2239).
+
+# 0.2.11 (January 27, 2020)
 
 ### Fixes
 - docs: misc fixes and tweaks (#2155, #2103, #2027, #2167, #2175).
@@ -19,7 +98,7 @@
 - sync: impl `Eq`, `PartialEq` for `oneshot::RecvError` (#2168).
 - task: methods for inspecting the `JoinError` cause (#2051).
 
-# 0.2.10 (January 21, 2019)
+# 0.2.10 (January 21, 2020)
 
 ### Fixes
 - `#[tokio::main]` when `rt-core` feature flag is not enabled (#2139).
@@ -41,7 +120,7 @@
 - `StreamExt::merge` combines two streams, yielding values as they become ready (#2091).
 - Task-local storage (#2126).
 
-# 0.2.9 (January 9, 2019)
+# 0.2.9 (January 9, 2020)
 
 ### Fixes
 - `AsyncSeek` impl for `File` (#1986).
@@ -49,12 +128,12 @@
 - rt: memory ordering when dropping `JoinHandle` (#2044).
 - docs: misc API documentation fixes and improvements.
 
-# 0.2.8 (January 7, 2019)
+# 0.2.8 (January 7, 2020)
 
 ### Fixes
 - depend on new version of `tokio-macros`.
 
-# 0.2.7 (January 7, 2019)
+# 0.2.7 (January 7, 2020)
 
 ### Fixes
 - potential deadlock when dropping `basic_scheduler` Runtime.

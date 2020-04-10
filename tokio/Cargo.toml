@@ -8,12 +8,12 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.2.11"
+version = "0.2.17"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 readme = "README.md"
-documentation = "https://docs.rs/tokio/0.2.11/tokio/"
+documentation = "https://docs.rs/tokio/0.2.17/tokio/"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
 description = """
@@ -129,7 +129,7 @@ tempfile = "3.1.0"
 # loom is currently not compiling on windows.
 # See: https://github.com/Xudong-Huang/generator-rs/issues/19
 [target.'cfg(not(windows))'.dev-dependencies]
-loom = { version = "0.2.13", features = ["futures", "checkpoint"] }
+loom = { version = "0.3.1", features = ["futures", "checkpoint"] }
 
 [package.metadata.docs.rs]
 all-features = true

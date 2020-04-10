@@ -28,8 +28,7 @@ macro_rules! pin {
 
 struct U32Encoder;
 
-impl Encoder for U32Encoder {
-    type Item = u32;
+impl Encoder<u32> for U32Encoder {
     type Error = io::Error;
 
     fn encode(&mut self, item: u32, dst: &mut BytesMut) -> io::Result<()> {

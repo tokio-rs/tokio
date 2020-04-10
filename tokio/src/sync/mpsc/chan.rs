@@ -1,4 +1,4 @@
-use crate::loom::cell::CausalCell;
+use crate::loom::cell::UnsafeCell;
 use crate::loom::future::AtomicWaker;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Arc;
@@ -114,7 +114,7 @@ struct Chan<T, S> {
     tx_count: AtomicUsize,
 
     /// Only accessed by `Rx` handle.
-    rx_fields: CausalCell<RxFields<T>>,
+    rx_fields: UnsafeCell<RxFields<T>>,
 }
 
 impl<T, S> fmt::Debug for Chan<T, S>
@@ -164,7 +164,7 @@ where
         semaphore,
         rx_waker: AtomicWaker::new(),
         tx_count: AtomicUsize::new(1),
-        rx_fields: CausalCell::new(RxFields {
+        rx_fields: UnsafeCell::new(RxFields {
             list: rx,
             rx_closed: false,
         }),
@@ -190,9 +190,20 @@ where
         self.inner.semaphore.poll_acquire(cx, &mut self.permit)
     }
 
+    pub(crate) fn disarm(&mut self) {
+        // TODO: should this error if not acquired?
+        self.inner.semaphore.drop_permit(&mut self.permit)
+    }
+
     /// Send a message and notify the receiver.
     pub(crate) fn try_send(&mut self, value: T) -> Result<(), (T, TrySendError)> {
         self.inner.try_send(value, &mut self.permit)
+    }
+}
+
+impl<T> Tx<T, (crate::sync::semaphore_ll::Semaphore, usize)> {
+    pub(crate) fn is_ready(&self) -> bool {
+        self.permit.is_acquired()
     }
 }
 
@@ -264,6 +275,9 @@ where
     /// Receive the next value
     pub(crate) fn recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         use super::block::Read::*;
+
+        // Keep track of task budget
+        ready!(crate::coop::poll_proceed(cx));
 
         self.inner.rx_fields.with_mut(|rx_fields_ptr| {
             let rx_fields = unsafe { &mut *rx_fields_ptr };
@@ -424,6 +438,9 @@ impl Semaphore for (crate::sync::semaphore_ll::Semaphore, usize) {
         cx: &mut Context<'_>,
         permit: &mut Permit,
     ) -> Poll<Result<(), ClosedError>> {
+        // Keep track of task budget
+        ready!(crate::coop::poll_proceed(cx));
+
         permit
             .poll_acquire(cx, 1, &self.0)
             .map_err(|_| ClosedError::new())

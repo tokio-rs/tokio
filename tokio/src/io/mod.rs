@@ -200,9 +200,13 @@ cfg_io_util! {
 
     pub(crate) mod util;
     pub use util::{
-        copy, empty, repeat, sink, AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt, BufReader,
-        BufStream, BufWriter, Copy, Empty, Lines, Repeat, Sink, Split, Take,
+        copy, empty, repeat, sink, AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt,
+        BufReader, BufStream, BufWriter, Copy, Empty, Lines, Repeat, Sink, Split, Take,
     };
+
+    cfg_stream! {
+        pub use util::{stream_reader, StreamReader};
+    }
 
     // Re-export io::Error so that users don't have to deal with conflicts when
     // `use`ing `tokio::io` and `std::io`.

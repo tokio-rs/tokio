@@ -108,12 +108,13 @@
 //!     assert_eq!(30, rx.recv().await.unwrap());
 //! }
 
-use crate::loom::cell::CausalCell;
+use crate::loom::cell::UnsafeCell;
 use crate::loom::future::AtomicWaker;
 use crate::loom::sync::atomic::{spin_loop_hint, AtomicBool, AtomicPtr, AtomicUsize};
 use crate::loom::sync::{Arc, Condvar, Mutex};
 
 use std::fmt;
+use std::mem;
 use std::ptr;
 use std::sync::atomic::Ordering::SeqCst;
 use std::task::{Context, Poll, Waker};
@@ -292,10 +293,10 @@ struct Slot<T> {
 /// A write in the buffer
 struct Write<T> {
     /// Uniquely identifies this write
-    pos: CausalCell<u64>,
+    pos: UnsafeCell<u64>,
 
     /// The written value
-    val: CausalCell<Option<T>>,
+    val: UnsafeCell<Option<T>>,
 }
 
 /// Tracks a waiting receiver
@@ -308,7 +309,7 @@ struct WaitNode {
     waker: AtomicWaker,
 
     /// Next pointer in the stack of waiting senders.
-    next: CausalCell<*const WaitNode>,
+    next: UnsafeCell<*const WaitNode>,
 }
 
 struct RecvGuard<'a, T> {
@@ -379,8 +380,8 @@ pub fn channel<T>(mut capacity: usize) -> (Sender<T>, Receiver<T>) {
             rem: AtomicUsize::new(0),
             lock: AtomicUsize::new(0),
             write: Write {
-                pos: CausalCell::new((i as u64).wrapping_sub(capacity as u64)),
-                val: CausalCell::new(None),
+                pos: UnsafeCell::new((i as u64).wrapping_sub(capacity as u64)),
+                val: UnsafeCell::new(None),
             },
         });
     }
@@ -400,7 +401,7 @@ pub fn channel<T>(mut capacity: usize) -> (Sender<T>, Receiver<T>) {
         wait: Arc::new(WaitNode {
             queued: AtomicBool::new(false),
             waker: AtomicWaker::new(),
-            next: CausalCell::new(ptr::null()),
+            next: UnsafeCell::new(ptr::null()),
         }),
     };
 
@@ -514,7 +515,7 @@ impl<T> Sender<T> {
             wait: Arc::new(WaitNode {
                 queued: AtomicBool::new(false),
                 waker: AtomicWaker::new(),
-                next: CausalCell::new(ptr::null()),
+                next: UnsafeCell::new(ptr::null()),
             }),
         }
     }
@@ -924,7 +925,7 @@ impl<T> Drop for Receiver<T> {
 impl<T> Drop for Shared<T> {
     fn drop(&mut self) {
         // Clear the wait stack
-        let mut curr = *self.wait_stack.get_mut() as *const WaitNode;
+        let mut curr = self.wait_stack.with_mut(|ptr| *ptr as *const WaitNode);
 
         while !curr.is_null() {
             let waiter = unsafe { Arc::from_raw(curr) };
@@ -980,7 +981,7 @@ impl<T> Slot<T> {
         if 1 == self.lock.fetch_sub(2, SeqCst) - 2 {
             // First acquire the lock to make sure our sender is waiting on the
             // condition variable, otherwise the notification could be lost.
-            let _ = tail.lock().unwrap();
+            mem::drop(tail.lock().unwrap());
             // Wake up senders
             condvar.notify_all();
         }
@@ -1000,8 +1001,6 @@ impl<'a, T> RecvGuard<'a, T> {
     }
 
     fn drop_no_rem_dec(self) {
-        use std::mem;
-
         self.slot.rx_unlock(self.tail, self.condvar, false);
 
         mem::forget(self);

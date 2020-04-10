@@ -25,6 +25,11 @@ impl AtomicUsize {
     pub(crate) unsafe fn unsync_load(&self) -> usize {
         *(*self.inner.get()).get_mut()
     }
+
+    pub(crate) fn with_mut<R>(&mut self, f: impl FnOnce(&mut usize) -> R) -> R {
+        // safety: we have mutable access
+        f(unsafe { (*self.inner.get()).get_mut() })
+    }
 }
 
 impl ops::Deref for AtomicUsize {

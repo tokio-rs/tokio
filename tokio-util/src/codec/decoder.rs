@@ -1,4 +1,3 @@
-use crate::codec::encoder::Encoder;
 use crate::codec::Framed;
 
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -159,7 +158,7 @@ pub trait Decoder {
     /// [`Framed`]: crate::codec::Framed
     fn framed<T: AsyncRead + AsyncWrite + Sized>(self, io: T) -> Framed<T, Self>
     where
-        Self: Encoder + Sized,
+        Self: Sized,
     {
         Framed::new(io, self)
     }

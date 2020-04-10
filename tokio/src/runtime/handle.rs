@@ -7,7 +7,12 @@ cfg_rt_core! {
     use std::future::Future;
 }
 
-/// Handle to the runtime
+/// Handle to the runtime.
+///
+/// The handle is internally reference-counted and can be freely cloned. A handle can be
+/// obtained using the [`Runtime::handle`] method.
+///
+/// [`Runtime::handle`]: crate::runtime::Runtime::handle()
 #[derive(Debug, Clone)]
 pub struct Handle {
     pub(super) spawner: Spawner,
@@ -26,7 +31,7 @@ pub struct Handle {
 }
 
 impl Handle {
-    /// Enter the runtime context
+    /// Enter the runtime context.
     pub fn enter<F, R>(&self, f: F) -> R
     where
         F: FnOnce() -> R,
@@ -38,20 +43,21 @@ impl Handle {
     ///
     /// # Panic
     ///
-    /// A Runtime must have been started or this will panic
+    /// This will panic if called outside the context of a Tokio runtime.
     ///
     /// # Examples
     ///
-    /// This allows for the current handle to be gotten when running in a `#`
+    /// This can be used to obtain the handle of the surrounding runtime from an async
+    /// block or function running on that runtime.
     ///
     /// ```
     /// # use tokio::runtime::Runtime;
-    ///
     /// # fn dox() {
     /// # let rt = Runtime::new().unwrap();
     /// # rt.spawn(async {
     /// use tokio::runtime::Handle;
     ///
+    /// // Inside an async block or function.
     /// let handle = Handle::current();
     /// handle.spawn(async {
     ///     println!("now running in the existing Runtime");

@@ -27,6 +27,7 @@ use futures_core::ready;
 use std::collections::VecDeque;
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{self, Poll, Waker};
 use std::{cmp, io};
 
@@ -57,6 +58,10 @@ enum Action {
     Read(Vec<u8>),
     Write(Vec<u8>),
     Wait(Duration),
+    // Wrapped in Arc so that Builder can be cloned and Send.
+    // Mock is not cloned as does not need to check Rc for ref counts.
+    ReadError(Option<Arc<io::Error>>),
+    WriteError(Option<Arc<io::Error>>),
 }
 
 #[derive(Debug)]
@@ -83,12 +88,32 @@ impl Builder {
         self
     }
 
+    /// Sequence a `read` operation that produces an error.
+    ///
+    /// The next operation in the mock's script will be to expect a `read` call
+    /// and return `error`.
+    pub fn read_error(&mut self, error: io::Error) -> &mut Self {
+        let error = Some(error.into());
+        self.actions.push_back(Action::ReadError(error));
+        self
+    }
+
     /// Sequence a `write` operation.
     ///
     /// The next operation in the mock's script will be to expect a `write`
     /// call.
     pub fn write(&mut self, buf: &[u8]) -> &mut Self {
         self.actions.push_back(Action::Write(buf.into()));
+        self
+    }
+
+    /// Sequence a `write` operation that produces an error.
+    ///
+    /// The next operation in the mock's script will be to expect a `write`
+    /// call that provides `error`.
+    pub fn write_error(&mut self, error: io::Error) -> &mut Self {
+        let error = Some(error.into());
+        self.actions.push_back(Action::WriteError(error));
         self
     }
 
@@ -128,12 +153,32 @@ impl Handle {
         self
     }
 
+    /// Sequence a `read` operation error.
+    ///
+    /// The next operation in the mock's script will be to expect a `read` call
+    /// and return `error`.
+    pub fn read_error(&mut self, error: io::Error) -> &mut Self {
+        let error = Some(error.into());
+        self.tx.send(Action::ReadError(error)).unwrap();
+        self
+    }
+
     /// Sequence a `write` operation.
     ///
     /// The next operation in the mock's script will be to expect a `write`
     /// call.
     pub fn write(&mut self, buf: &[u8]) -> &mut Self {
         self.tx.send(Action::Write(buf.into())).unwrap();
+        self
+    }
+
+    /// Sequence a `write` operation error.
+    ///
+    /// The next operation in the mock's script will be to expect a `write`
+    /// call error.
+    pub fn write_error(&mut self, error: io::Error) -> &mut Self {
+        let error = Some(error.into());
+        self.tx.send(Action::WriteError(error)).unwrap();
         self
     }
 }
@@ -174,6 +219,12 @@ impl Inner {
                 // Return the number of bytes read
                 Ok(n)
             }
+            Some(&mut Action::ReadError(ref mut err)) => {
+                // As the
+                let err = err.take().expect("Should have been removed from actions.");
+                let err = Arc::try_unwrap(err).expect("There are no other references.");
+                Err(err)
+            }
             Some(_) => {
                 // Either waiting or expecting a write
                 Err(io::ErrorKind::WouldBlock.into())
@@ -193,6 +244,12 @@ impl Inner {
             return Err(io::ErrorKind::WouldBlock.into());
         }
 
+        if let Some(&mut Action::WriteError(ref mut err)) = self.action() {
+            let err = err.take().expect("Should have been removed from actions.");
+            let err = Arc::try_unwrap(err).expect("There are no other references.");
+            return Err(err);
+        }
+
         for i in 0..self.actions.len() {
             match self.actions[i] {
                 Action::Write(ref mut expect) => {
@@ -210,7 +267,7 @@ impl Inner {
                         return Ok(ret);
                     }
                 }
-                Action::Wait(..) => {
+                Action::Wait(..) | Action::WriteError(..) => {
                     break;
                 }
                 _ => {}
@@ -258,6 +315,11 @@ impl Inner {
                         break;
                     }
                 }
+                Action::ReadError(ref mut error) | Action::WriteError(ref mut error) => {
+                    if error.is_some() {
+                        break;
+                    }
+                }
             }
 
             let _action = self.actions.pop_front();
@@ -272,7 +334,7 @@ impl Inner {
 impl Mock {
     fn maybe_wakeup_reader(&mut self) {
         match self.inner.action() {
-            Some(&mut Action::Read(_)) | None => {
+            Some(&mut Action::Read(_)) | Some(&mut Action::ReadError(_)) | None => {
                 if let Some(waker) = self.inner.read_wait.take() {
                     waker.wake();
                 }

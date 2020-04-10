@@ -17,8 +17,19 @@ macro_rules! poll {
 }
 
 #[test]
+fn frozen_utility_returns_correct_advanced_duration() {
+    let clock = Clock::new();
+    clock.pause();
+    let start = clock.now();
+
+    clock.advance(ms(10));
+    assert_eq!(clock.now() - start, ms(10));
+}
+
+#[test]
 fn immediate_delay() {
     let (mut driver, clock, handle) = setup();
+    let start = clock.now();
 
     let when = clock.now();
     let mut e = task::spawn(delay_until(&handle, when));
@@ -28,13 +39,12 @@ fn immediate_delay() {
     assert_ok!(driver.park_timeout(Duration::from_millis(1000)));
 
     // The time has not advanced. The `turn` completed immediately.
-    assert_eq!(clock.advanced(), ms(1000));
+    assert_eq!(clock.now() - start, ms(1000));
 }
 
 #[test]
 fn delayed_delay_level_0() {
     let (mut driver, clock, handle) = setup();
-
     let start = clock.now();
 
     for &i in &[1, 10, 60] {
@@ -45,7 +55,7 @@ fn delayed_delay_level_0() {
         assert_pending!(poll!(e));
 
         assert_ok!(driver.park());
-        assert_eq!(clock.advanced(), ms(i));
+        assert_eq!(clock.now() - start, ms(i));
 
         assert_ready_ok!(poll!(e));
     }
@@ -74,20 +84,21 @@ fn sub_ms_delayed_delay() {
 #[test]
 fn delayed_delay_wrapping_level_0() {
     let (mut driver, clock, handle) = setup();
+    let start = clock.now();
 
     assert_ok!(driver.park_timeout(ms(5)));
-    assert_eq!(clock.advanced(), ms(5));
+    assert_eq!(clock.now() - start, ms(5));
 
     let mut e = task::spawn(delay_until(&handle, clock.now() + ms(60)));
 
     assert_pending!(poll!(e));
 
     assert_ok!(driver.park());
-    assert_eq!(clock.advanced(), ms(64));
+    assert_eq!(clock.now() - start, ms(64));
     assert_pending!(poll!(e));
 
     assert_ok!(driver.park());
-    assert_eq!(clock.advanced(), ms(65));
+    assert_eq!(clock.now() - start, ms(65));
 
     assert_ready_ok!(poll!(e));
 }
@@ -95,6 +106,7 @@ fn delayed_delay_wrapping_level_0() {
 #[test]
 fn timer_wrapping_with_higher_levels() {
     let (mut driver, clock, handle) = setup();
+    let start = clock.now();
 
     // Set delay to hit level 1
     let mut e1 = task::spawn(delay_until(&handle, clock.now() + ms(64)));
@@ -109,13 +121,13 @@ fn timer_wrapping_with_higher_levels() {
 
     // This should result in s1 firing
     assert_ok!(driver.park());
-    assert_eq!(clock.advanced(), ms(64));
+    assert_eq!(clock.now() - start, ms(64));
 
     assert_ready_ok!(poll!(e1));
     assert_pending!(poll!(e2));
 
     assert_ok!(driver.park());
-    assert_eq!(clock.advanced(), ms(65));
+    assert_eq!(clock.now() - start, ms(65));
 
     assert_ready_ok!(poll!(e1));
 }
@@ -123,6 +135,7 @@ fn timer_wrapping_with_higher_levels() {
 #[test]
 fn delay_with_deadline_in_past() {
     let (mut driver, clock, handle) = setup();
+    let start = clock.now();
 
     // Create `Delay` that elapsed immediately.
     let mut e = task::spawn(delay_until(&handle, clock.now() - ms(100)));
@@ -135,12 +148,13 @@ fn delay_with_deadline_in_past() {
     assert_ok!(driver.park_timeout(ms(1000)));
 
     // The time has not advanced. The `turn` completed immediately.
-    assert_eq!(clock.advanced(), ms(1000));
+    assert_eq!(clock.now() - start, ms(1000));
 }
 
 #[test]
 fn delayed_delay_level_1() {
     let (mut driver, clock, handle) = setup();
+    let start = clock.now();
 
     // Create a `Delay` that elapses in the future
     let mut e = task::spawn(delay_until(&handle, clock.now() + ms(234)));
@@ -150,19 +164,20 @@ fn delayed_delay_level_1() {
 
     // Turn the timer, this will wake up to cascade the timer down.
     assert_ok!(driver.park_timeout(ms(1000)));
-    assert_eq!(clock.advanced(), ms(192));
+    assert_eq!(clock.now() - start, ms(192));
 
     // The delay has not elapsed.
     assert_pending!(poll!(e));
 
     // Turn the timer again
     assert_ok!(driver.park_timeout(ms(1000)));
-    assert_eq!(clock.advanced(), ms(234));
+    assert_eq!(clock.now() - start, ms(234));
 
     // The delay has elapsed.
     assert_ready_ok!(poll!(e));
 
     let (mut driver, clock, handle) = setup();
+    let start = clock.now();
 
     // Create a `Delay` that elapses in the future
     let mut e = task::spawn(delay_until(&handle, clock.now() + ms(234)));
@@ -172,20 +187,20 @@ fn delayed_delay_level_1() {
 
     // Turn the timer with a smaller timeout than the cascade.
     assert_ok!(driver.park_timeout(ms(100)));
-    assert_eq!(clock.advanced(), ms(100));
+    assert_eq!(clock.now() - start, ms(100));
 
     assert_pending!(poll!(e));
 
     // Turn the timer, this will wake up to cascade the timer down.
     assert_ok!(driver.park_timeout(ms(1000)));
-    assert_eq!(clock.advanced(), ms(192));
+    assert_eq!(clock.now() - start, ms(192));
 
     // The delay has not elapsed.
     assert_pending!(poll!(e));
 
     // Turn the timer again
     assert_ok!(driver.park_timeout(ms(1000)));
-    assert_eq!(clock.advanced(), ms(234));
+    assert_eq!(clock.now() - start, ms(234));
 
     // The delay has elapsed.
     assert_ready_ok!(poll!(e));
@@ -194,6 +209,7 @@ fn delayed_delay_level_1() {
 #[test]
 fn concurrently_set_two_timers_second_one_shorter() {
     let (mut driver, clock, handle) = setup();
+    let start = clock.now();
 
     let mut e1 = task::spawn(delay_until(&handle, clock.now() + ms(500)));
     let mut e2 = task::spawn(delay_until(&handle, clock.now() + ms(200)));
@@ -204,24 +220,24 @@ fn concurrently_set_two_timers_second_one_shorter() {
 
     // Delay until a cascade
     assert_ok!(driver.park());
-    assert_eq!(clock.advanced(), ms(192));
+    assert_eq!(clock.now() - start, ms(192));
 
     // Delay until the second timer.
     assert_ok!(driver.park());
-    assert_eq!(clock.advanced(), ms(200));
+    assert_eq!(clock.now() - start, ms(200));
 
     // The shorter delay fires
     assert_ready_ok!(poll!(e2));
     assert_pending!(poll!(e1));
 
     assert_ok!(driver.park());
-    assert_eq!(clock.advanced(), ms(448));
+    assert_eq!(clock.now() - start, ms(448));
 
     assert_pending!(poll!(e1));
 
     // Turn again, this time the time will advance to the second delay
     assert_ok!(driver.park());
-    assert_eq!(clock.advanced(), ms(500));
+    assert_eq!(clock.now() - start, ms(500));
 
     assert_ready_ok!(poll!(e1));
 }
@@ -229,6 +245,7 @@ fn concurrently_set_two_timers_second_one_shorter() {
 #[test]
 fn short_delay() {
     let (mut driver, clock, handle) = setup();
+    let start = clock.now();
 
     // Create a `Delay` that elapses in the future
     let mut e = task::spawn(delay_until(&handle, clock.now() + ms(1)));
@@ -243,7 +260,7 @@ fn short_delay() {
     assert_ready_ok!(poll!(e));
 
     // The time has advanced to the point of the delay elapsing.
-    assert_eq!(clock.advanced(), ms(1));
+    assert_eq!(clock.now() - start, ms(1));
 }
 
 #[test]
@@ -251,6 +268,7 @@ fn sorta_long_delay_until() {
     const MIN_5: u64 = 5 * 60 * 1000;
 
     let (mut driver, clock, handle) = setup();
+    let start = clock.now();
 
     // Create a `Delay` that elapses in the future
     let mut e = task::spawn(delay_until(&handle, clock.now() + ms(MIN_5)));
@@ -262,13 +280,13 @@ fn sorta_long_delay_until() {
 
     for &elapsed in cascades {
         assert_ok!(driver.park());
-        assert_eq!(clock.advanced(), ms(elapsed));
+        assert_eq!(clock.now() - start, ms(elapsed));
 
         assert_pending!(poll!(e));
     }
 
     assert_ok!(driver.park());
-    assert_eq!(clock.advanced(), ms(MIN_5));
+    assert_eq!(clock.now() - start, ms(MIN_5));
 
     // The delay has elapsed.
     assert_ready_ok!(poll!(e));
@@ -279,6 +297,7 @@ fn very_long_delay() {
     const MO_5: u64 = 5 * 30 * 24 * 60 * 60 * 1000;
 
     let (mut driver, clock, handle) = setup();
+    let start = clock.now();
 
     // Create a `Delay` that elapses in the future
     let mut e = task::spawn(delay_until(&handle, clock.now() + ms(MO_5)));
@@ -295,7 +314,7 @@ fn very_long_delay() {
 
     for &elapsed in cascades {
         assert_ok!(driver.park());
-        assert_eq!(clock.advanced(), ms(elapsed));
+        assert_eq!(clock.now() - start, ms(elapsed));
 
         assert_pending!(poll!(e));
     }
@@ -304,7 +323,7 @@ fn very_long_delay() {
     assert_ok!(driver.park());
 
     // The time has advanced to the point of the delay elapsing.
-    assert_eq!(clock.advanced(), ms(MO_5));
+    assert_eq!(clock.now() - start, ms(MO_5));
 
     // The delay has elapsed.
     assert_ready_ok!(poll!(e));
@@ -340,7 +359,9 @@ fn unpark_is_delayed() {
         fn unpark(&self) {}
     }
 
-    let clock = Clock::new_frozen();
+    let clock = Clock::new();
+    clock.pause();
+    let start = clock.now();
     let mut driver = Driver::new(MockPark(clock.clone()), clock.clone());
     let handle = driver.handle();
 
@@ -354,7 +375,7 @@ fn unpark_is_delayed() {
 
     assert_ok!(driver.park());
 
-    assert_eq!(clock.advanced(), ms(500));
+    assert_eq!(clock.now() - start, ms(500));
 
     assert_ready_ok!(poll!(e1));
     assert_ready_ok!(poll!(e2));
@@ -367,6 +388,7 @@ fn set_timeout_at_deadline_greater_than_max_timer() {
     const YR_5: u64 = 5 * YR_1;
 
     let (mut driver, clock, handle) = setup();
+    let start = clock.now();
 
     for _ in 0..5 {
         assert_ok!(driver.park_timeout(ms(YR_1)));
@@ -376,13 +398,14 @@ fn set_timeout_at_deadline_greater_than_max_timer() {
     assert_pending!(poll!(e));
 
     assert_ok!(driver.park_timeout(ms(1000)));
-    assert_eq!(clock.advanced(), ms(YR_5) + ms(1));
+    assert_eq!(clock.now() - start, ms(YR_5) + ms(1));
 
     assert_ready_ok!(poll!(e));
 }
 
 fn setup() -> (Driver<MockPark>, Clock, Handle) {
-    let clock = Clock::new_frozen();
+    let clock = Clock::new();
+    clock.pause();
     let driver = Driver::new(MockPark(clock.clone()), clock.clone());
     let handle = driver.handle();
 

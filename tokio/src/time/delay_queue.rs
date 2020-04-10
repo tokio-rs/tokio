@@ -326,7 +326,12 @@ impl<T> DelayQueue<T> {
         };
 
         if should_set_delay {
-            self.delay = Some(delay_until(self.start + Duration::from_millis(when)));
+            let delay_time = self.start + Duration::from_millis(when);
+            if let Some(ref mut delay) = &mut self.delay {
+                delay.reset(delay_time);
+            } else {
+                self.delay = Some(delay_until(delay_time));
+            }
         }
 
         Key::new(key)
@@ -716,15 +721,16 @@ impl<T> DelayQueue<T> {
                 self.poll = wheel::Poll::new(now);
             }
 
-            self.delay = None;
+            // We poll the wheel to get the next value out before finding the next deadline.
+            let wheel_idx = self.wheel.poll(&mut self.poll, &mut self.slab);
 
-            if let Some(idx) = self.wheel.poll(&mut self.poll, &mut self.slab) {
+            self.delay = self.next_deadline().map(delay_until);
+
+            if let Some(idx) = wheel_idx {
                 return Poll::Ready(Some(Ok(idx)));
             }
 
-            if let Some(deadline) = self.next_deadline() {
-                self.delay = Some(delay_until(deadline));
-            } else {
+            if self.delay.is_none() {
                 return Poll::Ready(None);
             }
         }
@@ -872,5 +878,10 @@ impl<T> Expired<T> {
     /// Consumes `self` and returns the inner value.
     pub fn into_inner(self) -> T {
         self.data
+    }
+
+    /// Returns the deadline that the expiration was set to.
+    pub fn deadline(&self) -> Instant {
+        self.deadline
     }
 }

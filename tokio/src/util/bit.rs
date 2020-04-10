@@ -33,6 +33,7 @@ impl Pack {
     }
 
     /// Mask used to unpack value
+    #[cfg(all(test, loom))]
     pub(crate) const fn mask(&self) -> usize {
         self.mask
     }

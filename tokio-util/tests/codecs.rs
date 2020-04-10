@@ -209,9 +209,9 @@ fn lines_encoder() {
     let mut codec = LinesCodec::new();
     let mut buf = BytesMut::new();
 
-    codec.encode(String::from("line 1"), &mut buf).unwrap();
+    codec.encode("line 1", &mut buf).unwrap();
     assert_eq!("line 1\n", buf);
 
-    codec.encode(String::from("line 2"), &mut buf).unwrap();
+    codec.encode("line 2", &mut buf).unwrap();
     assert_eq!("line 1\nline 2\n", buf);
 }

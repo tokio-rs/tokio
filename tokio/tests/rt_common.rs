@@ -18,12 +18,26 @@ macro_rules! rt_test {
             }
         }
 
-        mod threaded_scheduler {
+        mod threaded_scheduler_4_threads {
             $($t)*
 
             fn rt() -> Runtime {
                 tokio::runtime::Builder::new()
                     .threaded_scheduler()
+                    .core_threads(4)
+                    .enable_all()
+                    .build()
+                    .unwrap()
+            }
+        }
+
+        mod threaded_scheduler_1_thread {
+            $($t)*
+
+            fn rt() -> Runtime {
+                tokio::runtime::Builder::new()
+                    .threaded_scheduler()
+                    .core_threads(1)
                     .enable_all()
                     .build()
                     .unwrap()
@@ -150,10 +164,10 @@ rt_test! {
     }
 
     #[test]
-    fn spawn_many() {
+    fn spawn_many_from_block_on() {
         use tokio::sync::mpsc;
 
-        const ITER: usize = 20;
+        const ITER: usize = 200;
 
         let mut rt = rt();
 
@@ -190,6 +204,66 @@ rt_test! {
 
             out.sort();
             out
+        });
+
+        assert_eq!(ITER, out.len());
+
+        for i in 0..ITER {
+            assert_eq!(i, out[i]);
+        }
+    }
+
+    #[test]
+    fn spawn_many_from_task() {
+        use tokio::sync::mpsc;
+
+        const ITER: usize = 500;
+
+        let mut rt = rt();
+
+        let out = rt.block_on(async {
+            tokio::spawn(async move {
+                let (done_tx, mut done_rx) = mpsc::unbounded_channel();
+
+                /*
+                for _ in 0..100 {
+                    tokio::spawn(async move { });
+                }
+
+                tokio::task::yield_now().await;
+                */
+
+                let mut txs = (0..ITER)
+                    .map(|i| {
+                        let (tx, rx) = oneshot::channel();
+                        let done_tx = done_tx.clone();
+
+                        tokio::spawn(async move {
+                            let msg = assert_ok!(rx.await);
+                            assert_eq!(i, msg);
+                            assert_ok!(done_tx.send(msg));
+                        });
+
+                        tx
+                    })
+                    .collect::<Vec<_>>();
+
+                drop(done_tx);
+
+                thread::spawn(move || {
+                    for (i, tx) in txs.drain(..).enumerate() {
+                        assert_ok!(tx.send(i));
+                    }
+                });
+
+                let mut out = vec![];
+                while let Some(i) = done_rx.recv().await {
+                    out.push(i);
+                }
+
+                out.sort();
+                out
+            }).await.unwrap()
         });
 
         assert_eq!(ITER, out.len());
@@ -307,7 +381,7 @@ rt_test! {
     }
 
     #[test]
-    fn spawn_from_other_thread() {
+    fn spawn_from_other_thread_idle() {
         let mut rt = rt();
         let handle = rt.handle().clone();
 
@@ -322,6 +396,31 @@ rt_test! {
         });
 
         rt.block_on(async move {
+            assert_ok!(rx.await);
+        });
+    }
+
+    #[test]
+    fn spawn_from_other_thread_under_load() {
+        let mut rt = rt();
+        let handle = rt.handle().clone();
+
+        let (tx, rx) = oneshot::channel();
+
+        thread::spawn(move || {
+            handle.spawn(async move {
+                assert_ok!(tx.send(()));
+            });
+        });
+
+        rt.block_on(async move {
+            // Spin hard
+            tokio::spawn(async {
+                loop {
+                    yield_once().await;
+                }
+            });
+
             assert_ok!(rx.await);
         });
     }
@@ -680,7 +779,7 @@ rt_test! {
     fn io_notify_while_shutting_down() {
         use std::net::Ipv6Addr;
 
-        for _ in 1..100 {
+        for _ in 1..10 {
             let mut runtime = rt();
 
             runtime.block_on(async {
@@ -768,66 +867,143 @@ rt_test! {
         tx.send(()).unwrap();
     }
 
-    mod local_set {
-        use tokio::task;
-        use super::*;
+    #[test]
+    fn local_set_block_on_socket() {
+        let mut rt = rt();
+        let local = task::LocalSet::new();
 
-        #[test]
-        fn block_on_socket() {
-            let mut rt = rt();
-            let local = task::LocalSet::new();
+        local.block_on(&mut rt, async move {
+            let (tx, rx) = oneshot::channel();
 
-            local.block_on(&mut rt, async move {
-                let (tx, rx) = oneshot::channel();
+            let mut listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
 
-                let mut listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-                let addr = listener.local_addr().unwrap();
+            task::spawn_local(async move {
+                let _ = listener.accept().await;
+                tx.send(()).unwrap();
+            });
 
-                task::spawn_local(async move {
-                    let _ = listener.accept().await;
-                    tx.send(()).unwrap();
+            TcpStream::connect(&addr).await.unwrap();
+            rx.await.unwrap();
+        });
+    }
+
+    #[test]
+    fn local_set_client_server_block_on() {
+        let mut rt = rt();
+        let (tx, rx) = mpsc::channel();
+
+        let local = task::LocalSet::new();
+
+        local.block_on(&mut rt, async move { client_server_local(tx).await });
+
+        assert_ok!(rx.try_recv());
+        assert_err!(rx.try_recv());
+    }
+
+    async fn client_server_local(tx: mpsc::Sender<()>) {
+        let mut server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+
+        // Get the assigned address
+        let addr = assert_ok!(server.local_addr());
+
+        // Spawn the server
+        task::spawn_local(async move {
+            // Accept a socket
+            let (mut socket, _) = server.accept().await.unwrap();
+
+            // Write some data
+            socket.write_all(b"hello").await.unwrap();
+        });
+
+        let mut client = TcpStream::connect(&addr).await.unwrap();
+
+        let mut buf = vec![];
+        client.read_to_end(&mut buf).await.unwrap();
+
+        assert_eq!(buf, b"hello");
+        tx.send(()).unwrap();
+    }
+
+    #[test]
+    fn coop() {
+        use std::task::Poll::Ready;
+
+        let mut rt = rt();
+
+        rt.block_on(async {
+            // Create a bunch of tasks
+            let mut tasks = (0..1_000).map(|_| {
+                tokio::spawn(async { })
+            }).collect::<Vec<_>>();
+
+            // Hope that all the tasks complete...
+            time::delay_for(Duration::from_millis(100)).await;
+
+            poll_fn(|cx| {
+                // At least one task should not be ready
+                for task in &mut tasks {
+                    if Pin::new(task).poll(cx).is_pending() {
+                        return Ready(());
+                    }
+                }
+
+                panic!("did not yield");
+            }).await;
+        });
+    }
+
+    // Tests that the "next task" scheduler optimization is not able to starve
+    // other tasks.
+    #[test]
+    fn ping_pong_saturation() {
+        use tokio::sync::mpsc;
+
+        const NUM: usize = 100;
+
+        let mut rt = rt();
+
+        rt.block_on(async {
+            let (spawned_tx, mut spawned_rx) = mpsc::unbounded_channel();
+
+            // Spawn a bunch of tasks that ping ping between each other to
+            // saturate the runtime.
+            for _ in 0..NUM {
+                let (tx1, mut rx1) = mpsc::unbounded_channel();
+                let (tx2, mut rx2) = mpsc::unbounded_channel();
+                let spawned_tx = spawned_tx.clone();
+
+                task::spawn(async move {
+                    spawned_tx.send(()).unwrap();
+
+                    tx1.send(()).unwrap();
+
+                    loop {
+                        rx2.recv().await.unwrap();
+                        tx1.send(()).unwrap();
+                    }
                 });
 
-                TcpStream::connect(&addr).await.unwrap();
-                rx.await.unwrap();
+                task::spawn(async move {
+                    loop {
+                        rx1.recv().await.unwrap();
+                        tx2.send(()).unwrap();
+                    }
+                });
+            }
+
+            for _ in 0..NUM {
+                spawned_rx.recv().await.unwrap();
+            }
+
+            // spawn another task and wait for it to complete
+            let handle = task::spawn(async {
+                for _ in 0..5 {
+                    // Yielding forces it back into the local queue.
+                    task::yield_now().await;
+                }
             });
-        }
-
-        #[test]
-        fn client_server_block_on() {
-            let mut rt = rt();
-            let (tx, rx) = mpsc::channel();
-
-            let local = task::LocalSet::new();
-
-            local.block_on(&mut rt, async move { client_server_local(tx).await });
-
-            assert_ok!(rx.try_recv());
-            assert_err!(rx.try_recv());
-        }
-
-        async fn client_server_local(tx: mpsc::Sender<()>) {
-            let mut server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
-
-            // Get the assigned address
-            let addr = assert_ok!(server.local_addr());
-
-            // Spawn the server
-            task::spawn_local(async move {
-                // Accept a socket
-                let (mut socket, _) = server.accept().await.unwrap();
-
-                // Write some data
-                socket.write_all(b"hello").await.unwrap();
-            });
-
-            let mut client = TcpStream::connect(&addr).await.unwrap();
-
-            let mut buf = vec![];
-            client.read_to_end(&mut buf).await.unwrap();
-
-            assert_eq!(buf, b"hello");
-            tx.send(()).unwrap();
-        }
+            handle.await.unwrap();
+        });
     }
 }

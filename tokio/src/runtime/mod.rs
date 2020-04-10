@@ -187,11 +187,14 @@
 #[cfg(test)]
 #[macro_use]
 mod tests;
+
 pub(crate) mod context;
 
 cfg_rt_core! {
     mod basic_scheduler;
     use basic_scheduler::BasicScheduler;
+
+    pub(crate) mod task;
 }
 
 mod blocking;
@@ -215,7 +218,7 @@ mod io;
 
 cfg_rt_threaded! {
     mod park;
-    use park::{Parker, Unparker};
+    use park::Parker;
 }
 
 mod shell;
@@ -227,6 +230,8 @@ use self::spawner::Spawner;
 mod time;
 
 cfg_rt_threaded! {
+    mod queue;
+
     pub(crate) mod thread_pool;
     use self::thread_pool::ThreadPool;
 }
@@ -334,7 +339,7 @@ impl Runtime {
     /// [threaded scheduler]: index.html#threaded-scheduler
     /// [basic scheduler]: index.html#basic-scheduler
     /// [runtime builder]: crate::runtime::Builder
-    pub fn new() -> io::Result<Self> {
+    pub fn new() -> io::Result<Runtime> {
         #[cfg(feature = "rt-threaded")]
         let ret = Builder::new().threaded_scheduler().enable_all().build();
 
@@ -416,7 +421,7 @@ impl Runtime {
         })
     }
 
-    /// Enter the runtime context
+    /// Enter the runtime context.
     pub fn enter<F, R>(&self, f: F) -> R
     where
         F: FnOnce() -> R,
@@ -426,7 +431,8 @@ impl Runtime {
 
     /// Return a handle to the runtime's spawner.
     ///
-    /// The returned handle can be used to spawn tasks that run on this runtime.
+    /// The returned handle can be used to spawn tasks that run on this runtime, and can
+    /// be cloned to allow moving the `Handle` to other threads.
     ///
     /// # Examples
     ///

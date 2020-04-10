@@ -1,13 +1,13 @@
 use crate::util::slab::TransferStack;
 
-use loom::cell::CausalCell;
+use loom::cell::UnsafeCell;
 use loom::sync::Arc;
 use loom::thread;
 
 #[test]
 fn transfer_stack() {
     loom::model(|| {
-        let causalities = [CausalCell::new(None), CausalCell::new(None)];
+        let causalities = [UnsafeCell::new(None), UnsafeCell::new(None)];
         let shared = Arc::new((causalities, TransferStack::new()));
         let shared1 = shared.clone();
         let shared2 = shared.clone();
@@ -45,7 +45,7 @@ fn transfer_stack() {
             let val = unsafe { *val };
             assert!(
                 val.is_some(),
-                "CausalCell write must happen-before index is pushed to the stack!",
+                "UnsafeCell write must happen-before index is pushed to the stack!",
             );
             // were there two entries in the stack? if so, check that
             // both saw a write.
@@ -54,7 +54,7 @@ fn transfer_stack() {
                     let val = unsafe { *val };
                     assert!(
                         val.is_some(),
-                        "CausalCell write must happen-before index is pushed to the stack!",
+                        "UnsafeCell write must happen-before index is pushed to the stack!",
                     );
                 });
                 true
@@ -77,7 +77,7 @@ fn transfer_stack() {
                 let val = unsafe { *val };
                 assert!(
                     val.is_some(),
-                    "CausalCell write must happen-before index is pushed to the stack!",
+                    "UnsafeCell write must happen-before index is pushed to the stack!",
                 );
             });
         }

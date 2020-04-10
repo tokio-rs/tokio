@@ -27,7 +27,7 @@ the Rust programming language. It is:
 [discord-url]: https://discord.gg/tokio
 
 [Website](https://tokio.rs) |
-[Guides](https://tokio.rs/docs/) |
+[Guides](https://tokio.rs/docs/overview/) |
 [API Docs](https://docs.rs/tokio/latest/tokio) |
 [Roadmap](https://github.com/tokio-rs/tokio/blob/master/ROADMAP.md) |
 [Chat](https://discord.gg/tokio)
@@ -99,7 +99,7 @@ First, see if the answer to your question can be found in the [Guides] or the
 the [Tokio Discord server][chat]. We would be happy to try to answer your
 question. Last, if that doesn't work, try opening an [issue] with the question.
 
-[Guides]: https://tokio.rs/docs/
+[Guides]: https://tokio.rs/docs/overview/
 [API documentation]: https://docs.rs/tokio/latest/tokio
 [chat]: https://discord.gg/tokio
 [issue]: https://github.com/tokio-rs/tokio/issues/new
@@ -110,7 +110,7 @@ question. Last, if that doesn't work, try opening an [issue] with the question.
 you! We have a [contributing guide][guide] to help you get involved in the Tokio
 project.
 
-[guide]: CONTRIBUTING.md
+[guide]: https://github.com/tokio-rs/tokio/blob/master/CONTRIBUTING.md
 
 ## Related Projects
 
@@ -127,7 +127,7 @@ several other libraries, including:
 
 * [`tracing`] (formerly `tokio-trace`): A framework for application-level
   tracing and async-aware diagnostics.
-  
+
 * [`rdbc`]: A Rust database connectivity library for MySQL, Postgres and SQLite.
 
 * [`mio`]: A low-level, cross-platform abstraction over OS I/O APIs that powers

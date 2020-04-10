@@ -1,14 +1,15 @@
 #![cfg_attr(any(not(feature = "full"), loom), allow(unused_imports, dead_code))]
 
+mod atomic_ptr;
+mod atomic_u16;
 mod atomic_u32;
 mod atomic_u64;
+mod atomic_u8;
 mod atomic_usize;
-mod causal_cell;
-
-pub(crate) mod alloc;
+mod unsafe_cell;
 
 pub(crate) mod cell {
-    pub(crate) use super::causal_cell::{CausalCell, CausalCheck};
+    pub(crate) use super::unsafe_cell::UnsafeCell;
 }
 
 #[cfg(any(feature = "sync", feature = "io-driver"))]
@@ -60,11 +61,13 @@ pub(crate) mod sync {
     pub(crate) use std::sync::{Condvar, Mutex, MutexGuard, WaitTimeoutResult};
 
     pub(crate) mod atomic {
+        pub(crate) use crate::loom::std::atomic_ptr::AtomicPtr;
+        pub(crate) use crate::loom::std::atomic_u16::AtomicU16;
         pub(crate) use crate::loom::std::atomic_u32::AtomicU32;
         pub(crate) use crate::loom::std::atomic_u64::AtomicU64;
+        pub(crate) use crate::loom::std::atomic_u8::AtomicU8;
         pub(crate) use crate::loom::std::atomic_usize::AtomicUsize;
 
-        pub(crate) use std::sync::atomic::{fence, AtomicPtr};
         pub(crate) use std::sync::atomic::{spin_loop_hint, AtomicBool};
     }
 }
@@ -72,7 +75,7 @@ pub(crate) mod sync {
 pub(crate) mod sys {
     #[cfg(feature = "rt-threaded")]
     pub(crate) fn num_cpus() -> usize {
-        usize::max(1, num_cpus::get_physical())
+        usize::max(1, num_cpus::get())
     }
 
     #[cfg(not(feature = "rt-threaded"))]

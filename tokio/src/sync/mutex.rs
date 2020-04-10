@@ -78,9 +78,8 @@
 //!
 //! [`Mutex`]: struct.Mutex.html
 //! [`MutexGuard`]: struct.MutexGuard.html
-
-use crate::future::poll_fn;
-use crate::sync::semaphore_ll as semaphore;
+use crate::coop::CoopFutureExt;
+use crate::sync::batch_semaphore as semaphore;
 
 use std::cell::UnsafeCell;
 use std::error::Error;
@@ -108,7 +107,6 @@ pub struct Mutex<T> {
 /// will succeed yet again.
 pub struct MutexGuard<'a, T> {
     lock: &'a Mutex<T>,
-    permit: semaphore::Permit,
 }
 
 // As long as T: Send, it's fine to send and share Mutex<T> between threads.
@@ -137,8 +135,17 @@ impl Error for TryLockError {}
 #[test]
 #[cfg(not(loom))]
 fn bounds() {
-    fn check<T: Send>() {}
-    check::<MutexGuard<'_, u32>>();
+    fn check_send<T: Send>() {}
+    fn check_unpin<T: Unpin>() {}
+    // This has to take a value, since the async fn's return type is unnameable.
+    fn check_send_sync_val<T: Send + Sync>(_t: T) {}
+    fn check_send_sync<T: Send + Sync>() {}
+    check_send::<MutexGuard<'_, u32>>();
+    check_unpin::<Mutex<u32>>();
+    check_send_sync::<Mutex<u32>>();
+
+    let mutex = Mutex::new(1);
+    check_send_sync_val(mutex.lock());
 }
 
 impl<T> Mutex<T> {
@@ -152,33 +159,31 @@ impl<T> Mutex<T> {
 
     /// A future that resolves on acquiring the lock and returns the `MutexGuard`.
     pub async fn lock(&self) -> MutexGuard<'_, T> {
-        let mut guard = MutexGuard {
-            lock: self,
-            permit: semaphore::Permit::new(),
-        };
-        poll_fn(|cx| guard.permit.poll_acquire(cx, 1, &self.s))
-            .await
-            .unwrap_or_else(|_| {
-                // The semaphore was closed. but, we never explicitly close it, and we have a
-                // handle to it through the Arc, which means that this can never happen.
-                unreachable!()
-            });
-        guard
+        self.s.acquire(1).cooperate().await.unwrap_or_else(|_| {
+            // The semaphore was closed. but, we never explicitly close it, and we have a
+            // handle to it through the Arc, which means that this can never happen.
+            unreachable!()
+        });
+        MutexGuard { lock: self }
     }
 
     /// Tries to acquire the lock
     pub fn try_lock(&self) -> Result<MutexGuard<'_, T>, TryLockError> {
-        let mut permit = semaphore::Permit::new();
-        match permit.try_acquire(1, &self.s) {
-            Ok(_) => Ok(MutexGuard { lock: self, permit }),
+        match self.s.try_acquire(1) {
+            Ok(_) => Ok(MutexGuard { lock: self }),
             Err(_) => Err(TryLockError(())),
         }
+    }
+
+    /// Consumes the mutex, returning the underlying data.
+    pub fn into_inner(self) -> T {
+        self.c.into_inner()
     }
 }
 
 impl<'a, T> Drop for MutexGuard<'a, T> {
     fn drop(&mut self) {
-        self.permit.release(1, &self.lock.s);
+        self.lock.s.release(1)
     }
 }
 
@@ -200,14 +205,12 @@ where
 impl<'a, T> Deref for MutexGuard<'a, T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
-        assert!(self.permit.is_acquired());
         unsafe { &*self.lock.c.get() }
     }
 }
 
 impl<'a, T> DerefMut for MutexGuard<'a, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        assert!(self.permit.is_acquired());
         unsafe { &mut *self.lock.c.get() }
     }
 }

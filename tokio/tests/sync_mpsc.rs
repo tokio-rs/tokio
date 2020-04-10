@@ -40,6 +40,44 @@ fn send_recv_with_buffer() {
     assert!(val.is_none());
 }
 
+#[test]
+fn disarm() {
+    let (tx, rx) = mpsc::channel::<i32>(2);
+    let mut tx1 = task::spawn(tx.clone());
+    let mut tx2 = task::spawn(tx.clone());
+    let mut tx3 = task::spawn(tx.clone());
+    let mut tx4 = task::spawn(tx);
+    let mut rx = task::spawn(rx);
+
+    // We should be able to `poll_ready` two handles without problem
+    assert_ready_ok!(tx1.enter(|cx, mut tx| tx.poll_ready(cx)));
+    assert_ready_ok!(tx2.enter(|cx, mut tx| tx.poll_ready(cx)));
+
+    // But a third should not be ready
+    assert_pending!(tx3.enter(|cx, mut tx| tx.poll_ready(cx)));
+
+    // Using one of the reserved slots should allow a new handle to become ready
+    tx1.try_send(1).unwrap();
+    // We also need to receive for the slot to be free
+    let _ = assert_ready!(rx.enter(|cx, mut rx| rx.poll_recv(cx))).unwrap();
+    // Now there's a free slot!
+    assert_ready_ok!(tx3.enter(|cx, mut tx| tx.poll_ready(cx)));
+    assert_pending!(tx4.enter(|cx, mut tx| tx.poll_ready(cx)));
+
+    // Dropping a ready handle should also open up a slot
+    drop(tx2);
+    assert_ready_ok!(tx4.enter(|cx, mut tx| tx.poll_ready(cx)));
+    assert_pending!(tx1.enter(|cx, mut tx| tx.poll_ready(cx)));
+
+    // Explicitly disarming a handle should also open a slot
+    assert!(tx3.disarm());
+    assert_ready_ok!(tx1.enter(|cx, mut tx| tx.poll_ready(cx)));
+
+    // Disarming a non-armed sender does not free up a slot
+    assert!(!tx3.disarm());
+    assert_pending!(tx3.enter(|cx, mut tx| tx.poll_ready(cx)));
+}
+
 #[tokio::test]
 async fn send_recv_stream_with_buffer() {
     use tokio::stream::StreamExt;

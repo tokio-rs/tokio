@@ -20,7 +20,8 @@ use crate::park::{Park, Unpark};
 use crate::time::{wheel, Error};
 use crate::time::{Clock, Duration, Instant};
 
-use std::sync::atomic::Ordering::SeqCst;
+use std::sync::atomic::Ordering::{Acquire, Relaxed, Release, SeqCst};
+
 use std::sync::Arc;
 use std::usize;
 use std::{cmp, fmt};
@@ -247,7 +248,7 @@ where
                 if deadline > now {
                     let dur = deadline - now;
 
-                    if self.clock.is_frozen() {
+                    if self.clock.is_paused() {
                         self.park.park_timeout(Duration::from_secs(0))?;
                         self.clock.advance(dur);
                     } else {
@@ -278,7 +279,7 @@ where
                 if deadline > now {
                     let duration = cmp::min(deadline - now, duration);
 
-                    if self.clock.is_frozen() {
+                    if self.clock.is_paused() {
                         self.park.park_timeout(Duration::from_secs(0))?;
                         self.clock.advance(duration);
                     } else {
@@ -333,28 +334,32 @@ impl Inner {
         self.elapsed.load(SeqCst)
     }
 
+    #[cfg(all(test, loom))]
+    fn num(&self, ordering: std::sync::atomic::Ordering) -> usize {
+        self.num.load(ordering)
+    }
+
     /// Increments the number of active timeouts
     fn increment(&self) -> Result<(), Error> {
-        let mut curr = self.num.load(SeqCst);
-
+        let mut curr = self.num.load(Relaxed);
         loop {
             if curr == MAX_TIMEOUTS {
                 return Err(Error::at_capacity());
             }
 
-            let actual = self.num.compare_and_swap(curr, curr + 1, SeqCst);
-
-            if curr == actual {
-                return Ok(());
+            match self
+                .num
+                .compare_exchange_weak(curr, curr + 1, Release, Relaxed)
+            {
+                Ok(_) => return Ok(()),
+                Err(next) => curr = next,
             }
-
-            curr = actual;
         }
     }
 
     /// Decrements the number of active timeouts
     fn decrement(&self) {
-        let prev = self.num.fetch_sub(1, SeqCst);
+        let prev = self.num.fetch_sub(1, Acquire);
         debug_assert!(prev <= MAX_TIMEOUTS);
     }
 
@@ -381,3 +386,6 @@ impl fmt::Debug for Inner {
         fmt.debug_struct("Inner").finish()
     }
 }
+
+#[cfg(all(test, loom))]
+mod tests;

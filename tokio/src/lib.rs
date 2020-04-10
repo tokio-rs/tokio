@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio/0.2.11")]
+#![doc(html_root_url = "https://docs.rs/tokio/0.2.17")]
 #![allow(
     clippy::cognitive_complexity,
     clippy::large_enum_variant,
@@ -321,6 +321,8 @@ cfg_process! {
 
 pub mod runtime;
 
+pub(crate) mod coop;
+
 cfg_signal! {
     pub mod signal;
 }
@@ -356,8 +358,14 @@ cfg_macros! {
 
     doc_rt_core! {
         cfg_rt_threaded! {
+            // This is the docs.rs case (with all features) so make sure macros
+            // is included in doc(cfg).
+
             #[cfg(not(test))] // Work around for rust-lang/rust#62127
+            #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
             pub use tokio_macros::main_threaded as main;
+
+            #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
             pub use tokio_macros::test_threaded as test;
         }
 
@@ -375,10 +383,6 @@ cfg_macros! {
         pub use tokio_macros::test;
     }
 }
-
-// Tests
-#[cfg(test)]
-mod tests;
 
 // TODO: rm
 #[cfg(feature = "io-util")]

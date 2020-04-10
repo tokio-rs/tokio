@@ -10,7 +10,7 @@
 //! section. If no permits are available, then acquiring the semaphore returns
 //! `Pending`. The task is woken once a permit becomes available.
 
-use crate::loom::cell::CausalCell;
+use crate::loom::cell::UnsafeCell;
 use crate::loom::future::AtomicWaker;
 use crate::loom::sync::atomic::{AtomicPtr, AtomicUsize};
 use crate::loom::thread;
@@ -30,7 +30,7 @@ pub(crate) struct Semaphore {
     state: AtomicUsize,
 
     /// waiter queue head pointer.
-    head: CausalCell<NonNull<Waiter>>,
+    head: UnsafeCell<NonNull<Waiter>>,
 
     /// Coordinates access to the queue head.
     rx_lock: AtomicUsize,
@@ -165,7 +165,7 @@ impl Semaphore {
 
         Semaphore {
             state: AtomicUsize::new(state.to_usize()),
-            head: CausalCell::new(ptr),
+            head: UnsafeCell::new(ptr),
             rx_lock: AtomicUsize::new(0),
             stub,
         }
@@ -610,6 +610,7 @@ impl Permit {
     }
 
     /// Returns `true` if the permit has been acquired
+    #[allow(dead_code)] // may be used later
     pub(crate) fn is_acquired(&self) -> bool {
         match self.state {
             PermitState::Acquired(num) if num > 0 => true,

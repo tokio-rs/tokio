@@ -1,6 +1,6 @@
 #![cfg_attr(any(loom, not(feature = "sync")), allow(dead_code, unreachable_pub))]
 
-use crate::loom::cell::CausalCell;
+use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{self, AtomicUsize};
 
 use std::fmt;
@@ -24,7 +24,7 @@ use std::task::Waker;
 /// `wake`.
 pub(crate) struct AtomicWaker {
     state: AtomicUsize,
-    waker: CausalCell<Option<Waker>>,
+    waker: UnsafeCell<Option<Waker>>,
 }
 
 // `AtomicWaker` is a multi-consumer, single-producer transfer cell. The cell
@@ -137,7 +137,7 @@ impl AtomicWaker {
     pub(crate) fn new() -> AtomicWaker {
         AtomicWaker {
             state: AtomicUsize::new(WAITING),
-            waker: CausalCell::new(None),
+            waker: UnsafeCell::new(None),
         }
     }
 

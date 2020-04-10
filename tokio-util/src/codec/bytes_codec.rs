@@ -65,8 +65,7 @@ impl Decoder for BytesCodec {
     }
 }
 
-impl Encoder for BytesCodec {
-    type Item = Bytes;
+impl Encoder<Bytes> for BytesCodec {
     type Error = io::Error;
 
     fn encode(&mut self, data: Bytes, buf: &mut BytesMut) -> Result<(), io::Error> {

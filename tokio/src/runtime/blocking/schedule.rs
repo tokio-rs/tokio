@@ -1,20 +1,24 @@
-use crate::task::{Schedule, ScheduleSendOnly, Task};
+use crate::runtime::task::{self, Task};
 
 /// `task::Schedule` implementation that does nothing. This is unique to the
 /// blocking scheduler as tasks scheduled are not really futures but blocking
 /// operations.
+///
+/// We avoid storing the task by forgetting it in `bind` and re-materializing it
+/// in `release.
 pub(super) struct NoopSchedule;
 
-impl Schedule for NoopSchedule {
-    fn bind(&self, _task: &Task<Self>) {}
+impl task::Schedule for NoopSchedule {
+    fn bind(_task: Task<Self>) -> NoopSchedule {
+        // Do nothing w/ the task
+        NoopSchedule
+    }
 
-    fn release(&self, _task: Task<Self>) {}
+    fn release(&self, _task: &Task<Self>) -> Option<Task<Self>> {
+        None
+    }
 
-    fn release_local(&self, _task: &Task<Self>) {}
-
-    fn schedule(&self, _task: Task<Self>) {
+    fn schedule(&self, _task: task::Notified<Self>) {
         unreachable!();
     }
 }
-
-impl ScheduleSendOnly for NoopSchedule {}
