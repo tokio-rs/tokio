@@ -111,7 +111,18 @@ cfg_rt_core! {
             F: Future + Send + 'static,
             F::Output: Send + 'static,
         {
-            self.spawner.spawn(future)
+            self.spawner.spawn(future, false)
+        }
+
+        /// Spawns the `future` on the scheduler.
+        ///
+        /// The scheduler is woken up if it was asleep.
+        pub fn awake_and_spawn<F>(&self, future: F) -> JoinHandle<F::Output>
+        where
+            F: Future + Send + 'static,
+            F::Output: Send + 'static,
+        {
+            self.spawner.spawn(future, true)
         }
     }
 }

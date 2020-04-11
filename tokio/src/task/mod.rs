@@ -247,7 +247,7 @@ cfg_rt_core! {
     use self::raw::RawTask;
 
     mod spawn;
-    pub use spawn::spawn;
+    pub use spawn::{spawn, awake_and_spawn};
 
     mod stack;
     pub(crate) use self::stack::TransferStack;

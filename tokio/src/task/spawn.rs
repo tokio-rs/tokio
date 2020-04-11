@@ -125,6 +125,19 @@ doc_rt_core! {
     {
         let spawn_handle = runtime::context::spawn_handle()
         .expect("must be called from the context of Tokio runtime configured with either `basic_scheduler` or `threaded_scheduler`");
-        spawn_handle.spawn(task)
+        spawn_handle.spawn(task, false)
+    }
+
+    /// Spawns the `future` on the scheduler.
+    ///
+    /// The scheduler is woken up if it was asleep.
+    pub fn awake_and_spawn<T>(task: T, must_awake: bool) -> JoinHandle<T::Output>
+    where
+        T: Future + Send + 'static,
+        T::Output: Send + 'static,
+    {
+        let spawn_handle = runtime::context::spawn_handle()
+        .expect("must be called from the context of Tokio runtime configured with either `basic_scheduler` or `threaded_scheduler`");
+        spawn_handle.spawn(task, must_awake)
     }
 }

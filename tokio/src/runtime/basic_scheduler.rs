@@ -6,7 +6,7 @@ use std::fmt;
 use std::future::Future;
 use std::mem::ManuallyDrop;
 use std::ptr;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, Condvar};
 use std::task::{RawWaker, RawWakerVTable, Waker};
 
 use std::time::{Duration, Instant};
@@ -37,6 +37,10 @@ pub(super) struct SchedulerPriv {
 
     /// Max throttling duration
     max_throttling: Option<Duration>,
+
+    /// Awake from sleep condvar
+    must_awake: Mutex<bool>,
+    must_awake_cvar: Condvar,
 }
 
 unsafe impl Send for SchedulerPriv {}
@@ -101,6 +105,8 @@ where
                 queues: MpscQueues::new(),
                 unpark: Box::new(unpark),
                 max_throttling,
+                must_awake: Mutex::new(false),
+                must_awake_cvar: Condvar::new(),
             }),
             local: LocalState {
                 tick: 0,
@@ -215,13 +221,23 @@ where
 
 impl Spawner {
     /// Spawns a future onto the thread pool
-    pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
+    ///
+    /// If `must_awake` is `true`, and throttling is activated,
+    /// the scheduler is woken up if it was asleep.
+    pub(crate) fn spawn<F>(&self, future: F, must_awake: bool) -> JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
         let (task, handle) = task::joinable(future);
         self.scheduler.schedule(task, true);
+
+        if must_awake {
+            let mut must_awake = self.scheduler.must_awake.lock().unwrap();
+            *must_awake = true;
+            self.scheduler.must_awake_cvar.notify_one();
+        }
+
         handle
     }
 }
@@ -269,8 +285,6 @@ impl SchedulerPriv {
     }
 
     fn tick_throttling(&self, local: &mut LocalState<impl Park>, max_throttling: Duration) {
-        use std::thread;
-
         let mut nb_task_checks = 0;
         while nb_task_checks < MAX_TASKS_PER_TICK {
             match local.throttle_state {
@@ -393,9 +407,17 @@ impl SchedulerPriv {
                 }
                 ThrottleState::ReadyToPause(last) => {
                     // Pause until the maximum throttling duration has elapsed.
-                    let elapsed = last.elapsed();
-                    if elapsed < max_throttling {
-                        thread::sleep(max_throttling - elapsed);
+                    if let Some(wait_duration) = max_throttling.checked_sub(last.elapsed()) {
+                        // Pause unless woken up
+                        let mut res = self.must_awake_cvar.wait_timeout_while(
+                            self.must_awake.lock().unwrap(),
+                            wait_duration,
+                            |&mut must_awake| !must_awake,
+                        )
+                        .unwrap();
+
+                        // reset must_awake
+                        *res.0 = false;
                     }
 
                     // Prepare to start a new cycle.
