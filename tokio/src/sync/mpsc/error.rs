@@ -96,7 +96,7 @@ impl Error for TryRecvError {}
 
 // ===== ClosedError =====
 
-/// Error returned by [`Sender::poll_ready`](super::Sender::poll_ready)].
+/// Error returned by [`Sender::poll_ready`](super::Sender::poll_ready).
 #[derive(Debug)]
 pub struct ClosedError(());
 
