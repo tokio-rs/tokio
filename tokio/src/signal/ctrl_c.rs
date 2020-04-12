@@ -11,9 +11,9 @@ use std::io;
 /// platforms support receiving a signal on "ctrl-c". This function provides a
 /// portable API for receiving this notification.
 ///
-/// Once the returned future is polled, a listener a listener is registered. The
-/// future will complete on the first received `ctrl-c` **after** the initial
-/// call to either `Future::poll` or `.await`.
+/// Once the returned future is polled, a listener is registered. The future
+/// will complete on the first received `ctrl-c` **after** the initial call to
+/// either `Future::poll` or `.await`.
 ///
 /// # Caveats
 ///
