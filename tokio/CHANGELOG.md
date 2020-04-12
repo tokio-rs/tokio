@@ -1,3 +1,9 @@
+# 0.2.18 (April 12, 2020)
+
+### Fixes
+- task: `LocalSet` was incorrectly marked as `Send` (#2398)
+- io: correctly report `WriteZero` failure in `write_int` (#2334)
+
 # 0.2.17 (April 9, 2020)
 
 ### Fixes
