@@ -7,6 +7,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
+use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::Poll;
@@ -114,6 +115,9 @@ cfg_rt_util! {
 
         /// State available from thread-local
         context: Context,
+
+        /// This type should not be Send.
+        _not_send: PhantomData<*const ()>,
     }
 }
 
@@ -228,6 +232,7 @@ impl LocalSet {
                     waker: AtomicWaker::new(),
                 }),
             },
+            _not_send: PhantomData,
         }
     }
 
