@@ -76,8 +76,8 @@
 //! case, the mutex will be unlocked. If the panic is caught, this might leave
 //! the data protected by the mutex in an inconsistent state.
 //!
-//! [`Mutex`]: struct.Mutex.html
-//! [`MutexGuard`]: struct.MutexGuard.html
+//! [`Mutex`]: struct@Mutex
+//! [`MutexGuard`]: struct@MutexGuard
 use crate::coop::CoopFutureExt;
 use crate::sync::batch_semaphore as semaphore;
 

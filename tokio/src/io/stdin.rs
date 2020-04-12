@@ -20,8 +20,8 @@ cfg_io_std! {
     ///
     /// Created by the [`stdin`] function.
     ///
-    /// [`stdin`]: fn.stdin.html
-    /// [`AsyncRead`]: trait.AsyncRead.html
+    /// [`stdin`]: fn@stdin
+    /// [`AsyncRead`]: trait@AsyncRead
     #[derive(Debug)]
     pub struct Stdin {
         std: Blocking<std::io::Stdin>,

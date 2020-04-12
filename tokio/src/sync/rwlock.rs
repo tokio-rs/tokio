@@ -62,10 +62,10 @@ const MAX_READS: usize = 10;
 /// }
 /// ```
 ///
-/// [`Mutex`]: struct.Mutex.html
-/// [`RwLock`]: struct.RwLock.html
-/// [`RwLockReadGuard`]: struct.RwLockReadGuard.html
-/// [`RwLockWriteGuard`]: struct.RwLockWriteGuard.html
+/// [`Mutex`]: struct@super::Mutex
+/// [`RwLock`]: struct@RwLock
+/// [`RwLockReadGuard`]: struct@RwLockReadGuard
+/// [`RwLockWriteGuard`]: struct@RwLockWriteGuard
 /// [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
 /// [_write-preferring_]: https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock#Priority_policies
 #[derive(Debug)]
@@ -83,7 +83,7 @@ pub struct RwLock<T> {
 /// This structure is created by the [`read`] method on
 /// [`RwLock`].
 ///
-/// [`read`]: struct.RwLock.html#method.read
+/// [`read`]: method@RwLock::read
 #[derive(Debug)]
 pub struct RwLockReadGuard<'a, T> {
     permit: ReleasingPermit<'a, T>,
@@ -96,8 +96,8 @@ pub struct RwLockReadGuard<'a, T> {
 /// This structure is created by the [`write`] and method
 /// on [`RwLock`].
 ///
-/// [`write`]: struct.RwLock.html#method.write
-/// [`RwLock`]: struct.RwLock.html
+/// [`write`]: method@RwLock::write
+/// [`RwLock`]: struct@RwLock
 #[derive(Debug)]
 pub struct RwLockWriteGuard<'a, T> {
     permit: ReleasingPermit<'a, T>,

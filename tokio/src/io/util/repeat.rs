@@ -13,7 +13,7 @@ cfg_io_util! {
     ///
     /// This is an asynchronous version of [`std::io::Repeat`][std].
     ///
-    /// [repeat]: fn.repeat.html
+    /// [repeat]: fn@repeat
     /// [std]: std::io::Repeat
     #[derive(Debug)]
     pub struct Repeat {

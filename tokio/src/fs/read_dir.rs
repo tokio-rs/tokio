@@ -99,7 +99,7 @@ impl crate::stream::Stream for ReadDir {
 
 /// Entries returned by the [`ReadDir`] stream.
 ///
-/// [`ReadDir`]: struct.ReadDir.html
+/// [`ReadDir`]: struct@ReadDir
 ///
 /// This is a specialized version of [`std::fs::DirEntry`] for usage from the
 /// Tokio runtime.

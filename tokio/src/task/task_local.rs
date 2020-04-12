@@ -219,7 +219,7 @@ impl<T: 'static, F: Future> Future for TaskLocalFuture<T, F> {
 trait StaticLifetime: 'static {}
 impl<T: 'static> StaticLifetime for T {}
 
-/// An error returned by [`LocalKey::try_with`](struct.LocalKey.html#method.try_with).
+/// An error returned by [`LocalKey::try_with`](method@LocalKey::try_with).
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct AccessError {
     _private: (),

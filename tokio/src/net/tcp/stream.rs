@@ -20,9 +20,9 @@ cfg_tcp! {
     /// A TCP stream can either be created by connecting to an endpoint, via the
     /// [`connect`] method, or by [accepting] a connection from a [listener].
     ///
-    /// [`connect`]: struct.TcpStream.html#method.connect
-    /// [accepting]: struct.TcpListener.html#method.accept
-    /// [listener]: struct.TcpListener.html
+    /// [`connect`]: method@TcpStream::connect
+    /// [accepting]: method@super::TcpListener::accept
+    /// [listener]: struct@super::TcpListener
     ///
     /// # Examples
     ///

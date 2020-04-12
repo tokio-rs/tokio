@@ -105,9 +105,9 @@ cfg_rt_util! {
     /// ```
     ///
     /// [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
-    /// [local task set]: struct.LocalSet.html
+    /// [local task set]: struct@LocalSet
     /// [`Runtime::block_on`]: ../struct.Runtime.html#method.block_on
-    /// [`task::spawn_local`]: fn.spawn.html
+    /// [`task::spawn_local`]: fn@spawn_local
     pub struct LocalSet {
         /// Current scheduler tick
         tick: Cell<u8>,
@@ -266,7 +266,7 @@ impl LocalSet {
     ///     }).await;
     /// }
     /// ```
-    /// [`spawn_local`]: fn.spawn_local.html
+    /// [`spawn_local`]: fn@spawn_local
     pub fn spawn_local<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + 'static,
@@ -335,7 +335,7 @@ impl LocalSet {
     /// })
     /// ```
     ///
-    /// [`spawn_local`]: fn.spawn_local.html
+    /// [`spawn_local`]: fn@spawn_local
     /// [`Runtime::block_on`]: ../struct.Runtime.html#method.block_on
     /// [in-place blocking]: ../blocking/fn.in_place.html
     /// [`spawn_blocking`]: ../blocking/fn.spawn_blocking.html
@@ -372,7 +372,7 @@ impl LocalSet {
     /// }
     /// ```
     ///
-    /// [`spawn_local`]: fn.spawn_local.html
+    /// [`spawn_local`]: fn@spawn_local
     /// [awaiting the local set]: #awaiting-a-localset
     pub async fn run_until<F>(&self, future: F) -> F::Output
     where

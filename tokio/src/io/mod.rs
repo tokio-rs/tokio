@@ -138,20 +138,20 @@
 //! context of the Tokio runtime, as they require Tokio-specific features to
 //! function. Calling these functions outside of a Tokio runtime will panic.
 //!
-//! [input]: fn.stdin.html
-//! [output]: fn.stdout.html
-//! [error]: fn.stderr.html
+//! [input]: fn@stdin
+//! [output]: fn@stdout
+//! [error]: fn@stderr
 //!
 //! # `std` re-exports
 //!
 //! Additionally, [`Error`], [`ErrorKind`], and [`Result`] are re-exported
 //! from `std::io` for ease of use.
 //!
-//! [`AsyncRead`]: trait.AsyncRead.html
-//! [`AsyncWrite`]: trait.AsyncWrite.html
-//! [`Error`]: struct.Error.html
-//! [`ErrorKind`]: enum.ErrorKind.html
-//! [`Result`]: type.Result.html
+//! [`AsyncRead`]: trait@AsyncRead
+//! [`AsyncWrite`]: trait@AsyncWrite
+//! [`Error`]: struct@Error
+//! [`ErrorKind`]: enum@ErrorKind
+//! [`Result`]: type@Result
 //! [`Read`]: std::io::Read
 //! [`Write`]: std::io::Write
 cfg_io_blocking! {
