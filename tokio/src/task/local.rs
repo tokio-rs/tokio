@@ -338,7 +338,7 @@ impl LocalSet {
     /// [`spawn_local`]: fn@spawn_local
     /// [`Runtime::block_on`]: method@crate::runtime::Runtime::block_on
     /// [in-place blocking]: ../blocking/fn.in_place.html
-    /// [`spawn_blocking`]: ../blocking/fn.spawn_blocking.html
+    /// [`spawn_blocking`]: fn@crate::task::spawn_blocking
     pub fn block_on<F>(&self, rt: &mut crate::runtime::Runtime, future: F) -> F::Output
     where
         F: Future,
