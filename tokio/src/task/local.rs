@@ -106,7 +106,7 @@ cfg_rt_util! {
     ///
     /// [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
     /// [local task set]: struct@LocalSet
-    /// [`Runtime::block_on`]: ../struct.Runtime.html#method.block_on
+    /// [`Runtime::block_on`]: method@crate::runtime::Runtime::block_on
     /// [`task::spawn_local`]: fn@spawn_local
     pub struct LocalSet {
         /// Current scheduler tick
@@ -336,7 +336,7 @@ impl LocalSet {
     /// ```
     ///
     /// [`spawn_local`]: fn@spawn_local
-    /// [`Runtime::block_on`]: ../struct.Runtime.html#method.block_on
+    /// [`Runtime::block_on`]: method@crate::runtime::Runtime::block_on
     /// [in-place blocking]: ../blocking/fn.in_place.html
     /// [`spawn_blocking`]: ../blocking/fn.spawn_blocking.html
     pub fn block_on<F>(&self, rt: &mut crate::runtime::Runtime, future: F) -> F::Output
