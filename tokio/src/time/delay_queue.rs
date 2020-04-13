@@ -50,13 +50,12 @@ use std::task::{self, Poll};
 ///
 /// # Implementation
 ///
-/// The `DelayQueue` is backed by the same hashed timing wheel implementation as
-/// [`Timer`] as such, it offers the same performance benefits. See [`Timer`]
-/// for further implementation notes.
+/// The [`DelayQueue`] is backed by a separate instance of the same timer wheel used internally by
+/// Tokio's standalone timer utilities such as [`delay_for`]. Because of this, it offers the same
+/// performance and scalability benefits.
 ///
-/// State associated with each entry is stored in a [`slab`]. This allows
-/// amortizing the cost of allocation. Space created for expired entries is
-/// reused when inserting new entries.
+/// State associated with each entry is stored in a [`slab`]. This amortizes the cost of allocation,
+/// and allows reuse of the memory allocated for expired entires.
 ///
 /// Capacity can be checked using [`capacity`] and allocated preemptively by using
 /// the [`reserve`] method.
@@ -118,7 +117,8 @@ use std::task::{self, Poll};
 /// [`Stream`]: https://docs.rs/futures/0.1/futures/stream/trait.Stream.html
 /// [`poll`]: #method.poll
 /// [`Stream::poll`]: #method.poll
-/// [`Timer`]: ../struct.Timer.html
+/// [`DelayQueue`]: struct@DelayQueue
+/// [`delay_for`]: fn@super::delay_for
 /// [`slab`]: https://docs.rs/slab
 /// [`capacity`]: #method.capacity
 /// [`reserve`]: #method.reserve
