@@ -135,7 +135,7 @@ impl TcpListener {
     /// established, the corresponding [`TcpStream`] and the remote peer's
     /// address will be returned.
     ///
-    /// [`TcpStream`]: ../struct.TcpStream.html
+    /// [`TcpStream`]: struct@crate::net::TcpStream
     ///
     /// # Examples
     ///

@@ -245,7 +245,7 @@ use std::time::Duration;
 
 /// The Tokio runtime.
 ///
-/// The runtime provides an I/O [driver], task scheduler, [timer], and blocking
+/// The runtime provides an I/O driver, task scheduler, [timer], and blocking
 /// pool, necessary for running asynchronous tasks.
 ///
 /// Instances of `Runtime` can be created using [`new`] or [`Builder`]. However,
@@ -266,7 +266,6 @@ use std::time::Duration;
 /// that reactor will no longer function. Calling any method on them will
 /// result in an error.
 ///
-/// [driver]: crate::io::driver
 /// [timer]: crate::time
 /// [mod]: index.html
 /// [`new`]: #method.new
