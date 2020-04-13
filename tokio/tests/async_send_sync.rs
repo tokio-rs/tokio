@@ -41,6 +41,44 @@ macro_rules! into_todo {
         x
     }};
 }
+macro_rules! assert_value {
+    ($type:ty: Send & Sync) => {
+        #[allow(unreachable_code)]
+        #[allow(unused_variables)]
+        const _: fn() = || {
+            let f: $type = todo!();
+            require_send(&f);
+            require_sync(&f);
+        };
+    };
+    ($type:ty: !Send & Sync) => {
+        #[allow(unreachable_code)]
+        #[allow(unused_variables)]
+        const _: fn() = || {
+            let f: $type = todo!();
+            AmbiguousIfSend::some_item(&f);
+            require_sync(&f);
+        };
+    };
+    ($type:ty: Send & !Sync) => {
+        #[allow(unreachable_code)]
+        #[allow(unused_variables)]
+        const _: fn() = || {
+            let f: $type = todo!();
+            require_send(&f);
+            AmbiguousIfSync::some_item(&f);
+        };
+    };
+    ($type:ty: !Send & !Sync) => {
+        #[allow(unreachable_code)]
+        #[allow(unused_variables)]
+        const _: fn() = || {
+            let f: $type = todo!();
+            AmbiguousIfSend::some_item(&f);
+            AmbiguousIfSync::some_item(&f);
+        };
+    };
+}
 macro_rules! async_assert_fn {
     ($($f:ident $(< $($generic:ty),* > )? )::+($($arg:ty),*): Send & Sync) => {
         #[allow(unreachable_code)]
@@ -206,6 +244,7 @@ async_assert_fn!(tokio::task::LocalKey<Rc<u32>>::scope(_, Rc<u32>, BoxFutureSync
 async_assert_fn!(tokio::task::LocalKey<Rc<u32>>::scope(_, Rc<u32>, BoxFutureSend<()>): !Send & !Sync);
 async_assert_fn!(tokio::task::LocalKey<Rc<u32>>::scope(_, Rc<u32>, BoxFuture<()>): !Send & !Sync);
 async_assert_fn!(tokio::task::LocalSet::run_until(_, BoxFutureSync<()>): !Send & !Sync);
+assert_value!(tokio::task::LocalSet: !Send & !Sync);
 
 async_assert_fn!(tokio::time::advance(Duration): Send & Sync);
 async_assert_fn!(tokio::time::delay_for(Duration): Send & Sync);
