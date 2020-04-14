@@ -9,10 +9,8 @@ use std::ops::{Deref, DerefMut};
 /// An asynchronous `Mutex`-like type.
 ///
 /// This type acts similarly to an asynchronous [`std::sync::Mutex`], with one
-/// major difference: the [`MutexGuard`] returned by `lock` is not tied to the lifetime of the
-/// `Mutex`. This enables you to acquire a lock, and then pass that guard into a future, and then
-/// release it at some later point in time.
-///
+/// major difference: [`lock`] does not block.\
+/// Another difference is that [`MutexGuard`] is [`Send`]
 /// This allows you to do something along the lines of:
 ///
 /// ```rust,no_run
@@ -44,25 +42,25 @@ use std::ops::{Deref, DerefMut};
 ///
 /// #[tokio::main]
 /// async fn main() {
-///    let count = Arc::new(Mutex::new(0));
+///     let count = Arc::new(Mutex::new(0));
 ///
-///    for _ in 0..5 {
-///        let my_count = Arc::clone(&count);
-///        tokio::spawn(async move {
-///            for _ in 0..10 {
-///                let mut lock = my_count.lock().await;
-///                *lock += 1;
-///                println!("{}", lock);
-///            }
-///        });
-///    }
+///     for _ in 0..5 {
+///         let my_count = Arc::clone(&count);
+///         tokio::spawn(async move {
+///             for _ in 0..10 {
+///                 let mut lock = my_count.lock().await;
+///                 *lock += 1;
+///                 println!("{}", lock);
+///             }
+///         });
+///     }
 ///
-///    loop {
-///        if *count.lock().await >= 50 {
-///            break;
-///        }
-///    }
-///   println!("Count hit 50.");
+///     loop {
+///         if *count.lock().await >= 50 {
+///             break;
+///         }
+///     }
+///    println!("Count hit 50.");
 /// }
 /// ```
 /// There are a few things of note here to pay attention to in this example.
@@ -88,6 +86,8 @@ use std::ops::{Deref, DerefMut};
 /// [`MutexGuard`]: struct@MutexGuard
 /// [`Arc`]: https://doc.rust-lang.org/std/sync/struct.Arc.html
 /// [`std::sync::Mutex`]: https://doc.rust-lang.org/std/sync/struct.Mutex.html
+/// [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
+/// [`lock`]: method@Mutex::lock
 
 #[derive(Debug)]
 pub struct Mutex<T> {
@@ -178,7 +178,7 @@ impl<T> Mutex<T> {
     ///
     ///     let n = mutex.lock().await;
     ///     *n = 2;
-    ///}
+    /// }
     /// ```
     pub async fn lock(&self) -> MutexGuard<'_, T> {
         self.s.acquire(1).cooperate().await.unwrap_or_else(|_| {
@@ -198,10 +198,11 @@ impl<T> Mutex<T> {
     /// ```
     /// use tokio::sync::Mutex;
     ///
-    ///   let mutex = Mutex::new(1);
+    /// let mutex = Mutex::new(1);
     ///
-    ///   let n = mutex.try_lock()?;
-    ///   assert_eq!(n, 1);
+    /// let n = mutex.try_lock()?;
+    /// assert_eq!(n, 1);
+    /// ```
     pub fn try_lock(&self) -> Result<MutexGuard<'_, T>, TryLockError> {
         match self.s.try_acquire(1) {
             Ok(_) => Ok(MutexGuard { lock: self }),
@@ -221,7 +222,7 @@ impl<T> Mutex<T> {
     ///
     ///     let n = mutex.into_inner()
     ///     assert_eq!(n, 1);
-    ///}
+    /// }
     /// ```
     pub fn into_inner(self) -> T {
         self.c.into_inner()
