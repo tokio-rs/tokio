@@ -8,7 +8,7 @@ use std::ops::{Deref, DerefMut};
 
 /// An asynchronous `Mutex`-like type.
 ///
-/// This module provides [`Mutex`], a type that acts similarly to an asynchronous [`std::sync::Mutex`], with one
+/// This type acts similarly to an asynchronous [`std::sync::Mutex`], with one
 /// major difference: the [`MutexGuard`] returned by `lock` is not tied to the lifetime of the
 /// `Mutex`. This enables you to acquire a lock, and then pass that guard into a future, and then
 /// release it at some later point in time.
