@@ -9,8 +9,8 @@ use std::ops::{Deref, DerefMut};
 /// An asynchronous `Mutex`-like type.
 ///
 /// This type acts similarly to an asynchronous [`std::sync::Mutex`], with one
-/// major difference: [`lock`] does not block.\
-/// Another difference is that [`MutexGuard`] is [`Send`]
+/// major difference: [`lock`] does not block.  
+/// Another difference is [`lock`] can be held across await points.
 /// This allows you to do something along the lines of:
 ///
 /// ```rust,no_run
@@ -69,8 +69,8 @@ use std::ops::{Deref, DerefMut};
 /// 3. Mutation of the data the Mutex is protecting is done by de-referencing the the obtained lock
 ///    as seen on lines 23 and 30.
 ///
-/// Tokio's Mutex works in a simple FIFO (first in, first out) style where as requests for a lock are
-/// made Tokio will queue them up and provide a lock when it is that requester's turn. In that way
+/// Tokio's Mutex works in a simple FIFO (first in, first out) style where all calls
+/// to lock complete in the order they were performed. In that way
 /// the Mutex is "fair" and predictable in how it distributes the locks to inner data. This is why
 /// the output of this program is an in-order count to 50. Locks are released and reacquired
 /// after every iteration, so basically, each thread goes to the back of the line after it increments
