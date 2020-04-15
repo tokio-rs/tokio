@@ -176,7 +176,7 @@ impl<T> Mutex<T> {
     /// async fn main() {
     ///     let mutex = Mutex::new(1);
     ///
-    ///     let n = mutex.lock().await;
+    ///     let mut n = mutex.lock().await;
     ///     *n = 2;
     /// }
     /// ```
@@ -197,11 +197,14 @@ impl<T> Mutex<T> {
     ///
     /// ```
     /// use tokio::sync::Mutex;
+    /// # async fn dox() -> Result<(), tokio::sync::TryLockError> {
     ///
     /// let mutex = Mutex::new(1);
     ///
     /// let n = mutex.try_lock()?;
-    /// assert_eq!(n, 1);
+    /// assert_eq!(*n, 1);
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn try_lock(&self) -> Result<MutexGuard<'_, T>, TryLockError> {
         match self.s.try_acquire(1) {
@@ -220,7 +223,7 @@ impl<T> Mutex<T> {
     /// async fn main() {
     ///     let mutex = Mutex::new(1);
     ///
-    ///     let n = mutex.into_inner()
+    ///     let n = mutex.into_inner();
     ///     assert_eq!(n, 1);
     /// }
     /// ```
