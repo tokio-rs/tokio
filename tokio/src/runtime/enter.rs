@@ -4,7 +4,10 @@ use std::marker::PhantomData;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum EnterContext {
-    Entered { allow_blocking: bool },
+    Entered {
+        #[allow(dead_code)]
+        allow_blocking: bool,
+    },
     NotEntered,
 }
 
@@ -38,48 +41,6 @@ pub(crate) fn enter(allow_blocking: bool) -> Enter {
          current thread while the thread is being used to drive \
          asynchronous tasks."
     );
-}
-
-/// Returns true if in a runtime context.
-pub(crate) fn context() -> EnterContext {
-    ENTERED.with(|c| c.get())
-}
-
-/// Disallow blocking in the current runtime context until the guard is dropped.
-pub(crate) fn disallow_blocking() -> DisallowBlockingGuard {
-    let reset = ENTERED.with(|c| {
-        if let EnterContext::Entered {
-            allow_blocking: true,
-        } = c.get()
-        {
-            c.set(EnterContext::Entered {
-                allow_blocking: false,
-            });
-            true
-        } else {
-            false
-        }
-    });
-    DisallowBlockingGuard(reset)
-}
-
-pub(crate) struct DisallowBlockingGuard(bool);
-impl Drop for DisallowBlockingGuard {
-    fn drop(&mut self) {
-        if self.0 {
-            // XXX: Do we want some kind of assertion here, or is "best effort" okay?
-            ENTERED.with(|c| {
-                if let EnterContext::Entered {
-                    allow_blocking: false,
-                } = c.get()
-                {
-                    c.set(EnterContext::Entered {
-                        allow_blocking: true,
-                    });
-                }
-            })
-        }
-    }
 }
 
 /// Tries to enter a runtime context, returns `None` if already in a runtime
@@ -125,6 +86,56 @@ pub(crate) fn exit<F: FnOnce() -> R, R>(f: F) -> R {
     let _reset = Reset(was);
     // dropping _reset after f() will reset ENTERED
     f()
+}
+
+cfg_rt_core! {
+    cfg_rt_util! {
+        /// Disallow blocking in the current runtime context until the guard is dropped.
+        pub(crate) fn disallow_blocking() -> DisallowBlockingGuard {
+            let reset = ENTERED.with(|c| {
+                if let EnterContext::Entered {
+                    allow_blocking: true,
+                } = c.get()
+                {
+                    c.set(EnterContext::Entered {
+                        allow_blocking: false,
+                    });
+                    true
+                } else {
+                    false
+                }
+            });
+            DisallowBlockingGuard(reset)
+        }
+
+        pub(crate) struct DisallowBlockingGuard(bool);
+        impl Drop for DisallowBlockingGuard {
+            fn drop(&mut self) {
+                if self.0 {
+                    // XXX: Do we want some kind of assertion here, or is "best effort" okay?
+                    ENTERED.with(|c| {
+                        if let EnterContext::Entered {
+                            allow_blocking: false,
+                        } = c.get()
+                        {
+                            c.set(EnterContext::Entered {
+                                allow_blocking: true,
+                            });
+                        }
+                    })
+                }
+            }
+        }
+    }
+}
+
+cfg_rt_threaded! {
+    cfg_blocking! {
+        /// Returns true if in a runtime context.
+        pub(crate) fn context() -> EnterContext {
+            ENTERED.with(|c| c.get())
+        }
+    }
 }
 
 cfg_blocking_impl! {

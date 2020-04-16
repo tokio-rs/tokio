@@ -8,7 +8,6 @@ use crate::loom::rand::seed;
 use crate::loom::sync::{Arc, Mutex};
 use crate::park::{Park, Unpark};
 use crate::runtime;
-use crate::runtime::enter::EnterContext;
 use crate::runtime::park::{Parker, Unparker};
 use crate::runtime::thread_pool::{AtomicCell, Idle};
 use crate::runtime::{queue, task};
@@ -173,6 +172,8 @@ pub(super) fn create(size: usize, park: Parker) -> (Arc<Shared>, Launch) {
 }
 
 cfg_blocking! {
+    use crate::runtime::enter::EnterContext;
+
     pub(crate) fn block_in_place<F, R>(f: F) -> R
     where
         F: FnOnce() -> R,
