@@ -78,7 +78,7 @@ impl ThreadPool {
     where
         F: Future,
     {
-        let mut enter = crate::runtime::enter();
+        let mut enter = crate::runtime::enter(true);
         enter.block_on(future).expect("failed to park thread")
     }
 }

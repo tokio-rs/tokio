@@ -32,7 +32,7 @@ impl Shell {
     where
         F: Future,
     {
-        let _e = enter();
+        let _e = enter(true);
 
         pin!(f);
 

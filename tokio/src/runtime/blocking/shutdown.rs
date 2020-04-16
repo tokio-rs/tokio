@@ -36,12 +36,12 @@ impl Receiver {
         use crate::runtime::enter::{enter, try_enter};
 
         let mut e = if std::thread::panicking() {
-            match try_enter() {
+            match try_enter(false) {
                 Some(enter) => enter,
                 _ => return,
             }
         } else {
-            enter()
+            enter(false)
         };
 
         // The oneshot completes with an Err
