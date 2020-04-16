@@ -191,7 +191,7 @@ cfg_blocking! {
         }
 
         CURRENT.with(|maybe_cx| {
-            let cx = maybe_cx.expect("can call blocking only when running in a spawned task");
+            let cx = maybe_cx.expect("can call blocking only when running in a spawned task on the multi-threaded runtime");
 
             // Get the worker core. If none is set, then blocking is fine!
             let core = match cx.core.borrow_mut().take() {
