@@ -51,26 +51,20 @@ pub(crate) fn exit<F: FnOnce() -> R, R>(f: F) -> R {
     impl Drop for Reset {
         fn drop(&mut self) {
             ENTERED.with(|c| {
+                assert!(!c.get(), "closure claimed permanent executor");
                 c.set(true);
             });
         }
     }
 
     ENTERED.with(|c| {
-        debug_assert!(c.get());
+        assert!(c.get(), "asked to exit when not entered");
         c.set(false);
     });
 
-    let reset = Reset;
-    let ret = f();
-    std::mem::forget(reset);
-
-    ENTERED.with(|c| {
-        assert!(!c.get(), "closure claimed permanent executor");
-        c.set(true);
-    });
-
-    ret
+    let _reset = Reset;
+    // dropping reset after f() will do c.set(true)
+    f()
 }
 
 cfg_blocking_impl! {

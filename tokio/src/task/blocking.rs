@@ -32,9 +32,7 @@ cfg_rt_threaded! {
     where
         F: FnOnce() -> R,
     {
-        use crate::runtime::{enter, thread_pool};
-
-        enter::exit(|| thread_pool::block_in_place(f))
+        crate::runtime::thread_pool::block_in_place(f)
     }
 }
 
