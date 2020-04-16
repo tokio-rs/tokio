@@ -34,7 +34,7 @@ cfg_rt_threaded! {
     {
         use crate::runtime::{enter, thread_pool};
 
-        enter::exit(|| thread_pool::block_in_place(f))
+        enter::try_exit(|| thread_pool::block_in_place(f)).0
     }
 }
 

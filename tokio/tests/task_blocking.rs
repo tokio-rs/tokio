@@ -27,3 +27,23 @@ async fn basic_blocking() {
         assert_eq!(out, "hello");
     }
 }
+
+#[tokio::test(threaded_scheduler)]
+async fn block_in_block() {
+    // Run a few times
+    for _ in 0..100 {
+        let out = assert_ok!(
+            tokio::spawn(async {
+                task::block_in_place(|| {
+                    task::block_in_place(|| {
+                        thread::sleep(Duration::from_millis(5));
+                    });
+                    "hello"
+                })
+            })
+            .await
+        );
+
+        assert_eq!(out, "hello");
+    }
+}
