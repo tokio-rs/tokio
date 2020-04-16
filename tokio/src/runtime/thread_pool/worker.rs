@@ -237,7 +237,11 @@ cfg_blocking! {
 
         let _reset = Reset(had_core);
 
-        f()
+        if had_core {
+            crate::runtime::enter::exit(f)
+        } else {
+            f()
+        }
     }
 }
 

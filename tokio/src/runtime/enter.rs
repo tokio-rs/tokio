@@ -40,39 +40,31 @@ pub(crate) fn try_enter() -> Option<Enter> {
 // Forces the current "entered" state to be cleared while the closure
 // is executed.
 //
-// The return bool is true only if we were actually in the "entered" state.
-//
 // # Warning
 //
 // This is hidden for a reason. Do not use without fully understanding
 // executors. Misuing can easily cause your program to deadlock.
 #[cfg(all(feature = "rt-threaded", feature = "blocking"))]
-pub(crate) fn try_exit<F: FnOnce() -> R, R>(f: F) -> (R, bool) {
+pub(crate) fn exit<F: FnOnce() -> R, R>(f: F) -> R {
     // Reset in case the closure panics
-    struct Reset(bool);
+    struct Reset;
     impl Drop for Reset {
         fn drop(&mut self) {
             ENTERED.with(|c| {
                 assert!(!c.get(), "closure claimed permanent executor");
-                if self.0 {
-                    c.set(true);
-                }
+                c.set(true);
             });
         }
     }
 
-    let was_entered = ENTERED.with(|c| {
-        if c.get() {
-            c.set(false);
-            true
-        } else {
-            false
-        }
+    ENTERED.with(|c| {
+        assert!(c.get(), "asked to exit when not entered");
+        c.set(false);
     });
 
-    let _reset = Reset(was_entered);
+    let _reset = Reset;
     // dropping reset after f() will do c.set(true)
-    (f(), was_entered)
+    f()
 }
 
 cfg_blocking_impl! {
