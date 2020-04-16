@@ -184,7 +184,9 @@ cfg_blocking! {
                 CURRENT.with(|maybe_cx| {
                     if let Some(cx) = maybe_cx {
                         let core = cx.worker.core.take();
-                        *cx.core.borrow_mut() = core;
+                        let mut cx_core = cx.core.borrow_mut();
+                        assert!(cx_core.is_none());
+                        *cx_core = core;
                     }
                 });
             }
