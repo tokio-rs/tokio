@@ -177,11 +177,20 @@ cfg_blocking! {
         F: FnOnce() -> R,
     {
         // Try to steal the worker core back
-        struct Reset;
+        struct Reset(bool);
 
         impl Drop for Reset {
             fn drop(&mut self) {
                 CURRENT.with(|maybe_cx| {
+                    if !self.0 {
+                        // We were not the ones to give away the core,
+                        // so we do not get to restore it either.
+                        // This is necessary so that with a nested
+                        // block_in_place, the inner block_in_place
+                        // does not restore the core.
+                        return;
+                    }
+
                     if let Some(cx) = maybe_cx {
                         let core = cx.worker.core.take();
                         let mut cx_core = cx.core.borrow_mut();
@@ -192,6 +201,7 @@ cfg_blocking! {
             }
         }
 
+        let mut had_core = false;
         CURRENT.with(|maybe_cx| {
             let cx = maybe_cx.expect("can call blocking only when running in a spawned task on the multi-threaded runtime");
 
@@ -214,6 +224,7 @@ cfg_blocking! {
             //
             // First, move the core back into the worker's shared core slot.
             cx.worker.core.set(core);
+            had_core = true;
 
             // Next, clone the worker handle and send it to a new thread for
             // processing.
@@ -224,7 +235,7 @@ cfg_blocking! {
             runtime::spawn_blocking(move || run(worker));
         });
 
-        let _reset = Reset;
+        let _reset = Reset(had_core);
 
         f()
     }
