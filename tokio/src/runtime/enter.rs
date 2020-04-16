@@ -12,8 +12,8 @@ pub(crate) enum EnterContext {
 }
 
 impl EnterContext {
-    pub(crate) fn is_entered(&self) -> bool {
-        if let EnterContext::Entered { .. } = *self {
+    pub(crate) fn is_entered(self) -> bool {
+        if let EnterContext::Entered { .. } = self {
             true
         } else {
             false
