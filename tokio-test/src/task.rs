@@ -116,6 +116,26 @@ impl<T: Stream> Spawn<T> {
     }
 }
 
+impl<T: Future> Future for Spawn<T> {
+    type Output = T::Output;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // Safety: we only expose &mut T if T: Unpin therefore this is safe.
+        let future = unsafe { self.map_unchecked_mut(|s| &mut s.future) };
+        future.poll(cx)
+    }
+}
+
+impl<T: Stream> Stream for Spawn<T> {
+    type Item = T::Item;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        // Safety: we only expose &mut T if T: Unpin therefore this is safe.
+        let stream = unsafe { self.map_unchecked_mut(|s| &mut s.future) };
+        stream.poll_next(cx)
+    }
+}
+
 impl MockTask {
     /// Creates new mock task
     fn new() -> Self {
