@@ -6,40 +6,50 @@ use std::io::{Read, Write};
 use std::{net, thread};
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
+use tokio::net::{TcpListener, TcpStream};
+use tokio::try_join;
 
 #[tokio::test]
 async fn split() -> Result<()> {
     const MSG: &[u8] = b"split";
 
-    let listener = net::TcpListener::bind("127.0.0.1:0")?;
+    let mut listener = TcpListener::bind("127.0.0.1:0").await?;
     let addr = listener.local_addr()?;
 
-    let handle = thread::spawn(move || {
-        let (mut stream, _) = listener.accept().unwrap();
-        stream.write(MSG).unwrap();
+    let (stream1, (mut stream2, _)) = try_join! {
+        TcpStream::connect(&addr),
+        listener.accept(),
+    }?;
+    let (mut read_half, mut write_half) = stream1.into_split();
 
-        let mut read_buf = [0u8; 32];
-        let read_len = stream.read(&mut read_buf).unwrap();
-        assert_eq!(&read_buf[..read_len], MSG);
-    });
+    let ((), (), ()) = try_join! {
+        async {
+            let len = stream2.write(MSG).await?;
+            assert_eq!(len, MSG.len());
 
-    let stream = TcpStream::connect(&addr).await?;
-    let (mut read_half, mut write_half) = stream.into_split();
+            let mut read_buf = vec![0u8; 32];
+            let read_len = stream2.read(&mut read_buf).await?;
+            assert_eq!(&read_buf[..read_len], MSG);
+            Result::Ok(())
+        },
+        async {
+            let len = write_half.write(MSG).await?;
+            assert_eq!(len, MSG.len());
+            Ok(())
+        },
+        async {
+            let mut read_buf = vec![0u8; 32];
+            let peek_len1 = read_half.peek(&mut read_buf[..]).await?;
+            let peek_len2 = read_half.peek(&mut read_buf[..]).await?;
+            assert_eq!(peek_len1, peek_len2);
 
-    let write_join = tokio::spawn(async move { write_half.write(MSG).await });
+            let read_len = read_half.read(&mut read_buf[..]).await?;
+            assert_eq!(peek_len1, read_len);
+            assert_eq!(&read_buf[..read_len], MSG);
+            Ok(())
+        },
+    }?;
 
-    let mut read_buf = [0u8; 32];
-    let peek_len1 = read_half.peek(&mut read_buf[..]).await?;
-    let peek_len2 = read_half.peek(&mut read_buf[..]).await?;
-    assert_eq!(peek_len1, peek_len2);
-
-    let read_len = read_half.read(&mut read_buf[..]).await?;
-    assert_eq!(peek_len1, read_len);
-    assert_eq!(&read_buf[..read_len], MSG);
-
-    write_join.await.unwrap().unwrap();
-    handle.join().unwrap();
     Ok(())
 }
 
