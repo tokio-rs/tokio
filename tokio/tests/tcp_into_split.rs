@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use std::io::{Result, Error, ErrorKind};
+use std::io::{Error, ErrorKind, Result};
 use std::io::{Read, Write};
 use std::{net, thread};
 
@@ -85,9 +85,11 @@ async fn drop_write() -> Result<()> {
         let mut read_buf = [0u8; 32];
         match stream.read(&mut read_buf) {
             Ok(0) => Ok(()),
-            Ok(len) => Err(Error::new(ErrorKind::Other,
-                format!("Unexpected read: {} bytes.", len))),
-            Err(err) => Err(err)
+            Ok(len) => Err(Error::new(
+                ErrorKind::Other,
+                format!("Unexpected read: {} bytes.", len),
+            )),
+            Err(err) => Err(err),
         }
     });
 
@@ -105,7 +107,7 @@ async fn drop_write() -> Result<()> {
     });
 
     match read_half.read(&mut read_buf[..]).await {
-        Ok(0) => {},
+        Ok(0) => {}
         Ok(len) => panic!("Unexpected read: {} bytes.", len),
         Err(err) => panic!("Unexpected error: {}.", err),
     }
