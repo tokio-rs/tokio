@@ -213,6 +213,51 @@
 //! [rt-threaded]: runtime/index.html#threaded-scheduler
 //! [rt-features]: runtime/index.html#runtime-scheduler
 //!
+//! ## CPU-bound tasks and blocking code
+//!
+//! Tokio is able to concurrently run many tasks on a few threads by repeatedly
+//! swapping the currently running task on each thread. However, this kind of
+//! swapping can only happen at `.await` points, so code that spends a long time
+//! without reaching an `.await` will prevent other tasks from running. To
+//! combat this, Tokio provides two kinds of threads: Core threads and blocking
+//! threads. The core threads are where all asynchronous code runs, and Tokio
+//! will by default spawn one for each CPU core. The blocking threads are
+//! spawned on demand, and can be used to run blocking code that would otherwise
+//! block other tasks from running. Since it is not possible for Tokio to swap
+//! out blocking tasks, like it can do with asynchronous code, the upper limit
+//! on the number of blocking threads is very large. These limits can be
+//! configured on the [`Builder`].
+//!
+//! Two spawn a blocking task, you should use the [`spawn_blocking`] function.
+//!
+//! [`Builder`]: crate::runtime::Builder
+//! [`spawn_blocking`]: crate::task::spawn_blocking()
+//!
+//! ```
+//! #[tokio::main]
+//! async fn main() {
+//!     // This is running on a core thread.
+//!
+//!     let blocking_task = tokio::task::spawn_blocking(|| {
+//!         // This is running on a blocking thread.
+//!         // Blocking here is ok.
+//!     });
+//!
+//!     // We can wait for the blocking task like this:
+//!     // If the blocking task panics, the unwrap below will propagate the
+//!     // panic.
+//!     blocking_task.await.unwrap();
+//! }
+//! ```
+//!
+//! If your code is CPU-bound and you wish to limit the number of threads used
+//! to run it, you should run it on another thread pool such as [rayon]. You
+//! can use an [`oneshot`] channel to send the result back to Tokio when the
+//! rayon task finishes.
+//!
+//! [rayon]: https://docs.rs/rayon
+//! [`oneshot`]: crate::sync::oneshot
+//!
 //! ## Asynchronous IO
 //!
 //! As well as scheduling and running tasks, Tokio provides everything you need
