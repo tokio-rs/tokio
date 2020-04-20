@@ -12,11 +12,14 @@ cfg_io_std! {
     /// The handle implements the [`AsyncRead`] trait, but beware that concurrent
     /// reads of `Stdin` must be executed with care.
     ///
-    /// As an additional caveat, reading from the handle may block the calling
-    /// future indefinitely if there is not enough data available. This makes this
-    /// handle unsuitable for use in any circumstance where immediate reaction to
-    /// available data is required, e.g. interactive use or when implementing a
-    /// subprocess driven by requests on the standard input.
+    /// This handle is best used for non-interactive uses, such as when a file
+    /// is piped into the application. For technical reasons, `stdin` is
+    /// implemented by using an ordinary blocking read on a separate thread, and
+    /// it is impossible to cancel that read. This can make shutdown of the
+    /// runtime hang until the user presses enter.
+    ///
+    /// For interactive uses, it is recommended to spawn a thread dedicated to
+    /// user input and use blocking IO directly in that thread.
     ///
     /// Created by the [`stdin`] function.
     ///
@@ -29,14 +32,14 @@ cfg_io_std! {
 
     /// Constructs a new handle to the standard input of the current process.
     ///
-    /// The returned handle allows reading from standard input from the within the
-    /// Tokio runtime.
+    /// This handle is best used for non-interactive uses, such as when a file
+    /// is piped into the application. For technical reasons, `stdin` is
+    /// implemented by using an ordinary blocking read on a separate thread, and
+    /// it is impossible to cancel that read. This can make shutdown of the
+    /// runtime hang until the user presses enter.
     ///
-    /// As an additional caveat, reading from the handle may block the calling
-    /// future indefinitely if there is not enough data available. This makes this
-    /// handle unsuitable for use in any circumstance where immediate reaction to
-    /// available data is required, e.g. interactive use or when implementing a
-    /// subprocess driven by requests on the standard input.
+    /// For interactive uses, it is recommended to spawn a thread dedicated to
+    /// user input and use blocking IO directly in that thread.
     pub fn stdin() -> Stdin {
         let std = io::stdin();
         Stdin {
