@@ -175,7 +175,35 @@ where
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
     pub fn new(io: E) -> io::Result<Self> {
-        let registration = Registration::new(&io)?;
+        PollEvented::new_with_ready(io, mio::Ready::all())
+    }
+
+    /// Creates a new `PollEvented` associated with the default reactor, for specific `mio::Ready`
+    /// state. `new_with_ready` should be used over `new` when you need control over the readiness
+    /// state, such as when a file descriptor only allows reads. This does not add `hup` or `error`
+    /// so if you are interested in those states, you will need to add them to the readiness state
+    /// passed to this function.
+    ///
+    /// An example to listen to read only
+    ///
+    /// ```rust
+    /// ##[cfg(unix)]
+    ///     mio::Ready::from_usize(
+    ///         mio::Ready::readable().as_usize()
+    ///         | mio::unix::UnixReady::error().as_usize()
+    ///         | mio::unix::UnixReady::hup().as_usize()
+    ///     );
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function panics if thread-local runtime is not set.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
+    pub fn new_with_ready(io: E, ready: mio::Ready) -> io::Result<Self> {
+        let registration = Registration::new_with_ready(&io, ready)?;
         Ok(Self {
             io: Some(io),
             inner: Inner {
