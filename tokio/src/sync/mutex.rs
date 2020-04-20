@@ -34,11 +34,10 @@ use std::ops::{Deref, DerefMut};
 ///
 /// Another example
 /// ```rust,no_run
-/// #![warn(rust_2018_idioms)]
-///
+/// # #![warn(rust_2018_idioms)]
+/// #
 /// use tokio::sync::Mutex;
 /// use std::sync::Arc;
-///
 ///
 /// #[tokio::main]
 /// async fn main() {
@@ -60,7 +59,7 @@ use std::ops::{Deref, DerefMut};
 ///             break;
 ///         }
 ///     }
-///    println!("Count hit 50.");
+///     println!("Count hit 50.");
 /// }
 /// ```
 /// There are a few things of note here to pay attention to in this example.
