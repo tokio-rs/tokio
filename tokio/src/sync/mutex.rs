@@ -10,7 +10,7 @@ use std::ops::{Deref, DerefMut};
 ///
 /// This type acts similarly to an asynchronous [`std::sync::Mutex`], with one
 /// major difference: [`lock`] does not block.  
-/// Another difference is [`lock`] can be held across await points.
+/// Another difference is that the lock guard can be held across await points.
 /// This allows you to do something along the lines of:
 ///
 /// ```rust,no_run
@@ -66,15 +66,15 @@ use std::ops::{Deref, DerefMut};
 /// There are a few things of note here to pay attention to in this example.
 /// 1. The mutex is wrapped in an [`Arc`] to allow it to be shared across threads.
 /// 2. Each spawned task obtains a lock and releases it on every iteration.
-/// 3. Mutation of the data the Mutex is protecting is done by de-referencing the the obtained lock
+/// 3. Mutation of the data protected by the Mutex is done by de-referencing the the obtained lock
 ///    as seen on lines 23 and 30.
 ///
 /// Tokio's Mutex works in a simple FIFO (first in, first out) style where all calls
-/// to lock complete in the order they were performed. In that way
+/// to [`lock`] complete in the order they were performed. In that way
 /// the Mutex is "fair" and predictable in how it distributes the locks to inner data. This is why
-/// the output of this program is an in-order count to 50. Locks are released and reacquired
+/// the output of the program above is an in-order count to 50. Locks are released and reacquired
 /// after every iteration, so basically, each thread goes to the back of the line after it increments
-/// the value once. Also, since there is only a single valid lock at any given time there is no
+/// the value once. Finally, since there is only a single valid lock at any given time, there is no
 /// possibility of a race condition when mutating the inner value.
 ///
 /// Note that in contrast to [`std::sync::Mutex`], this implementation does not
@@ -165,7 +165,7 @@ impl<T> Mutex<T> {
 
     /// Locks this mutex, causing the current task
     /// to yield until the lock has been acquired.
-    /// When acquired function returns a [`MutexGuard`]
+    /// When the lock has been acquired, function returns a [`MutexGuard`].
     ///
     /// # Examples
     ///
@@ -189,8 +189,8 @@ impl<T> Mutex<T> {
         MutexGuard { lock: self }
     }
 
-    /// Attempts to acquire the lock returning [`TryLockError`] if
-    /// lock is already acquired
+    /// Attempts to acquire the lock, and returns [`TryLockError`] if the
+    /// lock is currently held somewhere else.
     ///
     /// [`TryLockError`]: TryLockError
     /// # Examples
