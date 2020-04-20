@@ -172,6 +172,8 @@ pub(super) fn create(size: usize, park: Parker) -> (Arc<Shared>, Launch) {
 }
 
 cfg_blocking! {
+    use crate::runtime::enter::EnterContext;
+
     pub(crate) fn block_in_place<F, R>(f: F) -> R
     where
         F: FnOnce() -> R,
@@ -203,7 +205,33 @@ cfg_blocking! {
 
         let mut had_core = false;
         CURRENT.with(|maybe_cx| {
-            let cx = maybe_cx.expect("can call blocking only when running in a spawned task on the multi-threaded runtime");
+            match (crate::runtime::enter::context(),  maybe_cx.is_some()) {
+                (EnterContext::Entered { .. }, true) => {
+                    // We are on a thread pool runtime thread, so we just need to set up blocking.
+                }
+                (EnterContext::Entered { allow_blocking }, false) => {
+                    // We are on an executor, but _not_ on the thread pool.
+                    // That is _only_ okay if we are in a thread pool runtime's block_on method:
+                    if allow_blocking {
+                        return;
+                    } else {
+                        // This probably means we are on the basic_scheduler or in a LocalSet,
+                        // where it is _not_ okay to block.
+                        panic!("can call blocking only when running on the multi-threaded runtime");
+                    }
+                }
+                (EnterContext::NotEntered, true) => {
+                    // This is a nested call to block_in_place (we already exited).
+                    // All the necessary setup has already been done.
+                    return;
+                }
+                (EnterContext::NotEntered, false) => {
+                    // We are outside of the tokio runtime, so blocking is fine.
+                    // We can also skip all of the thread pool blocking setup steps.
+                    return;
+                }
+            }
+            let cx = maybe_cx.expect("no .is_some() == false cases above should lead here");
 
             // Get the worker core. If none is set, then blocking is fine!
             let core = match cx.core.borrow_mut().take() {
@@ -273,7 +301,7 @@ fn run(worker: Arc<Worker>) {
         core: RefCell::new(None),
     };
 
-    let _enter = crate::runtime::enter();
+    let _enter = crate::runtime::enter(true);
 
     CURRENT.set(&cx, || {
         // This should always be an error. It only returns a `Result` to support

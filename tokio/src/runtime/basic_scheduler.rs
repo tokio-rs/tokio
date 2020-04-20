@@ -121,7 +121,7 @@ where
         F: Future,
     {
         enter(self, |scheduler, context| {
-            let _enter = runtime::enter();
+            let _enter = runtime::enter(false);
             let waker = waker_ref(&scheduler.spawner.shared);
             let mut cx = std::task::Context::from_waker(&waker);
 

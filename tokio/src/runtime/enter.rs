@@ -2,7 +2,26 @@ use std::cell::{Cell, RefCell};
 use std::fmt;
 use std::marker::PhantomData;
 
-thread_local!(static ENTERED: Cell<bool> = Cell::new(false));
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum EnterContext {
+    Entered {
+        #[allow(dead_code)]
+        allow_blocking: bool,
+    },
+    NotEntered,
+}
+
+impl EnterContext {
+    pub(crate) fn is_entered(self) -> bool {
+        if let EnterContext::Entered { .. } = self {
+            true
+        } else {
+            false
+        }
+    }
+}
+
+thread_local!(static ENTERED: Cell<EnterContext> = Cell::new(EnterContext::NotEntered));
 
 /// Represents an executor context.
 pub(crate) struct Enter {
@@ -11,8 +30,8 @@ pub(crate) struct Enter {
 
 /// Marks the current thread as being within the dynamic extent of an
 /// executor.
-pub(crate) fn enter() -> Enter {
-    if let Some(enter) = try_enter() {
+pub(crate) fn enter(allow_blocking: bool) -> Enter {
+    if let Some(enter) = try_enter(allow_blocking) {
         return enter;
     }
 
@@ -26,12 +45,12 @@ pub(crate) fn enter() -> Enter {
 
 /// Tries to enter a runtime context, returns `None` if already in a runtime
 /// context.
-pub(crate) fn try_enter() -> Option<Enter> {
+pub(crate) fn try_enter(allow_blocking: bool) -> Option<Enter> {
     ENTERED.with(|c| {
-        if c.get() {
+        if c.get().is_entered() {
             None
         } else {
-            c.set(true);
+            c.set(EnterContext::Entered { allow_blocking });
             Some(Enter { _p: PhantomData })
         }
     })
@@ -47,24 +66,76 @@ pub(crate) fn try_enter() -> Option<Enter> {
 #[cfg(all(feature = "rt-threaded", feature = "blocking"))]
 pub(crate) fn exit<F: FnOnce() -> R, R>(f: F) -> R {
     // Reset in case the closure panics
-    struct Reset;
+    struct Reset(EnterContext);
     impl Drop for Reset {
         fn drop(&mut self) {
             ENTERED.with(|c| {
-                assert!(!c.get(), "closure claimed permanent executor");
-                c.set(true);
+                assert!(!c.get().is_entered(), "closure claimed permanent executor");
+                c.set(self.0);
             });
         }
     }
 
-    ENTERED.with(|c| {
-        assert!(c.get(), "asked to exit when not entered");
-        c.set(false);
+    let was = ENTERED.with(|c| {
+        let e = c.get();
+        assert!(e.is_entered(), "asked to exit when not entered");
+        c.set(EnterContext::NotEntered);
+        e
     });
 
-    let _reset = Reset;
-    // dropping reset after f() will do c.set(true)
+    let _reset = Reset(was);
+    // dropping _reset after f() will reset ENTERED
     f()
+}
+
+cfg_rt_core! {
+    cfg_rt_util! {
+        /// Disallow blocking in the current runtime context until the guard is dropped.
+        pub(crate) fn disallow_blocking() -> DisallowBlockingGuard {
+            let reset = ENTERED.with(|c| {
+                if let EnterContext::Entered {
+                    allow_blocking: true,
+                } = c.get()
+                {
+                    c.set(EnterContext::Entered {
+                        allow_blocking: false,
+                    });
+                    true
+                } else {
+                    false
+                }
+            });
+            DisallowBlockingGuard(reset)
+        }
+
+        pub(crate) struct DisallowBlockingGuard(bool);
+        impl Drop for DisallowBlockingGuard {
+            fn drop(&mut self) {
+                if self.0 {
+                    // XXX: Do we want some kind of assertion here, or is "best effort" okay?
+                    ENTERED.with(|c| {
+                        if let EnterContext::Entered {
+                            allow_blocking: false,
+                        } = c.get()
+                        {
+                            c.set(EnterContext::Entered {
+                                allow_blocking: true,
+                            });
+                        }
+                    })
+                }
+            }
+        }
+    }
+}
+
+cfg_rt_threaded! {
+    cfg_blocking! {
+        /// Returns true if in a runtime context.
+        pub(crate) fn context() -> EnterContext {
+            ENTERED.with(|c| c.get())
+        }
+    }
 }
 
 cfg_blocking_impl! {
@@ -149,8 +220,8 @@ impl fmt::Debug for Enter {
 impl Drop for Enter {
     fn drop(&mut self) {
         ENTERED.with(|c| {
-            assert!(c.get());
-            c.set(false);
+            assert!(c.get().is_entered());
+            c.set(EnterContext::NotEntered);
         });
     }
 }

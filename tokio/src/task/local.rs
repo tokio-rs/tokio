@@ -520,6 +520,8 @@ impl<T: Future> Future for RunUntil<'_, T> {
                 .waker
                 .register_by_ref(cx.waker());
 
+            let _no_blocking = crate::runtime::enter::disallow_blocking();
+
             if let Poll::Ready(output) = me.future.poll(cx) {
                 return Poll::Ready(output);
             }
