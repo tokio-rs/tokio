@@ -49,7 +49,7 @@ macro_rules! task_local {
 #[macro_export]
 macro_rules! __task_local_inner {
     ($(#[$attr:meta])* $vis:vis $name:ident, $t:ty) => {
-        static $name: $crate::task::LocalKey<$t> = {
+        $vis static $name: $crate::task::LocalKey<$t> = {
             std::thread_local! {
                 static __KEY: std::cell::RefCell<Option<$t>> = std::cell::RefCell::new(None);
             }
