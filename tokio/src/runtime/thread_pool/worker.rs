@@ -208,7 +208,6 @@ cfg_blocking! {
             match (crate::runtime::enter::context(),  maybe_cx.is_some()) {
                 (EnterContext::Entered { .. }, true) => {
                     // We are on a thread pool runtime thread, so we just need to set up blocking.
-                    // TODO: LocalSet on a thread pool?
                 }
                 (EnterContext::Entered { allow_blocking }, false) => {
                     // We are on an executor, but _not_ on the thread pool.
@@ -216,7 +215,7 @@ cfg_blocking! {
                     if allow_blocking {
                         return;
                     } else {
-                        // This probably means we are on the basic_scheduler,
+                        // This probably means we are on the basic_scheduler or in a LocalSet,
                         // where it is _not_ okay to block.
                         panic!("can call blocking only when running on the multi-threaded runtime");
                     }
