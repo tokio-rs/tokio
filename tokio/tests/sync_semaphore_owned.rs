@@ -7,9 +7,9 @@ use tokio::sync::Semaphore;
 fn try_acquire() {
     let sem = Arc::new(Semaphore::new(1));
     {
-        let p1 = sem.try_acquire_owned();
+        let p1 = sem.clone().try_acquire_owned();
         assert!(p1.is_ok());
-        let p2 = sem.try_acquire_owned();
+        let p2 = sem.clone().try_acquire_owned();
         assert!(p2.is_err());
     }
     let p3 = sem.try_acquire_owned();
@@ -19,7 +19,7 @@ fn try_acquire() {
 #[tokio::test]
 async fn acquire() {
     let sem = Arc::new(Semaphore::new(1));
-    let p1 = sem.try_acquire_owned().unwrap();
+    let p1 = sem.clone().try_acquire_owned().unwrap();
     let sem_clone = sem.clone();
     let j = tokio::spawn(async move {
         let _p2 = sem_clone.acquire_owned().await;
@@ -43,7 +43,7 @@ async fn add_permits() {
 fn forget() {
     let sem = Arc::new(Semaphore::new(1));
     {
-        let p = sem.try_acquire_owned().unwrap();
+        let p = sem.clone().try_acquire_owned().unwrap();
         assert_eq!(sem.available_permits(), 0);
         p.forget();
         assert_eq!(sem.available_permits(), 0);
@@ -66,10 +66,10 @@ async fn stresstest() {
         j.await.unwrap();
     }
     // there should be exactly 5 semaphores available now
-    let _p1 = sem.try_acquire_owned().unwrap();
-    let _p2 = sem.try_acquire_owned().unwrap();
-    let _p3 = sem.try_acquire_owned().unwrap();
-    let _p4 = sem.try_acquire_owned().unwrap();
-    let _p5 = sem.try_acquire_owned().unwrap();
+    let _p1 = sem.clone().try_acquire_owned().unwrap();
+    let _p2 = sem.clone().try_acquire_owned().unwrap();
+    let _p3 = sem.clone().try_acquire_owned().unwrap();
+    let _p4 = sem.clone().try_acquire_owned().unwrap();
+    let _p5 = sem.clone().try_acquire_owned().unwrap();
     assert!(sem.try_acquire_owned().is_err());
 }
