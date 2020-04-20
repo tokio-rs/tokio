@@ -1,5 +1,6 @@
 use super::batch_semaphore as ll; // low level implementation
 use crate::coop::CoopFutureExt;
+use std::sync::Arc;
 
 /// Counting semaphore performing asynchronous permit aquisition.
 ///
@@ -18,11 +19,27 @@ pub struct Semaphore {
     ll_sem: ll::Semaphore,
 }
 
-/// A permit from the semaphore
+/// A permit from the semaphore.
+///
+/// This type is created by the [`acquire`] method.
+///
+/// [`acquire`]: crate::sync::Semaphore::acquire()
 #[must_use]
 #[derive(Debug)]
 pub struct SemaphorePermit<'a> {
     sem: &'a Semaphore,
+    permits: u16,
+}
+
+/// An owned permit from the semaphore.
+///
+/// This type is created by the [`acquire_owned`] method.
+///
+/// [`acquire_owned`]: crate::sync::Semaphore::acquire_owned()
+#[must_use]
+#[derive(Debug)]
+pub struct OwnedSemaphorePermit {
+    sem: Arc<Semaphore>,
     permits: u16,
 }
 
@@ -51,14 +68,14 @@ fn bounds() {
 }
 
 impl Semaphore {
-    /// Creates a new semaphore with the initial number of permits
+    /// Creates a new semaphore with the initial number of permits.
     pub fn new(permits: usize) -> Self {
         Self {
             ll_sem: ll::Semaphore::new(permits),
         }
     }
 
-    /// Returns the current number of available permits
+    /// Returns the current number of available permits.
     pub fn available_permits(&self) -> usize {
         self.ll_sem.available_permits()
     }
@@ -68,7 +85,7 @@ impl Semaphore {
         self.ll_sem.release(n);
     }
 
-    /// Acquires permit from the semaphore
+    /// Acquires permit from the semaphore.
     pub async fn acquire(&self) -> SemaphorePermit<'_> {
         self.ll_sem.acquire(1).cooperate().await.unwrap();
         SemaphorePermit {
@@ -77,11 +94,39 @@ impl Semaphore {
         }
     }
 
-    /// Tries to acquire a permit form the semaphore
+    /// Tries to acquire a permit from the semaphore.
     pub fn try_acquire(&self) -> Result<SemaphorePermit<'_>, TryAcquireError> {
         match self.ll_sem.try_acquire(1) {
             Ok(_) => Ok(SemaphorePermit {
                 sem: self,
+                permits: 1,
+            }),
+            Err(_) => Err(TryAcquireError(())),
+        }
+    }
+
+    /// Acquires permit from the semaphore.
+    ///
+    /// The semaphore must be wrapped in an [`Arc`] to call this method.
+    ///
+    /// [`Arc`]: std::sync::Arc
+    pub async fn acquire_owned(self: Arc<Self>) -> OwnedSemaphorePermit {
+        self.ll_sem.acquire(1).cooperate().await.unwrap();
+        OwnedSemaphorePermit {
+            sem: self.clone(),
+            permits: 1,
+        }
+    }
+
+    /// Tries to acquire a permit from the semaphore.
+    ///
+    /// The semaphore must be wrapped in an [`Arc`] to call this method.
+    ///
+    /// [`Arc`]: std::sync::Arc
+    pub fn try_acquire_owned(self: Arc<Self>) -> Result<OwnedSemaphorePermit, TryAcquireError> {
+        match self.ll_sem.try_acquire(1) {
+            Ok(_) => Ok(OwnedSemaphorePermit {
+                sem: self.clone(),
                 permits: 1,
             }),
             Err(_) => Err(TryAcquireError(())),
@@ -98,7 +143,22 @@ impl<'a> SemaphorePermit<'a> {
     }
 }
 
+impl OwnedSemaphorePermit {
+    /// Forgets the permit **without** releasing it back to the semaphore.
+    /// This can be used to reduce the amount of permits available from a
+    /// semaphore.
+    pub fn forget(mut self) {
+        self.permits = 0;
+    }
+}
+
 impl<'a> Drop for SemaphorePermit<'_> {
+    fn drop(&mut self) {
+        self.sem.add_permits(self.permits as usize);
+    }
+}
+
+impl Drop for OwnedSemaphorePermit {
     fn drop(&mut self) {
         self.sem.add_permits(self.permits as usize);
     }
