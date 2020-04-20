@@ -334,7 +334,7 @@ impl Runtime {
     /// ```
     ///
     /// [mod]: index.html
-    /// [main]: ../../tokio_macros/attr.main.html
+    /// [main]: ../attr.main.html
     /// [threaded scheduler]: index.html#threaded-scheduler
     /// [basic scheduler]: index.html#basic-scheduler
     /// [runtime builder]: crate::runtime::Builder
