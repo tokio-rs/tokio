@@ -19,7 +19,7 @@ cfg_io_std! {
     /// runtime hang until the user presses enter.
     ///
     /// For interactive uses, it is recommended to spawn a thread dedicated to
-    /// user input and using blocking IO directly in that thread.
+    /// user input and use blocking IO directly in that thread.
     ///
     /// Created by the [`stdin`] function.
     ///
@@ -39,7 +39,7 @@ cfg_io_std! {
     /// runtime hang until the user presses enter.
     ///
     /// For interactive uses, it is recommended to spawn a thread dedicated to
-    /// user input and using blocking IO directly in that thread.
+    /// user input and use blocking IO directly in that thread.
     pub fn stdin() -> Stdin {
         let std = io::stdin();
         Stdin {
