@@ -9,8 +9,18 @@ use std::ops::{Deref, DerefMut};
 /// An asynchronous `Mutex`-like type.
 ///
 /// This type acts similarly to an asynchronous [`std::sync::Mutex`], with one
-/// major difference: [`lock`] does not block.  
-/// Another difference is that the lock guard can be held across await points.
+/// major difference: [`lock`] does not block. Another difference is that the
+/// lock guard can be held across await points.
+///
+/// There are some situations where you should prefer the mutex from the
+/// standard library. Generally this is the case if:
+///
+///  1. The lock does not need to be held across await points.
+///  2. The duration of any single lock is near-instant.
+///
+/// On the other hand, the Tokio mutex is for the situation where the lock needs
+/// to be held for longer periods of time, or across await points.
+///
 /// This allows you to do something along the lines of:
 ///
 /// ```rust,no_run
