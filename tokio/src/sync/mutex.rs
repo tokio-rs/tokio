@@ -1,83 +1,3 @@
-//! An asynchronous `Mutex`-like type.
-//!
-//! This module provides [`Mutex`], a type that acts similarly to an asynchronous `Mutex`, with one
-//! major difference: the [`MutexGuard`] returned by `lock` is not tied to the lifetime of the
-//! `Mutex`. This enables you to acquire a lock, and then pass that guard into a future, and then
-//! release it at some later point in time.
-//!
-//! This allows you to do something along the lines of:
-//!
-//! ```rust,no_run
-//! use tokio::sync::Mutex;
-//! use std::sync::Arc;
-//!
-//! #[tokio::main]
-//! async fn main() {
-//!     let data1 = Arc::new(Mutex::new(0));
-//!     let data2 = Arc::clone(&data1);
-//!
-//!     tokio::spawn(async move {
-//!         let mut lock = data2.lock().await;
-//!         *lock += 1;
-//!     });
-//!
-//!     let mut lock = data1.lock().await;
-//!     *lock += 1;
-//! }
-//! ```
-//!
-//! Another example
-//! ```rust,no_run
-//! #![warn(rust_2018_idioms)]
-//!
-//! use tokio::sync::Mutex;
-//! use std::sync::Arc;
-//!
-//!
-//! #[tokio::main]
-//! async fn main() {
-//!    let count = Arc::new(Mutex::new(0));
-//!
-//!    for _ in 0..5 {
-//!        let my_count = Arc::clone(&count);
-//!        tokio::spawn(async move {
-//!            for _ in 0..10 {
-//!                let mut lock = my_count.lock().await;
-//!                *lock += 1;
-//!                println!("{}", lock);
-//!            }
-//!        });
-//!    }
-//!
-//!    loop {
-//!        if *count.lock().await >= 50 {
-//!            break;
-//!        }
-//!    }
-//!   println!("Count hit 50.");
-//! }
-//! ```
-//! There are a few things of note here to pay attention to in this example.
-//! 1. The mutex is wrapped in an [`std::sync::Arc`] to allow it to be shared across threads.
-//! 2. Each spawned task obtains a lock and releases it on every iteration.
-//! 3. Mutation of the data the Mutex is protecting is done by de-referencing the the obtained lock
-//!    as seen on lines 23 and 30.
-//!
-//! Tokio's Mutex works in a simple FIFO (first in, first out) style where as requests for a lock are
-//! made Tokio will queue them up and provide a lock when it is that requester's turn. In that way
-//! the Mutex is "fair" and predictable in how it distributes the locks to inner data. This is why
-//! the output of this program is an in-order count to 50. Locks are released and reacquired
-//! after every iteration, so basically, each thread goes to the back of the line after it increments
-//! the value once. Also, since there is only a single valid lock at any given time there is no
-//! possibility of a race condition when mutating the inner value.
-//!
-//! Note that in contrast to `std::sync::Mutex`, this implementation does not
-//! poison the mutex when a thread holding the `MutexGuard` panics. In such a
-//! case, the mutex will be unlocked. If the panic is caught, this might leave
-//! the data protected by the mutex in an inconsistent state.
-//!
-//! [`Mutex`]: struct@Mutex
-//! [`MutexGuard`]: struct@MutexGuard
 use crate::coop::CoopFutureExt;
 use crate::sync::batch_semaphore as semaphore;
 
@@ -86,11 +6,96 @@ use std::error::Error;
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 
-/// An asynchronous mutual exclusion primitive useful for protecting shared data
+/// An asynchronous `Mutex`-like type.
 ///
-/// Each mutex has a type parameter (`T`) which represents the data that it is protecting. The data
-/// can only be accessed through the RAII guards returned from `lock`, which
-/// guarantees that the data is only ever accessed when the mutex is locked.
+/// This type acts similarly to an asynchronous [`std::sync::Mutex`], with one
+/// major difference: [`lock`] does not block. Another difference is that the
+/// lock guard can be held across await points.
+///
+/// There are some situations where you should prefer the mutex from the
+/// standard library. Generally this is the case if:
+///
+///  1. The lock does not need to be held across await points.
+///  2. The duration of any single lock is near-instant.
+///
+/// On the other hand, the Tokio mutex is for the situation where the lock needs
+/// to be held for longer periods of time, or across await points.
+///
+/// # Examples:
+///
+/// ```rust,no_run
+/// use tokio::sync::Mutex;
+/// use std::sync::Arc;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let data1 = Arc::new(Mutex::new(0));
+///     let data2 = Arc::clone(&data1);
+///
+///     tokio::spawn(async move {
+///         let mut lock = data2.lock().await;
+///         *lock += 1;
+///     });
+///
+///     let mut lock = data1.lock().await;
+///     *lock += 1;
+/// }
+/// ```
+///
+///
+/// ```rust,no_run
+/// use tokio::sync::Mutex;
+/// use std::sync::Arc;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let count = Arc::new(Mutex::new(0));
+///
+///     for _ in 0..5 {
+///         let my_count = Arc::clone(&count);
+///         tokio::spawn(async move {
+///             for _ in 0..10 {
+///                 let mut lock = my_count.lock().await;
+///                 *lock += 1;
+///                 println!("{}", lock);
+///             }
+///         });
+///     }
+///
+///     loop {
+///         if *count.lock().await >= 50 {
+///             break;
+///         }
+///     }
+///     println!("Count hit 50.");
+/// }
+/// ```
+/// There are a few things of note here to pay attention to in this example.
+/// 1. The mutex is wrapped in an [`Arc`] to allow it to be shared across threads.
+/// 2. Each spawned task obtains a lock and releases it on every iteration.
+/// 3. Mutation of the data protected by the Mutex is done by de-referencing the obtained lock
+///    as seen on lines 12 and 19.
+///
+/// Tokio's Mutex works in a simple FIFO (first in, first out) style where all calls
+/// to [`lock`] complete in the order they were performed. In that way
+/// the Mutex is "fair" and predictable in how it distributes the locks to inner data. This is why
+/// the output of the program above is an in-order count to 50. Locks are released and reacquired
+/// after every iteration, so basically, each thread goes to the back of the line after it increments
+/// the value once. Finally, since there is only a single valid lock at any given time, there is no
+/// possibility of a race condition when mutating the inner value.
+///
+/// Note that in contrast to [`std::sync::Mutex`], this implementation does not
+/// poison the mutex when a thread holding the [`MutexGuard`] panics. In such a
+/// case, the mutex will be unlocked. If the panic is caught, this might leave
+/// the data protected by the mutex in an inconsistent state.
+///
+/// [`Mutex`]: struct@Mutex
+/// [`MutexGuard`]: struct@MutexGuard
+/// [`Arc`]: https://doc.rust-lang.org/std/sync/struct.Arc.html
+/// [`std::sync::Mutex`]: https://doc.rust-lang.org/std/sync/struct.Mutex.html
+/// [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
+/// [`lock`]: method@Mutex::lock
+
 #[derive(Debug)]
 pub struct Mutex<T> {
     c: UnsafeCell<T>,
@@ -150,6 +155,14 @@ fn bounds() {
 
 impl<T> Mutex<T> {
     /// Creates a new lock in an unlocked state ready for use.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::Mutex;
+    ///
+    /// let lock = Mutex::new(5);
+    /// ```
     pub fn new(t: T) -> Self {
         Self {
             c: UnsafeCell::new(t),
@@ -157,7 +170,23 @@ impl<T> Mutex<T> {
         }
     }
 
-    /// A future that resolves on acquiring the lock and returns the `MutexGuard`.
+    /// Locks this mutex, causing the current task
+    /// to yield until the lock has been acquired.
+    /// When the lock has been acquired, function returns a [`MutexGuard`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::Mutex;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mutex = Mutex::new(1);
+    ///
+    ///     let mut n = mutex.lock().await;
+    ///     *n = 2;
+    /// }
+    /// ```
     pub async fn lock(&self) -> MutexGuard<'_, T> {
         self.s.acquire(1).cooperate().await.unwrap_or_else(|_| {
             // The semaphore was closed. but, we never explicitly close it, and we have a
@@ -167,7 +196,23 @@ impl<T> Mutex<T> {
         MutexGuard { lock: self }
     }
 
-    /// Tries to acquire the lock
+    /// Attempts to acquire the lock, and returns [`TryLockError`] if the
+    /// lock is currently held somewhere else.
+    ///
+    /// [`TryLockError`]: TryLockError
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::Mutex;
+    /// # async fn dox() -> Result<(), tokio::sync::TryLockError> {
+    ///
+    /// let mutex = Mutex::new(1);
+    ///
+    /// let n = mutex.try_lock()?;
+    /// assert_eq!(*n, 1);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn try_lock(&self) -> Result<MutexGuard<'_, T>, TryLockError> {
         match self.s.try_acquire(1) {
             Ok(_) => Ok(MutexGuard { lock: self }),
@@ -176,6 +221,19 @@ impl<T> Mutex<T> {
     }
 
     /// Consumes the mutex, returning the underlying data.
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::Mutex;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mutex = Mutex::new(1);
+    ///
+    ///     let n = mutex.into_inner();
+    ///     assert_eq!(n, 1);
+    /// }
+    /// ```
     pub fn into_inner(self) -> T {
         self.c.into_inner()
     }
