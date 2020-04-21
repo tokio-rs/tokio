@@ -21,7 +21,7 @@ use std::ops::{Deref, DerefMut};
 /// On the other hand, the Tokio mutex is for the situation where the lock needs
 /// to be held for longer periods of time, or across await points.
 ///
-/// This allows you to do something along the lines of:
+/// # Examples:
 ///
 /// ```rust,no_run
 /// use tokio::sync::Mutex;
@@ -42,7 +42,7 @@ use std::ops::{Deref, DerefMut};
 /// }
 /// ```
 ///
-/// Another example
+///
 /// ```rust,no_run
 /// use tokio::sync::Mutex;
 /// use std::sync::Arc;
