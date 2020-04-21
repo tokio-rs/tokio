@@ -92,11 +92,11 @@ cfg_io_driver! {
     ///
     /// [`std::io::Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
     /// [`std::io::Write`]: https://doc.rust-lang.org/std/io/trait.Write.html
-    /// [`AsyncRead`]: ../io/trait.AsyncRead.html
-    /// [`AsyncWrite`]: ../io/trait.AsyncWrite.html
+    /// [`AsyncRead`]: trait@AsyncRead
+    /// [`AsyncWrite`]: trait@AsyncWrite
     /// [`mio::Evented`]: https://docs.rs/mio/0.6/mio/trait.Evented.html
     /// [`Registration`]: struct@Registration
-    /// [`TcpListener`]: ../net/struct.TcpListener.html
+    /// [`TcpListener`]: struct@crate::net::TcpListener
     /// [`clear_read_ready`]: #method.clear_read_ready
     /// [`clear_write_ready`]: #method.clear_write_ready
     /// [`poll_read_ready`]: #method.poll_read_ready

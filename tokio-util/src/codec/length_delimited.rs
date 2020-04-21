@@ -367,9 +367,9 @@
 //! [`LengthDelimitedCodec::new()`]: method@LengthDelimitedCodec::new
 //! [`FramedRead`]: struct@FramedRead
 //! [`FramedWrite`]: struct@FramedWrite
-//! [`AsyncRead`]: ../../trait.AsyncRead.html
-//! [`AsyncWrite`]: ../../trait.AsyncWrite.html
-//! [`Encoder`]: ../trait.Encoder.html
+//! [`AsyncRead`]: trait@tokio::io::AsyncRead
+//! [`AsyncWrite`]: trait@tokio::io::AsyncWrite
+//! [`Encoder`]: trait@Encoder
 //! [`BytesMut`]: https://docs.rs/bytes/0.4/bytes/struct.BytesMut.html
 
 use crate::codec::{Decoder, Encoder, Framed, FramedRead, FramedWrite};

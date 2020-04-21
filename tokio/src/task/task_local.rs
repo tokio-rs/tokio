@@ -29,7 +29,7 @@ use std::{fmt, thread};
 /// See [LocalKey documentation][`tokio::task::LocalKey`] for more
 /// information.
 ///
-/// [`tokio::task::LocalKey`]: ../tokio/task/struct.LocalKey.html
+/// [`tokio::task::LocalKey`]: struct@crate::task::LocalKey
 #[macro_export]
 macro_rules! task_local {
      // empty (base case for the recursion)
