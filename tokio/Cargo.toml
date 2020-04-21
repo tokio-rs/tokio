@@ -121,7 +121,7 @@ default-features = false
 optional = true
 
 [dev-dependencies]
-tokio-test = { version = "0.2.0" }
+tokio-test = { version = "0.2.0", path = "../tokio-test" }
 futures = { version = "0.3.0", features = ["async-await"] }
 proptest = "0.9.4"
 tempfile = "3.1.0"
