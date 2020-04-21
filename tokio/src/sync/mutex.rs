@@ -34,8 +34,6 @@ use std::ops::{Deref, DerefMut};
 ///
 /// Another example
 /// ```rust,no_run
-/// # #![warn(rust_2018_idioms)]
-/// #
 /// use tokio::sync::Mutex;
 /// use std::sync::Arc;
 ///
