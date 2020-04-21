@@ -73,7 +73,7 @@ use std::ops::{Deref, DerefMut};
 /// There are a few things of note here to pay attention to in this example.
 /// 1. The mutex is wrapped in an [`Arc`] to allow it to be shared across threads.
 /// 2. Each spawned task obtains a lock and releases it on every iteration.
-/// 3. Mutation of the data protected by the Mutex is done by de-referencing the the obtained lock
+/// 3. Mutation of the data protected by the Mutex is done by de-referencing the obtained lock
 ///    as seen on lines 23 and 30.
 ///
 /// Tokio's Mutex works in a simple FIFO (first in, first out) style where all calls
