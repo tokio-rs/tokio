@@ -69,3 +69,27 @@ async fn pending_first() {
     assert_eq!(stream.size_hint(), (0, None));
     assert_eq!(None, assert_ready!(stream.poll_next()));
 }
+
+#[test]
+fn size_overflow() {
+    struct Monster;
+
+    impl tokio::stream::Stream for Monster {
+        type Item = ();
+        fn poll_next(
+            self: std::pin::Pin<&mut Self>,
+            _cx: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Option<()>> {
+            panic!()
+        }
+
+        fn size_hint(&self) -> (usize, Option<usize>) {
+            (usize::max_value(), Some(usize::max_value()))
+        }
+    }
+
+    let m1 = Monster;
+    let m2 = Monster;
+    let m = m1.chain(m2);
+    assert_eq!(m.size_hint(), (usize::max_value(), None));
+}

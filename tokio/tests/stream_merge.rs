@@ -52,3 +52,27 @@ async fn merge_async_streams() {
     assert!(rx.is_woken());
     assert_eq!(None, assert_ready!(rx.poll_next()));
 }
+
+#[test]
+fn size_overflow() {
+    struct Monster;
+
+    impl tokio::stream::Stream for Monster {
+        type Item = ();
+        fn poll_next(
+            self: std::pin::Pin<&mut Self>,
+            _cx: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Option<()>> {
+            panic!()
+        }
+
+        fn size_hint(&self) -> (usize, Option<usize>) {
+            (usize::max_value(), Some(usize::max_value()))
+        }
+    }
+
+    let m1 = Monster;
+    let m2 = Monster;
+    let m = m1.merge(m2);
+    assert_eq!(m.size_hint(), (usize::max_value(), None));
+}

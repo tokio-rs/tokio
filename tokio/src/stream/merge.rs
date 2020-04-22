@@ -52,15 +52,7 @@ where
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let (a_lower, a_upper) = self.a.size_hint();
-        let (b_lower, b_upper) = self.b.size_hint();
-
-        let upper = match (a_upper, b_upper) {
-            (Some(a_upper), Some(b_upper)) => Some(a_upper + b_upper),
-            _ => None,
-        };
-
-        (a_lower + b_lower, upper)
+        super::merge_size_hints(self.a.size_hint(), self.b.size_hint())
     }
 }
 
