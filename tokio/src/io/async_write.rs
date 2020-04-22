@@ -51,7 +51,7 @@ pub trait AsyncWrite {
     /// If the object is not ready for writing, the method returns
     /// `Poll::Pending` and arranges for the current task (via
     /// `cx.waker()`) to receive a notification when the object becomes
-    /// readable or is closed.
+    /// writable or is closed.
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
