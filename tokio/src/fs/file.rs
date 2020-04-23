@@ -24,12 +24,22 @@ use std::task::Poll::*;
 /// Tokio runtime.
 ///
 /// An instance of a `File` can be read and/or written depending on what options
-/// it was opened with. Files also implement Seek to alter the logical cursor
-/// that the file contains internally.
+/// it was opened with. Files also implement [`AsyncSeek`] to alter the logical
+/// cursor that the file contains internally.
 ///
 /// Files are automatically closed when they go out of scope.
 ///
-/// [std]: std::fs::File
+/// Reading and writing to a `File` is usually done using the convenience
+/// methods found on the [`AsyncReadExt`] and [`AsyncWriteExt`] traits. Examples
+/// import these traits through [the prelude].
+///
+/// [std]: struct@std::fs::File
+/// [`AsyncSeek`]: trait@crate::io::AsyncSeek
+/// [`flush`]: fn@crate::io::AsyncWriteExt::flush
+/// [`sync_all`]: fn@crate::fs::File::sync_all
+/// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
+/// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
+/// [the prelude]: crate::prelude
 ///
 /// # Examples
 ///
@@ -37,7 +47,7 @@ use std::task::Poll::*;
 ///
 /// ```no_run
 /// use tokio::fs::File;
-/// use tokio::prelude::*;
+/// use tokio::prelude::*; // for write_all()
 ///
 /// # async fn dox() -> std::io::Result<()> {
 /// let mut file = File::create("foo.txt").await?;
@@ -50,7 +60,7 @@ use std::task::Poll::*;
 ///
 /// ```no_run
 /// use tokio::fs::File;
-/// use tokio::prelude::*;
+/// use tokio::prelude::*; // for read_to_end()
 ///
 /// # async fn dox() -> std::io::Result<()> {
 /// let mut file = File::open("foo.txt").await?;
@@ -114,6 +124,11 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// The [`read_to_end`] method is defined on the [`AsyncReadExt`] trait.
+    ///
+    /// [`read_to_end`]: fn@crate::io::AsyncReadExt::read_to_end
+    /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
     pub async fn open(path: impl AsRef<Path>) -> io::Result<File> {
         let path = path.as_ref().to_owned();
         let std = asyncify(|| sys::File::open(path)).await?;
@@ -149,6 +164,11 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// The [`write_all`] method is defined on the [`AsyncWriteExt`] trait.
+    ///
+    /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
+    /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     pub async fn create(path: impl AsRef<Path>) -> io::Result<File> {
         let path = path.as_ref().to_owned();
         let std_file = asyncify(move || sys::File::create(path)).await?;
@@ -195,6 +215,11 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// The [`read_exact`] method is defined on the [`AsyncReadExt`] trait.
+    ///
+    /// [`read_exact`]: fn@crate::io::AsyncReadExt::read_exact
+    /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
     pub async fn seek(&mut self, mut pos: SeekFrom) -> io::Result<u64> {
         self.complete_inflight().await;
 
@@ -251,6 +276,11 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// The [`write_all`] method is defined on the [`AsyncWriteExt`] trait.
+    ///
+    /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
+    /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     pub async fn sync_all(&mut self) -> io::Result<()> {
         self.complete_inflight().await;
 
@@ -280,6 +310,11 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// The [`write_all`] method is defined on the [`AsyncWriteExt`] trait.
+    ///
+    /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
+    /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     pub async fn sync_data(&mut self) -> io::Result<()> {
         self.complete_inflight().await;
 
@@ -312,6 +347,11 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// The [`write_all`] method is defined on the [`AsyncWriteExt`] trait.
+    ///
+    /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
+    /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     pub async fn set_len(&mut self, size: u64) -> io::Result<()> {
         self.complete_inflight().await;
 

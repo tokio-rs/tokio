@@ -19,14 +19,32 @@ use std::net::Shutdown;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// Read half of a `TcpStream`.
+/// Read half of a [`TcpStream`], created by [`split`].
+///
+/// Reading from a `ReadHalf` is usually done using the convenience methods found on the
+/// [`AsyncReadExt`] trait. Examples import this trait through [the prelude].
+///
+/// [`TcpStream`]: TcpStream
+/// [`split`]: TcpStream::split()
+/// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
+/// [the prelude]: crate::prelude
 #[derive(Debug)]
 pub struct ReadHalf<'a>(&'a TcpStream);
 
-/// Write half of a `TcpStream`.
+/// Write half of a [`TcpStream`], created by [`split`].
 ///
-/// Note that in the `AsyncWrite` implemenation of this type, `poll_shutdown` will
+/// Note that in the [`AsyncWrite`] implemenation of this type, [`poll_shutdown`] will
 /// shut down the TCP stream in the write direction.
+///
+/// Writing to an `OwnedWriteHalf` is usually done using the convenience methods found
+/// on the [`AsyncWriteExt`] trait. Examples import this trait through [the prelude].
+///
+/// [`TcpStream`]: TcpStream
+/// [`split`]: TcpStream::split()
+/// [`AsyncWrite`]: trait@crate::io::AsyncWrite
+/// [`poll_shutdown`]: fn@crate::io::AsyncWrite::poll_shutdown
+/// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
+/// [the prelude]: crate::prelude
 #[derive(Debug)]
 pub struct WriteHalf<'a>(&'a TcpStream);
 
@@ -74,6 +92,8 @@ impl ReadHalf<'_> {
     ///
     /// See the [`TcpStream::peek`] level documenation for more details.
     ///
+    /// [`TcpStream::peek`]: TcpStream::peek
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -101,7 +121,10 @@ impl ReadHalf<'_> {
     /// }
     /// ```
     ///
-    /// [`TcpStream::peek`]: TcpStream::peek
+    /// The [`read`] method is defined on the [`AsyncReadExt`] trait.
+    ///
+    /// [`read`]: fn@crate::io::AsyncReadExt::read
+    /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
     pub async fn peek(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         poll_fn(|cx| self.poll_peek(cx, buf)).await
     }
