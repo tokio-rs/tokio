@@ -3,7 +3,6 @@ use crate::io::PollEvented;
 use crate::net::unix::{Incoming, UnixStream};
 
 use mio::Ready;
-use mio_uds;
 use std::convert::TryFrom;
 use std::fmt;
 use std::io;
