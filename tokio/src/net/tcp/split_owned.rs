@@ -23,8 +23,13 @@ use std::{fmt, io};
 
 /// Owned read half of a [`TcpStream`], created by [`into_split`].
 ///
+/// Reading from an `OwnedReadHalf` is usually done using the convenience methods found
+/// on the [`AsyncReadExt`] trait. Examples import this trait through [the prelude].
+///
 /// [`TcpStream`]: TcpStream
 /// [`into_split`]: TcpStream::into_split()
+/// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
+/// [the prelude]: crate::prelude
 #[derive(Debug)]
 pub struct OwnedReadHalf {
     inner: Arc<TcpStream>,
@@ -32,13 +37,20 @@ pub struct OwnedReadHalf {
 
 /// Owned write half of a [`TcpStream`], created by [`into_split`].
 ///
-/// Note that in the `AsyncWrite` implemenation of this type, `poll_shutdown` will
+/// Note that in the [`AsyncWrite`] implemenation of this type, [`poll_shutdown`] will
 /// shut down the TCP stream in the write direction.
 ///
 /// Dropping the write half will close the TCP stream in both directions.
 ///
+/// Writing to an `OwnedWriteHalf` is usually done using the convenience methods found
+/// on the [`AsyncWriteExt`] trait. Examples import this trait through [the prelude].
+///
 /// [`TcpStream`]: TcpStream
 /// [`into_split`]: TcpStream::into_split()
+/// [`AsyncWrite`]: trait@crate::io::AsyncWrite
+/// [`poll_shutdown`]: fn@crate::io::AsyncWrite::poll_shutdown
+/// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
+/// [the prelude]: crate::prelude
 #[derive(Debug)]
 pub struct OwnedWriteHalf {
     inner: Arc<TcpStream>,
@@ -136,6 +148,8 @@ impl OwnedReadHalf {
     ///
     /// See the [`TcpStream::peek`] level documenation for more details.
     ///
+    /// [`TcpStream::peek`]: TcpStream::peek
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -163,7 +177,10 @@ impl OwnedReadHalf {
     /// }
     /// ```
     ///
-    /// [`TcpStream::peek`]: TcpStream::peek
+    /// The [`read`] method is defined on the [`AsyncReadExt`] trait.
+    ///
+    /// [`read`]: fn@crate::io::AsyncReadExt::read
+    /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
     pub async fn peek(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         poll_fn(|cx| self.poll_peek(cx, buf)).await
     }
