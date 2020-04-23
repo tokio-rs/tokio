@@ -13,6 +13,360 @@ use core::{
     task::{Context, Poll, Waker},
 };
 
+/// A token which can be used to signal a cancellation request to one or more
+/// tasks.
+///
+/// Tasks can call [`CancellationToken::cancelled()`] in order to
+/// obtain a Future which will be resolved when cancellation is requested.
+///
+/// Cancellation can be requested through the [`CancellationToken::cancel`] method.
+///
+/// # Examples
+///
+/// ```ignore
+/// use tokio::select;
+/// use tokio::scope::CancellationToken;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let token = CancellationToken::new();
+///     let cloned_token = token.clone();
+///
+///     let join_handle = tokio::spawn(async move {
+///         // Wait for either cancellation or a very long time
+///         select! {
+///             _ = cloned_token.cancelled() => {
+///                 // The token was cancelled
+///                 5
+///             }
+///             _ = tokio::time::delay_for(std::time::Duration::from_secs(9999)) => {
+///                 99
+///             }
+///         }
+///     });
+///
+///     tokio::spawn(async move {
+///         tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
+///         token.cancel();
+///     });
+///
+///     assert_eq!(5, join_handle.await.unwrap());
+/// }
+/// ```
+pub struct CancellationToken {
+    inner: NonNull<CancellationTokenState>,
+}
+
+// Safety: The CancellationToken is thread-safe and can be moved between threads,
+// since all methods are internally synchronized.
+unsafe impl Send for CancellationToken {}
+unsafe impl Sync for CancellationToken {}
+
+impl core::fmt::Debug for CancellationToken {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("CancellationToken")
+            .field("is_cancelled", &self.is_cancelled())
+            .finish()
+    }
+}
+
+impl Clone for CancellationToken {
+    fn clone(&self) -> Self {
+        // Safety: The state inside a `CancellationToken` is always valid, since
+        // is reference counted
+        let inner = self.state();
+
+        // Tokens are cloned by increasing their refcount
+        let current_state = inner.snapshot();
+        inner.increment_refcount(current_state);
+
+        CancellationToken { inner: self.inner }
+    }
+}
+
+impl Drop for CancellationToken {
+    fn drop(&mut self) {
+        let token_state_pointer = self.inner;
+
+        // Safety: The state inside a `CancellationToken` is always valid, since
+        // is reference counted
+        let inner = unsafe { &mut *self.inner.as_ptr() };
+
+        let mut current_state = inner.snapshot();
+
+        // We need to safe the parent, since the state might be released by the
+        // next call
+        let parent = inner.parent;
+
+        // Drop our own refcount
+        current_state = inner.decrement_refcount(current_state);
+
+        // If this was the last reference, unregister from the parent
+        if current_state.refcount == 0 {
+            if let Some(mut parent) = parent {
+                // Safety: Since we still retain a reference on the parent, it must be valid.
+                let parent = unsafe { parent.as_mut() };
+                parent.unregister_child(token_state_pointer, current_state);
+            }
+        }
+    }
+}
+
+impl CancellationToken {
+    /// Creates a new CancellationToken in the non-cancelled state.
+    #[allow(dead_code)]
+    pub(crate) fn new() -> CancellationToken {
+        let state = Box::new(CancellationTokenState::new(
+            None,
+            StateSnapshot {
+                cancel_state: CancellationState::NotCancelled,
+                has_parent_ref: false,
+                refcount: 1,
+            },
+        ));
+
+        // Safety: We just created the Box. The pointer is guaranteed to be
+        // not null
+        CancellationToken {
+            inner: unsafe { NonNull::new_unchecked(Box::into_raw(state)) },
+        }
+    }
+
+    /// Returns a reference to the utilized `CancellationTokenState`.
+    fn state(&self) -> &CancellationTokenState {
+        // Safety: The state inside a `CancellationToken` is always valid, since
+        // is reference counted
+        unsafe { &*self.inner.as_ptr() }
+    }
+
+    /// Creates a `CancellationToken` which will get cancelled whenever the
+    /// current token gets cancelled.
+    ///
+    /// If the current token is already cancelled, the child token will get
+    /// returned in cancelled state.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use tokio::select;
+    /// use tokio::scope::CancellationToken;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let token = CancellationToken::new();
+    ///     let child_token = token.child_token();
+    ///
+    ///     let join_handle = tokio::spawn(async move {
+    ///         // Wait for either cancellation or a very long time
+    ///         select! {
+    ///             _ = child_token.cancelled() => {
+    ///                 // The token was cancelled
+    ///                 5
+    ///             }
+    ///             _ = tokio::time::delay_for(std::time::Duration::from_secs(9999)) => {
+    ///                 99
+    ///             }
+    ///         }
+    ///     });
+    ///
+    ///     tokio::spawn(async move {
+    ///         tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
+    ///         token.cancel();
+    ///     });
+    ///
+    ///     assert_eq!(5, join_handle.await.unwrap());
+    /// }
+    /// ```
+    #[allow(dead_code)]
+    pub(crate) fn child_token(&self) -> CancellationToken {
+        let inner = self.state();
+
+        // Increment the refcount of this token. It will be referenced by the
+        // child, independent of whether the child is immediately cancelled or
+        // not.
+        let _current_state = inner.increment_refcount(inner.snapshot());
+
+        let mut unpacked_child_state = StateSnapshot {
+            has_parent_ref: true,
+            refcount: 1,
+            cancel_state: CancellationState::NotCancelled,
+        };
+        let mut child_token_state = Box::new(CancellationTokenState::new(
+            Some(self.inner),
+            unpacked_child_state,
+        ));
+
+        {
+            let mut guard = inner.synchronized.lock().unwrap();
+            if guard.is_cancelled {
+                // This task was already cancelled. In this case we should not
+                // insert the child into the list, since it would never get removed
+                // from the list.
+                (*child_token_state.synchronized.lock().unwrap()).is_cancelled = true;
+                unpacked_child_state.cancel_state = CancellationState::Cancelled;
+                // Since it's not in the list, the parent doesn't need to retain
+                // a reference to it.
+                unpacked_child_state.has_parent_ref = false;
+                child_token_state
+                    .state
+                    .store(unpacked_child_state.pack(), Ordering::SeqCst);
+            } else {
+                if let Some(mut first_child) = guard.first_child {
+                    child_token_state.from_parent.next_peer = Some(first_child);
+                    // Safety: We manipulate other child task inside the Mutex
+                    // and retain a parent reference on it. The child token can't
+                    // get invalidated while the Mutex is held.
+                    unsafe {
+                        first_child.as_mut().from_parent.prev_peer =
+                            Some((&mut *child_token_state).into())
+                    };
+                }
+                guard.first_child = Some((&mut *child_token_state).into());
+            }
+        };
+
+        let child_token_ptr = Box::into_raw(child_token_state);
+        // Safety: We just created the pointer from a `Box`
+        CancellationToken {
+            inner: unsafe { NonNull::new_unchecked(child_token_ptr) },
+        }
+    }
+
+    /// Returns the number of child tokens
+    #[cfg(all(test, not(loom)))]
+    fn child_tokens(&self) -> usize {
+        let mut result = 0;
+        let inner = self.state();
+
+        let guard = inner.synchronized.lock().unwrap();
+        let mut child = guard.first_child;
+        while let Some(mut c) = child {
+            result += 1;
+            // Safety: The child state is accessed from within a Mutex. Since
+            // the child needs to take the Mutex to unregister itself before
+            // getting destroyed, it is guaranteed to be alive.
+            child = unsafe { c.as_mut().from_parent.next_peer };
+        }
+
+        result
+    }
+
+    /// Cancel the [`CancellationToken`] and all child tokens which had been
+    /// derived from it.
+    ///
+    /// This will wake up all tasks which are waiting for cancellation.
+    #[allow(dead_code)]
+    pub(crate) fn cancel(&self) {
+        self.state().cancel();
+    }
+
+    /// Returns `true` if the `CancellationToken` had been cancelled
+    pub fn is_cancelled(&self) -> bool {
+        self.state().is_cancelled()
+    }
+
+    /// Returns a `Future` that gets fulfilled when cancellation is requested.
+    pub fn cancelled(&self) -> WaitForCancellationFuture<'_> {
+        WaitForCancellationFuture {
+            cancellation_token: Some(self),
+            wait_node: ListNode::new(WaitQueueEntry::new()),
+            is_registered: false,
+        }
+    }
+
+    unsafe fn register(
+        &self,
+        wait_node: &mut ListNode<WaitQueueEntry>,
+        cx: &mut Context<'_>,
+    ) -> Poll<()> {
+        self.state().register(wait_node, cx)
+    }
+
+    fn check_for_cancellation(
+        &self,
+        wait_node: &mut ListNode<WaitQueueEntry>,
+        cx: &mut Context<'_>,
+    ) -> Poll<()> {
+        self.state().check_for_cancellation(wait_node, cx)
+    }
+
+    fn unregister(&self, wait_node: &mut ListNode<WaitQueueEntry>) {
+        self.state().unregister(wait_node)
+    }
+}
+
+/// A Future that is resolved once the corresponding [`CancellationToken`]
+/// was cancelled
+#[must_use = "futures do nothing unless polled"]
+pub struct WaitForCancellationFuture<'a> {
+    /// The CancellationToken that is associated with this WaitForCancellationFuture
+    cancellation_token: Option<&'a CancellationToken>,
+    /// Node for waiting at the cancellation_token
+    wait_node: ListNode<WaitQueueEntry>,
+    /// Whether this future was registered at the token yet as a waiter
+    is_registered: bool,
+}
+
+// Safety: Futures can be sent between threads as long as the underlying
+// cancellation_token is thread-safe (Sync),
+// which allows to poll/register/unregister from a different thread.
+unsafe impl<'a> Send for WaitForCancellationFuture<'a> {}
+
+impl<'a> core::fmt::Debug for WaitForCancellationFuture<'a> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("WaitForCancellationFuture").finish()
+    }
+}
+
+impl<'a> Future for WaitForCancellationFuture<'a> {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+        // Safety: We do not move anything out of `WaitForCancellationFuture`
+        let mut_self: &mut WaitForCancellationFuture<'_> = unsafe { Pin::get_unchecked_mut(self) };
+
+        let cancellation_token = mut_self
+            .cancellation_token
+            .expect("polled WaitForCancellationFuture after completion");
+
+        let poll_res = if !mut_self.is_registered {
+            // Safety: The `ListNode` is pinned through the Future,
+            // and we will unregister it in `WaitForCancellationFuture::drop`
+            // before the Future is dropped and the memory reference is invalidated.
+            unsafe { cancellation_token.register(&mut mut_self.wait_node, cx) }
+        } else {
+            cancellation_token.check_for_cancellation(&mut mut_self.wait_node, cx)
+        };
+
+        if let Poll::Ready(()) = poll_res {
+            // The cancellation_token was signalled
+            mut_self.cancellation_token = None;
+            // A signalled Token means the Waker won't be enqueued anymore
+            mut_self.is_registered = false;
+            mut_self.wait_node.task = None;
+        } else {
+            // This `Future` and its stored `Waker` stay registered at the
+            // `CancellationToken`
+            mut_self.is_registered = true;
+        }
+
+        poll_res
+    }
+}
+
+impl<'a> Drop for WaitForCancellationFuture<'a> {
+    fn drop(&mut self) {
+        // If this WaitForCancellationFuture has been polled and it was added to the
+        // wait queue at the cancellation_token, it must be removed before dropping.
+        // Otherwise the cancellation_token would access invalid memory.
+        if let Some(token) = self.cancellation_token {
+            if self.is_registered {
+                token.unregister(&mut self.wait_node);
+            }
+        }
+    }
+}
+
 /// Tracks how the future had interacted with the [`CancellationToken`]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum PollState {
@@ -523,360 +877,6 @@ impl CancellationTokenState {
             wait_node.state = PollState::Done;
         }
         wait_node.task = None;
-    }
-}
-
-/// A token which can be used to signal a cancellation request to one or more
-/// tasks.
-///
-/// Tasks can call [`CancellationToken::cancelled()`] in order to
-/// obtain a Future which will be resolved when cancellation is requested.
-///
-/// Cancellation can be requested through the [`CancellationToken::cancel`] method.
-///
-/// # Examples
-///
-/// ```ignore
-/// use tokio::select;
-/// use tokio::scope::CancellationToken;
-///
-/// #[tokio::main]
-/// async fn main() {
-///     let token = CancellationToken::new();
-///     let cloned_token = token.clone();
-///
-///     let join_handle = tokio::spawn(async move {
-///         // Wait for either cancellation or a very long time
-///         select! {
-///             _ = cloned_token.cancelled() => {
-///                 // The token was cancelled
-///                 5
-///             }
-///             _ = tokio::time::delay_for(std::time::Duration::from_secs(9999)) => {
-///                 99
-///             }
-///         }
-///     });
-///
-///     tokio::spawn(async move {
-///         tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
-///         token.cancel();
-///     });
-///
-///     assert_eq!(5, join_handle.await.unwrap());
-/// }
-/// ```
-pub struct CancellationToken {
-    inner: NonNull<CancellationTokenState>,
-}
-
-// Safety: The CancellationToken is thread-safe and can be moved between threads,
-// since all methods are internally synchronized.
-unsafe impl Send for CancellationToken {}
-unsafe impl Sync for CancellationToken {}
-
-impl core::fmt::Debug for CancellationToken {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("CancellationToken")
-            .field("is_cancelled", &self.is_cancelled())
-            .finish()
-    }
-}
-
-impl Clone for CancellationToken {
-    fn clone(&self) -> Self {
-        // Safety: The state inside a `CancellationToken` is always valid, since
-        // is reference counted
-        let inner = self.state();
-
-        // Tokens are cloned by increasing their refcount
-        let current_state = inner.snapshot();
-        inner.increment_refcount(current_state);
-
-        CancellationToken { inner: self.inner }
-    }
-}
-
-impl Drop for CancellationToken {
-    fn drop(&mut self) {
-        let token_state_pointer = self.inner;
-
-        // Safety: The state inside a `CancellationToken` is always valid, since
-        // is reference counted
-        let inner = unsafe { &mut *self.inner.as_ptr() };
-
-        let mut current_state = inner.snapshot();
-
-        // We need to safe the parent, since the state might be released by the
-        // next call
-        let parent = inner.parent;
-
-        // Drop our own refcount
-        current_state = inner.decrement_refcount(current_state);
-
-        // If this was the last reference, unregister from the parent
-        if current_state.refcount == 0 {
-            if let Some(mut parent) = parent {
-                // Safety: Since we still retain a reference on the parent, it must be valid.
-                let parent = unsafe { parent.as_mut() };
-                parent.unregister_child(token_state_pointer, current_state);
-            }
-        }
-    }
-}
-
-impl CancellationToken {
-    /// Creates a new CancellationToken in the non-cancelled state.
-    #[allow(dead_code)]
-    pub(crate) fn new() -> CancellationToken {
-        let state = Box::new(CancellationTokenState::new(
-            None,
-            StateSnapshot {
-                cancel_state: CancellationState::NotCancelled,
-                has_parent_ref: false,
-                refcount: 1,
-            },
-        ));
-
-        // Safety: We just created the Box. The pointer is guaranteed to be
-        // not null
-        CancellationToken {
-            inner: unsafe { NonNull::new_unchecked(Box::into_raw(state)) },
-        }
-    }
-
-    /// Returns a reference to the utilized `CancellationTokenState`.
-    fn state(&self) -> &CancellationTokenState {
-        // Safety: The state inside a `CancellationToken` is always valid, since
-        // is reference counted
-        unsafe { &*self.inner.as_ptr() }
-    }
-
-    /// Creates a `CancellationToken` which will get cancelled whenever the
-    /// current token gets cancelled.
-    ///
-    /// If the current token is already cancelled, the child token will get
-    /// returned in cancelled state.
-    ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// use tokio::select;
-    /// use tokio::scope::CancellationToken;
-    ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let token = CancellationToken::new();
-    ///     let child_token = token.child_token();
-    ///
-    ///     let join_handle = tokio::spawn(async move {
-    ///         // Wait for either cancellation or a very long time
-    ///         select! {
-    ///             _ = child_token.cancelled() => {
-    ///                 // The token was cancelled
-    ///                 5
-    ///             }
-    ///             _ = tokio::time::delay_for(std::time::Duration::from_secs(9999)) => {
-    ///                 99
-    ///             }
-    ///         }
-    ///     });
-    ///
-    ///     tokio::spawn(async move {
-    ///         tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
-    ///         token.cancel();
-    ///     });
-    ///
-    ///     assert_eq!(5, join_handle.await.unwrap());
-    /// }
-    /// ```
-    #[allow(dead_code)]
-    pub(crate) fn child_token(&self) -> CancellationToken {
-        let inner = self.state();
-
-        // Increment the refcount of this token. It will be referenced by the
-        // child, independent of whether the child is immediately cancelled or
-        // not.
-        let _current_state = inner.increment_refcount(inner.snapshot());
-
-        let mut unpacked_child_state = StateSnapshot {
-            has_parent_ref: true,
-            refcount: 1,
-            cancel_state: CancellationState::NotCancelled,
-        };
-        let mut child_token_state = Box::new(CancellationTokenState::new(
-            Some(self.inner),
-            unpacked_child_state,
-        ));
-
-        {
-            let mut guard = inner.synchronized.lock().unwrap();
-            if guard.is_cancelled {
-                // This task was already cancelled. In this case we should not
-                // insert the child into the list, since it would never get removed
-                // from the list.
-                (*child_token_state.synchronized.lock().unwrap()).is_cancelled = true;
-                unpacked_child_state.cancel_state = CancellationState::Cancelled;
-                // Since it's not in the list, the parent doesn't need to retain
-                // a reference to it.
-                unpacked_child_state.has_parent_ref = false;
-                child_token_state
-                    .state
-                    .store(unpacked_child_state.pack(), Ordering::SeqCst);
-            } else {
-                if let Some(mut first_child) = guard.first_child {
-                    child_token_state.from_parent.next_peer = Some(first_child);
-                    // Safety: We manipulate other child task inside the Mutex
-                    // and retain a parent reference on it. The child token can't
-                    // get invalidated while the Mutex is held.
-                    unsafe {
-                        first_child.as_mut().from_parent.prev_peer =
-                            Some((&mut *child_token_state).into())
-                    };
-                }
-                guard.first_child = Some((&mut *child_token_state).into());
-            }
-        };
-
-        let child_token_ptr = Box::into_raw(child_token_state);
-        // Safety: We just created the pointer from a `Box`
-        CancellationToken {
-            inner: unsafe { NonNull::new_unchecked(child_token_ptr) },
-        }
-    }
-
-    /// Returns the number of child tokens
-    #[cfg(all(test, not(loom)))]
-    fn child_tokens(&self) -> usize {
-        let mut result = 0;
-        let inner = self.state();
-
-        let guard = inner.synchronized.lock().unwrap();
-        let mut child = guard.first_child;
-        while let Some(mut c) = child {
-            result += 1;
-            // Safety: The child state is accessed from within a Mutex. Since
-            // the child needs to take the Mutex to unregister itself before
-            // getting destroyed, it is guaranteed to be alive.
-            child = unsafe { c.as_mut().from_parent.next_peer };
-        }
-
-        result
-    }
-
-    /// Cancel the [`CancellationToken`] and all child tokens which had been
-    /// derived from it.
-    ///
-    /// This will wake up all tasks which are waiting for cancellation.
-    #[allow(dead_code)]
-    pub(crate) fn cancel(&self) {
-        self.state().cancel();
-    }
-
-    /// Returns `true` if the `CancellationToken` had been cancelled
-    pub fn is_cancelled(&self) -> bool {
-        self.state().is_cancelled()
-    }
-
-    /// Returns a `Future` that gets fulfilled when cancellation is requested.
-    pub fn cancelled(&self) -> WaitForCancellationFuture<'_> {
-        WaitForCancellationFuture {
-            cancellation_token: Some(self),
-            wait_node: ListNode::new(WaitQueueEntry::new()),
-            is_registered: false,
-        }
-    }
-
-    unsafe fn register(
-        &self,
-        wait_node: &mut ListNode<WaitQueueEntry>,
-        cx: &mut Context<'_>,
-    ) -> Poll<()> {
-        self.state().register(wait_node, cx)
-    }
-
-    fn check_for_cancellation(
-        &self,
-        wait_node: &mut ListNode<WaitQueueEntry>,
-        cx: &mut Context<'_>,
-    ) -> Poll<()> {
-        self.state().check_for_cancellation(wait_node, cx)
-    }
-
-    fn unregister(&self, wait_node: &mut ListNode<WaitQueueEntry>) {
-        self.state().unregister(wait_node)
-    }
-}
-
-/// A Future that is resolved once the corresponding [`CancellationToken`]
-/// was cancelled
-#[must_use = "futures do nothing unless polled"]
-pub struct WaitForCancellationFuture<'a> {
-    /// The CancellationToken that is associated with this WaitForCancellationFuture
-    cancellation_token: Option<&'a CancellationToken>,
-    /// Node for waiting at the cancellation_token
-    wait_node: ListNode<WaitQueueEntry>,
-    /// Whether this future was registered at the token yet as a waiter
-    is_registered: bool,
-}
-
-// Safety: Futures can be sent between threads as long as the underlying
-// cancellation_token is thread-safe (Sync),
-// which allows to poll/register/unregister from a different thread.
-unsafe impl<'a> Send for WaitForCancellationFuture<'a> {}
-
-impl<'a> core::fmt::Debug for WaitForCancellationFuture<'a> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("WaitForCancellationFuture").finish()
-    }
-}
-
-impl<'a> Future for WaitForCancellationFuture<'a> {
-    type Output = ();
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-        // Safety: We do not move anything out of `WaitForCancellationFuture`
-        let mut_self: &mut WaitForCancellationFuture<'_> = unsafe { Pin::get_unchecked_mut(self) };
-
-        let cancellation_token = mut_self
-            .cancellation_token
-            .expect("polled WaitForCancellationFuture after completion");
-
-        let poll_res = if !mut_self.is_registered {
-            // Safety: The `ListNode` is pinned through the Future,
-            // and we will unregister it in `WaitForCancellationFuture::drop`
-            // before the Future is dropped and the memory reference is invalidated.
-            unsafe { cancellation_token.register(&mut mut_self.wait_node, cx) }
-        } else {
-            cancellation_token.check_for_cancellation(&mut mut_self.wait_node, cx)
-        };
-
-        if let Poll::Ready(()) = poll_res {
-            // The cancellation_token was signalled
-            mut_self.cancellation_token = None;
-            // A signalled Token means the Waker won't be enqueued anymore
-            mut_self.is_registered = false;
-            mut_self.wait_node.task = None;
-        } else {
-            // This `Future` and its stored `Waker` stay registered at the
-            // `CancellationToken`
-            mut_self.is_registered = true;
-        }
-
-        poll_res
-    }
-}
-
-impl<'a> Drop for WaitForCancellationFuture<'a> {
-    fn drop(&mut self) {
-        // If this WaitForCancellationFuture has been polled and it was added to the
-        // wait queue at the cancellation_token, it must be removed before dropping.
-        // Otherwise the cancellation_token would access invalid memory.
-        if let Some(token) = self.cancellation_token {
-            if self.is_registered {
-                token.unregister(&mut self.wait_node);
-            }
-        }
     }
 }
 
