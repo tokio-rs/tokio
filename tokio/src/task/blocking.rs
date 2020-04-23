@@ -39,10 +39,9 @@ cfg_rt_threaded! {
 cfg_blocking! {
     /// Runs the provided closure on a thread where blocking is acceptable.
     ///
-    /// In general, issuing a blocking call or performing a lot of compute in a future without
-    /// yielding is not okay, as it may prevent the executor from driving other futures forward.
-    /// A closure that is run through this method will instead be run on a dedicated thread pool for
-    /// such blocking tasks without holding up the main futures executor.
+    /// More information about the blocking threads is available at [CPU-bound tasks and blocking code][blocking].
+    ///
+    ///  [blocking]: ../index.html#cpu-bound-tasks-and-blocking-code
     ///
     /// # Examples
     ///
