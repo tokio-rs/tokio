@@ -27,7 +27,13 @@ use std::task::Poll::*;
 /// it was opened with. Files also implement [`AsyncSeek`] to alter the logical
 /// cursor that the file contains internally.
 ///
-/// Files are automatically closed when they go out of scope.
+/// A file will not be closed immediately when it goes out of scope if there
+/// are any IO operations that have not yet completed. To ensure that a file is
+/// closed immediately when it is dropped, you should call [`flush`] before
+/// dropping it. Note that this does not ensure that the file has been fully
+/// written to disk; the operating system might keep the changes around in an
+/// in-memory buffer. See the [`sync_all`] method for telling the OS to write
+/// the data to disk.
 ///
 /// Reading and writing to a `File` is usually done using the convenience
 /// methods found on the [`AsyncReadExt`] and [`AsyncWriteExt`] traits. Examples
