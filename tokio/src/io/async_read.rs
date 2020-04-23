@@ -140,12 +140,14 @@ macro_rules! deref_async_read {
             (**self).prepare_uninitialized_buffer(buf)
         }
 
-        fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8])
-            -> Poll<io::Result<usize>>
-        {
+        fn poll_read(
+            mut self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            buf: &mut [u8],
+        ) -> Poll<io::Result<usize>> {
             Pin::new(&mut **self).poll_read(cx, buf)
         }
-    }
+    };
 }
 
 impl<T: ?Sized + AsyncRead + Unpin> AsyncRead for Box<T> {
