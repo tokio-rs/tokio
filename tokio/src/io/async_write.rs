@@ -153,9 +153,11 @@ pub trait AsyncWrite {
 
 macro_rules! deref_async_write {
     () => {
-        fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8])
-            -> Poll<io::Result<usize>>
-        {
+        fn poll_write(
+            mut self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            buf: &[u8],
+        ) -> Poll<io::Result<usize>> {
             Pin::new(&mut **self).poll_write(cx, buf)
         }
 
@@ -166,7 +168,7 @@ macro_rules! deref_async_write {
         fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
             Pin::new(&mut **self).poll_shutdown(cx)
         }
-    }
+    };
 }
 
 impl<T: ?Sized + AsyncWrite + Unpin> AsyncWrite for Box<T> {
