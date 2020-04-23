@@ -55,13 +55,10 @@ macro_rules! deref_async_seek {
             Pin::new(&mut **self).start_seek(cx, pos)
         }
 
-        fn poll_complete(
-            mut self: Pin<&mut Self>,
-            cx: &mut Context<'_>,
-        ) -> Poll<io::Result<u64>> {
+        fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
             Pin::new(&mut **self).poll_complete(cx)
         }
-    }
+    };
 }
 
 impl<T: ?Sized + AsyncSeek + Unpin> AsyncSeek for Box<T> {
