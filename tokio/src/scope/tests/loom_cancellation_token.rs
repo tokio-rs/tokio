@@ -11,7 +11,7 @@ fn cancel_token() {
 
         let th1 = thread::spawn(move || {
             block_on(async {
-                token1.wait_for_cancellation().await;
+                token1.cancelled().await;
             });
         });
 
@@ -34,7 +34,7 @@ fn cancel_with_child() {
 
         let th1 = thread::spawn(move || {
             block_on(async {
-                token1.wait_for_cancellation().await;
+                token1.cancelled().await;
             });
         });
 
@@ -44,7 +44,7 @@ fn cancel_with_child() {
 
         let th3 = thread::spawn(move || {
             block_on(async {
-                child_token.wait_for_cancellation().await;
+                child_token.cancelled().await;
             });
         });
 

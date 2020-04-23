@@ -529,7 +529,7 @@ impl CancellationTokenState {
 /// A token which can be used to signal a cancellation request to one or more
 /// tasks.
 ///
-/// Tasks can call [`CancellationToken::wait_for_cancellation`] in order to
+/// Tasks can call [`CancellationToken::cancelled()`] in order to
 /// obtain a Future which will be resolved when cancellation is requested.
 ///
 /// Cancellation can be requested through the [`CancellationToken::cancel`] method.
@@ -548,7 +548,7 @@ impl CancellationTokenState {
 ///     let join_handle = tokio::spawn(async move {
 ///         // Wait for either cancellation or a very long time
 ///         select! {
-///             _ = cloned_token.wait_for_cancellation() => {
+///             _ = cloned_token.cancelled() => {
 ///                 // The token was cancelled
 ///                 5
 ///             }
@@ -672,7 +672,7 @@ impl CancellationToken {
     ///     let join_handle = tokio::spawn(async move {
     ///         // Wait for either cancellation or a very long time
     ///         select! {
-    ///             _ = child_token.wait_for_cancellation() => {
+    ///             _ = child_token.cancelled() => {
     ///                 // The token was cancelled
     ///                 5
     ///             }
@@ -778,8 +778,8 @@ impl CancellationToken {
         self.state().is_cancelled()
     }
 
-    /// Returns a `Future` that gets fulfilled when cancellation is signalled.
-    pub fn wait_for_cancellation(&self) -> WaitForCancellationFuture<'_> {
+    /// Returns a `Future` that gets fulfilled when cancellation is requested.
+    pub fn cancelled(&self) -> WaitForCancellationFuture<'_> {
         WaitForCancellationFuture {
             cancellation_token: Some(self),
             wait_node: ListNode::new(WaitQueueEntry::new()),
@@ -892,7 +892,7 @@ mod tests {
         let token = CancellationToken::new();
         assert_eq!(false, token.is_cancelled());
 
-        let wait_fut = token.wait_for_cancellation();
+        let wait_fut = token.cancelled();
         pin!(wait_fut);
 
         assert_eq!(
@@ -901,7 +901,7 @@ mod tests {
         );
         assert_eq!(wake_counter, 0);
 
-        let wait_fut_2 = token.wait_for_cancellation();
+        let wait_fut_2 = token.cancelled();
         pin!(wait_fut_2);
 
         token.cancel();
@@ -933,9 +933,9 @@ mod tests {
             child_token.state().snapshot()
         );
 
-        let child_fut = child_token.wait_for_cancellation();
+        let child_fut = child_token.cancelled();
         pin!(child_fut);
-        let parent_fut = token.wait_for_cancellation();
+        let parent_fut = token.cancelled();
         pin!(parent_fut);
 
         assert_eq!(
@@ -978,9 +978,9 @@ mod tests {
 
         let child_token_1 = token.child_token();
 
-        let child_fut = child_token_1.wait_for_cancellation();
+        let child_fut = child_token_1.cancelled();
         pin!(child_fut);
-        let parent_fut = token.wait_for_cancellation();
+        let parent_fut = token.cancelled();
         pin!(parent_fut);
 
         assert_eq!(
@@ -1016,7 +1016,7 @@ mod tests {
         );
 
         let child_token_2 = token.child_token();
-        let child_fut_2 = child_token_2.wait_for_cancellation();
+        let child_fut_2 = child_token_2.cancelled();
         pin!(child_fut_2);
 
         assert_eq!(
@@ -1061,9 +1061,9 @@ mod tests {
             );
 
             {
-                let child_fut = child_token.wait_for_cancellation();
+                let child_fut = child_token.cancelled();
                 pin!(child_fut);
-                let parent_fut = token.wait_for_cancellation();
+                let parent_fut = token.cancelled();
                 pin!(parent_fut);
 
                 assert_eq!(
@@ -1177,7 +1177,7 @@ mod tests {
     #[test]
     fn cancellation_future_is_send() {
         let token = CancellationToken::new();
-        let fut = token.wait_for_cancellation();
+        let fut = token.cancelled();
 
         fn with_send<T: Send>(_: T) {}
 
