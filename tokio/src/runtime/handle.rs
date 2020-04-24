@@ -133,6 +133,27 @@ cfg_rt_core! {
         ///
         /// This function panics if the executor is at capacity, if the provided
         /// future panics, or if called within an asynchronous execution context.
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::runtime::Runtime;
+        /// use std::thread;
+        ///
+        /// // Create the runtime
+        /// let rt = Runtime::new().unwrap();
+        /// let handle = rt.handle().clone();
+        ///
+        /// // Use the runtime from another thread
+        /// let th = thread::spawn(move || {
+        ///     // Execute the future, blocking the current thread until completion
+        ///     handle.block_on(async {
+        ///         println!("hello");
+        ///     });
+        /// });
+        ///
+        /// th.join().unwrap();
+        /// ```
         pub fn block_on<F: Future>(&self, future: F) -> F::Output {
             self.enter(|| {
                 let mut enter = crate::runtime::enter(true);

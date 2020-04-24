@@ -35,6 +35,22 @@ macro_rules! cfg_blocking_impl {
     }
 }
 
+/// Enables enter::block_on
+macro_rules! cfg_block_on {
+    ($($item:item)*) => {
+        $(
+            #[cfg(any(
+                    feature = "blocking",
+                    feature = "fs",
+                    feature = "dns",
+                    feature = "io-std",
+                    feature = "rt-core",
+                    ))]
+            $item
+        )*
+    }
+}
+
 /// Enables blocking API internals
 macro_rules! cfg_not_blocking_impl {
     ($($item:item)*) => {
