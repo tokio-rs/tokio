@@ -449,30 +449,35 @@ impl Runtime {
 
     /// Enter the runtime context. This allows you to construct types that must
     /// have an executor available on creation such as [`Delay`] or [`TcpStream`].
+    /// It will also allow you to call methods such as [`tokio::spawn`].
     ///
     /// This function is also available as [`Handle::enter`].
     ///
     /// [`Delay`]: struct@crate::time::Delay
     /// [`TcpStream`]: struct@crate::net::TcpStream
-    /// [`Handle::enter`]: fn@Handle::enter
+    /// [`Handle::enter`]: fn@crate::runtime::Handle::enter
+    /// [`tokio::spawn`]: fn@crate::spawn
     ///
     /// # Example
     ///
-    /// ```no_run
-    /// use std::net::TcpStream as StdTcpStream;
-    /// use tokio::net::TcpStream as TokioTcpStream;
-    ///
+    /// ```
     /// use tokio::runtime::Runtime;
-    /// let rt = Runtime::new().unwrap();
     ///
-    /// // Use the standard library to create a tcp stream in
-    /// // synchronous code.
-    /// let std_stream = StdTcpStream::connect("127.0.0.1:8000").unwrap();
+    /// fn function_that_spawns(msg: String) {
+    ///     // Had we not used `rt.enter` below, this would panic.
+    ///     tokio::spawn(async move {
+    ///         println!("{}", msg);
+    ///     });
+    /// }
     ///
-    /// // Convert it to an async tcp stream from synchronous code.
-    /// let tokio_stream = rt.enter(|| {
-    ///     TokioTcpStream::from_std(std_stream)
-    /// }).unwrap();
+    /// fn main() {
+    ///     let rt = Runtime::new().unwrap();
+    ///
+    ///     let s = "Hello World!".to_string();
+    ///
+    ///     // By entering the context, we tie `tokio::spawn` to this executor.
+    ///     rt.enter(|| function_that_spawns(s));
+    /// }
     /// ```
     pub fn enter<F, R>(&self, f: F) -> R
     where
