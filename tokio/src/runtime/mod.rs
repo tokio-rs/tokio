@@ -379,8 +379,14 @@ impl Runtime {
     ///
     /// # Panics
     ///
-    /// This function panics if the spawn fails. Failure occurs if the executor
-    /// is currently at capacity and is unable to spawn a new future.
+    /// This function will not panic unless task execution is disabled on the
+    /// executor. This can only happen if the runtime was built using
+    /// [`Builder`] without picking either [`basic_scheduler`] or
+    /// [`threaded_scheduler`].
+    ///
+    /// [`Builder`]: struct@Builder
+    /// [`threaded_scheduler`]: fn@Builder::threaded_scheduler
+    /// [`basic_scheduler`]: fn@Builder::basic_scheduler
     #[cfg(feature = "rt-core")]
     pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
@@ -407,12 +413,12 @@ impl Runtime {
     /// configured. [`runtime::Handle::block_on`][handle] provides a version
     /// that takes `&self`.
     ///
-    /// This method should not be called from an asynchronous context.
+    /// This method may not be called from an asynchronous context.
     ///
     /// # Panics
     ///
-    /// This function panics if the executor is at capacity, if the provided
-    /// future panics, or if called within an asynchronous execution context.
+    /// This function panics if the provided future panics, or if called within an
+    /// asynchronous execution context.
     ///
     /// # Examples
     ///
@@ -441,7 +447,33 @@ impl Runtime {
         })
     }
 
-    /// Enter the runtime context.
+    /// Enter the runtime context. This allows you to construct types that must
+    /// have an executor available on creation such as [`Delay`] or [`TcpStream`].
+    ///
+    /// This function is also available as [`Handle::enter`].
+    ///
+    /// [`Delay`]: struct@crate::time::Delay
+    /// [`TcpStream`]: struct@crate::net::TcpStream
+    /// [`Handle::enter`]: fn@Handle::enter
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use std::net::TcpStream as StdTcpStream;
+    /// use tokio::net::TcpStream as TokioTcpStream;
+    ///
+    /// use tokio::runtime::Runtime;
+    /// let rt = Runtime::new().unwrap();
+    ///
+    /// // Use the standard library to create a tcp stream in
+    /// // synchronous code.
+    /// let std_stream = StdTcpStream::connect("127.0.0.1:8000").unwrap();
+    ///
+    /// // Convert it to an async tcp stream from synchronous code.
+    /// let tokio_stream = rt.enter(|| {
+    ///     TokioTcpStream::from_std(std_stream)
+    /// }).unwrap();
+    /// ```
     pub fn enter<F, R>(&self, f: F) -> R
     where
         F: FnOnce() -> R,
@@ -476,7 +508,7 @@ impl Runtime {
     /// Usually, dropping a `Runtime` handle is sufficient as tasks are able to
     /// shutdown in a timely fashion. However, dropping a `Runtime` will wait
     /// indefinitely for all tasks to terminate, and there are cases where a long
-    /// blocking task has been spawned which can block dropping `Runtime`.
+    /// blocking task has been spawned, which can block dropping `Runtime`.
     ///
     /// In this case, calling `shutdown_timeout` with an explicit wait timeout
     /// can work. The `shutdown_timeout` will signal all tasks to shutdown and

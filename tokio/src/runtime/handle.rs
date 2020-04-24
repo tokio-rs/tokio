@@ -31,7 +31,32 @@ pub struct Handle {
 }
 
 impl Handle {
-    /// Enter the runtime context.
+    /// Enter the runtime context. This allows you to construct types that must
+    /// have an executor available on creation such as [`Delay`] or [`TcpStream`].
+    ///
+    /// [`Delay`]: struct@crate::time::Delay
+    /// [`TcpStream`]: struct@crate::net::TcpStream
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use std::net::TcpStream as StdTcpStream;
+    /// use tokio::net::TcpStream as TokioTcpStream;
+    ///
+    /// use tokio::runtime::Runtime;
+    /// let rt = Runtime::new().unwrap();
+    ///
+    /// let handle = rt.handle().clone();
+    ///
+    /// // Use the standard library to create a tcp stream in
+    /// // synchronous code.
+    /// let std_stream = StdTcpStream::connect("127.0.0.1:8000").unwrap();
+    ///
+    /// // Convert it to an async tcp stream from synchronous code.
+    /// let tokio_stream = handle.enter(|| {
+    ///     TokioTcpStream::from_std(std_stream)
+    /// }).unwrap();
+    /// ```
     pub fn enter<F, R>(&self, f: F) -> R
     where
         F: FnOnce() -> R,
@@ -110,8 +135,14 @@ cfg_rt_core! {
         ///
         /// # Panics
         ///
-        /// This function panics if the spawn fails. Failure occurs if the executor
-        /// is currently at capacity and is unable to spawn a new future.
+        /// This function will not panic unless task execution is disabled on the
+        /// executor. This can only happen if the runtime was built using
+        /// [`Builder`] without picking either [`basic_scheduler`] or
+        /// [`threaded_scheduler`].
+        ///
+        /// [`Builder`]: struct@crate::runtime::Builder
+        /// [`threaded_scheduler`]: fn@crate::runtime::Builder::threaded_scheduler
+        /// [`basic_scheduler`]: fn@crate::runtime::Builder::basic_scheduler
         pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
         where
             F: Future + Send + 'static,
@@ -127,26 +158,47 @@ cfg_rt_core! {
         /// complete, and yielding its resolved result. Any tasks or timers which
         /// the future spawns internally will be executed on the runtime.
         ///
-        /// This method should not be called from an asynchronous context.
+        /// If the provided executor currently has no active core thread, this
+        /// function might hang until a core thread is added. This is not a
+        /// concern when using the [threaded scheduler], as it always has active
+        /// core threads, but if you use the [basic scheduler], some other
+        /// thread must currently be inside a call to [`Runtime::block_on`].
+        /// See also [the module level documentation][1], which has a section on
+        /// scheduler types.
+        ///
+        /// This method may not be called from an asynchronous context.
+        ///
+        /// [threaded scheduler]: fn@crate::runtime::Builder::threaded_scheduler
+        /// [basic scheduler]: fn@crate::runtime::Builder::basic_scheduler
+        /// [`Runtime::block_on`]: fn@crate::runtime::Runtime::block_on
+        /// [1]: index.html#runtime-configurations
         ///
         /// # Panics
         ///
-        /// This function panics if the executor is at capacity, if the provided
-        /// future panics, or if called within an asynchronous execution context.
+        /// This function panics if the provided future panics, or if called
+        /// within an asynchronous execution context.
         ///
         /// # Examples
         ///
-        /// ```no_run
+        /// Using `block_on` with the [threaded scheduler].
+        ///
+        /// ```
         /// use tokio::runtime::Runtime;
         /// use std::thread;
         ///
-        /// // Create the runtime
+        /// // Create the runtime.
+        /// //
+        /// // If the rt-threaded feature is enabled, this creates a threaded
+        /// // scheduler by default.
         /// let rt = Runtime::new().unwrap();
         /// let handle = rt.handle().clone();
         ///
-        /// // Use the runtime from another thread
+        /// // Use the runtime from another thread.
         /// let th = thread::spawn(move || {
-        ///     // Execute the future, blocking the current thread until completion
+        ///     // Execute the future, blocking the current thread until completion.
+        ///     //
+        ///     // This example uses the threaded scheduler, so no concurrent call to
+        ///     // `rt.block_on` is required.
         ///     handle.block_on(async {
         ///         println!("hello");
         ///     });
@@ -154,6 +206,47 @@ cfg_rt_core! {
         ///
         /// th.join().unwrap();
         /// ```
+        ///
+        /// Using the [basic scheduler] requires a concurrent call to
+        /// [`Runtime::block_on`]:
+        ///
+        /// [threaded scheduler]: fn@crate::runtime::Builder::threaded_scheduler
+        /// [basic scheduler]: fn@crate::runtime::Builder::basic_scheduler
+        /// [`Runtime::block_on`]: fn@crate::runtime::Runtime::block_on
+        ///
+        /// ```
+        /// use tokio::runtime::Builder;
+        /// use tokio::sync::oneshot;
+        /// use std::thread;
+        ///
+        /// // Create the runtime.
+        /// let mut rt = Builder::new()
+        ///     .enable_all()
+        ///     .basic_scheduler()
+        ///     .build()
+        ///     .unwrap();
+        ///
+        /// let handle = rt.handle().clone();
+        ///
+        /// // Signal main thread when task has finished.
+        /// let (send, recv) = oneshot::channel();
+        ///
+        /// // Use the runtime from another thread.
+        /// let th = thread::spawn(move || {
+        ///     // Execute the future, blocking the current thread until completion.
+        ///     handle.block_on(async {
+        ///         send.send("done").unwrap();
+        ///     });
+        /// });
+        ///
+        /// // The basic scheduler is used, so the thread above might hang if we
+        /// // didn't call block_on on the rt too.
+        /// rt.block_on(async {
+        ///     assert_eq!(recv.await.unwrap(), "done");
+        /// });
+        /// # th.join().unwrap();
+        /// ```
+        ///
         pub fn block_on<F: Future>(&self, future: F) -> F::Output {
             self.enter(|| {
                 let mut enter = crate::runtime::enter(true);
