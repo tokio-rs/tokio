@@ -83,10 +83,40 @@ rt_test! {
     }
 
     #[test]
+    fn block_on_handle_sync() {
+        let rt = rt();
+
+        let mut win = false;
+        rt.handle().block_on(async {
+            win = true;
+        });
+
+        assert!(win);
+    }
+
+    #[test]
     fn block_on_async() {
         let mut rt = rt();
 
         let out = rt.block_on(async {
+            let (tx, rx) = oneshot::channel();
+
+            thread::spawn(move || {
+                thread::sleep(Duration::from_millis(50));
+                tx.send("ZOMG").unwrap();
+            });
+
+            assert_ok!(rx.await)
+        });
+
+        assert_eq!(out, "ZOMG");
+    }
+
+    #[test]
+    fn block_on_handle_async() {
+        let rt = rt();
+
+        let out = rt.handle().block_on(async {
             let (tx, rx) = oneshot::channel();
 
             thread::spawn(move || {
