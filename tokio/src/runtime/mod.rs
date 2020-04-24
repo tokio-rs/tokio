@@ -379,8 +379,14 @@ impl Runtime {
     ///
     /// # Panics
     ///
-    /// This function panics if the spawn fails. Failure occurs if the executor
-    /// is currently at capacity and is unable to spawn a new future.
+    /// This function will not panic unless task execution is disabled on the
+    /// executor. This can only happen if the runtime was built using
+    /// [`Builder`] without picking either [`basic_scheduler`] or
+    /// [`threaded_scheduler`].
+    ///
+    /// [`Builder`]: struct@Builder
+    /// [`threaded_scheduler`]: fn@Builder::threaded_scheduler
+    /// [`basic_scheduler`]: fn@Builder::basic_scheduler
     #[cfg(feature = "rt-core")]
     pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
@@ -407,12 +413,12 @@ impl Runtime {
     /// configured. [`runtime::Handle::block_on`][handle] provides a version
     /// that takes `&self`.
     ///
-    /// This method should not be called from an asynchronous context.
+    /// This method may not be called from an asynchronous context.
     ///
     /// # Panics
     ///
-    /// This function panics if the executor is at capacity, if the provided
-    /// future panics, or if called within an asynchronous execution context.
+    /// This function panics if the provided future panics, or if called within an
+    /// asynchronous execution context.
     ///
     /// # Examples
     ///
@@ -441,7 +447,38 @@ impl Runtime {
         })
     }
 
-    /// Enter the runtime context.
+    /// Enter the runtime context. This allows you to construct types that must
+    /// have an executor available on creation such as [`Delay`] or [`TcpStream`].
+    /// It will also allow you to call methods such as [`tokio::spawn`].
+    ///
+    /// This function is also available as [`Handle::enter`].
+    ///
+    /// [`Delay`]: struct@crate::time::Delay
+    /// [`TcpStream`]: struct@crate::net::TcpStream
+    /// [`Handle::enter`]: fn@crate::runtime::Handle::enter
+    /// [`tokio::spawn`]: fn@crate::spawn
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use tokio::runtime::Runtime;
+    ///
+    /// fn function_that_spawns(msg: String) {
+    ///     // Had we not used `rt.enter` below, this would panic.
+    ///     tokio::spawn(async move {
+    ///         println!("{}", msg);
+    ///     });
+    /// }
+    ///
+    /// fn main() {
+    ///     let rt = Runtime::new().unwrap();
+    ///
+    ///     let s = "Hello World!".to_string();
+    ///
+    ///     // By entering the context, we tie `tokio::spawn` to this executor.
+    ///     rt.enter(|| function_that_spawns(s));
+    /// }
+    /// ```
     pub fn enter<F, R>(&self, f: F) -> R
     where
         F: FnOnce() -> R,
@@ -476,7 +513,7 @@ impl Runtime {
     /// Usually, dropping a `Runtime` handle is sufficient as tasks are able to
     /// shutdown in a timely fashion. However, dropping a `Runtime` will wait
     /// indefinitely for all tasks to terminate, and there are cases where a long
-    /// blocking task has been spawned which can block dropping `Runtime`.
+    /// blocking task has been spawned, which can block dropping `Runtime`.
     ///
     /// In this case, calling `shutdown_timeout` with an explicit wait timeout
     /// can work. The `shutdown_timeout` will signal all tasks to shutdown and

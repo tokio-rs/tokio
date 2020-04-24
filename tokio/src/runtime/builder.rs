@@ -399,12 +399,13 @@ cfg_rt_core! {
         /// Sets runtime to use a simpler scheduler that runs all tasks on the current-thread.
         ///
         /// The executor and all necessary drivers will all be run on the current
-        /// thread during `block_on` calls.
+        /// thread during [`block_on`] calls.
         ///
         /// See also [the module level documentation][1], which has a section on scheduler
         /// types.
         ///
         /// [1]: index.html#runtime-configurations
+        /// [`block_on`]: Runtime::block_on
         pub fn basic_scheduler(&mut self) -> &mut Self {
             self.kind = Kind::Basic;
             self
