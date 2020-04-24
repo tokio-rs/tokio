@@ -1,3 +1,16 @@
+# 0.2.19 (April 24, 2020)
+
+### Fixes
+- docs: misc improvements (#2400, #2405, #2414, #2420, #2423, #2426, #2427, #2434, #2436, #2440).
+- rt: support `block_in_place` in more contexts (#2409, #2410).
+- stream: no panic in `merge()` and `chain()` when using `size_hint()` (#2430).
+- task: include visibility modifier when defining a task-local (#2416).
+
+### Added
+- rt: `runtime::Handle::block_on` (#2437).
+- sync: owned `Semaphore` permit (#2421).
+- tcp: owned split (#2270).
+
 # 0.2.18 (April 12, 2020)
 
 ### Fixes
@@ -7,7 +20,7 @@
 # 0.2.17 (April 9, 2020)
 
 ### Fixes
-- rt: bug in work-stealing queue (#2387) 
+- rt: bug in work-stealing queue (#2387)
 
 ### Changes
 - rt: threadpool uses logical CPU count instead of physical by default (#2391)
