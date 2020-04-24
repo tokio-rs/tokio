@@ -119,6 +119,47 @@ cfg_rt_core! {
         {
             self.spawner.spawn(future)
         }
+
+        /// Run a future to completion on the Tokio runtime from a synchronous
+        /// context.
+        ///
+        /// This runs the given future on the runtime, blocking until it is
+        /// complete, and yielding its resolved result. Any tasks or timers which
+        /// the future spawns internally will be executed on the runtime.
+        ///
+        /// This method should not be called from an asynchronous context.
+        ///
+        /// # Panics
+        ///
+        /// This function panics if the executor is at capacity, if the provided
+        /// future panics, or if called within an asynchronous execution context.
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::runtime::Runtime;
+        /// use std::thread;
+        ///
+        /// // Create the runtime
+        /// let rt = Runtime::new().unwrap();
+        /// let handle = rt.handle().clone();
+        ///
+        /// // Use the runtime from another thread
+        /// let th = thread::spawn(move || {
+        ///     // Execute the future, blocking the current thread until completion
+        ///     handle.block_on(async {
+        ///         println!("hello");
+        ///     });
+        /// });
+        ///
+        /// th.join().unwrap();
+        /// ```
+        pub fn block_on<F: Future>(&self, future: F) -> F::Output {
+            self.enter(|| {
+                let mut enter = crate::runtime::enter(true);
+                enter.block_on(future).expect("failed to park thread")
+            })
+        }
     }
 }
 

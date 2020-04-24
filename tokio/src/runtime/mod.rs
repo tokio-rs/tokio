@@ -402,12 +402,33 @@ impl Runtime {
     /// complete, and yielding its resolved result. Any tasks or timers which
     /// the future spawns internally will be executed on the runtime.
     ///
+    /// `&mut` is required as calling `block_on` **may** result in advancing the
+    /// state of the runtime. The details depend on how the runtime is
+    /// configured. [`runtime::Handle::block_on`][handle] provides a version
+    /// that takes `&self`.
+    ///
     /// This method should not be called from an asynchronous context.
     ///
     /// # Panics
     ///
     /// This function panics if the executor is at capacity, if the provided
     /// future panics, or if called within an asynchronous execution context.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::runtime::Runtime;
+    ///
+    /// // Create the runtime
+    /// let mut rt = Runtime::new().unwrap();
+    ///
+    /// // Execute the future, blocking the current thread until completion
+    /// rt.block_on(async {
+    ///     println!("hello");
+    /// });
+    /// ```
+    ///
+    /// [handle]: fn@Handle::block_on
     pub fn block_on<F: Future>(&mut self, future: F) -> F::Output {
         let kind = &mut self.kind;
 

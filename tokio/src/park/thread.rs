@@ -204,7 +204,7 @@ impl Unpark for UnparkThread {
     }
 }
 
-cfg_blocking_impl! {
+cfg_block_on! {
     use std::marker::PhantomData;
     use std::rc::Rc;
 

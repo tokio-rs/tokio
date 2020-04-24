@@ -138,14 +138,11 @@ cfg_rt_threaded! {
     }
 }
 
-cfg_blocking_impl! {
-    use crate::park::ParkError;
-    use std::time::Duration;
-
+cfg_block_on! {
     impl Enter {
         /// Blocks the thread on the specified future, returning the value with
         /// which that future completes.
-        pub(crate) fn block_on<F>(&mut self, mut f: F) -> Result<F::Output, ParkError>
+        pub(crate) fn block_on<F>(&mut self, mut f: F) -> Result<F::Output, crate::park::ParkError>
         where
             F: std::future::Future,
         {
@@ -170,7 +167,14 @@ cfg_blocking_impl! {
                 park.park()?;
             }
         }
+    }
+}
 
+cfg_blocking_impl! {
+    use crate::park::ParkError;
+    use std::time::Duration;
+
+    impl Enter {
         /// Blocks the thread on the specified future for **at most** `timeout`
         ///
         /// If the future completes before `timeout`, the result is returned. If
