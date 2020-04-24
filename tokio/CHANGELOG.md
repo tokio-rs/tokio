@@ -1,7 +1,7 @@
 # 0.2.19 (April 24, 2020)
 
 ### Fixes
-- docs: misc improvements (#2400, #2414, #2420, #2423, #2405, #2427, #2426, #2434, #2436, #2440).
+- docs: misc improvements (#2400, #2405, #2414, #2420, #2423, #2426, #2427, #2434, #2436, #2440).
 - rt: support `block_in_place` in more contexts (#2409, #2410).
 - stream: no panic in `merge()` and `chain()` when using `size_hint()` (#2430).
 - task: include visibility modifier when defining a task-local (#2416).
