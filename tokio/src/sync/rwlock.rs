@@ -87,7 +87,6 @@ pub struct RwLock<T> {
 #[derive(Debug)]
 pub struct RwLockReadGuard<'a, T> {
     permit: ReleasingPermit<'a, T>,
-    lock: &'a RwLock<T>,
 }
 
 /// RAII structure used to release the exclusive write access of a lock when
@@ -101,7 +100,6 @@ pub struct RwLockReadGuard<'a, T> {
 #[derive(Debug)]
 pub struct RwLockWriteGuard<'a, T> {
     permit: ReleasingPermit<'a, T>,
-    lock: &'a RwLock<T>,
 }
 
 // Wrapper arround Permit that releases on Drop
@@ -213,7 +211,7 @@ impl<T> RwLock<T> {
             // handle to it through the Arc, which means that this can never happen.
             unreachable!()
         });
-        RwLockReadGuard { lock: self, permit }
+        RwLockReadGuard { permit }
     }
 
     /// Locks this rwlock with exclusive write access, causing the current task
@@ -247,7 +245,7 @@ impl<T> RwLock<T> {
                 unreachable!()
             });
 
-        RwLockWriteGuard { lock: self, permit }
+        RwLockWriteGuard { permit }
     }
 
     /// Consumes the lock, returning the underlying data.
@@ -260,7 +258,7 @@ impl<T> ops::Deref for RwLockReadGuard<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &T {
-        unsafe { &*self.lock.c.get() }
+        unsafe { &*self.permit.lock.c.get() }
     }
 }
 
@@ -268,13 +266,13 @@ impl<T> ops::Deref for RwLockWriteGuard<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &T {
-        unsafe { &*self.lock.c.get() }
+        unsafe { &*self.permit.lock.c.get() }
     }
 }
 
 impl<T> ops::DerefMut for RwLockWriteGuard<'_, T> {
     fn deref_mut(&mut self) -> &mut T {
-        unsafe { &mut *self.lock.c.get() }
+        unsafe { &mut *self.permit.lock.c.get() }
     }
 }
 
