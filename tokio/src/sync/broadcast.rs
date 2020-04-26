@@ -292,8 +292,6 @@ struct Slot<T> {
 
 /// A write in the buffer
 struct Write<T> {
-    prev: UnsafeCell<u64>,
-
     /// Uniquely identifies this write
     pos: UnsafeCell<u64>,
 
@@ -385,7 +383,6 @@ pub fn channel<T>(mut capacity: usize) -> (Sender<T>, Receiver<T>) {
             rem: AtomicUsize::new(0),
             lock: AtomicUsize::new(0),
             write: Write {
-                prev: UnsafeCell::new((i as u64).wrapping_sub(capacity as u64)),
                 pos: UnsafeCell::new((i as u64).wrapping_sub(capacity as u64)),
                 val: UnsafeCell::new(None),
             },
@@ -608,10 +605,6 @@ impl<T> Sender<T> {
             return Ok(rem);
         }
 
-        // Set the previous write slot
-        let prev = slot.write.pos.with(|ptr| unsafe { *ptr });
-        slot.write.prev.with_mut(|ptr| unsafe { *ptr = prev });
-
         // Slot lock acquired
         slot.write.pos.with_mut(|ptr| unsafe { *ptr = pos });
 
@@ -703,7 +696,7 @@ impl<T> Receiver<T> {
         let pos = guard.pos();
 
         // If the slot's current write position is the expected next postion,
-        // the receiver is not lagging
+        // the receiver is not slow
         if pos == self.next {
             // If the `CLOSED` bit it set on the slot, the channel is closed
             if slot.lock.load(SeqCst) & CLOSED == CLOSED {
@@ -720,39 +713,30 @@ impl<T> Receiver<T> {
             return Err(TryRecvError::Empty);
         }
 
-        let prev = slot.write.prev.with(|ptr| unsafe { *ptr });
+        let tail = self.shared.tail.lock().unwrap();
 
-        // The receiver has lagged behind and must catch up; return the number
-        // of missed values and set `self.next` to the oldest value still in
-        // the channel
-        if self.next != prev || (self.next == prev && slot.lock.load(SeqCst) & CLOSED == 0) {
-            guard.drop_no_rem_dec();
+        // `tail.pos` points to the slot that the **next** send writes to. If
+        // the channel is closed, the previous slot is the oldest value.
+        let mut adjust = 0;
+        if self.shared.is_closed() {
+            adjust = 1
+        }
+        let next = tail
+            .pos
+            .wrapping_sub(self.shared.buffer.len() as u64 + adjust);
 
-            let tail = self.shared.tail.lock().unwrap();
+        let missed = next.wrapping_sub(self.next);
 
-            // `tail.pos` points to the slot the **next** send writes to. If
-            // the channel is not closed, this slot holds the oldest value. If
-            // the channel is closed, the previous slot holds the oldest value.
-            // To make the positions match, we subtract the capacity and
-            // account for closure.
-            let mut adjust = 0;
-            if self.shared.is_closed() {
-                adjust = 1;
-            }
-            let next = tail
-                .pos
-                .wrapping_sub(self.shared.buffer.len() as u64 + adjust);
-            let missed = next.wrapping_sub(self.next);
-
-            self.next = next;
-
-            return Err(TryRecvError::Lagged(missed));
+        // The receiver is slow but no values have been missed
+        if missed == 0 {
+            self.next = self.next.wrapping_add(1);
+            return Ok(guard);
         }
 
-        // The receiver is already pointing at the oldest value. Increment the
-        // next position to read from and return the guarded value.
-        self.next = self.next.wrapping_add(1);
-        return Ok(guard);
+        guard.drop_no_rem_dec();
+        self.next = next;
+
+        return Err(TryRecvError::Lagged(missed));
     }
 }
 
