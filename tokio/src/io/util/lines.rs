@@ -59,6 +59,21 @@ where
 
         poll_fn(|cx| Pin::new(&mut *self).poll_next_line(cx)).await
     }
+
+    /// Obtain a mutable reference to a byte of the underlying reader
+    pub fn get_mut(&mut self) -> &mut R {
+        &mut self.reader
+    }
+
+    /// Obtain a reference to a byte of the underlying reader
+    pub fn get_ref(&mut self) -> &R {
+        &self.reader
+    }
+
+    /// Consume the line, returning the underlying bytes
+    pub fn into_inner(self) -> R {
+        self.reader
+    }
 }
 
 impl<R> Lines<R>
