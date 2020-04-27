@@ -272,6 +272,9 @@ struct Tail {
 
     /// Number of active receivers
     rx_cnt: usize,
+
+    /// True if the channel is closed
+    closed: bool,
 }
 
 /// Slot in the buffer
@@ -392,7 +395,11 @@ pub fn channel<T>(mut capacity: usize) -> (Sender<T>, Receiver<T>) {
     let shared = Arc::new(Shared {
         buffer: buffer.into_boxed_slice(),
         mask: capacity - 1,
-        tail: Mutex::new(Tail { pos: 0, rx_cnt: 1 }),
+        tail: Mutex::new(Tail {
+            pos: 0,
+            rx_cnt: 1,
+            closed: false,
+        }),
         condvar: Condvar::new(),
         wait_stack: AtomicPtr::new(ptr::null_mut()),
         num_tx: AtomicUsize::new(1),
@@ -611,6 +618,7 @@ impl<T> Sender<T> {
         // Set the closed bit if the value is `None`; otherwise write the value
         if value.is_none() {
             slot.lock.fetch_or(CLOSED, SeqCst);
+            tail.closed = true;
         } else {
             slot.write.val.with_mut(|ptr| unsafe { *ptr = value });
         }
@@ -693,50 +701,53 @@ impl<T> Receiver<T> {
             tail: &self.shared.tail,
             condvar: &self.shared.condvar,
         };
-        let pos = guard.pos();
 
-        // If the slot's current write position is the expected next postion,
-        // the receiver is not slow
-        if pos == self.next {
-            // If the `CLOSED` bit it set on the slot, the channel is closed
-            if slot.lock.load(SeqCst) & CLOSED == CLOSED {
-                return Err(TryRecvError::Closed);
+        if guard.pos() != self.next {
+            let pos = guard.pos();
+
+            // The receiver has read all current values in the channel
+            if pos.wrapping_add(self.shared.buffer.len() as u64) == self.next {
+                guard.drop_no_rem_dec();
+                return Err(TryRecvError::Empty);
             }
 
-            self.next = self.next.wrapping_add(1);
-            return Ok(guard);
-        }
+            let tail = self.shared.tail.lock().unwrap();
 
-        // The receiver has read all current values in the channel
-        if pos.wrapping_add(self.shared.buffer.len() as u64) == self.next {
+            // `tail.pos` points to the slot that the **next** send writes to. If
+            // the channel is closed, the previous slot is the oldest value.
+            let mut adjust = 0;
+            if tail.closed {
+                adjust = 1
+            }
+            let next = tail
+                .pos
+                .wrapping_sub(self.shared.buffer.len() as u64 + adjust);
+
+            let missed = next.wrapping_sub(self.next);
+
+            drop(tail);
+
+            // The receiver is slow but no values have been missed
+            if missed == 0 {
+                self.next = self.next.wrapping_add(1);
+                return Ok(guard);
+            }
+
             guard.drop_no_rem_dec();
-            return Err(TryRecvError::Empty);
+            self.next = next;
+
+            return Err(TryRecvError::Lagged(missed));
         }
 
-        let tail = self.shared.tail.lock().unwrap();
+        self.next = self.next.wrapping_add(1);
 
-        // `tail.pos` points to the slot that the **next** send writes to. If
-        // the channel is closed, the previous slot is the oldest value.
-        let mut adjust = 0;
-        if self.shared.is_closed() {
-            adjust = 1
-        }
-        let next = tail
-            .pos
-            .wrapping_sub(self.shared.buffer.len() as u64 + adjust);
-
-        let missed = next.wrapping_sub(self.next);
-
-        // The receiver is slow but no values have been missed
-        if missed == 0 {
-            self.next = self.next.wrapping_add(1);
-            return Ok(guard);
+        // If the `CLOSED` bit it set on the slot, the channel is closed
+        if slot.lock.load(SeqCst) & CLOSED == CLOSED {
+            guard.drop_no_rem_dec();
+            return Err(TryRecvError::Closed);
         }
 
-        guard.drop_no_rem_dec();
-        self.next = next;
-
-        Err(TryRecvError::Lagged(missed))
+        Ok(guard)
     }
 }
 
@@ -968,12 +979,6 @@ impl<T> fmt::Debug for Sender<T> {
 impl<T> fmt::Debug for Receiver<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "broadcast::Receiver")
-    }
-}
-
-impl<T> Shared<T> {
-    fn is_closed(&self) -> bool {
-        self.num_tx.load(SeqCst) == 0
     }
 }
 
