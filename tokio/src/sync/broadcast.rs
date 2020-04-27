@@ -736,7 +736,7 @@ impl<T> Receiver<T> {
         guard.drop_no_rem_dec();
         self.next = next;
 
-        return Err(TryRecvError::Lagged(missed));
+        Err(TryRecvError::Lagged(missed))
     }
 }
 
