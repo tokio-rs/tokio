@@ -89,21 +89,15 @@ where
         let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
             struct Guard<'a, T: Future, S: Schedule> {
                 core: &'a Core<T, S>,
-                polled: bool,
             }
 
             impl<T: Future, S: Schedule> Drop for Guard<'_, T, S> {
                 fn drop(&mut self) {
-                    if !self.polled {
-                        self.core.drop_future_or_output();
-                    }
+                    self.core.drop_future_or_output();
                 }
             }
 
-            let mut guard = Guard {
-                core: self.core(),
-                polled: false,
-            };
+            let guard = Guard { core: self.core() };
 
             // If the task is cancelled, avoid polling it, instead signalling it
             // is complete.
@@ -113,7 +107,7 @@ where
                 let res = guard.core.poll(self.header());
 
                 // prevent the guard from dropping the future
-                guard.polled = true;
+                mem::forget(guard);
 
                 res.map(Ok)
             }
