@@ -51,13 +51,13 @@ where
         // If this is the first time the task is polled, the task will be bound
         // to the scheduler, in which case the task ref count must be
         // incremented.
-        let ref_inc = !self.core().is_bound();
+        let is_not_bound = !self.core().is_bound();
 
         // Transition the task to the running state.
         //
         // A failure to transition here indicates the task has been cancelled
         // while in the run queue pending execution.
-        let snapshot = match self.header().state.transition_to_running(ref_inc) {
+        let snapshot = match self.header().state.transition_to_running(is_not_bound) {
             Ok(snapshot) => snapshot,
             Err(_) => {
                 // The task was shutdown while in the run queue. At this point,
@@ -67,15 +67,20 @@ where
             }
         };
 
-        // Ensure the task is bound to a scheduler instance. If this is the
-        // first time polling the task, a scheduler instance is pulled from the
-        // local context and assigned to the task.
-        //
-        // The scheduler maintains ownership of the task and responds to `wake`
-        // calls.
-        //
-        // The task reference count has been incremented.
-        self.core().bind_scheduler(self.to_task());
+        if is_not_bound {
+            // Ensure the task is bound to a scheduler instance. Since this is
+            // the first time polling the task, a scheduler instance is pulled
+            // from the local context and assigned to the task.
+            //
+            // The scheduler maintains ownership of the task and responds to
+            // `wake` calls.
+            //
+            // The task reference count has been incremented.
+            //
+            // Safety: Since we have unique access to the task so that we can
+            // safely call `bind_scheduler`.
+            self.core().bind_scheduler(self.to_task());
+        }
 
         // The transition to `Running` done above ensures that a lock on the
         // future has been obtained. This also ensures the `*mut T` pointer
