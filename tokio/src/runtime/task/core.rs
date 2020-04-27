@@ -1,3 +1,14 @@
+//! Core task module.
+//!
+//! # Safety
+//!
+//! The functions in this module are private to the `task` module. All of them
+//! should be considered `unsafe` to use, but are not marked as such since it
+//! would be too noisy.
+//!
+//! Make sure to consult the relevant safety section of each function before
+//! use.
+
 use crate::loom::cell::UnsafeCell;
 use crate::runtime::task::raw::{self, Vtable};
 use crate::runtime::task::state::State;
@@ -95,15 +106,16 @@ impl<T: Future, S: Schedule> Cell<T, S> {
 }
 
 impl<T: Future, S: Schedule> Core<T, S> {
-    /// If needed, bind a scheduler to the task.
+    /// Bind a scheduler to the task.
     ///
-    /// This only happens on the first poll.
+    /// This only happens on the first poll and must be preceeded by a call to
+    /// `is_bound` to determine if binding is appropriate or not.
+    ///
+    /// # Safety
+    ///
+    /// Binding must not be done concurrently since it will mutate the task
+    /// core through a shared reference.
     pub(super) fn bind_scheduler(&self, task: Task<S>) {
-        use std::mem::ManuallyDrop;
-
-        // TODO: it would be nice to not have to wrap with a ManuallyDrop
-        let task = ManuallyDrop::new(task);
-
         // This function may be called concurrently, but the __first__ time it
         // is called, the caller has unique access to this field. All subsequent
         // concurrent calls will be via the `Waker`, which will "happens after"
@@ -111,12 +123,10 @@ impl<T: Future, S: Schedule> Core<T, S> {
         //
         // In other words, it is always safe to read the field and it is safe to
         // write to the field when it is `None`.
-        if self.is_bound() {
-            return;
-        }
+        debug_assert!(!self.is_bound());
 
         // Bind the task to the scheduler
-        let scheduler = S::bind(ManuallyDrop::into_inner(task));
+        let scheduler = S::bind(task);
 
         // Safety: As `scheduler` is not set, this is the first poll
         self.scheduler.with_mut(|ptr| unsafe {
