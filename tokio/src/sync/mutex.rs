@@ -220,13 +220,15 @@ impl<T> Mutex<T> {
         MutexGuard { lock: self }
     }
 
-    /// Locks this mutex, causing the current task to yield until the lock has been acquired.
-    /// When the lock has been acquired, this returns an [`OwnedMutexGuard`].
+    /// Locks this mutex, causing the current task to yield until the lock has
+    /// been acquired. When the lock has been acquired, this returns an
+    /// [`OwnedMutexGuard`].
     ///
-    /// This method is identical to [`Mutex::lock`], except that the returned guard references
-    /// the `Mutex` with an [`Arc`] rather than by borrowing it. Therefore, the `Mutex` must be
-    /// wrapped in an `Arc` to call this method, and the guard will live for the `'static`
-    /// lifetime, as it keeps the `Mutex` alive by holding an `Arc`.
+    /// This method is identical to [`Mutex::lock`], except that the returned
+    /// guard references the `Mutex` with an [`Arc`] rather than by borrowing
+    /// it. Therefore, the `Mutex` must be wrapped in an `Arc` to call this
+    /// method, and the guard will live for the `'static` lifetime, as it keeps
+    /// the `Mutex` alive by holding an `Arc`.
     ///
     /// # Examples
     ///
@@ -281,13 +283,14 @@ impl<T> Mutex<T> {
         }
     }
 
-    /// Attempts to acquire the lock, and returns [`TryLockError`] if the
-    /// lock is currently held somewhere else.
+    /// Attempts to acquire the lock, and returns [`TryLockError`] if the lock
+    /// is currently held somewhere else.
     ///
-    /// This method is identical to [`Mutex::try_lock`], except that the returned  guard references
-    /// the `Mutex` with an [`Arc`] rather than by borrowing it. Therefore, the `Mutex` must be
-    /// wrapped in an `Arc` to call this method, and the guard will live for the `'static`
-    /// lifetime, as it keeps the `Mutex` alive by holding an `Arc`.
+    /// This method is identical to [`Mutex::try_lock`], except that the
+    /// returned  guard references the `Mutex` with an [`Arc`] rather than by
+    /// borrowing it. Therefore, the `Mutex` must be wrapped in an `Arc` to call
+    /// this method, and the guard will live for the `'static` lifetime, as it
+    /// keeps the `Mutex` alive by holding an `Arc`.
     ///
     /// [`TryLockError`]: TryLockError
     /// [`Arc`]: std::sync::Arc
