@@ -322,6 +322,16 @@ fn multi_threadpool() {
     done_rx.recv().unwrap();
 }
 
+// Testing this does not panic
+#[test]
+fn max_threads() {
+    let _rt = tokio::runtime::Builder::new()
+        .threaded_scheduler()
+        .max_threads(1)
+        .build()
+        .unwrap();
+}
+
 fn rt() -> Runtime {
     Runtime::new().unwrap()
 }
