@@ -77,7 +77,7 @@ impl<T, E> FramedWrite<T, E> {
     }
 }
 
-// This impl just defers to the underlying FramedWrite2
+// This impl just defers to the underlying FramedImpl
 impl<T, I, E> Sink<I> for FramedWrite<T, E>
 where
     T: AsyncWrite,
@@ -103,6 +103,7 @@ where
     }
 }
 
+// This impl just defers to the underlying T: Stream
 impl<T, D> Stream for FramedWrite<T, D>
 where
     T: Stream,

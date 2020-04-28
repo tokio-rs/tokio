@@ -101,6 +101,7 @@ impl<T, D> FramedRead<T, D> {
     }
 }
 
+// This impl just defers to the underlying FramedImpl
 impl<T, D> Stream for FramedRead<T, D>
 where
     T: AsyncRead,

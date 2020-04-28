@@ -220,6 +220,7 @@ impl<T, U> Framed<T, U> {
     }
 }
 
+// This impl just defers to the underlying FramedImpl
 impl<T, U> Stream for Framed<T, U>
 where
     T: AsyncRead,
@@ -232,6 +233,7 @@ where
     }
 }
 
+// This impl just defers to the underlying FramedImpl
 impl<T, I, U> Sink<I> for Framed<T, U>
 where
     T: AsyncWrite,
