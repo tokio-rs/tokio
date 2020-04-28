@@ -615,19 +615,17 @@ impl<T> Sender<T> {
         // Slot lock acquired
         slot.write.pos.with_mut(|ptr| unsafe { *ptr = pos });
 
-        // Set the closed bit if the value is `None`; otherwise write the value
-        if value.is_none() {
-            slot.lock.fetch_or(CLOSED, SeqCst);
-            tail.closed = true;
-        } else {
-            slot.write.val.with_mut(|ptr| unsafe { *ptr = value });
-        }
-
         // Set remaining receivers
         slot.rem.store(rem, SeqCst);
 
-        // Release the slot lock
-        slot.lock.fetch_and(CLOSED, SeqCst);
+        // Set the closed bit if the value is `None`; otherwise write the value
+        if value.is_none() {
+            tail.closed = true;
+            slot.lock.store(CLOSED, SeqCst);
+        } else {
+            slot.write.val.with_mut(|ptr| unsafe { *ptr = value });
+            slot.lock.store(0, SeqCst);
+        }
 
         // Release the mutex. This must happen after the slot lock is released,
         // otherwise the writer lock bit could be cleared while another thread
