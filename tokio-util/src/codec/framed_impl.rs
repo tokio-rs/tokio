@@ -174,17 +174,10 @@ where
         // If the buffer is already over 8KiB, then attempt to flush it. If after flushing it's
         // *still* over 8KiB, then apply backpressure (reject the send).
         if self.state.borrow().buffer.len() >= BACKPRESSURE_BOUNDARY {
-            match self.as_mut().poll_flush(cx) {
-                Poll::Pending => return Poll::Pending,
-                Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
-                Poll::Ready(Ok(())) => (),
-            };
-
-            if self.state.borrow().buffer.len() >= BACKPRESSURE_BOUNDARY {
-                return Poll::Pending;
-            }
+            self.as_mut().poll_flush(cx)
+        } else {
+            Poll::Ready(Ok(()))
         }
-        Poll::Ready(Ok(()))
     }
 
     fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::Error> {
