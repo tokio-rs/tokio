@@ -171,8 +171,6 @@ where
     type Error = U::Error;
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // If the buffer is already over 8KiB, then attempt to flush it. If after flushing it's
-        // *still* over 8KiB, then apply backpressure (reject the send).
         if self.state.borrow().buffer.len() >= BACKPRESSURE_BOUNDARY {
             self.as_mut().poll_flush(cx)
         } else {
