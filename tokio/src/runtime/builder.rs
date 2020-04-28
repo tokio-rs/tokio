@@ -461,10 +461,12 @@ cfg_rt_threaded! {
         }
 
         fn build_threaded_runtime(&mut self) -> io::Result<Runtime> {
+            use crate::loom::sys::num_cpus;
             use crate::runtime::{Kind, ThreadPool};
             use crate::runtime::park::Parker;
+            use std::cmp;
 
-            let core_threads = self.core_threads.unwrap_or_else(crate::loom::sys::num_cpus);
+            let core_threads = self.core_threads.unwrap_or_else(|| cmp::min(self.max_threads, num_cpus()));
             assert!(core_threads <= self.max_threads, "Core threads number cannot be above max limit");
 
             let clock = time::create_clock();
