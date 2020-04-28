@@ -84,12 +84,12 @@ impl<T, E> FramedWrite<T, E> {
         self.inner.inner.io
     }
 
-    /// Returns a reference to the underlying decoder.
+    /// Returns a reference to the underlying encoder.
     pub fn encoder(&self) -> &E {
         &self.inner.inner.codec
     }
 
-    /// Returns a mutable reference to the underlying decoder.
+    /// Returns a mutable reference to the underlying encoder.
     pub fn encoder_mut(&mut self) -> &mut E {
         &mut self.inner.inner.codec
     }
