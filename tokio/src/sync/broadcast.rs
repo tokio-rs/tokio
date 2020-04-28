@@ -740,6 +740,10 @@ impl<T> Receiver<T> {
         self.next = self.next.wrapping_add(1);
 
         // If the `CLOSED` bit it set on the slot, the channel is closed
+        //
+        // `try_rx_lock` could check for this and bail early. If it's return
+        // value was changed to represent the state of the lock, it could
+        // match on being closed, empty, or available for reading.
         if slot.lock.load(SeqCst) & CLOSED == CLOSED {
             guard.drop_no_rem_dec();
             return Err(TryRecvError::Closed);
