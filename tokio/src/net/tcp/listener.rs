@@ -87,6 +87,8 @@ impl TcpListener {
     /// the addresses succeed in creating a listener, the error returned from
     /// the last attempt (the last address) is returned.
     ///
+    /// This function sets the `SO_REUSEADDR` option on the socket.
+    ///
     /// # Examples
     ///
     /// ```no_run
