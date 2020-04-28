@@ -1,3 +1,9 @@
+# 0.2.20 (April 28, 2020)
+
+### Fixes
+- sync: `broadcast` closing the channel no longer requires capacity (#2448).
+- rt: regression when configuring runtime with `max_threads` less than number of CPUs (#2457).
+
 # 0.2.19 (April 24, 2020)
 
 ### Fixes
