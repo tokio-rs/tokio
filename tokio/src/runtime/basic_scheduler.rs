@@ -407,18 +407,24 @@ impl SchedulerPriv {
                 }
                 ThrottleState::ReadyToPause(last) => {
                     // Pause until the maximum throttling duration has elapsed.
-                    if let Some(wait_duration) = max_throttling.checked_sub(last.elapsed()) {
-                        // Pause unless woken up
-                        let mut res = self.must_awake_cvar.wait_timeout_while(
-                            self.must_awake.lock().unwrap(),
-                            wait_duration,
-                            |&mut must_awake| !must_awake,
-                        )
-                        .unwrap();
 
-                        // reset must_awake
-                        *res.0 = false;
-                    }
+                    let mut must_awake = self.must_awake.lock().unwrap();
+                    let mut must_awake = loop {
+                        if let Some(wait_duration) = max_throttling.checked_sub(last.elapsed()) {
+                            let result = self.must_awake_cvar
+                                .wait_timeout(must_awake, wait_duration)
+                                .unwrap();
+
+                            must_awake = result.0;
+                            if *must_awake {
+                                break must_awake;
+                            }
+                        } else {
+                            break must_awake;
+                        }
+                    };
+
+                    *must_awake = false;
 
                     // Prepare to start a new cycle.
                     local.throttle_state = ThrottleState::HandlingTasks(last);
