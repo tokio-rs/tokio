@@ -247,7 +247,7 @@ pub fn limit<R>(bound: usize, f: impl FnOnce() -> R) -> R {
 pub fn poll_proceed(cx: &mut Context<'_>) -> Poll<()> {
     HITS.with(|hits| {
         let n = hits.get();
-        if dbg!(n) == UNCONSTRAINED {
+        if n == UNCONSTRAINED {
             // opted out of budgeting
             Poll::Ready(())
         } else if n == 0 {

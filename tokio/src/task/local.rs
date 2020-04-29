@@ -394,7 +394,7 @@ impl LocalSet {
     /// notified again.
     fn tick(&self) -> bool {
         for _ in 0..MAX_TASKS_PER_TICK {
-            match dbg!(self.next_task()) {
+            match self.next_task() {
                 // Run the task
                 //
                 // Safety: As spawned tasks are `!Send`, `run_unchecked` must be
@@ -416,9 +416,9 @@ impl LocalSet {
 
     fn next_task(&self) -> Option<task::Notified<Arc<Shared>>> {
         let tick = self.tick.get();
-        self.tick.set(dbg!(tick.wrapping_add(1)));
+        self.tick.set(tick.wrapping_add(1));
 
-        if dbg!(tick % REMOTE_FIRST_INTERVAL == 0) {
+        if tick % REMOTE_FIRST_INTERVAL == 0 {
             self.context
                 .shared
                 .queue
