@@ -126,7 +126,7 @@
 //! pressure.
 //!
 //! A common concurrency pattern for resource management is to spawn a task
-//! dedicated to managing that resource and using message passing betwen other
+//! dedicated to managing that resource and using message passing between other
 //! tasks to interact with the resource. The resource may be anything that may
 //! not be concurrently used. Some examples include a socket and program state.
 //! For example, if multiple tasks need to send data over a single socket, spawn
