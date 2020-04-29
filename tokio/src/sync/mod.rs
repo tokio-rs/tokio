@@ -428,7 +428,7 @@ cfg_sync! {
     pub mod mpsc;
 
     mod mutex;
-    pub use mutex::{Mutex, MutexGuard, TryLockError};
+    pub use mutex::{Mutex, MutexGuard, TryLockError, OwnedMutexGuard};
 
     mod notify;
     pub use notify::Notify;
