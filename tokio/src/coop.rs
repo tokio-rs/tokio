@@ -110,27 +110,29 @@ cfg_blocking_impl! {
     }
 }
 
-cfg_rt_util! {
-    /// Run the given closure with a new task budget, resetting the previous
-    /// budget when the closure finishes.
-    ///
-    /// This is intended for internal use by `LocalSet` and (potentially) other
-    /// similar schedulers which are themselves futures, and need a fresh budget
-    /// for each of their children.
-    #[inline(always)]
-    pub(crate) fn reset<F, R>(f: F) -> R
-    where
-        F: FnOnce() -> R,
-    {
-        HITS.with(move |hits| {
-            let prev = hits.get();
-            hits.set(UNCONSTRAINED);
-            let _guard = ResetGuard {
-                hits,
-                prev,
-            };
-            f()
-        })
+cfg_rt_core! {
+    cfg_rt_util! {
+        /// Run the given closure with a new task budget, resetting the previous
+        /// budget when the closure finishes.
+        ///
+        /// This is intended for internal use by `LocalSet` and (potentially) other
+        /// similar schedulers which are themselves futures, and need a fresh budget
+        /// for each of their children.
+        #[inline(always)]
+        pub(crate) fn reset<F, R>(f: F) -> R
+        where
+            F: FnOnce() -> R,
+        {
+            HITS.with(move |hits| {
+                let prev = hits.get();
+                hits.set(UNCONSTRAINED);
+                let _guard = ResetGuard {
+                    hits,
+                    prev,
+                };
+                f()
+            })
+        }
     }
 }
 
