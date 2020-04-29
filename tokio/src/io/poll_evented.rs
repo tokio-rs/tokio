@@ -307,8 +307,8 @@ where
     ///
     /// # Warning
     ///
-    /// &self is to allow concurrently calling poll_read_ready and poll_write_ready.
-    /// But calling this function concurrently will mess up mio's internal state.
+    /// This method may not be called concurrently. It takes `&self` to allow
+    /// calling it concurrently with `poll_read_ready`.
     pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<mio::Ready>> {
         poll_ready!(
             self,
