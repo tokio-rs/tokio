@@ -394,7 +394,7 @@ impl LocalSet {
     /// notified again.
     fn tick(&self) -> bool {
         for _ in 0..MAX_TASKS_PER_TICK {
-            match self.next_task() {
+            match dbg!(self.next_task()) {
                 // Run the task
                 //
                 // Safety: As spawned tasks are `!Send`, `run_unchecked` must be
@@ -416,9 +416,9 @@ impl LocalSet {
 
     fn next_task(&self) -> Option<task::Notified<Arc<Shared>>> {
         let tick = self.tick.get();
-        self.tick.set(tick.wrapping_add(1));
+        self.tick.set(dbg!(tick.wrapping_add(1)));
 
-        if tick % REMOTE_FIRST_INTERVAL == 0 {
+        if dbg!(tick % REMOTE_FIRST_INTERVAL == 0) {
             self.context
                 .shared
                 .queue
@@ -454,20 +454,24 @@ impl Future for LocalSet {
         // Register the waker before starting to work
         self.context.shared.waker.register_by_ref(cx.waker());
 
-        if self.with(|| self.tick()) {
-            // If `tick` returns true, we need to notify the local future again:
-            // there are still tasks remaining in the run queue.
-            cx.waker().wake_by_ref();
-            Poll::Pending
-        } else if self.context.tasks.borrow().owned.is_empty() {
-            // If the scheduler has no remaining futures, we're done!
-            Poll::Ready(())
-        } else {
-            // There are still futures in the local set, but we've polled all the
-            // futures in the run queue. Therefore, we can just return Pending
-            // since the remaining futures will be woken from somewhere else.
-            Poll::Pending
-        }
+        // Reset any previous task budget while polling tasks spawned on the
+        // `LocalSet`, ensuring that each has its own separate budget.
+        crate::coop::reset(|| {
+            if self.with(|| self.tick()) {
+                // If `tick` returns true, we need to notify the local future again:
+                // there are still tasks remaining in the run queue.
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            } else if self.context.tasks.borrow().owned.is_empty() {
+                // If the scheduler has no remaining futures, we're done!
+                Poll::Ready(())
+            } else {
+                // There are still futures in the local set, but we've polled all the
+                // futures in the run queue. Therefore, we can just return Pending
+                // since the remaining futures will be woken from somewhere else.
+                Poll::Pending
+            }
+        })
     }
 }
 
@@ -521,18 +525,23 @@ impl<T: Future> Future for RunUntil<'_, T> {
                 .register_by_ref(cx.waker());
 
             let _no_blocking = crate::runtime::enter::disallow_blocking();
+            // Reset any previous task budget so that the future passed to
+            // `run_until` and any tasks spawned on the `LocalSet` have their
+            // own budgets.
+            crate::coop::reset(|| {
+                let f = me.future;
+                if let Poll::Ready(output) = crate::coop::budget(|| f.poll(cx)) {
+                    return Poll::Ready(output);
+                }
 
-            if let Poll::Ready(output) = me.future.poll(cx) {
-                return Poll::Ready(output);
-            }
+                if me.local_set.tick() {
+                    // If `tick` returns `true`, we need to notify the local future again:
+                    // there are still tasks remaining in the run queue.
+                    cx.waker().wake_by_ref();
+                }
 
-            if me.local_set.tick() {
-                // If `tick` returns `true`, we need to notify the local future again:
-                // there are still tasks remaining in the run queue.
-                cx.waker().wake_by_ref();
-            }
-
-            Poll::Pending
+                Poll::Pending
+            })
         })
     }
 }
