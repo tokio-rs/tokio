@@ -19,8 +19,8 @@ use std::sync::Arc;
 ///  1. The lock does not need to be held across await points.
 ///  2. The duration of any single lock is near-instant.
 ///
-/// On the other hand, the Tokio mutex is for the situation where the lock needs
-/// to be held for longer periods of time, or across await points.
+/// On the other hand, the Tokio mutex is for the situation where the lock
+/// needs to be held for longer periods of time, or across await points.
 ///
 /// # Examples:
 ///
@@ -72,18 +72,20 @@ use std::sync::Arc;
 /// }
 /// ```
 /// There are a few things of note here to pay attention to in this example.
-/// 1. The mutex is wrapped in an [`Arc`] to allow it to be shared across threads.
+/// 1. The mutex is wrapped in an [`Arc`] to allow it to be shared across
+///    threads.
 /// 2. Each spawned task obtains a lock and releases it on every iteration.
-/// 3. Mutation of the data protected by the Mutex is done by de-referencing the obtained lock
-///    as seen on lines 12 and 19.
+/// 3. Mutation of the data protected by the Mutex is done by de-referencing
+///    the obtained lock as seen on lines 12 and 19.
 ///
-/// Tokio's Mutex works in a simple FIFO (first in, first out) style where all calls
-/// to [`lock`] complete in the order they were performed. In that way
-/// the Mutex is "fair" and predictable in how it distributes the locks to inner data. This is why
-/// the output of the program above is an in-order count to 50. Locks are released and reacquired
-/// after every iteration, so basically, each thread goes to the back of the line after it increments
-/// the value once. Finally, since there is only a single valid lock at any given time, there is no
-/// possibility of a race condition when mutating the inner value.
+/// Tokio's Mutex works in a simple FIFO (first in, first out) style where all
+/// calls to [`lock`] complete in the order they were performed. In that way the
+/// Mutex is "fair" and predictable in how it distributes the locks to inner
+/// data. This is why the output of the program above is an in-order count to
+/// 50. Locks are released and reacquired after every iteration, so basically,
+/// each thread goes to the back of the line after it increments the value once.
+/// Finally, since there is only a single valid lock at any given time, there is
+/// no possibility of a race condition when mutating the inner value.
 ///
 /// Note that in contrast to [`std::sync::Mutex`], this implementation does not
 /// poison the mutex when a thread holding the [`MutexGuard`] panics. In such a
@@ -105,11 +107,12 @@ pub struct Mutex<T> {
 
 /// A handle to a held `Mutex`.
 ///
-/// As long as you have this guard, you have exclusive access to the underlying `T`. The guard
-/// internally borrows the `Mutex`, so the mutex will not be dropped while a guard exists.
+/// As long as you have this guard, you have exclusive access to the underlying
+/// `T`. The guard internally borrows the `Mutex`, so the mutex will not be
+/// dropped while a guard exists.
 ///
-/// The lock is automatically released whenever the guard is dropped, at which point `lock`
-/// will succeed yet again.
+/// The lock is automatically released whenever the guard is dropped, at which
+/// point `lock` will succeed yet again.
 pub struct MutexGuard<'a, T> {
     lock: &'a Mutex<T>,
 }
@@ -121,12 +124,12 @@ pub struct MutexGuard<'a, T> {
 /// it clones the `Arc`, incrementing the reference count. This means that
 /// unlike `MutexGuard`, it will have the `'static` lifetime.
 ///
-/// As long as you have this guard, you have exclusive access to the underlying `T`. The guard
-/// internally keeps a reference-couned pointer to the original `Mutex`, so even if the lock goes
-/// away, the guard remains valid.
+/// As long as you have this guard, you have exclusive access to the underlying
+/// `T`. The guard internally keeps a reference-couned pointer to the original
+/// `Mutex`, so even if the lock goes away, the guard remains valid.
 ///
-/// The lock is automatically released whenever the guard is dropped, at which point `lock`
-/// will succeed yet again.
+/// The lock is automatically released whenever the guard is dropped, at which
+/// point `lock` will succeed yet again.
 ///
 /// [`Arc`]: std::sync::Arc
 pub struct OwnedMutexGuard<T> {
@@ -134,8 +137,8 @@ pub struct OwnedMutexGuard<T> {
 }
 
 // As long as T: Send, it's fine to send and share Mutex<T> between threads.
-// If T was not Send, sending and sharing a Mutex<T> would be bad, since you can access T through
-// Mutex<T>.
+// If T was not Send, sending and sharing a Mutex<T> would be bad, since you can
+// access T through Mutex<T>.
 unsafe impl<T> Send for Mutex<T> where T: Send {}
 unsafe impl<T> Sync for Mutex<T> where T: Send {}
 unsafe impl<'a, T> Sync for MutexGuard<'a, T> where T: Send + Sync {}
