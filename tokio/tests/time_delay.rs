@@ -2,7 +2,7 @@
 #![cfg(feature = "full")]
 
 use tokio::time::{self, Duration, Instant};
-use tokio_test::{assert_pending, task};
+use tokio_test::{assert_pending, assert_ready, task};
 
 macro_rules! assert_elapsed {
     ($now:expr, $ms:expr) => {{
@@ -135,6 +135,26 @@ async fn reset_future_delay_after_fire() {
     delay.reset(now + ms(110));
     delay.await;
     assert_elapsed!(now, 110);
+}
+
+#[tokio::test]
+async fn reset_delay_to_past() {
+    time::pause();
+
+    let now = Instant::now();
+
+    let mut delay = task::spawn(time::delay_until(now + ms(100)));
+    assert_pending!(delay.poll());
+
+    time::delay_for(ms(50)).await;
+
+    assert!(!delay.is_woken());
+
+    delay.reset(now + ms(40));
+
+    assert!(delay.is_woken());
+
+    assert_ready!(delay.poll());
 }
 
 #[test]
