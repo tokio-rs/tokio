@@ -85,15 +85,11 @@ where
             return f();
         }
 
-        struct Guard<'a>(&'a Cell<usize>);
-        impl<'a> Drop for Guard<'a> {
-            fn drop(&mut self) {
-                self.0.set(UNCONSTRAINED);
-            }
-        }
-
         hits.set(BUDGET);
-        let _guard = Guard(hits);
+        let _guard = ResetGuard {
+            hits,
+            prev: UNCONSTRAINED,
+        };
         f()
     })
 }
@@ -111,6 +107,32 @@ cfg_blocking_impl! {
         HITS.with(|hits| {
             hits.set(UNCONSTRAINED);
         });
+    }
+}
+
+cfg_rt_core! {
+    cfg_rt_util! {
+        /// Run the given closure with a new task budget, resetting the previous
+        /// budget when the closure finishes.
+        ///
+        /// This is intended for internal use by `LocalSet` and (potentially) other
+        /// similar schedulers which are themselves futures, and need a fresh budget
+        /// for each of their children.
+        #[inline(always)]
+        pub(crate) fn reset<F, R>(f: F) -> R
+        where
+            F: FnOnce() -> R,
+        {
+            HITS.with(move |hits| {
+                let prev = hits.get();
+                hits.set(UNCONSTRAINED);
+                let _guard = ResetGuard {
+                    hits,
+                    prev,
+                };
+                f()
+            })
+        }
     }
 }
 
@@ -289,6 +311,11 @@ pin_project_lite::pin_project! {
     }
 }
 
+struct ResetGuard<'a> {
+    hits: &'a Cell<usize>,
+    prev: usize,
+}
+
 impl<F: Future> Future for CoopFuture<F> {
     type Output = F::Output;
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -325,6 +352,12 @@ cfg_sync! {
     }
 
     impl<F> CoopFutureExt for F where F: Future {}
+}
+
+impl<'a> Drop for ResetGuard<'a> {
+    fn drop(&mut self) {
+        self.hits.set(self.prev);
+    }
 }
 
 #[cfg(all(test, not(loom)))]
