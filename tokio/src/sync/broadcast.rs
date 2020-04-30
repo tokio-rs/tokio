@@ -579,7 +579,7 @@ impl<T> Sender<T> {
         slot.pos = pos;
 
         // Set remaining receivers
-        *slot.rem.get_mut() = rem;
+        slot.rem.with_mut(|v| *v = rem);
 
         // Set the closed bit if the value is `None`; otherwise write the value
         if value.is_none() {
