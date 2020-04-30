@@ -59,6 +59,24 @@ where
 
         poll_fn(|cx| Pin::new(&mut *self).poll_next_line(cx)).await
     }
+
+    /// Obtain a mutable reference to the underlying reader
+    pub fn get_mut(&mut self) -> &mut R {
+        &mut self.reader
+    }
+
+    /// Obtain a reference to the underlying reader
+    pub fn get_ref(&mut self) -> &R {
+        &self.reader
+    }
+
+    /// Unwraps this `Lines<R>`, returning the underlying reader.
+    ///
+    /// Note that any leftover data in the internal buffer is lost.
+    /// Therefore, a following read from the underlying reader may lead to data loss.
+    pub fn into_inner(self) -> R {
+        self.reader
+    }
 }
 
 impl<R> Lines<R>
