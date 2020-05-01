@@ -644,7 +644,7 @@ impl<T> Receiver<T> {
         let idx = (self.next & self.shared.mask as u64) as usize;
 
         // The slot holding the next value to read
-        let slot = self.shared.buffer[idx].read().unwrap();
+        let mut slot = self.shared.buffer[idx].read().unwrap();
 
         if slot.pos != self.next {
             // The receiver has read all current values in the channel
@@ -653,7 +653,14 @@ impl<T> Receiver<T> {
                 return Err(TryRecvError::Empty);
             }
 
+            // In order to avoid deadlocks, release the `slot` lock before
+            // attempting to acquire the `tail` lock.
+            drop(slot);
+
             let tail = self.shared.tail.lock().unwrap();
+
+            // Acquire slot lock again
+            slot = self.shared.buffer[idx].read().unwrap();
 
             // `tail.pos` points to the slot that the **next** send writes to. If
             // the channel is closed, the previous slot is the oldest value.
