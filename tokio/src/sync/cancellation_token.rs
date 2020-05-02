@@ -1,8 +1,8 @@
 //! An asynchronously awaitable `CancellationToken`.
 //! The token allows to signal a cancellation request to one or more tasks.
 
-use crate::loom::sync::Mutex;
 use crate::loom::sync::atomic::AtomicUsize;
+use crate::loom::sync::Mutex;
 use crate::util::intrusive_double_linked_list::{LinkedList, ListNode};
 
 use core::future::Future;
