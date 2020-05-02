@@ -425,6 +425,11 @@ cfg_sync! {
 
     pub mod broadcast;
 
+    #[cfg(tokio_unstable)]
+    mod cancellation_token;
+    #[cfg(tokio_unstable)]
+    pub use cancellation_token::{CancellationToken, WaitForCancellationFuture};
+
     pub mod mpsc;
 
     mod mutex;
