@@ -30,8 +30,9 @@ jobs:
     workingDirectory: $(Build.SourcesDirectory)/tokio
 
   # Run `tokio` with "unstable" cfg flag
-  - script: RUSTFLAGS="--cfg tokio_unstable" cargo test --all-features
+  - script: cargo test --all-features
     env:
+      RUSTFLAGS: '--cfg tokio_unstable'
       RUST_BACKTRACE: 1
       CI: 'True'
     displayName: tokio - cargo test --features full
