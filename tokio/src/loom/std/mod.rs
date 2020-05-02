@@ -49,11 +49,15 @@ pub(crate) mod sync {
 
     #[cfg(feature = "parking_lot")]
     #[allow(unused_imports)]
-    pub(crate) use crate::loom::std::parking_lot::{Condvar, Mutex, MutexGuard, RwLock, RwLockReadGuard, WaitTimeoutResult};
+    pub(crate) use crate::loom::std::parking_lot::{
+        Condvar, Mutex, MutexGuard, RwLock, RwLockReadGuard, WaitTimeoutResult,
+    };
 
     #[cfg(not(feature = "parking_lot"))]
     #[allow(unused_imports)]
-    pub(crate) use std::sync::{Condvar, Mutex, MutexGuard, RwLock, RwLockReadGuard, WaitTimeoutResult};
+    pub(crate) use std::sync::{
+        Condvar, Mutex, MutexGuard, RwLock, RwLockReadGuard, WaitTimeoutResult,
+    };
 
     pub(crate) mod atomic {
         pub(crate) use crate::loom::std::atomic_ptr::AtomicPtr;
