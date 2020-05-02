@@ -6,12 +6,19 @@
 use std::sync::{LockResult, TryLockError, TryLockResult};
 use std::time::Duration;
 
+// Types that do not need wrapping
+pub(crate) use parking_lot::{MutexGuard, RwLockReadGuard, RwLockWriteGuard, WaitTimeoutResult};
+
 /// Adapter for `parking_lot::Mutex` to the `std::sync::Mutex` interface.
 #[derive(Debug)]
 pub(crate) struct Mutex<T: ?Sized>(parking_lot::Mutex<T>);
 
-// Types that do not need wrapping
-pub(crate) use parking_lot::{MutexGuard, WaitTimeoutResult};
+#[derive(Debug)]
+pub(crate) struct RwLock<T>(parking_lot::RwLock<T>);
+
+/// Adapter for `parking_lot::Condvar` to the `std::sync::Condvar` interface.
+#[derive(Debug)]
+pub(crate) struct Condvar(parking_lot::Condvar);
 
 impl<T> Mutex<T> {
     #[inline]
@@ -36,9 +43,19 @@ impl<T> Mutex<T> {
     // provided here as needed.
 }
 
-/// Adapter for `parking_lot::Condvar` to the `std::sync::Condvar` interface.
-#[derive(Debug)]
-pub(crate) struct Condvar(parking_lot::Condvar);
+impl<T> RwLock<T> {
+    pub(crate) fn new(t: T) -> RwLock<T> {
+        RwLock(parking_lot::RwLock::new(t))
+    }
+
+    pub(crate) fn read(&self) -> LockResult<RwLockReadGuard<'_, T>> {
+        Ok(self.0.read())
+    }
+
+    pub(crate) fn write(&self) -> LockResult<RwLockWriteGuard<'_, T>> {
+        Ok(self.0.write())
+    }
+}
 
 impl Condvar {
     #[inline]

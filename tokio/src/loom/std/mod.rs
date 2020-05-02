@@ -49,7 +49,7 @@ pub(crate) mod sync {
 
     #[cfg(feature = "parking_lot")]
     #[allow(unused_imports)]
-    pub(crate) use crate::loom::std::parking_lot::{Condvar, Mutex, MutexGuard, WaitTimeoutResult};
+    pub(crate) use crate::loom::std::parking_lot::{Condvar, Mutex, MutexGuard, RwLock, RwLockReadGuard, WaitTimeoutResult};
 
     #[cfg(not(feature = "parking_lot"))]
     #[allow(unused_imports)]
