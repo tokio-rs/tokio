@@ -33,4 +33,6 @@ jobs:
 
   # Try with unstable feature flags
   - script: RUSTFLAGS="--cfg tokio_unstable" cargo hack check --all --each-feature -Z avoid-dev-deps
-    displayName: RUSTFLAGS="--cfg tokio_unstable" cargo hack check --all --each-feature
+    displayName: cargo hack check --all --each-feature
+    env:
+      RUSTFLAGS: '--cfg tokio_unstable'
