@@ -6,10 +6,9 @@
 //! Similar to `std`, channel creation provides [`Receiver`] and [`Sender`]
 //! handles. [`Receiver`] implements `Stream` and allows a task to read values
 //! out of the channel. If there is no message to read, the current task will be
-//! notified when a new value is sent.  [`Sender`] implements the `Sink` trait
-//! and allows sending messages into the channel. If the channel is at capacity,
-//! the send is rejected and the task will be notified when additional capacity
-//! is available. In other words, the channel provides backpressure.
+//! notified when a new value is sent. If the channel is at capacity, the send
+//! is rejected and the task will be notified when additional capacity is
+//! available. In other words, the channel provides backpressure.
 //!
 //! Unbounded channels are also available using the `unbounded_channel`
 //! constructor.
