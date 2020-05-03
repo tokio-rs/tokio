@@ -267,11 +267,11 @@ where
                 s.get_mut().context = null_mut();
                 Poll::Ready(Ok(StartedHandshake::Done(TlsStream(s))))
             }
+            Err(HandshakeError::Failure(e)) => Poll::Ready(Err(e)),
             Err(HandshakeError::WouldBlock(mut s)) => {
                 s.get_mut().context = null_mut();
                 Poll::Ready(Ok(StartedHandshake::Mid(s)))
             }
-            Err(HandshakeError::Failure(e)) => Poll::Ready(Err(e)),
         }
     }
 }
@@ -349,7 +349,10 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Future for MidHandshake<S> {
 
         s.get_mut().context = cx as *mut _ as *mut ();
         match s.handshake() {
-            Ok(stream) => Poll::Ready(Ok(TlsStream(stream))),
+            Ok(mut s) => {
+                s.get_mut().context = null_mut();
+                Poll::Ready(Ok(TlsStream(s)))
+            }
             Err(HandshakeError::Failure(e)) => Poll::Ready(Err(e)),
             Err(HandshakeError::WouldBlock(mut s)) => {
                 s.get_mut().context = null_mut();
