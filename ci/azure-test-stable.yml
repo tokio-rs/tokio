@@ -21,6 +21,23 @@ jobs:
 
   - template: azure-is-release.yml
 
+  # Run `tokio` with only `full`
+  - script: cargo test --features full
+    env:
+      RUST_BACKTRACE: 1
+      CI: 'True'
+    displayName: tokio - cargo test --features full
+    workingDirectory: $(Build.SourcesDirectory)/tokio
+
+  # Run `tokio` with "unstable" cfg flag
+  - script: cargo test --all-features
+    env:
+      RUSTFLAGS: '--cfg tokio_unstable'
+      RUST_BACKTRACE: 1
+      CI: 'True'
+    displayName: tokio - cargo test --features full
+    workingDirectory: $(Build.SourcesDirectory)/tokio
+
   - ${{ each crate in parameters.crates }}:
     # Run with all crate features
     - script: cargo test --all-features

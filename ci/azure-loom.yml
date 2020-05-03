@@ -21,7 +21,7 @@ jobs:
     parameters:
       rust_version: ${{ parameters.rust }}
 
-  - script: RUSTFLAGS="--cfg loom" cargo test --lib --release --features "full" -- --nocapture $(scope)
+  - script: RUSTFLAGS="--cfg loom --cfg tokio_unstable" cargo test --lib --release --features "full" -- --nocapture $(scope)
     env:
       LOOM_MAX_PREEMPTIONS: 2
       CI: 'True'

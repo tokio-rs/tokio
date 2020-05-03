@@ -30,3 +30,9 @@ jobs:
   #   tracking-issue: https://github.com/rust-lang/cargo/issues/5133
   - script: cargo hack check --all --each-feature -Z avoid-dev-deps
     displayName: cargo hack check --all --each-feature
+
+  # Try with unstable feature flags
+  - script: cargo hack check --all --each-feature -Z avoid-dev-deps
+    displayName: cargo hack check --all --each-feature
+    env:
+      RUSTFLAGS: '--cfg tokio_unstable'

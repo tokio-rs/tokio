@@ -1,4 +1,4 @@
-use crate::scope::CancellationToken;
+use crate::sync::CancellationToken;
 
 use loom::{future::block_on, thread};
 use tokio_test::assert_ok;
