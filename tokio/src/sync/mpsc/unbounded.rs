@@ -173,4 +173,12 @@ impl<T> UnboundedSender<T> {
         self.chan.send_unbounded(message)?;
         Ok(())
     }
+
+    /// Returns `true` when the channel is closed.
+    ///
+    /// From the Sender point of view, the channel is considered closed if
+    /// the receiver half of the channel is closed.
+    pub fn is_closed(&mut self) -> bool {
+        self.chan.is_closed()
+    }
 }
