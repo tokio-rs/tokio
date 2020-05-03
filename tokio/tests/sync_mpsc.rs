@@ -490,3 +490,135 @@ fn try_recv_unbounded() {
         _ => panic!(),
     }
 }
+
+#[test]
+fn is_closed_is_true_when_bounded_when_closing_rx() {
+    let (tx, rx) = mpsc::channel::<i32>(3);
+
+    let mut tx0 = task::spawn(tx.clone());
+    let mut tx1 = task::spawn(tx);
+    let mut rx0 = task::spawn(rx);
+
+    // The handles are `poll_ready`.
+    assert_ready_ok!(tx0.enter(|cx, mut tx| tx.poll_ready(cx)));
+    assert_ready_ok!(tx1.enter(|cx, mut tx| tx.poll_ready(cx)));
+
+    // The channel is created open.
+    assert!(tx0.enter(|_cx, mut tx| !tx.is_closed()));
+    assert!(tx1.enter(|_cx, mut tx| !tx.is_closed()));
+    assert!(rx0.enter(|_cx, mut rx| !rx.is_closed()));
+
+    assert_ok!(tx0.try_send(0));
+    assert_ok!(tx1.try_send(1));
+
+    let val = assert_ready!(rx0.enter(|cx, mut rx| rx.poll_recv(cx)));
+    assert_eq!(val, Some(0));
+    let val = assert_ready!(rx0.enter(|cx, mut rx| rx.poll_recv(cx)));
+    assert_eq!(val, Some(1));
+
+    // Closing the receiving half of a channel will close the channel.
+    rx0.enter(|_cx, mut rx| rx.close());
+
+    assert!(tx0.enter(|_cx, mut tx| tx.is_closed()));
+    assert!(tx1.enter(|_cx, mut tx| tx.is_closed()));
+    assert!(rx0.enter(|_cx, mut rx| rx.is_closed()));
+}
+
+#[test]
+fn is_closed_is_true_when_unbounded_when_closing_rx() {
+    let (tx, rx) = mpsc::unbounded_channel::<i32>();
+
+    let mut tx0 = task::spawn(tx.clone());
+    let mut tx1 = task::spawn(tx);
+    let mut rx0 = task::spawn(rx);
+
+    // The channel is created open.
+    assert!(tx0.enter(|_cx, mut tx| !tx.is_closed()));
+    assert!(tx1.enter(|_cx, mut tx| !tx.is_closed()));
+    assert!(rx0.enter(|_cx, mut rx| !rx.is_closed()));
+
+    assert_ok!(tx0.send(0));
+    assert_ok!(tx1.send(1));
+
+    let val = assert_ready!(rx0.enter(|cx, mut rx| rx.poll_recv(cx)));
+    assert_eq!(val, Some(0));
+    let val = assert_ready!(rx0.enter(|cx, mut rx| rx.poll_recv(cx)));
+    assert_eq!(val, Some(1));
+
+    // Closing the receiving half of a channel will close the channel.
+    rx0.enter(|_cx, mut rx| rx.close());
+
+    assert!(tx0.enter(|_cx, mut tx| tx.is_closed()));
+    assert!(tx1.enter(|_cx, mut tx| tx.is_closed()));
+    assert!(rx0.enter(|_cx, mut rx| rx.is_closed()));
+}
+
+#[test]
+fn is_closed_is_true_when_bounded_when_dropping_tx() {
+    let (tx, rx) = mpsc::channel::<i32>(3);
+
+    let mut tx0 = task::spawn(tx.clone());
+    let mut tx1 = task::spawn(tx);
+    let mut rx0 = task::spawn(rx);
+
+    // The handles are `poll_ready`.
+    assert_ready_ok!(tx0.enter(|cx, mut tx| tx.poll_ready(cx)));
+    assert_ready_ok!(tx1.enter(|cx, mut tx| tx.poll_ready(cx)));
+
+    // The channel is created open.
+    assert!(tx0.enter(|_cx, mut tx| !tx.is_closed()));
+    assert!(tx1.enter(|_cx, mut tx| !tx.is_closed()));
+    assert!(rx0.enter(|_cx, mut rx| !rx.is_closed()));
+
+    assert_ok!(tx0.try_send(0));
+    assert_ok!(tx1.try_send(1));
+
+    let val = assert_ready!(rx0.enter(|cx, mut rx| rx.poll_recv(cx)));
+    assert_eq!(val, Some(0));
+    let val = assert_ready!(rx0.enter(|cx, mut rx| rx.poll_recv(cx)));
+    assert_eq!(val, Some(1));
+
+    // Closing, by dropping, one sending half of a channel, while
+    // another is still open will not close the channel.
+    drop(tx0);
+    assert!(tx1.enter(|_cx, mut tx| !tx.is_closed()));
+    assert!(rx0.enter(|_cx, mut rx| !rx.is_closed()));
+
+    // Closing, by dropping, all the senders of a channel will close
+    // the channel.
+    drop(tx1);
+    assert!(rx0.enter(|_cx, mut rx| rx.is_closed()));
+}
+
+#[test]
+fn is_closed_is_true_when_unbounded_when_dropping_tx() {
+    let (tx, rx) = mpsc::unbounded_channel::<i32>();
+
+    let mut tx0 = task::spawn(tx.clone());
+    let mut tx1 = task::spawn(tx);
+    let mut rx0 = task::spawn(rx);
+
+    // The channel is created open.
+    assert!(tx0.enter(|_cx, mut tx| !tx.is_closed()));
+    assert!(tx1.enter(|_cx, mut tx| !tx.is_closed()));
+    assert!(rx0.enter(|_cx, mut rx| !rx.is_closed()));
+
+    assert_ok!(tx0.send(0));
+    assert_ok!(tx1.send(1));
+
+    let val = assert_ready!(rx0.enter(|cx, mut rx| rx.poll_recv(cx)));
+    assert_eq!(val, Some(0));
+    let val = assert_ready!(rx0.enter(|cx, mut rx| rx.poll_recv(cx)));
+    assert_eq!(val, Some(1));
+
+    // Closing, by dropping, one sending half of a channel, while
+    // another is still open will not close the channel.
+    drop(tx0);
+    assert!(tx1.enter(|_cx, mut tx| !tx.is_closed()));
+    assert!(rx0.enter(|_cx, mut rx| !rx.is_closed()));
+
+    // Closing, by dropping, all the senders of a channel will close
+    // the channel.
+    drop(tx1);
+    assert!(rx0.enter(|_cx, mut rx| rx.is_closed()));
+}
