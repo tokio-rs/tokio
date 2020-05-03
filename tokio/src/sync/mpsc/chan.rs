@@ -113,7 +113,7 @@ struct Chan<T, S> {
     /// When this drops to zero, the send half of the channel is closed.
     tx_count: AtomicUsize,
 
-    /// Only accessed by `Rx` handle.
+    /// Fields related to the `Rx` handle.
     rx_fields: UnsafeCell<RxFields<T>>,
 }
 
@@ -132,7 +132,7 @@ where
     }
 }
 
-/// Fields only accessed by `Rx` handle.
+/// Fields related to the `Rx` handle.
 struct RxFields<T> {
     /// Channel receiver. This field is only accessed by the `Receiver` type.
     list: list::Rx<T>,
@@ -198,6 +198,15 @@ where
     /// Send a message and notify the receiver.
     pub(crate) fn try_send(&mut self, value: T) -> Result<(), (T, TrySendError)> {
         self.inner.try_send(value, &mut self.permit)
+    }
+
+    /// Returns `true` if the channel is closed.
+    ///
+    /// The channel is closed if `Rx::close` is called.
+    pub(crate) fn is_closed(&self) -> bool {
+        self.inner
+            .rx_fields
+            .with(|rx_fields_ptr| unsafe { (*rx_fields_ptr).rx_closed })
     }
 }
 
