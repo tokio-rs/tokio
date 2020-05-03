@@ -218,13 +218,3 @@ fn drop_parent_before_child_tokens() {
     drop(child1);
     drop(child2);
 }
-
-#[test]
-fn cancellation_future_is_send() {
-    let token = CancellationToken::new();
-    let fut = token.cancelled();
-
-    fn with_send<T: Send>(_: T) {}
-
-    with_send(fut);
-}
