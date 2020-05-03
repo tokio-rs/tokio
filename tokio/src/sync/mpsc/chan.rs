@@ -7,7 +7,7 @@ use crate::sync::mpsc::{error, list};
 
 use std::fmt;
 use std::process;
-use std::sync::atomic::Ordering::{AcqRel, Relaxed};
+use std::sync::atomic::Ordering::{AcqRel, Relaxed, SeqCst};
 use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll};
 
@@ -335,6 +335,21 @@ where
                 None => Err(TryRecvError::Empty),
             }
         })
+    }
+
+    /// Returns `true` if the channel is closed.
+    ///
+    /// The channel is closed if the number of outstanding sender
+    /// handles is zero, thus the send half of the channel is closed,
+    /// or if `Rx::close` is called.
+    pub(crate) fn is_closed(&self) -> bool {
+        if self.inner.tx_count.load(SeqCst) == 0 {
+            return true;
+        }
+
+        self.inner
+            .rx_fields
+            .with(|rx_fields_ptr| unsafe { (*rx_fields_ptr).rx_closed })
     }
 }
 
