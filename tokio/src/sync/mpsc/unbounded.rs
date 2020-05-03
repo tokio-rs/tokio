@@ -145,6 +145,19 @@ impl<T> UnboundedReceiver<T> {
     pub fn close(&mut self) {
         self.chan.close();
     }
+
+    /// Returns `true` when the channel is closed.
+    ///
+    /// The channel is considered closed if one of this conditions is true:
+    ///
+    /// - the number of outstanding sender handles is zero, thus the send half
+    ///   of the channel is closed;
+    /// - if  [`close`] is called.
+    ///
+    /// [`close`]: UnboundedReceiver::close
+    pub fn is_closed(&mut self) -> bool {
+        self.chan.is_closed()
+    }
 }
 
 #[cfg(feature = "stream")]
