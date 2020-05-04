@@ -8,18 +8,21 @@ name = "tokio-tls"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.3.x" git tag.
-version = "0.3.0"
+version = "0.3.1"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-tls/0.3.0-alpha.6/tokio_tls/"
+documentation = "https://docs.rs/tokio-tls/0.3.1/tokio_tls/"
 description = """
+Deprecated in favor of `tokio-naitve-tls`.
+
 An implementation of TLS/SSL streams for Tokio giving an implementation of TLS
 for nonblocking I/O streams.
 """
 categories = ["asynchronous", "network-programming"]
+maintenance = { status = "deprecated" }
 
 [badges]
 travis-ci = { repository = "tokio-rs/tokio-tls" }

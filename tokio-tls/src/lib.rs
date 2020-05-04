@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-tls/0.3.0")]
+#![doc(html_root_url = "https://docs.rs/tokio-tls/0.3.1")]
 #![warn(
     missing_debug_implementations,
     missing_docs,
@@ -12,6 +12,9 @@
 ))]
 
 //! Async TLS streams
+//!
+//! > **Note:** This crate is **deprecated** and has been moved
+//! into the [`tokio-native-tls`] crate.
 //!
 //! This library is an implementation of TLS streams using the most appropriate
 //! system library by default for negotiating the connection. That is, on
