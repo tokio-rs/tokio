@@ -32,7 +32,7 @@
 //! single producer to a single consumer. This channel is usually used to send
 //! the result of a computation to a waiter.
 //!
-//! **Example:** using a `oneshot` channel to receive the result of a
+//! **Example:** using a [`oneshot` channel][oneshot] to receive the result of a
 //! computation.
 //!
 //! ```
