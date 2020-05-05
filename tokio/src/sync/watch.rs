@@ -243,6 +243,42 @@ impl<T> Receiver<T> {
 
         Pending
     }
+
+    /// Returns `Option<()>` when a `Sender` sends a value via channel.
+    ///
+    /// Works similar to the `recv` method on the `Receiver`
+    /// but instead of returning a clone of the value sent by the `Sender`,
+    /// an `Option<()>` is returned.
+    ///
+    /// Useful when the `Sender` sends values that don't implement `Clone`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::watch;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = watch::channel("hello");
+    ///
+    ///     let v = rx.notify().await.unwrap();
+    ///     assert_eq!(v, ());
+    ///
+    ///     tokio::spawn(async move {
+    ///         tx.broadcast("goodbye").unwrap();
+    ///     });
+    ///
+    ///     // Waits for the new task to spawn and send the value.
+    ///     let v = rx.notify().await.unwrap();
+    ///     assert_eq!(v, ());
+    ///
+    ///     let v = rx.notify().await;
+    ///     assert!(v.is_none());
+    /// }
+    /// ```
+    pub async fn notify(&mut self) -> Option<()> {
+        poll_fn(|cx| self.poll_recv_ref(cx).map(|x| x.map(|_| ()))).await
+    }
 }
 
 impl<T: Clone> Receiver<T> {
