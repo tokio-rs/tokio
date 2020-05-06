@@ -98,12 +98,14 @@ impl Handle {
     ///     println!("now running in the existing Runtime");
     /// });
     ///
+    /// # let handle = 
     /// thread::spawn(move || {
     ///     // Notice that the handle is created outside of this thread and then moved in
     ///     handle.block_on(async { /* ... */ })
     ///     // This next line would cause a panic
     ///     // let handle2 = Handle::current();
-    /// })
+    /// });
+    /// # handle.join().unwrap();
     /// # });
     /// # }
     /// ```
