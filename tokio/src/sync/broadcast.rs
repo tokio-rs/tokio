@@ -649,12 +649,16 @@ impl<T> Receiver<T> {
         if slot.pos != self.next {
             // The receiver has read all current values in the channel
             if slot.pos.wrapping_add(self.shared.buffer.len() as u64) == self.next {
-                // guard.drop_no_rem_dec();
                 return Err(TryRecvError::Empty);
             }
 
-            // In order to avoid deadlocks, release the `slot` lock before
-            // attempting to acquire the `tail` lock.
+            // Release the `slot` lock before attempting to acquire the `tail`
+            // lock. This is required because `send2` acquires the tail lock
+            // first followed by the slot lock. Acquiring the locks in reverse
+            // order here would result in a potential deadlock: `recv_ref`
+            // acquires the `slot` lock and attempts to acquire the `tail` lock
+            // while `send2` acquired the `tail` lock and attempts to acquire
+            // the slot lock.
             drop(slot);
 
             let tail = self.shared.tail.lock().unwrap();
