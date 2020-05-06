@@ -37,8 +37,8 @@ jobs:
   # Always patch
   - template: azure-patch-crates.yml
 
-  - script: cross check --all --exclude tokio-tls --target $(target)
+  - script: cross check --all --target $(target)
     displayName: Check source
 
-  # - script: cross check --tests --all --exclude tokio-tls --target $(target)
+  # - script: cross check --tests --all --target $(target)
   #   displayName: Check tests
