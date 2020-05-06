@@ -1,5 +1,4 @@
 use super::batch_semaphore as ll; // low level implementation
-use crate::coop::CoopFutureExt;
 use std::sync::Arc;
 
 /// Counting semaphore performing asynchronous permit aquisition.
@@ -87,7 +86,7 @@ impl Semaphore {
 
     /// Acquires permit from the semaphore.
     pub async fn acquire(&self) -> SemaphorePermit<'_> {
-        self.ll_sem.acquire(1).cooperate().await.unwrap();
+        self.ll_sem.acquire(1).await.unwrap();
         SemaphorePermit {
             sem: &self,
             permits: 1,
@@ -111,7 +110,7 @@ impl Semaphore {
     ///
     /// [`Arc`]: std::sync::Arc
     pub async fn acquire_owned(self: Arc<Self>) -> OwnedSemaphorePermit {
-        self.ll_sem.acquire(1).cooperate().await.unwrap();
+        self.ll_sem.acquire(1).await.unwrap();
         OwnedSemaphorePermit {
             sem: self.clone(),
             permits: 1,
