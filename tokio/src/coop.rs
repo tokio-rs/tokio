@@ -50,7 +50,6 @@
 // NOTE: The doctests in this module are ignored since the whole module is (currently) private.
 
 use std::cell::Cell;
-use std::task::{Context, Poll};
 
 thread_local! {
     static CURRENT: Cell<Budget> = Cell::new(Budget::unconstrained());
@@ -80,23 +79,12 @@ impl Budget {
     const fn unconstrained() -> Budget {
         Budget(None)
     }
+}
 
-    fn has_remaining(&self) -> bool {
-        self.0.map(|budget| budget > 0).unwrap_or(true)
-    }
-
-    /// Decrement the budget. Returns `true` if successful. Decrementing fails
-    /// when there is not enough remaining budget.
-    fn decrement(&mut self) -> bool {
-        if let Some(num) = &mut self.0 {
-            if *num > 0 {
-                *num -= 1;
-                true
-            } else {
-                false
-            }
-        } else {
-            true
+cfg_rt_threaded! {
+    impl Budget {
+        fn has_remaining(&self) -> bool {
+            self.0.map(|budget| budget > 0).unwrap_or(true)
         }
     }
 }
@@ -146,20 +134,41 @@ cfg_blocking_impl! {
     }
 }
 
-/// Returns `Poll::Pending` if the current task has exceeded its budget and should yield.
-#[inline]
-pub(crate) fn poll_proceed(cx: &mut Context<'_>) -> Poll<()> {
-    CURRENT.with(|cell| {
-        let mut budget = cell.get();
+cfg_coop! {
+    use std::task::{Context, Poll};
 
-        if budget.decrement() {
-            cell.set(budget);
-            Poll::Ready(())
-        } else {
-            cx.waker().wake_by_ref();
-            Poll::Pending
-        }
-    })
+    /// Returns `Poll::Pending` if the current task has exceeded its budget and should yield.
+    #[inline]
+    pub(crate) fn poll_proceed(cx: &mut Context<'_>) -> Poll<()> {
+        CURRENT.with(|cell| {
+            let mut budget = cell.get();
+
+            if budget.decrement() {
+                cell.set(budget);
+                Poll::Ready(())
+            } else {
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            }
+        })
+    }
+
+    impl Budget {
+        /// Decrement the budget. Returns `true` if successful. Decrementing fails
+        /// when there is not enough remaining budget.
+        fn decrement(&mut self) -> bool {
+            if let Some(num) = &mut self.0 {
+                if *num > 0 {
+                    *num -= 1;
+                    true
+                } else {
+                    false
+                }
+            } else {
+                true
+            }
+    }
+    }
 }
 
 #[cfg(all(test, not(loom)))]
