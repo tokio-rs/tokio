@@ -6,25 +6,33 @@
 use std::sync::{LockResult, TryLockError, TryLockResult};
 use std::time::Duration;
 
-use parking_lot as pl;
+// Types that do not need wrapping
+pub(crate) use parking_lot::{MutexGuard, RwLockReadGuard, RwLockWriteGuard, WaitTimeoutResult};
 
 /// Adapter for `parking_lot::Mutex` to the `std::sync::Mutex` interface.
 #[derive(Debug)]
-pub(crate) struct Mutex<T: ?Sized>(pl::Mutex<T>);
+pub(crate) struct Mutex<T: ?Sized>(parking_lot::Mutex<T>);
+
+#[derive(Debug)]
+pub(crate) struct RwLock<T>(parking_lot::RwLock<T>);
+
+/// Adapter for `parking_lot::Condvar` to the `std::sync::Condvar` interface.
+#[derive(Debug)]
+pub(crate) struct Condvar(parking_lot::Condvar);
 
 impl<T> Mutex<T> {
     #[inline]
     pub(crate) fn new(t: T) -> Mutex<T> {
-        Mutex(pl::Mutex::new(t))
+        Mutex(parking_lot::Mutex::new(t))
     }
 
     #[inline]
-    pub(crate) fn lock(&self) -> LockResult<pl::MutexGuard<'_, T>> {
+    pub(crate) fn lock(&self) -> LockResult<MutexGuard<'_, T>> {
         Ok(self.0.lock())
     }
 
     #[inline]
-    pub(crate) fn try_lock(&self) -> TryLockResult<pl::MutexGuard<'_, T>> {
+    pub(crate) fn try_lock(&self) -> TryLockResult<MutexGuard<'_, T>> {
         match self.0.try_lock() {
             Some(guard) => Ok(guard),
             None => Err(TryLockError::WouldBlock),
@@ -35,14 +43,24 @@ impl<T> Mutex<T> {
     // provided here as needed.
 }
 
-/// Adapter for `parking_lot::Condvar` to the `std::sync::Condvar` interface.
-#[derive(Debug)]
-pub(crate) struct Condvar(pl::Condvar);
+impl<T> RwLock<T> {
+    pub(crate) fn new(t: T) -> RwLock<T> {
+        RwLock(parking_lot::RwLock::new(t))
+    }
+
+    pub(crate) fn read(&self) -> LockResult<RwLockReadGuard<'_, T>> {
+        Ok(self.0.read())
+    }
+
+    pub(crate) fn write(&self) -> LockResult<RwLockWriteGuard<'_, T>> {
+        Ok(self.0.write())
+    }
+}
 
 impl Condvar {
     #[inline]
     pub(crate) fn new() -> Condvar {
-        Condvar(pl::Condvar::new())
+        Condvar(parking_lot::Condvar::new())
     }
 
     #[inline]
@@ -58,8 +76,8 @@ impl Condvar {
     #[inline]
     pub(crate) fn wait<'a, T>(
         &self,
-        mut guard: pl::MutexGuard<'a, T>,
-    ) -> LockResult<pl::MutexGuard<'a, T>> {
+        mut guard: MutexGuard<'a, T>,
+    ) -> LockResult<MutexGuard<'a, T>> {
         self.0.wait(&mut guard);
         Ok(guard)
     }
@@ -67,9 +85,9 @@ impl Condvar {
     #[inline]
     pub(crate) fn wait_timeout<'a, T>(
         &self,
-        mut guard: pl::MutexGuard<'a, T>,
+        mut guard: MutexGuard<'a, T>,
         timeout: Duration,
-    ) -> LockResult<(pl::MutexGuard<'a, T>, pl::WaitTimeoutResult)> {
+    ) -> LockResult<(MutexGuard<'a, T>, WaitTimeoutResult)> {
         let wtr = self.0.wait_for(&mut guard, timeout);
         Ok((guard, wtr))
     }

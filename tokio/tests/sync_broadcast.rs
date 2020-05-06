@@ -49,7 +49,7 @@ macro_rules! assert_closed {
     };
 }
 
-trait AssertSend: Send {}
+trait AssertSend: Send + Sync {}
 impl AssertSend for broadcast::Sender<i32> {}
 impl AssertSend for broadcast::Receiver<i32> {}
 
