@@ -83,7 +83,7 @@ impl Budget {
 
 cfg_rt_threaded! {
     impl Budget {
-        fn has_remaining(&self) -> bool {
+        fn has_remaining(self) -> bool {
             self.0.map(|budget| budget > 0).unwrap_or(true)
         }
     }
