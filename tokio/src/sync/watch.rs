@@ -277,7 +277,7 @@ impl<T> Receiver<T> {
     /// }
     /// ```
     pub async fn notify(&mut self) -> Option<()> {
-        poll_fn(|cx| self.poll_recv_ref(cx).map(|x| x.map(|_| ()))).await
+        poll_fn(|cx| self.poll_recv_ref(cx)).await.map(|_| ())
     }
 }
 
