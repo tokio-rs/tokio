@@ -4,7 +4,6 @@ members = [
   "tokio",
   "tokio-macros",
   "tokio-test",
-  "tokio-tls",
   "tokio-util",
 
   # Internal
