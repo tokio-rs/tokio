@@ -39,4 +39,4 @@ task:
   # i686_test_script:
   #   - . $HOME/.cargo/env
   #   - |
-  #     cargo test --all --exclude tokio-tls --exclude tokio-macros --target i686-unknown-freebsd
+  #     cargo test --all --exclude tokio-macros --target i686-unknown-freebsd
