@@ -98,6 +98,7 @@ pub(crate) fn budget<R>(f: impl FnOnce() -> R) -> R {
 
 cfg_rt_threaded! {
     /// Set the current task's budget
+    #[cfg(feature = "blocking")]
     pub(crate) fn set(budget: Budget) {
         CURRENT.with(|cell| cell.set(budget))
     }
