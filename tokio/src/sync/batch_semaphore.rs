@@ -386,7 +386,11 @@ impl Future for Acquire<'_> {
     type Output = Result<(), AcquireError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // First, ensure the current task has enough budget to proceed.
+        ready!(crate::coop::poll_proceed(cx));
+
         let (node, semaphore, needed, queued) = self.project();
+
         match semaphore.poll_acquire(cx, needed, node, *queued) {
             Pending => {
                 *queued = true;

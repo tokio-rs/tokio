@@ -1,4 +1,3 @@
-use crate::coop::CoopFutureExt;
 use crate::sync::batch_semaphore::{AcquireError, Semaphore};
 use std::cell::UnsafeCell;
 use std::ops;
@@ -116,7 +115,7 @@ impl<'a, T> ReleasingPermit<'a, T> {
         lock: &'a RwLock<T>,
         num_permits: u16,
     ) -> Result<ReleasingPermit<'a, T>, AcquireError> {
-        lock.s.acquire(num_permits).cooperate().await?;
+        lock.s.acquire(num_permits).await?;
         Ok(Self { num_permits, lock })
     }
 }

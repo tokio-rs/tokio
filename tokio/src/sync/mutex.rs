@@ -1,4 +1,3 @@
-use crate::coop::CoopFutureExt;
 use crate::sync::batch_semaphore as semaphore;
 
 use std::cell::UnsafeCell;
@@ -255,7 +254,7 @@ impl<T> Mutex<T> {
     }
 
     async fn acquire(&self) {
-        self.s.acquire(1).cooperate().await.unwrap_or_else(|_| {
+        self.s.acquire(1).await.unwrap_or_else(|_| {
             // The semaphore was closed. but, we never explicitly close it, and
             // we own it exclusively, which means that this can never happen.
             unreachable!()
