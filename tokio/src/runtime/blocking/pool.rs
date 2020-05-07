@@ -148,7 +148,7 @@ impl fmt::Debug for BlockingPool {
 // ===== impl Spawner =====
 
 impl Spawner {
-    fn spawn(&self, task: Task, rt: &Handle) -> Result<(), ()> {
+    pub(crate) fn spawn(&self, task: Task, rt: &Handle) -> Result<(), ()> {
         let shutdown_tx = {
             let mut shared = self.inner.shared.lock().unwrap();
 

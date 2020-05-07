@@ -3,13 +3,13 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 /// Converts a function to a future that completes on poll
-pub(super) struct BlockingTask<T> {
+pub(crate) struct BlockingTask<T> {
     func: Option<T>,
 }
 
 impl<T> BlockingTask<T> {
     /// Initializes a new blocking task from the given function
-    pub(super) fn new(func: T) -> BlockingTask<T> {
+    pub(crate) fn new(func: T) -> BlockingTask<T> {
         BlockingTask { func: Some(func) }
     }
 }

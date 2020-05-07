@@ -6,7 +6,7 @@ use crate::runtime::task::{self, Task};
 ///
 /// We avoid storing the task by forgetting it in `bind` and re-materializing it
 /// in `release.
-pub(super) struct NoopSchedule;
+pub(crate) struct NoopSchedule;
 
 impl task::Schedule for NoopSchedule {
     fn bind(_task: Task<Self>) -> NoopSchedule {
