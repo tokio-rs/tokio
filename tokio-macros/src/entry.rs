@@ -142,7 +142,7 @@ fn parse_knobs(
     let header = {
         if is_test {
             quote! {
-                #[test]
+                #[::core::prelude::v1::test]
             }
         } else {
             quote! {}
@@ -334,14 +334,14 @@ pub(crate) mod old {
 
         let result = match runtime {
             Runtime::Threaded => quote! {
-                #[test]
+                #[::core::prelude::v1::test]
                 #(#attrs)*
                 #vis fn #name() #ret {
                     tokio::runtime::Runtime::new().unwrap().block_on(async { #body })
                 }
             },
             Runtime::Basic | Runtime::Auto => quote! {
-                #[test]
+                #[::core::prelude::v1::test]
                 #(#attrs)*
                 #vis fn #name() #ret {
                     tokio::runtime::Builder::new()
