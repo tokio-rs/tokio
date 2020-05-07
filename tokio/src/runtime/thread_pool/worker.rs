@@ -4,6 +4,7 @@
 //! "core" is handed off to a new thread allowing the scheduler to continue to
 //! make progress while the originating thread blocks.
 
+use crate::coop;
 use crate::loom::rand::seed;
 use crate::loom::sync::{Arc, Mutex};
 use crate::park::{Park, Unpark};
@@ -179,31 +180,27 @@ cfg_blocking! {
         F: FnOnce() -> R,
     {
         // Try to steal the worker core back
-        struct Reset(bool);
+        struct Reset(coop::Budget);
 
         impl Drop for Reset {
             fn drop(&mut self) {
                 CURRENT.with(|maybe_cx| {
-                    if !self.0 {
-                        // We were not the ones to give away the core,
-                        // so we do not get to restore it either.
-                        // This is necessary so that with a nested
-                        // block_in_place, the inner block_in_place
-                        // does not restore the core.
-                        return;
-                    }
-
                     if let Some(cx) = maybe_cx {
                         let core = cx.worker.core.take();
                         let mut cx_core = cx.core.borrow_mut();
                         assert!(cx_core.is_none());
                         *cx_core = core;
+
+                        // Reset the task budget as we are re-entering the
+                        // runtime.
+                        coop::set(self.0);
                     }
                 });
             }
         }
 
         let mut had_core = false;
+
         CURRENT.with(|maybe_cx| {
             match (crate::runtime::enter::context(),  maybe_cx.is_some()) {
                 (EnterContext::Entered { .. }, true) => {
@@ -231,16 +228,12 @@ cfg_blocking! {
                     return;
                 }
             }
+
             let cx = maybe_cx.expect("no .is_some() == false cases above should lead here");
 
             // Get the worker core. If none is set, then blocking is fine!
             let core = match cx.core.borrow_mut().take() {
-                Some(core) => {
-                    // We are effectively leaving the executor, so we need to
-                    // forcibly end budgeting.
-                    crate::coop::stop();
-                    core
-                },
+                Some(core) => core,
                 None => return,
             };
 
@@ -263,9 +256,12 @@ cfg_blocking! {
             runtime::spawn_blocking(move || run(worker));
         });
 
-        let _reset = Reset(had_core);
 
         if had_core {
+            // Unset the current task's budget. Blocking sections are not
+            // constrained by task budgets.
+            let _reset = Reset(coop::stop());
+
             crate::runtime::enter::exit(f)
         } else {
             f()
@@ -349,7 +345,7 @@ impl Context {
         *self.core.borrow_mut() = Some(core);
 
         // Run the task
-        crate::coop::budget(|| {
+        coop::budget(|| {
             task.run();
 
             // As long as there is budget remaining and a task exists in the
@@ -368,7 +364,7 @@ impl Context {
                     None => return Ok(core),
                 };
 
-                if crate::coop::has_budget_remaining() {
+                if coop::has_budget_remaining() {
                     // Run the LIFO task, then loop
                     *self.core.borrow_mut() = Some(core);
                     task.run();

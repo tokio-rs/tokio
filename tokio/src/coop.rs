@@ -92,10 +92,20 @@ cfg_rt_threaded! {
 /// Run the given closure with a cooperative task budget. When the function
 /// returns, the budget is reset to the value prior to calling the function.
 #[inline(always)]
-pub(crate) fn budget<F, R>(f: F) -> R
-where
-    F: FnOnce() -> R,
-{
+pub(crate) fn budget<R>(f: impl FnOnce() -> R) -> R {
+    with_budget(Budget::initial(), f)
+}
+
+cfg_rt_threaded! {
+    /// Set the current task's budget
+    #[cfg(feature = "blocking")]
+    pub(crate) fn set(budget: Budget) {
+        CURRENT.with(|cell| cell.set(budget))
+    }
+}
+
+#[inline(always)]
+fn with_budget<R>(budget: Budget, f: impl FnOnce() -> R) -> R {
     struct ResetGuard<'a> {
         cell: &'a Cell<Budget>,
         prev: Budget,
@@ -110,7 +120,7 @@ where
     CURRENT.with(move |cell| {
         let prev = cell.get();
 
-        cell.set(Budget::initial());
+        cell.set(budget);
 
         let _guard = ResetGuard { cell, prev };
 
@@ -127,10 +137,14 @@ cfg_rt_threaded! {
 
 cfg_blocking_impl! {
     /// Forcibly remove the budgeting constraints early.
-    pub(crate) fn stop() {
+    ///
+    /// Returns the remaining budget
+    pub(crate) fn stop() -> Budget {
         CURRENT.with(|cell| {
+            let prev = cell.get();
             cell.set(Budget::unconstrained());
-        });
+            prev
+        })
     }
 }
 
