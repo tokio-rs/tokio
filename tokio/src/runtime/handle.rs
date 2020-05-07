@@ -98,7 +98,7 @@ impl Handle {
     ///     println!("now running in the existing Runtime");
     /// });
     ///
-    /// # let handle = 
+    /// # let handle =
     /// thread::spawn(move || {
     ///     // Notice that the handle is created outside of this thread and then moved in
     ///     handle.block_on(async { /* ... */ })
