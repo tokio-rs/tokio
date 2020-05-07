@@ -32,7 +32,7 @@
 //! single producer to a single consumer. This channel is usually used to send
 //! the result of a computation to a waiter.
 //!
-//! **Example:** using a `oneshot` channel to receive the result of a
+//! **Example:** using a [`oneshot` channel][oneshot] to receive the result of a
 //! computation.
 //!
 //! ```
@@ -232,7 +232,7 @@
 //!
 //! ## `broadcast` channel
 //!
-//! The [`broadcast` channel][broadcast] supports sending **many** values from
+//! The [`broadcast` channel] supports sending **many** values from
 //! **many** producers to **many** consumers. Each consumer will receive
 //! **each** value. This channel can be used to implement "fan out" style
 //! patterns common with pub / sub or "chat" systems.
@@ -265,12 +265,14 @@
 //! }
 //! ```
 //!
+//! [`broadcast` channel]: crate::sync::broadcast
+//!
 //! ## `watch` channel
 //!
-//! The [`watch` channel][watch] supports sending **many** values from a
-//! **single** producer to **many** consumers. However, only the **most recent**
-//! value is stored in the channel. Consumers are notified when a new value is
-//! sent, but there is no guarantee that consumers will see **all** values.
+//! The [`watch` channel] supports sending **many** values from a **single**
+//! producer to **many** consumers. However, only the **most recent** value is
+//! stored in the channel. Consumers are notified when a new value is sent, but
+//! there is no guarantee that consumers will see **all** values.
 //!
 //! The [`watch` channel] is similar to a [`broadcast` channel] with capacity 1.
 //!
@@ -278,9 +280,9 @@
 //! changes or signalling program state changes, such as transitioning to
 //! shutdown.
 //!
-//! **Example:** use a `watch` channel to notify tasks of configuration changes.
-//! In this example, a configuration file is checked periodically. When the file
-//! changes, the configuration changes are signalled to consumers.
+//! **Example:** use a [`watch` channel] to notify tasks of configuration
+//! changes. In this example, a configuration file is checked periodically. When
+//! the file changes, the configuration changes are signalled to consumers.
 //!
 //! ```
 //! use tokio::sync::watch;
@@ -392,6 +394,9 @@
 //!     }
 //! }
 //! ```
+//!
+//! [`watch` channel]: crate::sync::watch
+//! [`broadcast` channel]: crate::sync::broadcast
 //!
 //! # State synchronization
 //!
