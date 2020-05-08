@@ -73,7 +73,7 @@ impl From<BytesMut> for ReadFrame {
         Self {
             buffer,
             is_readable: size > 0,
-            ..Self::default()
+            eof: false,
         }
     }
 }
@@ -171,8 +171,19 @@ where
     type Error = U::Error;
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        // If the buffer is already over 8KiB, then attempt to flush it. If after flushing it's
+        // *still* over 8KiB, then apply backpressure (reject the send).
         if self.state.borrow().buffer.len() >= BACKPRESSURE_BOUNDARY {
-            self.as_mut().poll_flush(cx)
+            match self.as_mut().poll_flush(cx) {
+                Poll::Pending => {
+                    if self.state.borrow().buffer.len() >= BACKPRESSURE_BOUNDARY {
+                        Poll::Pending
+                    } else {
+                        Poll::Ready(Ok(()))
+                    }
+                }
+                Poll::Ready(result) => Poll::Ready(result),
+            }
         } else {
             Poll::Ready(Ok(()))
         }

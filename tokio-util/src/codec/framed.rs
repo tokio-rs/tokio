@@ -100,8 +100,9 @@ where
                 codec,
                 state: RWFrames {
                     read: ReadFrame {
+                        eof: false,
+                        is_readable: false,
                         buffer: BytesMut::with_capacity(capacity),
-                        ..ReadFrame::default()
                     },
                     write: WriteFrame::default(),
                 },
