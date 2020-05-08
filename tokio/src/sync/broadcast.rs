@@ -109,12 +109,15 @@
 //! }
 
 use crate::loom::cell::UnsafeCell;
-use crate::loom::future::AtomicWaker;
-use crate::loom::sync::atomic::{AtomicBool, AtomicPtr, AtomicUsize};
+use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::{Arc, Mutex, RwLock, RwLockReadGuard};
+use crate::util::linked_list::{self, LinkedList};
 
 use std::fmt;
-use std::ptr;
+use std::future::Future;
+use std::marker::PhantomPinned;
+use std::pin::Pin;
+use std::ptr::NonNull;
 use std::sync::atomic::Ordering::SeqCst;
 use std::task::{Context, Poll, Waker};
 use std::usize;
@@ -191,9 +194,6 @@ pub struct Receiver<T> {
 
     /// Next position to read from
     next: u64,
-
-    /// Waiter state
-    wait: Arc<WaitNode>,
 }
 
 /// Error returned by [`Sender::send`][Sender::send].
@@ -251,11 +251,8 @@ struct Shared<T> {
     /// Mask a position -> index
     mask: usize,
 
-    /// Tail of the queue
+    /// Tail of the queue. Includes the rx wait list.
     tail: Mutex<Tail>,
-
-    /// Stack of pending waiters
-    wait_stack: AtomicPtr<WaitNode>,
 
     /// Number of outstanding Sender handles
     num_tx: AtomicUsize,
@@ -271,6 +268,9 @@ struct Tail {
 
     /// True if the channel is closed
     closed: bool,
+
+    /// Receivers waiting for a value
+    waiters: LinkedList<Waiter>,
 }
 
 /// Slot in the buffer
@@ -296,21 +296,32 @@ struct Slot<T> {
     val: UnsafeCell<Option<T>>,
 }
 
-/// Tracks a waiting receiver
-#[derive(Debug)]
-struct WaitNode {
-    /// `true` if queued
-    queued: AtomicBool,
+/// An entry in the wait queue
+struct Waiter {
+    /// True if queued
+    queued: bool,
 
-    /// Task to wake when a permit is made available.
-    waker: AtomicWaker,
+    /// Task waiting on the broadcast channel.
+    waker: Option<Waker>,
 
-    /// Next pointer in the stack of waiting senders.
-    next: UnsafeCell<*const WaitNode>,
+    /// Intrusive linked-list pointers.
+    pointers: linked_list::Pointers<Waiter>,
+
+    /// Should not be `Unpin`.
+    _p: PhantomPinned,
 }
 
 struct RecvGuard<'a, T> {
     slot: RwLockReadGuard<'a, Slot<T>>,
+}
+
+/// Receive a value future
+struct Recv<'a, T> {
+    /// Receiver being waited on
+    receiver: &'a mut Receiver<T>,
+
+    /// Entry in the waiter `LinkedList`
+    waiter: UnsafeCell<Waiter>,
 }
 
 /// Max number of receivers. Reserve space to lock.
@@ -386,19 +397,14 @@ pub fn channel<T>(mut capacity: usize) -> (Sender<T>, Receiver<T>) {
             pos: 0,
             rx_cnt: 1,
             closed: false,
+            waiters: LinkedList::new(),
         }),
-        wait_stack: AtomicPtr::new(ptr::null_mut()),
         num_tx: AtomicUsize::new(1),
     });
 
     let rx = Receiver {
         shared: shared.clone(),
         next: 0,
-        wait: Arc::new(WaitNode {
-            queued: AtomicBool::new(false),
-            waker: AtomicWaker::new(),
-            next: UnsafeCell::new(ptr::null()),
-        }),
     };
 
     let tx = Sender { shared };
@@ -508,11 +514,6 @@ impl<T> Sender<T> {
         Receiver {
             shared,
             next,
-            wait: Arc::new(WaitNode {
-                queued: AtomicBool::new(false),
-                waker: AtomicWaker::new(),
-                next: UnsafeCell::new(ptr::null()),
-            }),
         }
     }
 
@@ -589,34 +590,33 @@ impl<T> Sender<T> {
             slot.val.with_mut(|ptr| unsafe { *ptr = value });
         }
 
-        // Release the slot lock before the tail lock
+        // Release the slot lock before notifying the receivers.
         drop(slot);
+
+        // The tail lock **must** still be held for safety as this is used to
+        // guard access to each waker.
+        tail.notify_rx();
 
         // Release the mutex. This must happen after the slot lock is released,
         // otherwise the writer lock bit could be cleared while another thread
         // is in the critical section.
         drop(tail);
 
-        // Notify waiting receivers
-        self.notify_rx();
-
         Ok(rem)
     }
+}
 
-    fn notify_rx(&self) {
-        let mut curr = self.shared.wait_stack.swap(ptr::null_mut(), SeqCst) as *const WaitNode;
+impl Tail {
+    fn notify_rx(&mut self) {
+        while let Some(mut waiter) = self.waiters.pop_back() {
+            // Safety: `waiters` lock is still held.
+            let waiter = unsafe { waiter.as_mut() };
 
-        while !curr.is_null() {
-            let waiter = unsafe { Arc::from_raw(curr) };
+            assert!(waiter.queued);
+            waiter.queued = false;
 
-            // Update `curr` before toggling `queued` and waking
-            curr = waiter.next.with(|ptr| unsafe { *ptr });
-
-            // Unset queued
-            waiter.queued.store(false, SeqCst);
-
-            // Wake
-            waiter.waker.wake();
+            let waker = waiter.waker.take().unwrap();
+            waker.wake();
         }
     }
 }
@@ -640,15 +640,18 @@ impl<T> Drop for Sender<T> {
 
 impl<T> Receiver<T> {
     /// Locks the next value if there is one.
-    fn recv_ref(&mut self) -> Result<RecvGuard<'_, T>, TryRecvError> {
+    fn recv_ref(&mut self, waiter: Option<(&UnsafeCell<Waiter>, &Waker)>) -> Result<RecvGuard<'_, T>, TryRecvError> {
         let idx = (self.next & self.shared.mask as u64) as usize;
 
         // The slot holding the next value to read
         let mut slot = self.shared.buffer[idx].read().unwrap();
 
         if slot.pos != self.next {
-            // The receiver has read all current values in the channel
-            if slot.pos.wrapping_add(self.shared.buffer.len() as u64) == self.next {
+            let next_pos = slot.pos.wrapping_add(self.shared.buffer.len() as u64);
+
+            // The receiver has read all current values in the channel and there
+            // is no waiter to register
+            if waiter.is_none() && next_pos == self.next {
                 return Err(TryRecvError::Empty);
             }
 
@@ -661,35 +664,61 @@ impl<T> Receiver<T> {
             // the slot lock.
             drop(slot);
 
-            let tail = self.shared.tail.lock().unwrap();
+            let mut tail = self.shared.tail.lock().unwrap();
 
             // Acquire slot lock again
             slot = self.shared.buffer[idx].read().unwrap();
 
-            // `tail.pos` points to the slot that the **next** send writes to. If
-            // the channel is closed, the previous slot is the oldest value.
-            let mut adjust = 0;
-            if tail.closed {
-                adjust = 1
+            // Make sure the position did not change. This could happen in the
+            // unlikely event that the buffer is wrapped between dropping the
+            // read lock and acquiring the tail lock.
+            if slot.pos != self.next {
+                let next_pos = slot.pos.wrapping_add(self.shared.buffer.len() as u64);
+
+                if next_pos == self.next {
+                    // Store the waker
+                    if let Some((waiter, waker)) = waiter {
+                        // Safety: called while locked.
+                        unsafe {
+                            // Only queue if not already queued
+                            waiter.with_mut(|ptr| {
+                                if !(*ptr).queued {
+                                    (*ptr).queued = true;
+                                    (*ptr).waker = Some(waker.clone());
+                                    tail.waiters.push_front(NonNull::new_unchecked(&mut *ptr));
+                                }
+                            });
+                        }
+                    }
+
+                    return Err(TryRecvError::Empty);
+                }
+
+                // `tail.pos` points to the slot that the **next** send writes to. If
+                // the channel is closed, the previous slot is the oldest value.
+                let mut adjust = 0;
+                if tail.closed {
+                    adjust = 1
+                }
+                let next = tail
+                    .pos
+                    .wrapping_sub(self.shared.buffer.len() as u64 + adjust);
+
+                let missed = next.wrapping_sub(self.next);
+
+                drop(tail);
+
+                // The receiver is slow but no values have been missed
+                if missed == 0 {
+                    self.next = self.next.wrapping_add(1);
+
+                    return Ok(RecvGuard { slot });
+                }
+
+                self.next = next;
+
+                return Err(TryRecvError::Lagged(missed));
             }
-            let next = tail
-                .pos
-                .wrapping_sub(self.shared.buffer.len() as u64 + adjust);
-
-            let missed = next.wrapping_sub(self.next);
-
-            drop(tail);
-
-            // The receiver is slow but no values have been missed
-            if missed == 0 {
-                self.next = self.next.wrapping_add(1);
-
-                return Ok(RecvGuard { slot });
-            }
-
-            self.next = next;
-
-            return Err(TryRecvError::Lagged(missed));
         }
 
         self.next = self.next.wrapping_add(1);
@@ -746,10 +775,11 @@ where
     /// }
     /// ```
     pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
-        let guard = self.recv_ref()?;
+        let guard = self.recv_ref(None)?;
         guard.clone_value().ok_or(TryRecvError::Closed)
     }
 
+    /*
     #[doc(hidden)] // TODO: document
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Result<T, RecvError>> {
         if let Some(value) = ok_empty(self.try_recv())? {
@@ -764,6 +794,7 @@ where
             Poll::Pending
         }
     }
+    */
 
     /// Receives the next value for this receiver.
     ///
@@ -830,11 +861,19 @@ where
     ///     assert_eq!(30, rx.recv().await.unwrap());
     /// }
     pub async fn recv(&mut self) -> Result<T, RecvError> {
-        use crate::future::poll_fn;
-
-        poll_fn(|cx| self.poll_recv(cx)).await
+        Recv {
+            receiver: self,
+            waiter: UnsafeCell::new(Waiter {
+                queued: false,
+                waker: None,
+                pointers: linked_list::Pointers::new(),
+                _p: PhantomPinned
+            }),
+        }
+        .await
     }
 
+    /*
     fn register_waker(&self, cx: &Waker) {
         self.wait.waker.register_by_ref(cx);
 
@@ -865,8 +904,10 @@ where
             }
         }
     }
+    */
 }
 
+/*
 #[cfg(feature = "stream")]
 impl<T> crate::stream::Stream for Receiver<T>
 where
@@ -885,6 +926,7 @@ where
         })
     }
 }
+*/
 
 impl<T> Drop for Receiver<T> {
     fn drop(&mut self) {
@@ -896,7 +938,7 @@ impl<T> Drop for Receiver<T> {
         drop(tail);
 
         while self.next != until {
-            match self.recv_ref() {
+            match self.recv_ref(None) {
                 Ok(_) => {}
                 // The channel is closed
                 Err(TryRecvError::Closed) => break,
@@ -909,15 +951,77 @@ impl<T> Drop for Receiver<T> {
     }
 }
 
-impl<T> Drop for Shared<T> {
-    fn drop(&mut self) {
-        // Clear the wait stack
-        let mut curr = self.wait_stack.with_mut(|ptr| *ptr as *const WaitNode);
+impl<T> Recv<'_, T> {
+    /// A custom `project` implementation is used in place of `pin-project-lite`
+    /// as a custom drop implementation is needed.
+    fn project(self: Pin<&mut Self>) -> (&mut Receiver<T>, &UnsafeCell<Waiter>) {
+        unsafe {
+            // Safety: Receiver is Unpin
+            is_unpin::<&mut Receiver<T>>();
 
-        while !curr.is_null() {
-            let waiter = unsafe { Arc::from_raw(curr) };
-            curr = waiter.next.with(|ptr| unsafe { *ptr });
+            let me = self.get_unchecked_mut();
+            (&mut me.receiver, &me.waiter)
         }
+    }
+}
+
+impl<T: Clone> Future for Recv<'_, T> {
+    type Output = Result<T, RecvError>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<T, RecvError>> {
+        let (receiver, waiter) = self.project();
+
+        let guard = match receiver.recv_ref(Some((waiter, cx.waker()))) {
+            Ok(value) => value,
+            Err(TryRecvError::Empty) => return Poll::Pending,
+            Err(TryRecvError::Lagged(n)) => return Poll::Ready(Err(RecvError::Lagged(n))),
+            Err(TryRecvError::Closed) => return Poll::Ready(Err(RecvError::Closed)),
+        };
+
+        Poll::Ready(guard.clone_value().ok_or(RecvError::Closed))
+    }
+}
+
+impl<T> Drop for Recv<'_, T> {
+    fn drop(&mut self) {
+        // Acquire the tail lock. This is required for safety before accessing
+        // the waiter node.
+        let mut tail = self.receiver.shared.tail.lock().unwrap();
+
+        // safety: tail lock is held
+        let queued = self.waiter.with(|ptr| unsafe { (*ptr).queued });
+
+        if queued {
+            // Remove the node
+            //
+            // safety: tail lock is held and the wait node is verified to be in
+            // the list.
+            unsafe {
+                self.waiter.with_mut(|ptr| {
+                    tail.waiters.remove((&mut *ptr).into());
+                });
+            }
+        }
+    }
+}
+
+/// # Safety
+///
+/// `Waiter` is forced to be !Unpin.
+unsafe impl linked_list::Link for Waiter {
+    type Handle = NonNull<Waiter>;
+    type Target = Waiter;
+
+    fn as_raw(handle: &NonNull<Waiter>) -> NonNull<Waiter> {
+        *handle
+    }
+
+    unsafe fn from_raw(ptr: NonNull<Waiter>) -> NonNull<Waiter> {
+        ptr
+    }
+
+    unsafe fn pointers(mut target: NonNull<Waiter>) -> NonNull<linked_list::Pointers<Waiter>> {
+        NonNull::from(&mut target.as_mut().pointers)
     }
 }
 
@@ -952,15 +1056,6 @@ impl<'a, T> Drop for RecvGuard<'a, T> {
     }
 }
 
-fn ok_empty<T>(res: Result<T, TryRecvError>) -> Result<Option<T>, RecvError> {
-    match res {
-        Ok(value) => Ok(Some(value)),
-        Err(TryRecvError::Empty) => Ok(None),
-        Err(TryRecvError::Lagged(n)) => Err(RecvError::Lagged(n)),
-        Err(TryRecvError::Closed) => Err(RecvError::Closed),
-    }
-}
-
 impl fmt::Display for RecvError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -983,3 +1078,5 @@ impl fmt::Display for TryRecvError {
 }
 
 impl std::error::Error for TryRecvError {}
+
+fn is_unpin<T: Unpin>() {}

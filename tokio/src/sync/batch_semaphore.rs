@@ -186,7 +186,7 @@ impl Semaphore {
 
     /// Release `rem` permits to the semaphore's wait list, starting from the
     /// end of the queue.
-    ///  
+    ///
     /// If `rem` exceeds the number of permits needed by the wait list, the
     /// remainder are assigned back to the semaphore.
     fn add_permits_locked(&self, mut rem: usize, waiters: MutexGuard<'_, Waitlist>) {
