@@ -327,6 +327,9 @@ struct Recv<'a, T> {
     waiter: UnsafeCell<Waiter>,
 }
 
+unsafe impl<'a, T: Send> Send for Recv<'a, T> {}
+unsafe impl<'a, T: Send> Sync for Recv<'a, T> {}
+
 /// Max number of receivers. Reserve space to lock.
 const MAX_RECEIVERS: usize = usize::MAX >> 2;
 
@@ -913,39 +916,6 @@ where
         }
         .await
     }
-
-    /*
-    fn register_waker(&self, cx: &Waker) {
-        self.wait.waker.register_by_ref(cx);
-
-        if !self.wait.queued.load(SeqCst) {
-            // Set `queued` before queuing.
-            self.wait.queued.store(true, SeqCst);
-
-            let mut curr = self.shared.wait_stack.load(SeqCst);
-
-            // The ref count is decremented in `notify_rx` when all nodes are
-            // removed from the waiter stack.
-            let node = Arc::into_raw(self.wait.clone()) as *mut _;
-
-            loop {
-                // Safety: `queued == false` means the caller has exclusive
-                // access to `self.wait.next`.
-                self.wait.next.with_mut(|ptr| unsafe { *ptr = curr });
-
-                let res = self
-                    .shared
-                    .wait_stack
-                    .compare_exchange(curr, node, SeqCst, SeqCst);
-
-                match res {
-                    Ok(_) => return,
-                    Err(actual) => curr = actual,
-                }
-            }
-        }
-    }
-    */
 }
 
 #[cfg(feature = "stream")]
