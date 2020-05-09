@@ -194,6 +194,9 @@ pub struct Receiver<T> {
 
     /// Next position to read from
     next: u64,
+
+    /// Used to support the deprecated `poll_recv` fn
+    waiter: Option<Pin<Box<UnsafeCell<Waiter>>>>,
 }
 
 /// Error returned by [`Sender::send`][Sender::send].
@@ -405,6 +408,7 @@ pub fn channel<T>(mut capacity: usize) -> (Sender<T>, Receiver<T>) {
     let rx = Receiver {
         shared: shared.clone(),
         next: 0,
+        waiter: None,
     };
 
     let tx = Sender { shared };
@@ -514,6 +518,7 @@ impl<T> Sender<T> {
         Receiver {
             shared,
             next,
+            waiter: None,
         }
     }
 
@@ -593,8 +598,6 @@ impl<T> Sender<T> {
         // Release the slot lock before notifying the receivers.
         drop(slot);
 
-        // The tail lock **must** still be held for safety as this is used to
-        // guard access to each waker.
         tail.notify_rx();
 
         // Release the mutex. This must happen after the slot lock is released,
@@ -779,22 +782,45 @@ where
         guard.clone_value().ok_or(TryRecvError::Closed)
     }
 
-    /*
-    #[doc(hidden)] // TODO: document
+    #[doc(hidden)]
+    #[deprecated(since = "0.2.21", note = "use async fn recv()")]
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Result<T, RecvError>> {
-        if let Some(value) = ok_empty(self.try_recv())? {
-            return Poll::Ready(Ok(value));
+        use Poll::{Ready, Pending};
+
+        struct Guard<'a, T> {
+            waiter: Option<Pin<Box<UnsafeCell<Waiter>>>>,
+            receiver: &'a mut Receiver<T>,
         }
 
-        self.register_waker(cx.waker());
+        impl<'a, T> Drop for Guard<'a, T> {
+            fn drop(&mut self) {
+                self.receiver.waiter = self.waiter.take();
+            }
+        }
 
-        if let Some(value) = ok_empty(self.try_recv())? {
-            Poll::Ready(Ok(value))
-        } else {
-            Poll::Pending
+        if self.waiter.is_none() {
+            self.waiter = Some(Box::pin(UnsafeCell::new(Waiter {
+                queued: false,
+                waker: None,
+                pointers: linked_list::Pointers::new(),
+                _p: PhantomPinned,
+            })));
+        }
+
+        let waiter = self.waiter.take();
+        let guard = Guard {
+            waiter,
+            receiver: self,
+        };
+        let res = guard.receiver.recv_ref(Some((&guard.waiter.as_ref().unwrap(), cx.waker())));
+
+        match res {
+            Ok(guard) => Ready(guard.clone_value().ok_or(RecvError::Closed)),
+            Err(TryRecvError::Closed) => Ready(Err(RecvError::Closed)),
+            Err(TryRecvError::Lagged(n)) => Ready(Err(RecvError::Lagged(n))),
+            Err(TryRecvError::Empty) => Pending,
         }
     }
-    */
 
     /// Receives the next value for this receiver.
     ///
@@ -907,8 +933,9 @@ where
     */
 }
 
-/*
 #[cfg(feature = "stream")]
+#[doc(hidden)]
+#[deprecated(since = "0.2.21", note = "use `into_stream()`")]
 impl<T> crate::stream::Stream for Receiver<T>
 where
     T: Clone,
@@ -919,6 +946,7 @@ where
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Option<Result<T, RecvError>>> {
+        #[allow(deprecated)]
         self.poll_recv(cx).map(|v| match v {
             Ok(v) => Some(Ok(v)),
             lag @ Err(RecvError::Lagged(_)) => Some(lag),
@@ -926,11 +954,27 @@ where
         })
     }
 }
-*/
 
 impl<T> Drop for Receiver<T> {
     fn drop(&mut self) {
         let mut tail = self.shared.tail.lock().unwrap();
+
+        if let Some(waiter) = &self.waiter {
+            // safety: tail lock is held
+            let queued = waiter.with(|ptr| unsafe { (*ptr).queued });
+
+            if queued {
+                // Remove the node
+                //
+                // safety: tail lock is held and the wait node is verified to be in
+                // the list.
+                unsafe {
+                    waiter.with_mut(|ptr| {
+                        tail.waiters.remove((&mut *ptr).into());
+                    });
+                }
+            }
+        }
 
         tail.rx_cnt -= 1;
         let until = tail.pos;
