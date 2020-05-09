@@ -643,7 +643,10 @@ impl<T> Drop for Sender<T> {
 
 impl<T> Receiver<T> {
     /// Locks the next value if there is one.
-    fn recv_ref(&mut self, waiter: Option<(&UnsafeCell<Waiter>, &Waker)>) -> Result<RecvGuard<'_, T>, TryRecvError> {
+    fn recv_ref(
+        &mut self,
+        waiter: Option<(&UnsafeCell<Waiter>, &Waker)>,
+    ) -> Result<RecvGuard<'_, T>, TryRecvError> {
         let idx = (self.next & self.shared.mask as u64) as usize;
 
         // The slot holding the next value to read
@@ -795,7 +798,7 @@ where
     #[doc(hidden)]
     #[deprecated(since = "0.2.21", note = "use async fn recv()")]
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Result<T, RecvError>> {
-        use Poll::{Ready, Pending};
+        use Poll::{Pending, Ready};
 
         struct Guard<'a, T> {
             waiter: Option<Pin<Box<UnsafeCell<Waiter>>>>,
@@ -822,7 +825,9 @@ where
             waiter,
             receiver: self,
         };
-        let res = guard.receiver.recv_ref(Some((&guard.waiter.as_ref().unwrap(), cx.waker())));
+        let res = guard
+            .receiver
+            .recv_ref(Some((&guard.waiter.as_ref().unwrap(), cx.waker())));
 
         match res {
             Ok(guard) => Ready(guard.clone_value().ok_or(RecvError::Closed)),
@@ -903,7 +908,7 @@ where
                 queued: false,
                 waker: None,
                 pointers: linked_list::Pointers::new(),
-                _p: PhantomPinned
+                _p: PhantomPinned,
             }),
         }
         .await
