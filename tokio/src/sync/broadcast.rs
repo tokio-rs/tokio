@@ -905,7 +905,7 @@ where
     ///     assert_eq!(30, rx.recv().await.unwrap());
     /// }
     pub async fn recv(&mut self) -> Result<T, RecvError> {
-        Recv {
+        let fut = Recv {
             receiver: self,
             waiter: UnsafeCell::new(Waiter {
                 queued: false,
@@ -913,8 +913,9 @@ where
                 pointers: linked_list::Pointers::new(),
                 _p: PhantomPinned,
             }),
-        }
-        .await
+        };
+
+        fut.await
     }
 }
 
