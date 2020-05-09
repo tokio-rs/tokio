@@ -177,6 +177,23 @@ fn send_two_recv_bounded() {
 }
 
 #[test]
+fn change_tasks() {
+    let (tx, mut rx) = broadcast::channel(1);
+
+    let mut recv = Box::pin(rx.recv());
+
+    let mut task1 = task::spawn(&mut recv);
+    assert_pending!(task1.poll());
+
+    let mut task2 = task::spawn(&mut recv);
+    assert_pending!(task2.poll());
+
+    tx.send("hello").unwrap();
+
+    assert!(task2.is_woken());
+}
+
+#[test]
 fn send_slow_rx() {
     let (tx, mut rx1) = broadcast::channel(16);
     let mut rx2 = tx.subscribe();

@@ -685,9 +685,19 @@ impl<T> Receiver<T> {
                         unsafe {
                             // Only queue if not already queued
                             waiter.with_mut(|ptr| {
+                                // If there is no waker **or** if the currently
+                                // stored waker references a **different** task,
+                                // track the tasks' waker to be notified on
+                                // receipt of a new value.
+                                match (*ptr).waker {
+                                    Some(ref w) if w.will_wake(waker) => {}
+                                    _ => {
+                                        (*ptr).waker = Some(waker.clone());
+                                    }
+                                }
+
                                 if !(*ptr).queued {
                                     (*ptr).queued = true;
-                                    (*ptr).waker = Some(waker.clone());
                                     tail.waiters.push_front(NonNull::new_unchecked(&mut *ptr));
                                 }
                             });
