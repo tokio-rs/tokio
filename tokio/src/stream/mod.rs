@@ -303,7 +303,7 @@ pub trait StreamExt: Stream {
     /// As values of this stream are made available, the provided function will
     /// be run on them. If the predicate `f` resolves to
     /// [`Some(item)`](Some) then the stream will yield the value `item`, but if
-    /// it resolves to [`None`] then the next value will be produced.
+    /// it resolves to [`None`], then the value value will be skipped.
     ///
     /// Note that this function consumes the stream passed into it and returns a
     /// wrapped version of it, similar to [`Iterator::filter_map`] method in the
