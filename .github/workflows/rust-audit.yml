@@ -1,0 +1,28 @@
+name: Rust security audit
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # run at 2 AM UTC
+  push:
+    paths:
+      - '**/Cargo.toml'
+      - 'Cargo.lock'
+
+jobs:
+  security-audit:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, 'ci skip')"
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/audit-check@v1.2.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Discord notification
+        if: failure()
+        env:
+          run_url: "https://github.com/tokio-rs/tokio/actions/runs/${{ github.run_id }}"
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          DISCORD_USERNAME: GitHub dependency audit
+        uses: Ilshidur/action-discord@f237343
+        with:
+          args: "Dependency security audit failed.\n${{ env.run_url }}"
