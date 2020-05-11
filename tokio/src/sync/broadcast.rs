@@ -319,16 +319,21 @@ struct RecvGuard<'a, T> {
 }
 
 /// Receive a value future
-struct Recv<'a, T> {
+struct Recv<R, T>
+where
+    R: AsMut<Receiver<T>>,
+{
     /// Receiver being waited on
-    receiver: &'a mut Receiver<T>,
+    receiver: R,
 
     /// Entry in the waiter `LinkedList`
     waiter: UnsafeCell<Waiter>,
+
+    _p: std::marker::PhantomData<T>,
 }
 
-unsafe impl<'a, T: Send> Send for Recv<'a, T> {}
-unsafe impl<'a, T: Send> Sync for Recv<'a, T> {}
+unsafe impl<R: AsMut<Receiver<T>> + Send, T: Send> Send for Recv<R, T> {}
+unsafe impl<R: AsMut<Receiver<T>> + Sync, T: Send> Sync for Recv<R, T> {}
 
 /// Max number of receivers. Reserve space to lock.
 const MAX_RECEIVERS: usize = usize::MAX >> 2;
@@ -905,16 +910,7 @@ where
     ///     assert_eq!(30, rx.recv().await.unwrap());
     /// }
     pub async fn recv(&mut self) -> Result<T, RecvError> {
-        let fut = Recv {
-            receiver: self,
-            waiter: UnsafeCell::new(Waiter {
-                queued: false,
-                waker: None,
-                pointers: linked_list::Pointers::new(),
-                _p: PhantomPinned,
-            }),
-        };
-
+        let fut = Recv::<_, T>::new(self);
         fut.await
     }
 }
@@ -981,7 +977,23 @@ impl<T> Drop for Receiver<T> {
     }
 }
 
-impl<T> Recv<'_, T> {
+impl<R, T> Recv<R, T>
+where
+    R: AsMut<Receiver<T>>,
+{
+    fn new(receiver: R) -> Recv<R, T> {
+        Recv {
+            receiver,
+            waiter: UnsafeCell::new(Waiter {
+                queued: false,
+                waker: None,
+                pointers: linked_list::Pointers::new(),
+                _p: PhantomPinned,
+            }),
+            _p: std::marker::PhantomData,
+        }
+    }
+
     /// A custom `project` implementation is used in place of `pin-project-lite`
     /// as a custom drop implementation is needed.
     fn project(self: Pin<&mut Self>) -> (&mut Receiver<T>, &UnsafeCell<Waiter>) {
@@ -990,12 +1002,16 @@ impl<T> Recv<'_, T> {
             is_unpin::<&mut Receiver<T>>();
 
             let me = self.get_unchecked_mut();
-            (&mut me.receiver, &me.waiter)
+            (me.receiver.as_mut(), &me.waiter)
         }
     }
 }
 
-impl<T: Clone> Future for Recv<'_, T> {
+impl<R, T> Future for Recv<R, T>
+where
+    R: AsMut<Receiver<T>>,
+    T: Clone,
+{
     type Output = Result<T, RecvError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<T, RecvError>> {
@@ -1012,11 +1028,52 @@ impl<T: Clone> Future for Recv<'_, T> {
     }
 }
 
-impl<T> Drop for Recv<'_, T> {
+cfg_stream! {
+    use futures_core::Stream;
+
+    impl<T> AsMut<Receiver<T>> for Receiver<T> {
+        fn as_mut(&mut self) -> &mut Receiver<T> {
+            &mut *self
+        }
+    }
+
+    impl<T: Clone> Receiver<T> {
+        /// TODO: Dox
+        pub fn into_stream(self) -> impl Stream<Item = Result<T, RecvError>> {
+            Recv::new(self)
+        }
+    }
+
+    impl<R, T: Clone> Stream for Recv<R, T>
+    where
+        R: AsMut<Receiver<T>>,
+        T: Clone,
+    {
+        type Item = Result<T, RecvError>;
+
+        fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+            let (receiver, waiter) = self.project();
+
+            let guard = match receiver.recv_ref(Some((waiter, cx.waker()))) {
+                Ok(value) => value,
+                Err(TryRecvError::Empty) => return Poll::Pending,
+                Err(TryRecvError::Lagged(n)) => return Poll::Ready(Some(Err(RecvError::Lagged(n)))),
+                Err(TryRecvError::Closed) => return Poll::Ready(None),
+            };
+
+            Poll::Ready(guard.clone_value().map(Ok))
+        }
+    }
+}
+
+impl<R, T> Drop for Recv<R, T>
+where
+    R: AsMut<Receiver<T>>,
+{
     fn drop(&mut self) {
         // Acquire the tail lock. This is required for safety before accessing
         // the waiter node.
-        let mut tail = self.receiver.shared.tail.lock().unwrap();
+        let mut tail = self.receiver.as_mut().shared.tail.lock().unwrap();
 
         // safety: tail lock is held
         let queued = self.waiter.with(|ptr| unsafe { (*ptr).queued });
