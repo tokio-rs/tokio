@@ -768,12 +768,15 @@ impl KillHandle {
         // process which happens to reuse the same pid as our child).
         match Weak::upgrade(&self.child) {
             Some(ref mut child) => child_mut(child, Kill::kill),
-            None => Ok(())
+            None => Ok(()),
         }
     }
 }
 
-fn child_mut<R>(child: &mut Arc<Mutex<ChildDropGuard<imp::Child>>>, f: impl FnOnce(&mut ChildDropGuard<imp::Child>) -> R) -> R {
+fn child_mut<R>(
+    child: &mut Arc<Mutex<ChildDropGuard<imp::Child>>>,
+    f: impl FnOnce(&mut ChildDropGuard<imp::Child>) -> R
+) -> R {
     match Arc::get_mut(child) {
         Some(child) => f(child.get_mut().unwrap()),
         None => f(&mut child.lock().unwrap()),
