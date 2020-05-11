@@ -192,11 +192,16 @@ pub trait StreamExt: Stream {
     /// Values are produced from the merged stream in the order they arrive from
     /// the two source streams. If both source streams provide values
     /// simultaneously, the merge stream alternates between them. This provides
-    /// some level of fairness.
+    /// some level of fairness. You should not chain calls to `merge`, as this
+    /// will break the fairness of the merging.
     ///
     /// The merged stream completes once **both** source streams complete. When
     /// one source stream completes before the other, the merge stream
     /// exclusively polls the remaining stream.
+    ///
+    /// For merging multiple streams, consider using [`StreamMap`] instead.
+    ///
+    /// [`StreamMap`]: crate::stream::StreamMap
     ///
     /// # Examples
     ///
@@ -303,7 +308,7 @@ pub trait StreamExt: Stream {
     /// As values of this stream are made available, the provided function will
     /// be run on them. If the predicate `f` resolves to
     /// [`Some(item)`](Some) then the stream will yield the value `item`, but if
-    /// it resolves to [`None`], then the value value will be skipped.
+    /// it resolves to [`None`], then the value will be skipped.
     ///
     /// Note that this function consumes the stream passed into it and returns a
     /// wrapped version of it, similar to [`Iterator::filter_map`] method in the
