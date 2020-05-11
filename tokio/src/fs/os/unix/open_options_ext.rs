@@ -31,7 +31,6 @@ pub trait OpenOptionsExt {
     ///     let file = options.open("foo.txt").await?;
     ///
     ///     Ok(())
-    ///
     /// }
     /// ```
     fn mode(&mut self, mode: u32) -> &mut Self;
