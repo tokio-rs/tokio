@@ -66,9 +66,46 @@ impl Registration {
     where
         T: Evented,
     {
+        Registration::new_with_ready(io, mio::Ready::all())
+    }
+
+    /// Registers the I/O resource with the default reactor, for a specific `mio::Ready` state.
+    /// `new_with_ready` should be used over `new` when you need control over the readiness state,
+    /// such as when a file descriptor only allows reads. This does not add `hup` or `error` so if
+    /// you are interested in those states, you will need to add them to the readiness state passed
+    /// to this function.
+    ///
+    /// An example to listen to read only
+    ///
+    /// ```rust
+    /// ##[cfg(unix)]
+    ///     mio::Ready::from_usize(
+    ///         mio::Ready::readable().as_usize()
+    ///         | mio::unix::UnixReady::error().as_usize()
+    ///         | mio::unix::UnixReady::hup().as_usize()
+    ///     );
+    /// ```
+    ///
+    /// # Return
+    ///
+    /// - `Ok` if the registration happened successfully
+    /// - `Err` if an error was encountered during registration
+    ///
+    ///
+    /// # Panics
+    ///
+    /// This function panics if thread-local runtime is not set.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
+    pub fn new_with_ready<T>(io: &T, ready: mio::Ready) -> io::Result<Registration>
+    where
+        T: Evented,
+    {
         let handle = Handle::current();
         let address = if let Some(inner) = handle.inner() {
-            inner.add_source(io)?
+            inner.add_source(io, ready)?
         } else {
             return Err(io::Error::new(
                 io::ErrorKind::Other,
