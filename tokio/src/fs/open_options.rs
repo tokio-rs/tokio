@@ -382,6 +382,12 @@ impl OpenOptions {
         let std = asyncify(move || opts.open(path)).await?;
         Ok(File::from_std(std))
     }
+
+    /// Returns an immutable reference to the the underlying std::fs::OpenOptions
+    #[doc(hidden)]
+    pub(super) fn as_inner_mut(&mut self) -> &mut std::fs::OpenOptions {
+        &mut self.0
+    }
 }
 
 impl From<std::fs::OpenOptions> for OpenOptions {
