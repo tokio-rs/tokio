@@ -237,10 +237,14 @@ impl fmt::Debug for Handle {
 // ===== impl Inner =====
 
 impl Inner {
-    /// Registers an I/O resource with the reactor.
+    /// Registers an I/O resource with the reactor for a given `mio::Ready` state.
     ///
     /// The registration token is returned.
-    pub(super) fn add_source(&self, source: &dyn Evented) -> io::Result<Address> {
+    pub(super) fn add_source(
+        &self,
+        source: &dyn Evented,
+        ready: mio::Ready,
+    ) -> io::Result<Address> {
         let address = self.io_dispatch.alloc().ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::Other,
@@ -253,7 +257,7 @@ impl Inner {
         self.io.register(
             source,
             mio::Token(address.to_usize()),
-            mio::Ready::all(),
+            ready,
             mio::PollOpt::edge(),
         )?;
 
@@ -339,12 +343,12 @@ mod tests {
             let inner = reactor.inner;
             let inner2 = inner.clone();
 
-            let token_1 = inner.add_source(&NotEvented).unwrap();
+            let token_1 = inner.add_source(&NotEvented, mio::Ready::all()).unwrap();
             let thread = thread::spawn(move || {
                 inner2.drop_source(token_1);
             });
 
-            let token_2 = inner.add_source(&NotEvented).unwrap();
+            let token_2 = inner.add_source(&NotEvented, mio::Ready::all()).unwrap();
             thread.join().unwrap();
 
             assert!(token_1 != token_2);
@@ -360,15 +364,15 @@ mod tests {
             // add sources to fill up the first page so that the dropped index
             // may be reused.
             for _ in 0..31 {
-                inner.add_source(&NotEvented).unwrap();
+                inner.add_source(&NotEvented, mio::Ready::all()).unwrap();
             }
 
-            let token_1 = inner.add_source(&NotEvented).unwrap();
+            let token_1 = inner.add_source(&NotEvented, mio::Ready::all()).unwrap();
             let thread = thread::spawn(move || {
                 inner2.drop_source(token_1);
             });
 
-            let token_2 = inner.add_source(&NotEvented).unwrap();
+            let token_2 = inner.add_source(&NotEvented, mio::Ready::all()).unwrap();
             thread.join().unwrap();
 
             assert!(token_1 != token_2);
@@ -383,11 +387,11 @@ mod tests {
             let inner2 = inner.clone();
 
             let thread = thread::spawn(move || {
-                let token_2 = inner2.add_source(&NotEvented).unwrap();
+                let token_2 = inner2.add_source(&NotEvented, mio::Ready::all()).unwrap();
                 token_2
             });
 
-            let token_1 = inner.add_source(&NotEvented).unwrap();
+            let token_1 = inner.add_source(&NotEvented, mio::Ready::all()).unwrap();
             let token_2 = thread.join().unwrap();
 
             assert!(token_1 != token_2);
