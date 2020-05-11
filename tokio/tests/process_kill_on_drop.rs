@@ -40,3 +40,40 @@ async fn kill_on_drop() {
 
     assert_eq!("child ran\n", msg);
 }
+
+#[tokio::test]
+async fn kill_handle_does_not_prevent_kill_on_drop() {
+    let mut cmd = Command::new("sh");
+    cmd.args(&[
+        "-c",
+        "
+       # Fork another child that won't get killed
+       sh -c 'sleep 1; echo child ran' &
+       disown -a
+
+       # Await our death
+       sleep 5
+       echo hello from beyond the grave
+    ",
+    ]);
+
+    let mut child = cmd
+        .kill_on_drop(true)
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    let mut kill_handle = child.kill_handle();
+
+    delay_for(Duration::from_secs(2)).await;
+
+    let mut out = child.stdout.take().unwrap();
+    drop(child);
+
+    let mut msg = String::new();
+    assert_ok!(out.read_to_string(&mut msg).await);
+
+    assert_eq!("child ran\n", msg);
+
+    kill_handle.kill().unwrap(); // Does nothing after process exited
+}

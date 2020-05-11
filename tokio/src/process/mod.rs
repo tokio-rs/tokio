@@ -131,6 +131,7 @@ use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::pin::Pin;
 use std::process::{Command as StdCommand, ExitStatus, Output, Stdio};
+use std::sync::{Arc, Mutex, Weak};
 use std::task::Context;
 use std::task::Poll;
 
@@ -554,10 +555,10 @@ impl Command {
     /// ```
     pub fn spawn(&mut self) -> io::Result<Child> {
         imp::spawn_child(&mut self.std).map(|spawned_child| Child {
-            child: ChildDropGuard {
+            child: Arc::new(Mutex::new(ChildDropGuard {
                 inner: spawned_child.child,
                 kill_on_drop: self.kill_on_drop,
-            },
+            })),
             stdin: spawned_child.stdin.map(|inner| ChildStdin { inner }),
             stdout: spawned_child.stdout.map(|inner| ChildStdout { inner }),
             stderr: spawned_child.stderr.map(|inner| ChildStderr { inner }),
@@ -731,7 +732,7 @@ where
 #[must_use = "futures do nothing unless polled"]
 #[derive(Debug)]
 pub struct Child {
-    child: ChildDropGuard<imp::Child>,
+    child: Arc<Mutex<ChildDropGuard<imp::Child>>>,
 
     /// The handle for writing to the child's standard input (stdin), if it has
     /// been captured.
@@ -746,17 +747,60 @@ pub struct Child {
     pub stderr: Option<ChildStderr>,
 }
 
+/// A handle for killing a child process without direct access to the `Child`
+/// struct itself.
+///
+/// For example, this handle can be used from within another task to dynamically
+/// kill the child process and unblock any tasks which are `.await`ing it.
+#[derive(Debug)]
+pub struct KillHandle {
+    child: Weak<Mutex<ChildDropGuard<imp::Child>>>,
+}
+
+impl KillHandle {
+    /// Forces the child to exit.
+    ///
+    /// This is equivalent to sending a SIGKILL on unix platforms.
+    pub fn kill(&mut self) -> io::Result<()> {
+        // NB: we delegate the kill to the `std::process::Child` implementation
+        // which guards against sending kill signals after a child has been
+        // reaped on Unix (since we don't want to accidentally kill a *new*
+        // process which happens to reuse the same pid as our child).
+        match Weak::upgrade(&self.child) {
+            Some(ref mut child) => child_mut(child, Kill::kill),
+            None => Ok(())
+        }
+    }
+}
+
+fn child_mut<R>(child: &mut Arc<Mutex<ChildDropGuard<imp::Child>>>, f: impl FnOnce(&mut ChildDropGuard<imp::Child>) -> R) -> R {
+    match Arc::get_mut(child) {
+        Some(child) => f(child.get_mut().unwrap()),
+        None => f(&mut child.lock().unwrap()),
+    }
+}
+
 impl Child {
     /// Returns the OS-assigned process identifier associated with this child.
     pub fn id(&self) -> u32 {
-        self.child.inner.id()
+        self.child.lock().unwrap().inner.id()
     }
 
     /// Forces the child to exit.
     ///
     /// This is equivalent to sending a SIGKILL on unix platforms.
     pub fn kill(&mut self) -> io::Result<()> {
-        self.child.kill()
+        child_mut(&mut self.child, Kill::kill)
+    }
+
+    /// Grab a handle for killing this child without direct access to it.
+    ///
+    /// For example, this handle can be used from within another task to dynamically
+    /// kill the child process and unblock any tasks which are `.await`ing it.
+    pub fn kill_handle(&mut self) -> KillHandle {
+        KillHandle {
+            child: Arc::downgrade(&self.child),
+        }
     }
 
     #[doc(hidden)]
@@ -822,7 +866,7 @@ impl Future for Child {
     type Output = io::Result<ExitStatus>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        Pin::new(&mut self.child).poll(cx)
+        child_mut(&mut self.child, |child| Pin::new(child).poll(cx))
     }
 }
 
