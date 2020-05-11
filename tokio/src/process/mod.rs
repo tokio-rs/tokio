@@ -775,7 +775,7 @@ impl KillHandle {
 
 fn child_mut<R>(
     child: &mut Arc<Mutex<ChildDropGuard<imp::Child>>>,
-    f: impl FnOnce(&mut ChildDropGuard<imp::Child>) -> R
+    f: impl FnOnce(&mut ChildDropGuard<imp::Child>) -> R,
 ) -> R {
     match Arc::get_mut(child) {
         Some(child) => f(child.get_mut().unwrap()),
