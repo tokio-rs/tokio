@@ -332,6 +332,23 @@ where
     _p: std::marker::PhantomData<T>,
 }
 
+/// `AsMut<T>` is not implemented for `T` (coherence). Explicitly implementing
+/// `AsMut` for `Receiver` would be included in the public API of the receiver
+/// type. Instead, `Borrow` is used internally to bridge the gap.
+struct Borrow<T>(T);
+
+impl<T> AsMut<Receiver<T>> for Borrow<Receiver<T>> {
+    fn as_mut(&mut self) -> &mut Receiver<T> {
+        &mut self.0
+    }
+}
+
+impl<'a, T> AsMut<Receiver<T>> for Borrow<&'a mut Receiver<T>> {
+    fn as_mut(&mut self) -> &mut Receiver<T> {
+        &mut *self.0
+    }
+}
+
 unsafe impl<R: AsMut<Receiver<T>> + Send, T: Send> Send for Recv<R, T> {}
 unsafe impl<R: AsMut<Receiver<T>> + Sync, T: Send> Sync for Recv<R, T> {}
 
@@ -910,7 +927,7 @@ where
     ///     assert_eq!(30, rx.recv().await.unwrap());
     /// }
     pub async fn recv(&mut self) -> Result<T, RecvError> {
-        let fut = Recv::<_, T>::new(self);
+        let fut = Recv::<_, T>::new(Borrow(self));
         fut.await
     }
 }
@@ -1031,12 +1048,6 @@ where
 cfg_stream! {
     use futures_core::Stream;
 
-    impl<T> AsMut<Receiver<T>> for Receiver<T> {
-        fn as_mut(&mut self) -> &mut Receiver<T> {
-            &mut *self
-        }
-    }
-
     impl<T: Clone> Receiver<T> {
         /// Convert the receiver into a `Stream`.
         ///
@@ -1075,7 +1086,7 @@ cfg_stream! {
         /// }
         /// ```
         pub fn into_stream(self) -> impl Stream<Item = Result<T, RecvError>> {
-            Recv::new(self)
+            Recv::new(Borrow(self))
         }
     }
 
