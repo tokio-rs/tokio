@@ -735,8 +735,20 @@ impl<T> Receiver<T> {
                     return Err(TryRecvError::Empty);
                 }
 
-                // `tail.pos` points to the slot that the **next** send writes to. If
-                // the channel is closed, the previous slot is the oldest value.
+                // At this point, the receiver has lagged behind the sender by
+                // more than the channel capacity. The receiver will attempt to
+                // catch up by skipping dropped messages and setting the
+                // internal cursor to the **oldest** message stored by the
+                // channel.
+                //
+                // However, finding the oldest position is a bit more
+                // complicated than `tail-position - buffer-size`. When
+                // the channel is closed, the tail position is incremented to
+                // signal a new `None` message, but `None` is not stored in the
+                // channel itself (see issue #2425 for why).
+                //
+                // To account for this, if the channel is closed, the tail
+                // position is decremented by `buffer-size + 1`.
                 let mut adjust = 0;
                 if tail.closed {
                     adjust = 1
