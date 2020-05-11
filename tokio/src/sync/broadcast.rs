@@ -825,6 +825,17 @@ where
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Result<T, RecvError>> {
         use Poll::{Pending, Ready};
 
+        // The borrow checker prohibits calling `self.poll_ref` while passing in
+        // a mutable ref to a field (as it should). To work around this,
+        // `waiter` is first *removed* from `self` then `poll_recv` is called.
+        //
+        // However, for safety, we must ensure that `waiter` is **not** dropped.
+        // It could be contained in the intrusive linked list. The `Receiver`
+        // drop implementation handles cleanup.
+        //
+        // The guard pattern is used to ensure that, on return, even due to
+        // panic, the waiter node is replaced on `self`.
+
         struct Guard<'a, T> {
             waiter: Option<Pin<Box<UnsafeCell<Waiter>>>>,
             receiver: &'a mut Receiver<T>,
