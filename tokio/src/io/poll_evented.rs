@@ -261,6 +261,11 @@ where
     ///
     /// * `ready` includes writable.
     /// * called from outside of a task context.
+    ///
+    /// # Warning
+    ///
+    /// This method may not be called concurrently. It takes `&self` to allow
+    /// calling it concurrently with `poll_write_ready`.
     pub fn poll_read_ready(
         &self,
         cx: &mut Context<'_>,
@@ -327,6 +332,11 @@ where
     ///
     /// * `ready` contains bits besides `writable` and `hup`.
     /// * called from outside of a task context.
+    ///
+    /// # Warning
+    ///
+    /// This method may not be called concurrently. It takes `&self` to allow
+    /// calling it concurrently with `poll_read_ready`.
     pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<mio::Ready>> {
         poll_ready!(
             self,
