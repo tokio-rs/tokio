@@ -38,17 +38,8 @@ impl DirBuilder {
     ///
     /// let builder = DirBuilder::new();
     /// ```
-    pub fn new() -> DirBuilder {
-        #[cfg(not(unix))]
-        let builder = DirBuilder { recursive: false };
-
-        #[cfg(unix)]
-        let builder = DirBuilder {
-            recursive: false,
-            mode: None,
-        };
-
-        builder
+    pub fn new() -> Self {
+        Default::default()
     }
 
     /// Indicates whether to create directories recursively (including all parent directories).
@@ -122,16 +113,5 @@ impl DirBuilder {
         }
 
         asyncify(move || builder.create(path)).await
-    }
-}
-
-cfg_unix! {
-    use std::os::unix::fs::DirBuilderExt;
-
-    impl DirBuilderExt for DirBuilder {
-        fn mode(&mut self, mode: u32) -> &mut Self {
-            self.mode = Some(mode);
-            self
-        }
     }
 }
