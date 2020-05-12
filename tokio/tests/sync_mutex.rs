@@ -47,7 +47,7 @@ fn readiness() {
     // But once g unlocks, we can acquire it
     drop(g);
     assert!(t2.is_woken());
-    assert_ready!(t2.poll());
+    let _g = assert_ready!(t2.poll());
 }
 
 /*
@@ -93,7 +93,7 @@ async fn aborted_future_1() {
         timeout(Duration::from_millis(1u64), async move {
             let iv = interval(Duration::from_millis(1000));
             tokio::pin!(iv);
-            m2.lock().await;
+            let _g = m2.lock().await;
             iv.as_mut().tick().await;
             iv.as_mut().tick().await;
         })
@@ -102,7 +102,7 @@ async fn aborted_future_1() {
     }
     // This should succeed as there is no lock left for the mutex.
     timeout(Duration::from_millis(1u64), async move {
-        m1.lock().await;
+        let _g = m1.lock().await;
     })
     .await
     .expect("Mutex is locked");
@@ -120,7 +120,7 @@ async fn aborted_future_2() {
             let m2 = m1.clone();
             // Try to lock mutex in a future that is aborted prematurely
             timeout(Duration::from_millis(1u64), async move {
-                m2.lock().await;
+                let _g = m2.lock().await;
             })
             .await
             .unwrap_err();
@@ -128,7 +128,7 @@ async fn aborted_future_2() {
     }
     // This should succeed as there is no lock left for the mutex.
     timeout(Duration::from_millis(1u64), async move {
-        m1.lock().await;
+        let _g = m1.lock().await;
     })
     .await
     .expect("Mutex is locked");
