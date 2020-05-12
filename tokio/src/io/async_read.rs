@@ -5,7 +5,7 @@ use std::ops::DerefMut;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// This utility function shoyld be used to override `AsyncRead::prepare_uninitialized_buffer`
+/// This utility function should be used to override `AsyncRead::prepare_uninitialized_buffer`
 /// for any AsyncRead impl which wraps an `std::io::Read` instance.
 pub(crate) fn prepare_uninitialized_buffer_std_read<R: std::io::Read>(
     buf: &mut [MaybeUninit<u8>],
