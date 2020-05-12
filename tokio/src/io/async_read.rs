@@ -18,11 +18,7 @@ pub(crate) fn prepare_uninitialized_buffer_std_read<R: std::io::Read>(
     }
     */
     for x in buf {
-        // we could use safe method x.write(0) here, but it is unstable.
-        // Safety: as_mut_ptr() returns valid writeable pointer.
-        unsafe {
-            x.as_mut_ptr().write(0);
-        }
+        *x = MaybeUninit::new(0);
     }
     true
 }
@@ -98,7 +94,7 @@ pub trait AsyncRead {
     /// [`poll_read_buf`]: #method.poll_read_buf
     unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [MaybeUninit<u8>]) -> bool {
         for x in buf {
-            *x.as_mut_ptr() = 0;
+            *x = MaybeUninit::new(0);
         }
 
         true
