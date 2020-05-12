@@ -421,7 +421,7 @@
 //!
 //! * [`Semaphore`][Semaphore] Limits the amount of concurrency. A semaphore
 //!   holds a number of permits, which tasks may request in order to enter a
-//!   critical section. Semaphores are useful for implementing limiting of
+//!   critical section. Semaphores are useful for implementing limiting or
 //!   bounding of any kind.
 
 cfg_sync! {
