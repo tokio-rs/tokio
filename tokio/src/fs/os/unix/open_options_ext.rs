@@ -6,7 +6,7 @@ use std::os::unix::fs::OpenOptionsExt as StdOpenOptionsExt;
 /// This mirrors the definition of [`std::os::unix::fs::OpenOptionsExt`].
 ///
 ///
-/// [`fs::OpenOptions`]: ../../struct.OpenOptions.html
+/// [`fs::OpenOptions`]: crate::fs::OpenOptions
 /// [`std::os::unix::fs::OpenOptionsExt`]: std::os::unix::fs::OpenOptionsExt
 pub trait OpenOptionsExt {
     /// Sets the mode bits that a new file will be created with.
