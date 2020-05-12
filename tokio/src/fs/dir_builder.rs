@@ -20,7 +20,7 @@ pub struct DirBuilder {
 
     /// Set the Unix mode for newly created directories.
     #[cfg(unix)]
-    mode: Option<u32>,
+    pub(super) mode: Option<u32>,
 }
 
 impl DirBuilder {
