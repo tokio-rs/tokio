@@ -128,6 +128,20 @@
 //! other words, these types must never block the thread, and instead the
 //! current task is notified when the I/O resource is ready.
 //!
+//! ## Conversion to and from Sink/Stream
+//!
+//! It is often convenient to encapsulate the reading and writing of
+//! bytes and instead work with a [`Sink`] or [`Stream`] of some data
+//! type that is encoded as bytes and/or decoded from bytes. Tokio
+//! provides some utility traits in the [tokio-util] crate that
+//! abstract the asynchronous buffering that is required and allows
+//! you to write [`Encoder`] and [`Decoder`] functions working with a
+//! buffer of bytes, and then use that ["codec"] to transform anything
+//! that implements `AsyncRead` and `AsyncWrite` into a `Sink`/`Stream` of
+//! your structured data.
+//!
+//! [tokio-util]: https://docs.rs/tokio-util/0.3.1/tokio_util/codec/index.html
+//!
 //! # Standard input and output
 //!
 //! Tokio provides asynchronous APIs to standard [input], [output], and [error].
@@ -149,10 +163,14 @@
 //!
 //! [`AsyncRead`]: trait@AsyncRead
 //! [`AsyncWrite`]: trait@AsyncWrite
+//! [`Encoder`]: tokio_util::codec::Encoder
+//! [`Decoder`]: tokio_util::codec::Decoder
 //! [`Error`]: struct@Error
 //! [`ErrorKind`]: enum@ErrorKind
 //! [`Result`]: type@Result
 //! [`Read`]: std::io::Read
+//! [`Sink`]: futures_sink::Sink
+//! [`Stream`]: futures_core::stream::Stream
 //! [`Write`]: std::io::Write
 cfg_io_blocking! {
     pub(crate) mod blocking;
