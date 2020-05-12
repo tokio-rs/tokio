@@ -140,7 +140,7 @@
 //! that implements [`AsyncRead`] and [`AsyncWrite`] into a `Sink`/`Stream` of
 //! your structured data.
 //!
-//! [tokio-util]: https://docs.rs/tokio-util/0.3.1/tokio_util/codec/index.html
+//! [tokio-util]: https://docs.rs/tokio-util/0.3/tokio_util/codec/index.html
 //!
 //! # Standard input and output
 //!
