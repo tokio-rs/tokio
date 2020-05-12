@@ -1,0 +1,43 @@
+on: [push, pull_request]
+
+# on:
+#   push:
+#     branches: ["master"]
+#   pull_request:
+#     branches: ["master"]
+
+name: Test tokio
+
+env:
+  RUSTFLAGS: -Dwarnings
+  nightly: nightly-2020-01-25
+
+jobs:
+  test_tokio:
+    name: Test tokio
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+
+      # Run `tokio` with only `full`
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --features full
+        env:
+          RUST_BACKTRACE: 1
+          CI: 'True'
+        name: tokio - cargo test --features full
+        working-directory: ${{ github.workspace }}/tokio
+
+      # Run `tokio` with "unstable" cfg flag
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --features full
+        env:
+          RUSTFLAGS: '--cfg tokio_unstable'
+          RUST_BACKTRACE: 1
+          CI: 'True'
+        name: tokio - cargo test --features full
+        working-directory: ${{ github.workspace }}/tokio
