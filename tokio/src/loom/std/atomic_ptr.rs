@@ -11,10 +11,6 @@ impl<T> AtomicPtr<T> {
         let inner = std::sync::atomic::AtomicPtr::new(ptr);
         AtomicPtr { inner }
     }
-
-    pub(crate) fn with_mut<R>(&mut self, f: impl FnOnce(&mut *mut T) -> R) -> R {
-        f(self.inner.get_mut())
-    }
 }
 
 impl<T> Deref for AtomicPtr<T> {
