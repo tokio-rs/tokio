@@ -6,13 +6,13 @@ use std::path::Path;
 /// A builder for creating directories in various manners.
 ///
 /// Additional Unix-specific options are available via importing the
-/// [os::unix::fs::DirBuilderExt] trait.
+/// [`DirBuilderExt`] trait.
 ///
-/// This is a specialized version of [`std::fs::DirBuilder`] for usage from
+/// This is a specialized version of [`std::fs::DirBuilder`] for usage on
 /// the Tokio runtime.
 ///
-/// [os::unix::fs::DirBuilderExt]: ../os/unix/fs/trait.DirBuilderExt.html
-/// [std::fs::DirBuilder]: https://doc.rust-lang.org/std/fs/struct.DirBuilder.html
+/// [std::fs::DirBuilder]: std::fs::DirBuilder
+/// [`DirBuilderExt`]: crate::fs::os::unix::DirBuilderExt
 #[derive(Debug, Default)]
 pub struct DirBuilder {
     /// Indicates whether to create parent directories if they are missing.
