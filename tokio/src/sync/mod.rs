@@ -58,11 +58,12 @@
 //! }
 //! ```
 //!
-//! Note, if the task produces the the computation result as its final action
-//! before terminating, the [`JoinHandle`] can be used to receive the
-//! computation result instead of allocating resources for the `oneshot`
-//! channel. Awaiting on [`JoinHandle`] returns `Result`. If the task panics,
-//! the `Joinhandle` yields `Err` with the panic cause.
+//! Note, if the task produces a computation result as its final
+//! action before terminating, the [`JoinHandle`] can be used to
+//! receive that value instead of allocating resources for the
+//! `oneshot` channel. Awaiting on [`JoinHandle`] returns `Result`. If
+//! the task panics, the `Joinhandle` yields `Err` with the panic
+//! cause.
 //!
 //! **Example:**
 //!
