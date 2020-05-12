@@ -5,6 +5,28 @@ use std::ops::DerefMut;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+/// This utility function shoyld be used to override `AsyncRead::prepare_uninitialized_buffer`
+/// for any AsyncRead impl which wraps an `std::io::Read` instance.
+pub(crate) fn prepare_uninitialized_buffer_std_read<R: std::io::Read>(
+    buf: &mut [MaybeUninit<u8>],
+) -> bool {
+    // TODO: when std::io::Initializer is stable, it should be used
+    // to override `prepare_uninitialized_buffer`
+    /*use std::io::Read;
+    if !T::initializer::should_initialize() {
+        return false;
+    }
+    */
+    for x in buf {
+        // we could use safe method x.write(0) here, but it is unstable.
+        // Safety: as_mut_ptr() returns valid writeable pointer.
+        unsafe {
+            x.as_mut_ptr().write(0);
+        }
+    }
+    true
+}
+
 /// Reads bytes from a source.
 ///
 /// This trait is analogous to the [`std::io::Read`] trait, but integrates with

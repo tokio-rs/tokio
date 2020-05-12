@@ -163,6 +163,7 @@ pub use self::async_buf_read::AsyncBufRead;
 
 mod async_read;
 pub use self::async_read::AsyncRead;
+pub(crate) use self::async_read::prepare_uninitialized_buffer_std_read;
 
 mod async_seek;
 pub use self::async_seek::AsyncSeek;
