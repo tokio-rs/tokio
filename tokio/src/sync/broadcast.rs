@@ -859,16 +859,15 @@ where
             }
         }
 
-        if self.waiter.is_none() {
-            self.waiter = Some(Box::pin(UnsafeCell::new(Waiter {
+        let waiter = self.waiter.take().or_else(|| {
+            Some(Box::pin(UnsafeCell::new(Waiter {
                 queued: false,
                 waker: None,
                 pointers: linked_list::Pointers::new(),
                 _p: PhantomPinned,
-            })));
-        }
+            })))
+        });
 
-        let waiter = self.waiter.take();
         let guard = Guard {
             waiter,
             receiver: self,
