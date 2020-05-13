@@ -66,7 +66,7 @@ jobs:
       - uses: actions/checkout@master
 
       # Run with all crate features
-      - name: tokio - cargo test --features full
+      - name: ${{ matrix.crate }} - cargo test --features full
         uses: actions-rs/cargo@v1
         with:
           command: test
@@ -102,7 +102,7 @@ jobs:
           echo "~~~~~~~~~~~~~~~~~~~~"
 
       # Run with all crate features
-      - name: tokio - cargo test --features full
+      - name: ${{ matrix.crate }} - cargo test --features full
         uses: actions-rs/cargo@v1
         with:
           command: test
