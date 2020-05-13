@@ -142,6 +142,7 @@ jobs:
           CI: 'True'
 
       - name: Patch Cargo.toml
+        shell: bash
         run: |
           set -e
 
