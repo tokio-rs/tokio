@@ -7,8 +7,7 @@ use std::task::{Context, Poll};
 
 /// This utility function should be used to override `AsyncRead::prepare_uninitialized_buffer`
 /// for any AsyncRead impl which wraps an `std::io::Read` instance.
-#[cfg(any(feature = "io-std", features = "fs"))]
-pub(crate) fn prepare_uninitialized_buffer_std_read<R: std::io::Read>(
+pub fn prepare_uninitialized_buffer_std_read<R: std::io::Read>(
     buf: &mut [MaybeUninit<u8>],
 ) -> bool {
     // TODO: when std::io::Initializer is stable, it should be used
