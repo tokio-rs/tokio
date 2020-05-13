@@ -2,7 +2,7 @@
 
 ### Fixes
 
-- macros: disambiguate built-in #[test] attribute in macro expansion (#2503)
+- macros: disambiguate built-in `#[test]` attribute in macro expansion (#2503)
 - rt: `LocalSet` and task budgeting (#2462).
 - rt: task budgeting with `block_in_place` (#2502).
 - sync: release `broadcast` channel memory without sending a value (#2509).
