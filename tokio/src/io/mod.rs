@@ -165,6 +165,7 @@
 //! [`AsyncWrite`]: trait@AsyncWrite
 //! [`AsyncReadExt`]: trait@AsyncReadExt
 //! [`AsyncWriteExt`]: trait@AsyncWriteExt
+//! ["codec"]: https://docs.rs/tokio-util/0.3/tokio_util/codec/index.html
 //! [`Encoder`]: https://docs.rs/tokio-util/0.3/tokio_util/codec/trait.Encoder.html
 //! [`Decoder`]: https://docs.rs/tokio-util/0.3/tokio_util/codec/trait.Decoder.html
 //! [`Error`]: struct@Error
@@ -172,7 +173,7 @@
 //! [`Result`]: type@Result
 //! [`Read`]: std::io::Read
 //! [`Sink`]: https://docs.rs/futures/0.3/futures/sink/trait.Sink.html
-//! [`Stream`]: https://docs.rs/futures/0.3/futures/stream/trait.Stream.html
+//! [`Stream`]: crate::stream::Stream
 //! [`Write`]: std::io::Write
 cfg_io_blocking! {
     pub(crate) mod blocking;
