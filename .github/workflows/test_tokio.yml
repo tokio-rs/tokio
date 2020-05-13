@@ -23,21 +23,19 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --features full
+          args: --manifest-path ${{ github.workspace }}/tokio/Cargo.toml --features full
         env:
           RUST_BACKTRACE: 1
           CI: 'True'
         name: tokio - cargo test --features full
-        working-directory: ${{ github.workspace }}/tokio
 
       # Run `tokio` with "unstable" cfg flag
       - uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --features full
+          args: --manifest-path ${{ github.workspace }}/tokio/Cargo.toml --features full
         env:
           RUSTFLAGS: '--cfg tokio_unstable'
           RUST_BACKTRACE: 1
           CI: 'True'
         name: tokio - cargo test --features full
-        working-directory: ${{ github.workspace }}/tokio
