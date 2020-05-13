@@ -56,21 +56,47 @@ jobs:
       - uses: actions/checkout@master
 
       # Run with all crate features
-      - uses: actions-rs/cargo@v1
+      - name: tokio - cargo test --features full
+        uses: actions-rs/cargo@v1
         with:
           command: test
           args: --manifest-path ${{ github.workspace }}/${{ matrix.crate }}/Cargo.toml --all-features
         env:
           RUST_BACKTRACE: 1
           CI: 'True'
-        name: tokio - cargo test --features full
 
         # Check benches
-      - uses: actions-rs/cargo@v1
+      - name: ${{ matrix.crate }} - cargo check --benches
+        uses: actions-rs/cargo@v1
         with:
           command: check
           args: --manifest-path ${{ github.workspace }}/${{ matrix.crate }}/Cargo.toml --all-features --benches
         env:
           RUST_BACKTRACE: 1
           CI: 'True'
-        name: ${{ matrix.crate }} - cargo check --benches
+
+      - name: Patch Cargo.toml
+        run: |
+          set -e
+
+          # Remove any existing patch statements
+          mv Cargo.toml Cargo.toml.bck
+          sed -n '/\[patch.crates-io\]/q;p' Cargo.toml.bck > Cargo.toml
+
+          # Patch all crates
+          cat ci/patch.toml >> Cargo.toml
+
+          # Print `Cargo.toml` for debugging
+          echo "~~~~ Cargo.toml ~~~~"
+          cat Cargo.toml
+          echo "~~~~~~~~~~~~~~~~~~~~"
+
+      # Run with all crate features
+      - name: tokio - cargo test --features full
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --manifest-path ${{ github.workspace }}/${{ matrix.crate }}/Cargo.toml --all-features
+        env:
+          RUST_BACKTRACE: 1
+          CI: 'True'
