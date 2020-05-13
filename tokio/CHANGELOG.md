@@ -1,3 +1,20 @@
+# 0.2.21 (May 13, 2020)
+
+### Fixes
+
+- macros: disambiguate built-in `#[test]` attribute in macro expansion (#2503)
+- rt: `LocalSet` and task budgeting (#2462).
+- rt: task budgeting with `block_in_place` (#2502).
+- sync: release `broadcast` channel memory without sending a value (#2509).
+- time: notify when resetting a `Delay` to a time in the past (#2290).
+
+### Added
+- io: `get_mut`, `get_ref`, and `into_inner` to `Lines` (#2450).
+- io: `mio::Ready` argument to `PollEvented` (#2419).
+- os: illumos support (#2486).
+- rt: `Handle::spawn_blocking` (#2501).
+- sync: `OwnedMutexGuard` for `Arc<Mutex<T>>` (#2455).
+
 # 0.2.20 (April 28, 2020)
 
 ### Fixes
