@@ -15,7 +15,13 @@ env:
 jobs:
   test_tokio:
     name: Test tokio
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
+          - macos-latest
     steps:
       - uses: actions/checkout@master
 
@@ -45,6 +51,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
+          - macos-latest
         crate:
           - tokio
           - tests-integration
