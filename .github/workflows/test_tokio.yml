@@ -168,3 +168,24 @@ jobs:
         env:
           RUST_BACKTRACE: 1
           CI: 'True'
+
+  test_integration:
+    name: Integration tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
+          - macos-latest
+    steps:
+      - uses: actions/checkout@master
+      - run: cargo install cargo-hack
+        name: Install cargo-hack
+      - uses: actions-rs/cargo@v1
+        name: cargo hack test --each-feature
+        with:
+          command: hack
+          args: test --manifest-path ${{ github.workspace }}/tests-integration/Cargo.toml --each-feature
+        env:
+          CI: 'True'
