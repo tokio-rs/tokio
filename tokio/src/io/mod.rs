@@ -15,19 +15,19 @@
 //! type will _yield_ to the Tokio scheduler when IO is not ready, rather than
 //! blocking. This allows other tasks to run while waiting on IO.
 //!
-//! Another difference is that [`AsyncRead`] and [`AsyncWrite`] only contain
+//! Another difference is that `AsyncRead` and `AsyncWrite` only contain
 //! core methods needed to provide asynchronous reading and writing
 //! functionality. Instead, utility methods are defined in the [`AsyncReadExt`]
 //! and [`AsyncWriteExt`] extension traits. These traits are automatically
-//! implemented for all values that implement [`AsyncRead`] and [`AsyncWrite`]
+//! implemented for all values that implement `AsyncRead` and `AsyncWrite`
 //! respectively.
 //!
-//! End users will rarely interact directly with [`AsyncRead`] and
-//! [`AsyncWrite`]. Instead, they will use the async functions defined in the
-//! extension traits. Library authors are expected to implement [`AsyncRead`]
-//! and [`AsyncWrite`] in order to provide types that behave like byte streams.
+//! End users will rarely interact directly with `AsyncRead` and
+//! `AsyncWrite`. Instead, they will use the async functions defined in the
+//! extension traits. Library authors are expected to implement `AsyncRead`
+//! and `AsyncWrite` in order to provide types that behave like byte streams.
 //!
-//! Even with these differences, Tokio's [`AsyncRead`] and [`AsyncWrite`] traits
+//! Even with these differences, Tokio's `AsyncRead` and `AsyncWrite` traits
 //! can be used in almost exactly the same manner as the standard library's
 //! `Read` and `Write`. Most types in the standard library that implement `Read`
 //! and `Write` have asynchronous equivalents in `tokio` that implement
@@ -122,11 +122,25 @@
 //!
 //! ## Implementing AsyncRead and AsyncWrite
 //!
-//! Because they are traits, we can implement `AsyncRead` and `AsyncWrite` for
+//! Because they are traits, we can implement [`AsyncRead`] and [`AsyncWrite`] for
 //! our own types, as well. Note that these traits must only be implemented for
 //! non-blocking I/O types that integrate with the futures type system. In
 //! other words, these types must never block the thread, and instead the
 //! current task is notified when the I/O resource is ready.
+//!
+//! ## Conversion to and from Sink/Stream
+//!
+//! It is often convenient to encapsulate the reading and writing of
+//! bytes and instead work with a [`Sink`] or [`Stream`] of some data
+//! type that is encoded as bytes and/or decoded from bytes. Tokio
+//! provides some utility traits in the [tokio-util] crate that
+//! abstract the asynchronous buffering that is required and allows
+//! you to write [`Encoder`] and [`Decoder`] functions working with a
+//! buffer of bytes, and then use that ["codec"] to transform anything
+//! that implements [`AsyncRead`] and [`AsyncWrite`] into a `Sink`/`Stream` of
+//! your structured data.
+//!
+//! [tokio-util]: https://docs.rs/tokio-util/0.3/tokio_util/codec/index.html
 //!
 //! # Standard input and output
 //!
@@ -149,10 +163,17 @@
 //!
 //! [`AsyncRead`]: trait@AsyncRead
 //! [`AsyncWrite`]: trait@AsyncWrite
+//! [`AsyncReadExt`]: trait@AsyncReadExt
+//! [`AsyncWriteExt`]: trait@AsyncWriteExt
+//! ["codec"]: https://docs.rs/tokio-util/0.3/tokio_util/codec/index.html
+//! [`Encoder`]: https://docs.rs/tokio-util/0.3/tokio_util/codec/trait.Encoder.html
+//! [`Decoder`]: https://docs.rs/tokio-util/0.3/tokio_util/codec/trait.Decoder.html
 //! [`Error`]: struct@Error
 //! [`ErrorKind`]: enum@ErrorKind
 //! [`Result`]: type@Result
 //! [`Read`]: std::io::Read
+//! [`Sink`]: https://docs.rs/futures/0.3/futures/sink/trait.Sink.html
+//! [`Stream`]: crate::stream::Stream
 //! [`Write`]: std::io::Write
 cfg_io_blocking! {
     pub(crate) mod blocking;

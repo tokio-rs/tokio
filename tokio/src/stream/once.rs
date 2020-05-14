@@ -4,7 +4,7 @@ use core::option;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
-/// Stream for the [`once`] function.
+/// Stream for the [`once`](fn@once) function.
 #[derive(Debug)]
 #[must_use = "streams do nothing unless polled"]
 pub struct Once<T> {

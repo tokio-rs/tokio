@@ -58,11 +58,12 @@
 //! }
 //! ```
 //!
-//! Note, if the task produces the the computation result as its final action
-//! before terminating, the [`JoinHandle`] can be used to receive the
-//! computation result instead of allocating resources for the `oneshot`
-//! channel. Awaiting on [`JoinHandle`] returns `Result`. If the task panics,
-//! the `Joinhandle` yields `Err` with the panic cause.
+//! Note, if the task produces a computation result as its final
+//! action before terminating, the [`JoinHandle`] can be used to
+//! receive that value instead of allocating resources for the
+//! `oneshot` channel. Awaiting on [`JoinHandle`] returns `Result`. If
+//! the task panics, the `Joinhandle` yields `Err` with the panic
+//! cause.
 //!
 //! **Example:**
 //!
@@ -84,6 +85,7 @@
 //! }
 //! ```
 //!
+//! [oneshot]: oneshot
 //! [`JoinHandle`]: crate::task::JoinHandle
 //!
 //! ## `mpsc` channel
@@ -229,6 +231,8 @@
 //!     }
 //! }
 //! ```
+//!
+//! [mpsc]: mpsc
 //!
 //! ## `broadcast` channel
 //!
@@ -405,23 +409,23 @@
 //! operate in a similar way as their `std` counterparts parts but will wait
 //! asynchronously instead of blocking the thread.
 //!
-//! * [`Barrier`][Barrier] Ensures multiple tasks will wait for each other to
+//! * [`Barrier`](Barrier) Ensures multiple tasks will wait for each other to
 //!   reach a point in the program, before continuing execution all together.
 //!
-//! * [`Mutex`][Mutex] Mutual Exclusion mechanism, which ensures that at most
+//! * [`Mutex`](Mutex) Mutual Exclusion mechanism, which ensures that at most
 //!   one thread at a time is able to access some data.
 //!
-//! * [`Notify`][Notify] Basic task notification. `Notify` supports notifying a
+//! * [`Notify`](Notify) Basic task notification. `Notify` supports notifying a
 //!   receiving task without sending data. In this case, the task wakes up and
 //!   resumes processing.
 //!
-//! * [`RwLock`][RwLock] Provides a mutual exclusion mechanism which allows
+//! * [`RwLock`](RwLock) Provides a mutual exclusion mechanism which allows
 //!   multiple readers at the same time, while allowing only one writer at a
 //!   time. In some cases, this can be more efficient than a mutex.
 //!
-//! * [`Semaphore`][Semaphore] Limits the amount of concurrency. A semaphore
+//! * [`Semaphore`](Semaphore) Limits the amount of concurrency. A semaphore
 //!   holds a number of permits, which tasks may request in order to enter a
-//!   critical section. Semaphores are useful for implementing limiting of
+//!   critical section. Semaphores are useful for implementing limiting or
 //!   bounding of any kind.
 
 cfg_sync! {
