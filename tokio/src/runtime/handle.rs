@@ -76,11 +76,13 @@ impl Handle {
         context::enter(self.clone(), f)
     }
 
-    /// Returns a Handle view over the currently running Runtime
+    /// Returns a `Handle` view over the currently running `Runtime`
     ///
     /// # Panic
     ///
-    /// This will panic if called outside the context of a Tokio runtime.
+    /// This will panic if called outside the context of a Tokio runtime. That means that you must
+    /// call this on one of the threads **being run by the runtime**. Calling this from within a
+    /// thread created by `std::thread::spawn` (for example) will cause a panic.
     ///
     /// # Examples
     ///
@@ -88,6 +90,7 @@ impl Handle {
     /// block or function running on that runtime.
     ///
     /// ```
+    /// # use std::thread;
     /// # use tokio::runtime::Runtime;
     /// # fn dox() {
     /// # let rt = Runtime::new().unwrap();
@@ -98,7 +101,16 @@ impl Handle {
     /// let handle = Handle::current();
     /// handle.spawn(async {
     ///     println!("now running in the existing Runtime");
-    /// })
+    /// });
+    ///
+    /// # let handle =
+    /// thread::spawn(move || {
+    ///     // Notice that the handle is created outside of this thread and then moved in
+    ///     handle.block_on(async { /* ... */ })
+    ///     // This next line would cause a panic
+    ///     // let handle2 = Handle::current();
+    /// });
+    /// # handle.join().unwrap();
     /// # });
     /// # }
     /// ```
