@@ -6,6 +6,8 @@
 //! variants) return "future aware" types that interoperate with Tokio. The asynchronous process
 //! support is provided through signal handling on Unix and system APIs on Windows.
 //!
+//! [`std::process::Command`]: std::process::Command
+//!
 //! # Examples
 //!
 //! Here's an example program which will spawn `echo hello world` and then wait
@@ -140,6 +142,9 @@ use std::task::Poll;
 /// [output](Command::output).
 ///
 /// `Command` uses asynchronous versions of some `std` types (for example [`Child`]).
+///
+/// [`std::process::Command`]: std::process::Command
+/// [`Child`]: struct@Child
 #[derive(Debug)]
 pub struct Command {
     std: StdCommand,
@@ -171,7 +176,7 @@ impl Command {
     /// The search path to be used may be controlled by setting the
     /// `PATH` environment variable on the Command,
     /// but this has some implementation limitations on Windows
-    /// (see issue rust-lang/rust#37519).
+    /// (see issue [rust-lang/rust#37519]).
     ///
     /// # Examples
     ///
@@ -181,6 +186,8 @@ impl Command {
     /// use tokio::process::Command;
     /// let command = Command::new("sh");
     /// ```
+    ///
+    /// [rust-lang/rust#37519]: https://github.com/rust-lang/rust/issues/37519
     pub fn new<S: AsRef<OsStr>>(program: S) -> Command {
         Self::from(StdCommand::new(program))
     }

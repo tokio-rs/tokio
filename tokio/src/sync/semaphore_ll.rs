@@ -749,7 +749,7 @@ impl Permit {
     /// Forgets the permit **without** releasing it back to the semaphore.
     ///
     /// After calling `forget`, `poll_acquire` is able to acquire new permit
-    /// from the sempahore.
+    /// from the semaphore.
     ///
     /// Repeatedly calling `forget` without associated calls to `add_permit`
     /// will result in the semaphore losing all permits.
