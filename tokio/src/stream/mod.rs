@@ -70,7 +70,7 @@ use take_while::TakeWhile;
 
 cfg_time! {
     mod timeout;
-    use timeout::Timeout;
+    pub use timeout::Timeout;
     use std::time::Duration;
 }
 
