@@ -228,7 +228,7 @@
 //! on the number of blocking threads is very large. These limits can be
 //! configured on the [`Builder`].
 //!
-//! Two spawn a blocking task, you should use the [`spawn_blocking`] function.
+//! To spawn a blocking task, you should use the [`spawn_blocking`] function.
 //!
 //! [`Builder`]: crate::runtime::Builder
 //! [`spawn_blocking`]: crate::task::spawn_blocking()
