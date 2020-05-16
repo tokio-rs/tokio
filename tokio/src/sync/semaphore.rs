@@ -79,7 +79,9 @@ impl Semaphore {
         self.ll_sem.available_permits()
     }
     
-    /// The maximum number of permits is usize::MAX >> 3, and this function will panic if the limit is exceeded.
+    /// Adds `n` new permits to the semaphore.
+    ///
+    /// The maximum number of permits is `usize::MAX >> 3`, and this function will panic if the limit is exceeded.
     pub fn add_permits(&self, n: usize) {
         self.ll_sem.release(n);
     }
