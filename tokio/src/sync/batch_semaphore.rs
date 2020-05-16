@@ -123,7 +123,9 @@ impl Semaphore {
         self.permits.load(Acquire) >> Self::PERMIT_SHIFT
     }
 
-    /// Adds `n` new permits to the semaphore.
+    /// Adds `added` new permits to the semaphore.
+    ///
+    /// The maximum number of permits is `usize::MAX >> 3`, and this function will panic if the limit is exceeded.
     pub(crate) fn release(&self, added: usize) {
         if added == 0 {
             return;

@@ -333,8 +333,9 @@ impl Semaphore {
 
         self.add_permits_locked(0, true);
     }
-
     /// Adds `n` new permits to the semaphore.
+    ///
+    /// The maximum number of permits is `usize::MAX >> 3`, and this function will panic if the limit is exceeded.
     pub(crate) fn add_permits(&self, n: usize) {
         if n == 0 {
             return;
