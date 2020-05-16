@@ -124,6 +124,10 @@ impl Semaphore {
     }
 
     /// Adds `n` new permits to the semaphore.
+    ///
+    /// `n` must less than [`MAX_PERMITS`]
+    ///
+    /// [`MAX_PERMITS`]: Semaphore::MAX_PERMITS
     pub(crate) fn release(&self, added: usize) {
         if added == 0 {
             return;
