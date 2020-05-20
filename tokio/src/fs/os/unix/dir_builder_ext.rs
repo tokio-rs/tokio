@@ -1,8 +1,8 @@
 use crate::fs::dir_builder::DirBuilder;
 
-/// Unix-specific extensions to [`DirBuilderExt`].
+/// Unix-specific extensions to [`DirBuilder`].
 ///
-/// [crate::fs::os::unix::DirBuilderExt]: DirBuilderExt
+/// [`DirBuilder`]: crate::fs::DirBuilder
 pub trait DirBuilderExt {
     /// Sets the mode to create new directories with.
     ///
