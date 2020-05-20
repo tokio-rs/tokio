@@ -1,6 +1,7 @@
-use crate::sync::batch_semaphore::{AcquireError, Semaphore};
+use crate::sync::batch_semaphore::{AcquireError, Semaphore, TryAcquireError};
 use std::cell::UnsafeCell;
 use std::ops;
+use std::{error, fmt};
 
 #[cfg(not(loom))]
 const MAX_READS: usize = 32;
@@ -118,6 +119,14 @@ impl<'a, T> ReleasingPermit<'a, T> {
         lock.s.acquire(num_permits).await?;
         Ok(Self { num_permits, lock })
     }
+
+    fn try_acquire(
+        lock: &'a RwLock<T>,
+        num_permits: u16,
+    ) -> Result<ReleasingPermit<'a, T>, TryAcquireError> {
+        lock.s.try_acquire(num_permits)?;
+        Ok(Self { num_permits, lock })
+    }
 }
 
 impl<'a, T> Drop for ReleasingPermit<'a, T> {
@@ -215,6 +224,42 @@ impl<T> RwLock<T> {
         RwLockReadGuard { lock: self, permit }
     }
 
+    /// Attempts to lock this rwlock with shared read access, returning [`TryReadError`]
+    /// if the lock couldn't be acquired immediately without yielding the current task.
+    ///
+    /// This function will return an error immediately if other writers currently have access to the
+    /// lock.
+    ///
+    /// Returns an RAII guard which will drop the read access of this rwlock when dropped.
+    ///
+    /// [`TryReadError`]: TryReadError
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::RwLock;
+    ///
+    /// let lock = RwLock::new(1);
+    ///
+    /// if let Ok(n) = lock.try_read() {
+    ///     assert_eq!(*n, 1);
+    /// } else {
+    ///     unreachable!()
+    /// };
+    /// ```
+    pub fn try_read(&self) -> Result<RwLockReadGuard<'_, T>, TryReadError> {
+        let permit = match ReleasingPermit::try_acquire(self, 1) {
+            Ok(v) => v,
+            Err(TryAcquireError::NoPermits) => return Err(TryReadError(())),
+            Err(TryAcquireError::Closed) => {
+                // The semaphore was closed. but, we never explicitly close it, and we have a
+                // handle to it through the Arc, which means that this can never happen.
+                unreachable!()
+            }
+        };
+        Ok(RwLockReadGuard { lock: self, permit })
+    }
+
     /// Locks this rwlock with exclusive write access, causing the current task
     /// to yield until the lock has been acquired.
     ///
@@ -247,6 +292,44 @@ impl<T> RwLock<T> {
             });
 
         RwLockWriteGuard { lock: self, permit }
+    }
+
+    /// Attempts to lock this rwlock with exclusive write access, returning [`TryWriteError`]
+    /// if the lock couldn't be acquired immediately without yielding the current task.
+    ///
+    /// This function will return an error immediately if other writers or other readers
+    /// currently have access to the lock.
+    ///
+    /// Returns an RAII guard which will drop the write access of this rwlock when dropped.
+    ///
+    /// [`TryWriteError`]: TryWriteError
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::RwLock;
+    ///
+    /// let lock = RwLock::new(1);
+    ///
+    /// assert_eq!(*lock.try_read().unwrap(), 1);
+    ///
+    /// if let Ok(mut n) = lock.try_write() {
+    ///     *n = 2;
+    /// }
+    ///
+    /// assert_eq!(*lock.try_read().unwrap(), 2);
+    /// ```
+    pub fn try_write(&self) -> Result<RwLockWriteGuard<'_, T>, TryWriteError> {
+        let permit = match ReleasingPermit::try_acquire(self, MAX_READS as u16) {
+            Ok(v) => v,
+            Err(TryAcquireError::NoPermits) => return Err(TryWriteError(())),
+            Err(TryAcquireError::Closed) => {
+                // The semaphore was closed. but, we never explicitly close it, and we have a
+                // handle to it through the Arc, which means that this can never happen.
+                unreachable!()
+            }
+        };
+        Ok(RwLockWriteGuard { lock: self, permit })
     }
 
     /// Consumes the lock, returning the underlying data.
@@ -291,3 +374,37 @@ where
         Self::new(T::default())
     }
 }
+
+/// Error returned by `try_read` when a read lock couldn't be acquired.
+pub struct TryReadError(());
+
+impl fmt::Debug for TryReadError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TryReadError").finish()
+    }
+}
+
+impl fmt::Display for TryReadError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("read lock couldn't be acquired")
+    }
+}
+
+impl error::Error for TryReadError {}
+
+/// Error returned by `try_write` when the write lock couldn't be acquired.
+pub struct TryWriteError(());
+
+impl fmt::Debug for TryWriteError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TryWriteError").finish()
+    }
+}
+
+impl fmt::Display for TryWriteError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("write lock couldn't be acquired")
+    }
+}
+
+impl error::Error for TryWriteError {}
