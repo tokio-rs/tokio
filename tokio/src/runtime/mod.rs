@@ -195,6 +195,10 @@ cfg_rt_core! {
     use basic_scheduler::BasicScheduler;
 
     pub(crate) mod task;
+
+    cfg_test_util_unstable! {
+        mod test_scheduler;
+    }
 }
 
 mod blocking;
