@@ -151,15 +151,46 @@ cfg_blocking_impl! {
 cfg_coop! {
     use std::task::{Context, Poll};
 
+    #[must_use]
+    pub(crate) struct RestoreOnPending(Cell<Option<Budget>>);
+
+    impl RestoreOnPending {
+        pub(crate) fn made_progress(&self) {
+            self.0.set(None);
+        }
+    }
+
+    impl Drop for RestoreOnPending {
+        fn drop(&mut self) {
+            if let Some(budget) = self.0.get() {
+                CURRENT.with(|cell| {
+                    cell.set(budget);
+                });
+            }
+        }
+    }
+
     /// Returns `Poll::Pending` if the current task has exceeded its budget and should yield.
+    ///
+    /// When you call this method, the current budget is decremented. However, to ensure that
+    /// progress is made every time a task is polled, the budget is automatically restored to its
+    /// former value if the returned `RestoreOnPending` is dropped. It is the caller's
+    /// responsibility to call `RestoreOnPending::made_progress` if it made progress, to ensure
+    /// that the budget empties appropriately.
+    ///
+    /// Note that `RestoreOnPending` restores the budget **as it was before `poll_proceed`**.
+    /// Therefore, if the budget is _further_ adjusted between when `poll_proceed` returns and
+    /// `RestRestoreOnPending` is dropped, those adjustments are erased unless the caller indicates
+    /// that progress was made.
     #[inline]
-    pub(crate) fn poll_proceed(cx: &mut Context<'_>) -> Poll<()> {
+    pub(crate) fn poll_proceed(cx: &mut Context<'_>) -> Poll<RestoreOnPending> {
         CURRENT.with(|cell| {
             let mut budget = cell.get();
 
             if budget.decrement() {
+                let restore = RestoreOnPending(Cell::new(cell.get().if_dynamic()));
                 cell.set(budget);
-                Poll::Ready(())
+                Poll::Ready(restore)
             } else {
                 cx.waker().wake_by_ref();
                 Poll::Pending
@@ -181,7 +212,15 @@ cfg_coop! {
             } else {
                 true
             }
-    }
+        }
+
+        fn if_dynamic(self) -> Option<Self> {
+            if self.0.is_some() {
+                Some(self)
+            } else {
+                None
+            }
+        }
     }
 }
 

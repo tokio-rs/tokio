@@ -102,7 +102,7 @@ impl<T> Future for JoinHandle<T> {
         let mut ret = Poll::Pending;
 
         // Keep track of task budget
-        ready!(crate::coop::poll_proceed(cx));
+        let coop = ready!(crate::coop::poll_proceed(cx));
 
         // Raw should always be set. If it is not, this is due to polling after
         // completion
@@ -124,6 +124,10 @@ impl<T> Future for JoinHandle<T> {
         // The type of `T` must match the task's output type.
         unsafe {
             raw.try_read_output(&mut ret as *mut _ as *mut (), cx.waker());
+        }
+
+        if ret.is_ready() {
+            coop.made_progress();
         }
 
         ret
