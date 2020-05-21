@@ -47,6 +47,9 @@ cfg_io_util! {
 }
 
 impl AsyncRead for Repeat {
+    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [std::mem::MaybeUninit<u8>]) -> bool {
+        false
+    }
     #[inline]
     fn poll_read(
         self: Pin<&mut Self>,
