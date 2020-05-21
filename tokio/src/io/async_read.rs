@@ -4,28 +4,31 @@ use std::mem::MaybeUninit;
 use std::ops::DerefMut;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-cfg_io_blocking! {
-    /// Implements `AsyncRead::prepare_uninitialized_buffer` in a such a way
-    /// that is valid for `R` requirements.
-    /// Should be used to override `AsyncRead::prepare_uninitialized_buffer`
-    /// for any AsyncRead impl which wraps an `std::io::Read` instance.
-    pub(crate) fn prepare_uninitialized_buffer_std_read<R: std::io::Read>(
-        buf: &mut [MaybeUninit<u8>],
-    ) -> bool {
-        // TODO: when std::io::Initializer is stable, it should be used
-        // to override `prepare_uninitialized_buffer`
-        /*use std::io::Read;
-        if !T::initializer::should_initialize() {
-            return false;
-        }
-        */
-        for x in buf {
-            *x = MaybeUninit::new(0);
-        }
-        true
-    }
-}
 
+/// Implements `AsyncRead::prepare_uninitialized_buffer` in a such a way
+/// that is valid for `R` requirements. Currently, it will always
+/// zero buffer. In future, it will skip zeroing if
+/// `R::initializer` returns Initializer::nop()  
+///
+/// Should be used to override `AsyncRead::prepare_uninitialized_buffer`
+/// for any AsyncRead impl which wraps an `std::io::Read` instance.
+// TODO: use `cfg` bounds instead.
+#[allow(dead_code)]
+pub(crate) fn prepare_uninitialized_buffer_std_read<R: std::io::Read>(
+    buf: &mut [MaybeUninit<u8>],
+) -> bool {
+    // TODO: when std::io::Initializer is stable, it should be used
+    // to override `prepare_uninitialized_buffer`
+    /*use std::io::Read;
+    if !T::initializer::should_initialize() {
+        return false;
+    }
+    */
+    for x in buf {
+        *x = MaybeUninit::new(0);
+    }
+    true
+}
 
 /// Reads bytes from a source.
 ///

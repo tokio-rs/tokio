@@ -162,9 +162,10 @@ mod async_buf_read;
 pub use self::async_buf_read::AsyncBufRead;
 
 mod async_read;
-cfg_io_blocking! {
-    pub(crate) use self::async_read::prepare_uninitialized_buffer_std_read;
-}
+// TODO: use `cfg` bounds instead.
+#[allow(dead_code)]
+pub(crate) use self::async_read::prepare_uninitialized_buffer_std_read;
+
 pub use self::async_read::AsyncRead;
 
 mod async_seek;
