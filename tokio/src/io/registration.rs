@@ -177,11 +177,17 @@ impl Registration {
     /// This function will panic if called from outside of a task context.
     pub fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<mio::Ready>> {
         // Keep track of task budget
-        ready!(crate::coop::poll_proceed(cx));
+        let coop = ready!(crate::coop::poll_proceed(cx));
 
-        let v = self.poll_ready(Direction::Read, Some(cx))?;
+        let v = self.poll_ready(Direction::Read, Some(cx)).map_err(|e| {
+            coop.made_progress();
+            e
+        })?;
         match v {
-            Some(v) => Poll::Ready(Ok(v)),
+            Some(v) => {
+                coop.made_progress();
+                Poll::Ready(Ok(v))
+            }
             None => Poll::Pending,
         }
     }
@@ -231,11 +237,17 @@ impl Registration {
     /// This function will panic if called from outside of a task context.
     pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<mio::Ready>> {
         // Keep track of task budget
-        ready!(crate::coop::poll_proceed(cx));
+        let coop = ready!(crate::coop::poll_proceed(cx));
 
-        let v = self.poll_ready(Direction::Write, Some(cx))?;
+        let v = self.poll_ready(Direction::Write, Some(cx)).map_err(|e| {
+            coop.made_progress();
+            e
+        })?;
         match v {
-            Some(v) => Poll::Ready(Ok(v)),
+            Some(v) => {
+                coop.made_progress();
+                Poll::Ready(Ok(v))
+            }
             None => Poll::Pending,
         }
     }

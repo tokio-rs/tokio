@@ -389,7 +389,7 @@ impl Future for Acquire<'_> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // First, ensure the current task has enough budget to proceed.
-        ready!(crate::coop::poll_proceed(cx));
+        let coop = ready!(crate::coop::poll_proceed(cx));
 
         let (node, semaphore, needed, queued) = self.project();
 
@@ -399,6 +399,7 @@ impl Future for Acquire<'_> {
                 Pending
             }
             Ready(r) => {
+                coop.made_progress();
                 r?;
                 *queued = false;
                 Ready(Ok(()))
