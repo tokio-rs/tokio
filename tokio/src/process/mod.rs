@@ -879,6 +879,11 @@ impl AsyncWrite for ChildStdin {
 }
 
 impl AsyncRead for ChildStdout {
+    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [std::mem::MaybeUninit<u8>]) -> bool {
+        // https://github.com/rust-lang/rust/blob/09c817eeb29e764cfc12d0a8d94841e3ffe34023/src/libstd/process.rs#L314
+        false
+    }
+
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -889,6 +894,11 @@ impl AsyncRead for ChildStdout {
 }
 
 impl AsyncRead for ChildStderr {
+    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [std::mem::MaybeUninit<u8>]) -> bool {
+        // https://github.com/rust-lang/rust/blob/09c817eeb29e764cfc12d0a8d94841e3ffe34023/src/libstd/process.rs#L375
+        false
+    }
+
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,

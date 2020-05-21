@@ -76,7 +76,7 @@ pub trait AsyncRead {
     /// [`poll_read_buf`]: #method.poll_read_buf
     unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [MaybeUninit<u8>]) -> bool {
         for x in buf {
-            *x.as_mut_ptr() = 0;
+            *x = MaybeUninit::new(0);
         }
 
         true
