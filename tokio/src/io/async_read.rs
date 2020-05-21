@@ -11,10 +11,8 @@ use std::task::{Context, Poll};
 /// `R::initializer` returns Initializer::nop()  
 ///
 /// Should be used to override `AsyncRead::prepare_uninitialized_buffer`
-/// for any AsyncRead impl which wraps an `std::io::Read` instance.
-// TODO: use `cfg` bounds instead.
-#[allow(dead_code)]
-pub(crate) fn prepare_uninitialized_buffer_std_read<R: std::io::Read>(
+/// for any AsyncRead impl which wraps an `std::io::Read` instance.]
+pub fn prepare_uninitialized_buffer_std_read<R: std::io::Read>(
     buf: &mut [MaybeUninit<u8>],
 ) -> bool {
     // TODO: when std::io::Initializer is stable, it should be used

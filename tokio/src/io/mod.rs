@@ -162,9 +162,12 @@ mod async_buf_read;
 pub use self::async_buf_read::AsyncBufRead;
 
 mod async_read;
-// TODO: use `cfg` bounds instead.
-#[allow(unused_imports)]
-pub(crate) use self::async_read::prepare_uninitialized_buffer_std_read;
+
+// This function is only `pub` to be used in `fs_file_mocked` test.
+// It is considered implementation detail, and should not be used
+// outside of Tokio.
+#[doc(hidden)]
+pub use self::async_read::prepare_uninitialized_buffer_std_read;
 
 pub use self::async_read::AsyncRead;
 
