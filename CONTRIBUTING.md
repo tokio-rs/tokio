@@ -132,8 +132,14 @@ RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
 ```
 The `cargo fmt` command does not work on the Tokio codebase. You can use the
 command below instead:
+
+#### Bash
 ```
 rustfmt --check --edition 2018 $(find . -name '*.rs' -print)
+```
+#### Powershell
+```
+Get-ChildItem . -Filter "*.rs" -Recurse | foreach { rustfmt --check --edition 2018 $_.FullName }
 ```
 The `--check` argument prints the things that need to be fixed. If you remove
 it, `rustfmt` will update your files locally instead.

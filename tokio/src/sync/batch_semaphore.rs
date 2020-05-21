@@ -123,7 +123,9 @@ impl Semaphore {
         self.permits.load(Acquire) >> Self::PERMIT_SHIFT
     }
 
-    /// Adds `n` new permits to the semaphore.
+    /// Adds `added` new permits to the semaphore.
+    ///
+    /// The maximum number of permits is `usize::MAX >> 3`, and this function will panic if the limit is exceeded.
     pub(crate) fn release(&self, added: usize) {
         if added == 0 {
             return;
@@ -186,7 +188,7 @@ impl Semaphore {
 
     /// Release `rem` permits to the semaphore's wait list, starting from the
     /// end of the queue.
-    ///  
+    ///
     /// If `rem` exceeds the number of permits needed by the wait list, the
     /// remainder are assigned back to the semaphore.
     fn add_permits_locked(&self, mut rem: usize, waiters: MutexGuard<'_, Waitlist>) {

@@ -12,7 +12,7 @@
 //!
 //! # Usage
 //!
-//! Attempting to write data that the mock isn't expected will result in a
+//! Attempting to write data that the mock isn't expecting will result in a
 //! panic.
 //!
 //! [`AsyncRead`]: tokio::io::AsyncRead
