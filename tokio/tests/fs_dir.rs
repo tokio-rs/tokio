@@ -2,7 +2,7 @@
 #![cfg(feature = "full")]
 
 use tokio::fs;
-use tokio_test::assert_ok;
+use tokio_test::{assert_err, assert_ok};
 
 use std::sync::{Arc, Mutex};
 use tempfile::tempdir;
@@ -26,6 +26,23 @@ async fn create_all() {
 
     assert_ok!(fs::create_dir_all(new_dir).await);
     assert!(new_dir_2.is_dir());
+}
+
+#[tokio::test]
+async fn build_dir() {
+    let base_dir = tempdir().unwrap();
+    let new_dir = base_dir.path().join("foo").join("bar");
+    let new_dir_2 = new_dir.clone();
+
+    assert_ok!(fs::DirBuilder::new().recursive(true).create(new_dir).await);
+
+    assert!(new_dir_2.is_dir());
+    assert_err!(
+        fs::DirBuilder::new()
+            .recursive(false)
+            .create(new_dir_2)
+            .await
+    );
 }
 
 #[tokio::test]
