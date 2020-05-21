@@ -151,15 +151,49 @@ cfg_blocking_impl! {
 cfg_coop! {
     use std::task::{Context, Poll};
 
+    #[must_use]
+    pub(crate) struct RestoreOnPending(Cell<Budget>);
+
+    impl RestoreOnPending {
+        pub(crate) fn made_progress(&self) {
+            self.0.set(Budget::unconstrained());
+        }
+    }
+
+    impl Drop for RestoreOnPending {
+        fn drop(&mut self) {
+            // Don't reset if budget was unconstrained or if we made progress.
+            // They are both represented as the remembered budget being unconstrained.
+            let budget = self.0.get();
+            if !budget.is_unconstrained() {
+                CURRENT.with(|cell| {
+                    cell.set(budget);
+                });
+            }
+        }
+    }
+
     /// Returns `Poll::Pending` if the current task has exceeded its budget and should yield.
+    ///
+    /// When you call this method, the current budget is decremented. However, to ensure that
+    /// progress is made every time a task is polled, the budget is automatically restored to its
+    /// former value if the returned `RestoreOnPending` is dropped. It is the caller's
+    /// responsibility to call `RestoreOnPending::made_progress` if it made progress, to ensure
+    /// that the budget empties appropriately.
+    ///
+    /// Note that `RestoreOnPending` restores the budget **as it was before `poll_proceed`**.
+    /// Therefore, if the budget is _further_ adjusted between when `poll_proceed` returns and
+    /// `RestRestoreOnPending` is dropped, those adjustments are erased unless the caller indicates
+    /// that progress was made.
     #[inline]
-    pub(crate) fn poll_proceed(cx: &mut Context<'_>) -> Poll<()> {
+    pub(crate) fn poll_proceed(cx: &mut Context<'_>) -> Poll<RestoreOnPending> {
         CURRENT.with(|cell| {
             let mut budget = cell.get();
 
             if budget.decrement() {
+                let restore = RestoreOnPending(Cell::new(cell.get()));
                 cell.set(budget);
-                Poll::Ready(())
+                Poll::Ready(restore)
             } else {
                 cx.waker().wake_by_ref();
                 Poll::Pending
@@ -181,7 +215,11 @@ cfg_coop! {
             } else {
                 true
             }
-    }
+        }
+
+        fn is_unconstrained(self) -> bool {
+            self.0.is_none()
+        }
     }
 }
 
@@ -200,21 +238,41 @@ mod test {
 
         assert!(get().0.is_none());
 
-        assert_ready!(task::spawn(()).enter(|cx, _| poll_proceed(cx)));
+        let coop = assert_ready!(task::spawn(()).enter(|cx, _| poll_proceed(cx)));
 
+        assert!(get().0.is_none());
+        drop(coop);
         assert!(get().0.is_none());
 
         budget(|| {
             assert_eq!(get().0, Budget::initial().0);
-            assert_ready!(task::spawn(()).enter(|cx, _| poll_proceed(cx)));
+
+            let coop = assert_ready!(task::spawn(()).enter(|cx, _| poll_proceed(cx)));
             assert_eq!(get().0.unwrap(), Budget::initial().0.unwrap() - 1);
-            assert_ready!(task::spawn(()).enter(|cx, _| poll_proceed(cx)));
+            drop(coop);
+            // we didn't make progress
+            assert_eq!(get().0, Budget::initial().0);
+
+            let coop = assert_ready!(task::spawn(()).enter(|cx, _| poll_proceed(cx)));
+            assert_eq!(get().0.unwrap(), Budget::initial().0.unwrap() - 1);
+            coop.made_progress();
+            drop(coop);
+            // we _did_ make progress
+            assert_eq!(get().0.unwrap(), Budget::initial().0.unwrap() - 1);
+
+            let coop = assert_ready!(task::spawn(()).enter(|cx, _| poll_proceed(cx)));
+            assert_eq!(get().0.unwrap(), Budget::initial().0.unwrap() - 2);
+            coop.made_progress();
+            drop(coop);
             assert_eq!(get().0.unwrap(), Budget::initial().0.unwrap() - 2);
 
             budget(|| {
                 assert_eq!(get().0, Budget::initial().0);
 
-                assert_ready!(task::spawn(()).enter(|cx, _| poll_proceed(cx)));
+                let coop = assert_ready!(task::spawn(()).enter(|cx, _| poll_proceed(cx)));
+                assert_eq!(get().0.unwrap(), Budget::initial().0.unwrap() - 1);
+                coop.made_progress();
+                drop(coop);
                 assert_eq!(get().0.unwrap(), Budget::initial().0.unwrap() - 1);
             });
 
@@ -227,11 +285,13 @@ mod test {
             let n = get().0.unwrap();
 
             for _ in 0..n {
-                assert_ready!(task::spawn(()).enter(|cx, _| poll_proceed(cx)));
+                let coop = assert_ready!(task::spawn(()).enter(|cx, _| poll_proceed(cx)));
+                coop.made_progress();
             }
 
             let mut task = task::spawn(poll_fn(|cx| {
-                ready!(poll_proceed(cx));
+                let coop = ready!(poll_proceed(cx));
+                coop.made_progress();
                 Poll::Ready(())
             }));
 

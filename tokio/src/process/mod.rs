@@ -708,13 +708,17 @@ where
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // Keep track of task budget
-        ready!(crate::coop::poll_proceed(cx));
+        let coop = ready!(crate::coop::poll_proceed(cx));
 
         let ret = Pin::new(&mut self.inner).poll(cx);
 
         if let Poll::Ready(Ok(_)) = ret {
             // Avoid the overhead of trying to kill a reaped process
             self.kill_on_drop = false;
+        }
+
+        if ret.is_ready() {
+            coop.made_progress();
         }
 
         ret
