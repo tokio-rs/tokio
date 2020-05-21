@@ -91,6 +91,7 @@ where
         let me = self.project();
 
         let n = ready!(read_line_internal(me.reader, cx, me.buf, me.bytes, me.read))?;
+        debug_assert_eq!(*me.read, 0);
 
         if n == 0 && me.buf.is_empty() {
             return Poll::Ready(Ok(None));

@@ -27,7 +27,7 @@ async fn read_until() {
 async fn read_until_not_all_ready() {
     let mock = Builder::new()
         .read(b"Hello Wor")
-        .read(b"ld#FizzBuz")
+        .read(b"ld#Fizz\xffBuz")
         .read(b"z#1#2")
         .build();
 
@@ -40,8 +40,8 @@ async fn read_until_not_all_ready() {
 
     chunk = b"I solve ".to_vec();
     let bytes = read.read_until(b'#', &mut chunk).await.unwrap();
-    assert_eq!(bytes, "FizzBuzz\n".len());
-    assert_eq!(chunk, b"I solve FizzBuzz#");
+    assert_eq!(bytes, b"Fizz\xffBuzz\n".len());
+    assert_eq!(chunk, b"I solve Fizz\xffBuzz#");
 
     chunk.clear();
     let bytes = read.read_until(b'#', &mut chunk).await.unwrap();
@@ -57,15 +57,18 @@ async fn read_until_not_all_ready() {
 #[tokio::test]
 async fn read_until_fail() {
     let mock = Builder::new()
-        .read(b"Hello Wor")
+        .read(b"Hello \xffWor")
         .read_error(Error::new(ErrorKind::Other, "The world has no end"))
         .build();
 
     let mut read = BufReader::new(mock);
 
     let mut chunk = b"Foo".to_vec();
-    let err = read.read_until(b'#', &mut chunk).await.expect_err("Should fail");
+    let err = read
+        .read_until(b'#', &mut chunk)
+        .await
+        .expect_err("Should fail");
     assert_eq!(err.kind(), ErrorKind::Other);
     assert_eq!(err.to_string(), "The world has no end");
-    assert_eq!(chunk, b"FooHello Wor");
+    assert_eq!(chunk, b"FooHello \xffWor");
 }

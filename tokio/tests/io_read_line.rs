@@ -61,6 +61,19 @@ async fn read_line_not_all_ready() {
 }
 
 #[tokio::test]
+async fn read_line_invalid_utf8() {
+    let mock = Builder::new().read(b"Hello Wor\xffld.\n").build();
+
+    let mut read = BufReader::new(mock);
+
+    let mut line = "Foo".to_string();
+    let err = read.read_line(&mut line).await.expect_err("Should fail");
+    assert_eq!(err.kind(), ErrorKind::InvalidData);
+    assert_eq!(err.to_string(), "stream did not contain valid UTF-8");
+    assert_eq!(line.as_str(), "Foo");
+}
+
+#[tokio::test]
 async fn read_line_fail() {
     let mock = Builder::new()
         .read(b"Hello Wor")
@@ -74,4 +87,21 @@ async fn read_line_fail() {
     assert_eq!(err.kind(), ErrorKind::Other);
     assert_eq!(err.to_string(), "The world has no end");
     assert_eq!(line.as_str(), "FooHello Wor");
+}
+
+#[tokio::test]
+async fn read_line_fail_and_utf8_fail() {
+    let mock = Builder::new()
+        .read(b"Hello Wor")
+        .read(b"\xff\xff\xff")
+        .read_error(Error::new(ErrorKind::Other, "The world has no end"))
+        .build();
+
+    let mut read = BufReader::new(mock);
+
+    let mut line = "Foo".to_string();
+    let err = read.read_line(&mut line).await.expect_err("Should fail");
+    assert_eq!(err.kind(), ErrorKind::Other);
+    assert_eq!(err.to_string(), "The world has no end");
+    assert_eq!(line.as_str(), "Foo");
 }
