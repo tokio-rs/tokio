@@ -381,10 +381,6 @@ impl<E> AsyncRead for PollEvented<E>
 where
     E: Evented + Read + Unpin,
 {
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [std::mem::MaybeUninit<u8>]) -> bool {
-        crate::io::prepare_uninitialized_buffer_std_read::<E>(buf)
-    }
-
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,

@@ -43,16 +43,6 @@ pub(crate) use support::mock_pool as pool;
 pub(crate) mod io {
     pub(crate) use tokio::io::*;
 
-    // this function duplicated here, because it is pub(crate) so not imported.
-    pub(crate) fn prepare_uninitialized_buffer_std_read<R: std::io::Read>(
-        buf: &mut [std::mem::MaybeUninit<u8>],
-    ) -> bool {
-        for x in buf {
-            *x = std::mem::MaybeUninit::new(0);
-        }
-        true
-    }
-
     pub(crate) use crate::blocking;
 
     pub(crate) mod sys {
