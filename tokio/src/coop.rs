@@ -152,17 +152,20 @@ cfg_coop! {
     use std::task::{Context, Poll};
 
     #[must_use]
-    pub(crate) struct RestoreOnPending(Cell<Option<Budget>>);
+    pub(crate) struct RestoreOnPending(Cell<Budget>);
 
     impl RestoreOnPending {
         pub(crate) fn made_progress(&self) {
-            self.0.set(None);
+            self.0.set(Budget::unconstrained());
         }
     }
 
     impl Drop for RestoreOnPending {
         fn drop(&mut self) {
-            if let Some(budget) = self.0.get() {
+            // Don't reset if budget was unconstrained or if we made progress.
+            // They are both represented as the remembered budget being unconstrained.
+            let budget = self.0.get();
+            if !budget.is_unconstrained() {
                 CURRENT.with(|cell| {
                     cell.set(budget);
                 });
@@ -188,7 +191,7 @@ cfg_coop! {
             let mut budget = cell.get();
 
             if budget.decrement() {
-                let restore = RestoreOnPending(Cell::new(cell.get().if_dynamic()));
+                let restore = RestoreOnPending(Cell::new(cell.get()));
                 cell.set(budget);
                 Poll::Ready(restore)
             } else {
@@ -214,12 +217,8 @@ cfg_coop! {
             }
         }
 
-        fn if_dynamic(self) -> Option<Self> {
-            if self.0.is_some() {
-                Some(self)
-            } else {
-                None
-            }
+        fn is_unconstrained(&self) -> bool {
+            self.0.is_none()
         }
     }
 }
