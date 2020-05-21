@@ -217,7 +217,7 @@ cfg_coop! {
             }
         }
 
-        fn is_unconstrained(&self) -> bool {
+        fn is_unconstrained(self) -> bool {
             self.0.is_none()
         }
     }
