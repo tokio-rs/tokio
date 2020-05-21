@@ -91,9 +91,6 @@ where
         if self.second.prepare_uninitialized_buffer(buf) {
             return true;
         }
-        for x in buf {
-            *x = std::mem::MaybeUninit::new(0);
-        }
         false
     }
     fn poll_read(
