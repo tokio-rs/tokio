@@ -41,3 +41,45 @@ async fn echo() -> io::Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn split() -> std::io::Result<()> {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("split.sock");
+    let socket = UnixDatagram::bind(path.clone())?;
+    let (mut r, mut s) = socket.split();
+
+    let msg = b"hello";
+    tokio::spawn(async move {
+        s.send_to(msg, path).await.unwrap();
+    });
+    let mut recv_buf = [0u8; 32];
+    let (len, _) = r.recv_from(&mut recv_buf[..]).await?;
+    assert_eq!(&recv_buf[..len], msg);
+    Ok(())
+}
+
+#[tokio::test]
+async fn reunite() -> std::io::Result<()> {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("reunite.sock");
+    let socket = UnixDatagram::bind(path)?;
+    let (s, r) = socket.split();
+    assert!(s.reunite(r).is_ok());
+    Ok(())
+}
+
+#[tokio::test]
+async fn reunite_error() -> std::io::Result<()> {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("reunit.sock");
+    let dir = tempfile::tempdir().unwrap();
+    let path1 = dir.path().join("reunit.sock");
+    let socket = UnixDatagram::bind(path)?;
+    let socket1 = UnixDatagram::bind(path1)?;
+
+    let (s, _) = socket.split();
+    let (_, r1) = socket1.split();
+    assert!(s.reunite(r1).is_err());
+    Ok(())
+}

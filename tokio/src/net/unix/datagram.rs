@@ -2,12 +2,14 @@ use crate::future::poll_fn;
 use crate::io::PollEvented;
 
 use std::convert::TryFrom;
+use std::error::Error;
 use std::fmt;
 use std::io;
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::os::unix::net::{self, SocketAddr};
 use std::path::Path;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 cfg_uds! {
@@ -201,6 +203,12 @@ impl UnixDatagram {
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         self.io.get_ref().shutdown(how)
     }
+
+    /// Split a `UnixDatagram` into a receive half and a send half, which can be used
+    /// to receice and send the datagram concurrently.
+    pub fn split(self) -> (RecvHalf, SendHalf) {
+        split(self)
+    }
 }
 
 impl TryFrom<UnixDatagram> for mio_uds::UnixDatagram {
@@ -238,5 +246,108 @@ impl fmt::Debug for UnixDatagram {
 impl AsRawFd for UnixDatagram {
     fn as_raw_fd(&self) -> RawFd {
         self.io.get_ref().as_raw_fd()
+    }
+}
+
+fn split(socket: UnixDatagram) -> (RecvHalf, SendHalf) {
+    let shared = Arc::new(socket);
+    let send = shared.clone();
+    let recv = shared;
+    (RecvHalf(recv), SendHalf(send))
+}
+
+/// The send half after [`split`](UnixDatagram::split).
+///
+/// Use [`send_to`](#method.send_to) or [`send`](#method.send) to send
+/// datagrams.
+#[derive(Debug)]
+pub struct SendHalf(Arc<UnixDatagram>);
+
+/// The recv half after [`split`](UnixDatagram::split).
+///
+/// Use [`recv_from`](#method.recv_from) or [`recv`](#method.recv) to receive
+/// datagrams.
+#[derive(Debug)]
+pub struct RecvHalf(Arc<UnixDatagram>);
+
+/// Error indicating two halves were not from the same socket, and thus could
+/// not be `reunite`d.
+#[derive(Debug)]
+pub struct ReuniteError(pub SendHalf, pub RecvHalf);
+
+impl fmt::Display for ReuniteError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "tried to reunite halves that are not from the same socket"
+        )
+    }
+}
+
+impl Error for ReuniteError {}
+
+fn reunite(s: SendHalf, r: RecvHalf) -> Result<UnixDatagram, ReuniteError> {
+    if Arc::ptr_eq(&s.0, &r.0) {
+        drop(r);
+        // Only two instances of the `Arc` are ever created, one for the
+        // receiver and one for the sender, and those `Arc`s are never exposed
+        // externally. And so when we drop one here, the other one must be the
+        // only remaining one.
+        Ok(Arc::try_unwrap(s.0).expect("unixdatagram: try_unwrap failed in reunite"))
+    } else {
+        Err(ReuniteError(s, r))
+    }
+}
+
+impl RecvHalf {
+    /// Attempts to put the two "halves" of a `UnixDatagram` back together and
+    /// recover the original socket. Succeeds only if the two "halves"
+    /// originated from the same call to `UnixDatagram::split`.
+    pub fn reunite(self, other: SendHalf) -> Result<UnixDatagram, ReuniteError> {
+        reunite(other, self)
+    }
+
+    /// Receives data from the socket.
+    pub async fn recv_from(&mut self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+        poll_fn(|cx| self.0.poll_recv_from_priv(cx, buf)).await
+    }
+
+    /// Receives data from the socket.
+    pub async fn recv(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        poll_fn(|cx| self.0.poll_recv_priv(cx, buf)).await
+    }
+}
+
+impl SendHalf {
+    /// Attempts to put the two "halves" of a `UnixDatagram` back together and
+    /// recover the original socket. Succeeds only if the two "halves"
+    /// originated from the same call to `UnixDatagram::split`.
+    pub fn reunite(self, other: RecvHalf) -> Result<UnixDatagram, ReuniteError> {
+        reunite(self, other)
+    }
+
+    /// Sends data on the socket to the specified address.
+    pub async fn send_to<P>(&mut self, buf: &[u8], target: P) -> io::Result<usize>
+    where
+        P: AsRef<Path> + Unpin,
+    {
+        poll_fn(|cx| self.0.poll_send_to_priv(cx, buf, target.as_ref())).await
+    }
+
+    /// Sends data on the socket to the socket's peer.
+    pub async fn send(&mut self, buf: &[u8]) -> io::Result<usize> {
+        poll_fn(|cx| self.0.poll_send_priv(cx, buf)).await
+    }
+}
+
+impl AsRef<UnixDatagram> for SendHalf {
+    fn as_ref(&self) -> &UnixDatagram {
+        &self.0
+    }
+}
+
+impl AsRef<UnixDatagram> for RecvHalf {
+    fn as_ref(&self) -> &UnixDatagram {
+        &self.0
     }
 }
