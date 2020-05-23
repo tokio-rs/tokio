@@ -206,7 +206,7 @@ impl UnixDatagram {
 
     /// Split a `UnixDatagram` into a receive half and a send half, which can be used
     /// to receice and send the datagram concurrently.
-    pub fn into_split(self) -> (RecvHalf, SendHalf) {
+    pub fn into_split(self) -> (OwnedRecvHalf, OwnedSendHalf) {
         split_owned(self)
     }
 }
@@ -249,13 +249,13 @@ impl AsRawFd for UnixDatagram {
     }
 }
 
-fn split_owned(socket: UnixDatagram) -> (RecvHalf, SendHalf) {
+fn split_owned(socket: UnixDatagram) -> (OwnedRecvHalf, OwnedSendHalf) {
     let shared = Arc::new(socket);
     let send = shared.clone();
     let recv = shared;
     (
-        RecvHalf { inner: recv },
-        SendHalf {
+        OwnedRecvHalf { inner: recv },
+        OwnedSendHalf {
             inner: send,
             shutdown_on_drop: true,
         },
@@ -267,7 +267,7 @@ fn split_owned(socket: UnixDatagram) -> (RecvHalf, SendHalf) {
 /// Use [`send_to`](#method.send_to) or [`send`](#method.send) to send
 /// datagrams.
 #[derive(Debug)]
-pub struct SendHalf {
+pub struct OwnedSendHalf {
     inner: Arc<UnixDatagram>,
     shutdown_on_drop: bool,
 }
@@ -277,14 +277,14 @@ pub struct SendHalf {
 /// Use [`recv_from`](#method.recv_from) or [`recv`](#method.recv) to receive
 /// datagrams.
 #[derive(Debug)]
-pub struct RecvHalf {
+pub struct OwnedRecvHalf {
     inner: Arc<UnixDatagram>,
 }
 
 /// Error indicating two halves were not from the same socket, and thus could
 /// not be `reunite`d.
 #[derive(Debug)]
-pub struct ReuniteError(pub SendHalf, pub RecvHalf);
+pub struct ReuniteError(pub OwnedSendHalf, pub OwnedRecvHalf);
 
 impl fmt::Display for ReuniteError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -297,7 +297,7 @@ impl fmt::Display for ReuniteError {
 
 impl Error for ReuniteError {}
 
-fn reunite(s: SendHalf, r: RecvHalf) -> Result<UnixDatagram, ReuniteError> {
+fn reunite(s: OwnedSendHalf, r: OwnedRecvHalf) -> Result<UnixDatagram, ReuniteError> {
     if Arc::ptr_eq(&s.inner, &r.inner) {
         s.forget();
         // Only two instances of the `Arc` are ever created, one for the
@@ -310,11 +310,11 @@ fn reunite(s: SendHalf, r: RecvHalf) -> Result<UnixDatagram, ReuniteError> {
     }
 }
 
-impl RecvHalf {
+impl OwnedRecvHalf {
     /// Attempts to put the two "halves" of a `UnixDatagram` back together and
     /// recover the original socket. Succeeds only if the two "halves"
     /// originated from the same call to `UnixDatagram::split`.
-    pub fn reunite(self, other: SendHalf) -> Result<UnixDatagram, ReuniteError> {
+    pub fn reunite(self, other: OwnedSendHalf) -> Result<UnixDatagram, ReuniteError> {
         reunite(other, self)
     }
 
@@ -329,11 +329,11 @@ impl RecvHalf {
     }
 }
 
-impl SendHalf {
+impl OwnedSendHalf {
     /// Attempts to put the two "halves" of a `UnixDatagram` back together and
     /// recover the original socket. Succeeds only if the two "halves"
     /// originated from the same call to `UnixDatagram::split`.
-    pub fn reunite(self, other: RecvHalf) -> Result<UnixDatagram, ReuniteError> {
+    pub fn reunite(self, other: OwnedRecvHalf) -> Result<UnixDatagram, ReuniteError> {
         reunite(self, other)
     }
 
@@ -359,7 +359,7 @@ impl SendHalf {
     }
 }
 
-impl Drop for SendHalf {
+impl Drop for OwnedSendHalf {
     fn drop(&mut self) {
         if self.shutdown_on_drop {
             let _ = self.inner.shutdown(Shutdown::Both);
@@ -367,13 +367,13 @@ impl Drop for SendHalf {
     }
 }
 
-impl AsRef<UnixDatagram> for SendHalf {
+impl AsRef<UnixDatagram> for OwnedSendHalf {
     fn as_ref(&self) -> &UnixDatagram {
         &self.inner
     }
 }
 
-impl AsRef<UnixDatagram> for RecvHalf {
+impl AsRef<UnixDatagram> for OwnedRecvHalf {
     fn as_ref(&self) -> &UnixDatagram {
         &self.inner
     }
