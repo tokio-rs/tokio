@@ -206,8 +206,8 @@ impl UnixDatagram {
 
     /// Split a `UnixDatagram` into a receive half and a send half, which can be used
     /// to receice and send the datagram concurrently.
-    pub fn split(self) -> (RecvHalf, SendHalf) {
-        split(self)
+    pub fn into_split(self) -> (RecvHalf, SendHalf) {
+        split_owned(self)
     }
 }
 
@@ -249,11 +249,17 @@ impl AsRawFd for UnixDatagram {
     }
 }
 
-fn split(socket: UnixDatagram) -> (RecvHalf, SendHalf) {
+fn split_owned(socket: UnixDatagram) -> (RecvHalf, SendHalf) {
     let shared = Arc::new(socket);
     let send = shared.clone();
     let recv = shared;
-    (RecvHalf(recv), SendHalf(send))
+    (
+        RecvHalf { inner: recv },
+        SendHalf {
+            inner: send,
+            shutdown_on_drop: true,
+        },
+    )
 }
 
 /// The send half after [`split`](UnixDatagram::split).
@@ -261,14 +267,19 @@ fn split(socket: UnixDatagram) -> (RecvHalf, SendHalf) {
 /// Use [`send_to`](#method.send_to) or [`send`](#method.send) to send
 /// datagrams.
 #[derive(Debug)]
-pub struct SendHalf(Arc<UnixDatagram>);
+pub struct SendHalf {
+    inner: Arc<UnixDatagram>,
+    shutdown_on_drop: bool,
+}
 
 /// The recv half after [`split`](UnixDatagram::split).
 ///
 /// Use [`recv_from`](#method.recv_from) or [`recv`](#method.recv) to receive
 /// datagrams.
 #[derive(Debug)]
-pub struct RecvHalf(Arc<UnixDatagram>);
+pub struct RecvHalf {
+    inner: Arc<UnixDatagram>,
+}
 
 /// Error indicating two halves were not from the same socket, and thus could
 /// not be `reunite`d.
@@ -287,13 +298,13 @@ impl fmt::Display for ReuniteError {
 impl Error for ReuniteError {}
 
 fn reunite(s: SendHalf, r: RecvHalf) -> Result<UnixDatagram, ReuniteError> {
-    if Arc::ptr_eq(&s.0, &r.0) {
-        drop(r);
+    if Arc::ptr_eq(&s.inner, &r.inner) {
+        s.forget();
         // Only two instances of the `Arc` are ever created, one for the
         // receiver and one for the sender, and those `Arc`s are never exposed
         // externally. And so when we drop one here, the other one must be the
         // only remaining one.
-        Ok(Arc::try_unwrap(s.0).expect("unixdatagram: try_unwrap failed in reunite"))
+        Ok(Arc::try_unwrap(r.inner).expect("unixdatagram: try_unwrap failed in reunite"))
     } else {
         Err(ReuniteError(s, r))
     }
@@ -309,12 +320,12 @@ impl RecvHalf {
 
     /// Receives data from the socket.
     pub async fn recv_from(&mut self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        poll_fn(|cx| self.0.poll_recv_from_priv(cx, buf)).await
+        poll_fn(|cx| self.inner.poll_recv_from_priv(cx, buf)).await
     }
 
     /// Receives data from the socket.
     pub async fn recv(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        poll_fn(|cx| self.0.poll_recv_priv(cx, buf)).await
+        poll_fn(|cx| self.inner.poll_recv_priv(cx, buf)).await
     }
 }
 
@@ -331,23 +342,39 @@ impl SendHalf {
     where
         P: AsRef<Path> + Unpin,
     {
-        poll_fn(|cx| self.0.poll_send_to_priv(cx, buf, target.as_ref())).await
+        poll_fn(|cx| self.inner.poll_send_to_priv(cx, buf, target.as_ref())).await
     }
 
     /// Sends data on the socket to the socket's peer.
     pub async fn send(&mut self, buf: &[u8]) -> io::Result<usize> {
-        poll_fn(|cx| self.0.poll_send_priv(cx, buf)).await
+        poll_fn(|cx| self.inner.poll_send_priv(cx, buf)).await
+    }
+
+    /// Destroy the send half, but don't close the stream until the recvice half
+    /// is dropped. If the read half has already been dropped, this closes the
+    /// stream.
+    pub fn forget(mut self) {
+        self.shutdown_on_drop = false;
+        drop(self);
+    }
+}
+
+impl Drop for SendHalf {
+    fn drop(&mut self) {
+        if self.shutdown_on_drop {
+            let _ = self.inner.shutdown(Shutdown::Both);
+        }
     }
 }
 
 impl AsRef<UnixDatagram> for SendHalf {
     fn as_ref(&self) -> &UnixDatagram {
-        &self.0
+        &self.inner
     }
 }
 
 impl AsRef<UnixDatagram> for RecvHalf {
     fn as_ref(&self) -> &UnixDatagram {
-        &self.0
+        &self.inner
     }
 }

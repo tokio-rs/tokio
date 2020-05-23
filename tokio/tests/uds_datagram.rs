@@ -47,7 +47,7 @@ async fn split() -> std::io::Result<()> {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("split.sock");
     let socket = UnixDatagram::bind(path.clone())?;
-    let (mut r, mut s) = socket.split();
+    let (mut r, mut s) = socket.into_split();
 
     let msg = b"hello";
     tokio::spawn(async move {
@@ -64,7 +64,7 @@ async fn reunite() -> std::io::Result<()> {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("reunite.sock");
     let socket = UnixDatagram::bind(path)?;
-    let (s, r) = socket.split();
+    let (s, r) = socket.into_split();
     assert!(s.reunite(r).is_ok());
     Ok(())
 }
@@ -78,8 +78,8 @@ async fn reunite_error() -> std::io::Result<()> {
     let socket = UnixDatagram::bind(path)?;
     let socket1 = UnixDatagram::bind(path1)?;
 
-    let (s, _) = socket.split();
-    let (_, r1) = socket1.split();
+    let (s, _) = socket.into_split();
+    let (_, r1) = socket1.into_split();
     assert!(s.reunite(r1).is_err());
     Ok(())
 }
