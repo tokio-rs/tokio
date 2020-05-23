@@ -262,7 +262,7 @@ fn split_owned(socket: UnixDatagram) -> (RecvHalf, SendHalf) {
     )
 }
 
-/// The send half after [`split`](UnixDatagram::split).
+/// The send half after [`split`](UnixDatagram::into_split).
 ///
 /// Use [`send_to`](#method.send_to) or [`send`](#method.send) to send
 /// datagrams.
@@ -272,7 +272,7 @@ pub struct SendHalf {
     shutdown_on_drop: bool,
 }
 
-/// The recv half after [`split`](UnixDatagram::split).
+/// The recv half after [`split`](UnixDatagram::into_split).
 ///
 /// Use [`recv_from`](#method.recv_from) or [`recv`](#method.recv) to receive
 /// datagrams.
