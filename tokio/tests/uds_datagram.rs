@@ -3,6 +3,7 @@
 #![cfg(unix)]
 
 use tokio::net::UnixDatagram;
+use tokio::try_join;
 
 use std::io;
 
@@ -50,12 +51,19 @@ async fn split() -> std::io::Result<()> {
     let (mut r, mut s) = socket.into_split();
 
     let msg = b"hello";
-    tokio::spawn(async move {
-        s.send_to(msg, path).await.unwrap();
-    });
-    let mut recv_buf = [0u8; 32];
-    let (len, _) = r.recv_from(&mut recv_buf[..]).await?;
-    assert_eq!(&recv_buf[..len], msg);
+    let ((), ()) = try_join! {
+        async {
+            s.send_to(msg, path).await?;
+            io::Result::Ok(())
+        },
+        async {
+            let mut recv_buf = [0u8; 32];
+            let (len, _) = r.recv_from(&mut recv_buf[..]).await?;
+            assert_eq!(&recv_buf[..len], msg);
+            Ok(())
+        },
+    }?;
+
     Ok(())
 }
 
