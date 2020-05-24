@@ -10,6 +10,7 @@ name: Test tokio
 
 env:
   RUSTFLAGS: -Dwarnings
+  RUST_BACKTRACE: 1
   nightly: nightly-2020-01-25
 
 jobs:
@@ -30,9 +31,6 @@ jobs:
         with:
           command: test
           args: --manifest-path ${{ github.workspace }}/tokio/Cargo.toml --features full
-        env:
-          RUST_BACKTRACE: 1
-          CI: 'True'
         name: tokio - cargo test --features full
 
       # Run `tokio` with "unstable" cfg flag
@@ -42,9 +40,7 @@ jobs:
           args: --manifest-path ${{ github.workspace }}/tokio/Cargo.toml --features full
         env:
           RUSTFLAGS: '--cfg tokio_unstable'
-          RUST_BACKTRACE: 1
-          CI: 'True'
-        name: tokio - cargo test --features full
+        name: tokio - cargo test --features full --cfg tokio_unstable
 
   test_cross_subcrates:
     name: Test ${{ matrix.crate }} (${{ matrix.os }}) all-features
@@ -77,9 +73,6 @@ jobs:
         with:
           command: test
           args: --manifest-path ${{ github.workspace }}/${{ matrix.crate }}/Cargo.toml --all-features
-        env:
-          RUST_BACKTRACE: 1
-          CI: 'True'
 
         # Check benches
       - name: ${{ matrix.crate }} - cargo check --benches
@@ -87,9 +80,6 @@ jobs:
         with:
           command: check
           args: --manifest-path ${{ github.workspace }}/${{ matrix.crate }}/Cargo.toml --all-features --benches
-        env:
-          RUST_BACKTRACE: 1
-          CI: 'True'
 
       - name: Patch Cargo.toml
         shell: bash
@@ -114,9 +104,6 @@ jobs:
         with:
           command: test
           args: --manifest-path ${{ github.workspace }}/${{ matrix.crate }}/Cargo.toml --all-features
-        env:
-          RUST_BACKTRACE: 1
-          CI: 'True'
 
   test_integration:
     name: Integration tests
@@ -136,5 +123,3 @@ jobs:
         with:
           command: hack
           args: test --manifest-path ${{ github.workspace }}/tests-integration/Cargo.toml --each-feature
-        env:
-          CI: 'True'
