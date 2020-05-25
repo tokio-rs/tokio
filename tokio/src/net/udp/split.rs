@@ -23,14 +23,14 @@ use std::sync::Arc;
 
 /// The send half after [`split`](super::UdpSocket::split).
 ///
-/// Use [`send_to`](#method.send_to) or [`send`](#method.send) to send
+/// Use [`send_to`](method@Self::send_to) or [`send`](method@Self::send) to send
 /// datagrams.
 #[derive(Debug)]
 pub struct SendHalf(Arc<UdpSocket>);
 
 /// The recv half after [`split`](super::UdpSocket::split).
 ///
-/// Use [`recv_from`](#method.recv_from) or [`recv`](#method.recv) to receive
+/// Use [`recv_from`](method@Self::recv_from) or [`recv`](method@Self::recv) to receive
 /// datagrams.
 #[derive(Debug)]
 pub struct RecvHalf(Arc<UdpSocket>);

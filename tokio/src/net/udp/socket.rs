@@ -111,7 +111,7 @@ impl UdpSocket {
     /// The [`connect`] method will connect this socket to a remote address. The future
     /// will resolve to an error if the socket is not connected.
     ///
-    /// [`connect`]: #method.connect
+    /// [`connect`]: method@Self::connect
     pub async fn send(&mut self, buf: &[u8]) -> io::Result<usize> {
         poll_fn(|cx| self.poll_send(cx, buf)).await
     }
@@ -150,7 +150,7 @@ impl UdpSocket {
     /// The [`connect`] method will connect this socket to a remote address. The future
     /// will fail if the socket is not connected.
     ///
-    /// [`connect`]: #method.connect
+    /// [`connect`]: method@Self::connect
     pub async fn recv(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         poll_fn(|cx| self.poll_recv(cx, buf)).await
     }
@@ -235,7 +235,7 @@ impl UdpSocket {
     ///
     /// For more information about this option, see [`set_broadcast`].
     ///
-    /// [`set_broadcast`]: #method.set_broadcast
+    /// [`set_broadcast`]: method@Self::set_broadcast
     pub fn broadcast(&self) -> io::Result<bool> {
         self.io.get_ref().broadcast()
     }
@@ -252,7 +252,7 @@ impl UdpSocket {
     ///
     /// For more information about this option, see [`set_multicast_loop_v4`].
     ///
-    /// [`set_multicast_loop_v4`]: #method.set_multicast_loop_v4
+    /// [`set_multicast_loop_v4`]: method@Self::set_multicast_loop_v4
     pub fn multicast_loop_v4(&self) -> io::Result<bool> {
         self.io.get_ref().multicast_loop_v4()
     }
@@ -272,7 +272,7 @@ impl UdpSocket {
     ///
     /// For more information about this option, see [`set_multicast_ttl_v4`].
     ///
-    /// [`set_multicast_ttl_v4`]: #method.set_multicast_ttl_v4
+    /// [`set_multicast_ttl_v4`]: method@Self::set_multicast_ttl_v4
     pub fn multicast_ttl_v4(&self) -> io::Result<u32> {
         self.io.get_ref().multicast_ttl_v4()
     }
@@ -294,7 +294,7 @@ impl UdpSocket {
     ///
     /// For more information about this option, see [`set_multicast_loop_v6`].
     ///
-    /// [`set_multicast_loop_v6`]: #method.set_multicast_loop_v6
+    /// [`set_multicast_loop_v6`]: method@Self::set_multicast_loop_v6
     pub fn multicast_loop_v6(&self) -> io::Result<bool> {
         self.io.get_ref().multicast_loop_v6()
     }
@@ -314,7 +314,7 @@ impl UdpSocket {
     ///
     /// For more information about this option, see [`set_ttl`].
     ///
-    /// [`set_ttl`]: #method.set_ttl
+    /// [`set_ttl`]: method@Self::set_ttl
     pub fn ttl(&self) -> io::Result<u32> {
         self.io.get_ref().ttl()
     }
@@ -351,7 +351,7 @@ impl UdpSocket {
     ///
     /// For more information about this option, see [`join_multicast_v4`].
     ///
-    /// [`join_multicast_v4`]: #method.join_multicast_v4
+    /// [`join_multicast_v4`]: method@Self::join_multicast_v4
     pub fn leave_multicast_v4(&self, multiaddr: Ipv4Addr, interface: Ipv4Addr) -> io::Result<()> {
         self.io.get_ref().leave_multicast_v4(&multiaddr, &interface)
     }
@@ -360,7 +360,7 @@ impl UdpSocket {
     ///
     /// For more information about this option, see [`join_multicast_v6`].
     ///
-    /// [`join_multicast_v6`]: #method.join_multicast_v6
+    /// [`join_multicast_v6`]: method@Self::join_multicast_v6
     pub fn leave_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
         self.io.get_ref().leave_multicast_v6(multiaddr, interface)
     }

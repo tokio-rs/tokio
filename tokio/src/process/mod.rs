@@ -211,7 +211,7 @@ impl Command {
     ///
     /// To pass multiple arguments see [`args`].
     ///
-    /// [`args`]: #method.args
+    /// [`args`]: method@Self::args
     ///
     /// # Examples
     ///
@@ -233,7 +233,7 @@ impl Command {
     ///
     /// To pass a single argument see [`arg`].
     ///
-    /// [`arg`]: #method.arg
+    /// [`arg`]: method@Self::arg
     ///
     /// # Examples
     ///
