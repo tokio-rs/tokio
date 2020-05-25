@@ -231,7 +231,7 @@ use self::shell::Shell;
 mod spawner;
 use self::spawner::Spawner;
 
-mod time;
+pub(crate) mod time;
 
 cfg_rt_threaded! {
     mod queue;
@@ -301,6 +301,9 @@ enum Kind {
     /// Execute tasks across multiple threads.
     #[cfg(feature = "rt-threaded")]
     ThreadPool(ThreadPool),
+
+    #[cfg(all(feature = "test-util", tokio_unstable))]
+    Test(crate::runtime::test_scheduler::TestScheduler),
 }
 
 /// After thread starts / before thread stops
@@ -402,6 +405,8 @@ impl Runtime {
             #[cfg(feature = "rt-threaded")]
             Kind::ThreadPool(exec) => exec.spawn(future),
             Kind::Basic(exec) => exec.spawn(future),
+            #[cfg(all(feature = "test-util", tokio_unstable))]
+            Kind::Test(exec) => exec.spawn(future),
         }
     }
 
@@ -448,6 +453,8 @@ impl Runtime {
             Kind::Basic(exec) => exec.block_on(future),
             #[cfg(feature = "rt-threaded")]
             Kind::ThreadPool(exec) => exec.block_on(future),
+            #[cfg(all(feature = "test-util", tokio_unstable))]
+            Kind::Test(exec) => exec.block_on(future),
         })
     }
 

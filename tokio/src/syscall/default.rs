@@ -1,28 +1,47 @@
 //! Default [Syscalls]
 use super::Syscalls;
-use std::future::Future;
-use std::pin::Pin;
+use crate::park::Park;
+use std::sync::Mutex;
+use std::io;
+use crate::park::Either;
 
-pub(crate) struct DefaultSyscalls;
+pub(crate) struct DefaultSyscalls {
+    inner: Mutex<Inner>
+}
+
+struct Inner {
+    io_driver: crate::runtime::time::Driver
+}
+
+impl DefaultSyscalls {
+    pub(crate) fn new(io_driver: crate::runtime::time::Driver) -> Self {
+        Self {
+            inner: Mutex::new(Inner { io_driver })
+        }
+    }
+}
 
 impl Syscalls for DefaultSyscalls {
-    fn spawn(&self, _future: Pin<Box<dyn Future<Output = ()>>>) {
-        todo!("spawn")
+    fn park(&self) -> io::Result<()> {
+        let mut lock = self.inner.lock().unwrap();
+        match lock.io_driver.park() {
+            Ok(_) => Ok(()),
+            Err(Either::A(e)) => Err(io::Error::new(io::ErrorKind::Other, format!("park error: {:?}", e))),
+            Err(Either::B(e)) => Err(io::Error::new(io::ErrorKind::Other, format!("park error: {:?}", e)))
+        }
     }
 
-    fn spawn_blocking(&self, _task: Box<dyn FnOnce()>) {
-        todo!("spawn_blocking")
-    }
-
-    fn park(&self) {
-        todo!("park")
-    }
-
-    fn park_timeout(&self, _duration: std::time::Duration) {
-        todo!("park_timeout")
+    fn park_timeout(&self, duration: std::time::Duration) -> io::Result<()> {
+        let mut lock = self.inner.lock().unwrap();
+        match lock.io_driver.park_timeout(duration) {
+            Ok(_) => Ok(()),
+            Err(Either::A(e)) => Err(io::Error::new(io::ErrorKind::Other, format!("park error: {:?}", e))),
+            Err(Either::B(e)) => Err(io::Error::new(io::ErrorKind::Other, format!("park error: {:?}", e)))
+        }
     }
 
     fn unpark(&self) {
-        todo!("unpark")
+        let lock = self.inner.lock().unwrap();
+        lock.io_driver.unpark(); // TODO: What should be returned here?
     }
 }

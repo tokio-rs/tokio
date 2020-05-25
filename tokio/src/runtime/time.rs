@@ -19,12 +19,20 @@ mod variant {
         Clock::new()
     }
 
+    #[cfg(all(feature = "test-util", tokio_unstable))]
+    pub(crate) fn create_test_clock() -> Clock {
+        Clock::new_frozen()
+    }
+
     /// Create a new timer driver / handle pair
-    pub(crate) fn create_driver(
+    pub(crate) fn create_driver<P>(
         enable: bool,
-        io_driver: io::Driver,
+        io_driver: P,
         clock: Clock,
-    ) -> (Driver, Handle) {
+    ) -> (Either<driver::Driver<P>, P>, Handle)
+    where
+        P: crate::park::Park,
+    {
         if enable {
             let driver = driver::Driver::new(io_driver, clock);
             let handle = driver.handle();
@@ -48,12 +56,16 @@ mod variant {
         ()
     }
 
+    #[cfg(all(feature = "test-util", tokio_unstable))]
+    pub(crate) fn create_test_clock() -> Clock {
+        ()
+    }
+
     /// Create a new timer driver / handle pair
-    pub(crate) fn create_driver(
-        _enable: bool,
-        io_driver: io::Driver,
-        _clock: Clock,
-    ) -> (Driver, Handle) {
+    pub(crate) fn create_driver<P>(_enable: bool, io_driver: P, _clock: Clock) -> (P, Handle)
+    where
+        P: crate::park::Park,
+    {
         (io_driver, ())
     }
 }

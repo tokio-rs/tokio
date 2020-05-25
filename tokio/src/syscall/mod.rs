@@ -14,25 +14,24 @@
 //!
 //! [syscall]:crate::syscall
 mod default;
-use std::future::Future;
-
+pub(crate) use default::DefaultSyscalls;
 use std::io;
+use std::future::Future;
 use std::pin::Pin;
 
 /// Syscalls trait allows for hooking into the Tokio runtime.
 pub trait Syscalls: Send + Sync {
-    /// Spawn a Future onto the runtime.
-    fn spawn(&self, future: Pin<Box<dyn Future<Output = ()>>>);
-
-    /// Spawn a blocking task onto the runtime.
-    fn spawn_blocking(&self, task: Box<dyn FnOnce()>);
-
-    /// Drive the runtime forward
-    fn park(&self);
+    /// Drive the runtime forward.
+    fn park(&self) -> io::Result<()>;
 
     /// Drive the runtime forward with a timeout.
-    fn park_timeout(&self, duration: std::time::Duration);
+    fn park_timeout(&self, duration: std::time::Duration) -> io::Result<()>;
 
-    /// Unblock the runtime
+    /// Unpark the runtime.
     fn unpark(&self);
+
+    /// Wrap all spawned futures.
+    fn wrap_future(&self, future: Pin<Box<dyn Future<Output = ()> + Send>>) -> Pin<Box<dyn Future<Output = ()> + Send>> {
+        future
+    }
 }

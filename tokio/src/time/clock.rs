@@ -19,6 +19,11 @@ cfg_not_test_util! {
             Clock {}
         }
 
+        #[cfg(all(feature = "test-util", tokio_unstable))]
+        pub(crate) fn new_frozen() -> Clock {
+            Clock {}
+        }
+
         pub(crate) fn now(&self) -> Instant {
             now()
         }
@@ -122,6 +127,18 @@ cfg_test_util! {
                 inner: Arc::new(Mutex::new(Inner {
                     base: now,
                     unfrozen: Some(now),
+                })),
+            }
+        }
+
+        #[cfg(all(feature = "test-util", tokio_unstable))]
+        pub(crate)  fn new_frozen() -> Clock {
+            let now = std::time::Instant::now();
+
+            Clock {
+                inner: Arc::new(Mutex::new(Inner {
+                    base: now,
+                    unfrozen: None,
                 })),
             }
         }

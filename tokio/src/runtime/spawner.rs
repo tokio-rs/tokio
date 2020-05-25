@@ -16,6 +16,8 @@ pub(crate) enum Spawner {
     Basic(basic_scheduler::Spawner),
     #[cfg(feature = "rt-threaded")]
     ThreadPool(thread_pool::Spawner),
+    #[cfg(all(feature = "test-util", tokio_unstable))]
+    Test(crate::runtime::test_scheduler::Spawner),
 }
 
 cfg_rt_core! {
@@ -31,6 +33,8 @@ cfg_rt_core! {
                 Spawner::Basic(spawner) => spawner.spawn(future),
                 #[cfg(feature = "rt-threaded")]
                 Spawner::ThreadPool(spawner) => spawner.spawn(future),
+                #[cfg(all(feature = "test-util", tokio_unstable))]
+                Spawner::Test(spawner) => spawner.spawn(future)
             }
         }
     }

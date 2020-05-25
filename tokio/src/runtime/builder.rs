@@ -75,6 +75,8 @@ enum Kind {
     Basic,
     #[cfg(feature = "rt-threaded")]
     ThreadPool,
+    #[cfg(all(feature = "test-util", feature = "rt-core", tokio_unstable))]
+    Test,
 }
 
 impl Builder {
@@ -316,6 +318,8 @@ impl Builder {
             Kind::Basic => self.build_basic_runtime(),
             #[cfg(feature = "rt-threaded")]
             Kind::ThreadPool => self.build_threaded_runtime(),
+            #[cfg(all(feature = "test-util", feature = "rt-core", tokio_unstable))]
+            Kind::Test => self.build_test_runtime(),
         }
     }
 
@@ -497,6 +501,43 @@ cfg_rt_threaded! {
                 handle,
                 blocking_pool,
             })
+        }
+    }
+}
+
+cfg_rt_core! {
+    cfg_test_util_unstable! {
+        impl Builder {
+            /// Sets runtime to use a deterministic single threaded executor intended for tests.
+            pub fn test_scheduler(&mut self) -> &mut Self {
+                self.kind = Kind::Test;
+                self
+            }
+
+            fn build_test_runtime(&mut self) -> io::Result<Runtime> {
+                let (io_driver, io_handle) = crate::runtime::io::create_driver(self.enable_io)?;
+                let clock = time::create_test_clock();
+                let (driver, time_handle) = crate::runtime::time::create_driver(self.enable_time, io_driver, clock.clone());
+                let syscalls = Arc::new(crate::syscall::DefaultSyscalls::new(driver));
+                let scheduler = crate::runtime::test_scheduler::TestScheduler::new(syscalls);
+                let spawner = Spawner::Test(scheduler.spawner().clone());
+
+            // Blocking pool
+            let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
+            let blocking_spawner = blocking_pool.spawner().clone();
+
+            Ok(Runtime {
+                kind: crate::runtime::Kind::Test(scheduler),
+                handle: Handle {
+                    spawner,
+                    io_handle,
+                    time_handle,
+                    clock,
+                    blocking_spawner,
+                },
+                blocking_pool,
+            })
+            }
         }
     }
 }
