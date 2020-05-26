@@ -1,22 +1,19 @@
 use crate::park::{Park, Unpark};
 use crate::syscall::Syscalls;
-use std::sync::Arc;
 use std::io;
+use std::sync::Arc;
 use std::time::Duration;
 pub(crate) struct SyscallsPark {
     syscalls: Arc<dyn Syscalls>,
 }
 
-impl SyscallsPark
-
-{
+impl SyscallsPark {
     pub(crate) fn new(syscalls: Arc<dyn Syscalls>) -> Self {
         Self { syscalls }
     }
 }
 
-impl Park for SyscallsPark
-{
+impl Park for SyscallsPark {
     type Unpark = SyscallsUnpark;
     type Error = io::Error;
 

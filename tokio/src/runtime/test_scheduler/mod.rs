@@ -23,16 +23,19 @@ pub(crate) struct Spawner {
     syscalls: Arc<dyn Syscalls>,
 }
 
-
 impl TestScheduler {
     pub(crate) fn new(syscalls: Arc<dyn Syscalls>) -> Self {
         let park = park::SyscallsPark::new(Arc::clone(&syscalls));
         let inner = BasicScheduler::new(park);
         let spawner = Spawner {
             inner: inner.spawner().clone(),
-            syscalls: Arc::clone(&syscalls)
+            syscalls: Arc::clone(&syscalls),
         };
-        TestScheduler { inner, spawner, syscalls }
+        TestScheduler {
+            inner,
+            spawner,
+            syscalls,
+        }
     }
 
     pub(crate) fn spawner(&self) -> &Spawner {

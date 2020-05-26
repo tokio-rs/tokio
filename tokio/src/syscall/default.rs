@@ -1,22 +1,22 @@
 //! Default [Syscalls]
 use super::Syscalls;
-use crate::park::Park;
-use std::sync::Mutex;
-use std::io;
 use crate::park::Either;
+use crate::park::Park;
+use std::io;
+use std::sync::Mutex;
 
 pub(crate) struct DefaultSyscalls {
-    inner: Mutex<Inner>
+    inner: Mutex<Inner>,
 }
 
 struct Inner {
-    io_driver: crate::runtime::time::Driver
+    io_driver: crate::runtime::time::Driver,
 }
 
 impl DefaultSyscalls {
     pub(crate) fn new(io_driver: crate::runtime::time::Driver) -> Self {
         Self {
-            inner: Mutex::new(Inner { io_driver })
+            inner: Mutex::new(Inner { io_driver }),
         }
     }
 }
@@ -26,8 +26,14 @@ impl Syscalls for DefaultSyscalls {
         let mut lock = self.inner.lock().unwrap();
         match lock.io_driver.park() {
             Ok(_) => Ok(()),
-            Err(Either::A(e)) => Err(io::Error::new(io::ErrorKind::Other, format!("park error: {:?}", e))),
-            Err(Either::B(e)) => Err(io::Error::new(io::ErrorKind::Other, format!("park error: {:?}", e)))
+            Err(Either::A(e)) => Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("park error: {:?}", e),
+            )),
+            Err(Either::B(e)) => Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("park error: {:?}", e),
+            )),
         }
     }
 
@@ -35,8 +41,14 @@ impl Syscalls for DefaultSyscalls {
         let mut lock = self.inner.lock().unwrap();
         match lock.io_driver.park_timeout(duration) {
             Ok(_) => Ok(()),
-            Err(Either::A(e)) => Err(io::Error::new(io::ErrorKind::Other, format!("park error: {:?}", e))),
-            Err(Either::B(e)) => Err(io::Error::new(io::ErrorKind::Other, format!("park error: {:?}", e)))
+            Err(Either::A(e)) => Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("park error: {:?}", e),
+            )),
+            Err(Either::B(e)) => Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("park error: {:?}", e),
+            )),
         }
     }
 
