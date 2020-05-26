@@ -518,7 +518,7 @@ cfg_rt_core! {
                 let (io_driver, io_handle) = crate::runtime::io::create_driver(self.enable_io)?;
                 let clock = time::create_test_clock();
                 let (driver, time_handle) = crate::runtime::time::create_driver(self.enable_time, io_driver, clock.clone());
-                let syscalls = Arc::new(crate::syscall::DefaultSyscalls::new(driver));
+                let syscalls = std::sync::Arc::new(crate::syscall::DefaultSyscalls::new(driver));
                 let scheduler = crate::runtime::test_scheduler::TestScheduler::new(syscalls);
                 let spawner = Spawner::Test(scheduler.spawner().clone());
 
