@@ -12,6 +12,7 @@ jobs:
         cargo clippy --version
       displayName: Install clippy
     - script: |
+        set -e
         cargo clippy --all --all-features
         # TODO currently tests trigger some clippy warnings
         # that's why -Dwarnings is disabled
