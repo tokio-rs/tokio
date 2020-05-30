@@ -401,7 +401,7 @@ pub struct Signal {
 /// * If the lower-level C functions fail for some reason.
 /// * If the previous initialization of this specific signal failed.
 /// * If the signal is one of
-///   [`signal_hook::FORBIDDEN`](https://docs.rs/signal-hook/*/signal_hook/fn.register.html#panics)
+///   [`signal_hook::FORBIDDEN`](fn@signal_hook_registry::register#panics)
 pub fn signal(kind: SignalKind) -> io::Result<Signal> {
     let signal = kind.0;
 

@@ -1,6 +1,6 @@
-//! [`UdpSocket`](../struct.UdpSocket.html) split support.
+//! [`UdpSocket`](crate::net::UdpSocket) split support.
 //!
-//! The [`split`](../struct.UdpSocket.html#method.split) method splits a
+//! The [`split`](method@crate::net::UdpSocket::split) method splits a
 //! `UdpSocket` into a receive half and a send half, which can be used to
 //! receive and send datagrams concurrently, even from two different tasks.
 //!

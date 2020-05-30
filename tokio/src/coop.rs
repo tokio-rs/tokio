@@ -45,7 +45,7 @@
 //! other futures. By doing this, you avoid double-counting each iteration of
 //! the outer future against the cooperating budget.
 //!
-//! [`poll`]: https://doc.rust-lang.org/std/future/trait.Future.html#tymethod.poll
+//! [`poll`]: method@std::future::Future::poll
 
 // NOTE: The doctests in this module are ignored since the whole module is (currently) private.
 

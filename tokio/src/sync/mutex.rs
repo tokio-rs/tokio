@@ -93,9 +93,9 @@ use std::sync::Arc;
 ///
 /// [`Mutex`]: struct@Mutex
 /// [`MutexGuard`]: struct@MutexGuard
-/// [`Arc`]: https://doc.rust-lang.org/std/sync/struct.Arc.html
-/// [`std::sync::Mutex`]: https://doc.rust-lang.org/std/sync/struct.Mutex.html
-/// [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
+/// [`Arc`]: struct@std::sync::Arc
+/// [`std::sync::Mutex`]: struct@std::sync::Mutex
+/// [`Send`]: trait@std::marker::Send
 /// [`lock`]: method@Mutex::lock
 
 #[derive(Debug)]

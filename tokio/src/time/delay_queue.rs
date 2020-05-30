@@ -119,7 +119,7 @@ use std::task::{self, Poll};
 /// [`Stream::poll`]: method@Self::poll
 /// [`DelayQueue`]: struct@DelayQueue
 /// [`delay_for`]: fn@super::delay_for
-/// [`slab`]: https://docs.rs/slab
+/// [`slab`]: slab
 /// [`capacity`]: method@Self::capacity
 /// [`reserve`]: method@Self::reserve
 #[derive(Debug)]

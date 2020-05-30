@@ -370,7 +370,7 @@
 //! [`AsyncRead`]: trait@tokio::io::AsyncRead
 //! [`AsyncWrite`]: trait@tokio::io::AsyncWrite
 //! [`Encoder`]: trait@Encoder
-//! [`BytesMut`]: https://docs.rs/bytes/0.4/bytes/struct.BytesMut.html
+//! [`BytesMut`]: bytes::BytesMut
 
 use crate::codec::{Decoder, Encoder, Framed, FramedRead, FramedWrite};
 
