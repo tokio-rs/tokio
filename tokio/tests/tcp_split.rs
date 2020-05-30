@@ -17,7 +17,7 @@ async fn split() -> Result<()> {
 
     let handle = thread::spawn(move || {
         let (mut stream, _) = listener.accept().unwrap();
-        stream.write(MSG).unwrap();
+        stream.write_all(MSG).unwrap();
 
         let mut read_buf = [0u8; 32];
         let read_len = stream.read(&mut read_buf).unwrap();
