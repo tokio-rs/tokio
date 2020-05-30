@@ -322,7 +322,7 @@ impl TcpListener {
     ///
     /// For more information about this option, see [`set_ttl`].
     ///
-    /// [`set_ttl`]: #method.set_ttl
+    /// [`set_ttl`]: method@Self::set_ttl
     ///
     /// # Examples
     ///

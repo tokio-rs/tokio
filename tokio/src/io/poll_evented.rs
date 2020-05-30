@@ -97,10 +97,10 @@ cfg_io_driver! {
     /// [`mio::Evented`]: https://docs.rs/mio/0.6/mio/trait.Evented.html
     /// [`Registration`]: struct@Registration
     /// [`TcpListener`]: struct@crate::net::TcpListener
-    /// [`clear_read_ready`]: #method.clear_read_ready
-    /// [`clear_write_ready`]: #method.clear_write_ready
-    /// [`poll_read_ready`]: #method.poll_read_ready
-    /// [`poll_write_ready`]: #method.poll_write_ready
+    /// [`clear_read_ready`]: method@Self::clear_read_ready
+    /// [`clear_write_ready`]: method@Self::clear_write_ready
+    /// [`poll_read_ready`]: method@Self::poll_read_ready
+    /// [`poll_write_ready`]: method@Self::poll_write_ready
     pub struct PollEvented<E: Evented> {
         io: Option<E>,
         inner: Inner,
@@ -253,7 +253,7 @@ where
     /// The I/O resource will remain in a read-ready state until readiness is
     /// cleared by calling [`clear_read_ready`].
     ///
-    /// [`clear_read_ready`]: #method.clear_read_ready
+    /// [`clear_read_ready`]: method@Self::clear_read_ready
     ///
     /// # Panics
     ///
@@ -324,7 +324,7 @@ where
     /// The I/O resource will remain in a write-ready state until readiness is
     /// cleared by calling [`clear_write_ready`].
     ///
-    /// [`clear_write_ready`]: #method.clear_write_ready
+    /// [`clear_write_ready`]: method@Self::clear_write_ready
     ///
     /// # Panics
     ///
