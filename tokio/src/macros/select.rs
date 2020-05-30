@@ -362,7 +362,7 @@ macro_rules! select {
                     let branch;
                     #[allow(clippy::modulo_one)]
                     {
-                        branch = (start + i) % BRANCHES
+                        branch = (start + i) % BRANCHES;
                     }
                     match branch {
                         $(
