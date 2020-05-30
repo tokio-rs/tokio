@@ -34,9 +34,9 @@ cfg_io_driver! {
     /// stream. The write readiness event stream is only for `Ready::writable()`
     /// events.
     ///
-    /// [`new`]: #method.new
-    /// [`poll_read_ready`]: #method.poll_read_ready`]
-    /// [`poll_write_ready`]: #method.poll_write_ready`]
+    /// [`new`]: method@Self::new
+    /// [`poll_read_ready`]: method@Self::poll_read_ready`
+    /// [`poll_write_ready`]: method@Self::poll_write_ready`
     #[derive(Debug)]
     pub struct Registration {
         handle: Handle,
@@ -153,8 +153,6 @@ impl Registration {
     /// the function will always return `Ready(HUP)`. This should be treated as
     /// the end of the readiness stream.
     ///
-    /// Ensure that [`register`] has been called first.
-    ///
     /// # Return value
     ///
     /// There are several possible return values:
@@ -166,10 +164,8 @@ impl Registration {
     ///   since the last call to `poll_read_ready`.
     ///
     /// * `Poll::Ready(Err(err))` means that the registration has encountered an
-    ///   error. This error either represents a permanent internal error **or**
-    ///   the fact that [`register`] was not called first.
+    ///   error. This could represent a permanent internal error for example.
     ///
-    /// [`register`]: #method.register
     /// [edge-triggered]: https://docs.rs/mio/0.6/mio/struct.Poll.html#edge-triggered-and-level-triggered
     ///
     /// # Panics
@@ -198,7 +194,7 @@ impl Registration {
     /// will not notify the current task when a new event is received. As such,
     /// it is safe to call this function from outside of a task context.
     ///
-    /// [`poll_read_ready`]: #method.poll_read_ready
+    /// [`poll_read_ready`]: method@Self::poll_read_ready
     pub fn take_read_ready(&self) -> io::Result<Option<mio::Ready>> {
         self.poll_ready(Direction::Read, None)
     }
@@ -213,8 +209,6 @@ impl Registration {
     /// the function will always return `Ready(HUP)`. This should be treated as
     /// the end of the readiness stream.
     ///
-    /// Ensure that [`register`] has been called first.
-    ///
     /// # Return value
     ///
     /// There are several possible return values:
@@ -226,10 +220,8 @@ impl Registration {
     ///   since the last call to `poll_write_ready`.
     ///
     /// * `Poll::Ready(Err(err))` means that the registration has encountered an
-    ///   error. This error either represents a permanent internal error **or**
-    ///   the fact that [`register`] was not called first.
+    ///   error. This could represent a permanent internal error for example.
     ///
-    /// [`register`]: #method.register
     /// [edge-triggered]: https://docs.rs/mio/0.6/mio/struct.Poll.html#edge-triggered-and-level-triggered
     ///
     /// # Panics
@@ -258,7 +250,7 @@ impl Registration {
     /// will not notify the current task when a new event is received. As such,
     /// it is safe to call this function from outside of a task context.
     ///
-    /// [`poll_write_ready`]: #method.poll_write_ready
+    /// [`poll_write_ready`]: method@Self::poll_write_ready
     pub fn take_write_ready(&self) -> io::Result<Option<mio::Ready>> {
         self.poll_ready(Direction::Write, None)
     }
