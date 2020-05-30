@@ -359,8 +359,11 @@ macro_rules! select {
                 let start = $crate::macros::support::thread_rng_n(BRANCHES);
 
                 for i in 0..BRANCHES {
-                    let branch = (start + i) % BRANCHES;
-
+                    let branch;
+                    #[allow(clippy::modulo_one)]
+                    {
+                        branch = (start + i) % BRANCHES;
+                    }
                     match branch {
                         $(
                             $crate::count!( $($skip)* ) => {
