@@ -166,7 +166,7 @@ impl Registration {
     /// * `Poll::Ready(Err(err))` means that the registration has encountered an
     ///   error. This could represent a permanent internal error for example.
     ///
-    /// [edge-triggered]: https://docs.rs/mio/0.6/mio/struct.Poll.html#edge-triggered-and-level-triggered
+    /// [edge-triggered]: struct@mio::Poll#edge-triggered-and-level-triggered
     ///
     /// # Panics
     ///
@@ -222,7 +222,7 @@ impl Registration {
     /// * `Poll::Ready(Err(err))` means that the registration has encountered an
     ///   error. This could represent a permanent internal error for example.
     ///
-    /// [edge-triggered]: https://docs.rs/mio/0.6/mio/struct.Poll.html#edge-triggered-and-level-triggered
+    /// [edge-triggered]: struct@mio::Poll#edge-triggered-and-level-triggered
     ///
     /// # Panics
     ///
