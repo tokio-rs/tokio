@@ -89,7 +89,7 @@ macro_rules! __task_local_inner {
 /// }).await;
 /// # }
 /// ```
-/// [`std::thread::LocalKey`]: https://doc.rust-lang.org/std/thread/struct.LocalKey.html
+/// [`std::thread::LocalKey`]: struct@std::thread::LocalKey
 pub struct LocalKey<T: 'static> {
     #[doc(hidden)]
     pub inner: thread::LocalKey<RefCell<Option<T>>>,

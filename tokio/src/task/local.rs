@@ -105,7 +105,7 @@ cfg_rt_util! {
     /// }
     /// ```
     ///
-    /// [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
+    /// [`Send`]: trait@std::marker::Send
     /// [local task set]: struct@LocalSet
     /// [`Runtime::block_on`]: method@crate::runtime::Runtime::block_on
     /// [`task::spawn_local`]: fn@spawn_local

@@ -90,11 +90,11 @@ cfg_io_driver! {
     /// These events are included as part of the read readiness event stream. The
     /// write readiness event stream is only for `Ready::writable()` events.
     ///
-    /// [`std::io::Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
-    /// [`std::io::Write`]: https://doc.rust-lang.org/std/io/trait.Write.html
+    /// [`std::io::Read`]: trait@std::io::Read
+    /// [`std::io::Write`]: trait@std::io::Write
     /// [`AsyncRead`]: trait@AsyncRead
     /// [`AsyncWrite`]: trait@AsyncWrite
-    /// [`mio::Evented`]: https://docs.rs/mio/0.6/mio/trait.Evented.html
+    /// [`mio::Evented`]: trait@mio::Evented
     /// [`Registration`]: struct@Registration
     /// [`TcpListener`]: struct@crate::net::TcpListener
     /// [`clear_read_ready`]: method@Self::clear_read_ready

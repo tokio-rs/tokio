@@ -29,7 +29,7 @@ cfg_rt_threaded! {
     /// [blocking]: ../index.html#cpu-bound-tasks-and-blocking-code
     /// [threaded scheduler]: fn@crate::runtime::Builder::threaded_scheduler
     /// [`spawn_blocking`]: fn@crate::task::spawn_blocking
-    /// [`join!`]: ../macro.join.html
+    /// [`join!`]: macro@join
     /// [`thread::spawn`]: fn@std::thread::spawn
     /// [`shutdown_timeout`]: fn@crate::runtime::Runtime::shutdown_timeout
     ///
