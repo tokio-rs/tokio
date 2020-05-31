@@ -36,7 +36,7 @@ use std::{cmp, fmt};
 /// to handle callers from across threads.
 ///
 /// After creating the `Driver` instance, the caller must repeatedly call `park`
-/// or `park_timeout`. The time driver will perform no work unless `park` or 
+/// or `park_timeout`. The time driver will perform no work unless `park` or
 /// `park_timeout` is called repeatedly.
 ///
 /// The driver has a resolution of one millisecond. Any unit of time that falls
