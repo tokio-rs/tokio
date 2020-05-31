@@ -12,5 +12,5 @@ jobs:
         cargo clippy --version
       displayName: Install clippy
     - script: |
-        cargo clippy --all --all-features
-      displayName: cargo clippy --all
+        cargo clippy --all --all-features --tests
+      displayName: cargo clippy --all --tests

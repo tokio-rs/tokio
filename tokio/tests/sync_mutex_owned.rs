@@ -36,7 +36,7 @@ fn straight_execution() {
 fn readiness() {
     let l = Arc::new(Mutex::new(100));
     let mut t1 = spawn(l.clone().lock_owned());
-    let mut t2 = spawn(l.clone().lock_owned());
+    let mut t2 = spawn(l.lock_owned());
 
     let g = assert_ready!(t1.poll());
 
