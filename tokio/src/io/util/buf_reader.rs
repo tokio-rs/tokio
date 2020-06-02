@@ -82,7 +82,7 @@ impl<R: AsyncRead> BufReader<R> {
         self.project().inner
     }
 
-    /// Consumes this `BufWriter`, returning the underlying reader.
+    /// Consumes this `BufReader`, returning the underlying reader.
     ///
     /// Note that any leftover data in the internal buffer is lost.
     pub fn into_inner(self) -> R {
