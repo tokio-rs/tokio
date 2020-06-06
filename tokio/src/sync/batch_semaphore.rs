@@ -519,8 +519,8 @@ impl TryAcquireError {
 impl fmt::Display for TryAcquireError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            TryAcquireError::Closed => write!(fmt, "{}", "semaphore closed"),
-            TryAcquireError::NoPermits => write!(fmt, "{}", "no permits available"),
+            TryAcquireError::Closed => write!(fmt, "semaphore closed"),
+            TryAcquireError::NoPermits => write!(fmt, "no permits available"),
         }
     }
 }

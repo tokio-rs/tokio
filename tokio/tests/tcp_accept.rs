@@ -80,7 +80,7 @@ async fn no_extra_poll() {
             s: listener.incoming(),
         };
         assert_ok!(tx.send(Arc::clone(&incoming.npolls)));
-        while let Some(_) = incoming.next().await {
+        while incoming.next().await.is_some() {
             accepted_tx.send(()).unwrap();
         }
     });

@@ -571,7 +571,7 @@ impl Core {
         }
 
         // Drain the queue
-        while let Some(_) = self.next_local_task() {}
+        while self.next_local_task().is_some() {}
     }
 
     fn drain_pending_drop(&mut self, worker: &Worker) {
@@ -793,7 +793,7 @@ impl Shared {
         }
 
         // Drain the injection queue
-        while let Some(_) = self.inject.pop() {}
+        while self.inject.pop().is_some() {}
     }
 
     fn ptr_eq(&self, other: &Shared) -> bool {

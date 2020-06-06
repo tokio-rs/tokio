@@ -153,7 +153,7 @@ pub struct TryLockError(());
 
 impl fmt::Display for TryLockError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "{}", "operation would block")
+        write!(fmt, "operation would block")
     }
 }
 
