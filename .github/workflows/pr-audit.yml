@@ -2,6 +2,11 @@ name: Pull Request Security Audit
 
 on:
   push:
+    branches:
+      - master
+    paths:
+      - '**/Cargo.toml'
+  pull_request:
     paths:
       - '**/Cargo.toml'
 
@@ -27,3 +32,13 @@ jobs:
         uses: action-rs/cargo@v1
         with:
           command: audit
+
+      - name: Discord notification
+        if: failure() && (github.event_name == 'push' && github.event.ref == 'refs/heads/master')
+        env:
+          run_url: "https://github.com/tokio-rs/tokio/actions/runs/${{ github.run_id }}"
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          DISCORD_USERNAME: GitHub dependency audit
+        uses: Ilshidur/action-discord@f237343
+        with:
+          args: "Dependency security audit failed.\n${{ env.run_url }}"
