@@ -16,17 +16,17 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Install cargo-audit
-        uses: action-rs/cargo@v1
+        uses: actions-rs/cargo@v1
         with:
           command: install
           args: cargo-audit
 
       - name: Generate lockfile
-        uses: action-rs/cargo@v1
+        uses: actions-rs/cargo@v1
         with:
           command: generate-lockfile
 
       - name: Audit dependencies
-        uses: action-rs/cargo@v1
+        uses: actions-rs/cargo@v1
         with:
           command: audit
