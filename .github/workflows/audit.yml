@@ -1,4 +1,4 @@
-name: Daily Security Audit
+name: Security Audit
 
 on:
   push:
