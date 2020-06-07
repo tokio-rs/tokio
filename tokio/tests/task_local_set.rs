@@ -365,7 +365,7 @@ fn drop_cancels_remote_tasks() {
         let mut rt = rt();
 
         let local = LocalSet::new();
-        local.spawn_local(async move { while let Some(_) = rx.recv().await {} });
+        local.spawn_local(async move { while rx.recv().await.is_some() {} });
         local.block_on(&mut rt, async {
             time::delay_for(Duration::from_millis(1)).await;
         });
