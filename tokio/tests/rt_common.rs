@@ -601,6 +601,7 @@ rt_test! {
     }
 
     #[test]
+    #[cfg(not(windows))]
     fn io_driver_called_when_under_load() {
         let mut rt = rt();
 
