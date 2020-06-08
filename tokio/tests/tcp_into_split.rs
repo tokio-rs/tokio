@@ -106,8 +106,6 @@ async fn drop_write() -> Result<()> {
             Err(err) => Err(err),
         };
 
-        barrier2.wait();
-
         drop(stream);
 
         res
@@ -131,8 +129,6 @@ async fn drop_write() -> Result<()> {
         Ok(len) => panic!("Unexpected read: {} bytes.", len),
         Err(err) => panic!("Unexpected error: {}.", err),
     }
-
-    barrier.wait();
 
     handle.join().unwrap().unwrap();
     Ok(())

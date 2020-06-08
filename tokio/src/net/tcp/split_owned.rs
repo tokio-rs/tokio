@@ -221,7 +221,7 @@ impl OwnedWriteHalf {
 impl Drop for OwnedWriteHalf {
     fn drop(&mut self) {
         if self.shutdown_on_drop {
-            let _ = self.inner.shutdown(Shutdown::Both);
+            let _ = self.inner.shutdown(Shutdown::Write);
         }
     }
 }
