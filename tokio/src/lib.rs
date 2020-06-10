@@ -16,6 +16,7 @@
     attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
 ))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(docsrs, feature(doc_alias))]
 
 //! A runtime for writing reliable, asynchronous, and slim applications.
 //!

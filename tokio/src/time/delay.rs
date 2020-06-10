@@ -33,6 +33,7 @@ pub fn delay_until(deadline: Instant) -> Delay {
 ///
 /// Canceling a delay is done by dropping the returned future. No additional
 /// cleanup work is required.
+#[cfg_attr(docsrs, doc(alias = "sleep"))]
 pub fn delay_for(duration: Duration) -> Delay {
     delay_until(Instant::now() + duration)
 }
