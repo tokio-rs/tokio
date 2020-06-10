@@ -167,6 +167,10 @@ impl<T> UnboundedSender<T> {
     /// being called or the [`UnboundedReceiver`] having been dropped,
     /// the function returns an error. The error includes the value passed to `send`.
     ///
+    /// This method is not marked async because sending a message to an unbounded channel
+    /// never requires any form of waiting. Because of this, the `send` method can be
+    /// used in both synchronous and asynchronous code without problems.
+    ///
     /// [`close`]: UnboundedReceiver::close
     /// [`UnboundedReceiver`]: UnboundedReceiver
     pub fn send(&self, message: T) -> Result<(), SendError<T>> {
