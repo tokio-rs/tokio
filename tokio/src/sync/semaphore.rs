@@ -27,7 +27,6 @@ pub struct Semaphore {
 #[derive(Debug)]
 pub struct SemaphorePermit<'a> {
     sem: &'a Semaphore,
-    permits: u16,
 }
 
 /// An owned permit from the semaphore.
@@ -38,8 +37,7 @@ pub struct SemaphorePermit<'a> {
 #[must_use]
 #[derive(Debug)]
 pub struct OwnedSemaphorePermit {
-    sem: Arc<Semaphore>,
-    permits: u16,
+    sem: Option<Arc<Semaphore>>,
 }
 
 /// Error returned from the [`Semaphore::try_acquire`] function.
@@ -64,6 +62,12 @@ fn bounds() {
 
     let semaphore = Semaphore::new(0);
     check_send_sync_val(semaphore.acquire());
+}
+
+#[test]
+fn is_slim() {
+    assert_eq!(std::mem::size_of::<&()>(), std::mem::size_of::<SemaphorePermit<'static>>());
+    assert_eq!(std::mem::size_of::<Arc<()>>(), std::mem::size_of::<OwnedSemaphorePermit>());
 }
 
 impl Semaphore {
@@ -91,7 +95,6 @@ impl Semaphore {
         self.ll_sem.acquire(1).await.unwrap();
         SemaphorePermit {
             sem: &self,
-            permits: 1,
         }
     }
 
@@ -100,7 +103,6 @@ impl Semaphore {
         match self.ll_sem.try_acquire(1) {
             Ok(_) => Ok(SemaphorePermit {
                 sem: self,
-                permits: 1,
             }),
             Err(_) => Err(TryAcquireError(())),
         }
@@ -114,8 +116,7 @@ impl Semaphore {
     pub async fn acquire_owned(self: Arc<Self>) -> OwnedSemaphorePermit {
         self.ll_sem.acquire(1).await.unwrap();
         OwnedSemaphorePermit {
-            sem: self.clone(),
-            permits: 1,
+            sem: Some(self.clone()),
         }
     }
 
@@ -127,8 +128,7 @@ impl Semaphore {
     pub fn try_acquire_owned(self: Arc<Self>) -> Result<OwnedSemaphorePermit, TryAcquireError> {
         match self.ll_sem.try_acquire(1) {
             Ok(_) => Ok(OwnedSemaphorePermit {
-                sem: self.clone(),
-                permits: 1,
+                sem: Some(self.clone()),
             }),
             Err(_) => Err(TryAcquireError(())),
         }
@@ -139,8 +139,10 @@ impl<'a> SemaphorePermit<'a> {
     /// Forgets the permit **without** releasing it back to the semaphore.
     /// This can be used to reduce the amount of permits available from a
     /// semaphore.
-    pub fn forget(mut self) {
-        self.permits = 0;
+    pub fn forget(self) {
+        // the destructor won't run, so it won't release the permits.
+        // there are no fields that could leak.
+        std::mem::forget(self);
     }
 }
 
@@ -149,18 +151,21 @@ impl OwnedSemaphorePermit {
     /// This can be used to reduce the amount of permits available from a
     /// semaphore.
     pub fn forget(mut self) {
-        self.permits = 0;
+        // the destructor won't be able to release the permits
+        self.sem = None;
     }
 }
 
 impl<'a> Drop for SemaphorePermit<'_> {
     fn drop(&mut self) {
-        self.sem.add_permits(self.permits as usize);
+        self.sem.add_permits(1);
     }
 }
 
 impl Drop for OwnedSemaphorePermit {
     fn drop(&mut self) {
-        self.sem.add_permits(self.permits as usize);
+        if let Some(ref mut sem) = self.sem {
+            sem.add_permits(1);
+        }
     }
 }
