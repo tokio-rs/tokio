@@ -15,7 +15,6 @@
 use std::error::Error;
 use std::net::SocketAddr;
 use std::{env, io};
-use tokio;
 use tokio::net::UdpSocket;
 
 struct Server {

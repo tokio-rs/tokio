@@ -23,6 +23,13 @@ jobs:
           - macos-latest
     steps:
       - uses: actions/checkout@master
+      - name: Install Rust
+        run: rustup update stable
+        if: matrix.os != 'macos-latest'
+      # https://github.com/rust-lang/rust/issues/73030
+      - name: Install Rust
+        run: rustup update 1.43.1 && rustup default 1.43.1
+        if: matrix.os == 'macos-latest'
 
       # Run `tokio` with only `full`
       - uses: actions-rs/cargo@v1
@@ -64,6 +71,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@master
+      - name: Install Rust
+        run: rustup update stable
+        if: matrix.os != 'macos-latest'
+      # https://github.com/rust-lang/rust/issues/73030
+      - name: Install Rust
+        run: rustup update 1.43.1 && rustup default 1.43.1
+        if: matrix.os == 'macos-latest'
 
       # Run with all crate features
       - name: ${{ matrix.crate }} - cargo test --all-features
@@ -114,6 +128,13 @@ jobs:
           - macos-latest
     steps:
       - uses: actions/checkout@master
+      - name: Install Rust
+        run: rustup update stable
+        if: matrix.os != 'macos-latest'
+      # https://github.com/rust-lang/rust/issues/73030
+      - name: Install Rust
+        run: rustup update 1.43.1 && rustup default 1.43.1
+        if: matrix.os == 'macos-latest'
       - run: cargo install cargo-hack
         name: Install cargo-hack
       - uses: actions-rs/cargo@v1

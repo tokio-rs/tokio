@@ -65,7 +65,7 @@ fn no_extra_poll() {
 
     let mut rt = rt();
 
-    rt.spawn(async move { while let Some(_) = rx.next().await {} });
+    rt.spawn(async move { while rx.next().await.is_some() {} });
     rt.block_on(async {
         tokio::task::yield_now().await;
     });
