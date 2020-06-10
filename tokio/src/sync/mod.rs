@@ -452,7 +452,7 @@ cfg_sync! {
     pub(crate) mod batch_semaphore;
     pub(crate) mod semaphore_ll;
     mod semaphore;
-    pub use semaphore::{Semaphore, SemaphorePermit, OwnedSemaphorePermit};
+    pub use semaphore::{Semaphore, SemaphorePermit, OwnedSemaphorePermit, SemaphorePermits, OwnedSemaphorePermits};
 
     mod rwlock;
     pub use rwlock::{RwLock, RwLockReadGuard, RwLockWriteGuard};

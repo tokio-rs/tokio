@@ -214,6 +214,8 @@ async_assert_fn!(tokio::sync::RwLock<Cell<u8>>::write(_): !Send & !Sync);
 async_assert_fn!(tokio::sync::RwLock<Rc<u8>>::read(_): !Send & !Sync);
 async_assert_fn!(tokio::sync::RwLock<Rc<u8>>::write(_): !Send & !Sync);
 async_assert_fn!(tokio::sync::Semaphore::acquire(_): Send & Sync);
+async_assert_fn!(tokio::sync::Semaphore::acquire_n(_, _): Send & Sync);
+async_assert_fn!(tokio::sync::Semaphore::acquire_n_owned(_, _): Send & Sync);
 
 async_assert_fn!(tokio::sync::broadcast::Receiver<u8>::recv(_): Send & Sync);
 async_assert_fn!(tokio::sync::broadcast::Receiver<Cell<u8>>::recv(_): Send & Sync);

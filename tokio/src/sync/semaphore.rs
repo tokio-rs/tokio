@@ -40,6 +40,30 @@ pub struct OwnedSemaphorePermit {
     sem: Option<Arc<Semaphore>>,
 }
 
+/// A number of permits from the semaphore.
+///
+/// This type is created by the [`acquire_n`] method.
+///
+/// [`acquire_n`]: crate::sync::Semaphore::acquire_n()
+#[must_use]
+#[derive(Debug)]
+pub struct SemaphorePermits<'a> {
+    sem: &'a Semaphore,
+    permits: u32,
+}
+
+/// An owned variant for a number of permit from the semaphore.
+///
+/// This type is created by the [`acquire_n_owned`] method.
+///
+/// [`acquire_n_owned`]: crate::sync::Semaphore::acquire_n_owned()
+#[must_use]
+#[derive(Debug)]
+pub struct OwnedSemaphorePermits {
+    sem: Arc<Semaphore>,
+    permits: u32,
+}
+
 /// Error returned from the [`Semaphore::try_acquire`] function.
 ///
 /// A `try_acquire` operation can only fail if the semaphore has no available
@@ -90,11 +114,20 @@ impl Semaphore {
         self.ll_sem.release(n);
     }
 
-    /// Acquires permit from the semaphore.
+    /// Acquires one permit from the semaphore.
     pub async fn acquire(&self) -> SemaphorePermit<'_> {
         self.ll_sem.acquire(1).await.unwrap();
         SemaphorePermit {
             sem: &self,
+        }
+    }
+
+    /// Acquires a number of permits from the semaphore.
+    pub async fn acquire_n(&self, num_permits: u32) -> SemaphorePermits<'_> {
+        self.ll_sem.acquire(num_permits).await.unwrap();
+        SemaphorePermits {
+            sem: &self,
+            permits: num_permits,
         }
     }
 
@@ -103,6 +136,17 @@ impl Semaphore {
         match self.ll_sem.try_acquire(1) {
             Ok(_) => Ok(SemaphorePermit {
                 sem: self,
+            }),
+            Err(_) => Err(TryAcquireError(())),
+        }
+    }
+
+    /// Tries to acquire a number of permits from the semaphore.
+    pub fn try_acquire_n(&self, num_permits: u32) -> Result<SemaphorePermits<'_>, TryAcquireError> {
+        match self.ll_sem.try_acquire(num_permits) {
+            Ok(_) => Ok(SemaphorePermits {
+                sem: self,
+                permits: num_permits,
             }),
             Err(_) => Err(TryAcquireError(())),
         }
@@ -120,6 +164,19 @@ impl Semaphore {
         }
     }
 
+    /// Acquires a number of permits from the semaphore.
+    ///
+    /// The semaphore must be wrapped in an [`Arc`] to call this method.
+    ///
+    /// [`Arc`]: std::sync::Arc
+    pub async fn acquire_n_owned(self: Arc<Self>, num_permits: u32) -> OwnedSemaphorePermits {
+        self.ll_sem.acquire(num_permits).await.unwrap();
+        OwnedSemaphorePermits {
+            sem: self.clone(),
+            permits: num_permits,
+        }
+    }
+
     /// Tries to acquire a permit from the semaphore.
     ///
     /// The semaphore must be wrapped in an [`Arc`] to call this method.
@@ -129,6 +186,21 @@ impl Semaphore {
         match self.ll_sem.try_acquire(1) {
             Ok(_) => Ok(OwnedSemaphorePermit {
                 sem: Some(self.clone()),
+            }),
+            Err(_) => Err(TryAcquireError(())),
+        }
+    }
+
+    /// Tries to acquire a number of permits from the semaphore.
+    ///
+    /// The semaphore must be wrapped in an [`Arc`] to call this method.
+    ///
+    /// [`Arc`]: std::sync::Arc
+    pub fn try_acquire_n_owned(self: Arc<Self>, num_permits: u32) -> Result<OwnedSemaphorePermits, TryAcquireError> {
+        match self.ll_sem.try_acquire(num_permits) {
+            Ok(_) => Ok(OwnedSemaphorePermits {
+                sem: self.clone(),
+                permits: num_permits,
             }),
             Err(_) => Err(TryAcquireError(())),
         }
@@ -146,16 +218,6 @@ impl<'a> SemaphorePermit<'a> {
     }
 }
 
-impl OwnedSemaphorePermit {
-    /// Forgets the permit **without** releasing it back to the semaphore.
-    /// This can be used to reduce the amount of permits available from a
-    /// semaphore.
-    pub fn forget(mut self) {
-        // the destructor won't be able to release the permits
-        self.sem = None;
-    }
-}
-
 impl<'a> Drop for SemaphorePermit<'_> {
     fn drop(&mut self) {
         self.sem.add_permits(1);
@@ -167,5 +229,55 @@ impl Drop for OwnedSemaphorePermit {
         if let Some(ref mut sem) = self.sem {
             sem.add_permits(1);
         }
+    }
+}
+
+impl OwnedSemaphorePermit {
+    /// Forgets the permit **without** releasing it back to the semaphore.
+    /// This can be used to reduce the amount of permits available from a
+    /// semaphore.
+    pub fn forget(mut self) {
+        // the destructor won't be able to release the permits
+        self.sem = None;
+    }
+}
+
+impl<'a> SemaphorePermits<'a> {
+    /// Forgets the permits **without** releasing them back to the semaphore.
+    /// This can be used to reduce the amount of permits available from a
+    /// semaphore.
+    pub fn forget(mut self) {
+        self.permits = 0;
+    }
+
+    /// Number of permits acquired in this instance
+    pub fn num_permits(&self) -> u32 {
+        self.permits
+    }
+}
+
+impl<'a> Drop for SemaphorePermits<'_> {
+    fn drop(&mut self) {
+        self.sem.add_permits(self.permits as usize);
+    }
+}
+
+impl OwnedSemaphorePermits {
+    /// Forgets the permits **without** releasing them back to the semaphore.
+    /// This can be used to reduce the amount of permits available from a
+    /// semaphore.
+    pub fn forget(mut self) {
+        self.permits = 0;
+    }
+
+    /// Number of permits acquired in this instance
+    pub fn num_permits(&self) -> u32 {
+        self.permits
+    }
+}
+
+impl Drop for OwnedSemaphorePermits {
+    fn drop(&mut self) {
+        self.sem.add_permits(self.permits as usize);
     }
 }
