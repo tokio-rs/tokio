@@ -20,13 +20,3 @@ jobs:
         uses: actions-rs/audit-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Discord notification
-        if: failure() && (github.event_name == 'push' && github.event.ref == 'refs/heads/master')
-        env:
-          run_url: "https://github.com/tokio-rs/tokio/actions/runs/${{ github.run_id }}"
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-          DISCORD_USERNAME: GitHub dependency audit
-        uses: Ilshidur/action-discord@f237343
-        with:
-          args: "Dependency security audit failed.\n${{ env.run_url }}"
