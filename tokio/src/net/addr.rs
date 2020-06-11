@@ -121,6 +121,20 @@ impl sealed::ToSocketAddrsPriv for (Ipv6Addr, u16) {
     }
 }
 
+// ===== impl &[SocketAddr] =====
+
+impl ToSocketAddrs for &[SocketAddr] {}
+
+impl sealed::ToSocketAddrsPriv for &[SocketAddr] {
+    type Iter = std::vec::IntoIter<SocketAddr>;
+    type Future = ReadyFuture<Self::Iter>;
+
+    fn to_socket_addrs(&self) -> Self::Future {
+        let iter = self.to_vec().into_iter();
+        future::ok(iter)
+    }
+}
+
 cfg_dns! {
     // ===== impl str =====
 
