@@ -140,24 +140,8 @@ fn reserve<R: AsyncRead + ?Sized>(buf: &mut Vec<u8>, read: &R, bytes: usize) {
 }
 
 /// Returns the unused capacity of the provided vector.
-///
-/// This function does not need to be marked unsafe, as MaybeUninit<u8> does not
-/// require the underlying memory to initialized.
 fn get_unused_capacity(buf: &mut Vec<u8>) -> &mut [MaybeUninit<u8>] {
-    let prepare_from = buf.len();
-    let prepare_len = buf.capacity() - prepare_from;
-    // safety: prepare_from is the length of the vector, so it will stay inside the
-    // allocation.
-    let ptr = unsafe { buf.as_mut_ptr().add(prepare_from).cast::<MaybeUninit<u8>>() };
-
-    // safety: The memory is properly allocated due to the invariants provided by
-    // Vec<u8>, and since the item type is MaybeUninit<u8>, it is safe for the
-    // memory to be uninitialized.
-    let slice: &mut [MaybeUninit<u8>] = unsafe { std::slice::from_raw_parts_mut(ptr, prepare_len) };
-    debug_assert_eq!(slice.len() + buf.len(), buf.capacity());
-    debug_assert_eq!(ptr as usize - buf[..].as_mut_ptr() as usize, buf.len(),);
-
-    slice
+    bytes::BufMut::bytes_mut(buf)
 }
 
 impl<A> Future for ReadToEnd<'_, A>
