@@ -106,10 +106,7 @@ pub trait AsyncRead {
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut B,
-    ) -> Poll<io::Result<usize>>
-    where
-        Self: Sized,
-    {
+    ) -> Poll<io::Result<usize>> {
         if !buf.has_remaining_mut() {
             return Poll::Ready(Ok(0));
         }
@@ -146,6 +143,14 @@ macro_rules! deref_async_read {
             buf: &mut [u8],
         ) -> Poll<io::Result<usize>> {
             Pin::new(&mut **self).poll_read(cx, buf)
+        }
+
+        fn poll_read_buf<B: BufMut>(
+            mut self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            buf: &mut B,
+        ) -> Poll<io::Result<usize>> {
+            Pin::new(&mut **self).poll_read_buf(cx, buf)
         }
     };
 }

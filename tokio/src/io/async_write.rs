@@ -137,10 +137,7 @@ pub trait AsyncWrite {
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut B,
-    ) -> Poll<Result<usize, io::Error>>
-    where
-        Self: Sized,
-    {
+    ) -> Poll<Result<usize, io::Error>> {
         if !buf.has_remaining() {
             return Poll::Ready(Ok(0));
         }
@@ -159,6 +156,14 @@ macro_rules! deref_async_write {
             buf: &[u8],
         ) -> Poll<io::Result<usize>> {
             Pin::new(&mut **self).poll_write(cx, buf)
+        }
+
+        fn poll_write_buf<B: Buf>(
+            mut self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            buf: &mut B,
+        ) -> Poll<Result<usize, io::Error>> {
+            Pin::new(&mut **self).poll_write_buf(cx, buf)
         }
 
         fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
