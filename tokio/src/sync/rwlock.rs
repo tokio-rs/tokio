@@ -31,8 +31,8 @@ const MAX_READS: usize = 10;
 ///
 /// The type parameter `T` represents the data that this lock protects. It is
 /// required that `T` satisfies [`Send`] to be shared across threads. The RAII guards
-/// returned from the locking methods implement [`Deref`](https://doc.rust-lang.org/std/ops/trait.Deref.html)
-/// (and [`DerefMut`](https://doc.rust-lang.org/std/ops/trait.DerefMut.html)
+/// returned from the locking methods implement [`Deref`](trait@std::ops::Deref)
+/// (and [`DerefMut`](trait@std::ops::DerefMut)
 /// for the `write` methods) to allow access to the content of the lock.
 ///
 /// # Examples
@@ -65,7 +65,7 @@ const MAX_READS: usize = 10;
 /// [`RwLock`]: struct@RwLock
 /// [`RwLockReadGuard`]: struct@RwLockReadGuard
 /// [`RwLockWriteGuard`]: struct@RwLockWriteGuard
-/// [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
+/// [`Send`]: trait@std::marker::Send
 /// [_write-preferring_]: https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock#Priority_policies
 #[derive(Debug)]
 pub struct RwLock<T> {

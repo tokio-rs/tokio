@@ -268,7 +268,7 @@ use std::time::Duration;
 ///
 /// [timer]: crate::time
 /// [mod]: index.html
-/// [`new`]: #method.new
+/// [`new`]: method@Self::new
 /// [`Builder`]: struct@Builder
 /// [`tokio::run`]: fn@run
 #[derive(Debug)]

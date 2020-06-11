@@ -94,7 +94,7 @@ async fn drop_write() -> Result<()> {
 
     let handle = thread::spawn(move || {
         let (mut stream, _) = listener.accept().unwrap();
-        stream.write(MSG).unwrap();
+        stream.write_all(MSG).unwrap();
 
         let mut read_buf = [0u8; 32];
         let res = match stream.read(&mut read_buf) {

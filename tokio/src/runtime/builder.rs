@@ -16,8 +16,8 @@ use std::sync::Arc;
 /// See function level documentation for details on the various configuration
 /// settings.
 ///
-/// [`build`]: #method.build
-/// [`Builder::new`]: #method.new
+/// [`build`]: method@Self::build
+/// [`Builder::new`]: method@Self::new
 ///
 /// # Examples
 ///

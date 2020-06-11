@@ -236,7 +236,7 @@ fn close_semaphore_notifies_permit2() {
 #[test]
 fn cancel_acquire_releases_permits() {
     let s = Semaphore::new(10);
-    let _permit1 = s.try_acquire(4).expect("uncontended try_acquire succeeds");
+    s.try_acquire(4).expect("uncontended try_acquire succeeds");
     assert_eq!(6, s.available_permits());
 
     let mut acquire = task::spawn(s.acquire(8));

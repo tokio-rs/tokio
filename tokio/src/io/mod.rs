@@ -57,7 +57,7 @@
 //! [`File`]: crate::fs::File
 //! [`TcpStream`]: crate::net::TcpStream
 //! [`std::fs::File`]: std::fs::File
-//! [std_example]: https://doc.rust-lang.org/std/io/index.html#read-and-write
+//! [std_example]: std::io#read-and-write
 //!
 //! ## Buffered Readers and Writers
 //!
@@ -114,7 +114,7 @@
 //! }
 //! ```
 //!
-//! [stdbuf]: https://doc.rust-lang.org/std/io/index.html#bufreader-and-bufwriter
+//! [stdbuf]: std::io#bufreader-and-bufwriter
 //! [`std::io::BufRead`]: std::io::BufRead
 //! [`AsyncBufRead`]: crate::io::AsyncBufRead
 //! [`BufReader`]: crate::io::BufReader

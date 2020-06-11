@@ -652,6 +652,8 @@ impl TcpStream {
     /// Unlike [`split`], the owned halves can be moved to separate tasks, however
     /// this comes at the cost of a heap allocation.
     ///
+    /// **Note:** Dropping the write half will close the TCP stream in both directions.
+    ///
     /// [`split`]: TcpStream::split()
     pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
         split_owned(self)
