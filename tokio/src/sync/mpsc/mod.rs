@@ -43,15 +43,17 @@
 //! are two situations to consider:
 //!
 //! **Bounded channel**: If you need a bounded channel, you should use a bounded
-//! Tokio mpsc channel for both directions of communication. To call the async
+//! Tokio `mpsc` channel for both directions of communication. To call the async
 //! [`send`][bounded-send] or [`recv`][bounded-recv] methods in sync code, you
-//! should use [`Handle::block_on`].
+//! will need to use [`Handle::block_on`], which allow you to execute an async
+//! method in synchronous code. This is necessary because a bounded channel may
+//! need to wait for additional capacity to become available.
 //!
 //! **Unbounded channel**: You should use the kind of channel that matches where
 //! the receiver is. So for sending a message _from async to sync_, you should
 //! use [the standard library unbounded channel][std-unbounded] or
 //! [crossbeam][crossbeam-unbounded].  Similarly, for sending a message _from sync
-//! to async_, you should use a Tokio mpsc channel.
+//! to async_, you should use an unbounded Tokio `mpsc` channel.
 //!
 //! [`Sender`]: crate::sync::mpsc::Sender
 //! [`Receiver`]: crate::sync::mpsc::Receiver
