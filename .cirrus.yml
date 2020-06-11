@@ -1,5 +1,5 @@
 freebsd_instance:
-  image: freebsd-12-0-release-amd64
+  image: freebsd-12-1-release-amd64
 
 # Test FreeBSD in a full VM on cirrus-ci.com.  Test the i686 target too, in the
 # same VM.  The binary will be built in 32-bit mode, but will execute on a
