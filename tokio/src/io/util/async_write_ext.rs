@@ -180,7 +180,7 @@ cfg_io_util! {
         /// ```
         fn write_buf<'a, B>(&'a mut self, src: &'a mut B) -> WriteBuf<'a, Self, B>
         where
-            Self: Sized,
+            Self: Sized + Unpin,
             B: Buf,
         {
             write_buf(self, src)
