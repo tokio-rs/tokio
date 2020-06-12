@@ -142,12 +142,11 @@ cfg_block_on! {
     impl Enter {
         /// Blocks the thread on the specified future, returning the value with
         /// which that future completes.
-        pub(crate) fn block_on<F>(&mut self, mut f: F) -> Result<F::Output, crate::park::ParkError>
+        pub(crate) fn block_on<F>(&mut self, f: F) -> Result<F::Output, crate::park::ParkError>
         where
             F: std::future::Future,
         {
             use crate::park::{CachedParkThread, Park};
-            use std::pin::Pin;
             use std::task::Context;
             use std::task::Poll::Ready;
 
@@ -155,9 +154,7 @@ cfg_block_on! {
             let waker = park.get_unpark()?.into_waker();
             let mut cx = Context::from_waker(&waker);
 
-            // `block_on` takes ownership of `f`. Once it is pinned here, the original `f` binding can
-            // no longer be accessed, making the pinning safe.
-            let mut f = unsafe { Pin::new_unchecked(&mut f) };
+            pin!(f);
 
             loop {
                 if let Ready(v) = crate::coop::budget(|| f.as_mut().poll(&mut cx)) {
@@ -179,12 +176,11 @@ cfg_blocking_impl! {
         ///
         /// If the future completes before `timeout`, the result is returned. If
         /// `timeout` elapses, then `Err` is returned.
-        pub(crate) fn block_on_timeout<F>(&mut self, mut f: F, timeout: Duration) -> Result<F::Output, ParkError>
+        pub(crate) fn block_on_timeout<F>(&mut self, f: F, timeout: Duration) -> Result<F::Output, ParkError>
         where
             F: std::future::Future,
         {
             use crate::park::{CachedParkThread, Park};
-            use std::pin::Pin;
             use std::task::Context;
             use std::task::Poll::Ready;
             use std::time::Instant;
@@ -193,9 +189,7 @@ cfg_blocking_impl! {
             let waker = park.get_unpark()?.into_waker();
             let mut cx = Context::from_waker(&waker);
 
-            // `block_on` takes ownership of `f`. Once it is pinned here, the original `f` binding can
-            // no longer be accessed, making the pinning safe.
-            let mut f = unsafe { Pin::new_unchecked(&mut f) };
+            pin!(f);
             let when = Instant::now() + timeout;
 
             loop {
