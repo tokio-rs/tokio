@@ -47,6 +47,7 @@ jobs:
 - template: ci/azure-miri.yml
   parameters:
     name: miri
+    rust: $(nightly)
 
 # Try cross compiling
 - template: ci/azure-cross-compile.yml
