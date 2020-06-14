@@ -22,7 +22,7 @@ pub use self::impl_linux::get_peer_cred;
 ))]
 pub use self::impl_macos::get_peer_cred;
 
-#[cfg(any(target_os = "solaris"))]
+#[cfg(any(target_os = "solaris", target_os = "illumos"))]
 pub use self::impl_solaris::get_peer_cred;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -102,7 +102,7 @@ pub mod impl_macos {
     }
 }
 
-#[cfg(any(target_os = "solaris"))]
+#[cfg(any(target_os = "solaris", target_os = "illumos"))]
 pub mod impl_solaris {
     use std::io;
     use std::os::unix::io::AsRawFd;
