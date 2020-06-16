@@ -59,14 +59,16 @@
 //! # }
 //! ```
 //!
-//! A simple example using `tokio::time::interval` to execute a task every
-//! two seconds.
+//! A simple example using [`interval`] to execute a task every two seconds.
 //!
-//! `tokio::time::interval` yields so every iteration of the loop takes
-//! two seconds (except the first as the first `tick` completes immediately).
-//! The difference with `tokio::time::delay_for` is that `delay_for` blocks.
-//! Replacing `interval` with `delay_for` would result in a loop that takes
-//! three seconds per iteration.
+//! The difference between [`interval`] and [`delay_for`] is that an
+//! [`interval`] measures the time since the last tick, which means that
+//! `.tick().await` may wait for a shorter time than the duration specified
+//! for the interval if some time has passed between calls to `.tick().await`.
+//!
+//! If the tick in the example below was replaced with [`delay_for`], the task
+//! would only be executed once every three seconds, and not every two
+//! seconds.
 //!
 //! ```
 //! use tokio::time;
@@ -85,6 +87,9 @@
 //!     }
 //! }
 //! ```
+//!
+//! [`delay_for`]: crate::time::delay_for()
+//! [`interval`]: crate::time::interval()
 
 mod clock;
 pub(crate) use self::clock::Clock;
