@@ -33,6 +33,33 @@ use std::task::{Context, Poll};
 ///     // approximately 20ms have elapsed.
 /// }
 /// ```
+///
+/// A simple example using `tokio::time::interval` to execute a task every
+/// two seconds.
+///
+/// `tokio::time::interval` yields so every iteration of the loop takes
+/// two seconds (except the first as the first `tick` completes immediately).
+/// The difference with `tokio::time::delay_for` is that `delay_for` blocks.
+/// Replacing `interval` with `delay_for` would result in a loop that takes
+/// three seconds per iteration.
+///
+/// ```
+/// use tokio::time;
+///
+/// async fn task_that_takes_a_second() {
+///     println!("hello");
+///     time::delay_for(time::Duration::from_secs(1)).await
+/// }
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let mut interval = time::interval(time::Duration::from_secs(2));
+///     for _i in 0..5 {
+///         interval.tick().await;
+///         task_that_takes_a_second().await;
+///     }
+/// }
+/// ```
 pub fn interval(period: Duration) -> Interval {
     assert!(period > Duration::new(0, 0), "`period` must be non-zero.");
 
