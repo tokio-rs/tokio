@@ -10,12 +10,12 @@
 //! is rejected and the task will be notified when additional capacity is
 //! available. In other words, the channel provides backpressure.
 //!
-//! This module provides two variants of the channel: A bounded and an unbounded
-//! variant. The bounded variant has a limit on the number of messages that the
-//! channel can store, and if this limit is reached, trying to send another
-//! message will sleep until a message is received from the channel. An unbounded
-//! channel has an infinite capacity, so the `send` method never does any kind of
-//! sleeping. This makes the [`UnboundedSender`] usable from both synchronous and
+//! This module provides two variants of the channel: bounded and unbounded. The
+//! bounded variant has a limit on the number of messages that the channel can
+//! store, and if this limit is reached, trying to send another message will
+//! wait until a message is received from the channel. An unbounded channel has
+//! an infinite capacity, so the `send` method never does any kind of sleeping.
+//! This makes the [`UnboundedSender`] usable from both synchronous and
 //! asynchronous code.
 //!
 //! # Disconnection
