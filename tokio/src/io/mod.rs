@@ -93,7 +93,8 @@
 //! ```
 //!
 //! [`BufWriter`] doesn't add any new ways of writing; it just buffers every call
-//! to [`write`](crate::io::AsyncWriteExt::write):
+//! to [`write`](crate::io::AsyncWriteExt::write). However, you **must** flush
+//! [`BufWriter`] to ensure that any buffered data is written.
 //!
 //! ```no_run
 //! use tokio::io::{self, BufWriter, AsyncWriteExt};
@@ -105,10 +106,13 @@
 //!     {
 //!         let mut writer = BufWriter::new(f);
 //!
-//!         // write a byte to the buffer
+//!         // Write a byte to the buffer.
 //!         writer.write(&[42u8]).await?;
 //!
-//!     } // the buffer is flushed once writer goes out of scope
+//!         // Flush the buffer before it goes out of scope.
+//!         writer.flush().await?;
+//!
+//!     } // Unless flushed or shut down, the contents of the buffer is discarded on drop.
 //!
 //!     Ok(())
 //! }
