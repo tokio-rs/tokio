@@ -144,8 +144,11 @@ impl<T> Sender<T> {
     /// Attempts to send a value on this channel, returning it back if it could
     /// not be sent.
     ///
-    /// The function consumes `self` as only one value may ever be sent on a
-    /// one-shot channel.
+    /// This method consumes `self` as only one value may ever be sent on a oneshot
+    /// channel. It is not marked async because sending a message to an oneshot
+    /// channel never requires any form of waiting.  Because of this, the `send`
+    /// method can be used in both synchronous and asynchronous code without
+    /// problems.
     ///
     /// A successful send occurs when it is determined that the other end of the
     /// channel has not hung up already. An unsuccessful send would be one where

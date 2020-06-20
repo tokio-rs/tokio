@@ -18,7 +18,6 @@ use futures::SinkExt;
 use http::{header::HeaderValue, Request, Response, StatusCode};
 #[macro_use]
 extern crate serde_derive;
-use serde_json;
 use std::{env, error::Error, fmt, io};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::stream::StreamExt;
