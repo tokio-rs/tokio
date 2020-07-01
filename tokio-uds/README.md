@@ -8,7 +8,7 @@ An implementation of Unix Domain Sockets for Tokio
 [`tokio::net`]: https://docs.rs/tokio/latest/tokio/net/index.html
 [feature flag]: https://docs.rs/tokio/latest/tokio/index.html#feature-flags
 
-[Documentation](https://docs.rs/tokio-uds/0.2.5/tokio_uds/)
+[Documentation](https://docs.rs/tokio-uds/0.2.7/tokio_uds/)
 
 ## License
 
