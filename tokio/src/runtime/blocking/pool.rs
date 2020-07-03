@@ -41,6 +41,7 @@ struct Inner {
     /// Call before a thread stops
     before_stop: Option<Callback>,
 
+    // Maximum number of threads
     thread_cap: usize,
 }
 
@@ -51,6 +52,7 @@ struct Shared {
     num_notify: u32,
     shutdown: bool,
     shutdown_tx: Option<shutdown::Sender>,
+    worker_threads: Vec<thread::JoinHandle<()>>
 }
 
 type Task = task::Notified<NoopSchedule>;
@@ -96,6 +98,7 @@ impl BlockingPool {
                         num_notify: 0,
                         shutdown: false,
                         shutdown_tx: Some(shutdown_tx),
+                        worker_threads: Vec::new(),
                     }),
                     condvar: Condvar::new(),
                     thread_name: builder.thread_name.clone(),
@@ -126,10 +129,15 @@ impl BlockingPool {
         shared.shutdown = true;
         shared.shutdown_tx = None;
         self.spawner.inner.condvar.notify_all();
+        let workers = shared.worker_threads.drain(0..).collect::<Vec<_>>();
 
         drop(shared);
 
-        self.shutdown_rx.wait(timeout);
+        if self.shutdown_rx.wait(timeout) {
+            for handle in workers {
+                handle.join().ok();
+            }
+        }
     }
 }
 
@@ -187,13 +195,17 @@ impl Spawner {
         };
 
         if let Some(shutdown_tx) = shutdown_tx {
-            self.spawn_thread(shutdown_tx, rt);
+            let handle = self.spawn_thread(shutdown_tx, rt);
+
+            let mut shared = self.inner.shared.lock().unwrap();
+            shared.worker_threads.push(handle);
+            drop(shared);
         }
 
         Ok(())
     }
 
-    fn spawn_thread(&self, shutdown_tx: shutdown::Sender, rt: &Handle) {
+    fn spawn_thread(&self, shutdown_tx: shutdown::Sender, rt: &Handle) -> thread::JoinHandle<()> {
         let mut builder = thread::Builder::new().name(self.inner.thread_name.clone());
 
         if let Some(stack_size) = self.inner.stack_size {
@@ -211,7 +223,7 @@ impl Spawner {
                     drop(shutdown_tx);
                 })
             })
-            .unwrap();
+            .unwrap()
     }
 }
 

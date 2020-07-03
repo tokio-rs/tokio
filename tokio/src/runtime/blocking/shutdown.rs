@@ -32,13 +32,15 @@ impl Receiver {
     /// If `timeout` is `Some`, the thread is blocked for **at most** `timeout`
     /// duration. If `timeout` is `None`, then the thread is blocked until the
     /// shutdown signal is received.
-    pub(crate) fn wait(&mut self, timeout: Option<Duration>) {
+    ///
+    /// If the timeout has elapsed it returns `false`, otherwise it returns `true`.
+    pub(crate) fn wait(&mut self, timeout: Option<Duration>) -> bool {
         use crate::runtime::enter::{enter, try_enter};
 
         let mut e = if std::thread::panicking() {
             match try_enter(false) {
                 Some(enter) => enter,
-                _ => return,
+                _ => return true,
             }
         } else {
             enter(false)
@@ -50,9 +52,10 @@ impl Receiver {
         // current thread (usually, shutting down a runtime stored in a
         // thread-local).
         if let Some(timeout) = timeout {
-            let _ = e.block_on_timeout(&mut self.rx, timeout);
+            !e.block_on_timeout(&mut self.rx, timeout).is_err()
         } else {
             let _ = e.block_on(&mut self.rx);
+            true
         }
     }
 }
