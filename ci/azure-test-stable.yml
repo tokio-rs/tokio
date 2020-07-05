@@ -5,22 +5,19 @@ jobs:
     matrix:
       Linux:
         vmImage: ubuntu-16.04
-        rust_version: ${{ parameters.rust }}
 
       ${{ if parameters.cross }}:
         MacOS:
           vmImage: macos-latest
-          rust_version: 1.43.1 # https://github.com/rust-lang/rust/issues/73030
         Windows:
           vmImage: vs2017-win2016
-          rust_version: ${{ parameters.rust }}
   pool:
     vmImage: $(vmImage)
 
   steps:
   - template: azure-install-rust.yml
     parameters:
-      rust_version: $(rust_version)
+      rust_version: ${{ parameters.rust }}
 
   - template: azure-is-release.yml
 
