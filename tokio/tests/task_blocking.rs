@@ -115,3 +115,64 @@ fn can_enter_basic_rt_from_within_block_in_place() {
         })
     });
 }
+
+#[test]
+fn useful_panic_message_when_dropping_rt_in_rt() {
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+
+    let mut outer = tokio::runtime::Builder::new()
+        .threaded_scheduler()
+        .build()
+        .unwrap();
+
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        outer.block_on(async {
+            let _ = tokio::runtime::Builder::new()
+                .basic_scheduler()
+                .build()
+                .unwrap();
+        });
+    }));
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    let err: &'static str = err.downcast_ref::<&'static str>().unwrap();
+
+    assert!(
+        err.find("Cannot drop a runtime").is_some(),
+        "Wrong panic message: {:?}",
+        err
+    );
+}
+
+#[test]
+fn can_shutdown_with_zero_timeout_in_runtime() {
+    let mut outer = tokio::runtime::Builder::new()
+        .threaded_scheduler()
+        .build()
+        .unwrap();
+
+    outer.block_on(async {
+        let rt = tokio::runtime::Builder::new()
+            .basic_scheduler()
+            .build()
+            .unwrap();
+        rt.shutdown_timeout(Duration::from_nanos(0));
+    });
+}
+
+#[test]
+fn can_shutdown_now_in_runtime() {
+    let mut outer = tokio::runtime::Builder::new()
+        .threaded_scheduler()
+        .build()
+        .unwrap();
+
+    outer.block_on(async {
+        let rt = tokio::runtime::Builder::new()
+            .basic_scheduler()
+            .build()
+            .unwrap();
+        rt.shutdown_background();
+    });
+}
