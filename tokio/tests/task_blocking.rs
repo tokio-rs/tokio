@@ -96,3 +96,22 @@ fn no_block_in_basic_block_on() {
         task::block_in_place(|| {});
     });
 }
+
+#[test]
+fn can_enter_basic_rt_from_within_block_in_place() {
+    let mut outer = tokio::runtime::Builder::new()
+        .threaded_scheduler()
+        .build()
+        .unwrap();
+
+    outer.block_on(async {
+        tokio::task::block_in_place(|| {
+            let mut inner = tokio::runtime::Builder::new()
+                .basic_scheduler()
+                .build()
+                .unwrap();
+
+            inner.block_on(async {})
+        })
+    });
+}
