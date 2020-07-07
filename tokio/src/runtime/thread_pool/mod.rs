@@ -91,7 +91,7 @@ impl fmt::Debug for ThreadPool {
 
 impl Drop for ThreadPool {
     fn drop(&mut self) {
-        self.spawner.shared.close();
+        self.spawner.shutdown();
     }
 }
 
@@ -107,6 +107,10 @@ impl Spawner {
         let (task, handle) = task::joinable(future);
         self.shared.schedule(task, false);
         handle
+    }
+
+    pub(crate) fn shutdown(&mut self) {
+        self.shared.close();
     }
 }
 

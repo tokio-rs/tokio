@@ -33,5 +33,12 @@ cfg_rt_core! {
                 Spawner::ThreadPool(spawner) => spawner.spawn(future),
             }
         }
+
+        pub(crate) fn shutdown(&mut self) {
+            match self {
+                Spawner::ThreadPool(spawner) => spawner.shutdown(),
+                _ => {},
+            }
+        }
     }
 }
