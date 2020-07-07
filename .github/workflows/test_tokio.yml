@@ -23,6 +23,8 @@ jobs:
           - macos-latest
     steps:
       - uses: actions/checkout@master
+      - name: Install Rust
+        run: rustup update stable
 
       # Run `tokio` with only `full`
       - uses: actions-rs/cargo@v1
@@ -64,6 +66,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@master
+      - name: Install Rust
+        run: rustup update stable
 
       # Run with all crate features
       - name: ${{ matrix.crate }} - cargo test --all-features
@@ -114,6 +118,8 @@ jobs:
           - macos-latest
     steps:
       - uses: actions/checkout@master
+      - name: Install Rust
+        run: rustup update stable
       - run: cargo install cargo-hack
         name: Install cargo-hack
       - uses: actions-rs/cargo@v1

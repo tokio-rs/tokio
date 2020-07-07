@@ -24,7 +24,7 @@
 //!
 //! # Examples
 //!
-//! Wait 100ms and print "Hello World!"
+//! Wait 100ms and print "100 ms have elapsed"
 //!
 //! ```
 //! use tokio::time::delay_for;
@@ -58,6 +58,38 @@
 //! }
 //! # }
 //! ```
+//!
+//! A simple example using [`interval`] to execute a task every two seconds.
+//!
+//! The difference between [`interval`] and [`delay_for`] is that an
+//! [`interval`] measures the time since the last tick, which means that
+//! `.tick().await` may wait for a shorter time than the duration specified
+//! for the interval if some time has passed between calls to `.tick().await`.
+//!
+//! If the tick in the example below was replaced with [`delay_for`], the task
+//! would only be executed once every three seconds, and not every two
+//! seconds.
+//!
+//! ```
+//! use tokio::time;
+//!
+//! async fn task_that_takes_a_second() {
+//!     println!("hello");
+//!     time::delay_for(time::Duration::from_secs(1)).await
+//! }
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!     let mut interval = time::interval(time::Duration::from_secs(2));
+//!     for _i in 0..5 {
+//!         interval.tick().await;
+//!         task_that_takes_a_second().await;
+//!     }
+//! }
+//! ```
+//!
+//! [`delay_for`]: crate::time::delay_for()
+//! [`interval`]: crate::time::interval()
 
 mod clock;
 pub(crate) use self::clock::Clock;

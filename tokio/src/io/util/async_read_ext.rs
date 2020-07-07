@@ -221,7 +221,7 @@ cfg_io_util! {
         /// ```
         fn read_buf<'a, B>(&'a mut self, buf: &'a mut B) -> ReadBuf<'a, Self, B>
         where
-            Self: Sized,
+            Self: Sized + Unpin,
             B: BufMut,
         {
             read_buf(self, buf)
@@ -237,12 +237,6 @@ cfg_io_util! {
         ///
         /// This function reads as many bytes as necessary to completely fill
         /// the specified buffer `buf`.
-        ///
-        /// No guarantees are provided about the contents of `buf` when this
-        /// function is called, implementations cannot rely on any property of
-        /// the contents of `buf` being `true`. It is recommended that
-        /// implementations only write data to `buf` instead of reading its
-        /// contents.
         ///
         /// # Errors
         ///

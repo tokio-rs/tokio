@@ -29,10 +29,29 @@ pub fn delay_until(deadline: Instant) -> Delay {
 /// operates at millisecond granularity and should not be used for tasks that
 /// require high-resolution timers.
 ///
+/// To run something regularly on a schedule, see [`interval`].
+///
 /// # Cancellation
 ///
 /// Canceling a delay is done by dropping the returned future. No additional
 /// cleanup work is required.
+///
+/// # Examples
+///
+/// Wait 100ms and print "100 ms have elapsed".
+///
+/// ```
+/// use tokio::time::{delay_for, Duration};
+///
+/// #[tokio::main]
+/// async fn main() {
+///     delay_for(Duration::from_millis(100)).await;
+///     println!("100 ms have elapsed");
+/// }
+/// ```
+///
+/// [`interval`]: crate::time::interval()
+#[cfg_attr(docsrs, doc(alias = "sleep"))]
 pub fn delay_for(duration: Duration) -> Delay {
     delay_until(Instant::now() + duration)
 }

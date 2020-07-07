@@ -163,9 +163,13 @@ impl<T> UnboundedSender<T> {
 
     /// Attempts to send a message on this `UnboundedSender` without blocking.
     ///
+    /// This method is not marked async because sending a message to an unbounded channel
+    /// never requires any form of waiting. Because of this, the `send` method can be
+    /// used in both synchronous and asynchronous code without problems.
+    ///
     /// If the receive half of the channel is closed, either due to [`close`]
-    /// being called or the [`UnboundedReceiver`] having been dropped,
-    /// the function returns an error. The error includes the value passed to `send`.
+    /// being called or the [`UnboundedReceiver`] having been dropped, this
+    /// function returns an error. The error includes the value passed to `send`.
     ///
     /// [`close`]: UnboundedReceiver::close
     /// [`UnboundedReceiver`]: UnboundedReceiver
