@@ -82,6 +82,7 @@ async fn reunite() -> Result<()> {
 }
 
 /// Test that dropping the write half actually closes the stream.
+#[ignore]
 #[tokio::test]
 async fn drop_write() -> Result<()> {
     const MSG: &[u8] = b"split";

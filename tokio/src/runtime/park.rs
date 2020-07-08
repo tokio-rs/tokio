@@ -9,6 +9,7 @@ use crate::park::{Park, Unpark};
 use crate::runtime::time;
 use crate::util::TryLock;
 
+use std::sync::Weak;
 use std::sync::atomic::Ordering::SeqCst;
 use std::time::Duration;
 
@@ -17,7 +18,7 @@ pub(crate) struct Parker {
 }
 
 pub(crate) struct Unparker {
-    inner: Arc<Inner>,
+    inner: Weak<Inner>,
 }
 
 struct Inner {
@@ -85,7 +86,7 @@ impl Park for Parker {
 
     fn unpark(&self) -> Unparker {
         Unparker {
-            inner: self.inner.clone(),
+            inner: std::sync::Arc::downgrade(&self.inner),
         }
     }
 
@@ -108,7 +109,9 @@ impl Park for Parker {
 
 impl Unpark for Unparker {
     fn unpark(&self) {
-        self.inner.unpark();
+        if let Some(inner) = self.inner.upgrade() {
+            inner.unpark();
+        }
     }
 }
 

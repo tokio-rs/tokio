@@ -2,7 +2,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-// Tests to run on both current-thread & therad-pool runtime variants.
+// Tests to run on both current-thread & thread-pool runtime variants.
 
 macro_rules! rt_test {
     ($($t:tt)*) => {
@@ -855,6 +855,7 @@ rt_test! {
         runtime.shutdown_timeout(Duration::from_millis(100));
     }
 
+    #[ignore]
     #[test]
     fn runtime_in_thread_local() {
         use std::cell::RefCell;
