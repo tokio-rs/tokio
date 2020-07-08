@@ -3,13 +3,12 @@
 //! A combination of the various resource driver park handles.
 
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::{Arc, Condvar, Mutex};
+use crate::loom::sync::{Arc, Condvar, Mutex, Weak};
 use crate::loom::thread;
 use crate::park::{Park, Unpark};
 use crate::runtime::time;
 use crate::util::TryLock;
 
-use std::sync::Weak;
 use std::sync::atomic::Ordering::SeqCst;
 use std::time::Duration;
 
@@ -86,7 +85,7 @@ impl Park for Parker {
 
     fn unpark(&self) -> Unparker {
         Unparker {
-            inner: std::sync::Arc::downgrade(&self.inner),
+            inner: Arc::downgrade(&self.inner),
         }
     }
 

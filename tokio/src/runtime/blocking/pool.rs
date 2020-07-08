@@ -52,7 +52,7 @@ struct Shared {
     num_notify: u32,
     shutdown: bool,
     shutdown_tx: Option<shutdown::Sender>,
-    worker_threads: Vec<thread::JoinHandle<()>>
+    worker_threads: Vec<thread::JoinHandle<()>>,
 }
 
 type Task = task::Notified<NoopSchedule>;

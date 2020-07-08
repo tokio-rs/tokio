@@ -52,7 +52,7 @@ impl Receiver {
         // current thread (usually, shutting down a runtime stored in a
         // thread-local).
         if let Some(timeout) = timeout {
-            !e.block_on_timeout(&mut self.rx, timeout).is_err()
+            e.block_on_timeout(&mut self.rx, timeout).is_ok()
         } else {
             let _ = e.block_on(&mut self.rx);
             true
