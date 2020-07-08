@@ -855,8 +855,8 @@ rt_test! {
         runtime.shutdown_timeout(Duration::from_millis(100));
     }
 
-    #[ignore]
     #[test]
+    #[cfg(not(windows))]
     fn runtime_in_thread_local() {
         use std::cell::RefCell;
         use std::thread;
