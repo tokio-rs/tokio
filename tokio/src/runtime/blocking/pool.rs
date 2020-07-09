@@ -135,7 +135,7 @@ impl BlockingPool {
 
         if self.shutdown_rx.wait(timeout) {
             for handle in workers {
-                handle.join().ok();
+                let _ = handle.join();
             }
         }
     }
