@@ -366,7 +366,7 @@ impl<T> Receiver<T> {
     /// Prevents the associated [`Sender`] handle from sending a value.
     ///
     /// Any `send` operation which happens after calling `close` is guaranteed
-    /// to fail. After calling `close`, `Receiver::poll`] should be called to
+    /// to fail. After calling `close`, [`try_recv`] should be called to
     /// receive a value if one was sent **before** the call to `close`
     /// completed.
     ///
@@ -374,6 +374,7 @@ impl<T> Receiver<T> {
     /// value will not be sent into the channel and never received.
     ///
     /// [`Sender`]: Sender
+    /// [`try_recv`]: Receiver::try_recv
     ///
     /// # Examples
     ///
