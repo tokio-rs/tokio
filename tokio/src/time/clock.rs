@@ -56,8 +56,9 @@ cfg_test_util! {
     /// Pause time
     ///
     /// The current value of `Instant::now()` is saved and all subsequent calls
-    /// to `Instant::now()` will return the saved value. This is useful for
-    /// running tests that are dependent on time.
+    /// to `Instant::now()` until the timer wheel is checked again will return the saved value.
+    /// Once the timer wheel is checked, time will immediately advance to the next registered
+    /// `Delay`. This is useful for running tests that depend on time.
     ///
     /// # Panics
     ///
