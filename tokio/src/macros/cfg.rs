@@ -364,6 +364,16 @@ macro_rules! cfg_unstable {
     }
 }
 
+macro_rules! cfg_trace {
+    ($($item:item)*) => {
+        $(
+            #[cfg(all(feature = "tracing", tokio_unstable))]
+            #[cfg_attr(docsrs, doc(cfg(all(feature = tokio_unstable))))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_coop {
     ($($item:item)*) => {
         $(

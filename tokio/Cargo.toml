@@ -120,6 +120,9 @@ version = "0.3.8"
 default-features = false
 optional = true
 
+[target.'cfg(tokio_unstable)'.dependencies]
+tracing = { version = "0.1.16", default-features = false, features = ["std"], optional = true }
+
 [dev-dependencies]
 tokio-test = { version = "0.2.0", path = "../tokio-test" }
 futures = { version = "0.3.0", features = ["async-await"] }

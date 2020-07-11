@@ -129,6 +129,16 @@ doc_rt_core! {
     {
         let spawn_handle = runtime::context::spawn_handle()
         .expect("must be called from the context of Tokio runtime configured with either `basic_scheduler` or `threaded_scheduler`");
+        #[cfg(all(feature = "tracing", tokio_unstable))]
+        #[cfg_attr(docsrs, doc(cfg(all(feature = tokio_unstable))))]
+        let task = {
+            let span = tracing::trace_span!(
+                target: "tokio::task",
+                "task",
+                future = %std::any::type_name::<T>(),
+            );
+            crate::util::Instrumented::new(task, span)
+        };
         spawn_handle.spawn(task)
     }
 }
