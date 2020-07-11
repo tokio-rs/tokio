@@ -43,6 +43,13 @@ use std::task::{Context, Poll};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_span_events(tracing_subscriber::fmt::format::FmtSpan::FULL)
+        .with_target(false)
+        .with_timer(())
+        .init();
+
     // Create the shared state. This is how all the peers communicate.
     //
     // The server task will hold a handle to this. For every new client, the
@@ -59,7 +66,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Note that this is the Tokio TcpListener, which is fully async.
     let mut listener = TcpListener::bind(&addr).await?;
 
-    println!("server running on {}", addr);
+    tracing::info!("server running on {}", addr);
 
     loop {
         // Asynchronously wait for an inbound TcpStream.
@@ -70,8 +77,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         // Spawn our handler to be run asynchronously.
         tokio::spawn(async move {
+            tracing::debug!("accepted connection");
             if let Err(e) = process(state, stream, addr).await {
-                println!("an error occurred; error = {:?}", e);
+                tracing::info!("an error occurred; error = {:?}", e);
             }
         });
     }
@@ -200,7 +208,7 @@ async fn process(
         Some(Ok(line)) => line,
         // We didn't get a line so we return early here.
         _ => {
-            println!("Failed to get username from {}. Client disconnected.", addr);
+            tracing::error!("Failed to get username from {}. Client disconnected.", addr);
             return Ok(());
         }
     };
@@ -212,7 +220,7 @@ async fn process(
     {
         let mut state = state.lock().await;
         let msg = format!("{} has joined the chat", username);
-        println!("{}", msg);
+        tracing::info!("{}", msg);
         state.broadcast(addr, &msg).await;
     }
 
@@ -233,9 +241,10 @@ async fn process(
                 peer.lines.send(&msg).await?;
             }
             Err(e) => {
-                println!(
+                tracing::error!(
                     "an error occurred while processing messages for {}; error = {:?}",
-                    username, e
+                    username,
+                    e
                 );
             }
         }
@@ -248,7 +257,7 @@ async fn process(
         state.peers.remove(&addr);
 
         let msg = format!("{} has left the chat", username);
-        println!("{}", msg);
+        tracing::info!("{}", msg);
         state.broadcast(addr, &msg).await;
     }
 
