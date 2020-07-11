@@ -135,6 +135,7 @@ doc_rt_core! {
             let span = tracing::trace_span!(
                 target: "tokio::task",
                 "task",
+                kind = %"task",
                 future = %std::any::type_name::<T>(),
             );
             crate::util::Instrumented::new(task, span)
