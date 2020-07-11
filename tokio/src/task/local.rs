@@ -201,10 +201,10 @@ cfg_rt_util! {
             let span = tracing::trace_span!(
                 target: "tokio::task",
                 "task",
-                future = %std::any::type_name::<T>(),
+                future = %std::any::type_name::<F>(),
                 kind = %"local",
             );
-            crate::util::Instrumented::new(task, span)
+            crate::util::Instrumented::new(future, span)
         };
 
         CURRENT.with(|maybe_cx| {
@@ -296,9 +296,9 @@ impl LocalSet {
                 target: "tokio::task",
                 "task",
                 kind = %"local",
-                future = %std::any::type_name::<T>(),
+                future = %std::any::type_name::<F>(),
             );
-            crate::util::Instrumented::new(task, span)
+            crate::util::Instrumented::new(future, span)
         };
 
         let (task, handle) = unsafe { task::joinable_local(future) };

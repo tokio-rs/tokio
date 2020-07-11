@@ -125,7 +125,7 @@ cfg_blocking! {
             );
             move || {
                 let _g = span.enter();
-                f
+                f()
             }
         };
         crate::runtime::spawn_blocking(f)
