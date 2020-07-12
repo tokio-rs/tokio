@@ -5,11 +5,10 @@ cfg_trace! {
     use pin_project_lite::pin_project;
 
     use tracing::Span;
-    // A future, stream, sink, or executor that has been instrumented with a
-    // `tracing` span.
 
     #[cfg(any(feature = "rt-core", feature = "rt-util"))]
     pin_project! {
+        /// A future that has been instrumented with a `tracing` span.
         #[derive(Debug, Clone)]
         pub(crate) struct Instrumented<T> {
             #[pin]
