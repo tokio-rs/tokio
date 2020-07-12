@@ -5,7 +5,10 @@ cfg_trace! {
     use pin_project_lite::pin_project;
 
     use tracing::Span;
-    // A future, stream, sink, or executor that has been instrumented with a `tracing` span.
+    // A future, stream, sink, or executor that has been instrumented with a
+    // `tracing` span.
+
+    #[cfg(any(feature = "rt-core", feature = "rt-util"))]
     pin_project! {
         #[derive(Debug, Clone)]
         pub(crate) struct Instrumented<T> {
@@ -15,6 +18,7 @@ cfg_trace! {
         }
     }
 
+    #[cfg(any(feature = "rt-core", feature = "rt-util"))]
     impl<T: Future> Future for Instrumented<T> {
         type Output = T::Output;
 
@@ -25,12 +29,14 @@ cfg_trace! {
         }
     }
 
+    #[cfg(any(feature = "rt-core", feature = "rt-util"))]
     impl<T> Instrumented<T> {
         pub(crate) fn new(inner: T, span: Span) -> Self {
             Self { inner, span }
         }
     }
 
+    #[cfg(any(feature = "rt-core", feature = "rt-util"))]
     #[inline]
     pub(crate) fn task<F>(task: F, kind: &'static str) -> Instrumented<F> {
         let span = tracing::trace_span!(
@@ -44,6 +50,7 @@ cfg_trace! {
 }
 
 cfg_not_trace! {
+    #[cfg(any(feature = "rt-core", feature = "rt-util"))]
     #[inline]
     pub(crate) fn task<F>(task: F, _: &'static str) -> F {
         // nop
