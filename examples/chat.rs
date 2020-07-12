@@ -43,11 +43,25 @@ use std::task::{Context, Poll};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
+    // Configure a `tracing` subscriber that logs traces emitted by the chat
+    // server.
     tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .with_span_events(tracing_subscriber::fmt::format::FmtSpan::FULL)
-        .with_target(false)
-        .with_timer(())
+        // Filter what traces are displayed based on the RUST_LOG environment
+        // variable.
+        //
+        // Traces emitted by the example code will always be displayed.
+        // If the example is built with `RUSTFLAGS="--cfg tokio_unstable", you
+        // can set `RUST_LOG=tokio=trace` to enable additional traces emitted by
+        // Tokio itself.
+        .with_env_filter(EnvFilter::from_default_env().add_directive("chat=info".parse()?))
+        // Log events when `tracing` spans are created, entered, exited, or
+        // closed. When Tokio's internal tracing support is enabled (as
+        // described above), this can be used to track the lifecycle of spawned
+        // tasks on the Tokio runtime.
+        .with_span_events(FmtSpan::FULL)
+        // Set this subscriber as the default, to collect all traces emitted by
+        // the program.
         .init();
 
     // Create the shared state. This is how all the peers communicate.
