@@ -195,18 +195,7 @@ cfg_rt_util! {
         F: Future + 'static,
         F::Output: 'static,
     {
-        #[cfg(all(feature = "tracing", tokio_unstable))]
-        #[cfg_attr(docsrs, doc(cfg(all(feature = tokio_unstable))))]
-        let future = {
-            let span = tracing::trace_span!(
-                target: "tokio::task",
-                "task",
-                future = %std::any::type_name::<F>(),
-                kind = %"local",
-            );
-            crate::util::Instrumented::new(future, span)
-        };
-
+        let future = crate::util::trace::task(future, "local");
         CURRENT.with(|maybe_cx| {
             let cx = maybe_cx
                 .expect("`spawn_local` called from outside of a `task::LocalSet`");
@@ -289,18 +278,7 @@ impl LocalSet {
         F: Future + 'static,
         F::Output: 'static,
     {
-        #[cfg(all(feature = "tracing", tokio_unstable))]
-        #[cfg_attr(docsrs, doc(cfg(all(feature = tokio_unstable))))]
-        let future = {
-            let span = tracing::trace_span!(
-                target: "tokio::task",
-                "task",
-                kind = %"local",
-                future = %std::any::type_name::<F>(),
-            );
-            crate::util::Instrumented::new(future, span)
-        };
-
+        let future = crate::util::trace::task(future, "local");
         let (task, handle) = unsafe { task::joinable_local(future) };
         self.context.tasks.borrow_mut().queue.push_back(task);
         handle

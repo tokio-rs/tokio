@@ -374,6 +374,15 @@ macro_rules! cfg_trace {
     }
 }
 
+macro_rules! cfg_not_trace {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(all(feature = "tracing", tokio_unstable)))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_coop {
     ($($item:item)*) => {
         $(
