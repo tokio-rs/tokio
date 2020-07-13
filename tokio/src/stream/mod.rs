@@ -702,7 +702,7 @@ pub trait StreamExt: Stream {
     /// # Notes
     ///
     /// `FromStream` is currently a sealed trait. Stabilization is pending
-    /// enhancements to the Rust langague.
+    /// enhancements to the Rust language.
     ///
     /// # Examples
     ///
