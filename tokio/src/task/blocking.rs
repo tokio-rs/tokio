@@ -114,6 +114,19 @@ cfg_blocking! {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
+        #[cfg(feature = "tracing")]
+        let f = {
+            let span = tracing::trace_span!(
+                target: "tokio::task",
+                "task",
+                kind = %"blocking",
+                function = %std::any::type_name::<F>(),
+            );
+            move || {
+                let _g = span.enter();
+                f()
+            }
+        };
         crate::runtime::spawn_blocking(f)
     }
 }

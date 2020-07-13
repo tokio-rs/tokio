@@ -106,6 +106,7 @@ iovec = { version = "0.1.4", optional = true }
 num_cpus = { version = "1.8.0", optional = true }
 parking_lot = { version = "0.10.0", optional = true } # Not in full
 slab = { version = "0.4.1", optional = true } # Backs `DelayQueue`
+tracing = { version = "0.1.16", default-features = false, features = ["std"], optional = true } # Not in full
 
 [target.'cfg(unix)'.dependencies]
 mio-uds = { version = "0.6.5", optional = true }
