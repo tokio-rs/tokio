@@ -50,8 +50,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         // Filter what traces are displayed based on the RUST_LOG environment
         // variable.
         //
-        // Traces emitted by the example code will always be displayed.
-        // If the example is built with `RUSTFLAGS="--cfg tokio_unstable", you
+        // Traces emitted by the example code will always be displayed. You
         // can set `RUST_LOG=tokio=trace` to enable additional traces emitted by
         // Tokio itself.
         .with_env_filter(EnvFilter::from_default_env().add_directive("chat=info".parse()?))
