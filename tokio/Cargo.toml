@@ -106,6 +106,7 @@ iovec = { version = "0.1.4", optional = true }
 num_cpus = { version = "1.8.0", optional = true }
 parking_lot = { version = "0.10.0", optional = true } # Not in full
 slab = { version = "0.4.1", optional = true } # Backs `DelayQueue`
+tracing = { version = "0.1.16", default-features = false, features = ["std"], optional = true } # Not in full
 
 [target.'cfg(unix)'.dependencies]
 mio-uds = { version = "0.6.5", optional = true }
@@ -119,9 +120,6 @@ mio-named-pipes = { version = "0.1.6", optional = true }
 version = "0.3.8"
 default-features = false
 optional = true
-
-[target.'cfg(tokio_unstable)'.dependencies]
-tracing = { version = "0.1.16", default-features = false, features = ["std"], optional = true }
 
 [dev-dependencies]
 tokio-test = { version = "0.2.0", path = "../tokio-test" }

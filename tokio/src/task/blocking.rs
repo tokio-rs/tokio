@@ -114,8 +114,7 @@ cfg_blocking! {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        #[cfg(all(feature = "tracing", tokio_unstable))]
-        #[cfg_attr(docsrs, doc(cfg(all(feature = tokio_unstable))))]
+        #[cfg(feature = "tracing")]
         let f = {
             let span = tracing::trace_span!(
                 target: "tokio::task",
