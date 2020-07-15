@@ -16,7 +16,7 @@ use crate::io::AsyncWrite;
 use bytes::Buf;
 
 cfg_io_util! {
-    /// Define numeric writer
+    /// Defines numeric writer
     macro_rules! write_impl {
         (
             $(
@@ -33,7 +33,7 @@ cfg_io_util! {
         }
     }
 
-    /// Write bytes to a sink.
+    /// Writes bytes to a sink.
     ///
     /// Implemented as an extention trait, adding utility methods to all
     /// [`AsyncWrite`] types. Callers will tend to import this trait instead of
@@ -66,7 +66,7 @@ cfg_io_util! {
     /// [`AsyncWrite`]: AsyncWrite
     /// [`prelude`]: crate::prelude
     pub trait AsyncWriteExt: AsyncWrite {
-        /// Write a buffer into this writer, returning how many bytes were
+        /// Writes a buffer into this writer, returning how many bytes were
         /// written.
         ///
         /// Equivalent to:
@@ -119,7 +119,7 @@ cfg_io_util! {
             write(self, src)
         }
 
-        /// Write a buffer into this writer, advancing the buffer's internal
+        /// Writes a buffer into this writer, advancing the buffer's internal
         /// cursor.
         ///
         /// Equivalent to:
@@ -186,7 +186,7 @@ cfg_io_util! {
         /// ```
         fn write_buf<'a, B>(&'a mut self, src: &'a mut B) -> WriteBuf<'a, Self, B>
         where
-            Self: Sized,
+            Self: Sized + Unpin,
             B: Buf,
         {
             write_buf(self, src)
@@ -925,7 +925,7 @@ cfg_io_util! {
             fn write_i128_le(&mut self, n: i128) -> WriteI128Le;
         }
 
-        /// Flush this output stream, ensuring that all intermediately buffered
+        /// Flushes this output stream, ensuring that all intermediately buffered
         /// contents reach their destination.
         ///
         /// Equivalent to:

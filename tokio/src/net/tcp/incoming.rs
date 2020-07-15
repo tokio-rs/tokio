@@ -17,7 +17,11 @@ impl Incoming<'_> {
         Incoming { inner: listener }
     }
 
-    #[doc(hidden)] // TODO: dox
+    /// Attempts to poll `TcpStream` by polling inner `TcpListener` to accept
+    /// connection.
+    ///
+    /// If `TcpListener` isn't ready yet, `Poll::Pending` is returned and
+    /// current task will be notified by a waker.
     pub fn poll_accept(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -28,7 +32,7 @@ impl Incoming<'_> {
 }
 
 #[cfg(feature = "stream")]
-impl futures_core::Stream for Incoming<'_> {
+impl crate::stream::Stream for Incoming<'_> {
     type Item = io::Result<TcpStream>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {

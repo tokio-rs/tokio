@@ -54,7 +54,7 @@ pub(crate) fn channel<T>() -> (Tx<T>, Rx<T>) {
 }
 
 impl<T> Tx<T> {
-    /// Push a value into the list.
+    /// Pushes a value into the list.
     pub(crate) fn push(&self, value: T) {
         // First, claim a slot for the value. `Acquire` is used here to
         // synchronize with the `fetch_add` in `reclaim_blocks`.
@@ -69,7 +69,7 @@ impl<T> Tx<T> {
         }
     }
 
-    /// Close the send half of the list
+    /// Closes the send half of the list
     ///
     /// Similar process as pushing a value, but instead of writing the value &
     /// setting the ready flag, the TX_CLOSED flag is set on the block.
@@ -220,7 +220,7 @@ impl<T> fmt::Debug for Tx<T> {
 }
 
 impl<T> Rx<T> {
-    /// Pop the next value off the queue
+    /// Pops the next value off the queue
     pub(crate) fn pop(&mut self, tx: &Tx<T>) -> Option<block::Read<T>> {
         // Advance `head`, if needed
         if !self.try_advancing_head() {
@@ -242,7 +242,7 @@ impl<T> Rx<T> {
         }
     }
 
-    /// Try advancing the block pointer to the block referenced by `self.index`.
+    /// Tries advancing the block pointer to the block referenced by `self.index`.
     ///
     /// Returns `true` if successful, `false` if there is no next block to load.
     fn try_advancing_head(&mut self) -> bool {

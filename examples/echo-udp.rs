@@ -15,7 +15,6 @@
 use std::error::Error;
 use std::net::SocketAddr;
 use std::{env, io};
-use tokio;
 use tokio::net::UdpSocket;
 
 struct Server {
@@ -51,7 +50,9 @@ impl Server {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
+    let addr = env::args()
+        .nth(1)
+        .unwrap_or_else(|| "127.0.0.1:8080".to_string());
 
     let socket = UdpSocket::bind(&addr).await?;
     println!("Listening on: {}", socket.local_addr()?);

@@ -18,22 +18,6 @@ pub(crate) enum Spawner {
     ThreadPool(thread_pool::Spawner),
 }
 
-impl Spawner {
-    /// Enter the scheduler context
-    pub(crate) fn enter<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce() -> R,
-    {
-        match self {
-            Spawner::Shell => f(),
-            #[cfg(feature = "rt-core")]
-            Spawner::Basic(spawner) => spawner.enter(f),
-            #[cfg(feature = "rt-threaded")]
-            Spawner::ThreadPool(spawner) => spawner.enter(f),
-        }
-    }
-}
-
 cfg_rt_core! {
     impl Spawner {
         pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>

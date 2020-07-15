@@ -3,7 +3,7 @@ pr: ["master"]
 
 variables:
   RUSTFLAGS: -Dwarnings
-  nightly: nightly-2019-11-16
+  nightly: nightly-2020-05-29
 
 jobs:
 # Test top level crate
@@ -26,9 +26,15 @@ jobs:
     crates:
       - tokio-macros
       - tokio-test
-      - tokio-tls
       - tokio-util
       - examples
+
+# Run integration tests
+- template: ci/azure-test-integration.yml
+  parameters:
+    name: test_integration
+    displayName: Integration tests
+    rust: stable
 
 # Run tests from `tests-build`. This requires a different process
 - template: ci/azure-test-build.yml
@@ -37,13 +43,11 @@ jobs:
     displayName: Test build permutations
     rust: stable
 
-# Run loom tests
-- template: ci/azure-loom.yml
+# Run miri tests
+- template: ci/azure-miri.yml
   parameters:
-    name: loom
-    rust: stable
-    crates:
-      - tokio
+    name: miri
+    rust: $(nightly)
 
 # Try cross compiling
 - template: ci/azure-cross-compile.yml
@@ -92,16 +96,25 @@ jobs:
 #     name: tsan
 #     rust: stable
 
+# Run loom tests
+- template: ci/azure-loom.yml
+  parameters:
+    name: loom
+    rust: stable
+
 - template: ci/azure-deploy-docs.yml
   parameters:
     rust: stable
     dependsOn:
       - rustfmt
+      - docs
       - clippy
       - test_tokio
       - test_linux
+      - test_integration
       - test_build
       - loom
+      - miri
       - cross
       - minrust
       - check_features

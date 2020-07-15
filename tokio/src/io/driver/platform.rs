@@ -12,6 +12,14 @@ mod sys {
     pub(crate) fn is_hup(ready: Ready) -> bool {
         UnixReady::from(ready).is_hup()
     }
+
+    pub(crate) fn error() -> Ready {
+        UnixReady::error().into()
+    }
+
+    pub(crate) fn is_error(ready: Ready) -> bool {
+        UnixReady::from(ready).is_error()
+    }
 }
 
 #[cfg(windows)]
@@ -23,6 +31,14 @@ mod sys {
     }
 
     pub(crate) fn is_hup(_: Ready) -> bool {
+        false
+    }
+
+    pub(crate) fn error() -> Ready {
+        Ready::empty()
+    }
+
+    pub(crate) fn is_error(_: Ready) -> bool {
         false
     }
 }

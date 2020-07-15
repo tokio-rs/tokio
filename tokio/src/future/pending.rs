@@ -1,6 +1,6 @@
+use sdt::pin::Pin;
 use std::future::Future;
 use std::marker;
-use sdt::pin::Pin;
 use std::task::{Context, Poll};
 
 /// Future for the [`pending()`] function.
@@ -29,7 +29,8 @@ struct Pending<T> {
 pub async fn pending() -> ! {
     Pending {
         _data: marker::PhantomData,
-    }.await
+    }
+    .await
 }
 
 impl<T> Future for Pending<T> {
@@ -40,5 +41,4 @@ impl<T> Future for Pending<T> {
     }
 }
 
-impl<T> Unpin for Pending<T> {
-}
+impl<T> Unpin for Pending<T> {}

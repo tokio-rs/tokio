@@ -15,19 +15,19 @@
 //! type will _yield_ to the Tokio scheduler when IO is not ready, rather than
 //! blocking. This allows other tasks to run while waiting on IO.
 //!
-//! Another difference is that [`AsyncRead`] and [`AsyncWrite`] only contain
+//! Another difference is that `AsyncRead` and `AsyncWrite` only contain
 //! core methods needed to provide asynchronous reading and writing
 //! functionality. Instead, utility methods are defined in the [`AsyncReadExt`]
 //! and [`AsyncWriteExt`] extension traits. These traits are automatically
-//! implemented for all values that implement [`AsyncRead`] and [`AsyncWrite`]
+//! implemented for all values that implement `AsyncRead` and `AsyncWrite`
 //! respectively.
 //!
-//! End users will rarely interact directly with [`AsyncRead`] and
-//! [`AsyncWrite`]. Instead, they will use the async functions defined in the
-//! extension traits. Library authors are expected to implement [`AsyncRead`]
-//! and [`AsyncWrite`] in order to provide types that behave like byte streams.
+//! End users will rarely interact directly with `AsyncRead` and
+//! `AsyncWrite`. Instead, they will use the async functions defined in the
+//! extension traits. Library authors are expected to implement `AsyncRead`
+//! and `AsyncWrite` in order to provide types that behave like byte streams.
 //!
-//! Even with these differences, Tokio's [`AsyncRead`] and [`AsyncWrite`] traits
+//! Even with these differences, Tokio's `AsyncRead` and `AsyncWrite` traits
 //! can be used in almost exactly the same manner as the standard library's
 //! `Read` and `Write`. Most types in the standard library that implement `Read`
 //! and `Write` have asynchronous equivalents in `tokio` that implement
@@ -57,7 +57,7 @@
 //! [`File`]: crate::fs::File
 //! [`TcpStream`]: crate::net::TcpStream
 //! [`std::fs::File`]: std::fs::File
-//! [std_example]: https://doc.rust-lang.org/std/io/index.html#read-and-write
+//! [std_example]: std::io#read-and-write
 //!
 //! ## Buffered Readers and Writers
 //!
@@ -93,7 +93,8 @@
 //! ```
 //!
 //! [`BufWriter`] doesn't add any new ways of writing; it just buffers every call
-//! to [`write`](crate::io::AsyncWriteExt::write):
+//! to [`write`](crate::io::AsyncWriteExt::write). However, you **must** flush
+//! [`BufWriter`] to ensure that any buffered data is written.
 //!
 //! ```no_run
 //! use tokio::io::{self, BufWriter, AsyncWriteExt};
@@ -105,16 +106,19 @@
 //!     {
 //!         let mut writer = BufWriter::new(f);
 //!
-//!         // write a byte to the buffer
+//!         // Write a byte to the buffer.
 //!         writer.write(&[42u8]).await?;
 //!
-//!     } // the buffer is flushed once writer goes out of scope
+//!         // Flush the buffer before it goes out of scope.
+//!         writer.flush().await?;
+//!
+//!     } // Unless flushed or shut down, the contents of the buffer is discarded on drop.
 //!
 //!     Ok(())
 //! }
 //! ```
 //!
-//! [stdbuf]: https://doc.rust-lang.org/std/io/index.html#bufreader-and-bufwriter
+//! [stdbuf]: std::io#bufreader-and-bufwriter
 //! [`std::io::BufRead`]: std::io::BufRead
 //! [`AsyncBufRead`]: crate::io::AsyncBufRead
 //! [`BufReader`]: crate::io::BufReader
@@ -122,11 +126,25 @@
 //!
 //! ## Implementing AsyncRead and AsyncWrite
 //!
-//! Because they are traits, we can implement `AsyncRead` and `AsyncWrite` for
+//! Because they are traits, we can implement [`AsyncRead`] and [`AsyncWrite`] for
 //! our own types, as well. Note that these traits must only be implemented for
 //! non-blocking I/O types that integrate with the futures type system. In
 //! other words, these types must never block the thread, and instead the
 //! current task is notified when the I/O resource is ready.
+//!
+//! ## Conversion to and from Sink/Stream
+//!
+//! It is often convenient to encapsulate the reading and writing of
+//! bytes and instead work with a [`Sink`] or [`Stream`] of some data
+//! type that is encoded as bytes and/or decoded from bytes. Tokio
+//! provides some utility traits in the [tokio-util] crate that
+//! abstract the asynchronous buffering that is required and allows
+//! you to write [`Encoder`] and [`Decoder`] functions working with a
+//! buffer of bytes, and then use that ["codec"] to transform anything
+//! that implements [`AsyncRead`] and [`AsyncWrite`] into a `Sink`/`Stream` of
+//! your structured data.
+//!
+//! [tokio-util]: https://docs.rs/tokio-util/0.3/tokio_util/codec/index.html
 //!
 //! # Standard input and output
 //!
@@ -138,21 +156,28 @@
 //! context of the Tokio runtime, as they require Tokio-specific features to
 //! function. Calling these functions outside of a Tokio runtime will panic.
 //!
-//! [input]: fn.stdin.html
-//! [output]: fn.stdout.html
-//! [error]: fn.stderr.html
+//! [input]: fn@stdin
+//! [output]: fn@stdout
+//! [error]: fn@stderr
 //!
 //! # `std` re-exports
 //!
 //! Additionally, [`Error`], [`ErrorKind`], and [`Result`] are re-exported
 //! from `std::io` for ease of use.
 //!
-//! [`AsyncRead`]: trait.AsyncRead.html
-//! [`AsyncWrite`]: trait.AsyncWrite.html
-//! [`Error`]: struct.Error.html
-//! [`ErrorKind`]: enum.ErrorKind.html
-//! [`Result`]: type.Result.html
+//! [`AsyncRead`]: trait@AsyncRead
+//! [`AsyncWrite`]: trait@AsyncWrite
+//! [`AsyncReadExt`]: trait@AsyncReadExt
+//! [`AsyncWriteExt`]: trait@AsyncWriteExt
+//! ["codec"]: https://docs.rs/tokio-util/0.3/tokio_util/codec/index.html
+//! [`Encoder`]: https://docs.rs/tokio-util/0.3/tokio_util/codec/trait.Encoder.html
+//! [`Decoder`]: https://docs.rs/tokio-util/0.3/tokio_util/codec/trait.Decoder.html
+//! [`Error`]: struct@Error
+//! [`ErrorKind`]: enum@ErrorKind
+//! [`Result`]: type@Result
 //! [`Read`]: std::io::Read
+//! [`Sink`]: https://docs.rs/futures/0.3/futures/sink/trait.Sink.html
+//! [`Stream`]: crate::stream::Stream
 //! [`Write`]: std::io::Write
 cfg_io_blocking! {
     pub(crate) mod blocking;
@@ -162,7 +187,11 @@ mod async_buf_read;
 pub use self::async_buf_read::AsyncBufRead;
 
 mod async_read;
+
 pub use self::async_read::AsyncRead;
+
+mod async_seek;
+pub use self::async_seek::AsyncSeek;
 
 mod async_write;
 pub use self::async_write::AsyncWrite;
@@ -192,11 +221,18 @@ cfg_io_util! {
     mod split;
     pub use split::{split, ReadHalf, WriteHalf};
 
+    pub(crate) mod seek;
+    pub use self::seek::Seek;
+
     pub(crate) mod util;
     pub use util::{
-        copy, empty, repeat, sink, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufStream,
-        BufWriter, Copy, Empty, Lines, Repeat, Sink, Split, Take,
+        copy, empty, repeat, sink, AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt,
+        BufReader, BufStream, BufWriter, Copy, Empty, Lines, Repeat, Sink, Split, Take,
     };
+
+    cfg_stream! {
+        pub use util::{stream_reader, StreamReader};
+    }
 
     // Re-export io::Error so that users don't have to deal with conflicts when
     // `use`ing `tokio::io` and `std::io`.

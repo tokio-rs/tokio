@@ -1,12 +1,15 @@
 //! Futures task based helpers
 
-use futures_core::Stream;
+#![allow(clippy::mutex_atomic)]
+
 use std::future::Future;
 use std::mem;
 use std::ops;
 use std::pin::Pin;
 use std::sync::{Arc, Condvar, Mutex};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
+
+use tokio::stream::Stream;
 
 /// TOOD: dox
 pub fn spawn<T>(task: T) -> Spawn<T> {
@@ -42,22 +45,12 @@ const WAKE: usize = 1;
 const SLEEP: usize = 2;
 
 impl<T> Spawn<T> {
-    /// Consume `self` returning the inner value
-    pub fn into_inner(mut self) -> T
+    /// Consumes `self` returning the inner value
+    pub fn into_inner(self) -> T
     where
         T: Unpin,
     {
-        drop(self.task);
-
-        // Pin::into_inner is unstable, so we work around it
-        //
-        // Safety: `T` is bound by `Unpin`.
-        unsafe {
-            let ptr = Pin::get_mut(self.future.as_mut()) as *mut T;
-            let future = Box::from_raw(ptr);
-            mem::forget(self.future);
-            *future
-        }
+        *Pin::into_inner(self.future)
     }
 
     /// Returns `true` if the inner future has received a wake notification
@@ -98,7 +91,7 @@ impl<T: Unpin> ops::DerefMut for Spawn<T> {
 }
 
 impl<T: Future> Spawn<T> {
-    /// Poll a future
+    /// Polls a future
     pub fn poll(&mut self) -> Poll<T::Output> {
         let fut = self.future.as_mut();
         self.task.enter(|cx| fut.poll(cx))
@@ -106,22 +99,38 @@ impl<T: Future> Spawn<T> {
 }
 
 impl<T: Stream> Spawn<T> {
-    /// Poll a stream
+    /// Polls a stream
     pub fn poll_next(&mut self) -> Poll<Option<T::Item>> {
         let stream = self.future.as_mut();
         self.task.enter(|cx| stream.poll_next(cx))
     }
 }
 
+impl<T: Future> Future for Spawn<T> {
+    type Output = T::Output;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        self.future.as_mut().poll(cx)
+    }
+}
+
+impl<T: Stream> Stream for Spawn<T> {
+    type Item = T::Item;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.future.as_mut().poll_next(cx)
+    }
+}
+
 impl MockTask {
-    /// Create a new mock task
+    /// Creates new mock task
     fn new() -> Self {
         MockTask {
             waker: Arc::new(ThreadWaker::new()),
         }
     }
 
-    /// Run a closure from the context of the task.
+    /// Runs a closure from the context of the task.
     ///
     /// Any wake notifications resulting from the execution of the closure are
     /// tracked.
@@ -187,8 +196,7 @@ impl ThreadWaker {
     }
 
     fn wake(&self) {
-        // First, try transitioning from IDLE -> NOTIFY, this does not require a
-        // lock.
+        // First, try transitioning from IDLE -> NOTIFY, this does not require a lock.
         let mut state = self.state.lock().unwrap();
         let prev = *state;
 

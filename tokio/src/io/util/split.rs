@@ -75,6 +75,8 @@ where
         let n = ready!(read_until_internal(
             me.reader, cx, *me.delim, me.buf, me.read,
         ))?;
+        // read_until_internal resets me.read to zero once it finds the delimeter
+        debug_assert_eq!(*me.read, 0);
 
         if n == 0 && me.buf.is_empty() {
             return Poll::Ready(Ok(None));
@@ -89,7 +91,7 @@ where
 }
 
 #[cfg(feature = "stream")]
-impl<R: AsyncBufRead> futures_core::Stream for Split<R> {
+impl<R: AsyncBufRead> crate::stream::Stream for Split<R> {
     type Item = io::Result<Vec<u8>>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {

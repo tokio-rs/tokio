@@ -3,7 +3,7 @@ use crate::loom::sync::atomic::AtomicUsize;
 use crate::util::bit;
 use crate::util::slab::{Address, Entry, Generation};
 
-use std::sync::atomic::Ordering::{Acquire, AcqRel, SeqCst};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, SeqCst};
 
 #[derive(Debug)]
 pub(crate) struct ScheduledIo {
@@ -29,12 +29,10 @@ impl Entry for ScheduledIo {
 
             let next = PACK.pack(generation.next().to_usize(), 0);
 
-            match self.readiness.compare_exchange(
-                current,
-                next,
-                AcqRel,
-                Acquire,
-            ) {
+            match self
+                .readiness
+                .compare_exchange(current, next, AcqRel, Acquire)
+            {
                 Ok(_) => break,
                 Err(actual) => current = actual,
             }
@@ -58,6 +56,7 @@ impl Default for ScheduledIo {
 }
 
 impl ScheduledIo {
+    #[cfg(all(test, loom))]
     /// Returns the current readiness value of this `ScheduledIo`, if the
     /// provided `token` is still a valid access.
     ///

@@ -54,35 +54,29 @@
 use crate::future::poll_fn;
 use crate::sync::task::AtomicWaker;
 
-use fnv::FnvHashMap;
+use fnv::FnvHashSet;
 use std::ops;
 use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::SeqCst;
+use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard, Weak};
 use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll};
 
-/// Receives values from the associated [`Sender`](struct.Sender.html).
+/// Receives values from the associated [`Sender`](struct@Sender).
 ///
-/// Instances are created by the [`channel`](fn.channel.html) function.
+/// Instances are created by the [`channel`](fn@channel) function.
 #[derive(Debug)]
 pub struct Receiver<T> {
     /// Pointer to the shared state
     shared: Arc<Shared<T>>,
 
     /// Pointer to the watcher's internal state
-    inner: Arc<WatchInner>,
-
-    /// Watcher ID.
-    id: u64,
-
-    /// Last observed version
-    ver: usize,
+    inner: Watcher,
 }
 
-/// Sends values to the associated [`Receiver`](struct.Receiver.html).
+/// Sends values to the associated [`Receiver`](struct@Receiver).
 ///
-/// Instances are created by the [`channel`](fn.channel.html) function.
+/// Instances are created by the [`channel`](fn@channel) function.
 #[derive(Debug)]
 pub struct Sender<T> {
     shared: Weak<Shared<T>>,
@@ -117,7 +111,7 @@ pub mod error {
         }
     }
 
-    impl<T: fmt::Debug> ::std::error::Error for SendError<T> {}
+    impl<T: fmt::Debug> std::error::Error for SendError<T> {}
 }
 
 #[derive(Debug)]
@@ -138,20 +132,22 @@ struct Shared<T> {
     cancel: AtomicWaker,
 }
 
-#[derive(Debug)]
-struct Watchers {
-    next_id: u64,
-    watchers: FnvHashMap<u64, Arc<WatchInner>>,
-}
+type Watchers = FnvHashSet<Watcher>;
+
+/// The watcher's ID is based on the Arc's pointer.
+#[derive(Clone, Debug)]
+struct Watcher(Arc<WatchInner>);
 
 #[derive(Debug)]
 struct WatchInner {
+    /// Last observed version
+    version: AtomicUsize,
     waker: AtomicWaker,
 }
 
 const CLOSED: usize = 1;
 
-/// Create a new watch channel, returning the "send" and "receive" handles.
+/// Creates a new watch channel, returning the "send" and "receive" handles.
 ///
 /// All values sent by [`Sender`] will become visible to the [`Receiver`] handles.
 /// Only the last value sent is made available to the [`Receiver`] half. All
@@ -176,24 +172,23 @@ const CLOSED: usize = 1;
 /// # }
 /// ```
 ///
-/// [`Sender`]: struct.Sender.html
-/// [`Receiver`]: struct.Receiver.html
+/// [`Sender`]: struct@Sender
+/// [`Receiver`]: struct@Receiver
 pub fn channel<T: Clone>(init: T) -> (Sender<T>, Receiver<T>) {
-    const INIT_ID: u64 = 0;
+    const VERSION_0: usize = 0;
+    const VERSION_1: usize = 2;
 
-    let inner = Arc::new(WatchInner::new());
+    // We don't start knowing VERSION_1
+    let inner = Watcher::new_version(VERSION_0);
 
     // Insert the watcher
-    let mut watchers = FnvHashMap::with_capacity_and_hasher(0, Default::default());
-    watchers.insert(INIT_ID, inner.clone());
+    let mut watchers = FnvHashSet::with_capacity_and_hasher(0, Default::default());
+    watchers.insert(inner.clone());
 
     let shared = Arc::new(Shared {
         value: RwLock::new(init),
-        version: AtomicUsize::new(2),
-        watchers: Mutex::new(Watchers {
-            next_id: INIT_ID + 1,
-            watchers,
-        }),
+        version: AtomicUsize::new(VERSION_1),
+        watchers: Mutex::new(watchers),
         cancel: AtomicWaker::new(),
     });
 
@@ -201,12 +196,7 @@ pub fn channel<T: Clone>(init: T) -> (Sender<T>, Receiver<T>) {
         shared: Arc::downgrade(&shared),
     };
 
-    let rx = Receiver {
-        shared,
-        inner,
-        id: INIT_ID,
-        ver: 0,
-    };
+    let rx = Receiver { shared, inner };
 
     (tx, rx)
 }
@@ -240,9 +230,8 @@ impl<T> Receiver<T> {
         let state = self.shared.version.load(SeqCst);
         let version = state & !CLOSED;
 
-        if version != self.ver {
+        if self.inner.version.swap(version, Relaxed) != version {
             let inner = self.shared.value.read().unwrap();
-            self.ver = version;
 
             return Ready(Some(Ref { inner }));
         }
@@ -258,6 +247,38 @@ impl<T> Receiver<T> {
 
 impl<T: Clone> Receiver<T> {
     /// Attempts to clone the latest value sent via the channel.
+    ///
+    /// If this is the first time the function is called on a `Receiver`
+    /// instance, then the function completes immediately with the **current**
+    /// value held by the channel. On the next call, the function waits until
+    /// a new value is sent in the channel.
+    ///
+    /// `None` is returned if the `Sender` half is dropped.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::watch;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = watch::channel("hello");
+    ///
+    ///     let v = rx.recv().await.unwrap();
+    ///     assert_eq!(v, "hello");
+    ///
+    ///     tokio::spawn(async move {
+    ///         tx.broadcast("goodbye").unwrap();
+    ///     });
+    ///
+    ///     // Waits for the new task to spawn and send the value.
+    ///     let v = rx.recv().await.unwrap();
+    ///     assert_eq!(v, "goodbye");
+    ///
+    ///     let v = rx.recv().await;
+    ///     assert!(v.is_none());
+    /// }
+    /// ```
     pub async fn recv(&mut self) -> Option<T> {
         poll_fn(|cx| {
             let v_ref = ready!(self.poll_recv_ref(cx));
@@ -268,7 +289,7 @@ impl<T: Clone> Receiver<T> {
 }
 
 #[cfg(feature = "stream")]
-impl<T: Clone> futures_core::Stream for Receiver<T> {
+impl<T: Clone> crate::stream::Stream for Receiver<T> {
     type Item = T;
 
     fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
@@ -280,47 +301,24 @@ impl<T: Clone> futures_core::Stream for Receiver<T> {
 
 impl<T> Clone for Receiver<T> {
     fn clone(&self) -> Self {
-        let inner = Arc::new(WatchInner::new());
+        let ver = self.inner.version.load(Relaxed);
+        let inner = Watcher::new_version(ver);
         let shared = self.shared.clone();
 
-        let id = {
-            let mut watchers = shared.watchers.lock().unwrap();
-            let id = watchers.next_id;
+        shared.watchers.lock().unwrap().insert(inner.clone());
 
-            watchers.next_id += 1;
-            watchers.watchers.insert(id, inner.clone());
-
-            id
-        };
-
-        let ver = self.ver;
-
-        Receiver {
-            shared,
-            inner,
-            id,
-            ver,
-        }
+        Receiver { shared, inner }
     }
 }
 
 impl<T> Drop for Receiver<T> {
     fn drop(&mut self) {
-        let mut watchers = self.shared.watchers.lock().unwrap();
-        watchers.watchers.remove(&self.id);
-    }
-}
-
-impl WatchInner {
-    fn new() -> Self {
-        WatchInner {
-            waker: AtomicWaker::new(),
-        }
+        self.shared.watchers.lock().unwrap().remove(&self.inner);
     }
 }
 
 impl<T> Sender<T> {
-    /// Broadcast a new value via the channel, notifying all receivers.
+    /// Broadcasts a new value via the channel, notifying all receivers.
     pub fn broadcast(&self, value: T) -> Result<(), error::SendError<T>> {
         let shared = match self.shared.upgrade() {
             Some(shared) => shared,
@@ -363,11 +361,11 @@ impl<T> Sender<T> {
     }
 }
 
-/// Notify all watchers of a change
+/// Notifies all watchers of a change
 fn notify_all<T>(shared: &Shared<T>) {
     let watchers = shared.watchers.lock().unwrap();
 
-    for watcher in watchers.watchers.values() {
+    for watcher in watchers.iter() {
         // Notify the task
         watcher.waker.wake();
     }
@@ -397,5 +395,38 @@ impl<T> ops::Deref for Ref<'_, T> {
 impl<T> Drop for Shared<T> {
     fn drop(&mut self) {
         self.cancel.wake();
+    }
+}
+
+// ===== impl Watcher =====
+
+impl Watcher {
+    fn new_version(version: usize) -> Self {
+        Watcher(Arc::new(WatchInner {
+            version: AtomicUsize::new(version),
+            waker: AtomicWaker::new(),
+        }))
+    }
+}
+
+impl std::cmp::PartialEq for Watcher {
+    fn eq(&self, other: &Watcher) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl std::cmp::Eq for Watcher {}
+
+impl std::hash::Hash for Watcher {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        (&*self.0 as *const WatchInner).hash(state)
+    }
+}
+
+impl std::ops::Deref for Watcher {
+    type Target = WatchInner;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

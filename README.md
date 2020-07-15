@@ -24,12 +24,13 @@ the Rust programming language. It is:
 [azure-badge]: https://dev.azure.com/tokio-rs/Tokio/_apis/build/status/tokio-rs.tokio?branchName=master
 [azure-url]: https://dev.azure.com/tokio-rs/Tokio/_build/latest?definitionId=1&branchName=master
 [discord-badge]: https://img.shields.io/discord/500028886025895936.svg?logo=discord&style=flat-square
-[discord-url]: https://discord.gg/6yGkFeN
+[discord-url]: https://discord.gg/tokio
 
 [Website](https://tokio.rs) |
-[Guides](https://tokio.rs/docs/) |
+[Guides](https://tokio.rs/docs/overview/) |
 [API Docs](https://docs.rs/tokio/latest/tokio) |
-[Chat](https://discord.gg/6yGkFeN)
+[Roadmap](https://github.com/tokio-rs/tokio/blob/master/ROADMAP.md) |
+[Chat](https://discord.gg/tokio)
 
 ## Overview
 
@@ -87,14 +88,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 }
-
 ```
 
-More examples can be found [here](examples). Note that the `master` branch
-is currently being updated to use `async` / `await`. The examples are
-not fully ported. Examples for stable Tokio can be found
-[here](https://github.com/tokio-rs/tokio/tree/v0.1.x/tokio/examples).
-
+More examples can be found [here](examples).
 
 ## Getting Help
 
@@ -103,9 +99,9 @@ First, see if the answer to your question can be found in the [Guides] or the
 the [Tokio Discord server][chat]. We would be happy to try to answer your
 question. Last, if that doesn't work, try opening an [issue] with the question.
 
-[Guides]: https://tokio.rs/docs/
+[Guides]: https://tokio.rs/docs/overview/
 [API documentation]: https://docs.rs/tokio/latest/tokio
-[chat]: https://discord.gg/6yGkFeN
+[chat]: https://discord.gg/tokio
 [issue]: https://github.com/tokio-rs/tokio/issues/new
 
 ## Contributing
@@ -114,21 +110,39 @@ question. Last, if that doesn't work, try opening an [issue] with the question.
 you! We have a [contributing guide][guide] to help you get involved in the Tokio
 project.
 
-[guide]: CONTRIBUTING.md
+[guide]: https://github.com/tokio-rs/tokio/blob/master/CONTRIBUTING.md
 
 ## Related Projects
 
 In addition to the crates in this repository, the Tokio project also maintains
 several other libraries, including:
 
+* [`hyper`]: A fast and correct HTTP/1.1 and HTTP/2 implementation for Rust.
+
+* [`tonic`]: A gRPC over HTTP/2 implementation focused on high performance, interoperability, and flexibility.
+
+* [`warp`]: A super-easy, composable, web server framework for warp speeds.
+
+* [`tower`]: A library of modular and reusable components for building robust networking clients and servers.
+
 * [`tracing`] (formerly `tokio-trace`): A framework for application-level
   tracing and async-aware diagnostics.
+
+* [`rdbc`]: A Rust database connectivity library for MySQL, Postgres and SQLite.
 
 * [`mio`]: A low-level, cross-platform abstraction over OS I/O APIs that powers
   `tokio`.
 
 * [`bytes`]: Utilities for working with bytes, including efficient byte buffers.
 
+* [`loom`]: A testing tool for concurrent Rust code
+
+[`warp`]: https://github.com/seanmonstar/warp
+[`hyper`]: https://github.com/hyperium/hyper
+[`tonic`]: https://github.com/hyperium/tonic
+[`tower`]: https://github.com/tower-rs/tower
+[`loom`]: https://github.com/tokio-rs/loom
+[`rdbc`]: https://github.com/tokio-rs/rdbc
 [`tracing`]: https://github.com/tokio-rs/tracing
 [`mio`]: https://github.com/tokio-rs/mio
 [`bytes`]: https://github.com/tokio-rs/bytes

@@ -4,5 +4,4 @@
 tokio = { path = "tokio" }
 tokio-macros = { path = "tokio-macros" }
 tokio-test = { path = "tokio-test" }
-tokio-tls = { path = "tokio-tls" }
 tokio-util = { path = "tokio-util" }

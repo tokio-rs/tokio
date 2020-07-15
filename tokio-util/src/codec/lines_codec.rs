@@ -4,7 +4,10 @@ use crate::codec::encoder::Encoder;
 use bytes::{Buf, BufMut, BytesMut};
 use std::{cmp, fmt, io, str, usize};
 
-/// A simple `Codec` implementation that splits up data into lines.
+/// A simple [`Decoder`] and [`Encoder`] implementation that splits up data into lines.
+///
+/// [`Decoder`]: crate::codec::Decoder
+/// [`Encoder`]: crate::codec::Encoder
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct LinesCodec {
     // Stored index of the next index to examine for a `\n` character.
@@ -33,7 +36,7 @@ impl LinesCodec {
     /// of a buffered line. See the documentation for [`new_with_max_length`]
     /// for information on why this could be a potential security risk.
     ///
-    /// [`new_with_max_length`]: #method.new_with_max_length
+    /// [`new_with_max_length`]: crate::codec::LinesCodec::new_with_max_length()
     pub fn new() -> LinesCodec {
         LinesCodec {
             next_index: 0,
@@ -45,7 +48,7 @@ impl LinesCodec {
     /// Returns a `LinesCodec` with a maximum line length limit.
     ///
     /// If this is set, calls to `LinesCodec::decode` will return a
-    /// [`LengthError`] when a line exceeds the length limit. Subsequent calls
+    /// [`LinesCodecError`] when a line exceeds the length limit. Subsequent calls
     /// will discard up to `limit` bytes from that line until a newline
     /// character is reached, returning `None` until the line over the limit
     /// has been fully discarded. After that point, calls to `decode` will
@@ -59,7 +62,7 @@ impl LinesCodec {
     /// exploit this unbounded buffer by sending an unbounded amount of input
     /// without any `\n` characters, causing unbounded memory consumption.
     ///
-    /// [`LengthError`]: ../struct.LengthError
+    /// [`LinesCodecError`]: crate::codec::LinesCodecError
     pub fn new_with_max_length(max_length: usize) -> Self {
         LinesCodec {
             max_length,
@@ -179,11 +182,14 @@ impl Decoder for LinesCodec {
     }
 }
 
-impl Encoder for LinesCodec {
-    type Item = String;
+impl<T> Encoder<T> for LinesCodec
+where
+    T: AsRef<str>,
+{
     type Error = LinesCodecError;
 
-    fn encode(&mut self, line: String, buf: &mut BytesMut) -> Result<(), LinesCodecError> {
+    fn encode(&mut self, line: T, buf: &mut BytesMut) -> Result<(), LinesCodecError> {
+        let line = line.as_ref();
         buf.reserve(line.len() + 1);
         buf.put(line.as_bytes());
         buf.put_u8(b'\n');

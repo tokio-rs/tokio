@@ -1,5 +1,5 @@
+use crate::io::driver::platform;
 use crate::io::{AsyncRead, AsyncWrite, Registration};
-use crate::io::driver::{platform};
 
 use mio::event::Evented;
 use std::fmt;
@@ -90,17 +90,17 @@ cfg_io_driver! {
     /// These events are included as part of the read readiness event stream. The
     /// write readiness event stream is only for `Ready::writable()` events.
     ///
-    /// [`std::io::Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
-    /// [`std::io::Write`]: https://doc.rust-lang.org/std/io/trait.Write.html
-    /// [`AsyncRead`]: ../io/trait.AsyncRead.html
-    /// [`AsyncWrite`]: ../io/trait.AsyncWrite.html
-    /// [`mio::Evented`]: https://docs.rs/mio/0.6/mio/trait.Evented.html
-    /// [`Registration`]: struct.Registration.html
-    /// [`TcpListener`]: ../net/struct.TcpListener.html
-    /// [`clear_read_ready`]: #method.clear_read_ready
-    /// [`clear_write_ready`]: #method.clear_write_ready
-    /// [`poll_read_ready`]: #method.poll_read_ready
-    /// [`poll_write_ready`]: #method.poll_write_ready
+    /// [`std::io::Read`]: trait@std::io::Read
+    /// [`std::io::Write`]: trait@std::io::Write
+    /// [`AsyncRead`]: trait@AsyncRead
+    /// [`AsyncWrite`]: trait@AsyncWrite
+    /// [`mio::Evented`]: trait@mio::Evented
+    /// [`Registration`]: struct@Registration
+    /// [`TcpListener`]: struct@crate::net::TcpListener
+    /// [`clear_read_ready`]: method@Self::clear_read_ready
+    /// [`clear_write_ready`]: method@Self::clear_write_ready
+    /// [`poll_read_ready`]: method@Self::poll_read_ready
+    /// [`poll_write_ready`]: method@Self::poll_write_ready
     pub struct PollEvented<E: Evented> {
         io: Option<E>,
         inner: Inner,
@@ -123,7 +123,7 @@ macro_rules! poll_ready {
     ($me:expr, $mask:expr, $cache:ident, $take:ident, $poll:expr) => {{
         // Load cached & encoded readiness.
         let mut cached = $me.inner.$cache.load(Relaxed);
-        let mask = $mask | platform::hup();
+        let mask = $mask | platform::hup() | platform::error();
 
         // See if the current readiness matches any bits.
         let mut ret = mio::Ready::from_usize(cached) & $mask;
@@ -166,8 +166,44 @@ where
     E: Evented,
 {
     /// Creates a new `PollEvented` associated with the default reactor.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if thread-local runtime is not set.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
     pub fn new(io: E) -> io::Result<Self> {
-        let registration = Registration::new(&io)?;
+        PollEvented::new_with_ready(io, mio::Ready::all())
+    }
+
+    /// Creates a new `PollEvented` associated with the default reactor, for specific `mio::Ready`
+    /// state. `new_with_ready` should be used over `new` when you need control over the readiness
+    /// state, such as when a file descriptor only allows reads. This does not add `hup` or `error`
+    /// so if you are interested in those states, you will need to add them to the readiness state
+    /// passed to this function.
+    ///
+    /// An example to listen to read only
+    ///
+    /// ```rust
+    /// ##[cfg(unix)]
+    ///     mio::Ready::from_usize(
+    ///         mio::Ready::readable().as_usize()
+    ///         | mio::unix::UnixReady::error().as_usize()
+    ///         | mio::unix::UnixReady::hup().as_usize()
+    ///     );
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function panics if thread-local runtime is not set.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
+    pub fn new_with_ready(io: E, ready: mio::Ready) -> io::Result<Self> {
+        let registration = Registration::new_with_ready(&io, ready)?;
         Ok(Self {
             io: Some(io),
             inner: Inner {
@@ -204,7 +240,7 @@ where
         Ok(io)
     }
 
-    /// Check the I/O resource's read readiness state.
+    /// Checks the I/O resource's read readiness state.
     ///
     /// The mask argument allows specifying what readiness to notify on. This
     /// can be any value, including platform specific readiness, **except**
@@ -217,7 +253,7 @@ where
     /// The I/O resource will remain in a read-ready state until readiness is
     /// cleared by calling [`clear_read_ready`].
     ///
-    /// [`clear_read_ready`]: #method.clear_read_ready
+    /// [`clear_read_ready`]: method@Self::clear_read_ready
     ///
     /// # Panics
     ///
@@ -225,6 +261,11 @@ where
     ///
     /// * `ready` includes writable.
     /// * called from outside of a task context.
+    ///
+    /// # Warning
+    ///
+    /// This method may not be called concurrently. It takes `&self` to allow
+    /// calling it concurrently with `poll_write_ready`.
     pub fn poll_read_ready(
         &self,
         cx: &mut Context<'_>,
@@ -272,18 +313,18 @@ where
         Ok(())
     }
 
-    /// Check the I/O resource's write readiness state.
+    /// Checks the I/O resource's write readiness state.
     ///
     /// This always checks for writable readiness and also checks for HUP
     /// readiness on platforms that support it.
     ///
-    /// If the resource is not ready for a write then `Async::NotReady` is
+    /// If the resource is not ready for a write then `Poll::Pending` is
     /// returned and the current task is notified once a new event is received.
     ///
     /// The I/O resource will remain in a write-ready state until readiness is
     /// cleared by calling [`clear_write_ready`].
     ///
-    /// [`clear_write_ready`]: #method.clear_write_ready
+    /// [`clear_write_ready`]: method@Self::clear_write_ready
     ///
     /// # Panics
     ///
@@ -291,6 +332,11 @@ where
     ///
     /// * `ready` contains bits besides `writable` and `hup`.
     /// * called from outside of a task context.
+    ///
+    /// # Warning
+    ///
+    /// This method may not be called concurrently. It takes `&self` to allow
+    /// calling it concurrently with `poll_read_ready`.
     pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<mio::Ready>> {
         poll_ready!(
             self,

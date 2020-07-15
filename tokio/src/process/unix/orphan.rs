@@ -22,9 +22,9 @@ impl<T: Wait> Wait for &mut T {
 
 /// An interface for queueing up an orphaned process so that it can be reaped.
 pub(crate) trait OrphanQueue<T> {
-    /// Add an orphan to the queue.
+    /// Adds an orphan to the queue.
     fn push_orphan(&self, orphan: T);
-    /// Attempt to reap every process in the queue, ignoring any errors and
+    /// Attempts to reap every process in the queue, ignoring any errors and
     /// enqueueing any orphans which have not yet exited.
     fn reap_orphans(&self);
 }

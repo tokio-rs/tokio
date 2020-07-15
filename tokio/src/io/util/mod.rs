@@ -7,6 +7,9 @@ cfg_io_util! {
     mod async_read_ext;
     pub use async_read_ext::AsyncReadExt;
 
+    mod async_seek_ext;
+    pub use async_seek_ext::AsyncSeekExt;
+
     mod async_write_ext;
     pub use async_write_ext::AsyncWriteExt;
 
@@ -56,6 +59,11 @@ cfg_io_util! {
 
     mod split;
     pub use split::Split;
+
+    cfg_stream! {
+        mod stream_reader;
+        pub use stream_reader::{stream_reader, StreamReader};
+    }
 
     mod take;
     pub use take::Take;

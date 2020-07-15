@@ -203,7 +203,7 @@ fn huge_size() {
             if buf.len() < 32 * 1024 {
                 return Ok(None);
             }
-            buf.split_to(32 * 1024);
+            buf.advance(32 * 1024);
             Ok(Some(0))
         }
     }

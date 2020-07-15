@@ -24,12 +24,29 @@ pin_project! {
 }
 
 impl<RW: AsyncRead + AsyncWrite> BufStream<RW> {
-    /// Wrap a type in both [`BufWriter`] and [`BufReader`].
+    /// Wraps a type in both [`BufWriter`] and [`BufReader`].
     ///
     /// See the documentation for those types and [`BufStream`] for details.
     pub fn new(stream: RW) -> BufStream<RW> {
         BufStream {
             inner: BufReader::new(BufWriter::new(stream)),
+        }
+    }
+
+    /// Creates a `BufStream` with the specified [`BufReader`] capacity and [`BufWriter`]
+    /// capacity.
+    ///
+    /// See the documentation for those types and [`BufStream`] for details.
+    pub fn with_capacity(
+        reader_capacity: usize,
+        writer_capacity: usize,
+        stream: RW,
+    ) -> BufStream<RW> {
+        BufStream {
+            inner: BufReader::with_capacity(
+                reader_capacity,
+                BufWriter::with_capacity(writer_capacity, stream),
+            ),
         }
     }
 
@@ -131,7 +148,7 @@ impl<RW: AsyncRead + AsyncWrite> AsyncRead for BufStream<RW> {
     }
 }
 
-impl<RW: AsyncBufRead + AsyncRead + AsyncWrite> AsyncBufRead for BufStream<RW> {
+impl<RW: AsyncRead + AsyncWrite> AsyncBufRead for BufStream<RW> {
     fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
         self.project().inner.poll_fill_buf(cx)
     }

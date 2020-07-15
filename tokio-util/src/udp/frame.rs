@@ -1,9 +1,9 @@
 use crate::codec::{Decoder, Encoder};
 
-use tokio::net::UdpSocket;
+use tokio::{net::UdpSocket, stream::Stream};
 
 use bytes::{BufMut, BytesMut};
-use futures_core::{ready, Stream};
+use futures_core::ready;
 use futures_sink::Sink;
 use std::io;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
@@ -27,7 +27,7 @@ use std::task::{Context, Poll};
 /// calling `split` on the `UdpFramed` returned by this method, which will break
 /// them into separate objects, allowing them to interact more easily.
 #[must_use = "sinks do nothing unless polled"]
-#[cfg_attr(docsrs, doc(feature = "codec-udp"))]
+#[cfg_attr(docsrs, doc(all(feature = "codec", feature = "udp")))]
 #[derive(Debug)]
 pub struct UdpFramed<C> {
     socket: UdpSocket,
@@ -70,7 +70,7 @@ impl<C: Decoder + Unpin> Stream for UdpFramed<C> {
     }
 }
 
-impl<C: Encoder + Unpin> Sink<(C::Item, SocketAddr)> for UdpFramed<C> {
+impl<I, C: Encoder<I> + Unpin> Sink<(I, SocketAddr)> for UdpFramed<C> {
     type Error = C::Error;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -84,7 +84,7 @@ impl<C: Encoder + Unpin> Sink<(C::Item, SocketAddr)> for UdpFramed<C> {
         Poll::Ready(Ok(()))
     }
 
-    fn start_send(self: Pin<&mut Self>, item: (C::Item, SocketAddr)) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, item: (I, SocketAddr)) -> Result<(), Self::Error> {
         let (frame, out_addr) = item;
 
         let pin = self.get_mut();

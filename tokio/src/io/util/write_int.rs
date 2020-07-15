@@ -56,6 +56,9 @@ macro_rules! writer {
                     {
                         Poll::Pending => return Poll::Pending,
                         Poll::Ready(Err(e)) => return Poll::Ready(Err(e.into())),
+                        Poll::Ready(Ok(0)) => {
+                            return Poll::Ready(Err(io::ErrorKind::WriteZero.into()));
+                        }
                         Poll::Ready(Ok(n)) => n as u8,
                     };
                 }
@@ -96,7 +99,7 @@ macro_rules! writer8 {
                 match me.dst.poll_write(cx, &buf[..]) {
                     Poll::Pending => Poll::Pending,
                     Poll::Ready(Err(e)) => Poll::Ready(Err(e.into())),
-                    Poll::Ready(Ok(0)) => Poll::Pending,
+                    Poll::Ready(Ok(0)) => Poll::Ready(Err(io::ErrorKind::WriteZero.into())),
                     Poll::Ready(Ok(1)) => Poll::Ready(Ok(())),
                     Poll::Ready(Ok(_)) => unreachable!(),
                 }

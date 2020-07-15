@@ -104,8 +104,8 @@ const ERROR: u64 = u64::MAX;
 // ===== impl Entry =====
 
 impl Entry {
-    pub(crate) fn new(deadline: Instant, duration: Duration) -> Arc<Entry> {
-        let inner = Handle::current().inner().unwrap();
+    pub(crate) fn new(handle: &Handle, deadline: Instant, duration: Duration) -> Arc<Entry> {
+        let inner = handle.inner().unwrap();
         let entry: Entry;
 
         // Increment the number of active timeouts
@@ -143,12 +143,12 @@ impl Entry {
     /// The current entry state as known by the timer. This is not the value of
     /// `state`, but lets the timer know how to converge its state to `state`.
     pub(crate) fn when_internal(&self) -> Option<u64> {
-        unsafe { (*self.when.get()) }
+        unsafe { *self.when.get() }
     }
 
     pub(crate) fn set_when_internal(&self, when: Option<u64>) {
         unsafe {
-            (*self.when.get()) = when;
+            *self.when.get() = when;
         }
     }
 
@@ -266,8 +266,9 @@ impl Entry {
         let when = inner.normalize_deadline(deadline);
         let elapsed = inner.elapsed();
 
+        let next = if when <= elapsed { ELAPSED } else { when };
+
         let mut curr = entry.state.load(SeqCst);
-        let mut notify;
 
         loop {
             // In these two cases, there is no work to do when resetting the
@@ -276,16 +277,6 @@ impl Entry {
             // the reset is a noop.
             if curr == ERROR || curr == when {
                 return;
-            }
-
-            let next;
-
-            if when <= elapsed {
-                next = ELAPSED;
-                notify = !is_elapsed(curr);
-            } else {
-                next = when;
-                notify = true;
             }
 
             let actual = entry.state.compare_and_swap(curr, next, SeqCst);
@@ -297,7 +288,16 @@ impl Entry {
             curr = actual;
         }
 
-        if notify {
+        // If the state has transitioned to 'elapsed' then wake the task as
+        // this entry is ready to be polled.
+        if !is_elapsed(curr) && is_elapsed(next) {
+            entry.waker.wake();
+        }
+
+        // The driver tracks all non-elapsed entries; notify the driver that it
+        // should update its state for this entry unless the entry had already
+        // elapsed and remains elapsed.
+        if !is_elapsed(curr) || !is_elapsed(next) {
             let _ = inner.queue(entry);
         }
     }

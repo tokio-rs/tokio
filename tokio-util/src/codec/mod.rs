@@ -1,13 +1,18 @@
-//! Utilities for encoding and decoding frames.
+//! Adaptors from AsyncRead/AsyncWrite to Stream/Sink
 //!
-//! Contains adapters to go from streams of bytes, [`AsyncRead`] and
-//! [`AsyncWrite`], to framed streams implementing [`Sink`] and [`Stream`].
-//! Framed streams are also known as transports.
+//! Raw I/O objects work with byte sequences, but higher-level code
+//! usually wants to batch these into meaningful chunks, called
+//! "frames".
 //!
-//! [`AsyncRead`]: https://docs.rs/tokio/*/tokio/io/trait.AsyncRead.html
-//! [`AsyncWrite`]: https://docs.rs/tokio/*/tokio/io/trait.AsyncWrite.html
-//! [`Sink`]: https://docs.rs/futures-sink/*/futures_sink/trait.Sink.html
-//! [`Stream`]: https://docs.rs/futures-core/*/futures_core/stream/trait.Stream.html
+//! This module contains adapters to go from streams of bytes,
+//! [`AsyncRead`] and [`AsyncWrite`], to framed streams implementing
+//! [`Sink`] and [`Stream`].  Framed streams are also known as
+//! transports.
+//!
+//! [`AsyncRead`]: tokio::io::AsyncRead
+//! [`AsyncWrite`]: tokio::io::AsyncWrite
+//! [`Stream`]: tokio::stream::Stream
+//! [`Sink`]: futures_sink::Sink
 
 mod bytes_codec;
 pub use self::bytes_codec::BytesCodec;
@@ -17,6 +22,10 @@ pub use self::decoder::Decoder;
 
 mod encoder;
 pub use self::encoder::Encoder;
+
+mod framed_impl;
+#[allow(unused_imports)]
+pub(crate) use self::framed_impl::{FramedImpl, RWFrames, ReadFrame, WriteFrame};
 
 mod framed;
 pub use self::framed::{Framed, FramedParts};

@@ -1,4 +1,4 @@
-use tokio::net::UdpSocket;
+use tokio::{net::UdpSocket, stream::StreamExt};
 use tokio_util::codec::{Decoder, Encoder};
 use tokio_util::udp::UdpFramed;
 
@@ -6,9 +6,9 @@ use bytes::{BufMut, BytesMut};
 use futures::future::try_join;
 use futures::future::FutureExt;
 use futures::sink::SinkExt;
-use futures::stream::StreamExt;
 use std::io;
 
+#[cfg_attr(any(target_os = "macos", target_os = "ios"), allow(unused_assignments))]
 #[tokio::test]
 async fn send_framed() -> std::io::Result<()> {
     let mut a_soc = UdpSocket::bind("127.0.0.1:0").await?;
@@ -22,33 +22,34 @@ async fn send_framed() -> std::io::Result<()> {
         let mut a = UdpFramed::new(a_soc, ByteCodec);
         let mut b = UdpFramed::new(b_soc, ByteCodec);
 
-        let msg = b"4567".to_vec();
+        let msg = b"4567";
 
-        let send = a.send((msg.clone(), b_addr));
+        let send = a.send((msg, b_addr));
         let recv = b.next().map(|e| e.unwrap());
         let (_, received) = try_join(send, recv).await.unwrap();
 
         let (data, addr) = received;
-        assert_eq!(msg, data);
+        assert_eq!(msg, &*data);
         assert_eq!(a_addr, addr);
 
         a_soc = a.into_inner();
         b_soc = b.into_inner();
     }
 
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     // test sending & receiving an empty message
     {
         let mut a = UdpFramed::new(a_soc, ByteCodec);
         let mut b = UdpFramed::new(b_soc, ByteCodec);
 
-        let msg = b"".to_vec();
+        let msg = b"";
 
-        let send = a.send((msg.clone(), b_addr));
+        let send = a.send((msg, b_addr));
         let recv = b.next().map(|e| e.unwrap());
         let (_, received) = try_join(send, recv).await.unwrap();
 
         let (data, addr) = received;
-        assert_eq!(msg, data);
+        assert_eq!(msg, &*data);
         assert_eq!(a_addr, addr);
     }
 
@@ -67,13 +68,12 @@ impl Decoder for ByteCodec {
     }
 }
 
-impl Encoder for ByteCodec {
-    type Item = Vec<u8>;
+impl Encoder<&[u8]> for ByteCodec {
     type Error = io::Error;
 
-    fn encode(&mut self, data: Vec<u8>, buf: &mut BytesMut) -> Result<(), io::Error> {
+    fn encode(&mut self, data: &[u8], buf: &mut BytesMut) -> Result<(), io::Error> {
         buf.reserve(data.len());
-        buf.put_slice(&data);
+        buf.put_slice(data);
         Ok(())
     }
 }

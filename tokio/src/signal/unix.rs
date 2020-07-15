@@ -214,7 +214,7 @@ fn action(globals: Pin<&'static Globals>, signal: c_int) {
     drop(sender.write(&[1]));
 }
 
-/// Enable this module to receive signal notifications for the `signal`
+/// Enables this module to receive signal notifications for the `signal`
 /// provided.
 ///
 /// This will register the signal handler if it hasn't already been registered,
@@ -243,7 +243,7 @@ fn signal_enable(signal: c_int) -> io::Result<()> {
     });
     registered?;
     // If the call_once failed, it won't be retried on the next attempt to register the signal. In
-    // such case it is not run, registered is still `Ok(())`, initialized is still false.
+    // such case it is not run, registered is still `Ok(())`, initialized is still `false`.
     if siginfo.initialized.load(Ordering::Relaxed) {
         Ok(())
     } else {
@@ -294,9 +294,11 @@ impl Driver {
     /// Drain all data in the global receiver, ensuring we'll get woken up when
     /// there is a write on the other end.
     ///
-    /// We do *NOT* use the existence of any read bytes as evidence a sigal was
+    /// We do *NOT* use the existence of any read bytes as evidence a signal was
     /// received since the `pending` flags would have already been set if that
-    /// was the case. See #38 for more info.
+    /// was the case. See
+    /// [#38](https://github.com/alexcrichton/tokio-signal/issues/38) for more
+    /// info.
     fn drain(&mut self, cx: &mut Context<'_>) {
         loop {
             match Pin::new(&mut self.wakeup).poll_read(cx, &mut [0; 128]) {
@@ -399,7 +401,7 @@ pub struct Signal {
 /// * If the lower-level C functions fail for some reason.
 /// * If the previous initialization of this specific signal failed.
 /// * If the signal is one of
-///   [`signal_hook::FORBIDDEN`](https://docs.rs/signal-hook/*/signal_hook/fn.register.html#panics)
+///   [`signal_hook::FORBIDDEN`](fn@signal_hook_registry::register#panics)
 pub fn signal(kind: SignalKind) -> io::Result<Signal> {
     let signal = kind.0;
 
@@ -419,7 +421,7 @@ pub fn signal(kind: SignalKind) -> io::Result<Signal> {
 }
 
 impl Signal {
-    /// Receive the next signal notification event.
+    /// Receives the next signal notification event.
     ///
     /// `None` is returned if no more events can be received by this stream.
     ///
@@ -447,7 +449,7 @@ impl Signal {
         poll_fn(|cx| self.poll_recv(cx)).await
     }
 
-    /// Poll to receive the next signal notification event, outside of an
+    /// Polls to receive the next signal notification event, outside of an
     /// `async` context.
     ///
     /// `None` is returned if no more events can be received by this stream.
@@ -482,7 +484,7 @@ impl Signal {
 }
 
 cfg_stream! {
-    impl futures_core::Stream for Signal {
+    impl crate::stream::Stream for Signal {
         type Item = ();
 
         fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<()>> {

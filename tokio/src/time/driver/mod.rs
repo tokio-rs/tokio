@@ -4,10 +4,10 @@ mod atomic_stack;
 use self::atomic_stack::AtomicStack;
 
 mod entry;
-use self::entry::Entry;
+pub(super) use self::entry::Entry;
 
 mod handle;
-pub(crate) use self::handle::{set_default, Handle};
+pub(crate) use self::handle::Handle;
 
 mod registration;
 pub(crate) use self::registration::Registration;
@@ -20,7 +20,8 @@ use crate::park::{Park, Unpark};
 use crate::time::{wheel, Error};
 use crate::time::{Clock, Duration, Instant};
 
-use std::sync::atomic::Ordering::SeqCst;
+use std::sync::atomic::Ordering::{Acquire, Relaxed, Release, SeqCst};
+
 use std::sync::Arc;
 use std::usize;
 use std::{cmp, fmt};
@@ -70,19 +71,11 @@ use std::{cmp, fmt};
 /// * Level 5: 64 x ~12 day slots.
 ///
 /// When the timer processes entries at level zero, it will notify all the
-/// [`Delay`] instances as their deadlines have been reached. For all higher
+/// `Delay` instances as their deadlines have been reached. For all higher
 /// levels, all entries will be redistributed across the wheel at the next level
 /// down. Eventually, as time progresses, entries will [`Delay`] instances will
 /// either be canceled (dropped) or their associated entries will reach level
 /// zero and be notified.
-///
-/// [`Delay`]: struct.Delay.html
-/// [`Interval`]: struct.Interval.html
-/// [`Timeout`]: struct.Timeout.html
-/// [paper]: http://www.cs.columbia.edu/~nahum/w6998/papers/ton97-timing-wheels.pdf
-/// [`handle`]: #method.handle
-/// [`turn`]: #method.turn
-/// [Handle.struct]: struct.Handle.html
 #[derive(Debug)]
 pub(crate) struct Driver<T> {
     /// Shared state
@@ -125,7 +118,7 @@ impl<T> Driver<T>
 where
     T: Park,
 {
-    /// Create a new `Driver` instance that uses `park` to block the current
+    /// Creates a new `Driver` instance that uses `park` to block the current
     /// thread and `now` to get the current `Instant`.
     ///
     /// Specifying the source of time is useful when testing.
@@ -155,7 +148,7 @@ where
         self.inner.start + Duration::from_millis(when)
     }
 
-    /// Run timer related logic
+    /// Runs timer related logic
     fn process(&mut self) {
         let now = crate::time::ms(
             self.clock.now() - self.inner.start,
@@ -177,7 +170,7 @@ where
         self.inner.elapsed.store(self.wheel.elapsed(), SeqCst);
     }
 
-    /// Process the entry queue
+    /// Processes the entry queue
     ///
     /// This handles adding and canceling timeouts.
     fn process_queue(&mut self) {
@@ -207,7 +200,7 @@ where
         entry.set_when_internal(None);
     }
 
-    /// Fire the entry if it needs to, otherwise queue it to be processed later.
+    /// Fires the entry if it needs to, otherwise queue it to be processed later.
     ///
     /// Returns `None` if the entry was fired.
     fn add_entry(&mut self, entry: Arc<Entry>, when: u64) {
@@ -253,7 +246,14 @@ where
                 let deadline = self.expiration_instant(when);
 
                 if deadline > now {
-                    self.park.park_timeout(deadline - now)?;
+                    let dur = deadline - now;
+
+                    if self.clock.is_paused() {
+                        self.park.park_timeout(Duration::from_secs(0))?;
+                        self.clock.advance(dur);
+                    } else {
+                        self.park.park_timeout(dur)?;
+                    }
                 } else {
                     self.park.park_timeout(Duration::from_secs(0))?;
                 }
@@ -277,7 +277,14 @@ where
                 let deadline = self.expiration_instant(when);
 
                 if deadline > now {
-                    self.park.park_timeout(cmp::min(deadline - now, duration))?;
+                    let duration = cmp::min(deadline - now, duration);
+
+                    if self.clock.is_paused() {
+                        self.park.park_timeout(Duration::from_secs(0))?;
+                        self.clock.advance(duration);
+                    } else {
+                        self.park.park_timeout(duration)?;
+                    }
                 } else {
                     self.park.park_timeout(Duration::from_secs(0))?;
                 }
@@ -327,28 +334,32 @@ impl Inner {
         self.elapsed.load(SeqCst)
     }
 
-    /// Increment the number of active timeouts
-    fn increment(&self) -> Result<(), Error> {
-        let mut curr = self.num.load(SeqCst);
+    #[cfg(all(test, loom))]
+    fn num(&self, ordering: std::sync::atomic::Ordering) -> usize {
+        self.num.load(ordering)
+    }
 
+    /// Increments the number of active timeouts
+    fn increment(&self) -> Result<(), Error> {
+        let mut curr = self.num.load(Relaxed);
         loop {
             if curr == MAX_TIMEOUTS {
                 return Err(Error::at_capacity());
             }
 
-            let actual = self.num.compare_and_swap(curr, curr + 1, SeqCst);
-
-            if curr == actual {
-                return Ok(());
+            match self
+                .num
+                .compare_exchange_weak(curr, curr + 1, Release, Relaxed)
+            {
+                Ok(_) => return Ok(()),
+                Err(next) => curr = next,
             }
-
-            curr = actual;
         }
     }
 
-    /// Decrement the number of active timeouts
+    /// Decrements the number of active timeouts
     fn decrement(&self) {
-        let prev = self.num.fetch_sub(1, SeqCst);
+        let prev = self.num.fetch_sub(1, Acquire);
         debug_assert!(prev <= MAX_TIMEOUTS);
     }
 
@@ -375,3 +386,6 @@ impl fmt::Debug for Inner {
         fmt.debug_struct("Inner").finish()
     }
 }
+
+#[cfg(all(test, loom))]
+mod tests;

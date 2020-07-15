@@ -48,7 +48,8 @@ macro_rules! reader {
                 }
 
                 while *me.read < $bytes as u8 {
-                    *me.read += match me.src
+                    *me.read += match me
+                        .src
                         .as_mut()
                         .poll_read(cx, &mut me.buf[*me.read as usize..])
                     {

@@ -217,7 +217,7 @@ impl<T> fmt::Debug for Level<T> {
 }
 
 fn occupied_bit(slot: usize) -> u64 {
-    (1 << slot)
+    1 << slot
 }
 
 fn slot_range(level: usize) -> u64 {

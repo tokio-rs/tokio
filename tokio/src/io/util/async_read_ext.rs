@@ -16,7 +16,7 @@ use crate::io::AsyncRead;
 use bytes::BufMut;
 
 cfg_io_util! {
-    /// Define numeric reader
+    /// Defines numeric reader
     macro_rules! read_impl {
         (
             $(
@@ -33,7 +33,7 @@ cfg_io_util! {
         }
     }
 
-    /// Read bytes from a source.
+    /// Reads bytes from a source.
     ///
     /// Implemented as an extention trait, adding utility methods to all
     /// [`AsyncRead`] types. Callers will tend to import this trait instead of
@@ -62,7 +62,7 @@ cfg_io_util! {
     /// [`AsyncRead`]: AsyncRead
     /// [`prelude`]: crate::prelude
     pub trait AsyncReadExt: AsyncRead {
-        /// Create a new `AsyncRead` instance that chains this stream with
+        /// Creates a new `AsyncRead` instance that chains this stream with
         /// `next`.
         ///
         /// The returned `AsyncRead` instance will first read all bytes from this object
@@ -99,7 +99,7 @@ cfg_io_util! {
             chain(self, next)
         }
 
-        /// Pull some bytes from this source into the specified buffer,
+        /// Pulls some bytes from this source into the specified buffer,
         /// returning how many bytes were read.
         ///
         /// Equivalent to:
@@ -124,7 +124,7 @@ cfg_io_util! {
         ///
         /// No guarantees are provided about the contents of `buf` when this
         /// function is called, implementations cannot rely on any property of the
-        /// contents of `buf` being true. It is recommended that *implementations*
+        /// contents of `buf` being `true`. It is recommended that *implementations*
         /// only write data to `buf` instead of reading its contents.
         ///
         /// Correspondingly, however, *callers* of this method may not assume
@@ -166,7 +166,7 @@ cfg_io_util! {
             read(self, buf)
         }
 
-        /// Pull some bytes from this source into the specified buffer,
+        /// Pulls some bytes from this source into the specified buffer,
         /// advancing the buffer's internal cursor.
         ///
         /// Equivalent to:
@@ -225,13 +225,13 @@ cfg_io_util! {
         /// ```
         fn read_buf<'a, B>(&'a mut self, buf: &'a mut B) -> ReadBuf<'a, Self, B>
         where
-            Self: Sized,
+            Self: Sized + Unpin,
             B: BufMut,
         {
             read_buf(self, buf)
         }
 
-        /// Read the exact number of bytes required to fill `buf`.
+        /// Reads the exact number of bytes required to fill `buf`.
         ///
         /// Equivalent to:
         ///
@@ -241,12 +241,6 @@ cfg_io_util! {
         ///
         /// This function reads as many bytes as necessary to completely fill
         /// the specified buffer `buf`.
-        ///
-        /// No guarantees are provided about the contents of `buf` when this
-        /// function is called, implementations cannot rely on any property of
-        /// the contents of `buf` being true. It is recommended that
-        /// implementations only write data to `buf` instead of reading its
-        /// contents.
         ///
         /// # Errors
         ///
@@ -982,7 +976,7 @@ cfg_io_util! {
             fn read_i128_le(&mut self) -> ReadI128Le;
         }
 
-        /// Read all bytes until EOF in this source, placing them into `buf`.
+        /// Reads all bytes until EOF in this source, placing them into `buf`.
         ///
         /// Equivalent to:
         ///
@@ -1032,7 +1026,7 @@ cfg_io_util! {
             read_to_end(self, buf)
         }
 
-        /// Read all bytes until EOF in this source, appending them to `buf`.
+        /// Reads all bytes until EOF in this source, appending them to `buf`.
         ///
         /// Equivalent to:
         ///
