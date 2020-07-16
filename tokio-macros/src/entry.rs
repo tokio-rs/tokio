@@ -57,7 +57,7 @@ fn parse_knobs(
                                         runtime = Some(Runtime::Basic);
                                     }
 
-                                    if let Some(v) = max_threads {
+                                    if let Some(ThreadCount::Constant(v)) = max_threads {
                                         if v < num {
                                             return Err(syn::Error::new_spanned(
                                                 namevalue,
@@ -106,8 +106,19 @@ fn parse_knobs(
                                     ));
                                 }
                             }
-                            max_threads = Some(num);
+                            max_threads = Some(ThreadCount::Constant(num));
                         }
+                        syn::Lit::Str(expr) => match syn::parse_str::<Expr>(&expr.value()) {
+                            Ok(ex) => {
+                                max_threads = Some(ThreadCount::Expression(ex));
+                            }
+                            Err(e) => {
+                                return Err(syn::Error::new_spanned(
+                                    namevalue,
+                                    format!("max_threads argument isn't a valid expression: {}", e),
+                                ));
+                            }
+                        },
                         _ => {
                             return Err(syn::Error::new_spanned(
                                 namevalue,
@@ -159,8 +170,15 @@ fn parse_knobs(
             }
             ThreadCount::Expression(e) => quote! { #rt.core_threads(#e) },
         };
-    } else if let Some(v) = max_threads.map(|v| v.get()) {
-        rt = quote! { #rt.max_threads(#v) };
+    }
+    if let Some(v) = max_threads {
+        rt = match v {
+            ThreadCount::Constant(u) => {
+                let val = u.get();
+                quote! { #rt.max_threads(#val) }
+            }
+            ThreadCount::Expression(e) => quote! { #rt.max_threads(#e) },
+        };
     }
 
     let header = {
