@@ -1,11 +1,18 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use std::num::NonZeroUsize;
+use syn::Expr;
 
 #[derive(Clone, Copy, PartialEq)]
 enum Runtime {
     Basic,
     Threaded,
+}
+
+#[derive(Clone)]
+enum ThreadCount {
+    Constant(NonZeroUsize),
+    Expression(Expr),
 }
 
 fn parse_knobs(
@@ -59,7 +66,19 @@ fn parse_knobs(
                                         }
                                     }
 
-                                    core_threads = Some(num);
+                                    core_threads = Some(ThreadCount::Constant(num));
+                                }
+                                syn::Lit::Str(expr) => {
+                                    // Might want a fancier way to switch..?
+                                    runtime = Some(Runtime::Threaded);
+                                    match syn::parse_str::<Expr>(&expr.value()) {
+                                        Ok(ex) => {
+                                            core_threads = Some(ThreadCount::Expression(ex));
+                                        }
+                                        Err(e) => {
+                                            return Err(syn::Error::new_spanned(namevalue, format!("core_threads argument isn't a valid expression: {}", e)));
+                                        }
+                                    }
                                 }
                                 _ => {
                                     return Err(syn::Error::new_spanned(
@@ -79,7 +98,7 @@ fn parse_knobs(
                         syn::Lit::Int(expr) => {
                             let num = expr.base10_parse::<NonZeroUsize>().unwrap();
 
-                            if let Some(v) = core_threads {
+                            if let Some(ThreadCount::Constant(v)) = core_threads {
                                 if num < v {
                                     return Err(syn::Error::new_spanned(
                                         namevalue,
@@ -132,10 +151,15 @@ fn parse_knobs(
     if rt_threaded && (runtime == Some(Runtime::Threaded) || (runtime.is_none() && !is_test)) {
         rt = quote! { #rt.threaded_scheduler() };
     }
-    if let Some(v) = core_threads.map(|v| v.get()) {
-        rt = quote! { #rt.core_threads(#v) };
-    }
-    if let Some(v) = max_threads.map(|v| v.get()) {
+    if let Some(v) = core_threads {
+        rt = match v {
+            ThreadCount::Constant(u) => {
+                let val = u.get();
+                quote! { #rt.core_threads(#val) }
+            }
+            ThreadCount::Expression(e) => quote! { #rt.core_threads(#e) },
+        };
+    } else if let Some(v) = max_threads.map(|v| v.get()) {
         rt = quote! { #rt.max_threads(#v) };
     }
 
