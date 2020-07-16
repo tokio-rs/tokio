@@ -121,3 +121,13 @@ reader!(ReadI16, i16, get_i16);
 reader!(ReadI32, i32, get_i32);
 reader!(ReadI64, i64, get_i64);
 reader!(ReadI128, i128, get_i128);
+
+reader!(ReadU16Le, u16, get_u16_le);
+reader!(ReadU32Le, u32, get_u32_le);
+reader!(ReadU64Le, u64, get_u64_le);
+reader!(ReadU128Le, u128, get_u128_le);
+
+reader!(ReadI16Le, i16, get_i16_le);
+reader!(ReadI32Le, i32, get_i32_le);
+reader!(ReadI64Le, i64, get_i64_le);
+reader!(ReadI128Le, i128, get_i128_le);
