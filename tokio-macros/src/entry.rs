@@ -73,7 +73,8 @@ fn parse_knobs(
                                     runtime = Some(Runtime::Threaded);
                                     match syn::parse_str::<Expr>(&expr.value()) {
                                         Ok(ex) => {
-                                            core_threads = Some(ThreadCount::Expression(Box::new(ex)));
+                                            core_threads =
+                                                Some(ThreadCount::Expression(Box::new(ex)));
                                         }
                                         Err(e) => {
                                             return Err(syn::Error::new_spanned(namevalue, format!("core_threads argument isn't a valid expression: {}", e)));
