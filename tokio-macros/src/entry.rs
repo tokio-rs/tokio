@@ -12,7 +12,7 @@ enum Runtime {
 #[derive(Clone)]
 enum ThreadCount {
     Constant(NonZeroUsize),
-    Expression(Expr),
+    Expression(Box<Expr>),
 }
 
 fn parse_knobs(
@@ -73,7 +73,7 @@ fn parse_knobs(
                                     runtime = Some(Runtime::Threaded);
                                     match syn::parse_str::<Expr>(&expr.value()) {
                                         Ok(ex) => {
-                                            core_threads = Some(ThreadCount::Expression(ex));
+                                            core_threads = Some(ThreadCount::Expression(Box::new(ex)));
                                         }
                                         Err(e) => {
                                             return Err(syn::Error::new_spanned(namevalue, format!("core_threads argument isn't a valid expression: {}", e)));
@@ -110,7 +110,7 @@ fn parse_knobs(
                         }
                         syn::Lit::Str(expr) => match syn::parse_str::<Expr>(&expr.value()) {
                             Ok(ex) => {
-                                max_threads = Some(ThreadCount::Expression(ex));
+                                max_threads = Some(ThreadCount::Expression(Box::new(ex)));
                             }
                             Err(e) => {
                                 return Err(syn::Error::new_spanned(
