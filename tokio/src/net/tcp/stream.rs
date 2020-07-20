@@ -63,13 +63,17 @@ cfg_tcp! {
 impl TcpStream {
     /// Opens a TCP connection to a remote host.
     ///
-    /// `addr` is an address of the remote host. Anything which implements
-    /// `ToSocketAddrs` trait can be supplied for the address.
+    /// `addr` is an address of the remote host. Anything which implements the
+    /// [`ToSocketAddrs`] trait can be supplied as the address. Note that
+    /// strings only implement this trait when the **`dns`** feature is enabled,
+    /// as strings may contain domain names that need to be resolved.
     ///
     /// If `addr` yields multiple addresses, connect will be attempted with each
     /// of the addresses until a connection is successful. If none of the
     /// addresses result in a successful connection, the error returned from the
     /// last connection attempt (the last address) is returned.
+    ///
+    /// [`ToSocketAddrs`]: trait@crate::net::ToSocketAddrs
     ///
     /// # Examples
     ///
@@ -82,6 +86,26 @@ impl TcpStream {
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     // Connect to a peer
     ///     let mut stream = TcpStream::connect("127.0.0.1:8080").await?;
+    ///
+    ///     // Write some data.
+    ///     stream.write_all(b"hello world!").await?;
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// Without the `dns` feature:
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpStream;
+    /// use tokio::prelude::*;
+    /// use std::error::Error;
+    /// use std::net::Ipv4Addr;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     // Connect to a peer
+    ///     let mut stream = TcpStream::connect((Ipv4Addr::new(127, 0, 0, 1), 8080)).await?;
     ///
     ///     // Write some data.
     ///     stream.write_all(b"hello world!").await?;
