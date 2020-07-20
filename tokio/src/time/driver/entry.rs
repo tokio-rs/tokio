@@ -30,7 +30,8 @@ pub(crate) struct Entry {
     /// Timer internals. Using a weak pointer allows the timer to shutdown
     /// without all `Delay` instances having completed.
     ///
-    /// When `None`, the entry has not yet been linked with a timer instance.
+    /// When empty, it means that the entry has not yet been linked with a
+    /// timer instance.
     inner: Weak<Inner>,
 
     /// Tracks the entry state. This value contains the following information:
