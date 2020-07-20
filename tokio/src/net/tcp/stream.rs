@@ -65,7 +65,8 @@ impl TcpStream {
     ///
     /// `addr` is an address of the remote host. Anything which implements the
     /// [`ToSocketAddrs`] trait can be supplied as the address. Note that
-    /// strings only implement this trait when the **`dns`** feature is enabled.
+    /// strings only implement this trait when the **`dns`** feature is enabled,
+    /// as strings may contain domain names that need to be resolved.
     ///
     /// If `addr` yields multiple addresses, connect will be attempted with each
     /// of the addresses until a connection is successful. If none of the

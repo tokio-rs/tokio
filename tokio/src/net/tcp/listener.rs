@@ -82,7 +82,7 @@ impl TcpListener {
     ///
     /// The address type can be any implementor of the [`ToSocketAddrs`] trait.
     /// Note that strings only implement this trait when the **`dns`** feature
-    /// is enabled.
+    /// is enabled, as strings may contain domain names that need to be resolved.
     ///
     /// If `addr` yields multiple addresses, bind will be attempted with each of
     /// the addresses until one succeeds and returns the listener. If none of
