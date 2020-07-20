@@ -1,7 +1,6 @@
-# 0.2.21 (July 20, 2020)
+# 0.2.22 (July 20, 2020)
 
 ### Fixes
-
 - docs: misc improvements (#2572, #2658, #2663, #2656, #2647, #2630, #2487, #2621,
   #2624, #2600, #2623, #2622, #2577, #2569, #2589, #2575, #2540, #2564, #2567,
   #2520, #2521, #2572, #2493)
@@ -14,15 +13,14 @@
   `AsyncWriteExt::write_buf` (#2612)
 - io: fix unnecessary zeroing for `AsyncRead` implementors (#2525)
 - io: Fix `BufReader` not correctly forwarding `poll_write_buf` (#2654)
+- io: fix panic in `AsyncReadExt::read_line` (#2541)
 
 ### Changes
 - coop: returning `Poll::Pending` no longer decrements the task budget (#2549)
 
 ### Added
-
 - io: little-endian variants of `AsyncReadExt` and `AsyncWriteExt` methods
   (#1915)
-- io: fix panic in `AsyncReadExt::read_line` (#2541)
 - task: add [`tracing`] instrumentation to spawned tasks (#2655)
 - sync: allow unsized types in `Mutex` and `RwLock` (via `default` constructors)
   (#2615)
