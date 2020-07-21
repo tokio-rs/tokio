@@ -1,0 +1,22 @@
+name: Security Audit
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '**/Cargo.toml'
+  schedule:
+    - cron: '0 2 * * *' # run at 2 AM UTC
+
+jobs:
+  security-audit:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, 'ci skip')"
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Audit Check
+        uses: actions-rs/audit-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
