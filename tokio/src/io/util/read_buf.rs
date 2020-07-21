@@ -15,7 +15,7 @@ where
 }
 
 cfg_io_util! {
-    /// Future returned by [`read_buf`](AsyncReadExt::read_buf).
+    /// Future returned by [`read_buf`](crate::io::AsyncReadExt::read_buf).
     #[derive(Debug)]
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct ReadBuf<'a, R, B> {

@@ -3,7 +3,6 @@
 
 use std::io::{Error, ErrorKind, Result};
 use std::io::{Read, Write};
-use std::sync::{Arc, Barrier};
 use std::{net, thread};
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -90,9 +89,6 @@ async fn drop_write() -> Result<()> {
     let listener = net::TcpListener::bind("127.0.0.1:0")?;
     let addr = listener.local_addr()?;
 
-    let barrier = Arc::new(Barrier::new(2));
-    let barrier2 = barrier.clone();
-
     let handle = thread::spawn(move || {
         let (mut stream, _) = listener.accept().unwrap();
         stream.write_all(MSG).unwrap();
@@ -106,8 +102,6 @@ async fn drop_write() -> Result<()> {
             )),
             Err(err) => Err(err),
         };
-
-        barrier2.wait();
 
         drop(stream);
 
@@ -132,8 +126,6 @@ async fn drop_write() -> Result<()> {
         Ok(len) => panic!("Unexpected read: {} bytes.", len),
         Err(err) => panic!("Unexpected error: {}.", err),
     }
-
-    barrier.wait();
 
     handle.join().unwrap().unwrap();
     Ok(())

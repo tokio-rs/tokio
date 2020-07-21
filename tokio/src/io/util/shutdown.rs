@@ -8,7 +8,8 @@ use std::task::{Context, Poll};
 cfg_io_util! {
     /// A future used to shutdown an I/O object.
     ///
-    /// Created by the [`AsyncWriteExt::shutdown`] function.
+    /// Created by the [`AsyncWriteExt::shutdown`][shutdown] function.
+    /// [shutdown]: crate::io::AsyncWriteExt::shutdown
     #[derive(Debug)]
     pub struct Shutdown<'a, A: ?Sized> {
         a: &'a mut A,

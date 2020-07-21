@@ -40,7 +40,7 @@ pub struct OwnedReadHalf {
 /// Note that in the [`AsyncWrite`] implemenation of this type, [`poll_shutdown`] will
 /// shut down the TCP stream in the write direction.
 ///
-/// Dropping the write half will close the TCP stream in both directions.
+/// Dropping the write half will shutdown the write half of the TCP stream.
 ///
 /// Writing to an `OwnedWriteHalf` is usually done using the convenience methods found
 /// on the [`AsyncWriteExt`] trait. Examples import this trait through [the prelude].
@@ -209,9 +209,8 @@ impl OwnedWriteHalf {
     pub fn reunite(self, other: OwnedReadHalf) -> Result<TcpStream, ReuniteError> {
         reunite(other, self)
     }
-    /// Destroy the write half, but don't close the stream until the read half
-    /// is dropped. If the read half has already been dropped, this closes the
-    /// stream.
+
+    /// Drop the write half, but don't issue a TCP shutdown.
     pub fn forget(mut self) {
         self.shutdown_on_drop = false;
         drop(self);
@@ -221,7 +220,7 @@ impl OwnedWriteHalf {
 impl Drop for OwnedWriteHalf {
     fn drop(&mut self) {
         if self.shutdown_on_drop {
-            let _ = self.inner.shutdown(Shutdown::Both);
+            let _ = self.inner.shutdown(Shutdown::Write);
         }
     }
 }
