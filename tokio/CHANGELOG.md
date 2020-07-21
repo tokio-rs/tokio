@@ -3,7 +3,7 @@
 ### Fixes
 - docs: misc improvements (#2572, #2658, #2663, #2656, #2647, #2630, #2487, #2621,
   #2624, #2600, #2623, #2622, #2577, #2569, #2589, #2575, #2540, #2564, #2567,
-  #2520, #2521, #2572, #2493)
+  #2520, #2521, #2493)
 - rt: allow calls to `block_on` inside calls to `block_in_place` that are
   themselves inside `block_on` (#2645)
 - net: fix non-portable behavior when dropping `TcpStream` `OwnedWriteHalf` (#2597)
