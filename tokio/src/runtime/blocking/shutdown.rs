@@ -33,7 +33,7 @@ impl Receiver {
     /// duration. If `timeout` is `None`, then the thread is blocked until the
     /// shutdown signal is received.
     ///
-    /// If the timeout has elapsed it returns `false`, otherwise it returns `true`.
+    /// If the timeout has elapsed, it returns `false`, otherwise it returns `true`.
     pub(crate) fn wait(&mut self, timeout: Option<Duration>) -> bool {
         use crate::runtime::enter::{enter, try_enter};
 
