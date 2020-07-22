@@ -1,3 +1,35 @@
+# 0.2.22 (July 21, 2020)
+
+### Fixes
+- docs: misc improvements (#2572, #2658, #2663, #2656, #2647, #2630, #2487, #2621,
+  #2624, #2600, #2623, #2622, #2577, #2569, #2589, #2575, #2540, #2564, #2567,
+  #2520, #2521, #2493)
+- rt: allow calls to `block_on` inside calls to `block_in_place` that are
+  themselves inside `block_on` (#2645)
+- net: fix non-portable behavior when dropping `TcpStream` `OwnedWriteHalf` (#2597)
+- io: improve stack usage by allocating large buffers on directly on the heap
+  (#2634)
+- io: fix unsound pin projection in `AsyncReadExt::read_buf` and
+  `AsyncWriteExt::write_buf` (#2612)
+- io: fix unnecessary zeroing for `AsyncRead` implementors (#2525)
+- io: Fix `BufReader` not correctly forwarding `poll_write_buf` (#2654)
+- io: fix panic in `AsyncReadExt::read_line` (#2541)
+
+### Changes
+- coop: returning `Poll::Pending` no longer decrements the task budget (#2549)
+
+### Added
+- io: little-endian variants of `AsyncReadExt` and `AsyncWriteExt` methods
+  (#1915)
+- task: add [`tracing`] instrumentation to spawned tasks (#2655)
+- sync: allow unsized types in `Mutex` and `RwLock` (via `default` constructors)
+  (#2615)
+- net: add `ToSocketAddrs` implementation for `&[SocketAddr]` (#2604)
+- fs: add `OpenOptionsExt` for `OpenOptions` (#2515)
+- fs: add `DirBuilder` (#2524)
+
+[`tracing`]: https://crates.io/crates/tracing
+
 # 0.2.21 (May 13, 2020)
 
 ### Fixes
@@ -6,7 +38,7 @@
 - rt: `LocalSet` and task budgeting (#2462).
 - rt: task budgeting with `block_in_place` (#2502).
 - sync: release `broadcast` channel memory without sending a value (#2509).
-- time: notify when resetting a `Delay` to a time in the past (#2290).
+- time: notify when resetting a `Delay` to a time in the past (#2290)
 
 ### Added
 - io: `get_mut`, `get_ref`, and `into_inner` to `Lines` (#2450).
