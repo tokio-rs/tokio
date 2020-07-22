@@ -1,70 +1,33 @@
 use crate::park::{Park, Unpark};
-use crate::task::{self, JoinHandle, Schedule, ScheduleSendOnly, Task};
+use crate::runtime;
+use crate::runtime::task::{self, JoinHandle, Schedule, Task};
+use crate::util::linked_list::LinkedList;
+use crate::util::{waker_ref, Wake};
 
-use std::cell::UnsafeCell;
+use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
-use std::mem::ManuallyDrop;
 use std::sync::{Arc, Mutex};
-use std::task::{RawWaker, RawWakerVTable, Waker};
+use std::task::Poll::Ready;
 use std::time::Duration;
 
 /// Executes tasks on the current thread
-#[derive(Debug)]
 pub(crate) struct BasicScheduler<P>
 where
     P: Park,
 {
-    /// Scheduler component
-    scheduler: Arc<SchedulerPriv>,
-
-    /// Local state
-    local: LocalState<P>,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct Spawner {
-    scheduler: Arc<SchedulerPriv>,
-}
-
-/// The scheduler component.
-pub(super) struct SchedulerPriv {
-    /// List of all active tasks spawned onto this executor.
+    /// Scheduler run queue
     ///
-    /// # Safety
+    /// When the scheduler is executed, the queue is removed from `self` and
+    /// moved into `Context`.
     ///
-    /// Must only be accessed from the primary thread
-    owned_tasks: UnsafeCell<task::OwnedList<Self>>,
+    /// This indirection is to allow `BasicScheduler` to be `Send`.
+    tasks: Option<Tasks>,
 
-    /// Local run queue.
-    ///
-    /// Tasks notified from the current thread are pushed into this queue.
-    ///
-    /// # Safety
-    ///
-    /// References should not be handed out. Only call `push` / `pop` functions.
-    /// Only call from the owning thread.
-    local_queue: UnsafeCell<VecDeque<Task<SchedulerPriv>>>,
+    /// Sendable task spawner
+    spawner: Spawner,
 
-    /// Remote run queue.
-    ///
-    /// Tasks notified from another thread are pushed into this queue.
-    remote_queue: Mutex<RemoteQueue>,
-
-    /// Tasks pending drop
-    pending_drop: task::TransferStack<Self>,
-
-    /// Unpark the blocked thread
-    unpark: Box<dyn Unpark>,
-}
-
-unsafe impl Send for SchedulerPriv {}
-unsafe impl Sync for SchedulerPriv {}
-
-/// Local state
-#[derive(Debug)]
-struct LocalState<P> {
     /// Current tick
     tick: u8,
 
@@ -72,307 +35,292 @@ struct LocalState<P> {
     park: P,
 }
 
-#[derive(Debug)]
-struct RemoteQueue {
-    /// FIFO list of tasks
-    queue: VecDeque<Task<SchedulerPriv>>,
-
-    /// `true` when a task can be pushed into the queue, false otherwise.
-    open: bool,
+#[derive(Clone)]
+pub(crate) struct Spawner {
+    shared: Arc<Shared>,
 }
+
+struct Tasks {
+    /// Collection of all active tasks spawned onto this executor.
+    owned: LinkedList<Task<Arc<Shared>>>,
+
+    /// Local run queue.
+    ///
+    /// Tasks notified from the current thread are pushed into this queue.
+    queue: VecDeque<task::Notified<Arc<Shared>>>,
+}
+
+/// Scheduler state shared between threads.
+struct Shared {
+    /// Remote run queue
+    queue: Mutex<VecDeque<task::Notified<Arc<Shared>>>>,
+
+    /// Unpark the blocked thread
+    unpark: Box<dyn Unpark>,
+}
+
+/// Thread-local context
+struct Context {
+    /// Shared scheduler state
+    shared: Arc<Shared>,
+
+    /// Local queue
+    tasks: RefCell<Tasks>,
+}
+
+/// Initial queue capacity
+const INITIAL_CAPACITY: usize = 64;
 
 /// Max number of tasks to poll per tick.
 const MAX_TASKS_PER_TICK: usize = 61;
 
-/// How often to check the remote queue first
-const CHECK_REMOTE_INTERVAL: u8 = 13;
+/// How often ot check the remote queue first
+const REMOTE_FIRST_INTERVAL: u8 = 31;
+
+// Tracks the current BasicScheduler
+scoped_thread_local!(static CURRENT: Context);
 
 impl<P> BasicScheduler<P>
 where
     P: Park,
 {
     pub(crate) fn new(park: P) -> BasicScheduler<P> {
-        let unpark = park.unpark();
+        let unpark = Box::new(park.unpark());
 
         BasicScheduler {
-            scheduler: Arc::new(SchedulerPriv {
-                owned_tasks: UnsafeCell::new(task::OwnedList::new()),
-                local_queue: UnsafeCell::new(VecDeque::with_capacity(64)),
-                remote_queue: Mutex::new(RemoteQueue {
-                    queue: VecDeque::with_capacity(64),
-                    open: true,
-                }),
-                pending_drop: task::TransferStack::new(),
-                unpark: Box::new(unpark),
+            tasks: Some(Tasks {
+                owned: LinkedList::new(),
+                queue: VecDeque::with_capacity(INITIAL_CAPACITY),
             }),
-            local: LocalState { tick: 0, park },
+            spawner: Spawner {
+                shared: Arc::new(Shared {
+                    queue: Mutex::new(VecDeque::with_capacity(INITIAL_CAPACITY)),
+                    unpark: unpark as Box<dyn Unpark>,
+                }),
+            },
+            tick: 0,
+            park,
         }
     }
 
-    pub(crate) fn spawner(&self) -> Spawner {
-        Spawner {
-            scheduler: self.scheduler.clone(),
-        }
+    pub(crate) fn spawner(&self) -> &Spawner {
+        &self.spawner
     }
 
-    /// Spawn a future onto the thread pool
+    /// Spawns a future onto the thread pool
     pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        let (task, handle) = task::joinable(future);
-        self.scheduler.schedule(task);
-        handle
+        self.spawner.spawn(future)
     }
 
-    pub(crate) fn block_on<F>(&mut self, mut future: F) -> F::Output
+    pub(crate) fn block_on<F>(&mut self, future: F) -> F::Output
     where
         F: Future,
     {
-        use crate::runtime;
-        use std::pin::Pin;
-        use std::task::Context;
-        use std::task::Poll::Ready;
+        enter(self, |scheduler, context| {
+            let _enter = runtime::enter(false);
+            let waker = waker_ref(&scheduler.spawner.shared);
+            let mut cx = std::task::Context::from_waker(&waker);
 
-        let local = &mut self.local;
-        let scheduler = &*self.scheduler;
+            pin!(future);
 
-        runtime::global::with_basic_scheduler(scheduler, || {
-            let mut _enter = runtime::enter();
-
-            let raw_waker = RawWaker::new(
-                scheduler as *const SchedulerPriv as *const (),
-                &RawWakerVTable::new(sched_clone_waker, sched_noop, sched_wake_by_ref, sched_noop),
-            );
-
-            let waker = ManuallyDrop::new(unsafe { Waker::from_raw(raw_waker) });
-            let mut cx = Context::from_waker(&waker);
-
-            // `block_on` takes ownership of `f`. Once it is pinned here, the
-            // original `f` binding can no longer be accessed, making the
-            // pinning safe.
-            let mut future = unsafe { Pin::new_unchecked(&mut future) };
-
-            loop {
-                if let Ready(v) = future.as_mut().poll(&mut cx) {
+            'outer: loop {
+                if let Ready(v) = crate::coop::budget(|| future.as_mut().poll(&mut cx)) {
                     return v;
                 }
 
-                scheduler.tick(local);
+                for _ in 0..MAX_TASKS_PER_TICK {
+                    // Get and increment the current tick
+                    let tick = scheduler.tick;
+                    scheduler.tick = scheduler.tick.wrapping_add(1);
 
-                // Maintenance work
-                scheduler.drain_pending_drop();
+                    let next = if tick % REMOTE_FIRST_INTERVAL == 0 {
+                        scheduler
+                            .spawner
+                            .pop()
+                            .or_else(|| context.tasks.borrow_mut().queue.pop_front())
+                    } else {
+                        context
+                            .tasks
+                            .borrow_mut()
+                            .queue
+                            .pop_front()
+                            .or_else(|| scheduler.spawner.pop())
+                    };
+
+                    match next {
+                        Some(task) => crate::coop::budget(|| task.run()),
+                        None => {
+                            // Park until the thread is signaled
+                            scheduler.park.park().ok().expect("failed to park");
+
+                            // Try polling the `block_on` future next
+                            continue 'outer;
+                        }
+                    }
+                }
+
+                // Yield to the park, this drives the timer and pulls any pending
+                // I/O events.
+                scheduler
+                    .park
+                    .park_timeout(Duration::from_millis(0))
+                    .ok()
+                    .expect("failed to park");
             }
         })
     }
 }
 
-impl Spawner {
-    /// Spawn a future onto the thread pool
-    pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
-    where
-        F: Future + Send + 'static,
-        F::Output: Send + 'static,
-    {
-        let (task, handle) = task::joinable(future);
-        self.scheduler.schedule(task);
-        handle
+/// Enter the scheduler context. This sets the queue and other necessary
+/// scheduler state in the thread-local
+fn enter<F, R, P>(scheduler: &mut BasicScheduler<P>, f: F) -> R
+where
+    F: FnOnce(&mut BasicScheduler<P>, &Context) -> R,
+    P: Park,
+{
+    // Ensures the run queue is placed back in the `BasicScheduler` instance
+    // once `block_on` returns.`
+    struct Guard<'a, P: Park> {
+        context: Option<Context>,
+        scheduler: &'a mut BasicScheduler<P>,
     }
 
-    /// Enter the executor context
-    pub(crate) fn enter<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce() -> R,
-    {
-        use crate::runtime::global;
-        global::with_basic_scheduler(&*self.scheduler, f)
+    impl<P: Park> Drop for Guard<'_, P> {
+        fn drop(&mut self) {
+            let Context { tasks, .. } = self.context.take().expect("context missing");
+            self.scheduler.tasks = Some(tasks.into_inner());
+        }
     }
+
+    // Remove `tasks` from `self` and place it in a `Context`.
+    let tasks = scheduler.tasks.take().expect("invalid state");
+
+    let guard = Guard {
+        context: Some(Context {
+            shared: scheduler.spawner.shared.clone(),
+            tasks: RefCell::new(tasks),
+        }),
+        scheduler,
+    };
+
+    let context = guard.context.as_ref().unwrap();
+    let scheduler = &mut *guard.scheduler;
+
+    CURRENT.set(context, || f(scheduler, context))
 }
-
-impl SchedulerPriv {
-    fn tick(&self, local: &mut LocalState<impl Park>) {
-        for _ in 0..MAX_TASKS_PER_TICK {
-            // Get the current tick
-            let tick = local.tick;
-
-            // Increment the tick
-            local.tick = tick.wrapping_add(1);
-
-            let task = match self.next_task(tick) {
-                Some(task) => task,
-                None => {
-                    local.park.park().ok().expect("failed to park");
-                    return;
-                }
-            };
-
-            if let Some(task) = task.run(&mut || Some(self.into())) {
-                unsafe {
-                    self.schedule_local(task);
-                }
-            }
-        }
-
-        local
-            .park
-            .park_timeout(Duration::from_millis(0))
-            .ok()
-            .expect("failed to park");
-    }
-
-    fn drain_pending_drop(&self) {
-        for task in self.pending_drop.drain() {
-            unsafe {
-                (*self.owned_tasks.get()).remove(&task);
-            }
-            drop(task);
-        }
-    }
-
-    /// # Safety
-    ///
-    /// Must be called from the same thread that holds the `BasicScheduler`
-    /// value.
-    pub(super) unsafe fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
-    where
-        F: Future + Send + 'static,
-        F::Output: Send + 'static,
-    {
-        let (task, handle) = task::joinable(future);
-        self.schedule_local(task);
-        handle
-    }
-
-    unsafe fn schedule_local(&self, task: Task<Self>) {
-        (*self.local_queue.get()).push_back(task);
-    }
-
-    fn next_task(&self, tick: u8) -> Option<Task<Self>> {
-        if 0 == tick % CHECK_REMOTE_INTERVAL {
-            self.next_remote_task().or_else(|| self.next_local_task())
-        } else {
-            self.next_local_task().or_else(|| self.next_remote_task())
-        }
-    }
-
-    fn next_local_task(&self) -> Option<Task<Self>> {
-        unsafe { (*self.local_queue.get()).pop_front() }
-    }
-
-    fn next_remote_task(&self) -> Option<Task<Self>> {
-        self.remote_queue.lock().unwrap().queue.pop_front()
-    }
-}
-
-impl Schedule for SchedulerPriv {
-    fn bind(&self, task: &Task<Self>) {
-        unsafe {
-            (*self.owned_tasks.get()).insert(task);
-        }
-    }
-
-    fn release(&self, task: Task<Self>) {
-        self.pending_drop.push(task);
-    }
-
-    fn release_local(&self, task: &Task<Self>) {
-        unsafe {
-            (*self.owned_tasks.get()).remove(task);
-        }
-    }
-
-    fn schedule(&self, task: Task<Self>) {
-        use crate::runtime::global;
-
-        if global::basic_scheduler_is_current(self) {
-            unsafe { self.schedule_local(task) };
-        } else {
-            let mut lock = self.remote_queue.lock().unwrap();
-
-            if lock.open {
-                lock.queue.push_back(task);
-            } else {
-                task.shutdown();
-            }
-
-            // while locked, call unpark
-            self.unpark.unpark();
-
-            drop(lock);
-        }
-    }
-}
-
-impl ScheduleSendOnly for SchedulerPriv {}
 
 impl<P> Drop for BasicScheduler<P>
 where
     P: Park,
 {
     fn drop(&mut self) {
-        // Close the remote queue
-        let mut lock = self.scheduler.remote_queue.lock().unwrap();
-        lock.open = false;
+        enter(self, |scheduler, context| {
+            // Loop required here to ensure borrow is dropped between iterations
+            #[allow(clippy::while_let_loop)]
+            loop {
+                let task = match context.tasks.borrow_mut().owned.pop_back() {
+                    Some(task) => task,
+                    None => break,
+                };
 
-        while let Some(task) = lock.queue.pop_front() {
-            task.shutdown();
-        }
+                task.shutdown();
+            }
 
-        drop(lock);
+            // Drain local queue
+            for task in context.tasks.borrow_mut().queue.drain(..) {
+                task.shutdown();
+            }
 
-        // Drain all local tasks
-        while let Some(task) = self.scheduler.next_local_task() {
-            task.shutdown();
-        }
+            // Drain remote queue
+            for task in scheduler.spawner.shared.queue.lock().unwrap().drain(..) {
+                task.shutdown();
+            }
 
-        // Release owned tasks
-        unsafe {
-            (*self.scheduler.owned_tasks.get()).shutdown();
-        }
-
-        self.scheduler.drain_pending_drop();
-
-        // Wait until all tasks have been released.
-        while unsafe { !(*self.scheduler.owned_tasks.get()).is_empty() } {
-            self.local.park.park().ok().expect("park failed");
-            self.scheduler.drain_pending_drop();
-        }
+            assert!(context.tasks.borrow().owned.is_empty());
+        });
     }
 }
 
-impl fmt::Debug for SchedulerPriv {
+impl<P: Park> fmt::Debug for BasicScheduler<P> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("Scheduler").finish()
+        fmt.debug_struct("BasicScheduler").finish()
     }
 }
 
-unsafe fn sched_clone_waker(ptr: *const ()) -> RawWaker {
-    let s1 = ManuallyDrop::new(Arc::from_raw(ptr as *const SchedulerPriv));
+// ===== impl Spawner =====
 
-    #[allow(clippy::redundant_clone)]
-    let s2 = s1.clone();
+impl Spawner {
+    /// Spawns a future onto the thread pool
+    pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
+    where
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        let (task, handle) = task::joinable(future);
+        self.shared.schedule(task);
+        handle
+    }
 
-    RawWaker::new(
-        &**s2 as *const SchedulerPriv as *const (),
-        &RawWakerVTable::new(sched_clone_waker, sched_wake, sched_wake_by_ref, sched_drop),
-    )
+    fn pop(&self) -> Option<task::Notified<Arc<Shared>>> {
+        self.shared.queue.lock().unwrap().pop_front()
+    }
 }
 
-unsafe fn sched_wake(ptr: *const ()) {
-    let scheduler = Arc::from_raw(ptr as *const SchedulerPriv);
-    scheduler.unpark.unpark();
+impl fmt::Debug for Spawner {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("Spawner").finish()
+    }
 }
 
-unsafe fn sched_wake_by_ref(ptr: *const ()) {
-    let scheduler = ManuallyDrop::new(Arc::from_raw(ptr as *const SchedulerPriv));
-    scheduler.unpark.unpark();
+// ===== impl Shared =====
+
+impl Schedule for Arc<Shared> {
+    fn bind(task: Task<Self>) -> Arc<Shared> {
+        CURRENT.with(|maybe_cx| {
+            let cx = maybe_cx.expect("scheduler context missing");
+            cx.tasks.borrow_mut().owned.push_front(task);
+            cx.shared.clone()
+        })
+    }
+
+    fn release(&self, task: &Task<Self>) -> Option<Task<Self>> {
+        use std::ptr::NonNull;
+
+        CURRENT.with(|maybe_cx| {
+            let cx = maybe_cx.expect("scheduler context missing");
+
+            // safety: the task is inserted in the list in `bind`.
+            unsafe {
+                let ptr = NonNull::from(task.header());
+                cx.tasks.borrow_mut().owned.remove(ptr)
+            }
+        })
+    }
+
+    fn schedule(&self, task: task::Notified<Self>) {
+        CURRENT.with(|maybe_cx| match maybe_cx {
+            Some(cx) if Arc::ptr_eq(self, &cx.shared) => {
+                cx.tasks.borrow_mut().queue.push_back(task);
+            }
+            _ => {
+                self.queue.lock().unwrap().push_back(task);
+                self.unpark.unpark();
+            }
+        });
+    }
 }
 
-unsafe fn sched_drop(ptr: *const ()) {
-    let _ = Arc::from_raw(ptr as *const SchedulerPriv);
-}
+impl Wake for Shared {
+    fn wake(self: Arc<Self>) {
+        Wake::wake_by_ref(&self)
+    }
 
-unsafe fn sched_noop(_ptr: *const ()) {
-    unreachable!();
+    /// Wake by reference
+    fn wake_by_ref(arc_self: &Arc<Self>) {
+        arc_self.unpark.unpark();
+    }
 }

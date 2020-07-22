@@ -22,7 +22,7 @@ pub(crate) use self::impl_linux::get_peer_cred;
 ))]
 pub(crate) use self::impl_macos::get_peer_cred;
 
-#[cfg(any(target_os = "solaris"))]
+#[cfg(any(target_os = "solaris", target_os = "illumos"))]
 pub(crate) use self::impl_solaris::get_peer_cred;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -110,7 +110,7 @@ pub(crate) mod impl_macos {
     }
 }
 
-#[cfg(any(target_os = "solaris"))]
+#[cfg(any(target_os = "solaris", target_os = "illumos"))]
 pub(crate) mod impl_solaris {
     use crate::net::unix::UnixStream;
     use std::io;
@@ -125,10 +125,7 @@ pub(crate) mod impl_solaris {
         fn ucred_geteuid(cred: *const ucred_t) -> super::uid_t;
         fn ucred_getegid(cred: *const ucred_t) -> super::gid_t;
 
-        fn getpeerucred(
-            fd: ::std::os::raw::c_int,
-            cred: *mut *mut ucred_t,
-        ) -> ::std::os::raw::c_int;
+        fn getpeerucred(fd: std::os::raw::c_int, cred: *mut *mut ucred_t) -> std::os::raw::c_int;
     }
 
     pub(crate) fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {

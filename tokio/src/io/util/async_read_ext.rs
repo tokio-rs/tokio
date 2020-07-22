@@ -1,13 +1,39 @@
 use crate::io::util::chain::{chain, Chain};
 use crate::io::util::read::{read, Read};
+use crate::io::util::read_buf::{read_buf, ReadBuf};
 use crate::io::util::read_exact::{read_exact, ReadExact};
+use crate::io::util::read_int::{
+    ReadI128, ReadI128Le, ReadI16, ReadI16Le, ReadI32, ReadI32Le, ReadI64, ReadI64Le, ReadI8,
+};
+use crate::io::util::read_int::{
+    ReadU128, ReadU128Le, ReadU16, ReadU16Le, ReadU32, ReadU32Le, ReadU64, ReadU64Le, ReadU8,
+};
 use crate::io::util::read_to_end::{read_to_end, ReadToEnd};
 use crate::io::util::read_to_string::{read_to_string, ReadToString};
 use crate::io::util::take::{take, Take};
 use crate::io::AsyncRead;
 
+use bytes::BufMut;
+
 cfg_io_util! {
-    /// Read bytes from a source.
+    /// Defines numeric reader
+    macro_rules! read_impl {
+        (
+            $(
+                $(#[$outer:meta])*
+                fn $name:ident(&mut self) -> $($fut:ident)*;
+            )*
+        ) => {
+            $(
+                $(#[$outer])*
+                fn $name<'a>(&'a mut self) -> $($fut)*<&'a mut Self> where Self: Unpin {
+                    $($fut)*::new(self)
+                }
+            )*
+        }
+    }
+
+    /// Reads bytes from a source.
     ///
     /// Implemented as an extention trait, adding utility methods to all
     /// [`AsyncRead`] types. Callers will tend to import this trait instead of
@@ -36,7 +62,7 @@ cfg_io_util! {
     /// [`AsyncRead`]: AsyncRead
     /// [`prelude`]: crate::prelude
     pub trait AsyncReadExt: AsyncRead {
-        /// Create a new `AsyncRead` instance that chains this stream with
+        /// Creates a new `AsyncRead` instance that chains this stream with
         /// `next`.
         ///
         /// The returned `AsyncRead` instance will first read all bytes from this object
@@ -73,7 +99,7 @@ cfg_io_util! {
             chain(self, next)
         }
 
-        /// Pull some bytes from this source into the specified buffer,
+        /// Pulls some bytes from this source into the specified buffer,
         /// returning how many bytes were read.
         ///
         /// Equivalent to:
@@ -98,7 +124,7 @@ cfg_io_util! {
         ///
         /// No guarantees are provided about the contents of `buf` when this
         /// function is called, implementations cannot rely on any property of the
-        /// contents of `buf` being true. It is recommended that *implementations*
+        /// contents of `buf` being `true`. It is recommended that *implementations*
         /// only write data to `buf` instead of reading its contents.
         ///
         /// Correspondingly, however, *callers* of this method may not assume
@@ -140,7 +166,72 @@ cfg_io_util! {
             read(self, buf)
         }
 
-        /// Read the exact number of bytes required to fill `buf`.
+        /// Pulls some bytes from this source into the specified buffer,
+        /// advancing the buffer's internal cursor.
+        ///
+        /// Equivalent to:
+        ///
+        /// ```ignore
+        /// async fn read_buf<B: BufMut>(&mut self, buf: &mut B) -> io::Result<usize>;
+        /// ```
+        ///
+        /// Usually, only a single `read` syscall is issued, even if there is
+        /// more space in the supplied buffer.
+        ///
+        /// This function does not provide any guarantees about whether it
+        /// completes immediately or asynchronously
+        ///
+        /// # Return
+        ///
+        /// On a successful read, the number of read bytes is returned. If the
+        /// supplied buffer is not empty and the function returns `Ok(0)` then
+        /// the source as reached an "end-of-file" event.
+        ///
+        /// # Errors
+        ///
+        /// If this function encounters any form of I/O or other error, an error
+        /// variant will be returned. If an error is returned then it must be
+        /// guaranteed that no bytes were read.
+        ///
+        /// # Examples
+        ///
+        /// [`File`] implements `Read` and [`BytesMut`] implements [`BufMut`]:
+        ///
+        /// [`File`]: crate::fs::File
+        /// [`BytesMut`]: bytes::BytesMut
+        /// [`BufMut`]: bytes::BufMut
+        ///
+        /// ```no_run
+        /// use tokio::fs::File;
+        /// use tokio::io::{self, AsyncReadExt};
+        ///
+        /// use bytes::BytesMut;
+        ///
+        /// #[tokio::main]
+        /// async fn main() -> io::Result<()> {
+        ///     let mut f = File::open("foo.txt").await?;
+        ///     let mut buffer = BytesMut::with_capacity(10);
+        ///
+        ///     assert!(buffer.is_empty());
+        ///
+        ///     // read up to 10 bytes, note that the return value is not needed
+        ///     // to access the data that was read as `buffer`'s internal
+        ///     // cursor is updated.
+        ///     f.read_buf(&mut buffer).await?;
+        ///
+        ///     println!("The bytes: {:?}", &buffer[..]);
+        ///     Ok(())
+        /// }
+        /// ```
+        fn read_buf<'a, B>(&'a mut self, buf: &'a mut B) -> ReadBuf<'a, Self, B>
+        where
+            Self: Sized + Unpin,
+            B: BufMut,
+        {
+            read_buf(self, buf)
+        }
+
+        /// Reads the exact number of bytes required to fill `buf`.
         ///
         /// Equivalent to:
         ///
@@ -150,12 +241,6 @@ cfg_io_util! {
         ///
         /// This function reads as many bytes as necessary to completely fill
         /// the specified buffer `buf`.
-        ///
-        /// No guarantees are provided about the contents of `buf` when this
-        /// function is called, implementations cannot rely on any property of
-        /// the contents of `buf` being true. It is recommended that
-        /// implementations only write data to `buf` instead of reading its
-        /// contents.
         ///
         /// # Errors
         ///
@@ -199,7 +284,699 @@ cfg_io_util! {
             read_exact(self, buf)
         }
 
-        /// Read all bytes until EOF in this source, placing them into `buf`.
+        read_impl! {
+            /// Reads an unsigned 8 bit integer from the underlying reader.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_u8(&mut self) -> io::Result<u8>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered reader to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+            ///
+            /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+            ///
+            /// # Examples
+            ///
+            /// Read unsigned 8 bit integers from an `AsyncRead`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncReadExt};
+            ///
+            /// use std::io::Cursor;
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut reader = Cursor::new(vec![2, 5]);
+            ///
+            ///     assert_eq!(2, reader.read_u8().await?);
+            ///     assert_eq!(5, reader.read_u8().await?);
+            ///
+            ///     Ok(())
+            /// }
+            /// ```
+            fn read_u8(&mut self) -> ReadU8;
+
+            /// Reads a signed 8 bit integer from the underlying reader.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_i8(&mut self) -> io::Result<i8>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered reader to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+            ///
+            /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+            ///
+            /// # Examples
+            ///
+            /// Read unsigned 8 bit integers from an `AsyncRead`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncReadExt};
+            ///
+            /// use std::io::Cursor;
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut reader = Cursor::new(vec![0x02, 0xfb]);
+            ///
+            ///     assert_eq!(2, reader.read_i8().await?);
+            ///     assert_eq!(-5, reader.read_i8().await?);
+            ///
+            ///     Ok(())
+            /// }
+            /// ```
+            fn read_i8(&mut self) -> ReadI8;
+
+            /// Reads an unsigned 16-bit integer in big-endian order from the
+            /// underlying reader.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_u16(&mut self) -> io::Result<u16>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered reader to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+            ///
+            /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+            ///
+            /// # Examples
+            ///
+            /// Read unsigned 16 bit big-endian integers from a `AsyncRead`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncReadExt};
+            ///
+            /// use std::io::Cursor;
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut reader = Cursor::new(vec![2, 5, 3, 0]);
+            ///
+            ///     assert_eq!(517, reader.read_u16().await?);
+            ///     assert_eq!(768, reader.read_u16().await?);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn read_u16(&mut self) -> ReadU16;
+
+            /// Reads a signed 16-bit integer in big-endian order from the
+            /// underlying reader.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_i16(&mut self) -> io::Result<i16>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered reader to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+            ///
+            /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+            ///
+            /// # Examples
+            ///
+            /// Read signed 16 bit big-endian integers from a `AsyncRead`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncReadExt};
+            ///
+            /// use std::io::Cursor;
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut reader = Cursor::new(vec![0x00, 0xc1, 0xff, 0x7c]);
+            ///
+            ///     assert_eq!(193, reader.read_i16().await?);
+            ///     assert_eq!(-132, reader.read_i16().await?);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn read_i16(&mut self) -> ReadI16;
+
+            /// Reads an unsigned 32-bit integer in big-endian order from the
+            /// underlying reader.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_u32(&mut self) -> io::Result<u32>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered reader to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+            ///
+            /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+            ///
+            /// # Examples
+            ///
+            /// Read unsigned 32-bit big-endian integers from a `AsyncRead`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncReadExt};
+            ///
+            /// use std::io::Cursor;
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut reader = Cursor::new(vec![0x00, 0x00, 0x01, 0x0b]);
+            ///
+            ///     assert_eq!(267, reader.read_u32().await?);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn read_u32(&mut self) -> ReadU32;
+
+            /// Reads a signed 32-bit integer in big-endian order from the
+            /// underlying reader.
+            ///
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_i32(&mut self) -> io::Result<i32>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered reader to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+            ///
+            /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+            ///
+            /// # Examples
+            ///
+            /// Read signed 32-bit big-endian integers from a `AsyncRead`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncReadExt};
+            ///
+            /// use std::io::Cursor;
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut reader = Cursor::new(vec![0xff, 0xff, 0x7a, 0x33]);
+            ///
+            ///     assert_eq!(-34253, reader.read_i32().await?);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn read_i32(&mut self) -> ReadI32;
+
+            /// Reads an unsigned 64-bit integer in big-endian order from the
+            /// underlying reader.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_u64(&mut self) -> io::Result<u64>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered reader to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+            ///
+            /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+            ///
+            /// # Examples
+            ///
+            /// Read unsigned 64-bit big-endian integers from a `AsyncRead`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncReadExt};
+            ///
+            /// use std::io::Cursor;
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut reader = Cursor::new(vec![
+            ///         0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83
+            ///     ]);
+            ///
+            ///     assert_eq!(918733457491587, reader.read_u64().await?);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn read_u64(&mut self) -> ReadU64;
+
+            /// Reads an signed 64-bit integer in big-endian order from the
+            /// underlying reader.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_i64(&mut self) -> io::Result<i64>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered reader to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+            ///
+            /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+            ///
+            /// # Examples
+            ///
+            /// Read signed 64-bit big-endian integers from a `AsyncRead`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncReadExt};
+            ///
+            /// use std::io::Cursor;
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut reader = Cursor::new(vec![0x80, 0, 0, 0, 0, 0, 0, 0]);
+            ///
+            ///     assert_eq!(i64::min_value(), reader.read_i64().await?);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn read_i64(&mut self) -> ReadI64;
+
+            /// Reads an unsigned 128-bit integer in big-endian order from the
+            /// underlying reader.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_u128(&mut self) -> io::Result<u128>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered reader to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+            ///
+            /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+            ///
+            /// # Examples
+            ///
+            /// Read unsigned 128-bit big-endian integers from a `AsyncRead`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncReadExt};
+            ///
+            /// use std::io::Cursor;
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut reader = Cursor::new(vec![
+            ///         0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83,
+            ///         0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83
+            ///     ]);
+            ///
+            ///     assert_eq!(16947640962301618749969007319746179, reader.read_u128().await?);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn read_u128(&mut self) -> ReadU128;
+
+            /// Reads an signed 128-bit integer in big-endian order from the
+            /// underlying reader.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_i128(&mut self) -> io::Result<i128>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered reader to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+            ///
+            /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+            ///
+            /// # Examples
+            ///
+            /// Read signed 128-bit big-endian integers from a `AsyncRead`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncReadExt};
+            ///
+            /// use std::io::Cursor;
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut reader = Cursor::new(vec![
+            ///         0x80, 0, 0, 0, 0, 0, 0, 0,
+            ///         0, 0, 0, 0, 0, 0, 0, 0
+            ///     ]);
+            ///
+            ///     assert_eq!(i128::min_value(), reader.read_i128().await?);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn read_i128(&mut self) -> ReadI128;
+
+            /// Reads an unsigned 16-bit integer in little-endian order from the
+            /// underlying reader.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_u16_le(&mut self) -> io::Result<u16>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered reader to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+            ///
+            /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+            ///
+            /// # Examples
+            ///
+            /// Read unsigned 16 bit little-endian integers from a `AsyncRead`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncReadExt};
+            ///
+            /// use std::io::Cursor;
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut reader = Cursor::new(vec![2, 5, 3, 0]);
+            ///
+            ///     assert_eq!(1282, reader.read_u16_le().await?);
+            ///     assert_eq!(3, reader.read_u16_le().await?);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn read_u16_le(&mut self) -> ReadU16Le;
+
+            /// Reads a signed 16-bit integer in little-endian order from the
+            /// underlying reader.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_i16_le(&mut self) -> io::Result<i16>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered reader to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+            ///
+            /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+            ///
+            /// # Examples
+            ///
+            /// Read signed 16 bit little-endian integers from a `AsyncRead`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncReadExt};
+            ///
+            /// use std::io::Cursor;
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut reader = Cursor::new(vec![0x00, 0xc1, 0xff, 0x7c]);
+            ///
+            ///     assert_eq!(-16128, reader.read_i16_le().await?);
+            ///     assert_eq!(31999, reader.read_i16_le().await?);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn read_i16_le(&mut self) -> ReadI16Le;
+
+            /// Reads an unsigned 32-bit integer in little-endian order from the
+            /// underlying reader.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_u32_le(&mut self) -> io::Result<u32>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered reader to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+            ///
+            /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+            ///
+            /// # Examples
+            ///
+            /// Read unsigned 32-bit little-endian integers from a `AsyncRead`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncReadExt};
+            ///
+            /// use std::io::Cursor;
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut reader = Cursor::new(vec![0x00, 0x00, 0x01, 0x0b]);
+            ///
+            ///     assert_eq!(184614912, reader.read_u32_le().await?);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn read_u32_le(&mut self) -> ReadU32Le;
+
+            /// Reads a signed 32-bit integer in little-endian order from the
+            /// underlying reader.
+            ///
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_i32_le(&mut self) -> io::Result<i32>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered reader to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+            ///
+            /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+            ///
+            /// # Examples
+            ///
+            /// Read signed 32-bit little-endian integers from a `AsyncRead`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncReadExt};
+            ///
+            /// use std::io::Cursor;
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut reader = Cursor::new(vec![0xff, 0xff, 0x7a, 0x33]);
+            ///
+            ///     assert_eq!(863698943, reader.read_i32_le().await?);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn read_i32_le(&mut self) -> ReadI32Le;
+
+            /// Reads an unsigned 64-bit integer in little-endian order from the
+            /// underlying reader.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_u64_le(&mut self) -> io::Result<u64>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered reader to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+            ///
+            /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+            ///
+            /// # Examples
+            ///
+            /// Read unsigned 64-bit little-endian integers from a `AsyncRead`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncReadExt};
+            ///
+            /// use std::io::Cursor;
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut reader = Cursor::new(vec![
+            ///         0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83
+            ///     ]);
+            ///
+            ///     assert_eq!(9477368352180732672, reader.read_u64_le().await?);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn read_u64_le(&mut self) -> ReadU64Le;
+
+            /// Reads an signed 64-bit integer in little-endian order from the
+            /// underlying reader.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_i64_le(&mut self) -> io::Result<i64>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered reader to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+            ///
+            /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+            ///
+            /// # Examples
+            ///
+            /// Read signed 64-bit little-endian integers from a `AsyncRead`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncReadExt};
+            ///
+            /// use std::io::Cursor;
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut reader = Cursor::new(vec![0x80, 0, 0, 0, 0, 0, 0, 0]);
+            ///
+            ///     assert_eq!(128, reader.read_i64_le().await?);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn read_i64_le(&mut self) -> ReadI64Le;
+
+            /// Reads an unsigned 128-bit integer in little-endian order from the
+            /// underlying reader.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_u128_le(&mut self) -> io::Result<u128>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered reader to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+            ///
+            /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+            ///
+            /// # Examples
+            ///
+            /// Read unsigned 128-bit little-endian integers from a `AsyncRead`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncReadExt};
+            ///
+            /// use std::io::Cursor;
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut reader = Cursor::new(vec![
+            ///         0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83,
+            ///         0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83
+            ///     ]);
+            ///
+            ///     assert_eq!(174826588484952389081207917399662330624, reader.read_u128_le().await?);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn read_u128_le(&mut self) -> ReadU128Le;
+
+            /// Reads an signed 128-bit integer in little-endian order from the
+            /// underlying reader.
+            ///
+            /// Equivalent to:
+            ///
+            /// ```ignore
+            /// async fn read_i128_le(&mut self) -> io::Result<i128>;
+            /// ```
+            ///
+            /// It is recommended to use a buffered reader to avoid excessive
+            /// syscalls.
+            ///
+            /// # Errors
+            ///
+            /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+            ///
+            /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+            ///
+            /// # Examples
+            ///
+            /// Read signed 128-bit little-endian integers from a `AsyncRead`:
+            ///
+            /// ```rust
+            /// use tokio::io::{self, AsyncReadExt};
+            ///
+            /// use std::io::Cursor;
+            ///
+            /// #[tokio::main]
+            /// async fn main() -> io::Result<()> {
+            ///     let mut reader = Cursor::new(vec![
+            ///         0x80, 0, 0, 0, 0, 0, 0, 0,
+            ///         0, 0, 0, 0, 0, 0, 0, 0
+            ///     ]);
+            ///
+            ///     assert_eq!(128, reader.read_i128_le().await?);
+            ///     Ok(())
+            /// }
+            /// ```
+            fn read_i128_le(&mut self) -> ReadI128Le;
+        }
+
+        /// Reads all bytes until EOF in this source, placing them into `buf`.
         ///
         /// Equivalent to:
         ///
@@ -249,7 +1026,7 @@ cfg_io_util! {
             read_to_end(self, buf)
         }
 
-        /// Read all bytes until EOF in this source, appending them to `buf`.
+        /// Reads all bytes until EOF in this source, appending them to `buf`.
         ///
         /// Equivalent to:
         ///

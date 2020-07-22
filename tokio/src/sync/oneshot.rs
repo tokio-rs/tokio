@@ -2,7 +2,7 @@
 
 //! A channel for sending a single message between asynchronous tasks.
 
-use crate::loom::cell::CausalCell;
+use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Arc;
 
@@ -16,7 +16,7 @@ use std::task::{Context, Poll, Waker};
 
 /// Sends a value to the associated `Receiver`.
 ///
-/// Instances are created by the [`channel`](fn.channel.html) function.
+/// Instances are created by the [`channel`](fn@channel) function.
 #[derive(Debug)]
 pub struct Sender<T> {
     inner: Option<Arc<Inner<T>>>,
@@ -24,7 +24,7 @@ pub struct Sender<T> {
 
 /// Receive a value from the associated `Sender`.
 ///
-/// Instances are created by the [`channel`](fn.channel.html) function.
+/// Instances are created by the [`channel`](fn@channel) function.
 #[derive(Debug)]
 pub struct Receiver<T> {
     inner: Option<Arc<Inner<T>>>,
@@ -36,12 +36,18 @@ pub mod error {
     use std::fmt;
 
     /// Error returned by the `Future` implementation for `Receiver`.
-    #[derive(Debug)]
+    #[derive(Debug, Eq, PartialEq)]
     pub struct RecvError(pub(super) ());
 
     /// Error returned by the `try_recv` function on `Receiver`.
-    #[derive(Debug)]
-    pub struct TryRecvError(pub(super) ());
+    #[derive(Debug, Eq, PartialEq)]
+    pub enum TryRecvError {
+        /// The send half of the channel has not yet sent a value.
+        Empty,
+
+        /// The send half of the channel was dropped without sending a value.
+        Closed,
+    }
 
     // ===== impl RecvError =====
 
@@ -51,17 +57,20 @@ pub mod error {
         }
     }
 
-    impl ::std::error::Error for RecvError {}
+    impl std::error::Error for RecvError {}
 
     // ===== impl TryRecvError =====
 
     impl fmt::Display for TryRecvError {
         fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(fmt, "channel closed")
+            match self {
+                TryRecvError::Empty => write!(fmt, "channel empty"),
+                TryRecvError::Closed => write!(fmt, "channel closed"),
+            }
         }
     }
 
-    impl ::std::error::Error for TryRecvError {}
+    impl std::error::Error for TryRecvError {}
 }
 
 use self::error::*;
@@ -72,13 +81,13 @@ struct Inner<T> {
 
     /// The value. This is set by `Sender` and read by `Receiver`. The state of
     /// the cell is tracked by `state`.
-    value: CausalCell<Option<T>>,
+    value: UnsafeCell<Option<T>>,
 
     /// The task to notify when the receiver drops without consuming the value.
-    tx_task: CausalCell<MaybeUninit<Waker>>,
+    tx_task: UnsafeCell<MaybeUninit<Waker>>,
 
     /// The task to notify when the value is sent.
-    rx_task: CausalCell<MaybeUninit<Waker>>,
+    rx_task: UnsafeCell<MaybeUninit<Waker>>,
 }
 
 #[derive(Clone, Copy)]
@@ -118,9 +127,9 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
     #[allow(deprecated)]
     let inner = Arc::new(Inner {
         state: AtomicUsize::new(State::new().as_usize()),
-        value: CausalCell::new(None),
-        tx_task: CausalCell::new(MaybeUninit::uninit()),
-        rx_task: CausalCell::new(MaybeUninit::uninit()),
+        value: UnsafeCell::new(None),
+        tx_task: UnsafeCell::new(MaybeUninit::uninit()),
+        rx_task: UnsafeCell::new(MaybeUninit::uninit()),
     });
 
     let tx = Sender {
@@ -132,15 +141,46 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
 }
 
 impl<T> Sender<T> {
-    /// Completes this oneshot with a successful result.
+    /// Attempts to send a value on this channel, returning it back if it could
+    /// not be sent.
     ///
-    /// The function consumes `self` and notifies the `Receiver` handle that a
-    /// value is ready to be received.
+    /// This method consumes `self` as only one value may ever be sent on a oneshot
+    /// channel. It is not marked async because sending a message to an oneshot
+    /// channel never requires any form of waiting.  Because of this, the `send`
+    /// method can be used in both synchronous and asynchronous code without
+    /// problems.
     ///
-    /// If the value is successfully enqueued for the remote end to receive,
-    /// then `Ok(())` is returned. If the receiving end was dropped before this
-    /// function was called, however, then `Err` is returned with the value
-    /// provided.
+    /// A successful send occurs when it is determined that the other end of the
+    /// channel has not hung up already. An unsuccessful send would be one where
+    /// the corresponding receiver has already been deallocated. Note that a
+    /// return value of `Err` means that the data will never be received, but
+    /// a return value of `Ok` does *not* mean that the data will be received.
+    /// It is possible for the corresponding receiver to hang up immediately
+    /// after this function returns `Ok`.
+    ///
+    /// # Examples
+    ///
+    /// Send a value to another task
+    ///
+    /// ```
+    /// use tokio::sync::oneshot;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = oneshot::channel();
+    ///
+    ///     tokio::spawn(async move {
+    ///         if let Err(_) = tx.send(3) {
+    ///             println!("the receiver dropped");
+    ///         }
+    ///     });
+    ///
+    ///     match rx.await {
+    ///         Ok(v) => println!("got = {:?}", v),
+    ///         Err(_) => println!("the sender dropped"),
+    ///     }
+    /// }
+    /// ```
     pub fn send(mut self, t: T) -> Result<(), T> {
         let inner = self.inner.take().unwrap();
 
@@ -159,11 +199,15 @@ impl<T> Sender<T> {
 
     #[doc(hidden)] // TODO: remove
     pub fn poll_closed(&mut self, cx: &mut Context<'_>) -> Poll<()> {
+        // Keep track of task budget
+        let coop = ready!(crate::coop::poll_proceed(cx));
+
         let inner = self.inner.as_ref().unwrap();
 
         let mut state = State::load(&inner.state, Acquire);
 
         if state.is_closed() {
+            coop.made_progress();
             return Poll::Ready(());
         }
 
@@ -176,6 +220,7 @@ impl<T> Sender<T> {
                 if state.is_closed() {
                     // Set the flag again so that the waker is released in drop
                     State::set_tx_task(&inner.state);
+                    coop.made_progress();
                     return Ready(());
                 } else {
                     unsafe { inner.drop_tx_task() };
@@ -193,6 +238,7 @@ impl<T> Sender<T> {
             state = State::set_tx_task(&inner.state);
 
             if state.is_closed() {
+                coop.made_progress();
                 return Ready(());
             }
         }
@@ -200,15 +246,24 @@ impl<T> Sender<T> {
         Pending
     }
 
-    /// Wait for the associated [`Receiver`] handle to drop.
+    /// Waits for the associated [`Receiver`] handle to close.
+    ///
+    /// A [`Receiver`] is closed by either calling [`close`] explicitly or the
+    /// [`Receiver`] value is dropped.
+    ///
+    /// This function is useful when paired with `select!` to abort a
+    /// computation when the receiver is no longer interested in the result.
     ///
     /// # Return
     ///
     /// Returns a `Future` which must be awaited on.
     ///
-    /// [`Receiver`]: struct.Receiver.html
+    /// [`Receiver`]: Receiver
+    /// [`close`]: Receiver::close
     ///
     /// # Examples
+    ///
+    /// Basic usage
     ///
     /// ```
     /// use tokio::sync::oneshot;
@@ -225,19 +280,72 @@ impl<T> Sender<T> {
     ///     println!("the receiver dropped");
     /// }
     /// ```
+    ///
+    /// Paired with select
+    ///
+    /// ```
+    /// use tokio::sync::oneshot;
+    /// use tokio::time::{self, Duration};
+    ///
+    /// use futures::{select, FutureExt};
+    ///
+    /// async fn compute() -> String {
+    ///     // Complex computation returning a `String`
+    /// # "hello".to_string()
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (mut tx, rx) = oneshot::channel();
+    ///
+    ///     tokio::spawn(async move {
+    ///         select! {
+    ///             _ = tx.closed().fuse() => {
+    ///                 // The receiver dropped, no need to do any further work
+    ///             }
+    ///             value = compute().fuse() => {
+    ///                 tx.send(value).unwrap()
+    ///             }
+    ///         }
+    ///     });
+    ///
+    ///     // Wait for up to 10 seconds
+    ///     let _ = time::timeout(Duration::from_secs(10), rx).await;
+    /// }
+    /// ```
     pub async fn closed(&mut self) {
         use crate::future::poll_fn;
 
         poll_fn(|cx| self.poll_closed(cx)).await
     }
 
-    /// Check if the associated [`Receiver`] handle has been dropped.
+    /// Returns `true` if the associated [`Receiver`] handle has been dropped.
     ///
-    /// Unlike [`poll_closed`], this function does not register a task for
-    /// wakeup upon close.
+    /// A [`Receiver`] is closed by either calling [`close`] explicitly or the
+    /// [`Receiver`] value is dropped.
     ///
-    /// [`Receiver`]: struct.Receiver.html
-    /// [`poll_closed`]: struct.Sender.html#method.poll_closed
+    /// If `true` is returned, a call to `send` will always result in an error.
+    ///
+    /// [`Receiver`]: Receiver
+    /// [`close`]: Receiver::close
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::oneshot;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = oneshot::channel();
+    ///
+    ///     assert!(!tx.is_closed());
+    ///
+    ///     drop(rx);
+    ///
+    ///     assert!(tx.is_closed());
+    ///     assert!(tx.send("never received").is_err());
+    /// }
+    /// ```
     pub fn is_closed(&self) -> bool {
         let inner = self.inner.as_ref().unwrap();
 
@@ -255,29 +363,130 @@ impl<T> Drop for Sender<T> {
 }
 
 impl<T> Receiver<T> {
-    /// Prevent the associated [`Sender`] handle from sending a value.
+    /// Prevents the associated [`Sender`] handle from sending a value.
     ///
     /// Any `send` operation which happens after calling `close` is guaranteed
-    /// to fail. After calling `close`, `Receiver::poll`] should be called to
+    /// to fail. After calling `close`, [`try_recv`] should be called to
     /// receive a value if one was sent **before** the call to `close`
     /// completed.
     ///
-    /// [`Sender`]: struct.Sender.html
+    /// This function is useful to perform a graceful shutdown and ensure that a
+    /// value will not be sent into the channel and never received.
+    ///
+    /// [`Sender`]: Sender
+    /// [`try_recv`]: Receiver::try_recv
+    ///
+    /// # Examples
+    ///
+    /// Prevent a value from being sent
+    ///
+    /// ```
+    /// use tokio::sync::oneshot;
+    /// use tokio::sync::oneshot::error::TryRecvError;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = oneshot::channel();
+    ///
+    ///     assert!(!tx.is_closed());
+    ///
+    ///     rx.close();
+    ///
+    ///     assert!(tx.is_closed());
+    ///     assert!(tx.send("never received").is_err());
+    ///
+    ///     match rx.try_recv() {
+    ///         Err(TryRecvError::Closed) => {}
+    ///         _ => unreachable!(),
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// Receive a value sent **before** calling `close`
+    ///
+    /// ```
+    /// use tokio::sync::oneshot;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = oneshot::channel();
+    ///
+    ///     assert!(tx.send("will receive").is_ok());
+    ///
+    ///     rx.close();
+    ///
+    ///     let msg = rx.try_recv().unwrap();
+    ///     assert_eq!(msg, "will receive");
+    /// }
+    /// ```
     pub fn close(&mut self) {
         let inner = self.inner.as_ref().unwrap();
         inner.close();
     }
 
-    /// Attempts to receive a value outside of the context of a task.
+    /// Attempts to receive a value.
     ///
-    /// Does not register a task if no value has been sent.
+    /// If a pending value exists in the channel, it is returned. If no value
+    /// has been sent, the current task **will not** be registered for
+    /// future notification.
     ///
-    /// A return value of `None` must be considered immediately stale (out of
-    /// date) unless [`close`] has been called first.
+    /// This function is useful to call from outside the context of an
+    /// asynchronous task.
     ///
-    /// Returns an error if the sender was dropped.
+    /// # Return
     ///
-    /// [`close`]: #method.close
+    /// - `Ok(T)` if a value is pending in the channel.
+    /// - `Err(TryRecvError::Empty)` if no value has been sent yet.
+    /// - `Err(TryRecvError::Closed)` if the sender has dropped without sending
+    ///   a value.
+    ///
+    /// # Examples
+    ///
+    /// `try_recv` before a value is sent, then after.
+    ///
+    /// ```
+    /// use tokio::sync::oneshot;
+    /// use tokio::sync::oneshot::error::TryRecvError;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = oneshot::channel();
+    ///
+    ///     match rx.try_recv() {
+    ///         // The channel is currently empty
+    ///         Err(TryRecvError::Empty) => {}
+    ///         _ => unreachable!(),
+    ///     }
+    ///
+    ///     // Send a value
+    ///     tx.send("hello").unwrap();
+    ///
+    ///     match rx.try_recv() {
+    ///         Ok(value) => assert_eq!(value, "hello"),
+    ///         _ => unreachable!(),
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// `try_recv` when the sender dropped before sending a value
+    ///
+    /// ```
+    /// use tokio::sync::oneshot;
+    /// use tokio::sync::oneshot::error::TryRecvError;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = oneshot::channel::<()>();
+    ///
+    ///     drop(tx);
+    ///
+    ///     match rx.try_recv() {
+    ///         // The channel will never receive a value.
+    ///         Err(TryRecvError::Closed) => {}
+    ///         _ => unreachable!(),
+    ///     }
+    /// }
+    /// ```
     pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
         let result = if let Some(inner) = self.inner.as_ref() {
             let state = State::load(&inner.state, Acquire);
@@ -285,13 +494,13 @@ impl<T> Receiver<T> {
             if state.is_complete() {
                 match unsafe { inner.consume_value() } {
                     Some(value) => Ok(value),
-                    None => Err(TryRecvError(())),
+                    None => Err(TryRecvError::Closed),
                 }
             } else if state.is_closed() {
-                Err(TryRecvError(()))
+                Err(TryRecvError::Closed)
             } else {
                 // Not ready, this does not clear `inner`
-                return Err(TryRecvError(()));
+                return Err(TryRecvError::Empty);
             }
         } else {
             panic!("called after complete");
@@ -345,15 +554,20 @@ impl<T> Inner<T> {
     }
 
     fn poll_recv(&self, cx: &mut Context<'_>) -> Poll<Result<T, RecvError>> {
+        // Keep track of task budget
+        let coop = ready!(crate::coop::poll_proceed(cx));
+
         // Load the state
         let mut state = State::load(&self.state, Acquire);
 
         if state.is_complete() {
+            coop.made_progress();
             match unsafe { self.consume_value() } {
                 Some(value) => Ready(Ok(value)),
                 None => Ready(Err(RecvError(()))),
             }
         } else if state.is_closed() {
+            coop.made_progress();
             Ready(Err(RecvError(())))
         } else {
             if state.is_rx_task_set() {
@@ -367,6 +581,7 @@ impl<T> Inner<T> {
                         // Set the flag again so that the waker is released in drop
                         State::set_rx_task(&self.state);
 
+                        coop.made_progress();
                         return match unsafe { self.consume_value() } {
                             Some(value) => Ready(Ok(value)),
                             None => Ready(Err(RecvError(()))),
@@ -387,6 +602,7 @@ impl<T> Inner<T> {
                 state = State::set_rx_task(&self.state);
 
                 if state.is_complete() {
+                    coop.made_progress();
                     match unsafe { self.consume_value() } {
                         Some(value) => Ready(Ok(value)),
                         None => Ready(Err(RecvError(()))),
@@ -411,7 +627,7 @@ impl<T> Inner<T> {
         }
     }
 
-    /// Consume the value. This function does not check `state`.
+    /// Consumes the value. This function does not check `state`.
     unsafe fn consume_value(&self) -> Option<T> {
         self.value.with_mut(|ptr| (*ptr).take())
     }
@@ -470,7 +686,7 @@ unsafe impl<T: Send> Sync for Inner<T> {}
 
 impl<T> Drop for Inner<T> {
     fn drop(&mut self) {
-        let state = State(*self.state.get_mut());
+        let state = State(self.state.with_mut(|v| *v));
 
         if state.is_rx_task_set() {
             unsafe {

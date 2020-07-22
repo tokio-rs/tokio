@@ -50,7 +50,7 @@
 //! ```
 
 use crate::util::bit;
-use crate::util::slab::{Generation, MAX_PAGES, MAX_THREADS, INITIAL_PAGE_SIZE};
+use crate::util::slab::{Generation, INITIAL_PAGE_SIZE, MAX_PAGES, MAX_THREADS};
 
 use std::usize;
 
@@ -61,15 +61,14 @@ pub(crate) struct Address(usize);
 const PAGE_INDEX_SHIFT: u32 = INITIAL_PAGE_SIZE.trailing_zeros() + 1;
 
 /// Address in the shard
-const SLOT: bit::Pack = bit::Pack::least_significant(
-    MAX_PAGES as u32 + PAGE_INDEX_SHIFT);
+const SLOT: bit::Pack = bit::Pack::least_significant(MAX_PAGES as u32 + PAGE_INDEX_SHIFT);
 
 /// Masks the thread identifier
 const THREAD: bit::Pack = SLOT.then(MAX_THREADS.trailing_zeros() + 1);
 
 /// Masks the generation
-const GENERATION: bit::Pack = THREAD.then(
-    bit::pointer_width().wrapping_sub(RESERVED.width() + THREAD.width() + SLOT.width()));
+const GENERATION: bit::Pack = THREAD
+    .then(bit::pointer_width().wrapping_sub(RESERVED.width() + THREAD.width() + SLOT.width()));
 
 // Chosen arbitrarily
 const RESERVED: bit::Pack = bit::Pack::most_significant(5);

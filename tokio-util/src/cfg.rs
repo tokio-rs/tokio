@@ -8,6 +8,16 @@ macro_rules! cfg_codec {
     }
 }
 
+macro_rules! cfg_compat {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "compat")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "compat")))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_udp {
     ($($item:item)*) => {
         $(

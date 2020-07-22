@@ -3,6 +3,7 @@
 
 use tokio::fs::File;
 use tokio::prelude::*;
+use tokio_test::task;
 
 use std::io::prelude::*;
 use tempfile::NamedTempFile;
@@ -36,6 +37,51 @@ async fn basic_write() {
     assert_eq!(file, HELLO);
 }
 
+#[tokio::test]
+async fn coop() {
+    let mut tempfile = tempfile();
+    tempfile.write_all(HELLO).unwrap();
+
+    let mut task = task::spawn(async {
+        let mut file = File::open(tempfile.path()).await.unwrap();
+
+        let mut buf = [0; 1024];
+
+        loop {
+            file.read(&mut buf).await.unwrap();
+            file.seek(std::io::SeekFrom::Start(0)).await.unwrap();
+        }
+    });
+
+    for _ in 0..1_000 {
+        if task.poll().is_pending() {
+            return;
+        }
+    }
+
+    panic!("did not yield");
+}
+
 fn tempfile() -> NamedTempFile {
     NamedTempFile::new().unwrap()
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn unix_fd() {
+    use std::os::unix::io::AsRawFd;
+    let tempfile = tempfile();
+
+    let file = File::create(tempfile.path()).await.unwrap();
+    assert!(file.as_raw_fd() as u64 > 0);
+}
+
+#[tokio::test]
+#[cfg(windows)]
+async fn windows_handle() {
+    use std::os::windows::io::AsRawHandle;
+    let tempfile = tempfile();
+
+    let file = File::create(tempfile.path()).await.unwrap();
+    assert!(file.as_raw_handle() as u64 > 0);
 }

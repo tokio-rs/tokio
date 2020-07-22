@@ -1,6 +1,7 @@
 use crate::io::util::DEFAULT_BUF_SIZE;
 use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite};
 
+use bytes::Buf;
 use pin_project_lite::pin_project;
 use std::io::{self, Read};
 use std::mem::MaybeUninit;
@@ -82,7 +83,7 @@ impl<R: AsyncRead> BufReader<R> {
         self.project().inner
     }
 
-    /// Consumes this `BufWriter`, returning the underlying reader.
+    /// Consumes this `BufReader`, returning the underlying reader.
     ///
     /// Note that any leftover data in the internal buffer is lost.
     pub fn into_inner(self) -> R {
@@ -160,6 +161,14 @@ impl<R: AsyncRead + AsyncWrite> AsyncWrite for BufReader<R> {
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
         self.get_pin_mut().poll_write(cx, buf)
+    }
+
+    fn poll_write_buf<B: Buf>(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut B,
+    ) -> Poll<io::Result<usize>> {
+        self.get_pin_mut().poll_write_buf(cx, buf)
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {

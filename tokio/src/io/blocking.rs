@@ -16,7 +16,7 @@ use self::State::*;
 pub(crate) struct Blocking<T> {
     inner: Option<T>,
     state: State<T>,
-    /// true if the lower IO layer needs flushing
+    /// `true` if the lower IO layer needs flushing
     need_flush: bool,
 }
 

@@ -1,6 +1,6 @@
 //! A collection of useful macros for testing futures and tokio based code
 
-/// Assert a `Poll` is ready, returning the value.
+/// Asserts a `Poll` is ready, returning the value.
 ///
 /// This will invoke `panic!` if the provided `Poll` does not evaluate to `Poll::Ready` at
 /// runtime.
@@ -39,7 +39,7 @@ macro_rules! assert_ready {
     }};
 }
 
-/// Assert a `Poll<Result<...>>` is ready and `Ok`, returning the value.
+/// Asserts a `Poll<Result<...>>` is ready and `Ok`, returning the value.
 ///
 /// This will invoke `panic!` if the provided `Poll` does not evaluate to `Poll::Ready(Ok(..))` at
 /// runtime.
@@ -72,7 +72,7 @@ macro_rules! assert_ready_ok {
     }};
 }
 
-/// Assert a `Poll<Result<...>>` is ready and `Err`, returning the error.
+/// Asserts a `Poll<Result<...>>` is ready and `Err`, returning the error.
 ///
 /// This will invoke `panic!` if the provided `Poll` does not evaluate to `Poll::Ready(Err(..))` at
 /// runtime.
@@ -105,7 +105,7 @@ macro_rules! assert_ready_err {
     }};
 }
 
-/// Assert a `Poll` is pending.
+/// Asserts a `Poll` is pending.
 ///
 /// This will invoke `panic!` if the provided `Poll` does not evaluate to `Poll::Pending` at
 /// runtime.
@@ -144,7 +144,7 @@ macro_rules! assert_pending {
     }};
 }
 
-/// Assert if a poll is ready and check for equality on the value
+/// Asserts if a poll is ready and check for equality on the value
 ///
 /// This will invoke `panic!` if the provided `Poll` does not evaluate to `Poll::Ready` at
 /// runtime and the value produced does not partially equal the expected value.

@@ -6,7 +6,7 @@ use std::time::Duration;
 
 /// A measurement of the system clock, useful for talking to
 /// external entities like the file system or other processes.
-#[derive(Clone, Copy, Eq, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct Instant {
     std: std::time::Instant,
 }
@@ -123,6 +123,18 @@ impl Instant {
     /// underlying data structure), `None` otherwise.
     pub fn checked_sub(&self, duration: Duration) -> Option<Instant> {
         self.std.checked_sub(duration).map(Instant::from_std)
+    }
+}
+
+impl From<std::time::Instant> for Instant {
+    fn from(time: std::time::Instant) -> Instant {
+        Instant::from_std(time)
+    }
+}
+
+impl From<Instant> for std::time::Instant {
+    fn from(time: Instant) -> std::time::Instant {
+        time.into_std()
     }
 }
 

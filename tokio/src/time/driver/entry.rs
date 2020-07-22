@@ -1,6 +1,6 @@
 use crate::loom::sync::atomic::AtomicU64;
 use crate::sync::AtomicWaker;
-use crate::time::driver::{HandlePriv, Inner};
+use crate::time::driver::{Handle, Inner};
 use crate::time::{Duration, Error, Instant};
 
 use std::cell::UnsafeCell;
@@ -30,7 +30,8 @@ pub(crate) struct Entry {
     /// Timer internals. Using a weak pointer allows the timer to shutdown
     /// without all `Delay` instances having completed.
     ///
-    /// When `None`, the entry has not yet been linked with a timer instance.
+    /// When empty, it means that the entry has not yet been linked with a
+    /// timer instance.
     inner: Weak<Inner>,
 
     /// Tracks the entry state. This value contains the following information:
@@ -104,37 +105,25 @@ const ERROR: u64 = u64::MAX;
 // ===== impl Entry =====
 
 impl Entry {
-    pub(crate) fn new(deadline: Instant, duration: Duration) -> Arc<Entry> {
-        let handle_priv = HandlePriv::current();
-        let handle = handle_priv.inner().unwrap();
+    pub(crate) fn new(handle: &Handle, deadline: Instant, duration: Duration) -> Arc<Entry> {
+        let inner = handle.inner().unwrap();
+        let entry: Entry;
 
         // Increment the number of active timeouts
-        if handle.increment().is_err() {
-            // TODO(kleimkuhler): Transition to error state instead of
-            // panicking?
-            panic!("failed to add entry; timer at capacity");
-        };
-
-        let when = handle.normalize_deadline(deadline);
-        let state = if when <= handle.elapsed() {
-            ELAPSED
+        if inner.increment().is_err() {
+            entry = Entry::new2(deadline, duration, Weak::new(), ERROR)
         } else {
-            when
-        };
+            let when = inner.normalize_deadline(deadline);
+            let state = if when <= inner.elapsed() {
+                ELAPSED
+            } else {
+                when
+            };
+            entry = Entry::new2(deadline, duration, Arc::downgrade(&inner), state);
+        }
 
-        let entry = Arc::new(Entry {
-            time: CachePadded(UnsafeCell::new(Time { deadline, duration })),
-            inner: handle_priv.into_inner(),
-            waker: AtomicWaker::new(),
-            state: AtomicU64::new(state),
-            queued: AtomicBool::new(false),
-            next_atomic: UnsafeCell::new(ptr::null_mut()),
-            when: UnsafeCell::new(None),
-            next_stack: UnsafeCell::new(None),
-            prev_stack: UnsafeCell::new(ptr::null_mut()),
-        });
-
-        if handle.queue(&entry).is_err() {
+        let entry = Arc::new(entry);
+        if inner.queue(&entry).is_err() {
             entry.error();
         }
 
@@ -155,12 +144,12 @@ impl Entry {
     /// The current entry state as known by the timer. This is not the value of
     /// `state`, but lets the timer know how to converge its state to `state`.
     pub(crate) fn when_internal(&self) -> Option<u64> {
-        unsafe { (*self.when.get()) }
+        unsafe { *self.when.get() }
     }
 
     pub(crate) fn set_when_internal(&self, when: Option<u64>) {
         unsafe {
-            (*self.when.get()) = when;
+            *self.when.get() = when;
         }
     }
 
@@ -278,8 +267,9 @@ impl Entry {
         let when = inner.normalize_deadline(deadline);
         let elapsed = inner.elapsed();
 
+        let next = if when <= elapsed { ELAPSED } else { when };
+
         let mut curr = entry.state.load(SeqCst);
-        let mut notify;
 
         loop {
             // In these two cases, there is no work to do when resetting the
@@ -288,16 +278,6 @@ impl Entry {
             // the reset is a noop.
             if curr == ERROR || curr == when {
                 return;
-            }
-
-            let next;
-
-            if when <= elapsed {
-                next = ELAPSED;
-                notify = !is_elapsed(curr);
-            } else {
-                next = when;
-                notify = true;
             }
 
             let actual = entry.state.compare_and_swap(curr, next, SeqCst);
@@ -309,8 +289,31 @@ impl Entry {
             curr = actual;
         }
 
-        if notify {
+        // If the state has transitioned to 'elapsed' then wake the task as
+        // this entry is ready to be polled.
+        if !is_elapsed(curr) && is_elapsed(next) {
+            entry.waker.wake();
+        }
+
+        // The driver tracks all non-elapsed entries; notify the driver that it
+        // should update its state for this entry unless the entry had already
+        // elapsed and remains elapsed.
+        if !is_elapsed(curr) || !is_elapsed(next) {
             let _ = inner.queue(entry);
+        }
+    }
+
+    fn new2(deadline: Instant, duration: Duration, inner: Weak<Inner>, state: u64) -> Self {
+        Self {
+            time: CachePadded(UnsafeCell::new(Time { deadline, duration })),
+            inner,
+            waker: AtomicWaker::new(),
+            state: AtomicU64::new(state),
+            queued: AtomicBool::new(false),
+            next_atomic: UnsafeCell::new(ptr::null_mut()),
+            when: UnsafeCell::new(None),
+            next_stack: UnsafeCell::new(None),
+            prev_stack: UnsafeCell::new(ptr::null_mut()),
         }
     }
 

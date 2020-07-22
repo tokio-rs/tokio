@@ -31,7 +31,7 @@ enum Kind {
 }
 
 impl Error {
-    /// Create an error representing a shutdown timer.
+    /// Creates an error representing a shutdown timer.
     pub fn shutdown() -> Error {
         Error(Shutdown)
     }
@@ -44,7 +44,7 @@ impl Error {
         }
     }
 
-    /// Create an error representing a timer at capacity.
+    /// Creates an error representing a timer at capacity.
     pub fn at_capacity() -> Error {
         Error(AtCapacity)
     }
@@ -64,7 +64,7 @@ impl fmt::Display for Error {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         use self::Kind::*;
         let descr = match self.0 {
-            Shutdown => "timer is shutdown",
+            Shutdown => "the timer is shutdown, must be called from the context of Tokio runtime",
             AtCapacity => "timer is at capacity and cannot create a new entry",
         };
         write!(fmt, "{}", descr)

@@ -8,12 +8,12 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.2.1"
+version = "0.2.22"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 readme = "README.md"
-documentation = "https://docs.rs/tokio/0.2.1/tokio/"
+documentation = "https://docs.rs/tokio/0.2.22/tokio/"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
 description = """
@@ -49,7 +49,7 @@ full = [
 
 blocking = ["rt-core"]
 dns = ["rt-core"]
-fs = ["rt-core"]
+fs = ["rt-core", "io-util"]
 io-driver = ["mio", "lazy_static"]
 io-util = ["memchr"]
 # stdin, stdout, stderr
@@ -85,14 +85,13 @@ signal = [
 stream = ["futures-core"]
 sync = ["fnv"]
 test-util = []
-tcp = ["io-driver"]
+tcp = ["io-driver", "iovec"]
 time = ["slab"]
 udp = ["io-driver"]
 uds = ["io-driver", "mio-uds", "libc"]
 
-
 [dependencies]
-tokio-macros = { version = "0.2.0", optional = true, path = "../tokio-macros" }
+tokio-macros = { version = "0.2.4", path = "../tokio-macros", optional = true }
 
 bytes = "0.5.0"
 pin-project-lite = "0.1.1"
@@ -103,9 +102,11 @@ futures-core = { version = "0.3.0", optional = true }
 lazy_static = { version = "1.0.2", optional = true }
 memchr = { version = "2.2", optional = true }
 mio = { version = "0.6.20", optional = true }
+iovec = { version = "0.1.4", optional = true }
 num_cpus = { version = "1.8.0", optional = true }
-# Backs `DelayQueue`
-slab = { version = "0.4.1", optional = true }
+parking_lot = { version = "0.10.0", optional = true } # Not in full
+slab = { version = "0.4.1", optional = true } # Backs `DelayQueue`
+tracing = { version = "0.1.16", default-features = false, features = ["std"], optional = true } # Not in full
 
 [target.'cfg(unix)'.dependencies]
 mio-uds = { version = "0.6.5", optional = true }
@@ -123,10 +124,16 @@ optional = true
 [dev-dependencies]
 tokio-test = { version = "0.2.0", path = "../tokio-test" }
 futures = { version = "0.3.0", features = ["async-await"] }
-loom = { version = "0.2.13", features = ["futures", "checkpoint"] }
+futures-test = "0.3.0"
 proptest = "0.9.4"
 tempfile = "3.1.0"
+
+[target.'cfg(loom)'.dev-dependencies]
+loom = { version = "0.3.4", features = ["futures", "checkpoint"] }
 
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+
+[package.metadata.playground]
+features = ["full"]

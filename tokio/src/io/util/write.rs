@@ -35,14 +35,3 @@ where
         Pin::new(&mut *me.writer).poll_write(cx, me.buf)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn assert_unpin() {
-        use std::marker::PhantomPinned;
-        crate::is_unpin::<Write<'_, PhantomPinned>>();
-    }
-}
