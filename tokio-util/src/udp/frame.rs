@@ -6,6 +6,7 @@ use bytes::{BufMut, BytesMut};
 use futures_core::ready;
 use futures_sink::Sink;
 use std::io;
+use std::mem::MaybeUninit;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -66,11 +67,12 @@ impl<C: Decoder + Unpin> Stream for UdpFramed<C> {
 
             // We're out of data. Try and fetch more data to decode
             let addr = unsafe {
-                // Convert `&mut [MaybeUnit<u8>]` to `&mut [u8]` because we will be 
-                // writing to it via `poll_recv_from` and therefore initializing it.
-                let b: &mut [u8] = std::mem::transmute(pin.rd.bytes_mut());
+                // Convert `&mut [MaybeUnit<u8>]` to `&mut [u8]` because we will be
+                // writing to it via `poll_recv_from` and therefore initializing the memory.
+                let buf: &mut [u8] =
+                    &mut *(pin.rd.bytes_mut() as *mut [MaybeUninit<u8>] as *mut [u8]);
 
-                let res = ready!(Pin::new(&mut pin.socket).poll_recv_from(cx, b));
+                let res = ready!(Pin::new(&mut pin.socket).poll_recv_from(cx, buf));
 
                 let (n, addr) = res?;
                 pin.rd.advance_mut(n);
