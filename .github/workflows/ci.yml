@@ -4,11 +4,12 @@ on:
   pull_request:
     branches: ["master"]
 
-name: Test tokio
+name: CI
 
 env:
   RUSTFLAGS: -Dwarnings
   RUST_BACKTRACE: 1
+  WORKSPACE: ${{ github.workspace }}
   nightly: nightly-2020-01-25
 
 jobs:
@@ -26,21 +27,25 @@ jobs:
       - name: Install Rust
         run: rustup update stable
 
-      # Run `tokio` with only `full`
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --manifest-path ${{ github.workspace }}/tokio/Cargo.toml --features full
-        name: tokio - cargo test --features full
+      - name: test tokio --full
+        run: cargo test --features full
+        working-directory: tokio
 
-      # Run `tokio` with "unstable" cfg flag
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --manifest-path ${{ github.workspace }}/tokio/Cargo.toml --features full
-        env:
-          RUSTFLAGS: '--cfg tokio_unstable'
-        name: tokio - cargo test --features full --cfg tokio_unstable
+      # # Run `tokio` with only `full`
+      # - uses: actions-rs/cargo@v1
+      #   with:
+      #     command: test
+      #     args: --manifest-path ${{ github.workspace }}/tokio/Cargo.toml --features full
+      #   name: tokio - cargo test --features full
+
+      # # Run `tokio` with "unstable" cfg flag
+      # - uses: actions-rs/cargo@v1
+      #   with:
+      #     command: test
+      #     args: --manifest-path ${{ github.workspace }}/tokio/Cargo.toml --features full
+      #   env:
+      #     RUSTFLAGS: '--cfg tokio_unstable'
+      #   name: tokio - cargo test --features full --cfg tokio_unstable
 
   test_cross_subcrates:
     name: Test ${{ matrix.crate }} (${{ matrix.os }}) all-features
