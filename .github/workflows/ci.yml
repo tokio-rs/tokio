@@ -14,7 +14,7 @@ env:
 
 jobs:
   test_tokio:
-    name: Test tokio full
+    name: test tokio full
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -27,9 +27,20 @@ jobs:
       - name: Install Rust
         run: rustup update stable
 
-      - name: test tokio --full
+      # Run `tokio` with `full` features
+      - name: test tokio full
         run: cargo test --features full
         working-directory: tokio
+
+      # Check `tokio` with `full + parking_lot`
+      - name: check tokio full,parking_lot
+        run: cargo check --features features,parking_lot
+
+      # Run `tokio` with "unstable" cfg flag
+      - name: test tokio full --cfg unstable
+        run: cargo test --features full
+        env:
+          RUSTFLAGS: '--cfg tokio_unstable'
 
       # # Run `tokio` with only `full`
       # - uses: actions-rs/cargo@v1
