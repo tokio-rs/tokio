@@ -160,17 +160,17 @@ impl<T> Receiver<T> {
     /// fn main() {
     ///     let (mut tx, mut rx) = mpsc::channel(10);
     ///     
-    ///     let sync_code = thread::spawn(|| {
+    ///     let sync_code = thread::spawn(move || {
     ///         assert_eq!(Some(10), rx.blocking_recv());
     ///     });
     ///
     ///     Runtime::new()
     ///         .unwrap()
-    ///         .block_on(async {
+    ///         .block_on(move async {
     ///             let _ = tx.send(10).await;
     ///         });
+    ///     sync_code.join().unwrap()
     /// }
-    ///
     /// ```
     pub fn blocking_recv(&mut self) -> Option<T> {
         loop {
