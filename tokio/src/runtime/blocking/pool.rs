@@ -197,7 +197,12 @@ impl Spawner {
         if let Some(shutdown_tx) = shutdown_tx {
             let handle = self.spawn_thread(shutdown_tx, rt);
 
-            self.inner.shared.lock().unwrap().worker_threads.push(handle);
+            self.inner
+                .shared
+                .lock()
+                .unwrap()
+                .worker_threads
+                .push(handle);
         }
 
         Ok(())

@@ -21,8 +21,10 @@ pub(crate) enum Spawner {
 impl Spawner {
     pub(crate) fn shutdown(&mut self) {
         #[cfg(feature = "rt-threaded")]
-        if let Spawner::ThreadPool(spawner) = self {
-            spawner.shutdown();
+        {
+            if let Spawner::ThreadPool(spawner) = self {
+                spawner.shutdown();
+            }
         }
     }
 }
