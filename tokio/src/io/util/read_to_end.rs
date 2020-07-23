@@ -29,7 +29,9 @@ where
     }
 }
 
-/// SAFETY: Before first calling this method, the unused capacity must have been
+/// # Safety
+///
+/// Before first calling this method, the unused capacity must have been
 /// prepared for use with the provided AsyncRead. This can be done using the
 /// `prepare_buffer` function later in this file.
 pub(super) unsafe fn read_to_end_internal<R: AsyncRead + ?Sized>(
@@ -55,8 +57,10 @@ pub(super) unsafe fn read_to_end_internal<R: AsyncRead + ?Sized>(
 ///
 /// The length of the buffer is increased by the number of bytes read.
 ///
-/// SAFETY: Before first calling this method, the unused capacity must have been
-/// prepared for use with the provided AsyncRead. This can be done using the
+/// # Safety
+///
+/// The caller ensures that the buffer has been prepared for use with the
+/// AsyncRead before calling this function. This can be done using the
 /// `prepare_buffer` function later in this file.
 unsafe fn poll_read_to_end<R: AsyncRead + ?Sized>(
     buf: &mut Vec<u8>,
@@ -75,11 +79,7 @@ unsafe fn poll_read_to_end<R: AsyncRead + ?Sized>(
 
     // safety: The buffer has been prepared for use with the AsyncRead before
     // calling this function.
-    let slice: &mut [u8] = {
-        let ptr = unused_capacity.as_mut_ptr().cast::<u8>();
-        let len = unused_capacity.len();
-        std::slice::from_raw_parts_mut(ptr, len)
-    };
+    let slice: &mut [u8] = &mut *(unused_capacity as *mut [MaybeUninit<u8>] as *mut [u8]);
 
     let res = ready!(read.poll_read(cx, slice));
     if let Ok(num) = res {

@@ -98,6 +98,7 @@ pub(super) fn read_line_internal<R: AsyncBufRead + ?Sized>(
     // At this point both buf and output are empty. The allocation is in utf8_res.
 
     debug_assert!(buf.is_empty());
+    debug_assert!(output.is_empty());
     finish_string_read(io_res, utf8_res, *read, output, false)
 }
 

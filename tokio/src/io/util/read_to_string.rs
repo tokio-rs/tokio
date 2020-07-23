@@ -41,7 +41,9 @@ where
     }
 }
 
-/// SAFETY: Before first calling this method, the unused capacity must have been
+/// # Safety
+///
+/// Before first calling this method, the unused capacity must have been
 /// prepared for use with the provided AsyncRead. This can be done using the
 /// `prepare_buffer` function in `read_to_end.rs`.
 unsafe fn read_to_string_internal<R: AsyncRead + ?Sized>(
@@ -57,6 +59,7 @@ unsafe fn read_to_string_internal<R: AsyncRead + ?Sized>(
     // At this point both buf and output are empty. The allocation is in utf8_res.
 
     debug_assert!(buf.is_empty());
+    debug_assert!(output.is_empty());
     finish_string_read(io_res, utf8_res, *read, output, true)
 }
 
