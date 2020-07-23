@@ -27,7 +27,7 @@ the Rust programming language. It is:
 [discord-url]: https://discord.gg/tokio
 
 [Website](https://tokio.rs) |
-[Guides](https://tokio.rs/docs/overview/) |
+[Guides](https://tokio.rs/tokio/tutorial) |
 [API Docs](https://docs.rs/tokio/latest/tokio) |
 [Roadmap](https://github.com/tokio-rs/tokio/blob/master/ROADMAP.md) |
 [Chat](https://discord.gg/tokio)
@@ -103,7 +103,7 @@ First, see if the answer to your question can be found in the [Guides] or the
 the [Tokio Discord server][chat]. We would be happy to try to answer your
 question. You can also ask your question on [the discussions page][discussions].
 
-[Guides]: https://tokio.rs/docs/overview/
+[Guides]: https://tokio.rs/tokio/tutorial
 [API documentation]: https://docs.rs/tokio/latest/tokio
 [chat]: https://discord.gg/tokio
 [discussions]: https://github.com/tokio-rs/tokio/discussions
