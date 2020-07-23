@@ -75,6 +75,47 @@ jobs:
         env:
           RUSTFLAGS: '--cfg tokio_unstable'
 
+  miri:
+    name: miri
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust
+        run: rustup update nightly
+      - name: Install Miri
+        run: |
+          set -e
+          rustup component add miri --toolchain nightly
+          cargo +nightly miri setup
+          rm -rf tokio/tests
+
+      - name: miri
+        run: cargo +nightly miri test --features rt-core,rt-threaded,rt-util,sync -- -- task
+        working-directory: tokio
+
+  cross:
+    name: cross
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - i686-unknown-linux-gnu
+          - powerpc-unknown-linux-gnu
+          - powerpc64-unknown-linux-gnu
+          - mips-unknown-linux-gnu
+          - arm-linux-androideabi
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --workspace --target ${{ matrix.target }}
 
   loom:
     name: loom
