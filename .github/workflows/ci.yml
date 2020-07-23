@@ -26,6 +26,8 @@ jobs:
       - uses: actions/checkout@master
       - name: Install Rust
         run: rustup update stable
+      - name: Install cargo-hack
+        run: cargo install cargo-hack
 
       # Run `tokio` with `full` features. This excludes testing utilities which
       # can alter the runtime behavior of Tokio.
@@ -49,23 +51,15 @@ jobs:
       - name: test all --all-features
         run: cargo test --workspace --all-features
 
-  integration:
-    name: integration
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os:
-          - windows-latest
-          - ubuntu-latest
-          - macos-latest
-    steps:
-      - uses: actions/checkout@master
-      - name: Install Rust
-        run: rustup update stable
-      - run: cargo install cargo-hack
-        name: Install cargo-hack
-
       # Run integration tests for each feature
       - name: test tests-integration --each-feature
         run: cargo hack test --each-feature
         working-directory: tests-integration
+
+      # Run macro build tests
+      - name: test tests-build --each-feature
+        run: cargo hack test --each-feature
+        working-directory: tests-build
+
+  build:
+    name: build
