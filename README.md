@@ -96,6 +96,9 @@ More examples can be found [here][examples]. For a larger "real world" example, 
 [examples]: https://github.com/tokio-rs/tokio/tree/master/examples
 [mini-redis]: https://github.com/tokio-rs/mini-redis/
 
+To see a list of the available features flags that can be enabled, check our
+[docs][feature-flag-docs].
+
 ## Getting Help
 
 First, see if the answer to your question can be found in the [Guides] or the
@@ -107,6 +110,7 @@ question. You can also ask your question on [the discussions page][discussions].
 [API documentation]: https://docs.rs/tokio/latest/tokio
 [chat]: https://discord.gg/tokio
 [discussions]: https://github.com/tokio-rs/tokio/discussions
+[feature-flag-docs]: https://docs.rs/tokio/#feature-flags
 
 ## Contributing
 
