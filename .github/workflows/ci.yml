@@ -60,3 +60,24 @@ jobs:
       - name: test tests-build --each-feature
         run: cargo hack test --each-feature
         working-directory: tests-build
+
+  test-unstable:
+    name: test tokio full --unstable
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
+          - macos-latest
+    steps:
+      - uses: actions/checkout@master
+      - name: Install Rust
+        run: rustup update stable
+
+      # Run `tokio` with "unstable" cfg flag.
+      - name: test tokio full --cfg unstable
+        run: cargo test --features full
+        working-directory: tokio
+        env:
+          RUSTFLAGS: '--cfg tokio_unstable'
