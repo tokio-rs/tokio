@@ -80,17 +80,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Install Rust
-        run: rustup update nightly
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ nightly }}
+          override: true
       - name: Install Miri
         run: |
           set -e
-          rustup component add miri --toolchain nightly
-          cargo +nightly miri setup
+          rustup component add miri
+          cargo miri setup
           rm -rf tokio/tests
 
       - name: miri
-        run: cargo +nightly miri test --features rt-core,rt-threaded,rt-util,sync -- -- task
+        run: cargo miri test --features rt-core,rt-threaded,rt-util,sync -- -- task
         working-directory: tokio
 
   cross:
@@ -114,8 +116,27 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           use-cross: true
-          command: build
+          command: check
           args: --workspace --target ${{ matrix.target }}
+
+  features:
+    name: features
+    run-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust
+        run: rustup update nightly
+      - name: Install cargo-hack
+        run: cargo +nightly install cargo-hack
+
+      - name: check --each-feature
+        run: cargo +nightly hack check --all --each-feature -Z avoid-dev-deps
+
+      # Try with unstable feature flags
+      - name: check --each-feature --unstable
+        run: cargo +nightly hack check --all --each-feature -Z avoid-dev-deps
+        env:
+          RUSTFLAGS: --cfg tokio_unstable
 
   loom:
     name: loom
