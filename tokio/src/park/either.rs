@@ -36,6 +36,13 @@ where
             Either::B(b) => b.park_timeout(duration).map_err(Either::B),
         }
     }
+
+    fn shutdown(&mut self) {
+        match self {
+            Either::A(a) => a.shutdown(),
+            Either::B(b) => b.shutdown(),
+        }
+    }
 }
 
 impl<A, B> Unpark for Either<A, B>

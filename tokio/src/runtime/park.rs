@@ -3,7 +3,7 @@
 //! A combination of the various resource driver park handles.
 
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::{Arc, Condvar, Mutex, Weak};
+use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::loom::thread;
 use crate::park::{Park, Unpark};
 use crate::runtime::time;
@@ -17,7 +17,7 @@ pub(crate) struct Parker {
 }
 
 pub(crate) struct Unparker {
-    inner: Weak<Inner>,
+    inner: Arc<Inner>,
 }
 
 struct Inner {
@@ -85,7 +85,7 @@ impl Park for Parker {
 
     fn unpark(&self) -> Unparker {
         Unparker {
-            inner: Arc::downgrade(&self.inner),
+            inner: self.inner.clone(),
         }
     }
 
@@ -104,13 +104,15 @@ impl Park for Parker {
             Ok(())
         }
     }
+
+    fn shutdown(&mut self) {
+        self.inner.shutdown();
+    }
 }
 
 impl Unpark for Unparker {
     fn unpark(&self) {
-        if let Some(inner) = self.inner.upgrade() {
-            inner.unpark();
-        }
+        self.inner.unpark();
     }
 }
 
@@ -243,5 +245,13 @@ impl Inner {
 
     fn unpark_driver(&self) {
         self.shared.handle.unpark();
+    }
+
+    fn shutdown(&self) {
+        if let Some(mut driver) = self.shared.driver.try_lock() {
+            driver.shutdown();
+        }
+
+        self.condvar.notify_all();
     }
 }

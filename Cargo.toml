@@ -5,6 +5,7 @@ members = [
   "tokio-macros",
   "tokio-test",
   "tokio-util",
+  "tokio-hello-world-leak",
 
   # Internal
   "benches",
@@ -12,3 +13,8 @@ members = [
   "tests-build",
   "tests-integration",
 ]
+[patch.crates-io]
+tokio = { path = "tokio" }
+tokio-macros = { path = "tokio-macros" }
+tokio-test = { path = "tokio-test" }
+tokio-util = { path = "tokio-util" }

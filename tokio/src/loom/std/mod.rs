@@ -42,7 +42,6 @@ pub(crate) mod rand {
 
 pub(crate) mod sync {
     pub(crate) use std::sync::Arc;
-    pub(crate) use std::sync::Weak;
 
     // Below, make sure all the feature-influenced types are exported for
     // internal use. Note however that some are not _currently_ named by
