@@ -60,6 +60,3 @@ jobs:
       - name: test tests-build --each-feature
         run: cargo hack test --each-feature
         working-directory: tests-build
-
-  build:
-    name: build
