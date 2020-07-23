@@ -34,7 +34,7 @@ jobs:
 
       # Check `tokio` with `full + parking_lot`
       - name: check tokio full,parking_lot
-        run: cargo check --features features,parking_lot
+        run: cargo check --features full,parking_lot
         working-directory: tokio
 
       # Run `tokio` with "unstable" cfg flag
