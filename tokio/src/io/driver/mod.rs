@@ -182,9 +182,7 @@ impl Park for Driver {
         Ok(())
     }
 
-    fn shutdown(&mut self) {
-
-    }
+    fn shutdown(&mut self) {}
 }
 
 impl fmt::Debug for Driver {

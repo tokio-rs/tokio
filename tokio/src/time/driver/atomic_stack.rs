@@ -56,8 +56,10 @@ impl AtomicStack {
 
             // Update the `next` pointer. This is safe because setting the queued
             // bit is a "lock" on this field.
-            unsafe {
-                *(entry.next_atomic.get()) = curr;
+            if !curr.is_null() {
+                unsafe {
+                    *(entry.next_atomic.get()) = curr;
+                }
             }
 
             let actual = self.head.compare_and_swap(curr, ptr, SeqCst);
@@ -103,7 +105,14 @@ impl Iterator for AtomicStackEntries {
         let entry = unsafe { Arc::from_raw(self.ptr) };
 
         // Update `self.ptr` to point to the next element of the stack
-        self.ptr = unsafe { *entry.next_atomic.get() };
+        self.ptr = unsafe {
+            let entry = entry.next_atomic.get();
+            if entry.is_null() {
+                return None
+            }
+
+            *entry
+        };
 
         // Unset the queued flag
         let res = entry.queued.fetch_and(false, SeqCst);

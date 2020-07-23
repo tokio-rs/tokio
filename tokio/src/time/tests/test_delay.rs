@@ -354,9 +354,7 @@ fn unpark_is_delayed() {
             Ok(())
         }
 
-        fn shutdown(&mut self) {
-            
-        }
+        fn shutdown(&mut self) {}
     }
 
     impl Unpark for MockUnpark {
@@ -441,9 +439,7 @@ impl Park for MockPark {
         Ok(())
     }
 
-    fn shutdown(&mut self) {
-
-    }
+    fn shutdown(&mut self) {}
 }
 
 impl Unpark for MockUnpark {
