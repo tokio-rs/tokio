@@ -40,13 +40,6 @@ jobs:
         run: cargo check --features full,parking_lot
         working-directory: tokio
 
-      # Run `tokio` with "unstable" cfg flag.
-      - name: test tokio full --cfg unstable
-        run: cargo test --features full
-        working-directory: tokio
-        env:
-          RUSTFLAGS: '--cfg tokio_unstable'
-
       # Test **all** crates in the workspace with all features.
       - name: test all --all-features
         run: cargo test --workspace --all-features
