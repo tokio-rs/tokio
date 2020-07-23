@@ -150,6 +150,39 @@ impl<T> Receiver<T> {
         poll_fn(|cx| self.poll_recv(cx)).await
     }
 
+    /// Blocking receive to call outside of asynchronous contexts
+    ///
+    /// ```
+    /// use std::thread;
+    /// use tokio::runtime::Runtime;
+    /// use tokio::sync::mpsc;
+    ///
+    /// fn main() {
+    ///     let (mut tx, mut rx) = mpsc::channel(10);
+    ///     
+    ///     let sync_code = thread::spawn(|| {
+    ///         assert_eq!(Some(10), rx.blocking_recv());
+    ///     });
+    ///
+    ///     Runtime::new()
+    ///         .unwrap()
+    ///         .block_on(async {
+    ///             let _ = tx.send(10).await;
+    ///         });
+    /// }
+    ///
+    /// ```
+    pub fn blocking_recv(&mut self) -> Option<T> {
+        loop {
+            let res = match self.try_recv() {
+                Ok(t) => Some(t),
+                Err(TryRecvError::Closed) => None,
+                _ => continue,
+            };
+            return res;
+        }
+    }
+
     #[doc(hidden)] // TODO: document
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         self.chan.recv(cx)
