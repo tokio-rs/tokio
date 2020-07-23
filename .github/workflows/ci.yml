@@ -9,7 +9,6 @@ name: CI
 env:
   RUSTFLAGS: -Dwarnings
   RUST_BACKTRACE: 1
-  WORKSPACE: ${{ github.workspace }}
   nightly: nightly-2020-01-25
 
 jobs:
@@ -82,7 +81,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ nightly }}
+          toolchain: ${{ env.nightly }}
           override: true
       - name: Install Miri
         run: |
