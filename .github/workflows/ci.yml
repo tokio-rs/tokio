@@ -76,25 +76,25 @@ jobs:
           RUSTFLAGS: '--cfg tokio_unstable'
 
 
-    loom:
-      name: loom
-      runs-on: ubuntu-latest
-      strategy:
-        matrix:
-          scope:
-            - --skip loom_pool
-            - loom_pool::group_a
-            - loom_pool::group_b
-            - loom_pool::group_c
-            - loom_pool::group_d
-      steps:
-        - uses: actions/checkout@master
-        - name: Install Rust
-          run: rustup update stable
+  loom:
+    name: loom
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        scope:
+          - --skip loom_pool
+          - loom_pool::group_a
+          - loom_pool::group_b
+          - loom_pool::group_c
+          - loom_pool::group_d
+    steps:
+      - uses: actions/checkout@master
+      - name: Install Rust
+        run: rustup update stable
 
-        - name: loom ${{ matrix.scope }}
-          run: cargo test --lib --release --features full -- --nocapture ${ matrix.scope }
-          working-directory: tokio
-          env:
-            RUSTFLAGS: --cfg loom --cfg tokio_unstable
-            LOOM_MAX_PREEMPTIONS: 2
+      - name: loom ${{ matrix.scope }}
+        run: cargo test --lib --release --features full -- --nocapture ${ matrix.scope }
+        working-directory: tokio
+        env:
+          RUSTFLAGS: --cfg loom --cfg tokio_unstable
+          LOOM_MAX_PREEMPTIONS: 2
