@@ -158,7 +158,7 @@ impl<T> Receiver<T> {
     /// use tokio::sync::mpsc;
     ///
     /// fn main() {
-    ///     let (mut tx, mut rx) = mpsc::channel(10);
+    ///     let (mut tx, mut rx) = mpsc::channel::<u8>(10);
     ///     
     ///     let sync_code = thread::spawn(move || {
     ///         assert_eq!(Some(10), rx.blocking_recv());
@@ -166,7 +166,7 @@ impl<T> Receiver<T> {
     ///
     ///     Runtime::new()
     ///         .unwrap()
-    ///         .block_on(move async {
+    ///         .block_on(async move 
     ///             let _ = tx.send(10).await;
     ///         });
     ///     sync_code.join().unwrap()
