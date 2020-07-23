@@ -22,7 +22,7 @@ jobs:
           - ubuntu-latest
           - macos-latest
     steps:
-      - uses: actions/checkout@master
+      - uses: actions/checkout@v2
       - name: Install Rust
         run: rustup update stable
       - name: Install cargo-hack
@@ -63,7 +63,7 @@ jobs:
           - ubuntu-latest
           - macos-latest
     steps:
-      - uses: actions/checkout@master
+      - uses: actions/checkout@v2
       - name: Install Rust
         run: rustup update stable
 
@@ -149,7 +149,7 @@ jobs:
           - loom_pool::group_c
           - loom_pool::group_d
     steps:
-      - uses: actions/checkout@master
+      - uses: actions/checkout@v2
       - name: Install Rust
         run: rustup update stable
 
