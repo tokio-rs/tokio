@@ -35,15 +35,25 @@ impl Receiver {
     ///
     /// If the timeout has elapsed, it returns `false`, otherwise it returns `true`.
     pub(crate) fn wait(&mut self, timeout: Option<Duration>) -> bool {
-        use crate::runtime::enter::{enter, try_enter};
+        use crate::runtime::enter::try_enter;
 
-        let mut e = if std::thread::panicking() {
-            match try_enter(false) {
-                Some(enter) => enter,
-                _ => return true,
+        if timeout == Some(Duration::from_nanos(0)) {
+            return true;
+        }
+
+        let mut e = match try_enter(false) {
+            Some(enter) => enter,
+            _ => {
+                if std::thread::panicking() {
+                    // Don't panic in a panic
+                    return false;
+                } else {
+                    panic!(
+                        "Cannot drop a runtime in a context where blocking is not allowed. \
+                        This happens when a runtime is dropped from within an asynchronous context."
+                    );
+                }
             }
-        } else {
-            enter(false)
         };
 
         // The oneshot completes with an Err

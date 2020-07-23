@@ -115,7 +115,7 @@ impl<'a, T: ?Sized> ReleasingPermit<'a, T> {
         lock: &'a RwLock<T>,
         num_permits: u16,
     ) -> Result<ReleasingPermit<'a, T>, AcquireError> {
-        lock.s.acquire(num_permits).await?;
+        lock.s.acquire(num_permits.into()).await?;
         Ok(Self { num_permits, lock })
     }
 }

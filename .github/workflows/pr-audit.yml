@@ -1,0 +1,32 @@
+name: Pull Request Security Audit
+
+on:
+  push:
+    paths:
+      - '**/Cargo.toml'
+  pull_request:
+    paths:
+      - '**/Cargo.toml'
+
+jobs:
+  security-audit:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, 'ci skip')"
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install cargo-audit
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cargo-audit
+
+      - name: Generate lockfile
+        uses: actions-rs/cargo@v1
+        with:
+          command: generate-lockfile
+
+      - name: Audit dependencies
+        uses: actions-rs/cargo@v1
+        with:
+          command: audit
