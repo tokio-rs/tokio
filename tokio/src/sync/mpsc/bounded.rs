@@ -166,7 +166,7 @@ impl<T> Receiver<T> {
     ///
     ///     Runtime::new()
     ///         .unwrap()
-    ///         .block_on(async move 
+    ///         .block_on(async move {
     ///             let _ = tx.send(10).await;
     ///         });
     ///     sync_code.join().unwrap()
