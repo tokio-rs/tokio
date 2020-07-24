@@ -1,6 +1,7 @@
 //! Unix domain socket utility types
 
 pub(crate) mod datagram;
+pub use datagram::{OwnedRecvHalf, OwnedSendHalf, ReuniteError};
 
 mod incoming;
 pub use incoming::Incoming;
