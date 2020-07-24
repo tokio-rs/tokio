@@ -976,7 +976,7 @@ cfg_io_util! {
         /// no longer attempt to write to the stream. For example, the
         /// `TcpStream` implementation will issue a `shutdown(Write)` sys call.
         ///
-        /// [`flush`]: AsyncWriteExt::flush
+        /// [`flush`]: fn@crate::io::AsyncWriteExt::flush
         ///
         /// # Examples
         ///

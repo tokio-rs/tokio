@@ -42,7 +42,7 @@ pub(crate) fn split(socket: UdpSocket) -> (RecvHalf, SendHalf) {
     (RecvHalf(recv), SendHalf(send))
 }
 
-/// Error indicating two halves were not from the same socket, and thus could
+/// Error indicating that two halves were not from the same socket, and thus could
 /// not be `reunite`d.
 #[derive(Debug)]
 pub struct ReuniteError(pub SendHalf, pub RecvHalf);
