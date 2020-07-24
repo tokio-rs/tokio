@@ -1,0 +1,97 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `tokio/src/fs/read.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>read.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css"><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="shortcut icon" href="../../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../tokio/index.html'><div class='logo-container'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1"> 1</span>
+<span id="2"> 2</span>
+<span id="3"> 3</span>
+<span id="4"> 4</span>
+<span id="5"> 5</span>
+<span id="6"> 6</span>
+<span id="7"> 7</span>
+<span id="8"> 8</span>
+<span id="9"> 9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+</pre><div class="example-wrap"><pre class="rust ">
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">fs</span>::<span class="ident">asyncify</span>;
+
+<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">io</span>, <span class="ident">path</span>::<span class="ident">Path</span>};
+
+<span class="doccomment">/// Reads the entire contents of a file into a bytes vector.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This is an async version of [`std::fs::read`][std]</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// [std]: std::fs::read</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This is a convenience function for using [`File::open`] and [`read_to_end`]</span>
+<span class="doccomment">/// with fewer imports and without an intermediate variable. It pre-allocates a</span>
+<span class="doccomment">/// buffer based on the file size when available, so it is generally faster than</span>
+<span class="doccomment">/// reading into a vector created with `Vec::new()`.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// [`File::open`]: super::File::open</span>
+<span class="doccomment">/// [`read_to_end`]: crate::io::AsyncReadExt::read_to_end</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// # Errors</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This function will return an error if `path` does not already exist.</span>
+<span class="doccomment">/// Other errors may also be returned according to [`OpenOptions::open`].</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// [`OpenOptions::open`]: super::OpenOptions::open</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// It will also return an error if it encounters while reading an error</span>
+<span class="doccomment">/// of a kind other than [`ErrorKind::Interrupted`].</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// [`ErrorKind::Interrupted`]: std::io::ErrorKind::Interrupted</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// # Examples</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// ```no_run</span>
+<span class="doccomment">/// use tokio::fs;</span>
+<span class="doccomment">/// use std::net::SocketAddr;</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// #[tokio::main]</span>
+<span class="doccomment">/// async fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error + &#39;static&gt;&gt; {</span>
+<span class="doccomment">///     let contents = fs::read(&quot;address.txt&quot;).await?;</span>
+<span class="doccomment">///     let foo: SocketAddr = String::from_utf8_lossy(&amp;contents).parse()?;</span>
+<span class="doccomment">///     Ok(())</span>
+<span class="doccomment">/// }</span>
+<span class="doccomment">/// ```</span>
+<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read</span>(<span class="ident">path</span>: <span class="kw">impl</span> <span class="ident">AsRef</span><span class="op">&lt;</span><span class="ident">Path</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">path</span> <span class="op">=</span> <span class="ident">path</span>.<span class="ident">as_ref</span>().<span class="ident">to_owned</span>();
+    <span class="ident">asyncify</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> <span class="ident">std</span>::<span class="ident">fs</span>::<span class="ident">read</span>(<span class="ident">path</span>)).<span class="kw">await</span>
+}
+</pre></div>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../";window.currentCrate = "tokio";</script><script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script><script defer src="../../../search-index.js"></script></body></html>

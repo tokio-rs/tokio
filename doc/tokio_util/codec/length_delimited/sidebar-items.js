@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Builder","Configure length delimited `LengthDelimitedCodec`s."],["LengthDelimitedCodec","A codec for frames delimited by a frame head specifying their lengths."],["LengthDelimitedCodecError","An error when the number of bytes read is more than max frame length."]]});

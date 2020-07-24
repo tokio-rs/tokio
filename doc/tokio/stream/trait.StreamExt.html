@@ -1,0 +1,504 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `StreamExt` trait in crate `tokio`."><meta name="keywords" content="rust, rustlang, rust-lang, StreamExt"><title>tokio::stream::StreamExt - Rust</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc trait"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../tokio/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a><p class='location'>Trait StreamExt</p><div class="sidebar-elems"><div class="block items"><a class="sidebar-title" href="#provided-methods">Provided Methods</a><div class="sidebar-links"><a href="#method.all">all</a><a href="#method.any">any</a><a href="#method.chain">chain</a><a href="#method.collect">collect</a><a href="#method.filter">filter</a><a href="#method.filter_map">filter_map</a><a href="#method.fold">fold</a><a href="#method.fuse">fuse</a><a href="#method.map">map</a><a href="#method.merge">merge</a><a href="#method.next">next</a><a href="#method.skip">skip</a><a href="#method.skip_while">skip_while</a><a href="#method.take">take</a><a href="#method.take_while">take_while</a><a href="#method.timeout">timeout</a><a href="#method.try_next">try_next</a></div><a class="sidebar-title" href="#implementors">Implementors</a></div><p class='location'><a href='../index.html'>tokio</a>::<wbr><a href='index.html'>stream</a></p><script>window.sidebarCurrent = {name: 'StreamExt', ty: 'trait', relpath: ''};</script><script defer src="sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../../src/tokio/stream/mod.rs.html#81-822' title='goto source code'>[src]</a></span><span class='in-band'>Trait <a href='../index.html'>tokio</a>::<wbr><a href='index.html'>stream</a>::<wbr><a class="trait" href=''>StreamExt</a></span></h1><div class="docblock type-decl hidden-by-usual-hider"><pre class='rust trait'>pub trait StreamExt: <a class="trait" href="../../tokio/stream/trait.Stream.html" title="trait tokio::stream::Stream">Stream</a> {
+    fn <a href='#method.next' class='fnname'>next</a>(&amp;mut self) -&gt; Next&lt;Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.try_next' class='fnname'>try_next</a>&lt;T, E&gt;(&amp;mut self) -&gt; TryNext&lt;Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="../../tokio/stream/trait.Stream.html" title="trait tokio::stream::Stream">Stream</a>&lt;Item = <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;T, E&gt;&gt; + <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.map' class='fnname'>map</a>&lt;T, F&gt;(self, f: F) -&gt; Map&lt;Self, F&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;F: <a class="trait" href="https://doc.rust-lang.org/nightly/core/ops/function/trait.FnMut.html" title="trait core::ops::function::FnMut">FnMut</a>(Self::<a class="type" href="../../tokio/stream/trait.Stream.html#associatedtype.Item" title="type tokio::stream::Stream::Item">Item</a>) -&gt; T,<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.merge' class='fnname'>merge</a>&lt;U&gt;(self, other: U) -&gt; Merge&lt;Self, U&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;U: <a class="trait" href="../../tokio/stream/trait.Stream.html" title="trait tokio::stream::Stream">Stream</a>&lt;Item = Self::<a class="type" href="../../tokio/stream/trait.Stream.html#associatedtype.Item" title="type tokio::stream::Stream::Item">Item</a>&gt;,<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.filter' class='fnname'>filter</a>&lt;F&gt;(self, f: F) -&gt; Filter&lt;Self, F&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;F: <a class="trait" href="https://doc.rust-lang.org/nightly/core/ops/function/trait.FnMut.html" title="trait core::ops::function::FnMut">FnMut</a>(&amp;Self::<a class="type" href="../../tokio/stream/trait.Stream.html#associatedtype.Item" title="type tokio::stream::Stream::Item">Item</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.filter_map' class='fnname'>filter_map</a>&lt;T, F&gt;(self, f: F) -&gt; FilterMap&lt;Self, F&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;F: <a class="trait" href="https://doc.rust-lang.org/nightly/core/ops/function/trait.FnMut.html" title="trait core::ops::function::FnMut">FnMut</a>(Self::<a class="type" href="../../tokio/stream/trait.Stream.html#associatedtype.Item" title="type tokio::stream::Stream::Item">Item</a>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;T&gt;,<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.fuse' class='fnname'>fuse</a>(self) -&gt; Fuse&lt;Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.take' class='fnname'>take</a>(self, n: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>) -&gt; Take&lt;Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.take_while' class='fnname'>take_while</a>&lt;F&gt;(self, f: F) -&gt; TakeWhile&lt;Self, F&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;F: <a class="trait" href="https://doc.rust-lang.org/nightly/core/ops/function/trait.FnMut.html" title="trait core::ops::function::FnMut">FnMut</a>(&amp;Self::<a class="type" href="../../tokio/stream/trait.Stream.html#associatedtype.Item" title="type tokio::stream::Stream::Item">Item</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.skip' class='fnname'>skip</a>(self, n: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>) -&gt; Skip&lt;Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.skip_while' class='fnname'>skip_while</a>&lt;F&gt;(self, f: F) -&gt; SkipWhile&lt;Self, F&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;F: <a class="trait" href="https://doc.rust-lang.org/nightly/core/ops/function/trait.FnMut.html" title="trait core::ops::function::FnMut">FnMut</a>(&amp;Self::<a class="type" href="../../tokio/stream/trait.Stream.html#associatedtype.Item" title="type tokio::stream::Stream::Item">Item</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.all' class='fnname'>all</a>&lt;F&gt;(&amp;mut self, f: F) -&gt; AllFuture&lt;Self, F&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;F: <a class="trait" href="https://doc.rust-lang.org/nightly/core/ops/function/trait.FnMut.html" title="trait core::ops::function::FnMut">FnMut</a>(Self::<a class="type" href="../../tokio/stream/trait.Stream.html#associatedtype.Item" title="type tokio::stream::Stream::Item">Item</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.any' class='fnname'>any</a>&lt;F&gt;(&amp;mut self, f: F) -&gt; AnyFuture&lt;Self, F&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;F: <a class="trait" href="https://doc.rust-lang.org/nightly/core/ops/function/trait.FnMut.html" title="trait core::ops::function::FnMut">FnMut</a>(Self::<a class="type" href="../../tokio/stream/trait.Stream.html#associatedtype.Item" title="type tokio::stream::Stream::Item">Item</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.chain' class='fnname'>chain</a>&lt;U&gt;(self, other: U) -&gt; Chain&lt;Self, U&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;U: <a class="trait" href="../../tokio/stream/trait.Stream.html" title="trait tokio::stream::Stream">Stream</a>&lt;Item = Self::<a class="type" href="../../tokio/stream/trait.Stream.html#associatedtype.Item" title="type tokio::stream::Stream::Item">Item</a>&gt;,<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.fold' class='fnname'>fold</a>&lt;B, F&gt;(self, init: B, f: F) -&gt; FoldFuture&lt;Self, B, F&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;F: <a class="trait" href="https://doc.rust-lang.org/nightly/core/ops/function/trait.FnMut.html" title="trait core::ops::function::FnMut">FnMut</a>(B, Self::<a class="type" href="../../tokio/stream/trait.Stream.html#associatedtype.Item" title="type tokio::stream::Stream::Item">Item</a>) -&gt; B</span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.collect' class='fnname'>collect</a>&lt;T&gt;(self) -&gt; Collect&lt;Self, T&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;T: <a class="trait" href="../../tokio/stream/trait.FromStream.html" title="trait tokio::stream::FromStream">FromStream</a>&lt;Self::<a class="type" href="../../tokio/stream/trait.Stream.html#associatedtype.Item" title="type tokio::stream::Stream::Item">Item</a>&gt;,<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.timeout' class='fnname'>timeout</a>(self, duration: <a class="struct" href="../../tokio/time/struct.Duration.html" title="struct tokio::time::Duration">Duration</a>) -&gt; Timeout&lt;Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a></span>,
+    { ... }
+}</pre></div><div class='docblock'><p>An extension trait for <code>Stream</code>s that provides a variety of convenient
+combinator functions.</p>
+</div>
+            <h2 id='provided-methods' class='small-section-header'>Provided methods<a href='#provided-methods' class='anchor'></a></h2><div class='methods'><h3 id='method.next' class='method'><code id='next.v'>fn <a href='#method.next' class='fnname'>next</a>(&amp;mut self) -&gt; Next&lt;Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,&nbsp;</span></code></h3><div class='docblock'><p>Consumes and returns the next value in the stream or <code>None</code> if the
+stream is finished.</p>
+<p>Equivalent to:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">next</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span>;</pre></div>
+<p>Note that because <code>next</code> doesn't take ownership over the stream,
+the [<code>Stream</code>] type must be [<code>Unpin</code>]. If you want to use <code>next</code> with a
+<a href="Unpin"><code>!Unpin</code></a> stream, you'll first have to pin the stream. This can
+be done by boxing the stream using [<code>Box::pin</code>] or
+pinning it to the stack using the <code>pin_mut!</code> macro from the <code>pin_utils</code>
+crate.</p>
+<h1 id="examples" class="section-header"><a href="#examples">Examples</a></h1>
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">stream</span>::{<span class="self">self</span>, <span class="ident">StreamExt</span>};
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stream</span> <span class="op">=</span> <span class="ident">stream</span>::<span class="ident">iter</span>(<span class="number">1</span>..<span class="op">=</span><span class="number">3</span>);
+
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>, <span class="prelude-val">Some</span>(<span class="number">1</span>));
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>, <span class="prelude-val">Some</span>(<span class="number">2</span>));
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>, <span class="prelude-val">Some</span>(<span class="number">3</span>));
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>, <span class="prelude-val">None</span>);</pre></div>
+</div><h3 id='method.try_next' class='method'><code id='try_next.v'>fn <a href='#method.try_next' class='fnname'>try_next</a>&lt;T, E&gt;(&amp;mut self) -&gt; TryNext&lt;Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="../../tokio/stream/trait.Stream.html" title="trait tokio::stream::Stream">Stream</a>&lt;Item = <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;T, E&gt;&gt; + <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,&nbsp;</span></code></h3><div class='docblock'><p>Consumes and returns the next item in the stream. If an error is
+encountered before the next item, the error is returned instead.</p>
+<p>Equivalent to:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">try_next</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">E</span><span class="op">&gt;</span>;</pre></div>
+<p>This is similar to the <a href="StreamExt::next"><code>next</code></a> combinator,
+but returns a <a href="Result"><code>Result&lt;Option&lt;T&gt;, E&gt;</code></a> rather than
+an <a href="Option"><code>Option&lt;Result&lt;T, E&gt;&gt;</code></a>, making for easy use
+with the <a href="std::ops::Try"><code>?</code></a> operator.</p>
+<h1 id="examples-1" class="section-header"><a href="#examples-1">Examples</a></h1>
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">stream</span>::{<span class="self">self</span>, <span class="ident">StreamExt</span>};
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stream</span> <span class="op">=</span> <span class="ident">stream</span>::<span class="ident">iter</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="prelude-val">Ok</span>(<span class="number">1</span>), <span class="prelude-val">Ok</span>(<span class="number">2</span>), <span class="prelude-val">Err</span>(<span class="string">&quot;nope&quot;</span>)]);
+
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">try_next</span>().<span class="kw">await</span>, <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="number">1</span>)));
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">try_next</span>().<span class="kw">await</span>, <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="number">2</span>)));
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">try_next</span>().<span class="kw">await</span>, <span class="prelude-val">Err</span>(<span class="string">&quot;nope&quot;</span>));</pre></div>
+</div><h3 id='method.map' class='method'><code id='map.v'>fn <a href='#method.map' class='fnname'>map</a>&lt;T, F&gt;(self, f: F) -&gt; Map&lt;Self, F&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;F: <a class="trait" href="https://doc.rust-lang.org/nightly/core/ops/function/trait.FnMut.html" title="trait core::ops::function::FnMut">FnMut</a>(Self::<a class="type" href="../../tokio/stream/trait.Stream.html#associatedtype.Item" title="type tokio::stream::Stream::Item">Item</a>) -&gt; T,<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,&nbsp;</span></code></h3><div class='docblock'><p>Maps this stream's items to a different type, returning a new stream of
+the resulting type.</p>
+<p>The provided closure is executed over all elements of this stream as
+they are made available. It is executed inline with calls to
+<a href="Stream::poll_next"><code>poll_next</code></a>.</p>
+<p>Note that this function consumes the stream passed into it and returns a
+wrapped version of it, similar to the existing <code>map</code> methods in the
+standard library.</p>
+<h1 id="examples-2" class="section-header"><a href="#examples-2">Examples</a></h1>
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">stream</span>::{<span class="self">self</span>, <span class="ident">StreamExt</span>};
+
+<span class="kw">let</span> <span class="ident">stream</span> <span class="op">=</span> <span class="ident">stream</span>::<span class="ident">iter</span>(<span class="number">1</span>..<span class="op">=</span><span class="number">3</span>);
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stream</span> <span class="op">=</span> <span class="ident">stream</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span> <span class="op">+</span> <span class="number">3</span>);
+
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>, <span class="prelude-val">Some</span>(<span class="number">4</span>));
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>, <span class="prelude-val">Some</span>(<span class="number">5</span>));
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>, <span class="prelude-val">Some</span>(<span class="number">6</span>));</pre></div>
+</div><h3 id='method.merge' class='method'><code id='merge.v'>fn <a href='#method.merge' class='fnname'>merge</a>&lt;U&gt;(self, other: U) -&gt; Merge&lt;Self, U&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;U: <a class="trait" href="../../tokio/stream/trait.Stream.html" title="trait tokio::stream::Stream">Stream</a>&lt;Item = Self::<a class="type" href="../../tokio/stream/trait.Stream.html#associatedtype.Item" title="type tokio::stream::Stream::Item">Item</a>&gt;,<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,&nbsp;</span></code></h3><div class='docblock'><p>Combine two streams into one by interleaving the output of both as it
+is produced.</p>
+<p>Values are produced from the merged stream in the order they arrive from
+the two source streams. If both source streams provide values
+simultaneously, the merge stream alternates between them. This provides
+some level of fairness. You should not chain calls to <code>merge</code>, as this
+will break the fairness of the merging.</p>
+<p>The merged stream completes once <strong>both</strong> source streams complete. When
+one source stream completes before the other, the merge stream
+exclusively polls the remaining stream.</p>
+<p>For merging multiple streams, consider using <a href="crate::stream::StreamMap"><code>StreamMap</code></a> instead.</p>
+<h1 id="examples-3" class="section-header"><a href="#examples-3">Examples</a></h1>
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">stream</span>::<span class="ident">StreamExt</span>;
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">sync</span>::<span class="ident">mpsc</span>;
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">time</span>;
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::<span class="ident">Duration</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">tx1</span>, <span class="ident">rx1</span>) <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">channel</span>(<span class="number">10</span>);
+    <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">tx2</span>, <span class="ident">rx2</span>) <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">channel</span>(<span class="number">10</span>);
+
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rx</span> <span class="op">=</span> <span class="ident">rx1</span>.<span class="ident">merge</span>(<span class="ident">rx2</span>);
+
+    <span class="ident">tokio</span>::<span class="ident">spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
+        <span class="comment">// Send some values immediately</span>
+        <span class="ident">tx1</span>.<span class="ident">send</span>(<span class="number">1</span>).<span class="kw">await</span>.<span class="ident">unwrap</span>();
+        <span class="ident">tx1</span>.<span class="ident">send</span>(<span class="number">2</span>).<span class="kw">await</span>.<span class="ident">unwrap</span>();
+
+        <span class="comment">// Let the other task send values</span>
+        <span class="ident">time</span>::<span class="ident">delay_for</span>(<span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="number">20</span>)).<span class="kw">await</span>;
+
+        <span class="ident">tx1</span>.<span class="ident">send</span>(<span class="number">4</span>).<span class="kw">await</span>.<span class="ident">unwrap</span>();
+    });
+
+    <span class="ident">tokio</span>::<span class="ident">spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
+        <span class="comment">// Wait for the first task to send values</span>
+        <span class="ident">time</span>::<span class="ident">delay_for</span>(<span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="number">5</span>)).<span class="kw">await</span>;
+
+        <span class="ident">tx2</span>.<span class="ident">send</span>(<span class="number">3</span>).<span class="kw">await</span>.<span class="ident">unwrap</span>();
+
+        <span class="ident">time</span>::<span class="ident">delay_for</span>(<span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="number">25</span>)).<span class="kw">await</span>;
+
+        <span class="comment">// Send the final value</span>
+        <span class="ident">tx2</span>.<span class="ident">send</span>(<span class="number">5</span>).<span class="kw">await</span>.<span class="ident">unwrap</span>();
+    });
+
+   <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">1</span>, <span class="ident">rx</span>.<span class="ident">next</span>().<span class="kw">await</span>.<span class="ident">unwrap</span>());
+   <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">2</span>, <span class="ident">rx</span>.<span class="ident">next</span>().<span class="kw">await</span>.<span class="ident">unwrap</span>());
+   <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">3</span>, <span class="ident">rx</span>.<span class="ident">next</span>().<span class="kw">await</span>.<span class="ident">unwrap</span>());
+   <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">4</span>, <span class="ident">rx</span>.<span class="ident">next</span>().<span class="kw">await</span>.<span class="ident">unwrap</span>());
+   <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">5</span>, <span class="ident">rx</span>.<span class="ident">next</span>().<span class="kw">await</span>.<span class="ident">unwrap</span>());
+
+   <span class="comment">// The merged stream is consumed</span>
+   <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">rx</span>.<span class="ident">next</span>().<span class="kw">await</span>.<span class="ident">is_none</span>());
+}</pre></div>
+</div><h3 id='method.filter' class='method'><code id='filter.v'>fn <a href='#method.filter' class='fnname'>filter</a>&lt;F&gt;(self, f: F) -&gt; Filter&lt;Self, F&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;F: <a class="trait" href="https://doc.rust-lang.org/nightly/core/ops/function/trait.FnMut.html" title="trait core::ops::function::FnMut">FnMut</a>(&amp;Self::<a class="type" href="../../tokio/stream/trait.Stream.html#associatedtype.Item" title="type tokio::stream::Stream::Item">Item</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,&nbsp;</span></code></h3><div class='docblock'><p>Filters the values produced by this stream according to the provided
+predicate.</p>
+<p>As values of this stream are made available, the provided predicate <code>f</code>
+will be run against them. If the predicate
+resolves to <code>true</code>, then the stream will yield the value, but if the
+predicate resolves to <code>false</code>, then the value
+will be discarded and the next value will be produced.</p>
+<p>Note that this function consumes the stream passed into it and returns a
+wrapped version of it, similar to [<code>Iterator::filter</code>] method in the
+standard library.</p>
+<h1 id="examples-4" class="section-header"><a href="#examples-4">Examples</a></h1>
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">stream</span>::{<span class="self">self</span>, <span class="ident">StreamExt</span>};
+
+<span class="kw">let</span> <span class="ident">stream</span> <span class="op">=</span> <span class="ident">stream</span>::<span class="ident">iter</span>(<span class="number">1</span>..<span class="op">=</span><span class="number">8</span>);
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">evens</span> <span class="op">=</span> <span class="ident">stream</span>.<span class="ident">filter</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span> <span class="op">%</span> <span class="number">2</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>);
+
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">Some</span>(<span class="number">2</span>), <span class="ident">evens</span>.<span class="ident">next</span>().<span class="kw">await</span>);
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">Some</span>(<span class="number">4</span>), <span class="ident">evens</span>.<span class="ident">next</span>().<span class="kw">await</span>);
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">Some</span>(<span class="number">6</span>), <span class="ident">evens</span>.<span class="ident">next</span>().<span class="kw">await</span>);
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">Some</span>(<span class="number">8</span>), <span class="ident">evens</span>.<span class="ident">next</span>().<span class="kw">await</span>);
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">None</span>, <span class="ident">evens</span>.<span class="ident">next</span>().<span class="kw">await</span>);</pre></div>
+</div><h3 id='method.filter_map' class='method'><code id='filter_map.v'>fn <a href='#method.filter_map' class='fnname'>filter_map</a>&lt;T, F&gt;(self, f: F) -&gt; FilterMap&lt;Self, F&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;F: <a class="trait" href="https://doc.rust-lang.org/nightly/core/ops/function/trait.FnMut.html" title="trait core::ops::function::FnMut">FnMut</a>(Self::<a class="type" href="../../tokio/stream/trait.Stream.html#associatedtype.Item" title="type tokio::stream::Stream::Item">Item</a>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;T&gt;,<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,&nbsp;</span></code></h3><div class='docblock'><p>Filters the values produced by this stream while simultaneously mapping
+them to a different type according to the provided closure.</p>
+<p>As values of this stream are made available, the provided function will
+be run on them. If the predicate <code>f</code> resolves to
+<a href="Some"><code>Some(item)</code></a> then the stream will yield the value <code>item</code>, but if
+it resolves to [<code>None</code>], then the value will be skipped.</p>
+<p>Note that this function consumes the stream passed into it and returns a
+wrapped version of it, similar to [<code>Iterator::filter_map</code>] method in the
+standard library.</p>
+<h1 id="examples-5" class="section-header"><a href="#examples-5">Examples</a></h1>
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">stream</span>::{<span class="self">self</span>, <span class="ident">StreamExt</span>};
+
+<span class="kw">let</span> <span class="ident">stream</span> <span class="op">=</span> <span class="ident">stream</span>::<span class="ident">iter</span>(<span class="number">1</span>..<span class="op">=</span><span class="number">8</span>);
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">evens</span> <span class="op">=</span> <span class="ident">stream</span>.<span class="ident">filter_map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> {
+    <span class="kw">if</span> <span class="ident">x</span> <span class="op">%</span> <span class="number">2</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> { <span class="prelude-val">Some</span>(<span class="ident">x</span> <span class="op">+</span> <span class="number">1</span>) } <span class="kw">else</span> { <span class="prelude-val">None</span> }
+});
+
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">Some</span>(<span class="number">3</span>), <span class="ident">evens</span>.<span class="ident">next</span>().<span class="kw">await</span>);
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">Some</span>(<span class="number">5</span>), <span class="ident">evens</span>.<span class="ident">next</span>().<span class="kw">await</span>);
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">Some</span>(<span class="number">7</span>), <span class="ident">evens</span>.<span class="ident">next</span>().<span class="kw">await</span>);
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">Some</span>(<span class="number">9</span>), <span class="ident">evens</span>.<span class="ident">next</span>().<span class="kw">await</span>);
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">None</span>, <span class="ident">evens</span>.<span class="ident">next</span>().<span class="kw">await</span>);</pre></div>
+</div><h3 id='method.fuse' class='method'><code id='fuse.v'>fn <a href='#method.fuse' class='fnname'>fuse</a>(self) -&gt; Fuse&lt;Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,&nbsp;</span></code></h3><div class='docblock'><p>Creates a stream which ends after the first <code>None</code>.</p>
+<p>After a stream returns <code>None</code>, behavior is undefined. Future calls to
+<code>poll_next</code> may or may not return <code>Some(T)</code> again or they may panic.
+<code>fuse()</code> adapts a stream, ensuring that after <code>None</code> is given, it will
+return <code>None</code> forever.</p>
+<h1 id="examples-6" class="section-header"><a href="#examples-6">Examples</a></h1>
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">stream</span>::{<span class="ident">Stream</span>, <span class="ident">StreamExt</span>};
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">pin</span>::<span class="ident">Pin</span>;
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">task</span>::{<span class="ident">Context</span>, <span class="ident">Poll</span>};
+
+<span class="comment">// a stream which alternates between Some and None</span>
+<span class="kw">struct</span> <span class="ident">Alternate</span> {
+    <span class="ident">state</span>: <span class="ident">i32</span>,
+}
+
+<span class="kw">impl</span> <span class="ident">Stream</span> <span class="kw">for</span> <span class="ident">Alternate</span> {
+    <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="ident">i32</span>;
+
+    <span class="kw">fn</span> <span class="ident">poll_next</span>(<span class="kw-2">mut</span> <span class="self">self</span>: <span class="ident">Pin</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span><span class="op">&gt;</span>, <span class="ident">_cx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Context</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Poll</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">i32</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">val</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">state</span>;
+        <span class="self">self</span>.<span class="ident">state</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">state</span> <span class="op">+</span> <span class="number">1</span>;
+
+        <span class="comment">// if it&#39;s even, Some(i32), else None</span>
+        <span class="kw">if</span> <span class="ident">val</span> <span class="op">%</span> <span class="number">2</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
+            <span class="ident">Poll</span>::<span class="ident">Ready</span>(<span class="prelude-val">Some</span>(<span class="ident">val</span>))
+        } <span class="kw">else</span> {
+            <span class="ident">Poll</span>::<span class="ident">Ready</span>(<span class="prelude-val">None</span>)
+        }
+    }
+}
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stream</span> <span class="op">=</span> <span class="ident">Alternate</span> { <span class="ident">state</span>: <span class="number">0</span> };
+
+    <span class="comment">// the stream goes back and forth</span>
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>, <span class="prelude-val">Some</span>(<span class="number">0</span>));
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>, <span class="prelude-val">None</span>);
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>, <span class="prelude-val">Some</span>(<span class="number">2</span>));
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>, <span class="prelude-val">None</span>);
+
+    <span class="comment">// however, once it is fused</span>
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stream</span> <span class="op">=</span> <span class="ident">stream</span>.<span class="ident">fuse</span>();
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>, <span class="prelude-val">Some</span>(<span class="number">4</span>));
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>, <span class="prelude-val">None</span>);
+
+    <span class="comment">// it will always return `None` after the first time.</span>
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>, <span class="prelude-val">None</span>);
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>, <span class="prelude-val">None</span>);
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>, <span class="prelude-val">None</span>);
+}</pre></div>
+</div><h3 id='method.take' class='method'><code id='take.v'>fn <a href='#method.take' class='fnname'>take</a>(self, n: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>) -&gt; Take&lt;Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,&nbsp;</span></code></h3><div class='docblock'><p>Creates a new stream of at most <code>n</code> items of the underlying stream.</p>
+<p>Once <code>n</code> items have been yielded from this stream then it will always
+return that the stream is done.</p>
+<h1 id="examples-7" class="section-header"><a href="#examples-7">Examples</a></h1>
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">stream</span>::{<span class="self">self</span>, <span class="ident">StreamExt</span>};
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stream</span> <span class="op">=</span> <span class="ident">stream</span>::<span class="ident">iter</span>(<span class="number">1</span>..<span class="op">=</span><span class="number">10</span>).<span class="ident">take</span>(<span class="number">3</span>);
+
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">Some</span>(<span class="number">1</span>), <span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>);
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">Some</span>(<span class="number">2</span>), <span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>);
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">Some</span>(<span class="number">3</span>), <span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>);
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">None</span>, <span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>);</pre></div>
+</div><h3 id='method.take_while' class='method'><code id='take_while.v'>fn <a href='#method.take_while' class='fnname'>take_while</a>&lt;F&gt;(self, f: F) -&gt; TakeWhile&lt;Self, F&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;F: <a class="trait" href="https://doc.rust-lang.org/nightly/core/ops/function/trait.FnMut.html" title="trait core::ops::function::FnMut">FnMut</a>(&amp;Self::<a class="type" href="../../tokio/stream/trait.Stream.html#associatedtype.Item" title="type tokio::stream::Stream::Item">Item</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,&nbsp;</span></code></h3><div class='docblock'><p>Take elements from this stream while the provided predicate
+resolves to <code>true</code>.</p>
+<p>This function, like <code>Iterator::take_while</code>, will take elements from the
+stream until the predicate <code>f</code> resolves to <code>false</code>. Once one element
+returns false it will always return that the stream is done.</p>
+<h1 id="examples-8" class="section-header"><a href="#examples-8">Examples</a></h1>
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">stream</span>::{<span class="self">self</span>, <span class="ident">StreamExt</span>};
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stream</span> <span class="op">=</span> <span class="ident">stream</span>::<span class="ident">iter</span>(<span class="number">1</span>..<span class="op">=</span><span class="number">10</span>).<span class="ident">take_while</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">x</span> <span class="op">&lt;</span><span class="op">=</span> <span class="number">3</span>);
+
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">Some</span>(<span class="number">1</span>), <span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>);
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">Some</span>(<span class="number">2</span>), <span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>);
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">Some</span>(<span class="number">3</span>), <span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>);
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">None</span>, <span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>);</pre></div>
+</div><h3 id='method.skip' class='method'><code id='skip.v'>fn <a href='#method.skip' class='fnname'>skip</a>(self, n: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>) -&gt; Skip&lt;Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,&nbsp;</span></code></h3><div class='docblock'><p>Creates a new stream that will skip the <code>n</code> first items of the
+underlying stream.</p>
+<h1 id="examples-9" class="section-header"><a href="#examples-9">Examples</a></h1>
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">stream</span>::{<span class="self">self</span>, <span class="ident">StreamExt</span>};
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stream</span> <span class="op">=</span> <span class="ident">stream</span>::<span class="ident">iter</span>(<span class="number">1</span>..<span class="op">=</span><span class="number">10</span>).<span class="ident">skip</span>(<span class="number">7</span>);
+
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">Some</span>(<span class="number">8</span>), <span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>);
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">Some</span>(<span class="number">9</span>), <span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>);
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">Some</span>(<span class="number">10</span>), <span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>);
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">None</span>, <span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>);</pre></div>
+</div><h3 id='method.skip_while' class='method'><code id='skip_while.v'>fn <a href='#method.skip_while' class='fnname'>skip_while</a>&lt;F&gt;(self, f: F) -&gt; SkipWhile&lt;Self, F&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;F: <a class="trait" href="https://doc.rust-lang.org/nightly/core/ops/function/trait.FnMut.html" title="trait core::ops::function::FnMut">FnMut</a>(&amp;Self::<a class="type" href="../../tokio/stream/trait.Stream.html#associatedtype.Item" title="type tokio::stream::Stream::Item">Item</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,&nbsp;</span></code></h3><div class='docblock'><p>Skip elements from the underlying stream while the provided predicate
+resolves to <code>true</code>.</p>
+<p>This function, like <a href="std::iter::Iterator::skip_while()"><code>Iterator::skip_while</code></a>, will ignore elemets from the
+stream until the predicate <code>f</code> resolves to <code>false</code>. Once one element
+returns false, the rest of the elements will be yielded.</p>
+<h1 id="examples-10" class="section-header"><a href="#examples-10">Examples</a></h1>
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">stream</span>::{<span class="self">self</span>, <span class="ident">StreamExt</span>};
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stream</span> <span class="op">=</span> <span class="ident">stream</span>::<span class="ident">iter</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="number">1</span>,<span class="number">2</span>,<span class="number">3</span>,<span class="number">4</span>,<span class="number">1</span>]).<span class="ident">skip_while</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">x</span> <span class="op">&lt;</span> <span class="number">3</span>);
+
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">Some</span>(<span class="number">3</span>), <span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>);
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">Some</span>(<span class="number">4</span>), <span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>);
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">Some</span>(<span class="number">1</span>), <span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>);
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">None</span>, <span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>);</pre></div>
+</div><h3 id='method.all' class='method'><code id='all.v'>fn <a href='#method.all' class='fnname'>all</a>&lt;F&gt;(&amp;mut self, f: F) -&gt; AllFuture&lt;Self, F&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;F: <a class="trait" href="https://doc.rust-lang.org/nightly/core/ops/function/trait.FnMut.html" title="trait core::ops::function::FnMut">FnMut</a>(Self::<a class="type" href="../../tokio/stream/trait.Stream.html#associatedtype.Item" title="type tokio::stream::Stream::Item">Item</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a>,&nbsp;</span></code></h3><div class='docblock'><p>Tests if every element of the stream matches a predicate.</p>
+<p><code>all()</code> takes a closure that returns <code>true</code> or <code>false</code>. It applies
+this closure to each element of the stream, and if they all return
+<code>true</code>, then so does <code>all</code>. If any of them return <code>false</code>, it
+returns <code>false</code>. An empty stream returns <code>true</code>.</p>
+<p><code>all()</code> is short-circuiting; in other words, it will stop processing
+as soon as it finds a <code>false</code>, given that no matter what else happens,
+the result will also be <code>false</code>.</p>
+<p>An empty stream returns <code>true</code>.</p>
+<h1 id="examples-11" class="section-header"><a href="#examples-11">Examples</a></h1>
+<p>Basic usage:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">stream</span>::{<span class="self">self</span>, <span class="ident">StreamExt</span>};
+
+<span class="kw">let</span> <span class="ident">a</span> <span class="op">=</span> [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>];
+
+<span class="macro">assert</span><span class="macro">!</span>(<span class="ident">stream</span>::<span class="ident">iter</span>(<span class="kw-2">&amp;</span><span class="ident">a</span>).<span class="ident">all</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span> <span class="op">&gt;</span> <span class="number">0</span>).<span class="kw">await</span>);
+
+<span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">stream</span>::<span class="ident">iter</span>(<span class="kw-2">&amp;</span><span class="ident">a</span>).<span class="ident">all</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span> <span class="op">&gt;</span> <span class="number">2</span>).<span class="kw">await</span>);</pre></div>
+<p>Stopping at the first <code>false</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">stream</span>::{<span class="self">self</span>, <span class="ident">StreamExt</span>};
+
+<span class="kw">let</span> <span class="ident">a</span> <span class="op">=</span> [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>];
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">iter</span> <span class="op">=</span> <span class="ident">stream</span>::<span class="ident">iter</span>(<span class="kw-2">&amp;</span><span class="ident">a</span>);
+
+<span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">iter</span>.<span class="ident">all</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span> <span class="op">!</span><span class="op">=</span> <span class="number">2</span>).<span class="kw">await</span>);
+
+<span class="comment">// we can still use `iter`, as there are more elements.</span>
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">iter</span>.<span class="ident">next</span>().<span class="kw">await</span>, <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="number">3</span>));</pre></div>
+</div><h3 id='method.any' class='method'><code id='any.v'>fn <a href='#method.any' class='fnname'>any</a>&lt;F&gt;(&amp;mut self, f: F) -&gt; AnyFuture&lt;Self, F&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;F: <a class="trait" href="https://doc.rust-lang.org/nightly/core/ops/function/trait.FnMut.html" title="trait core::ops::function::FnMut">FnMut</a>(Self::<a class="type" href="../../tokio/stream/trait.Stream.html#associatedtype.Item" title="type tokio::stream::Stream::Item">Item</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a>,&nbsp;</span></code></h3><div class='docblock'><p>Tests if any element of the stream matches a predicate.</p>
+<p><code>any()</code> takes a closure that returns <code>true</code> or <code>false</code>. It applies
+this closure to each element of the stream, and if any of them return
+<code>true</code>, then so does <code>any()</code>. If they all return <code>false</code>, it
+returns <code>false</code>.</p>
+<p><code>any()</code> is short-circuiting; in other words, it will stop processing
+as soon as it finds a <code>true</code>, given that no matter what else happens,
+the result will also be <code>true</code>.</p>
+<p>An empty stream returns <code>false</code>.</p>
+<p>Basic usage:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">stream</span>::{<span class="self">self</span>, <span class="ident">StreamExt</span>};
+
+<span class="kw">let</span> <span class="ident">a</span> <span class="op">=</span> [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>];
+
+<span class="macro">assert</span><span class="macro">!</span>(<span class="ident">stream</span>::<span class="ident">iter</span>(<span class="kw-2">&amp;</span><span class="ident">a</span>).<span class="ident">any</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span> <span class="op">&gt;</span> <span class="number">0</span>).<span class="kw">await</span>);
+
+<span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">stream</span>::<span class="ident">iter</span>(<span class="kw-2">&amp;</span><span class="ident">a</span>).<span class="ident">any</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span> <span class="op">&gt;</span> <span class="number">5</span>).<span class="kw">await</span>);</pre></div>
+<p>Stopping at the first <code>true</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">stream</span>::{<span class="self">self</span>, <span class="ident">StreamExt</span>};
+
+<span class="kw">let</span> <span class="ident">a</span> <span class="op">=</span> [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>];
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">iter</span> <span class="op">=</span> <span class="ident">stream</span>::<span class="ident">iter</span>(<span class="kw-2">&amp;</span><span class="ident">a</span>);
+
+<span class="macro">assert</span><span class="macro">!</span>(<span class="ident">iter</span>.<span class="ident">any</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span> <span class="op">!</span><span class="op">=</span> <span class="number">2</span>).<span class="kw">await</span>);
+
+<span class="comment">// we can still use `iter`, as there are more elements.</span>
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">iter</span>.<span class="ident">next</span>().<span class="kw">await</span>, <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="number">2</span>));</pre></div>
+</div><h3 id='method.chain' class='method'><code id='chain.v'>fn <a href='#method.chain' class='fnname'>chain</a>&lt;U&gt;(self, other: U) -&gt; Chain&lt;Self, U&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;U: <a class="trait" href="../../tokio/stream/trait.Stream.html" title="trait tokio::stream::Stream">Stream</a>&lt;Item = Self::<a class="type" href="../../tokio/stream/trait.Stream.html#associatedtype.Item" title="type tokio::stream::Stream::Item">Item</a>&gt;,<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,&nbsp;</span></code></h3><div class='docblock'><p>Combine two streams into one by first returning all values from the
+first stream then all values from the second stream.</p>
+<p>As long as <code>self</code> still has values to emit, no values from <code>other</code> are
+emitted, even if some are ready.</p>
+<h1 id="examples-12" class="section-header"><a href="#examples-12">Examples</a></h1>
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">stream</span>::{<span class="self">self</span>, <span class="ident">StreamExt</span>};
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> <span class="ident">one</span> <span class="op">=</span> <span class="ident">stream</span>::<span class="ident">iter</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>]);
+    <span class="kw">let</span> <span class="ident">two</span> <span class="op">=</span> <span class="ident">stream</span>::<span class="ident">iter</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>]);
+
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stream</span> <span class="op">=</span> <span class="ident">one</span>.<span class="ident">chain</span>(<span class="ident">two</span>);
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>, <span class="prelude-val">Some</span>(<span class="number">1</span>));
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>, <span class="prelude-val">Some</span>(<span class="number">2</span>));
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>, <span class="prelude-val">Some</span>(<span class="number">3</span>));
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>, <span class="prelude-val">Some</span>(<span class="number">4</span>));
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>, <span class="prelude-val">Some</span>(<span class="number">5</span>));
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>, <span class="prelude-val">Some</span>(<span class="number">6</span>));
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">stream</span>.<span class="ident">next</span>().<span class="kw">await</span>, <span class="prelude-val">None</span>);
+}</pre></div>
+</div><h3 id='method.fold' class='method'><code id='fold.v'>fn <a href='#method.fold' class='fnname'>fold</a>&lt;B, F&gt;(self, init: B, f: F) -&gt; FoldFuture&lt;Self, B, F&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;F: <a class="trait" href="https://doc.rust-lang.org/nightly/core/ops/function/trait.FnMut.html" title="trait core::ops::function::FnMut">FnMut</a>(B, Self::<a class="type" href="../../tokio/stream/trait.Stream.html#associatedtype.Item" title="type tokio::stream::Stream::Item">Item</a>) -&gt; B,&nbsp;</span></code></h3><div class='docblock'><p>A combinator that applies a function to every element in a stream
+producing a single, final value.</p>
+<h1 id="examples-13" class="section-header"><a href="#examples-13">Examples</a></h1>
+<p>Basic usage:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">stream</span>::{<span class="self">self</span>, <span class="kw-2">*</span>};
+
+<span class="kw">let</span> <span class="ident">s</span> <span class="op">=</span> <span class="ident">stream</span>::<span class="ident">iter</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="number">1u8</span>, <span class="number">2</span>, <span class="number">3</span>]);
+<span class="kw">let</span> <span class="ident">sum</span> <span class="op">=</span> <span class="ident">s</span>.<span class="ident">fold</span>(<span class="number">0</span>, <span class="op">|</span><span class="ident">acc</span>, <span class="ident">x</span><span class="op">|</span> <span class="ident">acc</span> <span class="op">+</span> <span class="ident">x</span>).<span class="kw">await</span>;
+
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">sum</span>, <span class="number">6</span>);</pre></div>
+</div><h3 id='method.collect' class='method'><code id='collect.v'>fn <a href='#method.collect' class='fnname'>collect</a>&lt;T&gt;(self) -&gt; Collect&lt;Self, T&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;T: <a class="trait" href="../../tokio/stream/trait.FromStream.html" title="trait tokio::stream::FromStream">FromStream</a>&lt;Self::<a class="type" href="../../tokio/stream/trait.Stream.html#associatedtype.Item" title="type tokio::stream::Stream::Item">Item</a>&gt;,<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,&nbsp;</span></code></h3><div class='docblock'><p>Drain stream pushing all emitted values into a collection.</p>
+<p><code>collect</code> streams all values, awaiting as needed. Values are pushed into
+a collection. A number of different target collection types are
+supported, including <a href="std::vec::Vec"><code>Vec</code></a>,
+<a href="std::string::String"><code>String</code></a>, and <a href="bytes::Bytes"><code>Bytes</code></a>.</p>
+<h1 id="result" class="section-header"><a href="#result"><code>Result</code></a></h1>
+<p><code>collect()</code> can also be used with streams of type <code>Result&lt;T, E&gt;</code> where
+<code>T: FromStream&lt;_&gt;</code>. In this case, <code>collect()</code> will stream as long as
+values yielded from the stream are <code>Ok(_)</code>. If <code>Err(_)</code> is encountered,
+streaming is terminated and <code>collect()</code> returns the <code>Err</code>.</p>
+<h1 id="notes" class="section-header"><a href="#notes">Notes</a></h1>
+<p><code>FromStream</code> is currently a sealed trait. Stabilization is pending
+enhancements to the Rust language.</p>
+<h1 id="examples-14" class="section-header"><a href="#examples-14">Examples</a></h1>
+<p>Basic usage:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">stream</span>::{<span class="self">self</span>, <span class="ident">StreamExt</span>};
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> <span class="ident">doubled</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">i32</span><span class="op">&gt;</span> <span class="op">=</span>
+        <span class="ident">stream</span>::<span class="ident">iter</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>])
+            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span> <span class="op">*</span> <span class="number">2</span>)
+            .<span class="ident">collect</span>()
+            .<span class="kw">await</span>;
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="number">2</span>, <span class="number">4</span>, <span class="number">6</span>], <span class="ident">doubled</span>);
+}</pre></div>
+<p>Collecting a stream of <code>Result</code> values</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">stream</span>::{<span class="self">self</span>, <span class="ident">StreamExt</span>};
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="comment">// A stream containing only `Ok` values will be collected</span>
+    <span class="kw">let</span> <span class="ident">values</span>: <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">i32</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">&gt;</span> <span class="op">=</span>
+        <span class="ident">stream</span>::<span class="ident">iter</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="prelude-val">Ok</span>(<span class="number">1</span>), <span class="prelude-val">Ok</span>(<span class="number">2</span>), <span class="prelude-val">Ok</span>(<span class="number">3</span>)])
+            .<span class="ident">collect</span>()
+            .<span class="kw">await</span>;
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">Ok</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>]), <span class="ident">values</span>);
+
+    <span class="comment">// A stream containing `Err` values will return the first error.</span>
+    <span class="kw">let</span> <span class="ident">results</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="prelude-val">Ok</span>(<span class="number">1</span>), <span class="prelude-val">Err</span>(<span class="string">&quot;no&quot;</span>), <span class="prelude-val">Ok</span>(<span class="number">2</span>), <span class="prelude-val">Ok</span>(<span class="number">3</span>), <span class="prelude-val">Err</span>(<span class="string">&quot;nein&quot;</span>)];
+
+    <span class="kw">let</span> <span class="ident">values</span>: <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">i32</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">&gt;</span> <span class="op">=</span>
+        <span class="ident">stream</span>::<span class="ident">iter</span>(<span class="ident">results</span>)
+            .<span class="ident">collect</span>()
+            .<span class="kw">await</span>;
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="prelude-val">Err</span>(<span class="string">&quot;no&quot;</span>), <span class="ident">values</span>);
+}</pre></div>
+</div><h3 id='method.timeout' class='method'><code id='timeout.v'>fn <a href='#method.timeout' class='fnname'>timeout</a>(self, duration: <a class="struct" href="../../tokio/time/struct.Duration.html" title="struct tokio::time::Duration">Duration</a>) -&gt; Timeout&lt;Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,&nbsp;</span></code></h3><div class='docblock'><p>Applies a per-item timeout to the passed stream.</p>
+<p><code>timeout()</code> takes a <code>Duration</code> that represents the maximum amount of
+time each element of the stream has to complete before timing out.</p>
+<p>If the wrapped stream yields a value before the deadline is reached, the
+value is returned. Otherwise, an error is returned. The caller may decide
+to continue consuming the stream and will eventually get the next source
+stream value once it becomes available.</p>
+<h1 id="notes-1" class="section-header"><a href="#notes-1">Notes</a></h1>
+<p>This function consumes the stream passed into it and returns a
+wrapped version of it.</p>
+<p>Polling the returned stream will continue to poll the inner stream even
+if one or more items time out.</p>
+<h1 id="examples-15" class="section-header"><a href="#examples-15">Examples</a></h1>
+<p>Suppose we have a stream <code>int_stream</code> that yields 3 numbers (1, 2, 3):</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">stream</span>::{<span class="self">self</span>, <span class="ident">StreamExt</span>};
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::<span class="ident">Duration</span>;
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">int_stream</span> <span class="op">=</span> <span class="ident">int_stream</span>.<span class="ident">timeout</span>(<span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">1</span>));
+
+<span class="comment">// When no items time out, we get the 3 elements in succession:</span>
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">int_stream</span>.<span class="ident">try_next</span>().<span class="kw">await</span>, <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="number">1</span>)));
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">int_stream</span>.<span class="ident">try_next</span>().<span class="kw">await</span>, <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="number">2</span>)));
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">int_stream</span>.<span class="ident">try_next</span>().<span class="kw">await</span>, <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="number">3</span>)));
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">int_stream</span>.<span class="ident">try_next</span>().<span class="kw">await</span>, <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>));
+
+<span class="comment">// If the second item times out, we get an error and continue polling the stream:</span>
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">int_stream</span>.<span class="ident">try_next</span>().<span class="kw">await</span>, <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="number">1</span>)));
+<span class="macro">assert</span><span class="macro">!</span>(<span class="ident">int_stream</span>.<span class="ident">try_next</span>().<span class="kw">await</span>.<span class="ident">is_err</span>());
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">int_stream</span>.<span class="ident">try_next</span>().<span class="kw">await</span>, <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="number">2</span>)));
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">int_stream</span>.<span class="ident">try_next</span>().<span class="kw">await</span>, <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="number">3</span>)));
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">int_stream</span>.<span class="ident">try_next</span>().<span class="kw">await</span>, <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>));
+
+<span class="comment">// If we want to stop consuming the source stream the first time an</span>
+<span class="comment">// element times out, we can use the `take_while` operator:</span>
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">int_stream</span> <span class="op">=</span> <span class="ident">int_stream</span>.<span class="ident">take_while</span>(<span class="prelude-ty">Result</span>::<span class="ident">is_ok</span>);
+
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">int_stream</span>.<span class="ident">try_next</span>().<span class="kw">await</span>, <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="number">1</span>)));
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">int_stream</span>.<span class="ident">try_next</span>().<span class="kw">await</span>, <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>));</pre></div>
+</div></div><span class='loading-content'>Loading content...</span>
+            <h2 id='implementors' class='small-section-header'>Implementors<a href='#implementors' class='anchor'></a></h2><div class='item-list' id='implementors-list'><h3 id='impl-StreamExt' class='impl'><code class='in-band'>impl&lt;St:&nbsp;?<a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>&gt; StreamExt for St <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;St: <a class="trait" href="../../tokio/stream/trait.Stream.html" title="trait tokio::stream::Stream">Stream</a>,&nbsp;</span></code><a href='#impl-StreamExt' class='anchor'></a><a class='srclink' href='../../src/tokio/stream/mod.rs.html#824' title='goto source code'>[src]</a></h3><div class='impl-items'></div></div><span class='loading-content'>Loading content...</span><script type="text/javascript" src="../../implementors/tokio/stream/trait.StreamExt.js" async></script></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "tokio";</script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>

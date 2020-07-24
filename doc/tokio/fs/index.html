@@ -1,0 +1,51 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `fs` mod in crate `tokio`."><meta name="keywords" content="rust, rustlang, rust-lang, fs"><title>tokio::fs - Rust</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../tokio/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a><p class='location'>Module fs</p><div class="sidebar-elems"><div class="block items"><ul><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li><li><a href="#functions">Functions</a></li></ul></div><p class='location'><a href='../index.html'>tokio</a></p><script>window.sidebarCurrent = {name: 'fs', ty: 'mod', relpath: '../'};</script><script defer src="../sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../../src/tokio/fs/mod.rs.html#1-112' title='goto source code'>[src]</a></span><span class='in-band'>Module <a href='../index.html'>tokio</a>::<wbr><a class="mod" href=''>fs</a></span></h1><div class='docblock'><p>Asynchronous file and standard stream adaptation.</p>
+<p>This module contains utility methods and adapter types for input/output to
+files or standard streams (<code>Stdin</code>, <code>Stdout</code>, <code>Stderr</code>), and
+filesystem manipulation, for use within (and only within) a Tokio runtime.</p>
+<p>Tasks run by <em>worker</em> threads should not block, as this could delay
+servicing reactor events. Portable filesystem operations are blocking,
+however. This module offers adapters which use a <code>blocking</code> annotation
+to inform the runtime that a blocking operation is required. When
+necessary, this allows the runtime to convert the current thread from a
+<em>worker</em> to a <em>backup</em> thread, where blocking is acceptable.</p>
+<h2 id="usage" class="section-header"><a href="#usage">Usage</a></h2>
+<p>Where possible, users should prefer the provided asynchronous-specific
+traits such as <a href="https://docs.rs/tokio-io/0.1/tokio_io/trait.AsyncRead.html"><code>AsyncRead</code></a>, or methods returning a <code>Future</code> or <code>Poll</code>
+type. Adaptions also extend to traits like <code>std::io::Read</code> where methods
+return <code>std::io::Result</code>. Be warned that these adapted methods may return
+<code>std::io::ErrorKind::WouldBlock</code> if a <em>worker</em> thread can not be converted
+to a <em>backup</em> thread immediately.</p>
+</div><h2 id='modules' class='section-header'><a href="#modules">Modules</a></h2>
+<table><tr class='module-item'><td><a class="mod" href="os/index.html" title='tokio::fs::os mod'>os</a></td><td class='docblock-short'><p>OS-specific functionality.</p>
+</td></tr></table><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
+<table><tr class='module-item'><td><a class="struct" href="struct.DirBuilder.html" title='tokio::fs::DirBuilder struct'>DirBuilder</a></td><td class='docblock-short'><p>A builder for creating directories in various manners.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.DirEntry.html" title='tokio::fs::DirEntry struct'>DirEntry</a></td><td class='docblock-short'><p>Entries returned by the <a href="struct@ReadDir"><code>ReadDir</code></a> stream.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.File.html" title='tokio::fs::File struct'>File</a></td><td class='docblock-short'><p>A reference to an open file on the filesystem.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.OpenOptions.html" title='tokio::fs::OpenOptions struct'>OpenOptions</a></td><td class='docblock-short'><p>Options and flags which can be used to configure how a file is opened.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.ReadDir.html" title='tokio::fs::ReadDir struct'>ReadDir</a></td><td class='docblock-short'><p>Stream of the entries in a directory.</p>
+</td></tr></table><h2 id='functions' class='section-header'><a href="#functions">Functions</a></h2>
+<table><tr class='module-item'><td><a class="fn" href="fn.canonicalize.html" title='tokio::fs::canonicalize fn'>canonicalize</a></td><td class='docblock-short'><p>Returns the canonical, absolute form of a path with all intermediate
+components normalized and symbolic links resolved.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.copy.html" title='tokio::fs::copy fn'>copy</a></td><td class='docblock-short'><p>Copies the contents of one file to another. This function will also copy the permission bits of the original file to the destination file.
+This function will overwrite the contents of to.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.create_dir.html" title='tokio::fs::create_dir fn'>create_dir</a></td><td class='docblock-short'><p>Creates a new, empty directory at the provided path</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.create_dir_all.html" title='tokio::fs::create_dir_all fn'>create_dir_all</a></td><td class='docblock-short'><p>Recursively creates a directory and all of its parent components if they
+are missing.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.hard_link.html" title='tokio::fs::hard_link fn'>hard_link</a></td><td class='docblock-short'><p>Creates a new hard link on the filesystem.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.metadata.html" title='tokio::fs::metadata fn'>metadata</a></td><td class='docblock-short'><p>Given a path, queries the file system to get information about a file,
+directory, etc.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.read.html" title='tokio::fs::read fn'>read</a></td><td class='docblock-short'><p>Reads the entire contents of a file into a bytes vector.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.read_dir.html" title='tokio::fs::read_dir fn'>read_dir</a></td><td class='docblock-short'><p>Returns a stream over the entries within a directory.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.read_link.html" title='tokio::fs::read_link fn'>read_link</a></td><td class='docblock-short'><p>Reads a symbolic link, returning the file that the link points to.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.read_to_string.html" title='tokio::fs::read_to_string fn'>read_to_string</a></td><td class='docblock-short'><p>Creates a future which will open a file for reading and read the entire
+contents into a string and return said string.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.remove_dir.html" title='tokio::fs::remove_dir fn'>remove_dir</a></td><td class='docblock-short'><p>Removes an existing, empty directory.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.remove_dir_all.html" title='tokio::fs::remove_dir_all fn'>remove_dir_all</a></td><td class='docblock-short'><p>Removes a directory at this path, after removing all its contents. Use carefully!</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.remove_file.html" title='tokio::fs::remove_file fn'>remove_file</a></td><td class='docblock-short'><p>Removes a file from the filesystem.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.rename.html" title='tokio::fs::rename fn'>rename</a></td><td class='docblock-short'><p>Renames a file or directory to a new name, replacing the original file if
+<code>to</code> already exists.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.set_permissions.html" title='tokio::fs::set_permissions fn'>set_permissions</a></td><td class='docblock-short'><p>Changes the permissions found on a file or a directory.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.symlink_metadata.html" title='tokio::fs::symlink_metadata fn'>symlink_metadata</a></td><td class='docblock-short'><p>Queries the file system metadata for a path.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.write.html" title='tokio::fs::write fn'>write</a></td><td class='docblock-short'><p>Creates a future that will open a file for writing and write the entire
+contents of <code>contents</code> to it.</p>
+</td></tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "tokio";</script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>

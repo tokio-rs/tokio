@@ -1,0 +1,883 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `tokio/src/sync/mutex.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mutex.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css"><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="shortcut icon" href="../../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../tokio/index.html'><div class='logo-container'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<span id="2">  2</span>
+<span id="3">  3</span>
+<span id="4">  4</span>
+<span id="5">  5</span>
+<span id="6">  6</span>
+<span id="7">  7</span>
+<span id="8">  8</span>
+<span id="9">  9</span>
+<span id="10"> 10</span>
+<span id="11"> 11</span>
+<span id="12"> 12</span>
+<span id="13"> 13</span>
+<span id="14"> 14</span>
+<span id="15"> 15</span>
+<span id="16"> 16</span>
+<span id="17"> 17</span>
+<span id="18"> 18</span>
+<span id="19"> 19</span>
+<span id="20"> 20</span>
+<span id="21"> 21</span>
+<span id="22"> 22</span>
+<span id="23"> 23</span>
+<span id="24"> 24</span>
+<span id="25"> 25</span>
+<span id="26"> 26</span>
+<span id="27"> 27</span>
+<span id="28"> 28</span>
+<span id="29"> 29</span>
+<span id="30"> 30</span>
+<span id="31"> 31</span>
+<span id="32"> 32</span>
+<span id="33"> 33</span>
+<span id="34"> 34</span>
+<span id="35"> 35</span>
+<span id="36"> 36</span>
+<span id="37"> 37</span>
+<span id="38"> 38</span>
+<span id="39"> 39</span>
+<span id="40"> 40</span>
+<span id="41"> 41</span>
+<span id="42"> 42</span>
+<span id="43"> 43</span>
+<span id="44"> 44</span>
+<span id="45"> 45</span>
+<span id="46"> 46</span>
+<span id="47"> 47</span>
+<span id="48"> 48</span>
+<span id="49"> 49</span>
+<span id="50"> 50</span>
+<span id="51"> 51</span>
+<span id="52"> 52</span>
+<span id="53"> 53</span>
+<span id="54"> 54</span>
+<span id="55"> 55</span>
+<span id="56"> 56</span>
+<span id="57"> 57</span>
+<span id="58"> 58</span>
+<span id="59"> 59</span>
+<span id="60"> 60</span>
+<span id="61"> 61</span>
+<span id="62"> 62</span>
+<span id="63"> 63</span>
+<span id="64"> 64</span>
+<span id="65"> 65</span>
+<span id="66"> 66</span>
+<span id="67"> 67</span>
+<span id="68"> 68</span>
+<span id="69"> 69</span>
+<span id="70"> 70</span>
+<span id="71"> 71</span>
+<span id="72"> 72</span>
+<span id="73"> 73</span>
+<span id="74"> 74</span>
+<span id="75"> 75</span>
+<span id="76"> 76</span>
+<span id="77"> 77</span>
+<span id="78"> 78</span>
+<span id="79"> 79</span>
+<span id="80"> 80</span>
+<span id="81"> 81</span>
+<span id="82"> 82</span>
+<span id="83"> 83</span>
+<span id="84"> 84</span>
+<span id="85"> 85</span>
+<span id="86"> 86</span>
+<span id="87"> 87</span>
+<span id="88"> 88</span>
+<span id="89"> 89</span>
+<span id="90"> 90</span>
+<span id="91"> 91</span>
+<span id="92"> 92</span>
+<span id="93"> 93</span>
+<span id="94"> 94</span>
+<span id="95"> 95</span>
+<span id="96"> 96</span>
+<span id="97"> 97</span>
+<span id="98"> 98</span>
+<span id="99"> 99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
+<span id="408">408</span>
+<span id="409">409</span>
+<span id="410">410</span>
+<span id="411">411</span>
+<span id="412">412</span>
+<span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
+<span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+</pre><div class="example-wrap"><pre class="rust ">
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">sync</span>::<span class="ident">batch_semaphore</span> <span class="kw">as</span> <span class="ident">semaphore</span>;
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cell</span>::<span class="ident">UnsafeCell</span>;
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">error</span>::<span class="ident">Error</span>;
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fmt</span>;
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>};
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>;
+
+<span class="doccomment">/// An asynchronous `Mutex`-like type.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This type acts similarly to an asynchronous [`std::sync::Mutex`], with one</span>
+<span class="doccomment">/// major difference: [`lock`] does not block and the lock guard can be held</span>
+<span class="doccomment">/// across await points.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// # Which kind of mutex should you use?</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Contrary to popular belief, it is ok and often preferred to use the ordinary</span>
+<span class="doccomment">/// [`Mutex`][std] from the standard library in asynchronous code. This section</span>
+<span class="doccomment">/// will help you decide on which kind of mutex you should use.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// The primary use case of the async mutex is to provide shared mutable access</span>
+<span class="doccomment">/// to IO resources such as a database connection. If the data stored behind the</span>
+<span class="doccomment">/// mutex is just data, it is often better to use a blocking mutex such as the</span>
+<span class="doccomment">/// one in the standard library or [`parking_lot`]. This is because the feature</span>
+<span class="doccomment">/// that the async mutex offers over the blocking mutex is that it is possible</span>
+<span class="doccomment">/// to keep the mutex locked across an `.await` point, which is rarely necessary</span>
+<span class="doccomment">/// for data.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// A common pattern is to wrap the `Arc&lt;Mutex&lt;...&gt;&gt;` in a struct that provides</span>
+<span class="doccomment">/// non-async methods for performing operations on the data within, and only</span>
+<span class="doccomment">/// lock the mutex inside these methods. The [mini-redis] example provides an</span>
+<span class="doccomment">/// illustration of this pattern.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Additionally, when you _do_ want shared access to an IO resource, it is</span>
+<span class="doccomment">/// often better to spawn a task to manage the IO resource, and to use message</span>
+<span class="doccomment">/// passing to communicate with that task.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// [std]: std::sync::Mutex</span>
+<span class="doccomment">/// [`parking_lot`]: https://docs.rs/parking_lot</span>
+<span class="doccomment">/// [mini-redis]: https://github.com/tokio-rs/mini-redis/blob/master/src/db.rs</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// # Examples:</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// ```rust,no_run</span>
+<span class="doccomment">/// use tokio::sync::Mutex;</span>
+<span class="doccomment">/// use std::sync::Arc;</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// #[tokio::main]</span>
+<span class="doccomment">/// async fn main() {</span>
+<span class="doccomment">///     let data1 = Arc::new(Mutex::new(0));</span>
+<span class="doccomment">///     let data2 = Arc::clone(&amp;data1);</span>
+<span class="doccomment">///</span>
+<span class="doccomment">///     tokio::spawn(async move {</span>
+<span class="doccomment">///         let mut lock = data2.lock().await;</span>
+<span class="doccomment">///         *lock += 1;</span>
+<span class="doccomment">///     });</span>
+<span class="doccomment">///</span>
+<span class="doccomment">///     let mut lock = data1.lock().await;</span>
+<span class="doccomment">///     *lock += 1;</span>
+<span class="doccomment">/// }</span>
+<span class="doccomment">/// ```</span>
+<span class="doccomment">///</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// ```rust,no_run</span>
+<span class="doccomment">/// use tokio::sync::Mutex;</span>
+<span class="doccomment">/// use std::sync::Arc;</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// #[tokio::main]</span>
+<span class="doccomment">/// async fn main() {</span>
+<span class="doccomment">///     let count = Arc::new(Mutex::new(0));</span>
+<span class="doccomment">///</span>
+<span class="doccomment">///     for _ in 0..5 {</span>
+<span class="doccomment">///         let my_count = Arc::clone(&amp;count);</span>
+<span class="doccomment">///         tokio::spawn(async move {</span>
+<span class="doccomment">///             for _ in 0..10 {</span>
+<span class="doccomment">///                 let mut lock = my_count.lock().await;</span>
+<span class="doccomment">///                 *lock += 1;</span>
+<span class="doccomment">///                 println!(&quot;{}&quot;, lock);</span>
+<span class="doccomment">///             }</span>
+<span class="doccomment">///         });</span>
+<span class="doccomment">///     }</span>
+<span class="doccomment">///</span>
+<span class="doccomment">///     loop {</span>
+<span class="doccomment">///         if *count.lock().await &gt;= 50 {</span>
+<span class="doccomment">///             break;</span>
+<span class="doccomment">///         }</span>
+<span class="doccomment">///     }</span>
+<span class="doccomment">///     println!(&quot;Count hit 50.&quot;);</span>
+<span class="doccomment">/// }</span>
+<span class="doccomment">/// ```</span>
+<span class="doccomment">/// There are a few things of note here to pay attention to in this example.</span>
+<span class="doccomment">/// 1. The mutex is wrapped in an [`Arc`] to allow it to be shared across</span>
+<span class="doccomment">///    threads.</span>
+<span class="doccomment">/// 2. Each spawned task obtains a lock and releases it on every iteration.</span>
+<span class="doccomment">/// 3. Mutation of the data protected by the Mutex is done by de-referencing</span>
+<span class="doccomment">///    the obtained lock as seen on lines 12 and 19.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Tokio&#39;s Mutex works in a simple FIFO (first in, first out) style where all</span>
+<span class="doccomment">/// calls to [`lock`] complete in the order they were performed. In that way the</span>
+<span class="doccomment">/// Mutex is &quot;fair&quot; and predictable in how it distributes the locks to inner</span>
+<span class="doccomment">/// data. This is why the output of the program above is an in-order count to</span>
+<span class="doccomment">/// 50. Locks are released and reacquired after every iteration, so basically,</span>
+<span class="doccomment">/// each thread goes to the back of the line after it increments the value once.</span>
+<span class="doccomment">/// Finally, since there is only a single valid lock at any given time, there is</span>
+<span class="doccomment">/// no possibility of a race condition when mutating the inner value.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Note that in contrast to [`std::sync::Mutex`], this implementation does not</span>
+<span class="doccomment">/// poison the mutex when a thread holding the [`MutexGuard`] panics. In such a</span>
+<span class="doccomment">/// case, the mutex will be unlocked. If the panic is caught, this might leave</span>
+<span class="doccomment">/// the data protected by the mutex in an inconsistent state.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// [`Mutex`]: struct@Mutex</span>
+<span class="doccomment">/// [`MutexGuard`]: struct@MutexGuard</span>
+<span class="doccomment">/// [`Arc`]: struct@std::sync::Arc</span>
+<span class="doccomment">/// [`std::sync::Mutex`]: struct@std::sync::Mutex</span>
+<span class="doccomment">/// [`Send`]: trait@std::marker::Send</span>
+<span class="doccomment">/// [`lock`]: method@Mutex::lock</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> {
+    <span class="ident">s</span>: <span class="ident">semaphore</span>::<span class="ident">Semaphore</span>,
+    <span class="ident">c</span>: <span class="ident">UnsafeCell</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
+}
+
+<span class="doccomment">/// A handle to a held `Mutex`.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// As long as you have this guard, you have exclusive access to the underlying</span>
+<span class="doccomment">/// `T`. The guard internally borrows the `Mutex`, so the mutex will not be</span>
+<span class="doccomment">/// dropped while a guard exists.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// The lock is automatically released whenever the guard is dropped, at which</span>
+<span class="doccomment">/// point `lock` will succeed yet again.</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> {
+    <span class="ident">lock</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
+}
+
+<span class="doccomment">/// An owned handle to a held `Mutex`.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This guard is only available from a `Mutex` that is wrapped in an [`Arc`]. It</span>
+<span class="doccomment">/// is identical to `MutexGuard`, except that rather than borrowing the `Mutex`,</span>
+<span class="doccomment">/// it clones the `Arc`, incrementing the reference count. This means that</span>
+<span class="doccomment">/// unlike `MutexGuard`, it will have the `&#39;static` lifetime.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// As long as you have this guard, you have exclusive access to the underlying</span>
+<span class="doccomment">/// `T`. The guard internally keeps a reference-couned pointer to the original</span>
+<span class="doccomment">/// `Mutex`, so even if the lock goes away, the guard remains valid.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// The lock is automatically released whenever the guard is dropped, at which</span>
+<span class="doccomment">/// point `lock` will succeed yet again.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// [`Arc`]: std::sync::Arc</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">OwnedMutexGuard</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> {
+    <span class="ident">lock</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+}
+
+<span class="comment">// As long as T: Send, it&#39;s fine to send and share Mutex&lt;T&gt; between threads.</span>
+<span class="comment">// If T was not Send, sending and sharing a Mutex&lt;T&gt; would be bad, since you can</span>
+<span class="comment">// access T through Mutex&lt;T&gt;.</span>
+<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Send</span> <span class="kw">for</span> <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span> <span class="op">+</span> <span class="ident">Send</span> {}
+<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span> <span class="op">+</span> <span class="ident">Send</span> {}
+<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">T</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span> {}
+<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">OwnedMutexGuard</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span> {}
+
+<span class="doccomment">/// Error returned from the [`Mutex::try_lock`] function.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// A `try_lock` operation can only fail if the mutex is already locked.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// [`Mutex::try_lock`]: Mutex::try_lock</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TryLockError</span>(());
+
+<span class="kw">impl</span> <span class="ident">fmt</span>::<span class="ident">Display</span> <span class="kw">for</span> <span class="ident">TryLockError</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">fmt</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt</span>::<span class="ident">Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
+        <span class="macro">write</span><span class="macro">!</span>(<span class="ident">fmt</span>, <span class="string">&quot;operation would block&quot;</span>)
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">Error</span> <span class="kw">for</span> <span class="ident">TryLockError</span> {}
+
+<span class="attribute">#[<span class="ident">test</span>]</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">loom</span>))]</span>
+<span class="kw">fn</span> <span class="ident">bounds</span>() {
+    <span class="kw">fn</span> <span class="ident">check_send</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span><span class="op">&gt;</span>() {}
+    <span class="kw">fn</span> <span class="ident">check_unpin</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Unpin</span><span class="op">&gt;</span>() {}
+    <span class="comment">// This has to take a value, since the async fn&#39;s return type is unnameable.</span>
+    <span class="kw">fn</span> <span class="ident">check_send_sync_val</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span><span class="op">&gt;</span>(<span class="ident">_t</span>: <span class="ident">T</span>) {}
+    <span class="kw">fn</span> <span class="ident">check_send_sync</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span><span class="op">&gt;</span>() {}
+    <span class="kw">fn</span> <span class="ident">check_static</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="lifetime">&#39;static</span><span class="op">&gt;</span>() {}
+    <span class="kw">fn</span> <span class="ident">check_static_val</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="lifetime">&#39;static</span><span class="op">&gt;</span>(<span class="ident">_t</span>: <span class="ident">T</span>) {}
+
+    <span class="ident">check_send</span>::<span class="op">&lt;</span><span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">u32</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+    <span class="ident">check_send</span>::<span class="op">&lt;</span><span class="ident">OwnedMutexGuard</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+    <span class="ident">check_unpin</span>::<span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+    <span class="ident">check_send_sync</span>::<span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+    <span class="ident">check_static</span>::<span class="op">&lt;</span><span class="ident">OwnedMutexGuard</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+
+    <span class="kw">let</span> <span class="ident">mutex</span> <span class="op">=</span> <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="number">1</span>);
+    <span class="ident">check_send_sync_val</span>(<span class="ident">mutex</span>.<span class="ident">lock</span>());
+    <span class="kw">let</span> <span class="ident">arc_mutex</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="number">1</span>));
+    <span class="ident">check_send_sync_val</span>(<span class="ident">arc_mutex</span>.<span class="ident">clone</span>().<span class="ident">lock_owned</span>());
+    <span class="ident">check_static_val</span>(<span class="ident">arc_mutex</span>.<span class="ident">lock_owned</span>());
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Creates a new lock in an unlocked state ready for use.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Examples</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// ```</span>
+    <span class="doccomment">/// use tokio::sync::Mutex;</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// let lock = Mutex::new(5);</span>
+    <span class="doccomment">/// ```</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">t</span>: <span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>
+    <span class="kw">where</span>
+        <span class="ident">T</span>: <span class="ident">Sized</span>,
+    {
+        <span class="self">Self</span> {
+            <span class="ident">c</span>: <span class="ident">UnsafeCell</span>::<span class="ident">new</span>(<span class="ident">t</span>),
+            <span class="ident">s</span>: <span class="ident">semaphore</span>::<span class="ident">Semaphore</span>::<span class="ident">new</span>(<span class="number">1</span>),
+        }
+    }
+
+    <span class="doccomment">/// Locks this mutex, causing the current task</span>
+    <span class="doccomment">/// to yield until the lock has been acquired.</span>
+    <span class="doccomment">/// When the lock has been acquired, function returns a [`MutexGuard`].</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Examples</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// ```</span>
+    <span class="doccomment">/// use tokio::sync::Mutex;</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// #[tokio::main]</span>
+    <span class="doccomment">/// async fn main() {</span>
+    <span class="doccomment">///     let mutex = Mutex::new(1);</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">///     let mut n = mutex.lock().await;</span>
+    <span class="doccomment">///     *n = 2;</span>
+    <span class="doccomment">/// }</span>
+    <span class="doccomment">/// ```</span>
+    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">lock</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">acquire</span>().<span class="kw">await</span>;
+        <span class="ident">MutexGuard</span> { <span class="ident">lock</span>: <span class="self">self</span> }
+    }
+
+    <span class="doccomment">/// Locks this mutex, causing the current task to yield until the lock has</span>
+    <span class="doccomment">/// been acquired. When the lock has been acquired, this returns an</span>
+    <span class="doccomment">/// [`OwnedMutexGuard`].</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This method is identical to [`Mutex::lock`], except that the returned</span>
+    <span class="doccomment">/// guard references the `Mutex` with an [`Arc`] rather than by borrowing</span>
+    <span class="doccomment">/// it. Therefore, the `Mutex` must be wrapped in an `Arc` to call this</span>
+    <span class="doccomment">/// method, and the guard will live for the `&#39;static` lifetime, as it keeps</span>
+    <span class="doccomment">/// the `Mutex` alive by holding an `Arc`.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Examples</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// ```</span>
+    <span class="doccomment">/// use tokio::sync::Mutex;</span>
+    <span class="doccomment">/// use std::sync::Arc;</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// #[tokio::main]</span>
+    <span class="doccomment">/// async fn main() {</span>
+    <span class="doccomment">///     let mutex = Arc::new(Mutex::new(1));</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">///     let mut n = mutex.clone().lock_owned().await;</span>
+    <span class="doccomment">///     *n = 2;</span>
+    <span class="doccomment">/// }</span>
+    <span class="doccomment">/// ```</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// [`Arc`]: std::sync::Arc</span>
+    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">lock_owned</span>(<span class="self">self</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">OwnedMutexGuard</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">acquire</span>().<span class="kw">await</span>;
+        <span class="ident">OwnedMutexGuard</span> { <span class="ident">lock</span>: <span class="self">self</span> }
+    }
+
+    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">acquire</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">s</span>.<span class="ident">acquire</span>(<span class="number">1</span>).<span class="kw">await</span>.<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> {
+            <span class="comment">// The semaphore was closed. but, we never explicitly close it, and</span>
+            <span class="comment">// we own it exclusively, which means that this can never happen.</span>
+            <span class="macro">unreachable</span><span class="macro">!</span>()
+        });
+    }
+
+    <span class="doccomment">/// Attempts to acquire the lock, and returns [`TryLockError`] if the</span>
+    <span class="doccomment">/// lock is currently held somewhere else.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// [`TryLockError`]: TryLockError</span>
+    <span class="doccomment">/// # Examples</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// ```</span>
+    <span class="doccomment">/// use tokio::sync::Mutex;</span>
+    <span class="doccomment">/// # async fn dox() -&gt; Result&lt;(), tokio::sync::TryLockError&gt; {</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// let mutex = Mutex::new(1);</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// let n = mutex.try_lock()?;</span>
+    <span class="doccomment">/// assert_eq!(*n, 1);</span>
+    <span class="doccomment">/// # Ok(())</span>
+    <span class="doccomment">/// # }</span>
+    <span class="doccomment">/// ```</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_lock</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">TryLockError</span><span class="op">&gt;</span> {
+        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">s</span>.<span class="ident">try_acquire</span>(<span class="number">1</span>) {
+            <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">MutexGuard</span> { <span class="ident">lock</span>: <span class="self">self</span> }),
+            <span class="prelude-val">Err</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="ident">TryLockError</span>(())),
+        }
+    }
+
+    <span class="doccomment">/// Attempts to acquire the lock, and returns [`TryLockError`] if the lock</span>
+    <span class="doccomment">/// is currently held somewhere else.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This method is identical to [`Mutex::try_lock`], except that the</span>
+    <span class="doccomment">/// returned  guard references the `Mutex` with an [`Arc`] rather than by</span>
+    <span class="doccomment">/// borrowing it. Therefore, the `Mutex` must be wrapped in an `Arc` to call</span>
+    <span class="doccomment">/// this method, and the guard will live for the `&#39;static` lifetime, as it</span>
+    <span class="doccomment">/// keeps the `Mutex` alive by holding an `Arc`.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// [`TryLockError`]: TryLockError</span>
+    <span class="doccomment">/// [`Arc`]: std::sync::Arc</span>
+    <span class="doccomment">/// # Examples</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// ```</span>
+    <span class="doccomment">/// use tokio::sync::Mutex;</span>
+    <span class="doccomment">/// use std::sync::Arc;</span>
+    <span class="doccomment">/// # async fn dox() -&gt; Result&lt;(), tokio::sync::TryLockError&gt; {</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// let mutex = Arc::new(Mutex::new(1));</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// let n = mutex.clone().try_lock_owned()?;</span>
+    <span class="doccomment">/// assert_eq!(*n, 1);</span>
+    <span class="doccomment">/// # Ok(())</span>
+    <span class="doccomment">/// # }</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_lock_owned</span>(<span class="self">self</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">OwnedMutexGuard</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">TryLockError</span><span class="op">&gt;</span> {
+        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">s</span>.<span class="ident">try_acquire</span>(<span class="number">1</span>) {
+            <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">OwnedMutexGuard</span> { <span class="ident">lock</span>: <span class="self">self</span> }),
+            <span class="prelude-val">Err</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="ident">TryLockError</span>(())),
+        }
+    }
+
+    <span class="doccomment">/// Consumes the mutex, returning the underlying data.</span>
+    <span class="doccomment">/// # Examples</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// ```</span>
+    <span class="doccomment">/// use tokio::sync::Mutex;</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// #[tokio::main]</span>
+    <span class="doccomment">/// async fn main() {</span>
+    <span class="doccomment">///     let mutex = Mutex::new(1);</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">///     let n = mutex.into_inner();</span>
+    <span class="doccomment">///     assert_eq!(n, 1);</span>
+    <span class="doccomment">/// }</span>
+    <span class="doccomment">/// ```</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">into_inner</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">T</span>
+    <span class="kw">where</span>
+        <span class="ident">T</span>: <span class="ident">Sized</span>,
+    {
+        <span class="self">self</span>.<span class="ident">c</span>.<span class="ident">into_inner</span>()
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">s</span>: <span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="self">Self</span>::<span class="ident">new</span>(<span class="ident">s</span>)
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">T</span>: <span class="ident">Default</span>,
+{
+    <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="self">Self</span>::<span class="ident">new</span>(<span class="ident">T</span>::<span class="ident">default</span>())
+    }
+}
+
+<span class="comment">// === impl MutexGuard ===</span>
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">s</span>.<span class="ident">release</span>(<span class="number">1</span>)
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">T</span>;
+    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">Target</span> {
+        <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">c</span>.<span class="ident">get</span>() }
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> <span class="ident">DerefMut</span> <span class="kw">for</span> <span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">deref_mut</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span>::<span class="ident">Target</span> {
+        <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">c</span>.<span class="ident">get</span>() }
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span> <span class="op">+</span> <span class="ident">fmt</span>::<span class="ident">Debug</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt</span>::<span class="ident">Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
+        <span class="ident">fmt</span>::<span class="ident">Debug</span>::<span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="kw-2">*</span><span class="self">self</span>, <span class="ident">f</span>)
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span> <span class="op">+</span> <span class="ident">fmt</span>::<span class="ident">Display</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="ident">Display</span> <span class="kw">for</span> <span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt</span>::<span class="ident">Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
+        <span class="ident">fmt</span>::<span class="ident">Display</span>::<span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="kw-2">*</span><span class="self">self</span>, <span class="ident">f</span>)
+    }
+}
+
+<span class="comment">// === impl OwnedMutexGuard ===</span>
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">OwnedMutexGuard</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">s</span>.<span class="ident">release</span>(<span class="number">1</span>)
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">OwnedMutexGuard</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">T</span>;
+    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">Target</span> {
+        <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">c</span>.<span class="ident">get</span>() }
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> <span class="ident">DerefMut</span> <span class="kw">for</span> <span class="ident">OwnedMutexGuard</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">deref_mut</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span>::<span class="ident">Target</span> {
+        <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">c</span>.<span class="ident">get</span>() }
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span> <span class="op">+</span> <span class="ident">fmt</span>::<span class="ident">Debug</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">OwnedMutexGuard</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt</span>::<span class="ident">Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
+        <span class="ident">fmt</span>::<span class="ident">Debug</span>::<span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="kw-2">*</span><span class="self">self</span>, <span class="ident">f</span>)
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span> <span class="op">+</span> <span class="ident">fmt</span>::<span class="ident">Display</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="ident">Display</span> <span class="kw">for</span> <span class="ident">OwnedMutexGuard</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt</span>::<span class="ident">Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
+        <span class="ident">fmt</span>::<span class="ident">Display</span>::<span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="kw-2">*</span><span class="self">self</span>, <span class="ident">f</span>)
+    }
+}
+</pre></div>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../";window.currentCrate = "tokio";</script><script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script><script defer src="../../../search-index.js"></script></body></html>

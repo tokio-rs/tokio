@@ -1,0 +1,56 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `main` attr in crate `tokio`."><meta name="keywords" content="rust, rustlang, rust-lang, main"><title>tokio::main - Rust</title><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../dark.css"><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script src="../storage.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="shortcut icon" href="../favicon.ico"><style type="text/css">#crate-search{background-image:url("../down-arrow.svg");}</style></head><body class="rustdoc attr"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../tokio/index.html'><div class='logo-container'><img src='../rust-logo.png' alt='logo'></div></a><div class="sidebar-elems"><p class='location'><a href='index.html'>tokio</a></p><script>window.sidebarCurrent = {name: 'main', ty: 'attr', relpath: ''};</script><script defer src="sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../settings.html"><img src="../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../src/tokio_macros/lib.rs.html#101-103' title='goto source code'>[src]</a></span><span class='in-band'>Attribute Macro <a href='index.html'>tokio</a>::<wbr><a class="attr" href=''>main</a></span></h1><pre class='rust attr'>#[main]</pre><div class='docblock'><p>Marks async function to be executed by selected runtime. This macro helps set up a <code>Runtime</code>
+without requiring the user to use <a href="../tokio/runtime/struct.Runtime.html">Runtime</a> or
+<a href="../tokio/runtime/struct.builder.html">Builder</a> directly.</p>
+<h2 id="options" class="section-header"><a href="#options">Options:</a></h2>
+<ul>
+<li><code>core_threads=n</code> - Sets core threads to <code>n</code> (requires <code>rt-threaded</code> feature).</li>
+<li><code>max_threads=n</code> - Sets max threads to <code>n</code> (requires <code>rt-core</code> or <code>rt-threaded</code> feature).</li>
+</ul>
+<h2 id="function-arguments" class="section-header"><a href="#function-arguments">Function arguments:</a></h2>
+<p>Arguments are allowed for any functions aside from <code>main</code> which is special</p>
+<h2 id="usage" class="section-header"><a href="#usage">Usage</a></h2><h3 id="using-default" class="section-header"><a href="#using-default">Using default</a></h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;Hello world&quot;</span>);
+}</pre></div>
+<p>Equivalent code not using <code>#[tokio::main]</code></p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="ident">tokio</span>::<span class="ident">runtime</span>::<span class="ident">Builder</span>::<span class="ident">new</span>()
+        .<span class="ident">threaded_scheduler</span>()
+        .<span class="ident">enable_all</span>()
+        .<span class="ident">build</span>()
+        .<span class="ident">unwrap</span>()
+        .<span class="ident">block_on</span>(<span class="kw">async</span> {
+            <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;Hello world&quot;</span>);
+        })
+}</pre></div>
+<h3 id="set-number-of-core-threads" class="section-header"><a href="#set-number-of-core-threads">Set number of core threads</a></h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>(<span class="ident">core_threads</span> <span class="op">=</span> <span class="number">2</span>)]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;Hello world&quot;</span>);
+}</pre></div>
+<p>Equivalent code not using <code>#[tokio::main]</code></p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="ident">tokio</span>::<span class="ident">runtime</span>::<span class="ident">Builder</span>::<span class="ident">new</span>()
+        .<span class="ident">threaded_scheduler</span>()
+        .<span class="ident">core_threads</span>(<span class="number">2</span>)
+        .<span class="ident">enable_all</span>()
+        .<span class="ident">build</span>()
+        .<span class="ident">unwrap</span>()
+        .<span class="ident">block_on</span>(<span class="kw">async</span> {
+            <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;Hello world&quot;</span>);
+        })
+}</pre></div>
+<h3 id="note" class="section-header"><a href="#note">NOTE:</a></h3>
+<p>If you rename the tokio crate in your dependencies this macro
+will not work. If you must rename the 0.2 version of tokio because
+you're also using the 0.1 version of tokio, you <em>must</em> make the
+tokio 0.2 crate available as <code>tokio</code> in the module where this
+macro is expanded.</p>
+</div></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../";window.currentCrate = "tokio";</script><script src="../main.js"></script><script defer src="../search-index.js"></script></body></html>

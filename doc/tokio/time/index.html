@@ -1,0 +1,111 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `time` mod in crate `tokio`."><meta name="keywords" content="rust, rustlang, rust-lang, time"><title>tokio::time - Rust</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../tokio/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a><p class='location'>Module time</p><div class="sidebar-elems"><div class="block items"><ul><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li><li><a href="#functions">Functions</a></li></ul></div><p class='location'><a href='../index.html'>tokio</a></p><script>window.sidebarCurrent = {name: 'time', ty: 'mod', relpath: '../'};</script><script defer src="../sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../../src/tokio/time/mod.rs.html#1-162' title='goto source code'>[src]</a></span><span class='in-band'>Module <a href='../index.html'>tokio</a>::<wbr><a class="mod" href=''>time</a></span></h1><div class='docblock'><p>Utilities for tracking time.</p>
+<p>This module provides a number of types for executing code after a set period
+of time.</p>
+<ul>
+<li>
+<p><code>Delay</code> is a future that does no work and completes at a specific <code>Instant</code>
+in time.</p>
+</li>
+<li>
+<p><code>Interval</code> is a stream yielding a value at a fixed period. It is
+initialized with a <code>Duration</code> and repeatedly yields each time the duration
+elapses.</p>
+</li>
+<li>
+<p><code>Timeout</code>: Wraps a future or stream, setting an upper bound to the amount
+of time it is allowed to execute. If the future or stream does not
+complete in time, then it is canceled and an error is returned.</p>
+</li>
+<li>
+<p><code>DelayQueue</code>: A queue where items are returned once the requested delay
+has expired.</p>
+</li>
+</ul>
+<p>These types are sufficient for handling a large number of scenarios
+involving time.</p>
+<p>These types must be used from within the context of the <code>Runtime</code>.</p>
+<h1 id="examples" class="section-header"><a href="#examples">Examples</a></h1>
+<p>Wait 100ms and print &quot;100 ms have elapsed&quot;</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">time</span>::<span class="ident">delay_for</span>;
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::<span class="ident">Duration</span>;
+
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="ident">delay_for</span>(<span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="number">100</span>)).<span class="kw">await</span>;
+    <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;100 ms have elapsed&quot;</span>);
+}</pre></div>
+<p>Require that an operation takes no more than 300ms. Note that this uses the
+<code>timeout</code> function on the <code>FutureExt</code> trait. This trait is included in the
+prelude.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">time</span>::{<span class="ident">timeout</span>, <span class="ident">Duration</span>};
+
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">long_future</span>() {
+    <span class="comment">// do work here</span>
+}
+
+<span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">timeout</span>(<span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">1</span>), <span class="ident">long_future</span>()).<span class="kw">await</span>;
+
+<span class="kw">if</span> <span class="ident">res</span>.<span class="ident">is_err</span>() {
+    <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;operation timed out&quot;</span>);
+}</pre></div>
+<p>A simple example using <a href="crate::time::interval()"><code>interval</code></a> to execute a task every two seconds.</p>
+<p>The difference between <a href="crate::time::interval()"><code>interval</code></a> and <a href="crate::time::delay_for()"><code>delay_for</code></a> is that an
+<a href="crate::time::interval()"><code>interval</code></a> measures the time since the last tick, which means that
+<code>.tick().await</code> may wait for a shorter time than the duration specified
+for the interval if some time has passed between calls to <code>.tick().await</code>.</p>
+<p>If the tick in the example below was replaced with <a href="crate::time::delay_for()"><code>delay_for</code></a>, the task
+would only be executed once every three seconds, and not every two
+seconds.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">time</span>;
+
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">task_that_takes_a_second</span>() {
+    <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;hello&quot;</span>);
+    <span class="ident">time</span>::<span class="ident">delay_for</span>(<span class="ident">time</span>::<span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">1</span>)).<span class="kw">await</span>
+}
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">interval</span> <span class="op">=</span> <span class="ident">time</span>::<span class="ident">interval</span>(<span class="ident">time</span>::<span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">2</span>));
+    <span class="kw">for</span> <span class="ident">_i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">5</span> {
+        <span class="ident">interval</span>.<span class="ident">tick</span>().<span class="kw">await</span>;
+        <span class="ident">task_that_takes_a_second</span>().<span class="kw">await</span>;
+    }
+}</pre></div>
+</div><h2 id='modules' class='section-header'><a href="#modules">Modules</a></h2>
+<table><tr class='module-item'><td><a class="mod" href="delay_queue/index.html" title='tokio::time::delay_queue mod'>delay_queue</a></td><td class='docblock-short'><p>A queue of delayed elements.</p>
+</td></tr></table><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
+<table><tr class='module-item'><td><a class="struct" href="struct.Delay.html" title='tokio::time::Delay struct'>Delay</a></td><td class='docblock-short'><p>Future returned by <a href="delay_until"><code>delay_until</code></a> and
+<a href="delay_for"><code>delay_for</code></a>.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.DelayQueue.html" title='tokio::time::DelayQueue struct'>DelayQueue</a></td><td class='docblock-short'><p>A queue of delayed elements.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Duration.html" title='tokio::time::Duration struct'>Duration</a></td><td class='docblock-short'><p>A <code>Duration</code> type to represent a span of time, typically used for system
+timeouts.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Elapsed.html" title='tokio::time::Elapsed struct'>Elapsed</a></td><td class='docblock-short'><p>Error returned by <code>Timeout</code>.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Error.html" title='tokio::time::Error struct'>Error</a></td><td class='docblock-short'><p>Errors encountered by the timer implementation.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Instant.html" title='tokio::time::Instant struct'>Instant</a></td><td class='docblock-short'><p>A measurement of the system clock, useful for talking to
+external entities like the file system or other processes.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Interval.html" title='tokio::time::Interval struct'>Interval</a></td><td class='docblock-short'><p>Stream returned by <a href="interval"><code>interval</code></a> and <a href="interval_at"><code>interval_at</code></a>.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Throttle.html" title='tokio::time::Throttle struct'>Throttle</a></td><td class='docblock-short'><p>Stream for the <a href="throttle"><code>throttle</code></a> function.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Timeout.html" title='tokio::time::Timeout struct'>Timeout</a></td><td class='docblock-short'><p>Future returned by <a href="timeout"><code>timeout</code></a> and <a href="timeout_at"><code>timeout_at</code></a>.</p>
+</td></tr></table><h2 id='functions' class='section-header'><a href="#functions">Functions</a></h2>
+<table><tr class='module-item'><td><a class="fn" href="fn.advance.html" title='tokio::time::advance fn'>advance</a></td><td class='docblock-short'><p>Advance time</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.delay_for.html" title='tokio::time::delay_for fn'>delay_for</a></td><td class='docblock-short'><p>Waits until <code>duration</code> has elapsed.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.delay_until.html" title='tokio::time::delay_until fn'>delay_until</a></td><td class='docblock-short'><p>Waits until <code>deadline</code> is reached.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.interval.html" title='tokio::time::interval fn'>interval</a></td><td class='docblock-short'><p>Creates new <code>Interval</code> that yields with interval of <code>duration</code>. The first
+tick completes immediately.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.interval_at.html" title='tokio::time::interval_at fn'>interval_at</a></td><td class='docblock-short'><p>Creates new <code>Interval</code> that yields with interval of <code>period</code> with the
+first tick completing at <code>at</code>.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.pause.html" title='tokio::time::pause fn'>pause</a></td><td class='docblock-short'><p>Pause time</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.resume.html" title='tokio::time::resume fn'>resume</a></td><td class='docblock-short'><p>Resume time</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.throttle.html" title='tokio::time::throttle fn'>throttle</a></td><td class='docblock-short'><p>Slows down a stream by enforcing a delay between items.
+They will be produced not more often than the specified interval.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.timeout.html" title='tokio::time::timeout fn'>timeout</a></td><td class='docblock-short'><p>Require a <code>Future</code> to complete before the specified duration has elapsed.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.timeout_at.html" title='tokio::time::timeout_at fn'>timeout_at</a></td><td class='docblock-short'><p>Require a <code>Future</code> to complete before the specified instant in time.</p>
+</td></tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "tokio";</script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>

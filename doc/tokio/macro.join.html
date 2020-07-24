@@ -1,0 +1,55 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `join` macro in crate `tokio`."><meta name="keywords" content="rust, rustlang, rust-lang, join"><title>tokio::join - Rust</title><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../dark.css"><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script src="../storage.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="shortcut icon" href="../favicon.ico"><style type="text/css">#crate-search{background-image:url("../down-arrow.svg");}</style></head><body class="rustdoc macro"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../tokio/index.html'><div class='logo-container'><img src='../rust-logo.png' alt='logo'></div></a><div class="sidebar-elems"><p class='location'><a href='index.html'>tokio</a></p><script>window.sidebarCurrent = {name: 'join', ty: 'macro', relpath: ''};</script><script defer src="sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../settings.html"><img src="../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../src/tokio/macros/join.rs.html#57-119' title='goto source code'>[src]</a></span><span class='in-band'>Macro <a href='index.html'>tokio</a>::<wbr><a class="macro" href=''>join</a></span></h1><div class="docblock type-decl hidden-by-usual-hider"><div class="example-wrap"><pre class="rust macro">
+<span class="macro">macro_rules</span><span class="macro">!</span> <span class="ident">join</span> {
+    (@ {
+        <span class="comment">// One `_` for each branch in the `join!` macro. This is not used once</span>
+        <span class="comment">// normalization is complete.</span>
+        ( $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">count</span>:<span class="ident">tt</span>)<span class="op">*</span> )
+
+        <span class="comment">// Normalized join! branches</span>
+        $( ( $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">skip</span>:<span class="ident">tt</span>)<span class="op">*</span> ) <span class="macro-nonterminal">$</span><span class="macro-nonterminal">e</span>:<span class="ident">expr</span>, )<span class="op">*</span>
+
+    }) <span class="op">=</span><span class="op">&gt;</span> { ... };
+    (@ { ( $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">s</span>:<span class="ident">tt</span>)<span class="op">*</span> ) $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">tt</span>)<span class="op">*</span> } <span class="macro-nonterminal">$</span><span class="macro-nonterminal">e</span>:<span class="ident">expr</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>:<span class="ident">tt</span>)<span class="op">*</span> ) <span class="op">=</span><span class="op">&gt;</span> { ... };
+    ( $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">e</span>:<span class="ident">expr</span>),<span class="op">*</span> $(,)<span class="question-mark">?</span>) <span class="op">=</span><span class="op">&gt;</span> { ... };
+}</pre></div>
+</div><div class='docblock'><p>Wait on multiple concurrent branches, returning when <strong>all</strong> branches
+complete.</p>
+<p>The <code>join!</code> macro must be used inside of async functions, closures, and
+blocks.</p>
+<p>The <code>join!</code> macro takes a list of async expressions and evaluates them
+concurrently on the same task. Each async expression evaluates to a future
+and the futures from each expression are multiplexed on the current task.</p>
+<p>When working with async expressions returning <code>Result</code>, <code>join!</code> will wait
+for <strong>all</strong> branches complete regardless if any complete with <code>Err</code>. Use
+<a href="macro@try_join"><code>try_join!</code></a> to return early when <code>Err</code> is encountered.</p>
+<h1 id="notes" class="section-header"><a href="#notes">Notes</a></h1>
+<p>The supplied futures are stored inline and does not require allocating a
+<code>Vec</code>.</p>
+<h3 id="runtime-characteristics" class="section-header"><a href="#runtime-characteristics">Runtime characteristics</a></h3>
+<p>By running all async expressions on the current task, the expressions are
+able to run <strong>concurrently</strong> but not in <strong>parallel</strong>. This means all
+expressions are run on the same thread and if one branch blocks the thread,
+all other expressions will be unable to continue. If parallelism is
+required, spawn each async expression using <a href="crate::spawn"><code>tokio::spawn</code></a> and pass the
+join handle to <code>join!</code>.</p>
+<h1 id="examples" class="section-header"><a href="#examples">Examples</a></h1>
+<p>Basic join with two branches</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">do_stuff_async</span>() {
+    <span class="comment">// async work</span>
+}
+
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">more_async_work</span>() {
+    <span class="comment">// more here</span>
+}
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> (<span class="ident">first</span>, <span class="ident">second</span>) <span class="op">=</span> <span class="ident">tokio</span>::<span class="macro">join</span><span class="macro">!</span>(
+        <span class="ident">do_stuff_async</span>(),
+        <span class="ident">more_async_work</span>());
+
+    <span class="comment">// do something with the values</span>
+}</pre></div>
+</div></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../";window.currentCrate = "tokio";</script><script src="../main.js"></script><script defer src="../search-index.js"></script></body></html>

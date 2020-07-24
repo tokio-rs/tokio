@@ -1,0 +1,96 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `spawn` fn in crate `tokio`."><meta name="keywords" content="rust, rustlang, rust-lang, spawn"><title>tokio::task::spawn - Rust</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc fn"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../tokio/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a><div class="sidebar-elems"><p class='location'><a href='../index.html'>tokio</a>::<wbr><a href='index.html'>task</a></p><script>window.sidebarCurrent = {name: 'spawn', ty: 'fn', relpath: ''};</script><script defer src="sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../../src/tokio/task/spawn.rs.html#125-134' title='goto source code'>[src]</a></span><span class='in-band'>Function <a href='../index.html'>tokio</a>::<wbr><a href='index.html'>task</a>::<wbr><a class="fn" href=''>spawn</a></span></h1><pre class='rust fn'>pub fn spawn&lt;T&gt;(task: T) -&gt; <a class="struct" href="../../tokio/task/struct.JoinHandle.html" title="struct tokio::task::JoinHandle">JoinHandle</a>&lt;T::<a class="type" href="https://doc.rust-lang.org/nightly/core/future/future/trait.Future.html#associatedtype.Output" title="type core::future::future::Future::Output">Output</a>&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;T: <a class="trait" href="https://doc.rust-lang.org/nightly/core/future/future/trait.Future.html" title="trait core::future::future::Future">Future</a> + <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'static,<br>&nbsp;&nbsp;&nbsp;&nbsp;T::<a class="type" href="https://doc.rust-lang.org/nightly/core/future/future/trait.Future.html#associatedtype.Output" title="type core::future::future::Future::Output">Output</a>: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'static,&nbsp;</span></pre><div class='docblock'><p>Spawns a new asynchronous task, returning a
+<a href="super::JoinHandle"><code>JoinHandle</code></a> for it.</p>
+<p>Spawning a task enables the task to execute concurrently to other tasks. The
+spawned task may execute on the current thread, or it may be sent to a
+different thread to be executed. The specifics depend on the current
+<a href="crate::runtime::Runtime"><code>Runtime</code></a> configuration.</p>
+<p>There is no guarantee that a spawned task will execute to completion.
+When a runtime is shutdown, all outstanding tasks are dropped,
+regardless of the lifecycle of that task.</p>
+<p>This function must be called from the context of a Tokio runtime. Tasks running on
+the Tokio runtime are always inside its context, but you can also enter the context
+using the <a href="crate::runtime::Handle::enter()"><code>Handle::enter</code></a> method.</p>
+<h1 id="examples" class="section-header"><a href="#examples">Examples</a></h1>
+<p>In this example, a server is started and <code>spawn</code> is used to start a new task
+that processes each received connection.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">net</span>::{<span class="ident">TcpListener</span>, <span class="ident">TcpStream</span>};
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>;
+
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">process</span>(<span class="ident">socket</span>: <span class="ident">TcpStream</span>) {
+    <span class="comment">// ...</span>
+}
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">listener</span> <span class="op">=</span> <span class="ident">TcpListener</span>::<span class="ident">bind</span>(<span class="string">&quot;127.0.0.1:8080&quot;</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+    <span class="kw">loop</span> {
+        <span class="kw">let</span> (<span class="ident">socket</span>, <span class="kw">_</span>) <span class="op">=</span> <span class="ident">listener</span>.<span class="ident">accept</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+
+        <span class="ident">tokio</span>::<span class="ident">spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
+            <span class="comment">// Process each socket concurrently.</span>
+            <span class="ident">process</span>(<span class="ident">socket</span>).<span class="kw">await</span>
+        });
+    }
+}</pre></div>
+<h1 id="panics" class="section-header"><a href="#panics">Panics</a></h1>
+<p>Panics if called from <strong>outside</strong> of the Tokio runtime.</p>
+<h1 id="using-send-values-from-a-task" class="section-header"><a href="#using-send-values-from-a-task">Using <code>!Send</code> values from a task</a></h1>
+<p>The task supplied to <code>spawn</code> must implement <code>Send</code>. However, it is
+possible to <strong>use</strong> <code>!Send</code> values from the task as long as they only
+exist between calls to <code>.await</code>.</p>
+<p>For example, this will work:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">task</span>;
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">rc</span>::<span class="ident">Rc</span>;
+
+<span class="kw">fn</span> <span class="ident">use_rc</span>(<span class="ident">rc</span>: <span class="ident">Rc</span><span class="op">&lt;</span>()<span class="op">&gt;</span>) {
+    <span class="comment">// Do stuff w/ rc</span>
+}
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="ident">tokio</span>::<span class="ident">spawn</span>(<span class="kw">async</span> {
+        <span class="comment">// Force the `Rc` to stay in a scope with no `.await`</span>
+        {
+            <span class="kw">let</span> <span class="ident">rc</span> <span class="op">=</span> <span class="ident">Rc</span>::<span class="ident">new</span>(());
+            <span class="ident">use_rc</span>(<span class="ident">rc</span>.<span class="ident">clone</span>());
+        }
+
+        <span class="ident">task</span>::<span class="ident">yield_now</span>().<span class="kw">await</span>;
+    }).<span class="kw">await</span>.<span class="ident">unwrap</span>();
+}</pre></div>
+<p>This will <strong>not</strong> work:</p>
+
+<div class='information'><div class='tooltip compile_fail'>ⓘ<span class='tooltiptext'>This example deliberately fails to compile</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered compile_fail">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">task</span>;
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">rc</span>::<span class="ident">Rc</span>;
+
+<span class="kw">fn</span> <span class="ident">use_rc</span>(<span class="ident">rc</span>: <span class="ident">Rc</span><span class="op">&lt;</span>()<span class="op">&gt;</span>) {
+    <span class="comment">// Do stuff w/ rc</span>
+}
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="ident">tokio</span>::<span class="ident">spawn</span>(<span class="kw">async</span> {
+        <span class="kw">let</span> <span class="ident">rc</span> <span class="op">=</span> <span class="ident">Rc</span>::<span class="ident">new</span>(());
+
+        <span class="ident">task</span>::<span class="ident">yield_now</span>().<span class="kw">await</span>;
+
+        <span class="ident">use_rc</span>(<span class="ident">rc</span>.<span class="ident">clone</span>());
+    }).<span class="kw">await</span>.<span class="ident">unwrap</span>();
+}</pre></div>
+<p>Holding on to a <code>!Send</code> value across calls to <code>.await</code> will result in
+an unfriendly compile error message similar to:</p>
+<pre><code class="language-text">`[... some type ...]` cannot be sent between threads safely
+</code></pre>
+<p>or:</p>
+<pre><code class="language-text">error[E0391]: cycle detected when processing `main`
+</code></pre>
+</div></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "tokio";</script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>

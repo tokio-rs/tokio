@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["RecvHalf","The recv half after `split`."],["ReuniteError","Error indicating two halves were not from the same socket, and thus could not be `reunite`d."],["SendHalf","The send half after `split`."]]});

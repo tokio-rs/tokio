@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["SendError","Error produced when sending a value fails."]]});

@@ -1,0 +1,267 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `tokio/src/task/blocking.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>blocking.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css"><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="shortcut icon" href="../../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../tokio/index.html'><div class='logo-container'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<span id="2">  2</span>
+<span id="3">  3</span>
+<span id="4">  4</span>
+<span id="5">  5</span>
+<span id="6">  6</span>
+<span id="7">  7</span>
+<span id="8">  8</span>
+<span id="9">  9</span>
+<span id="10"> 10</span>
+<span id="11"> 11</span>
+<span id="12"> 12</span>
+<span id="13"> 13</span>
+<span id="14"> 14</span>
+<span id="15"> 15</span>
+<span id="16"> 16</span>
+<span id="17"> 17</span>
+<span id="18"> 18</span>
+<span id="19"> 19</span>
+<span id="20"> 20</span>
+<span id="21"> 21</span>
+<span id="22"> 22</span>
+<span id="23"> 23</span>
+<span id="24"> 24</span>
+<span id="25"> 25</span>
+<span id="26"> 26</span>
+<span id="27"> 27</span>
+<span id="28"> 28</span>
+<span id="29"> 29</span>
+<span id="30"> 30</span>
+<span id="31"> 31</span>
+<span id="32"> 32</span>
+<span id="33"> 33</span>
+<span id="34"> 34</span>
+<span id="35"> 35</span>
+<span id="36"> 36</span>
+<span id="37"> 37</span>
+<span id="38"> 38</span>
+<span id="39"> 39</span>
+<span id="40"> 40</span>
+<span id="41"> 41</span>
+<span id="42"> 42</span>
+<span id="43"> 43</span>
+<span id="44"> 44</span>
+<span id="45"> 45</span>
+<span id="46"> 46</span>
+<span id="47"> 47</span>
+<span id="48"> 48</span>
+<span id="49"> 49</span>
+<span id="50"> 50</span>
+<span id="51"> 51</span>
+<span id="52"> 52</span>
+<span id="53"> 53</span>
+<span id="54"> 54</span>
+<span id="55"> 55</span>
+<span id="56"> 56</span>
+<span id="57"> 57</span>
+<span id="58"> 58</span>
+<span id="59"> 59</span>
+<span id="60"> 60</span>
+<span id="61"> 61</span>
+<span id="62"> 62</span>
+<span id="63"> 63</span>
+<span id="64"> 64</span>
+<span id="65"> 65</span>
+<span id="66"> 66</span>
+<span id="67"> 67</span>
+<span id="68"> 68</span>
+<span id="69"> 69</span>
+<span id="70"> 70</span>
+<span id="71"> 71</span>
+<span id="72"> 72</span>
+<span id="73"> 73</span>
+<span id="74"> 74</span>
+<span id="75"> 75</span>
+<span id="76"> 76</span>
+<span id="77"> 77</span>
+<span id="78"> 78</span>
+<span id="79"> 79</span>
+<span id="80"> 80</span>
+<span id="81"> 81</span>
+<span id="82"> 82</span>
+<span id="83"> 83</span>
+<span id="84"> 84</span>
+<span id="85"> 85</span>
+<span id="86"> 86</span>
+<span id="87"> 87</span>
+<span id="88"> 88</span>
+<span id="89"> 89</span>
+<span id="90"> 90</span>
+<span id="91"> 91</span>
+<span id="92"> 92</span>
+<span id="93"> 93</span>
+<span id="94"> 94</span>
+<span id="95"> 95</span>
+<span id="96"> 96</span>
+<span id="97"> 97</span>
+<span id="98"> 98</span>
+<span id="99"> 99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+</pre><div class="example-wrap"><pre class="rust ">
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">task</span>::<span class="ident">JoinHandle</span>;
+
+<span class="macro">cfg_rt_threaded</span><span class="macro">!</span> {
+    <span class="doccomment">/// Runs the provided blocking function on the current thread without</span>
+    <span class="doccomment">/// blocking the executor.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// In general, issuing a blocking call or performing a lot of compute in a</span>
+    <span class="doccomment">/// future without yielding is not okay, as it may prevent the executor from</span>
+    <span class="doccomment">/// driving other futures forward.  This function runs the closure on the</span>
+    <span class="doccomment">/// current thread by having the thread temporarily cease from being a core</span>
+    <span class="doccomment">/// thread, and turns it into a blocking thread. See the [CPU-bound tasks</span>
+    <span class="doccomment">/// and blocking code][blocking] section for more information.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Although this function avoids starving other independently spawned</span>
+    <span class="doccomment">/// tasks, any other code running concurrently in the same task will be</span>
+    <span class="doccomment">/// suspended during the call to `block_in_place`. This can happen e.g. when</span>
+    <span class="doccomment">/// using the [`join!`] macro. To avoid this issue, use [`spawn_blocking`]</span>
+    <span class="doccomment">/// instead.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Note that this function can only be used on the [threaded scheduler].</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Code running behind `block_in_place` cannot be cancelled. When you shut</span>
+    <span class="doccomment">/// down the executor, it will wait indefinitely for all blocking operations</span>
+    <span class="doccomment">/// to finish. You can use [`shutdown_timeout`] to stop waiting for them</span>
+    <span class="doccomment">/// after a certain timeout. Be aware that this will still not cancel the</span>
+    <span class="doccomment">/// tasks — they are simply allowed to keep running after the method</span>
+    <span class="doccomment">/// returns.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// [blocking]: ../index.html#cpu-bound-tasks-and-blocking-code</span>
+    <span class="doccomment">/// [threaded scheduler]: fn@crate::runtime::Builder::threaded_scheduler</span>
+    <span class="doccomment">/// [`spawn_blocking`]: fn@crate::task::spawn_blocking</span>
+    <span class="doccomment">/// [`join!`]: macro@join</span>
+    <span class="doccomment">/// [`thread::spawn`]: fn@std::thread::spawn</span>
+    <span class="doccomment">/// [`shutdown_timeout`]: fn@crate::runtime::Runtime::shutdown_timeout</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Examples</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// ```</span>
+    <span class="doccomment">/// use tokio::task;</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # async fn docs() {</span>
+    <span class="doccomment">/// task::block_in_place(move || {</span>
+    <span class="doccomment">///     // do some compute-heavy work or call synchronous code</span>
+    <span class="doccomment">/// });</span>
+    <span class="doccomment">/// # }</span>
+    <span class="doccomment">/// ```</span>
+    <span class="attribute">#[<span class="ident">cfg_attr</span>(<span class="ident">docsrs</span>, <span class="ident">doc</span>(<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;blocking&quot;</span>)))]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">block_in_place</span><span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">R</span><span class="op">&gt;</span>(<span class="ident">f</span>: <span class="ident">F</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">R</span>
+    <span class="kw">where</span>
+        <span class="ident">F</span>: <span class="ident">FnOnce</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">R</span>,
+    {
+        <span class="kw">crate</span>::<span class="ident">runtime</span>::<span class="ident">thread_pool</span>::<span class="ident">block_in_place</span>(<span class="ident">f</span>)
+    }
+}
+
+<span class="macro">cfg_blocking</span><span class="macro">!</span> {
+    <span class="doccomment">/// Runs the provided closure on a thread where blocking is acceptable.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// In general, issuing a blocking call or performing a lot of compute in a</span>
+    <span class="doccomment">/// future without yielding is not okay, as it may prevent the executor from</span>
+    <span class="doccomment">/// driving other futures forward. This function runs the provided closure</span>
+    <span class="doccomment">/// on a thread dedicated to blocking operations. See the [CPU-bound tasks</span>
+    <span class="doccomment">/// and blocking code][blocking] section for more information.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Tokio will spawn more blocking threads when they are requested through</span>
+    <span class="doccomment">/// this function until the upper limit configured on the [`Builder`] is</span>
+    <span class="doccomment">/// reached.  This limit is very large by default, because `spawn_blocking` is</span>
+    <span class="doccomment">/// often used for various kinds of IO operations that cannot be performed</span>
+    <span class="doccomment">/// asynchronously. When you run CPU-bound code using `spawn_blocking`, you</span>
+    <span class="doccomment">/// should keep this large upper limit in mind; to run your CPU-bound</span>
+    <span class="doccomment">/// computations on only a few threads, you should use a separate thread</span>
+    <span class="doccomment">/// pool such as [rayon] rather than configuring the number of blocking</span>
+    <span class="doccomment">/// threads.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This function is intended for non-async operations that eventually</span>
+    <span class="doccomment">/// finish on their own. If you want to spawn an ordinary thread, you should</span>
+    <span class="doccomment">/// use [`thread::spawn`] instead.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Closures spawned using `spawn_blocking` cannot be cancelled. When you</span>
+    <span class="doccomment">/// shut down the executor, it will wait indefinitely for all blocking</span>
+    <span class="doccomment">/// operations to finish. You can use [`shutdown_timeout`] to stop waiting</span>
+    <span class="doccomment">/// for them after a certain timeout. Be aware that this will still not</span>
+    <span class="doccomment">/// cancel the tasks — they are simply allowed to keep running after the</span>
+    <span class="doccomment">/// method returns.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Note that if you are using the [basic scheduler], this function will</span>
+    <span class="doccomment">/// still spawn additional threads for blocking operations. The basic</span>
+    <span class="doccomment">/// scheduler&#39;s single thread is only used for asynchronous code.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// [`Builder`]: struct@crate::runtime::Builder</span>
+    <span class="doccomment">/// [blocking]: ../index.html#cpu-bound-tasks-and-blocking-code</span>
+    <span class="doccomment">/// [rayon]: https://docs.rs/rayon</span>
+    <span class="doccomment">/// [basic scheduler]: fn@crate::runtime::Builder::basic_scheduler</span>
+    <span class="doccomment">/// [`thread::spawn`]: fn@std::thread::spawn</span>
+    <span class="doccomment">/// [`shutdown_timeout`]: fn@crate::runtime::Runtime::shutdown_timeout</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Examples</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// ```</span>
+    <span class="doccomment">/// use tokio::task;</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # async fn docs() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt;{</span>
+    <span class="doccomment">/// let res = task::spawn_blocking(move || {</span>
+    <span class="doccomment">///     // do some compute-heavy work or call synchronous code</span>
+    <span class="doccomment">///     &quot;done computing&quot;</span>
+    <span class="doccomment">/// }).await?;</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// assert_eq!(res, &quot;done computing&quot;);</span>
+    <span class="doccomment">/// # Ok(())</span>
+    <span class="doccomment">/// # }</span>
+    <span class="doccomment">/// ```</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">spawn_blocking</span><span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">R</span><span class="op">&gt;</span>(<span class="ident">f</span>: <span class="ident">F</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">JoinHandle</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span>
+    <span class="kw">where</span>
+        <span class="ident">F</span>: <span class="ident">FnOnce</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">R</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+        <span class="ident">R</span>: <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+    {
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;tracing&quot;</span>)]</span>
+        <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> {
+            <span class="kw">let</span> <span class="ident">span</span> <span class="op">=</span> <span class="ident">tracing</span>::<span class="macro">trace_span</span><span class="macro">!</span>(
+                <span class="ident">target</span>: <span class="string">&quot;tokio::task&quot;</span>,
+                <span class="string">&quot;task&quot;</span>,
+                <span class="ident">kind</span> <span class="op">=</span> <span class="op">%</span><span class="string">&quot;blocking&quot;</span>,
+                <span class="ident">function</span> <span class="op">=</span> <span class="op">%</span><span class="ident">std</span>::<span class="ident">any</span>::<span class="ident">type_name</span>::<span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span>(),
+            );
+            <span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
+                <span class="kw">let</span> <span class="ident">_g</span> <span class="op">=</span> <span class="ident">span</span>.<span class="ident">enter</span>();
+                <span class="ident">f</span>()
+            }
+        };
+        <span class="kw">crate</span>::<span class="ident">runtime</span>::<span class="ident">spawn_blocking</span>(<span class="ident">f</span>)
+    }
+}
+</pre></div>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../";window.currentCrate = "tokio";</script><script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script><script defer src="../../../search-index.js"></script></body></html>

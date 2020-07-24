@@ -1,0 +1,89 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `tokio-macros/src/select.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>select.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../tokio_macros/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1"> 1</span>
+<span id="2"> 2</span>
+<span id="3"> 3</span>
+<span id="4"> 4</span>
+<span id="5"> 5</span>
+<span id="6"> 6</span>
+<span id="7"> 7</span>
+<span id="8"> 8</span>
+<span id="9"> 9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+</pre><div class="example-wrap"><pre class="rust ">
+<span class="kw">use</span> <span class="ident">proc_macro</span>::{<span class="ident">TokenStream</span>, <span class="ident">TokenTree</span>};
+<span class="kw">use</span> <span class="ident">proc_macro2</span>::<span class="ident">Span</span>;
+<span class="kw">use</span> <span class="ident">quote</span>::<span class="ident">quote</span>;
+<span class="kw">use</span> <span class="ident">syn</span>::<span class="ident">Ident</span>;
+
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">declare_output_enum</span>(<span class="ident">input</span>: <span class="ident">TokenStream</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">TokenStream</span> {
+    <span class="comment">// passed in is: `(_ _ _)` with one `_` per branch</span>
+    <span class="kw">let</span> <span class="ident">branches</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">input</span>.<span class="ident">into_iter</span>().<span class="ident">next</span>() {
+        <span class="prelude-val">Some</span>(<span class="ident">TokenTree</span>::<span class="ident">Group</span>(<span class="ident">group</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">group</span>.<span class="ident">stream</span>().<span class="ident">into_iter</span>().<span class="ident">count</span>(),
+        <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;unexpected macro input&quot;</span>),
+    };
+
+    <span class="kw">let</span> <span class="ident">variants</span> <span class="op">=</span> (<span class="number">0</span>..<span class="ident">branches</span>)
+        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">num</span><span class="op">|</span> <span class="ident">Ident</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;_{}&quot;</span>, <span class="ident">num</span>), <span class="ident">Span</span>::<span class="ident">call_site</span>()))
+        .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+
+    <span class="comment">// Use a bitfield to track which futures completed</span>
+    <span class="kw">let</span> <span class="ident">mask</span> <span class="op">=</span> <span class="ident">Ident</span>::<span class="ident">new</span>(
+        <span class="kw">if</span> <span class="ident">branches</span> <span class="op">&lt;</span><span class="op">=</span> <span class="number">8</span> {
+            <span class="string">&quot;u8&quot;</span>
+        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">branches</span> <span class="op">&lt;</span><span class="op">=</span> <span class="number">16</span> {
+            <span class="string">&quot;u16&quot;</span>
+        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">branches</span> <span class="op">&lt;</span><span class="op">=</span> <span class="number">32</span> {
+            <span class="string">&quot;u32&quot;</span>
+        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">branches</span> <span class="op">&lt;</span><span class="op">=</span> <span class="number">64</span> {
+            <span class="string">&quot;u64&quot;</span>
+        } <span class="kw">else</span> {
+            <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;up to 64 branches supported&quot;</span>);
+        },
+        <span class="ident">Span</span>::<span class="ident">call_site</span>(),
+    );
+
+    <span class="ident">TokenStream</span>::<span class="ident">from</span>(<span class="macro">quote</span><span class="macro">!</span> {
+        <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">enum</span> <span class="ident">Out</span><span class="op">&lt;</span>#( #<span class="ident">variants</span> ),<span class="kw-2">*</span><span class="op">&gt;</span> {
+            #( #<span class="ident">variants</span>(#<span class="ident">variants</span>), )<span class="op">*</span>
+            <span class="comment">// Include a `Disabled` variant signifying that all select branches</span>
+            <span class="comment">// failed to resolve.</span>
+            <span class="ident">Disabled</span>,
+        }
+
+        <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">type</span> <span class="ident">Mask</span> <span class="op">=</span> #<span class="ident">mask</span>;
+    })
+}
+</pre></div>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "tokio_macros";</script><script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script><script defer src="../../search-index.js"></script></body></html>

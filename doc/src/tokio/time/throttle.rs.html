@@ -1,0 +1,237 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `tokio/src/time/throttle.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>throttle.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css"><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="shortcut icon" href="../../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../tokio/index.html'><div class='logo-container'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<span id="2">  2</span>
+<span id="3">  3</span>
+<span id="4">  4</span>
+<span id="5">  5</span>
+<span id="6">  6</span>
+<span id="7">  7</span>
+<span id="8">  8</span>
+<span id="9">  9</span>
+<span id="10"> 10</span>
+<span id="11"> 11</span>
+<span id="12"> 12</span>
+<span id="13"> 13</span>
+<span id="14"> 14</span>
+<span id="15"> 15</span>
+<span id="16"> 16</span>
+<span id="17"> 17</span>
+<span id="18"> 18</span>
+<span id="19"> 19</span>
+<span id="20"> 20</span>
+<span id="21"> 21</span>
+<span id="22"> 22</span>
+<span id="23"> 23</span>
+<span id="24"> 24</span>
+<span id="25"> 25</span>
+<span id="26"> 26</span>
+<span id="27"> 27</span>
+<span id="28"> 28</span>
+<span id="29"> 29</span>
+<span id="30"> 30</span>
+<span id="31"> 31</span>
+<span id="32"> 32</span>
+<span id="33"> 33</span>
+<span id="34"> 34</span>
+<span id="35"> 35</span>
+<span id="36"> 36</span>
+<span id="37"> 37</span>
+<span id="38"> 38</span>
+<span id="39"> 39</span>
+<span id="40"> 40</span>
+<span id="41"> 41</span>
+<span id="42"> 42</span>
+<span id="43"> 43</span>
+<span id="44"> 44</span>
+<span id="45"> 45</span>
+<span id="46"> 46</span>
+<span id="47"> 47</span>
+<span id="48"> 48</span>
+<span id="49"> 49</span>
+<span id="50"> 50</span>
+<span id="51"> 51</span>
+<span id="52"> 52</span>
+<span id="53"> 53</span>
+<span id="54"> 54</span>
+<span id="55"> 55</span>
+<span id="56"> 56</span>
+<span id="57"> 57</span>
+<span id="58"> 58</span>
+<span id="59"> 59</span>
+<span id="60"> 60</span>
+<span id="61"> 61</span>
+<span id="62"> 62</span>
+<span id="63"> 63</span>
+<span id="64"> 64</span>
+<span id="65"> 65</span>
+<span id="66"> 66</span>
+<span id="67"> 67</span>
+<span id="68"> 68</span>
+<span id="69"> 69</span>
+<span id="70"> 70</span>
+<span id="71"> 71</span>
+<span id="72"> 72</span>
+<span id="73"> 73</span>
+<span id="74"> 74</span>
+<span id="75"> 75</span>
+<span id="76"> 76</span>
+<span id="77"> 77</span>
+<span id="78"> 78</span>
+<span id="79"> 79</span>
+<span id="80"> 80</span>
+<span id="81"> 81</span>
+<span id="82"> 82</span>
+<span id="83"> 83</span>
+<span id="84"> 84</span>
+<span id="85"> 85</span>
+<span id="86"> 86</span>
+<span id="87"> 87</span>
+<span id="88"> 88</span>
+<span id="89"> 89</span>
+<span id="90"> 90</span>
+<span id="91"> 91</span>
+<span id="92"> 92</span>
+<span id="93"> 93</span>
+<span id="94"> 94</span>
+<span id="95"> 95</span>
+<span id="96"> 96</span>
+<span id="97"> 97</span>
+<span id="98"> 98</span>
+<span id="99"> 99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+</pre><div class="example-wrap"><pre class="rust ">
+<span class="doccomment">//! Slow down a stream by enforcing a delay between items.</span>
+
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">stream</span>::<span class="ident">Stream</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">time</span>::{<span class="ident">Delay</span>, <span class="ident">Duration</span>, <span class="ident">Instant</span>};
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">future</span>::<span class="ident">Future</span>;
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">marker</span>::<span class="ident">Unpin</span>;
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">pin</span>::<span class="ident">Pin</span>;
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">task</span>::{<span class="self">self</span>, <span class="ident">Poll</span>};
+
+<span class="kw">use</span> <span class="ident">pin_project_lite</span>::<span class="ident">pin_project</span>;
+
+<span class="doccomment">/// Slows down a stream by enforcing a delay between items.</span>
+<span class="doccomment">/// They will be produced not more often than the specified interval.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// # Example</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Create a throttled stream.</span>
+<span class="doccomment">/// ```rust,no_run</span>
+<span class="doccomment">/// use std::time::Duration;</span>
+<span class="doccomment">/// use tokio::stream::StreamExt;</span>
+<span class="doccomment">/// use tokio::time::throttle;</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// # async fn dox() {</span>
+<span class="doccomment">/// let mut item_stream = throttle(Duration::from_secs(2), futures::stream::repeat(&quot;one&quot;));</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// loop {</span>
+<span class="doccomment">///     // The string will be produced at most every 2 seconds</span>
+<span class="doccomment">///     println!(&quot;{:?}&quot;, item_stream.next().await);</span>
+<span class="doccomment">/// }</span>
+<span class="doccomment">/// # }</span>
+<span class="doccomment">/// ```</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">throttle</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">duration</span>: <span class="ident">Duration</span>, <span class="ident">stream</span>: <span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Throttle</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">T</span>: <span class="ident">Stream</span>,
+{
+    <span class="kw">let</span> <span class="ident">delay</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">duration</span> <span class="op">=</span><span class="op">=</span> <span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="number">0</span>) {
+        <span class="prelude-val">None</span>
+    } <span class="kw">else</span> {
+        <span class="prelude-val">Some</span>(<span class="ident">Delay</span>::<span class="ident">new_timeout</span>(<span class="ident">Instant</span>::<span class="ident">now</span>() <span class="op">+</span> <span class="ident">duration</span>, <span class="ident">duration</span>))
+    };
+
+    <span class="ident">Throttle</span> {
+        <span class="ident">delay</span>,
+        <span class="ident">duration</span>,
+        <span class="ident">has_delayed</span>: <span class="bool-val">true</span>,
+        <span class="ident">stream</span>,
+    }
+}
+
+<span class="macro">pin_project</span><span class="macro">!</span> {
+    <span class="doccomment">/// Stream for the [`throttle`](throttle) function.</span>
+    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+    <span class="attribute">#[<span class="ident">must_use</span> <span class="op">=</span> <span class="string">&quot;streams do nothing unless polled&quot;</span>]</span>
+    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Throttle</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="comment">// `None` when duration is zero.</span>
+        <span class="ident">delay</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Delay</span><span class="op">&gt;</span>,
+        <span class="ident">duration</span>: <span class="ident">Duration</span>,
+
+        <span class="comment">// Set to true when `delay` has returned ready, but `stream` hasn&#39;t.</span>
+        <span class="ident">has_delayed</span>: <span class="ident">bool</span>,
+
+        <span class="comment">// The stream to throttle</span>
+        <span class="attribute">#[<span class="ident">pin</span>]</span>
+        <span class="ident">stream</span>: <span class="ident">T</span>,
+    }
+}
+
+<span class="comment">// XXX: are these safe if `T: !Unpin`?</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Unpin</span><span class="op">&gt;</span> <span class="ident">Throttle</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Acquires a reference to the underlying stream that this combinator is</span>
+    <span class="doccomment">/// pulling from.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_ref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">T</span> {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">stream</span>
+    }
+
+    <span class="doccomment">/// Acquires a mutable reference to the underlying stream that this combinator</span>
+    <span class="doccomment">/// is pulling from.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Note that care must be taken to avoid tampering with the state of the stream</span>
+    <span class="doccomment">/// which may otherwise confuse this combinator.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_mut</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">T</span> {
+        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">stream</span>
+    }
+
+    <span class="doccomment">/// Consumes this combinator, returning the underlying stream.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Note that this may discard intermediate state of this combinator, so care</span>
+    <span class="doccomment">/// should be taken to avoid losing resources when this is called.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">into_inner</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">T</span> {
+        <span class="self">self</span>.<span class="ident">stream</span>
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Stream</span><span class="op">&gt;</span> <span class="ident">Stream</span> <span class="kw">for</span> <span class="ident">Throttle</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="ident">T</span>::<span class="ident">Item</span>;
+
+    <span class="kw">fn</span> <span class="ident">poll_next</span>(<span class="kw-2">mut</span> <span class="self">self</span>: <span class="ident">Pin</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span><span class="op">&gt;</span>, <span class="ident">cx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">task</span>::<span class="ident">Context</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Poll</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Item</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">has_delayed</span> <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="self">self</span>.<span class="ident">delay</span>.<span class="ident">is_some</span>() {
+            <span class="macro">ready</span><span class="macro">!</span>(<span class="ident">Pin</span>::<span class="ident">new</span>(<span class="self">self</span>.<span class="ident">as_mut</span>().<span class="ident">project</span>().<span class="ident">delay</span>.<span class="ident">as_mut</span>().<span class="ident">unwrap</span>()).<span class="ident">poll</span>(<span class="ident">cx</span>));
+            <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">as_mut</span>().<span class="ident">project</span>().<span class="ident">has_delayed</span> <span class="op">=</span> <span class="bool-val">true</span>;
+        }
+
+        <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="macro">ready</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">as_mut</span>().<span class="ident">project</span>().<span class="ident">stream</span>.<span class="ident">poll_next</span>(<span class="ident">cx</span>));
+
+        <span class="kw">if</span> <span class="ident">value</span>.<span class="ident">is_some</span>() {
+            <span class="kw">let</span> <span class="ident">dur</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">duration</span>;
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">delay</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">as_mut</span>().<span class="ident">project</span>().<span class="ident">delay</span> {
+                <span class="ident">delay</span>.<span class="ident">reset</span>(<span class="ident">Instant</span>::<span class="ident">now</span>() <span class="op">+</span> <span class="ident">dur</span>);
+            }
+
+            <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">as_mut</span>().<span class="ident">project</span>().<span class="ident">has_delayed</span> <span class="op">=</span> <span class="bool-val">false</span>;
+        }
+
+        <span class="ident">Poll</span>::<span class="ident">Ready</span>(<span class="ident">value</span>)
+    }
+}
+</pre></div>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../";window.currentCrate = "tokio";</script><script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script><script defer src="../../../search-index.js"></script></body></html>

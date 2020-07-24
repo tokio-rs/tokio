@@ -1,0 +1,105 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `process` mod in crate `tokio`."><meta name="keywords" content="rust, rustlang, rust-lang, process"><title>tokio::process - Rust</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../tokio/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a><p class='location'>Module process</p><div class="sidebar-elems"><div class="block items"><ul><li><a href="#structs">Structs</a></li></ul></div><p class='location'><a href='../index.html'>tokio</a></p><script>window.sidebarCurrent = {name: 'process', ty: 'mod', relpath: '../'};</script><script defer src="../sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../../src/tokio/process/mod.rs.html#1-1099' title='goto source code'>[src]</a></span><span class='in-band'>Module <a href='../index.html'>tokio</a>::<wbr><a class="mod" href=''>process</a></span></h1><div class='docblock'><p>An implementation of asynchronous process management for Tokio.</p>
+<p>This module provides a <a href="crate::process::Command"><code>Command</code></a> struct that imitates the interface of the
+<a href="std::process::Command"><code>std::process::Command</code></a> type in the standard library, but provides asynchronous versions of
+functions that create processes. These functions (<code>spawn</code>, <code>status</code>, <code>output</code> and their
+variants) return &quot;future aware&quot; types that interoperate with Tokio. The asynchronous process
+support is provided through signal handling on Unix and system APIs on Windows.</p>
+<h1 id="examples" class="section-header"><a href="#examples">Examples</a></h1>
+<p>Here's an example program which will spawn <code>echo hello world</code> and then wait
+for it complete.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">process</span>::<span class="ident">Command</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">std</span>::<span class="ident">error</span>::<span class="ident">Error</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="comment">// The usage is the same as with the standard library&#39;s `Command` type, however the value</span>
+    <span class="comment">// returned from `spawn` is a `Result` containing a `Future`.</span>
+    <span class="kw">let</span> <span class="ident">child</span> <span class="op">=</span> <span class="ident">Command</span>::<span class="ident">new</span>(<span class="string">&quot;echo&quot;</span>).<span class="ident">arg</span>(<span class="string">&quot;hello&quot;</span>).<span class="ident">arg</span>(<span class="string">&quot;world&quot;</span>)
+                        .<span class="ident">spawn</span>();
+
+    <span class="comment">// Make sure our child succeeded in spawning and process the result</span>
+    <span class="kw">let</span> <span class="ident">future</span> <span class="op">=</span> <span class="ident">child</span>.<span class="ident">expect</span>(<span class="string">&quot;failed to spawn&quot;</span>);
+
+    <span class="comment">// Await until the future (and the command) completes</span>
+    <span class="kw">let</span> <span class="ident">status</span> <span class="op">=</span> <span class="ident">future</span>.<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;the command exited with: {}&quot;</span>, <span class="ident">status</span>);
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+<p>Next, let's take a look at an example where we not only spawn <code>echo hello world</code> but we also capture its output.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">process</span>::<span class="ident">Command</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">std</span>::<span class="ident">error</span>::<span class="ident">Error</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="comment">// Like above, but use `output` which returns a future instead of</span>
+    <span class="comment">// immediately returning the `Child`.</span>
+    <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">Command</span>::<span class="ident">new</span>(<span class="string">&quot;echo&quot;</span>).<span class="ident">arg</span>(<span class="string">&quot;hello&quot;</span>).<span class="ident">arg</span>(<span class="string">&quot;world&quot;</span>)
+                        .<span class="ident">output</span>();
+
+    <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">output</span>.<span class="kw">await</span><span class="question-mark">?</span>;
+
+    <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">output</span>.<span class="ident">status</span>.<span class="ident">success</span>());
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">output</span>.<span class="ident">stdout</span>, <span class="string">b&quot;hello world\n&quot;</span>);
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+<p>We can also read input line by line.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="ident">BufReader</span>, <span class="ident">AsyncBufReadExt</span>};
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">process</span>::<span class="ident">Command</span>;
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">process</span>::<span class="ident">Stdio</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">std</span>::<span class="ident">error</span>::<span class="ident">Error</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cmd</span> <span class="op">=</span> <span class="ident">Command</span>::<span class="ident">new</span>(<span class="string">&quot;cat&quot;</span>);
+
+    <span class="comment">// Specify that we want the command&#39;s standard output piped back to us.</span>
+    <span class="comment">// By default, standard input/output/error will be inherited from the</span>
+    <span class="comment">// current process (for example, this means that standard input will</span>
+    <span class="comment">// come from the keyboard and standard output/error will go directly to</span>
+    <span class="comment">// the terminal if this process is invoked from the command line).</span>
+    <span class="ident">cmd</span>.<span class="ident">stdout</span>(<span class="ident">Stdio</span>::<span class="ident">piped</span>());
+
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">child</span> <span class="op">=</span> <span class="ident">cmd</span>.<span class="ident">spawn</span>()
+        .<span class="ident">expect</span>(<span class="string">&quot;failed to spawn command&quot;</span>);
+
+    <span class="kw">let</span> <span class="ident">stdout</span> <span class="op">=</span> <span class="ident">child</span>.<span class="ident">stdout</span>.<span class="ident">take</span>()
+        .<span class="ident">expect</span>(<span class="string">&quot;child did not have a handle to stdout&quot;</span>);
+
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="ident">BufReader</span>::<span class="ident">new</span>(<span class="ident">stdout</span>).<span class="ident">lines</span>();
+
+    <span class="comment">// Ensure the child process is spawned in the runtime so it can</span>
+    <span class="comment">// make progress on its own while we await for any output.</span>
+    <span class="ident">tokio</span>::<span class="ident">spawn</span>(<span class="kw">async</span> {
+        <span class="kw">let</span> <span class="ident">status</span> <span class="op">=</span> <span class="ident">child</span>.<span class="kw">await</span>
+            .<span class="ident">expect</span>(<span class="string">&quot;child process encountered an error&quot;</span>);
+
+        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;child status was: {}&quot;</span>, <span class="ident">status</span>);
+    });
+
+    <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">line</span>) <span class="op">=</span> <span class="ident">reader</span>.<span class="ident">next_line</span>().<span class="kw">await</span><span class="question-mark">?</span> {
+        <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;Line: {}&quot;</span>, <span class="ident">line</span>);
+    }
+
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+<h1 id="caveats" class="section-header"><a href="#caveats">Caveats</a></h1>
+<p>Similar to the behavior to the standard library, and unlike the futures
+paradigm of dropping-implies-cancellation, a spawned process will, by
+default, continue to execute even after the <code>Child</code> handle has been dropped.</p>
+<p>The <code>Command::kill_on_drop</code> method can be used to modify this behavior
+and kill the child process if the <code>Child</code> wrapper is dropped before it
+has exited.</p>
+</div><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
+<table><tr class='module-item'><td><a class="struct" href="struct.Child.html" title='tokio::process::Child struct'>Child</a></td><td class='docblock-short'><p>Representation of a child process spawned onto an event loop.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.ChildStderr.html" title='tokio::process::ChildStderr struct'>ChildStderr</a></td><td class='docblock-short'><p>The standard error stream for spawned children.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.ChildStdin.html" title='tokio::process::ChildStdin struct'>ChildStdin</a></td><td class='docblock-short'><p>The standard input stream for spawned children.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.ChildStdout.html" title='tokio::process::ChildStdout struct'>ChildStdout</a></td><td class='docblock-short'><p>The standard output stream for spawned children.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Command.html" title='tokio::process::Command struct'>Command</a></td><td class='docblock-short'><p>This structure mimics the API of <a href="std::process::Command"><code>std::process::Command</code></a> found in the standard library, but
+replaces functions that create a process with an asynchronous variant. The main provided
+asynchronous functions are <a href="Command::spawn">spawn</a>, <a href="Command::status">status</a>, and
+<a href="Command::output">output</a>.</p>
+</td></tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "tokio";</script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>

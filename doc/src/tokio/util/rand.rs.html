@@ -1,0 +1,131 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `tokio/src/util/rand.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>rand.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css"><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="shortcut icon" href="../../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../tokio/index.html'><div class='logo-container'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1"> 1</span>
+<span id="2"> 2</span>
+<span id="3"> 3</span>
+<span id="4"> 4</span>
+<span id="5"> 5</span>
+<span id="6"> 6</span>
+<span id="7"> 7</span>
+<span id="8"> 8</span>
+<span id="9"> 9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+</pre><div class="example-wrap"><pre class="rust ">
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cell</span>::<span class="ident">Cell</span>;
+
+<span class="doccomment">/// Fast random number generate</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Implement xorshift64+: 2 32-bit xorshift sequences added together.</span>
+<span class="doccomment">/// Shift triplet [17,7,16] was calculated as indicated in Marsaglia&#39;s</span>
+<span class="doccomment">/// Xorshift paper: https://www.jstatsoft.org/article/view/v008i14/xorshift.pdf</span>
+<span class="doccomment">/// This generator passes the SmallCrush suite, part of TestU01 framework:</span>
+<span class="doccomment">/// http://simul.iro.umontreal.ca/testu01/tu01.html</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct</span> <span class="ident">FastRand</span> {
+    <span class="ident">one</span>: <span class="ident">Cell</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,
+    <span class="ident">two</span>: <span class="ident">Cell</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,
+}
+
+<span class="kw">impl</span> <span class="ident">FastRand</span> {
+    <span class="doccomment">/// Initialize a new, thread-local, fast random number generator.</span>
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">seed</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">FastRand</span> {
+        <span class="kw">let</span> <span class="ident">one</span> <span class="op">=</span> (<span class="ident">seed</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">32</span>) <span class="kw">as</span> <span class="ident">u32</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">two</span> <span class="op">=</span> <span class="ident">seed</span> <span class="kw">as</span> <span class="ident">u32</span>;
+
+        <span class="kw">if</span> <span class="ident">two</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
+            <span class="comment">// This value cannot be zero</span>
+            <span class="ident">two</span> <span class="op">=</span> <span class="number">1</span>;
+        }
+
+        <span class="ident">FastRand</span> {
+            <span class="ident">one</span>: <span class="ident">Cell</span>::<span class="ident">new</span>(<span class="ident">one</span>),
+            <span class="ident">two</span>: <span class="ident">Cell</span>::<span class="ident">new</span>(<span class="ident">two</span>),
+        }
+    }
+
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">fastrand_n</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">n</span>: <span class="ident">u32</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u32</span> {
+        <span class="comment">// This is similar to fastrand() % n, but faster.</span>
+        <span class="comment">// See https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/</span>
+        <span class="kw">let</span> <span class="ident">mul</span> <span class="op">=</span> (<span class="self">self</span>.<span class="ident">fastrand</span>() <span class="kw">as</span> <span class="ident">u64</span>).<span class="ident">wrapping_mul</span>(<span class="ident">n</span> <span class="kw">as</span> <span class="ident">u64</span>);
+        (<span class="ident">mul</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">32</span>) <span class="kw">as</span> <span class="ident">u32</span>
+    }
+
+    <span class="kw">fn</span> <span class="ident">fastrand</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u32</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">s1</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">one</span>.<span class="ident">get</span>();
+        <span class="kw">let</span> <span class="ident">s0</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">two</span>.<span class="ident">get</span>();
+
+        <span class="ident">s1</span> <span class="op">^</span><span class="op">=</span> <span class="ident">s1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">17</span>;
+        <span class="ident">s1</span> <span class="op">=</span> <span class="ident">s1</span> <span class="op">^</span> <span class="ident">s0</span> <span class="op">^</span> <span class="ident">s1</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">7</span> <span class="op">^</span> <span class="ident">s0</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">16</span>;
+
+        <span class="self">self</span>.<span class="ident">one</span>.<span class="ident">set</span>(<span class="ident">s0</span>);
+        <span class="self">self</span>.<span class="ident">two</span>.<span class="ident">set</span>(<span class="ident">s1</span>);
+
+        <span class="ident">s0</span>.<span class="ident">wrapping_add</span>(<span class="ident">s1</span>)
+    }
+}
+
+<span class="comment">// Used by the select macro and `StreamMap`</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">any</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;macros&quot;</span>, <span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;stream&quot;</span>))]</span>
+<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
+<span class="attribute">#[<span class="ident">cfg_attr</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;macros&quot;</span>), <span class="ident">allow</span>(<span class="ident">unreachable_pub</span>))]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">thread_rng_n</span>(<span class="ident">n</span>: <span class="ident">u32</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u32</span> {
+    <span class="macro">thread_local</span><span class="macro">!</span> {
+        <span class="kw">static</span> <span class="ident">THREAD_RNG</span>: <span class="ident">FastRand</span> <span class="op">=</span> <span class="ident">FastRand</span>::<span class="ident">new</span>(<span class="kw">crate</span>::<span class="ident">loom</span>::<span class="ident">rand</span>::<span class="ident">seed</span>());
+    }
+
+    <span class="ident">THREAD_RNG</span>.<span class="ident">with</span>(<span class="op">|</span><span class="ident">rng</span><span class="op">|</span> <span class="ident">rng</span>.<span class="ident">fastrand_n</span>(<span class="ident">n</span>))
+}
+</pre></div>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../";window.currentCrate = "tokio";</script><script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script><script defer src="../../../search-index.js"></script></body></html>

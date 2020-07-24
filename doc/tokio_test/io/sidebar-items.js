@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Builder","Builds `Mock` instances."],["Handle","A handle to send additional actions to the related `Mock`."],["Mock","An I/O object that follows a predefined script."]]});

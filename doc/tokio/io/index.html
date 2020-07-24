@@ -1,0 +1,178 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `io` mod in crate `tokio`."><meta name="keywords" content="rust, rustlang, rust-lang, io"><title>tokio::io - Rust</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../tokio/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a><p class='location'>Module io</p><div class="sidebar-elems"><div class="block items"><ul><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li><li><a href="#traits">Traits</a></li><li><a href="#functions">Functions</a></li><li><a href="#types">Type Definitions</a></li></ul></div><p class='location'><a href='../index.html'>tokio</a></p><script>window.sidebarCurrent = {name: 'io', ty: 'mod', relpath: '../'};</script><script defer src="../sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../../src/tokio/io/mod.rs.html#1-255' title='goto source code'>[src]</a></span><span class='in-band'>Module <a href='../index.html'>tokio</a>::<wbr><a class="mod" href=''>io</a></span></h1><div class='docblock'><p>Traits, helpers, and type definitions for asynchronous I/O functionality.</p>
+<p>This module is the asynchronous version of <code>std::io</code>. Primarily, it
+defines two traits, <a href="trait@AsyncRead"><code>AsyncRead</code></a> and <a href="trait@AsyncWrite"><code>AsyncWrite</code></a>, which are asynchronous
+versions of the <a href="std::io::Read"><code>Read</code></a> and <a href="std::io::Write"><code>Write</code></a> traits in the standard library.</p>
+<h1 id="asyncread-and-asyncwrite" class="section-header"><a href="#asyncread-and-asyncwrite">AsyncRead and AsyncWrite</a></h1>
+<p>Like the standard library's <a href="std::io::Read"><code>Read</code></a> and <a href="std::io::Write"><code>Write</code></a> traits, <a href="trait@AsyncRead"><code>AsyncRead</code></a> and
+<a href="trait@AsyncWrite"><code>AsyncWrite</code></a> provide the most general interface for reading and writing
+input and output. Unlike the standard library's traits, however, they are
+<em>asynchronous</em> — meaning that reading from or writing to a <code>tokio::io</code>
+type will <em>yield</em> to the Tokio scheduler when IO is not ready, rather than
+blocking. This allows other tasks to run while waiting on IO.</p>
+<p>Another difference is that <code>AsyncRead</code> and <code>AsyncWrite</code> only contain
+core methods needed to provide asynchronous reading and writing
+functionality. Instead, utility methods are defined in the <a href="trait@AsyncReadExt"><code>AsyncReadExt</code></a>
+and <a href="trait@AsyncWriteExt"><code>AsyncWriteExt</code></a> extension traits. These traits are automatically
+implemented for all values that implement <code>AsyncRead</code> and <code>AsyncWrite</code>
+respectively.</p>
+<p>End users will rarely interact directly with <code>AsyncRead</code> and
+<code>AsyncWrite</code>. Instead, they will use the async functions defined in the
+extension traits. Library authors are expected to implement <code>AsyncRead</code>
+and <code>AsyncWrite</code> in order to provide types that behave like byte streams.</p>
+<p>Even with these differences, Tokio's <code>AsyncRead</code> and <code>AsyncWrite</code> traits
+can be used in almost exactly the same manner as the standard library's
+<code>Read</code> and <code>Write</code>. Most types in the standard library that implement <code>Read</code>
+and <code>Write</code> have asynchronous equivalents in <code>tokio</code> that implement
+<code>AsyncRead</code> and <code>AsyncWrite</code>, such as <a href="crate::fs::File"><code>File</code></a> and <a href="crate::net::TcpStream"><code>TcpStream</code></a>.</p>
+<p>For example, the standard library documentation introduces <code>Read</code> by
+<a href="std::io#read-and-write">demonstrating</a> reading some bytes from a <a href="std::fs::File"><code>std::fs::File</code></a>. We
+can do the same with <a href="crate::fs::File"><code>tokio::fs::File</code></a>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">fs</span>::<span class="ident">File</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">File</span>::<span class="ident">open</span>(<span class="string">&quot;foo.txt&quot;</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buffer</span> <span class="op">=</span> [<span class="number">0</span>; <span class="number">10</span>];
+
+    <span class="comment">// read up to 10 bytes</span>
+    <span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span> <span class="ident">f</span>.<span class="ident">read</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">buffer</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+    <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;The bytes: {:?}&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">buffer</span>[..<span class="ident">n</span>]);
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+<h2 id="buffered-readers-and-writers" class="section-header"><a href="#buffered-readers-and-writers">Buffered Readers and Writers</a></h2>
+<p>Byte-based interfaces are unwieldy and can be inefficient, as we'd need to be
+making near-constant calls to the operating system. To help with this,
+<code>std::io</code> comes with <a href="std::io#bufreader-and-bufwriter">support for <em>buffered</em> readers and writers</a>,
+and therefore, <code>tokio::io</code> does as well.</p>
+<p>Tokio provides an async version of the <a href="std::io::BufRead"><code>std::io::BufRead</code></a> trait,
+<a href="crate::io::AsyncBufRead"><code>AsyncBufRead</code></a>; and async <a href="crate::io::BufReader"><code>BufReader</code></a> and <a href="crate::io::BufWriter"><code>BufWriter</code></a> structs, which
+wrap readers and writers. These wrappers use a buffer, reducing the number
+of calls and providing nicer methods for accessing exactly what you want.</p>
+<p>For example, <a href="crate::io::BufReader"><code>BufReader</code></a> works with the <a href="crate::io::AsyncBufRead"><code>AsyncBufRead</code></a> trait to add
+extra methods to any async reader:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">BufReader</span>, <span class="ident">AsyncBufReadExt</span>};
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">fs</span>::<span class="ident">File</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">File</span>::<span class="ident">open</span>(<span class="string">&quot;foo.txt&quot;</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="ident">BufReader</span>::<span class="ident">new</span>(<span class="ident">f</span>);
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buffer</span> <span class="op">=</span> <span class="ident">String</span>::<span class="ident">new</span>();
+
+    <span class="comment">// read a line into buffer</span>
+    <span class="ident">reader</span>.<span class="ident">read_line</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">buffer</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+    <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">buffer</span>);
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+<p><a href="crate::io::BufWriter"><code>BufWriter</code></a> doesn't add any new ways of writing; it just buffers every call
+to <a href="crate::io::AsyncWriteExt::write"><code>write</code></a>. However, you <strong>must</strong> flush
+<a href="crate::io::BufWriter"><code>BufWriter</code></a> to ensure that any buffered data is written.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">BufWriter</span>, <span class="ident">AsyncWriteExt</span>};
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">fs</span>::<span class="ident">File</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">File</span>::<span class="ident">create</span>(<span class="string">&quot;foo.txt&quot;</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">writer</span> <span class="op">=</span> <span class="ident">BufWriter</span>::<span class="ident">new</span>(<span class="ident">f</span>);
+
+        <span class="comment">// Write a byte to the buffer.</span>
+        <span class="ident">writer</span>.<span class="ident">write</span>(<span class="kw-2">&amp;</span>[<span class="number">42u8</span>]).<span class="kw">await</span><span class="question-mark">?</span>;
+
+        <span class="comment">// Flush the buffer before it goes out of scope.</span>
+        <span class="ident">writer</span>.<span class="ident">flush</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+
+    } <span class="comment">// Unless flushed or shut down, the contents of the buffer is discarded on drop.</span>
+
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+<h2 id="implementing-asyncread-and-asyncwrite" class="section-header"><a href="#implementing-asyncread-and-asyncwrite">Implementing AsyncRead and AsyncWrite</a></h2>
+<p>Because they are traits, we can implement <a href="trait@AsyncRead"><code>AsyncRead</code></a> and <a href="trait@AsyncWrite"><code>AsyncWrite</code></a> for
+our own types, as well. Note that these traits must only be implemented for
+non-blocking I/O types that integrate with the futures type system. In
+other words, these types must never block the thread, and instead the
+current task is notified when the I/O resource is ready.</p>
+<h2 id="conversion-to-and-from-sinkstream" class="section-header"><a href="#conversion-to-and-from-sinkstream">Conversion to and from Sink/Stream</a></h2>
+<p>It is often convenient to encapsulate the reading and writing of
+bytes and instead work with a <a href="https://docs.rs/futures/0.3/futures/sink/trait.Sink.html"><code>Sink</code></a> or <a href="crate::stream::Stream"><code>Stream</code></a> of some data
+type that is encoded as bytes and/or decoded from bytes. Tokio
+provides some utility traits in the <a href="https://docs.rs/tokio-util/0.3/tokio_util/codec/index.html">tokio-util</a> crate that
+abstract the asynchronous buffering that is required and allows
+you to write <a href="https://docs.rs/tokio-util/0.3/tokio_util/codec/trait.Encoder.html"><code>Encoder</code></a> and <a href="https://docs.rs/tokio-util/0.3/tokio_util/codec/trait.Decoder.html"><code>Decoder</code></a> functions working with a
+buffer of bytes, and then use that <a href="https://docs.rs/tokio-util/0.3/tokio_util/codec/index.html">&quot;codec&quot;</a> to transform anything
+that implements <a href="trait@AsyncRead"><code>AsyncRead</code></a> and <a href="trait@AsyncWrite"><code>AsyncWrite</code></a> into a <code>Sink</code>/<code>Stream</code> of
+your structured data.</p>
+<h1 id="standard-input-and-output" class="section-header"><a href="#standard-input-and-output">Standard input and output</a></h1>
+<p>Tokio provides asynchronous APIs to standard <a href="fn@stdin">input</a>, <a href="fn@stdout">output</a>, and <a href="fn@stderr">error</a>.
+These APIs are very similar to the ones provided by <code>std</code>, but they also
+implement <a href="trait@AsyncRead"><code>AsyncRead</code></a> and <a href="trait@AsyncWrite"><code>AsyncWrite</code></a>.</p>
+<p>Note that the standard input / output APIs  <strong>must</strong> be used from the
+context of the Tokio runtime, as they require Tokio-specific features to
+function. Calling these functions outside of a Tokio runtime will panic.</p>
+<h1 id="std-re-exports" class="section-header"><a href="#std-re-exports"><code>std</code> re-exports</a></h1>
+<p>Additionally, <a href="struct@Error"><code>Error</code></a>, <a href="enum@ErrorKind"><code>ErrorKind</code></a>, <a href="type@Result"><code>Result</code></a>, and <a href="enum@SeekFrom"><code>SeekFrom</code></a> are
+re-exported from <code>std::io</code> for ease of use.</p>
+</div><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
+<table><tr class='module-item'><td><a class="struct" href="struct.BufReader.html" title='tokio::io::BufReader struct'>BufReader</a></td><td class='docblock-short'><p>The <code>BufReader</code> struct adds buffering to any reader.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.BufStream.html" title='tokio::io::BufStream struct'>BufStream</a></td><td class='docblock-short'><p>Wraps a type that is [<code>AsyncWrite</code>] and [<code>AsyncRead</code>], and buffers its input and output.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.BufWriter.html" title='tokio::io::BufWriter struct'>BufWriter</a></td><td class='docblock-short'><p>Wraps a writer and buffers its output.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Copy.html" title='tokio::io::Copy struct'>Copy</a></td><td class='docblock-short'><p>A future that asynchronously copies the entire contents of a reader into a
+writer.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.DuplexStream.html" title='tokio::io::DuplexStream struct'>DuplexStream</a></td><td class='docblock-short'><p>A bidirectional pipe to read and write bytes in memory.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Empty.html" title='tokio::io::Empty struct'>Empty</a></td><td class='docblock-short'><p>An async reader which is always at EOF.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Error.html" title='tokio::io::Error struct'>Error</a></td><td class='docblock-short'><p>The error type for I/O operations of the <a href="../io/trait.Read.html"><code>Read</code></a>, <a href="../io/trait.Write.html"><code>Write</code></a>, <a href="../io/trait.Seek.html"><code>Seek</code></a>, and
+associated traits.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Lines.html" title='tokio::io::Lines struct'>Lines</a></td><td class='docblock-short'><p>Stream for the <a href="crate::io::AsyncBufReadExt::lines"><code>lines</code></a> method.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.PollEvented.html" title='tokio::io::PollEvented struct'>PollEvented</a></td><td class='docblock-short'><p>Associates an I/O resource that implements the <a href="trait@std::io::Read"><code>std::io::Read</code></a> and/or
+<a href="trait@std::io::Write"><code>std::io::Write</code></a> traits with the reactor that drives it.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.ReadHalf.html" title='tokio::io::ReadHalf struct'>ReadHalf</a></td><td class='docblock-short'><p>The readable half of a value returned from <a href="split()"><code>split</code></a>.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Registration.html" title='tokio::io::Registration struct'>Registration</a></td><td class='docblock-short'><p>Associates an I/O resource with the reactor instance that drives it.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Repeat.html" title='tokio::io::Repeat struct'>Repeat</a></td><td class='docblock-short'><p>An async reader which yields one byte over and over and over and over and
+over and...</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Seek.html" title='tokio::io::Seek struct'>Seek</a></td><td class='docblock-short'><p>Future for the <a href="crate::io::AsyncSeekExt::seek"><code>seek</code></a> method.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Sink.html" title='tokio::io::Sink struct'>Sink</a></td><td class='docblock-short'><p>An async writer which will move data into the void.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Split.html" title='tokio::io::Split struct'>Split</a></td><td class='docblock-short'><p>Stream for the <a href="crate::io::AsyncBufReadExt::split"><code>split</code></a> method.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Stderr.html" title='tokio::io::Stderr struct'>Stderr</a></td><td class='docblock-short'><p>A handle to the standard error stream of a process.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Stdin.html" title='tokio::io::Stdin struct'>Stdin</a></td><td class='docblock-short'><p>A handle to the standard input stream of a process.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Stdout.html" title='tokio::io::Stdout struct'>Stdout</a></td><td class='docblock-short'><p>A handle to the standard output stream of a process.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.StreamReader.html" title='tokio::io::StreamReader struct'>StreamReader</a></td><td class='docblock-short'><p>Convert a stream of byte chunks into an <a href="crate::io::AsyncRead"><code>AsyncRead</code></a>.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Take.html" title='tokio::io::Take struct'>Take</a></td><td class='docblock-short'><p>Stream for the <a href="super::AsyncReadExt::take"><code>take</code></a> method.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.WriteHalf.html" title='tokio::io::WriteHalf struct'>WriteHalf</a></td><td class='docblock-short'><p>The writable half of a value returned from <a href="split()"><code>split</code></a>.</p>
+</td></tr></table><h2 id='enums' class='section-header'><a href="#enums">Enums</a></h2>
+<table><tr class='module-item'><td><a class="enum" href="enum.ErrorKind.html" title='tokio::io::ErrorKind enum'>ErrorKind</a></td><td class='docblock-short'><p>A list specifying general categories of I/O error.</p>
+</td></tr><tr class='module-item'><td><a class="enum" href="enum.SeekFrom.html" title='tokio::io::SeekFrom enum'>SeekFrom</a></td><td class='docblock-short'><p>Enumeration of possible methods to seek within an I/O object.</p>
+</td></tr></table><h2 id='traits' class='section-header'><a href="#traits">Traits</a></h2>
+<table><tr class='module-item'><td><a class="trait" href="trait.AsyncBufRead.html" title='tokio::io::AsyncBufRead trait'>AsyncBufRead</a></td><td class='docblock-short'><p>Reads bytes asynchronously.</p>
+</td></tr><tr class='module-item'><td><a class="trait" href="trait.AsyncBufReadExt.html" title='tokio::io::AsyncBufReadExt trait'>AsyncBufReadExt</a></td><td class='docblock-short'><p>An extension trait which adds utility methods to <a href="crate::io::AsyncBufRead"><code>AsyncBufRead</code></a> types.</p>
+</td></tr><tr class='module-item'><td><a class="trait" href="trait.AsyncRead.html" title='tokio::io::AsyncRead trait'>AsyncRead</a></td><td class='docblock-short'><p>Reads bytes from a source.</p>
+</td></tr><tr class='module-item'><td><a class="trait" href="trait.AsyncReadExt.html" title='tokio::io::AsyncReadExt trait'>AsyncReadExt</a></td><td class='docblock-short'><p>Reads bytes from a source.</p>
+</td></tr><tr class='module-item'><td><a class="trait" href="trait.AsyncSeek.html" title='tokio::io::AsyncSeek trait'>AsyncSeek</a></td><td class='docblock-short'><p>Seek bytes asynchronously.</p>
+</td></tr><tr class='module-item'><td><a class="trait" href="trait.AsyncSeekExt.html" title='tokio::io::AsyncSeekExt trait'>AsyncSeekExt</a></td><td class='docblock-short'><p>An extension trait which adds utility methods to <a href="AsyncSeek"><code>AsyncSeek</code></a> types.</p>
+</td></tr><tr class='module-item'><td><a class="trait" href="trait.AsyncWrite.html" title='tokio::io::AsyncWrite trait'>AsyncWrite</a></td><td class='docblock-short'><p>Writes bytes asynchronously.</p>
+</td></tr><tr class='module-item'><td><a class="trait" href="trait.AsyncWriteExt.html" title='tokio::io::AsyncWriteExt trait'>AsyncWriteExt</a></td><td class='docblock-short'><p>Writes bytes to a sink.</p>
+</td></tr></table><h2 id='functions' class='section-header'><a href="#functions">Functions</a></h2>
+<table><tr class='module-item'><td><a class="fn" href="fn.copy.html" title='tokio::io::copy fn'>copy</a></td><td class='docblock-short'><p>Asynchronously copies the entire contents of a reader into a writer.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.duplex.html" title='tokio::io::duplex fn'>duplex</a></td><td class='docblock-short'><p>Create a new pair of <code>DuplexStream</code>s that act like a pair of connected sockets.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.empty.html" title='tokio::io::empty fn'>empty</a></td><td class='docblock-short'><p>Creates a new empty async reader.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.repeat.html" title='tokio::io::repeat fn'>repeat</a></td><td class='docblock-short'><p>Creates an instance of an async reader that infinitely repeats one byte.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.sink.html" title='tokio::io::sink fn'>sink</a></td><td class='docblock-short'><p>Creates an instance of an async writer which will successfully consume all
+data.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.split.html" title='tokio::io::split fn'>split</a></td><td class='docblock-short'><p>Splits a single value implementing <code>AsyncRead + AsyncWrite</code> into separate
+<code>AsyncRead</code> and <code>AsyncWrite</code> handles.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.stderr.html" title='tokio::io::stderr fn'>stderr</a></td><td class='docblock-short'><p>Constructs a new handle to the standard error of the current process.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.stdin.html" title='tokio::io::stdin fn'>stdin</a></td><td class='docblock-short'><p>Constructs a new handle to the standard input of the current process.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.stdout.html" title='tokio::io::stdout fn'>stdout</a></td><td class='docblock-short'><p>Constructs a new handle to the standard output of the current process.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.stream_reader.html" title='tokio::io::stream_reader fn'>stream_reader</a></td><td class='docblock-short'><p>Convert a stream of byte chunks into an <a href="crate::io::AsyncRead"><code>AsyncRead</code></a>.</p>
+</td></tr></table><h2 id='types' class='section-header'><a href="#types">Type Definitions</a></h2>
+<table><tr class='module-item'><td><a class="type" href="type.Result.html" title='tokio::io::Result type'>Result</a></td><td class='docblock-short'><p>A specialized <a href="../result/enum.Result.html"><code>Result</code></a> type for I/O
+operations.</p>
+</td></tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "tokio";</script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>

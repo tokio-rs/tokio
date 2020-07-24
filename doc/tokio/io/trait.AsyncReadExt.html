@@ -1,0 +1,780 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `AsyncReadExt` trait in crate `tokio`."><meta name="keywords" content="rust, rustlang, rust-lang, AsyncReadExt"><title>tokio::io::AsyncReadExt - Rust</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc trait"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../tokio/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a><p class='location'>Trait AsyncReadExt</p><div class="sidebar-elems"><div class="block items"><a class="sidebar-title" href="#provided-methods">Provided Methods</a><div class="sidebar-links"><a href="#method.chain">chain</a><a href="#method.read">read</a><a href="#method.read_buf">read_buf</a><a href="#method.read_exact">read_exact</a><a href="#method.read_i128">read_i128</a><a href="#method.read_i128_le">read_i128_le</a><a href="#method.read_i16">read_i16</a><a href="#method.read_i16_le">read_i16_le</a><a href="#method.read_i32">read_i32</a><a href="#method.read_i32_le">read_i32_le</a><a href="#method.read_i64">read_i64</a><a href="#method.read_i64_le">read_i64_le</a><a href="#method.read_i8">read_i8</a><a href="#method.read_to_end">read_to_end</a><a href="#method.read_to_string">read_to_string</a><a href="#method.read_u128">read_u128</a><a href="#method.read_u128_le">read_u128_le</a><a href="#method.read_u16">read_u16</a><a href="#method.read_u16_le">read_u16_le</a><a href="#method.read_u32">read_u32</a><a href="#method.read_u32_le">read_u32_le</a><a href="#method.read_u64">read_u64</a><a href="#method.read_u64_le">read_u64_le</a><a href="#method.read_u8">read_u8</a><a href="#method.take">take</a></div><a class="sidebar-title" href="#implementors">Implementors</a></div><p class='location'><a href='../index.html'>tokio</a>::<wbr><a href='index.html'>io</a></p><script>window.sidebarCurrent = {name: 'AsyncReadExt', ty: 'trait', relpath: ''};</script><script defer src="sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../../src/tokio/io/util/async_read_ext.rs.html#64-1109' title='goto source code'>[src]</a></span><span class='in-band'>Trait <a href='../index.html'>tokio</a>::<wbr><a href='index.html'>io</a>::<wbr><a class="trait" href=''>AsyncReadExt</a></span></h1><div class="docblock type-decl hidden-by-usual-hider"><pre class='rust trait'>pub trait AsyncReadExt: <a class="trait" href="../../tokio/io/trait.AsyncRead.html" title="trait tokio::io::AsyncRead">AsyncRead</a> {
+    fn <a href='#method.chain' class='fnname'>chain</a>&lt;R&gt;(self, next: R) -&gt; Chain&lt;Self, R&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;R: <a class="trait" href="../../tokio/io/trait.AsyncRead.html" title="trait tokio::io::AsyncRead">AsyncRead</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.read' class='fnname'>read</a>&lt;'a&gt;(&amp;'a mut self, buf: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.slice.html">&amp;'a mut [</a><a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u8.html">u8</a><a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.slice.html">]</a>) -&gt; Read&lt;'a, Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.read_buf' class='fnname'>read_buf</a>&lt;'a, B&gt;(&amp;'a mut self, buf: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>B) -&gt; ReadBuf&lt;'a, Self, B&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a> + <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;B: <a class="trait" href="https://docs.rs/bytes/0.5.6/bytes/buf/buf_mut/trait.BufMut.html" title="trait bytes::buf::buf_mut::BufMut">BufMut</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.read_exact' class='fnname'>read_exact</a>&lt;'a&gt;(&amp;'a mut self, buf: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.slice.html">&amp;'a mut [</a><a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u8.html">u8</a><a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.slice.html">]</a>) -&gt; ReadExact&lt;'a, Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.read_u8' class='fnname'>read_u8</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadU8&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.read_i8' class='fnname'>read_i8</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadI8&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.read_u16' class='fnname'>read_u16</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadU16&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.read_i16' class='fnname'>read_i16</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadI16&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.read_u32' class='fnname'>read_u32</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadU32&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.read_i32' class='fnname'>read_i32</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadI32&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.read_u64' class='fnname'>read_u64</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadU64&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.read_i64' class='fnname'>read_i64</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadI64&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.read_u128' class='fnname'>read_u128</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadU128&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.read_i128' class='fnname'>read_i128</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadI128&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.read_u16_le' class='fnname'>read_u16_le</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadU16Le&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.read_i16_le' class='fnname'>read_i16_le</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadI16Le&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.read_u32_le' class='fnname'>read_u32_le</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadU32Le&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.read_i32_le' class='fnname'>read_i32_le</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadI32Le&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.read_u64_le' class='fnname'>read_u64_le</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadU64Le&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.read_i64_le' class='fnname'>read_i64_le</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadI64Le&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.read_u128_le' class='fnname'>read_u128_le</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadU128Le&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.read_i128_le' class='fnname'>read_i128_le</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadI128Le&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.read_to_end' class='fnname'>read_to_end</a>&lt;'a&gt;(<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&amp;'a mut self, <br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buf: &amp;'a mut <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u8.html">u8</a>&gt;<br>&nbsp;&nbsp;&nbsp;&nbsp;) -&gt; ReadToEnd&lt;'a, Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.read_to_string' class='fnname'>read_to_string</a>&lt;'a&gt;(<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&amp;'a mut self, <br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dst: &amp;'a mut <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/string/struct.String.html" title="struct alloc::string::String">String</a><br>&nbsp;&nbsp;&nbsp;&nbsp;) -&gt; ReadToString&lt;'a, Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a></span>,
+    { ... }
+<div class='item-spacer'></div>    fn <a href='#method.take' class='fnname'>take</a>(self, limit: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u64.html">u64</a>) -&gt; <a class="struct" href="../../tokio/io/struct.Take.html" title="struct tokio::io::Take">Take</a>&lt;Self&gt;<br>&nbsp;&nbsp;&nbsp; <span class="where">where<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a></span>,
+    { ... }
+}</pre></div><div class='docblock'><p>Reads bytes from a source.</p>
+<p>Implemented as an extention trait, adding utility methods to all
+<a href="AsyncRead"><code>AsyncRead</code></a> types. Callers will tend to import this trait instead of
+<a href="AsyncRead"><code>AsyncRead</code></a>.</p>
+<p>As a convenience, this trait may be imported using the <a href="crate::prelude"><code>prelude</code></a>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">fs</span>::<span class="ident">File</span>;
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">prelude</span>::<span class="kw-2">*</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">File</span>::<span class="ident">open</span>(<span class="string">&quot;foo.txt&quot;</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buffer</span> <span class="op">=</span> [<span class="number">0</span>; <span class="number">10</span>];
+
+    <span class="comment">// The `read` method is defined by this trait.</span>
+    <span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span> <span class="ident">f</span>.<span class="ident">read</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">buffer</span>[..]).<span class="kw">await</span><span class="question-mark">?</span>;
+
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+<p>See [module][crate::io] documentation for more details.</p>
+</div>
+            <h2 id='provided-methods' class='small-section-header'>Provided methods<a href='#provided-methods' class='anchor'></a></h2><div class='methods'><h3 id='method.chain' class='method'><code id='chain.v'>fn <a href='#method.chain' class='fnname'>chain</a>&lt;R&gt;(self, next: R) -&gt; Chain&lt;Self, R&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;R: <a class="trait" href="../../tokio/io/trait.AsyncRead.html" title="trait tokio::io::AsyncRead">AsyncRead</a>,&nbsp;</span></code></h3><div class='docblock'><p>Creates a new <code>AsyncRead</code> instance that chains this stream with
+<code>next</code>.</p>
+<p>The returned <code>AsyncRead</code> instance will first read all bytes from this object
+until EOF is encountered. Afterwards the output is equivalent to the
+output of <code>next</code>.</p>
+<h1 id="examples" class="section-header"><a href="#examples">Examples</a></h1>
+<p>[<code>File</code>][crate::fs::File]s implement <code>AsyncRead</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">fs</span>::<span class="ident">File</span>;
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">f1</span> <span class="op">=</span> <span class="ident">File</span>::<span class="ident">open</span>(<span class="string">&quot;foo.txt&quot;</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="ident">f2</span> <span class="op">=</span> <span class="ident">File</span>::<span class="ident">open</span>(<span class="string">&quot;bar.txt&quot;</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">handle</span> <span class="op">=</span> <span class="ident">f1</span>.<span class="ident">chain</span>(<span class="ident">f2</span>);
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buffer</span> <span class="op">=</span> <span class="ident">String</span>::<span class="ident">new</span>();
+
+    <span class="comment">// read the value into a String. We could use any AsyncRead</span>
+    <span class="comment">// method here, this is just one example.</span>
+    <span class="ident">handle</span>.<span class="ident">read_to_string</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">buffer</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+</div><h3 id='method.read' class='method'><code id='read.v'>fn <a href='#method.read' class='fnname'>read</a>&lt;'a&gt;(&amp;'a mut self, buf: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.slice.html">&amp;'a mut [</a><a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u8.html">u8</a><a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.slice.html">]</a>) -&gt; Read&lt;'a, Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,&nbsp;</span></code></h3><div class='docblock'><p>Pulls some bytes from this source into the specified buffer,
+returning how many bytes were read.</p>
+<p>Equivalent to:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> [<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>;</pre></div>
+<p>This function does not provide any guarantees about whether it
+completes immediately or asynchronously</p>
+<p>If the return value of this method is <code>Ok(n)</code>, then it must be
+guaranteed that <code>0 &lt;= n &lt;= buf.len()</code>. A nonzero <code>n</code> value indicates
+that the buffer <code>buf</code> has been filled in with <code>n</code> bytes of data from
+this source. If <code>n</code> is <code>0</code>, then it can indicate one of two
+scenarios:</p>
+<ol>
+<li>This reader has reached its &quot;end of file&quot; and will likely no longer
+be able to produce bytes. Note that this does not mean that the
+reader will <em>always</em> no longer be able to produce bytes.</li>
+<li>The buffer specified was 0 bytes in length.</li>
+</ol>
+<p>No guarantees are provided about the contents of <code>buf</code> when this
+function is called, implementations cannot rely on any property of the
+contents of <code>buf</code> being <code>true</code>. It is recommended that <em>implementations</em>
+only write data to <code>buf</code> instead of reading its contents.</p>
+<p>Correspondingly, however, <em>callers</em> of this method may not assume
+any guarantees about how the implementation uses <code>buf</code>. It is
+possible that the code that's supposed to write to the buffer might
+also read from it. It is your responsibility to make sure that <code>buf</code>
+is initialized before calling <code>read</code>.</p>
+<h1 id="errors" class="section-header"><a href="#errors">Errors</a></h1>
+<p>If this function encounters any form of I/O or other error, an error
+variant will be returned. If an error is returned then it must be
+guaranteed that no bytes were read.</p>
+<h1 id="examples-1" class="section-header"><a href="#examples-1">Examples</a></h1>
+<p>[<code>File</code>][crate::fs::File]s implement <code>Read</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">fs</span>::<span class="ident">File</span>;
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">File</span>::<span class="ident">open</span>(<span class="string">&quot;foo.txt&quot;</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buffer</span> <span class="op">=</span> [<span class="number">0</span>; <span class="number">10</span>];
+
+    <span class="comment">// read up to 10 bytes</span>
+    <span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span> <span class="ident">f</span>.<span class="ident">read</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">buffer</span>[..]).<span class="kw">await</span><span class="question-mark">?</span>;
+
+    <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;The bytes: {:?}&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">buffer</span>[..<span class="ident">n</span>]);
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+</div><h3 id='method.read_buf' class='method'><code id='read_buf.v'>fn <a href='#method.read_buf' class='fnname'>read_buf</a>&lt;'a, B&gt;(&amp;'a mut self, buf: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>B) -&gt; ReadBuf&lt;'a, Self, B&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a> + <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;B: <a class="trait" href="https://docs.rs/bytes/0.5.6/bytes/buf/buf_mut/trait.BufMut.html" title="trait bytes::buf::buf_mut::BufMut">BufMut</a>,&nbsp;</span></code></h3><div class='docblock'><p>Pulls some bytes from this source into the specified buffer,
+advancing the buffer's internal cursor.</p>
+<p>Equivalent to:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read_buf</span><span class="op">&lt;</span><span class="ident">B</span>: <span class="ident">BufMut</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">B</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>;</pre></div>
+<p>Usually, only a single <code>read</code> syscall is issued, even if there is
+more space in the supplied buffer.</p>
+<p>This function does not provide any guarantees about whether it
+completes immediately or asynchronously</p>
+<h1 id="return" class="section-header"><a href="#return">Return</a></h1>
+<p>On a successful read, the number of read bytes is returned. If the
+supplied buffer is not empty and the function returns <code>Ok(0)</code> then
+the source as reached an &quot;end-of-file&quot; event.</p>
+<h1 id="errors-1" class="section-header"><a href="#errors-1">Errors</a></h1>
+<p>If this function encounters any form of I/O or other error, an error
+variant will be returned. If an error is returned then it must be
+guaranteed that no bytes were read.</p>
+<h1 id="examples-2" class="section-header"><a href="#examples-2">Examples</a></h1>
+<p><a href="crate::fs::File"><code>File</code></a> implements <code>Read</code> and <a href="bytes::BytesMut"><code>BytesMut</code></a> implements <a href="bytes::BufMut"><code>BufMut</code></a>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">fs</span>::<span class="ident">File</span>;
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+
+<span class="kw">use</span> <span class="ident">bytes</span>::<span class="ident">BytesMut</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">File</span>::<span class="ident">open</span>(<span class="string">&quot;foo.txt&quot;</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buffer</span> <span class="op">=</span> <span class="ident">BytesMut</span>::<span class="ident">with_capacity</span>(<span class="number">10</span>);
+
+    <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">buffer</span>.<span class="ident">is_empty</span>());
+
+    <span class="comment">// read up to 10 bytes, note that the return value is not needed</span>
+    <span class="comment">// to access the data that was read as `buffer`&#39;s internal</span>
+    <span class="comment">// cursor is updated.</span>
+    <span class="ident">f</span>.<span class="ident">read_buf</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">buffer</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+    <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;The bytes: {:?}&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">buffer</span>[..]);
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+</div><h3 id='method.read_exact' class='method'><code id='read_exact.v'>fn <a href='#method.read_exact' class='fnname'>read_exact</a>&lt;'a&gt;(&amp;'a mut self, buf: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.slice.html">&amp;'a mut [</a><a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u8.html">u8</a><a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.slice.html">]</a>) -&gt; ReadExact&lt;'a, Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,&nbsp;</span></code></h3><div class='docblock'><p>Reads the exact number of bytes required to fill <code>buf</code>.</p>
+<p>Equivalent to:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read_exact</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> [<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>;</pre></div>
+<p>This function reads as many bytes as necessary to completely fill
+the specified buffer <code>buf</code>.</p>
+<h1 id="errors-2" class="section-header"><a href="#errors-2">Errors</a></h1>
+<p>If the operation encounters an &quot;end of file&quot; before completely
+filling the buffer, it returns an error of the kind
+<a href="std::io::ErrorKind::UnexpectedEof"><code>ErrorKind::UnexpectedEof</code></a>. The contents of <code>buf</code> are unspecified
+in this case.</p>
+<p>If any other read error is encountered then the operation
+immediately returns. The contents of <code>buf</code> are unspecified in this
+case.</p>
+<p>If this operation returns an error, it is unspecified how many bytes
+it has read, but it will never read more than would be necessary to
+completely fill the buffer.</p>
+<h1 id="examples-3" class="section-header"><a href="#examples-3">Examples</a></h1>
+<p>[<code>File</code>][crate::fs::File]s implement <code>Read</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">fs</span>::<span class="ident">File</span>;
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">File</span>::<span class="ident">open</span>(<span class="string">&quot;foo.txt&quot;</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buffer</span> <span class="op">=</span> [<span class="number">0</span>; <span class="number">10</span>];
+
+    <span class="comment">// read exactly 10 bytes</span>
+    <span class="ident">f</span>.<span class="ident">read_exact</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">buffer</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+</div><h3 id='method.read_u8' class='method'><code id='read_u8.v'>fn <a href='#method.read_u8' class='fnname'>read_u8</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadU8&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,&nbsp;</span></code></h3><div class='docblock'><p>Reads an unsigned 8 bit integer from the underlying reader.</p>
+<p>Equivalent to:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read_u8</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>;</pre></div>
+<p>It is recommended to use a buffered reader to avoid excessive
+syscalls.</p>
+<h1 id="errors-3" class="section-header"><a href="#errors-3">Errors</a></h1>
+<p>This method returns the same errors as <a href="AsyncReadExt::read_exact"><code>AsyncReadExt::read_exact</code></a>.</p>
+<h1 id="examples-4" class="section-header"><a href="#examples-4">Examples</a></h1>
+<p>Read unsigned 8 bit integers from an <code>AsyncRead</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Cursor</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="ident">Cursor</span>::<span class="ident">new</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="number">2</span>, <span class="number">5</span>]);
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">2</span>, <span class="ident">reader</span>.<span class="ident">read_u8</span>().<span class="kw">await</span><span class="question-mark">?</span>);
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">5</span>, <span class="ident">reader</span>.<span class="ident">read_u8</span>().<span class="kw">await</span><span class="question-mark">?</span>);
+
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+</div><h3 id='method.read_i8' class='method'><code id='read_i8.v'>fn <a href='#method.read_i8' class='fnname'>read_i8</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadI8&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,&nbsp;</span></code></h3><div class='docblock'><p>Reads a signed 8 bit integer from the underlying reader.</p>
+<p>Equivalent to:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read_i8</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">i8</span><span class="op">&gt;</span>;</pre></div>
+<p>It is recommended to use a buffered reader to avoid excessive
+syscalls.</p>
+<h1 id="errors-4" class="section-header"><a href="#errors-4">Errors</a></h1>
+<p>This method returns the same errors as <a href="AsyncReadExt::read_exact"><code>AsyncReadExt::read_exact</code></a>.</p>
+<h1 id="examples-5" class="section-header"><a href="#examples-5">Examples</a></h1>
+<p>Read unsigned 8 bit integers from an <code>AsyncRead</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Cursor</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="ident">Cursor</span>::<span class="ident">new</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="number">0x02</span>, <span class="number">0xfb</span>]);
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">2</span>, <span class="ident">reader</span>.<span class="ident">read_i8</span>().<span class="kw">await</span><span class="question-mark">?</span>);
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="op">-</span><span class="number">5</span>, <span class="ident">reader</span>.<span class="ident">read_i8</span>().<span class="kw">await</span><span class="question-mark">?</span>);
+
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+</div><h3 id='method.read_u16' class='method'><code id='read_u16.v'>fn <a href='#method.read_u16' class='fnname'>read_u16</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadU16&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,&nbsp;</span></code></h3><div class='docblock'><p>Reads an unsigned 16-bit integer in big-endian order from the
+underlying reader.</p>
+<p>Equivalent to:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read_u16</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>;</pre></div>
+<p>It is recommended to use a buffered reader to avoid excessive
+syscalls.</p>
+<h1 id="errors-5" class="section-header"><a href="#errors-5">Errors</a></h1>
+<p>This method returns the same errors as <a href="AsyncReadExt::read_exact"><code>AsyncReadExt::read_exact</code></a>.</p>
+<h1 id="examples-6" class="section-header"><a href="#examples-6">Examples</a></h1>
+<p>Read unsigned 16 bit big-endian integers from a <code>AsyncRead</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Cursor</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="ident">Cursor</span>::<span class="ident">new</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="number">2</span>, <span class="number">5</span>, <span class="number">3</span>, <span class="number">0</span>]);
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">517</span>, <span class="ident">reader</span>.<span class="ident">read_u16</span>().<span class="kw">await</span><span class="question-mark">?</span>);
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">768</span>, <span class="ident">reader</span>.<span class="ident">read_u16</span>().<span class="kw">await</span><span class="question-mark">?</span>);
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+</div><h3 id='method.read_i16' class='method'><code id='read_i16.v'>fn <a href='#method.read_i16' class='fnname'>read_i16</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadI16&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,&nbsp;</span></code></h3><div class='docblock'><p>Reads a signed 16-bit integer in big-endian order from the
+underlying reader.</p>
+<p>Equivalent to:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read_i16</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">i16</span><span class="op">&gt;</span>;</pre></div>
+<p>It is recommended to use a buffered reader to avoid excessive
+syscalls.</p>
+<h1 id="errors-6" class="section-header"><a href="#errors-6">Errors</a></h1>
+<p>This method returns the same errors as <a href="AsyncReadExt::read_exact"><code>AsyncReadExt::read_exact</code></a>.</p>
+<h1 id="examples-7" class="section-header"><a href="#examples-7">Examples</a></h1>
+<p>Read signed 16 bit big-endian integers from a <code>AsyncRead</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Cursor</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="ident">Cursor</span>::<span class="ident">new</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="number">0x00</span>, <span class="number">0xc1</span>, <span class="number">0xff</span>, <span class="number">0x7c</span>]);
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">193</span>, <span class="ident">reader</span>.<span class="ident">read_i16</span>().<span class="kw">await</span><span class="question-mark">?</span>);
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="op">-</span><span class="number">132</span>, <span class="ident">reader</span>.<span class="ident">read_i16</span>().<span class="kw">await</span><span class="question-mark">?</span>);
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+</div><h3 id='method.read_u32' class='method'><code id='read_u32.v'>fn <a href='#method.read_u32' class='fnname'>read_u32</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadU32&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,&nbsp;</span></code></h3><div class='docblock'><p>Reads an unsigned 32-bit integer in big-endian order from the
+underlying reader.</p>
+<p>Equivalent to:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read_u32</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>;</pre></div>
+<p>It is recommended to use a buffered reader to avoid excessive
+syscalls.</p>
+<h1 id="errors-7" class="section-header"><a href="#errors-7">Errors</a></h1>
+<p>This method returns the same errors as <a href="AsyncReadExt::read_exact"><code>AsyncReadExt::read_exact</code></a>.</p>
+<h1 id="examples-8" class="section-header"><a href="#examples-8">Examples</a></h1>
+<p>Read unsigned 32-bit big-endian integers from a <code>AsyncRead</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Cursor</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="ident">Cursor</span>::<span class="ident">new</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x01</span>, <span class="number">0x0b</span>]);
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">267</span>, <span class="ident">reader</span>.<span class="ident">read_u32</span>().<span class="kw">await</span><span class="question-mark">?</span>);
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+</div><h3 id='method.read_i32' class='method'><code id='read_i32.v'>fn <a href='#method.read_i32' class='fnname'>read_i32</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadI32&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,&nbsp;</span></code></h3><div class='docblock'><p>Reads a signed 32-bit integer in big-endian order from the
+underlying reader.</p>
+<p>Equivalent to:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read_i32</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">i32</span><span class="op">&gt;</span>;</pre></div>
+<p>It is recommended to use a buffered reader to avoid excessive
+syscalls.</p>
+<h1 id="errors-8" class="section-header"><a href="#errors-8">Errors</a></h1>
+<p>This method returns the same errors as <a href="AsyncReadExt::read_exact"><code>AsyncReadExt::read_exact</code></a>.</p>
+<h1 id="examples-9" class="section-header"><a href="#examples-9">Examples</a></h1>
+<p>Read signed 32-bit big-endian integers from a <code>AsyncRead</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Cursor</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="ident">Cursor</span>::<span class="ident">new</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="number">0xff</span>, <span class="number">0xff</span>, <span class="number">0x7a</span>, <span class="number">0x33</span>]);
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="op">-</span><span class="number">34253</span>, <span class="ident">reader</span>.<span class="ident">read_i32</span>().<span class="kw">await</span><span class="question-mark">?</span>);
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+</div><h3 id='method.read_u64' class='method'><code id='read_u64.v'>fn <a href='#method.read_u64' class='fnname'>read_u64</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadU64&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,&nbsp;</span></code></h3><div class='docblock'><p>Reads an unsigned 64-bit integer in big-endian order from the
+underlying reader.</p>
+<p>Equivalent to:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read_u64</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>;</pre></div>
+<p>It is recommended to use a buffered reader to avoid excessive
+syscalls.</p>
+<h1 id="errors-9" class="section-header"><a href="#errors-9">Errors</a></h1>
+<p>This method returns the same errors as <a href="AsyncReadExt::read_exact"><code>AsyncReadExt::read_exact</code></a>.</p>
+<h1 id="examples-10" class="section-header"><a href="#examples-10">Examples</a></h1>
+<p>Read unsigned 64-bit big-endian integers from a <code>AsyncRead</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Cursor</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="ident">Cursor</span>::<span class="ident">new</span>(<span class="macro">vec</span><span class="macro">!</span>[
+        <span class="number">0x00</span>, <span class="number">0x03</span>, <span class="number">0x43</span>, <span class="number">0x95</span>, <span class="number">0x4d</span>, <span class="number">0x60</span>, <span class="number">0x86</span>, <span class="number">0x83</span>
+    ]);
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">918733457491587</span>, <span class="ident">reader</span>.<span class="ident">read_u64</span>().<span class="kw">await</span><span class="question-mark">?</span>);
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+</div><h3 id='method.read_i64' class='method'><code id='read_i64.v'>fn <a href='#method.read_i64' class='fnname'>read_i64</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadI64&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,&nbsp;</span></code></h3><div class='docblock'><p>Reads an signed 64-bit integer in big-endian order from the
+underlying reader.</p>
+<p>Equivalent to:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read_i64</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">i64</span><span class="op">&gt;</span>;</pre></div>
+<p>It is recommended to use a buffered reader to avoid excessive
+syscalls.</p>
+<h1 id="errors-10" class="section-header"><a href="#errors-10">Errors</a></h1>
+<p>This method returns the same errors as <a href="AsyncReadExt::read_exact"><code>AsyncReadExt::read_exact</code></a>.</p>
+<h1 id="examples-11" class="section-header"><a href="#examples-11">Examples</a></h1>
+<p>Read signed 64-bit big-endian integers from a <code>AsyncRead</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Cursor</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="ident">Cursor</span>::<span class="ident">new</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="number">0x80</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>]);
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">i64</span>::<span class="ident">min_value</span>(), <span class="ident">reader</span>.<span class="ident">read_i64</span>().<span class="kw">await</span><span class="question-mark">?</span>);
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+</div><h3 id='method.read_u128' class='method'><code id='read_u128.v'>fn <a href='#method.read_u128' class='fnname'>read_u128</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadU128&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,&nbsp;</span></code></h3><div class='docblock'><p>Reads an unsigned 128-bit integer in big-endian order from the
+underlying reader.</p>
+<p>Equivalent to:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read_u128</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u128</span><span class="op">&gt;</span>;</pre></div>
+<p>It is recommended to use a buffered reader to avoid excessive
+syscalls.</p>
+<h1 id="errors-11" class="section-header"><a href="#errors-11">Errors</a></h1>
+<p>This method returns the same errors as <a href="AsyncReadExt::read_exact"><code>AsyncReadExt::read_exact</code></a>.</p>
+<h1 id="examples-12" class="section-header"><a href="#examples-12">Examples</a></h1>
+<p>Read unsigned 128-bit big-endian integers from a <code>AsyncRead</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Cursor</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="ident">Cursor</span>::<span class="ident">new</span>(<span class="macro">vec</span><span class="macro">!</span>[
+        <span class="number">0x00</span>, <span class="number">0x03</span>, <span class="number">0x43</span>, <span class="number">0x95</span>, <span class="number">0x4d</span>, <span class="number">0x60</span>, <span class="number">0x86</span>, <span class="number">0x83</span>,
+        <span class="number">0x00</span>, <span class="number">0x03</span>, <span class="number">0x43</span>, <span class="number">0x95</span>, <span class="number">0x4d</span>, <span class="number">0x60</span>, <span class="number">0x86</span>, <span class="number">0x83</span>
+    ]);
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">16947640962301618749969007319746179</span>, <span class="ident">reader</span>.<span class="ident">read_u128</span>().<span class="kw">await</span><span class="question-mark">?</span>);
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+</div><h3 id='method.read_i128' class='method'><code id='read_i128.v'>fn <a href='#method.read_i128' class='fnname'>read_i128</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadI128&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,&nbsp;</span></code></h3><div class='docblock'><p>Reads an signed 128-bit integer in big-endian order from the
+underlying reader.</p>
+<p>Equivalent to:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read_i128</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">i128</span><span class="op">&gt;</span>;</pre></div>
+<p>It is recommended to use a buffered reader to avoid excessive
+syscalls.</p>
+<h1 id="errors-12" class="section-header"><a href="#errors-12">Errors</a></h1>
+<p>This method returns the same errors as <a href="AsyncReadExt::read_exact"><code>AsyncReadExt::read_exact</code></a>.</p>
+<h1 id="examples-13" class="section-header"><a href="#examples-13">Examples</a></h1>
+<p>Read signed 128-bit big-endian integers from a <code>AsyncRead</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Cursor</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="ident">Cursor</span>::<span class="ident">new</span>(<span class="macro">vec</span><span class="macro">!</span>[
+        <span class="number">0x80</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>,
+        <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>
+    ]);
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">i128</span>::<span class="ident">min_value</span>(), <span class="ident">reader</span>.<span class="ident">read_i128</span>().<span class="kw">await</span><span class="question-mark">?</span>);
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+</div><h3 id='method.read_u16_le' class='method'><code id='read_u16_le.v'>fn <a href='#method.read_u16_le' class='fnname'>read_u16_le</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadU16Le&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,&nbsp;</span></code></h3><div class='docblock'><p>Reads an unsigned 16-bit integer in little-endian order from the
+underlying reader.</p>
+<p>Equivalent to:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read_u16_le</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>;</pre></div>
+<p>It is recommended to use a buffered reader to avoid excessive
+syscalls.</p>
+<h1 id="errors-13" class="section-header"><a href="#errors-13">Errors</a></h1>
+<p>This method returns the same errors as <a href="AsyncReadExt::read_exact"><code>AsyncReadExt::read_exact</code></a>.</p>
+<h1 id="examples-14" class="section-header"><a href="#examples-14">Examples</a></h1>
+<p>Read unsigned 16 bit little-endian integers from a <code>AsyncRead</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Cursor</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="ident">Cursor</span>::<span class="ident">new</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="number">2</span>, <span class="number">5</span>, <span class="number">3</span>, <span class="number">0</span>]);
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">1282</span>, <span class="ident">reader</span>.<span class="ident">read_u16_le</span>().<span class="kw">await</span><span class="question-mark">?</span>);
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">3</span>, <span class="ident">reader</span>.<span class="ident">read_u16_le</span>().<span class="kw">await</span><span class="question-mark">?</span>);
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+</div><h3 id='method.read_i16_le' class='method'><code id='read_i16_le.v'>fn <a href='#method.read_i16_le' class='fnname'>read_i16_le</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadI16Le&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,&nbsp;</span></code></h3><div class='docblock'><p>Reads a signed 16-bit integer in little-endian order from the
+underlying reader.</p>
+<p>Equivalent to:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read_i16_le</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">i16</span><span class="op">&gt;</span>;</pre></div>
+<p>It is recommended to use a buffered reader to avoid excessive
+syscalls.</p>
+<h1 id="errors-14" class="section-header"><a href="#errors-14">Errors</a></h1>
+<p>This method returns the same errors as <a href="AsyncReadExt::read_exact"><code>AsyncReadExt::read_exact</code></a>.</p>
+<h1 id="examples-15" class="section-header"><a href="#examples-15">Examples</a></h1>
+<p>Read signed 16 bit little-endian integers from a <code>AsyncRead</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Cursor</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="ident">Cursor</span>::<span class="ident">new</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="number">0x00</span>, <span class="number">0xc1</span>, <span class="number">0xff</span>, <span class="number">0x7c</span>]);
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="op">-</span><span class="number">16128</span>, <span class="ident">reader</span>.<span class="ident">read_i16_le</span>().<span class="kw">await</span><span class="question-mark">?</span>);
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">31999</span>, <span class="ident">reader</span>.<span class="ident">read_i16_le</span>().<span class="kw">await</span><span class="question-mark">?</span>);
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+</div><h3 id='method.read_u32_le' class='method'><code id='read_u32_le.v'>fn <a href='#method.read_u32_le' class='fnname'>read_u32_le</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadU32Le&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,&nbsp;</span></code></h3><div class='docblock'><p>Reads an unsigned 32-bit integer in little-endian order from the
+underlying reader.</p>
+<p>Equivalent to:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read_u32_le</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>;</pre></div>
+<p>It is recommended to use a buffered reader to avoid excessive
+syscalls.</p>
+<h1 id="errors-15" class="section-header"><a href="#errors-15">Errors</a></h1>
+<p>This method returns the same errors as <a href="AsyncReadExt::read_exact"><code>AsyncReadExt::read_exact</code></a>.</p>
+<h1 id="examples-16" class="section-header"><a href="#examples-16">Examples</a></h1>
+<p>Read unsigned 32-bit little-endian integers from a <code>AsyncRead</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Cursor</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="ident">Cursor</span>::<span class="ident">new</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x01</span>, <span class="number">0x0b</span>]);
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">184614912</span>, <span class="ident">reader</span>.<span class="ident">read_u32_le</span>().<span class="kw">await</span><span class="question-mark">?</span>);
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+</div><h3 id='method.read_i32_le' class='method'><code id='read_i32_le.v'>fn <a href='#method.read_i32_le' class='fnname'>read_i32_le</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadI32Le&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,&nbsp;</span></code></h3><div class='docblock'><p>Reads a signed 32-bit integer in little-endian order from the
+underlying reader.</p>
+<p>Equivalent to:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read_i32_le</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">i32</span><span class="op">&gt;</span>;</pre></div>
+<p>It is recommended to use a buffered reader to avoid excessive
+syscalls.</p>
+<h1 id="errors-16" class="section-header"><a href="#errors-16">Errors</a></h1>
+<p>This method returns the same errors as <a href="AsyncReadExt::read_exact"><code>AsyncReadExt::read_exact</code></a>.</p>
+<h1 id="examples-17" class="section-header"><a href="#examples-17">Examples</a></h1>
+<p>Read signed 32-bit little-endian integers from a <code>AsyncRead</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Cursor</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="ident">Cursor</span>::<span class="ident">new</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="number">0xff</span>, <span class="number">0xff</span>, <span class="number">0x7a</span>, <span class="number">0x33</span>]);
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">863698943</span>, <span class="ident">reader</span>.<span class="ident">read_i32_le</span>().<span class="kw">await</span><span class="question-mark">?</span>);
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+</div><h3 id='method.read_u64_le' class='method'><code id='read_u64_le.v'>fn <a href='#method.read_u64_le' class='fnname'>read_u64_le</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadU64Le&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,&nbsp;</span></code></h3><div class='docblock'><p>Reads an unsigned 64-bit integer in little-endian order from the
+underlying reader.</p>
+<p>Equivalent to:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read_u64_le</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>;</pre></div>
+<p>It is recommended to use a buffered reader to avoid excessive
+syscalls.</p>
+<h1 id="errors-17" class="section-header"><a href="#errors-17">Errors</a></h1>
+<p>This method returns the same errors as <a href="AsyncReadExt::read_exact"><code>AsyncReadExt::read_exact</code></a>.</p>
+<h1 id="examples-18" class="section-header"><a href="#examples-18">Examples</a></h1>
+<p>Read unsigned 64-bit little-endian integers from a <code>AsyncRead</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Cursor</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="ident">Cursor</span>::<span class="ident">new</span>(<span class="macro">vec</span><span class="macro">!</span>[
+        <span class="number">0x00</span>, <span class="number">0x03</span>, <span class="number">0x43</span>, <span class="number">0x95</span>, <span class="number">0x4d</span>, <span class="number">0x60</span>, <span class="number">0x86</span>, <span class="number">0x83</span>
+    ]);
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">9477368352180732672</span>, <span class="ident">reader</span>.<span class="ident">read_u64_le</span>().<span class="kw">await</span><span class="question-mark">?</span>);
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+</div><h3 id='method.read_i64_le' class='method'><code id='read_i64_le.v'>fn <a href='#method.read_i64_le' class='fnname'>read_i64_le</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadI64Le&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,&nbsp;</span></code></h3><div class='docblock'><p>Reads an signed 64-bit integer in little-endian order from the
+underlying reader.</p>
+<p>Equivalent to:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read_i64_le</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">i64</span><span class="op">&gt;</span>;</pre></div>
+<p>It is recommended to use a buffered reader to avoid excessive
+syscalls.</p>
+<h1 id="errors-18" class="section-header"><a href="#errors-18">Errors</a></h1>
+<p>This method returns the same errors as <a href="AsyncReadExt::read_exact"><code>AsyncReadExt::read_exact</code></a>.</p>
+<h1 id="examples-19" class="section-header"><a href="#examples-19">Examples</a></h1>
+<p>Read signed 64-bit little-endian integers from a <code>AsyncRead</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Cursor</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="ident">Cursor</span>::<span class="ident">new</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="number">0x80</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>]);
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">128</span>, <span class="ident">reader</span>.<span class="ident">read_i64_le</span>().<span class="kw">await</span><span class="question-mark">?</span>);
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+</div><h3 id='method.read_u128_le' class='method'><code id='read_u128_le.v'>fn <a href='#method.read_u128_le' class='fnname'>read_u128_le</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadU128Le&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,&nbsp;</span></code></h3><div class='docblock'><p>Reads an unsigned 128-bit integer in little-endian order from the
+underlying reader.</p>
+<p>Equivalent to:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read_u128_le</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u128</span><span class="op">&gt;</span>;</pre></div>
+<p>It is recommended to use a buffered reader to avoid excessive
+syscalls.</p>
+<h1 id="errors-19" class="section-header"><a href="#errors-19">Errors</a></h1>
+<p>This method returns the same errors as <a href="AsyncReadExt::read_exact"><code>AsyncReadExt::read_exact</code></a>.</p>
+<h1 id="examples-20" class="section-header"><a href="#examples-20">Examples</a></h1>
+<p>Read unsigned 128-bit little-endian integers from a <code>AsyncRead</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Cursor</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="ident">Cursor</span>::<span class="ident">new</span>(<span class="macro">vec</span><span class="macro">!</span>[
+        <span class="number">0x00</span>, <span class="number">0x03</span>, <span class="number">0x43</span>, <span class="number">0x95</span>, <span class="number">0x4d</span>, <span class="number">0x60</span>, <span class="number">0x86</span>, <span class="number">0x83</span>,
+        <span class="number">0x00</span>, <span class="number">0x03</span>, <span class="number">0x43</span>, <span class="number">0x95</span>, <span class="number">0x4d</span>, <span class="number">0x60</span>, <span class="number">0x86</span>, <span class="number">0x83</span>
+    ]);
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">174826588484952389081207917399662330624</span>, <span class="ident">reader</span>.<span class="ident">read_u128_le</span>().<span class="kw">await</span><span class="question-mark">?</span>);
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+</div><h3 id='method.read_i128_le' class='method'><code id='read_i128_le.v'>fn <a href='#method.read_i128_le' class='fnname'>read_i128_le</a>&lt;'a&gt;(&amp;'a mut self) -&gt; ReadI128Le&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;'a mut </a>Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,&nbsp;</span></code></h3><div class='docblock'><p>Reads an signed 128-bit integer in little-endian order from the
+underlying reader.</p>
+<p>Equivalent to:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read_i128_le</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">i128</span><span class="op">&gt;</span>;</pre></div>
+<p>It is recommended to use a buffered reader to avoid excessive
+syscalls.</p>
+<h1 id="errors-20" class="section-header"><a href="#errors-20">Errors</a></h1>
+<p>This method returns the same errors as <a href="AsyncReadExt::read_exact"><code>AsyncReadExt::read_exact</code></a>.</p>
+<h1 id="examples-21" class="section-header"><a href="#examples-21">Examples</a></h1>
+<p>Read signed 128-bit little-endian integers from a <code>AsyncRead</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Cursor</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="ident">Cursor</span>::<span class="ident">new</span>(<span class="macro">vec</span><span class="macro">!</span>[
+        <span class="number">0x80</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>,
+        <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>
+    ]);
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">128</span>, <span class="ident">reader</span>.<span class="ident">read_i128_le</span>().<span class="kw">await</span><span class="question-mark">?</span>);
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+</div><h3 id='method.read_to_end' class='method'><code id='read_to_end.v'>fn <a href='#method.read_to_end' class='fnname'>read_to_end</a>&lt;'a&gt;(&amp;'a mut self, buf: &amp;'a mut <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u8.html">u8</a>&gt;) -&gt; ReadToEnd&lt;'a, Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,&nbsp;</span></code></h3><div class='docblock'><p>Reads all bytes until EOF in this source, placing them into <code>buf</code>.</p>
+<p>Equivalent to:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read_to_end</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>;</pre></div>
+<p>All bytes read from this source will be appended to the specified
+buffer <code>buf</code>. This function will continuously call [<code>read()</code>] to
+append more data to <code>buf</code> until [<code>read()</code>][read] returns <code>Ok(0)</code>.</p>
+<p>If successful, the total number of bytes read is returned.</p>
+<h1 id="errors-21" class="section-header"><a href="#errors-21">Errors</a></h1>
+<p>If a read error is encountered then the <code>read_to_end</code> operation
+immediately completes. Any bytes which have already been read will
+be appended to <code>buf</code>.</p>
+<h1 id="examples-22" class="section-header"><a href="#examples-22">Examples</a></h1>
+<p>[<code>File</code>][crate::fs::File]s implement <code>Read</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">fs</span>::<span class="ident">File</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">File</span>::<span class="ident">open</span>(<span class="string">&quot;foo.txt&quot;</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buffer</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">new</span>();
+
+    <span class="comment">// read the whole file</span>
+    <span class="ident">f</span>.<span class="ident">read_to_end</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">buffer</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+<p>(See also the <a href="crate::fs::read::read"><code>tokio::fs::read</code></a> convenience function for reading from a
+file.)</p>
+</div><h3 id='method.read_to_string' class='method'><code id='read_to_string.v'>fn <a href='#method.read_to_string' class='fnname'>read_to_string</a>&lt;'a&gt;(<br>&nbsp;&nbsp;&nbsp;&nbsp;&amp;'a mut self, <br>&nbsp;&nbsp;&nbsp;&nbsp;dst: &amp;'a mut <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/string/struct.String.html" title="struct alloc::string::String">String</a><br>) -&gt; ReadToString&lt;'a, Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a>,&nbsp;</span></code></h3><div class='docblock'><p>Reads all bytes until EOF in this source, appending them to <code>buf</code>.</p>
+<p>Equivalent to:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read_to_string</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">String</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>;</pre></div>
+<p>If successful, the number of bytes which were read and appended to
+<code>buf</code> is returned.</p>
+<h1 id="errors-22" class="section-header"><a href="#errors-22">Errors</a></h1>
+<p>If the data in this stream is <em>not</em> valid UTF-8 then an error is
+returned and <code>buf</code> is unchanged.</p>
+<p>See [<code>read_to_end</code>][AsyncReadExt::read_to_end] for other error semantics.</p>
+<h1 id="examples-23" class="section-header"><a href="#examples-23">Examples</a></h1>
+<p>[<code>File</code>][crate::fs::File]s implement <code>Read</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">fs</span>::<span class="ident">File</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">File</span>::<span class="ident">open</span>(<span class="string">&quot;foo.txt&quot;</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buffer</span> <span class="op">=</span> <span class="ident">String</span>::<span class="ident">new</span>();
+
+    <span class="ident">f</span>.<span class="ident">read_to_string</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">buffer</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+<p>(See also the <a href="crate::fs::read_to_string::read_to_string"><code>crate::fs::read_to_string</code></a> convenience function for
+reading from a file.)</p>
+</div><h3 id='method.take' class='method'><code id='take.v'>fn <a href='#method.take' class='fnname'>take</a>(self, limit: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u64.html">u64</a>) -&gt; <a class="struct" href="../../tokio/io/struct.Take.html" title="struct tokio::io::Take">Take</a>&lt;Self&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Self: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,&nbsp;</span></code></h3><div class='docblock'><p>Creates an adaptor which reads at most <code>limit</code> bytes from it.</p>
+<p>This function returns a new instance of <code>AsyncRead</code> which will read
+at most <code>limit</code> bytes, after which it will always return EOF
+(<code>Ok(0)</code>). Any read errors will not count towards the number of
+bytes read and future calls to [<code>read()</code>][read] may succeed.</p>
+<h1 id="examples-24" class="section-header"><a href="#examples-24">Examples</a></h1>
+<p>[<code>File</code>][crate::fs::File]s implement <code>Read</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">AsyncReadExt</span>};
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">fs</span>::<span class="ident">File</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">File</span>::<span class="ident">open</span>(<span class="string">&quot;foo.txt&quot;</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buffer</span> <span class="op">=</span> [<span class="number">0</span>; <span class="number">5</span>];
+
+    <span class="comment">// read at most five bytes</span>
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">handle</span> <span class="op">=</span> <span class="ident">f</span>.<span class="ident">take</span>(<span class="number">5</span>);
+
+    <span class="ident">handle</span>.<span class="ident">read</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">buffer</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="prelude-val">Ok</span>(())
+}</pre></div>
+</div></div><span class='loading-content'>Loading content...</span>
+            <h2 id='implementors' class='small-section-header'>Implementors<a href='#implementors' class='anchor'></a></h2><div class='item-list' id='implementors-list'><h3 id='impl-AsyncReadExt' class='impl'><code class='in-band'>impl&lt;R:&nbsp;<a class="trait" href="../../tokio/io/trait.AsyncRead.html" title="trait tokio::io::AsyncRead">AsyncRead</a> + ?<a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>&gt; AsyncReadExt for R</code><a href='#impl-AsyncReadExt' class='anchor'></a><a class='srclink' href='../../src/tokio/io/util/async_read_ext.rs.html#1112' title='goto source code'>[src]</a></h3><div class='impl-items'></div></div><span class='loading-content'>Loading content...</span><script type="text/javascript" src="../../implementors/tokio/io/trait.AsyncReadExt.js" async></script></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "tokio";</script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>

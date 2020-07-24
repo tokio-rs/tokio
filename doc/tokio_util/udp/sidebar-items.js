@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["UdpFramed","A unified `Stream` and `Sink` interface to an underlying `UdpSocket`, using the `Encoder` and `Decoder` traits to encode and decode frames."]]});

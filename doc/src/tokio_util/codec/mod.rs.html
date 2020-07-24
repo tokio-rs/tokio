@@ -1,0 +1,89 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `tokio-util/src/codec/mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css"><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="shortcut icon" href="../../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../tokio_util/index.html'><div class='logo-container'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1"> 1</span>
+<span id="2"> 2</span>
+<span id="3"> 3</span>
+<span id="4"> 4</span>
+<span id="5"> 5</span>
+<span id="6"> 6</span>
+<span id="7"> 7</span>
+<span id="8"> 8</span>
+<span id="9"> 9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+</pre><div class="example-wrap"><pre class="rust ">
+<span class="doccomment">//! Adaptors from AsyncRead/AsyncWrite to Stream/Sink</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Raw I/O objects work with byte sequences, but higher-level code</span>
+<span class="doccomment">//! usually wants to batch these into meaningful chunks, called</span>
+<span class="doccomment">//! &quot;frames&quot;.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! This module contains adapters to go from streams of bytes,</span>
+<span class="doccomment">//! [`AsyncRead`] and [`AsyncWrite`], to framed streams implementing</span>
+<span class="doccomment">//! [`Sink`] and [`Stream`].  Framed streams are also known as</span>
+<span class="doccomment">//! transports.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! [`AsyncRead`]: tokio::io::AsyncRead</span>
+<span class="doccomment">//! [`AsyncWrite`]: tokio::io::AsyncWrite</span>
+<span class="doccomment">//! [`Stream`]: tokio::stream::Stream</span>
+<span class="doccomment">//! [`Sink`]: futures_sink::Sink</span>
+
+<span class="kw">mod</span> <span class="ident">bytes_codec</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">bytes_codec</span>::<span class="ident">BytesCodec</span>;
+
+<span class="kw">mod</span> <span class="ident">decoder</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">decoder</span>::<span class="ident">Decoder</span>;
+
+<span class="kw">mod</span> <span class="ident">encoder</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">encoder</span>::<span class="ident">Encoder</span>;
+
+<span class="kw">mod</span> <span class="ident">framed_impl</span>;
+<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused_imports</span>)]</span>
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="self">self</span>::<span class="ident">framed_impl</span>::{<span class="ident">FramedImpl</span>, <span class="ident">RWFrames</span>, <span class="ident">ReadFrame</span>, <span class="ident">WriteFrame</span>};
+
+<span class="kw">mod</span> <span class="ident">framed</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">framed</span>::{<span class="ident">Framed</span>, <span class="ident">FramedParts</span>};
+
+<span class="kw">mod</span> <span class="ident">framed_read</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">framed_read</span>::<span class="ident">FramedRead</span>;
+
+<span class="kw">mod</span> <span class="ident">framed_write</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">framed_write</span>::<span class="ident">FramedWrite</span>;
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">length_delimited</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">length_delimited</span>::{<span class="ident">LengthDelimitedCodec</span>, <span class="ident">LengthDelimitedCodecError</span>};
+
+<span class="kw">mod</span> <span class="ident">lines_codec</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">lines_codec</span>::{<span class="ident">LinesCodec</span>, <span class="ident">LinesCodecError</span>};
+</pre></div>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../";window.currentCrate = "tokio_util";</script><script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script><script defer src="../../../search-index.js"></script></body></html>

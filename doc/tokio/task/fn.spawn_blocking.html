@@ -1,0 +1,38 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `spawn_blocking` fn in crate `tokio`."><meta name="keywords" content="rust, rustlang, rust-lang, spawn_blocking"><title>tokio::task::spawn_blocking - Rust</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc fn"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../tokio/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a><div class="sidebar-elems"><p class='location'><a href='../index.html'>tokio</a>::<wbr><a href='index.html'>task</a></p><script>window.sidebarCurrent = {name: 'spawn_blocking', ty: 'fn', relpath: ''};</script><script defer src="sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../../src/tokio/task/blocking.rs.html#112-131' title='goto source code'>[src]</a></span><span class='in-band'>Function <a href='../index.html'>tokio</a>::<wbr><a href='index.html'>task</a>::<wbr><a class="fn" href=''>spawn_blocking</a></span></h1><pre class='rust fn'>pub fn spawn_blocking&lt;F, R&gt;(f: F) -&gt; <a class="struct" href="../../tokio/task/struct.JoinHandle.html" title="struct tokio::task::JoinHandle">JoinHandle</a>&lt;R&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;F: <a class="trait" href="https://doc.rust-lang.org/nightly/core/ops/function/trait.FnOnce.html" title="trait core::ops::function::FnOnce">FnOnce</a>() -&gt; R + <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'static,<br>&nbsp;&nbsp;&nbsp;&nbsp;R: <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'static,&nbsp;</span></pre><div class='docblock'><p>Runs the provided closure on a thread where blocking is acceptable.</p>
+<p>In general, issuing a blocking call or performing a lot of compute in a
+future without yielding is not okay, as it may prevent the executor from
+driving other futures forward. This function runs the provided closure
+on a thread dedicated to blocking operations. See the <a href="../index.html#cpu-bound-tasks-and-blocking-code">CPU-bound tasks
+and blocking code</a> section for more information.</p>
+<p>Tokio will spawn more blocking threads when they are requested through
+this function until the upper limit configured on the <a href="struct@crate::runtime::Builder"><code>Builder</code></a> is
+reached.  This limit is very large by default, because <code>spawn_blocking</code> is
+often used for various kinds of IO operations that cannot be performed
+asynchronously. When you run CPU-bound code using <code>spawn_blocking</code>, you
+should keep this large upper limit in mind; to run your CPU-bound
+computations on only a few threads, you should use a separate thread
+pool such as <a href="https://docs.rs/rayon">rayon</a> rather than configuring the number of blocking
+threads.</p>
+<p>This function is intended for non-async operations that eventually
+finish on their own. If you want to spawn an ordinary thread, you should
+use <a href="fn@std::thread::spawn"><code>thread::spawn</code></a> instead.</p>
+<p>Closures spawned using <code>spawn_blocking</code> cannot be cancelled. When you
+shut down the executor, it will wait indefinitely for all blocking
+operations to finish. You can use <a href="fn@crate::runtime::Runtime::shutdown_timeout"><code>shutdown_timeout</code></a> to stop waiting
+for them after a certain timeout. Be aware that this will still not
+cancel the tasks — they are simply allowed to keep running after the
+method returns.</p>
+<p>Note that if you are using the <a href="fn@crate::runtime::Builder::basic_scheduler">basic scheduler</a>, this function will
+still spawn additional threads for blocking operations. The basic
+scheduler's single thread is only used for asynchronous code.</p>
+<h1 id="examples" class="section-header"><a href="#examples">Examples</a></h1>
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">task</span>;
+
+<span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">task</span>::<span class="ident">spawn_blocking</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
+    <span class="comment">// do some compute-heavy work or call synchronous code</span>
+    <span class="string">&quot;done computing&quot;</span>
+}).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="string">&quot;done computing&quot;</span>);</pre></div>
+</div></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "tokio";</script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>

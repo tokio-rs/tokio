@@ -1,0 +1,41 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `watch` mod in crate `tokio`."><meta name="keywords" content="rust, rustlang, rust-lang, watch"><title>tokio::sync::watch - Rust</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css"><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="shortcut icon" href="../../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../tokio/index.html'><div class='logo-container'><img src='../../../rust-logo.png' alt='logo'></div></a><p class='location'>Module watch</p><div class="sidebar-elems"><div class="block items"><ul><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li><li><a href="#functions">Functions</a></li></ul></div><p class='location'><a href='../../index.html'>tokio</a>::<wbr><a href='../index.html'>sync</a></p><script>window.sidebarCurrent = {name: 'watch', ty: 'mod', relpath: '../'};</script><script defer src="../sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../../../src/tokio/sync/watch.rs.html#1-431' title='goto source code'>[src]</a></span><span class='in-band'>Module <a href='../../index.html'>tokio</a>::<wbr><a href='../index.html'>sync</a>::<wbr><a class="mod" href=''>watch</a></span></h1><div class='docblock'><p>A single-producer, multi-consumer channel that only retains the <em>last</em> sent
+value.</p>
+<p>This channel is useful for watching for changes to a value from multiple
+points in the code base, for example, changes to configuration values.</p>
+<h1 id="usage" class="section-header"><a href="#usage">Usage</a></h1>
+<p><a href="crate::sync::watch::channel"><code>channel</code></a> returns a <a href="crate::sync::watch::Sender"><code>Sender</code></a> / <a href="crate::sync::watch::Receiver"><code>Receiver</code></a> pair. These are
+the producer and sender halves of the channel. The channel is
+created with an initial value. <a href="crate::sync::watch::Receiver::recv"><code>Receiver::recv</code></a> will always
+be ready upon creation and will yield either this initial value or
+the latest value that has been sent by <code>Sender</code>.</p>
+<p>Calls to <a href="crate::sync::watch::Receiver::recv"><code>Receiver::recv</code></a> will always yield the latest value.</p>
+<h1 id="examples" class="section-header"><a href="#examples">Examples</a></h1>
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">sync</span>::<span class="ident">watch</span>;
+
+    <span class="kw">let</span> (<span class="ident">tx</span>, <span class="kw-2">mut</span> <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">watch</span>::<span class="ident">channel</span>(<span class="string">&quot;hello&quot;</span>);
+
+    <span class="ident">tokio</span>::<span class="ident">spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
+        <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">value</span>) <span class="op">=</span> <span class="ident">rx</span>.<span class="ident">recv</span>().<span class="kw">await</span> {
+            <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;received = {:?}&quot;</span>, <span class="ident">value</span>);
+        }
+    });
+
+    <span class="ident">tx</span>.<span class="ident">broadcast</span>(<span class="string">&quot;world&quot;</span>)<span class="question-mark">?</span>;</pre></div>
+<h1 id="closing" class="section-header"><a href="#closing">Closing</a></h1>
+<p><a href="crate::sync::watch::Sender::closed"><code>Sender::closed</code></a> allows the producer to detect when all <a href="crate::sync::watch::Receiver"><code>Receiver</code></a>
+handles have been dropped. This indicates that there is no further interest
+in the values being produced and work can be stopped.</p>
+<h1 id="thread-safety" class="section-header"><a href="#thread-safety">Thread safety</a></h1>
+<p>Both <a href="crate::sync::watch::Sender"><code>Sender</code></a> and <a href="crate::sync::watch::Receiver"><code>Receiver</code></a> are thread safe. They can be moved to other
+threads and can be used in a concurrent environment. Clones of <a href="crate::sync::watch::Receiver"><code>Receiver</code></a>
+handles may be moved to separate threads and also used concurrently.</p>
+</div><h2 id='modules' class='section-header'><a href="#modules">Modules</a></h2>
+<table><tr class='module-item'><td><a class="mod" href="error/index.html" title='tokio::sync::watch::error mod'>error</a></td><td class='docblock-short'><p>Watch error types</p>
+</td></tr></table><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
+<table><tr class='module-item'><td><a class="struct" href="struct.Receiver.html" title='tokio::sync::watch::Receiver struct'>Receiver</a></td><td class='docblock-short'><p>Receives values from the associated <a href="struct@Sender"><code>Sender</code></a>.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Ref.html" title='tokio::sync::watch::Ref struct'>Ref</a></td><td class='docblock-short'><p>Returns a reference to the inner value</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Sender.html" title='tokio::sync::watch::Sender struct'>Sender</a></td><td class='docblock-short'><p>Sends values to the associated <a href="struct@Receiver"><code>Receiver</code></a>.</p>
+</td></tr></table><h2 id='functions' class='section-header'><a href="#functions">Functions</a></h2>
+<table><tr class='module-item'><td><a class="fn" href="fn.channel.html" title='tokio::sync::watch::channel fn'>channel</a></td><td class='docblock-short'><p>Creates a new watch channel, returning the &quot;send&quot; and &quot;receive&quot; handles.</p>
+</td></tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../";window.currentCrate = "tokio";</script><script src="../../../main.js"></script><script defer src="../../../search-index.js"></script></body></html>

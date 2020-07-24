@@ -1,0 +1,96 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `broadcast` mod in crate `tokio`."><meta name="keywords" content="rust, rustlang, rust-lang, broadcast"><title>tokio::sync::broadcast - Rust</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css"><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="shortcut icon" href="../../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../tokio/index.html'><div class='logo-container'><img src='../../../rust-logo.png' alt='logo'></div></a><p class='location'>Module broadcast</p><div class="sidebar-elems"><div class="block items"><ul><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li><li><a href="#functions">Functions</a></li></ul></div><p class='location'><a href='../../index.html'>tokio</a>::<wbr><a href='../index.html'>sync</a></p><script>window.sidebarCurrent = {name: 'broadcast', ty: 'mod', relpath: '../'};</script><script defer src="../sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../../../src/tokio/sync/broadcast.rs.html#1-1237' title='goto source code'>[src]</a></span><span class='in-band'>Module <a href='../../index.html'>tokio</a>::<wbr><a href='../index.html'>sync</a>::<wbr><a class="mod" href=''>broadcast</a></span></h1><div class='docblock'><p>A multi-producer, multi-consumer broadcast queue. Each sent value is seen by
+all consumers.</p>
+<p>A <a href="crate::sync::broadcast::Sender"><code>Sender</code></a> is used to broadcast values to <strong>all</strong> connected <a href="crate::sync::broadcast::Receiver"><code>Receiver</code></a>
+values. <a href="crate::sync::broadcast::Sender"><code>Sender</code></a> handles are clone-able, allowing concurrent send and
+receive actions. <a href="crate::sync::broadcast::Sender"><code>Sender</code></a> and <a href="crate::sync::broadcast::Receiver"><code>Receiver</code></a> are both <code>Send</code> and <code>Sync</code> as
+long as <code>T</code> is also <code>Send</code> or <code>Sync</code> respectively.</p>
+<p>When a value is sent, <strong>all</strong> <a href="crate::sync::broadcast::Receiver"><code>Receiver</code></a> handles are notified and will
+receive the value. The value is stored once inside the channel and cloned on
+demand for each receiver. Once all receivers have received a clone of the
+value, the value is released from the channel.</p>
+<p>A channel is created by calling <a href="crate::sync::broadcast::channel"><code>channel</code></a>, specifying the maximum number
+of messages the channel can retain at any given time.</p>
+<p>New <a href="crate::sync::broadcast::Receiver"><code>Receiver</code></a> handles are created by calling <a href="crate::sync::broadcast::Sender::subscribe"><code>Sender::subscribe</code></a>. The
+returned <a href="crate::sync::broadcast::Receiver"><code>Receiver</code></a> will receive values sent <strong>after</strong> the call to
+<code>subscribe</code>.</p>
+<h2 id="lagging" class="section-header"><a href="#lagging">Lagging</a></h2>
+<p>As sent messages must be retained until <strong>all</strong> <a href="crate::sync::broadcast::Receiver"><code>Receiver</code></a> handles receive
+a clone, broadcast channels are suspectible to the &quot;slow receiver&quot; problem.
+In this case, all but one receiver are able to receive values at the rate
+they are sent. Because one receiver is stalled, the channel starts to fill
+up.</p>
+<p>This broadcast channel implementation handles this case by setting a hard
+upper bound on the number of values the channel may retain at any given
+time. This upper bound is passed to the <a href="crate::sync::broadcast::channel"><code>channel</code></a> function as an argument.</p>
+<p>If a value is sent when the channel is at capacity, the oldest value
+currently held by the channel is released. This frees up space for the new
+value. Any receiver that has not yet seen the released value will return
+<a href="crate::sync::broadcast::RecvError::Lagged"><code>RecvError::Lagged</code></a> the next time <a href="crate::sync::broadcast::Receiver::recv"><code>recv</code></a> is called.</p>
+<p>Once <a href="crate::sync::broadcast::RecvError::Lagged"><code>RecvError::Lagged</code></a> is returned, the lagging receiver's position is
+updated to the oldest value contained by the channel. The next call to
+<a href="crate::sync::broadcast::Receiver::recv"><code>recv</code></a> will return this value.</p>
+<p>This behavior enables a receiver to detect when it has lagged so far behind
+that data has been dropped. The caller may decide how to respond to this:
+either by aborting its task or by tolerating lost messages and resuming
+consumption of the channel.</p>
+<h2 id="closing" class="section-header"><a href="#closing">Closing</a></h2>
+<p>When <strong>all</strong> <a href="crate::sync::broadcast::Sender"><code>Sender</code></a> handles have been dropped, no new values may be
+sent. At this point, the channel is &quot;closed&quot;. Once a receiver has received
+all values retained by the channel, the next call to <a href="crate::sync::broadcast::Receiver::recv"><code>recv</code></a> will return
+with <a href="crate::sync::broadcast::RecvError::Closed"><code>RecvError::Closed</code></a>.</p>
+<h1 id="examples" class="section-header"><a href="#examples">Examples</a></h1>
+<p>Basic usage</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">sync</span>::<span class="ident">broadcast</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> (<span class="ident">tx</span>, <span class="kw-2">mut</span> <span class="ident">rx1</span>) <span class="op">=</span> <span class="ident">broadcast</span>::<span class="ident">channel</span>(<span class="number">16</span>);
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rx2</span> <span class="op">=</span> <span class="ident">tx</span>.<span class="ident">subscribe</span>();
+
+    <span class="ident">tokio</span>::<span class="ident">spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">rx1</span>.<span class="ident">recv</span>().<span class="kw">await</span>.<span class="ident">unwrap</span>(), <span class="number">10</span>);
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">rx1</span>.<span class="ident">recv</span>().<span class="kw">await</span>.<span class="ident">unwrap</span>(), <span class="number">20</span>);
+    });
+
+    <span class="ident">tokio</span>::<span class="ident">spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">rx2</span>.<span class="ident">recv</span>().<span class="kw">await</span>.<span class="ident">unwrap</span>(), <span class="number">10</span>);
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">rx2</span>.<span class="ident">recv</span>().<span class="kw">await</span>.<span class="ident">unwrap</span>(), <span class="number">20</span>);
+    });
+
+    <span class="ident">tx</span>.<span class="ident">send</span>(<span class="number">10</span>).<span class="ident">unwrap</span>();
+    <span class="ident">tx</span>.<span class="ident">send</span>(<span class="number">20</span>).<span class="ident">unwrap</span>();
+}</pre></div>
+<p>Handling lag</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">sync</span>::<span class="ident">broadcast</span>;
+
+<span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">main</span>]</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> (<span class="ident">tx</span>, <span class="kw-2">mut</span> <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">broadcast</span>::<span class="ident">channel</span>(<span class="number">2</span>);
+
+    <span class="ident">tx</span>.<span class="ident">send</span>(<span class="number">10</span>).<span class="ident">unwrap</span>();
+    <span class="ident">tx</span>.<span class="ident">send</span>(<span class="number">20</span>).<span class="ident">unwrap</span>();
+    <span class="ident">tx</span>.<span class="ident">send</span>(<span class="number">30</span>).<span class="ident">unwrap</span>();
+
+    <span class="comment">// The receiver lagged behind</span>
+    <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">rx</span>.<span class="ident">recv</span>().<span class="kw">await</span>.<span class="ident">is_err</span>());
+
+    <span class="comment">// At this point, we can abort or continue with lost messages</span>
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">20</span>, <span class="ident">rx</span>.<span class="ident">recv</span>().<span class="kw">await</span>.<span class="ident">unwrap</span>());
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">30</span>, <span class="ident">rx</span>.<span class="ident">recv</span>().<span class="kw">await</span>.<span class="ident">unwrap</span>());
+}</pre></div>
+</div><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
+<table><tr class='module-item'><td><a class="struct" href="struct.Receiver.html" title='tokio::sync::broadcast::Receiver struct'>Receiver</a></td><td class='docblock-short'><p>Receiving-half of the <a href="crate::sync::broadcast"><code>broadcast</code></a> channel.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.SendError.html" title='tokio::sync::broadcast::SendError struct'>SendError</a></td><td class='docblock-short'><p>Error returned by [<code>Sender::send</code>][Sender::send].</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Sender.html" title='tokio::sync::broadcast::Sender struct'>Sender</a></td><td class='docblock-short'><p>Sending-half of the <a href="crate::sync::broadcast"><code>broadcast</code></a> channel.</p>
+</td></tr></table><h2 id='enums' class='section-header'><a href="#enums">Enums</a></h2>
+<table><tr class='module-item'><td><a class="enum" href="enum.RecvError.html" title='tokio::sync::broadcast::RecvError enum'>RecvError</a></td><td class='docblock-short'><p>An error returned from the <a href="crate::sync::broadcast::Receiver::recv"><code>recv</code></a> function on a <a href="crate::sync::broadcast::Receiver"><code>Receiver</code></a>.</p>
+</td></tr><tr class='module-item'><td><a class="enum" href="enum.TryRecvError.html" title='tokio::sync::broadcast::TryRecvError enum'>TryRecvError</a></td><td class='docblock-short'><p>An error returned from the <a href="crate::sync::broadcast::Receiver::try_recv"><code>try_recv</code></a> function on a <a href="crate::sync::broadcast::Receiver"><code>Receiver</code></a>.</p>
+</td></tr></table><h2 id='functions' class='section-header'><a href="#functions">Functions</a></h2>
+<table><tr class='module-item'><td><a class="fn" href="fn.channel.html" title='tokio::sync::broadcast::channel fn'>channel</a></td><td class='docblock-short'><p>Create a bounded, multi-producer, multi-consumer channel where each sent
+value is broadcasted to all active receivers.</p>
+</td></tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../";window.currentCrate = "tokio";</script><script src="../../../main.js"></script><script defer src="../../../search-index.js"></script></body></html>
