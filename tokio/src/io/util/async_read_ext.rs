@@ -990,6 +990,7 @@ cfg_io_util! {
         ///
         /// If successful, the total number of bytes read is returned.
         ///
+        /// [`read()`]: AsyncReadExt::read
         ///
         /// # Errors
         ///
