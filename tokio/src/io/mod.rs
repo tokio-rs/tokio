@@ -162,8 +162,8 @@
 //!
 //! # `std` re-exports
 //!
-//! Additionally, [`Error`], [`ErrorKind`], and [`Result`] are re-exported
-//! from `std::io` for ease of use.
+//! Additionally, [`Error`], [`ErrorKind`], [`Result`], and [`SeekFrom`] are
+//! re-exported from `std::io` for ease of use.
 //!
 //! [`AsyncRead`]: trait@AsyncRead
 //! [`AsyncWrite`]: trait@AsyncWrite
@@ -176,6 +176,7 @@
 //! [`ErrorKind`]: enum@ErrorKind
 //! [`Result`]: type@Result
 //! [`Read`]: std::io::Read
+//! [`SeekFrom`]: enum@SeekFrom
 //! [`Sink`]: https://docs.rs/futures/0.3/futures/sink/trait.Sink.html
 //! [`Stream`]: crate::stream::Stream
 //! [`Write`]: std::io::Write
@@ -187,7 +188,6 @@ mod async_buf_read;
 pub use self::async_buf_read::AsyncBufRead;
 
 mod async_read;
-
 pub use self::async_read::AsyncRead;
 
 mod async_seek;
@@ -195,6 +195,10 @@ pub use self::async_seek::AsyncSeek;
 
 mod async_write;
 pub use self::async_write::AsyncWrite;
+
+// Re-export some types from `std::io` so that users don't have to deal
+// with conflicts when `use`ing `tokio::io` and `std::io`.
+pub use std::io::{Error, ErrorKind, Result, SeekFrom};
 
 cfg_io_driver! {
     pub(crate) mod driver;
@@ -233,10 +237,6 @@ cfg_io_util! {
     cfg_stream! {
         pub use util::{stream_reader, StreamReader};
     }
-
-    // Re-export io::Error so that users don't have to deal with conflicts when
-    // `use`ing `tokio::io` and `std::io`.
-    pub use std::io::{Error, ErrorKind, Result};
 }
 
 cfg_not_io_util! {
