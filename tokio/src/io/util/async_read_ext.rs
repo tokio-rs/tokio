@@ -986,9 +986,11 @@ cfg_io_util! {
         ///
         /// All bytes read from this source will be appended to the specified
         /// buffer `buf`. This function will continuously call [`read()`] to
-        /// append more data to `buf` until [`read()`][read] returns `Ok(0)`.
+        /// append more data to `buf` until [`read()`] returns `Ok(0)`.
         ///
         /// If successful, the total number of bytes read is returned.
+        ///
+        /// [`read()`]: fn@crate::io::AsyncReadExt::read
         ///
         /// # Errors
         ///
@@ -1018,7 +1020,7 @@ cfg_io_util! {
         /// (See also the [`tokio::fs::read`] convenience function for reading from a
         /// file.)
         ///
-        /// [`tokio::fs::read`]: crate::fs::read::read
+        /// [`tokio::fs::read`]: fn@crate::fs::read
         fn read_to_end<'a>(&'a mut self, buf: &'a mut Vec<u8>) -> ReadToEnd<'a, Self>
         where
             Self: Unpin,
@@ -1078,7 +1080,9 @@ cfg_io_util! {
         /// This function returns a new instance of `AsyncRead` which will read
         /// at most `limit` bytes, after which it will always return EOF
         /// (`Ok(0)`). Any read errors will not count towards the number of
-        /// bytes read and future calls to [`read()`][read] may succeed.
+        /// bytes read and future calls to [`read()`] may succeed.
+        ///
+        /// [`read()`]: fn@crate::io::AsyncReadExt::read
         ///
         /// # Examples
         ///
