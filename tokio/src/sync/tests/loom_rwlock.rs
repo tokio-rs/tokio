@@ -72,7 +72,7 @@ fn concurrent_spin_write() {
 
         t1.join().expect("thread 1 write should not panic");
         t2.join().expect("thread 2 write should not panic");
-        //when all threads have finished the value on the lock should be 10
+        // when all threads have finished the value on the lock should be 10
         let guard = spin_read(&rwlock);
         assert_eq!(10, *guard);
     });
@@ -142,7 +142,7 @@ fn concurrent_spin_read_write() {
         let rwclone = rwlock.clone();
         let t3 = thread::spawn(move || {
             let guard = spin_read(&rwclone);
-            //at this state the value on the lock may either be 0, 5, or 10
+            // at this state the value on the lock may either be 0, 5, or 10
             assert!(*guard == 0 || *guard == 5 || *guard == 10);
         });
 
@@ -151,7 +151,7 @@ fn concurrent_spin_read_write() {
         t3.join().expect("thread 3 read should not panic");
 
         let guard = spin_read(&rwlock);
-        //when all threads have finished the value on the lock should be 10
+        // when all threads have finished the value on the lock should be 10
         assert_eq!(10, *guard);
     });
 }
