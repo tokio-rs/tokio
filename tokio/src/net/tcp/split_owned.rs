@@ -76,7 +76,7 @@ pub(crate) fn reunite(
         write.forget();
         // This unwrap cannot fail as the api does not allow creating more than two Arcs,
         // and we just dropped the other half.
-        Ok(Arc::try_unwrap(read.inner).expect("TcpStream: try_unwrap failed in reunite")))
+        Ok(Arc::try_unwrap(read.inner).expect("TcpStream: try_unwrap failed in reunite"))
     } else {
         Err(ReuniteError(read, write))
     }
