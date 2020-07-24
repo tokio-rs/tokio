@@ -19,18 +19,6 @@ task:
     - |
       echo "~~~~ rustc --version ~~~~"
       rustc --version
-
-      # Remove any existing patch statements
-      mv Cargo.toml Cargo.toml.bck
-      sed -n '/\[patch.crates-io\]/q;p' Cargo.toml.bck > Cargo.toml
-
-      # Patch all crates
-      cat ci/patch.toml >> Cargo.toml
-
-      # Print `Cargo.toml` for debugging
-      echo "~~~~ Cargo.toml ~~~~"
-      cat Cargo.toml
-      echo "~~~~~~~~~~~~~~~~~~~~"
   test_script:
     - . $HOME/.cargo/env
     - cargo test --all
