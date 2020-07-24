@@ -151,7 +151,7 @@ jobs:
           override: true
 
       - name: "test --workspace --all-features"
-        run: cargo test --workspace --all-features
+        run: cargo check --workspace --all-features
 
   fmt:
     name: fmt
