@@ -1,0 +1,222 @@
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+
+name: CI
+
+env:
+  RUSTFLAGS: -Dwarnings
+  RUST_BACKTRACE: 1
+  nightly: nightly-2020-07-12
+  minrust: 1.39.0
+
+jobs:
+  test:
+    name: test tokio full
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
+          - macos-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust
+        run: rustup update stable
+      - name: Install cargo-hack
+        run: cargo install cargo-hack
+
+      # Run `tokio` with `full` features. This excludes testing utilities which
+      # can alter the runtime behavior of Tokio.
+      - name: test tokio full
+        run: cargo test --features full
+        working-directory: tokio
+
+      # Check `tokio` with `full + parking_lot` to make sure it compiles.
+      - name: check tokio full,parking_lot
+        run: cargo check --features full,parking_lot
+        working-directory: tokio
+
+      # Test **all** crates in the workspace with all features.
+      - name: test all --all-features
+        run: cargo test --workspace --all-features
+
+      # Run integration tests for each feature
+      - name: test tests-integration --each-feature
+        run: cargo hack test --each-feature
+        working-directory: tests-integration
+
+      # Run macro build tests
+      - name: test tests-build --each-feature
+        run: cargo hack test --each-feature
+        working-directory: tests-build
+
+  test-unstable:
+    name: test tokio full --unstable
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
+          - macos-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust
+        run: rustup update stable
+
+      # Run `tokio` with "unstable" cfg flag.
+      - name: test tokio full --cfg unstable
+        run: cargo test --features full
+        working-directory: tokio
+        env:
+          RUSTFLAGS: '--cfg tokio_unstable'
+
+  miri:
+    name: miri
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.nightly }}
+          override: true
+      - name: Install Miri
+        run: |
+          set -e
+          rustup component add miri
+          cargo miri setup
+          rm -rf tokio/tests
+
+      - name: miri
+        run: cargo miri test --features rt-core,rt-threaded,rt-util,sync -- -- task
+        working-directory: tokio
+
+  cross:
+    name: cross
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - i686-unknown-linux-gnu
+          - powerpc-unknown-linux-gnu
+          - powerpc64-unknown-linux-gnu
+          - mips-unknown-linux-gnu
+          - arm-linux-androideabi
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: check
+          args: --workspace --target ${{ matrix.target }}
+
+  features:
+    name: features
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.nightly }}
+          override: true
+      - name: Install cargo-hack
+        run: cargo install cargo-hack
+
+      - name: check --each-feature
+        run: cargo hack check --all --each-feature -Z avoid-dev-deps
+
+      # Try with unstable feature flags
+      - name: check --each-feature --unstable
+        run: cargo hack check --all --each-feature -Z avoid-dev-deps
+        env:
+          RUSTFLAGS: --cfg tokio_unstable
+
+  minrust:
+    name: minrust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.minrust }}
+          override: true
+
+      - name: "test --workspace --all-features"
+        run: cargo check --workspace --all-features
+
+  fmt:
+    name: fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust
+        run: rustup update stable
+      - name: Install rustfmt
+        run: rustup component add rustfmt
+
+      # Check fmt
+      - name: "rustfmt --check"
+        # Workaround for rust-lang/cargo#7732
+        run: rustfmt --check --edition 2018 $(find . -name '*.rs' -print)
+
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust
+        run: rustup update stable
+      - name: Install clippy
+        run: rustup component add clippy
+
+      # Run clippy
+      - name: "clippy --all"
+        run: cargo clippy --all --tests
+
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.nightly }}
+          override: true
+
+      - name: "doc --lib --all-features"
+        run: cargo doc --lib --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: --cfg docsrs
+
+  loom:
+    name: loom
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        scope:
+          - --skip loom_pool
+          - loom_pool::group_a
+          - loom_pool::group_b
+          - loom_pool::group_c
+          - loom_pool::group_d
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust
+        run: rustup update stable
+
+      - name: loom ${{ matrix.scope }}
+        run: cargo test --lib --release --features full -- --nocapture $SCOPE
+        working-directory: tokio
+        env:
+          RUSTFLAGS: --cfg loom --cfg tokio_unstable
+          LOOM_MAX_PREEMPTIONS: 2
+          SCOPE: ${{ matrix.scope }}

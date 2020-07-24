@@ -990,7 +990,7 @@ cfg_io_util! {
         ///
         /// If successful, the total number of bytes read is returned.
         ///
-        /// [`read()`]: fn@crate::io::AsyncReadExt::read
+        /// [`read()`]: AsyncReadExt::read
         ///
         /// # Errors
         ///
@@ -1083,6 +1083,8 @@ cfg_io_util! {
         /// bytes read and future calls to [`read()`] may succeed.
         ///
         /// [`read()`]: fn@crate::io::AsyncReadExt::read
+        ///
+        /// [read]: AsyncReadExt::read
         ///
         /// # Examples
         ///
