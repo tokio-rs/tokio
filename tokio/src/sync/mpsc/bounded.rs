@@ -175,7 +175,7 @@ impl<T> Receiver<T> {
     ///     sync_code.join().unwrap()
     /// }
     /// ```
-    pub fn blocking_recv(&mut self) -> Result<Option<T>, crate::park::ParkError> {
+    pub fn blocking_recv(&mut self) -> Result<Option<T>, ()> {
         // TODO This is too restrictive want to only panic if called in block_on
         #[cfg(feature = "rt-core")]
         if Handle::try_current().is_ok() {
