@@ -1,3 +1,4 @@
+#[cfg(feature="blocking")]
 use crate::park::{CachedParkThread, Park};
 #[cfg(feature = "rt-core")]
 use crate::runtime::Handle;
@@ -175,6 +176,7 @@ impl<T> Receiver<T> {
     ///     sync_code.join().unwrap()
     /// }
     /// ```
+    #[cfg(feature="blocking")]
     pub fn blocking_recv(&mut self) -> Result<Option<T>, ()> {
         // TODO This is too restrictive want to only panic if called in block_on
         #[cfg(feature = "rt-core")]
@@ -299,6 +301,7 @@ impl<T> Sender<T> {
     }
 
     /// Blocking send to call outside of asynchronous contexts
+    #[cfg(feature="blocking")]
     pub fn blocking_send(&mut self, value: T) -> Result<(), SendError<T>> {
         // TODO ensure can't be called from block_on
         let mut park = CachedParkThread::new();
