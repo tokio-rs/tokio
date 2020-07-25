@@ -513,3 +513,17 @@ async fn blocking_recv_async() {
     let (_tx, mut rx) = mpsc::channel::<()>(1);
     let _ = rx.blocking_recv();
 }
+
+#[test]
+fn blocking_send() {
+    let (mut tx, mut rx) = mpsc::channel::<u8>(1);
+
+    let sync_code = thread::spawn(move || {
+        tx.blocking_send(10).unwrap();
+    });
+
+    Runtime::new().unwrap().block_on(async move {
+        assert_eq!(Some(10), rx.recv().await);
+    });
+    sync_code.join().unwrap()
+}

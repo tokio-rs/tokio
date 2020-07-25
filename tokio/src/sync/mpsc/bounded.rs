@@ -176,6 +176,7 @@ impl<T> Receiver<T> {
     /// }
     /// ```
     pub fn blocking_recv(&mut self) -> Result<Option<T>, crate::park::ParkError> {
+        // TODO This is too restrictive want to only panic if called in block_on
         #[cfg(feature = "rt-core")]
         if Handle::try_current().is_ok() {
             panic!("blocking_recv cannot be called from within a runtime");
@@ -294,6 +295,32 @@ impl<T> Sender<T> {
             Ok(()) => Ok(()),
             Err(TrySendError::Full(_)) => unreachable!(),
             Err(TrySendError::Closed(value)) => Err(SendError(value)),
+        }
+    }
+
+    /// Blocking send to call outside of asynchronous contexts
+    pub fn blocking_send(&mut self, value: T) -> Result<(), SendError<T>> {
+        // TODO ensure can't be called from block_on
+        let mut park = CachedParkThread::new();
+        let waker = match park.get_unpark() {
+            Ok(s) => s.into_waker(),
+            Err(_) => return Err(SendError(value)),
+        };
+        let mut cx = Context::from_waker(&waker);
+
+        loop {
+            if let Poll::Ready(v) = self.poll_ready(&mut cx) {
+                if v.is_ok() {
+                    return match self.try_send(value) {
+                        Ok(()) => Ok(()),
+                        Err(TrySendError::Closed(value)) => Err(SendError(value)),
+                        _ => unreachable!(),
+                    };
+                }
+            }
+            if park.park().is_err() {
+                return Err(SendError(value));
+            };
         }
     }
 
