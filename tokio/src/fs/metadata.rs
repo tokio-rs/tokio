@@ -4,7 +4,7 @@ use std::fs::Metadata;
 use std::io;
 use std::path::Path;
 
-/// Given a path, query the file system to get information about a file,
+/// Given a path, queries the file system to get information about a file,
 /// directory, etc.
 ///
 /// This is an async version of [`std::fs::metadata`][std]

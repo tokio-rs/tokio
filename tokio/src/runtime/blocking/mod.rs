@@ -5,49 +5,30 @@
 
 cfg_blocking_impl! {
     mod pool;
-    pub(crate) use pool::{spawn_blocking, BlockingPool, Spawner};
+    pub(crate) use pool::{spawn_blocking, try_spawn_blocking, BlockingPool, Spawner};
 
     mod schedule;
     mod shutdown;
-    mod task;
+    pub(crate) mod task;
 
-    use crate::runtime::{self, Builder, io, time};
+    use crate::runtime::Builder;
 
-    pub(crate) fn create_blocking_pool(
-        builder: &Builder,
-        spawner: &runtime::Spawner,
-        io: &io::Handle,
-        time: &time::Handle,
-        clock: &time::Clock,
-        thread_cap: usize,
-    ) -> BlockingPool {
-        BlockingPool::new(
-            builder,
-            spawner,
-            io,
-            time,
-            clock,
-            thread_cap)
+    pub(crate) fn create_blocking_pool(builder: &Builder, thread_cap: usize) -> BlockingPool {
+        BlockingPool::new(builder, thread_cap)
 
     }
 }
 
 cfg_not_blocking_impl! {
-    use crate::runtime::{self, io, time, Builder};
+    use crate::runtime::Builder;
+    use std::time::Duration;
 
     #[derive(Debug, Clone)]
     pub(crate) struct BlockingPool {}
 
     pub(crate) use BlockingPool as Spawner;
 
-    pub(crate) fn create_blocking_pool(
-        _builder: &Builder,
-        _spawner: &runtime::Spawner,
-        _io: &io::Handle,
-        _time: &time::Handle,
-        _clock: &time::Clock,
-        _thread_cap: usize,
-    ) -> BlockingPool {
+    pub(crate) fn create_blocking_pool(_builder: &Builder, _thread_cap: usize) -> BlockingPool {
         BlockingPool {}
     }
 
@@ -56,11 +37,7 @@ cfg_not_blocking_impl! {
             self
         }
 
-        pub(crate) fn enter<F, R>(&self, f: F) -> R
-        where
-            F: FnOnce() -> R,
-        {
-            f()
+        pub(crate) fn shutdown(&mut self, _duration: Option<Duration>) {
         }
     }
 }

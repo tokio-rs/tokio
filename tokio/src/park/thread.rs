@@ -10,13 +10,7 @@ pub(crate) struct ParkThread {
     inner: Arc<Inner>,
 }
 
-/// Error returned by `ParkThread`
-///
-/// This currently is never returned, but might at some point in the future.
-#[derive(Debug)]
-pub(crate) struct ParkError {
-    _p: (),
-}
+pub(crate) type ParkError = ();
 
 /// Unblocks a thread that was blocked by `ParkThread`.
 #[derive(Clone, Debug)]
@@ -135,6 +129,10 @@ impl Inner {
             return;
         }
 
+        if dur == Duration::from_millis(0) {
+            return;
+        }
+
         let m = self.mutex.lock().unwrap();
 
         match self.state.compare_exchange(EMPTY, PARKED, SeqCst, SeqCst) {
@@ -206,7 +204,7 @@ impl Unpark for UnparkThread {
     }
 }
 
-cfg_blocking_impl! {
+cfg_block_on! {
     use std::marker::PhantomData;
     use std::rc::Rc;
 
@@ -240,7 +238,7 @@ cfg_blocking_impl! {
             F: FnOnce(&ParkThread) -> R,
         {
             CURRENT_PARKER.try_with(|inner| f(inner))
-                .map_err(|_| ParkError { _p: () })
+                .map_err(|_| ())
         }
     }
 

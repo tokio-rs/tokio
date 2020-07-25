@@ -1,45 +1,21 @@
 //! Threadpool
 
-mod current;
+mod atomic_cell;
+use atomic_cell::AtomicCell;
 
 mod idle;
 use self::idle::Idle;
 
-mod owned;
-use self::owned::Owned;
-
-mod queue;
-
-mod spawner;
-pub(crate) use self::spawner::Spawner;
-
-mod slice;
-
-mod shared;
-use self::shared::Shared;
-
 mod worker;
-use worker::Worker;
+pub(crate) use worker::Launch;
 
 cfg_blocking! {
     pub(crate) use worker::block_in_place;
 }
 
-/// Unit tests
-#[cfg(test)]
-mod tests;
-
-#[cfg(not(loom))]
-const LOCAL_QUEUE_CAPACITY: usize = 256;
-
-// Shrink the size of the local queue when using loom. This shouldn't impact
-// logic, but allows loom to test more edge cases in a reasonable a mount of
-// time.
-#[cfg(loom)]
-const LOCAL_QUEUE_CAPACITY: usize = 2;
-
-use crate::runtime::{self, blocking, Parker};
-use crate::task::JoinHandle;
+use crate::loom::sync::Arc;
+use crate::runtime::task::{self, JoinHandle};
+use crate::runtime::Parker;
 
 use std::fmt;
 use std::future::Future;
@@ -49,19 +25,32 @@ pub(crate) struct ThreadPool {
     spawner: Spawner,
 }
 
-pub(crate) struct Workers {
-    workers: Vec<Worker>,
+/// Submit futures to the associated thread pool for execution.
+///
+/// A `Spawner` instance is a handle to a single thread pool that allows the owner
+/// of the handle to spawn futures onto the thread pool.
+///
+/// The `Spawner` handle is *only* used for spawning new futures. It does not
+/// impact the lifecycle of the thread pool in any way. The thread pool may
+/// shutdown while there are outstanding `Spawner` instances.
+///
+/// `Spawner` instances are obtained by calling [`ThreadPool::spawner`].
+///
+/// [`ThreadPool::spawner`]: method@ThreadPool::spawner
+#[derive(Clone)]
+pub(crate) struct Spawner {
+    shared: Arc<worker::Shared>,
 }
 
+// ===== impl ThreadPool =====
+
 impl ThreadPool {
-    pub(crate) fn new(pool_size: usize, parker: Parker) -> (ThreadPool, Workers) {
-        let (pool, workers) = worker::create_set(pool_size, parker);
+    pub(crate) fn new(size: usize, parker: Parker) -> (ThreadPool, Launch) {
+        let (shared, launch) = worker::create(size, parker);
+        let spawner = Spawner { shared };
+        let thread_pool = ThreadPool { spawner };
 
-        let spawner = Spawner::new(pool);
-
-        let pool = ThreadPool { spawner };
-
-        (pool, Workers { workers })
+        (thread_pool, launch)
     }
 
     /// Returns reference to `Spawner`.
@@ -72,7 +61,7 @@ impl ThreadPool {
         &self.spawner
     }
 
-    /// Spawn a task
+    /// Spawns a task
     pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
@@ -81,7 +70,7 @@ impl ThreadPool {
         self.spawner.spawn(future)
     }
 
-    /// Block the current thread waiting for the future to complete.
+    /// Blocks the current thread waiting for the future to complete.
     ///
     /// The future will execute on the current thread, but all spawned tasks
     /// will be executed on the thread pool.
@@ -89,10 +78,8 @@ impl ThreadPool {
     where
         F: Future,
     {
-        self.spawner.enter(|| {
-            let mut enter = crate::runtime::enter();
-            enter.block_on(future).expect("failed to park thread")
-        })
+        let mut enter = crate::runtime::enter(true);
+        enter.block_on(future).expect("failed to park thread")
     }
 }
 
@@ -104,17 +91,27 @@ impl fmt::Debug for ThreadPool {
 
 impl Drop for ThreadPool {
     fn drop(&mut self) {
-        self.spawner.workers().close();
+        self.spawner.shared.close();
     }
 }
 
-impl Workers {
-    pub(crate) fn spawn(self, blocking_pool: &blocking::Spawner) {
-        blocking_pool.enter(|| {
-            for worker in self.workers {
-                let b = blocking_pool.clone();
-                runtime::spawn_blocking(move || worker.run(b));
-            }
-        });
+// ==== impl Spawner =====
+
+impl Spawner {
+    /// Spawns a future onto the thread pool
+    pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
+    where
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        let (task, handle) = task::joinable(future);
+        self.shared.schedule(task, false);
+        handle
+    }
+}
+
+impl fmt::Debug for Spawner {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("Spawner").finish()
     }
 }

@@ -23,6 +23,7 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::io;
+use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
 
 use futures::future::try_join;
@@ -63,8 +64,15 @@ async fn transfer(mut inbound: TcpStream, proxy_addr: String) -> Result<(), Box<
     let (mut ri, mut wi) = inbound.split();
     let (mut ro, mut wo) = outbound.split();
 
-    let client_to_server = io::copy(&mut ri, &mut wo);
-    let server_to_client = io::copy(&mut ro, &mut wi);
+    let client_to_server = async {
+        io::copy(&mut ri, &mut wo).await?;
+        wo.shutdown().await
+    };
+
+    let server_to_client = async {
+        io::copy(&mut ro, &mut wi).await?;
+        wi.shutdown().await
+    };
 
     try_join(client_to_server, server_to_client).await?;
 

@@ -302,6 +302,37 @@
 //! anywhere because it already is factored into the total frame length that
 //! is read from the byte stream.
 //!
+//! ## Example 7
+//!
+//! The following will parse a 3 byte length field at offset 0 in a 4 byte
+//! frame head, excluding the 4th byte from the yielded `BytesMut`.
+//!
+//! ```
+//! # use tokio::io::AsyncRead;
+//! # use tokio_util::codec::LengthDelimitedCodec;
+//! # fn bind_read<T: AsyncRead>(io: T) {
+//! LengthDelimitedCodec::builder()
+//!     .length_field_offset(0) // default value
+//!     .length_field_length(3)
+//!     .length_adjustment(0)  // default value
+//!     .num_skip(4) // skip the first 4 bytes
+//!     .new_read(io);
+//! # }
+//! # pub fn main() {}
+//! ```
+//!
+//! The following frame will be decoded as such:
+//!
+//! ```text
+//!                  INPUT                       DECODED
+//! +------- len ------+--- Payload ---+    +--- Payload ---+
+//! | \x00\x00\x0B\xFF |  Hello world  | => |  Hello world  |
+//! +------------------+---------------+    +---------------+
+//! ```
+//!
+//! A simple example where there are unused bytes between the length field
+//! and the payload.
+//!
 //! # Encoding
 //!
 //! [`FramedWrite`] adapts an [`AsyncWrite`] into a `Sink` of [`BytesMut`],
@@ -333,13 +364,13 @@
 //! +------------+--------------+
 //! ```
 //!
-//! [`LengthDelimitedCodec::new()`]: struct.LengthDelimitedCodec.html#method.new
-//! [`FramedRead`]: struct.FramedRead.html
-//! [`FramedWrite`]: struct.FramedWrite.html
-//! [`AsyncRead`]: ../../trait.AsyncRead.html
-//! [`AsyncWrite`]: ../../trait.AsyncWrite.html
-//! [`Encoder`]: ../trait.Encoder.html
-//! [`BytesMut`]: https://docs.rs/bytes/0.4/bytes/struct.BytesMut.html
+//! [`LengthDelimitedCodec::new()`]: method@LengthDelimitedCodec::new
+//! [`FramedRead`]: struct@FramedRead
+//! [`FramedWrite`]: struct@FramedWrite
+//! [`AsyncRead`]: trait@tokio::io::AsyncRead
+//! [`AsyncWrite`]: trait@tokio::io::AsyncWrite
+//! [`Encoder`]: trait@Encoder
+//! [`BytesMut`]: bytes::BytesMut
 
 use crate::codec::{Decoder, Encoder, Framed, FramedRead, FramedWrite};
 
@@ -494,7 +525,7 @@ impl LengthDelimitedCodec {
         let num_skip = self.builder.get_num_skip();
 
         if num_skip > 0 {
-            let _ = src.split_to(num_skip);
+            src.advance(num_skip);
         }
 
         // Ensure that the buffer has enough space to read the incoming
@@ -546,12 +577,11 @@ impl Decoder for LengthDelimitedCodec {
     }
 }
 
-impl Encoder for LengthDelimitedCodec {
-    type Item = Bytes;
+impl Encoder<Bytes> for LengthDelimitedCodec {
     type Error = io::Error;
 
     fn encode(&mut self, data: Bytes, dst: &mut BytesMut) -> Result<(), io::Error> {
-        let n = (&data).remaining();
+        let n = data.len();
 
         if n > self.builder.max_frame_len {
             return Err(io::Error::new(

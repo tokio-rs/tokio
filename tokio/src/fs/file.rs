@@ -24,12 +24,28 @@ use std::task::Poll::*;
 /// Tokio runtime.
 ///
 /// An instance of a `File` can be read and/or written depending on what options
-/// it was opened with. Files also implement Seek to alter the logical cursor
-/// that the file contains internally.
+/// it was opened with. Files also implement [`AsyncSeek`] to alter the logical
+/// cursor that the file contains internally.
 ///
-/// Files are automatically closed when they go out of scope.
+/// A file will not be closed immediately when it goes out of scope if there
+/// are any IO operations that have not yet completed. To ensure that a file is
+/// closed immediately when it is dropped, you should call [`flush`] before
+/// dropping it. Note that this does not ensure that the file has been fully
+/// written to disk; the operating system might keep the changes around in an
+/// in-memory buffer. See the [`sync_all`] method for telling the OS to write
+/// the data to disk.
 ///
-/// [std]: std::fs::File
+/// Reading and writing to a `File` is usually done using the convenience
+/// methods found on the [`AsyncReadExt`] and [`AsyncWriteExt`] traits. Examples
+/// import these traits through [the prelude].
+///
+/// [std]: struct@std::fs::File
+/// [`AsyncSeek`]: trait@crate::io::AsyncSeek
+/// [`flush`]: fn@crate::io::AsyncWriteExt::flush
+/// [`sync_all`]: fn@crate::fs::File::sync_all
+/// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
+/// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
+/// [the prelude]: crate::prelude
 ///
 /// # Examples
 ///
@@ -37,7 +53,7 @@ use std::task::Poll::*;
 ///
 /// ```no_run
 /// use tokio::fs::File;
-/// use tokio::prelude::*;
+/// use tokio::prelude::*; // for write_all()
 ///
 /// # async fn dox() -> std::io::Result<()> {
 /// let mut file = File::create("foo.txt").await?;
@@ -50,7 +66,7 @@ use std::task::Poll::*;
 ///
 /// ```no_run
 /// use tokio::fs::File;
-/// use tokio::prelude::*;
+/// use tokio::prelude::*; // for read_to_end()
 ///
 /// # async fn dox() -> std::io::Result<()> {
 /// let mut file = File::open("foo.txt").await?;
@@ -114,6 +130,11 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// The [`read_to_end`] method is defined on the [`AsyncReadExt`] trait.
+    ///
+    /// [`read_to_end`]: fn@crate::io::AsyncReadExt::read_to_end
+    /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
     pub async fn open(path: impl AsRef<Path>) -> io::Result<File> {
         let path = path.as_ref().to_owned();
         let std = asyncify(|| sys::File::open(path)).await?;
@@ -149,13 +170,18 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// The [`write_all`] method is defined on the [`AsyncWriteExt`] trait.
+    ///
+    /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
+    /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     pub async fn create(path: impl AsRef<Path>) -> io::Result<File> {
         let path = path.as_ref().to_owned();
         let std_file = asyncify(move || sys::File::create(path)).await?;
         Ok(File::from_std(std_file))
     }
 
-    /// Convert a [`std::fs::File`][std] to a [`tokio::fs::File`][file].
+    /// Converts a [`std::fs::File`][std] to a [`tokio::fs::File`][file].
     ///
     /// [std]: std::fs::File
     /// [file]: File
@@ -176,7 +202,7 @@ impl File {
         }
     }
 
-    /// Seek to an offset, in bytes, in a stream.
+    /// Seeks to an offset, in bytes, in a stream.
     ///
     /// # Examples
     ///
@@ -195,6 +221,11 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// The [`read_exact`] method is defined on the [`AsyncReadExt`] trait.
+    ///
+    /// [`read_exact`]: fn@crate::io::AsyncReadExt::read_exact
+    /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
     pub async fn seek(&mut self, mut pos: SeekFrom) -> io::Result<u64> {
         self.complete_inflight().await;
 
@@ -251,6 +282,11 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// The [`write_all`] method is defined on the [`AsyncWriteExt`] trait.
+    ///
+    /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
+    /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     pub async fn sync_all(&mut self) -> io::Result<()> {
         self.complete_inflight().await;
 
@@ -280,6 +316,11 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// The [`write_all`] method is defined on the [`AsyncWriteExt`] trait.
+    ///
+    /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
+    /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     pub async fn sync_data(&mut self) -> io::Result<()> {
         self.complete_inflight().await;
 
@@ -312,6 +353,11 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// The [`write_all`] method is defined on the [`AsyncWriteExt`] trait.
+    ///
+    /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
+    /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     pub async fn set_len(&mut self, size: u64) -> io::Result<()> {
         self.complete_inflight().await;
 
@@ -491,6 +537,11 @@ impl File {
 }
 
 impl AsyncRead for File {
+    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [std::mem::MaybeUninit<u8>]) -> bool {
+        // https://github.com/rust-lang/rust/blob/09c817eeb29e764cfc12d0a8d94841e3ffe34023/src/libstd/fs.rs#L668
+        false
+    }
+
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -558,10 +609,6 @@ impl AsyncSeek for File {
         cx: &mut Context<'_>,
         mut pos: SeekFrom,
     ) -> Poll<io::Result<()>> {
-        if let Some(e) = self.last_write_err.take() {
-            return Ready(Err(e.into()));
-        }
-
         loop {
             match self.state {
                 Idle(ref mut buf_cell) => {
@@ -592,6 +639,7 @@ impl AsyncSeek for File {
                     match op {
                         Operation::Read(_) => {}
                         Operation::Write(Err(e)) => {
+                            assert!(self.last_write_err.is_none());
                             self.last_write_err = Some(e.kind());
                         }
                         Operation::Write(_) => {}
@@ -603,10 +651,6 @@ impl AsyncSeek for File {
     }
 
     fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
-        if let Some(e) = self.last_write_err.take() {
-            return Ready(Err(e.into()));
-        }
-
         loop {
             match self.state {
                 Idle(_) => panic!("must call start_seek before calling poll_complete"),
@@ -617,6 +661,7 @@ impl AsyncSeek for File {
                     match op {
                         Operation::Read(_) => {}
                         Operation::Write(Err(e)) => {
+                            assert!(self.last_write_err.is_none());
                             self.last_write_err = Some(e.kind());
                         }
                         Operation::Write(_) => {}

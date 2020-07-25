@@ -5,7 +5,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{self, Poll};
 
-/// Wait until `deadline` is reached.
+/// Waits until `deadline` is reached.
 ///
 /// No work is performed while awaiting on the delay to complete. The delay
 /// operates at millisecond granularity and should not be used for tasks that
@@ -20,7 +20,7 @@ pub fn delay_until(deadline: Instant) -> Delay {
     Delay { registration }
 }
 
-/// Wait until `duration` has elapsed.
+/// Waits until `duration` has elapsed.
 ///
 /// Equivalent to `delay_until(Instant::now() + duration)`. An asynchronous
 /// analog to `std::thread::sleep`.
@@ -29,10 +29,29 @@ pub fn delay_until(deadline: Instant) -> Delay {
 /// operates at millisecond granularity and should not be used for tasks that
 /// require high-resolution timers.
 ///
+/// To run something regularly on a schedule, see [`interval`].
+///
 /// # Cancellation
 ///
 /// Canceling a delay is done by dropping the returned future. No additional
 /// cleanup work is required.
+///
+/// # Examples
+///
+/// Wait 100ms and print "100 ms have elapsed".
+///
+/// ```
+/// use tokio::time::{delay_for, Duration};
+///
+/// #[tokio::main]
+/// async fn main() {
+///     delay_for(Duration::from_millis(100)).await;
+///     println!("100 ms have elapsed");
+/// }
+/// ```
+///
+/// [`interval`]: crate::time::interval()
+#[cfg_attr(docsrs, doc(alias = "sleep"))]
 pub fn delay_for(duration: Duration) -> Delay {
     delay_until(Instant::now() + duration)
 }
@@ -59,14 +78,14 @@ impl Delay {
         self.registration.deadline()
     }
 
-    /// Returns true if the `Delay` has elapsed
+    /// Returns `true` if the `Delay` has elapsed
     ///
     /// A `Delay` is elapsed when the requested duration has elapsed.
     pub fn is_elapsed(&self) -> bool {
         self.registration.is_elapsed()
     }
 
-    /// Reset the `Delay` instance to a new deadline.
+    /// Resets the `Delay` instance to a new deadline.
     ///
     /// Calling this function allows changing the instant at which the `Delay`
     /// future completes without having to create new associated state.

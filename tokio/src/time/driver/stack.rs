@@ -55,7 +55,7 @@ impl wheel::Stack for Stack {
         self.head = Some(entry);
     }
 
-    /// Pop an item from the stack
+    /// Pops an item from the stack
     fn pop(&mut self, _: &mut ()) -> Option<Arc<Entry>> {
         let entry = self.head.take();
 

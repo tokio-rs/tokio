@@ -6,7 +6,7 @@ use std::time::Duration;
 
 /// A measurement of the system clock, useful for talking to
 /// external entities like the file system or other processes.
-#[derive(Clone, Copy, Eq, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct Instant {
     std: std::time::Instant,
 }

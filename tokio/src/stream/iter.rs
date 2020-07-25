@@ -3,7 +3,7 @@ use crate::stream::Stream;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
-/// Stream for the [`iter`] function.
+/// Stream for the [`iter`](fn@iter) function.
 #[derive(Debug)]
 #[must_use = "streams do nothing unless polled"]
 pub struct Iter<I> {
@@ -44,7 +44,9 @@ where
 {
     type Item = I::Item;
 
-    fn poll_next(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Option<I::Item>> {
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<I::Item>> {
+        let coop = ready!(crate::coop::poll_proceed(cx));
+        coop.made_progress();
         Poll::Ready(self.iter.next())
     }
 

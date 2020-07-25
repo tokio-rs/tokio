@@ -3,7 +3,6 @@ use crate::io::PollEvented;
 use crate::net::unix::{Incoming, UnixStream};
 
 use mio::Ready;
-use mio_uds;
 use std::convert::TryFrom;
 use std::fmt;
 use std::io;
@@ -14,6 +13,39 @@ use std::task::{Context, Poll};
 
 cfg_uds! {
     /// A Unix socket which can accept connections from other Unix sockets.
+    ///
+    /// You can accept a new connection by using the [`accept`](`UnixListener::accept`) method. Alternatively `UnixListener`
+    /// implements the [`Stream`](`crate::stream::Stream`) trait, which allows you to use the listener in places that want a
+    /// stream. The stream will never return `None` and will also not yield the peer's `SocketAddr` structure. Iterating over
+    /// it is equivalent to calling accept in a loop.
+    ///
+    /// # Errors
+    ///
+    /// Note that accepting a connection can lead to various errors and not all
+    /// of them are necessarily fatal ‒ for example having too many open file
+    /// descriptors or the other side closing the connection while it waits in
+    /// an accept queue. These would terminate the stream if not handled in any
+    /// way.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::UnixListener;
+    /// use tokio::stream::StreamExt;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut listener = UnixListener::bind("/path/to/the/socket").unwrap();
+    ///     while let Some(stream) = listener.next().await {
+    ///         match stream {
+    ///             Ok(stream) => {
+    ///                 println!("new client!");
+    ///             }
+    ///             Err(e) => { /* connection failed */ }
+    ///         }
+    ///     }
+    /// }
+    /// ```
     pub struct UnixListener {
         io: PollEvented<mio_uds::UnixListener>,
     }
@@ -21,6 +53,14 @@ cfg_uds! {
 
 impl UnixListener {
     /// Creates a new `UnixListener` bound to the specified path.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if thread-local runtime is not set.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
     pub fn bind<P>(path: P) -> io::Result<UnixListener>
     where
         P: AsRef<Path>,
@@ -35,6 +75,14 @@ impl UnixListener {
     ///
     /// The returned listener will be associated with the given event loop
     /// specified by `handle` and is ready to perform I/O.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if thread-local runtime is not set.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
     pub fn from_std(listener: net::UnixListener) -> io::Result<UnixListener> {
         let listener = mio_uds::UnixListener::from_listener(listener)?;
         let io = PollEvented::new(listener)?;
@@ -88,6 +136,8 @@ impl UnixListener {
 
     /// Returns a stream over the connections being received on this listener.
     ///
+    /// Note that `UnixListener` also directly implements `Stream`.
+    ///
     /// The returned stream will never return `None` and will also not yield the
     /// peer's `SocketAddr` structure. Iterating over it is equivalent to
     /// calling accept in a loop.
@@ -123,6 +173,19 @@ impl UnixListener {
     /// ```
     pub fn incoming(&mut self) -> Incoming<'_> {
         Incoming::new(self)
+    }
+}
+
+#[cfg(feature = "stream")]
+impl crate::stream::Stream for UnixListener {
+    type Item = io::Result<UnixStream>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        let (socket, _) = ready!(self.poll_accept(cx))?;
+        Poll::Ready(Some(Ok(socket)))
     }
 }
 

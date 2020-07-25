@@ -2,10 +2,11 @@
 //!
 //! See [`Timeout`] documentation for more details.
 //!
-//! [`Timeout`]: struct.Timeout.html
+//! [`Timeout`]: struct@Timeout
 
 use crate::time::{delay_until, Delay, Duration, Instant};
 
+use pin_project_lite::pin_project;
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
@@ -14,7 +15,8 @@ use std::task::{self, Poll};
 /// Require a `Future` to complete before the specified duration has elapsed.
 ///
 /// If the future completes before the duration has elapsed, then the completed
-/// value is returned. Otherwise, an error is returned.
+/// value is returned. Otherwise, an error is returned and the future is
+/// canceled.
 ///
 /// # Cancelation
 ///
@@ -98,17 +100,29 @@ where
     }
 }
 
-/// Future returned by [`timeout`](timeout) and [`timeout_at`](timeout_at).
-#[must_use = "futures do nothing unless you `.await` or poll them"]
-#[derive(Debug)]
-pub struct Timeout<T> {
-    value: T,
-    delay: Delay,
+pin_project! {
+    /// Future returned by [`timeout`](timeout) and [`timeout_at`](timeout_at).
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
+    #[derive(Debug)]
+    pub struct Timeout<T> {
+        #[pin]
+        value: T,
+        #[pin]
+        delay: Delay,
+    }
 }
 
 /// Error returned by `Timeout`.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Elapsed(());
+
+impl Elapsed {
+    // Used on StreamExt::timeout
+    #[allow(unused)]
+    pub(crate) fn new() -> Self {
+        Elapsed(())
+    }
+}
 
 impl<T> Timeout<T> {
     pub(crate) fn new_with_delay(value: T, delay: Delay) -> Timeout<T> {
@@ -137,24 +151,18 @@ where
 {
     type Output = Result<T::Output, Elapsed>;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
-        // First, try polling the future
+    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
+        let me = self.project();
 
-        // Safety: we never move `self.value`
-        unsafe {
-            let p = self.as_mut().map_unchecked_mut(|me| &mut me.value);
-            if let Poll::Ready(v) = p.poll(cx) {
-                return Poll::Ready(Ok(v));
-            }
+        // First, try polling the future
+        if let Poll::Ready(v) = me.value.poll(cx) {
+            return Poll::Ready(Ok(v));
         }
 
         // Now check the timer
-        // Safety: X_X!
-        unsafe {
-            match self.map_unchecked_mut(|me| &mut me.delay).poll(cx) {
-                Poll::Ready(()) => Poll::Ready(Err(Elapsed(()))),
-                Poll::Pending => Poll::Pending,
-            }
+        match me.delay.poll(cx) {
+            Poll::Ready(()) => Poll::Ready(Err(Elapsed(()))),
+            Poll::Pending => Poll::Pending,
         }
     }
 }
