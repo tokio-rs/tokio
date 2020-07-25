@@ -1,4 +1,5 @@
 use crate::park::{CachedParkThread, Park};
+#[cfg(feature = "rt-core")]
 use crate::runtime::Handle;
 use crate::sync::mpsc::chan;
 use crate::sync::mpsc::error::{ClosedError, SendError, TryRecvError, TrySendError};
@@ -175,6 +176,7 @@ impl<T> Receiver<T> {
     /// }
     /// ```
     pub fn blocking_recv(&mut self) -> Result<Option<T>, crate::park::ParkError> {
+        #[cfg(feature = "rt-core")]
         if Handle::try_current().is_ok() {
             panic!("blocking_recv cannot be called from within a runtime");
         }
