@@ -85,6 +85,73 @@ impl UnixDatagram {
         poll_fn(|cx| self.poll_send_priv(cx, buf)).await
     }
 
+    /// Try to send a datagram to the peer without waiting.
+    ///
+    /// ```
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// use tokio::net::UnixDatagram;
+    ///
+    /// let bytes = b"bytes";
+    /// // We use a socket pair so that they are assigned
+    /// // each other as a peer.
+    /// let (mut first, mut second) = UnixDatagram::pair()?;
+    ///
+    /// let size = first.try_send(bytes)?;
+    /// assert_eq!(size, bytes.len());
+    ///
+    /// let mut buffer = vec![0u8; 24];
+    /// let size = second.try_recv(&mut buffer)?;
+    ///
+    /// let dgram = &buffer.as_slice()[..size];
+    /// assert_eq!(dgram, bytes);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn try_send(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.io.get_ref().send(buf)
+    }
+
+    /// Try to send a datagram to the peer without waiting.
+    ///
+    /// ```
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// use {
+    ///     tokio::net::UnixDatagram,
+    ///     tempfile::tempdir,
+    /// };
+    ///
+    /// let bytes = b"bytes";
+    /// // We use a temporary directory so that the socket
+    /// // files left by the bound sockets will get cleaned up.
+    /// let tmp = tempdir().unwrap();
+    ///
+    /// let server_path = tmp.path().join("server");
+    /// let mut server = UnixDatagram::bind(&server_path)?;
+    ///
+    /// let client_path = tmp.path().join("client");
+    /// let mut client = UnixDatagram::bind(&client_path)?;
+    ///
+    /// let size = client.try_send_to(bytes, &server_path)?;
+    /// assert_eq!(size, bytes.len());
+    ///
+    /// let mut buffer = vec![0u8; 24];
+    /// let (size, addr) = server.try_recv_from(&mut buffer)?;
+    ///
+    /// let dgram = &buffer.as_slice()[..size];
+    /// assert_eq!(dgram, bytes);
+    /// assert_eq!(addr.as_pathname().unwrap(), &client_path);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn try_send_to<P>(&mut self, buf: &[u8], target: P) -> io::Result<usize>
+    where
+        P: AsRef<Path>,
+    {
+        self.io.get_ref().send_to(buf, target)
+    }
+
     // Poll IO functions that takes `&self` are provided for the split API.
     //
     // They are not public because (taken from the doc of `PollEvented`):
@@ -114,6 +181,11 @@ impl UnixDatagram {
     /// Receives data from the socket.
     pub async fn recv(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         poll_fn(|cx| self.poll_recv_priv(cx, buf)).await
+    }
+
+    /// Try to receive a datagram from the peer without waiting.
+    pub fn try_recv(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.io.get_ref().recv(buf)
     }
 
     pub(crate) fn poll_recv_priv(
@@ -160,6 +232,11 @@ impl UnixDatagram {
     /// Receives data from the socket.
     pub async fn recv_from(&mut self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         poll_fn(|cx| self.poll_recv_from_priv(cx, buf)).await
+    }
+
+    /// Try to receive data from the socket without waiting.
+    pub fn try_recv_from(&mut self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+        self.io.get_ref().recv_from(buf)
     }
 
     pub(crate) fn poll_recv_from_priv(

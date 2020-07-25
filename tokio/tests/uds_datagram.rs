@@ -43,6 +43,46 @@ async fn echo() -> io::Result<()> {
     Ok(())
 }
 
+// Even though we use sync non-blocking io we still need a reactor.
+#[tokio::test]
+async fn try_send_recv_never_block() -> io::Result<()> {
+    let mut recv_buf = [0u8; 16];
+    let payload = b"PAYLOAD";
+    let mut count = 0;
+
+    let (mut dgram1, mut dgram2) = UnixDatagram::pair()?;
+
+    // Send until we hit the OS `net.unix.max_dgram_qlen`.
+    loop {
+        match dgram1.try_send(payload) {
+            Err(err) => match err.kind() {
+                io::ErrorKind::WouldBlock | io::ErrorKind::Other => break,
+                _ => unreachable!("unexpected error {:?}", err),
+            },
+            Ok(len) => {
+                assert_eq!(len, payload.len());
+            }
+        }
+        count += 1;
+    }
+
+    // Read every dgram we sent.
+    while count > 0 {
+        let len = dgram2.try_recv(&mut recv_buf[..])?;
+        assert_eq!(len, payload.len());
+        assert_eq!(payload, &recv_buf[..len]);
+        count -= 1;
+    }
+
+    let err = dgram2.try_recv(&mut recv_buf[..]).unwrap_err();
+    match err.kind() {
+        io::ErrorKind::WouldBlock => (),
+        _ => unreachable!("unexpected error {:?}", err),
+    }
+
+    Ok(())
+}
+
 #[tokio::test]
 async fn split() -> std::io::Result<()> {
     let dir = tempfile::tempdir().unwrap();
