@@ -496,16 +496,14 @@ fn try_recv_unbounded() {
 #[test]
 fn blocking_recv() {
     let (mut tx, mut rx) = mpsc::channel::<u8>(1);
-     
+
     let sync_code = thread::spawn(move || {
         assert_eq!(Ok(Some(10)), rx.blocking_recv());
     });
 
-    Runtime::new()
-        .unwrap()
-        .block_on(async move {
-            let _ = tx.send(10).await;
-        });
+    Runtime::new().unwrap().block_on(async move {
+        let _ = tx.send(10).await;
+    });
     sync_code.join().unwrap()
 }
 
