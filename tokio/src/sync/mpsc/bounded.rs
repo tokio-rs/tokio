@@ -183,7 +183,7 @@ impl<T> Receiver<T> {
         let mut cx = Context::from_waker(&waker);
 
         loop {
-            if let Poll::Ready(v) = crate::coop::budget(|| self.poll_recv(&mut cx)) {
+            if let Poll::Ready(v) = self.poll_recv(&mut cx) {
                 return Ok(v);
             }
             park.park()?;
