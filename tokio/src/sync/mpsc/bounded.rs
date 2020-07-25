@@ -1,4 +1,5 @@
 use crate::park::{CachedParkThread, Park};
+use crate::runtime::Handle;
 use crate::sync::mpsc::chan;
 use crate::sync::mpsc::error::{ClosedError, SendError, TryRecvError, TrySendError};
 use crate::sync::semaphore_ll as semaphore;
@@ -174,6 +175,9 @@ impl<T> Receiver<T> {
     /// }
     /// ```
     pub fn blocking_recv(&mut self) -> Result<Option<T>, crate::park::ParkError> {
+        if Handle::try_current().is_ok() {
+            panic!("blocking_recv cannot be called from within a runtime");
+        }
         let mut park = CachedParkThread::new();
         let waker = park.get_unpark()?.into_waker();
         let mut cx = Context::from_waker(&waker);
