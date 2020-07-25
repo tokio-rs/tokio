@@ -72,6 +72,20 @@ cfg_io_std! {
     }
 }
 
+#[cfg(unix)]
+impl std::os::unix::io::AsRawFd for Stdout {
+    fn as_raw_fd(&self) -> std::os::unix::io::RawFd {
+        std::io::stdout().as_raw_fd()
+    }
+}
+
+#[cfg(windows)]
+impl std::os::windows::io::AsRawHandle for Stdout {
+    fn as_raw_handle(&self) -> std::os::windows::io::RawHandle {
+        std::io::stdout().as_raw_handle()
+    }
+}
+
 impl AsyncWrite for Stdout {
     fn poll_write(
         mut self: Pin<&mut Self>,

@@ -99,7 +99,7 @@ impl crate::stream::Stream for ReadDir {
 
 /// Entries returned by the [`ReadDir`] stream.
 ///
-/// [`ReadDir`]: struct.ReadDir.html
+/// [`ReadDir`]: struct@ReadDir
 ///
 /// This is a specialized version of [`std::fs::DirEntry`] for usage from the
 /// Tokio runtime.
@@ -165,7 +165,7 @@ impl DirEntry {
         self.0.file_name()
     }
 
-    /// Return the metadata for the file that this entry points at.
+    /// Returns the metadata for the file that this entry points at.
     ///
     /// This function will not traverse symlinks if this entry points at a
     /// symlink.
@@ -200,7 +200,7 @@ impl DirEntry {
         asyncify(move || std.metadata()).await
     }
 
-    /// Return the file type for the file that this entry points at.
+    /// Returns the file type for the file that this entry points at.
     ///
     /// This function will not traverse symlinks if this entry points at a
     /// symlink.

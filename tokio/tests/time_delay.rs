@@ -2,7 +2,7 @@
 #![cfg(feature = "full")]
 
 use tokio::time::{self, Duration, Instant};
-use tokio_test::{assert_pending, task};
+use tokio_test::{assert_pending, assert_ready, task};
 
 macro_rules! assert_elapsed {
     ($now:expr, $ms:expr) => {{
@@ -137,6 +137,26 @@ async fn reset_future_delay_after_fire() {
     assert_elapsed!(now, 110);
 }
 
+#[tokio::test]
+async fn reset_delay_to_past() {
+    time::pause();
+
+    let now = Instant::now();
+
+    let mut delay = task::spawn(time::delay_until(now + ms(100)));
+    assert_pending!(delay.poll());
+
+    time::delay_for(ms(50)).await;
+
+    assert!(!delay.is_woken());
+
+    delay.reset(now + ms(40));
+
+    assert!(delay.is_woken());
+
+    assert_ready!(delay.poll());
+}
+
 #[test]
 #[should_panic]
 fn creating_delay_outside_of_context() {
@@ -153,6 +173,22 @@ async fn greater_than_max() {
     const YR_5: u64 = 5 * 365 * 24 * 60 * 60 * 1000;
 
     time::delay_until(Instant::now() + ms(YR_5)).await;
+}
+
+const NUM_LEVELS: usize = 6;
+const MAX_DURATION: u64 = (1 << (6 * NUM_LEVELS)) - 1;
+
+#[should_panic]
+#[tokio::test]
+async fn exactly_max() {
+    // TODO: this should not panic but `time::ms()` is acting up
+    time::delay_for(ms(MAX_DURATION)).await;
+}
+
+#[tokio::test]
+async fn no_out_of_bounds_close_to_max() {
+    time::pause();
+    time::delay_for(ms(MAX_DURATION - 1)).await;
 }
 
 fn ms(n: u64) -> Duration {

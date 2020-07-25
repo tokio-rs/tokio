@@ -10,11 +10,27 @@ use all::AllFuture;
 mod any;
 use any::AnyFuture;
 
+mod chain;
+use chain::Chain;
+
+mod collect;
+use collect::Collect;
+pub use collect::FromStream;
+
+mod empty;
+pub use empty::{empty, Empty};
+
 mod filter;
 use filter::Filter;
 
 mod filter_map;
 use filter_map::FilterMap;
+
+mod fold;
+use fold::FoldFuture;
+
+mod fuse;
+use fuse::Fuse;
 
 mod iter;
 pub use iter::{iter, Iter};
@@ -22,8 +38,26 @@ pub use iter::{iter, Iter};
 mod map;
 use map::Map;
 
+mod merge;
+use merge::Merge;
+
 mod next;
 use next::Next;
+
+mod once;
+pub use once::{once, Once};
+
+mod pending;
+pub use pending::{pending, Pending};
+
+mod stream_map;
+pub use stream_map::StreamMap;
+
+mod skip;
+use skip::Skip;
+
+mod skip_while;
+use skip_while::SkipWhile;
 
 mod try_next;
 use try_next::TryNext;
@@ -33,6 +67,12 @@ use take::Take;
 
 mod take_while;
 use take_while::TakeWhile;
+
+cfg_time! {
+    mod timeout;
+    use timeout::Timeout;
+    use std::time::Duration;
+}
 
 pub use futures_core::Stream;
 
@@ -146,6 +186,84 @@ pub trait StreamExt: Stream {
         Map::new(self, f)
     }
 
+    /// Combine two streams into one by interleaving the output of both as it
+    /// is produced.
+    ///
+    /// Values are produced from the merged stream in the order they arrive from
+    /// the two source streams. If both source streams provide values
+    /// simultaneously, the merge stream alternates between them. This provides
+    /// some level of fairness. You should not chain calls to `merge`, as this
+    /// will break the fairness of the merging.
+    ///
+    /// The merged stream completes once **both** source streams complete. When
+    /// one source stream completes before the other, the merge stream
+    /// exclusively polls the remaining stream.
+    ///
+    /// For merging multiple streams, consider using [`StreamMap`] instead.
+    ///
+    /// [`StreamMap`]: crate::stream::StreamMap
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::stream::StreamExt;
+    /// use tokio::sync::mpsc;
+    /// use tokio::time;
+    ///
+    /// use std::time::Duration;
+    ///
+    /// # /*
+    /// #[tokio::main]
+    /// # */
+    /// # #[tokio::main(basic_scheduler)]
+    /// async fn main() {
+    /// # time::pause();
+    ///     let (mut tx1, rx1) = mpsc::channel(10);
+    ///     let (mut tx2, rx2) = mpsc::channel(10);
+    ///
+    ///     let mut rx = rx1.merge(rx2);
+    ///
+    ///     tokio::spawn(async move {
+    ///         // Send some values immediately
+    ///         tx1.send(1).await.unwrap();
+    ///         tx1.send(2).await.unwrap();
+    ///
+    ///         // Let the other task send values
+    ///         time::delay_for(Duration::from_millis(20)).await;
+    ///
+    ///         tx1.send(4).await.unwrap();
+    ///     });
+    ///
+    ///     tokio::spawn(async move {
+    ///         // Wait for the first task to send values
+    ///         time::delay_for(Duration::from_millis(5)).await;
+    ///
+    ///         tx2.send(3).await.unwrap();
+    ///
+    ///         time::delay_for(Duration::from_millis(25)).await;
+    ///
+    ///         // Send the final value
+    ///         tx2.send(5).await.unwrap();
+    ///     });
+    ///
+    ///    assert_eq!(1, rx.next().await.unwrap());
+    ///    assert_eq!(2, rx.next().await.unwrap());
+    ///    assert_eq!(3, rx.next().await.unwrap());
+    ///    assert_eq!(4, rx.next().await.unwrap());
+    ///    assert_eq!(5, rx.next().await.unwrap());
+    ///
+    ///    // The merged stream is consumed
+    ///    assert!(rx.next().await.is_none());
+    /// }
+    /// ```
+    fn merge<U>(self, other: U) -> Merge<Self, U>
+    where
+        U: Stream<Item = Self::Item>,
+        Self: Sized,
+    {
+        Merge::new(self, other)
+    }
+
     /// Filters the values produced by this stream according to the provided
     /// predicate.
     ///
@@ -190,7 +308,7 @@ pub trait StreamExt: Stream {
     /// As values of this stream are made available, the provided function will
     /// be run on them. If the predicate `f` resolves to
     /// [`Some(item)`](Some) then the stream will yield the value `item`, but if
-    /// it resolves to [`None`] then the next value will be produced.
+    /// it resolves to [`None`], then the value will be skipped.
     ///
     /// Note that this function consumes the stream passed into it and returns a
     /// wrapped version of it, similar to [`Iterator::filter_map`] method in the
@@ -220,6 +338,71 @@ pub trait StreamExt: Stream {
         Self: Sized,
     {
         FilterMap::new(self, f)
+    }
+
+    /// Creates a stream which ends after the first `None`.
+    ///
+    /// After a stream returns `None`, behavior is undefined. Future calls to
+    /// `poll_next` may or may not return `Some(T)` again or they may panic.
+    /// `fuse()` adapts a stream, ensuring that after `None` is given, it will
+    /// return `None` forever.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::stream::{Stream, StreamExt};
+    ///
+    /// use std::pin::Pin;
+    /// use std::task::{Context, Poll};
+    ///
+    /// // a stream which alternates between Some and None
+    /// struct Alternate {
+    ///     state: i32,
+    /// }
+    ///
+    /// impl Stream for Alternate {
+    ///     type Item = i32;
+    ///
+    ///     fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<i32>> {
+    ///         let val = self.state;
+    ///         self.state = self.state + 1;
+    ///
+    ///         // if it's even, Some(i32), else None
+    ///         if val % 2 == 0 {
+    ///             Poll::Ready(Some(val))
+    ///         } else {
+    ///             Poll::Ready(None)
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut stream = Alternate { state: 0 };
+    ///
+    ///     // the stream goes back and forth
+    ///     assert_eq!(stream.next().await, Some(0));
+    ///     assert_eq!(stream.next().await, None);
+    ///     assert_eq!(stream.next().await, Some(2));
+    ///     assert_eq!(stream.next().await, None);
+    ///
+    ///     // however, once it is fused
+    ///     let mut stream = stream.fuse();
+    ///
+    ///     assert_eq!(stream.next().await, Some(4));
+    ///     assert_eq!(stream.next().await, None);
+    ///
+    ///     // it will always return `None` after the first time.
+    ///     assert_eq!(stream.next().await, None);
+    ///     assert_eq!(stream.next().await, None);
+    ///     assert_eq!(stream.next().await, None);
+    /// }
+    /// ```
+    fn fuse(self) -> Fuse<Self>
+    where
+        Self: Sized,
+    {
+        Fuse::new(self)
     }
 
     /// Creates a new stream of at most `n` items of the underlying stream.
@@ -277,6 +460,62 @@ pub trait StreamExt: Stream {
         Self: Sized,
     {
         TakeWhile::new(self, f)
+    }
+
+    /// Creates a new stream that will skip the `n` first items of the
+    /// underlying stream.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio::stream::{self, StreamExt};
+    ///
+    /// let mut stream = stream::iter(1..=10).skip(7);
+    ///
+    /// assert_eq!(Some(8), stream.next().await);
+    /// assert_eq!(Some(9), stream.next().await);
+    /// assert_eq!(Some(10), stream.next().await);
+    /// assert_eq!(None, stream.next().await);
+    /// # }
+    /// ```
+    fn skip(self, n: usize) -> Skip<Self>
+    where
+        Self: Sized,
+    {
+        Skip::new(self, n)
+    }
+
+    /// Skip elements from the underlying stream while the provided predicate
+    /// resolves to `true`.
+    ///
+    /// This function, like [`Iterator::skip_while`], will ignore elemets from the
+    /// stream until the predicate `f` resolves to `false`. Once one element
+    /// returns false, the rest of the elements will be yielded.
+    ///
+    /// [`Iterator::skip_while`]: std::iter::Iterator::skip_while()
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio::stream::{self, StreamExt};
+    /// let mut stream = stream::iter(vec![1,2,3,4,1]).skip_while(|x| *x < 3);
+    ///
+    /// assert_eq!(Some(3), stream.next().await);
+    /// assert_eq!(Some(4), stream.next().await);
+    /// assert_eq!(Some(1), stream.next().await);
+    /// assert_eq!(None, stream.next().await);
+    /// # }
+    /// ```
+    fn skip_while<F>(self, f: F) -> SkipWhile<Self, F>
+    where
+        F: FnMut(&Self::Item) -> bool,
+        Self: Sized,
+    {
+        SkipWhile::new(self, f)
     }
 
     /// Tests if every element of the stream matches a predicate.
@@ -386,6 +625,213 @@ pub trait StreamExt: Stream {
     {
         AnyFuture::new(self, f)
     }
+
+    /// Combine two streams into one by first returning all values from the
+    /// first stream then all values from the second stream.
+    ///
+    /// As long as `self` still has values to emit, no values from `other` are
+    /// emitted, even if some are ready.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::stream::{self, StreamExt};
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let one = stream::iter(vec![1, 2, 3]);
+    ///     let two = stream::iter(vec![4, 5, 6]);
+    ///
+    ///     let mut stream = one.chain(two);
+    ///
+    ///     assert_eq!(stream.next().await, Some(1));
+    ///     assert_eq!(stream.next().await, Some(2));
+    ///     assert_eq!(stream.next().await, Some(3));
+    ///     assert_eq!(stream.next().await, Some(4));
+    ///     assert_eq!(stream.next().await, Some(5));
+    ///     assert_eq!(stream.next().await, Some(6));
+    ///     assert_eq!(stream.next().await, None);
+    /// }
+    /// ```
+    fn chain<U>(self, other: U) -> Chain<Self, U>
+    where
+        U: Stream<Item = Self::Item>,
+        Self: Sized,
+    {
+        Chain::new(self, other)
+    }
+
+    /// A combinator that applies a function to every element in a stream
+    /// producing a single, final value.
+    ///
+    /// # Examples
+    /// Basic usage:
+    /// ```
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio::stream::{self, *};
+    ///
+    /// let s = stream::iter(vec![1u8, 2, 3]);
+    /// let sum = s.fold(0, |acc, x| acc + x).await;
+    ///
+    /// assert_eq!(sum, 6);
+    /// # }
+    /// ```
+    fn fold<B, F>(self, init: B, f: F) -> FoldFuture<Self, B, F>
+    where
+        Self: Sized,
+        F: FnMut(B, Self::Item) -> B,
+    {
+        FoldFuture::new(self, init, f)
+    }
+
+    /// Drain stream pushing all emitted values into a collection.
+    ///
+    /// `collect` streams all values, awaiting as needed. Values are pushed into
+    /// a collection. A number of different target collection types are
+    /// supported, including [`Vec`](std::vec::Vec),
+    /// [`String`](std::string::String), and [`Bytes`](bytes::Bytes).
+    ///
+    /// # `Result`
+    ///
+    /// `collect()` can also be used with streams of type `Result<T, E>` where
+    /// `T: FromStream<_>`. In this case, `collect()` will stream as long as
+    /// values yielded from the stream are `Ok(_)`. If `Err(_)` is encountered,
+    /// streaming is terminated and `collect()` returns the `Err`.
+    ///
+    /// # Notes
+    ///
+    /// `FromStream` is currently a sealed trait. Stabilization is pending
+    /// enhancements to the Rust language.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage:
+    ///
+    /// ```
+    /// use tokio::stream::{self, StreamExt};
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let doubled: Vec<i32> =
+    ///         stream::iter(vec![1, 2, 3])
+    ///             .map(|x| x * 2)
+    ///             .collect()
+    ///             .await;
+    ///
+    ///     assert_eq!(vec![2, 4, 6], doubled);
+    /// }
+    /// ```
+    ///
+    /// Collecting a stream of `Result` values
+    ///
+    /// ```
+    /// use tokio::stream::{self, StreamExt};
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     // A stream containing only `Ok` values will be collected
+    ///     let values: Result<Vec<i32>, &str> =
+    ///         stream::iter(vec![Ok(1), Ok(2), Ok(3)])
+    ///             .collect()
+    ///             .await;
+    ///
+    ///     assert_eq!(Ok(vec![1, 2, 3]), values);
+    ///
+    ///     // A stream containing `Err` values will return the first error.
+    ///     let results = vec![Ok(1), Err("no"), Ok(2), Ok(3), Err("nein")];
+    ///
+    ///     let values: Result<Vec<i32>, &str> =
+    ///         stream::iter(results)
+    ///             .collect()
+    ///             .await;
+    ///
+    ///     assert_eq!(Err("no"), values);
+    /// }
+    /// ```
+    fn collect<T>(self) -> Collect<Self, T>
+    where
+        T: FromStream<Self::Item>,
+        Self: Sized,
+    {
+        Collect::new(self)
+    }
+
+    /// Applies a per-item timeout to the passed stream.
+    ///
+    /// `timeout()` takes a `Duration` that represents the maximum amount of
+    /// time each element of the stream has to complete before timing out.
+    ///
+    /// If the wrapped stream yields a value before the deadline is reached, the
+    /// value is returned. Otherwise, an error is returned. The caller may decide
+    /// to continue consuming the stream and will eventually get the next source
+    /// stream value once it becomes available.
+    ///
+    /// # Notes
+    ///
+    /// This function consumes the stream passed into it and returns a
+    /// wrapped version of it.
+    ///
+    /// Polling the returned stream will continue to poll the inner stream even
+    /// if one or more items time out.
+    ///
+    /// # Examples
+    ///
+    /// Suppose we have a stream `int_stream` that yields 3 numbers (1, 2, 3):
+    ///
+    /// ```
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio::stream::{self, StreamExt};
+    /// use std::time::Duration;
+    /// # let int_stream = stream::iter(1..=3);
+    ///
+    /// let mut int_stream = int_stream.timeout(Duration::from_secs(1));
+    ///
+    /// // When no items time out, we get the 3 elements in succession:
+    /// assert_eq!(int_stream.try_next().await, Ok(Some(1)));
+    /// assert_eq!(int_stream.try_next().await, Ok(Some(2)));
+    /// assert_eq!(int_stream.try_next().await, Ok(Some(3)));
+    /// assert_eq!(int_stream.try_next().await, Ok(None));
+    ///
+    /// // If the second item times out, we get an error and continue polling the stream:
+    /// # let mut int_stream = stream::iter(vec![Ok(1), Err(()), Ok(2), Ok(3)]);
+    /// assert_eq!(int_stream.try_next().await, Ok(Some(1)));
+    /// assert!(int_stream.try_next().await.is_err());
+    /// assert_eq!(int_stream.try_next().await, Ok(Some(2)));
+    /// assert_eq!(int_stream.try_next().await, Ok(Some(3)));
+    /// assert_eq!(int_stream.try_next().await, Ok(None));
+    ///
+    /// // If we want to stop consuming the source stream the first time an
+    /// // element times out, we can use the `take_while` operator:
+    /// # let int_stream = stream::iter(vec![Ok(1), Err(()), Ok(2), Ok(3)]);
+    /// let mut int_stream = int_stream.take_while(Result::is_ok);
+    ///
+    /// assert_eq!(int_stream.try_next().await, Ok(Some(1)));
+    /// assert_eq!(int_stream.try_next().await, Ok(None));
+    /// # }
+    /// ```
+    #[cfg(all(feature = "time"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+    fn timeout(self, duration: Duration) -> Timeout<Self>
+    where
+        Self: Sized,
+    {
+        Timeout::new(self, duration)
+    }
 }
 
 impl<St: ?Sized> StreamExt for St where St: Stream {}
+
+/// Merge the size hints from two streams.
+fn merge_size_hints(
+    (left_low, left_high): (usize, Option<usize>),
+    (right_low, right_hign): (usize, Option<usize>),
+) -> (usize, Option<usize>) {
+    let low = left_low.saturating_add(right_low);
+    let high = match (left_high, right_hign) {
+        (Some(h1), Some(h2)) => h1.checked_add(h2),
+        _ => None,
+    };
+    (low, high)
+}

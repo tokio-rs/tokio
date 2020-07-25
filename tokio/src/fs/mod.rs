@@ -33,6 +33,9 @@ pub use self::create_dir::create_dir;
 mod create_dir_all;
 pub use self::create_dir_all::create_dir_all;
 
+mod dir_builder;
+pub use self::dir_builder::DirBuilder;
+
 mod file;
 pub use self::file::File;
 
@@ -79,6 +82,9 @@ pub use self::symlink_metadata::symlink_metadata;
 
 mod write;
 pub use self::write::write;
+
+mod copy;
+pub use self::copy::copy;
 
 use std::io;
 

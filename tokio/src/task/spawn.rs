@@ -16,6 +16,10 @@ doc_rt_core! {
     /// When a runtime is shutdown, all outstanding tasks are dropped,
     /// regardless of the lifecycle of that task.
     ///
+    /// This function must be called from the context of a Tokio runtime. Tasks running on
+    /// the Tokio runtime are always inside its context, but you can also enter the context
+    /// using the [`Handle::enter`](crate::runtime::Handle::enter()) method.
+    ///
     /// # Examples
     ///
     /// In this example, a server is started and `spawn` is used to start a new task
@@ -125,6 +129,7 @@ doc_rt_core! {
     {
         let spawn_handle = runtime::context::spawn_handle()
         .expect("must be called from the context of Tokio runtime configured with either `basic_scheduler` or `threaded_scheduler`");
+        let task = crate::util::trace::task(task, "task");
         spawn_handle.spawn(task)
     }
 }

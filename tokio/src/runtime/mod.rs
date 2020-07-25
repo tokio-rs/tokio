@@ -107,7 +107,7 @@
 //!
 //! ## Runtime Configurations
 //!
-//! Tokio provides multiple task scheding strategies, suitable for different
+//! Tokio provides multiple task scheduling strategies, suitable for different
 //! applications. The [runtime builder] or `#[tokio::main]` attribute may be
 //! used to select which scheduler to use.
 //!
@@ -148,7 +148,7 @@
 //! ```
 //!
 //! If the `rt-threaded` feature flag is enabled, [`Runtime::new`] will return a
-//! basic scheduler runtime by default.
+//! threaded scheduler runtime by default.
 //!
 //! Most applications should use the threaded scheduler, except in some niche
 //! use-cases, such as when running only a single thread is required.
@@ -187,18 +187,22 @@
 #[cfg(test)]
 #[macro_use]
 mod tests;
+
 pub(crate) mod context;
 
 cfg_rt_core! {
     mod basic_scheduler;
     use basic_scheduler::BasicScheduler;
+
+    pub(crate) mod task;
 }
 
 mod blocking;
 use blocking::BlockingPool;
 
 cfg_blocking_impl! {
-    pub(crate) use blocking::spawn_blocking;
+    #[allow(unused_imports)]
+    pub(crate) use blocking::{spawn_blocking, try_spawn_blocking};
 }
 
 mod builder;
@@ -208,13 +212,13 @@ pub(crate) mod enter;
 use self::enter::enter;
 
 mod handle;
-pub use self::handle::Handle;
+pub use self::handle::{Handle, TryCurrentError};
 
 mod io;
 
 cfg_rt_threaded! {
     mod park;
-    use park::{Parker, Unparker};
+    use park::Parker;
 }
 
 mod shell;
@@ -226,6 +230,8 @@ use self::spawner::Spawner;
 mod time;
 
 cfg_rt_threaded! {
+    mod queue;
+
     pub(crate) mod thread_pool;
     use self::thread_pool::ThreadPool;
 }
@@ -235,10 +241,11 @@ cfg_rt_core! {
 }
 
 use std::future::Future;
+use std::time::Duration;
 
 /// The Tokio runtime.
 ///
-/// The runtime provides an I/O [driver], task scheduler, [timer], and blocking
+/// The runtime provides an I/O driver, task scheduler, [timer], and blocking
 /// pool, necessary for running asynchronous tasks.
 ///
 /// Instances of `Runtime` can be created using [`new`] or [`Builder`]. However,
@@ -259,12 +266,11 @@ use std::future::Future;
 /// that reactor will no longer function. Calling any method on them will
 /// result in an error.
 ///
-/// [driver]: crate::io::driver
 /// [timer]: crate::time
 /// [mod]: index.html
-/// [`new`]: #method.new
-/// [`Builder`]: struct.Builder.html
-/// [`tokio::run`]: fn.run.html
+/// [`new`]: method@Self::new
+/// [`Builder`]: struct@Builder
+/// [`tokio::run`]: fn@run
 #[derive(Debug)]
 pub struct Runtime {
     /// Task executor
@@ -328,11 +334,11 @@ impl Runtime {
     /// ```
     ///
     /// [mod]: index.html
-    /// [main]: ../../tokio_macros/attr.main.html
+    /// [main]: ../attr.main.html
     /// [threaded scheduler]: index.html#threaded-scheduler
     /// [basic scheduler]: index.html#basic-scheduler
     /// [runtime builder]: crate::runtime::Builder
-    pub fn new() -> io::Result<Self> {
+    pub fn new() -> io::Result<Runtime> {
         #[cfg(feature = "rt-threaded")]
         let ret = Builder::new().threaded_scheduler().enable_all().build();
 
@@ -373,8 +379,14 @@ impl Runtime {
     ///
     /// # Panics
     ///
-    /// This function panics if the spawn fails. Failure occurs if the executor
-    /// is currently at capacity and is unable to spawn a new future.
+    /// This function will not panic unless task execution is disabled on the
+    /// executor. This can only happen if the runtime was built using
+    /// [`Builder`] without picking either [`basic_scheduler`] or
+    /// [`threaded_scheduler`].
+    ///
+    /// [`Builder`]: struct@Builder
+    /// [`threaded_scheduler`]: fn@Builder::threaded_scheduler
+    /// [`basic_scheduler`]: fn@Builder::basic_scheduler
     #[cfg(feature = "rt-core")]
     pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
@@ -396,12 +408,33 @@ impl Runtime {
     /// complete, and yielding its resolved result. Any tasks or timers which
     /// the future spawns internally will be executed on the runtime.
     ///
-    /// This method should not be called from an asynchronous context.
+    /// `&mut` is required as calling `block_on` **may** result in advancing the
+    /// state of the runtime. The details depend on how the runtime is
+    /// configured. [`runtime::Handle::block_on`][handle] provides a version
+    /// that takes `&self`.
+    ///
+    /// This method may not be called from an asynchronous context.
     ///
     /// # Panics
     ///
-    /// This function panics if the executor is at capacity, if the provided
-    /// future panics, or if called within an asynchronous execution context.
+    /// This function panics if the provided future panics, or if called within an
+    /// asynchronous execution context.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::runtime::Runtime;
+    ///
+    /// // Create the runtime
+    /// let mut rt = Runtime::new().unwrap();
+    ///
+    /// // Execute the future, blocking the current thread until completion
+    /// rt.block_on(async {
+    ///     println!("hello");
+    /// });
+    /// ```
+    ///
+    /// [handle]: fn@Handle::block_on
     pub fn block_on<F: Future>(&mut self, future: F) -> F::Output {
         let kind = &mut self.kind;
 
@@ -414,7 +447,38 @@ impl Runtime {
         })
     }
 
-    /// Enter the runtime context
+    /// Enter the runtime context. This allows you to construct types that must
+    /// have an executor available on creation such as [`Delay`] or [`TcpStream`].
+    /// It will also allow you to call methods such as [`tokio::spawn`].
+    ///
+    /// This function is also available as [`Handle::enter`].
+    ///
+    /// [`Delay`]: struct@crate::time::Delay
+    /// [`TcpStream`]: struct@crate::net::TcpStream
+    /// [`Handle::enter`]: fn@crate::runtime::Handle::enter
+    /// [`tokio::spawn`]: fn@crate::spawn
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use tokio::runtime::Runtime;
+    ///
+    /// fn function_that_spawns(msg: String) {
+    ///     // Had we not used `rt.enter` below, this would panic.
+    ///     tokio::spawn(async move {
+    ///         println!("{}", msg);
+    ///     });
+    /// }
+    ///
+    /// fn main() {
+    ///     let rt = Runtime::new().unwrap();
+    ///
+    ///     let s = "Hello World!".to_string();
+    ///
+    ///     // By entering the context, we tie `tokio::spawn` to this executor.
+    ///     rt.enter(|| function_that_spawns(s));
+    /// }
+    /// ```
     pub fn enter<F, R>(&self, f: F) -> R
     where
         F: FnOnce() -> R,
@@ -424,7 +488,8 @@ impl Runtime {
 
     /// Return a handle to the runtime's spawner.
     ///
-    /// The returned handle can be used to spawn tasks that run on this runtime.
+    /// The returned handle can be used to spawn tasks that run on this runtime, and can
+    /// be cloned to allow moving the `Handle` to other threads.
     ///
     /// # Examples
     ///
@@ -440,5 +505,77 @@ impl Runtime {
     /// ```
     pub fn handle(&self) -> &Handle {
         &self.handle
+    }
+
+    /// Shutdown the runtime, waiting for at most `duration` for all spawned
+    /// task to shutdown.
+    ///
+    /// Usually, dropping a `Runtime` handle is sufficient as tasks are able to
+    /// shutdown in a timely fashion. However, dropping a `Runtime` will wait
+    /// indefinitely for all tasks to terminate, and there are cases where a long
+    /// blocking task has been spawned, which can block dropping `Runtime`.
+    ///
+    /// In this case, calling `shutdown_timeout` with an explicit wait timeout
+    /// can work. The `shutdown_timeout` will signal all tasks to shutdown and
+    /// will wait for at most `duration` for all spawned tasks to terminate. If
+    /// `timeout` elapses before all tasks are dropped, the function returns and
+    /// outstanding tasks are potentially leaked.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Runtime;
+    /// use tokio::task;
+    ///
+    /// use std::thread;
+    /// use std::time::Duration;
+    ///
+    /// fn main() {
+    ///    let mut runtime = Runtime::new().unwrap();
+    ///
+    ///    runtime.block_on(async move {
+    ///        task::spawn_blocking(move || {
+    ///            thread::sleep(Duration::from_secs(10_000));
+    ///        });
+    ///    });
+    ///
+    ///    runtime.shutdown_timeout(Duration::from_millis(100));
+    /// }
+    /// ```
+    pub fn shutdown_timeout(self, duration: Duration) {
+        let Runtime {
+            mut blocking_pool, ..
+        } = self;
+        blocking_pool.shutdown(Some(duration));
+    }
+
+    /// Shutdown the runtime, without waiting for any spawned tasks to shutdown.
+    ///
+    /// This can be useful if you want to drop a runtime from within another runtime.
+    /// Normally, dropping a runtime will block indefinitely for spawned blocking tasks
+    /// to complete, which would normally not be permitted within an asynchronous context.
+    /// By calling `shutdown_background()`, you can drop the runtime from such a context.
+    ///
+    /// Note however, that because we do not wait for any blocking tasks to complete, this
+    /// may result in a resource leak (in that any blocking tasks are still running until they
+    /// return.
+    ///
+    /// This function is equivalent to calling `shutdown_timeout(Duration::of_nanos(0))`.
+    ///
+    /// ```
+    /// use tokio::runtime::Runtime;
+    ///
+    /// fn main() {
+    ///    let mut runtime = Runtime::new().unwrap();
+    ///
+    ///    runtime.block_on(async move {
+    ///        let inner_runtime = Runtime::new().unwrap();
+    ///        // ...
+    ///        inner_runtime.shutdown_background();
+    ///    });
+    /// }
+    /// ```
+    pub fn shutdown_background(self) {
+        self.shutdown_timeout(Duration::from_nanos(0))
     }
 }

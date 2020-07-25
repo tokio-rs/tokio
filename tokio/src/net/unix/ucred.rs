@@ -22,7 +22,7 @@ pub(crate) use self::impl_linux::get_peer_cred;
 ))]
 pub(crate) use self::impl_macos::get_peer_cred;
 
-#[cfg(any(target_os = "solaris"))]
+#[cfg(any(target_os = "solaris", target_os = "illumos"))]
 pub(crate) use self::impl_solaris::get_peer_cred;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -110,7 +110,7 @@ pub(crate) mod impl_macos {
     }
 }
 
-#[cfg(any(target_os = "solaris"))]
+#[cfg(any(target_os = "solaris", target_os = "illumos"))]
 pub(crate) mod impl_solaris {
     use crate::net::unix::UnixStream;
     use std::io;

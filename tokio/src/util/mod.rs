@@ -3,13 +3,26 @@ cfg_io_driver! {
     pub(crate) mod slab;
 }
 
-cfg_rt_threaded! {
-    mod pad;
-    pub(crate) use pad::CachePadded;
+#[cfg(any(feature = "sync", feature = "rt-core"))]
+pub(crate) mod linked_list;
 
-    mod rand;
+#[cfg(any(feature = "rt-threaded", feature = "macros", feature = "stream"))]
+mod rand;
+
+mod wake;
+pub(crate) use wake::{waker_ref, Wake};
+
+cfg_rt_threaded! {
     pub(crate) use rand::FastRand;
 
     mod try_lock;
     pub(crate) use try_lock::TryLock;
 }
+
+pub(crate) mod trace;
+
+#[cfg(any(feature = "macros", feature = "stream"))]
+#[cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
+pub use rand::thread_rng_n;
+
+pub(crate) mod intrusive_double_linked_list;

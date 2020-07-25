@@ -1,20 +1,15 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use std::{
-    cell::Cell,
-    sync::atomic::{
-        AtomicBool, AtomicUsize,
-        Ordering::{self, SeqCst},
-    },
-    time::Duration,
-};
-use tokio::{
-    runtime::{self, Runtime},
-    sync::{mpsc, oneshot},
-    task::{self, LocalSet},
-    time,
-};
+use tokio::runtime::{self, Runtime};
+use tokio::sync::{mpsc, oneshot};
+use tokio::task::{self, LocalSet};
+use tokio::time;
+
+use std::cell::Cell;
+use std::sync::atomic::Ordering::{self, SeqCst};
+use std::sync::atomic::{AtomicBool, AtomicUsize};
+use std::time::Duration;
 
 #[tokio::test(basic_scheduler)]
 async fn local_basic_scheduler() {
@@ -285,15 +280,23 @@ fn join_local_future_elsewhere() {
         join2.await.unwrap()
     });
 }
+
 #[test]
 fn drop_cancels_tasks() {
+    use std::rc::Rc;
+
     // This test reproduces issue #1842
     let mut rt = rt();
+    let rc1 = Rc::new(());
+    let rc2 = rc1.clone();
 
     let (started_tx, started_rx) = oneshot::channel();
 
     let local = LocalSet::new();
     local.spawn_local(async move {
+        // Move this in
+        let _rc2 = rc2;
+
         started_tx.send(()).unwrap();
         loop {
             time::delay_for(Duration::from_secs(3600)).await;
@@ -305,30 +308,21 @@ fn drop_cancels_tasks() {
     });
     drop(local);
     drop(rt);
+
+    assert_eq!(1, Rc::strong_count(&rc1));
 }
 
-#[test]
-fn drop_cancels_remote_tasks() {
-    // This test reproduces issue #1885.
+/// Runs a test function in a separate thread, and panics if the test does not
+/// complete within the specified timeout, or if the test function panics.
+///
+/// This is intended for running tests whose failure mode is a hang or infinite
+/// loop that cannot be detected otherwise.
+fn with_timeout(timeout: Duration, f: impl FnOnce() + Send + 'static) {
     use std::sync::mpsc::RecvTimeoutError;
 
     let (done_tx, done_rx) = std::sync::mpsc::channel();
     let thread = std::thread::spawn(move || {
-        let (tx, mut rx) = mpsc::channel::<()>(1024);
-
-        let mut rt = rt();
-
-        let local = LocalSet::new();
-        local.spawn_local(async move { while let Some(_) = rx.recv().await {} });
-        local.block_on(&mut rt, async {
-            time::delay_for(Duration::from_millis(1)).await;
-        });
-
-        drop(tx);
-
-        // This enters an infinite loop if the remote notified tasks are not
-        // properly cancelled.
-        drop(local);
+        f();
 
         // Send a message on the channel so that the test thread can
         // determine if we have entered an infinite loop:
@@ -344,10 +338,11 @@ fn drop_cancels_remote_tasks() {
     //
     // Note that it should definitely complete in under a minute, but just
     // in case CI is slow, we'll give it a long timeout.
-    match done_rx.recv_timeout(Duration::from_secs(60)) {
+    match done_rx.recv_timeout(timeout) {
         Err(RecvTimeoutError::Timeout) => panic!(
-            "test did not complete within 60 seconds, \
-             we have (probably) entered an infinite loop!"
+            "test did not complete within {:?} seconds, \
+             we have (probably) entered an infinite loop!",
+            timeout,
         ),
         // Did the test thread panic? We'll find out for sure when we `join`
         // with it.
@@ -359,6 +354,49 @@ fn drop_cancels_remote_tasks() {
     }
 
     thread.join().expect("test thread should not panic!")
+}
+
+#[test]
+fn drop_cancels_remote_tasks() {
+    // This test reproduces issue #1885.
+    with_timeout(Duration::from_secs(60), || {
+        let (tx, mut rx) = mpsc::channel::<()>(1024);
+
+        let mut rt = rt();
+
+        let local = LocalSet::new();
+        local.spawn_local(async move { while rx.recv().await.is_some() {} });
+        local.block_on(&mut rt, async {
+            time::delay_for(Duration::from_millis(1)).await;
+        });
+
+        drop(tx);
+
+        // This enters an infinite loop if the remote notified tasks are not
+        // properly cancelled.
+        drop(local);
+    });
+}
+
+#[test]
+fn local_tasks_wake_join_all() {
+    // This test reproduces issue #2460.
+    with_timeout(Duration::from_secs(60), || {
+        use futures::future::join_all;
+        use tokio::task::LocalSet;
+
+        let mut rt = rt();
+        let set = LocalSet::new();
+        let mut handles = Vec::new();
+
+        for _ in 1..=128 {
+            handles.push(set.spawn_local(async move {
+                tokio::task::spawn_local(async move {}).await.unwrap();
+            }));
+        }
+
+        rt.block_on(set.run_until(join_all(handles)));
+    });
 }
 
 #[tokio::test]

@@ -13,7 +13,7 @@ cfg_io_util! {
     ///
     /// This is an asynchronous version of [`std::io::empty`][std].
     ///
-    /// [`empty`]: fn.empty.html
+    /// [`empty`]: fn@empty
     /// [std]: std::io::empty
     pub struct Empty {
         _p: (),
@@ -47,6 +47,9 @@ cfg_io_util! {
 }
 
 impl AsyncRead for Empty {
+    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [std::mem::MaybeUninit<u8>]) -> bool {
+        false
+    }
     #[inline]
     fn poll_read(
         self: Pin<&mut Self>,

@@ -13,7 +13,7 @@ cfg_io_util! {
     ///
     /// This is an asynchronous version of [`std::io::Repeat`][std].
     ///
-    /// [repeat]: fn.repeat.html
+    /// [repeat]: fn@repeat
     /// [std]: std::io::Repeat
     #[derive(Debug)]
     pub struct Repeat {
@@ -47,6 +47,9 @@ cfg_io_util! {
 }
 
 impl AsyncRead for Repeat {
+    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [std::mem::MaybeUninit<u8>]) -> bool {
+        false
+    }
     #[inline]
     fn poll_read(
         self: Pin<&mut Self>,

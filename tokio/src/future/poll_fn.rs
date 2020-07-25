@@ -6,14 +6,14 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 /// Future for the [`poll_fn`] function.
-pub(crate) struct PollFn<F> {
+pub struct PollFn<F> {
     f: F,
 }
 
 impl<F> Unpin for PollFn<F> {}
 
 /// Creates a new future wrapping around a function returning [`Poll`].
-pub(crate) fn poll_fn<T, F>(f: F) -> PollFn<F>
+pub fn poll_fn<T, F>(f: F) -> PollFn<F>
 where
     F: FnMut(&mut Context<'_>) -> Poll<T>,
 {

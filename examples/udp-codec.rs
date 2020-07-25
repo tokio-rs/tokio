@@ -46,7 +46,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Run both futures simultaneously of `a` and `b` sending messages back and forth.
     match futures::future::try_join(a, b).await {
-        Err(e) => println!("an error occured; error = {:?}", e),
+        Err(e) => println!("an error occurred; error = {:?}", e),
         _ => println!("done!"),
     }
 

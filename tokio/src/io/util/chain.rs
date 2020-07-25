@@ -84,6 +84,15 @@ where
     T: AsyncRead,
     U: AsyncRead,
 {
+    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [std::mem::MaybeUninit<u8>]) -> bool {
+        if self.first.prepare_uninitialized_buffer(buf) {
+            return true;
+        }
+        if self.second.prepare_uninitialized_buffer(buf) {
+            return true;
+        }
+        false
+    }
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,

@@ -69,7 +69,7 @@ impl Error for RecvError {}
 
 /// This enumeration is the list of the possible reasons that try_recv
 /// could not return data when called.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum TryRecvError {
     /// This channel is currently empty, but the Sender(s) have not yet
     /// disconnected, so data may yet become available.
@@ -96,7 +96,7 @@ impl Error for TryRecvError {}
 
 // ===== ClosedError =====
 
-/// Erorr returned by [`Sender::poll_ready`](super::Sender::poll_ready)].
+/// Error returned by [`Sender::poll_ready`](super::Sender::poll_ready).
 #[derive(Debug)]
 pub struct ClosedError(());
 
@@ -113,3 +113,34 @@ impl fmt::Display for ClosedError {
 }
 
 impl Error for ClosedError {}
+
+cfg_time! {
+    // ===== SendTimeoutError =====
+
+    #[derive(Debug)]
+    /// Error returned by [`Sender::send_timeout`](super::Sender::send_timeout)].
+    pub enum SendTimeoutError<T> {
+        /// The data could not be sent on the channel because the channel is
+        /// full, and the timeout to send has elapsed.
+        Timeout(T),
+
+        /// The receive half of the channel was explicitly closed or has been
+        /// dropped.
+        Closed(T),
+    }
+
+    impl<T: fmt::Debug> Error for SendTimeoutError<T> {}
+
+    impl<T> fmt::Display for SendTimeoutError<T> {
+        fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(
+                fmt,
+                "{}",
+                match self {
+                    SendTimeoutError::Timeout(..) => "timed out waiting on send operation",
+                    SendTimeoutError::Closed(..) => "channel closed",
+                }
+            )
+        }
+    }
+}

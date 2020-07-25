@@ -5,11 +5,11 @@
 
 cfg_blocking_impl! {
     mod pool;
-    pub(crate) use pool::{spawn_blocking, BlockingPool, Spawner};
+    pub(crate) use pool::{spawn_blocking, try_spawn_blocking, BlockingPool, Spawner};
 
     mod schedule;
     mod shutdown;
-    mod task;
+    pub(crate) mod task;
 
     use crate::runtime::Builder;
 
@@ -21,6 +21,7 @@ cfg_blocking_impl! {
 
 cfg_not_blocking_impl! {
     use crate::runtime::Builder;
+    use std::time::Duration;
 
     #[derive(Debug, Clone)]
     pub(crate) struct BlockingPool {}
@@ -34,6 +35,9 @@ cfg_not_blocking_impl! {
     impl BlockingPool {
         pub(crate) fn spawner(&self) -> &BlockingPool {
             self
+        }
+
+        pub(crate) fn shutdown(&mut self, _duration: Option<Duration>) {
         }
     }
 }

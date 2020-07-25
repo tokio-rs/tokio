@@ -18,7 +18,6 @@ use futures::SinkExt;
 use http::{header::HeaderValue, Request, Response, StatusCode};
 #[macro_use]
 extern crate serde_derive;
-use serde_json;
 use std::{env, error::Error, fmt, io};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::stream::StreamExt;
@@ -96,8 +95,7 @@ struct Http;
 
 /// Implementation of encoding an HTTP response into a `BytesMut`, basically
 /// just writing out an HTTP/1.1 response.
-impl Encoder for Http {
-    type Item = Response<String>;
+impl Encoder<Response<String>> for Http {
     type Error = io::Error;
 
     fn encode(&mut self, item: Response<String>, dst: &mut BytesMut) -> io::Result<()> {

@@ -1,5 +1,5 @@
 use crate::loom::{
-    cell::CausalCell,
+    cell::UnsafeCell,
     sync::atomic::{AtomicPtr, AtomicUsize},
     thread,
 };
@@ -26,7 +26,7 @@ pub(crate) struct Block<T> {
 
     /// The observed `tail_position` value *after* the block has been passed by
     /// `block_tail`.
-    observed_tail_position: CausalCell<usize>,
+    observed_tail_position: UnsafeCell<usize>,
 
     /// Array containing values pushed into the block. Values are stored in a
     /// continuous array in order to improve cache line behavior when reading.
@@ -39,7 +39,7 @@ pub(crate) enum Read<T> {
     Closed,
 }
 
-struct Values<T>([CausalCell<MaybeUninit<T>>; BLOCK_CAP]);
+struct Values<T>([UnsafeCell<MaybeUninit<T>>; BLOCK_CAP]);
 
 use super::BLOCK_CAP;
 
@@ -85,7 +85,7 @@ impl<T> Block<T> {
 
             ready_slots: AtomicUsize::new(0),
 
-            observed_tail_position: CausalCell::new(0),
+            observed_tail_position: UnsafeCell::new(0),
 
             // Value storage
             values: unsafe { Values::uninitialized() },
@@ -107,7 +107,7 @@ impl<T> Block<T> {
         other_index.wrapping_sub(self.start_index) / BLOCK_CAP
     }
 
-    /// Read the value at the given offset.
+    /// Reads the value at the given offset.
     ///
     /// Returns `None` if the slot is empty.
     ///
@@ -135,7 +135,7 @@ impl<T> Block<T> {
         Some(Read::Value(value.assume_init()))
     }
 
-    /// Write a value to the block at the given offset.
+    /// Writes a value to the block at the given offset.
     ///
     /// # Safety
     ///
@@ -162,7 +162,7 @@ impl<T> Block<T> {
         self.ready_slots.fetch_or(TX_CLOSED, Release);
     }
 
-    /// Reset the block to a blank state. This enables reusing blocks in the
+    /// Resets the block to a blank state. This enables reusing blocks in the
     /// channel.
     ///
     /// # Safety
@@ -177,7 +177,7 @@ impl<T> Block<T> {
         self.ready_slots = AtomicUsize::new(0);
     }
 
-    /// Release the block to the rx half for freeing.
+    /// Releases the block to the rx half for freeing.
     ///
     /// This function is called by the tx half once it can be guaranteed that no
     /// more senders will attempt to access the block.
@@ -229,7 +229,7 @@ impl<T> Block<T> {
         }
     }
 
-    /// Load the next block
+    /// Loads the next block
     pub(crate) fn load_next(&self, ordering: Ordering) -> Option<NonNull<Block<T>>> {
         let ret = NonNull::new(self.next.load(ordering));
 
@@ -241,7 +241,7 @@ impl<T> Block<T> {
         ret
     }
 
-    /// Push `block` as the next block in the link.
+    /// Pushes `block` as the next block in the link.
     ///
     /// Returns Ok if successful, otherwise, a pointer to the next block in
     /// the list is returned.
@@ -274,7 +274,7 @@ impl<T> Block<T> {
         }
     }
 
-    /// Grow the `Block` linked list by allocating and appending a new block.
+    /// Grows the `Block` linked list by allocating and appending a new block.
     ///
     /// The next block in the linked list is returned. This may or may not be
     /// the one allocated by the function call.
@@ -365,12 +365,12 @@ impl<T> Values<T> {
     unsafe fn uninitialized() -> Values<T> {
         let mut vals = MaybeUninit::uninit();
 
-        // When fuzzing, `CausalCell` needs to be initialized.
+        // When fuzzing, `UnsafeCell` needs to be initialized.
         if_loom! {
-            let p = vals.as_mut_ptr() as *mut CausalCell<MaybeUninit<T>>;
+            let p = vals.as_mut_ptr() as *mut UnsafeCell<MaybeUninit<T>>;
             for i in 0..BLOCK_CAP {
                 p.add(i)
-                    .write(CausalCell::new(MaybeUninit::uninit()));
+                    .write(UnsafeCell::new(MaybeUninit::uninit()));
             }
         }
 
@@ -379,7 +379,7 @@ impl<T> Values<T> {
 }
 
 impl<T> ops::Index<usize> for Values<T> {
-    type Output = CausalCell<MaybeUninit<T>>;
+    type Output = UnsafeCell<MaybeUninit<T>>;
 
     fn index(&self, index: usize) -> &Self::Output {
         self.0.index(index)

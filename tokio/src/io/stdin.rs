@@ -12,16 +12,19 @@ cfg_io_std! {
     /// The handle implements the [`AsyncRead`] trait, but beware that concurrent
     /// reads of `Stdin` must be executed with care.
     ///
-    /// As an additional caveat, reading from the handle may block the calling
-    /// future indefinitely if there is not enough data available. This makes this
-    /// handle unsuitable for use in any circumstance where immediate reaction to
-    /// available data is required, e.g. interactive use or when implementing a
-    /// subprocess driven by requests on the standard input.
+    /// This handle is best used for non-interactive uses, such as when a file
+    /// is piped into the application. For technical reasons, `stdin` is
+    /// implemented by using an ordinary blocking read on a separate thread, and
+    /// it is impossible to cancel that read. This can make shutdown of the
+    /// runtime hang until the user presses enter.
+    ///
+    /// For interactive uses, it is recommended to spawn a thread dedicated to
+    /// user input and use blocking IO directly in that thread.
     ///
     /// Created by the [`stdin`] function.
     ///
-    /// [`stdin`]: fn.stdin.html
-    /// [`AsyncRead`]: trait.AsyncRead.html
+    /// [`stdin`]: fn@stdin
+    /// [`AsyncRead`]: trait@AsyncRead
     #[derive(Debug)]
     pub struct Stdin {
         std: Blocking<std::io::Stdin>,
@@ -29,14 +32,14 @@ cfg_io_std! {
 
     /// Constructs a new handle to the standard input of the current process.
     ///
-    /// The returned handle allows reading from standard input from the within the
-    /// Tokio runtime.
+    /// This handle is best used for non-interactive uses, such as when a file
+    /// is piped into the application. For technical reasons, `stdin` is
+    /// implemented by using an ordinary blocking read on a separate thread, and
+    /// it is impossible to cancel that read. This can make shutdown of the
+    /// runtime hang until the user presses enter.
     ///
-    /// As an additional caveat, reading from the handle may block the calling
-    /// future indefinitely if there is not enough data available. This makes this
-    /// handle unsuitable for use in any circumstance where immediate reaction to
-    /// available data is required, e.g. interactive use or when implementing a
-    /// subprocess driven by requests on the standard input.
+    /// For interactive uses, it is recommended to spawn a thread dedicated to
+    /// user input and use blocking IO directly in that thread.
     pub fn stdin() -> Stdin {
         let std = io::stdin();
         Stdin {
@@ -45,7 +48,26 @@ cfg_io_std! {
     }
 }
 
+#[cfg(unix)]
+impl std::os::unix::io::AsRawFd for Stdin {
+    fn as_raw_fd(&self) -> std::os::unix::io::RawFd {
+        std::io::stdin().as_raw_fd()
+    }
+}
+
+#[cfg(windows)]
+impl std::os::windows::io::AsRawHandle for Stdin {
+    fn as_raw_handle(&self) -> std::os::windows::io::RawHandle {
+        std::io::stdin().as_raw_handle()
+    }
+}
+
 impl AsyncRead for Stdin {
+    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [std::mem::MaybeUninit<u8>]) -> bool {
+        // https://github.com/rust-lang/rust/blob/09c817eeb29e764cfc12d0a8d94841e3ffe34023/src/libstd/io/stdio.rs#L97
+        false
+    }
+
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
