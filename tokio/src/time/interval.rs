@@ -71,7 +71,7 @@ pub fn interval(period: Duration) -> Interval {
 }
 
 /// Creates new `Interval` that yields with interval of `period` with the
-/// first tick completing at `at`.
+/// first tick completing at `start`.
 ///
 /// An interval will tick indefinitely. At any time, the `Interval` value can be
 /// dropped. This cancels the interval.
