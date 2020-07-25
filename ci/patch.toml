@@ -1,7 +1,0 @@
-# Patch dependencies to run all tests against versions of the crate in the
-# repository.
-[patch.crates-io]
-tokio = { path = "tokio" }
-tokio-macros = { path = "tokio-macros" }
-tokio-test = { path = "tokio-test" }
-tokio-util = { path = "tokio-util" }

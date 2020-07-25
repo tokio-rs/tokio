@@ -225,7 +225,7 @@ where
                 // The entry's deadline is invalid, so error it and update the
                 // internal state accordingly.
                 entry.set_when_internal(None);
-                entry.error();
+                entry.error(Error::invalid());
             }
         }
     }
@@ -317,7 +317,7 @@ impl<T> Drop for Driver<T> {
         let mut poll = wheel::Poll::new(u64::MAX);
 
         while let Some(entry) = self.wheel.poll(&mut poll, &mut ()) {
-            entry.error();
+            entry.error(Error::shutdown());
         }
     }
 }

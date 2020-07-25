@@ -1,5 +1,7 @@
 use crate::future::poll_fn;
 use crate::io::PollEvented;
+use crate::net::unix::datagram::split::{split, RecvHalf, SendHalf};
+use crate::net::unix::datagram::split_owned::{split_owned, OwnedRecvHalf, OwnedSendHalf};
 
 use std::convert::TryFrom;
 use std::fmt;
@@ -200,6 +202,35 @@ impl UnixDatagram {
     /// (see the documentation of `Shutdown`).
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         self.io.get_ref().shutdown(how)
+    }
+
+    // These lifetime markers also appear in the generated documentation, and make
+    // it more clear that this is a *borrowed* split.
+    #[allow(clippy::needless_lifetimes)]
+    /// Split a `UnixDatagram` into a receive half and a send half, which can be used
+    /// to receive and send the datagram concurrently.
+    ///
+    /// This method is more efficient than [`into_split`], but the halves cannot
+    /// be moved into independently spawned tasks.
+    ///
+    /// [`into_split`]: fn@crate::net::UnixDatagram::into_split
+    pub fn split<'a>(&'a mut self) -> (RecvHalf<'a>, SendHalf<'a>) {
+        split(self)
+    }
+
+    /// Split a `UnixDatagram` into a receive half and a send half, which can be used
+    /// to receive and send the datagram concurrently.
+    ///
+    /// Unlike [`split`], the owned halves can be moved to separate tasks,
+    /// however this comes at the cost of a heap allocation.
+    ///
+    /// **Note:** Dropping the write half will shut down the write half of the
+    /// datagram. This is equivalent to calling [`shutdown(Write)`].
+    ///
+    /// [`split`]: fn@crate::net::UnixDatagram::split
+    /// [`shutdown(Write)`]:fn@crate::net::UnixDatagram::shutdown
+    pub fn into_split(self) -> (OwnedRecvHalf, OwnedSendHalf) {
+        split_owned(self)
     }
 }
 

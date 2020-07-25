@@ -659,6 +659,9 @@ impl TcpStream {
         self.io.get_ref().set_linger(dur)
     }
 
+    // These lifetime markers also appear in the generated documentation, and make
+    // it more clear that this is a *borrowed* split.
+    #[allow(clippy::needless_lifetimes)]
     /// Splits a `TcpStream` into a read half and a write half, which can be used
     /// to read and write the stream concurrently.
     ///
@@ -666,7 +669,7 @@ impl TcpStream {
     /// moved into independently spawned tasks.
     ///
     /// [`into_split`]: TcpStream::into_split()
-    pub fn split(&mut self) -> (ReadHalf<'_>, WriteHalf<'_>) {
+    pub fn split<'a>(&'a mut self) -> (ReadHalf<'a>, WriteHalf<'a>) {
         split(self)
     }
 
@@ -676,10 +679,11 @@ impl TcpStream {
     /// Unlike [`split`], the owned halves can be moved to separate tasks, however
     /// this comes at the cost of a heap allocation.
     ///
-    /// **Note::** Dropping the write half will shutdown the write half of the TCP
-    /// stream. This is equivalent to calling `shutdown(Write)` on the `TcpStream`.
+    /// **Note:** Dropping the write half will shut down the write half of the TCP
+    /// stream. This is equivalent to calling [`shutdown(Write)`] on the `TcpStream`.
     ///
     /// [`split`]: TcpStream::split()
+    /// [`shutdown(Write)`]: fn@crate::net::TcpStream::shutdown
     pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
         split_owned(self)
     }
