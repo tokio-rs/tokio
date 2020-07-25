@@ -107,6 +107,11 @@ pub fn interval_at(start: Instant, period: Duration) -> Interval {
 }
 
 /// Stream returned by [`interval`](interval) and [`interval_at`](interval_at).
+///
+/// This type only implements the [`Stream`] trait if the "stream" feature is
+/// enabled.
+///
+/// [`Stream`]: trait@crate::stream::Stream
 #[derive(Debug)]
 pub struct Interval {
     /// Future that completes the next time the `Interval` yields a value.
