@@ -1,3 +1,4 @@
+use crate::park::{CachedParkThread, Park};
 use crate::sync::mpsc::chan;
 use crate::sync::mpsc::error::{ClosedError, SendError, TryRecvError, TrySendError};
 use crate::sync::semaphore_ll as semaphore;
@@ -161,7 +162,7 @@ impl<T> Receiver<T> {
     ///     let (mut tx, mut rx) = mpsc::channel::<u8>(10);
     ///     
     ///     let sync_code = thread::spawn(move || {
-    ///         assert_eq!(Some(10), rx.blocking_recv());
+    ///         assert_eq!(Ok(Some(10)), rx.blocking_recv());
     ///     });
     ///
     ///     Runtime::new()
@@ -172,14 +173,16 @@ impl<T> Receiver<T> {
     ///     sync_code.join().unwrap()
     /// }
     /// ```
-    pub fn blocking_recv(&mut self) -> Option<T> {
+    pub fn blocking_recv(&mut self) -> Result<Option<T>, crate::park::ParkError> {
+        let mut park = CachedParkThread::new();
+        let waker = park.get_unpark()?.into_waker();
+        let mut cx = Context::from_waker(&waker);
+        
         loop {
-            let res = match self.try_recv() {
-                Ok(t) => Some(t),
-                Err(TryRecvError::Closed) => None,
-                _ => continue,
-            };
-            return res;
+            if let Poll::Ready(v) = crate::coop::budget(|| self.poll_recv(&mut cx)) {
+                return Ok(v);
+            }
+            park.park()?;
         }
     }
 
