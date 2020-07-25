@@ -1,5 +1,6 @@
 //! Slow down a stream by enforcing a delay between items.
 
+use crate::stream::Stream;
 use crate::time::{Delay, Duration, Instant};
 
 use std::future::Future;
@@ -7,18 +8,17 @@ use std::marker::Unpin;
 use std::pin::Pin;
 use std::task::{self, Poll};
 
-use futures_core::Stream;
 use pin_project_lite::pin_project;
 
-/// Slow down a stream by enforcing a delay between items.
+/// Slows down a stream by enforcing a delay between items.
 /// They will be produced not more often than the specified interval.
 ///
 /// # Example
 ///
 /// Create a throttled stream.
-/// ```rust,norun
-/// use futures::stream::StreamExt;
+/// ```rust,no_run
 /// use std::time::Duration;
+/// use tokio::stream::StreamExt;
 /// use tokio::time::throttle;
 ///
 /// # async fn dox() {
@@ -97,16 +97,11 @@ impl<T: Stream> Stream for Throttle<T> {
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {
         if !self.has_delayed && self.delay.is_some() {
-            ready!(Pin::new(self.as_mut()
-                .project().delay.as_mut().unwrap())
-                .poll(cx));
+            ready!(Pin::new(self.as_mut().project().delay.as_mut().unwrap()).poll(cx));
             *self.as_mut().project().has_delayed = true;
         }
 
-        let value = ready!(self
-            .as_mut()
-            .project().stream
-            .poll_next(cx));
+        let value = ready!(self.as_mut().project().stream.poll_next(cx));
 
         if value.is_some() {
             let dur = self.duration;

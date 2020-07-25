@@ -42,9 +42,10 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::net::TcpListener;
+use tokio::stream::StreamExt;
 use tokio_util::codec::{Framed, LinesCodec};
 
-use futures::{SinkExt, StreamExt};
+use futures::SinkExt;
 use std::collections::HashMap;
 use std::env;
 use std::error::Error;
@@ -129,7 +130,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
                                 let response = response.serialize();
 
-                                if let Err(e) = lines.send(response).await {
+                                if let Err(e) = lines.send(response.as_str()).await {
                                     println!("error on sending response; error = {:?}", e);
                                 }
                             }

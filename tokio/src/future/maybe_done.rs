@@ -7,7 +7,7 @@ use std::task::{Context, Poll};
 
 /// A future that may have completed.
 #[derive(Debug)]
-pub(crate) enum MaybeDone<Fut: Future> {
+pub enum MaybeDone<Fut: Future> {
     /// A not-yet-completed future
     Future(Fut),
     /// The output of the completed future
@@ -21,7 +21,7 @@ pub(crate) enum MaybeDone<Fut: Future> {
 impl<Fut: Future + Unpin> Unpin for MaybeDone<Fut> {}
 
 /// Wraps a future into a `MaybeDone`
-pub(crate) fn maybe_done<Fut: Future>(future: Fut) -> MaybeDone<Fut> {
+pub fn maybe_done<Fut: Future>(future: Fut) -> MaybeDone<Fut> {
     MaybeDone::Future(future)
 }
 
@@ -30,7 +30,7 @@ impl<Fut: Future> MaybeDone<Fut> {
     /// The output of this method will be [`Some`] if and only if the inner
     /// future has been completed and [`take_output`](MaybeDone::take_output)
     /// has not yet been called.
-    pub(crate) fn output_mut(self: Pin<&mut Self>) -> Option<&mut Fut::Output> {
+    pub fn output_mut(self: Pin<&mut Self>) -> Option<&mut Fut::Output> {
         unsafe {
             let this = self.get_unchecked_mut();
             match this {
@@ -40,10 +40,10 @@ impl<Fut: Future> MaybeDone<Fut> {
         }
     }
 
-    /// Attempt to take the output of a `MaybeDone` without driving it
+    /// Attempts to take the output of a `MaybeDone` without driving it
     /// towards completion.
     #[inline]
-    pub(crate) fn take_output(self: Pin<&mut Self>) -> Option<Fut::Output> {
+    pub fn take_output(self: Pin<&mut Self>) -> Option<Fut::Output> {
         unsafe {
             let this = self.get_unchecked_mut();
             match this {

@@ -6,15 +6,15 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 cfg_io_util! {
-    // An async reader which is always at EOF.
+    /// An async reader which is always at EOF.
     ///
     /// This struct is generally created by calling [`empty`]. Please see
     /// the documentation of [`empty()`][`empty`] for more details.
     ///
     /// This is an asynchronous version of [`std::io::empty`][std].
     ///
-    /// [`empty`]: fn.empty.html
-    /// [std]: https://doc.rust-lang.org/std/io/struct.Empty.html
+    /// [`empty`]: fn@empty
+    /// [std]: std::io::empty
     pub struct Empty {
         _p: (),
     }
@@ -25,26 +25,31 @@ cfg_io_util! {
     ///
     /// This is an asynchronous version of [`std::io::empty`][std].
     ///
+    /// [std]: std::io::empty
+    ///
     /// # Examples
     ///
     /// A slightly sad example of not reading anything into a buffer:
     ///
-    /// ```rust
-    /// # use tokio::io::{self, AsyncReadExt};
-    /// # async fn dox() {
-    /// let mut buffer = String::new();
-    /// io::empty().read_to_string(&mut buffer).await.unwrap();
-    /// assert!(buffer.is_empty());
-    /// # }
     /// ```
+    /// use tokio::io::{self, AsyncReadExt};
     ///
-    /// [std]: https://doc.rust-lang.org/std/io/fn.empty.html
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut buffer = String::new();
+    ///     io::empty().read_to_string(&mut buffer).await.unwrap();
+    ///     assert!(buffer.is_empty());
+    /// }
+    /// ```
     pub fn empty() -> Empty {
         Empty { _p: () }
     }
 }
 
 impl AsyncRead for Empty {
+    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [std::mem::MaybeUninit<u8>]) -> bool {
+        false
+    }
     #[inline]
     fn poll_read(
         self: Pin<&mut Self>,

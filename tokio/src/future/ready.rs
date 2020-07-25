@@ -2,7 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// Future for the [`ready`](ready()) function.
+/// Future for the [`ok`](ok()) function.
 ///
 /// `pub` in order to use the future as an associated type in a sealed trait.
 #[derive(Debug)]
@@ -21,7 +21,7 @@ impl<T> Future for Ready<T> {
     }
 }
 
-/// Create a future that is immediately ready with a success value.
+/// Creates a future that is immediately ready with a success value.
 pub(crate) fn ok<T, E>(t: T) -> Ready<Result<T, E>> {
     Ready(Some(Ok(t)))
 }

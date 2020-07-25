@@ -8,7 +8,7 @@ use std::task::{Context, Poll};
 /// Send values to the associated `UnboundedReceiver`.
 ///
 /// Instances are created by the
-/// [`unbounded_channel`](fn.unbounded_channel.html) function.
+/// [`unbounded_channel`](unbounded_channel) function.
 pub struct UnboundedSender<T> {
     chan: chan::Tx<T, Semaphore>,
 }
@@ -32,7 +32,7 @@ impl<T> fmt::Debug for UnboundedSender<T> {
 /// Receive values from the associated `UnboundedSender`.
 ///
 /// Instances are created by the
-/// [`unbounded_channel`](fn.unbounded_channel.html) function.
+/// [`unbounded_channel`](unbounded_channel) function.
 pub struct UnboundedReceiver<T> {
     /// The channel receiver
     chan: chan::Rx<T, Semaphore>,
@@ -46,7 +46,7 @@ impl<T> fmt::Debug for UnboundedReceiver<T> {
     }
 }
 
-/// Create an unbounded mpsc channel for communicating between asynchronous
+/// Creates an unbounded mpsc channel for communicating between asynchronous
 /// tasks.
 ///
 /// A `send` on this channel will always succeed as long as the receive half has
@@ -78,7 +78,7 @@ impl<T> UnboundedReceiver<T> {
         self.chan.recv(cx)
     }
 
-    /// Receive the next value for this receiver.
+    /// Receives the next value for this receiver.
     ///
     /// `None` is returned when all `Sender` halves have dropped, indicating
     /// that no further values can be sent on the channel.
@@ -148,7 +148,7 @@ impl<T> UnboundedReceiver<T> {
 }
 
 #[cfg(feature = "stream")]
-impl<T> futures_core::Stream for UnboundedReceiver<T> {
+impl<T> crate::stream::Stream for UnboundedReceiver<T> {
     type Item = T;
 
     fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
@@ -162,6 +162,17 @@ impl<T> UnboundedSender<T> {
     }
 
     /// Attempts to send a message on this `UnboundedSender` without blocking.
+    ///
+    /// This method is not marked async because sending a message to an unbounded channel
+    /// never requires any form of waiting. Because of this, the `send` method can be
+    /// used in both synchronous and asynchronous code without problems.
+    ///
+    /// If the receive half of the channel is closed, either due to [`close`]
+    /// being called or the [`UnboundedReceiver`] having been dropped, this
+    /// function returns an error. The error includes the value passed to `send`.
+    ///
+    /// [`close`]: UnboundedReceiver::close
+    /// [`UnboundedReceiver`]: UnboundedReceiver
     pub fn send(&self, message: T) -> Result<(), SendError<T>> {
         self.chan.send_unbounded(message)?;
         Ok(())

@@ -50,3 +50,15 @@ impl FastRand {
         s0.wrapping_add(s1)
     }
 }
+
+// Used by the select macro and `StreamMap`
+#[cfg(any(feature = "macros", feature = "stream"))]
+#[doc(hidden)]
+#[cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
+pub fn thread_rng_n(n: u32) -> u32 {
+    thread_local! {
+        static THREAD_RNG: FastRand = FastRand::new(crate::loom::rand::seed());
+    }
+
+    THREAD_RNG.with(|rng| rng.fastrand_n(n))
+}

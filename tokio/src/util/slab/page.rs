@@ -1,11 +1,11 @@
-use crate::loom::cell::CausalCell;
+use crate::loom::cell::UnsafeCell;
 use crate::util::slab::{Address, Entry, Slot, TransferStack, INITIAL_PAGE_SIZE};
 
 use std::fmt;
 
 /// Data accessed only by the thread that owns the shard.
 pub(crate) struct Local {
-    head: CausalCell<usize>,
+    head: UnsafeCell<usize>,
 }
 
 /// Data accessed by any thread.
@@ -13,7 +13,7 @@ pub(crate) struct Shared<T> {
     remote: TransferStack,
     size: usize,
     prev_sz: usize,
-    slab: CausalCell<Option<Box<[Slot<T>]>>>,
+    slab: UnsafeCell<Option<Box<[Slot<T>]>>>,
 }
 
 /// Returns the size of the page at index `n`
@@ -24,7 +24,7 @@ pub(super) fn size(n: usize) -> usize {
 impl Local {
     pub(crate) fn new() -> Self {
         Self {
-            head: CausalCell::new(0),
+            head: UnsafeCell::new(0),
         }
     }
 
@@ -45,7 +45,7 @@ impl<T: Entry> Shared<T> {
             prev_sz,
             size,
             remote: TransferStack::new(),
-            slab: CausalCell::new(None),
+            slab: UnsafeCell::new(None),
         }
     }
 

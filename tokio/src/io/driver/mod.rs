@@ -5,15 +5,14 @@ pub(crate) use scheduled_io::ScheduledIo; // pub(crate) for tests
 
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::park::{Park, Unpark};
+use crate::runtime::context;
 use crate::util::slab::{Address, Slab};
 
 use mio::event::Evented;
-use std::cell::RefCell;
 use std::fmt;
 use std::io;
-use std::marker::PhantomData;
-use std::sync::{Arc, Weak};
 use std::sync::atomic::Ordering::SeqCst;
+use std::sync::{Arc, Weak};
 use std::task::Waker;
 use std::time::Duration;
 
@@ -54,11 +53,6 @@ pub(super) enum Direction {
     Write,
 }
 
-thread_local! {
-    /// Tracks the reactor for the current execution context.
-    static CURRENT_REACTOR: RefCell<Option<Handle>> = RefCell::new(None)
-}
-
 const TOKEN_WAKEUP: mio::Token = mio::Token(Address::NULL);
 
 fn _assert_kinds() {
@@ -68,40 +62,6 @@ fn _assert_kinds() {
 }
 
 // ===== impl Driver =====
-
-#[derive(Debug)]
-/// Guard that resets current reactor on drop.
-pub(crate) struct DefaultGuard<'a> {
-    _lifetime: PhantomData<&'a u8>,
-}
-
-impl Drop for DefaultGuard<'_> {
-    fn drop(&mut self) {
-        CURRENT_REACTOR.with(|current| {
-            let mut current = current.borrow_mut();
-            *current = None;
-        });
-    }
-}
-
-/// Sets handle for a default reactor, returning guard that unsets it on drop.
-pub(crate) fn set_default(handle: &Handle) -> DefaultGuard<'_> {
-    CURRENT_REACTOR.with(|current| {
-        let mut current = current.borrow_mut();
-
-        assert!(
-            current.is_none(),
-            "default Tokio reactor already set \
-             for execution context"
-        );
-
-        *current = Some(handle.clone());
-    });
-
-    DefaultGuard {
-        _lifetime: PhantomData,
-    }
-}
 
 impl Driver {
     /// Creates a new event loop, returning any error that happened during the
@@ -186,7 +146,7 @@ impl Driver {
             return;
         }
 
-        if ready.is_writable() || platform::is_hup(ready) {
+        if ready.is_writable() || platform::is_hup(ready) || platform::is_error(ready) {
             wr = io.writer.take_waker();
         }
 
@@ -238,10 +198,8 @@ impl Handle {
     ///
     /// This function panics if there is no current reactor set.
     pub(super) fn current() -> Self {
-        CURRENT_REACTOR.with(|current| match *current.borrow() {
-            Some(ref handle) => handle.clone(),
-            None => panic!("no current reactor"),
-        })
+        context::io_handle()
+            .expect("there is no reactor running, must be called from the context of Tokio runtime")
     }
 
     /// Forces a reactor blocked in a call to `turn` to wakeup, or otherwise
@@ -279,10 +237,14 @@ impl fmt::Debug for Handle {
 // ===== impl Inner =====
 
 impl Inner {
-    /// Register an I/O resource with the reactor.
+    /// Registers an I/O resource with the reactor for a given `mio::Ready` state.
     ///
     /// The registration token is returned.
-    pub(super) fn add_source(&self, source: &dyn Evented) -> io::Result<Address> {
+    pub(super) fn add_source(
+        &self,
+        source: &dyn Evented,
+        ready: mio::Ready,
+    ) -> io::Result<Address> {
         let address = self.io_dispatch.alloc().ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::Other,
@@ -295,7 +257,7 @@ impl Inner {
         self.io.register(
             source,
             mio::Token(address.to_usize()),
-            mio::Ready::all(),
+            ready,
             mio::PollOpt::edge(),
         )?;
 
@@ -319,20 +281,12 @@ impl Inner {
             .get(token)
             .unwrap_or_else(|| panic!("IO resource for token {:?} does not exist!", token));
 
-        let readiness = sched
-            .get_readiness(token)
-            .unwrap_or_else(|| panic!("token {:?} no longer valid!", token));
-
-        let (waker, ready) = match dir {
-            Direction::Read => (&sched.reader, !mio::Ready::writable()),
-            Direction::Write => (&sched.writer, mio::Ready::writable()),
+        let waker = match dir {
+            Direction::Read => &sched.reader,
+            Direction::Write => &sched.writer,
         };
 
         waker.register(w);
-
-        if readiness & ready.as_usize() != 0 {
-            waker.wake();
-        }
     }
 }
 
@@ -343,7 +297,7 @@ impl Direction {
                 // Everything except writable is signaled through read.
                 mio::Ready::all() - mio::Ready::writable()
             }
-            Direction::Write => mio::Ready::writable() | platform::hup(),
+            Direction::Write => mio::Ready::writable() | platform::hup() | platform::error(),
         }
     }
 }
@@ -389,12 +343,12 @@ mod tests {
             let inner = reactor.inner;
             let inner2 = inner.clone();
 
-            let token_1 = inner.add_source(&NotEvented).unwrap();
+            let token_1 = inner.add_source(&NotEvented, mio::Ready::all()).unwrap();
             let thread = thread::spawn(move || {
                 inner2.drop_source(token_1);
             });
 
-            let token_2 = inner.add_source(&NotEvented).unwrap();
+            let token_2 = inner.add_source(&NotEvented, mio::Ready::all()).unwrap();
             thread.join().unwrap();
 
             assert!(token_1 != token_2);
@@ -410,15 +364,15 @@ mod tests {
             // add sources to fill up the first page so that the dropped index
             // may be reused.
             for _ in 0..31 {
-                inner.add_source(&NotEvented).unwrap();
+                inner.add_source(&NotEvented, mio::Ready::all()).unwrap();
             }
 
-            let token_1 = inner.add_source(&NotEvented).unwrap();
+            let token_1 = inner.add_source(&NotEvented, mio::Ready::all()).unwrap();
             let thread = thread::spawn(move || {
                 inner2.drop_source(token_1);
             });
 
-            let token_2 = inner.add_source(&NotEvented).unwrap();
+            let token_2 = inner.add_source(&NotEvented, mio::Ready::all()).unwrap();
             thread.join().unwrap();
 
             assert!(token_1 != token_2);
@@ -433,11 +387,11 @@ mod tests {
             let inner2 = inner.clone();
 
             let thread = thread::spawn(move || {
-                let token_2 = inner2.add_source(&NotEvented).unwrap();
+                let token_2 = inner2.add_source(&NotEvented, mio::Ready::all()).unwrap();
                 token_2
             });
 
-            let token_1 = inner.add_source(&NotEvented).unwrap();
+            let token_1 = inner.add_source(&NotEvented, mio::Ready::all()).unwrap();
             let token_2 = thread.join().unwrap();
 
             assert!(token_1 != token_2);

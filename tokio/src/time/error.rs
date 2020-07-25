@@ -24,14 +24,16 @@ use std::fmt;
 #[derive(Debug)]
 pub struct Error(Kind);
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
 enum Kind {
-    Shutdown,
-    AtCapacity,
+    Shutdown = 1,
+    AtCapacity = 2,
+    Invalid = 3,
 }
 
 impl Error {
-    /// Create an error representing a shutdown timer.
+    /// Creates an error representing a shutdown timer.
     pub fn shutdown() -> Error {
         Error(Shutdown)
     }
@@ -44,7 +46,7 @@ impl Error {
         }
     }
 
-    /// Create an error representing a timer at capacity.
+    /// Creates an error representing a timer at capacity.
     pub fn at_capacity() -> Error {
         Error(AtCapacity)
     }
@@ -56,6 +58,32 @@ impl Error {
             _ => false,
         }
     }
+
+    /// Create an error representing a misconfigured timer.
+    pub fn invalid() -> Error {
+        Error(Invalid)
+    }
+
+    /// Returns `true` if the error was caused by the timer being misconfigured.
+    pub fn is_invalid(&self) -> bool {
+        match self.0 {
+            Kind::Invalid => true,
+            _ => false,
+        }
+    }
+
+    pub(crate) fn as_u8(&self) -> u8 {
+        self.0 as u8
+    }
+
+    pub(crate) fn from_u8(n: u8) -> Self {
+        Error(match n {
+            1 => Shutdown,
+            2 => AtCapacity,
+            3 => Invalid,
+            _ => panic!("u8 does not correspond to any time error variant"),
+        })
+    }
 }
 
 impl error::Error for Error {}
@@ -64,8 +92,9 @@ impl fmt::Display for Error {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         use self::Kind::*;
         let descr = match self.0 {
-            Shutdown => "timer is shutdown",
+            Shutdown => "the timer is shutdown, must be called from the context of Tokio runtime",
             AtCapacity => "timer is at capacity and cannot create a new entry",
+            Invalid => "timer duration exceeds maximum duration",
         };
         write!(fmt, "{}", descr)
     }

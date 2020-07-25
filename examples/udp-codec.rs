@@ -9,12 +9,13 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::net::UdpSocket;
+use tokio::stream::StreamExt;
 use tokio::{io, time};
 use tokio_util::codec::BytesCodec;
 use tokio_util::udp::UdpFramed;
 
 use bytes::Bytes;
-use futures::{FutureExt, SinkExt, StreamExt};
+use futures::{FutureExt, SinkExt};
 use std::env;
 use std::error::Error;
 use std::net::SocketAddr;
@@ -45,7 +46,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Run both futures simultaneously of `a` and `b` sending messages back and forth.
     match futures::future::try_join(a, b).await {
-        Err(e) => println!("an error occured; error = {:?}", e),
+        Err(e) => println!("an error occurred; error = {:?}", e),
         _ => println!("done!"),
     }
 

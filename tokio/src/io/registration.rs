@@ -1,9 +1,9 @@
-use crate::io::driver::{Direction, Handle, platform};
+use crate::io::driver::{platform, Direction, Handle};
 use crate::util::slab::Address;
 
 use mio::{self, Evented};
-use std::task::{Context, Poll};
 use std::io;
+use std::task::{Context, Poll};
 
 cfg_io_driver! {
     /// Associates an I/O resource with the reactor instance that drives it.
@@ -34,9 +34,9 @@ cfg_io_driver! {
     /// stream. The write readiness event stream is only for `Ready::writable()`
     /// events.
     ///
-    /// [`new`]: #method.new
-    /// [`poll_read_ready`]: #method.poll_read_ready`]
-    /// [`poll_write_ready`]: #method.poll_write_ready`]
+    /// [`new`]: method@Self::new
+    /// [`poll_read_ready`]: method@Self::poll_read_ready`
+    /// [`poll_write_ready`]: method@Self::poll_write_ready`
     #[derive(Debug)]
     pub struct Registration {
         handle: Handle,
@@ -47,19 +47,65 @@ cfg_io_driver! {
 // ===== impl Registration =====
 
 impl Registration {
-    /// Register the I/O resource with the default reactor.
+    /// Registers the I/O resource with the default reactor.
     ///
     /// # Return
     ///
     /// - `Ok` if the registration happened successfully
     /// - `Err` if an error was encountered during registration
+    ///
+    ///
+    /// # Panics
+    ///
+    /// This function panics if thread-local runtime is not set.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
     pub fn new<T>(io: &T) -> io::Result<Registration>
+    where
+        T: Evented,
+    {
+        Registration::new_with_ready(io, mio::Ready::all())
+    }
+
+    /// Registers the I/O resource with the default reactor, for a specific `mio::Ready` state.
+    /// `new_with_ready` should be used over `new` when you need control over the readiness state,
+    /// such as when a file descriptor only allows reads. This does not add `hup` or `error` so if
+    /// you are interested in those states, you will need to add them to the readiness state passed
+    /// to this function.
+    ///
+    /// An example to listen to read only
+    ///
+    /// ```rust
+    /// ##[cfg(unix)]
+    ///     mio::Ready::from_usize(
+    ///         mio::Ready::readable().as_usize()
+    ///         | mio::unix::UnixReady::error().as_usize()
+    ///         | mio::unix::UnixReady::hup().as_usize()
+    ///     );
+    /// ```
+    ///
+    /// # Return
+    ///
+    /// - `Ok` if the registration happened successfully
+    /// - `Err` if an error was encountered during registration
+    ///
+    ///
+    /// # Panics
+    ///
+    /// This function panics if thread-local runtime is not set.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
+    pub fn new_with_ready<T>(io: &T, ready: mio::Ready) -> io::Result<Registration>
     where
         T: Evented,
     {
         let handle = Handle::current();
         let address = if let Some(inner) = handle.inner() {
-            inner.add_source(io)?
+            inner.add_source(io, ready)?
         } else {
             return Err(io::Error::new(
                 io::ErrorKind::Other,
@@ -70,7 +116,7 @@ impl Registration {
         Ok(Registration { handle, address })
     }
 
-    /// Deregister the I/O resource from the reactor it is associated with.
+    /// Deregisters the I/O resource from the reactor it is associated with.
     ///
     /// This function must be called before the I/O resource associated with the
     /// registration is dropped.
@@ -97,7 +143,7 @@ impl Registration {
         inner.deregister_source(io)
     }
 
-    /// Poll for events on the I/O resource's read readiness stream.
+    /// Polls for events on the I/O resource's read readiness stream.
     ///
     /// If the I/O resource receives a new read readiness event since the last
     /// call to `poll_read_ready`, it is returned. If it has not, the current
@@ -106,8 +152,6 @@ impl Registration {
     /// All events except `HUP` are [edge-triggered]. Once `HUP` is returned,
     /// the function will always return `Ready(HUP)`. This should be treated as
     /// the end of the readiness stream.
-    ///
-    /// Ensure that [`register`] has been called first.
     ///
     /// # Return value
     ///
@@ -120,19 +164,26 @@ impl Registration {
     ///   since the last call to `poll_read_ready`.
     ///
     /// * `Poll::Ready(Err(err))` means that the registration has encountered an
-    ///   error. This error either represents a permanent internal error **or**
-    ///   the fact that [`register`] was not called first.
+    ///   error. This could represent a permanent internal error for example.
     ///
-    /// [`register`]: #method.register
-    /// [edge-triggered]: https://docs.rs/mio/0.6/mio/struct.Poll.html#edge-triggered-and-level-triggered
+    /// [edge-triggered]: struct@mio::Poll#edge-triggered-and-level-triggered
     ///
     /// # Panics
     ///
     /// This function will panic if called from outside of a task context.
     pub fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<mio::Ready>> {
-        let v = self.poll_ready(Direction::Read, Some(cx))?;
+        // Keep track of task budget
+        let coop = ready!(crate::coop::poll_proceed(cx));
+
+        let v = self.poll_ready(Direction::Read, Some(cx)).map_err(|e| {
+            coop.made_progress();
+            e
+        })?;
         match v {
-            Some(v) => Poll::Ready(Ok(v)),
+            Some(v) => {
+                coop.made_progress();
+                Poll::Ready(Ok(v))
+            }
             None => Poll::Pending,
         }
     }
@@ -143,12 +194,12 @@ impl Registration {
     /// will not notify the current task when a new event is received. As such,
     /// it is safe to call this function from outside of a task context.
     ///
-    /// [`poll_read_ready`]: #method.poll_read_ready
+    /// [`poll_read_ready`]: method@Self::poll_read_ready
     pub fn take_read_ready(&self) -> io::Result<Option<mio::Ready>> {
         self.poll_ready(Direction::Read, None)
     }
 
-    /// Poll for events on the I/O resource's write readiness stream.
+    /// Polls for events on the I/O resource's write readiness stream.
     ///
     /// If the I/O resource receives a new write readiness event since the last
     /// call to `poll_write_ready`, it is returned. If it has not, the current
@@ -157,8 +208,6 @@ impl Registration {
     /// All events except `HUP` are [edge-triggered]. Once `HUP` is returned,
     /// the function will always return `Ready(HUP)`. This should be treated as
     /// the end of the readiness stream.
-    ///
-    /// Ensure that [`register`] has been called first.
     ///
     /// # Return value
     ///
@@ -171,35 +220,42 @@ impl Registration {
     ///   since the last call to `poll_write_ready`.
     ///
     /// * `Poll::Ready(Err(err))` means that the registration has encountered an
-    ///   error. This error either represents a permanent internal error **or**
-    ///   the fact that [`register`] was not called first.
+    ///   error. This could represent a permanent internal error for example.
     ///
-    /// [`register`]: #method.register
-    /// [edge-triggered]: https://docs.rs/mio/0.6/mio/struct.Poll.html#edge-triggered-and-level-triggered
+    /// [edge-triggered]: struct@mio::Poll#edge-triggered-and-level-triggered
     ///
     /// # Panics
     ///
     /// This function will panic if called from outside of a task context.
     pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<mio::Ready>> {
-        let v = self.poll_ready(Direction::Write, Some(cx))?;
+        // Keep track of task budget
+        let coop = ready!(crate::coop::poll_proceed(cx));
+
+        let v = self.poll_ready(Direction::Write, Some(cx)).map_err(|e| {
+            coop.made_progress();
+            e
+        })?;
         match v {
-            Some(v) => Poll::Ready(Ok(v)),
+            Some(v) => {
+                coop.made_progress();
+                Poll::Ready(Ok(v))
+            }
             None => Poll::Pending,
         }
     }
 
-    /// Consume any pending write readiness event.
+    /// Consumes any pending write readiness event.
     ///
     /// This function is identical to [`poll_write_ready`] **except** that it
     /// will not notify the current task when a new event is received. As such,
     /// it is safe to call this function from outside of a task context.
     ///
-    /// [`poll_write_ready`]: #method.poll_write_ready
+    /// [`poll_write_ready`]: method@Self::poll_write_ready
     pub fn take_write_ready(&self) -> io::Result<Option<mio::Ready>> {
         self.poll_ready(Direction::Write, None)
     }
 
-    /// Poll for events on the I/O resource's `direction` readiness stream.
+    /// Polls for events on the I/O resource's `direction` readiness stream.
     ///
     /// If called with a task context, notify the task when a new event is
     /// received.
@@ -220,18 +276,26 @@ impl Registration {
         }
 
         let mask = direction.mask();
-        let mask_no_hup = (mask - platform::hup()).as_usize();
+        let mask_no_hup = (mask - platform::hup() - platform::error()).as_usize();
 
         let sched = inner.io_dispatch.get(self.address).unwrap();
 
-        // This consumes the current readiness state **except** for HUP. HUP is
-        // excluded because a) it is a final state and never transitions out of
-        // HUP and b) both the read AND the write directions need to be able to
-        // observe this state.
+        // This consumes the current readiness state **except** for HUP and
+        // error. HUP and error are excluded because a) they are final states
+        // and never transitition out and b) both the read AND the write
+        // directions need to be able to obvserve these states.
         //
-        // If HUP were to be cleared when `direction` is `Read`, then when
-        // `poll_ready` is called again with a _`direction` of `Write`, the HUP
-        // state would not be visible.
+        // # Platform-specific behavior
+        //
+        // HUP and error readiness are platform-specific. On epoll platforms,
+        // HUP has specific conditions that must be met by both peers of a
+        // connection in order to be triggered.
+        //
+        // On epoll platforms, `EPOLLERR` is signaled through
+        // `UnixReady::error()` and is important to be observable by both read
+        // AND write. A specific case that `EPOLLERR` occurs is when the read
+        // end of a pipe is closed. When this occurs, a peer blocked by
+        // writing to the pipe should be notified.
         let curr_ready = sched
             .set_readiness(self.address, |curr| curr & (!mask_no_hup))
             .unwrap_or_else(|_| panic!("address {:?} no longer valid!", self.address));

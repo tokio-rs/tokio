@@ -5,7 +5,7 @@ use std::ops::DerefMut;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// Read bytes from a source.
+/// Reads bytes from a source.
 ///
 /// This trait is analogous to the [`std::io::Read`] trait, but integrates with
 /// the asynchronous task system. In particular, the [`poll_read`] method,
@@ -73,16 +73,16 @@ pub trait AsyncRead {
     /// that they did not write to.
     ///
     /// [`io::Read`]: std::io::Read
-    /// [`poll_read_buf`]: #method.poll_read_buf
+    /// [`poll_read_buf`]: method@Self::poll_read_buf
     unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [MaybeUninit<u8>]) -> bool {
         for x in buf {
-            *x.as_mut_ptr() = 0;
+            *x = MaybeUninit::new(0);
         }
 
         true
     }
 
-    /// Attempt to read from the `AsyncRead` into `buf`.
+    /// Attempts to read from the `AsyncRead` into `buf`.
     ///
     /// On success, returns `Poll::Ready(Ok(num_bytes_read))`.
     ///
@@ -96,7 +96,7 @@ pub trait AsyncRead {
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>>;
 
-    /// Pull some bytes from this source into the specified `BufMut`, returning
+    /// Pulls some bytes from this source into the specified `BufMut`, returning
     /// how many bytes were read.
     ///
     /// The `buf` provided will have bytes read into it and the internal cursor
@@ -123,7 +123,9 @@ pub trait AsyncRead {
                 // Convert to `&mut [u8]`
                 let b = &mut *(b as *mut [MaybeUninit<u8>] as *mut [u8]);
 
-                ready!(self.poll_read(cx, b))?
+                let n = ready!(self.poll_read(cx, b))?;
+                assert!(n <= b.len(), "Bad AsyncRead implementation, more bytes were reported as read than the buffer can hold");
+                n
             };
 
             buf.advance_mut(n);
@@ -138,12 +140,14 @@ macro_rules! deref_async_read {
             (**self).prepare_uninitialized_buffer(buf)
         }
 
-        fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8])
-            -> Poll<io::Result<usize>>
-        {
+        fn poll_read(
+            mut self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            buf: &mut [u8],
+        ) -> Poll<io::Result<usize>> {
             Pin::new(&mut **self).poll_read(cx, buf)
         }
-    }
+    };
 }
 
 impl<T: ?Sized + AsyncRead + Unpin> AsyncRead for Box<T> {

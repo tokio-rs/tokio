@@ -15,15 +15,20 @@
 //! over Unix Domain Datagram Socket **(available on Unix only)**
 
 //!
-//! [`TcpListener`]: struct.TcpListener.html
-//! [`TcpStream`]: struct.TcpStream.html
-//! [`UdpSocket`]: struct.UdpSocket.html
-//! [`UnixListener`]: struct.UnixListener.html
-//! [`UnixStream`]: struct.UnixStream.html
-//! [`UnixDatagram`]: struct.UnixDatagram.html
+//! [`TcpListener`]: TcpListener
+//! [`TcpStream`]: TcpStream
+//! [`UdpSocket`]: UdpSocket
+//! [`UnixListener`]: UnixListener
+//! [`UnixStream`]: UnixStream
+//! [`UnixDatagram`]: UnixDatagram
 
 mod addr;
 pub use addr::ToSocketAddrs;
+
+cfg_dns! {
+    mod lookup_host;
+    pub use lookup_host::lookup_host;
+}
 
 cfg_tcp! {
     pub mod tcp;
@@ -38,7 +43,7 @@ cfg_udp! {
 
 cfg_uds! {
     pub mod unix;
-    pub use unix::datagram::UnixDatagram;
+    pub use unix::datagram::socket::UnixDatagram;
     pub use unix::listener::UnixListener;
     pub use unix::stream::UnixStream;
 }

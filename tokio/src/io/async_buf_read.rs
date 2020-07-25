@@ -5,13 +5,23 @@ use std::ops::DerefMut;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// Read bytes asynchronously.
+/// Reads bytes asynchronously.
 ///
-/// This trait inherits from `std::io::BufRead` and indicates that an I/O object is
-/// **non-blocking**. All non-blocking I/O objects must return an error when
-/// bytes are unavailable instead of blocking the current thread.
+/// This trait is analogous to [`std::io::BufRead`], but integrates with
+/// the asynchronous task system. In particular, the [`poll_fill_buf`] method,
+/// unlike [`BufRead::fill_buf`], will automatically queue the current task for wakeup
+/// and return if data is not yet available, rather than blocking the calling
+/// thread.
+///
+/// Utilities for working with `AsyncBufRead` values are provided by
+/// [`AsyncBufReadExt`].
+///
+/// [`std::io::BufRead`]: std::io::BufRead
+/// [`poll_fill_buf`]: AsyncBufRead::poll_fill_buf
+/// [`BufRead::fill_buf`]: std::io::BufRead::fill_buf
+/// [`AsyncBufReadExt`]: crate::io::AsyncBufReadExt
 pub trait AsyncBufRead: AsyncRead {
-    /// Attempt to return the contents of the internal buffer, filling it with more data
+    /// Attempts to return the contents of the internal buffer, filling it with more data
     /// from the inner reader if it is empty.
     ///
     /// On success, returns `Poll::Ready(Ok(buf))`.
@@ -54,16 +64,14 @@ pub trait AsyncBufRead: AsyncRead {
 
 macro_rules! deref_async_buf_read {
     () => {
-        fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>)
-            -> Poll<io::Result<&[u8]>>
-        {
+        fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
             Pin::new(&mut **self.get_mut()).poll_fill_buf(cx)
         }
 
         fn consume(mut self: Pin<&mut Self>, amt: usize) {
             Pin::new(&mut **self).consume(amt)
         }
-    }
+    };
 }
 
 impl<T: ?Sized + AsyncBufRead + Unpin> AsyncBufRead for Box<T> {

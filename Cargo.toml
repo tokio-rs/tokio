@@ -4,10 +4,10 @@ members = [
   "tokio",
   "tokio-macros",
   "tokio-test",
-  "tokio-tls",
   "tokio-util",
 
   # Internal
+  "benches",
   "examples",
   "tests-build",
   "tests-integration",

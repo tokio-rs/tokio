@@ -4,7 +4,6 @@ macro_rules! cfg_resource_drivers {
     ($($item:item)*) => {
         $(
             #[cfg(any(feature = "io-driver", feature = "time"))]
-            #[cfg(not(loom))]
             $item
         )*
     }
@@ -20,7 +19,7 @@ macro_rules! cfg_blocking {
     }
 }
 
-/// Enable blocking API internals
+/// Enables blocking API internals
 macro_rules! cfg_blocking_impl {
     ($($item:item)*) => {
         $(
@@ -36,7 +35,40 @@ macro_rules! cfg_blocking_impl {
     }
 }
 
-/// Enable blocking API internals
+/// Enables blocking API internals
+macro_rules! cfg_blocking_impl_or_task {
+    ($($item:item)*) => {
+        $(
+            #[cfg(any(
+                    feature = "blocking",
+                    feature = "fs",
+                    feature = "dns",
+                    feature = "io-std",
+                    feature = "rt-threaded",
+                    feature = "task",
+                    ))]
+            $item
+        )*
+    }
+}
+
+/// Enables enter::block_on
+macro_rules! cfg_block_on {
+    ($($item:item)*) => {
+        $(
+            #[cfg(any(
+                    feature = "blocking",
+                    feature = "fs",
+                    feature = "dns",
+                    feature = "io-std",
+                    feature = "rt-core",
+                    ))]
+            $item
+        )*
+    }
+}
+
+/// Enables blocking API internals
 macro_rules! cfg_not_blocking_impl {
     ($($item:item)*) => {
         $(
@@ -52,7 +84,7 @@ macro_rules! cfg_not_blocking_impl {
     }
 }
 
-/// Enable internal `AtomicWaker` impl
+/// Enables internal `AtomicWaker` impl
 macro_rules! cfg_atomic_waker_impl {
     ($($item:item)*) => {
         $(
@@ -317,6 +349,55 @@ macro_rules! cfg_uds {
         $(
             #[cfg(all(unix, feature = "uds"))]
             #[cfg_attr(docsrs, doc(cfg(feature = "uds")))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_unstable {
+    ($($item:item)*) => {
+        $(
+            #[cfg(tokio_unstable)]
+            #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_trace {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "tracing")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "tracing")))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_not_trace {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(feature = "tracing"))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_coop {
+    ($($item:item)*) => {
+        $(
+            #[cfg(any(
+                    feature = "blocking",
+                    feature = "dns",
+                    feature = "fs",
+                    feature = "io-driver",
+                    feature = "io-std",
+                    feature = "process",
+                    feature = "rt-core",
+                    feature = "sync",
+                    feature = "stream",
+                    feature = "time"
+                    ))]
             $item
         )*
     }

@@ -107,11 +107,11 @@ impl Future for Child {
                     Poll::Pending => return Poll::Pending,
                 }
                 let status = try_wait(&inner.child)?.expect("not ready yet");
-                return Poll::Ready(Ok(status.into()));
+                return Poll::Ready(Ok(status));
             }
 
             if let Some(e) = try_wait(&inner.child)? {
-                return Poll::Ready(Ok(e.into()));
+                return Poll::Ready(Ok(e));
             }
             let (tx, rx) = oneshot::channel();
             let ptr = Box::into_raw(Box::new(Some(tx)));

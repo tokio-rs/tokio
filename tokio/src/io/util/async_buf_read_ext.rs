@@ -5,9 +5,11 @@ use crate::io::util::split::{split, Split};
 use crate::io::AsyncBufRead;
 
 cfg_io_util! {
-    /// An extension trait which adds utility methods to `AsyncBufRead` types.
+    /// An extension trait which adds utility methods to [`AsyncBufRead`] types.
+    ///
+    /// [`AsyncBufRead`]: crate::io::AsyncBufRead
     pub trait AsyncBufReadExt: AsyncBufRead {
-        /// Read all bytes into `buf` until the delimiter `byte` or EOF is reached.
+        /// Reads all bytes into `buf` until the delimiter `byte` or EOF is reached.
         ///
         /// Equivalent to:
         ///
@@ -83,7 +85,7 @@ cfg_io_util! {
             read_until(self, byte, buf)
         }
 
-        /// Read all bytes until a newline (the 0xA byte) is reached, and append
+        /// Reads all bytes until a newline (the 0xA byte) is reached, and append
         /// them to the provided buffer.
         ///
         /// Equivalent to:
@@ -226,8 +228,8 @@ cfg_io_util! {
         ///
         /// ```
         /// use tokio::io::AsyncBufReadExt;
+        /// use tokio::stream::StreamExt;
         ///
-        /// use futures::{StreamExt};
         /// use std::io::Cursor;
         ///
         /// #[tokio::main]

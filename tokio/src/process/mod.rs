@@ -6,6 +6,8 @@
 //! variants) return "future aware" types that interoperate with Tokio. The asynchronous process
 //! support is provided through signal handling on Unix and system APIs on Windows.
 //!
+//! [`std::process::Command`]: std::process::Command
+//!
 //! # Examples
 //!
 //! Here's an example program which will spawn `echo hello world` and then wait
@@ -74,7 +76,7 @@
 //!     let mut child = cmd.spawn()
 //!         .expect("failed to spawn command");
 //!
-//!     let stdout = child.stdout().take()
+//!     let stdout = child.stdout.take()
 //!         .expect("child did not have a handle to stdout");
 //!
 //!     let mut reader = BufReader::new(stdout).lines();
@@ -140,6 +142,9 @@ use std::task::Poll;
 /// [output](Command::output).
 ///
 /// `Command` uses asynchronous versions of some `std` types (for example [`Child`]).
+///
+/// [`std::process::Command`]: std::process::Command
+/// [`Child`]: struct@Child
 #[derive(Debug)]
 pub struct Command {
     std: StdCommand,
@@ -171,7 +176,7 @@ impl Command {
     /// The search path to be used may be controlled by setting the
     /// `PATH` environment variable on the Command,
     /// but this has some implementation limitations on Windows
-    /// (see issue rust-lang/rust#37519).
+    /// (see issue [rust-lang/rust#37519]).
     ///
     /// # Examples
     ///
@@ -181,6 +186,8 @@ impl Command {
     /// use tokio::process::Command;
     /// let command = Command::new("sh");
     /// ```
+    ///
+    /// [rust-lang/rust#37519]: https://github.com/rust-lang/rust/issues/37519
     pub fn new<S: AsRef<OsStr>>(program: S) -> Command {
         Self::from(StdCommand::new(program))
     }
@@ -204,7 +211,7 @@ impl Command {
     ///
     /// To pass multiple arguments see [`args`].
     ///
-    /// [`args`]: #method.args
+    /// [`args`]: method@Self::args
     ///
     /// # Examples
     ///
@@ -226,7 +233,7 @@ impl Command {
     ///
     /// To pass a single argument see [`arg`].
     ///
-    /// [`arg`]: #method.arg
+    /// [`arg`]: method@Self::arg
     ///
     /// # Examples
     ///
@@ -348,6 +355,8 @@ impl Command {
     /// platform specific and unstable, and it's recommended to use
     /// [`canonicalize`] to get an absolute program path instead.
     ///
+    /// [`canonicalize`]: crate::fs::canonicalize()
+    ///
     /// # Examples
     ///
     /// Basic usage:
@@ -358,14 +367,12 @@ impl Command {
     /// let command = Command::new("ls")
     ///         .current_dir("/bin");
     /// ```
-    ///
-    /// [`canonicalize`]: ../fs/fn.canonicalize.html
     pub fn current_dir<P: AsRef<Path>>(&mut self, dir: P) -> &mut Command {
         self.std.current_dir(dir);
         self
     }
 
-    /// Configuration for the child process's standard input (stdin) handle.
+    /// Sets configuration for the child process's standard input (stdin) handle.
     ///
     /// Defaults to [`inherit`] when used with `spawn` or `status`, and
     /// defaults to [`piped`] when used with `output`.
@@ -389,7 +396,7 @@ impl Command {
         self
     }
 
-    /// Configuration for the child process's standard output (stdout) handle.
+    /// Sets configuration for the child process's standard output (stdout) handle.
     ///
     /// Defaults to [`inherit`] when used with `spawn` or `status`, and
     /// defaults to [`piped`] when used with `output`.
@@ -413,7 +420,7 @@ impl Command {
         self
     }
 
-    /// Configuration for the child process's standard error (stderr) handle.
+    /// Sets configuration for the child process's standard error (stderr) handle.
     ///
     /// Defaults to [`inherit`] when used with `spawn` or `status`, and
     /// defaults to [`piped`] when used with `output`.
@@ -468,7 +475,7 @@ impl Command {
         self
     }
 
-    /// Similar to `uid`, but sets the group ID of the child process. This has
+    /// Similar to `uid` but sets the group ID of the child process. This has
     /// the same semantics as the `uid` field.
     #[cfg(unix)]
     pub fn gid(&mut self, id: u32) -> &mut Command {
@@ -556,7 +563,7 @@ impl Command {
         imp::spawn_child(&mut self.std).map(|spawned_child| Child {
             child: ChildDropGuard {
                 inner: spawned_child.child,
-                kill_on_drop: self.kill_on_drop
+                kill_on_drop: self.kill_on_drop,
             },
             stdin: spawned_child.stdin.map(|inner| ChildStdin { inner }),
             stdout: spawned_child.stdout.map(|inner| ChildStdout { inner }),
@@ -564,7 +571,7 @@ impl Command {
         })
     }
 
-    /// Executes a command as a child process, waiting for it to finish and
+    /// Executes the command as a child process, waiting for it to finish and
     /// collecting its exit status.
     ///
     /// By default, stdin, stdout and stderr are inherited from the parent.
@@ -700,11 +707,18 @@ where
     type Output = Result<T, E>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // Keep track of task budget
+        let coop = ready!(crate::coop::poll_proceed(cx));
+
         let ret = Pin::new(&mut self.inner).poll(cx);
 
         if let Poll::Ready(Ok(_)) = ret {
             // Avoid the overhead of trying to kill a reaped process
             self.kill_on_drop = false;
+        }
+
+        if ret.is_ready() {
+            coop.made_progress();
         }
 
         ret
@@ -729,9 +743,18 @@ where
 #[derive(Debug)]
 pub struct Child {
     child: ChildDropGuard<imp::Child>,
-    stdin: Option<ChildStdin>,
-    stdout: Option<ChildStdout>,
-    stderr: Option<ChildStderr>,
+
+    /// The handle for writing to the child's standard input (stdin), if it has
+    /// been captured.
+    pub stdin: Option<ChildStdin>,
+
+    /// The handle for reading from the child's standard output (stdout), if it
+    /// has been captured.
+    pub stdout: Option<ChildStdout>,
+
+    /// The handle for reading from the child's standard error (stderr), if it
+    /// has been captured.
+    pub stderr: Option<ChildStderr>,
 }
 
 impl Child {
@@ -747,20 +770,20 @@ impl Child {
         self.child.kill()
     }
 
-    /// Returns a handle for writing to the child's stdin, if it has been
-    /// captured.
+    #[doc(hidden)]
+    #[deprecated(note = "please use `child.stdin` instead")]
     pub fn stdin(&mut self) -> &mut Option<ChildStdin> {
         &mut self.stdin
     }
 
-    /// Returns a handle for reading from the child's stdout, if it has been
-    /// captured.
+    #[doc(hidden)]
+    #[deprecated(note = "please use `child.stdout` instead")]
     pub fn stdout(&mut self) -> &mut Option<ChildStdout> {
         &mut self.stdout
     }
 
-    /// Returns a handle for reading from the child's stderr, if it has been
-    /// captured.
+    #[doc(hidden)]
+    #[deprecated(note = "please use `child.stderr` instead")]
     pub fn stderr(&mut self) -> &mut Option<ChildStderr> {
         &mut self.stderr
     }
@@ -792,7 +815,7 @@ impl Child {
             Ok(vec)
         }
 
-        drop(self.stdin().take());
+        drop(self.stdin.take());
         let stdout_fut = read_to_end(self.stdout.take());
         let stderr_fut = read_to_end(self.stderr.take());
 
@@ -860,6 +883,11 @@ impl AsyncWrite for ChildStdin {
 }
 
 impl AsyncRead for ChildStdout {
+    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [std::mem::MaybeUninit<u8>]) -> bool {
+        // https://github.com/rust-lang/rust/blob/09c817eeb29e764cfc12d0a8d94841e3ffe34023/src/libstd/process.rs#L314
+        false
+    }
+
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -870,6 +898,11 @@ impl AsyncRead for ChildStdout {
 }
 
 impl AsyncRead for ChildStderr {
+    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [std::mem::MaybeUninit<u8>]) -> bool {
+        // https://github.com/rust-lang/rust/blob/09c817eeb29e764cfc12d0a8d94841e3ffe34023/src/libstd/process.rs#L375
+        false
+    }
+
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
