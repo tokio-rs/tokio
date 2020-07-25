@@ -316,6 +316,8 @@ impl<T> Sender<T> {
                         Err(TrySendError::Closed(value)) => Err(SendError(value)),
                         _ => unreachable!(),
                     };
+                } else {
+                    return Err(SendError(value));
                 }
             }
             if park.park().is_err() {
