@@ -1,6 +1,6 @@
 #[cfg(feature="blocking")]
 use crate::park::{CachedParkThread, Park};
-#[cfg(feature = "rt-core")]
+#[cfg(all(feature = "rt-core", feature="blocking"))]
 use crate::runtime::Handle;
 use crate::sync::mpsc::chan;
 use crate::sync::mpsc::error::{ClosedError, SendError, TryRecvError, TrySendError};
