@@ -13,6 +13,24 @@ env:
   minrust: 1.39.0
 
 jobs:
+  # Depends on all action sthat are required for a "successful" CI run.
+  tests-pass:
+    name: all systems go
+    runs-on: ubuntu-latest
+    needs:
+      - test
+      - test-unstable
+      - miri
+      - cross
+      - features
+      - minrust
+      - fmt
+      - clippy
+      - docs
+      - loom
+    steps:
+      - run: exit 0
+
   test:
     name: test tokio full
     runs-on: ${{ matrix.os }}
