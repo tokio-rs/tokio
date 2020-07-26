@@ -30,9 +30,12 @@ use proc_macro::TokenStream;
 ///
 /// ## Options:
 ///
+/// If you want to set the number of worker threads used for asynchronous code, use the
+/// `core_threads` option.
 ///
 /// - `core_threads=n` - Sets core threads to `n` (requires `rt-threaded` feature).
 /// - `max_threads=n` - Sets max threads to `n` (requires `rt-core` or `rt-threaded` feature).
+/// - `basic_scheduler` - Use the basic schduler (requires `rt-core`).
 ///
 /// ## Function arguments:
 ///
@@ -55,6 +58,32 @@ use proc_macro::TokenStream;
 /// fn main() {
 ///     tokio::runtime::Builder::new()
 ///         .threaded_scheduler()
+///         .enable_all()
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             println!("Hello world");
+///         })
+/// }
+/// ```
+///
+/// ### Using basic scheduler
+///
+/// The basic scheduler is single-threaded.
+///
+/// ```rust
+/// #[tokio::main(basic_scheduler)]
+/// async fn main() {
+///     println!("Hello world");
+/// }
+/// ```
+///
+/// Equivalent code not using `#[tokio::main]`
+///
+/// ```rust
+/// fn main() {
+///     tokio::runtime::Builder::new()
+///         .basic_scheduler()
 ///         .enable_all()
 ///         .build()
 ///         .unwrap()
