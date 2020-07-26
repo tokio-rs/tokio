@@ -129,6 +129,7 @@ doc_rt_core! {
     {
         let spawn_handle = runtime::context::spawn_handle()
         .expect("must be called from the context of Tokio runtime configured with either `basic_scheduler` or `threaded_scheduler`");
+        let task = crate::util::trace::task(task, "task");
         spawn_handle.spawn(task)
     }
 }

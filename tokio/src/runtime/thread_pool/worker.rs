@@ -200,16 +200,19 @@ cfg_blocking! {
         }
 
         let mut had_core = false;
+        let mut had_entered = false;
 
         CURRENT.with(|maybe_cx| {
             match (crate::runtime::enter::context(),  maybe_cx.is_some()) {
                 (EnterContext::Entered { .. }, true) => {
                     // We are on a thread pool runtime thread, so we just need to set up blocking.
+                    had_entered = true;
                 }
                 (EnterContext::Entered { allow_blocking }, false) => {
                     // We are on an executor, but _not_ on the thread pool.
                     // That is _only_ okay if we are in a thread pool runtime's block_on method:
                     if allow_blocking {
+                        had_entered = true;
                         return;
                     } else {
                         // This probably means we are on the basic_scheduler or in a LocalSet,
@@ -256,12 +259,13 @@ cfg_blocking! {
             runtime::spawn_blocking(move || run(worker));
         });
 
-
         if had_core {
             // Unset the current task's budget. Blocking sections are not
             // constrained by task budgets.
             let _reset = Reset(coop::stop());
 
+            crate::runtime::enter::exit(f)
+        } else if had_entered {
             crate::runtime::enter::exit(f)
         } else {
             f()

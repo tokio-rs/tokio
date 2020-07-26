@@ -257,27 +257,27 @@ fn flush_while_idle() {
 #[test]
 fn read_with_buffer_larger_than_max() {
     // Chunks
-    let a = 16 * 1024;
-    let b = a * 2;
-    let c = a * 3;
-    let d = a * 4;
+    let chunk_a = 16 * 1024;
+    let chunk_b = chunk_a * 2;
+    let chunk_c = chunk_a * 3;
+    let chunk_d = chunk_a * 4;
 
-    assert_eq!(d / 1024, 64);
+    assert_eq!(chunk_d / 1024, 64);
 
     let mut data = vec![];
-    for i in 0..(d - 1) {
+    for i in 0..(chunk_d - 1) {
         data.push((i % 151) as u8);
     }
 
     let (mock, file) = sys::File::mock();
-    mock.read(&data[0..a])
-        .read(&data[a..b])
-        .read(&data[b..c])
-        .read(&data[c..]);
+    mock.read(&data[0..chunk_a])
+        .read(&data[chunk_a..chunk_b])
+        .read(&data[chunk_b..chunk_c])
+        .read(&data[chunk_c..]);
 
     let mut file = File::from_std(file);
 
-    let mut actual = vec![0; d];
+    let mut actual = vec![0; chunk_d];
     let mut pos = 0;
 
     while pos < data.len() {
@@ -288,7 +288,7 @@ fn read_with_buffer_larger_than_max() {
         assert!(t.is_woken());
 
         let n = assert_ready_ok!(t.poll());
-        assert!(n <= a);
+        assert!(n <= chunk_a);
 
         pos += n;
     }
@@ -300,23 +300,23 @@ fn read_with_buffer_larger_than_max() {
 #[test]
 fn write_with_buffer_larger_than_max() {
     // Chunks
-    let a = 16 * 1024;
-    let b = a * 2;
-    let c = a * 3;
-    let d = a * 4;
+    let chunk_a = 16 * 1024;
+    let chunk_b = chunk_a * 2;
+    let chunk_c = chunk_a * 3;
+    let chunk_d = chunk_a * 4;
 
-    assert_eq!(d / 1024, 64);
+    assert_eq!(chunk_d / 1024, 64);
 
     let mut data = vec![];
-    for i in 0..(d - 1) {
+    for i in 0..(chunk_d - 1) {
         data.push((i % 151) as u8);
     }
 
     let (mock, file) = sys::File::mock();
-    mock.write(&data[0..a])
-        .write(&data[a..b])
-        .write(&data[b..c])
-        .write(&data[c..]);
+    mock.write(&data[0..chunk_a])
+        .write(&data[chunk_a..chunk_b])
+        .write(&data[chunk_b..chunk_c])
+        .write(&data[chunk_c..]);
 
     let mut file = File::from_std(file);
 
@@ -325,17 +325,17 @@ fn write_with_buffer_larger_than_max() {
     let mut first = true;
 
     while !rem.is_empty() {
-        let mut t = task::spawn(file.write(rem));
+        let mut task = task::spawn(file.write(rem));
 
         if !first {
-            assert_pending!(t.poll());
+            assert_pending!(task.poll());
             pool::run_one();
-            assert!(t.is_woken());
+            assert!(task.is_woken());
         }
 
         first = false;
 
-        let n = assert_ready_ok!(t.poll());
+        let n = assert_ready_ok!(task.poll());
 
         rem = &rem[n..];
     }

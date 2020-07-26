@@ -5,8 +5,8 @@ use crate::time::{Duration, Error, Instant};
 
 use std::cell::UnsafeCell;
 use std::ptr;
-use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::SeqCst;
+use std::sync::atomic::{AtomicBool, AtomicU8};
 use std::sync::{Arc, Weak};
 use std::task::{self, Poll};
 use std::u64;
@@ -30,7 +30,8 @@ pub(crate) struct Entry {
     /// Timer internals. Using a weak pointer allows the timer to shutdown
     /// without all `Delay` instances having completed.
     ///
-    /// When `None`, the entry has not yet been linked with a timer instance.
+    /// When empty, it means that the entry has not yet been linked with a
+    /// timer instance.
     inner: Weak<Inner>,
 
     /// Tracks the entry state. This value contains the following information:
@@ -43,6 +44,11 @@ pub(crate) struct Entry {
     /// which the entry must be fired. When a timer is reset to a different
     /// instant, this value is changed.
     state: AtomicU64,
+
+    /// Stores the actual error. If `state` indicates that an error occurred,
+    /// this is guaranteed to be a non-zero value representing the first error
+    /// that occurred. Otherwise its value is undefined.
+    error: AtomicU8,
 
     /// Task to notify once the deadline is reached.
     waker: AtomicWaker,
@@ -109,8 +115,9 @@ impl Entry {
         let entry: Entry;
 
         // Increment the number of active timeouts
-        if inner.increment().is_err() {
-            entry = Entry::new2(deadline, duration, Weak::new(), ERROR)
+        if let Err(err) = inner.increment() {
+            entry = Entry::new2(deadline, duration, Weak::new(), ERROR);
+            entry.error(err);
         } else {
             let when = inner.normalize_deadline(deadline);
             let state = if when <= inner.elapsed() {
@@ -122,8 +129,8 @@ impl Entry {
         }
 
         let entry = Arc::new(entry);
-        if inner.queue(&entry).is_err() {
-            entry.error();
+        if let Err(err) = inner.queue(&entry) {
+            entry.error(err);
         }
 
         entry
@@ -189,7 +196,12 @@ impl Entry {
         self.waker.wake();
     }
 
-    pub(crate) fn error(&self) {
+    pub(crate) fn error(&self, error: Error) {
+        // Record the precise nature of the error, if there isn't already an
+        // error present. If we don't actually transition to the error state
+        // below, that's fine, as the error details we set here will be ignored.
+        self.error.compare_and_swap(0, error.as_u8(), SeqCst);
+
         // Only transition to the error state if not currently elapsed
         let mut curr = self.state.load(SeqCst);
 
@@ -234,7 +246,7 @@ impl Entry {
 
         if is_elapsed(curr) {
             return Poll::Ready(if curr == ERROR {
-                Err(Error::shutdown())
+                Err(Error::from_u8(self.error.load(SeqCst)))
             } else {
                 Ok(())
             });
@@ -246,7 +258,7 @@ impl Entry {
 
         if is_elapsed(curr) {
             return Poll::Ready(if curr == ERROR {
-                Err(Error::shutdown())
+                Err(Error::from_u8(self.error.load(SeqCst)))
             } else {
                 Ok(())
             });
@@ -309,6 +321,7 @@ impl Entry {
             waker: AtomicWaker::new(),
             state: AtomicU64::new(state),
             queued: AtomicBool::new(false),
+            error: AtomicU8::new(0),
             next_atomic: UnsafeCell::new(ptr::null_mut()),
             when: UnsafeCell::new(None),
             next_stack: UnsafeCell::new(None),

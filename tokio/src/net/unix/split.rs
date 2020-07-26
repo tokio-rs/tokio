@@ -17,11 +17,32 @@ use std::net::Shutdown;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// Read half of a `UnixStream`.
+/// Borrowed read half of a [`UnixStream`], created by [`split`].
+///
+/// Reading from a `ReadHalf` is usually done using the convenience methods found on the
+/// [`AsyncReadExt`] trait. Examples import this trait through [the prelude].
+///
+/// [`UnixStream`]: UnixStream
+/// [`split`]: UnixStream::split()
+/// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
+/// [the prelude]: crate::prelude
 #[derive(Debug)]
 pub struct ReadHalf<'a>(&'a UnixStream);
 
-/// Write half of a `UnixStream`.
+/// Borrowed write half of a [`UnixStream`], created by [`split`].
+///
+/// Note that in the [`AsyncWrite`] implemenation of this type, [`poll_shutdown`] will
+/// shut down the UnixStream stream in the write direction.
+///
+/// Writing to an `WriteHalf` is usually done using the convenience methods found
+/// on the [`AsyncWriteExt`] trait. Examples import this trait through [the prelude].
+///
+/// [`UnixStream`]: UnixStream
+/// [`split`]: UnixStream::split()
+/// [`AsyncWrite`]: trait@crate::io::AsyncWrite
+/// [`poll_shutdown`]: fn@crate::io::AsyncWrite::poll_shutdown
+/// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
+/// [the prelude]: crate::prelude
 #[derive(Debug)]
 pub struct WriteHalf<'a>(&'a UnixStream);
 

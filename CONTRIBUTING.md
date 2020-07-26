@@ -15,12 +15,14 @@ It should be considered a map to help you navigate the process.
 The [dev channel][dev] is available for any concerns not covered in this guide, please join
 us!
 
-[dev]: https://discord.gg/6yGkFeN
+[dev]: https://discord.gg/tokio
 
 ## Conduct
 
 The Tokio project adheres to the [Rust Code of Conduct][coc]. This describes
-the _minimum_ behavior expected from all contributors. Instances of violations of the Code of Conduct can be reported by contacting the project team at [moderation@tokio.rs](mailto:moderation@tokio.rs).
+the _minimum_ behavior expected from all contributors. Instances of violations of the
+Code of Conduct can be reported by contacting the project team at
+[moderation@tokio.rs](mailto:moderation@tokio.rs).
 
 [coc]: https://github.com/rust-lang/rust/blob/master/CODE_OF_CONDUCT.md
 
@@ -29,8 +31,8 @@ the _minimum_ behavior expected from all contributors. Instances of violations o
 For any issue, there are fundamentally three ways an individual can contribute:
 
 1. By opening the issue for discussion: For instance, if you believe that you
-   have uncovered a bug in Tokio, creating a new issue in the tokio-rs/tokio
-   issue tracker is the way to report it.
+   have discovered a bug in Tokio, creating a new issue in [the tokio-rs/tokio
+   issue tracker][issue] is the way to report it.
 
 2. By helping to triage the issue: This can be done by providing
    supporting details (a test case that demonstrates a bug), providing
@@ -42,21 +44,25 @@ For any issue, there are fundamentally three ways an individual can contribute:
    often, by opening a Pull Request that changes some bit of something in
    Tokio in a concrete and reviewable manner.
 
+[issue]: https://github.com/tokio-rs/tokio/issues
+
 **Anybody can participate in any stage of contribution**. We urge you to
 participate in the discussion around bugs and participate in reviewing PRs.
 
 ### Asking for General Help
 
 If you have reviewed existing documentation and still have questions or are
-having problems, you can open an issue asking for help.
+having problems, you can [open a discussion] asking for help.
 
 In exchange for receiving help, we ask that you contribute back a documentation
 PR that helps others avoid the problems that you encountered.
 
+[open a discussion]: https://github.com/tokio-rs/tokio/discussions/new
+
 ### Submitting a Bug Report
 
-When opening a new issue in the Tokio issue tracker, users will be presented
-with a [basic template][template] that should be filled in. If you believe that you have
+When opening a new issue in the Tokio issue tracker, you will be presented
+with a basic template that should be filled in. If you believe that you have
 uncovered a bug, please fill out this form, following the template to the best
 of your ability. Do not worry if you cannot answer every detail, just fill in
 what you can.
@@ -72,7 +78,6 @@ cases should be limited, as much as possible, to using only Tokio APIs.
 See [How to create a Minimal, Complete, and Verifiable example][mcve].
 
 [mcve]: https://stackoverflow.com/help/mcve
-[template]: .github/PULL_REQUEST_TEMPLATE.md
 
 ### Triaging a Bug Report
 
@@ -133,12 +138,11 @@ RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
 The `cargo fmt` command does not work on the Tokio codebase. You can use the
 command below instead:
 
-#### Bash
 ```
+# Mac or Linux
 rustfmt --check --edition 2018 $(find . -name '*.rs' -print)
-```
-#### Powershell
-```
+
+# Powershell
 Get-ChildItem . -Filter "*.rs" -Recurse | foreach { rustfmt --check --edition 2018 $_.FullName }
 ```
 The `--check` argument prints the things that need to be fixed. If you remove

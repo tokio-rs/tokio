@@ -1,6 +1,6 @@
 //! Unix domain socket utility types
 
-pub(crate) mod datagram;
+pub mod datagram;
 
 mod incoming;
 pub use incoming::Incoming;
@@ -10,6 +10,9 @@ pub(crate) use listener::UnixListener;
 
 mod split;
 pub use split::{ReadHalf, WriteHalf};
+
+mod split_owned;
+pub use split_owned::{OwnedReadHalf, OwnedWriteHalf, ReuniteError};
 
 pub(crate) mod stream;
 pub(crate) use stream::UnixStream;

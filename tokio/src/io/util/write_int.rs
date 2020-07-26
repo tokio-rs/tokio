@@ -120,3 +120,13 @@ writer!(WriteI16, i16, put_i16);
 writer!(WriteI32, i32, put_i32);
 writer!(WriteI64, i64, put_i64);
 writer!(WriteI128, i128, put_i128);
+
+writer!(WriteU16Le, u16, put_u16_le);
+writer!(WriteU32Le, u32, put_u32_le);
+writer!(WriteU64Le, u64, put_u64_le);
+writer!(WriteU128Le, u128, put_u128_le);
+
+writer!(WriteI16Le, i16, put_i16_le);
+writer!(WriteI32Le, i32, put_i32_le);
+writer!(WriteI64Le, i64, put_i64_le);
+writer!(WriteI128Le, i128, put_i128_le);
