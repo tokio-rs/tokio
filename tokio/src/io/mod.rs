@@ -93,7 +93,8 @@
 //! ```
 //!
 //! [`BufWriter`] doesn't add any new ways of writing; it just buffers every call
-//! to [`write`](crate::io::AsyncWriteExt::write):
+//! to [`write`](crate::io::AsyncWriteExt::write). However, you **must** flush
+//! [`BufWriter`] to ensure that any buffered data is written.
 //!
 //! ```no_run
 //! use tokio::io::{self, BufWriter, AsyncWriteExt};
@@ -105,10 +106,13 @@
 //!     {
 //!         let mut writer = BufWriter::new(f);
 //!
-//!         // write a byte to the buffer
+//!         // Write a byte to the buffer.
 //!         writer.write(&[42u8]).await?;
 //!
-//!     } // the buffer is flushed once writer goes out of scope
+//!         // Flush the buffer before it goes out of scope.
+//!         writer.flush().await?;
+//!
+//!     } // Unless flushed or shut down, the contents of the buffer is discarded on drop.
 //!
 //!     Ok(())
 //! }
@@ -158,8 +162,8 @@
 //!
 //! # `std` re-exports
 //!
-//! Additionally, [`Error`], [`ErrorKind`], and [`Result`] are re-exported
-//! from `std::io` for ease of use.
+//! Additionally, [`Error`], [`ErrorKind`], [`Result`], and [`SeekFrom`] are
+//! re-exported from `std::io` for ease of use.
 //!
 //! [`AsyncRead`]: trait@AsyncRead
 //! [`AsyncWrite`]: trait@AsyncWrite
@@ -172,6 +176,7 @@
 //! [`ErrorKind`]: enum@ErrorKind
 //! [`Result`]: type@Result
 //! [`Read`]: std::io::Read
+//! [`SeekFrom`]: enum@SeekFrom
 //! [`Sink`]: https://docs.rs/futures/0.3/futures/sink/trait.Sink.html
 //! [`Stream`]: crate::stream::Stream
 //! [`Write`]: std::io::Write
@@ -183,7 +188,6 @@ mod async_buf_read;
 pub use self::async_buf_read::AsyncBufRead;
 
 mod async_read;
-
 pub use self::async_read::AsyncRead;
 
 mod async_seek;
@@ -191,6 +195,10 @@ pub use self::async_seek::AsyncSeek;
 
 mod async_write;
 pub use self::async_write::AsyncWrite;
+
+// Re-export some types from `std::io` so that users don't have to deal
+// with conflicts when `use`ing `tokio::io` and `std::io`.
+pub use std::io::{Error, ErrorKind, Result, SeekFrom};
 
 cfg_io_driver! {
     pub(crate) mod driver;
@@ -222,17 +230,13 @@ cfg_io_util! {
 
     pub(crate) mod util;
     pub use util::{
-        copy, empty, repeat, sink, AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt,
-        BufReader, BufStream, BufWriter, Copy, Empty, Lines, Repeat, Sink, Split, Take,
+        copy, duplex, empty, repeat, sink, AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt,
+        BufReader, BufStream, BufWriter, DuplexStream, Copy, Empty, Lines, Repeat, Sink, Split, Take,
     };
 
     cfg_stream! {
         pub use util::{stream_reader, StreamReader};
     }
-
-    // Re-export io::Error so that users don't have to deal with conflicts when
-    // `use`ing `tokio::io` and `std::io`.
-    pub use std::io::{Error, ErrorKind, Result};
 }
 
 cfg_not_io_util! {

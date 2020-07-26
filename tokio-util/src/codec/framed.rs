@@ -284,6 +284,7 @@ where
 ///
 /// [`Framed`]: crate::codec::Framed
 #[derive(Debug)]
+#[allow(clippy::manual_non_exhaustive)]
 pub struct FramedParts<T, U> {
     /// The inner transport used to read bytes to and write bytes to
     pub io: T,

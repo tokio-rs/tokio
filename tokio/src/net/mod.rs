@@ -43,7 +43,7 @@ cfg_udp! {
 
 cfg_uds! {
     pub mod unix;
-    pub use unix::datagram::UnixDatagram;
+    pub use unix::datagram::socket::UnixDatagram;
     pub use unix::listener::UnixListener;
     pub use unix::stream::UnixStream;
 }

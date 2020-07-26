@@ -19,6 +19,8 @@ cfg_rt_threaded! {
     pub(crate) use try_lock::TryLock;
 }
 
+pub(crate) mod trace;
+
 #[cfg(any(feature = "macros", feature = "stream"))]
 #[cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
 pub use rand::thread_rng_n;

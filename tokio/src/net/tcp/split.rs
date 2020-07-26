@@ -19,7 +19,7 @@ use std::net::Shutdown;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// Read half of a [`TcpStream`], created by [`split`].
+/// Borrowed read half of a [`TcpStream`], created by [`split`].
 ///
 /// Reading from a `ReadHalf` is usually done using the convenience methods found on the
 /// [`AsyncReadExt`] trait. Examples import this trait through [the prelude].
@@ -31,12 +31,12 @@ use std::task::{Context, Poll};
 #[derive(Debug)]
 pub struct ReadHalf<'a>(&'a TcpStream);
 
-/// Write half of a [`TcpStream`], created by [`split`].
+/// Borrowed write half of a [`TcpStream`], created by [`split`].
 ///
 /// Note that in the [`AsyncWrite`] implemenation of this type, [`poll_shutdown`] will
 /// shut down the TCP stream in the write direction.
 ///
-/// Writing to an `OwnedWriteHalf` is usually done using the convenience methods found
+/// Writing to an `WriteHalf` is usually done using the convenience methods found
 /// on the [`AsyncWriteExt`] trait. Examples import this trait through [the prelude].
 ///
 /// [`TcpStream`]: TcpStream

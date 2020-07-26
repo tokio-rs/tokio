@@ -37,10 +37,9 @@ pub struct OwnedReadHalf {
 
 /// Owned write half of a [`TcpStream`], created by [`into_split`].
 ///
-/// Note that in the [`AsyncWrite`] implemenation of this type, [`poll_shutdown`] will
-/// shut down the TCP stream in the write direction.
-///
-/// Dropping the write half will close the TCP stream in both directions.
+/// Note that in the [`AsyncWrite`] implementation of this type, [`poll_shutdown`] will
+/// shut down the TCP stream in the write direction.  Dropping the write half
+/// will also shut down the write half of the TCP stream.
 ///
 /// Writing to an `OwnedWriteHalf` is usually done using the convenience methods found
 /// on the [`AsyncWriteExt`] trait. Examples import this trait through [the prelude].
@@ -77,13 +76,13 @@ pub(crate) fn reunite(
         write.forget();
         // This unwrap cannot fail as the api does not allow creating more than two Arcs,
         // and we just dropped the other half.
-        Ok(Arc::try_unwrap(read.inner).expect("Too many handles to Arc"))
+        Ok(Arc::try_unwrap(read.inner).expect("TcpStream: try_unwrap failed in reunite"))
     } else {
         Err(ReuniteError(read, write))
     }
 }
 
-/// Error indicating two halves were not from the same socket, and thus could
+/// Error indicating that two halves were not from the same socket, and thus could
 /// not be reunited.
 #[derive(Debug)]
 pub struct ReuniteError(pub OwnedReadHalf, pub OwnedWriteHalf);
@@ -209,9 +208,10 @@ impl OwnedWriteHalf {
     pub fn reunite(self, other: OwnedReadHalf) -> Result<TcpStream, ReuniteError> {
         reunite(other, self)
     }
-    /// Destroy the write half, but don't close the stream until the read half
-    /// is dropped. If the read half has already been dropped, this closes the
-    /// stream.
+
+    /// Destroy the write half, but don't close the write half of the stream
+    /// until the read half is dropped. If the read half has already been
+    /// dropped, this closes the stream.
     pub fn forget(mut self) {
         self.shutdown_on_drop = false;
         drop(self);
@@ -221,7 +221,7 @@ impl OwnedWriteHalf {
 impl Drop for OwnedWriteHalf {
     fn drop(&mut self) {
         if self.shutdown_on_drop {
-            let _ = self.inner.shutdown(Shutdown::Both);
+            let _ = self.inner.shutdown(Shutdown::Write);
         }
     }
 }
@@ -251,7 +251,11 @@ impl AsyncWrite for OwnedWriteHalf {
 
     // `poll_shutdown` on a write half shutdowns the stream in the "write" direction.
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.inner.shutdown(Shutdown::Write).into()
+        let res = self.inner.shutdown(Shutdown::Write);
+        if res.is_ok() {
+            Pin::into_inner(self).shutdown_on_drop = false;
+        }
+        res.into()
     }
 }
 

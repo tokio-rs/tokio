@@ -9,17 +9,35 @@ use std::sync::Arc;
 /// An asynchronous `Mutex`-like type.
 ///
 /// This type acts similarly to an asynchronous [`std::sync::Mutex`], with one
-/// major difference: [`lock`] does not block. Another difference is that the
-/// lock guard can be held across await points.
+/// major difference: [`lock`] does not block and the lock guard can be held
+/// across await points.
 ///
-/// There are some situations where you should prefer the mutex from the
-/// standard library. Generally this is the case if:
+/// # Which kind of mutex should you use?
 ///
-///  1. The lock does not need to be held across await points.
-///  2. The duration of any single lock is near-instant.
+/// Contrary to popular belief, it is ok and often preferred to use the ordinary
+/// [`Mutex`][std] from the standard library in asynchronous code. This section
+/// will help you decide on which kind of mutex you should use.
 ///
-/// On the other hand, the Tokio mutex is for the situation where the lock
-/// needs to be held for longer periods of time, or across await points.
+/// The primary use case of the async mutex is to provide shared mutable access
+/// to IO resources such as a database connection. If the data stored behind the
+/// mutex is just data, it is often better to use a blocking mutex such as the
+/// one in the standard library or [`parking_lot`]. This is because the feature
+/// that the async mutex offers over the blocking mutex is that it is possible
+/// to keep the mutex locked across an `.await` point, which is rarely necessary
+/// for data.
+///
+/// A common pattern is to wrap the `Arc<Mutex<...>>` in a struct that provides
+/// non-async methods for performing operations on the data within, and only
+/// lock the mutex inside these methods. The [mini-redis] example provides an
+/// illustration of this pattern.
+///
+/// Additionally, when you _do_ want shared access to an IO resource, it is
+/// often better to spawn a task to manage the IO resource, and to use message
+/// passing to communicate with that task.
+///
+/// [std]: std::sync::Mutex
+/// [`parking_lot`]: https://docs.rs/parking_lot
+/// [mini-redis]: https://github.com/tokio-rs/mini-redis/blob/master/src/db.rs
 ///
 /// # Examples:
 ///
@@ -97,11 +115,10 @@ use std::sync::Arc;
 /// [`std::sync::Mutex`]: struct@std::sync::Mutex
 /// [`Send`]: trait@std::marker::Send
 /// [`lock`]: method@Mutex::lock
-
 #[derive(Debug)]
-pub struct Mutex<T> {
-    c: UnsafeCell<T>,
+pub struct Mutex<T: ?Sized> {
     s: semaphore::Semaphore,
+    c: UnsafeCell<T>,
 }
 
 /// A handle to a held `Mutex`.
@@ -112,7 +129,7 @@ pub struct Mutex<T> {
 ///
 /// The lock is automatically released whenever the guard is dropped, at which
 /// point `lock` will succeed yet again.
-pub struct MutexGuard<'a, T> {
+pub struct MutexGuard<'a, T: ?Sized> {
     lock: &'a Mutex<T>,
 }
 
@@ -131,17 +148,17 @@ pub struct MutexGuard<'a, T> {
 /// point `lock` will succeed yet again.
 ///
 /// [`Arc`]: std::sync::Arc
-pub struct OwnedMutexGuard<T> {
+pub struct OwnedMutexGuard<T: ?Sized> {
     lock: Arc<Mutex<T>>,
 }
 
 // As long as T: Send, it's fine to send and share Mutex<T> between threads.
 // If T was not Send, sending and sharing a Mutex<T> would be bad, since you can
 // access T through Mutex<T>.
-unsafe impl<T> Send for Mutex<T> where T: Send {}
-unsafe impl<T> Sync for Mutex<T> where T: Send {}
-unsafe impl<'a, T> Sync for MutexGuard<'a, T> where T: Send + Sync {}
-unsafe impl<T> Sync for OwnedMutexGuard<T> where T: Send + Sync {}
+unsafe impl<T> Send for Mutex<T> where T: ?Sized + Send {}
+unsafe impl<T> Sync for Mutex<T> where T: ?Sized + Send {}
+unsafe impl<T> Sync for MutexGuard<'_, T> where T: ?Sized + Send + Sync {}
+unsafe impl<T> Sync for OwnedMutexGuard<T> where T: ?Sized + Send + Sync {}
 
 /// Error returned from the [`Mutex::try_lock`] function.
 ///
@@ -183,7 +200,7 @@ fn bounds() {
     check_static_val(arc_mutex.lock_owned());
 }
 
-impl<T> Mutex<T> {
+impl<T: ?Sized> Mutex<T> {
     /// Creates a new lock in an unlocked state ready for use.
     ///
     /// # Examples
@@ -193,7 +210,10 @@ impl<T> Mutex<T> {
     ///
     /// let lock = Mutex::new(5);
     /// ```
-    pub fn new(t: T) -> Self {
+    pub fn new(t: T) -> Self
+    where
+        T: Sized,
+    {
         Self {
             c: UnsafeCell::new(t),
             s: semaphore::Semaphore::new(1),
@@ -330,7 +350,10 @@ impl<T> Mutex<T> {
     ///     assert_eq!(n, 1);
     /// }
     /// ```
-    pub fn into_inner(self) -> T {
+    pub fn into_inner(self) -> T
+    where
+        T: Sized,
+    {
         self.c.into_inner()
     }
 }
@@ -352,32 +375,32 @@ where
 
 // === impl MutexGuard ===
 
-impl<'a, T> Drop for MutexGuard<'a, T> {
+impl<T: ?Sized> Drop for MutexGuard<'_, T> {
     fn drop(&mut self) {
         self.lock.s.release(1)
     }
 }
 
-impl<'a, T> Deref for MutexGuard<'a, T> {
+impl<T: ?Sized> Deref for MutexGuard<'_, T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
         unsafe { &*self.lock.c.get() }
     }
 }
 
-impl<'a, T> DerefMut for MutexGuard<'a, T> {
+impl<T: ?Sized> DerefMut for MutexGuard<'_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { &mut *self.lock.c.get() }
     }
 }
 
-impl<'a, T: fmt::Debug> fmt::Debug for MutexGuard<'a, T> {
+impl<T: ?Sized + fmt::Debug> fmt::Debug for MutexGuard<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&**self, f)
     }
 }
 
-impl<'a, T: fmt::Display> fmt::Display for MutexGuard<'a, T> {
+impl<T: ?Sized + fmt::Display> fmt::Display for MutexGuard<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&**self, f)
     }
@@ -385,32 +408,32 @@ impl<'a, T: fmt::Display> fmt::Display for MutexGuard<'a, T> {
 
 // === impl OwnedMutexGuard ===
 
-impl<T> Drop for OwnedMutexGuard<T> {
+impl<T: ?Sized> Drop for OwnedMutexGuard<T> {
     fn drop(&mut self) {
         self.lock.s.release(1)
     }
 }
 
-impl<T> Deref for OwnedMutexGuard<T> {
+impl<T: ?Sized> Deref for OwnedMutexGuard<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
         unsafe { &*self.lock.c.get() }
     }
 }
 
-impl<T> DerefMut for OwnedMutexGuard<T> {
+impl<T: ?Sized> DerefMut for OwnedMutexGuard<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { &mut *self.lock.c.get() }
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for OwnedMutexGuard<T> {
+impl<T: ?Sized + fmt::Debug> fmt::Debug for OwnedMutexGuard<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&**self, f)
     }
 }
 
-impl<T: fmt::Display> fmt::Display for OwnedMutexGuard<T> {
+impl<T: ?Sized + fmt::Display> fmt::Display for OwnedMutexGuard<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&**self, f)
     }

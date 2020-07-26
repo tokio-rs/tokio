@@ -14,14 +14,17 @@ impl<T> BlockingTask<T> {
     }
 }
 
+// The closure `F` is never pinned
+impl<T> Unpin for BlockingTask<T> {}
+
 impl<T, R> Future for BlockingTask<T>
 where
     T: FnOnce() -> R,
 {
     type Output = R;
 
-    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<R> {
-        let me = unsafe { self.get_unchecked_mut() };
+    fn poll(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<R> {
+        let me = &mut *self;
         let func = me
             .func
             .take()
