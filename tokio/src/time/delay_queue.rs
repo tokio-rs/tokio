@@ -111,17 +111,17 @@ use std::task::{self, Poll};
 /// }
 /// ```
 ///
-/// [`insert`]: #method.insert
-/// [`insert_at`]: #method.insert_at
+/// [`insert`]: method@Self::insert
+/// [`insert_at`]: method@Self::insert_at
 /// [`Key`]: struct@Key
 /// [`Stream`]: https://docs.rs/futures/0.1/futures/stream/trait.Stream.html
-/// [`poll`]: #method.poll
-/// [`Stream::poll`]: #method.poll
+/// [`poll`]: method@Self::poll
+/// [`Stream::poll`]: method@Self::poll
 /// [`DelayQueue`]: struct@DelayQueue
 /// [`delay_for`]: fn@super::delay_for
-/// [`slab`]: https://docs.rs/slab
-/// [`capacity`]: #method.capacity
-/// [`reserve`]: #method.reserve
+/// [`slab`]: slab
+/// [`capacity`]: method@Self::capacity
+/// [`reserve`]: method@Self::reserve
 #[derive(Debug)]
 pub struct DelayQueue<T> {
     /// Stores data associated with entries
@@ -295,9 +295,9 @@ impl<T> DelayQueue<T> {
     /// # }
     /// ```
     ///
-    /// [`poll`]: #method.poll
-    /// [`remove`]: #method.remove
-    /// [`reset`]: #method.reset
+    /// [`poll`]: method@Self::poll
+    /// [`remove`]: method@Self::remove
+    /// [`reset`]: method@Self::reset
     /// [`Key`]: struct@Key
     /// [type]: #
     pub fn insert_at(&mut self, value: T, when: Instant) -> Key {
@@ -403,9 +403,9 @@ impl<T> DelayQueue<T> {
     /// # }
     /// ```
     ///
-    /// [`poll`]: #method.poll
-    /// [`remove`]: #method.remove
-    /// [`reset`]: #method.reset
+    /// [`poll`]: method@Self::poll
+    /// [`remove`]: method@Self::remove
+    /// [`reset`]: method@Self::reset
     /// [`Key`]: struct@Key
     /// [type]: #
     pub fn insert(&mut self, value: T, timeout: Duration) -> Key {
@@ -574,7 +574,7 @@ impl<T> DelayQueue<T> {
     ///
     /// Note that this method has no effect on the allocated capacity.
     ///
-    /// [`poll`]: #method.poll
+    /// [`poll`]: method@Self::poll
     ///
     /// # Examples
     ///

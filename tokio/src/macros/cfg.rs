@@ -364,6 +364,25 @@ macro_rules! cfg_unstable {
     }
 }
 
+macro_rules! cfg_trace {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "tracing")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "tracing")))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_not_trace {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(feature = "tracing"))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_coop {
     ($($item:item)*) => {
         $(

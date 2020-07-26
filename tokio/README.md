@@ -20,16 +20,17 @@ the Rust programming language. It is:
 [crates-badge]: https://img.shields.io/crates/v/tokio.svg
 [crates-url]: https://crates.io/crates/tokio
 [mit-badge]: https://img.shields.io/badge/license-MIT-blue.svg
-[mit-url]: LICENSE
+[mit-url]: https://github.com/tokio-rs/tokio/blob/master/LICENSE
 [azure-badge]: https://dev.azure.com/tokio-rs/Tokio/_apis/build/status/tokio-rs.tokio?branchName=master
 [azure-url]: https://dev.azure.com/tokio-rs/Tokio/_build/latest?definitionId=1&branchName=master
 [discord-badge]: https://img.shields.io/discord/500028886025895936.svg?logo=discord&style=flat-square
-[discord-url]: https://discord.gg/6yGkFeN
+[discord-url]: https://discord.gg/tokio
 
 [Website](https://tokio.rs) |
-[Guides](https://tokio.rs/docs/) |
-[API Docs](https://docs.rs/tokio/0.2/tokio) |
-[Chat](https://discord.gg/6yGkFeN)
+[Guides](https://tokio.rs/tokio/tutorial) |
+[API Docs](https://docs.rs/tokio/latest/tokio) |
+[Roadmap](https://github.com/tokio-rs/tokio/blob/master/ROADMAP.md) |
+[Chat](https://discord.gg/tokio)
 
 ## Overview
 
@@ -45,19 +46,10 @@ level, it provides a few major components:
 These components provide the runtime components necessary for building
 an asynchronous application.
 
-[net]: https://docs.rs/tokio/0.2/tokio/net/index.html
-[scheduler]: https://docs.rs/tokio/0.2/tokio/runtime/index.html
+[net]: https://docs.rs/tokio/latest/tokio/net/index.html
+[scheduler]: https://docs.rs/tokio/latest/tokio/runtime/index.html
 
 ## Example
-
-To get started, add the following to `Cargo.toml`.
-
-```toml
-tokio = { version = "0.2", features = ["full"] }
-```
-
-Tokio requires components to be explicitly enabled using feature flags. As a
-shorthand, the `full` feature enables all components.
 
 A basic TCP echo server with Tokio:
 
@@ -98,19 +90,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-More examples can be found [here](../examples).
+More examples can be found [here][examples]. For a larger "real world" example, see the
+[mini-redis] repository.
+
+[examples]: https://github.com/tokio-rs/tokio/tree/master/examples
+[mini-redis]: https://github.com/tokio-rs/mini-redis/
+
+To see a list of the available features flags that can be enabled, check our
+[docs][feature-flag-docs].
 
 ## Getting Help
 
 First, see if the answer to your question can be found in the [Guides] or the
 [API documentation]. If the answer is not there, there is an active community in
 the [Tokio Discord server][chat]. We would be happy to try to answer your
-question. Last, if that doesn't work, try opening an [issue] with the question.
+question. You can also ask your question on [the discussions page][discussions].
 
-[Guides]: https://tokio.rs/docs/
-[API documentation]: https://docs.rs/tokio/0.2
-[chat]: https://discord.gg/6yGkFeN
-[issue]: https://github.com/tokio-rs/tokio/issues/new
+[Guides]: https://tokio.rs/tokio/tutorial
+[API documentation]: https://docs.rs/tokio/latest/tokio
+[chat]: https://discord.gg/tokio
+[discussions]: https://github.com/tokio-rs/tokio/discussions
+[feature-flag-docs]: https://docs.rs/tokio/#feature-flags
 
 ## Contributing
 
@@ -118,36 +118,54 @@ question. Last, if that doesn't work, try opening an [issue] with the question.
 you! We have a [contributing guide][guide] to help you get involved in the Tokio
 project.
 
-[guide]: CONTRIBUTING.md
+[guide]: https://github.com/tokio-rs/tokio/blob/master/CONTRIBUTING.md
 
 ## Related Projects
 
 In addition to the crates in this repository, the Tokio project also maintains
 several other libraries, including:
 
+* [`hyper`]: A fast and correct HTTP/1.1 and HTTP/2 implementation for Rust.
+
+* [`tonic`]: A gRPC over HTTP/2 implementation focused on high performance, interoperability, and flexibility.
+
+* [`warp`]: A super-easy, composable, web server framework for warp speeds.
+
+* [`tower`]: A library of modular and reusable components for building robust networking clients and servers.
+
 * [`tracing`] (formerly `tokio-trace`): A framework for application-level
   tracing and async-aware diagnostics.
+
+* [`rdbc`]: A Rust database connectivity library for MySQL, Postgres and SQLite.
 
 * [`mio`]: A low-level, cross-platform abstraction over OS I/O APIs that powers
   `tokio`.
 
 * [`bytes`]: Utilities for working with bytes, including efficient byte buffers.
 
+* [`loom`]: A testing tool for concurrent Rust code
+
+[`warp`]: https://github.com/seanmonstar/warp
+[`hyper`]: https://github.com/hyperium/hyper
+[`tonic`]: https://github.com/hyperium/tonic
+[`tower`]: https://github.com/tower-rs/tower
+[`loom`]: https://github.com/tokio-rs/loom
+[`rdbc`]: https://github.com/tokio-rs/rdbc
 [`tracing`]: https://github.com/tokio-rs/tracing
 [`mio`]: https://github.com/tokio-rs/mio
 [`bytes`]: https://github.com/tokio-rs/bytes
 
 ## Supported Rust Versions
 
-Tokio is built against the latest stable, nightly, and beta Rust releases. The
-minimum version supported is the stable release from three months before the
-current stable release version. For example, if the latest stable Rust is 1.29,
-the minimum version supported is 1.26. The current Tokio version is not
-guaranteed to build on Rust versions earlier than the minimum supported version.
+Tokio is built against the latest stable release. The minimum supported version is 1.39.
+The current Tokio version is not guaranteed to build on Rust versions earlier than the
+minimum supported version.
 
 ## License
 
-This project is licensed under the [MIT license](LICENSE).
+This project is licensed under the [MIT license].
+
+[MIT license]: https://github.com/tokio-rs/tokio/blob/master/LICENSE
 
 ### Contribution
 

@@ -8,7 +8,7 @@ use std::path::Path;
 ///
 /// This is an async version of [`std::fs::symlink_metadata`][std]
 ///
-/// [std]: https://doc.rust-lang.org/std/fs/fn.symlink_metadata.html
+/// [std]: fn@std::fs::symlink_metadata
 pub async fn symlink_metadata(path: impl AsRef<Path>) -> io::Result<Metadata> {
     let path = path.as_ref().to_owned();
     asyncify(|| std::fs::symlink_metadata(path)).await

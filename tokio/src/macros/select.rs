@@ -30,7 +30,7 @@
 ///
 /// The complete lifecycle of a `select!` expression is as follows:
 ///
-/// 1. Evaluate all provded `<precondition>` expressions. If the precondition
+/// 1. Evaluate all provided `<precondition>` expressions. If the precondition
 ///    returns `false`, disable the branch for the remainder of the current call
 ///    to `select!`. Re-entering `select!` due to a loop clears the "disabled"
 ///    state.
@@ -359,8 +359,11 @@ macro_rules! select {
                 let start = $crate::macros::support::thread_rng_n(BRANCHES);
 
                 for i in 0..BRANCHES {
-                    let branch = (start + i) % BRANCHES;
-
+                    let branch;
+                    #[allow(clippy::modulo_one)]
+                    {
+                        branch = (start + i) % BRANCHES;
+                    }
                     match branch {
                         $(
                             $crate::count!( $($skip)* ) => {

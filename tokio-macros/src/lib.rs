@@ -24,7 +24,9 @@ mod select;
 
 use proc_macro::TokenStream;
 
-/// Marks async function to be executed by selected runtime.
+/// Marks async function to be executed by selected runtime. This macro helps set up a `Runtime`
+/// without requiring the user to use [Runtime](../tokio/runtime/struct.Runtime.html) or
+/// [Builder](../tokio/runtime/struct.builder.html) directly.
 ///
 /// ## Options:
 ///
@@ -47,21 +49,62 @@ use proc_macro::TokenStream;
 /// }
 /// ```
 ///
+/// Equivalent code not using `#[tokio::main]`
+///
+/// ```rust
+/// fn main() {
+///     tokio::runtime::Builder::new()
+///         .threaded_scheduler()
+///         .enable_all()
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             println!("Hello world");
+///         })
+/// }
+/// ```
+///
 /// ### Set number of core threads
 ///
 /// ```rust
-/// #[tokio::main(core_threads = 1)]
+/// #[tokio::main(core_threads = 2)]
 /// async fn main() {
 ///     println!("Hello world");
 /// }
 /// ```
+///
+/// Equivalent code not using `#[tokio::main]`
+///
+/// ```rust
+/// fn main() {
+///     tokio::runtime::Builder::new()
+///         .threaded_scheduler()
+///         .core_threads(2)
+///         .enable_all()
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             println!("Hello world");
+///         })
+/// }
+/// ```
+///
+/// ### NOTE:
+///
+/// If you rename the tokio crate in your dependencies this macro
+/// will not work. If you must rename the 0.2 version of tokio because
+/// you're also using the 0.1 version of tokio, you _must_ make the
+/// tokio 0.2 crate available as `tokio` in the module where this
+/// macro is expanded.
 #[proc_macro_attribute]
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub fn main_threaded(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::main(args, item, true)
 }
 
-/// Marks async function to be executed by selected runtime.
+/// Marks async function to be executed by selected runtime. This macro helps set up a `Runtime`
+/// without requiring the user to use [Runtime](../tokio/runtime/struct.Runtime.html) or
+/// [Builder](../tokio/runtime/struct.builder.html) directly.
 ///
 /// ## Options:
 ///
@@ -83,6 +126,18 @@ pub fn main_threaded(args: TokenStream, item: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
+/// Equivalent code not using `#[tokio::main]`
+///
+/// ```rust
+/// fn main() {
+///     tokio::runtime::Runtime::new()
+///         .unwrap()
+///         .block_on(async {
+///             println!("Hello world");
+///         })
+/// }
+/// ```
+///
 /// ### Select runtime
 ///
 /// ```rust
@@ -91,13 +146,38 @@ pub fn main_threaded(args: TokenStream, item: TokenStream) -> TokenStream {
 ///     println!("Hello world");
 /// }
 /// ```
+///
+/// Equivalent code not using `#[tokio::main]`
+///
+/// ```rust
+/// fn main() {
+///     tokio::runtime::Builder::new()
+///         .basic_scheduler()
+///         .enable_all()
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             println!("Hello world");
+///         })
+/// }
+/// ```
+///
+/// ### NOTE:
+///
+/// If you rename the tokio crate in your dependencies this macro
+/// will not work. If you must rename the 0.2 version of tokio because
+/// you're also using the 0.1 version of tokio, you _must_ make the
+/// tokio 0.2 crate available as `tokio` in the module where this
+/// macro is expanded.
 #[proc_macro_attribute]
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::old::main(args, item)
 }
 
-/// Marks async function to be executed by selected runtime.
+/// Marks async function to be executed by selected runtime. This macro helps set up a `Runtime`
+/// without requiring the user to use [Runtime](../tokio/runtime/struct.Runtime.html) or
+/// [Builder](../tokio/runtime/struct.builder.html) directly.
 ///
 /// ## Options:
 ///
@@ -117,6 +197,29 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 ///     println!("Hello world");
 /// }
 /// ```
+///
+/// Equivalent code not using `#[tokio::main]`
+///
+/// ```rust
+/// fn main() {
+///     tokio::runtime::Builder::new()
+///         .basic_scheduler()
+///         .enable_all()
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             println!("Hello world");
+///         })
+/// }
+/// ```
+///
+/// ### NOTE:
+///
+/// If you rename the tokio crate in your dependencies this macro
+/// will not work. If you must rename the 0.2 version of tokio because
+/// you're also using the 0.1 version of tokio, you _must_ make the
+/// tokio 0.2 crate available as `tokio` in the module where this
+/// macro is expanded.
 #[proc_macro_attribute]
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub fn main_basic(args: TokenStream, item: TokenStream) -> TokenStream {
@@ -149,6 +252,14 @@ pub fn main_basic(args: TokenStream, item: TokenStream) -> TokenStream {
 ///     assert!(true);
 /// }
 /// ```
+///
+/// ### NOTE:
+///
+/// If you rename the tokio crate in your dependencies this macro
+/// will not work. If you must rename the 0.2 version of tokio because
+/// you're also using the 0.1 version of tokio, you _must_ make the
+/// tokio 0.2 crate available as `tokio` in the module where this
+/// macro is expanded.
 #[proc_macro_attribute]
 pub fn test_threaded(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::test(args, item, true)
@@ -180,6 +291,14 @@ pub fn test_threaded(args: TokenStream, item: TokenStream) -> TokenStream {
 ///     assert!(true);
 /// }
 /// ```
+///
+/// ### NOTE:
+///
+/// If you rename the tokio crate in your dependencies this macro
+/// will not work. If you must rename the 0.2 version of tokio because
+/// you're also using the 0.1 version of tokio, you _must_ make the
+/// tokio 0.2 crate available as `tokio` in the module where this
+/// macro is expanded.
 #[proc_macro_attribute]
 pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::old::test(args, item)
@@ -199,6 +318,14 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
 ///     assert!(true);
 /// }
 /// ```
+///
+/// ### NOTE:
+///
+/// If you rename the tokio crate in your dependencies this macro
+/// will not work. If you must rename the 0.2 version of tokio because
+/// you're also using the 0.1 version of tokio, you _must_ make the
+/// tokio 0.2 crate available as `tokio` in the module where this
+/// macro is expanded.
 #[proc_macro_attribute]
 pub fn test_basic(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::test(args, item, false)

@@ -144,8 +144,11 @@ impl<T> Sender<T> {
     /// Attempts to send a value on this channel, returning it back if it could
     /// not be sent.
     ///
-    /// The function consumes `self` as only one value may ever be sent on a
-    /// one-shot channel.
+    /// This method consumes `self` as only one value may ever be sent on a oneshot
+    /// channel. It is not marked async because sending a message to an oneshot
+    /// channel never requires any form of waiting.  Because of this, the `send`
+    /// method can be used in both synchronous and asynchronous code without
+    /// problems.
     ///
     /// A successful send occurs when it is determined that the other end of the
     /// channel has not hung up already. An unsuccessful send would be one where
@@ -197,13 +200,14 @@ impl<T> Sender<T> {
     #[doc(hidden)] // TODO: remove
     pub fn poll_closed(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         // Keep track of task budget
-        ready!(crate::coop::poll_proceed(cx));
+        let coop = ready!(crate::coop::poll_proceed(cx));
 
         let inner = self.inner.as_ref().unwrap();
 
         let mut state = State::load(&inner.state, Acquire);
 
         if state.is_closed() {
+            coop.made_progress();
             return Poll::Ready(());
         }
 
@@ -216,6 +220,7 @@ impl<T> Sender<T> {
                 if state.is_closed() {
                     // Set the flag again so that the waker is released in drop
                     State::set_tx_task(&inner.state);
+                    coop.made_progress();
                     return Ready(());
                 } else {
                     unsafe { inner.drop_tx_task() };
@@ -233,6 +238,7 @@ impl<T> Sender<T> {
             state = State::set_tx_task(&inner.state);
 
             if state.is_closed() {
+                coop.made_progress();
                 return Ready(());
             }
         }
@@ -360,7 +366,7 @@ impl<T> Receiver<T> {
     /// Prevents the associated [`Sender`] handle from sending a value.
     ///
     /// Any `send` operation which happens after calling `close` is guaranteed
-    /// to fail. After calling `close`, `Receiver::poll`] should be called to
+    /// to fail. After calling `close`, [`try_recv`] should be called to
     /// receive a value if one was sent **before** the call to `close`
     /// completed.
     ///
@@ -368,6 +374,7 @@ impl<T> Receiver<T> {
     /// value will not be sent into the channel and never received.
     ///
     /// [`Sender`]: Sender
+    /// [`try_recv`]: Receiver::try_recv
     ///
     /// # Examples
     ///
@@ -548,17 +555,19 @@ impl<T> Inner<T> {
 
     fn poll_recv(&self, cx: &mut Context<'_>) -> Poll<Result<T, RecvError>> {
         // Keep track of task budget
-        ready!(crate::coop::poll_proceed(cx));
+        let coop = ready!(crate::coop::poll_proceed(cx));
 
         // Load the state
         let mut state = State::load(&self.state, Acquire);
 
         if state.is_complete() {
+            coop.made_progress();
             match unsafe { self.consume_value() } {
                 Some(value) => Ready(Ok(value)),
                 None => Ready(Err(RecvError(()))),
             }
         } else if state.is_closed() {
+            coop.made_progress();
             Ready(Err(RecvError(())))
         } else {
             if state.is_rx_task_set() {
@@ -572,6 +581,7 @@ impl<T> Inner<T> {
                         // Set the flag again so that the waker is released in drop
                         State::set_rx_task(&self.state);
 
+                        coop.made_progress();
                         return match unsafe { self.consume_value() } {
                             Some(value) => Ready(Ok(value)),
                             None => Ready(Err(RecvError(()))),
@@ -592,6 +602,7 @@ impl<T> Inner<T> {
                 state = State::set_rx_task(&self.state);
 
                 if state.is_complete() {
+                    coop.made_progress();
                     match unsafe { self.consume_value() } {
                         Some(value) => Ready(Ok(value)),
                         None => Ready(Err(RecvError(()))),

@@ -7,14 +7,18 @@ use std::task::{Context, Poll};
 
 /// Reads bytes asynchronously.
 ///
-/// This trait inherits from [`std::io::BufRead`] and indicates that an I/O object is
-/// **non-blocking**. All non-blocking I/O objects must return an error when
-/// bytes are unavailable instead of blocking the current thread.
+/// This trait is analogous to [`std::io::BufRead`], but integrates with
+/// the asynchronous task system. In particular, the [`poll_fill_buf`] method,
+/// unlike [`BufRead::fill_buf`], will automatically queue the current task for wakeup
+/// and return if data is not yet available, rather than blocking the calling
+/// thread.
 ///
 /// Utilities for working with `AsyncBufRead` values are provided by
 /// [`AsyncBufReadExt`].
 ///
 /// [`std::io::BufRead`]: std::io::BufRead
+/// [`poll_fill_buf`]: AsyncBufRead::poll_fill_buf
+/// [`BufRead::fill_buf`]: std::io::BufRead::fill_buf
 /// [`AsyncBufReadExt`]: crate::io::AsyncBufReadExt
 pub trait AsyncBufRead: AsyncRead {
     /// Attempts to return the contents of the internal buffer, filling it with more data

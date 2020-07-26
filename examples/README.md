@@ -19,5 +19,5 @@ If you've got an example you'd like to see here, please feel free to open an
 issue. Otherwise if you've got an example you'd like to add, please feel free
 to make a PR!
 
-[tokioweb]: https://tokio.rs/docs/overview/
+[tokioweb]: https://tokio.rs/tokio/tutorial
 [redis]: https://github.com/tokio-rs/mini-redis

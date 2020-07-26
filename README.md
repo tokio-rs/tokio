@@ -20,14 +20,14 @@ the Rust programming language. It is:
 [crates-badge]: https://img.shields.io/crates/v/tokio.svg
 [crates-url]: https://crates.io/crates/tokio
 [mit-badge]: https://img.shields.io/badge/license-MIT-blue.svg
-[mit-url]: LICENSE
+[mit-url]: https://github.com/tokio-rs/tokio/blob/master/LICENSE
 [azure-badge]: https://dev.azure.com/tokio-rs/Tokio/_apis/build/status/tokio-rs.tokio?branchName=master
 [azure-url]: https://dev.azure.com/tokio-rs/Tokio/_build/latest?definitionId=1&branchName=master
 [discord-badge]: https://img.shields.io/discord/500028886025895936.svg?logo=discord&style=flat-square
 [discord-url]: https://discord.gg/tokio
 
 [Website](https://tokio.rs) |
-[Guides](https://tokio.rs/docs/overview/) |
+[Guides](https://tokio.rs/tokio/tutorial) |
 [API Docs](https://docs.rs/tokio/latest/tokio) |
 [Roadmap](https://github.com/tokio-rs/tokio/blob/master/ROADMAP.md) |
 [Chat](https://discord.gg/tokio)
@@ -90,19 +90,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-More examples can be found [here](examples).
+More examples can be found [here][examples]. For a larger "real world" example, see the
+[mini-redis] repository.
+
+[examples]: https://github.com/tokio-rs/tokio/tree/master/examples
+[mini-redis]: https://github.com/tokio-rs/mini-redis/
+
+To see a list of the available features flags that can be enabled, check our
+[docs][feature-flag-docs].
 
 ## Getting Help
 
 First, see if the answer to your question can be found in the [Guides] or the
 [API documentation]. If the answer is not there, there is an active community in
 the [Tokio Discord server][chat]. We would be happy to try to answer your
-question. Last, if that doesn't work, try opening an [issue] with the question.
+question. You can also ask your question on [the discussions page][discussions].
 
-[Guides]: https://tokio.rs/docs/overview/
+[Guides]: https://tokio.rs/tokio/tutorial
 [API documentation]: https://docs.rs/tokio/latest/tokio
 [chat]: https://discord.gg/tokio
-[issue]: https://github.com/tokio-rs/tokio/issues/new
+[discussions]: https://github.com/tokio-rs/tokio/discussions
+[feature-flag-docs]: https://docs.rs/tokio/#feature-flags
 
 ## Contributing
 
@@ -149,15 +157,15 @@ several other libraries, including:
 
 ## Supported Rust Versions
 
-Tokio is built against the latest stable, nightly, and beta Rust releases. The
-minimum version supported is the stable release from three months before the
-current stable release version. For example, if the latest stable Rust is 1.29,
-the minimum version supported is 1.26. The current Tokio version is not
-guaranteed to build on Rust versions earlier than the minimum supported version.
+Tokio is built against the latest stable release. The minimum supported version is 1.39.
+The current Tokio version is not guaranteed to build on Rust versions earlier than the
+minimum supported version.
 
 ## License
 
-This project is licensed under the [MIT license](LICENSE).
+This project is licensed under the [MIT license].
+
+[MIT license]: https://github.com/tokio-rs/tokio/blob/master/LICENSE
 
 ### Contribution
 

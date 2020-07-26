@@ -32,8 +32,8 @@ const MAX_READS: usize = 10;
 ///
 /// The type parameter `T` represents the data that this lock protects. It is
 /// required that `T` satisfies [`Send`] to be shared across threads. The RAII guards
-/// returned from the locking methods implement [`Deref`](https://doc.rust-lang.org/std/ops/trait.Deref.html)
-/// (and [`DerefMut`](https://doc.rust-lang.org/std/ops/trait.DerefMut.html)
+/// returned from the locking methods implement [`Deref`](trait@std::ops::Deref)
+/// (and [`DerefMut`](trait@std::ops::DerefMut)
 /// for the `write` methods) to allow access to the content of the lock.
 ///
 /// # Examples
@@ -66,10 +66,10 @@ const MAX_READS: usize = 10;
 /// [`RwLock`]: struct@RwLock
 /// [`RwLockReadGuard`]: struct@RwLockReadGuard
 /// [`RwLockWriteGuard`]: struct@RwLockWriteGuard
-/// [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
+/// [`Send`]: trait@std::marker::Send
 /// [_write-preferring_]: https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock#Priority_policies
 #[derive(Debug)]
-pub struct RwLock<T> {
+pub struct RwLock<T: ?Sized> {
     //semaphore to coordinate read and write access to T
     s: Semaphore,
 
@@ -85,7 +85,7 @@ pub struct RwLock<T> {
 ///
 /// [`read`]: method@RwLock::read
 #[derive(Debug)]
-pub struct RwLockReadGuard<'a, T> {
+pub struct RwLockReadGuard<'a, T: ?Sized> {
     permit: ReleasingPermit<'a, T>,
     lock: &'a RwLock<T>,
 }
@@ -99,24 +99,24 @@ pub struct RwLockReadGuard<'a, T> {
 /// [`write`]: method@RwLock::write
 /// [`RwLock`]: struct@RwLock
 #[derive(Debug)]
-pub struct RwLockWriteGuard<'a, T> {
+pub struct RwLockWriteGuard<'a, T: ?Sized> {
     permit: ReleasingPermit<'a, T>,
     lock: &'a RwLock<T>,
 }
 
 // Wrapper arround Permit that releases on Drop
 #[derive(Debug)]
-struct ReleasingPermit<'a, T> {
+struct ReleasingPermit<'a, T: ?Sized> {
     num_permits: u16,
     lock: &'a RwLock<T>,
 }
 
-impl<'a, T> ReleasingPermit<'a, T> {
+impl<'a, T: ?Sized> ReleasingPermit<'a, T> {
     async fn acquire(
         lock: &'a RwLock<T>,
         num_permits: u16,
     ) -> Result<ReleasingPermit<'a, T>, AcquireError> {
-        lock.s.acquire(num_permits).await?;
+        lock.s.acquire(num_permits.into()).await?;
         Ok(Self { num_permits, lock })
     }
 
@@ -129,7 +129,7 @@ impl<'a, T> ReleasingPermit<'a, T> {
     }
 }
 
-impl<'a, T> Drop for ReleasingPermit<'a, T> {
+impl<T: ?Sized> Drop for ReleasingPermit<'_, T> {
     fn drop(&mut self) {
         self.lock.s.release(self.num_permits as usize);
     }
@@ -162,12 +162,12 @@ fn bounds() {
 // As long as T: Send + Sync, it's fine to send and share RwLock<T> between threads.
 // If T were not Send, sending and sharing a RwLock<T> would be bad, since you can access T through
 // RwLock<T>.
-unsafe impl<T> Send for RwLock<T> where T: Send {}
-unsafe impl<T> Sync for RwLock<T> where T: Send + Sync {}
-unsafe impl<'a, T> Sync for RwLockReadGuard<'a, T> where T: Send + Sync {}
-unsafe impl<'a, T> Sync for RwLockWriteGuard<'a, T> where T: Send + Sync {}
+unsafe impl<T> Send for RwLock<T> where T: ?Sized + Send {}
+unsafe impl<T> Sync for RwLock<T> where T: ?Sized + Send + Sync {}
+unsafe impl<T> Sync for RwLockReadGuard<'_, T> where T: ?Sized + Send + Sync {}
+unsafe impl<T> Sync for RwLockWriteGuard<'_, T> where T: ?Sized + Send + Sync {}
 
-impl<T> RwLock<T> {
+impl<T: ?Sized> RwLock<T> {
     /// Creates a new instance of an `RwLock<T>` which is unlocked.
     ///
     /// # Examples
@@ -177,7 +177,10 @@ impl<T> RwLock<T> {
     ///
     /// let lock = RwLock::new(5);
     /// ```
-    pub fn new(value: T) -> RwLock<T> {
+    pub fn new(value: T) -> RwLock<T>
+    where
+        T: Sized,
+    {
         RwLock {
             c: UnsafeCell::new(value),
             s: Semaphore::new(MAX_READS),
@@ -333,12 +336,15 @@ impl<T> RwLock<T> {
     }
 
     /// Consumes the lock, returning the underlying data.
-    pub fn into_inner(self) -> T {
+    pub fn into_inner(self) -> T
+    where
+        T: Sized,
+    {
         self.c.into_inner()
     }
 }
 
-impl<T> ops::Deref for RwLockReadGuard<'_, T> {
+impl<T: ?Sized> ops::Deref for RwLockReadGuard<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &T {
@@ -346,7 +352,7 @@ impl<T> ops::Deref for RwLockReadGuard<'_, T> {
     }
 }
 
-impl<T> ops::Deref for RwLockWriteGuard<'_, T> {
+impl<T: ?Sized> ops::Deref for RwLockWriteGuard<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &T {
@@ -354,7 +360,7 @@ impl<T> ops::Deref for RwLockWriteGuard<'_, T> {
     }
 }
 
-impl<T> ops::DerefMut for RwLockWriteGuard<'_, T> {
+impl<T: ?Sized> ops::DerefMut for RwLockWriteGuard<'_, T> {
     fn deref_mut(&mut self) -> &mut T {
         unsafe { &mut *self.lock.c.get() }
     }

@@ -10,8 +10,13 @@
 //! is rejected and the task will be notified when additional capacity is
 //! available. In other words, the channel provides backpressure.
 //!
-//! Unbounded channels are also available using the `unbounded_channel`
-//! constructor.
+//! This module provides two variants of the channel: bounded and unbounded. The
+//! bounded variant has a limit on the number of messages that the channel can
+//! store, and if this limit is reached, trying to send another message will
+//! wait until a message is received from the channel. An unbounded channel has
+//! an infinite capacity, so the `send` method never does any kind of sleeping.
+//! This makes the [`UnboundedSender`] usable from both synchronous and
+//! asynchronous code.
 //!
 //! # Disconnection
 //!
@@ -32,8 +37,32 @@
 //! consumes the channel to completion, at which point the receiver can be
 //! dropped.
 //!
+//! # Communicating between sync and async code
+//!
+//! When you want to communicate between synchronous and asynchronous code, there
+//! are two situations to consider:
+//!
+//! **Bounded channel**: If you need a bounded channel, you should use a bounded
+//! Tokio `mpsc` channel for both directions of communication. To call the async
+//! [`send`][bounded-send] or [`recv`][bounded-recv] methods in sync code, you
+//! will need to use [`Handle::block_on`], which allow you to execute an async
+//! method in synchronous code. This is necessary because a bounded channel may
+//! need to wait for additional capacity to become available.
+//!
+//! **Unbounded channel**: You should use the kind of channel that matches where
+//! the receiver is. So for sending a message _from async to sync_, you should
+//! use [the standard library unbounded channel][std-unbounded] or
+//! [crossbeam][crossbeam-unbounded].  Similarly, for sending a message _from sync
+//! to async_, you should use an unbounded Tokio `mpsc` channel.
+//!
 //! [`Sender`]: crate::sync::mpsc::Sender
 //! [`Receiver`]: crate::sync::mpsc::Receiver
+//! [bounded-send]: crate::sync::mpsc::Sender::send()
+//! [bounded-recv]: crate::sync::mpsc::Receiver::recv()
+//! [`UnboundedSender`]: crate::sync::mpsc::UnboundedSender
+//! [`Handle::block_on`]: crate::runtime::Handle::block_on()
+//! [std-unbounded]: std::sync::mpsc::channel
+//! [crossbeam-unbounded]: https://docs.rs/crossbeam/*/crossbeam/channel/fn.unbounded.html
 
 pub(super) mod block;
 

@@ -33,15 +33,25 @@ impl Receiver {
     /// duration. If `timeout` is `None`, then the thread is blocked until the
     /// shutdown signal is received.
     pub(crate) fn wait(&mut self, timeout: Option<Duration>) {
-        use crate::runtime::enter::{enter, try_enter};
+        use crate::runtime::enter::try_enter;
 
-        let mut e = if std::thread::panicking() {
-            match try_enter(false) {
-                Some(enter) => enter,
-                _ => return,
+        if timeout == Some(Duration::from_nanos(0)) {
+            return;
+        }
+
+        let mut e = match try_enter(false) {
+            Some(enter) => enter,
+            _ => {
+                if std::thread::panicking() {
+                    // Don't panic in a panic
+                    return;
+                } else {
+                    panic!(
+                        "Cannot drop a runtime in a context where blocking is not allowed. \
+                        This happens when a runtime is dropped from within an asynchronous context."
+                    );
+                }
             }
-        } else {
-            enter(false)
         };
 
         // The oneshot completes with an Err

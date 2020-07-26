@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio/0.2.21")]
+#![doc(html_root_url = "https://docs.rs/tokio/0.2.22")]
 #![allow(
     clippy::cognitive_complexity,
     clippy::large_enum_variant,
@@ -16,6 +16,7 @@
     attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
 ))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(docsrs, feature(doc_alias))]
 
 //! A runtime for writing reliable, asynchronous, and slim applications.
 //!
@@ -44,7 +45,7 @@
 //! [signal]: crate::signal
 //! [fs]: crate::fs
 //! [runtime]: crate::runtime
-//! [website]: https://tokio.rs/docs/overview/
+//! [website]: https://tokio.rs/tokio/tutorial
 //!
 //! # A Tour of Tokio
 //!

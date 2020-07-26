@@ -29,7 +29,7 @@ cfg_rt_threaded! {
     /// [blocking]: ../index.html#cpu-bound-tasks-and-blocking-code
     /// [threaded scheduler]: fn@crate::runtime::Builder::threaded_scheduler
     /// [`spawn_blocking`]: fn@crate::task::spawn_blocking
-    /// [`join!`]: ../macro.join.html
+    /// [`join!`]: macro@join
     /// [`thread::spawn`]: fn@std::thread::spawn
     /// [`shutdown_timeout`]: fn@crate::runtime::Runtime::shutdown_timeout
     ///
@@ -114,6 +114,19 @@ cfg_blocking! {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
+        #[cfg(feature = "tracing")]
+        let f = {
+            let span = tracing::trace_span!(
+                target: "tokio::task",
+                "task",
+                kind = %"blocking",
+                function = %std::any::type_name::<F>(),
+            );
+            move || {
+                let _g = span.enter();
+                f()
+            }
+        };
         crate::runtime::spawn_blocking(f)
     }
 }

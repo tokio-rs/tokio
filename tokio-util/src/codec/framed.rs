@@ -195,6 +195,11 @@ impl<T, U> Framed<T, U> {
         &self.inner.state.read.buffer
     }
 
+    /// Returns a mutable reference to the read buffer.
+    pub fn read_buffer_mut(&mut self) -> &mut BytesMut {
+        &mut self.inner.state.read.buffer
+    }
+
     /// Consumes the `Framed`, returning its underlying I/O stream.
     ///
     /// Note that care should be taken to not tamper with the underlying stream
@@ -279,6 +284,7 @@ where
 ///
 /// [`Framed`]: crate::codec::Framed
 #[derive(Debug)]
+#[allow(clippy::manual_non_exhaustive)]
 pub struct FramedParts<T, U> {
     /// The inner transport used to read bytes to and write bytes to
     pub io: T,

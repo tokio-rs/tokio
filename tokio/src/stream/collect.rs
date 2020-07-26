@@ -32,7 +32,7 @@ pin_project! {
 ///
 /// Currently, this trait may not be implemented by third parties. The trait is
 /// sealed in order to make changes in the future. Stabilization is pending
-/// enhancements to the Rust langague.
+/// enhancements to the Rust language.
 pub trait FromStream<T>: sealed::FromStreamPriv<T> {}
 
 impl<T, U> Collect<T, U>
