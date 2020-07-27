@@ -482,6 +482,27 @@ async fn reset_later_after_slot_starts() {
 }
 
 #[tokio::test]
+async fn reset_inserted_expired() {
+    time::pause();
+    let mut queue = task::spawn(DelayQueue::new());
+    let now = Instant::now();
+
+    let key = queue.insert_at("foo", now - ms(100));
+
+    // this causes the panic described in #2473
+    queue.reset_at(&key, now + ms(100));
+
+    assert_eq!(1, queue.len());
+
+    delay_for(ms(200)).await;
+
+    let entry = assert_ready_ok!(poll!(queue)).into_inner();
+    assert_eq!(entry, "foo");
+
+    assert_eq!(queue.len(), 0);
+}
+
+#[tokio::test]
 async fn reset_earlier_after_slot_starts() {
     time::pause();
 

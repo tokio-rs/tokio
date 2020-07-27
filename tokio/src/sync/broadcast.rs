@@ -808,6 +808,7 @@ where
     /// receive, `Err(TryRecvError::Empty)` is returned.
     ///
     /// [`recv`]: crate::sync::broadcast::Receiver::recv
+    /// [`try_recv`]: crate::sync::broadcast::Receiver::try_recv
     /// [`Receiver`]: crate::sync::broadcast::Receiver
     ///
     /// # Examples

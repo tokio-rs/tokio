@@ -427,6 +427,22 @@ impl<T> DelayQueue<T> {
         }
     }
 
+    /// Removes the key fom the expired queue or the timer wheel
+    /// depending on its expiration status
+    ///
+    /// # Panics
+    /// Panics if the key is not contained in the expired queue or the wheel
+    fn remove_key(&mut self, key: &Key) {
+        use crate::time::wheel::Stack;
+
+        // Special case the `expired` queue
+        if self.slab[key.index].expired {
+            self.expired.remove(&key.index, &mut self.slab);
+        } else {
+            self.wheel.remove(&key.index, &mut self.slab);
+        }
+    }
+
     /// Removes the item associated with `key` from the queue.
     ///
     /// There must be an item associated with `key`. The function returns the
@@ -456,15 +472,7 @@ impl<T> DelayQueue<T> {
     /// # }
     /// ```
     pub fn remove(&mut self, key: &Key) -> Expired<T> {
-        use crate::time::wheel::Stack;
-
-        // Special case the `expired` queue
-        if self.slab[key.index].expired {
-            self.expired.remove(&key.index, &mut self.slab);
-        } else {
-            self.wheel.remove(&key.index, &mut self.slab);
-        }
-
+        self.remove_key(key);
         let data = self.slab.remove(key.index);
 
         Expired {
@@ -508,7 +516,7 @@ impl<T> DelayQueue<T> {
     /// # }
     /// ```
     pub fn reset_at(&mut self, key: &Key, when: Instant) {
-        self.wheel.remove(&key.index, &mut self.slab);
+        self.remove_key(key);
 
         // Normalize the deadline. Values cannot be set to expire in the past.
         let when = self.normalize_deadline(when);

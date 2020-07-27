@@ -24,13 +24,18 @@ mod select;
 
 use proc_macro::TokenStream;
 
-/// Marks async function to be executed by selected runtime.
+/// Marks async function to be executed by selected runtime. This macro helps set up a `Runtime`
+/// without requiring the user to use [Runtime](../tokio/runtime/struct.Runtime.html) or
+/// [Builder](../tokio/runtime/struct.builder.html) directly.
 ///
 /// ## Options:
 ///
+/// If you want to set the number of worker threads used for asynchronous code, use the
+/// `core_threads` option.
 ///
 /// - `core_threads=n` - Sets core threads to `n` (requires `rt-threaded` feature).
 /// - `max_threads=n` - Sets max threads to `n` (requires `rt-core` or `rt-threaded` feature).
+/// - `basic_scheduler` - Use the basic schduler (requires `rt-core`).
 ///
 /// ## Function arguments:
 ///
@@ -47,12 +52,69 @@ use proc_macro::TokenStream;
 /// }
 /// ```
 ///
+/// Equivalent code not using `#[tokio::main]`
+///
+/// ```rust
+/// fn main() {
+///     tokio::runtime::Builder::new()
+///         .threaded_scheduler()
+///         .enable_all()
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             println!("Hello world");
+///         })
+/// }
+/// ```
+///
+/// ### Using basic scheduler
+///
+/// The basic scheduler is single-threaded.
+///
+/// ```rust
+/// #[tokio::main(basic_scheduler)]
+/// async fn main() {
+///     println!("Hello world");
+/// }
+/// ```
+///
+/// Equivalent code not using `#[tokio::main]`
+///
+/// ```rust
+/// fn main() {
+///     tokio::runtime::Builder::new()
+///         .basic_scheduler()
+///         .enable_all()
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             println!("Hello world");
+///         })
+/// }
+/// ```
+///
 /// ### Set number of core threads
 ///
 /// ```rust
-/// #[tokio::main(core_threads = 1)]
+/// #[tokio::main(core_threads = 2)]
 /// async fn main() {
 ///     println!("Hello world");
+/// }
+/// ```
+///
+/// Equivalent code not using `#[tokio::main]`
+///
+/// ```rust
+/// fn main() {
+///     tokio::runtime::Builder::new()
+///         .threaded_scheduler()
+///         .core_threads(2)
+///         .enable_all()
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             println!("Hello world");
+///         })
 /// }
 /// ```
 ///
@@ -69,7 +131,9 @@ pub fn main_threaded(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::main(args, item, true)
 }
 
-/// Marks async function to be executed by selected runtime.
+/// Marks async function to be executed by selected runtime. This macro helps set up a `Runtime`
+/// without requiring the user to use [Runtime](../tokio/runtime/struct.Runtime.html) or
+/// [Builder](../tokio/runtime/struct.builder.html) directly.
 ///
 /// ## Options:
 ///
@@ -91,12 +155,39 @@ pub fn main_threaded(args: TokenStream, item: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
+/// Equivalent code not using `#[tokio::main]`
+///
+/// ```rust
+/// fn main() {
+///     tokio::runtime::Runtime::new()
+///         .unwrap()
+///         .block_on(async {
+///             println!("Hello world");
+///         })
+/// }
+/// ```
+///
 /// ### Select runtime
 ///
 /// ```rust
 /// #[tokio::main(basic_scheduler)]
 /// async fn main() {
 ///     println!("Hello world");
+/// }
+/// ```
+///
+/// Equivalent code not using `#[tokio::main]`
+///
+/// ```rust
+/// fn main() {
+///     tokio::runtime::Builder::new()
+///         .basic_scheduler()
+///         .enable_all()
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             println!("Hello world");
+///         })
 /// }
 /// ```
 ///
@@ -113,7 +204,9 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::old::main(args, item)
 }
 
-/// Marks async function to be executed by selected runtime.
+/// Marks async function to be executed by selected runtime. This macro helps set up a `Runtime`
+/// without requiring the user to use [Runtime](../tokio/runtime/struct.Runtime.html) or
+/// [Builder](../tokio/runtime/struct.builder.html) directly.
 ///
 /// ## Options:
 ///
@@ -131,6 +224,21 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 /// #[tokio::main]
 /// async fn main() {
 ///     println!("Hello world");
+/// }
+/// ```
+///
+/// Equivalent code not using `#[tokio::main]`
+///
+/// ```rust
+/// fn main() {
+///     tokio::runtime::Builder::new()
+///         .basic_scheduler()
+///         .enable_all()
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             println!("Hello world");
+///         })
 /// }
 /// ```
 ///

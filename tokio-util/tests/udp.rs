@@ -1,5 +1,5 @@
 use tokio::{net::UdpSocket, stream::StreamExt};
-use tokio_util::codec::{Decoder, Encoder};
+use tokio_util::codec::{Decoder, Encoder, LinesCodec};
 use tokio_util::udp::UdpFramed;
 
 use bytes::{BufMut, BytesMut};
@@ -10,7 +10,7 @@ use std::io;
 
 #[cfg_attr(any(target_os = "macos", target_os = "ios"), allow(unused_assignments))]
 #[tokio::test]
-async fn send_framed() -> std::io::Result<()> {
+async fn send_framed_byte_codec() -> std::io::Result<()> {
     let mut a_soc = UdpSocket::bind("127.0.0.1:0").await?;
     let mut b_soc = UdpSocket::bind("127.0.0.1:0").await?;
 
@@ -76,4 +76,25 @@ impl Encoder<&[u8]> for ByteCodec {
         buf.put_slice(data);
         Ok(())
     }
+}
+
+#[tokio::test]
+async fn send_framed_lines_codec() -> std::io::Result<()> {
+    let a_soc = UdpSocket::bind("127.0.0.1:0").await?;
+    let b_soc = UdpSocket::bind("127.0.0.1:0").await?;
+
+    let a_addr = a_soc.local_addr()?;
+    let b_addr = b_soc.local_addr()?;
+
+    let mut a = UdpFramed::new(a_soc, ByteCodec);
+    let mut b = UdpFramed::new(b_soc, LinesCodec::new());
+
+    let msg = b"1\r\n2\r\n3\r\n".to_vec();
+    a.send((&msg, b_addr)).await?;
+
+    assert_eq!(b.next().await.unwrap().unwrap(), ("1".to_string(), a_addr));
+    assert_eq!(b.next().await.unwrap().unwrap(), ("2".to_string(), a_addr));
+    assert_eq!(b.next().await.unwrap().unwrap(), ("3".to_string(), a_addr));
+
+    Ok(())
 }
