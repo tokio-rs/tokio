@@ -1,4 +1,5 @@
-use crate::io::util::read_to_end::read_to_end_internal;
+use crate::io::util::read_line::finish_string_read;
+use crate::io::util::read_to_end::{prepare_buffer, read_to_end_internal};
 use crate::io::AsyncRead;
 
 use std::future::Future;
@@ -12,47 +13,54 @@ cfg_io_util! {
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct ReadToString<'a, R: ?Sized> {
         reader: &'a mut R,
-        buf: &'a mut String,
-        bytes: Vec<u8>,
-        start_len: usize,
+        /// This is the buffer we were provided. It will be replaced with an empty string
+        /// while reading to postpone utf-8 handling until after reading.
+        output: &'a mut String,
+        /// The actual allocation of the string is moved into this vector instead.
+        buf: Vec<u8>,
+        /// The number of bytes appended to buf. This can be less than buf.len() if
+        /// the buffer was not empty when the operation was started.
+        read: usize,
     }
 }
 
-pub(crate) fn read_to_string<'a, R>(reader: &'a mut R, buf: &'a mut String) -> ReadToString<'a, R>
+pub(crate) fn read_to_string<'a, R>(
+    reader: &'a mut R,
+    string: &'a mut String,
+) -> ReadToString<'a, R>
 where
     R: AsyncRead + ?Sized + Unpin,
 {
-    let start_len = buf.len();
+    let mut buf = mem::replace(string, String::new()).into_bytes();
+    prepare_buffer(&mut buf, reader);
     ReadToString {
         reader,
-        bytes: mem::replace(buf, String::new()).into_bytes(),
         buf,
-        start_len,
+        output: string,
+        read: 0,
     }
 }
 
-fn read_to_string_internal<R: AsyncRead + ?Sized>(
+/// # Safety
+///
+/// Before first calling this method, the unused capacity must have been
+/// prepared for use with the provided AsyncRead. This can be done using the
+/// `prepare_buffer` function in `read_to_end.rs`.
+unsafe fn read_to_string_internal<R: AsyncRead + ?Sized>(
     reader: Pin<&mut R>,
+    output: &mut String,
+    buf: &mut Vec<u8>,
+    read: &mut usize,
     cx: &mut Context<'_>,
-    buf: &mut String,
-    bytes: &mut Vec<u8>,
-    start_len: usize,
 ) -> Poll<io::Result<usize>> {
-    let ret = ready!(read_to_end_internal(reader, cx, bytes, start_len))?;
-    match String::from_utf8(mem::replace(bytes, Vec::new())) {
-        Ok(string) => {
-            debug_assert!(buf.is_empty());
-            *buf = string;
-            Poll::Ready(Ok(ret))
-        }
-        Err(e) => {
-            *bytes = e.into_bytes();
-            Poll::Ready(Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "stream did not contain valid UTF-8",
-            )))
-        }
-    }
+    let io_res = ready!(read_to_end_internal(buf, reader, read, cx));
+    let utf8_res = String::from_utf8(mem::replace(buf, Vec::new()));
+
+    // At this point both buf and output are empty. The allocation is in utf8_res.
+
+    debug_assert!(buf.is_empty());
+    debug_assert!(output.is_empty());
+    finish_string_read(io_res, utf8_res, *read, output, true)
 }
 
 impl<A> Future for ReadToString<'_, A>
@@ -65,17 +73,12 @@ where
         let Self {
             reader,
             buf,
-            bytes,
-            start_len,
+            output,
+            read,
         } = &mut *self;
-        let ret = read_to_string_internal(Pin::new(reader), cx, buf, bytes, *start_len);
-        if let Poll::Ready(Err(_)) = ret {
-            // Put back the original string.
-            bytes.truncate(*start_len);
-            **buf = String::from_utf8(mem::replace(bytes, Vec::new()))
-                .expect("original string no longer utf-8");
-        }
-        ret
+
+        // safety: The constructor of ReadToString called `prepare_buffer`.
+        unsafe { read_to_string_internal(Pin::new(*reader), output, buf, read, cx) }
     }
 }
 

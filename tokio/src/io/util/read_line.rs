@@ -5,6 +5,7 @@ use std::future::Future;
 use std::io;
 use std::mem;
 use std::pin::Pin;
+use std::string::FromUtf8Error;
 use std::task::{Context, Poll};
 
 cfg_io_util! {
@@ -16,7 +17,7 @@ cfg_io_util! {
         /// This is the buffer we were provided. It will be replaced with an empty string
         /// while reading to postpone utf-8 handling until after reading.
         output: &'a mut String,
-        /// The actual allocation of the string is moved into a vector instead.
+        /// The actual allocation of the string is moved into this vector instead.
         buf: Vec<u8>,
         /// The number of bytes appended to buf. This can be less than buf.len() if
         /// the buffer was not empty when the operation was started.
@@ -42,6 +43,48 @@ fn put_back_original_data(output: &mut String, mut vector: Vec<u8>, num_bytes_re
     *output = String::from_utf8(vector).expect("The original data must be valid utf-8.");
 }
 
+/// This handles the various failure cases and puts the string back into `output`.
+///
+/// The `truncate_on_io_error` bool is necessary because `read_to_string` and `read_line`
+/// disagree on what should happen when an IO error occurs.
+pub(super) fn finish_string_read(
+    io_res: io::Result<usize>,
+    utf8_res: Result<String, FromUtf8Error>,
+    read: usize,
+    output: &mut String,
+    truncate_on_io_error: bool,
+) -> Poll<io::Result<usize>> {
+    match (io_res, utf8_res) {
+        (Ok(num_bytes), Ok(string)) => {
+            debug_assert_eq!(read, 0);
+            *output = string;
+            Poll::Ready(Ok(num_bytes))
+        }
+        (Err(io_err), Ok(string)) => {
+            *output = string;
+            if truncate_on_io_error {
+                let original_len = output.len() - read;
+                output.truncate(original_len);
+            }
+            Poll::Ready(Err(io_err))
+        }
+        (Ok(num_bytes), Err(utf8_err)) => {
+            debug_assert_eq!(read, 0);
+            put_back_original_data(output, utf8_err.into_bytes(), num_bytes);
+
+            Poll::Ready(Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "stream did not contain valid UTF-8",
+            )))
+        }
+        (Err(io_err), Err(utf8_err)) => {
+            put_back_original_data(output, utf8_err.into_bytes(), read);
+
+            Poll::Ready(Err(io_err))
+        }
+    }
+}
+
 pub(super) fn read_line_internal<R: AsyncBufRead + ?Sized>(
     reader: Pin<&mut R>,
     cx: &mut Context<'_>,
@@ -55,31 +98,8 @@ pub(super) fn read_line_internal<R: AsyncBufRead + ?Sized>(
     // At this point both buf and output are empty. The allocation is in utf8_res.
 
     debug_assert!(buf.is_empty());
-    match (io_res, utf8_res) {
-        (Ok(num_bytes), Ok(string)) => {
-            debug_assert_eq!(*read, 0);
-            *output = string;
-            Poll::Ready(Ok(num_bytes))
-        }
-        (Err(io_err), Ok(string)) => {
-            *output = string;
-            Poll::Ready(Err(io_err))
-        }
-        (Ok(num_bytes), Err(utf8_err)) => {
-            debug_assert_eq!(*read, 0);
-            put_back_original_data(output, utf8_err.into_bytes(), num_bytes);
-
-            Poll::Ready(Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "stream did not contain valid UTF-8",
-            )))
-        }
-        (Err(io_err), Err(utf8_err)) => {
-            put_back_original_data(output, utf8_err.into_bytes(), *read);
-
-            Poll::Ready(Err(io_err))
-        }
-    }
+    debug_assert!(output.is_empty());
+    finish_string_read(io_res, utf8_res, *read, output, false)
 }
 
 impl<R: AsyncBufRead + ?Sized + Unpin> Future for ReadLine<'_, R> {
