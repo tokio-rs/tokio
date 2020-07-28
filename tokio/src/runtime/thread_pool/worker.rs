@@ -199,7 +199,6 @@ cfg_blocking! {
             }
         }
 
-        let mut had_core = false;
         let mut had_entered = false;
 
         CURRENT.with(|maybe_cx| {
@@ -248,7 +247,6 @@ cfg_blocking! {
             //
             // First, move the core back into the worker's shared core slot.
             cx.worker.core.set(core);
-            had_core = true;
 
             // Next, clone the worker handle and send it to a new thread for
             // processing.
@@ -259,13 +257,11 @@ cfg_blocking! {
             runtime::spawn_blocking(move || run(worker));
         });
 
-        if had_core {
+        if had_entered {
             // Unset the current task's budget. Blocking sections are not
             // constrained by task budgets.
             let _reset = Reset(coop::stop());
 
-            crate::runtime::enter::exit(f)
-        } else if had_entered {
             crate::runtime::enter::exit(f)
         } else {
             f()

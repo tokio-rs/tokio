@@ -176,3 +176,54 @@ fn can_shutdown_now_in_runtime() {
         rt.shutdown_background();
     });
 }
+
+#[test]
+fn coop_disabled_in_block_in_place() {
+    let mut outer = tokio::runtime::Builder::new()
+        .threaded_scheduler()
+        .build()
+        .unwrap();
+
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+    for i in 0..200 {
+        tx.send(i).unwrap();
+    }
+    drop(tx);
+
+    outer
+        .block_on(async move {
+            tokio::spawn(async move {
+                tokio::task::block_in_place(move || {
+                    futures::executor::block_on(async move {
+                        use tokio::stream::StreamExt;
+                        assert_eq!(rx.fold(0, |n, _| n + 1).await, 200);
+                    })
+                })
+            })
+            .await
+        })
+        .unwrap();
+}
+
+#[test]
+fn coop_disabled_in_block_in_place_in_block_on() {
+    let mut outer = tokio::runtime::Builder::new()
+        .threaded_scheduler()
+        .build()
+        .unwrap();
+
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+    for i in 0..200 {
+        tx.send(i).unwrap();
+    }
+    drop(tx);
+
+    outer.block_on(async move {
+        tokio::task::block_in_place(move || {
+            futures::executor::block_on(async move {
+                use tokio::stream::StreamExt;
+                assert_eq!(rx.fold(0, |n, _| { dbg!(n + 1) }).await, 200);
+            })
+        })
+    });
+}
