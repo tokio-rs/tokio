@@ -366,6 +366,7 @@ macro_rules! select {
                     }
                     match branch {
                         $(
+                            #[allow(unreachable_code)]
                             $crate::count!( $($skip)* ) => {
                                 // First, if the future has previously been
                                 // disabled, do not poll it again. This is done

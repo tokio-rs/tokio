@@ -440,9 +440,25 @@ async fn many_branches() {
     assert_eq!(1, num);
 }
 
+#[tokio::test]
+async fn never_branch_no_warnings() {
+    let t = tokio::select! {
+        _ = async_never() => 0,
+        one_async_ready = one() => one_async_ready,
+    };
+    assert_eq!(t, 1);
+}
+
 async fn one() -> usize {
     1
 }
 
 async fn require_mutable(_: &mut i32) {}
 async fn async_noop() {}
+
+async fn async_never() -> ! {
+    use tokio::time::Duration;
+    loop {
+        tokio::time::delay_for(Duration::from_millis(10)).await;
+    }
+}
