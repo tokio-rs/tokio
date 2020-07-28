@@ -176,3 +176,70 @@ fn can_shutdown_now_in_runtime() {
         rt.shutdown_background();
     });
 }
+
+#[test]
+fn coop_disabled_in_block_in_place() {
+    let mut outer = tokio::runtime::Builder::new()
+        .threaded_scheduler()
+        .enable_time()
+        .build()
+        .unwrap();
+
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+    for i in 0..200 {
+        tx.send(i).unwrap();
+    }
+    drop(tx);
+
+    outer.block_on(async move {
+        let jh = tokio::spawn(async move {
+            tokio::task::block_in_place(move || {
+                futures::executor::block_on(async move {
+                    use tokio::stream::StreamExt;
+                    assert_eq!(rx.fold(0, |n, _| n + 1).await, 200);
+                })
+            })
+        });
+
+        tokio::time::timeout(Duration::from_secs(1), jh)
+            .await
+            .expect("timed out (probably hanging)")
+            .unwrap()
+    });
+}
+
+#[test]
+fn coop_disabled_in_block_in_place_in_block_on() {
+    let (done_tx, done_rx) = std::sync::mpsc::channel();
+    let done = done_tx.clone();
+    thread::spawn(move || {
+        let mut outer = tokio::runtime::Builder::new()
+            .threaded_scheduler()
+            .build()
+            .unwrap();
+
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        for i in 0..200 {
+            tx.send(i).unwrap();
+        }
+        drop(tx);
+
+        outer.block_on(async move {
+            tokio::task::block_in_place(move || {
+                futures::executor::block_on(async move {
+                    use tokio::stream::StreamExt;
+                    assert_eq!(rx.fold(0, |n, _| n + 1).await, 200);
+                })
+            })
+        });
+
+        let _ = done.send(Ok(()));
+    });
+
+    thread::spawn(move || {
+        thread::sleep(Duration::from_secs(1));
+        let _ = done_tx.send(Err("timed out (probably hanging)"));
+    });
+
+    done_rx.recv().unwrap().unwrap();
+}
