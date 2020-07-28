@@ -456,9 +456,14 @@ impl AsyncWrite for Mock {
 /// Ensures that Mock isn't dropped with data "inside".
 impl Drop for Mock {
     fn drop(&mut self) {
+        // Avoid double panicking, since makes debugging much harder.
+        if std::thread::panicking() {
+            return;
+        }
+
         self.inner.actions.iter().for_each(|a| match a {
-            Action::Read(data) if !data.is_empty() => panic!("There is still data left to read."),
-            Action::Write(data) if !data.is_empty() => panic!("There is still data left to write."),
+            Action::Read(data) => assert!(data.is_empty(), "There is still data left to read."),
+            Action::Write(data) => assert!(data.is_empty(), "There is still data left to write."),
             _ => (),
         })
     }
