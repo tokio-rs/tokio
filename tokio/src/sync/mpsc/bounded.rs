@@ -1,7 +1,5 @@
 #[cfg(feature = "blocking")]
 use crate::park::{CachedParkThread, Park};
-#[cfg(all(feature = "rt-core", feature = "blocking"))]
-use crate::runtime::Handle;
 use crate::sync::mpsc::chan;
 use crate::sync::mpsc::error::{ClosedError, SendError, TryRecvError, TrySendError};
 use crate::sync::semaphore_ll as semaphore;
@@ -178,11 +176,7 @@ impl<T> Receiver<T> {
     /// ```
     #[cfg(feature = "blocking")]
     pub fn blocking_recv(&mut self) -> Result<Option<T>, ()> {
-        // TODO This is too restrictive want to only panic if called in block_on
-        #[cfg(feature = "rt-core")]
-        if Handle::try_current().is_ok() {
-            panic!("blocking_recv cannot be called from within a runtime");
-        }
+        let _enter_handle = crate::runtime::enter::enter(false);
         let mut park = CachedParkThread::new();
         let waker = park.get_unpark()?.into_waker();
         let mut cx = Context::from_waker(&waker);
@@ -303,7 +297,7 @@ impl<T> Sender<T> {
     /// Blocking send to call outside of asynchronous contexts
     #[cfg(feature = "blocking")]
     pub fn blocking_send(&mut self, value: T) -> Result<(), SendError<T>> {
-        // TODO ensure can't be called from block_on
+        let _enter_handle = crate::runtime::enter::enter(false);
         let mut park = CachedParkThread::new();
         let waker = match park.get_unpark() {
             Ok(s) => s.into_waker(),
