@@ -527,3 +527,10 @@ fn blocking_send() {
     });
     sync_code.join().unwrap()
 }
+
+#[tokio::test]
+#[should_panic]
+async fn blocking_send_async() {
+    let (_tx, mut rx) = mpsc::channel::<()>(1);
+    let _ = tx.blocking_send();
+}
