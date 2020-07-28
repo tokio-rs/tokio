@@ -94,8 +94,7 @@ async fn try_send_spawn() {
         .unwrap();
 
     let sent = &sender
-        .try_send_to(MSG, &receiver.local_addr().unwrap())
-        .await
+        .try_send_to(MSG, receiver.local_addr().unwrap())
         .unwrap();
     assert_eq!(sent, &MSG_LEN);
     let mut buf = [0u8; 32];

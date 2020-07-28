@@ -210,16 +210,8 @@ impl UdpSocket {
     /// if the IP version of the socket does not match that of `target`.
     ///
     /// [`ErrorKind::WouldBlock`]: std::io::error::ErrorKind::WouldBlock
-    pub async fn try_send_to<A: ToSocketAddrs>(&self, buf: &[u8], target: A) -> io::Result<usize> {
-        let mut addrs = target.to_socket_addrs().await?;
-
-        match addrs.next() {
-            Some(target) => self.io.get_ref().send_to(buf, &target),
-            None => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "no addresses to send data to",
-            )),
-        }
+    pub fn try_send_to(&self, buf: &[u8], target: SocketAddr) -> io::Result<usize> {
+        self.io.get_ref().send_to(buf, &target)
     }
 
     // TODO: Public or not?
