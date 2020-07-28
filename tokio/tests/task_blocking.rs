@@ -224,7 +224,7 @@ fn coop_disabled_in_block_in_place_in_block_on() {
         }
         drop(tx);
 
-        let x = outer.block_on(async move {
+        outer.block_on(async move {
             tokio::task::block_in_place(move || {
                 futures::executor::block_on(async move {
                     use tokio::stream::StreamExt;
@@ -233,7 +233,7 @@ fn coop_disabled_in_block_in_place_in_block_on() {
             })
         });
 
-        let _ = done.send(Ok(x));
+        let _ = done.send(Ok(()));
     });
 
     thread::spawn(move || {
