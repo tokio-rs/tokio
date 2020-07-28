@@ -131,12 +131,12 @@ impl BlockingPool {
         shared.shutdown = true;
         shared.shutdown_tx = None;
         self.spawner.inner.condvar.notify_all();
-        let workers = shared.worker_threads.drain().collect::<Vec<_>>();
+        let mut workers = std::mem::replace(&mut shared.worker_threads, Slab::new());
 
         drop(shared);
 
         if self.shutdown_rx.wait(timeout) {
-            for handle in workers {
+            for handle in workers.drain() {
                 let _ = handle.join();
             }
         }
