@@ -67,7 +67,7 @@ process = [
   "winapi/winerror",
 ]
 # Includes basic task execution capabilities
-rt-core = []
+rt-core = ["slab"]
 rt-util = []
 rt-threaded = [
   "num_cpus",
