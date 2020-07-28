@@ -267,6 +267,14 @@ impl Inner {
                 // Even if the condvar "timed out", if the pool is entering the
                 // shutdown phase, we want to perform the cleanup logic.
                 if !shared.shutdown && timeout_result.timed_out() {
+                    // Remove from list of worker threads to join
+                    let worker_thread_pos = shared
+                        .worker_threads
+                        .iter()
+                        .position(|x| x.thread().id() == thread::current().id())
+                        .expect("worker thread join handle not registered");
+                    shared.worker_threads.swap_remove(worker_thread_pos);
+
                     break 'main;
                 }
 

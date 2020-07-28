@@ -869,6 +869,20 @@ rt_test! {
     }
 
     #[test]
+    fn shutdown_wakeup_time() {
+        let mut runtime = rt();
+
+        runtime.block_on(async move {
+            tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
+        });
+
+        runtime.shutdown_timeout(Duration::from_secs(10_000));
+    }
+
+    // This test is currently ignored on Windows because of a
+    // rust-lang issue in thread local storage destructors.
+    // See https://github.com/rust-lang/rust/issues/74875
+    #[test]
     #[cfg(not(windows))]
     fn runtime_in_thread_local() {
         use std::cell::RefCell;
