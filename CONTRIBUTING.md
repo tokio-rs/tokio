@@ -453,13 +453,14 @@ our [GitHub project][project]. The section is primarily targeted at maintainers.
  - **C-feature-accepted** If you submit a PR for this feature request, we wont
    close it with the reason "we don't want this". Issues with this label should
    also have the `C-feature-request` label.
- - **C-musing** Stuff like tracking issues. "musings about a better world"
+ - **C-musing** Stuff like tracking issues or roadmaps. "musings about a better
+   world"
  - **C-proposal** A proposal of some kind, and a request for comments.
  - **C-question** A user question. Large overlap with GitHub discussions.
  - **C-request** A non-feature request, e.g. "please add deprecation notices to
    `-alpha.*` versions of crates"
 
-**Call for participation** I don't know why it's called `E-`. Many issues are
+**Call for participation.** I don't know why it's called `E-`. Many issues are
 missing a difficulty rating, and you should feel free to add one.
 
  - **E-help-wanted** Stuff where we want help. Often seen together with `C-bug`
@@ -472,7 +473,7 @@ missing a difficulty rating, and you should feel free to add one.
  - **E-needs-mvce** This bug is missing a minimal complete and verifiable
    example.
 
-**Module** A more fine groaned categorization than area.
+**Module.** A more fine groaned categorization than area.
 
  - **M-blocking** Things relevant to `spawn_blocking`, `block_in_place`.
  - **M-codec** The `tokio_util::codec` module.
@@ -491,13 +492,13 @@ missing a difficulty rating, and you should feel free to add one.
  - **M-time** The `tokio::time` module.
  - **M-tracing** Tracing support in Tokio.
 
-**Topic** Some extra information.
+**Topic.** Some extra information.
 
  - **T-docs** This is about documentation.
  - **T-performance** This is about performance.
  - **T-v0.1.x** This is about old Tokio.
 
-Any other labels are not in active use.
+Any label not listed here is not in active use.
 
 [project]: https://github.com/orgs/tokio-rs/projects/1
 
