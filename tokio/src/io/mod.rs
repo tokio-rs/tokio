@@ -236,6 +236,7 @@ cfg_io_util! {
 
     cfg_stream! {
         pub use util::{stream_reader, StreamReader};
+        pub use util::{reader_stream, ReaderStream};
     }
 }
 
