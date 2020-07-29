@@ -572,6 +572,8 @@ impl Core {
 
         // Drain the queue
         while self.next_local_task().is_some() {}
+
+        park.shutdown();
     }
 
     fn drain_pending_drop(&mut self, worker: &Worker) {

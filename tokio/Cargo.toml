@@ -67,7 +67,7 @@ process = [
   "winapi/winerror",
 ]
 # Includes basic task execution capabilities
-rt-core = []
+rt-core = ["slab"]
 rt-util = []
 rt-threaded = [
   "num_cpus",
@@ -129,7 +129,7 @@ proptest = "0.9.4"
 tempfile = "3.1.0"
 
 [target.'cfg(loom)'.dev-dependencies]
-loom = { version = "0.3.4", features = ["futures", "checkpoint"] }
+loom = { version = "0.3.5", features = ["futures", "checkpoint"] }
 
 [package.metadata.docs.rs]
 all-features = true

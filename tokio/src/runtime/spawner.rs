@@ -18,6 +18,17 @@ pub(crate) enum Spawner {
     ThreadPool(thread_pool::Spawner),
 }
 
+impl Spawner {
+    pub(crate) fn shutdown(&mut self) {
+        #[cfg(feature = "rt-threaded")]
+        {
+            if let Spawner::ThreadPool(spawner) = self {
+                spawner.shutdown();
+            }
+        }
+    }
+}
+
 cfg_rt_core! {
     impl Spawner {
         pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>

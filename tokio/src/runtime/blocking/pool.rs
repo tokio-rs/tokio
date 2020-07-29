@@ -8,6 +8,8 @@ use crate::runtime::blocking::task::BlockingTask;
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{Builder, Callback, Handle};
 
+use slab::Slab;
+
 use std::collections::VecDeque;
 use std::fmt;
 use std::time::Duration;
@@ -41,6 +43,7 @@ struct Inner {
     /// Call before a thread stops
     before_stop: Option<Callback>,
 
+    // Maximum number of threads
     thread_cap: usize,
 }
 
@@ -51,6 +54,7 @@ struct Shared {
     num_notify: u32,
     shutdown: bool,
     shutdown_tx: Option<shutdown::Sender>,
+    worker_threads: Slab<thread::JoinHandle<()>>,
 }
 
 type Task = task::Notified<NoopSchedule>;
@@ -96,6 +100,7 @@ impl BlockingPool {
                         num_notify: 0,
                         shutdown: false,
                         shutdown_tx: Some(shutdown_tx),
+                        worker_threads: Slab::new(),
                     }),
                     condvar: Condvar::new(),
                     thread_name: builder.thread_name.clone(),
@@ -126,10 +131,15 @@ impl BlockingPool {
         shared.shutdown = true;
         shared.shutdown_tx = None;
         self.spawner.inner.condvar.notify_all();
+        let mut workers = std::mem::replace(&mut shared.worker_threads, Slab::new());
 
         drop(shared);
 
-        self.shutdown_rx.wait(timeout);
+        if self.shutdown_rx.wait(timeout) {
+            for handle in workers.drain() {
+                let _ = handle.join();
+            }
+        }
     }
 }
 
@@ -187,13 +197,23 @@ impl Spawner {
         };
 
         if let Some(shutdown_tx) = shutdown_tx {
-            self.spawn_thread(shutdown_tx, rt);
+            let mut shared = self.inner.shared.lock().unwrap();
+            let entry = shared.worker_threads.vacant_entry();
+
+            let handle = self.spawn_thread(shutdown_tx, rt, entry.key());
+
+            entry.insert(handle);
         }
 
         Ok(())
     }
 
-    fn spawn_thread(&self, shutdown_tx: shutdown::Sender, rt: &Handle) {
+    fn spawn_thread(
+        &self,
+        shutdown_tx: shutdown::Sender,
+        rt: &Handle,
+        worker_id: usize,
+    ) -> thread::JoinHandle<()> {
         let mut builder = thread::Builder::new().name(self.inner.thread_name.clone());
 
         if let Some(stack_size) = self.inner.stack_size {
@@ -207,16 +227,16 @@ impl Spawner {
                 // Only the reference should be moved into the closure
                 let rt = &rt;
                 rt.enter(move || {
-                    rt.blocking_spawner.inner.run();
+                    rt.blocking_spawner.inner.run(worker_id);
                     drop(shutdown_tx);
                 })
             })
-            .unwrap();
+            .unwrap()
     }
 }
 
 impl Inner {
-    fn run(&self) {
+    fn run(&self, worker_id: usize) {
         if let Some(f) = &self.after_start {
             f()
         }
@@ -252,6 +272,8 @@ impl Inner {
                 // Even if the condvar "timed out", if the pool is entering the
                 // shutdown phase, we want to perform the cleanup logic.
                 if !shared.shutdown && timeout_result.timed_out() {
+                    shared.worker_threads.remove(worker_id);
+
                     break 'main;
                 }
 

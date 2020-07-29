@@ -542,11 +542,10 @@ impl Runtime {
     ///    runtime.shutdown_timeout(Duration::from_millis(100));
     /// }
     /// ```
-    pub fn shutdown_timeout(self, duration: Duration) {
-        let Runtime {
-            mut blocking_pool, ..
-        } = self;
-        blocking_pool.shutdown(Some(duration));
+    pub fn shutdown_timeout(mut self, duration: Duration) {
+        // Wakeup and shutdown all the worker threads
+        self.handle.spawner.shutdown();
+        self.blocking_pool.shutdown(Some(duration));
     }
 
     /// Shutdown the runtime, without waiting for any spawned tasks to shutdown.

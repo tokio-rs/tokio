@@ -104,6 +104,10 @@ impl Park for Parker {
             Ok(())
         }
     }
+
+    fn shutdown(&mut self) {
+        self.inner.shutdown();
+    }
 }
 
 impl Unpark for Unparker {
@@ -241,5 +245,13 @@ impl Inner {
 
     fn unpark_driver(&self) {
         self.shared.handle.unpark();
+    }
+
+    fn shutdown(&self) {
+        if let Some(mut driver) = self.shared.driver.try_lock() {
+            driver.shutdown();
+        }
+
+        self.condvar.notify_all();
     }
 }
