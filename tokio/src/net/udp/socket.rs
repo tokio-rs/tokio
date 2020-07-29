@@ -116,6 +116,20 @@ impl UdpSocket {
         poll_fn(|cx| self.poll_send(cx, buf)).await
     }
 
+    /// Try to send data on the socket to the remote address to which it is
+    /// connected.
+    ///
+    /// # Returns
+    ///
+    /// If successfull, the number of bytes sent is returned. Users
+    /// should ensure that when the remote cannot receive, the
+    /// [`ErrorKind::WouldBlock`] is properly handled.
+    ///
+    /// [`ErrorKind::WouldBlock`]: std::io::error::ErrorKind::WouldBlock
+    pub fn try_send(&self, buf: &[u8]) -> io::Result<usize> {
+        self.io.get_ref().send(buf)
+    }
+
     // Poll IO functions that takes `&self` are provided for the split API.
     //
     // They are not public because (taken from the doc of `PollEvented`):
@@ -183,6 +197,21 @@ impl UdpSocket {
                 "no addresses to send data to",
             )),
         }
+    }
+
+    /// Try to send data on the socket to the given address.
+    ///
+    /// # Returns
+    ///
+    /// If successfull, the future resolves to the number of bytes sent.
+    ///
+    /// Users should ensure that when the remote cannot receive, the
+    /// [`ErrorKind::WouldBlock`] is properly handled. An error can also occur
+    /// if the IP version of the socket does not match that of `target`.
+    ///
+    /// [`ErrorKind::WouldBlock`]: std::io::error::ErrorKind::WouldBlock
+    pub fn try_send_to(&self, buf: &[u8], target: SocketAddr) -> io::Result<usize> {
+        self.io.get_ref().send_to(buf, &target)
     }
 
     // TODO: Public or not?
