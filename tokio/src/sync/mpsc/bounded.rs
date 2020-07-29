@@ -295,6 +295,25 @@ impl<T> Sender<T> {
     }
 
     /// Blocking send to call outside of asynchronous contexts
+    ///
+    /// ```
+    /// use std::thread;
+    /// use tokio::runtime::Runtime;
+    /// use tokio::sync::mpsc;
+    ///
+    /// fn main() {
+    ///     let (mut tx, mut rx) = mpsc::channel::<u8>(1);
+    ///
+    ///     let sync_code = thread::spawn(move || {
+    ///         tx.blocking_send(10).unwrap();
+    ///     });
+    ///
+    ///     Runtime::new().unwrap().block_on(async move {
+    ///         assert_eq!(Some(10), rx.recv().await);
+    ///     });
+    ///     sync_code.join().unwrap()
+    /// }
+    /// ```
     #[cfg(feature = "blocking")]
     pub fn blocking_send(&mut self, value: T) -> Result<(), SendError<T>> {
         let _enter_handle = crate::runtime::enter::enter(false);
