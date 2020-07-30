@@ -129,6 +129,12 @@ impl Drop for CancellationToken {
     }
 }
 
+impl Default for CancellationToken {
+    fn default() -> CancellationToken {
+        CancellationToken::new()
+    }
+}
+
 impl CancellationToken {
     /// Creates a new CancellationToken in the non-cancelled state.
     pub fn new() -> CancellationToken {
