@@ -35,6 +35,16 @@ impl<T, S: Semaphore + fmt::Debug> fmt::Debug for Rx<T, S> {
 }
 
 pub(crate) trait Semaphore {
+    type Permit;
+
+    fn new_permit() -> Self::Permit;
+
+    /// The permit is dropped without a value being sent. In this case, the
+    /// permit must be returned to the semaphore.
+    fn drop_permit(&self, permit: &mut Self::Permit);
+
+    fn is_closed(&self) -> bool;
+
     fn is_idle(&self) -> bool;
 
     fn add_permit(&self);
@@ -124,7 +134,18 @@ pub(crate) fn channel<T, S: Semaphore>(semaphore: S) -> (Tx<T, S>, Rx<T, S>) {
 
 impl<T, S> Tx<T, S> {
     fn new(chan: Arc<Chan<T, S>>) -> Tx<T, S> {
-        Tx { inner: chan }
+        Tx {
+            inner: chan,
+            permit: S::new_permit(),
+        }
+    }
+
+    pub(crate) fn is_closed(&self) -> bool {
+        self.inner.semaphore.is_closed()
+    }
+
+    pub(crate) fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), ClosedError>> {
+        self.inner.semaphore.poll_acquire(cx, &mut self.permit)
     }
 
     pub(super) fn semaphore(&self) -> &S {
@@ -338,6 +359,23 @@ impl Semaphore for (crate::sync::batch_semaphore::Semaphore, usize) {
         self.0.release(1)
     }
 
+    fn is_closed(&self) -> bool {
+        // TODO find more efficient way
+        struct NoopWaker;
+        impl crate::util::Wake for NoopWaker {
+            fn wake(self: Arc<Self>) {}
+            fn wake_by_ref(_arc_self: &Arc<Self>) {}
+        }
+        let waker = Arc::new(NoopWaker);
+        let waker = crate::util::waker_ref(&waker);
+        let mut noop_cx = std::task::Context::from_waker(&*waker);
+        let mut permit = Permit::new();
+        match self.poll_acquire(&mut noop_cx, &mut permit) {
+            Poll::Ready(Err(_)) => true,
+            _ => false,
+        }
+    }
+
     fn is_idle(&self) -> bool {
         self.0.available_permits() == self.1
     }
@@ -364,6 +402,10 @@ impl Semaphore for AtomicUsize {
             // Something went wrong
             process::abort();
         }
+    }
+
+    fn is_closed(&self) -> bool {
+        self.load(Relaxed) & 1 == 1
     }
 
     fn is_idle(&self) -> bool {

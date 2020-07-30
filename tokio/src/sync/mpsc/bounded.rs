@@ -523,6 +523,20 @@ impl<T> Sender<T> {
         enter_handle.block_on(self.send(value)).unwrap()
     }
 
+    /// Checks if `Receiver` is still alive.
+    /// ```
+    /// let (tx, rx) = tokio::sync::mpsc::channel::<()>(42);
+    /// assert!(!tx.is_closed());
+    /// let tx2 = tx.clone();
+    /// assert!(!tx2.is_closed());
+    /// std::mem::drop(rx);
+    /// assert!(tx.is_closed());
+    /// assert!(tx2.is_closed());
+    /// ```
+    pub fn is_closed(&self) -> bool {
+        self.chan.is_closed()
+    }
+    
     /// Wait for channel capacity. Once capacity to send one message is
     /// available, it is reserved for the caller.
     ///
@@ -531,6 +545,7 @@ impl<T> Sender<T> {
     /// message is reserved for the caller. A [`Permit`] is returned to track
     /// the reserved capacity. The [`send`] function on [`Permit`] consumes the
     /// reserved capacity.
+    /// Undo a successful call to `poll_ready`.
     ///
     /// Dropping [`Permit`] without sending a message releases the capacity back
     /// to the channel.
