@@ -1,7 +1,5 @@
-#![cfg(tokio_unstable)]
-
 use tokio::pin;
-use tokio::sync::CancellationToken;
+use tokio_util::sync::CancellationToken;
 
 use core::future::Future;
 use core::task::{Context, Poll};

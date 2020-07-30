@@ -3,7 +3,7 @@
 
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Mutex;
-use crate::util::intrusive_double_linked_list::{LinkedList, ListNode};
+use crate::sync::intrusive_double_linked_list::{LinkedList, ListNode};
 
 use core::future::Future;
 use core::pin::Pin;

@@ -24,5 +24,3 @@ pub(crate) mod trace;
 #[cfg(any(feature = "macros", feature = "stream"))]
 #[cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
 pub use rand::thread_rng_n;
-
-pub(crate) mod intrusive_double_linked_list;
