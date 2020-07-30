@@ -498,7 +498,7 @@ fn blocking_recv() {
     let (mut tx, mut rx) = mpsc::channel::<u8>(1);
 
     let sync_code = thread::spawn(move || {
-        assert_eq!(Ok(Some(10)), rx.blocking_recv());
+        assert_eq!(Some(10), rx.blocking_recv());
     });
 
     Runtime::new().unwrap().block_on(async move {

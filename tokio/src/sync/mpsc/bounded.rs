@@ -1,5 +1,3 @@
-#[cfg(feature = "blocking")]
-use crate::park::{CachedParkThread, Park};
 use crate::sync::mpsc::chan;
 use crate::sync::mpsc::error::{ClosedError, SendError, TryRecvError, TrySendError};
 use crate::sync::semaphore_ll as semaphore;
@@ -163,7 +161,7 @@ impl<T> Receiver<T> {
     ///     let (mut tx, mut rx) = mpsc::channel::<u8>(10);
     ///     
     ///     let sync_code = thread::spawn(move || {
-    ///         assert_eq!(Ok(Some(10)), rx.blocking_recv());
+    ///         assert_eq!(Some(10), rx.blocking_recv());
     ///     });
     ///
     ///     Runtime::new()
@@ -174,19 +172,9 @@ impl<T> Receiver<T> {
     ///     sync_code.join().unwrap()
     /// }
     /// ```
-    #[cfg(feature = "blocking")]
-    pub fn blocking_recv(&mut self) -> Result<Option<T>, ()> {
-        let _enter_handle = crate::runtime::enter::enter(false);
-        let mut park = CachedParkThread::new();
-        let waker = park.get_unpark()?.into_waker();
-        let mut cx = Context::from_waker(&waker);
-
-        loop {
-            if let Poll::Ready(v) = self.poll_recv(&mut cx) {
-                return Ok(v);
-            }
-            park.park()?;
-        }
+    pub fn blocking_recv(&mut self) -> Option<T> {
+        let mut enter_handle = crate::runtime::enter::enter(false);
+        enter_handle.block_on(self.recv()).unwrap()
     }
 
     #[doc(hidden)] // TODO: document
@@ -314,32 +302,9 @@ impl<T> Sender<T> {
     ///     sync_code.join().unwrap()
     /// }
     /// ```
-    #[cfg(feature = "blocking")]
     pub fn blocking_send(&mut self, value: T) -> Result<(), SendError<T>> {
-        let _enter_handle = crate::runtime::enter::enter(false);
-        let mut park = CachedParkThread::new();
-        let waker = match park.get_unpark() {
-            Ok(s) => s.into_waker(),
-            Err(_) => return Err(SendError(value)),
-        };
-        let mut cx = Context::from_waker(&waker);
-
-        loop {
-            if let Poll::Ready(v) = self.poll_ready(&mut cx) {
-                if v.is_ok() {
-                    return match self.try_send(value) {
-                        Ok(()) => Ok(()),
-                        Err(TrySendError::Closed(value)) => Err(SendError(value)),
-                        _ => unreachable!(),
-                    };
-                } else {
-                    return Err(SendError(value));
-                }
-            }
-            if park.park().is_err() {
-                return Err(SendError(value));
-            };
-        }
+        let mut enter_handle = crate::runtime::enter::enter(false);
+        enter_handle.block_on(self.send(value)).unwrap()
     }
 
     /// Attempts to immediately send a message on this `Sender`
