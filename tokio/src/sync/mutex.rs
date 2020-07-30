@@ -115,7 +115,6 @@ use std::sync::Arc;
 /// [`std::sync::Mutex`]: struct@std::sync::Mutex
 /// [`Send`]: trait@std::marker::Send
 /// [`lock`]: method@Mutex::lock
-#[derive(Debug)]
 pub struct Mutex<T: ?Sized> {
     s: semaphore::Semaphore,
     c: UnsafeCell<T>,
@@ -370,6 +369,18 @@ where
 {
     fn default() -> Self {
         Self::new(T::default())
+    }
+}
+
+impl<T> std::fmt::Debug for Mutex<T>
+where
+    T: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.try_lock() {
+            Ok(inner) => f.debug_struct("Mutex").field("inner", &*inner).finish(),
+            Err(_) => f.debug_struct("Mutex").field("inner", &"<locked>").finish(),
+        }
     }
 }
 
