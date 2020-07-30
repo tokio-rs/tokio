@@ -372,7 +372,11 @@ impl Semaphore for (crate::sync::batch_semaphore::Semaphore, usize) {
         let mut permit = Permit::new();
         match self.poll_acquire(&mut noop_cx, &mut permit) {
             Poll::Ready(Err(_)) => true,
-            _ => false,
+            Poll::Ready(Ok(())) => {
+                permit.release(1, &self.0);
+                false
+            }
+            Poll::Pending => false,
         }
     }
 
@@ -405,7 +409,7 @@ impl Semaphore for AtomicUsize {
     }
 
     fn is_closed(&self) -> bool {
-        self.load(Relaxed) & 1 == 1
+        self.load(Acquire) & 1 == 1
     }
 
     fn is_idle(&self) -> bool {
