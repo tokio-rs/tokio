@@ -363,8 +363,8 @@ impl Semaphore for (crate::sync::batch_semaphore::Semaphore, usize) {
         // TODO find more efficient way
         struct NoopWaker;
         impl crate::util::Wake for NoopWaker {
-            fn wake(self: Arc<Self>) {}
-            fn wake_by_ref(_arc_self: &Arc<Self>) {}
+            fn wake(self: std::sync::Arc<Self>) {}
+            fn wake_by_ref(_arc_self: &std::sync::Arc<Self>) {}
         }
         let waker = Arc::new(NoopWaker);
         let waker = crate::util::waker_ref(&waker);
