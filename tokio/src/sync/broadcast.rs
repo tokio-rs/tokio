@@ -21,7 +21,7 @@
 //! ## Lagging
 //!
 //! As sent messages must be retained until **all** [`Receiver`] handles receive
-//! a clone, broadcast channels are suspectible to the "slow receiver" problem.
+//! a clone, broadcast channels are susceptible to the "slow receiver" problem.
 //! In this case, all but one receiver are able to receive values at the rate
 //! they are sent. Because one receiver is stalled, the channel starts to fill
 //! up.
