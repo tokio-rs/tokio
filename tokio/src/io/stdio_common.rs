@@ -34,6 +34,8 @@ where
         #[cfg(target_os = "windows")]
         let buf = if buf.len() > crate::io::blocking::MAX_BUF {
             &buf[..crate::io::blocking::MAX_BUF]
+        } else {
+            buf
         };
         // now remove possible trailing incomplete character
         #[cfg(target_os = "windows")]
