@@ -27,7 +27,15 @@ where
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<Result<usize, std::io::Error>> {
-        // if windows, remove possible trailing incomplete character
+        // following two ifs are enabled only on windows targets, because
+        // on other targets we do not have problems with incomplete utf8 chars
+
+        // ensure buffer is not longer than MAX_BUF
+        #[cfg(target_os = "windows")]
+        let buf = if buf.len() > crate::io::blocking::MAX_BUF {
+            &buf[..crate::io::blocking::MAX_BUF]
+        };
+        // now remove possible trailing incomplete character
         #[cfg(target_os = "windows")]
         let buf = match std::str::from_utf8(buf) {
             // `buf` is already utf-8, no need to trim it
