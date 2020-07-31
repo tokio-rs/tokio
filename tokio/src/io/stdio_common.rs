@@ -3,7 +3,8 @@ use crate::io::AsyncWrite;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 /// # Windows
-/// AsyncWrite adapter that finds last char boundary in given buffer and does not write the rest.
+/// AsyncWrite adapter that finds last char boundary in given buffer and does not write the rest,
+/// if buffer contents seems to be utf8. Otherwise it only trims buffer down to MAX_BUF.
 /// That's why, wrapped writer will always receive well-formed utf-8 bytes.
 /// # Other platforms
 /// passes data to `inner` as is
@@ -25,46 +26,74 @@ where
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &[u8],
+        mut buf: &[u8],
     ) -> Poll<Result<usize, std::io::Error>> {
-        // following two ifs are enabled only on windows targets, because
-        // on other targets we do not have problems with incomplete utf8 chars
+        // just a closure to avoid repetitive code
+        let mut call_inner = move |buf| Pin::new(&mut self.inner).poll_write(cx, buf);
 
-        // ensure buffer is not longer than MAX_BUF
-        #[cfg(any(target_os = "windows", test))]
-        let buf = if buf.len() > crate::io::blocking::MAX_BUF {
-            &buf[..crate::io::blocking::MAX_BUF]
-        } else {
-            buf
-        };
-        // now remove possible trailing incomplete character
-        #[cfg(any(target_os = "windows", test))]
-        let buf = match std::str::from_utf8(buf) {
-            // `buf` is already utf-8, no need to trim it futher
-            Ok(_) => buf,
+        // Only windows stdio can suffer from non-utf8.
+        // We also check for `test` so that we can write some tests
+        // for further code. Since `AsyncWrite` can always shrink
+        // buffer at its discretion, excessive (i.e. in tests) shrinking
+        // does not break correctness.
+        #[cfg(not(any(target_os = "windows", test, target_os = "linux" /*TODO(mb): remove this dbg clause*/)))]
+        return call_inner(buf);
+
+        // If buffer is small, it will not be shrinked.
+        // That's why, it's "textness" will not change, so we don't have
+        // to handle this case.
+        if buf.len() <= crate::io::blocking::MAX_BUF {
+            return call_inner(buf);
+        }
+
+        buf = &buf[..crate::io::blocking::MAX_BUF];
+
+        // Now there are two possibilites.
+        // If caller gave is binary buffer, we **should not** shrink it
+        // anymore, because excessive shrinking hits performance.
+        // If caller gave as binary buffer, we  **must** additionaly
+        // shrink it to strip incomplete char at the end of buffer.
+        // that's why check we will perform now is allowed to have
+        // false-positive.
+
+        // this constant is defined by Unicode standard.
+        const MAX_BYTES_PER_CHAR: usize = 4;
+
+        // Subject for tweaking here
+        const MAGIC_CONST: usize = 8;
+
+        // Now let's look at the first MAX_BYTES_PER_CHAR * MAGIC_CONST bytes.
+        // if they are (possibly incomplete) utf8, then we can be quite sure
+        // that input buffer was utf8.
+
+        let have_to_fix_up = match std::str::from_utf8(&buf[..MAX_BYTES_PER_CHAR * MAGIC_CONST]) {
+            Ok(_) => {
+                // We do not need to shrink this buffer:
+                // we were lucky enough and it didn't broke
+                // during shrinking
+                false
+            }
             Err(err) => {
                 let bad_bytes = buf.len() - err.valid_up_to();
-                // TODO: this is too conservative
-                const MAX_BYTES_PER_CHAR: usize = 8;
-
-                if bad_bytes <= MAX_BYTES_PER_CHAR && err.valid_up_to() > 0 {
-                    // Input data is probably UTF-8, but last char was split
-                    // after trimming.
-                    // let's exclude this character from the buf
-                    &buf[..err.valid_up_to()]
-                } else {
-                    // UTF-8 violation could not be caused by trimming.
-                    // Let's pass buffer to underlying writer as is.
-                    // Why do not we return error here? It is possible
-                    // that stdout is not console. Such streams allow
-                    // non-utf8 data. That's why, let's defer to underlying
-                    // writer and let it return error if needed
-                    buf
-                }
+                // this must hold for any shrinked utf8 buffer.
+                bad_bytes < MAX_BYTES_PER_CHAR
             }
         };
-        // now pass trimmed input buffer to inner writer
-        Pin::new(&mut self.inner).poll_write(cx, buf)
+
+        if have_to_fix_up {
+            // We must pop several bytes at the end which form incomplete
+            // character. To achieve it, we exploit UTF8 encoding:
+            // for any code point, all bytes except first start with 0b10 prefix.
+            // see https://en.wikipedia.org/wiki/UTF-8#Encoding for details
+            let trailing_incomplete_char_size = buf
+                .iter()
+                .rev()
+                .position(|byte| *byte < 0b1000_0000 || *byte >= 0b1100_0000)
+                .unwrap();
+            buf = &buf[..buf.len() - trailing_incomplete_char_size];
+        }
+
+        return call_inner(buf);
     }
 
     fn poll_flush(
