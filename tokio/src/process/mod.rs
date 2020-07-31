@@ -766,6 +766,27 @@ impl Child {
     /// Forces the child to exit.
     ///
     /// This is equivalent to sending a SIGKILL on unix platforms.
+    ///
+    /// If the child has to be killed remotely, it is possible to do it using
+    /// a combination of the select! macro and a oneshot channel. In the following
+    /// example, the child will run until completion unless the Receiver half of
+    /// the oneshot channel receives data. If that happens, then the child
+    /// is killed immediately using the .kill method.
+    ///
+    /// ```no_run
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (send, recv) = tokio::sync::oneshot::channel::<()>();
+    ///     let mut child = tokio::process::Command::new("sleep").arg("1").spawn().unwrap();
+    ///     tokio::task::spawn_blocking(
+    ///         move || {
+    ///             send.send(())
+    ///         });
+    ///     tokio::select! {
+    ///         _ = &mut child => {}
+    ///         _ = recv => {&mut child.kill(); println!("I killed a child!");}
+    ///     }
+    /// }
     pub fn kill(&mut self) -> io::Result<()> {
         self.child.kill()
     }
