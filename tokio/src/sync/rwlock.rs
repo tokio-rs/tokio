@@ -344,6 +344,52 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
             marker: marker::PhantomData,
         })
     }
+
+    /// Atomically downgrades a write lock into a read lock without allowing
+    /// any writers to take exclusive access of the lock in the meantime.
+    ///
+    /// Returns an RAII guard which will drop the read access of this rwlock
+    /// when dropped.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use tokio::sync::RwLock;
+    /// # use std::sync::Arc;
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let lock = Arc::new(RwLock::new(1));
+    ///
+    /// let n = lock.write().await;
+    ///   
+    /// let cloned_lock = lock.clone();
+    /// let handle = tokio::spawn(async move {
+    ///     *cloned_lock.write().await = 2;
+    /// });
+    ///
+    /// let n = n.downgrade();
+    /// assert_eq!(*n, 1, "downgrade is atomic");
+    ///
+    /// assert_eq!(*lock.read().await, 1, "additional readers can obtain locks");
+    ///
+    /// drop(n);
+    /// handle.await.unwrap();
+    /// assert_eq!(*lock.read().await, 2, "second writer obtained write lock");
+    /// # }
+    /// ```
+    pub fn downgrade(self) -> RwLockReadGuard<'a, T> {
+        let RwLockWriteGuard { s, data, .. } = self;
+
+        // Release all but one of the permits held by the write guard
+        s.release(MAX_READS - 1);
+
+        RwLockReadGuard {
+            s,
+            data,
+            marker: marker::PhantomData,
+        }
+    }
 }
 
 impl<'a, T: ?Sized> fmt::Debug for RwLockWriteGuard<'a, T>
