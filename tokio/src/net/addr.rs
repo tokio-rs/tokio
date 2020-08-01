@@ -201,6 +201,19 @@ cfg_dns! {
         }
     }
 
+    // ===== impl (String, u16) =====
+
+    impl ToSocketAddrs for (String, u16) {}
+
+    impl sealed::ToSocketAddrsPriv for (String, u16) {
+        type Iter = sealed::OneOrMore;
+        type Future = sealed::MaybeReady;
+
+        fn to_socket_addrs(&self) -> Self::Future {
+            (self.0.as_str(), self.1).to_socket_addrs()
+        }
+    }
+
     // ===== impl String =====
 
     impl ToSocketAddrs for String {}
