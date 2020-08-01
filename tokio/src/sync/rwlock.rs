@@ -348,6 +348,9 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
     /// Atomically downgrades a write lock into a read lock without allowing
     /// any writers to take exclusive access of the lock in the meantime.
     ///
+    /// **Note:** this won't *necessarily* allow any additional readers to acquire
+    /// locks, since [`RwLock`] is fair and it's possible a writer is next in line.
+    ///
     /// Returns an RAII guard which will drop the read access of this rwlock
     /// when dropped.
     ///
@@ -378,6 +381,8 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
     /// assert_eq!(*lock.read().await, 2, "second writer obtained write lock");
     /// # }
     /// ```
+    ///
+    /// [`RwLock`]: struct@RwLock
     pub fn downgrade(self) -> RwLockReadGuard<'a, T> {
         let RwLockWriteGuard { s, data, .. } = self;
 
