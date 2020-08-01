@@ -769,24 +769,25 @@ impl Child {
     ///
     /// If the child has to be killed remotely, it is possible to do it using
     /// a combination of the select! macro and a oneshot channel. In the following
-    /// example, the child will run until completion unless the Receiver half of
-    /// the oneshot channel receives data. If that happens, then the child
-    /// is killed immediately using the .kill method.
+    /// example, the child will run until completion unless a message is sent on
+    /// the oneshot channel. If that happens, the child is killed immediately
+    /// using the `.kill()` method.
     ///
     /// ```no_run
+    /// use tokio::process::Command;
+    /// use tokio::sync::oneshot::channel;
+    ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let (send, recv) = tokio::sync::oneshot::channel::<()>();
-    ///     let mut child = tokio::process::Command::new("sleep").arg("1").spawn().unwrap();
-    ///     tokio::task::spawn_blocking(
-    ///         move || {
-    ///             send.send(())
-    ///         });
+    ///     let (send, recv) = channel::<()>();
+    ///     let mut child = Command::new("sleep").arg("1").spawn().unwrap();
+    ///     tokio::spawn(async move { send.send(()) });
     ///     tokio::select! {
     ///         _ = &mut child => {}
     ///         _ = recv => {&mut child.kill(); println!("I killed a child!");}
     ///     }
     /// }
+
     pub fn kill(&mut self) -> io::Result<()> {
         self.child.kill()
     }
