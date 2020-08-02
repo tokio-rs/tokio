@@ -784,7 +784,10 @@ impl Child {
     ///     tokio::spawn(async move { send.send(()) });
     ///     tokio::select! {
     ///         _ = &mut child => {}
-    ///         _ = recv => {&mut child.kill(); println!("I killed a child!");}
+    ///         _ = recv => {
+    ///             &mut child.kill();
+    ///             child.await.unwrap();
+    ///         }
     ///     }
     /// }
 
