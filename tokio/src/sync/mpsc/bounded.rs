@@ -149,34 +149,34 @@ impl<T> Receiver<T> {
 
         poll_fn(|cx| self.poll_recv(cx)).await
     }
-
-    /// Blocking receive to call outside of asynchronous contexts
-    ///
-    /// ```
-    /// use std::thread;
-    /// use tokio::runtime::Runtime;
-    /// use tokio::sync::mpsc;
-    ///
-    /// fn main() {
-    ///     let (mut tx, mut rx) = mpsc::channel::<u8>(10);
-    ///
-    ///     let sync_code = thread::spawn(move || {
-    ///         assert_eq!(Some(10), rx.blocking_recv());
-    ///     });
-    ///
-    ///     Runtime::new()
-    ///         .unwrap()
-    ///         .block_on(async move {
-    ///             let _ = tx.send(10).await;
-    ///         });
-    ///     sync_code.join().unwrap()
-    /// }
-    /// ```
-    pub fn blocking_recv(&mut self) -> Option<T> {
-        let mut enter_handle = crate::runtime::enter::enter(false);
-        enter_handle.block_on(self.recv()).unwrap()
+    cfg_block_on! {
+        /// Blocking receive to call outside of asynchronous contexts
+        ///
+        /// ```
+        /// use std::thread;
+        /// use tokio::runtime::Runtime;
+        /// use tokio::sync::mpsc;
+        ///
+        /// fn main() {
+        ///     let (mut tx, mut rx) = mpsc::channel::<u8>(10);
+        ///
+        ///     let sync_code = thread::spawn(move || {
+        ///         assert_eq!(Some(10), rx.blocking_recv());
+        ///     });
+        ///
+        ///     Runtime::new()
+        ///         .unwrap()
+        ///         .block_on(async move {
+        ///             let _ = tx.send(10).await;
+        ///         });
+        ///     sync_code.join().unwrap()
+        /// }
+        /// ```
+        pub fn blocking_recv(&mut self) -> Option<T> {
+            let mut enter_handle = crate::runtime::enter::enter(false);
+            enter_handle.block_on(self.recv()).unwrap()
+        }
     }
-
     #[doc(hidden)] // TODO: document
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         self.chan.recv(cx)
@@ -282,31 +282,32 @@ impl<T> Sender<T> {
         }
     }
 
-    /// Blocking send to call outside of asynchronous contexts
-    ///
-    /// ```
-    /// use std::thread;
-    /// use tokio::runtime::Runtime;
-    /// use tokio::sync::mpsc;
-    ///
-    /// fn main() {
-    ///     let (mut tx, mut rx) = mpsc::channel::<u8>(1);
-    ///
-    ///     let sync_code = thread::spawn(move || {
-    ///         tx.blocking_send(10).unwrap();
-    ///     });
-    ///
-    ///     Runtime::new().unwrap().block_on(async move {
-    ///         assert_eq!(Some(10), rx.recv().await);
-    ///     });
-    ///     sync_code.join().unwrap()
-    /// }
-    /// ```
-    pub fn blocking_send(&mut self, value: T) -> Result<(), SendError<T>> {
-        let mut enter_handle = crate::runtime::enter::enter(false);
-        enter_handle.block_on(self.send(value)).unwrap()
+    cfg_block_on! {
+        /// Blocking send to call outside of asynchronous contexts
+        ///
+        /// ```
+        /// use std::thread;
+        /// use tokio::runtime::Runtime;
+        /// use tokio::sync::mpsc;
+        ///
+        /// fn main() {
+        ///     let (mut tx, mut rx) = mpsc::channel::<u8>(1);
+        ///
+        ///     let sync_code = thread::spawn(move || {
+        ///         tx.blocking_send(10).unwrap();
+        ///     });
+        ///
+        ///     Runtime::new().unwrap().block_on(async move {
+        ///         assert_eq!(Some(10), rx.recv().await);
+        ///     });
+        ///     sync_code.join().unwrap()
+        /// }
+        /// ```
+        pub fn blocking_send(&mut self, value: T) -> Result<(), SendError<T>> {
+            let mut enter_handle = crate::runtime::enter::enter(false);
+            enter_handle.block_on(self.send(value)).unwrap()
+        }
     }
-
     /// Attempts to immediately send a message on this `Sender`
     ///
     /// This method differs from [`send`] by returning immediately if the channel's
