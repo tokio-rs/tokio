@@ -786,6 +786,7 @@ impl Child {
     ///         _ = &mut child => {}
     ///         _ = recv => {
     ///             &mut child.kill();
+    ///             // NB: await the child here to avoid a zombie process on Unix platforms
     ///             child.await.unwrap();
     ///         }
     ///     }
