@@ -155,6 +155,35 @@ impl<T> Receiver<T> {
         self.chan.recv(cx)
     }
 
+    /// Blocking receive to call outside of asynchronous contexts
+    ///
+    /// ```
+    /// use std::thread;
+    /// use tokio::runtime::Runtime;
+    /// use tokio::sync::mpsc;
+    ///
+    /// fn main() {
+    ///     let (mut tx, mut rx) = mpsc::channel::<u8>(10);
+    ///
+    ///     let sync_code = thread::spawn(move || {
+    ///         assert_eq!(Some(10), rx.blocking_recv());
+    ///     });
+    ///
+    ///     Runtime::new()
+    ///         .unwrap()
+    ///         .block_on(async move {
+    ///             let _ = tx.send(10).await;
+    ///         });
+    ///     sync_code.join().unwrap()
+    /// }
+    /// ```
+    #[cfg(feature = "blocking")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
+    pub fn blocking_recv(&mut self) -> Option<T> {
+        let mut enter_handle = crate::runtime::enter::enter(false);
+        enter_handle.block_on(self.recv()).unwrap()
+    }
+
     /// Attempts to return a pending value on this receiver without blocking.
     ///
     /// This method will never block the caller in order to wait for data to
@@ -176,36 +205,6 @@ impl<T> Receiver<T> {
     /// still enabling the receiver to drain messages that are buffered.
     pub fn close(&mut self) {
         self.chan.close();
-    }
-}
-cfg_block_on! {
-    impl<T> Receiver<T> {
-        /// Blocking receive to call outside of asynchronous contexts
-        ///
-        /// ```
-        /// use std::thread;
-        /// use tokio::runtime::Runtime;
-        /// use tokio::sync::mpsc;
-        ///
-        /// fn main() {
-        ///     let (mut tx, mut rx) = mpsc::channel::<u8>(10);
-        ///
-        ///     let sync_code = thread::spawn(move || {
-        ///         assert_eq!(Some(10), rx.blocking_recv());
-        ///     });
-        ///
-        ///     Runtime::new()
-        ///         .unwrap()
-        ///         .block_on(async move {
-        ///             let _ = tx.send(10).await;
-        ///         });
-        ///     sync_code.join().unwrap()
-        /// }
-        /// ```
-        pub fn blocking_recv(&mut self) -> Option<T> {
-            let mut enter_handle = crate::runtime::enter::enter(false);
-            enter_handle.block_on(self.recv()).unwrap()
-        }
     }
 }
 
@@ -423,6 +422,33 @@ impl<T> Sender<T> {
         }
     }
 
+    /// Blocking send to call outside of asynchronous contexts
+    ///
+    /// ```
+    /// use std::thread;
+    /// use tokio::runtime::Runtime;
+    /// use tokio::sync::mpsc;
+    ///
+    /// fn main() {
+    ///     let (mut tx, mut rx) = mpsc::channel::<u8>(1);
+    ///
+    ///     let sync_code = thread::spawn(move || {
+    ///         tx.blocking_send(10).unwrap();
+    ///     });
+    ///
+    ///     Runtime::new().unwrap().block_on(async move {
+    ///         assert_eq!(Some(10), rx.recv().await);
+    ///     });
+    ///     sync_code.join().unwrap()
+    /// }
+    /// ```
+    #[cfg(feature = "blocking")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
+    pub fn blocking_send(&mut self, value: T) -> Result<(), SendError<T>> {
+        let mut enter_handle = crate::runtime::enter::enter(false);
+        enter_handle.block_on(self.send(value)).unwrap()
+    }
+
     /// Returns `Poll::Ready(Ok(()))` when the channel is able to accept another item.
     ///
     /// If the channel is full, then `Poll::Pending` is returned and the task is notified when a
@@ -504,35 +530,6 @@ impl<T> Sender<T> {
             true
         } else {
             false
-        }
-    }
-}
-
-cfg_block_on! {
-    impl<T> Sender<T> {
-        /// Blocking send to call outside of asynchronous contexts
-        ///
-        /// ```
-        /// use std::thread;
-        /// use tokio::runtime::Runtime;
-        /// use tokio::sync::mpsc;
-        ///
-        /// fn main() {
-        ///     let (mut tx, mut rx) = mpsc::channel::<u8>(1);
-        ///
-        ///     let sync_code = thread::spawn(move || {
-        ///         tx.blocking_send(10).unwrap();
-        ///     });
-        ///
-        ///     Runtime::new().unwrap().block_on(async move {
-        ///         assert_eq!(Some(10), rx.recv().await);
-        ///     });
-        ///     sync_code.join().unwrap()
-        /// }
-        /// ```
-        pub fn blocking_send(&mut self, value: T) -> Result<(), SendError<T>> {
-            let mut enter_handle = crate::runtime::enter::enter(false);
-            enter_handle.block_on(self.send(value)).unwrap()
         }
     }
 }
