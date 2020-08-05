@@ -177,23 +177,8 @@ impl<T> Receiver<T> {
     ///     sync_code.join().unwrap()
     /// }
     /// ```
-    #[cfg(any(
-        feature = "blocking",
-        feature = "fs",
-        feature = "dns",
-        feature = "io-std",
-        feature = "rt-core"
-    ))]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(any(
-            feature = "blocking",
-            feature = "fs",
-            feature = "dns",
-            feature = "io-std",
-            feature = "rt-core"
-        )))
-    )]
+    #[cfg(any(feature = "blocking", feature = "rt-core"))]
+    #[cfg_attr(docsrs, doc(cfg(any(feature = "blocking", feature = "rt-core"))))]
     pub fn blocking_recv(&mut self) -> Option<T> {
         let mut enter_handle = crate::runtime::enter::enter(false);
         enter_handle.block_on(self.recv()).unwrap()
@@ -457,23 +442,8 @@ impl<T> Sender<T> {
     ///     sync_code.join().unwrap()
     /// }
     /// ```
-    #[cfg(any(
-        feature = "blocking",
-        feature = "fs",
-        feature = "dns",
-        feature = "io-std",
-        feature = "rt-core"
-    ))]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(any(
-            feature = "blocking",
-            feature = "fs",
-            feature = "dns",
-            feature = "io-std",
-            feature = "rt-core"
-        )))
-    )]
+    #[cfg(any(feature = "blocking", feature = "rt-core"))]
+    #[cfg_attr(docsrs, doc(cfg(any(feature = "blocking", feature = "rt-core"))))]
     pub fn blocking_send(&mut self, value: T) -> Result<(), SendError<T>> {
         let mut enter_handle = crate::runtime::enter::enter(false);
         enter_handle.block_on(self.send(value)).unwrap()
