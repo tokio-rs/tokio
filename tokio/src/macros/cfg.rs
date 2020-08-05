@@ -62,7 +62,6 @@ macro_rules! cfg_block_on {
                     feature = "dns",
                     feature = "io-std",
                     feature = "rt-core",
-                    feature = "sync",
                     ))]
             $item
         )*
