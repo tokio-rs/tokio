@@ -159,8 +159,8 @@ impl<T> Receiver<T> {
     ///
     /// # Panics
     ///
-    /// This function panics if the provided future panics, or if called
-    /// within an asynchronous execution context.
+    /// This function panics if called within an asynchronous execution
+    /// context.
     ///
     /// # Examples
     ///
@@ -433,8 +433,8 @@ impl<T> Sender<T> {
     ///
     /// # Panics
     ///
-    /// This function panics if the provided future panics, or if called
-    /// within an asynchronous execution context.
+    /// This function panics if called within an asynchronous execution
+    /// context.
     ///
     /// # Examples
     ///
