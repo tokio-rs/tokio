@@ -157,6 +157,13 @@ impl<T> Receiver<T> {
 
     /// Blocking receive to call outside of asynchronous contexts
     ///
+    /// # Panics
+    ///
+    /// This function panics if the provided future panics, or if called
+    /// within an asynchronous execution context.
+    ///
+    /// # Examples
+    ///
     /// ```
     /// use std::thread;
     /// use tokio::runtime::Runtime;
@@ -423,6 +430,13 @@ impl<T> Sender<T> {
     }
 
     /// Blocking send to call outside of asynchronous contexts
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the provided future panics, or if called
+    /// within an asynchronous execution context.
+    ///
+    /// # Examples
     ///
     /// ```
     /// use std::thread;
