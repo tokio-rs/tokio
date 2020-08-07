@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-util/0.3.1")]
+#![doc(html_root_url = "https://docs.rs/tokio-util/0.4.0")]
 #![allow(clippy::needless_doctest_main)]
 #![warn(
     missing_debug_implementations,
