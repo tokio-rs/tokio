@@ -49,8 +49,7 @@ macro_rules! assert_not_writable {
 async fn create_pair() -> (TcpStream, TcpStream) {
     let mut listener = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
     let addr = assert_ok!(listener.local_addr());
-    let (client, (server, _)) =
-        assert_ok!(try_join!(TcpStream::connect(&addr), listener.accept(),));
+    let (client, (server, _)) = assert_ok!(try_join!(TcpStream::connect(&addr), listener.accept()));
     (client, server)
 }
 
@@ -107,23 +106,12 @@ async fn tcp_stream_poll_read_ready() {
 
 #[tokio::test]
 async fn tcp_stream_poll_write_ready() {
-    let (mut client, mut server) = create_pair().await;
+    let (mut client, server) = create_pair().await;
 
     // Initial state - writable.
     assert_writable!(client);
 
     // No space to write - not writable.
-    write_until_pending(&mut client).await;
-    assert_not_writable!(client);
-
-    assert_ok!(client.flush().await); // just to be sure
-
-    // Not writable until calls to `poll_write` return `Poll::Pending`.
-    read_until_pending(&mut server).await;
-    assert_not_writable!(client);
-    assert_ok!(client.write_all(b"ping").await);
-    assert_writable!(client);
-
     write_until_pending(&mut client).await;
     assert_not_writable!(client);
 
