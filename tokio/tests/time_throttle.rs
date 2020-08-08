@@ -1,7 +1,8 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::time::{self, throttle};
+use tokio::stream::throttle;
+use tokio::time;
 use tokio_test::*;
 
 use std::time::Duration;

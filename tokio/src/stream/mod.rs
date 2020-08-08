@@ -59,6 +59,11 @@ use skip::Skip;
 mod skip_while;
 use skip_while::SkipWhile;
 
+cfg_stream! {
+    mod throttle;
+    pub use throttle::{throttle, Throttle};
+}
+
 mod try_next;
 use try_next::TryNext;
 

@@ -19,7 +19,7 @@ use pin_project_lite::pin_project;
 /// ```rust,no_run
 /// use std::time::Duration;
 /// use tokio::stream::StreamExt;
-/// use tokio::time::throttle;
+/// use tokio::stream::throttle;
 ///
 /// # async fn dox() {
 /// let mut item_stream = throttle(Duration::from_secs(2), futures::stream::repeat("one"));
