@@ -95,7 +95,7 @@ where
             Poll::Ready(Ok(0)) => {
                 self.project().reader.set(None);
                 Poll::Ready(None)
-            },
+            }
             Poll::Ready(Ok(_)) => {
                 let chunk = this.buf.split();
                 Poll::Ready(Some(Ok(chunk.freeze())))
