@@ -118,7 +118,7 @@ fn parse_knobs(
                         }
                     },
                     name => {
-                        let msg = format!("Unknown attribute pair {} is specified; expected one of: `core_threads`, `max_threads`", name);
+                        let msg = format!("Unknown attribute pair {} is specified; expected one of: `core_threads`, `max_threads`, `runtime_builder`", name);
                         return Err(syn::Error::new_spanned(namevalue, msg));
                     }
                 }
