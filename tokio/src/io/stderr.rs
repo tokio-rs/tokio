@@ -59,7 +59,7 @@ cfg_io_std! {
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
-    ///     let mut stderr = io::stdout();
+    ///     let mut stderr = io::stderr();
     ///     stderr.write_all(b"Print some error here.").await?;
     ///     Ok(())
     /// }
