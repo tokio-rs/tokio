@@ -6,7 +6,8 @@ use std::task::{Context, Poll};
 use tokio::io::AsyncRead;
 use tokio::stream::StreamExt;
 
-/// produces at most `remaining` zeros, that returns error
+/// produces at most `remaining` zeros, that returns error.
+/// each time it reads at most 31 byte.
 struct Reader {
     remaining: usize,
 }
@@ -21,6 +22,7 @@ impl AsyncRead for Reader {
         assert_ne!(buf.len(), 0);
         if this.remaining > 0 {
             let n = std::cmp::min(this.remaining, buf.len());
+            let n = std::cmp::min(n, 31);
             for x in &mut buf[..n] {
                 *x = 0;
             }
@@ -34,7 +36,7 @@ impl AsyncRead for Reader {
 
 #[tokio::test]
 async fn correct_behavior_on_errors() {
-    let reader = Reader { remaining: 100 };
+    let reader = Reader { remaining: 8000 };
     let mut stream = tokio::io::reader_stream(reader);
     let mut zeros_received = 0;
     let mut had_error = false;
@@ -57,6 +59,6 @@ async fn correct_behavior_on_errors() {
     }
 
     assert!(had_error);
-    assert_eq!(zeros_received, 100);
+    assert_eq!(zeros_received, 8000);
     assert!(stream.next().await.is_none());
 }

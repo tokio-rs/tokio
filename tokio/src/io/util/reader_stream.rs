@@ -6,23 +6,31 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 pin_project! {
-    /// Convert an [`AsyncRead`](crate::io::AsyncRead) implementor into a
-    /// [`Stream`](crate::stream::Stream) of Result<[`Bytes`](bytes::Bytes), io::Error>. After first error it will
-    /// stop.
+    /// Convert an [`AsyncRead`] implementor into a
+    /// [`Stream`] of Result<[`Bytes`], std::io::Error>.
+    /// After first error it will stop.
+    /// Additionally, this stream is fused: after it returns None at some
+    /// moment, it is guaranteed that further `next()`, `poll_next()` and
+    /// similar functions will instantly return None.
     ///
-    /// This type can be created using the [`reader_stream`](crate::io::reader_stream) function
+    /// This type can be created using the [`reader_stream`] function
+    ///
+    /// [`AsyncRead`]: crate::io::AsyncRead
+    /// [`Stream`]: crate::stream::Stream
+    /// [`Bytes`]: bytes::Bytes
+    /// [`reader_stream`]: crate::io::reader_stream
     #[derive(Debug)]
     #[cfg_attr(docsrs, doc(cfg(feature = "stream")))]
     #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
     pub struct ReaderStream<R> {
-        // reader itself.
+        // Reader itself.
         // None if we had error reading from the `reader` in the past.
         #[pin]
         reader: Option<R>,
         // Working buffer, used to optimize allocations.
         // # Capacity behavior
         // Initially `buf` is empty. Also it's getting smaller and smaller
-        // during polls (because it's chunks are returned to stream user).
+        // during polls (because its chunks are returned to stream user).
         // But when it's capacity reaches 0, it is growed.
         buf: BytesMut,
     }
@@ -47,8 +55,8 @@ pin_project! {
 /// assert_eq!(stream_contents, data);
 /// # Ok(())
 /// # }
-///
 /// ```
+///
 /// [`AsyncRead`]: crate::io::AsyncRead
 /// [`Stream`]: crate::stream::Stream
 /// [`Bytes`]: bytes::Bytes
@@ -84,7 +92,10 @@ where
                 self.project().reader.set(None);
                 Poll::Ready(Some(Err(err)))
             }
-            Poll::Ready(Ok(0)) => Poll::Ready(None),
+            Poll::Ready(Ok(0)) => {
+                self.project().reader.set(None);
+                Poll::Ready(None)
+            },
             Poll::Ready(Ok(_)) => {
                 let chunk = this.buf.split();
                 Poll::Ready(Some(Ok(chunk.freeze())))
