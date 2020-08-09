@@ -546,4 +546,8 @@ impl<T> Sender<T> {
             false
         }
     }
+    /// TODO: Add docs
+    pub fn buffer_len(&self) -> usize {
+        self.chan.available_permits()
+    }
 }

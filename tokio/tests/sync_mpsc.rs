@@ -534,3 +534,12 @@ async fn blocking_send_async() {
     let (mut tx, _rx) = mpsc::channel::<()>(1);
     let _ = tx.blocking_send(());
 }
+
+#[tokio::test]
+async fn buffer_len_bounded() {
+    let buffer_size = 10;
+    let (mut tx, _rx) = mpsc::channel(buffer_size);
+    tx.try_send(0).unwrap();
+    tx.try_send(0).unwrap();
+    assert_eq!(tx.buffer_len(), buffer_size - 2);
+}

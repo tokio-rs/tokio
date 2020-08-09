@@ -96,6 +96,8 @@ pub(crate) trait Semaphore {
     fn forget(&self, permit: &mut Self::Permit);
 
     fn close(&self);
+
+    fn available_permits(&self) -> usize;
 }
 
 struct Chan<T, S> {
@@ -198,6 +200,10 @@ where
     /// Send a message and notify the receiver.
     pub(crate) fn try_send(&mut self, value: T) -> Result<(), (T, TrySendError)> {
         self.inner.try_send(value, &mut self.permit)
+    }
+
+    pub(crate) fn available_permits(&self) -> usize {
+        self.inner.semaphore.available_permits()
     }
 }
 
@@ -465,6 +471,10 @@ impl Semaphore for (crate::sync::semaphore_ll::Semaphore, usize) {
     fn close(&self) {
         self.0.close();
     }
+
+    fn available_permits(&self) -> usize {
+        self.0.available_permits()
+    }
 }
 
 // ===== impl Semaphore for AtomicUsize =====
@@ -527,5 +537,9 @@ impl Semaphore for AtomicUsize {
 
     fn close(&self) {
         self.fetch_or(1, Release);
+    }
+
+    fn available_permits(&self) -> usize {
+        self.load(Relaxed)
     }
 }
