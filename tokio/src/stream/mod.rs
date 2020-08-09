@@ -69,13 +69,14 @@ mod take_while;
 use take_while::TakeWhile;
 
 cfg_time! {
-    mod timeout;
-    use timeout::Timeout;
     use std::time::Duration;
     use std::pin::Pin;
-    use crate::time::{Delay, Instant};
     use std::task::{self, Poll};
+    mod timeout;
+    use timeout::Timeout;
     use futures_core::Future;
+    use pin_project_lite::pin_project;
+    use crate::time::{Delay, Instant};
 }
 
 pub use futures_core::Stream;
@@ -842,6 +843,8 @@ pub trait StreamExt: Stream {
     /// }
     /// # }
     /// ```
+    #[cfg(all(feature = "time"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
     fn throttle(self, duration: Duration) -> Throttle<Self>
     where
         Self: Sized,
@@ -876,7 +879,8 @@ fn merge_size_hints(
     (low, high)
 }
 
-use pin_project_lite::pin_project;
+#[cfg(all(feature = "time"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "time")))]
 pin_project! {
     /// Stream for the [`throttle`](throttle) function.
     #[derive(Debug)]
@@ -894,7 +898,8 @@ pin_project! {
         stream: T,
     }
 }
-
+#[cfg(all(feature = "time"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "time")))]
 // XXX: are these safe if `T: !Unpin`?
 impl<T: Unpin> Throttle<T> {
     /// Acquires a reference to the underlying stream that this combinator is
@@ -920,6 +925,8 @@ impl<T: Unpin> Throttle<T> {
         self.stream
     }
 }
+#[cfg(all(feature = "time"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "time")))]
 impl<T: Stream> Stream for Throttle<T> {
     type Item = T::Item;
 
