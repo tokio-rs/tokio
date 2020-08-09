@@ -15,17 +15,16 @@ pin_project! {
     #[cfg_attr(docsrs, doc(cfg(feature = "stream")))]
     #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
     pub struct ReaderStream<R> {
-        // reader itself
+        // reader itself.
+        // None if we had error reading from the `reader` in the past.
         #[pin]
-        reader: R,
+        reader: Option<R>,
         // Working buffer, used to optimize allocations.
         // # Capacity behavior
         // Initially `buf` is empty. Also it's getting smaller and smaller
         // during polls (because it's chunks are returned to stream user).
         // But when it's capacity reaches 0, it is growed.
         buf: BytesMut,
-        // true if we had error reading from the `reader` in the past
-        had_error: bool,
     }
 }
 
@@ -54,9 +53,8 @@ where
     R: AsyncRead,
 {
     ReaderStream {
-        reader,
+        reader: Some(reader),
         buf: BytesMut::new(),
-        had_error: false,
     }
 }
 
@@ -69,17 +67,17 @@ where
     type Item = std::io::Result<Bytes>;
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
-        if *this.had_error {
-            return Poll::Ready(None);
-        }
+        let reader = match this.reader.as_pin_mut() {
+            Some(r) => r,
+            None => return Poll::Ready(None),
+        };
         if this.buf.capacity() == 0 {
             this.buf.reserve(CAPACITY);
         }
-        // if we have something in our buf, let's return it
-        match this.reader.poll_read_buf(cx, &mut this.buf) {
+        match reader.poll_read_buf(cx, &mut this.buf) {
             Poll::Pending => Poll::Pending,
             Poll::Ready(Err(err)) => {
-                *this.had_error = true;
+                this.reader = unsafe { Pin::new_unchecked(&mut None) };
                 Poll::Ready(Some(Err(err)))
             }
             Poll::Ready(Ok(0)) => Poll::Ready(None),
