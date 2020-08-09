@@ -71,7 +71,7 @@ use take_while::TakeWhile;
 cfg_time! {
     mod timeout;
     use timeout::Timeout;
-    use crate::time::{Delay, Duration, Instant};
+    use crate::time::Duration;
     mod throttle;
     pub use throttle::{throttle, Throttle};
 }
