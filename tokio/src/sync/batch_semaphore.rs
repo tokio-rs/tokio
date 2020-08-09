@@ -96,7 +96,7 @@ impl Semaphore {
     /// Note that this reserves three bits of flags in the permit counter, but
     /// we only actually use one of them. However, the previous semaphore
     /// implementation used three bits, so we will continue to reserve them to
-    /// avoid a breaking change if additional flags need to be aadded in the
+    /// avoid a breaking change if additional flags need to be added in the
     /// future.
     pub(crate) const MAX_PERMITS: usize = std::usize::MAX >> 3;
     const CLOSED: usize = 1;
