@@ -28,8 +28,8 @@ pin_project! {
     }
 }
 
-/// Convert an [`AsyncRead`](crate::io::AsyncRead) implementor into a
-/// [`Stream`](crate::stream::Stream) of Result<[`Bytes`](bytes::Bytes), io::Error>.
+/// Convert an [`AsyncRead`] implementor into a
+/// [`Stream`] of Result<[`Bytes`], std::io::Error>.
 ///
 /// # Example
 ///
@@ -47,7 +47,11 @@ pin_project! {
 /// assert_eq!(stream_contents, data);
 /// # Ok(())
 /// # }
+///
 /// ```
+/// [`AsyncRead`]: crate::io::AsyncRead
+/// [`Stream`]: crate::stream::Stream
+/// [`Bytes`]: bytes::Bytes
 pub fn reader_stream<R>(reader: R) -> ReaderStream<R>
 where
     R: AsyncRead,
