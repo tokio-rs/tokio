@@ -1,7 +1,7 @@
 //! Slow down a stream by enforcing a delay between items.
 
 use crate::stream::Stream;
-use crate::time::{Delay, Duration, Instant};
+use crate::stream::{Delay, Duration, Instant};
 
 use std::future::Future;
 use std::marker::Unpin;

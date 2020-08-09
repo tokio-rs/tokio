@@ -68,13 +68,12 @@ use take::Take;
 mod take_while;
 use take_while::TakeWhile;
 
-mod throttle;
-pub use throttle::throttle;
-
 cfg_time! {
     mod timeout;
     use timeout::Timeout;
-    use std::time::Duration;
+    use crate::time::{Delay, Duration, Instant};
+    mod throttle;
+    pub use throttle::{throttle, Throttle};
 }
 
 pub use futures_core::Stream;
