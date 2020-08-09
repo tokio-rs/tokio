@@ -29,6 +29,7 @@ fn parse_knobs(
     let mut runtime = None;
     let mut core_threads = None;
     let mut max_threads = None;
+    let mut runtime_builder = None;
 
     for arg in args {
         match arg {
@@ -96,6 +97,26 @@ fn parse_knobs(
                             ))
                         }
                     },
+                    "runtime_builder" => match &namevalue.lit {
+                        syn::Lit::Str(expr) => {
+                            let builder_fn_name = if let Ok(path) = expr.parse::<syn::Path>() {
+                                path
+                            } else {
+                                return Err(syn::Error::new_spanned(
+                                    namevalue,
+                                    "runtime_builder argument contents must represent an identifier",
+                                ));
+                            };
+
+                            runtime_builder = Some(builder_fn_name);
+                        }
+                        _ => {
+                            return Err(syn::Error::new_spanned(
+                                namevalue,
+                                "runtime_builder argument must be a string",
+                            ))
+                        }
+                    },
                     name => {
                         let msg = format!("Unknown attribute pair {} is specified; expected one of: `core_threads`, `max_threads`", name);
                         return Err(syn::Error::new_spanned(namevalue, msg));
@@ -128,16 +149,37 @@ fn parse_knobs(
         }
     }
 
-    let mut rt = quote! { tokio::runtime::Builder::new().basic_scheduler() };
-    if rt_threaded && (runtime == Some(Runtime::Threaded) || (runtime.is_none() && !is_test)) {
-        rt = quote! { #rt.threaded_scheduler() };
-    }
-    if let Some(v) = core_threads.map(|v| v.get()) {
-        rt = quote! { #rt.core_threads(#v) };
-    }
-    if let Some(v) = max_threads.map(|v| v.get()) {
-        rt = quote! { #rt.max_threads(#v) };
-    }
+    // This variable holds a code to obtain a `Runtime` object.
+    let rt = match runtime_builder {
+        Some(builder) => {
+            // There is an user-provided runtime builder, just use it.
+            quote! { #builder() }
+        }
+        None => {
+            // No builder function was provided, construct a runtime on our own, depending on other
+            // possible options provided by the user.
+            let mut rt = quote! { tokio::runtime::Builder::new().basic_scheduler() };
+            if rt_threaded
+                && (runtime == Some(Runtime::Threaded) || (runtime.is_none() && !is_test))
+            {
+                rt = quote! { #rt.threaded_scheduler() };
+            }
+            if let Some(v) = core_threads.map(|v| v.get()) {
+                rt = quote! { #rt.core_threads(#v) };
+            }
+            if let Some(v) = max_threads.map(|v| v.get()) {
+                rt = quote! { #rt.max_threads(#v) };
+            }
+
+            rt = quote! {
+                #rt.enable_all()
+                    .build()
+                    .unwrap()
+            };
+
+            rt
+        }
+    };
 
     let header = {
         if is_test {
@@ -154,9 +196,6 @@ fn parse_knobs(
         #(#attrs)*
         #vis #sig {
             #rt
-                .enable_all()
-                .build()
-                .unwrap()
                 .block_on(async { #body })
         }
     };

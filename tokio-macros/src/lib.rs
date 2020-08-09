@@ -35,7 +35,9 @@ use proc_macro::TokenStream;
 ///
 /// - `core_threads=n` - Sets core threads to `n` (requires `rt-threaded` feature).
 /// - `max_threads=n` - Sets max threads to `n` (requires `rt-core` or `rt-threaded` feature).
-/// - `basic_scheduler` - Use the basic schduler (requires `rt-core`).
+/// - `basic_scheduler` - Use the basic scheduler (requires `rt-core`).
+/// - `runtime_builder` - Use the provided function to build a runtime (see the corresponding
+///    section in "usage" for details).
 ///
 /// ## Function arguments:
 ///
@@ -117,6 +119,30 @@ use proc_macro::TokenStream;
 ///         })
 /// }
 /// ```
+///
+/// ### Provide a runtime builder function
+///
+/// ```rust
+/// fn build_runtime() -> tokio::runtime::Runtime {
+///    tokio::runtime::Builder::new()
+///         .threaded_scheduler()
+///         .core_threads(2)
+///         .enable_all()
+///         .build()
+///         .unwrap()
+/// }
+///
+/// #[tokio::main(runtime_builder = "build_runtime")]
+/// async fn main() {
+///     println!("Hello world");
+/// }
+/// ```
+///
+/// The `runtime_builder` does not have to return a `tokio::runtime::Runtime` object, it may
+/// return any object compatible with its interface, e.g. one providing `block_on` function
+/// which takes a `std::future::Future` as an argument.
+///
+/// If `runtime_builder` argument is provided, all the other configuration arguments are ignored.
 ///
 /// ### NOTE:
 ///
