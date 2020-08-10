@@ -10,7 +10,7 @@ use std::task::{self, Poll};
 
 use pin_project_lite::pin_project;
 
-pub(super) fn throttle<T>(stream: T, duration: Duration) -> Throttle<T>
+pub(super) fn throttle<T>(duration: Duration, stream: T) -> Throttle<T>
 where
     T: Stream,
 {

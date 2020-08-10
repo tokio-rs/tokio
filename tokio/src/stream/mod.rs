@@ -846,7 +846,7 @@ pub trait StreamExt: Stream {
     where
         Self: Sized,
     {
-        throttle(self, duration)
+        throttle(duration, self)
     }
 }
 
