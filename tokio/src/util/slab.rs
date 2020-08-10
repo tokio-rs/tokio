@@ -1,6 +1,6 @@
 use crate::loom::cell::UnsafeCell;
-use crate::loom::sync::{Arc, Mutex};
 use crate::loom::sync::atomic::AtomicUsize;
+use crate::loom::sync::{Arc, Mutex};
 use crate::util::bit;
 use std::fmt;
 use std::mem;
