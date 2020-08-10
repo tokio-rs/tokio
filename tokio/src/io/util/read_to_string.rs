@@ -1,5 +1,5 @@
 use crate::io::util::read_line::finish_string_read;
-use crate::io::util::read_to_end::{prepare_buffer, read_to_end_internal};
+use crate::io::util::read_to_end::read_to_end_internal;
 use crate::io::AsyncRead;
 
 use std::future::Future;
@@ -31,8 +31,7 @@ pub(crate) fn read_to_string<'a, R>(
 where
     R: AsyncRead + ?Sized + Unpin,
 {
-    let mut buf = mem::replace(string, String::new()).into_bytes();
-    prepare_buffer(&mut buf, reader);
+    let buf = mem::replace(string, String::new()).into_bytes();
     ReadToString {
         reader,
         buf,

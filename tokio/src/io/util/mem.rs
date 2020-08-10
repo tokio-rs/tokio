@@ -1,6 +1,6 @@
 //! In-process memory IO types.
 
-use crate::io::{AsyncRead, AsyncWrite};
+use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 use crate::loom::sync::Mutex;
 
 use bytes::{Buf, BytesMut};
@@ -98,8 +98,8 @@ impl AsyncRead for DuplexStream {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<std::io::Result<usize>> {
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
         Pin::new(&mut *self.read.lock().unwrap()).poll_read(cx, buf)
     }
 }
@@ -163,11 +163,12 @@ impl AsyncRead for Pipe {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<std::io::Result<usize>> {
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
         if self.buffer.has_remaining() {
-            let max = self.buffer.remaining().min(buf.len());
-            self.buffer.copy_to_slice(&mut buf[..max]);
+            let max = self.buffer.remaining().min(buf.remaining());
+            buf.append(&self.buffer[..max]);
+            self.buffer.advance(max);
             if max > 0 {
                 // The passed `buf` might have been empty, don't wake up if
                 // no bytes have been moved.
@@ -175,9 +176,9 @@ impl AsyncRead for Pipe {
                     waker.wake();
                 }
             }
-            Poll::Ready(Ok(max))
+            Poll::Ready(Ok(()))
         } else if self.is_closed {
-            Poll::Ready(Ok(0))
+            Poll::Ready(Ok(()))
         } else {
             self.read_waker = Some(cx.waker().clone());
             Poll::Pending

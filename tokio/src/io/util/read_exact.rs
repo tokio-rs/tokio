@@ -1,4 +1,4 @@
-use crate::io::AsyncRead;
+use crate::io::{AsyncRead, ReadBuf};
 
 use std::future::Future;
 use std::io;
@@ -17,8 +17,7 @@ where
 {
     ReadExact {
         reader,
-        buf,
-        pos: 0,
+        buf: ReadBuf::new(buf),
     }
 }
 
@@ -31,8 +30,7 @@ cfg_io_util! {
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct ReadExact<'a, A: ?Sized> {
         reader: &'a mut A,
-        buf: &'a mut [u8],
-        pos: usize,
+        buf: ReadBuf<'a>,
     }
 }
 
@@ -49,17 +47,15 @@ where
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<usize>> {
         loop {
             // if our buffer is empty, then we need to read some data to continue.
-            if self.pos < self.buf.len() {
+            let rem = self.buf.remaining();
+            if rem != 0 {
                 let me = &mut *self;
-                let n = ready!(Pin::new(&mut *me.reader).poll_read(cx, &mut me.buf[me.pos..]))?;
-                me.pos += n;
-                if n == 0 {
+                ready!(Pin::new(&mut *me.reader).poll_read(cx, &mut me.buf))?;
+                if me.buf.remaining() == rem {
                     return Err(eof()).into();
                 }
-            }
-
-            if self.pos >= self.buf.len() {
-                return Poll::Ready(Ok(self.pos));
+            } else {
+                return Poll::Ready(Ok(self.buf.capacity()));
             }
         }
     }

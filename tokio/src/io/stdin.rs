@@ -1,5 +1,5 @@
 use crate::io::blocking::Blocking;
-use crate::io::AsyncRead;
+use crate::io::{AsyncRead, ReadBuf};
 
 use std::io;
 use std::pin::Pin;
@@ -63,16 +63,11 @@ impl std::os::windows::io::AsRawHandle for Stdin {
 }
 
 impl AsyncRead for Stdin {
-    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [std::mem::MaybeUninit<u8>]) -> bool {
-        // https://github.com/rust-lang/rust/blob/09c817eeb29e764cfc12d0a8d94841e3ffe34023/src/libstd/io/stdio.rs#L97
-        false
-    }
-
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
         Pin::new(&mut self.std).poll_read(cx, buf)
     }
 }
