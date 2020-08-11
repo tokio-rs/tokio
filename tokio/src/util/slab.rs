@@ -507,7 +507,9 @@ impl<T> Slots<T> {
     /// Maps a slot pointer to an offset within the current page.
     ///
     /// The pointer math removes the `usize` index from the `Ref` struct,
-    /// shrinking the struct to a single pointer size.
+    /// shrinking the struct to a single pointer size. The contents of the
+    /// function is safe, the resulting `usize` is bounds checked before being
+    /// used.
     ///
     /// # Panics
     ///
