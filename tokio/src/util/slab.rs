@@ -547,9 +547,12 @@ impl<T> Slots<T> {
 }
 
 impl<T: Entry> Slot<T> {
-    // Generates a `Ref` for the slot. This involves bumping the page's ref count.
+    /// Generates a `Ref` for the slot. This involves bumping the page's ref count.
     fn gen_ref(&self, page: &Arc<Page<T>>) -> Ref<T> {
-        // The ref holds a ref on the page.
+        // The ref holds a ref on the page. The `Arc` is forgotten here and is
+        // resurrected in `release` when the `Ref` is dropped. By avoiding to
+        // hold on to an explicit `Arc` value, the struct size of `Ref` is
+        // reduced.
         mem::forget(page.clone());
         let slot = self as *const Slot<T>;
         let value = slot as *const Value<T>;
