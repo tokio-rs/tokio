@@ -309,7 +309,7 @@ impl<T> Slab<T> {
 
 impl<T> fmt::Debug for Slab<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("Slab").finish()
+        debug(fmt, "Slab", &self.pages[..])
     }
 }
 
@@ -334,7 +334,7 @@ impl<T: Entry> Allocator<T> {
 
 impl<T> fmt::Debug for Allocator<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("slab::Allocator").finish()
+        debug(fmt, "slab::Allocator", &self.pages[..])
     }
 }
 
@@ -593,6 +593,23 @@ impl Address {
     pub(crate) fn from_usize(src: usize) -> Address {
         Address(src)
     }
+}
+
+fn debug<T>(fmt: &mut fmt::Formatter<'_>, name: &str, pages: &[Arc<Page<T>>]) -> fmt::Result {
+    let mut capacity = 0;
+    let mut len = 0;
+
+    for page in pages {
+        if page.allocated.load(Relaxed) {
+            capacity += page.len;
+            len += page.used.load(Relaxed);
+        }
+    }
+
+    fmt.debug_struct(name)
+        .field("len", &len)
+        .field("capacity", &capacity)
+        .finish()
 }
 
 #[cfg(all(test, not(loom)))]
