@@ -133,7 +133,7 @@ impl<'a> ReadBuf<'a> {
             unsafe {
                 self.buf[self.initialized..end]
                     .as_mut_ptr()
-                    .write_bytes(0, n);
+                    .write_bytes(0, end - self.initialized);
             }
             self.initialized = end;
         }
