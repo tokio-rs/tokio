@@ -229,6 +229,9 @@ impl<T> Slab<T> {
         // is bound to `&self`. The only way to invalidate the underlying memory
         // is to call `compact()`. The lifetimes prevent calling `compact()`
         // while references to values are outstanding.
+        //
+        // The referenced data is never mutated. Only `&self` references are
+        // used and the data is `Sync`.
         Some(self.cached[page_idx].get(slot_idx))
     }
 
