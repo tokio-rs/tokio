@@ -43,26 +43,6 @@ impl ScheduledIo {
         super::GENERATION.unpack(self.readiness.load(Acquire))
     }
 
-    #[cfg(all(test, loom))]
-    /// Returns the current readiness value of this `ScheduledIo`, if the
-    /// provided `token` is still a valid access.
-    ///
-    /// # Returns
-    ///
-    /// If the given token's generation no longer matches the `ScheduledIo`'s
-    /// generation, then the corresponding IO resource has been removed and
-    /// replaced with a new resource. In that case, this method returns `None`.
-    /// Otherwise, this returns the current readiness.
-    pub(crate) fn get_readiness(&self, address: Address) -> Option<usize> {
-        let ready = self.readiness.load(Acquire);
-
-        if unpack_generation(ready) != address.generation() {
-            return None;
-        }
-
-        Some(ready & !PACK.mask())
-    }
-
     /// Sets the readiness on this `ScheduledIo` by invoking the given closure on
     /// the current value, returning the previous readiness value.
     ///

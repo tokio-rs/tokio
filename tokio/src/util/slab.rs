@@ -312,7 +312,7 @@ impl<T: Entry> Allocator<T> {
     pub(crate) fn allocate(&self) -> Option<(Address, Ref<T>)> {
         // Find the first available slot.
         for page in &self.pages[..] {
-            if let Some((addr, val)) = page.allocate() {
+            if let Some((addr, val)) = Page::allocate(page) {
                 return Some((addr, val));
             }
         }
@@ -353,14 +353,17 @@ impl<T: fmt::Debug> fmt::Debug for Ref<T> {
 
 impl<T: Entry> Page<T> {
     // Allocates an object, returns the ref and address.
-    fn allocate(self: &Arc<Page<T>>) -> Option<(Address, Ref<T>)> {
+    //
+    // `self: &Arc<Page<T>>` is avoided here as this would not work with the
+    // loom `Arc`.
+    fn allocate(me: &Arc<Page<T>>) -> Option<(Address, Ref<T>)> {
         // Before acquiring the lock, use the `used` hint.
-        if self.used.load(Acquire) == self.len {
+        if me.used.load(Acquire) == me.len {
             return None;
         }
 
         // Allocating objects requires synchronization
-        let mut locked = self.slots.lock().unwrap();
+        let mut locked = me.slots.lock().unwrap();
 
         if locked.head < locked.slots.len() {
             // Re-use an already initialized slot.
@@ -378,14 +381,14 @@ impl<T: Entry> Page<T> {
 
             // Increment the number of used slots
             locked.used += 1;
-            self.used.store(locked.used, Release);
+            me.used.store(locked.used, Release);
 
             // Reset the slot
             slot.value.with(|ptr| unsafe { (*ptr).value.reset() });
 
             // Return a reference to the slot
-            Some((self.addr(idx), slot.gen_ref(self)))
-        } else if self.len == locked.slots.len() {
+            Some((me.addr(idx), slot.gen_ref(me)))
+        } else if me.len == locked.slots.len() {
             // The page is full
             None
         } else {
@@ -396,14 +399,14 @@ impl<T: Entry> Page<T> {
             if idx == 0 {
                 // The page has not yet been allocated. Allocate the storage for
                 // all page slots.
-                locked.slots.reserve_exact(self.len);
+                locked.slots.reserve_exact(me.len);
             }
 
             // Initialize a new slot
             locked.slots.push(Slot {
                 value: UnsafeCell::new(Value {
                     value: Default::default(),
-                    page: self.as_ref() as *const _,
+                    page: &**me as *const _,
                 }),
                 next: 0,
             });
@@ -413,11 +416,11 @@ impl<T: Entry> Page<T> {
 
             // Increment the number of used slots
             locked.used += 1;
-            self.used.store(locked.used, Release);
+            me.used.store(locked.used, Release);
 
             debug_assert_eq!(locked.slots.len(), locked.head);
 
-            Some((self.addr(idx), locked.slots[idx].gen_ref(self)))
+            Some((me.addr(idx), locked.slots[idx].gen_ref(me)))
         }
     }
 }
