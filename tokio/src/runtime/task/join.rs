@@ -75,6 +75,7 @@ doc_rt_core! {
     /// [`task::spawn`]: crate::task::spawn()
     /// [`task::spawn_blocking`]: crate::task::spawn_blocking
     /// [`std::thread::JoinHandle`]: std::thread::JoinHandle
+    #[must_use]
     pub struct JoinHandle<T> {
         raw: Option<RawTask>,
         _p: PhantomData<T>,
