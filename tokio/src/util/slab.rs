@@ -51,7 +51,7 @@ use std::sync::atomic::Ordering::{Acquire, Release};
 /// The `Slab` structure is able to provide (mostly) unsynchronized reads to
 /// values stored in the slab. Insertions and removals are synchronized. Reading
 /// objects via `Ref` is fully unsynchronized. Indexing objects uses amortized
-/// synhronization.
+/// synchronization.
 ///
 pub(crate) struct Slab<T> {
     /// Array of pages. Each page is synchronized.
@@ -281,7 +281,7 @@ impl<T> Slab<T> {
             let vec = mem::replace(&mut slots.slots, vec![]);
             slots.head = 0;
 
-            // Drop the vec outside of the lock
+            // Drop the lock so we can drop the vector outside the lock below.
             drop(slots);
 
             // Clear cache
