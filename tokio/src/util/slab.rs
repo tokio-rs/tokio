@@ -574,7 +574,7 @@ impl Address {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(loom)))]
 mod test {
     use super::*;
     use std::sync::atomic::AtomicUsize;
