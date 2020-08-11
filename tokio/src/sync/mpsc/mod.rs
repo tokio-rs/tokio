@@ -43,11 +43,10 @@
 //! are two situations to consider:
 //!
 //! **Bounded channel**: If you need a bounded channel, you should use a bounded
-//! Tokio `mpsc` channel for both directions of communication. To call the async
-//! [`send`][bounded-send] or [`recv`][bounded-recv] methods in sync code, you
-//! will need to use [`Handle::block_on`], which allow you to execute an async
-//! method in synchronous code. This is necessary because a bounded channel may
-//! need to wait for additional capacity to become available.
+//! Tokio `mpsc` channel for both directions of communication. Instead of calling
+//! the async [`send`][bounded-send] or [`recv`][bounded-recv] methods, in
+//! synchronous code you will need to use the [`blocking_send`][blocking-send] or
+//! [`blocking_recv`][blocking-recv] methods.
 //!
 //! **Unbounded channel**: You should use the kind of channel that matches where
 //! the receiver is. So for sending a message _from async to sync_, you should
@@ -59,6 +58,8 @@
 //! [`Receiver`]: crate::sync::mpsc::Receiver
 //! [bounded-send]: crate::sync::mpsc::Sender::send()
 //! [bounded-recv]: crate::sync::mpsc::Receiver::recv()
+//! [blocking-send]: crate::sync::mpsc::Sender::blocking_send()
+//! [blocking-recv]: crate::sync::mpsc::Receiver::blocking_recv()
 //! [`UnboundedSender`]: crate::sync::mpsc::UnboundedSender
 //! [`Handle::block_on`]: crate::runtime::Handle::block_on()
 //! [std-unbounded]: std::sync::mpsc::channel

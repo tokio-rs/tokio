@@ -155,7 +155,7 @@ impl<T> Receiver<T> {
         self.chan.recv(cx)
     }
 
-    /// Blocking receive to call outside of asynchronous contexts
+    /// Blocking receive to call outside of asynchronous contexts.
     ///
     /// # Panics
     ///
@@ -429,7 +429,7 @@ impl<T> Sender<T> {
         }
     }
 
-    /// Blocking send to call outside of asynchronous contexts
+    /// Blocking send to call outside of asynchronous contexts.
     ///
     /// # Panics
     ///
