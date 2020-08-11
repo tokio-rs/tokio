@@ -5,7 +5,21 @@
 use std::fmt;
 use std::mem::{self, MaybeUninit};
 
-/// dox
+/// A wrapper around a byte buffer that is incrementally filled and initialized.
+///
+/// This type is a sort of "double cursor". It tracks three regions in the
+/// buffer: a region at the beginning of the buffer that has been logically
+/// filled with data, a region that has been initialized at some point but not
+/// yet logically filled, and a region at the end that is fully uninitialized.
+/// The filled region is guaranteed to be a  subset of the initialized region.
+///
+/// In summary, the contents of the buffer can be visualized as:
+///
+/// ```not_rust
+/// [             capacity              ]
+/// [ filled |         unfilled         ]
+/// [    initialized    | uninitialized ]
+/// ```
 pub struct ReadBuf<'a> {
     buf: &'a mut [MaybeUninit<u8>],
     filled: usize,
