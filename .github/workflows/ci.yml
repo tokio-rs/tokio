@@ -10,7 +10,7 @@ env:
   RUSTFLAGS: -Dwarnings
   RUST_BACKTRACE: 1
   nightly: nightly-2020-07-12
-  minrust: 1.39.0
+  minrust: 1.45.2
 
 jobs:
   # Depends on all action sthat are required for a "successful" CI run.
