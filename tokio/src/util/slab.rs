@@ -1,12 +1,12 @@
 use crate::loom::cell::UnsafeCell;
-use crate::loom::sync::atomic::AtomicUsize;
+use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
 use crate::loom::sync::{Arc, Mutex};
 use crate::util::bit;
 use std::fmt;
 use std::mem;
 use std::ops;
 use std::ptr;
-use std::sync::atomic::Ordering::{Acquire, Release};
+use std::sync::atomic::Ordering::Relaxed;
 
 /// Amortized allocation for homogeneous data types.
 ///
@@ -107,6 +107,9 @@ struct Page<T> {
     // Number of slots currently being used. This is not guaranteed to be up to
     // date and should only be used as a hint.
     used: AtomicUsize,
+
+    // Set to `true` when the page has been allocated.
+    allocated: AtomicBool,
 
     // The number of slots the page can hold.
     len: usize,
@@ -266,6 +269,12 @@ impl<T> Slab<T> {
         // Iterate each page except the very first one. The very first page is
         // never freed.
         for (idx, page) in (&self.pages[1..]).iter().enumerate() {
+            if page.used.load(Relaxed) != 0 || !page.allocated.load(Relaxed) {
+                // If the page has slots in use or the memory has not been
+                // allocated then it cannot be compacted.
+                continue;
+            }
+
             let mut slots = match page.slots.try_lock() {
                 Ok(slots) => slots,
                 // If the lock cannot be acquired due to being held by another
@@ -278,6 +287,8 @@ impl<T> Slab<T> {
                 // way, there is no more work to do.
                 continue;
             }
+
+            page.allocated.store(false, Relaxed);
 
             // Remove the slots vector from the page. This is done so that the
             // freeing process is done outside of the lock's critical section.
@@ -358,7 +369,7 @@ impl<T: Entry> Page<T> {
     // loom `Arc`.
     fn allocate(me: &Arc<Page<T>>) -> Option<(Address, Ref<T>)> {
         // Before acquiring the lock, use the `used` hint.
-        if me.used.load(Acquire) == me.len {
+        if me.used.load(Relaxed) == me.len {
             return None;
         }
 
@@ -381,7 +392,7 @@ impl<T: Entry> Page<T> {
 
             // Increment the number of used slots
             locked.used += 1;
-            me.used.store(locked.used, Release);
+            me.used.store(locked.used, Relaxed);
 
             // Reset the slot
             slot.value.with(|ptr| unsafe { (*ptr).value.reset() });
@@ -416,7 +427,8 @@ impl<T: Entry> Page<T> {
 
             // Increment the number of used slots
             locked.used += 1;
-            me.used.store(locked.used, Release);
+            me.used.store(locked.used, Relaxed);
+            me.allocated.store(true, Relaxed);
 
             debug_assert_eq!(locked.slots.len(), locked.head);
 
@@ -442,6 +454,7 @@ impl<T> Default for Page<T> {
     fn default() -> Page<T> {
         Page {
             used: AtomicUsize::new(0),
+            allocated: AtomicBool::new(false),
             slots: Mutex::new(Slots {
                 slots: Vec::new(),
                 head: 0,
@@ -463,7 +476,7 @@ impl<T> Page<T> {
         locked.head = idx;
         locked.used -= 1;
 
-        self.used.store(locked.used, Release);
+        self.used.store(locked.used, Relaxed);
     }
 }
 
@@ -730,24 +743,28 @@ mod test {
         let alloc = slab.allocator();
         let mut entries = vec![];
 
-        for i in 0..10_000 {
-            let (addr, val) = alloc.allocate().unwrap();
-            val.id.store(i, SeqCst);
+        for _ in 0..2 {
+            entries.clear();
 
-            entries.push((addr, val));
-        }
+            for i in 0..10_000 {
+                let (addr, val) = alloc.allocate().unwrap();
+                val.id.store(i, SeqCst);
 
-        let mut addrs = vec![];
+                entries.push((addr, val));
+            }
 
-        for (addr, _) in entries {
-            addrs.push(addr);
-        }
+            let mut addrs = vec![];
 
-        slab.compact();
+            for (addr, _) in entries.drain(..) {
+                addrs.push(addr);
+            }
 
-        // The first page is never freed
-        for addr in &addrs[PAGE_INITIAL_SIZE..] {
-            assert!(slab.get(*addr).is_none());
+            slab.compact();
+
+            // The first page is never freed
+            for addr in &addrs[PAGE_INITIAL_SIZE..] {
+                assert!(slab.get(*addr).is_none());
+            }
         }
     }
 }
