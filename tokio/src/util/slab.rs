@@ -149,9 +149,6 @@ struct Slot<T> {
     value: UnsafeCell<Value<T>>,
 
     /// Next entry in the free list.
-    ///
-    /// Safety: Only written when pushing the slot into the free list and read
-    /// when removing the slot from the free list.
     next: u32,
 }
 
