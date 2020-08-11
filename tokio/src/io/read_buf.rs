@@ -1,3 +1,7 @@
+// This lint claims ugly casting is somehow safer than transmute, but there's
+// evidence that is the case. Shush.
+#![allow(clippy::transmute_ptr_to_ptr)]
+
 use std::fmt;
 use std::mem::{self, MaybeUninit};
 
