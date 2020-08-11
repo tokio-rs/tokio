@@ -117,7 +117,9 @@ impl<'a> ReadBuf<'a> {
 
         if self.initialized < end {
             unsafe {
-                self.buf[self.initialized..].as_mut_ptr().write_bytes(0, n);
+                self.buf[self.initialized..end]
+                    .as_mut_ptr()
+                    .write_bytes(0, n);
             }
             self.initialized = end;
         }
@@ -206,10 +208,12 @@ impl<'a> ReadBuf<'a> {
         // Cannot overflow, asserted above
         let end = self.filled + amt;
 
-        // Safety: the transmuted array isn't read here, only written to.
+        // Safety: the length is asserted above
         unsafe {
-            mem::transmute::<&mut [MaybeUninit<u8>], &mut [u8]>(self.buf)[self.filled..end]
-                .copy_from_slice(buf);
+            self.buf[self.filled..end]
+                .as_mut_ptr()
+                .cast::<u8>()
+                .copy_from_nonoverlapping(buf.as_ptr(), amt);
         }
 
         if self.initialized < end {
