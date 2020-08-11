@@ -4,6 +4,7 @@ use pin_project_lite::pin_project;
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use futures_core::ready;
 
 pin_project! {
     /// A compatibility layer that allows conversion between the
@@ -107,9 +108,12 @@ where
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
-        futures_io::AsyncRead::poll_read(self.project().inner, cx, buf)
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        let slice = buf.initialize_unfilled();
+        let n = ready!(futures_io::AsyncRead::poll_read(self.project().inner, cx, slice))?;
+        buf.add_filled(n);
+        Poll::Ready(Ok(()))
     }
 }
 
@@ -120,9 +124,11 @@ where
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
+        slice: &mut [u8],
     ) -> Poll<io::Result<usize>> {
-        tokio::io::AsyncRead::poll_read(self.project().inner, cx, buf)
+        let mut buf = tokio::io::ReadBuf::new(slice);
+        ready!(tokio::io::AsyncRead::poll_read(self.project().inner, cx, &mut buf))?;
+        Poll::Ready(Ok(buf.filled().len()))
     }
 }
 
