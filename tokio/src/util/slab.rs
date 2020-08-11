@@ -483,7 +483,7 @@ impl<T> CachedPage<T> {
         // until `compact()` is called. The `compact()` function also updates
         // `CachedPage`.
         unsafe {
-            let slot = self.slots.offset(idx as isize);
+            let slot = self.slots.add(idx);
             let value = slot as *const Value<T>;
 
             &(*value).value
