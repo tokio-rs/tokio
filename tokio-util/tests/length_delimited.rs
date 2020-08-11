@@ -1,6 +1,6 @@
 #![warn(rust_2018_idioms)]
 
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio_test::task;
 use tokio_test::{
     assert_err, assert_ok, assert_pending, assert_ready, assert_ready_err, assert_ready_ok,
@@ -707,18 +707,18 @@ impl AsyncRead for Mock {
     fn poll_read(
         mut self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
-        dst: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+        dst: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
         match self.calls.pop_front() {
             Some(Ready(Ok(Op::Data(data)))) => {
-                debug_assert!(dst.len() >= data.len());
-                dst[..data.len()].copy_from_slice(&data[..]);
-                Ready(Ok(data.len()))
+                debug_assert!(dst.remaining() >= data.len());
+                dst.append(&data);
+                Ready(Ok(()))
             }
             Some(Ready(Ok(_))) => panic!(),
             Some(Ready(Err(e))) => Ready(Err(e)),
             Some(Pending) => Pending,
-            None => Ready(Ok(0)),
+            None => Ready(Ok(())),
         }
     }
 }
