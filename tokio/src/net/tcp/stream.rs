@@ -9,7 +9,6 @@ use iovec::IoVec;
 use std::convert::TryFrom;
 use std::fmt;
 use std::io::{self, Read, Write};
-use std::mem;
 use std::net::{self, Shutdown, SocketAddr};
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -706,7 +705,8 @@ impl TcpStream {
     ) -> Poll<io::Result<()>> {
         ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
 
-        let b = unsafe { mem::transmute::<_, &mut [u8]>(buf.unfilled_mut()) };
+        let b =
+            unsafe { &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
         match self.io.get_ref().read(b) {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 self.io.clear_read_ready(cx, mio::Ready::readable())?;

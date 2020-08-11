@@ -7,7 +7,6 @@ use crate::net::unix::ucred::{self, UCred};
 use std::convert::TryFrom;
 use std::fmt;
 use std::io::{self, Read, Write};
-use std::mem;
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::os::unix::net::{self, SocketAddr};
@@ -214,7 +213,8 @@ impl UnixStream {
     ) -> Poll<io::Result<()>> {
         ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
 
-        let b = unsafe { mem::transmute(buf.unfilled_mut()) };
+        let b =
+            unsafe { &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
         match self.io.get_ref().read(b) {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 self.io.clear_read_ready(cx, mio::Ready::readable())?;
