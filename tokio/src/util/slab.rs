@@ -503,6 +503,9 @@ impl<T> Default for CachedPage<T> {
 impl<T> Slots<T> {
     /// Maps a slot pointer to an offset within the current page.
     ///
+    /// The pointer math removes the `usize` index from the `Ref` struct,
+    /// shrinking the struct to a single pointer size.
+    ///
     /// # Panics
     ///
     /// panics if the provided slot pointer is not contained by the page.
