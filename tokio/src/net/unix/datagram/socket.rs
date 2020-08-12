@@ -657,7 +657,7 @@ impl UnixDatagram {
     /// let socket_path = tmp.path().join("socket");
     /// let socket = UnixDatagram::bind(&socket_path)?;
     ///
-    /// assert_eq!(socket.local_addr()?.as_pathname().unwrap(), &socket_path); 
+    /// assert_eq!(socket.local_addr()?.as_pathname().unwrap(), &socket_path);
     ///
     /// # Ok(())
     /// # }
