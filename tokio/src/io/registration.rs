@@ -303,7 +303,7 @@ impl Registration {
         let curr_ready = self
             .shared
             .set_readiness(None, |curr| curr & (!mask_no_hup))
-            .unwrap();
+            .unwrap_or_else(|_| unreachable!());
 
         let mut ready = mask & mio::Ready::from_usize(curr_ready);
 
