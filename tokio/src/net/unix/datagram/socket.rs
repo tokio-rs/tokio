@@ -15,6 +15,14 @@ use std::task::{Context, Poll};
 cfg_uds! {
     /// An I/O object representing a Unix datagram socket.
     ///
+    /// A socket can be either named (associated with a filesystem path) or
+    /// unnamed.
+    ///
+    /// **Note:** named sockets are persisted even after the object is dropped
+    /// and the program has exited, and cannot be reconnected. It is advised
+    /// that you either check for and unlink the existing socket if it exists,
+    /// or use a temporary file that is guaranteed to not already exist.
+    ///
     /// # Examples
     /// Using named sockets, associated with a filesystem path:
     /// ```
