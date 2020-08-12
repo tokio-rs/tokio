@@ -1,5 +1,5 @@
-use crate::io::driver::{platform, Direction, Handle};
-use crate::util::slab::Address;
+use crate::io::driver::{platform, Direction, Handle, ScheduledIo};
+use crate::util::slab;
 
 use mio::{self, Evented};
 use std::io;
@@ -39,10 +39,16 @@ cfg_io_driver! {
     /// [`poll_write_ready`]: method@Self::poll_write_ready`
     #[derive(Debug)]
     pub struct Registration {
+        /// Handle to the associated driver.
         handle: Handle,
-        address: Address,
+
+        /// Reference to state stored by the driver.
+        shared: slab::Ref<ScheduledIo>,
     }
 }
+
+unsafe impl Send for Registration {}
+unsafe impl Sync for Registration {}
 
 // ===== impl Registration =====
 
@@ -104,7 +110,7 @@ impl Registration {
         T: Evented,
     {
         let handle = Handle::current();
-        let address = if let Some(inner) = handle.inner() {
+        let shared = if let Some(inner) = handle.inner() {
             inner.add_source(io, ready)?
         } else {
             return Err(io::Error::new(
@@ -113,7 +119,7 @@ impl Registration {
             ));
         };
 
-        Ok(Registration { handle, address })
+        Ok(Registration { handle, shared })
     }
 
     /// Deregisters the I/O resource from the reactor it is associated with.
@@ -272,13 +278,11 @@ impl Registration {
         // If the task should be notified about new events, ensure that it has
         // been registered
         if let Some(ref cx) = cx {
-            inner.register(self.address, direction, cx.waker().clone())
+            inner.register(&self.shared, direction, cx.waker().clone())
         }
 
         let mask = direction.mask();
         let mask_no_hup = (mask - platform::hup() - platform::error()).as_usize();
-
-        let sched = inner.io_dispatch.get(self.address).unwrap();
 
         // This consumes the current readiness state **except** for HUP and
         // error. HUP and error are excluded because a) they are final states
@@ -296,9 +300,10 @@ impl Registration {
         // AND write. A specific case that `EPOLLERR` occurs is when the read
         // end of a pipe is closed. When this occurs, a peer blocked by
         // writing to the pipe should be notified.
-        let curr_ready = sched
-            .set_readiness(self.address, |curr| curr & (!mask_no_hup))
-            .unwrap_or_else(|_| panic!("address {:?} no longer valid!", self.address));
+        let curr_ready = self
+            .shared
+            .set_readiness(None, |curr| curr & (!mask_no_hup))
+            .unwrap_or_else(|_| unreachable!());
 
         let mut ready = mask & mio::Ready::from_usize(curr_ready);
 
@@ -306,14 +311,15 @@ impl Registration {
             if let Some(cx) = cx {
                 // Update the task info
                 match direction {
-                    Direction::Read => sched.reader.register_by_ref(cx.waker()),
-                    Direction::Write => sched.writer.register_by_ref(cx.waker()),
+                    Direction::Read => self.shared.reader.register_by_ref(cx.waker()),
+                    Direction::Write => self.shared.writer.register_by_ref(cx.waker()),
                 }
 
                 // Try again
-                let curr_ready = sched
-                    .set_readiness(self.address, |curr| curr & (!mask_no_hup))
-                    .unwrap_or_else(|_| panic!("address {:?} no longer valid!", self.address));
+                let curr_ready = self
+                    .shared
+                    .set_readiness(None, |curr| curr & (!mask_no_hup))
+                    .unwrap();
                 ready = mask & mio::Ready::from_usize(curr_ready);
             }
         }
@@ -326,15 +332,9 @@ impl Registration {
     }
 }
 
-unsafe impl Send for Registration {}
-unsafe impl Sync for Registration {}
-
 impl Drop for Registration {
     fn drop(&mut self) {
-        let inner = match self.handle.inner() {
-            Some(inner) => inner,
-            None => return,
-        };
-        inner.drop_source(self.address);
+        drop(self.shared.reader.take_waker());
+        drop(self.shared.writer.take_waker());
     }
 }
