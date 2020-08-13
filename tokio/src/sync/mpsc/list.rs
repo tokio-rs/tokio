@@ -1,9 +1,7 @@
 //! A concurrent, lock-free, FIFO list.
 
-use crate::loom::{
-    sync::atomic::{AtomicPtr, AtomicUsize},
-    thread,
-};
+use crate::loom::sync::atomic::{AtomicPtr, AtomicUsize};
+use crate::loom::thread;
 use crate::sync::mpsc::block::{self, Block};
 
 use std::fmt;

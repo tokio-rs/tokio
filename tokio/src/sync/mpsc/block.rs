@@ -1,8 +1,6 @@
-use crate::loom::{
-    cell::UnsafeCell,
-    sync::atomic::{AtomicPtr, AtomicUsize},
-    thread,
-};
+use crate::loom::cell::UnsafeCell;
+use crate::loom::sync::atomic::{AtomicPtr, AtomicUsize};
+use crate::loom::thread;
 
 use std::mem::MaybeUninit;
 use std::ops;
