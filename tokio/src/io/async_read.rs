@@ -73,17 +73,16 @@ pub trait AsyncRead {
             return Poll::Ready(Ok(0));
         }
 
+        let mut b = ReadBuf::uninit(buf.bytes_mut());
+
+        ready!(self.poll_read(cx, &mut b))?;
+        let n = b.filled().len();
+
+        // Safety: we can assume `n` bytes were read, since they are in`filled`.
         unsafe {
-            let n = {
-                let mut b = ReadBuf::uninit(buf.bytes_mut());
-
-                ready!(self.poll_read(cx, &mut b))?;
-                b.filled().len()
-            };
-
             buf.advance_mut(n);
-            Poll::Ready(Ok(n))
         }
+        Poll::Ready(Ok(n))
     }
 }
 

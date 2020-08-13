@@ -110,6 +110,8 @@ where
         cx: &mut Context<'_>,
         buf: &mut tokio::io::ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
+        // We can't trust the inner type to not peak at the bytes,
+        // so we must defensively initialize the buffer.
         let slice = buf.initialize_unfilled();
         let n = ready!(futures_io::AsyncRead::poll_read(
             self.project().inner,

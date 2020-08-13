@@ -87,6 +87,7 @@ impl<R: AsyncRead> AsyncRead for Take<R> {
         let me = self.project();
         let max = std::cmp::min(buf.remaining() as u64, *me.limit_) as usize;
         // Make a ReadBuf of the unfulled section up to max
+        // Saftey: We don't set any of the `unfilled_mut` with `MaybeUninit::uninit`.
         let mut b = unsafe { ReadBuf::uninit(&mut buf.unfilled_mut()[..max]) };
         ready!(me.inner.poll_read(cx, &mut b))?;
         let n = b.filled().len();

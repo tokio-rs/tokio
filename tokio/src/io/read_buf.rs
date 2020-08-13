@@ -1,5 +1,5 @@
 // This lint claims ugly casting is somehow safer than transmute, but there's
-// evidence that is the case. Shush.
+// no evidence that is the case. Shush.
 #![allow(clippy::transmute_ptr_to_ptr)]
 
 use std::fmt;
@@ -63,6 +63,7 @@ impl<'a> ReadBuf<'a> {
         let slice = &self.buf[..self.filled];
         // safety: filled describes how far into the buffer that the
         // user has filled with bytes, so it's been initialized.
+        // TODO: This could use `MaybeUninit::slice_get_ref` when it is stable.
         unsafe { mem::transmute::<&[MaybeUninit<u8>], &[u8]>(slice) }
     }
 
@@ -72,6 +73,7 @@ impl<'a> ReadBuf<'a> {
         let slice = &mut self.buf[..self.filled];
         // safety: filled describes how far into the buffer that the
         // user has filled with bytes, so it's been initialized.
+        // TODO: This could use `MaybeUninit::slice_get_mut` when it is stable.
         unsafe { mem::transmute::<&mut [MaybeUninit<u8>], &mut [u8]>(slice) }
     }
 
@@ -83,6 +85,7 @@ impl<'a> ReadBuf<'a> {
         let slice = &self.buf[..self.initialized];
         // safety: initialized describes how far into the buffer that the
         // user has at some point initialized with bytes.
+        // TODO: This could use `MaybeUninit::slice_get_ref` when it is stable.
         unsafe { mem::transmute::<&[MaybeUninit<u8>], &[u8]>(slice) }
     }
 
@@ -94,6 +97,7 @@ impl<'a> ReadBuf<'a> {
         let slice = &mut self.buf[..self.initialized];
         // safety: initialized describes how far into the buffer that the
         // user has at some point initialized with bytes.
+        // TODO: This could use `MaybeUninit::slice_get_mut` when it is stable.
         unsafe { mem::transmute::<&mut [MaybeUninit<u8>], &mut [u8]>(slice) }
     }
 
@@ -127,6 +131,7 @@ impl<'a> ReadBuf<'a> {
     pub fn initialize_unfilled_to(&mut self, n: usize) -> &mut [u8] {
         assert!(self.remaining() >= n, "n overflows remaining");
 
+        // This can't overflow, otherwise the assert above would have failed.
         let end = self.filled + n;
 
         if self.initialized < end {
@@ -200,7 +205,7 @@ impl<'a> ReadBuf<'a> {
     /// The caller must ensure that `n` unfilled bytes of the buffer have already been initialized.
     #[inline]
     pub unsafe fn assume_init(&mut self, n: usize) {
-        let new = self.filled.checked_add(n).expect("filled overflow");
+        let new = self.filled + n;
         if new > self.initialized {
             self.initialized = new;
         }
@@ -239,6 +244,10 @@ impl<'a> ReadBuf<'a> {
 
 impl fmt::Debug for ReadBuf<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ReadBuf").finish()
+        f.debug_struct("ReadBuf")
+            .field("filled", &self.filled)
+            .field("initialized", &self.initialized)
+            .field("capacity", &self.capacity())
+            .finish()
     }
 }

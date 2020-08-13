@@ -28,12 +28,7 @@ where
     }
 }
 
-/// # Safety
-///
-/// Before first calling this method, the unused capacity must have been
-/// prepared for use with the provided AsyncRead. This can be done using the
-/// `prepare_buffer` function later in this file.
-pub(super) unsafe fn read_to_end_internal<R: AsyncRead + ?Sized>(
+pub(super) fn read_to_end_internal<R: AsyncRead + ?Sized>(
     buf: &mut Vec<u8>,
     mut reader: Pin<&mut R>,
     num_read: &mut usize,
@@ -55,13 +50,7 @@ pub(super) unsafe fn read_to_end_internal<R: AsyncRead + ?Sized>(
 /// Tries to read from the provided AsyncRead.
 ///
 /// The length of the buffer is increased by the number of bytes read.
-///
-/// # Safety
-///
-/// The caller ensures that the buffer has been prepared for use with the
-/// AsyncRead before calling this function. This can be done using the
-/// `prepare_buffer` function later in this file.
-unsafe fn poll_read_to_end<R: AsyncRead + ?Sized>(
+fn poll_read_to_end<R: AsyncRead + ?Sized>(
     buf: &mut Vec<u8>,
     read: Pin<&mut R>,
     cx: &mut Context<'_>,
@@ -78,37 +67,16 @@ unsafe fn poll_read_to_end<R: AsyncRead + ?Sized>(
 
     ready!(read.poll_read(cx, &mut unused_capacity))?;
 
-    // safety: There are two situations:
-    //
-    // 1. The AsyncRead has not overriden `prepare_uninitialized_buffer`.
-    //
-    // In this situation, the default implementation of that method will have
-    // zeroed the unused capacity. This means that setting the length will
-    // never expose uninitialized memory in the vector.
-    //
-    // Note that the assert! below ensures that we don't set the length to
-    // something larger than the capacity, which malicious implementors might
-    // try to have us do.
-    //
-    // 2. The AsyncRead has overriden `prepare_uninitialized_buffer`.
-    //
-    // In this case, the safety of the `set_len` call below relies on this
-    // guarantee from the documentation on `prepare_uninitialized_buffer`:
-    //
-    // > This function isn't actually unsafe to call but unsafe to implement.
-    // > The implementer must ensure that either the whole buf has been zeroed
-    // > or poll_read() overwrites the buffer without reading it and returns
-    // > correct value.
-    //
-    // Note that `prepare_uninitialized_buffer` is unsafe to implement, so this
-    // is a guarantee we can rely on in unsafe code.
-    //
-    // The assert!() is technically only necessary in the first case.
     let n = unused_capacity.filled().len();
     let new_len = buf.len() + n;
-    assert!(new_len <= buf.capacity());
 
-    buf.set_len(new_len);
+    // This should no longer even be possible in safe Rust. An implementor
+    // would need to have unsafely *replaced* the buffer inside `ReadBuf`,
+    // which... yolo?
+    assert!(new_len <= buf.capacity());
+    unsafe {
+        buf.set_len(new_len);
+    }
     Poll::Ready(Ok(n))
 }
 
@@ -135,8 +103,7 @@ where
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let Self { reader, buf, read } = &mut *self;
 
-        // safety: The constructor of ReadToEnd calls `prepare_buffer`
-        unsafe { read_to_end_internal(buf, Pin::new(*reader), read, cx) }
+        read_to_end_internal(buf, Pin::new(*reader), read, cx)
     }
 }
 

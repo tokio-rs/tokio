@@ -705,6 +705,7 @@ impl TcpStream {
     ) -> Poll<io::Result<()>> {
         ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
 
+        // Safety: `TcpStream::read` will not peak at the maybe uinitialized bytes.
         let b =
             unsafe { &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
         match self.io.get_ref().read(b) {
@@ -713,6 +714,8 @@ impl TcpStream {
                 Poll::Pending
             }
             Ok(n) => {
+                // Safety: We trust `TcpStream::read` to have filled up `n` bytes
+                // in the buffer.
                 unsafe {
                     buf.assume_init(n);
                 }

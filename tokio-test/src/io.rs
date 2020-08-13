@@ -216,7 +216,6 @@ impl Inner {
                 // Drain the data from the source
                 data.drain(..n);
 
-                // Return the number of bytes read
                 Ok(())
             }
             Some(&mut Action::ReadError(ref mut err)) => {

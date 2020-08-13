@@ -213,6 +213,7 @@ impl UnixStream {
     ) -> Poll<io::Result<()>> {
         ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
 
+        // Safety: `UnixStream::read` will not peak at the maybe uinitialized bytes.
         let b =
             unsafe { &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
         match self.io.get_ref().read(b) {
@@ -221,6 +222,8 @@ impl UnixStream {
                 Poll::Pending
             }
             Ok(n) => {
+                // Safety: We trust `UnixStream::read` to have filled up `n` bytes
+                // in the buffer.
                 unsafe {
                     buf.assume_init(n);
                 }
