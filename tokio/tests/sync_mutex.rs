@@ -152,3 +152,12 @@ async fn debug_format() {
     let m = Mutex::new(s.to_string());
     assert_eq!(format!("{:?}", s), format!("{:?}", m.lock().await));
 }
+
+#[tokio::test]
+async fn mutex_debug() {
+    let s = "data";
+    let m = Mutex::new(s.to_string());
+    assert_eq!(format!("{:?}", m), r#"Mutex { data: "data" }"#);
+    let _guard = m.lock().await;
+    assert_eq!(format!("{:?}", m), r#"Mutex { data: <locked> }"#)
+}

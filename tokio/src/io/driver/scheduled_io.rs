@@ -1,47 +1,30 @@
 use crate::loom::future::AtomicWaker;
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::util::bit;
-use crate::util::slab::{Address, Entry, Generation};
+use crate::util::slab::Entry;
 
-use std::sync::atomic::Ordering::{AcqRel, Acquire, SeqCst};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 
+/// Stored in the I/O driver resource slab.
 #[derive(Debug)]
 pub(crate) struct ScheduledIo {
+    /// Packs the resource's readiness with the resource's generation.
     readiness: AtomicUsize,
+
+    /// Task waiting on read readiness
     pub(crate) reader: AtomicWaker,
+
+    /// Task waiting on write readiness
     pub(crate) writer: AtomicWaker,
 }
 
-const PACK: bit::Pack = bit::Pack::most_significant(Generation::WIDTH);
-
 impl Entry for ScheduledIo {
-    fn generation(&self) -> Generation {
-        unpack_generation(self.readiness.load(SeqCst))
-    }
+    fn reset(&self) {
+        let state = self.readiness.load(Acquire);
 
-    fn reset(&self, generation: Generation) -> bool {
-        let mut current = self.readiness.load(Acquire);
+        let generation = super::GENERATION.unpack(state);
+        let next = super::GENERATION.pack_lossy(generation + 1, 0);
 
-        loop {
-            if unpack_generation(current) != generation {
-                return false;
-            }
-
-            let next = PACK.pack(generation.next().to_usize(), 0);
-
-            match self
-                .readiness
-                .compare_exchange(current, next, AcqRel, Acquire)
-            {
-                Ok(_) => break,
-                Err(actual) => current = actual,
-            }
-        }
-
-        drop(self.reader.take_waker());
-        drop(self.writer.take_waker());
-
-        true
+        self.readiness.store(next, Release);
     }
 }
 
@@ -56,24 +39,8 @@ impl Default for ScheduledIo {
 }
 
 impl ScheduledIo {
-    #[cfg(all(test, loom))]
-    /// Returns the current readiness value of this `ScheduledIo`, if the
-    /// provided `token` is still a valid access.
-    ///
-    /// # Returns
-    ///
-    /// If the given token's generation no longer matches the `ScheduledIo`'s
-    /// generation, then the corresponding IO resource has been removed and
-    /// replaced with a new resource. In that case, this method returns `None`.
-    /// Otherwise, this returns the current readiness.
-    pub(crate) fn get_readiness(&self, address: Address) -> Option<usize> {
-        let ready = self.readiness.load(Acquire);
-
-        if unpack_generation(ready) != address.generation() {
-            return None;
-        }
-
-        Some(ready & !PACK.mask())
+    pub(crate) fn generation(&self) -> usize {
+        super::GENERATION.unpack(self.readiness.load(Acquire))
     }
 
     /// Sets the readiness on this `ScheduledIo` by invoking the given closure on
@@ -92,32 +59,35 @@ impl ScheduledIo {
     /// Otherwise, this returns the previous readiness.
     pub(crate) fn set_readiness(
         &self,
-        address: Address,
+        token: Option<usize>,
         f: impl Fn(usize) -> usize,
     ) -> Result<usize, ()> {
-        let generation = address.generation();
-
         let mut current = self.readiness.load(Acquire);
 
         loop {
-            // Check that the generation for this access is still the current
-            // one.
-            if unpack_generation(current) != generation {
-                return Err(());
+            let current_generation = super::GENERATION.unpack(current);
+
+            if let Some(token) = token {
+                // Check that the generation for this access is still the
+                // current one.
+                if super::GENERATION.unpack(token) != current_generation {
+                    return Err(());
+                }
             }
+
             // Mask out the generation bits so that the modifying function
             // doesn't see them.
             let current_readiness = current & mio::Ready::all().as_usize();
             let new = f(current_readiness);
 
             debug_assert!(
-                new <= !PACK.max_value(),
+                new <= super::ADDRESS.max_value(),
                 "new readiness value would overwrite generation bits!"
             );
 
             match self.readiness.compare_exchange(
                 current,
-                PACK.pack(generation.to_usize(), new),
+                super::GENERATION.pack(current_generation, new),
                 AcqRel,
                 Acquire,
             ) {
@@ -134,8 +104,4 @@ impl Drop for ScheduledIo {
         self.writer.wake();
         self.reader.wake();
     }
-}
-
-fn unpack_generation(src: usize) -> Generation {
-    Generation::new(PACK.unpack(src))
 }

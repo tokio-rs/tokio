@@ -96,10 +96,13 @@ impl Semaphore {
     /// Note that this reserves three bits of flags in the permit counter, but
     /// we only actually use one of them. However, the previous semaphore
     /// implementation used three bits, so we will continue to reserve them to
-    /// avoid a breaking change if additional flags need to be aadded in the
+    /// avoid a breaking change if additional flags need to be added in the
     /// future.
     pub(crate) const MAX_PERMITS: usize = std::usize::MAX >> 3;
     const CLOSED: usize = 1;
+    // The least-significant bit in the number of permits is reserved to use
+    // as a flag indicating that the semaphore has been closed. Consequently
+    // PERMIT_SHIFT is used to leave that bit for that purpose.
     const PERMIT_SHIFT: usize = 1;
 
     /// Creates a new semaphore with the initial number of permits
@@ -357,7 +360,7 @@ impl Semaphore {
 impl fmt::Debug for Semaphore {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Semaphore")
-            .field("permits", &self.permits.load(Relaxed))
+            .field("permits", &self.available_permits())
             .finish()
     }
 }

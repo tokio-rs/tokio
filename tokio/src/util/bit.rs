@@ -7,16 +7,6 @@ pub(crate) struct Pack {
 }
 
 impl Pack {
-    /// Value is packed in the `width` most-significant bits.
-    pub(crate) const fn most_significant(width: u32) -> Pack {
-        let mask = mask_for(width).reverse_bits();
-
-        Pack {
-            mask,
-            shift: mask.trailing_zeros(),
-        }
-    }
-
     /// Value is packed in the `width` least-significant bits.
     pub(crate) const fn least_significant(width: u32) -> Pack {
         let mask = mask_for(width);
@@ -51,6 +41,14 @@ impl Pack {
     pub(crate) fn pack(&self, value: usize, base: usize) -> usize {
         assert!(value <= self.max_value());
         (base & !self.mask) | (value << self.shift)
+    }
+
+    /// Packs the value with `base`, losing any bits of `value` that fit.
+    ///
+    /// If `value` is larger than the max value that can be represented by the
+    /// allotted width, the most significant bits are truncated.
+    pub(crate) fn pack_lossy(&self, value: usize, base: usize) -> usize {
+        self.pack(value & self.max_value(), base)
     }
 
     pub(crate) fn unpack(&self, src: usize) -> usize {
