@@ -196,6 +196,9 @@ pub use self::async_seek::AsyncSeek;
 mod async_write;
 pub use self::async_write::AsyncWrite;
 
+mod read_buf;
+pub use self::read_buf::ReadBuf;
+
 // Re-export some types from `std::io` so that users don't have to deal
 // with conflicts when `use`ing `tokio::io` and `std::io`.
 pub use std::io::{Error, ErrorKind, Result, SeekFrom};

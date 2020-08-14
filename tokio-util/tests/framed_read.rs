@@ -1,6 +1,6 @@
 #![warn(rust_2018_idioms)]
 
-use tokio::io::AsyncRead;
+use tokio::io::{AsyncRead, ReadBuf};
 use tokio_test::assert_ready;
 use tokio_test::task;
 use tokio_util::codec::{Decoder, FramedRead};
@@ -264,19 +264,19 @@ impl AsyncRead for Mock {
     fn poll_read(
         mut self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
         use io::ErrorKind::WouldBlock;
 
         match self.calls.pop_front() {
             Some(Ok(data)) => {
-                debug_assert!(buf.len() >= data.len());
-                buf[..data.len()].copy_from_slice(&data[..]);
-                Ready(Ok(data.len()))
+                debug_assert!(buf.remaining() >= data.len());
+                buf.append(&data);
+                Ready(Ok(()))
             }
             Some(Err(ref e)) if e.kind() == WouldBlock => Pending,
             Some(Err(e)) => Ready(Err(e)),
-            None => Ready(Ok(0)),
+            None => Ready(Ok(())),
         }
     }
 }
@@ -288,8 +288,8 @@ impl AsyncRead for Slice<'_> {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
         Pin::new(&mut self.0).poll_read(cx, buf)
     }
 }

@@ -1,4 +1,4 @@
-use crate::io::{AsyncRead, AsyncWrite};
+use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 use std::future::Future;
 use std::io;
@@ -88,7 +88,9 @@ where
             // continue.
             if self.pos == self.cap && !self.read_done {
                 let me = &mut *self;
-                let n = ready!(Pin::new(&mut *me.reader).poll_read(cx, &mut me.buf))?;
+                let mut buf = ReadBuf::new(&mut me.buf);
+                ready!(Pin::new(&mut *me.reader).poll_read(cx, &mut buf))?;
+                let n = buf.filled().len();
                 if n == 0 {
                     self.read_done = true;
                 } else {

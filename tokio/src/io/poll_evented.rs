@@ -1,5 +1,5 @@
 use crate::io::driver::platform;
-use crate::io::{AsyncRead, AsyncWrite, Registration};
+use crate::io::{AsyncRead, AsyncWrite, ReadBuf, Registration};
 
 use mio::event::Evented;
 use std::fmt;
@@ -384,18 +384,22 @@ where
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
         ready!(self.poll_read_ready(cx, mio::Ready::readable()))?;
 
-        let r = (*self).get_mut().read(buf);
+        // We can't assume the `Read` won't look at the read buffer,
+        // so we have to force initialization here.
+        let r = (*self).get_mut().read(buf.initialize_unfilled());
 
         if is_wouldblock(&r) {
             self.clear_read_ready(cx, mio::Ready::readable())?;
             return Poll::Pending;
         }
 
-        Poll::Ready(r)
+        Poll::Ready(r.map(|n| {
+            buf.add_filled(n);
+        }))
     }
 }
 

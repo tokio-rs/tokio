@@ -5,7 +5,7 @@
 use self::State::*;
 use crate::fs::{asyncify, sys};
 use crate::io::blocking::Buf;
-use crate::io::{AsyncRead, AsyncSeek, AsyncWrite};
+use crate::io::{AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 
 use std::fmt;
 use std::fs::{Metadata, Permissions};
@@ -537,25 +537,20 @@ impl File {
 }
 
 impl AsyncRead for File {
-    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [std::mem::MaybeUninit<u8>]) -> bool {
-        // https://github.com/rust-lang/rust/blob/09c817eeb29e764cfc12d0a8d94841e3ffe34023/src/libstd/fs.rs#L668
-        false
-    }
-
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        dst: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+        dst: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
         loop {
             match self.state {
                 Idle(ref mut buf_cell) => {
                     let mut buf = buf_cell.take().unwrap();
 
                     if !buf.is_empty() {
-                        let n = buf.copy_to(dst);
+                        buf.copy_to(dst);
                         *buf_cell = Some(buf);
-                        return Ready(Ok(n));
+                        return Ready(Ok(()));
                     }
 
                     buf.ensure_capacity_for(dst);
@@ -571,9 +566,9 @@ impl AsyncRead for File {
 
                     match op {
                         Operation::Read(Ok(_)) => {
-                            let n = buf.copy_to(dst);
+                            buf.copy_to(dst);
                             self.state = Idle(Some(buf));
-                            return Ready(Ok(n));
+                            return Ready(Ok(()));
                         }
                         Operation::Read(Err(e)) => {
                             assert!(buf.is_empty());

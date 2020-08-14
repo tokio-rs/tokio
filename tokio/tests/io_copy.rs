@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::io::{self, AsyncRead};
+use tokio::io::{self, AsyncRead, ReadBuf};
 use tokio_test::assert_ok;
 
 use std::pin::Pin;
@@ -15,14 +15,14 @@ async fn copy() {
         fn poll_read(
             mut self: Pin<&mut Self>,
             _cx: &mut Context<'_>,
-            buf: &mut [u8],
-        ) -> Poll<io::Result<usize>> {
+            buf: &mut ReadBuf<'_>,
+        ) -> Poll<io::Result<()>> {
             if self.0 {
-                buf[0..11].copy_from_slice(b"hello world");
+                buf.append(b"hello world");
                 self.0 = false;
-                Poll::Ready(Ok(11))
+                Poll::Ready(Ok(()))
             } else {
-                Poll::Ready(Ok(0))
+                Poll::Ready(Ok(()))
             }
         }
     }

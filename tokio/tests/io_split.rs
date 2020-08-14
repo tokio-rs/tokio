@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::io::{split, AsyncRead, AsyncWrite, ReadHalf, WriteHalf};
+use tokio::io::{split, AsyncRead, AsyncWrite, ReadBuf, ReadHalf, WriteHalf};
 
 use std::io;
 use std::pin::Pin;
@@ -13,9 +13,10 @@ impl AsyncRead for RW {
     fn poll_read(
         self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
-        _buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
-        Poll::Ready(Ok(1))
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        buf.append(&[b'z']);
+        Poll::Ready(Ok(()))
     }
 }
 

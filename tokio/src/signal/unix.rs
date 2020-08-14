@@ -5,7 +5,7 @@
 
 #![cfg(unix)]
 
-use crate::io::{AsyncRead, PollEvented};
+use crate::io::{AsyncRead, PollEvented, ReadBuf};
 use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
 use crate::sync::mpsc::{channel, Receiver};
 
@@ -300,10 +300,16 @@ impl Driver {
     /// [#38](https://github.com/alexcrichton/tokio-signal/issues/38) for more
     /// info.
     fn drain(&mut self, cx: &mut Context<'_>) {
+        let mut buf = [0; 128];
+        let mut buf = ReadBuf::new(&mut buf);
         loop {
-            match Pin::new(&mut self.wakeup).poll_read(cx, &mut [0; 128]) {
-                Poll::Ready(Ok(0)) => panic!("EOF on self-pipe"),
-                Poll::Ready(Ok(_)) => {}
+            match Pin::new(&mut self.wakeup).poll_read(cx, &mut buf) {
+                Poll::Ready(Ok(())) => {
+                    if buf.filled().is_empty() {
+                        panic!("EOF on self-pipe")
+                    }
+                    buf.clear();
+                }
                 Poll::Ready(Err(e)) => panic!("Bad read on self-pipe: {}", e),
                 Poll::Pending => break,
             }

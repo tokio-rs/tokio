@@ -9,12 +9,11 @@
 //! level.
 
 use crate::future::poll_fn;
-use crate::io::{AsyncRead, AsyncWrite};
+use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 use crate::net::TcpStream;
 
 use bytes::Buf;
 use std::io;
-use std::mem::MaybeUninit;
 use std::net::Shutdown;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -131,15 +130,11 @@ impl ReadHalf<'_> {
 }
 
 impl AsyncRead for ReadHalf<'_> {
-    unsafe fn prepare_uninitialized_buffer(&self, _: &mut [MaybeUninit<u8>]) -> bool {
-        false
-    }
-
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
         self.0.poll_read_priv(cx, buf)
     }
 }

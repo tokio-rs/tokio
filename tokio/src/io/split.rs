@@ -4,7 +4,7 @@
 //! To restore this read/write object from its `split::ReadHalf` and
 //! `split::WriteHalf` use `unsplit`.
 
-use crate::io::{AsyncRead, AsyncWrite};
+use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 use bytes::{Buf, BufMut};
 use std::cell::UnsafeCell;
@@ -102,8 +102,8 @@ impl<T: AsyncRead> AsyncRead for ReadHalf<T> {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
         let mut inner = ready!(self.inner.poll_lock(cx));
         inner.stream_pin().poll_read(cx, buf)
     }

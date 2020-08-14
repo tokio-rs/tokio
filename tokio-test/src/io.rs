@@ -18,7 +18,7 @@
 //! [`AsyncRead`]: tokio::io::AsyncRead
 //! [`AsyncWrite`]: tokio::io::AsyncWrite
 
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::sync::mpsc;
 use tokio::time::{self, Delay, Duration, Instant};
 
@@ -204,20 +204,19 @@ impl Inner {
         self.rx.poll_recv(cx)
     }
 
-    fn read(&mut self, dst: &mut [u8]) -> io::Result<usize> {
+    fn read(&mut self, dst: &mut ReadBuf<'_>) -> io::Result<()> {
         match self.action() {
             Some(&mut Action::Read(ref mut data)) => {
                 // Figure out how much to copy
-                let n = cmp::min(dst.len(), data.len());
+                let n = cmp::min(dst.remaining(), data.len());
 
                 // Copy the data into the `dst` slice
-                (&mut dst[..n]).copy_from_slice(&data[..n]);
+                dst.append(&data[..n]);
 
                 // Drain the data from the source
                 data.drain(..n);
 
-                // Return the number of bytes read
-                Ok(n)
+                Ok(())
             }
             Some(&mut Action::ReadError(ref mut err)) => {
                 // As the
@@ -229,7 +228,7 @@ impl Inner {
                 // Either waiting or expecting a write
                 Err(io::ErrorKind::WouldBlock.into())
             }
-            None => Ok(0),
+            None => Ok(()),
         }
     }
 
@@ -348,8 +347,8 @@ impl AsyncRead for Mock {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
         loop {
             if let Some(ref mut sleep) = self.inner.sleep {
                 ready!(Pin::new(sleep).poll(cx));
@@ -357,6 +356,9 @@ impl AsyncRead for Mock {
 
             // If a sleep is set, it has already fired
             self.inner.sleep = None;
+
+            // Capture 'filled' to monitor if it changed
+            let filled = buf.filled().len();
 
             match self.inner.read(buf) {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
@@ -368,19 +370,22 @@ impl AsyncRead for Mock {
                         return Poll::Pending;
                     }
                 }
-                Ok(0) => {
-                    // TODO: Extract
-                    match ready!(self.inner.poll_action(cx)) {
-                        Some(action) => {
-                            self.inner.actions.push_back(action);
-                            continue;
+                Ok(()) => {
+                    if buf.filled().len() == filled {
+                        match ready!(self.inner.poll_action(cx)) {
+                            Some(action) => {
+                                self.inner.actions.push_back(action);
+                                continue;
+                            }
+                            None => {
+                                return Poll::Ready(Ok(()));
+                            }
                         }
-                        None => {
-                            return Poll::Ready(Ok(0));
-                        }
+                    } else {
+                        return Poll::Ready(Ok(()));
                     }
                 }
-                ret => return Poll::Ready(ret),
+                Err(e) => return Poll::Ready(Err(e)),
             }
         }
     }

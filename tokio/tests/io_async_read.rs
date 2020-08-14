@@ -1,14 +1,12 @@
-#![allow(clippy::transmute_ptr_to_ptr)]
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::io::AsyncRead;
+use tokio::io::{AsyncRead, ReadBuf};
 use tokio_test::task;
 use tokio_test::{assert_ready_err, assert_ready_ok};
 
-use bytes::{BufMut, BytesMut};
+use bytes::BytesMut;
 use std::io;
-use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -26,10 +24,10 @@ fn read_buf_success() {
         fn poll_read(
             self: Pin<&mut Self>,
             _cx: &mut Context<'_>,
-            buf: &mut [u8],
-        ) -> Poll<io::Result<usize>> {
-            buf[0..11].copy_from_slice(b"hello world");
-            Poll::Ready(Ok(11))
+            buf: &mut ReadBuf<'_>,
+        ) -> Poll<io::Result<()>> {
+            buf.append(b"hello world");
+            Poll::Ready(Ok(()))
         }
     }
 
@@ -51,8 +49,8 @@ fn read_buf_error() {
         fn poll_read(
             self: Pin<&mut Self>,
             _cx: &mut Context<'_>,
-            _buf: &mut [u8],
-        ) -> Poll<io::Result<usize>> {
+            _buf: &mut ReadBuf<'_>,
+        ) -> Poll<io::Result<()>> {
             let err = io::ErrorKind::Other.into();
             Poll::Ready(Err(err))
         }
@@ -74,8 +72,8 @@ fn read_buf_no_capacity() {
         fn poll_read(
             self: Pin<&mut Self>,
             _cx: &mut Context<'_>,
-            _buf: &mut [u8],
-        ) -> Poll<io::Result<usize>> {
+            _buf: &mut ReadBuf<'_>,
+        ) -> Poll<io::Result<()>> {
             unimplemented!();
         }
     }
@@ -89,57 +87,24 @@ fn read_buf_no_capacity() {
 }
 
 #[test]
-fn read_buf_no_uninitialized() {
-    struct Rd;
-
-    impl AsyncRead for Rd {
-        fn poll_read(
-            self: Pin<&mut Self>,
-            _cx: &mut Context<'_>,
-            buf: &mut [u8],
-        ) -> Poll<io::Result<usize>> {
-            for b in buf {
-                assert_eq!(0, *b);
-            }
-
-            Poll::Ready(Ok(0))
-        }
-    }
-
-    let mut buf = BytesMut::with_capacity(64);
-
-    task::spawn(Rd).enter(|cx, rd| {
-        let n = assert_ready_ok!(rd.poll_read_buf(cx, &mut buf));
-        assert_eq!(0, n);
-    });
-}
-
-#[test]
 fn read_buf_uninitialized_ok() {
     struct Rd;
 
     impl AsyncRead for Rd {
-        unsafe fn prepare_uninitialized_buffer(&self, _: &mut [MaybeUninit<u8>]) -> bool {
-            false
-        }
-
         fn poll_read(
             self: Pin<&mut Self>,
             _cx: &mut Context<'_>,
-            buf: &mut [u8],
-        ) -> Poll<io::Result<usize>> {
-            assert_eq!(buf[0..11], b"hello world"[..]);
-            Poll::Ready(Ok(0))
+            buf: &mut ReadBuf<'_>,
+        ) -> Poll<io::Result<()>> {
+            assert_eq!(buf.remaining(), 64);
+            assert_eq!(buf.filled().len(), 0);
+            assert_eq!(buf.initialized().len(), 0);
+            Poll::Ready(Ok(()))
         }
     }
 
     // Can't create BytesMut w/ zero capacity, so fill it up
     let mut buf = BytesMut::with_capacity(64);
-
-    unsafe {
-        let b: &mut [u8] = std::mem::transmute(buf.bytes_mut());
-        b[0..11].copy_from_slice(b"hello world");
-    }
 
     task::spawn(Rd).enter(|cx, rd| {
         let n = assert_ready_ok!(rd.poll_read_buf(cx, &mut buf));

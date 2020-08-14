@@ -1,10 +1,9 @@
 use crate::io::util::DEFAULT_BUF_SIZE;
-use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite};
+use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite, ReadBuf};
 
 use pin_project_lite::pin_project;
 use std::fmt;
 use std::io::{self, Write};
-use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -147,14 +146,9 @@ impl<W: AsyncWrite + AsyncRead> AsyncRead for BufWriter<W> {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
         self.get_pin_mut().poll_read(cx, buf)
-    }
-
-    // we can't skip unconditionally because of the large buffer case in read.
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [MaybeUninit<u8>]) -> bool {
-        self.get_ref().prepare_uninitialized_buffer(buf)
     }
 }
 

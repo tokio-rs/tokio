@@ -1,4 +1,4 @@
-use crate::io::AsyncRead;
+use crate::io::{AsyncRead, ReadBuf};
 
 use bytes::Buf;
 use pin_project_lite::pin_project;
@@ -48,17 +48,19 @@ macro_rules! reader {
                 }
 
                 while *me.read < $bytes as u8 {
-                    *me.read += match me
-                        .src
-                        .as_mut()
-                        .poll_read(cx, &mut me.buf[*me.read as usize..])
-                    {
+                    let mut buf = ReadBuf::new(&mut me.buf[*me.read as usize..]);
+
+                    *me.read += match me.src.as_mut().poll_read(cx, &mut buf) {
                         Poll::Pending => return Poll::Pending,
                         Poll::Ready(Err(e)) => return Poll::Ready(Err(e.into())),
-                        Poll::Ready(Ok(0)) => {
-                            return Poll::Ready(Err(UnexpectedEof.into()));
+                        Poll::Ready(Ok(())) => {
+                            let n = buf.filled().len();
+                            if n == 0 {
+                                return Poll::Ready(Err(UnexpectedEof.into()));
+                            }
+
+                            n as u8
                         }
-                        Poll::Ready(Ok(n)) => n as u8,
                     };
                 }
 
@@ -97,12 +99,17 @@ macro_rules! reader8 {
                 let me = self.project();
 
                 let mut buf = [0; 1];
-                match me.reader.poll_read(cx, &mut buf[..]) {
+                let mut buf = ReadBuf::new(&mut buf);
+                match me.reader.poll_read(cx, &mut buf) {
                     Poll::Pending => Poll::Pending,
                     Poll::Ready(Err(e)) => Poll::Ready(Err(e.into())),
-                    Poll::Ready(Ok(0)) => Poll::Ready(Err(UnexpectedEof.into())),
-                    Poll::Ready(Ok(1)) => Poll::Ready(Ok(buf[0] as $ty)),
-                    Poll::Ready(Ok(_)) => unreachable!(),
+                    Poll::Ready(Ok(())) => {
+                        if buf.filled().len() == 0 {
+                            return Poll::Ready(Err(UnexpectedEof.into()));
+                        }
+
+                        Poll::Ready(Ok(buf.filled()[0] as $ty))
+                    }
                 }
             }
         }

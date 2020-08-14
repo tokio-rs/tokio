@@ -1,9 +1,8 @@
-use crate::io::{AsyncBufRead, AsyncRead};
+use crate::io::{AsyncBufRead, AsyncRead, ReadBuf};
 use crate::stream::Stream;
 use bytes::{Buf, BufMut};
 use pin_project_lite::pin_project;
 use std::io;
-use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -103,10 +102,10 @@ where
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
-        if buf.is_empty() {
-            return Poll::Ready(Ok(0));
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        if buf.remaining() == 0 {
+            return Poll::Ready(Ok(()));
         }
 
         let inner_buf = match self.as_mut().poll_fill_buf(cx) {
@@ -114,11 +113,11 @@ where
             Poll::Ready(Err(err)) => return Poll::Ready(Err(err)),
             Poll::Pending => return Poll::Pending,
         };
-        let len = std::cmp::min(inner_buf.len(), buf.len());
-        (&mut buf[..len]).copy_from_slice(&inner_buf[..len]);
+        let len = std::cmp::min(inner_buf.len(), buf.remaining());
+        buf.append(&inner_buf[..len]);
 
         self.consume(len);
-        Poll::Ready(Ok(len))
+        Poll::Ready(Ok(()))
     }
     fn poll_read_buf<BM: BufMut>(
         mut self: Pin<&mut Self>,
@@ -142,9 +141,6 @@ where
 
         self.consume(len);
         Poll::Ready(Ok(len))
-    }
-    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [MaybeUninit<u8>]) -> bool {
-        false
     }
 }
 

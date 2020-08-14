@@ -1,4 +1,4 @@
-use crate::io::AsyncRead;
+use crate::io::{AsyncRead, ReadBuf};
 
 use std::future::Future;
 use std::io;
@@ -39,7 +39,9 @@ where
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<usize>> {
         let me = &mut *self;
-        Pin::new(&mut *me.reader).poll_read(cx, me.buf)
+        let mut buf = ReadBuf::new(me.buf);
+        ready!(Pin::new(&mut *me.reader).poll_read(cx, &mut buf))?;
+        Poll::Ready(Ok(buf.filled().len()))
     }
 }
 
