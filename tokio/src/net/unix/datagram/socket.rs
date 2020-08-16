@@ -29,10 +29,8 @@ cfg_uds! {
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
-    /// use {
-    ///     tokio::net::UnixDatagram,
-    ///     tempfile::tempdir,
-    /// };
+    /// use tokio::net::UnixDatagram;
+    /// use tempfile::tempdir;
     ///
     /// // We use a temporary directory so that the socket
     /// // files left by the bound sockets will get cleaned up.
@@ -50,7 +48,7 @@ cfg_uds! {
     /// let mut buf = vec![0u8; 24];
     /// let (size, addr) = rx.recv_from(&mut buf).await?;
     ///
-    /// let dgram = &buf.as_slice()[..size];
+    /// let dgram = &buf[..size];
     /// assert_eq!(dgram, bytes);
     /// assert_eq!(addr.as_pathname().unwrap(), &tx_path);
     ///
@@ -76,7 +74,7 @@ cfg_uds! {
     /// let mut buff = vec![0u8; 24];
     /// let size = sock2.recv(&mut buff).await?;
     ///
-    /// let dgram = &buff.as_slice()[..size];
+    /// let dgram = &buff[..size];
     /// assert_eq!(dgram, bytes);
     ///
     /// # Ok(())
@@ -95,10 +93,8 @@ impl UnixDatagram {
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
-    /// use {
-    ///     tokio::net::UnixDatagram,
-    ///     tempfile::tempdir,
-    /// };
+    /// use tokio::net::UnixDatagram;
+    /// use tempfile::tempdir;
     ///
     /// // We use a temporary directory so that the socket
     /// // files left by the bound sockets will get cleaned up.
@@ -122,8 +118,7 @@ impl UnixDatagram {
     /// Creates an unnamed pair of connected sockets.
     ///
     /// This function will create a pair of interconnected Unix sockets for
-    /// communicating back and forth between one another. Each socket will
-    /// be associated with the default event loop's handle.
+    /// communicating back and forth between one another.
     ///
     /// # Examples
     /// ```
@@ -143,7 +138,7 @@ impl UnixDatagram {
     /// let mut buff = vec![0u8; 24];
     /// let size = sock2.recv(&mut buff).await?;
     ///
-    /// let dgram = &buff.as_slice()[..size];
+    /// let dgram = &buff[..size];
     /// assert_eq!(dgram, bytes);
     ///
     /// # Ok(())
@@ -168,18 +163,16 @@ impl UnixDatagram {
     /// This function panics if thread-local runtime is not set.
     ///
     /// The runtime is usually set implicitly when this function is called
-    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// from a future driven by a Tokio runtime, otherwise runtime can be set
     /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
     /// # Examples
     /// ```
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
-    /// use {
-    ///     tokio::net::UnixDatagram,
-    ///     std::os::unix::net::UnixDatagram as StdUDS,
-    ///     tempfile::tempdir,
-    /// };
+    /// use tokio::net::UnixDatagram;
+    /// use std::os::unix::net::UnixDatagram as StdUDS;
+    /// use tempfile::tempdir;
     ///
     /// // We use a temporary directory so that the socket
     /// // files left by the bound sockets will get cleaned up.
@@ -211,10 +204,8 @@ impl UnixDatagram {
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
-    /// use {
-    ///     tokio::net::UnixDatagram,
-    ///     tempfile::tempdir,
-    /// };
+    /// use tokio::net::UnixDatagram;
+    /// use tempfile::tempdir;
     ///
     /// // Create an unbound socket
     /// let mut tx = UnixDatagram::unbound()?;
@@ -231,7 +222,7 @@ impl UnixDatagram {
     /// let mut buf = vec![0u8; 24];
     /// let (size, addr) = rx.recv_from(&mut buf).await?;
     ///
-    /// let dgram = &buf.as_slice()[..size];
+    /// let dgram = &buf[..size];
     /// assert_eq!(dgram, bytes);
     ///
     /// # Ok(())
@@ -252,10 +243,8 @@ impl UnixDatagram {
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
-    /// use {
-    ///     tokio::net::UnixDatagram,
-    ///     tempfile::tempdir,
-    /// };
+    /// use tokio::net::UnixDatagram;
+    /// use tempfile::tempdir;
     ///
     /// // Create an unbound socket
     /// let mut tx = UnixDatagram::unbound()?;
@@ -275,7 +264,7 @@ impl UnixDatagram {
     /// let mut buf = vec![0u8; 24];
     /// let (size, addr) = rx.recv_from(&mut buf).await?;
     ///
-    /// let dgram = &buf.as_slice()[..size];
+    /// let dgram = &buf[..size];
     /// assert_eq!(dgram, bytes);
     ///
     /// # Ok(())
@@ -305,7 +294,7 @@ impl UnixDatagram {
     /// let mut buff = vec![0u8; 24];
     /// let size = sock2.recv(&mut buff).await?;
     ///
-    /// let dgram = &buff.as_slice()[..size];
+    /// let dgram = &buff[..size];
     /// assert_eq!(dgram, bytes);
     ///
     /// # Ok(())
@@ -334,7 +323,7 @@ impl UnixDatagram {
     /// let mut buffer = vec![0u8; 24];
     /// let size = second.try_recv(&mut buffer)?;
     ///
-    /// let dgram = &buffer.as_slice()[..size];
+    /// let dgram = &buffer[..size];
     /// assert_eq!(dgram, bytes);
     /// # Ok(())
     /// # }
@@ -349,10 +338,8 @@ impl UnixDatagram {
     /// ```
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// use {
-    ///     tokio::net::UnixDatagram,
-    ///     tempfile::tempdir,
-    /// };
+    /// use tokio::net::UnixDatagram;
+    /// use tempfile::tempdir;
     ///
     /// let bytes = b"bytes";
     /// // We use a temporary directory so that the socket
@@ -371,7 +358,7 @@ impl UnixDatagram {
     /// let mut buffer = vec![0u8; 24];
     /// let (size, addr) = server.try_recv_from(&mut buffer)?;
     ///
-    /// let dgram = &buffer.as_slice()[..size];
+    /// let dgram = &buffer[..size];
     /// assert_eq!(dgram, bytes);
     /// assert_eq!(addr.as_pathname().unwrap(), &client_path);
     /// # Ok(())
@@ -430,7 +417,7 @@ impl UnixDatagram {
     /// let mut buff = vec![0u8; 24];
     /// let size = sock2.recv(&mut buff).await?;
     ///
-    /// let dgram = &buff.as_slice()[..size];
+    /// let dgram = &buff[..size];
     /// assert_eq!(dgram, bytes);
     ///
     /// # Ok(())
@@ -459,7 +446,7 @@ impl UnixDatagram {
     /// let mut buffer = vec![0u8; 24];
     /// let size = second.try_recv(&mut buffer)?;
     ///
-    /// let dgram = &buffer.as_slice()[..size];
+    /// let dgram = &buffer[..size];
     /// assert_eq!(dgram, bytes);
     /// # Ok(())
     /// # }
@@ -491,10 +478,8 @@ impl UnixDatagram {
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
-    /// use {
-    ///     tokio::net::UnixDatagram,
-    ///     tempfile::tempdir,
-    /// };
+    /// use tokio::net::UnixDatagram;
+    /// use tempfile::tempdir;
     ///
     /// // We use a temporary directory so that the socket
     /// // files left by the bound sockets will get cleaned up.
@@ -512,7 +497,7 @@ impl UnixDatagram {
     /// let mut buf = vec![0u8; 24];
     /// let (size, addr) = rx.recv_from(&mut buf).await?;
     ///
-    /// let dgram = &buf.as_slice()[..size];
+    /// let dgram = &buf[..size];
     /// assert_eq!(dgram, bytes);
     /// assert_eq!(addr.as_pathname().unwrap(), &tx_path);
     ///
@@ -550,10 +535,8 @@ impl UnixDatagram {
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
-    /// use {
-    ///     tokio::net::UnixDatagram,
-    ///     tempfile::tempdir,
-    /// };
+    /// use tokio::net::UnixDatagram;
+    /// use tempfile::tempdir;
     ///
     /// // We use a temporary directory so that the socket
     /// // files left by the bound sockets will get cleaned up.
@@ -571,7 +554,7 @@ impl UnixDatagram {
     /// let mut buf = vec![0u8; 24];
     /// let (size, addr) = rx.recv_from(&mut buf).await?;
     ///
-    /// let dgram = &buf.as_slice()[..size];
+    /// let dgram = &buf[..size];
     /// assert_eq!(dgram, bytes);
     /// assert_eq!(addr.as_pathname().unwrap(), &tx_path);
     ///
@@ -588,10 +571,8 @@ impl UnixDatagram {
     /// ```
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// use {
-    ///     tokio::net::UnixDatagram,
-    ///     tempfile::tempdir,
-    /// };
+    /// use tokio::net::UnixDatagram;
+    /// use tempfile::tempdir;
     ///
     /// let bytes = b"bytes";
     /// // We use a temporary directory so that the socket
@@ -610,7 +591,7 @@ impl UnixDatagram {
     /// let mut buffer = vec![0u8; 24];
     /// let (size, addr) = server.try_recv_from(&mut buffer)?;
     ///
-    /// let dgram = &buffer.as_slice()[..size];
+    /// let dgram = &buffer[..size];
     /// assert_eq!(dgram, bytes);
     /// assert_eq!(addr.as_pathname().unwrap(), &client_path);
     /// # Ok(())
@@ -644,10 +625,8 @@ impl UnixDatagram {
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
-    /// use {
-    ///     tokio::net::UnixDatagram,
-    ///     tempfile::tempdir,
-    /// };
+    /// use tokio::net::UnixDatagram;
+    /// use tempfile::tempdir;
     ///
     /// // We use a temporary directory so that the socket
     /// // files left by the bound sockets will get cleaned up.
@@ -692,10 +671,8 @@ impl UnixDatagram {
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
-    /// use {
-    ///     tokio::net::UnixDatagram,
-    ///     tempfile::tempdir,
-    /// };
+    /// use tokio::net::UnixDatagram;
+    /// use tempfile::tempdir;
     ///
     /// // Create an unbound socket
     /// let tx = UnixDatagram::unbound()?;
@@ -824,7 +801,7 @@ impl UnixDatagram {
     /// let mut buff = vec![0u8; 24];
     /// let size = sock2.recv(&mut buff).await?;
     ///
-    /// let dgram = &buff.as_slice()[..size];
+    /// let dgram = &buff[..size];
     /// assert_eq!(dgram, bytes);
     ///
     /// # Ok(())
@@ -864,7 +841,7 @@ impl UnixDatagram {
     /// let mut buff = vec![0u8; 24];
     /// let size = sock2.recv(&mut buff).await?;
     ///
-    /// let dgram = &buff.as_slice()[..size];
+    /// let dgram = &buff[..size];
     /// assert_eq!(dgram, bytes);
     ///
     /// # Ok(())
@@ -895,7 +872,7 @@ impl TryFrom<UnixDatagram> for mio_uds::UnixDatagram {
 impl TryFrom<net::UnixDatagram> for UnixDatagram {
     type Error = io::Error;
 
-    /// Consumes stream, returning the tokio I/O object.
+    /// Consumes stream, returning the Tokio I/O object.
     ///
     /// This is equivalent to
     /// [`UnixDatagram::from_std(stream)`](UnixDatagram::from_std).
