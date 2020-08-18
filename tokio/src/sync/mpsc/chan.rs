@@ -370,7 +370,7 @@ impl Semaphore for (crate::sync::batch_semaphore::Semaphore, usize) {
         let waker = crate::util::waker_ref(&waker);
         let mut noop_cx = std::task::Context::from_waker(&*waker);
         let mut permit = Permit::new();
-        match self.poll_acquire(&mut noop_cx, &mut permit) {
+        match permit.poll_acquire(&mut noop_cx, 1, &self.0) {
             Poll::Ready(Err(_)) => true,
             Poll::Ready(Ok(())) => {
                 permit.release(1, &self.0);
