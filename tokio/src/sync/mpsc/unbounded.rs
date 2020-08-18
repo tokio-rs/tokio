@@ -246,6 +246,7 @@ impl<T> UnboundedSender<T> {
         self.chan.closed().await
     }
     /// Checks if `UnboundedReceiver` is still alive.
+    ///
     /// ```
     /// let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<()>();
     /// assert!(!tx.is_closed());

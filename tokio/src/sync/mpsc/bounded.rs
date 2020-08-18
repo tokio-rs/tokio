@@ -524,6 +524,7 @@ impl<T> Sender<T> {
     }
 
     /// Checks if `Receiver` is still alive.
+    ///
     /// ```
     /// let (tx, rx) = tokio::sync::mpsc::channel::<()>(42);
     /// assert!(!tx.is_closed());
