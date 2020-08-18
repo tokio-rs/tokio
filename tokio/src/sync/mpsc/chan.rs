@@ -366,7 +366,7 @@ impl Semaphore for (crate::sync::batch_semaphore::Semaphore, usize) {
             fn wake(self: std::sync::Arc<Self>) {}
             fn wake_by_ref(_arc_self: &std::sync::Arc<Self>) {}
         }
-        let waker = Arc::new(NoopWaker);
+        let waker = std::sync::Arc::new(NoopWaker);
         let waker = crate::util::waker_ref(&waker);
         let mut noop_cx = std::task::Context::from_waker(&*waker);
         let mut permit = Permit::new();
