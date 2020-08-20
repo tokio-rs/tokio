@@ -70,3 +70,17 @@ async fn write_error() {
 
     mock.write_all(b"world!").await.expect("write 2");
 }
+
+#[tokio::test]
+#[should_panic]
+async fn mock_panics_read_data_left() {
+    use tokio_test::io::Builder;
+    Builder::new().read(b"read").build();
+}
+
+#[tokio::test]
+#[should_panic]
+async fn mock_panics_write_data_left() {
+    use tokio_test::io::Builder;
+    Builder::new().write(b"write").build();
+}
