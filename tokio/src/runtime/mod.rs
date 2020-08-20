@@ -69,7 +69,7 @@
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Create the runtime
-//!     let mut rt = Runtime::new()?;
+//!     let rt  = Runtime::new()?;
 //!
 //!     // Spawn the root task
 //!     rt.block_on(async {
@@ -240,6 +240,7 @@ cfg_rt_core! {
     use crate::task::JoinHandle;
 }
 
+use crate::loom::sync::{Arc, Mutex};
 use std::future::Future;
 use std::time::Duration;
 
@@ -271,7 +272,7 @@ use std::time::Duration;
 /// [`new`]: method@Self::new
 /// [`Builder`]: struct@Builder
 /// [`tokio::run`]: fn@run
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Runtime {
     /// Task executor
     kind: Kind,
@@ -280,23 +281,23 @@ pub struct Runtime {
     handle: Handle,
 
     /// Blocking pool handle, used to signal shutdown
-    blocking_pool: BlockingPool,
+    blocking_pool: Arc<BlockingPool>,
 }
 
 /// The runtime executor is either a thread-pool or a current-thread executor.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Kind {
     /// Not able to execute concurrent tasks. This variant is mostly used to get
     /// access to the driver handles.
-    Shell(Shell),
+    Shell(Arc<Mutex<Shell>>),
 
     /// Execute all tasks on the current-thread.
     #[cfg(feature = "rt-core")]
-    Basic(BasicScheduler<time::Driver>),
+    Basic(Arc<Mutex<BasicScheduler<time::Driver>>>),
 
     /// Execute tasks across multiple threads.
     #[cfg(feature = "rt-threaded")]
-    ThreadPool(ThreadPool),
+    ThreadPool(Arc<ThreadPool>),
 }
 
 /// After thread starts / before thread stops
@@ -397,7 +398,10 @@ impl Runtime {
             Kind::Shell(_) => panic!("task execution disabled"),
             #[cfg(feature = "rt-threaded")]
             Kind::ThreadPool(exec) => exec.spawn(future),
-            Kind::Basic(exec) => exec.spawn(future),
+            Kind::Basic(exec) => {
+                let exec = exec.lock().unwrap();
+                exec.spawn(future)
+            }
         }
     }
 
@@ -426,7 +430,7 @@ impl Runtime {
     /// use tokio::runtime::Runtime;
     ///
     /// // Create the runtime
-    /// let mut rt = Runtime::new().unwrap();
+    /// let rt  = Runtime::new().unwrap();
     ///
     /// // Execute the future, blocking the current thread until completion
     /// rt.block_on(async {
@@ -435,13 +439,17 @@ impl Runtime {
     /// ```
     ///
     /// [handle]: fn@Handle::block_on
-    pub fn block_on<F: Future>(&mut self, future: F) -> F::Output {
-        let kind = &mut self.kind;
-
-        self.handle.enter(|| match kind {
-            Kind::Shell(exec) => exec.block_on(future),
+    pub fn block_on<F: Future>(&self, future: F) -> F::Output {
+        self.handle.enter(|| match &self.kind {
+            Kind::Shell(exec) => {
+                let mut exec = exec.lock().unwrap();
+                exec.block_on(future)
+            }
             #[cfg(feature = "rt-core")]
-            Kind::Basic(exec) => exec.block_on(future),
+            Kind::Basic(exec) => {
+                let mut exec = exec.lock().unwrap();
+                exec.block_on(future)
+            }
             #[cfg(feature = "rt-threaded")]
             Kind::ThreadPool(exec) => exec.block_on(future),
         })
@@ -531,7 +539,7 @@ impl Runtime {
     /// use std::time::Duration;
     ///
     /// fn main() {
-    ///    let mut runtime = Runtime::new().unwrap();
+    ///    let runtime = Runtime::new().unwrap();
     ///
     ///    runtime.block_on(async move {
     ///        task::spawn_blocking(move || {
@@ -545,7 +553,11 @@ impl Runtime {
     pub fn shutdown_timeout(mut self, duration: Duration) {
         // Wakeup and shutdown all the worker threads
         self.handle.spawner.shutdown();
-        self.blocking_pool.shutdown(Some(duration));
+
+        // TODO: this is likely incorrect, we need to find some way to synchronize shutting down.
+        if let Some(blocking_pool) = Arc::get_mut(&mut self.blocking_pool) {
+            blocking_pool.shutdown(Some(duration));
+        }
     }
 
     /// Shutdown the runtime, without waiting for any spawned tasks to shutdown.
@@ -565,7 +577,7 @@ impl Runtime {
     /// use tokio::runtime::Runtime;
     ///
     /// fn main() {
-    ///    let mut runtime = Runtime::new().unwrap();
+    ///    let runtime = Runtime::new().unwrap();
     ///
     ///    runtime.block_on(async move {
     ///        let inner_runtime = Runtime::new().unwrap();

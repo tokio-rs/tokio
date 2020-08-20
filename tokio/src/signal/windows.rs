@@ -272,7 +272,7 @@ mod tests {
 
     #[test]
     fn ctrl_break() {
-        let mut rt = rt();
+        let rt = rt();
 
         rt.block_on(async {
             let mut ctrl_break = assert_ok!(super::ctrl_break());

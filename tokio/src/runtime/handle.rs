@@ -244,7 +244,7 @@ cfg_rt_core! {
         /// use std::thread;
         ///
         /// // Create the runtime.
-        /// let mut rt = Builder::new()
+        /// let rt  = Builder::new()
         ///     .enable_all()
         ///     .basic_scheduler()
         ///     .build()

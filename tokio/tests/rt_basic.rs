@@ -12,7 +12,7 @@ use std::time::Duration;
 fn spawned_task_does_not_progress_without_block_on() {
     let (tx, mut rx) = oneshot::channel();
 
-    let mut rt = rt();
+    let rt = rt();
 
     rt.spawn(async move {
         assert_ok!(tx.send("hello"));
@@ -65,7 +65,7 @@ fn no_extra_poll() {
     };
     let npolls = Arc::clone(&rx.npolls);
 
-    let mut rt = rt();
+    let rt = rt();
 
     rt.spawn(async move { while rx.next().await.is_some() {} });
     rt.block_on(async {
@@ -100,7 +100,7 @@ fn acquire_mutex_in_drop() {
     let (tx1, rx1) = oneshot::channel();
     let (tx2, rx2) = oneshot::channel();
 
-    let mut rt = rt();
+    let rt = rt();
 
     rt.spawn(async move {
         let _ = rx2.await;

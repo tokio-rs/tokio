@@ -57,22 +57,20 @@ fn many_oneshot_futures() {
 }
 #[test]
 fn many_multishot_futures() {
-    use tokio::sync::mpsc;
-
     const CHAIN: usize = 200;
     const CYCLES: usize = 5;
     const TRACKS: usize = 50;
 
     for _ in 0..50 {
-        let mut rt = rt();
+        let rt = rt();
         let mut start_txs = Vec::with_capacity(TRACKS);
         let mut final_rxs = Vec::with_capacity(TRACKS);
 
         for _ in 0..TRACKS {
-            let (start_tx, mut chain_rx) = mpsc::channel(10);
+            let (start_tx, mut chain_rx) = tokio::sync::mpsc::channel(10);
 
             for _ in 0..CHAIN {
-                let (mut next_tx, next_rx) = mpsc::channel(10);
+                let (mut next_tx, next_rx) = tokio::sync::mpsc::channel(10);
 
                 // Forward all the messages
                 rt.spawn(async move {
@@ -85,7 +83,7 @@ fn many_multishot_futures() {
             }
 
             // This final task cycles if needed
-            let (mut final_tx, final_rx) = mpsc::channel(10);
+            let (mut final_tx, final_rx) = tokio::sync::mpsc::channel(10);
             let mut cycle_tx = start_tx.clone();
             let mut rem = CYCLES;
 
@@ -123,7 +121,7 @@ fn many_multishot_futures() {
 
 #[test]
 fn spawn_shutdown() {
-    let mut rt = rt();
+    let rt = rt();
     let (tx, rx) = mpsc::channel();
 
     rt.block_on(async {
@@ -230,7 +228,7 @@ fn start_stop_callbacks_called() {
 
     let after_inner = after_start.clone();
     let before_inner = before_stop.clone();
-    let mut rt = tokio::runtime::Builder::new()
+    let rt = tokio::runtime::Builder::new()
         .threaded_scheduler()
         .enable_all()
         .on_thread_start(move || {
@@ -331,9 +329,7 @@ fn multi_threadpool() {
 // channel yields occasionally even if there are values ready to receive.
 #[test]
 fn coop_and_block_in_place() {
-    use tokio::sync::mpsc;
-
-    let mut rt = tokio::runtime::Builder::new()
+    let rt = tokio::runtime::Builder::new()
         .threaded_scheduler()
         // Setting max threads to 1 prevents another thread from claiming the
         // runtime worker yielded as part of `block_in_place` and guarantees the
@@ -344,7 +340,7 @@ fn coop_and_block_in_place() {
         .unwrap();
 
     rt.block_on(async move {
-        let (mut tx, mut rx) = mpsc::channel(1024);
+        let (mut tx, mut rx) = tokio::sync::mpsc::channel(1024);
 
         // Fill the channel
         for _ in 0..1024 {

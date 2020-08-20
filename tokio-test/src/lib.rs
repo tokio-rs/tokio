@@ -28,7 +28,7 @@ pub mod task;
 pub fn block_on<F: std::future::Future>(future: F) -> F::Output {
     use tokio::runtime;
 
-    let mut rt = runtime::Builder::new()
+    let rt = runtime::Builder::new()
         .basic_scheduler()
         .enable_all()
         .build()
