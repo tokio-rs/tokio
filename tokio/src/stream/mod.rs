@@ -3,6 +3,13 @@
 //! A `Stream` is an asynchronous sequence of values. It can be thought of as an asynchronous version of the standard library's `Iterator` trait.
 //!
 //! This module provides helpers to work with them.
+//!
+//! # Converting from `Stream` to `AsyncRead`
+//!
+//! Often a user may want to convert from a `Stream` to an `AsyncRead` for this usecase refer to
+//! [`stream_reader`]
+//!
+//! [`stream_reader`]: crate::io::stream_reader
 
 mod all;
 use all::AllFuture;
