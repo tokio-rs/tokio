@@ -13,7 +13,7 @@
 //! `Stream` use `while let` as follows:
 //!
 //! ```rust
-//! use tokio::stream::self;
+//! use tokio::stream::{self, StreamExt};
 //!
 //! #[tokio::main]
 //! async fn main() {
