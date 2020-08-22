@@ -8,9 +8,9 @@
 //! # Iterating over a Stream
 //!
 //! Due to similarities with the standard library's `Iterator` trait, some new
-//! users may assume they can use `for in` syntax to iterate over a `Stream`.  
-//! However, this isn't the case so instead to iterate over the values in a
-//! `Stream` use `while let` as follows:
+//! users may assume that they can use `for in` syntax to iterate over a
+//! `Stream`, but this is unfortunately not possible. Instead, you can use a
+//! `while let` loop as follows:
 //!
 //! ```rust
 //! use tokio::stream::{self, StreamExt};
@@ -30,27 +30,25 @@
 //! A common way to stream values from a function is to pass in the sender
 //! half of a channel and use the receiver as the stream. This requires awaiting
 //! both futures to ensure progress is made. Another alternative is the
-//! [async-stream] crate which contains macros which provide a `yield` keyword
+//! [async-stream] crate, which contains macros that provide a `yield` keyword
 //! and allow you to return an `impl Stream`.
 //!
-//! [async-stream]: https://docs.rs/async-stream/0.3/async_stream/index.html
+//! [async-stream]: https://docs.rs/async-stream
 //!
-//! # Conversion to and from the AsyncRead/AsyncWrite
+//! # Conversion to and from AsyncRead/AsyncWrite
 //!
-//! It is often desirable to convert from a `Stream` to an [`AsyncRead`],
+//! It is often desirable to convert a `Stream` into an [`AsyncRead`],
 //! especially when dealing with plaintext formats streamed over the network.
-//! To enable this functionality more ergonomically, [`tokio::io`] provides a
-//! function [`stream_reader`] for this purpose.
+//! To enable this functionality, [`tokio::io`] provides the [`stream_reader`]
+//! function for this purpose.
 //!
-//! It is often convenient to encapsulate the reading and writing of
-//! bytes and instead work with a [`Sink`] or `Stream` of some data
-//! type that is encoded as bytes and/or decoded from bytes. Tokio
+//! The inverse conversion to go from an [`AsyncRead`] into a [`Stream`]
+//! is also a commonly desired feature. For this usecase, Tokio
 //! provides some utility traits in the [tokio-util] crate that
 //! abstract the asynchronous buffering that is required and allows
 //! you to write [`Encoder`] and [`Decoder`] functions working with a
 //! buffer of bytes, and then use that ["codec"] to transform anything
-//! that implements [`AsyncRead`] and [`AsyncWrite`] into a `Sink`/`Stream` of
-//! your structured data.
+//! that implements [`AsyncRead`] into a `Stream` of your structured data.
 //!
 //! [tokio-util]: https://docs.rs/tokio-util/0.3/tokio_util/codec/index.html
 //! [`tokio::io`]: crate::io
