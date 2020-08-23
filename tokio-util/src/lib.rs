@@ -38,4 +38,8 @@ cfg_compat! {
     pub mod compat;
 }
 
+cfg_io! {
+    pub mod io;
+}
+
 pub mod sync;
