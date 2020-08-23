@@ -1,7 +1,5 @@
-#![cfg(tokio_unstable)]
-
 use tokio::pin;
-use tokio::sync::CancellationToken;
+use tokio_util::sync::CancellationToken;
 
 use core::future::Future;
 use core::task::{Context, Poll};
@@ -186,8 +184,8 @@ fn drop_multiple_child_tokens() {
     for drop_first_child_first in &[true, false] {
         let token = CancellationToken::new();
         let mut child_tokens = [None, None, None];
-        for i in 0..child_tokens.len() {
-            child_tokens[i] = Some(token.child_token());
+        for child in &mut child_tokens {
+            *child = Some(token.child_token());
         }
 
         assert!(!token.is_cancelled());

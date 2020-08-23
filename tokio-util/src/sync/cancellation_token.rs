@@ -3,7 +3,7 @@
 
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Mutex;
-use crate::util::intrusive_double_linked_list::{LinkedList, ListNode};
+use crate::sync::intrusive_double_linked_list::{LinkedList, ListNode};
 
 use core::future::Future;
 use core::pin::Pin;
@@ -126,6 +126,12 @@ impl Drop for CancellationToken {
                 parent.unregister_child(token_state_pointer, current_state);
             }
         }
+    }
+}
+
+impl Default for CancellationToken {
+    fn default() -> CancellationToken {
+        CancellationToken::new()
     }
 }
 

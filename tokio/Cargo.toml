@@ -125,7 +125,6 @@ optional = true
 [dev-dependencies]
 tokio-test = { version = "0.3.0", path = "../tokio-test" }
 futures = { version = "0.3.0", features = ["async-await"] }
-futures-test = "0.3.0"
 proptest = "0.9.4"
 tempfile = "3.1.0"
 

@@ -24,6 +24,8 @@
 #[macro_use]
 mod cfg;
 
+mod loom;
+
 cfg_codec! {
     pub mod codec;
 }
@@ -35,3 +37,5 @@ cfg_udp! {
 cfg_compat! {
     pub mod compat;
 }
+
+pub mod sync;

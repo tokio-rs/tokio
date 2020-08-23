@@ -434,11 +434,6 @@ cfg_sync! {
 
     pub mod broadcast;
 
-    cfg_unstable! {
-        mod cancellation_token;
-        pub use cancellation_token::{CancellationToken, WaitForCancellationFuture};
-    }
-
     pub mod mpsc;
 
     mod mutex;
