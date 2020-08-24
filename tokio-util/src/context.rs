@@ -28,3 +28,10 @@ impl<F: Future> Future for TokioContext<F> {
         handle.enter(|| fut.poll(cx))
     }
 }
+
+impl<F: Future> TokioContext<F> {
+    /// docs
+    pub fn new(f: F, handle: Handle) -> Self {
+        Self { inner: f, handle }
+    }
+}
