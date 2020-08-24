@@ -226,7 +226,7 @@ impl<T: ?Sized> Mutex<T> {
     /// ```
     /// use tokio::sync::Mutex;
     ///
-    /// static lock: Mutex = Mutex::const_new(5);
+    /// static lock: Mutex<i32> = Mutex::const_new(5);
     /// ```
     #[cfg(all(feature = "parking_lot", not(all(loom, test)),))]
     pub const fn const_new(t: T) -> Self
