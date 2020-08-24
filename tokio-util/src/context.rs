@@ -10,7 +10,7 @@ use std::{
 use tokio::runtime::Handle;
 
 pin_project! {
-    /// TODO: add docs
+    /// TODO: add docs. Get some inspiration?
     pub struct TokioContext<F> {
         #[pin]
         inner: F,
@@ -30,7 +30,8 @@ impl<F: Future> Future for TokioContext<F> {
 }
 
 impl<F: Future> TokioContext<F> {
-    /// docs
+    /// Creates a new `TokioContext`. Expects a future as its first argument, and a
+    /// `tokio::runtime::Handle` as a second.
     pub fn new(f: F, handle: Handle) -> Self {
         Self { inner: f, handle }
     }
