@@ -16,10 +16,7 @@ impl AtomicUsize {
         AtomicUsize { inner }
     }
 
-    #[cfg(all(
-        feature = "parking_lot", 
-        not(all(loom, test)),
-    ))]
+    #[cfg(all(feature = "parking_lot", not(all(loom, test)),))]
     pub(crate) const fn const_new(val: usize) -> AtomicUsize {
         let inner = UnsafeCell::new(std::sync::atomic::AtomicUsize::new(val));
         AtomicUsize { inner }

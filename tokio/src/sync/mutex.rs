@@ -228,13 +228,10 @@ impl<T: ?Sized> Mutex<T> {
     ///
     /// static lock: Mutex = Mutex::const_new(5);
     /// ```
-    #[cfg(all(
-        feature = "parking_lot", 
-        not(all(loom, test)),
-    ))]
+    #[cfg(all(feature = "parking_lot", not(all(loom, test)),))]
     pub const fn const_new(t: T) -> Self
     where
-        T: Sized
+        T: Sized,
     {
         Self {
             c: UnsafeCell::new(t),
