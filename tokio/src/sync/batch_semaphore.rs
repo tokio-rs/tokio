@@ -123,6 +123,24 @@ impl Semaphore {
         }
     }
 
+    /// Creates a new semaphore with the initial number of permits
+    ///
+    /// Maximum number of permits on 32-bit platforms is `1<<29`.
+    #[cfg(all(
+        feature = "parking_lot", 
+        not(all(loom, test)),
+    ))]
+    pub(crate) const fn const_new(permits: usize) -> Self {
+        // FIXME: assertions and by extension panics are still being worked on: https://github.com/rust-lang/rust/issues/74925
+        Self {
+            permits: AtomicUsize::const_new(permits << Self::PERMIT_SHIFT),
+            waiters: Mutex::const_new(Waitlist {
+                queue: LinkedList::const_new(),
+                closed: false,
+            }),
+        }
+    }
+
     /// Returns the current number of available permits
     pub(crate) fn available_permits(&self) -> usize {
         self.permits.load(Acquire) >> Self::PERMIT_SHIFT

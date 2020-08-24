@@ -75,6 +75,19 @@ impl<T: Link> LinkedList<T> {
         }
     }
 
+    /// Creates an empty linked list
+    #[cfg(all(
+        feature = "parking_lot", 
+        not(all(loom, test)),
+    ))]
+    pub(crate) const fn const_new() -> LinkedList<T> {
+        LinkedList {
+            head: None,
+            tail: None,
+        }
+    }
+
+
     /// Adds an element first in the list.
     pub(crate) fn push_front(&mut self, val: T::Handle) {
         // The value should not be dropped, it is being inserted into the list
