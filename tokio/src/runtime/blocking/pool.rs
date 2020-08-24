@@ -5,6 +5,7 @@ use crate::loom::thread;
 use crate::runtime::blocking::schedule::NoopSchedule;
 use crate::runtime::blocking::shutdown;
 use crate::runtime::blocking::task::BlockingTask;
+use crate::runtime::builder::ThreadNameFn;
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{Builder, Callback, Handle};
 
@@ -32,7 +33,7 @@ struct Inner {
     condvar: Condvar,
 
     /// Spawned threads use this name
-    thread_name: String,
+    thread_name: ThreadNameFn,
 
     /// Spawned thread stack size
     stack_size: Option<usize>,
@@ -214,7 +215,7 @@ impl Spawner {
         rt: &Handle,
         worker_id: usize,
     ) -> thread::JoinHandle<()> {
-        let mut builder = thread::Builder::new().name(self.inner.thread_name.clone());
+        let mut builder = thread::Builder::new().name((self.inner.thread_name)());
 
         if let Some(stack_size) = self.inner.stack_size {
             builder = builder.stack_size(stack_size);
