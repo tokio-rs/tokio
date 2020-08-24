@@ -3,7 +3,6 @@ use crate::runtime::shell::Shell;
 use crate::runtime::{blocking, io, time, Callback, Runtime, Spawner};
 
 use std::fmt;
-#[cfg(not(loom))]
 use std::sync::Arc;
 
 /// Builds Tokio Runtime with custom configuration values.
@@ -55,8 +54,8 @@ pub struct Builder {
     /// Cap on thread usage.
     max_threads: usize,
 
-    /// Name used for threads spawned by the runtime.
-    pub(super) thread_name: String,
+    /// Name fn used for threads spawned by the runtime.
+    pub(super) thread_name: ThreadNameFn,
 
     /// Stack size used for threads spawned by the runtime.
     pub(super) thread_stack_size: Option<usize>,
@@ -67,6 +66,8 @@ pub struct Builder {
     /// To run before each worker thread stops
     pub(super) before_stop: Option<Callback>,
 }
+
+pub(crate) type ThreadNameFn = Arc<dyn Fn() -> String + Send + Sync + 'static>;
 
 #[derive(Debug, Clone, Copy)]
 enum Kind {
@@ -99,7 +100,7 @@ impl Builder {
             max_threads: 512,
 
             // Default thread name
-            thread_name: "tokio-runtime-worker".into(),
+            thread_name: Arc::new(|| "tokio-runtime-worker".into()),
 
             // Do not set a stack size by default
             thread_stack_size: None,
@@ -210,7 +211,36 @@ impl Builder {
     /// # }
     /// ```
     pub fn thread_name(&mut self, val: impl Into<String>) -> &mut Self {
-        self.thread_name = val.into();
+        let val = val.into();
+        self.thread_name = Arc::new(move || val.clone());
+        self
+    }
+
+    /// Sets a function used to generate the name of threads spawned by the `Runtime`'s thread pool.
+    ///
+    /// The default name fn is `|| "tokio-runtime-worker".into()`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use tokio::runtime;
+    /// # use std::sync::atomic::{AtomicUsize, Ordering};
+    ///
+    /// # pub fn main() {
+    /// let rt = runtime::Builder::new()
+    ///     .thread_name_fn(|| {
+    ///        static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+    ///        let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+    ///        format!("my-pool-{}", id)
+    ///     })
+    ///     .build();
+    /// # }
+    /// ```
+    pub fn thread_name_fn<F>(&mut self, f: F) -> &mut Self
+    where
+        F: Fn() -> String + Send + Sync + 'static,
+    {
+        self.thread_name = Arc::new(f);
         self
     }
 
@@ -513,7 +543,10 @@ impl fmt::Debug for Builder {
             .field("kind", &self.kind)
             .field("core_threads", &self.core_threads)
             .field("max_threads", &self.max_threads)
-            .field("thread_name", &self.thread_name)
+            .field(
+                "thread_name",
+                &"<dyn Fn() -> String + Send + Sync + 'static>",
+            )
             .field("thread_stack_size", &self.thread_stack_size)
             .field("after_start", &self.after_start.as_ref().map(|_| "..."))
             .field("before_stop", &self.after_start.as_ref().map(|_| "..."))
