@@ -76,7 +76,7 @@ impl<T: Link> LinkedList<T> {
     }
 
     /// Creates an empty linked list
-    #[cfg(all(feature = "parking_lot", not(all(loom, test)),))]
+    #[cfg(all(feature = "nightly", feature = "parking_lot", not(all(loom, test)),))]
     pub(crate) const fn const_new() -> LinkedList<T> {
         LinkedList {
             head: None,
