@@ -273,9 +273,23 @@ impl std::os::unix::io::AsRawFd for File {
     }
 }
 
+#[cfg(unix)]
+impl std::os::unix::io::FromRawFd for File {
+    unsafe fn from_raw_fd(_: std::os::unix::io::RawFd) -> Self {
+        unimplemented!();
+    }
+}
+
 #[cfg(windows)]
 impl std::os::windows::io::AsRawHandle for File {
     fn as_raw_handle(&self) -> std::os::windows::io::RawHandle {
+        unimplemented!();
+    }
+}
+
+#[cfg(windows)]
+impl std::os::windows::io::FromRawHandle for File {
+    unsafe fn from_raw_handle(_: std::os::windows::io::RawHandle) -> Self {
         unimplemented!();
     }
 }

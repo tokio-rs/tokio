@@ -778,9 +778,23 @@ impl std::os::unix::io::AsRawFd for File {
     }
 }
 
+#[cfg(unix)]
+impl std::os::unix::io::FromRawFd for File {
+    unsafe fn from_raw_fd(fd: std::os::unix::io::RawFd) -> Self {
+        sys::File::from_raw_fd(fd).into()
+    }
+}
+
 #[cfg(windows)]
 impl std::os::windows::io::AsRawHandle for File {
     fn as_raw_handle(&self) -> std::os::windows::io::RawHandle {
         self.std.as_raw_handle()
+    }
+}
+
+#[cfg(windows)]
+impl std::os::windows::io::FromRawHandle for File {
+    unsafe fn from_raw_handle(handle: std::os::windows::io::RawHandle) -> Self {
+        sys::File::from_raw_handle(handle).into()
     }
 }
