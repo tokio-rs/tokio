@@ -40,9 +40,9 @@ futures-sink = "0.3.0"
 futures-io = { version = "0.3.0", optional = true }
 log = "0.4"
 pin-project-lite = "0.1.4"
-lazy_static = "1.4.0"
 
 [dev-dependencies]
+lazy_static = "1.4.0"
 tokio = { version = "0.3.0", path = "../tokio", features = ["full"] }
 tokio-test = { version = "0.3.0", path = "../tokio-test" }
 
