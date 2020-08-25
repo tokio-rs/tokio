@@ -10,7 +10,7 @@ use std::{
 use tokio::runtime::Handle;
 
 pin_project! {
-    /// TODO: add docs. Get some inspiration?
+    /// TokioContext allows connecting a custom executor with the tokio runtime.
     pub struct TokioContext<F> {
         #[pin]
         inner: F,
@@ -28,11 +28,31 @@ impl<F: Future> Future for TokioContext<F> {
         handle.enter(|| fut.poll(cx))
     }
 }
-
-impl<F: Future> TokioContext<F> {
-    /// Creates a new `TokioContext`. Expects a future as its first argument, and a
-    /// `tokio::runtime::Handle` as a second.
-    pub fn new(f: F, handle: Handle) -> Self {
-        Self { inner: f, handle }
+/// Trait extension that simplifies bundling a `Handle` with a `Future`.
+pub trait HandleExt: Into<Handle> + Clone {
+    /// Convenience method that takes a Future and returns a `TokioContext`.
+    /// # Example
+    /// ```rust,no_run
+    ///
+    /// use std::futures::Future;
+    /// use tokio-utils::context::{HandleExt};
+    /// use tokio::runtime::Handle;
+    ///
+    /// impl ThreadPool {
+    /// fn spawn(&self, f: impl Future<Output = ()> + Send + 'static) {
+    ///     let handle = self.rt.handle().clone();
+    ///     // create a TokioContext from the handle and future.
+    ///     let h = handle.wrap(f);
+    ///     self.inner.spawn_ok(h);
+    /// }
+    /// ```
+    ///
+    fn wrap<F>(&self, fut: F) -> TokioContext<F> 
+    where 
+    F: Future,
+    {
+        TokioContext {inner: fut, handle: (*self).clone().into()}
     }
 }
+
+impl HandleExt for Handle {}

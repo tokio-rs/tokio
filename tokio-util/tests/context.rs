@@ -1,9 +1,8 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::{net::TcpListener, sync::oneshot};
-use tokio_util::context::TokioContext;
+use tokio_util::context::{HandleExt, TokioContext};
 
-use lazy_static::lazy_static;
 use std::future::Future;
 
 struct ThreadPool {
@@ -11,8 +10,18 @@ struct ThreadPool {
     rt: tokio::runtime::Runtime,
 }
 
-lazy_static! {
-    static ref EXECUTOR: ThreadPool = {
+impl ThreadPool {
+    fn spawn(&self, f: impl Future<Output = ()> + Send + 'static) {
+        let handle = self.rt.handle().clone();
+        let h: TokioContext<_> = handle.wrap(f);
+        self.inner.spawn_ok(h);
+    }
+}
+
+#[test]
+fn tokio_context_with_another_runtime() {
+    let (tx, rx) = oneshot::channel();
+    let custom_executor: ThreadPool = {
         // Spawn tokio runtime on a single background thread
         // enabling IO and timers.
         let rt = tokio::runtime::Builder::new()
@@ -26,20 +35,8 @@ lazy_static! {
 
         ThreadPool { inner, rt }
     };
-}
 
-impl ThreadPool {
-    fn spawn(&self, f: impl Future<Output = ()> + Send + 'static) {
-        let handle = self.rt.handle().clone();
-        self.inner.spawn_ok(TokioContext::new(f, handle));
-    }
-}
-
-#[test]
-fn tokio_context_with_another_runtime() {
-    let (tx, rx) = oneshot::channel();
-
-    EXECUTOR.spawn(async move {
+    custom_executor.spawn(async move {
         let listener = TcpListener::bind("0.0.0.0:0").await.unwrap();
         println!("addr: {:?}", listener.local_addr());
         tx.send(()).unwrap();
