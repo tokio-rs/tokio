@@ -33,7 +33,7 @@ use std::task::{self, Poll};
 ///
 /// # `Stream` implementation
 ///
-/// Items are retrieved from the queue via [`Stream::poll_expired`]. If no delays have
+/// Items are retrieved from the queue via [`DelayQueue::poll_expired`]. If no delays have
 /// expired, no items are returned. In this case, `NotReady` is returned and the
 /// current task is registered to be notified once the next item's delay has
 /// expired.
