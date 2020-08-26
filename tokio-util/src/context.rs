@@ -70,7 +70,6 @@ pub trait HandleExt: Into<Handle> + Clone {
     /// executor.spawn(async {
     ///     delay_for(Duration::from_millis(2)).await
     /// });
-
     fn wrap<F>(&self, fut: F) -> TokioContext<F>
     where
         F: Future,
