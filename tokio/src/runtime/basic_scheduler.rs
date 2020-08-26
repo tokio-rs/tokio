@@ -108,6 +108,7 @@ where
     }
 
     /// Spawns a future onto the thread pool
+    #[allow(dead_code)]
     pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + Send + 'static,

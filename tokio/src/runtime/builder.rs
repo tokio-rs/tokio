@@ -463,7 +463,7 @@ cfg_rt_core! {
             let blocking_spawner = blocking_pool.spawner().clone();
 
             Ok(Runtime {
-                kind: Kind::Basic(Arc::new(Mutex::new(scheduler))),
+                kind: Kind::Basic(Arc::new(Mutex::new(Some(scheduler)))),
                 handle: Handle {
                     spawner,
                     io_handle,

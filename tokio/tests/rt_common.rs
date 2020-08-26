@@ -82,41 +82,12 @@ rt_test! {
         assert!(win);
     }
 
-    #[test]
-    fn block_on_handle_sync() {
-        let rt = rt();
-
-        let mut win = false;
-        rt.handle().block_on(async {
-            win = true;
-        });
-
-        assert!(win);
-    }
 
     #[test]
     fn block_on_async() {
         let rt = rt();
 
         let out = rt.block_on(async {
-            let (tx, rx) = oneshot::channel();
-
-            thread::spawn(move || {
-                thread::sleep(Duration::from_millis(50));
-                tx.send("ZOMG").unwrap();
-            });
-
-            assert_ok!(rx.await)
-        });
-
-        assert_eq!(out, "ZOMG");
-    }
-
-    #[test]
-    fn block_on_handle_async() {
-        let rt = rt();
-
-        let out = rt.handle().block_on(async {
             let (tx, rx) = oneshot::channel();
 
             thread::spawn(move || {
@@ -413,7 +384,7 @@ rt_test! {
     #[test]
     fn spawn_from_other_thread_idle() {
         let rt = rt();
-        let handle = rt.handle().clone();
+        let handle = rt.clone();
 
         let (tx, rx) = oneshot::channel();
 
@@ -433,7 +404,7 @@ rt_test! {
     #[test]
     fn spawn_from_other_thread_under_load() {
         let rt = rt();
-        let handle = rt.handle().clone();
+        let handle = rt.clone();
 
         let (tx, rx) = oneshot::channel();
 
@@ -586,7 +557,7 @@ rt_test! {
     #[test]
     fn spawn_blocking_after_shutdown() {
         let rt = rt();
-        let handle = rt.handle().clone();
+        let handle = rt.clone();
 
         // Shutdown
         drop(rt);
@@ -777,15 +748,15 @@ rt_test! {
 
         let rt = rt();
 
-        let h1 = rt.handle().clone();
+        let h1 = rt.clone();
 
-        rt.handle().spawn(async move {
+        rt.spawn(async move {
             // Ensure a waker gets stored in oneshot 1.
             let _ = rx1.await;
             tx3.send(()).unwrap();
         });
 
-        rt.handle().spawn(async move {
+        rt.spawn(async move {
             // When this task is dropped, we'll be "closing remotes".
             // We spawn a new task that owns the `tx1`, to move its Drop
             // out of here.
@@ -802,7 +773,7 @@ rt_test! {
             let _ = rx2.await;
         });
 
-        rt.handle().spawn(async move {
+        rt.spawn(async move {
             let _ = rx3.await;
             // We'll never get here, but once task 3 drops, this will
             // force task 2 to re-schedule since it's waiting on oneshot 2.

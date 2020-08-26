@@ -212,7 +212,7 @@ pub(crate) mod enter;
 use self::enter::enter;
 
 mod handle;
-pub use self::handle::{Handle, TryCurrentError};
+use handle::Handle;
 
 mod io;
 
@@ -293,7 +293,7 @@ enum Kind {
 
     /// Execute all tasks on the current-thread.
     #[cfg(feature = "rt-core")]
-    Basic(Arc<Mutex<BasicScheduler<time::Driver>>>),
+    Basic(Arc<Mutex<Option<BasicScheduler<time::Driver>>>>),
 
     /// Execute tasks across multiple threads.
     #[cfg(feature = "rt-threaded")]
@@ -398,10 +398,7 @@ impl Runtime {
             Kind::Shell(_) => panic!("task execution disabled"),
             #[cfg(feature = "rt-threaded")]
             Kind::ThreadPool(exec) => exec.spawn(future),
-            Kind::Basic(exec) => {
-                let exec = exec.lock().unwrap();
-                exec.spawn(future)
-            }
+            Kind::Basic(_exec) => self.handle.spawner.spawn(future),
         }
     }
 
@@ -442,13 +439,34 @@ impl Runtime {
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
         self.handle.enter(|| match &self.kind {
             Kind::Shell(exec) => {
+                // TODO(lucio): refactor shell to have to ability to extract
+                // the parker and return it back.
                 let mut exec = exec.lock().unwrap();
                 exec.block_on(future)
             }
             #[cfg(feature = "rt-core")]
             Kind::Basic(exec) => {
-                let mut exec = exec.lock().unwrap();
-                exec.block_on(future)
+                // TODO(lucio): clean this up and move this impl into
+                // `basic_scheduler.rs`, this is hacky and bad but will work for
+                // now.
+                if let Some(mut exec_temp) = {
+                    let mut lock = exec.lock().unwrap();
+                    let exec2 = lock.take();
+                    // if lets have lovely semantics and love to fucking
+                    // not drop locks for some reason so gotta do some
+                    // manual clean!!!! YAY!
+                    drop(lock);
+                    exec2
+                } {
+                    let res = exec_temp.block_on(future);
+                    exec.lock().unwrap().replace(exec_temp);
+                    res
+                } else {
+                    self.handle.enter(|| {
+                        let mut enter = crate::runtime::enter(true);
+                        enter.block_on(future).unwrap()
+                    })
+                }
             }
             #[cfg(feature = "rt-threaded")]
             Kind::ThreadPool(exec) => exec.block_on(future),
@@ -492,27 +510,6 @@ impl Runtime {
         F: FnOnce() -> R,
     {
         self.handle.enter(f)
-    }
-
-    /// Return a handle to the runtime's spawner.
-    ///
-    /// The returned handle can be used to spawn tasks that run on this runtime, and can
-    /// be cloned to allow moving the `Handle` to other threads.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio::runtime::Runtime;
-    ///
-    /// let rt = Runtime::new()
-    ///     .unwrap();
-    ///
-    /// let handle = rt.handle();
-    ///
-    /// handle.spawn(async { println!("hello"); });
-    /// ```
-    pub fn handle(&self) -> &Handle {
-        &self.handle
     }
 
     /// Shutdown the runtime, waiting for at most `duration` for all spawned
