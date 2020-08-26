@@ -23,6 +23,7 @@ pin_project! {
 
 impl<F: Future> Future for TokioContext<F> {
     type Output = F::Output;
+
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let me = self.project();
         let handle = me.handle;
@@ -31,6 +32,7 @@ impl<F: Future> Future for TokioContext<F> {
         handle.enter(|| fut.poll(cx))
     }
 }
+
 /// Trait extension that simplifies bundling a `Handle` with a `Future`.
 pub trait HandleExt: Into<Handle> + Clone {
     /// Convenience method that takes a Future and returns a `TokioContext`.
