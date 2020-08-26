@@ -67,7 +67,7 @@ pub trait HandleExt: Into<Handle> + Clone {
     {
         TokioContext {
             inner: fut,
-            handle: (*self).clone().into(),
+            handle: self.clone().into(),
         }
     }
 }
