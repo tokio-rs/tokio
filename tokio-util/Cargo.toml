@@ -45,7 +45,7 @@ pin-project-lite = "0.1.4"
 tokio = { version = "0.3.0", path = "../tokio", features = ["full"] }
 tokio-test = { version = "0.3.0", path = "../tokio-test" }
 
-futures = { version = "0.3.0", features = ["thread-pool"] }
+futures = "0.3.0"
 futures-test = "0.3.5"
 
 [package.metadata.docs.rs]
