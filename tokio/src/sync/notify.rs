@@ -26,7 +26,7 @@ use std::task::{Context, Poll, Waker};
 /// be made available, consumes the permit, and resumes.  [`notify()`] sets the
 /// permit, waking a pending task if there is one.
 ///
-/// If `notify()` is called **before** `notfied().await`, then the next call to
+/// If `notify()` is called **before** `notified().await`, then the next call to
 /// `notified().await` will complete immediately, consuming the permit. Any
 /// subsequent calls to `notified().await` will wait for a new permit.
 ///
