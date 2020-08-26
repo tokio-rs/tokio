@@ -6,7 +6,7 @@
     rust_2018_idioms,
     unreachable_pub
 )]
-#![deny(broken_intra_doc_links)]
+#![deny(intra_doc_link_resolution_failure)]
 #![doc(test(
     no_crate_inject,
     attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))

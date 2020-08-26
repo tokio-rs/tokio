@@ -403,7 +403,7 @@ impl<T> DelayQueue<T> {
     /// # }
     /// ```
     ///
-    /// [`poll`]: struct@DelayQueue::poll
+    /// [`poll`]: method@Self::poll
     /// [`remove`]: method@Self::remove
     /// [`reset`]: method@Self::reset
     /// [`Key`]: struct@Key
@@ -582,7 +582,7 @@ impl<T> DelayQueue<T> {
     ///
     /// Note that this method has no effect on the allocated capacity.
     ///
-    /// [`poll`]: struct@DelayQueue::poll
+    /// [`poll`]: method@Self::poll
     ///
     /// # Examples
     ///
