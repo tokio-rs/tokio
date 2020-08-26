@@ -39,37 +39,28 @@ pub trait HandleExt: Into<Handle> + Clone {
     ///
     /// # Example: calling Tokio Runtime from a custom ThreadPool
     ///
-    /// use std::futures::{self, Future};
-    /// use tokio-utils::context::HandleExt;
-    /// use tokio::runtime::{Builder, Handle, Runtime};
+    ///
+    /// ```no_run
+    /// use tokio_util::context::HandleExt;
     /// use tokio::time::{delay_for, Duration};
     ///
-    /// struct ThreadPool {
-    ///     pub inner: futures::executor::ThreadPool,
-    ///     pub rt: Runtime,
-    /// }
-    ///
-    /// impl ThreadPool {
-    ///     fn spawn(&self, f: impl Future<Output = ()> + Send + 'static) {
-    ///         let handle = self.rt.handle().clone();
-    ///         // create a TokioContext from the handle and future.
-    ///         let h = handle.wrap(f);
-    ///         self.inner.spawn_ok(h);
-    ///     }
-    /// }
-    ///
-    /// let rt = tokio::runtime::Builder::new()
+    /// let mut rt = tokio::runtime::Builder::new()
     ///     .threaded_scheduler()
     ///     .enable_all()
-    ///     .build.unwrap();
-    /// let inner = futures::executor::ThreadPool::builder().create().unwrap();
-    /// let executor: ThreadPool {
-    ///     inner, rt
-    /// }
+    ///     .build().unwrap();
     ///
-    /// executor.spawn(async {
-    ///     delay_for(Duration::from_millis(2)).await
-    /// });
+    /// let rt2 = tokio::runtime::Builder::new()
+    ///     .threaded_scheduler()
+    ///     .build().unwrap();
+    ///
+    /// let fut = delay_for(Duration::from_millis(2));
+    ///
+    /// rt.block_on(
+    ///     rt2
+    ///         .handle()
+    ///         .wrap(async { delay_for(Duration::from_millis(2)).await }),
+    /// );
+    ///```
     fn wrap<F>(&self, fut: F) -> TokioContext<F>
     where
         F: Future,
