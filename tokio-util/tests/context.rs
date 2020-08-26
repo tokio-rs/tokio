@@ -5,7 +5,6 @@ use tokio_util::context::{HandleExt, TokioContext};
 
 use std::future::Future;
 
-
 use tokio::runtime::Builder;
 
 struct ThreadPool {
@@ -23,7 +22,6 @@ impl ThreadPool {
 
 #[test]
 fn tokio_context_with_another_runtime() {
-
     let (tx, rx) = oneshot::channel();
     let custom_executor: ThreadPool = {
         // Spawn tokio runtime on a single background thread
@@ -73,7 +71,7 @@ fn tokio_context_with_another_runtime_no_timer_io() {
         tx.send(()).unwrap();
     });
 
-    // panics: "there is no reactor running, must be called from the context 
+    // panics: "there is no reactor running, must be called from the context
     // of Tokio runtime"
     futures::executor::block_on(rx).unwrap();
 }

@@ -32,7 +32,6 @@ impl<F: Future> Future for TokioContext<F> {
 pub trait HandleExt: Into<Handle> + Clone {
     /// Convenience method that takes a Future and returns a `TokioContext`.
     /// # Example
-    /// ```rust,no_run
     ///
     /// use std::futures::Future;
     /// use tokio-utils::context::{HandleExt};
@@ -45,13 +44,15 @@ pub trait HandleExt: Into<Handle> + Clone {
     ///     let h = handle.wrap(f);
     ///     self.inner.spawn_ok(h);
     /// }
-    /// ```
     ///
-    fn wrap<F>(&self, fut: F) -> TokioContext<F> 
-    where 
-    F: Future,
+    fn wrap<F>(&self, fut: F) -> TokioContext<F>
+    where
+        F: Future,
     {
-        TokioContext {inner: fut, handle: (*self).clone().into()}
+        TokioContext {
+            inner: fut,
+            handle: (*self).clone().into(),
+        }
     }
 }
 
