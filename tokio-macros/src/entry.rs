@@ -1,3 +1,5 @@
+#![allow(clippy::unnecessary_lazy_evaluations)]
+
 use proc_macro::TokenStream;
 use quote::quote;
 use std::num::NonZeroUsize;

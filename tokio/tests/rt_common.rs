@@ -1,4 +1,4 @@
-#![allow(clippy::needless_range_loop)]
+#![allow(clippy::needless_range_loop, clippy::stable_sort_primitive)]
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 

@@ -2,7 +2,9 @@
 #![allow(
     clippy::cognitive_complexity,
     clippy::large_enum_variant,
-    clippy::needless_doctest_main
+    clippy::needless_doctest_main,
+    clippy::match_like_matches_macro,
+    clippy::stable_sort_primitive
 )]
 #![warn(
     missing_debug_implementations,
