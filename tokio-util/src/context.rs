@@ -34,7 +34,7 @@ impl<F: Future> Future for TokioContext<F> {
 }
 
 /// Trait extension that simplifies bundling a `Handle` with a `Future`.
-pub trait HandleExt: Into<Handle> + Clone {
+pub trait HandleExt {
     /// Convenience method that takes a Future and returns a `TokioContext`.
     ///
     /// # Example: calling Tokio Runtime from a custom ThreadPool
@@ -61,15 +61,14 @@ pub trait HandleExt: Into<Handle> + Clone {
     ///         .wrap(async { delay_for(Duration::from_millis(2)).await }),
     /// );
     ///```
-    fn wrap<F>(&self, fut: F) -> TokioContext<F>
-    where
-        F: Future,
-    {
+    fn wrap<F: Future>(&self, fut: F) -> TokioContext<F>;
+}
+
+impl HandleExt for Handle {
+    fn wrap<F: Future>(&self, fut: F) -> TokioContext<F> {
         TokioContext {
             inner: fut,
-            handle: self.clone().into(),
+            handle: self.clone(),
         }
     }
 }
-
-impl HandleExt for Handle {}
