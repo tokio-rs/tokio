@@ -318,7 +318,7 @@ rt_test! {
     #[should_panic]
     fn nested_rt() {
         let rt1 = rt();
-        let rt2  = rt();
+        let rt2 = rt();
 
         rt1.block_on(async { rt2.block_on(async { "hello" }) });
     }
