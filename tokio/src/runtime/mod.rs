@@ -409,10 +409,11 @@ impl Runtime {
     /// complete, and yielding its resolved result. Any tasks or timers which
     /// the future spawns internally will be executed on the runtime.
     ///
-    /// When this runtime is configured with `core_threads = 0` only the first call
-    /// to `block_on` will run the io/timer driver. All other calls _before_ the first
-    /// `block_on` completes will just hook into that driver. This means the driver
-    /// may be passed around from thread to thread manually by the user.
+    /// When this runtime is configured with `core_threads = 0`, only the first call
+    /// to `block_on` will run the IO and timer drivers. Calls to other methods _before_ the first
+    /// `block_on` completes will just hook into the driver running on the thread
+    /// that first called `block_on`. This means that the driver may be passed
+    /// from thread to thread by the user between calls to `block_on`.
     ///
     /// This method may not be called from an asynchronous context.
     ///
