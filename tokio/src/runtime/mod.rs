@@ -289,7 +289,7 @@ pub struct Runtime {
 enum Kind {
     /// Not able to execute concurrent tasks. This variant is mostly used to get
     /// access to the driver handles.
-    Shell(Arc<Mutex<Shell>>),
+    Shell(Arc<Mutex<Option<Shell>>>),
 
     /// Execute all tasks on the current-thread.
     #[cfg(feature = "rt-core")]
@@ -439,25 +439,36 @@ impl Runtime {
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
         self.handle.enter(|| match &self.kind {
             Kind::Shell(exec) => {
-                // TODO(lucio): refactor shell to have to ability to extract
-                // the parker and return it back.
-                let mut exec = exec.lock().unwrap();
-                exec.block_on(future)
+                // TODO(lucio): clean this up and move this impl into
+                // `shell.rs`, this is hacky and bad but will work for
+                // now.
+                let exec_temp = {
+                    let mut lock = exec.lock().unwrap();
+                    lock.take()
+                };
+
+                if let Some(mut exec_temp) = exec_temp {
+                    let res = exec_temp.block_on(future);
+                    exec.lock().unwrap().replace(exec_temp);
+                    res
+                } else {
+                    self.handle.enter(|| {
+                        let mut enter = crate::runtime::enter(true);
+                        enter.block_on(future).unwrap()
+                    })
+                }
             }
             #[cfg(feature = "rt-core")]
             Kind::Basic(exec) => {
                 // TODO(lucio): clean this up and move this impl into
                 // `basic_scheduler.rs`, this is hacky and bad but will work for
                 // now.
-                if let Some(mut exec_temp) = {
+                let exec_temp = {
                     let mut lock = exec.lock().unwrap();
-                    let exec2 = lock.take();
-                    // if lets have lovely semantics and love to fucking
-                    // not drop locks for some reason so gotta do some
-                    // manual clean!!!! YAY!
-                    drop(lock);
-                    exec2
-                } {
+                    lock.take()
+                };
+
+                if let Some(mut exec_temp) = exec_temp {
                     let res = exec_temp.block_on(future);
                     exec.lock().unwrap().replace(exec_temp);
                     res

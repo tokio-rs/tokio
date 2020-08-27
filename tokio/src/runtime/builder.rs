@@ -364,7 +364,7 @@ impl Builder {
         let blocking_spawner = blocking_pool.spawner().clone();
 
         Ok(Runtime {
-            kind: Kind::Shell(Arc::new(Mutex::new(Shell::new(driver)))),
+            kind: Kind::Shell(Arc::new(Mutex::new(Some(Shell::new(driver))))),
             handle: Handle {
                 spawner,
                 io_handle,
