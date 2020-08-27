@@ -831,7 +831,39 @@ impl Child {
                 }
 
                 ret
-            },
+            }
+        }
+    }
+
+    /// Attempts to collect the exit status of the child if it has already
+    /// exited.
+    ///
+    /// This function will not block the calling thread and will only
+    /// check to see if the child process has exited or not. If the child has
+    /// exited then on Unix the process ID is reaped. This function is
+    /// guaranteed to repeatedly return a successful exit status so long as the
+    /// child has already exited.
+    ///
+    /// If the child has exited, then `Ok(Some(status))` is returned. If the
+    /// exit status is not available at this time then `Ok(None)` is returned.
+    /// If an error occurs, then that error is returned.
+    ///
+    /// Note that unlike `wait`, this function will not attempt to drop stdin,
+    /// nor will it wake the current task if the child exits.
+    pub fn try_wait(&mut self) -> io::Result<Option<ExitStatus>> {
+        match &mut self.child {
+            FusedChild::Done(exit) => Ok(Some(*exit)),
+            FusedChild::Child(guard) => {
+                let ret = guard.inner.try_wait();
+
+                if let Ok(Some(exit)) = ret {
+                    // Avoid the overhead of trying to kill a reaped process
+                    guard.kill_on_drop = false;
+                    self.child = FusedChild::Done(exit);
+                }
+
+                ret
+            }
         }
     }
 

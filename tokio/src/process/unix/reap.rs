@@ -63,7 +63,7 @@ where
         self.inner.as_ref().expect("inner has gone away")
     }
 
-    fn inner_mut(&mut self) -> &mut W {
+    pub(crate) fn inner_mut(&mut self) -> &mut W {
         self.inner.as_mut().expect("inner has gone away")
     }
 }
