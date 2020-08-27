@@ -9,38 +9,41 @@ macro_rules! rt_test {
         mod basic_scheduler {
             $($t)*
 
-            fn rt() -> Runtime {
+            fn rt() -> Arc<Runtime> {
                 tokio::runtime::Builder::new()
                     .basic_scheduler()
                     .enable_all()
                     .build()
                     .unwrap()
+                    .into()
             }
         }
 
         mod threaded_scheduler_4_threads {
             $($t)*
 
-            fn rt() -> Runtime {
+            fn rt() -> Arc<Runtime> {
                 tokio::runtime::Builder::new()
                     .threaded_scheduler()
                     .core_threads(4)
                     .enable_all()
                     .build()
                     .unwrap()
+                    .into()
             }
         }
 
         mod threaded_scheduler_1_thread {
             $($t)*
 
-            fn rt() -> Runtime {
+            fn rt() -> Arc<Runtime> {
                 tokio::runtime::Builder::new()
                     .threaded_scheduler()
                     .core_threads(1)
                     .enable_all()
                     .build()
                     .unwrap()
+                    .into()
             }
         }
     }
@@ -836,7 +839,7 @@ rt_test! {
             rx.await.unwrap();
         });
 
-        runtime.shutdown_timeout(Duration::from_millis(100));
+        Arc::try_unwrap(runtime).unwrap().shutdown_timeout(Duration::from_millis(100));
     }
 
     #[test]
@@ -847,7 +850,7 @@ rt_test! {
             tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
         });
 
-        runtime.shutdown_timeout(Duration::from_secs(10_000));
+        Arc::try_unwrap(runtime).unwrap().shutdown_timeout(Duration::from_secs(10_000));
     }
 
     // This test is currently ignored on Windows because of a
@@ -865,7 +868,9 @@ rt_test! {
 
         thread::spawn(|| {
             R.with(|cell| {
-                *cell.borrow_mut() = Some(rt());
+                let rt = rt();
+                let rt = Arc::try_unwrap(rt).unwrap();
+                *cell.borrow_mut() = Some(rt);
             });
 
             let _rt = rt();

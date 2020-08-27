@@ -19,14 +19,14 @@ pin_project! {
     ///
     /// It contains a `Handle` to the runtime. A handle to the runtime can be
     /// obtain by calling the `Runtime::handle()` method.
-    pub struct TokioContext<F> {
+    pub struct TokioContext<'a, F> {
         #[pin]
         inner: F,
-        handle: Runtime,
+        handle: &'a Runtime,
     }
 }
 
-impl<F: Future> Future for TokioContext<F> {
+impl<F: Future> Future for TokioContext<'_, F> {
     type Output = F::Output;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -64,14 +64,14 @@ pub trait RuntimeExt {
     ///         .wrap(async { delay_for(Duration::from_millis(2)).await }),
     /// );
     ///```
-    fn wrap<F: Future>(&self, fut: F) -> TokioContext<F>;
+    fn wrap<F: Future>(&self, fut: F) -> TokioContext<'_, F>;
 }
 
 impl RuntimeExt for Runtime {
-    fn wrap<F: Future>(&self, fut: F) -> TokioContext<F> {
+    fn wrap<F: Future>(&self, fut: F) -> TokioContext<'_, F> {
         TokioContext {
             inner: fut,
-            handle: self.clone(),
+            handle: self,
         }
     }
 }

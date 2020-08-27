@@ -240,7 +240,7 @@ cfg_rt_core! {
     use crate::task::JoinHandle;
 }
 
-use crate::loom::sync::{Arc, Mutex};
+use crate::loom::sync::Mutex;
 use std::future::Future;
 use std::time::Duration;
 
@@ -272,7 +272,7 @@ use std::time::Duration;
 /// [`new`]: method@Self::new
 /// [`Builder`]: struct@Builder
 /// [`tokio::run`]: fn@run
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Runtime {
     /// Task executor
     kind: Kind,
@@ -281,23 +281,23 @@ pub struct Runtime {
     handle: Handle,
 
     /// Blocking pool handle, used to signal shutdown
-    blocking_pool: Arc<BlockingPool>,
+    blocking_pool: BlockingPool,
 }
 
 /// The runtime executor is either a thread-pool or a current-thread executor.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 enum Kind {
     /// Not able to execute concurrent tasks. This variant is mostly used to get
     /// access to the driver handles.
-    Shell(Arc<Mutex<Option<Shell>>>),
+    Shell(Mutex<Option<Shell>>),
 
     /// Execute all tasks on the current-thread.
     #[cfg(feature = "rt-core")]
-    Basic(Arc<Mutex<Option<BasicScheduler<time::Driver>>>>),
+    Basic(Mutex<Option<BasicScheduler<time::Driver>>>),
 
     /// Execute tasks across multiple threads.
     #[cfg(feature = "rt-threaded")]
-    ThreadPool(Arc<ThreadPool>),
+    ThreadPool(ThreadPool),
 }
 
 /// After thread starts / before thread stops
@@ -452,10 +452,8 @@ impl Runtime {
                     exec.lock().unwrap().replace(exec_temp);
                     res
                 } else {
-                    self.handle.enter(|| {
-                        let mut enter = crate::runtime::enter(true);
-                        enter.block_on(future).unwrap()
-                    })
+                    let mut enter = crate::runtime::enter(true);
+                    enter.block_on(future).unwrap()
                 }
             }
             #[cfg(feature = "rt-core")]
@@ -473,10 +471,8 @@ impl Runtime {
                     exec.lock().unwrap().replace(exec_temp);
                     res
                 } else {
-                    self.handle.enter(|| {
-                        let mut enter = crate::runtime::enter(true);
-                        enter.block_on(future).unwrap()
-                    })
+                    let mut enter = crate::runtime::enter(true);
+                    enter.block_on(future).unwrap()
                 }
             }
             #[cfg(feature = "rt-threaded")]
@@ -558,11 +554,7 @@ impl Runtime {
     pub fn shutdown_timeout(mut self, duration: Duration) {
         // Wakeup and shutdown all the worker threads
         self.handle.spawner.shutdown();
-
-        // TODO: this is likely incorrect, we need to find some way to synchronize shutting down.
-        if let Some(blocking_pool) = Arc::get_mut(&mut self.blocking_pool) {
-            blocking_pool.shutdown(Some(duration));
-        }
+        self.blocking_pool.shutdown(Some(duration));
     }
 
     /// Shutdown the runtime, without waiting for any spawned tasks to shutdown.

@@ -364,7 +364,7 @@ impl Builder {
         let blocking_spawner = blocking_pool.spawner().clone();
 
         Ok(Runtime {
-            kind: Kind::Shell(Arc::new(Mutex::new(Some(Shell::new(driver))))),
+            kind: Kind::Shell(Mutex::new(Some(Shell::new(driver)))),
             handle: Handle {
                 spawner,
                 io_handle,
@@ -463,7 +463,7 @@ cfg_rt_core! {
             let blocking_spawner = blocking_pool.spawner().clone();
 
             Ok(Runtime {
-                kind: Kind::Basic(Arc::new(Mutex::new(Some(scheduler)))),
+                kind: Kind::Basic(Mutex::new(Some(scheduler))),
                 handle: Handle {
                     spawner,
                     io_handle,
@@ -523,7 +523,7 @@ cfg_rt_threaded! {
             handle.enter(|| launch.launch());
 
             Ok(Runtime {
-                kind: Kind::ThreadPool(Arc::new(scheduler)),
+                kind: Kind::ThreadPool(scheduler),
                 handle,
                 blocking_pool,
             })
