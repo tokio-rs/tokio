@@ -12,7 +12,7 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use tokio::runtime::Handle;
+use tokio::runtime::Runtime;
 
 pin_project! {
     /// `TokioContext` allows connecting a custom executor with the tokio runtime.
@@ -22,7 +22,7 @@ pin_project! {
     pub struct TokioContext<F> {
         #[pin]
         inner: F,
-        handle: Handle,
+        handle: Runtime,
     }
 }
 
@@ -39,16 +39,16 @@ impl<F: Future> Future for TokioContext<F> {
 }
 
 /// Trait extension that simplifies bundling a `Handle` with a `Future`.
-pub trait HandleExt {
+pub trait RuntimeExt {
     /// Convenience method that takes a Future and returns a `TokioContext`.
     ///
     /// # Example: calling Tokio Runtime from a custom ThreadPool
     ///
     /// ```no_run
-    /// use tokio_util::context::HandleExt;
+    /// use tokio_util::context::RuntimeExt;
     /// use tokio::time::{delay_for, Duration};
     ///
-    /// let mut rt = tokio::runtime::Builder::new()
+    /// let rt = tokio::runtime::Builder::new()
     ///     .threaded_scheduler()
     ///     .enable_all()
     ///     .build().unwrap();
@@ -61,14 +61,13 @@ pub trait HandleExt {
     ///
     /// rt.block_on(
     ///     rt2
-    ///         .handle()
     ///         .wrap(async { delay_for(Duration::from_millis(2)).await }),
     /// );
     ///```
     fn wrap<F: Future>(&self, fut: F) -> TokioContext<F>;
 }
 
-impl HandleExt for Handle {
+impl RuntimeExt for Runtime {
     fn wrap<F: Future>(&self, fut: F) -> TokioContext<F> {
         TokioContext {
             inner: fut,
