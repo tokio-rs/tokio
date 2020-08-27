@@ -67,7 +67,7 @@ pub struct Builder {
     pub(super) before_stop: Option<Callback>,
 }
 
-pub(crate) type ThreadNameFn = Arc<dyn Fn() -> String + Send + Sync + 'static>;
+pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync + 'static>;
 
 #[derive(Debug, Clone, Copy)]
 enum Kind {
@@ -100,7 +100,7 @@ impl Builder {
             max_threads: 512,
 
             // Default thread name
-            thread_name: Arc::new(|| "tokio-runtime-worker".into()),
+            thread_name: std::sync::Arc::new(|| "tokio-runtime-worker".into()),
 
             // Do not set a stack size by default
             thread_stack_size: None,
@@ -212,7 +212,7 @@ impl Builder {
     /// ```
     pub fn thread_name(&mut self, val: impl Into<String>) -> &mut Self {
         let val = val.into();
-        self.thread_name = Arc::new(move || val.clone());
+        self.thread_name = std::sync::Arc::new(move || val.clone());
         self
     }
 
@@ -240,7 +240,7 @@ impl Builder {
     where
         F: Fn() -> String + Send + Sync + 'static,
     {
-        self.thread_name = Arc::new(f);
+        self.thread_name = std::sync::Arc::new(f);
         self
     }
 

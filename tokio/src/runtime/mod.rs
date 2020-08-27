@@ -409,10 +409,10 @@ impl Runtime {
     /// complete, and yielding its resolved result. Any tasks or timers which
     /// the future spawns internally will be executed on the runtime.
     ///
-    /// `&mut` is required as calling `block_on` **may** result in advancing the
-    /// state of the runtime. The details depend on how the runtime is
-    /// configured. [`runtime::Handle::block_on`][handle] provides a version
-    /// that takes `&self`.
+    /// When this runtime is configured with `core_threads = 0` only the first call
+    /// to `block_on` will run the io/timer driver. All other calls _before_ the first
+    /// `block_on` completes will just hook into that driver. This means the driver
+    /// may be passed around from thread to thread manually by the user.
     ///
     /// This method may not be called from an asynchronous context.
     ///
@@ -477,11 +477,8 @@ impl Runtime {
     /// have an executor available on creation such as [`Delay`] or [`TcpStream`].
     /// It will also allow you to call methods such as [`tokio::spawn`].
     ///
-    /// This function is also available as [`Handle::enter`].
-    ///
     /// [`Delay`]: struct@crate::time::Delay
     /// [`TcpStream`]: struct@crate::net::TcpStream
-    /// [`Handle::enter`]: fn@crate::runtime::Handle::enter
     /// [`tokio::spawn`]: fn@crate::spawn
     ///
     /// # Example

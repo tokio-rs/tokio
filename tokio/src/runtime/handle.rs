@@ -33,15 +33,4 @@ impl Handle {
     {
         context::enter(self.clone(), f)
     }
-
-    /// Returns a `Handle` view over the currently running `Runtime`
-    ///
-    /// # Panic
-    ///
-    /// This will panic if called outside the context of a Tokio runtime. That means that you must
-    /// call this on one of the threads **being run by the runtime**. Calling this from within a
-    /// thread created by `std::thread::spawn` (for example) will cause a panic.
-    pub(crate) fn current() -> Self {
-        context::current().expect("not currently running on the Tokio runtime.")
-    }
 }

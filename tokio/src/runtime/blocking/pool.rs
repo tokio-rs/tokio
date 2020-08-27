@@ -6,6 +6,7 @@ use crate::runtime::blocking::schedule::NoopSchedule;
 use crate::runtime::blocking::shutdown;
 use crate::runtime::blocking::task::BlockingTask;
 use crate::runtime::builder::ThreadNameFn;
+use crate::runtime::context;
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{Builder, Callback, Handle};
 
@@ -67,7 +68,7 @@ pub(crate) fn spawn_blocking<F, R>(func: F) -> JoinHandle<R>
 where
     F: FnOnce() -> R + Send + 'static,
 {
-    let rt = Handle::current();
+    let rt = context::current().expect("not currently running on the Tokio runtime.");
 
     let (task, handle) = task::joinable(BlockingTask::new(func));
     let _ = rt.blocking_spawner.spawn(task, &rt);
@@ -79,7 +80,7 @@ pub(crate) fn try_spawn_blocking<F, R>(func: F) -> Result<(), ()>
 where
     F: FnOnce() -> R + Send + 'static,
 {
-    let rt = Handle::current();
+    let rt = context::current().expect("not currently running on the Tokio runtime.");
 
     let (task, _handle) = task::joinable(BlockingTask::new(func));
     rt.blocking_spawner.spawn(task, &rt)

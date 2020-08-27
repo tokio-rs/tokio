@@ -262,7 +262,7 @@ impl TcpListener {
     ///
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a tokio runtime, otherwise runtime can be set
-    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     pub fn from_std(listener: net::TcpListener) -> io::Result<TcpListener> {
         let io = mio::net::TcpListener::from_std(listener)?;
         let io = PollEvented::new(io)?;

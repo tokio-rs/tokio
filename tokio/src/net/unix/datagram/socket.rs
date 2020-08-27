@@ -164,7 +164,7 @@ impl UnixDatagram {
     ///
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a Tokio runtime, otherwise runtime can be set
-    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     /// # Examples
     /// ```
     /// # use std::error::Error;
