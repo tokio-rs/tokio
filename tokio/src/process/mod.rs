@@ -18,16 +18,15 @@
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     // The usage is the same as with the standard library's `Command` type, however the value
-//!     // returned from `spawn` is a `Result` containing a `Future`.
-//!     let child = Command::new("echo").arg("hello").arg("world")
-//!                         .spawn();
+//!     // The usage is similar as with the standard library's `Command` type
+//!     let mut child = Command::new("echo")
+//!         .arg("hello")
+//!         .arg("world")
+//!         .spawn()
+//!         .expect("failed to spawn");
 //!
-//!     // Make sure our child succeeded in spawning and process the result
-//!     let future = child.expect("failed to spawn");
-//!
-//!     // Await until the future (and the command) completes
-//!     let status = future.await?;
+//!     // Await until the command completes
+//!     let status = child.wait().await?;
 //!     println!("the command exited with: {}", status);
 //!     Ok(())
 //! }
@@ -83,8 +82,8 @@
 //!
 //!     // Ensure the child process is spawned in the runtime so it can
 //!     // make progress on its own while we await for any output.
-//!     tokio::spawn(async {
-//!         let status = child.await
+//!     tokio::spawn(async move {
+//!         let status = child.wait().await
 //!             .expect("child process encountered an error");
 //!
 //!         println!("child status was: {}", status);
@@ -555,16 +554,17 @@ impl Command {
     ///     Command::new("ls")
     ///         .spawn()
     ///         .expect("ls command failed to start")
+    ///         .wait()
     ///         .await
     ///         .expect("ls command failed to run")
     /// }
     /// ```
     pub fn spawn(&mut self) -> io::Result<Child> {
         imp::spawn_child(&mut self.std).map(|spawned_child| Child {
-            child: ChildDropGuard {
+            child: FusedChild::Child(ChildDropGuard {
                 inner: spawned_child.child,
                 kill_on_drop: self.kill_on_drop,
-            },
+            }),
             stdin: spawned_child.stdin.map(|inner| ChildStdin { inner }),
             stdout: spawned_child.stdout.map(|inner| ChildStdout { inner }),
             stderr: spawned_child.stderr.map(|inner| ChildStderr { inner }),
@@ -615,7 +615,7 @@ impl Command {
             child.stdout.take();
             child.stderr.take();
 
-            child.await
+            child.wait().await
         }
     }
 
@@ -725,11 +725,15 @@ where
     }
 }
 
+/// Keeps track of the exit status of a child process without worrying about
+/// polling the underlying futures even after they have completed.
+#[derive(Debug)]
+enum FusedChild {
+    Child(ChildDropGuard<imp::Child>),
+    Done(ExitStatus),
+}
+
 /// Representation of a child process spawned onto an event loop.
-///
-/// This type is also a future which will yield the `ExitStatus` of the
-/// underlying child process. A `Child` here also provides access to information
-/// like the OS-assigned identifier and the stdio streams.
 ///
 /// # Caveats
 /// Similar to the behavior to the standard library, and unlike the futures
@@ -739,10 +743,9 @@ where
 /// The `Command::kill_on_drop` method can be used to modify this behavior
 /// and kill the child process if the `Child` wrapper is dropped before it
 /// has exited.
-#[must_use = "futures do nothing unless polled"]
 #[derive(Debug)]
 pub struct Child {
-    child: ChildDropGuard<imp::Child>,
+    child: FusedChild,
 
     /// The handle for writing to the child's standard input (stdin), if it has
     /// been captured.
@@ -758,9 +761,17 @@ pub struct Child {
 }
 
 impl Child {
-    /// Returns the OS-assigned process identifier associated with this child.
-    pub fn id(&self) -> u32 {
-        self.child.inner.id()
+    /// Returns the OS-assigned process identifier associated with this child
+    /// while it is still running.
+    ///
+    /// Once the child has been polled to completion this will return `None`.
+    /// This is done to avoid confusion on platforms like Unix where the OS
+    /// identifier could be reused once the process has completed.
+    pub fn id(&self) -> Option<u32> {
+        match &self.child {
+            FusedChild::Child(child) => Some(child.inner.id()),
+            FusedChild::Done(_) => None,
+        }
     }
 
     /// Forces the child to exit.
@@ -783,17 +794,45 @@ impl Child {
     ///     let mut child = Command::new("sleep").arg("1").spawn().unwrap();
     ///     tokio::spawn(async move { send.send(()) });
     ///     tokio::select! {
-    ///         _ = &mut child => {}
+    ///         _ = child.wait() => {}
     ///         _ = recv => {
-    ///             &mut child.kill();
+    ///             child.kill().expect("kill failed");
     ///             // NB: await the child here to avoid a zombie process on Unix platforms
-    ///             child.await.unwrap();
+    ///             child.wait().await.unwrap();
     ///         }
     ///     }
     /// }
-
     pub fn kill(&mut self) -> io::Result<()> {
-        self.child.kill()
+        match &mut self.child {
+            FusedChild::Child(child) => child.kill(),
+            FusedChild::Done(_) => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "invalid argument: can't kill an exited process",
+            )),
+        }
+    }
+
+    /// Waits for the child to exit completely, returning the status that it
+    /// exited with. This function will continue to have the same return value
+    /// after it has been called at least once.
+    ///
+    /// The stdin handle to the child process, if any, will be closed
+    /// before waiting. This helps avoid deadlock: it ensures that the
+    /// child does not block waiting for input from the parent, while
+    /// the parent waits for the child to exit.
+    pub async fn wait(&mut self) -> io::Result<ExitStatus> {
+        match &mut self.child {
+            FusedChild::Done(exit) => Ok(*exit),
+            FusedChild::Child(child) => {
+                let ret = child.await;
+
+                if let Ok(exit) = ret {
+                    self.child = FusedChild::Done(exit);
+                }
+
+                ret
+            },
+        }
     }
 
     /// Returns a future that will resolve to an `Output`, containing the exit
@@ -827,21 +866,13 @@ impl Child {
         let stdout_fut = read_to_end(self.stdout.take());
         let stderr_fut = read_to_end(self.stderr.take());
 
-        let (status, stdout, stderr) = try_join3(self, stdout_fut, stderr_fut).await?;
+        let (status, stdout, stderr) = try_join3(self.wait(), stdout_fut, stderr_fut).await?;
 
         Ok(Output {
             status,
             stdout,
             stderr,
         })
-    }
-}
-
-impl Future for Child {
-    type Output = io::Result<ExitStatus>;
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        Pin::new(&mut self.child).poll(cx)
     }
 }
 

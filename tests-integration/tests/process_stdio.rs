@@ -72,7 +72,7 @@ async fn feed_cat(mut cat: Child, n: usize) -> io::Result<ExitStatus> {
     };
 
     // Compose reading and writing concurrently.
-    future::join3(write, read, cat)
+    future::join3(write, read, cat.wait())
         .map(|(_, _, status)| status)
         .await
 }
