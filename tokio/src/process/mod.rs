@@ -796,24 +796,6 @@ impl Child {
         self.child.kill()
     }
 
-    #[doc(hidden)]
-    #[deprecated(note = "please use `child.stdin` instead")]
-    pub fn stdin(&mut self) -> &mut Option<ChildStdin> {
-        &mut self.stdin
-    }
-
-    #[doc(hidden)]
-    #[deprecated(note = "please use `child.stdout` instead")]
-    pub fn stdout(&mut self) -> &mut Option<ChildStdout> {
-        &mut self.stdout
-    }
-
-    #[doc(hidden)]
-    #[deprecated(note = "please use `child.stderr` instead")]
-    pub fn stderr(&mut self) -> &mut Option<ChildStderr> {
-        &mut self.stderr
-    }
-
     /// Returns a future that will resolve to an `Output`, containing the exit
     /// status, stdout, and stderr of the child process.
     ///
