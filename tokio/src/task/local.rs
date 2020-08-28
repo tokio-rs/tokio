@@ -312,9 +312,9 @@ impl LocalSet {
     /// use tokio::runtime::Runtime;
     /// use tokio::task;
     ///
-    /// let mut rt = Runtime::new().unwrap();
+    /// let rt  = Runtime::new().unwrap();
     /// let local = task::LocalSet::new();
-    /// local.block_on(&mut rt, async {
+    /// local.block_on(&rt, async {
     ///     let join = task::spawn_local(async {
     ///         let blocking_result = task::block_in_place(|| {
     ///             // ...
@@ -329,9 +329,9 @@ impl LocalSet {
     /// use tokio::runtime::Runtime;
     /// use tokio::task;
     ///
-    /// let mut rt = Runtime::new().unwrap();
+    /// let rt  = Runtime::new().unwrap();
     /// let local = task::LocalSet::new();
-    /// local.block_on(&mut rt, async {
+    /// local.block_on(&rt, async {
     ///     let join = task::spawn_local(async {
     ///         let blocking_result = task::spawn_blocking(|| {
     ///             // ...
@@ -346,7 +346,7 @@ impl LocalSet {
     /// [`Runtime::block_on`]: method@crate::runtime::Runtime::block_on
     /// [in-place blocking]: fn@crate::task::block_in_place
     /// [`spawn_blocking`]: fn@crate::task::spawn_blocking
-    pub fn block_on<F>(&self, rt: &mut crate::runtime::Runtime, future: F) -> F::Output
+    pub fn block_on<F>(&self, rt: &crate::runtime::Runtime, future: F) -> F::Output
     where
         F: Future,
     {

@@ -14,11 +14,11 @@ use tokio::signal::unix::{signal, SignalKind};
 fn dropping_loops_does_not_cause_starvation() {
     let kind = SignalKind::user_defined1();
 
-    let mut first_rt = rt();
+    let first_rt = rt();
     let mut first_signal =
         first_rt.block_on(async { signal(kind).expect("failed to register first signal") });
 
-    let mut second_rt = rt();
+    let second_rt = rt();
     let mut second_signal =
         second_rt.block_on(async { signal(kind).expect("failed to register second signal") });
 

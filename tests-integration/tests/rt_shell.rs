@@ -18,7 +18,7 @@ fn basic_shell_rt() {
     });
 
     for _ in 0..1_000 {
-        let mut rt = runtime::Builder::new().build().unwrap();
+        let rt = runtime::Builder::new().build().unwrap();
 
         let (tx, rx) = oneshot::channel();
 

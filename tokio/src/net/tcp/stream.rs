@@ -187,7 +187,7 @@ impl TcpStream {
     ///
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a tokio runtime, otherwise runtime can be set
-    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     pub fn from_std(stream: net::TcpStream) -> io::Result<TcpStream> {
         let io = mio::net::TcpStream::from_stream(stream)?;
         let io = PollEvented::new(io)?;

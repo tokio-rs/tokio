@@ -1,9 +1,9 @@
+use crate::loom::sync::{Arc, Mutex};
 use crate::runtime::handle::Handle;
 use crate::runtime::shell::Shell;
 use crate::runtime::{blocking, io, time, Callback, Runtime, Spawner};
 
 use std::fmt;
-use std::sync::Arc;
 
 /// Builds Tokio Runtime with custom configuration values.
 ///
@@ -67,7 +67,7 @@ pub struct Builder {
     pub(super) before_stop: Option<Callback>,
 }
 
-pub(crate) type ThreadNameFn = Arc<dyn Fn() -> String + Send + Sync + 'static>;
+pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync + 'static>;
 
 #[derive(Debug, Clone, Copy)]
 enum Kind {
@@ -100,7 +100,7 @@ impl Builder {
             max_threads: 512,
 
             // Default thread name
-            thread_name: Arc::new(|| "tokio-runtime-worker".into()),
+            thread_name: std::sync::Arc::new(|| "tokio-runtime-worker".into()),
 
             // Do not set a stack size by default
             thread_stack_size: None,
@@ -212,7 +212,7 @@ impl Builder {
     /// ```
     pub fn thread_name(&mut self, val: impl Into<String>) -> &mut Self {
         let val = val.into();
-        self.thread_name = Arc::new(move || val.clone());
+        self.thread_name = std::sync::Arc::new(move || val.clone());
         self
     }
 
@@ -240,7 +240,7 @@ impl Builder {
     where
         F: Fn() -> String + Send + Sync + 'static,
     {
-        self.thread_name = Arc::new(f);
+        self.thread_name = std::sync::Arc::new(f);
         self
     }
 
@@ -293,7 +293,7 @@ impl Builder {
     where
         F: Fn() + Send + Sync + 'static,
     {
-        self.after_start = Some(Arc::new(f));
+        self.after_start = Some(std::sync::Arc::new(f));
         self
     }
 
@@ -333,7 +333,7 @@ impl Builder {
     /// ```
     /// use tokio::runtime::Builder;
     ///
-    /// let mut rt = Builder::new().build().unwrap();
+    /// let rt  = Builder::new().build().unwrap();
     ///
     /// rt.block_on(async {
     ///     println!("Hello from the Tokio runtime");
@@ -364,7 +364,7 @@ impl Builder {
         let blocking_spawner = blocking_pool.spawner().clone();
 
         Ok(Runtime {
-            kind: Kind::Shell(Shell::new(driver)),
+            kind: Kind::Shell(Mutex::new(Some(Shell::new(driver)))),
             handle: Handle {
                 spawner,
                 io_handle,
@@ -463,7 +463,7 @@ cfg_rt_core! {
             let blocking_spawner = blocking_pool.spawner().clone();
 
             Ok(Runtime {
-                kind: Kind::Basic(scheduler),
+                kind: Kind::Basic(Mutex::new(Some(scheduler))),
                 handle: Handle {
                     spawner,
                     io_handle,
