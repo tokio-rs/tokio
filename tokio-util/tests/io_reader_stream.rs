@@ -1,5 +1,4 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
 
 use std::pin::Pin;
 use std::task::{Context, Poll};
