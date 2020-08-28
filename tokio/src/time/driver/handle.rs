@@ -25,7 +25,7 @@ impl Handle {
     ///
     /// It can also panic whenever a timer is created outside of a Tokio runtime.
     /// That is why `rt.block_on(delay_for(...))` will panic, since they function is
-    /// executed outside of the runtime. Whereas `rt.block_on(async {delay_for(...)})` doesn't
+    /// executed outside of the runtime. Whereas `rt.block_on(async {delay_for(...).await})` doesn't
     /// panic. And this is because wrapping the function on an async makes it lazy, and so
     /// gets executed inside the runtime successfuly without panicking.
     pub(crate) fn current() -> Self {
