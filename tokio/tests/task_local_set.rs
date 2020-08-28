@@ -133,12 +133,12 @@ fn local_threadpool_blocking_in_place() {
 
     ON_RT_THREAD.with(|cell| cell.set(true));
 
-    let mut rt = runtime::Builder::new()
+    let rt = runtime::Builder::new()
         .threaded_scheduler()
         .enable_all()
         .build()
         .unwrap();
-    LocalSet::new().block_on(&mut rt, async {
+    LocalSet::new().block_on(&rt, async {
         assert!(ON_RT_THREAD.with(|cell| cell.get()));
         let join = task::spawn_local(async move {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
@@ -246,12 +246,12 @@ fn join_local_future_elsewhere() {
 
     ON_RT_THREAD.with(|cell| cell.set(true));
 
-    let mut rt = runtime::Builder::new()
+    let rt = runtime::Builder::new()
         .threaded_scheduler()
         .build()
         .unwrap();
     let local = LocalSet::new();
-    local.block_on(&mut rt, async move {
+    local.block_on(&rt, async move {
         let (tx, rx) = oneshot::channel();
         let join = task::spawn_local(async move {
             println!("hello world running...");
@@ -286,7 +286,7 @@ fn drop_cancels_tasks() {
     use std::rc::Rc;
 
     // This test reproduces issue #1842
-    let mut rt = rt();
+    let rt = rt();
     let rc1 = Rc::new(());
     let rc2 = rc1.clone();
 
@@ -303,7 +303,7 @@ fn drop_cancels_tasks() {
         }
     });
 
-    local.block_on(&mut rt, async {
+    local.block_on(&rt, async {
         started_rx.await.unwrap();
     });
     drop(local);
@@ -362,11 +362,11 @@ fn drop_cancels_remote_tasks() {
     with_timeout(Duration::from_secs(60), || {
         let (tx, mut rx) = mpsc::channel::<()>(1024);
 
-        let mut rt = rt();
+        let rt = rt();
 
         let local = LocalSet::new();
         local.spawn_local(async move { while rx.recv().await.is_some() {} });
-        local.block_on(&mut rt, async {
+        local.block_on(&rt, async {
             time::delay_for(Duration::from_millis(1)).await;
         });
 
@@ -385,7 +385,7 @@ fn local_tasks_wake_join_all() {
         use futures::future::join_all;
         use tokio::task::LocalSet;
 
-        let mut rt = rt();
+        let rt = rt();
         let set = LocalSet::new();
         let mut handles = Vec::new();
 

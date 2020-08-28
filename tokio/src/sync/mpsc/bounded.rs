@@ -155,6 +155,42 @@ impl<T> Receiver<T> {
         self.chan.recv(cx)
     }
 
+    /// Blocking receive to call outside of asynchronous contexts.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if called within an asynchronous execution
+    /// context.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::thread;
+    /// use tokio::runtime::Runtime;
+    /// use tokio::sync::mpsc;
+    ///
+    /// fn main() {
+    ///     let (mut tx, mut rx) = mpsc::channel::<u8>(10);
+    ///
+    ///     let sync_code = thread::spawn(move || {
+    ///         assert_eq!(Some(10), rx.blocking_recv());
+    ///     });
+    ///
+    ///     Runtime::new()
+    ///         .unwrap()
+    ///         .block_on(async move {
+    ///             let _ = tx.send(10).await;
+    ///         });
+    ///     sync_code.join().unwrap()
+    /// }
+    /// ```
+    #[cfg(feature = "rt-core")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "rt-core")))]
+    pub fn blocking_recv(&mut self) -> Option<T> {
+        let mut enter_handle = crate::runtime::enter::enter(false);
+        enter_handle.block_on(self.recv()).unwrap()
+    }
+
     /// Attempts to return a pending value on this receiver without blocking.
     ///
     /// This method will never block the caller in order to wait for data to
@@ -391,6 +427,40 @@ impl<T> Sender<T> {
             Err(TrySendError::Full(_)) => unreachable!(),
             Err(TrySendError::Closed(value)) => Err(SendTimeoutError::Closed(value)),
         }
+    }
+
+    /// Blocking send to call outside of asynchronous contexts.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if called within an asynchronous execution
+    /// context.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::thread;
+    /// use tokio::runtime::Runtime;
+    /// use tokio::sync::mpsc;
+    ///
+    /// fn main() {
+    ///     let (mut tx, mut rx) = mpsc::channel::<u8>(1);
+    ///
+    ///     let sync_code = thread::spawn(move || {
+    ///         tx.blocking_send(10).unwrap();
+    ///     });
+    ///
+    ///     Runtime::new().unwrap().block_on(async move {
+    ///         assert_eq!(Some(10), rx.recv().await);
+    ///     });
+    ///     sync_code.join().unwrap()
+    /// }
+    /// ```
+    #[cfg(feature = "rt-core")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "rt-core")))]
+    pub fn blocking_send(&mut self, value: T) -> Result<(), SendError<T>> {
+        let mut enter_handle = crate::runtime::enter::enter(false);
+        enter_handle.block_on(self.send(value)).unwrap()
     }
 
     /// Returns `Poll::Ready(Ok(()))` when the channel is able to accept another item.

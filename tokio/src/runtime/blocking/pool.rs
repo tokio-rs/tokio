@@ -5,6 +5,8 @@ use crate::loom::thread;
 use crate::runtime::blocking::schedule::NoopSchedule;
 use crate::runtime::blocking::shutdown;
 use crate::runtime::blocking::task::BlockingTask;
+use crate::runtime::builder::ThreadNameFn;
+use crate::runtime::context;
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{Builder, Callback, Handle};
 
@@ -32,7 +34,7 @@ struct Inner {
     condvar: Condvar,
 
     /// Spawned threads use this name
-    thread_name: String,
+    thread_name: ThreadNameFn,
 
     /// Spawned thread stack size
     stack_size: Option<usize>,
@@ -66,7 +68,7 @@ pub(crate) fn spawn_blocking<F, R>(func: F) -> JoinHandle<R>
 where
     F: FnOnce() -> R + Send + 'static,
 {
-    let rt = Handle::current();
+    let rt = context::current().expect("not currently running on the Tokio runtime.");
 
     let (task, handle) = task::joinable(BlockingTask::new(func));
     let _ = rt.blocking_spawner.spawn(task, &rt);
@@ -78,7 +80,7 @@ pub(crate) fn try_spawn_blocking<F, R>(func: F) -> Result<(), ()>
 where
     F: FnOnce() -> R + Send + 'static,
 {
-    let rt = Handle::current();
+    let rt = context::current().expect("not currently running on the Tokio runtime.");
 
     let (task, _handle) = task::joinable(BlockingTask::new(func));
     rt.blocking_spawner.spawn(task, &rt)
@@ -214,7 +216,7 @@ impl Spawner {
         rt: &Handle,
         worker_id: usize,
     ) -> thread::JoinHandle<()> {
-        let mut builder = thread::Builder::new().name(self.inner.thread_name.clone());
+        let mut builder = thread::Builder::new().name((self.inner.thread_name)());
 
         if let Some(stack_size) = self.inner.stack_size {
             builder = builder.stack_size(stack_size);

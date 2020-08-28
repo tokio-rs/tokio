@@ -18,7 +18,7 @@ doc_rt_core! {
     ///
     /// This function must be called from the context of a Tokio runtime. Tasks running on
     /// the Tokio runtime are always inside its context, but you can also enter the context
-    /// using the [`Handle::enter`](crate::runtime::Handle::enter()) method.
+    /// using the [`Runtime::enter`](crate::runtime::Runtime::enter()) method.
     ///
     /// # Examples
     ///

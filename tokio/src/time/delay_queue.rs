@@ -27,13 +27,13 @@ use std::task::{self, Poll};
 /// which it should be yielded back.
 ///
 /// Once delays have been configured, the `DelayQueue` is used via its
-/// [`Stream`] implementation. [`poll`] is called. If an entry has reached its
+/// [`Stream`] implementation. [`poll_expired`] is called. If an entry has reached its
 /// deadline, it is returned. If not, `Poll::Pending` indicating that the
 /// current task will be notified once the deadline has been reached.
 ///
 /// # `Stream` implementation
 ///
-/// Items are retrieved from the queue via [`Stream::poll`]. If no delays have
+/// Items are retrieved from the queue via [`DelayQueue::poll_expired`]. If no delays have
 /// expired, no items are returned. In this case, `NotReady` is returned and the
 /// current task is registered to be notified once the next item's delay has
 /// expired.
@@ -115,8 +115,8 @@ use std::task::{self, Poll};
 /// [`insert_at`]: method@Self::insert_at
 /// [`Key`]: struct@Key
 /// [`Stream`]: https://docs.rs/futures/0.1/futures/stream/trait.Stream.html
-/// [`poll`]: method@Self::poll
-/// [`Stream::poll`]: method@Self::poll
+/// [`poll_expired`]: method@Self::poll_expired
+/// [`Stream::poll_expired`]: method@Self::poll_expired
 /// [`DelayQueue`]: struct@DelayQueue
 /// [`delay_for`]: fn@super::delay_for
 /// [`slab`]: slab
@@ -146,9 +146,9 @@ pub struct DelayQueue<T> {
 
 /// An entry in `DelayQueue` that has expired and removed.
 ///
-/// Values are returned by [`DelayQueue::poll`].
+/// Values are returned by [`DelayQueue::poll_expired`].
 ///
-/// [`DelayQueue::poll`]: method@DelayQueue::poll
+/// [`DelayQueue::poll_expired`]: method@DelayQueue::poll_expired
 #[derive(Debug)]
 pub struct Expired<T> {
     /// The data stored in the queue
@@ -260,12 +260,12 @@ impl<T> DelayQueue<T> {
     /// of a `Duration`.
     ///
     /// `value` is stored in the queue until `when` is reached. At which point,
-    /// `value` will be returned from [`poll`]. If `when` has already been
+    /// `value` will be returned from [`poll_expired`]. If `when` has already been
     /// reached, then `value` is immediately made available to poll.
     ///
     /// The return value represents the insertion and is used at an argument to
     /// [`remove`] and [`reset`]. Note that [`Key`] is token and is reused once
-    /// `value` is removed from the queue either by calling [`poll`] after
+    /// `value` is removed from the queue either by calling [`poll_expired`] after
     /// `when` is reached or by calling [`remove`]. At this point, the caller
     /// must take care to not use the returned [`Key`] again as it may reference
     /// a different item in the queue.
@@ -295,7 +295,7 @@ impl<T> DelayQueue<T> {
     /// # }
     /// ```
     ///
-    /// [`poll`]: method@Self::poll
+    /// [`poll_expired`]: method@Self::poll_expired
     /// [`remove`]: method@Self::remove
     /// [`reset`]: method@Self::reset
     /// [`Key`]: struct@Key
@@ -367,12 +367,12 @@ impl<T> DelayQueue<T> {
     /// instead of an `Instant`.
     ///
     /// `value` is stored in the queue until `when` is reached. At which point,
-    /// `value` will be returned from [`poll`]. If `when` has already been
+    /// `value` will be returned from [`poll_expired`]. If `when` has already been
     /// reached, then `value` is immediately made available to poll.
     ///
     /// The return value represents the insertion and is used at an argument to
     /// [`remove`] and [`reset`]. Note that [`Key`] is token and is reused once
-    /// `value` is removed from the queue either by calling [`poll`] after
+    /// `value` is removed from the queue either by calling [`poll_expired`] after
     /// `when` is reached or by calling [`remove`]. At this point, the caller
     /// must take care to not use the returned [`Key`] again as it may reference
     /// a different item in the queue.
@@ -403,7 +403,7 @@ impl<T> DelayQueue<T> {
     /// # }
     /// ```
     ///
-    /// [`poll`]: method@Self::poll
+    /// [`poll_expired`]: method@Self::poll_expired
     /// [`remove`]: method@Self::remove
     /// [`reset`]: method@Self::reset
     /// [`Key`]: struct@Key
@@ -578,11 +578,11 @@ impl<T> DelayQueue<T> {
 
     /// Clears the queue, removing all items.
     ///
-    /// After calling `clear`, [`poll`] will return `Ok(Ready(None))`.
+    /// After calling `clear`, [`poll_expired`] will return `Ok(Ready(None))`.
     ///
     /// Note that this method has no effect on the allocated capacity.
     ///
-    /// [`poll`]: method@Self::poll
+    /// [`poll_expired`]: method@Self::poll_expired
     ///
     /// # Examples
     ///

@@ -2,6 +2,8 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
+use std::thread;
+use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::error::{TryRecvError, TrySendError};
 use tokio_test::task;
@@ -489,4 +491,46 @@ fn try_recv_unbounded() {
         Err(TryRecvError::Closed) => {}
         _ => panic!(),
     }
+}
+
+#[test]
+fn blocking_recv() {
+    let (mut tx, mut rx) = mpsc::channel::<u8>(1);
+
+    let sync_code = thread::spawn(move || {
+        assert_eq!(Some(10), rx.blocking_recv());
+    });
+
+    Runtime::new().unwrap().block_on(async move {
+        let _ = tx.send(10).await;
+    });
+    sync_code.join().unwrap()
+}
+
+#[tokio::test]
+#[should_panic]
+async fn blocking_recv_async() {
+    let (_tx, mut rx) = mpsc::channel::<()>(1);
+    let _ = rx.blocking_recv();
+}
+
+#[test]
+fn blocking_send() {
+    let (mut tx, mut rx) = mpsc::channel::<u8>(1);
+
+    let sync_code = thread::spawn(move || {
+        tx.blocking_send(10).unwrap();
+    });
+
+    Runtime::new().unwrap().block_on(async move {
+        assert_eq!(Some(10), rx.recv().await);
+    });
+    sync_code.join().unwrap()
+}
+
+#[tokio::test]
+#[should_panic]
+async fn blocking_send_async() {
+    let (mut tx, _rx) = mpsc::channel::<()>(1);
+    let _ = tx.blocking_send(());
 }

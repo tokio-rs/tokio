@@ -13,7 +13,7 @@ use std::sync::{mpsc, Arc};
 fn spawn_many(b: &mut Bencher) {
     const NUM_SPAWN: usize = 10_000;
 
-    let mut rt = rt();
+    let rt = rt();
 
     let (tx, rx) = mpsc::sync_channel(1000);
     let rem = Arc::new(AtomicUsize::new(0));
@@ -68,7 +68,7 @@ fn yield_many(b: &mut Bencher) {
 fn ping_pong(b: &mut Bencher) {
     const NUM_PINGS: usize = 1_000;
 
-    let mut rt = rt();
+    let rt = rt();
 
     let (done_tx, done_rx) = mpsc::sync_channel(1000);
     let rem = Arc::new(AtomicUsize::new(0));
@@ -111,7 +111,7 @@ fn ping_pong(b: &mut Bencher) {
 fn chained_spawn(b: &mut Bencher) {
     const ITER: usize = 1_000;
 
-    let mut rt = rt();
+    let rt = rt();
 
     fn iter(done_tx: mpsc::SyncSender<()>, n: usize) {
         if n == 0 {

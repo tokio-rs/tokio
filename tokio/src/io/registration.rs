@@ -67,7 +67,7 @@ impl Registration {
     ///
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a tokio runtime, otherwise runtime can be set
-    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     pub fn new<T>(io: &T) -> io::Result<Registration>
     where
         T: Evented,
@@ -104,7 +104,7 @@ impl Registration {
     ///
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a tokio runtime, otherwise runtime can be set
-    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     pub fn new_with_ready<T>(io: &T, ready: mio::Ready) -> io::Result<Registration>
     where
         T: Evented,

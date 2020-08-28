@@ -1,10 +1,9 @@
+use crate::loom::sync::{Arc, Mutex};
 use crate::runtime::handle::Handle;
 use crate::runtime::shell::Shell;
 use crate::runtime::{blocking, io, time, Callback, Runtime, Spawner};
 
 use std::fmt;
-#[cfg(not(loom))]
-use std::sync::Arc;
 
 /// Builds Tokio Runtime with custom configuration values.
 ///
@@ -55,8 +54,8 @@ pub struct Builder {
     /// Cap on thread usage.
     max_threads: usize,
 
-    /// Name used for threads spawned by the runtime.
-    pub(super) thread_name: String,
+    /// Name fn used for threads spawned by the runtime.
+    pub(super) thread_name: ThreadNameFn,
 
     /// Stack size used for threads spawned by the runtime.
     pub(super) thread_stack_size: Option<usize>,
@@ -67,6 +66,8 @@ pub struct Builder {
     /// To run before each worker thread stops
     pub(super) before_stop: Option<Callback>,
 }
+
+pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync + 'static>;
 
 #[derive(Debug, Clone, Copy)]
 enum Kind {
@@ -99,7 +100,7 @@ impl Builder {
             max_threads: 512,
 
             // Default thread name
-            thread_name: "tokio-runtime-worker".into(),
+            thread_name: std::sync::Arc::new(|| "tokio-runtime-worker".into()),
 
             // Do not set a stack size by default
             thread_stack_size: None,
@@ -210,7 +211,36 @@ impl Builder {
     /// # }
     /// ```
     pub fn thread_name(&mut self, val: impl Into<String>) -> &mut Self {
-        self.thread_name = val.into();
+        let val = val.into();
+        self.thread_name = std::sync::Arc::new(move || val.clone());
+        self
+    }
+
+    /// Sets a function used to generate the name of threads spawned by the `Runtime`'s thread pool.
+    ///
+    /// The default name fn is `|| "tokio-runtime-worker".into()`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use tokio::runtime;
+    /// # use std::sync::atomic::{AtomicUsize, Ordering};
+    ///
+    /// # pub fn main() {
+    /// let rt = runtime::Builder::new()
+    ///     .thread_name_fn(|| {
+    ///        static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+    ///        let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+    ///        format!("my-pool-{}", id)
+    ///     })
+    ///     .build();
+    /// # }
+    /// ```
+    pub fn thread_name_fn<F>(&mut self, f: F) -> &mut Self
+    where
+        F: Fn() -> String + Send + Sync + 'static,
+    {
+        self.thread_name = std::sync::Arc::new(f);
         self
     }
 
@@ -263,7 +293,7 @@ impl Builder {
     where
         F: Fn() + Send + Sync + 'static,
     {
-        self.after_start = Some(Arc::new(f));
+        self.after_start = Some(std::sync::Arc::new(f));
         self
     }
 
@@ -303,7 +333,7 @@ impl Builder {
     /// ```
     /// use tokio::runtime::Builder;
     ///
-    /// let mut rt = Builder::new().build().unwrap();
+    /// let rt  = Builder::new().build().unwrap();
     ///
     /// rt.block_on(async {
     ///     println!("Hello from the Tokio runtime");
@@ -334,7 +364,7 @@ impl Builder {
         let blocking_spawner = blocking_pool.spawner().clone();
 
         Ok(Runtime {
-            kind: Kind::Shell(Shell::new(driver)),
+            kind: Kind::Shell(Mutex::new(Some(Shell::new(driver)))),
             handle: Handle {
                 spawner,
                 io_handle,
@@ -433,7 +463,7 @@ cfg_rt_core! {
             let blocking_spawner = blocking_pool.spawner().clone();
 
             Ok(Runtime {
-                kind: Kind::Basic(scheduler),
+                kind: Kind::Basic(Mutex::new(Some(scheduler))),
                 handle: Handle {
                     spawner,
                     io_handle,
@@ -513,7 +543,10 @@ impl fmt::Debug for Builder {
             .field("kind", &self.kind)
             .field("core_threads", &self.core_threads)
             .field("max_threads", &self.max_threads)
-            .field("thread_name", &self.thread_name)
+            .field(
+                "thread_name",
+                &"<dyn Fn() -> String + Send + Sync + 'static>",
+            )
             .field("thread_stack_size", &self.thread_stack_size)
             .field("after_start", &self.after_start.as_ref().map(|_| "..."))
             .field("before_stop", &self.after_start.as_ref().map(|_| "..."))

@@ -1,5 +1,8 @@
-use crate::sync::batch_semaphore::{AcquireError, Semaphore};
+use crate::sync::batch_semaphore::Semaphore;
 use std::cell::UnsafeCell;
+use std::fmt;
+use std::marker;
+use std::mem;
 use std::ops;
 
 #[cfg(not(loom))]
@@ -83,10 +86,140 @@ pub struct RwLock<T: ?Sized> {
 /// [`RwLock`].
 ///
 /// [`read`]: method@RwLock::read
-#[derive(Debug)]
+/// [`RwLock`]: struct@RwLock
 pub struct RwLockReadGuard<'a, T: ?Sized> {
-    permit: ReleasingPermit<'a, T>,
-    lock: &'a RwLock<T>,
+    s: &'a Semaphore,
+    data: *const T,
+    marker: marker::PhantomData<&'a T>,
+}
+
+impl<'a, T> RwLockReadGuard<'a, T> {
+    /// Make a new `RwLockReadGuard` for a component of the locked data.
+    ///
+    /// This operation cannot fail as the `RwLockReadGuard` passed in already
+    /// locked the data.
+    ///
+    /// This is an associated function that needs to be
+    /// used as `RwLockReadGuard::map(...)`. A method would interfere with
+    /// methods of the same name on the contents of the locked data.
+    ///
+    /// This is an asynchronous version of [`RwLockReadGuard::map`] from the
+    /// [`parking_lot` crate].
+    ///
+    /// [`RwLockReadGuard::map`]: https://docs.rs/lock_api/latest/lock_api/struct.RwLockReadGuard.html#method.map
+    /// [`parking_lot` crate]: https://crates.io/crates/parking_lot
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::{RwLock, RwLockReadGuard};
+    ///
+    /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    /// struct Foo(u32);
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let lock = RwLock::new(Foo(1));
+    ///
+    /// let guard = lock.read().await;
+    /// let guard = RwLockReadGuard::map(guard, |f| &f.0);
+    ///
+    /// assert_eq!(1, *guard);
+    /// # }
+    /// ```
+    #[inline]
+    pub fn map<F, U: ?Sized>(this: Self, f: F) -> RwLockReadGuard<'a, U>
+    where
+        F: FnOnce(&T) -> &U,
+    {
+        let data = f(&*this) as *const U;
+        let s = this.s;
+        // NB: Forget to avoid drop impl from being called.
+        mem::forget(this);
+        RwLockReadGuard {
+            s,
+            data,
+            marker: marker::PhantomData,
+        }
+    }
+
+    /// Attempts to make a new [`RwLockReadGuard`] for a component of the
+    /// locked data. The original guard is returned if the closure returns
+    /// `None`.
+    ///
+    /// This operation cannot fail as the `RwLockReadGuard` passed in already
+    /// locked the data.
+    ///
+    /// This is an associated function that needs to be used as
+    /// `RwLockReadGuard::try_map(..)`. A method would interfere with methods of the
+    /// same name on the contents of the locked data.
+    ///
+    /// This is an asynchronous version of [`RwLockReadGuard::try_map`] from the
+    /// [`parking_lot` crate].
+    ///
+    /// [`RwLockReadGuard::try_map`]: https://docs.rs/lock_api/latest/lock_api/struct.RwLockReadGuard.html#method.try_map
+    /// [`parking_lot` crate]: https://crates.io/crates/parking_lot
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::{RwLock, RwLockReadGuard};
+    ///
+    /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    /// struct Foo(u32);
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let lock = RwLock::new(Foo(1));
+    ///
+    /// let guard = lock.read().await;
+    /// let guard = RwLockReadGuard::try_map(guard, |f| Some(&f.0)).expect("should not fail");
+    ///
+    /// assert_eq!(1, *guard);
+    /// # }
+    /// ```
+    #[inline]
+    pub fn try_map<F, U: ?Sized>(this: Self, f: F) -> Result<RwLockReadGuard<'a, U>, Self>
+    where
+        F: FnOnce(&T) -> Option<&U>,
+    {
+        let data = match f(&*this) {
+            Some(data) => data as *const U,
+            None => return Err(this),
+        };
+        let s = this.s;
+        // NB: Forget to avoid drop impl from being called.
+        mem::forget(this);
+        Ok(RwLockReadGuard {
+            s,
+            data,
+            marker: marker::PhantomData,
+        })
+    }
+}
+
+impl<'a, T: ?Sized> fmt::Debug for RwLockReadGuard<'a, T>
+where
+    T: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&**self, f)
+    }
+}
+
+impl<'a, T: ?Sized> fmt::Display for RwLockReadGuard<'a, T>
+where
+    T: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&**self, f)
+    }
+}
+
+impl<'a, T: ?Sized> Drop for RwLockReadGuard<'a, T> {
+    fn drop(&mut self) {
+        self.s.release(1);
+    }
 }
 
 /// RAII structure used to release the exclusive write access of a lock when
@@ -97,32 +230,143 @@ pub struct RwLockReadGuard<'a, T: ?Sized> {
 ///
 /// [`write`]: method@RwLock::write
 /// [`RwLock`]: struct@RwLock
-#[derive(Debug)]
 pub struct RwLockWriteGuard<'a, T: ?Sized> {
-    permit: ReleasingPermit<'a, T>,
-    lock: &'a RwLock<T>,
+    s: &'a Semaphore,
+    data: *mut T,
+    marker: marker::PhantomData<&'a mut T>,
 }
 
-// Wrapper arround Permit that releases on Drop
-#[derive(Debug)]
-struct ReleasingPermit<'a, T: ?Sized> {
-    num_permits: u16,
-    lock: &'a RwLock<T>,
-}
+impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
+    /// Make a new `RwLockWriteGuard` for a component of the locked data.
+    ///
+    /// This operation cannot fail as the `RwLockWriteGuard` passed in already
+    /// locked the data.
+    ///
+    /// This is an associated function that needs to be used as
+    /// `RwLockWriteGuard::map(..)`. A method would interfere with methods of
+    /// the same name on the contents of the locked data.
+    ///
+    /// This is an asynchronous version of [`RwLockWriteGuard::map`] from the
+    /// [`parking_lot` crate].
+    ///
+    /// [`RwLockWriteGuard::map`]: https://docs.rs/lock_api/latest/lock_api/struct.RwLockWriteGuard.html#method.map
+    /// [`parking_lot` crate]: https://crates.io/crates/parking_lot
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::{RwLock, RwLockWriteGuard};
+    ///
+    /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    /// struct Foo(u32);
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let lock = RwLock::new(Foo(1));
+    ///
+    /// {
+    ///     let mut mapped = RwLockWriteGuard::map(lock.write().await, |f| &mut f.0);
+    ///     *mapped = 2;
+    /// }
+    ///
+    /// assert_eq!(Foo(2), *lock.read().await);
+    /// # }
+    /// ```
+    #[inline]
+    pub fn map<F, U: ?Sized>(mut this: Self, f: F) -> RwLockWriteGuard<'a, U>
+    where
+        F: FnOnce(&mut T) -> &mut U,
+    {
+        let data = f(&mut *this) as *mut U;
+        let s = this.s;
+        // NB: Forget to avoid drop impl from being called.
+        mem::forget(this);
+        RwLockWriteGuard {
+            s,
+            data,
+            marker: marker::PhantomData,
+        }
+    }
 
-impl<'a, T: ?Sized> ReleasingPermit<'a, T> {
-    async fn acquire(
-        lock: &'a RwLock<T>,
-        num_permits: u16,
-    ) -> Result<ReleasingPermit<'a, T>, AcquireError> {
-        lock.s.acquire(num_permits.into()).await?;
-        Ok(Self { num_permits, lock })
+    /// Attempts to make  a new [`RwLockWriteGuard`] for a component of
+    /// the locked data. The original guard is returned if the closure returns
+    /// `None`.
+    ///
+    /// This operation cannot fail as the `RwLockWriteGuard` passed in already
+    /// locked the data.
+    ///
+    /// This is an associated function that needs to be
+    /// used as `RwLockWriteGuard::try_map(...)`. A method would interfere with
+    /// methods of the same name on the contents of the locked data.
+    ///
+    /// This is an asynchronous version of [`RwLockWriteGuard::try_map`] from
+    /// the [`parking_lot` crate].
+    ///
+    /// [`RwLockWriteGuard::try_map`]: https://docs.rs/lock_api/latest/lock_api/struct.RwLockWriteGuard.html#method.try_map
+    /// [`parking_lot` crate]: https://crates.io/crates/parking_lot
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::{RwLock, RwLockWriteGuard};
+    ///
+    /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    /// struct Foo(u32);
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let lock = RwLock::new(Foo(1));
+    ///
+    /// {
+    ///     let guard = lock.write().await;
+    ///     let mut guard = RwLockWriteGuard::try_map(guard, |f| Some(&mut f.0)).expect("should not fail");
+    ///     *guard = 2;
+    /// }
+    ///
+    /// assert_eq!(Foo(2), *lock.read().await);
+    /// # }
+    /// ```
+    #[inline]
+    pub fn try_map<F, U: ?Sized>(mut this: Self, f: F) -> Result<RwLockWriteGuard<'a, U>, Self>
+    where
+        F: FnOnce(&mut T) -> Option<&mut U>,
+    {
+        let data = match f(&mut *this) {
+            Some(data) => data as *mut U,
+            None => return Err(this),
+        };
+        let s = this.s;
+        // NB: Forget to avoid drop impl from being called.
+        mem::forget(this);
+        Ok(RwLockWriteGuard {
+            s,
+            data,
+            marker: marker::PhantomData,
+        })
     }
 }
 
-impl<T: ?Sized> Drop for ReleasingPermit<'_, T> {
+impl<'a, T: ?Sized> fmt::Debug for RwLockWriteGuard<'a, T>
+where
+    T: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&**self, f)
+    }
+}
+
+impl<'a, T: ?Sized> fmt::Display for RwLockWriteGuard<'a, T>
+where
+    T: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&**self, f)
+    }
+}
+
+impl<'a, T: ?Sized> Drop for RwLockWriteGuard<'a, T> {
     fn drop(&mut self) {
-        self.lock.s.release(self.num_permits as usize);
+        self.s.release(MAX_READS);
     }
 }
 
@@ -139,9 +383,11 @@ fn bounds() {
     check_sync::<RwLock<u32>>();
     check_unpin::<RwLock<u32>>();
 
+    check_send::<RwLockReadGuard<'_, u32>>();
     check_sync::<RwLockReadGuard<'_, u32>>();
     check_unpin::<RwLockReadGuard<'_, u32>>();
 
+    check_send::<RwLockWriteGuard<'_, u32>>();
     check_sync::<RwLockWriteGuard<'_, u32>>();
     check_unpin::<RwLockWriteGuard<'_, u32>>();
 
@@ -155,8 +401,17 @@ fn bounds() {
 // RwLock<T>.
 unsafe impl<T> Send for RwLock<T> where T: ?Sized + Send {}
 unsafe impl<T> Sync for RwLock<T> where T: ?Sized + Send + Sync {}
+// NB: These impls need to be explicit since we're storing a raw pointer.
+// Safety: Stores a raw pointer to `T`, so if `T` is `Sync`, the lock guard over
+// `T` is `Send`.
+unsafe impl<T> Send for RwLockReadGuard<'_, T> where T: ?Sized + Sync {}
 unsafe impl<T> Sync for RwLockReadGuard<'_, T> where T: ?Sized + Send + Sync {}
 unsafe impl<T> Sync for RwLockWriteGuard<'_, T> where T: ?Sized + Send + Sync {}
+// Safety: Stores a raw pointer to `T`, so if `T` is `Sync`, the lock guard over
+// `T` is `Send` - but since this is also provides mutable access, we need to
+// make sure that `T` is `Send` since its value can be sent across thread
+// boundaries.
+unsafe impl<T> Send for RwLockWriteGuard<'_, T> where T: ?Sized + Send + Sync {}
 
 impl<T: ?Sized> RwLock<T> {
     /// Creates a new instance of an `RwLock<T>` which is unlocked.
@@ -210,12 +465,16 @@ impl<T: ?Sized> RwLock<T> {
     ///}
     /// ```
     pub async fn read(&self) -> RwLockReadGuard<'_, T> {
-        let permit = ReleasingPermit::acquire(self, 1).await.unwrap_or_else(|_| {
+        self.s.acquire(1).await.unwrap_or_else(|_| {
             // The semaphore was closed. but, we never explicitly close it, and we have a
             // handle to it through the Arc, which means that this can never happen.
             unreachable!()
         });
-        RwLockReadGuard { lock: self, permit }
+        RwLockReadGuard {
+            s: &self.s,
+            data: self.c.get(),
+            marker: marker::PhantomData,
+        }
     }
 
     /// Locks this rwlock with exclusive write access, causing the current task
@@ -241,15 +500,16 @@ impl<T: ?Sized> RwLock<T> {
     ///}
     /// ```
     pub async fn write(&self) -> RwLockWriteGuard<'_, T> {
-        let permit = ReleasingPermit::acquire(self, MAX_READS as u16)
-            .await
-            .unwrap_or_else(|_| {
-                // The semaphore was closed. but, we never explicitly close it, and we have a
-                // handle to it through the Arc, which means that this can never happen.
-                unreachable!()
-            });
-
-        RwLockWriteGuard { lock: self, permit }
+        self.s.acquire(MAX_READS as u32).await.unwrap_or_else(|_| {
+            // The semaphore was closed. but, we never explicitly close it, and we have a
+            // handle to it through the Arc, which means that this can never happen.
+            unreachable!()
+        });
+        RwLockWriteGuard {
+            s: &self.s,
+            data: self.c.get(),
+            marker: marker::PhantomData,
+        }
     }
 
     /// Consumes the lock, returning the underlying data.
@@ -265,7 +525,7 @@ impl<T: ?Sized> ops::Deref for RwLockReadGuard<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &T {
-        unsafe { &*self.lock.c.get() }
+        unsafe { &*self.data }
     }
 }
 
@@ -273,13 +533,13 @@ impl<T: ?Sized> ops::Deref for RwLockWriteGuard<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &T {
-        unsafe { &*self.lock.c.get() }
+        unsafe { &*self.data }
     }
 }
 
 impl<T: ?Sized> ops::DerefMut for RwLockWriteGuard<'_, T> {
     fn deref_mut(&mut self) -> &mut T {
-        unsafe { &mut *self.lock.c.get() }
+        unsafe { &mut *self.data }
     }
 }
 
@@ -289,7 +549,7 @@ impl<T> From<T> for RwLock<T> {
     }
 }
 
-impl<T> Default for RwLock<T>
+impl<T: ?Sized> Default for RwLock<T>
 where
     T: Default,
 {
