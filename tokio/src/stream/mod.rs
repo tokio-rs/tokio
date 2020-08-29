@@ -39,26 +39,17 @@
 //!
 //! It is often desirable to convert a `Stream` into an [`AsyncRead`],
 //! especially when dealing with plaintext formats streamed over the network.
-//! To enable this functionality, [`tokio::io`] provides the [`stream_reader`]
-//! function for this purpose.
-//!
-//! The inverse conversion to go from an [`AsyncRead`] into a [`Stream`]
-//! is also a commonly desired feature. For this usecase, Tokio
-//! provides some utility traits in the [tokio-util] crate that
-//! abstract the asynchronous buffering that is required and allows
-//! you to write [`Encoder`] and [`Decoder`] functions working with a
-//! buffer of bytes, and then use that ["codec"] to transform anything
-//! that implements [`AsyncRead`] into a `Stream` of your structured data.
+//! The opposite conversion from an [`AsyncRead`] into a `Stream` is also
+//! another commonly required feature. To enable these conversions,
+//! [`tokio-util`] provides the [`StreamReader`] and [`ReaderStream`]
+//! types when the io feature is enabled.
 //!
 //! [tokio-util]: https://docs.rs/tokio-util/0.3/tokio_util/codec/index.html
 //! [`tokio::io`]: crate::io
 //! [`AsyncRead`]: crate::io::AsyncRead
 //! [`AsyncWrite`]: crate::io::AsyncWrite
-//! [`stream_reader`]: crate::io::stream_reader
-//! [`Sink`]: https://docs.rs/futures/0.3/futures/sink/trait.Sink.html
-//! ["codec"]: https://docs.rs/tokio-util/0.3/tokio_util/codec/index.html
-//! [`Encoder`]: https://docs.rs/tokio-util/0.3/tokio_util/codec/trait.Encoder.html
-//! [`Decoder`]: https://docs.rs/tokio-util/0.3/tokio_util/codec/trait.Decoder.html
+//! ["ReaderStream"]: https://docs.rs/tokio-util/0.3/tokio_util/io/struct.ReaderStream.html
+//! [`StreamReader`]: https://docs.rs/tokio-util/0.3/tokio_util/io/struct.StreamReader.html
 
 mod all;
 use all::AllFuture;
