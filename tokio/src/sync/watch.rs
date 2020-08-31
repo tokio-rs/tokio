@@ -278,7 +278,7 @@ impl<T: Clone> Receiver<T> {
     ///     assert_eq!(v, "goodbye");
     ///
     ///     let v = rx.recv().await;
-    ///     assert_eq!(v, "goodbye"); //TODO(blas) check whether this is true.
+    ///     assert_eq!(v, "goodbye");
     /// }
     /// ```
     pub async fn recv(&mut self) -> T {
