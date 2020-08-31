@@ -101,7 +101,7 @@ use std::task::{Context, Poll, Waker};
 #[derive(Debug)]
 pub struct Notify {
     state: AtomicU8,
-    waiters: Mutex<LinkedList<Waiter>>,
+    waiters: Mutex<LinkedList<Waiter, <Waiter as linked_list::Link>::Target>>,
 }
 
 #[derive(Debug)]
@@ -285,7 +285,7 @@ impl Default for Notify {
     }
 }
 
-fn notify_locked(waiters: &mut LinkedList<Waiter>, state: &AtomicU8, curr: u8) -> Option<Waker> {
+fn notify_locked(waiters: &mut LinkedList<Waiter, <Waiter as linked_list::Link>::Target>, state: &AtomicU8, curr: u8) -> Option<Waker> {
     loop {
         match curr {
             EMPTY | NOTIFIED => {
