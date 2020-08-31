@@ -1,7 +1,7 @@
 //! Runs `!Send` futures on the current thread.
 use crate::runtime::task::{self, JoinHandle, Task};
 use crate::sync::AtomicWaker;
-use crate::util::linked_list::{LinkedList, Link};
+use crate::util::linked_list::{Link, LinkedList};
 
 use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;

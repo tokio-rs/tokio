@@ -5,9 +5,9 @@
 //! specified node is actually contained by the list.
 
 use core::fmt;
+use core::marker::PhantomData;
 use core::mem::ManuallyDrop;
 use core::ptr::NonNull;
-use core::marker::PhantomData;
 
 /// An intrusive linked list.
 ///
@@ -21,7 +21,7 @@ pub(crate) struct LinkedList<L, T> {
     tail: Option<NonNull<T>>,
 
     /// Node type marker.
-    _marker: PhantomData<*const L>
+    _marker: PhantomData<*const L>,
 }
 
 unsafe impl<L: Link> Send for LinkedList<L, L::Target> where L::Target: Send {}
@@ -302,7 +302,10 @@ mod tests {
         ret
     }
 
-    fn push_all<'a>(list: &mut LinkedList<&'a Entry, <&'_ Entry as Link>::Target>, entries: &[Pin<&'a Entry>]) {
+    fn push_all<'a>(
+        list: &mut LinkedList<&'a Entry, <&'_ Entry as Link>::Target>,
+        entries: &[Pin<&'a Entry>],
+    ) {
         for entry in entries.iter() {
             list.push_front(*entry);
         }

@@ -12,7 +12,7 @@ use crate::runtime;
 use crate::runtime::park::{Parker, Unparker};
 use crate::runtime::thread_pool::{AtomicCell, Idle};
 use crate::runtime::{queue, task};
-use crate::util::linked_list::{LinkedList, Link};
+use crate::util::linked_list::{Link, LinkedList};
 use crate::util::FastRand;
 
 use std::cell::RefCell;
