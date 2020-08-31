@@ -4,7 +4,7 @@ use loom::{
     sync::CausalCell,
 };
 
-use std::mem::{self, ManuallyDrop};
+use std::mem::{self, ManuallyDrop, MaybeUninit};
 use std::ops;
 use std::ptr::{self, NonNull};
 use std::sync::atomic::Ordering::{self, AcqRel, Acquire, Release};
@@ -39,7 +39,7 @@ pub(crate) enum Read<T> {
     Closed,
 }
 
-struct Values<T>([CausalCell<ManuallyDrop<T>>; BLOCK_CAP]);
+struct Values<T>([MaybeUninit<CausalCell<ManuallyDrop<T>>>; BLOCK_CAP]);
 
 use super::BLOCK_CAP;
 
@@ -363,16 +363,16 @@ fn is_tx_closed(bits: usize) -> bool {
 
 impl<T> Values<T> {
     unsafe fn uninitialized() -> Values<T> {
-        let mut vals = mem::uninitialized();
+        let mut vals: [MaybeUninit<_>; BLOCK_CAP] = {
+            MaybeUninit::uninit().assume_init()
+        };
 
         // When fuzzing, `CausalCell` needs to be initialized.
         if_fuzz! {
             use std::ptr;
 
             for v in &mut vals {
-                ptr::write(
-                    v as *mut _,
-                    CausalCell::new(mem::zeroed()));
+                ptr::write(v.as_mut_ptr(), CausalCell::new(mem::zeroed()));
             }
         }
 
@@ -384,6 +384,8 @@ impl<T> ops::Index<usize> for Values<T> {
     type Output = CausalCell<ManuallyDrop<T>>;
 
     fn index(&self, index: usize) -> &Self::Output {
-        self.0.index(index)
+        unsafe {
+            &*self.0.index(index).as_ptr()
+        }
     }
 }
