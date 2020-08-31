@@ -822,7 +822,6 @@ pub trait StreamExt: Stream {
         Timeout::new(self, duration)
     }
     /// Slows down a stream by enforcing a delay between items.
-    /// They will be produced not more often than the specified interval.
     ///
     /// # Example
     ///
