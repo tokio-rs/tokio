@@ -71,6 +71,8 @@ unsafe impl<T: Sync> Sync for Pointers<T> {}
 // ===== impl LinkedList =====
 
 impl<L, T> LinkedList<L, T> {
+    /// Constant constructor for a `LinkedList`.
+    #[allow(dead_code)] // NOTE: This will get removed with: https://github.com/tokio-rs/tokio/pull/2790
     pub(crate) const fn const_new() -> LinkedList<L, T> {
         LinkedList {
             head: None,
@@ -323,6 +325,11 @@ mod tests {
             // Deal with mapping a Pin<&mut T> -> Option<NonNull<T>>
             assert_eq!(Some($a.as_ref().get_ref().into()), $b)
         }};
+    }
+
+    #[test]
+    fn const_new() {
+        const _: LinkedList<&Entry, <&Entry as Link>::Target> = LinkedList::const_new();
     }
 
     #[test]
