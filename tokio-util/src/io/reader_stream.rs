@@ -78,7 +78,7 @@ impl<R: AsyncRead> Stream for ReaderStream<R> {
         if this.buf.capacity() == 0 {
             this.buf.reserve(CAPACITY);
         }
-        match dbg!(reader.poll_read_buf(cx, &mut this.buf)) {
+        match reader.poll_read_buf(cx, &mut this.buf) {
             Poll::Pending => Poll::Pending,
             Poll::Ready(Err(err)) => {
                 self.project().reader.set(None);
