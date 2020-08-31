@@ -23,7 +23,7 @@
 //!     let (tx, mut rx) = watch::channel("hello");
 //!
 //!     tokio::spawn(async move {
-//!         while let Some(value) = rx.recv().await {
+//!         while let Some(value) = Some(rx.recv().await) {
 //!             println!("received = {:?}", value);
 //!         }
 //!     });
@@ -162,7 +162,7 @@ const CLOSED: usize = 1;
 ///     let (tx, mut rx) = watch::channel("hello");
 ///
 ///     tokio::spawn(async move {
-///         while let Some(value) = rx.recv().await {
+///         while let Some(value) = Some(rx.recv().await) {
 ///             println!("received = {:?}", value);
 ///         }
 ///     });
@@ -223,7 +223,7 @@ impl<T> Receiver<T> {
 
     // TODO: document
     #[doc(hidden)]
-    pub fn poll_recv_ref<'a>(&'a mut self, cx: &mut Context<'_>) -> Poll<Option<Ref<'a, T>>> {
+    pub fn poll_recv_ref<'a>(&'a mut self, cx: &mut Context<'_>) -> Poll<Ref<'a, T>> {
         // Make sure the task is up to date
         self.inner.waker.register_by_ref(cx.waker());
 
@@ -233,12 +233,14 @@ impl<T> Receiver<T> {
         if self.inner.version.swap(version, Relaxed) != version {
             let inner = self.shared.value.read().unwrap();
 
-            return Ready(Some(Ref { inner }));
+            return Ready(Ref { inner });
         }
 
         if CLOSED == state & CLOSED {
             // The `Store` handle has been dropped.
-            return Ready(None);
+            let inner = self.shared.value.read().unwrap();
+
+            return Ready(Ref { inner });
         }
 
         Pending
@@ -264,7 +266,7 @@ impl<T: Clone> Receiver<T> {
     /// async fn main() {
     ///     let (tx, mut rx) = watch::channel("hello");
     ///
-    ///     let v = rx.recv().await.unwrap();
+    ///     let v = rx.recv().await;
     ///     assert_eq!(v, "hello");
     ///
     ///     tokio::spawn(async move {
@@ -272,17 +274,17 @@ impl<T: Clone> Receiver<T> {
     ///     });
     ///
     ///     // Waits for the new task to spawn and send the value.
-    ///     let v = rx.recv().await.unwrap();
+    ///     let v = rx.recv().await;
     ///     assert_eq!(v, "goodbye");
     ///
     ///     let v = rx.recv().await;
-    ///     assert!(v.is_none());
+    ///     assert_eq!(v, "goodbye"); //TODO(blas) check whether this is true.
     /// }
     /// ```
-    pub async fn recv(&mut self) -> Option<T> {
+    pub async fn recv(&mut self) -> T {
         poll_fn(|cx| {
             let v_ref = ready!(self.poll_recv_ref(cx));
-            Poll::Ready(v_ref.map(|v_ref| (*v_ref).clone()))
+            Poll::Ready((*v_ref).clone())
         })
         .await
     }
@@ -295,7 +297,7 @@ impl<T: Clone> crate::stream::Stream for Receiver<T> {
     fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
         let v_ref = ready!(self.poll_recv_ref(cx));
 
-        Poll::Ready(v_ref.map(|v_ref| (*v_ref).clone()))
+        Poll::Ready(Some((*v_ref).clone()))
     }
 }
 

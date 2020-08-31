@@ -112,7 +112,7 @@ impl Barrier {
         loop {
             // note that the first time through the loop, this _will_ yield a generation
             // immediately, since we cloned a receiver that has never seen any values.
-            if wait.recv().await.expect("sender hasn't been closed") >= generation {
+            if wait.recv().await >= generation {
                 break;
             }
         }
