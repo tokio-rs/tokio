@@ -21,7 +21,7 @@ fn single_rx_recv() {
 
         assert_pending!(t.poll());
 
-        tx.broadcast("two").unwrap();
+        tx.send("two").unwrap();
 
         assert!(t.is_woken());
 
@@ -65,7 +65,7 @@ fn multi_rx() {
         assert_pending!(t1.poll());
         assert_pending!(t2.poll());
 
-        tx.broadcast("two").unwrap();
+        tx.send("two").unwrap();
 
         assert!(t1.is_woken());
         assert!(t2.is_woken());
@@ -79,7 +79,7 @@ fn multi_rx() {
 
         assert_pending!(t1.poll());
 
-        tx.broadcast("three").unwrap();
+        tx.send("three").unwrap();
 
         assert!(t1.is_woken());
         assert!(t2.is_woken());
@@ -100,7 +100,7 @@ fn multi_rx() {
         assert_pending!(t1.poll());
         assert_pending!(t2.poll());
 
-        tx.broadcast("four").unwrap();
+        tx.send("four").unwrap();
 
         let res = assert_ready!(t1.poll());
         assert_eq!(res, "four");
@@ -148,7 +148,7 @@ fn rx_observes_final_value() {
 
     let (tx, mut rx) = watch::channel("one");
 
-    tx.broadcast("two").unwrap();
+    tx.send("two").unwrap();
 
     {
         let mut t1 = spawn(rx.recv());
@@ -160,7 +160,7 @@ fn rx_observes_final_value() {
         let mut t1 = spawn(rx.recv());
         assert_pending!(t1.poll());
 
-        tx.broadcast("three").unwrap();
+        tx.send("three").unwrap();
         drop(tx);
 
         assert!(t1.is_woken());
@@ -190,7 +190,7 @@ fn poll_close() {
         assert_ready!(t.poll());
     }
 
-    assert!(tx.broadcast("two").is_err());
+    assert!(tx.send("two").is_err());
 }
 
 #[test]
@@ -210,7 +210,7 @@ fn stream_impl() {
 
         assert_pending!(t.poll());
 
-        tx.broadcast("two").unwrap();
+        tx.send("two").unwrap();
 
         assert!(t.is_woken());
 

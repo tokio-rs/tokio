@@ -96,7 +96,7 @@ impl Barrier {
                 // wake everyone, increment the generation, and return
                 state
                     .waker
-                    .broadcast(state.generation)
+                    .send(state.generation)
                     .expect("there is at least one receiver");
                 state.arrived = 0;
                 state.generation += 1;

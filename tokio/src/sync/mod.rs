@@ -330,7 +330,7 @@
 //!             // If the configuration changed, send the new config value
 //!             // on the watch channel.
 //!             if new_config != config {
-//!                 tx.broadcast(new_config.clone()).unwrap();
+//!                 tx.send(new_config.clone()).unwrap();
 //!                 config = new_config;
 //!             }
 //!         }

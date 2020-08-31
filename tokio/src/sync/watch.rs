@@ -28,7 +28,7 @@
 //!         }
 //!     });
 //!
-//!     tx.broadcast("world")?;
+//!     tx.send("world")?;
 //! # Ok(())
 //! # }
 //! ```
@@ -167,7 +167,7 @@ const CLOSED: usize = 1;
 ///         }
 ///     });
 ///
-///     tx.broadcast("world")?;
+///     tx.send("world")?;
 /// # Ok(())
 /// # }
 /// ```
@@ -270,7 +270,7 @@ impl<T: Clone> Receiver<T> {
     ///     assert_eq!(v, "hello");
     ///
     ///     tokio::spawn(async move {
-    ///         tx.broadcast("goodbye").unwrap();
+    ///         tx.send("goodbye").unwrap();
     ///     });
     ///
     ///     // Waits for the new task to spawn and send the value.
@@ -320,8 +320,8 @@ impl<T> Drop for Receiver<T> {
 }
 
 impl<T> Sender<T> {
-    /// Broadcasts a new value via the channel, notifying all receivers.
-    pub fn broadcast(&self, value: T) -> Result<(), error::SendError<T>> {
+    /// Sends a new value via the channel, notifying all receivers.
+    pub fn send(&self, value: T) -> Result<(), error::SendError<T>> {
         let shared = match self.shared.upgrade() {
             Some(shared) => shared,
             // All `Watch` handles have been canceled
