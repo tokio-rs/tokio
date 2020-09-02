@@ -5,6 +5,7 @@
 //! specified node is actually contained by the list.
 
 use core::fmt;
+use core::marker::PhantomData;
 use core::mem::ManuallyDrop;
 use core::ptr::NonNull;
 
@@ -12,16 +13,19 @@ use core::ptr::NonNull;
 ///
 /// Currently, the list is not emptied on drop. It is the caller's
 /// responsibility to ensure the list is empty before dropping it.
-pub(crate) struct LinkedList<T: Link> {
+pub(crate) struct LinkedList<L, T> {
     /// Linked list head
-    head: Option<NonNull<T::Target>>,
+    head: Option<NonNull<T>>,
 
     /// Linked list tail
-    tail: Option<NonNull<T::Target>>,
+    tail: Option<NonNull<T>>,
+
+    /// Node type marker.
+    _marker: PhantomData<*const L>,
 }
 
-unsafe impl<T: Link> Send for LinkedList<T> where T::Target: Send {}
-unsafe impl<T: Link> Sync for LinkedList<T> where T::Target: Sync {}
+unsafe impl<L: Link> Send for LinkedList<L, L::Target> where L::Target: Send {}
+unsafe impl<L: Link> Sync for LinkedList<L, L::Target> where L::Target: Sync {}
 
 /// Defines how a type is tracked within a linked list.
 ///
@@ -66,27 +70,31 @@ unsafe impl<T: Sync> Sync for Pointers<T> {}
 
 // ===== impl LinkedList =====
 
-impl<T: Link> LinkedList<T> {
-    /// Creates an empty linked list
-    pub(crate) fn new() -> LinkedList<T> {
+impl<L, T> LinkedList<L, T> {
+    /// Creates an empty linked list.
+    #[allow(dead_code)] // NOTE: This will get removed with: https://github.com/tokio-rs/tokio/pull/2790
+    pub(crate) const fn new() -> LinkedList<L, T> {
         LinkedList {
             head: None,
             tail: None,
+            _marker: PhantomData,
         }
     }
+}
 
+impl<L: Link> LinkedList<L, L::Target> {
     /// Adds an element first in the list.
-    pub(crate) fn push_front(&mut self, val: T::Handle) {
+    pub(crate) fn push_front(&mut self, val: L::Handle) {
         // The value should not be dropped, it is being inserted into the list
         let val = ManuallyDrop::new(val);
-        let ptr = T::as_raw(&*val);
+        let ptr = L::as_raw(&*val);
         assert_ne!(self.head, Some(ptr));
         unsafe {
-            T::pointers(ptr).as_mut().next = self.head;
-            T::pointers(ptr).as_mut().prev = None;
+            L::pointers(ptr).as_mut().next = self.head;
+            L::pointers(ptr).as_mut().prev = None;
 
             if let Some(head) = self.head {
-                T::pointers(head).as_mut().prev = Some(ptr);
+                L::pointers(head).as_mut().prev = Some(ptr);
             }
 
             self.head = Some(ptr);
@@ -99,21 +107,21 @@ impl<T: Link> LinkedList<T> {
 
     /// Removes the last element from a list and returns it, or None if it is
     /// empty.
-    pub(crate) fn pop_back(&mut self) -> Option<T::Handle> {
+    pub(crate) fn pop_back(&mut self) -> Option<L::Handle> {
         unsafe {
             let last = self.tail?;
-            self.tail = T::pointers(last).as_ref().prev;
+            self.tail = L::pointers(last).as_ref().prev;
 
-            if let Some(prev) = T::pointers(last).as_ref().prev {
-                T::pointers(prev).as_mut().next = None;
+            if let Some(prev) = L::pointers(last).as_ref().prev {
+                L::pointers(prev).as_mut().next = None;
             } else {
                 self.head = None
             }
 
-            T::pointers(last).as_mut().prev = None;
-            T::pointers(last).as_mut().next = None;
+            L::pointers(last).as_mut().prev = None;
+            L::pointers(last).as_mut().next = None;
 
-            Some(T::from_raw(last))
+            Some(L::from_raw(last))
         }
     }
 
@@ -133,38 +141,38 @@ impl<T: Link> LinkedList<T> {
     ///
     /// The caller **must** ensure that `node` is currently contained by
     /// `self` or not contained by any other list.
-    pub(crate) unsafe fn remove(&mut self, node: NonNull<T::Target>) -> Option<T::Handle> {
-        if let Some(prev) = T::pointers(node).as_ref().prev {
-            debug_assert_eq!(T::pointers(prev).as_ref().next, Some(node));
-            T::pointers(prev).as_mut().next = T::pointers(node).as_ref().next;
+    pub(crate) unsafe fn remove(&mut self, node: NonNull<L::Target>) -> Option<L::Handle> {
+        if let Some(prev) = L::pointers(node).as_ref().prev {
+            debug_assert_eq!(L::pointers(prev).as_ref().next, Some(node));
+            L::pointers(prev).as_mut().next = L::pointers(node).as_ref().next;
         } else {
             if self.head != Some(node) {
                 return None;
             }
 
-            self.head = T::pointers(node).as_ref().next;
+            self.head = L::pointers(node).as_ref().next;
         }
 
-        if let Some(next) = T::pointers(node).as_ref().next {
-            debug_assert_eq!(T::pointers(next).as_ref().prev, Some(node));
-            T::pointers(next).as_mut().prev = T::pointers(node).as_ref().prev;
+        if let Some(next) = L::pointers(node).as_ref().next {
+            debug_assert_eq!(L::pointers(next).as_ref().prev, Some(node));
+            L::pointers(next).as_mut().prev = L::pointers(node).as_ref().prev;
         } else {
             // This might be the last item in the list
             if self.tail != Some(node) {
                 return None;
             }
 
-            self.tail = T::pointers(node).as_ref().prev;
+            self.tail = L::pointers(node).as_ref().prev;
         }
 
-        T::pointers(node).as_mut().next = None;
-        T::pointers(node).as_mut().prev = None;
+        L::pointers(node).as_mut().next = None;
+        L::pointers(node).as_mut().prev = None;
 
-        Some(T::from_raw(node))
+        Some(L::from_raw(node))
     }
 }
 
-impl<T: Link> fmt::Debug for LinkedList<T> {
+impl<L: Link> fmt::Debug for LinkedList<L, L::Target> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("LinkedList")
             .field("head", &self.head)
@@ -174,8 +182,8 @@ impl<T: Link> fmt::Debug for LinkedList<T> {
 }
 
 cfg_sync! {
-    impl<T: Link> LinkedList<T> {
-        pub(crate) fn last(&self) -> Option<&T::Target> {
+    impl<L: Link> LinkedList<L, L::Target> {
+        pub(crate) fn last(&self) -> Option<&L::Target> {
             let tail = self.tail.as_ref()?;
             unsafe {
                 Some(&*tail.as_ptr())
@@ -192,8 +200,8 @@ cfg_rt_threaded! {
         _p: core::marker::PhantomData<&'a T>,
     }
 
-    impl<T: Link> LinkedList<T> {
-        pub(crate) fn iter(&self) -> Iter<'_, T> {
+    impl<L: Link> LinkedList<L, L::Target> {
+        pub(crate) fn iter(&self) -> Iter<'_, L> {
             Iter {
                 curr: self.head,
                 _p: core::marker::PhantomData,
@@ -277,7 +285,7 @@ mod tests {
         r.as_ref().get_ref().into()
     }
 
-    fn collect_list(list: &mut LinkedList<&'_ Entry>) -> Vec<i32> {
+    fn collect_list(list: &mut LinkedList<&'_ Entry, <&'_ Entry as Link>::Target>) -> Vec<i32> {
         let mut ret = vec![];
 
         while let Some(entry) = list.pop_back() {
@@ -287,7 +295,10 @@ mod tests {
         ret
     }
 
-    fn push_all<'a>(list: &mut LinkedList<&'a Entry>, entries: &[Pin<&'a Entry>]) {
+    fn push_all<'a>(
+        list: &mut LinkedList<&'a Entry, <&'_ Entry as Link>::Target>,
+        entries: &[Pin<&'a Entry>],
+    ) {
         for entry in entries.iter() {
             list.push_front(*entry);
         }
@@ -305,6 +316,11 @@ mod tests {
             // Deal with mapping a Pin<&mut T> -> Option<NonNull<T>>
             assert_eq!(Some($a.as_ref().get_ref().into()), $b)
         }};
+    }
+
+    #[test]
+    fn const_new() {
+        const _: LinkedList<&Entry, <&Entry as Link>::Target> = LinkedList::new();
     }
 
     #[test]
@@ -332,7 +348,7 @@ mod tests {
         let a = entry(5);
         let b = entry(7);
 
-        let mut list = LinkedList::<&Entry>::new();
+        let mut list = LinkedList::<&Entry, <&Entry as Link>::Target>::new();
 
         list.push_front(a.as_ref());
 
@@ -489,7 +505,7 @@ mod tests {
 
         unsafe {
             // Remove missing
-            let mut list = LinkedList::<&Entry>::new();
+            let mut list = LinkedList::<&Entry, <&Entry as Link>::Target>::new();
 
             list.push_front(b.as_ref());
             list.push_front(a.as_ref());
@@ -503,7 +519,7 @@ mod tests {
         let a = entry(5);
         let b = entry(7);
 
-        let mut list = LinkedList::<&Entry>::new();
+        let mut list = LinkedList::<&Entry, <&Entry as Link>::Target>::new();
 
         assert_eq!(0, list.iter().count());
 
@@ -543,7 +559,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let mut ll = LinkedList::<&Entry>::new();
+        let mut ll = LinkedList::<&Entry, <&Entry as Link>::Target>::new();
         let mut reference = VecDeque::new();
 
         let entries: Vec<_> = (0..ops.len()).map(|i| entry(i as i32)).collect();

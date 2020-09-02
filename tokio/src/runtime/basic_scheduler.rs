@@ -1,7 +1,7 @@
 use crate::park::{Park, Unpark};
 use crate::runtime;
 use crate::runtime::task::{self, JoinHandle, Schedule, Task};
-use crate::util::linked_list::LinkedList;
+use crate::util::linked_list::{Link, LinkedList};
 use crate::util::{waker_ref, Wake};
 
 use std::cell::RefCell;
@@ -42,7 +42,7 @@ pub(crate) struct Spawner {
 
 struct Tasks {
     /// Collection of all active tasks spawned onto this executor.
-    owned: LinkedList<Task<Arc<Shared>>>,
+    owned: LinkedList<Task<Arc<Shared>>, <Task<Arc<Shared>> as Link>::Target>,
 
     /// Local run queue.
     ///
