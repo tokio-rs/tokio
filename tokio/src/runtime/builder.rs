@@ -397,7 +397,7 @@ impl Builder {
     ///     .build();
     /// # }
     /// ```
-    pub fn keep_alive(&mut self, duration: Duration) -> &mut Self {
+    pub fn blocking_keep_alive(&mut self, duration: Duration) -> &mut Self {
         self.keep_alive = Some(duration);
         self
     }
