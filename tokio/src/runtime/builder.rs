@@ -389,9 +389,9 @@ impl Builder {
     #[cfg(feature = "blocking")]
     #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
     /// Sets a custom timeout for a thread in the blocking pool.
-    /// By default, the timeout for a thread is constant and defined
-    /// in KEEP_ALIVE. In case the user wants to customize this
-    /// value, then they can use blocking_keep_alive() for it.
+    ///
+    /// By default, the timeout for a thread is set to 10 seconds. This can
+    /// be overriden usinng .blocking_keep_alive().
     ///
     /// # Example
     ///
