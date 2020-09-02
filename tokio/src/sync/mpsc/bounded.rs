@@ -52,6 +52,8 @@ impl<T> fmt::Debug for Receiver<T> {
 /// Creates a bounded mpsc channel for communicating between asynchronous tasks,
 /// returning the sender/receiver halves.
 ///
+/// The provided `buffer` size must be at least 1.
+///
 /// All data sent on `Sender` will become available on `Receiver` in the same
 /// order as it was sent.
 ///
