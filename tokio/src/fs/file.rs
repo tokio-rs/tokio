@@ -202,68 +202,6 @@ impl File {
         }
     }
 
-    /// Seeks to an offset, in bytes, in a stream.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::fs::File;
-    /// use tokio::prelude::*;
-    ///
-    /// use std::io::SeekFrom;
-    ///
-    /// # async fn dox() -> std::io::Result<()> {
-    /// let mut file = File::open("foo.txt").await?;
-    /// file.seek(SeekFrom::Start(6)).await?;
-    ///
-    /// let mut contents = vec![0u8; 10];
-    /// file.read_exact(&mut contents).await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// The [`read_exact`] method is defined on the [`AsyncReadExt`] trait.
-    ///
-    /// [`read_exact`]: fn@crate::io::AsyncReadExt::read_exact
-    /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
-    pub async fn seek(&mut self, mut pos: SeekFrom) -> io::Result<u64> {
-        self.complete_inflight().await;
-
-        let mut buf = match self.state {
-            Idle(ref mut buf_cell) => buf_cell.take().unwrap(),
-            _ => unreachable!(),
-        };
-
-        // Factor in any unread data from the buf
-        if !buf.is_empty() {
-            let n = buf.discard_read();
-
-            if let SeekFrom::Current(ref mut offset) = pos {
-                *offset += n;
-            }
-        }
-
-        let std = self.std.clone();
-
-        // Start the operation
-        self.state = Busy(sys::run(move || {
-            let res = (&*std).seek(pos);
-            (Operation::Seek(res), buf)
-        }));
-
-        let (op, buf) = match self.state {
-            Idle(_) => unreachable!(),
-            Busy(ref mut rx) => rx.await.unwrap(),
-        };
-
-        self.state = Idle(Some(buf));
-
-        match op {
-            Operation::Seek(res) => res,
-            _ => unreachable!(),
-        }
-    }
-
     /// Attempts to sync all OS-internal metadata to disk.
     ///
     /// This function will attempt to ensure that all in-core data reaches the
