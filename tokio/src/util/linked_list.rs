@@ -71,9 +71,9 @@ unsafe impl<T: Sync> Sync for Pointers<T> {}
 // ===== impl LinkedList =====
 
 impl<L, T> LinkedList<L, T> {
-    /// Constant constructor for a `LinkedList`.
+    /// Creates an empty linked list.
     #[allow(dead_code)] // NOTE: This will get removed with: https://github.com/tokio-rs/tokio/pull/2790
-    pub(crate) const fn const_new() -> LinkedList<L, T> {
+    pub(crate) const fn new() -> LinkedList<L, T> {
         LinkedList {
             head: None,
             tail: None,
@@ -83,15 +83,6 @@ impl<L, T> LinkedList<L, T> {
 }
 
 impl<L: Link> LinkedList<L, L::Target> {
-    /// Creates an empty linked list
-    pub(crate) fn new() -> LinkedList<L, L::Target> {
-        LinkedList {
-            head: None,
-            tail: None,
-            _marker: PhantomData,
-        }
-    }
-
     /// Adds an element first in the list.
     pub(crate) fn push_front(&mut self, val: L::Handle) {
         // The value should not be dropped, it is being inserted into the list
@@ -329,7 +320,7 @@ mod tests {
 
     #[test]
     fn const_new() {
-        const _: LinkedList<&Entry, <&Entry as Link>::Target> = LinkedList::const_new();
+        const _: LinkedList<&Entry, <&Entry as Link>::Target> = LinkedList::new();
     }
 
     #[test]

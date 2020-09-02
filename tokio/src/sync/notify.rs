@@ -10,6 +10,8 @@ use std::ptr::NonNull;
 use std::sync::atomic::Ordering::SeqCst;
 use std::task::{Context, Poll, Waker};
 
+type WaitList = LinkedList<Waiter, <Waiter as linked_list::Link>::Target>;
+
 /// Notify a single task to wake up.
 ///
 /// `Notify` provides a basic mechanism to notify a single task of an event.
@@ -101,7 +103,7 @@ use std::task::{Context, Poll, Waker};
 #[derive(Debug)]
 pub struct Notify {
     state: AtomicU8,
-    waiters: Mutex<LinkedList<Waiter, <Waiter as linked_list::Link>::Target>>,
+    waiters: Mutex<WaitList>,
 }
 
 #[derive(Debug)]
@@ -285,11 +287,7 @@ impl Default for Notify {
     }
 }
 
-fn notify_locked(
-    waiters: &mut LinkedList<Waiter, <Waiter as linked_list::Link>::Target>,
-    state: &AtomicU8,
-    curr: u8,
-) -> Option<Waker> {
+fn notify_locked(waiters: &mut WaitList, state: &AtomicU8, curr: u8) -> Option<Waker> {
     loop {
         match curr {
             EMPTY | NOTIFIED => {
