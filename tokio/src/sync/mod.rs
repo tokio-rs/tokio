@@ -330,7 +330,7 @@
 //!             // If the configuration changed, send the new config value
 //!             // on the watch channel.
 //!             if new_config != config {
-//!                 tx.broadcast(new_config.clone()).unwrap();
+//!                 tx.send(new_config.clone()).unwrap();
 //!                 config = new_config;
 //!             }
 //!         }
@@ -358,7 +358,7 @@
 //!             // Receive the **initial** configuration value. As this is the
 //!             // first time the config is received from the watch, it will
 //!             // always complete immediatedly.
-//!             let mut conf = rx.recv().await.unwrap();
+//!             let mut conf = rx.recv().await;
 //!
 //!             let mut op_start = Instant::now();
 //!             let mut delay = time::delay_until(op_start + conf.timeout);
@@ -376,7 +376,7 @@
 //!                         delay = time::delay_until(op_start + conf.timeout);
 //!                     }
 //!                     new_conf = rx.recv() => {
-//!                         conf = new_conf.unwrap();
+//!                         conf = new_conf;
 //!
 //!                         // The configuration has been updated. Update the
 //!                         // `delay` using the new `timeout` value.
