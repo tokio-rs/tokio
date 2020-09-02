@@ -280,7 +280,7 @@ impl TcpStream {
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
-    ///     let mut stream = TcpStream::connect("127.0.0.1:8000").await?;
+    ///     let stream = TcpStream::connect("127.0.0.1:8000").await?;
     ///     let mut buf = [0; 10];
     ///
     ///     poll_fn(|cx| {
