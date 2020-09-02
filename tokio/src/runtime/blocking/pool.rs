@@ -47,6 +47,9 @@ struct Inner {
 
     // Maximum number of threads
     thread_cap: usize,
+
+    // Customizable wait timeout
+    keep_alive: Duration,
 }
 
 struct Shared {
@@ -110,6 +113,7 @@ impl BlockingPool {
                     after_start: builder.after_start.clone(),
                     before_stop: builder.before_stop.clone(),
                     thread_cap,
+                    keep_alive: builder.keep_alive.unwrap_or(KEEP_ALIVE),
                 }),
             },
             shutdown_rx,
@@ -258,7 +262,7 @@ impl Inner {
             shared.num_idle += 1;
 
             while !shared.shutdown {
-                let lock_result = self.condvar.wait_timeout(shared, KEEP_ALIVE).unwrap();
+                let lock_result = self.condvar.wait_timeout(shared, self.keep_alive).unwrap();
 
                 shared = lock_result.0;
                 let timeout_result = lock_result.1;

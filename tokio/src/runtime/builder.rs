@@ -4,6 +4,7 @@ use crate::runtime::shell::Shell;
 use crate::runtime::{blocking, io, time, Callback, Runtime, Spawner};
 
 use std::fmt;
+use std::time::Duration;
 
 /// Builds Tokio Runtime with custom configuration values.
 ///
@@ -65,6 +66,9 @@ pub struct Builder {
 
     /// To run before each worker thread stops
     pub(super) before_stop: Option<Callback>,
+
+    /// Customizable keep alive for BlockingPool
+    pub(super) keep_alive: Option<Duration>,
 }
 
 pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync + 'static>;
@@ -108,6 +112,8 @@ impl Builder {
             // No worker thread callbacks
             after_start: None,
             before_stop: None,
+
+            keep_alive: None,
         }
     }
 
@@ -374,6 +380,26 @@ impl Builder {
             },
             blocking_pool,
         })
+    }
+
+    /// Sets a custom timeout for a thread in the `BlockingPool`.
+    ///
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use tokio::runtime;
+    /// # use std::time::Duration;
+    ///
+    /// # pub fn main() {
+    /// let rt = runtime::Builder::new()
+    ///     .keep_alive(Duration::from_millis(100))
+    ///     .build();
+    /// # }
+    /// ```
+    pub fn keep_alive(&mut self, duration: Duration) -> &mut Self {
+        self.keep_alive = Some(duration);
+        self
     }
 }
 
