@@ -70,7 +70,7 @@ pub struct Builder {
 
     #[cfg(feature = "blocking")]
     #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
-    /// Customizable keep alive for BlockingPool
+    /// Customizable keep alive timeout for BlockingPool
     pub(super) keep_alive: Option<Duration>,
 }
 
@@ -391,7 +391,7 @@ impl Builder {
     /// Sets a custom timeout for a thread in the blocking pool.
     ///
     /// By default, the timeout for a thread is set to 10 seconds. This can
-    /// be overriden usinng .blocking_keep_alive().
+    /// be overriden using .blocking_keep_alive().
     ///
     /// # Example
     ///
