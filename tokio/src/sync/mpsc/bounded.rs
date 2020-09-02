@@ -49,7 +49,8 @@ impl<T> fmt::Debug for Receiver<T> {
     }
 }
 
-/// Creates a bounded mpsc channel for communicating between asynchronous tasks.
+/// Creates a bounded mpsc channel for communicating between asynchronous tasks
+/// with backpressure.
 ///
 /// The channel will buffer up to the provided number of messages.  Once the
 /// buffer is full, attempts to `send` new messages will wait until a message is

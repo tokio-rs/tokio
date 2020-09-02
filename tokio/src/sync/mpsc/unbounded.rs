@@ -47,7 +47,7 @@ impl<T> fmt::Debug for UnboundedReceiver<T> {
 }
 
 /// Creates an unbounded mpsc channel for communicating between asynchronous
-/// tasks.
+/// tasks without backpressure.
 ///
 /// A `send` on this channel will always succeed as long as the receive half has
 /// not been closed. If the receiver falls behind, messages will be arbitrarily
