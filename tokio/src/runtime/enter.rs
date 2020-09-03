@@ -138,31 +138,29 @@ cfg_rt_threaded! {
     }
 }
 
-cfg_block_on! {
-    impl Enter {
-        /// Blocks the thread on the specified future, returning the value with
-        /// which that future completes.
-        pub(crate) fn block_on<F>(&mut self, f: F) -> Result<F::Output, crate::park::ParkError>
-        where
-            F: std::future::Future,
-        {
-            use crate::park::{CachedParkThread, Park};
-            use std::task::Context;
-            use std::task::Poll::Ready;
+impl Enter {
+    /// Blocks the thread on the specified future, returning the value with
+    /// which that future completes.
+    pub(crate) fn block_on<F>(&mut self, f: F) -> Result<F::Output, crate::park::ParkError>
+    where
+        F: std::future::Future,
+    {
+        use crate::park::{CachedParkThread, Park};
+        use std::task::Context;
+        use std::task::Poll::Ready;
 
-            let mut park = CachedParkThread::new();
-            let waker = park.get_unpark()?.into_waker();
-            let mut cx = Context::from_waker(&waker);
+        let mut park = CachedParkThread::new();
+        let waker = park.get_unpark()?.into_waker();
+        let mut cx = Context::from_waker(&waker);
 
-            pin!(f);
+        pin!(f);
 
-            loop {
-                if let Ready(v) = crate::coop::budget(|| f.as_mut().poll(&mut cx)) {
-                    return Ok(v);
-                }
-
-                park.park()?;
+        loop {
+            if let Ready(v) = crate::coop::budget(|| f.as_mut().poll(&mut cx)) {
+                return Ok(v);
             }
+
+            park.park()?;
         }
     }
 }

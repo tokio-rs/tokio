@@ -1,7 +1,7 @@
 //! Runs `!Send` futures on the current thread.
 use crate::runtime::task::{self, JoinHandle, Task};
 use crate::sync::AtomicWaker;
-use crate::util::linked_list::LinkedList;
+use crate::util::linked_list::{Link, LinkedList};
 
 use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
@@ -132,7 +132,7 @@ struct Context {
 
 struct Tasks {
     /// Collection of all active tasks spawned onto this executor.
-    owned: LinkedList<Task<Arc<Shared>>>,
+    owned: LinkedList<Task<Arc<Shared>>, <Task<Arc<Shared>> as Link>::Target>,
 
     /// Local run queue sender and receiver.
     queue: VecDeque<task::Notified<Arc<Shared>>>,
@@ -312,9 +312,9 @@ impl LocalSet {
     /// use tokio::runtime::Runtime;
     /// use tokio::task;
     ///
-    /// let mut rt = Runtime::new().unwrap();
+    /// let rt  = Runtime::new().unwrap();
     /// let local = task::LocalSet::new();
-    /// local.block_on(&mut rt, async {
+    /// local.block_on(&rt, async {
     ///     let join = task::spawn_local(async {
     ///         let blocking_result = task::block_in_place(|| {
     ///             // ...
@@ -329,9 +329,9 @@ impl LocalSet {
     /// use tokio::runtime::Runtime;
     /// use tokio::task;
     ///
-    /// let mut rt = Runtime::new().unwrap();
+    /// let rt  = Runtime::new().unwrap();
     /// let local = task::LocalSet::new();
-    /// local.block_on(&mut rt, async {
+    /// local.block_on(&rt, async {
     ///     let join = task::spawn_local(async {
     ///         let blocking_result = task::spawn_blocking(|| {
     ///             // ...
@@ -346,7 +346,7 @@ impl LocalSet {
     /// [`Runtime::block_on`]: method@crate::runtime::Runtime::block_on
     /// [in-place blocking]: fn@crate::task::block_in_place
     /// [`spawn_blocking`]: fn@crate::task::spawn_blocking
-    pub fn block_on<F>(&self, rt: &mut crate::runtime::Runtime, future: F) -> F::Output
+    pub fn block_on<F>(&self, rt: &crate::runtime::Runtime, future: F) -> F::Output
     where
         F: Future,
     {

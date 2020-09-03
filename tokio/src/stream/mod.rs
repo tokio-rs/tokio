@@ -71,7 +71,9 @@ use take_while::TakeWhile;
 cfg_time! {
     mod timeout;
     use timeout::Timeout;
-    use std::time::Duration;
+    use crate::time::Duration;
+    mod throttle;
+    use crate::stream::throttle::{throttle, Throttle};
 }
 
 pub use futures_core::Stream;
@@ -818,6 +820,32 @@ pub trait StreamExt: Stream {
         Self: Sized,
     {
         Timeout::new(self, duration)
+    }
+    /// Slows down a stream by enforcing a delay between items.
+    ///
+    /// # Example
+    ///
+    /// Create a throttled stream.
+    /// ```rust,no_run
+    /// use std::time::Duration;
+    /// use tokio::stream::StreamExt;
+    ///
+    /// # async fn dox() {
+    /// let mut item_stream = futures::stream::repeat("one").throttle(Duration::from_secs(2));
+    ///
+    /// loop {
+    ///     // The string will be produced at most every 2 seconds
+    ///     println!("{:?}", item_stream.next().await);
+    /// }
+    /// # }
+    /// ```
+    #[cfg(all(feature = "time"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+    fn throttle(self, duration: Duration) -> Throttle<Self>
+    where
+        Self: Sized,
+    {
+        throttle(duration, self)
     }
 }
 

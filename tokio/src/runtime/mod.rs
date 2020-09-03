@@ -69,7 +69,7 @@
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Create the runtime
-//!     let mut rt = Runtime::new()?;
+//!     let rt  = Runtime::new()?;
 //!
 //!     // Spawn the root task
 //!     rt.block_on(async {
@@ -212,7 +212,7 @@ pub(crate) mod enter;
 use self::enter::enter;
 
 mod handle;
-pub use self::handle::{Handle, TryCurrentError};
+use handle::Handle;
 
 mod io;
 
@@ -240,6 +240,7 @@ cfg_rt_core! {
     use crate::task::JoinHandle;
 }
 
+use crate::loom::sync::Mutex;
 use std::future::Future;
 use std::time::Duration;
 
@@ -288,11 +289,11 @@ pub struct Runtime {
 enum Kind {
     /// Not able to execute concurrent tasks. This variant is mostly used to get
     /// access to the driver handles.
-    Shell(Shell),
+    Shell(Mutex<Option<Shell>>),
 
     /// Execute all tasks on the current-thread.
     #[cfg(feature = "rt-core")]
-    Basic(BasicScheduler<time::Driver>),
+    Basic(Mutex<Option<BasicScheduler<time::Driver>>>),
 
     /// Execute tasks across multiple threads.
     #[cfg(feature = "rt-threaded")]
@@ -397,7 +398,7 @@ impl Runtime {
             Kind::Shell(_) => panic!("task execution disabled"),
             #[cfg(feature = "rt-threaded")]
             Kind::ThreadPool(exec) => exec.spawn(future),
-            Kind::Basic(exec) => exec.spawn(future),
+            Kind::Basic(_exec) => self.handle.spawner.spawn(future),
         }
     }
 
@@ -408,10 +409,11 @@ impl Runtime {
     /// complete, and yielding its resolved result. Any tasks or timers which
     /// the future spawns internally will be executed on the runtime.
     ///
-    /// `&mut` is required as calling `block_on` **may** result in advancing the
-    /// state of the runtime. The details depend on how the runtime is
-    /// configured. [`runtime::Handle::block_on`][handle] provides a version
-    /// that takes `&self`.
+    /// When this runtime is configured with `core_threads = 0`, only the first call
+    /// to `block_on` will run the IO and timer drivers. Calls to other methods _before_ the first
+    /// `block_on` completes will just hook into the driver running on the thread
+    /// that first called `block_on`. This means that the driver may be passed
+    /// from thread to thread by the user between calls to `block_on`.
     ///
     /// This method may not be called from an asynchronous context.
     ///
@@ -426,7 +428,7 @@ impl Runtime {
     /// use tokio::runtime::Runtime;
     ///
     /// // Create the runtime
-    /// let mut rt = Runtime::new().unwrap();
+    /// let rt  = Runtime::new().unwrap();
     ///
     /// // Execute the future, blocking the current thread until completion
     /// rt.block_on(async {
@@ -435,13 +437,45 @@ impl Runtime {
     /// ```
     ///
     /// [handle]: fn@Handle::block_on
-    pub fn block_on<F: Future>(&mut self, future: F) -> F::Output {
-        let kind = &mut self.kind;
+    pub fn block_on<F: Future>(&self, future: F) -> F::Output {
+        self.handle.enter(|| match &self.kind {
+            Kind::Shell(exec) => {
+                // TODO(lucio): clean this up and move this impl into
+                // `shell.rs`, this is hacky and bad but will work for
+                // now.
+                let exec_temp = {
+                    let mut lock = exec.lock().unwrap();
+                    lock.take()
+                };
 
-        self.handle.enter(|| match kind {
-            Kind::Shell(exec) => exec.block_on(future),
+                if let Some(mut exec_temp) = exec_temp {
+                    let res = exec_temp.block_on(future);
+                    exec.lock().unwrap().replace(exec_temp);
+                    res
+                } else {
+                    let mut enter = crate::runtime::enter(true);
+                    enter.block_on(future).unwrap()
+                }
+            }
             #[cfg(feature = "rt-core")]
-            Kind::Basic(exec) => exec.block_on(future),
+            Kind::Basic(exec) => {
+                // TODO(lucio): clean this up and move this impl into
+                // `basic_scheduler.rs`, this is hacky and bad but will work for
+                // now.
+                let exec_temp = {
+                    let mut lock = exec.lock().unwrap();
+                    lock.take()
+                };
+
+                if let Some(mut exec_temp) = exec_temp {
+                    let res = exec_temp.block_on(future);
+                    exec.lock().unwrap().replace(exec_temp);
+                    res
+                } else {
+                    let mut enter = crate::runtime::enter(true);
+                    enter.block_on(future).unwrap()
+                }
+            }
             #[cfg(feature = "rt-threaded")]
             Kind::ThreadPool(exec) => exec.block_on(future),
         })
@@ -451,11 +485,8 @@ impl Runtime {
     /// have an executor available on creation such as [`Delay`] or [`TcpStream`].
     /// It will also allow you to call methods such as [`tokio::spawn`].
     ///
-    /// This function is also available as [`Handle::enter`].
-    ///
     /// [`Delay`]: struct@crate::time::Delay
     /// [`TcpStream`]: struct@crate::net::TcpStream
-    /// [`Handle::enter`]: fn@crate::runtime::Handle::enter
     /// [`tokio::spawn`]: fn@crate::spawn
     ///
     /// # Example
@@ -486,27 +517,6 @@ impl Runtime {
         self.handle.enter(f)
     }
 
-    /// Return a handle to the runtime's spawner.
-    ///
-    /// The returned handle can be used to spawn tasks that run on this runtime, and can
-    /// be cloned to allow moving the `Handle` to other threads.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio::runtime::Runtime;
-    ///
-    /// let rt = Runtime::new()
-    ///     .unwrap();
-    ///
-    /// let handle = rt.handle();
-    ///
-    /// handle.spawn(async { println!("hello"); });
-    /// ```
-    pub fn handle(&self) -> &Handle {
-        &self.handle
-    }
-
     /// Shutdown the runtime, waiting for at most `duration` for all spawned
     /// task to shutdown.
     ///
@@ -531,7 +541,7 @@ impl Runtime {
     /// use std::time::Duration;
     ///
     /// fn main() {
-    ///    let mut runtime = Runtime::new().unwrap();
+    ///    let runtime = Runtime::new().unwrap();
     ///
     ///    runtime.block_on(async move {
     ///        task::spawn_blocking(move || {
@@ -565,7 +575,7 @@ impl Runtime {
     /// use tokio::runtime::Runtime;
     ///
     /// fn main() {
-    ///    let mut runtime = Runtime::new().unwrap();
+    ///    let runtime = Runtime::new().unwrap();
     ///
     ///    runtime.block_on(async move {
     ///        let inner_runtime = Runtime::new().unwrap();

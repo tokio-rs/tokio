@@ -1,5 +1,5 @@
 use crate::runtime::task::{self, Schedule, Task};
-use crate::util::linked_list::LinkedList;
+use crate::util::linked_list::{Link, LinkedList};
 use crate::util::TryLock;
 
 use std::collections::VecDeque;
@@ -72,7 +72,7 @@ struct Inner {
 
 struct Core {
     queue: VecDeque<task::Notified<Runtime>>,
-    tasks: LinkedList<Task<Runtime>>,
+    tasks: LinkedList<Task<Runtime>, <Task<Runtime> as Link>::Target>,
 }
 
 static CURRENT: TryLock<Option<Runtime>> = TryLock::new(None);

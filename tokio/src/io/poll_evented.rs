@@ -173,7 +173,7 @@ where
     ///
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a tokio runtime, otherwise runtime can be set
-    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     pub fn new(io: E) -> io::Result<Self> {
         PollEvented::new_with_ready(io, mio::Ready::all())
     }
@@ -201,7 +201,7 @@ where
     ///
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a tokio runtime, otherwise runtime can be set
-    /// explicitly with [`Handle::enter`](crate::runtime::Handle::enter) function.
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     pub fn new_with_ready(io: E, ready: mio::Ready) -> io::Result<Self> {
         let registration = Registration::new_with_ready(&io, ready)?;
         Ok(Self {

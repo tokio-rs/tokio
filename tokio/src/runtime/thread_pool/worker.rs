@@ -12,7 +12,7 @@ use crate::runtime;
 use crate::runtime::park::{Parker, Unparker};
 use crate::runtime::thread_pool::{AtomicCell, Idle};
 use crate::runtime::{queue, task};
-use crate::util::linked_list::LinkedList;
+use crate::util::linked_list::{Link, LinkedList};
 use crate::util::FastRand;
 
 use std::cell::RefCell;
@@ -53,7 +53,7 @@ struct Core {
     is_shutdown: bool,
 
     /// Tasks owned by the core
-    tasks: LinkedList<Task>,
+    tasks: LinkedList<Task, <Task as Link>::Target>,
 
     /// Parker
     ///

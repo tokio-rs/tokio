@@ -185,7 +185,7 @@ mod tests {
 
     #[test]
     fn smoke() {
-        let mut rt = rt();
+        let rt = rt();
         rt.block_on(async move {
             let registry = Registry::new(vec![
                 EventInfo::default(),
@@ -247,7 +247,7 @@ mod tests {
 
     #[test]
     fn broadcast_cleans_up_disconnected_listeners() {
-        let mut rt = Runtime::new().unwrap();
+        let rt = Runtime::new().unwrap();
 
         rt.block_on(async {
             let registry = Registry::new(vec![EventInfo::default()]);

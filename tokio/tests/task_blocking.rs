@@ -79,7 +79,7 @@ async fn no_block_in_basic_scheduler() {
 
 #[test]
 fn yes_block_in_threaded_block_on() {
-    let mut rt = runtime::Builder::new()
+    let rt = runtime::Builder::new()
         .threaded_scheduler()
         .build()
         .unwrap();
@@ -91,7 +91,7 @@ fn yes_block_in_threaded_block_on() {
 #[test]
 #[should_panic]
 fn no_block_in_basic_block_on() {
-    let mut rt = runtime::Builder::new().basic_scheduler().build().unwrap();
+    let rt = runtime::Builder::new().basic_scheduler().build().unwrap();
     rt.block_on(async {
         task::block_in_place(|| {});
     });
@@ -99,14 +99,14 @@ fn no_block_in_basic_block_on() {
 
 #[test]
 fn can_enter_basic_rt_from_within_block_in_place() {
-    let mut outer = tokio::runtime::Builder::new()
+    let outer = tokio::runtime::Builder::new()
         .threaded_scheduler()
         .build()
         .unwrap();
 
     outer.block_on(async {
         tokio::task::block_in_place(|| {
-            let mut inner = tokio::runtime::Builder::new()
+            let inner = tokio::runtime::Builder::new()
                 .basic_scheduler()
                 .build()
                 .unwrap();
@@ -120,7 +120,7 @@ fn can_enter_basic_rt_from_within_block_in_place() {
 fn useful_panic_message_when_dropping_rt_in_rt() {
     use std::panic::{catch_unwind, AssertUnwindSafe};
 
-    let mut outer = tokio::runtime::Builder::new()
+    let outer = tokio::runtime::Builder::new()
         .threaded_scheduler()
         .build()
         .unwrap();
@@ -147,7 +147,7 @@ fn useful_panic_message_when_dropping_rt_in_rt() {
 
 #[test]
 fn can_shutdown_with_zero_timeout_in_runtime() {
-    let mut outer = tokio::runtime::Builder::new()
+    let outer = tokio::runtime::Builder::new()
         .threaded_scheduler()
         .build()
         .unwrap();
@@ -163,7 +163,7 @@ fn can_shutdown_with_zero_timeout_in_runtime() {
 
 #[test]
 fn can_shutdown_now_in_runtime() {
-    let mut outer = tokio::runtime::Builder::new()
+    let outer = tokio::runtime::Builder::new()
         .threaded_scheduler()
         .build()
         .unwrap();
@@ -179,7 +179,7 @@ fn can_shutdown_now_in_runtime() {
 
 #[test]
 fn coop_disabled_in_block_in_place() {
-    let mut outer = tokio::runtime::Builder::new()
+    let outer = tokio::runtime::Builder::new()
         .threaded_scheduler()
         .enable_time()
         .build()
@@ -213,7 +213,7 @@ fn coop_disabled_in_block_in_place_in_block_on() {
     let (done_tx, done_rx) = std::sync::mpsc::channel();
     let done = done_tx.clone();
     thread::spawn(move || {
-        let mut outer = tokio::runtime::Builder::new()
+        let outer = tokio::runtime::Builder::new()
             .threaded_scheduler()
             .build()
             .unwrap();
