@@ -4,7 +4,6 @@ use crate::runtime::shell::Shell;
 use crate::runtime::{blocking, io, time, Callback, Runtime, Spawner};
 
 use std::fmt;
-#[cfg(feature = "blocking")]
 use std::time::Duration;
 
 /// Builds Tokio Runtime with custom configuration values.
