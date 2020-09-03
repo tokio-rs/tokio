@@ -355,10 +355,8 @@
 //!             let op = my_async_operation();
 //!             tokio::pin!(op);
 //!
-//!             // Receive the **initial** configuration value. As this is the
-//!             // first time the config is received from the watch, it will
-//!             // always complete immediatedly.
-//!             let mut conf = rx.recv().await;
+//!             // Get the initial config value
+//!             let mut conf = rx.borrow().clone();
 //!
 //!             let mut op_start = Instant::now();
 //!             let mut delay = time::delay_until(op_start + conf.timeout);
@@ -375,8 +373,8 @@
 //!                         // Restart the timeout
 //!                         delay = time::delay_until(op_start + conf.timeout);
 //!                     }
-//!                     new_conf = rx.recv() => {
-//!                         conf = new_conf;
+//!                     _ = rx.changed() => {
+//!                         conf = rx.borrow().clone();
 //!
 //!                         // The configuration has been updated. Update the
 //!                         // `delay` using the new `timeout` value.
