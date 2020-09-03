@@ -17,10 +17,6 @@
 ))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(docsrs, feature(doc_alias))]
-#![cfg_attr(
-    all(feature = "nightly", feature = "parking_lot", not(all(loom, test))),
-    feature(const_fn)
-)]
 
 //! A runtime for writing reliable, asynchronous, and slim applications.
 //!

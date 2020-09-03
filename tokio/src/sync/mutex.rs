@@ -226,10 +226,10 @@ impl<T: ?Sized> Mutex<T> {
     /// ```
     /// use tokio::sync::Mutex;
     ///
-    /// static lock: Mutex<i32> = Mutex::const_new(5);
+    /// static LOCK: Mutex<i32> = Mutex::const_new(5);
     /// ```
-    #[cfg(all(feature = "nightly", feature = "parking_lot", not(all(loom, test)),))]
-    #[cfg_attr(docsrs, doc(cfg(all(feature = "parking_lot", feature = "nightly"))))]
+    #[cfg(all(feature = "parking_lot", not(all(loom, test)),))]
+    #[cfg_attr(docsrs, doc(cfg(all(feature = "parking_lot",))))]
     pub const fn const_new(t: T) -> Self
     where
         T: Sized,
