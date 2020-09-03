@@ -68,8 +68,6 @@ pub struct Builder {
     /// To run before each worker thread stops
     pub(super) before_stop: Option<Callback>,
 
-    #[cfg(feature = "blocking")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
     /// Customizable keep alive timeout for BlockingPool
     pub(super) keep_alive: Option<Duration>,
 }
@@ -116,7 +114,6 @@ impl Builder {
             after_start: None,
             before_stop: None,
 
-            #[cfg(feature = "blocking")]
             keep_alive: None,
         }
     }

@@ -94,10 +94,7 @@ where
 impl BlockingPool {
     pub(crate) fn new(builder: &Builder, thread_cap: usize) -> BlockingPool {
         let (shutdown_tx, shutdown_rx) = shutdown::channel();
-        #[cfg(feature = "blocking")]
         let keep_alive = builder.keep_alive.unwrap_or(KEEP_ALIVE);
-        #[cfg(not(feature = "blocking"))]
-        let keep_alive = KEEP_ALIVE;
 
         BlockingPool {
             spawner: Spawner {
