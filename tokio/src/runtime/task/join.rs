@@ -17,7 +17,8 @@ doc_rt_core! {
     /// on it.
     ///
     /// This `struct` is created by the [`task::spawn`] and [`task::spawn_blocking`]
-    /// functions.
+    /// functions. The struct is parameterized over the return type of the spawned task (which is a
+    /// `Result<T, JoinError>`).
     ///
     /// # Examples
     ///
@@ -42,6 +43,46 @@ doc_rt_core! {
     /// let join_handle: task::JoinHandle<_> = task::spawn_blocking(|| {
     ///     // some blocking work here
     /// });
+    /// # }
+    /// ```
+    ///
+    /// Explicit JoinHandle<T> specification for a spawned task that does not return a value.
+    /// This is parameterized over `()`:
+    /// ```
+    /// use tokio::task;
+    ///
+    /// # async fn doc() {
+    /// let join_handle: task::JoinHandle<()> = task::spawn(async {
+    ///     println!("I return nothing.")
+    /// });
+    /// # }
+    /// ```
+    ///
+    /// Explicit JoinHandle<T> specification for a spawned task that returns a value:
+    /// ```
+    /// use tokio::task;
+    ///
+    /// # async fn doc() {
+    /// let join_handle: task::JoinHandle<i32> = task::spawn(async {
+    ///     5 + 3
+    /// });
+    /// # }
+    ///
+    /// ```
+    ///
+    /// Returning a `Result` from a spawned task. Note the double chaining of the `?`
+    /// operator to match onto the `Ok` value (as, the return value is a
+    /// `Result<Result<i32, &str>, JoinError>`).
+    /// ```
+    /// use tokio::task;
+    ///
+    /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
+    /// let join_handle: task::JoinHandle<Result<i32, &str>> = task::spawn(async {
+    ///     Ok(5 + 3)
+    /// } );
+    ///
+    /// let result = join_handle.await??;
+    /// # Ok(())
     /// # }
     /// ```
     ///
