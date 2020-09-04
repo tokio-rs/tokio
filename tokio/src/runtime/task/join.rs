@@ -17,8 +17,8 @@ doc_rt_core! {
     /// on it.
     ///
     /// This `struct` is created by the [`task::spawn`] and [`task::spawn_blocking`]
-    /// functions. The struct is parameterized over the return type of the spawned task (which is a
-    /// `Result<T, JoinError>`).
+    /// functions. The struct is parameterized over the return type of the spawned
+    /// task (which is a `Result<T, JoinError>`).
     ///
     /// # Examples
     ///
@@ -48,6 +48,7 @@ doc_rt_core! {
     ///
     /// Explicit JoinHandle<T> specification for a spawned task that does not return a value.
     /// This is parameterized over `()`:
+    ///
     /// ```
     /// use tokio::task;
     ///
@@ -59,6 +60,7 @@ doc_rt_core! {
     /// ```
     ///
     /// Explicit JoinHandle<T> specification for a spawned task that returns a value:
+    ///
     /// ```
     /// use tokio::task;
     ///
@@ -73,6 +75,7 @@ doc_rt_core! {
     /// Returning a `Result` from a spawned task. Note the double chaining of the `?`
     /// operator to match onto the `Ok` value (as, the return value is a
     /// `Result<Result<i32, &str>, JoinError>`).
+    ///
     /// ```
     /// use tokio::task;
     ///
