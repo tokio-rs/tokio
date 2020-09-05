@@ -1,5 +1,5 @@
 use bytes::{Buf, BufMut};
-use futures_core::stream::TryStream;
+use futures_core::stream::Stream;
 use pin_project_lite::pin_project;
 use std::io;
 use std::pin::Pin;
@@ -54,17 +54,18 @@ pin_project! {
     /// [`Stream`]: tokio::stream::Stream
     /// [`ReaderStream`]: crate::io::ReaderStream
     #[derive(Debug)]
-    pub struct StreamReader<S: TryStream> {
+    pub struct StreamReader<S, B> {
         #[pin]
         inner: S,
-        chunk: Option<S::Ok>,
+        chunk: Option<B>,
     }
 }
 
-impl<S: TryStream> StreamReader<S>
+impl<S, B, E> StreamReader<S, B>
 where
-    <S as TryStream>::Ok: Buf,
-    <S as TryStream>::Error: Into<std::io::Error>,
+    S: Stream<Item = Result<B, E>>,
+    B: Buf,
+    E: Into<std::io::Error>,
 {
     /// Convert a stream of byte chunks into an [`AsyncRead`](tokio::io::AsyncRead).
     ///
@@ -92,10 +93,11 @@ where
     }
 }
 
-impl<S: TryStream> AsyncRead for StreamReader<S>
+impl<S, B, E> AsyncRead for StreamReader<S, B>
 where
-    <S as TryStream>::Ok: Buf,
-    <S as TryStream>::Error: Into<std::io::Error>,
+    S: Stream<Item = Result<B, E>>,
+    B: Buf,
+    E: Into<std::io::Error>,
 {
     fn poll_read(
         mut self: Pin<&mut Self>,
@@ -142,10 +144,11 @@ where
     }
 }
 
-impl<S: TryStream> AsyncBufRead for StreamReader<S>
+impl<S, B, E> AsyncBufRead for StreamReader<S, B>
 where
-    <S as TryStream>::Ok: Buf,
-    <S as TryStream>::Error: Into<std::io::Error>,
+    S: Stream<Item = Result<B, E>>,
+    B: Buf,
+    E: Into<std::io::Error>,
 {
     fn poll_fill_buf(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
         loop {
@@ -154,7 +157,7 @@ where
                 let buf = self.project().chunk.as_ref().unwrap().bytes();
                 return Poll::Ready(Ok(buf));
             } else {
-                match self.as_mut().project().inner.try_poll_next(cx) {
+                match self.as_mut().project().inner.poll_next(cx) {
                     Poll::Ready(Some(Ok(chunk))) => {
                         // Go around the loop in case the chunk is empty.
                         *self.as_mut().project().chunk = Some(chunk);
