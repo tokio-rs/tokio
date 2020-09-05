@@ -77,10 +77,11 @@ doc_rt_core! {
     ///
     /// ```
     /// use tokio::task;
+    /// use std::io;
     ///
     /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let join_handle: task::JoinHandle<Result<i32, &str>> = tokio::spawn(async {
+    /// async fn main() -> io::Result<()> {
+    ///     let join_handle: task::JoinHandle<Result<i32, io::Error>> = tokio::spawn(async {
     ///         Ok(5 + 3)
     ///     });
     ///
@@ -94,11 +95,12 @@ doc_rt_core! {
     ///
     /// ```
     /// use tokio::task;
+    /// use std::io;
     /// use std::panic;
     ///
     /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let join_handle: task::JoinHandle<_> = tokio::spawn(async {
+    /// async fn main() -> io::Result<()> {
+    ///     let join_handle: task::JoinHandle<Result<i32, io::Error>> = tokio::spawn(async {
     ///         panic!("boom");
     ///     });
     ///
