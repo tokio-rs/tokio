@@ -77,6 +77,14 @@ impl<'a> ReadBuf<'a> {
         unsafe { mem::transmute::<&mut [MaybeUninit<u8>], &mut [u8]>(slice) }
     }
 
+    /// Returns a new `ReadBuf` comprised of the unfilled section up to `n`.
+    #[inline]
+    pub fn take(&mut self, n: usize) -> ReadBuf<'_> {
+        let max = std::cmp::min(self.remaining(), n);
+        // Saftey: We don't set any of the `unfilled_mut` with `MaybeUninit::uninit`.
+        unsafe { ReadBuf::uninit(&mut self.unfilled_mut()[..max]) }
+    }
+
     /// Returns a shared reference to the initialized portion of the buffer.
     ///
     /// This includes the filled portion.
