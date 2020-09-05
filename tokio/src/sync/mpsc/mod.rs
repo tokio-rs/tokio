@@ -11,11 +11,11 @@
 //! This makes the [`UnboundedSender`] usable from both synchronous and
 //! asynchronous code.
 //!
-//! Similar to the `mpsc` channels provided in `std`, the channel constructor
+//! Similar to the `mpsc` channels provided by `std`, the channel constructor
 //! functions provide separate send and receive handles, [`Sender`] and
 //! [`Receiver`] for the bounded channel, [`UnboundedSender`] and
-//! [`UnboundedReceiver`] for the unbounded channel. [`Receiver`] and
-//! [`UnboundedReceiver`] both implement [`Stream`] and allow a task to read
+//! [`UnboundedReceiver`] for the unbounded channel. Both [`Receiver`] and
+//! [`UnboundedReceiver`] implement [`Stream`] and allow a task to read
 //! values out of the channel. If there is no message to read, the current task
 //! will be notified when a new value is sent. [`Sender`] and
 //! [`UnboundedSender`] allow sending values into the channel. If the bounded
