@@ -30,7 +30,7 @@ use proc_macro::TokenStream;
 ///
 /// Note: This macro is designed to be simplistic and targets applications that do not require
 /// a complex setup. If provided functionality is not sufficient, user may be interested in
-/// using [Builder](../tokio/runtime/struct.builder.html), which provides a more powerful
+/// using [Builder](../tokio/runtime/struct.Builder.html), which provides a more powerful
 /// interface.
 ///
 /// ## Options:
