@@ -152,7 +152,6 @@ async_assert_fn!(tokio::fs::DirEntry::file_type(_): Send & Sync);
 
 async_assert_fn!(tokio::fs::File::open(&str): Send & Sync);
 async_assert_fn!(tokio::fs::File::create(&str): Send & Sync);
-async_assert_fn!(tokio::fs::File::seek(_, std::io::SeekFrom): Send & Sync);
 async_assert_fn!(tokio::fs::File::sync_all(_): Send & Sync);
 async_assert_fn!(tokio::fs::File::sync_data(_): Send & Sync);
 async_assert_fn!(tokio::fs::File::set_len(_, u64): Send & Sync);
