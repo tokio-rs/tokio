@@ -17,8 +17,7 @@ doc_rt_core! {
     /// on it.
     ///
     /// This `struct` is created by the [`task::spawn`] and [`task::spawn_blocking`]
-    /// functions. The struct is parameterized over the return type of the spawned
-    /// task (which is a `Result<T, JoinError>`).
+    /// functions.
     ///
     /// # Examples
     ///
@@ -46,19 +45,8 @@ doc_rt_core! {
     /// # }
     /// ```
     ///
-    /// If a task has no return value, the join handle has type `JoinHandle<()>`.
-    ///
-    /// ```
-    /// use tokio::task;
-    ///
-    /// # async fn doc() {
-    /// let join_handle: task::JoinHandle<()> = task::spawn(async {
-    ///     println!("I return nothing.");
-    /// });
-    /// # }
-    /// ```
-    ///
-    /// Explicit JoinHandle<T> specification for a spawned task that returns a value:
+    /// The generic parameter `T` in `JoinHandle<T>` is the return type of the spawned task.
+    /// If the return value is an i32, the join handle has type `JoinHandle<i32>`:
     ///
     /// ```
     /// use tokio::task;
@@ -71,17 +59,28 @@ doc_rt_core! {
     ///
     /// ```
     ///
-    /// Returning a `Result` from a spawned task. Note the double chaining of the `?`
-    /// operator to match onto the `Ok` value (as, the return value is a
-    /// `Result<Result<i32, &str>, JoinError>`).
+    /// If the task does not have a return value, the join handle has type `JoinHandle<()>`:
     ///
     /// ```
-    /// use std::io;
-    /// use tokio::task::JoinHandle;
+    /// use tokio::task;
+    ///
+    /// # async fn doc() {
+    /// let join_handle: task::JoinHandle<()> = task::spawn(async {
+    ///     println!("I return nothing.");
+    /// });
+    /// # }
+    /// ```
+    ///
+    /// Note that `handle.await` doesn't give you the return type directly. It is wrapped in a
+    /// `Result` because panics in the spawned task are caught by Tokio. The `?` operator has
+    /// to be double chained to extract the returned value:
+    ///
+    /// ```
+    /// use tokio::task;
     ///
     /// #[tokio::main]
-    /// async fn main() -> io::Result<()> {
-    ///     let join_handle: JoinHandle<Result<i32, &str>> = tokio::spawn(async {
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let join_handle: task::JoinHandle<Result<i32, &str>> = tokio::spawn(async {
     ///         Ok(5 + 3)
     ///     });
     ///
@@ -91,6 +90,24 @@ doc_rt_core! {
     /// }
     /// ```
     ///
+    /// If the task panics, the error is a `JoinError` that contains the panic:
+    ///
+    /// ```
+    /// use tokio::task;
+    /// use std::panic;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let join_handle: task::JoinHandle<_> = tokio::spawn(async {
+    ///         panic!("boom");
+    ///     });
+    ///
+    ///     let err = join_handle.await.unwrap_err();
+    ///     assert!(err.is_panic());
+    ///     Ok(())
+    /// }
+    ///
+    /// ```
     /// Child being detached and outliving its parent:
     ///
     /// ```no_run
