@@ -10,14 +10,14 @@
 //! * A **timer** for scheduling work to run after a set period of time.
 //!
 //! Tokio's [`Runtime`] bundles all of these services as a single type, allowing
-//! them to be started, shut down, and configured together. However, most
-//! applications won't need to use [`Runtime`] directly. Instead, they can
+//! them to be started, shut down, and configured together. However, often
+//! it is not required to configure a [`Runtime`] manually, and user may just
 //! use the [`tokio::main`] attribute macro, which creates a [`Runtime`] under
 //! the hood.
 //!
 //! # Usage
 //!
-//! Most applications will use the [`tokio::main`] attribute macro.
+//! When no fine tuning is required, the [`tokio::main`] attribute macro can be used.
 //!
 //! ```no_run
 //! use tokio::net::TcpListener;

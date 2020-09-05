@@ -28,6 +28,11 @@ use proc_macro::TokenStream;
 /// without requiring the user to use [Runtime](../tokio/runtime/struct.Runtime.html) or
 /// [Builder](../tokio/runtime/struct.builder.html) directly.
 ///
+/// Note: This macro is designed to be simplistic and targets applications that do not require
+/// a complex setup. If provided functionality is not sufficient, user may be interested in
+/// using [Builder](../tokio/runtime/struct.builder.html), which provides a more powerful
+/// interface.
+///
 /// ## Options:
 ///
 /// If you want to set the number of worker threads used for asynchronous code, use the
@@ -134,6 +139,11 @@ pub fn main_threaded(args: TokenStream, item: TokenStream) -> TokenStream {
 /// Marks async function to be executed by selected runtime. This macro helps set up a `Runtime`
 /// without requiring the user to use [Runtime](../tokio/runtime/struct.Runtime.html) or
 /// [Builder](../tokio/runtime/struct.builder.html) directly.
+///
+/// Note: This macro is designed to be simplistic and targets applications that do not require
+/// a complex setup. If provided functionality is not sufficient, user may be interested in
+/// using [Builder](../tokio/runtime/struct.builder.html), which provides a more powerful
+/// interface.
 ///
 /// ## Options:
 ///
