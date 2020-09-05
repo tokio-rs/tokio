@@ -46,8 +46,7 @@ doc_rt_core! {
     /// # }
     /// ```
     ///
-    /// Explicit JoinHandle<T> specification for a spawned task that does not return a value.
-    /// This is parameterized over `()`:
+    /// If a task has no return value, the join handle has type `JoinHandle<()>`.
     ///
     /// ```
     /// use tokio::task;
