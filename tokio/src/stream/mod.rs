@@ -3,7 +3,9 @@
 //! A `Stream` is an asynchronous sequence of values. It can be thought of as
 //! an asynchronous version of the standard library's `Iterator` trait.
 //!
-//! This module provides helpers to work with them.
+//! This module provides helpers to work with them. For examples of usage and a more in-depth
+//! description of streams you can also refer to the [streams
+//! tutorial](https://tokio.rs/tokio/tutorial/streams) on the tokio website.
 //!
 //! # Iterating over a Stream
 //!
