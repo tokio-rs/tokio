@@ -91,7 +91,7 @@ doc_rt_core! {
     /// }
     /// ```
     ///
-    /// If the task panics, the error is a `JoinError` that contains the panic:
+    /// If the task panics, the error is a [`JoinError`] that contains the panic:
     ///
     /// ```
     /// use tokio::task;
@@ -140,6 +140,7 @@ doc_rt_core! {
     /// [`task::spawn`]: crate::task::spawn()
     /// [`task::spawn_blocking`]: crate::task::spawn_blocking
     /// [`std::thread::JoinHandle`]: std::thread::JoinHandle
+    /// [`JoinError`]: crate::task::JoinError
     pub struct JoinHandle<T> {
         raw: Option<RawTask>,
         _p: PhantomData<T>,
