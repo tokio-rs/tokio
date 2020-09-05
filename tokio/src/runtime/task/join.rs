@@ -45,6 +45,71 @@ doc_rt_core! {
     /// # }
     /// ```
     ///
+    /// The generic parameter `T` in `JoinHandle<T>` is the return type of the spawned task.
+    /// If the return value is an i32, the join handle has type `JoinHandle<i32>`:
+    ///
+    /// ```
+    /// use tokio::task;
+    ///
+    /// # async fn doc() {
+    /// let join_handle: task::JoinHandle<i32> = task::spawn(async {
+    ///     5 + 3
+    /// });
+    /// # }
+    ///
+    /// ```
+    ///
+    /// If the task does not have a return value, the join handle has type `JoinHandle<()>`:
+    ///
+    /// ```
+    /// use tokio::task;
+    ///
+    /// # async fn doc() {
+    /// let join_handle: task::JoinHandle<()> = task::spawn(async {
+    ///     println!("I return nothing.");
+    /// });
+    /// # }
+    /// ```
+    ///
+    /// Note that `handle.await` doesn't give you the return type directly. It is wrapped in a
+    /// `Result` because panics in the spawned task are caught by Tokio. The `?` operator has
+    /// to be double chained to extract the returned value:
+    ///
+    /// ```
+    /// use tokio::task;
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let join_handle: task::JoinHandle<Result<i32, io::Error>> = tokio::spawn(async {
+    ///         Ok(5 + 3)
+    ///     });
+    ///
+    ///     let result = join_handle.await??;
+    ///     assert_eq!(result, 8);
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// If the task panics, the error is a [`JoinError`] that contains the panic:
+    ///
+    /// ```
+    /// use tokio::task;
+    /// use std::io;
+    /// use std::panic;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let join_handle: task::JoinHandle<Result<i32, io::Error>> = tokio::spawn(async {
+    ///         panic!("boom");
+    ///     });
+    ///
+    ///     let err = join_handle.await.unwrap_err();
+    ///     assert!(err.is_panic());
+    ///     Ok(())
+    /// }
+    ///
+    /// ```
     /// Child being detached and outliving its parent:
     ///
     /// ```no_run
@@ -75,6 +140,7 @@ doc_rt_core! {
     /// [`task::spawn`]: crate::task::spawn()
     /// [`task::spawn_blocking`]: crate::task::spawn_blocking
     /// [`std::thread::JoinHandle`]: std::thread::JoinHandle
+    /// [`JoinError`]: crate::task::JoinError
     pub struct JoinHandle<T> {
         raw: Option<RawTask>,
         _p: PhantomData<T>,
