@@ -76,16 +76,19 @@ doc_rt_core! {
     /// `Result<Result<i32, &str>, JoinError>`).
     ///
     /// ```
-    /// use tokio::task;
+    /// use std::io;
+    /// use tokio::task::JoinHandle;
     ///
-    /// # async fn doc() -> Result<(), Box<dyn std::error::Error>> {
-    /// let join_handle: task::JoinHandle<Result<i32, &str>> = task::spawn(async {
-    ///     Ok(5 + 3)
-    /// } );
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let join_handle: JoinHandle<Result<i32, &str>> = tokio::spawn(async {
+    ///         Ok(5 + 3)
+    ///     });
     ///
-    /// let result = join_handle.await??;
-    /// # Ok(())
-    /// # }
+    ///     let result = join_handle.await??;
+    ///     assert_eq!(result, 8);
+    ///     Ok(())
+    /// }
     /// ```
     ///
     /// Child being detached and outliving its parent:
