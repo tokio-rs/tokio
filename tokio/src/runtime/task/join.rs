@@ -53,7 +53,7 @@ doc_rt_core! {
     ///
     /// # async fn doc() {
     /// let join_handle: task::JoinHandle<()> = task::spawn(async {
-    ///     println!("I return nothing.")
+    ///     println!("I return nothing.");
     /// });
     /// # }
     /// ```
