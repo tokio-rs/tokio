@@ -391,7 +391,7 @@ impl Builder {
     /// Sets a custom timeout for a thread in the blocking pool.
     ///
     /// By default, the timeout for a thread is set to 10 seconds. This can
-    /// be overriden using .blocking_keep_alive().
+    /// be overriden using .thread_keep_alive().
     ///
     /// # Example
     ///
@@ -401,11 +401,11 @@ impl Builder {
     ///
     /// # pub fn main() {
     /// let rt = runtime::Builder::new()
-    ///     .blocking_keep_alive(Duration::from_millis(100))
+    ///     .thread_keep_alive(Duration::from_millis(100))
     ///     .build();
     /// # }
     /// ```
-    pub fn blocking_keep_alive(&mut self, duration: Duration) -> &mut Self {
+    pub fn thread_keep_alive(&mut self, duration: Duration) -> &mut Self {
         self.keep_alive = Some(duration);
         self
     }
