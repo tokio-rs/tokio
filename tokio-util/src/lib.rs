@@ -41,3 +41,5 @@ cfg_compat! {
 pub mod context;
 
 pub mod sync;
+
+pub mod either;
