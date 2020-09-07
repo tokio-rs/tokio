@@ -9,7 +9,7 @@ use tokio::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf, Result}
 
 /// Combines two different futures, streams, or sinks having the same associated types into a single type.
 ///
-/// This type implements common asynchronous traits provided by `tokio`, and also `std::future::Future`.
+/// This type implements common asynchronous traits such as [`Future`] and those in Tokio.
 ///
 /// # Example
 ///
@@ -19,7 +19,6 @@ use tokio::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf, Result}
 /// # fn some_condition() -> bool { true }
 /// # async fn some_async_function() -> u32 { 10 }
 /// # async fn other_async_function() -> u32 { 20 }
-///
 /// #[tokio::main]
 /// async fn main() {
 ///     let result = if some_condition() {
@@ -32,11 +31,12 @@ use tokio::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf, Result}
 /// }
 /// ```
 ///
-/// This is because while output type for both futures is the same, the exact future types
-/// differ, and compiler is unable to choose appropriate type for the `result` variable.
+// This is because although the output types for both futures is the same, the exact future
+// types are different, but the compiler must be able to choose a single type for the
+// `result` variable.
 ///
-/// However, we can wrap these futures into `Either` (as long as the output type is the same)
-/// and then await for result without worrying about actual types lying behind these futures:
+/// When the output type is the same, we can wrap each future in `Either` to avoid the
+/// issue:
 ///
 /// ```
 /// use tokio_util::either::Either;
@@ -154,11 +154,10 @@ where
     }
 }
 
-#[cfg(feature = "codec")]
-impl<L, R> tokio::stream::Stream for Either<L, R>
+impl<L, R> futures_core::stream::Stream for Either<L, R>
 where
-    L: tokio::stream::Stream,
-    R: tokio::stream::Stream<Item = L::Item>,
+    L: futures_core::stream::Stream,
+    R: futures_core::stream::Stream<Item = L::Item>,
 {
     type Item = L::Item;
 
@@ -175,7 +174,6 @@ mod tests {
         stream::{once, Once, StreamExt},
     };
 
-    #[cfg(feature = "codec")]
     #[tokio::test]
     async fn either_is_stream() {
         let mut either: Either<Once<u32>, Once<u32>> = Either::Left(once(1));
