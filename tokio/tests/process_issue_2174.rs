@@ -39,8 +39,7 @@ async fn issue_2174() {
     time::delay_for(Duration::from_secs(1)).await;
 
     // Kill the child process.
-    child.kill().unwrap();
-    let _ = child.wait().await;
+    child.kill().await.unwrap();
 
     assert_err!(handle.await);
 }
