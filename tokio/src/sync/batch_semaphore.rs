@@ -130,7 +130,7 @@ impl Semaphore {
     pub(crate) const fn const_new(permits: usize) -> Self {
         // FIXME: assertions and by extension panics are still being worked on: https://github.com/rust-lang/rust/issues/74925
         Self {
-            permits: AtomicUsize::const_new(permits << Self::PERMIT_SHIFT),
+            permits: AtomicUsize::new(permits << Self::PERMIT_SHIFT),
             waiters: Mutex::const_new(Waitlist {
                 queue: LinkedList::new(),
                 closed: false,
