@@ -11,6 +11,8 @@ use tokio::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf, Result}
 ///
 /// This type implements common asynchronous traits such as [`Future`] and those in Tokio.
 ///
+/// [`Future`]: https://doc.rust-lang.org/std/future/trait.Future.html
+///
 /// # Example
 ///
 /// The following code will not work:
