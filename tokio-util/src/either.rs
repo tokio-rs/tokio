@@ -5,10 +5,7 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use tokio::{
-    io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf, Result},
-    stream::Stream,
-};
+use tokio::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf, Result};
 
 /// Combines two different futures, streams, or sinks having the same associated types into a single type.
 ///
@@ -157,14 +154,41 @@ where
     }
 }
 
-impl<L, R> Stream for Either<L, R>
+#[cfg(feature = "codec")]
+impl<L, R> tokio::stream::Stream for Either<L, R>
 where
-    L: Stream,
-    R: Stream<Item = L::Item>,
+    L: tokio::stream::Stream,
+    R: tokio::stream::Stream<Item = L::Item>,
 {
     type Item = L::Item;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         delegate_call!(self.poll_next(cx))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::{
+        io::{repeat, AsyncReadExt, Repeat},
+        stream::{once, Once, StreamExt},
+    };
+
+    #[cfg(feature = "codec")]
+    #[tokio::test]
+    async fn either_is_stream() {
+        let mut either: Either<Once<u32>, Once<u32>> = Either::Left(once(1));
+
+        assert_eq!(Some(1u32), either.next().await);
+    }
+
+    #[tokio::test]
+    async fn either_is_async_read() {
+        let mut buffer = [0; 3];
+        let mut either: Either<Repeat, Repeat> = Either::Right(repeat(0b101));
+
+        either.read_exact(&mut buffer).await.unwrap();
+        assert_eq!(buffer, [0b101, 0b101, 0b101]);
     }
 }
