@@ -5,6 +5,8 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::AsyncRead;
 
+const CAPACITY: usize = 4096;
+
 pin_project! {
     /// Convert an [`AsyncRead`] into a [`Stream`] of byte chunks.
     ///
@@ -65,19 +67,20 @@ impl<R: AsyncRead> ReaderStream<R> {
     }
 }
 
-const CAPACITY: usize = 4096;
-
 impl<R: AsyncRead> Stream for ReaderStream<R> {
     type Item = std::io::Result<Bytes>;
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.as_mut().project();
+
         let reader = match this.reader.as_pin_mut() {
             Some(r) => r,
             None => return Poll::Ready(None),
         };
+
         if this.buf.capacity() == 0 {
             this.buf.reserve(CAPACITY);
         }
+
         match reader.poll_read_buf(cx, &mut this.buf) {
             Poll::Pending => Poll::Pending,
             Poll::Ready(Err(err)) => {
