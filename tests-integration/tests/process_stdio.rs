@@ -72,7 +72,7 @@ async fn feed_cat(mut cat: Child, n: usize) -> io::Result<ExitStatus> {
     };
 
     // Compose reading and writing concurrently.
-    future::join3(write, read, cat)
+    future::join3(write, read, cat.wait())
         .map(|(_, _, status)| status)
         .await
 }
@@ -124,4 +124,27 @@ async fn status_closes_any_pipes() {
     let child = cat().status();
 
     assert_ok!(child.await);
+}
+
+#[tokio::test]
+async fn try_wait() {
+    let mut child = cat().spawn().unwrap();
+
+    let id = child.id().expect("missing id");
+    assert!(id > 0);
+
+    assert_eq!(None, assert_ok!(child.try_wait()));
+
+    // Drop the child's stdio handles so it can terminate
+    drop(child.stdin.take());
+    drop(child.stderr.take());
+    drop(child.stdout.take());
+
+    assert_ok!(child.wait().await);
+
+    // test that the `.try_wait()` method is fused just like the stdlib
+    assert!(assert_ok!(child.try_wait()).unwrap().success());
+
+    // Can't get id after process has exited
+    assert_eq!(child.id(), None);
 }

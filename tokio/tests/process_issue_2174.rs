@@ -40,7 +40,7 @@ async fn issue_2174() {
 
     // Kill the child process.
     child.kill().unwrap();
-    let _ = child.await;
+    let _ = child.wait().await;
 
     assert_err!(handle.await);
 }
