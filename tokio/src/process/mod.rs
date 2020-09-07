@@ -779,7 +779,7 @@ impl Child {
     ///
     /// On Unix platforms, this is the equivalent to sending a SIGKILL. Note
     /// that on Unix platforms it is possible for a zombie process to remain
-    /// after a kill is sent; to avoid this the caller should ensure that either
+    /// after a kill is sent; to avoid this, the caller should ensure that either
     /// `child.wait().await` or `child.try_wait()` is invoked successfully.
     pub fn start_kill(&mut self) -> io::Result<()> {
         match &mut self.child {
