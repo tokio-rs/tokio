@@ -48,8 +48,8 @@
 //! [`tokio::io`]: crate::io
 //! [`AsyncRead`]: crate::io::AsyncRead
 //! [`AsyncWrite`]: crate::io::AsyncWrite
-//! [`ReaderStream`]: https://docs.rs/tokio-util/0.3/tokio_util/io/struct.ReaderStream.html
-//! [`StreamReader`]: https://docs.rs/tokio-util/0.3/tokio_util/io/struct.StreamReader.html
+//! [`ReaderStream`]: https://docs.rs/tokio-util/0.4/tokio_util/io/struct.ReaderStream.html
+//! [`StreamReader`]: https://docs.rs/tokio-util/0.4/tokio_util/io/struct.StreamReader.html
 
 mod all;
 use all::AllFuture;
