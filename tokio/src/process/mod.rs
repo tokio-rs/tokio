@@ -774,6 +774,23 @@ impl Child {
         }
     }
 
+    /// Attempts to force the child to exit, but does not wait for the request
+    /// to take effect.
+    ///
+    /// On Unix platforms, this is the equivalent to sending a SIGKILL. Note
+    /// that on Unix platforms it is possible for a zombie process to remain
+    /// after a kill is sent; to avoid this, the caller should ensure that either
+    /// `child.wait().await` or `child.try_wait()` is invoked successfully.
+    pub fn start_kill(&mut self) -> io::Result<()> {
+        match &mut self.child {
+            FusedChild::Child(child) => child.kill(),
+            FusedChild::Done(_) => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "invalid argument: can't kill an exited process",
+            )),
+        }
+    }
+
     /// Forces the child to exit.
     ///
     /// This is equivalent to sending a SIGKILL on unix platforms.
@@ -795,21 +812,14 @@ impl Child {
     ///     tokio::spawn(async move { send.send(()) });
     ///     tokio::select! {
     ///         _ = child.wait() => {}
-    ///         _ = recv => {
-    ///             child.kill().expect("kill failed");
-    ///             // NB: await the child here to avoid a zombie process on Unix platforms
-    ///             child.wait().await.unwrap();
-    ///         }
+    ///         _ = recv => child.kill().await.expect("kill failed"),
     ///     }
     /// }
-    pub fn kill(&mut self) -> io::Result<()> {
-        match &mut self.child {
-            FusedChild::Child(child) => child.kill(),
-            FusedChild::Done(_) => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "invalid argument: can't kill an exited process",
-            )),
-        }
+    /// ```
+    pub async fn kill(&mut self) -> io::Result<()> {
+        self.start_kill()?;
+        self.wait().await?;
+        Ok(())
     }
 
     /// Waits for the child to exit completely, returning the status that it
