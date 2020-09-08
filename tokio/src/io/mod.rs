@@ -236,10 +236,6 @@ cfg_io_util! {
         copy, duplex, empty, repeat, sink, AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt,
         BufReader, BufStream, BufWriter, DuplexStream, Copy, Empty, Lines, Repeat, Sink, Split, Take,
     };
-
-    cfg_stream! {
-        pub use util::{stream_reader, StreamReader};
-    }
 }
 
 cfg_not_io_util! {

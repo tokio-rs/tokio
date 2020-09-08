@@ -1,3 +1,5 @@
+#![warn(rust_2018_idioms)]
+
 use tokio::pin;
 use tokio_util::sync::CancellationToken;
 
