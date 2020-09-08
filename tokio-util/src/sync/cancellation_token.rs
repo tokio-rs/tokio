@@ -1,5 +1,8 @@
 //! An asynchronously awaitable `CancellationToken`.
 //! The token allows to signal a cancellation request to one or more tasks.
+mod wrapped;
+
+pub use wrapped::{Aborted, Wrapped};
 
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Mutex;
@@ -10,6 +13,7 @@ use core::pin::Pin;
 use core::ptr::NonNull;
 use core::sync::atomic::Ordering;
 use core::task::{Context, Poll, Waker};
+use std::borrow::Cow;
 
 /// A token which can be used to signal a cancellation request to one or more
 /// tasks.
@@ -65,7 +69,7 @@ unsafe impl Sync for CancellationToken {}
 #[must_use = "futures do nothing unless polled"]
 pub struct WaitForCancellationFuture<'a> {
     /// The CancellationToken that is associated with this WaitForCancellationFuture
-    cancellation_token: Option<&'a CancellationToken>,
+    cancellation_token: Option<Cow<'a, CancellationToken>>,
     /// Node for waiting at the cancellation_token
     wait_node: ListNode<WaitQueueEntry>,
     /// Whether this future was registered at the token yet as a waiter
@@ -269,7 +273,30 @@ impl CancellationToken {
     /// Returns a `Future` that gets fulfilled when cancellation is requested.
     pub fn cancelled(&self) -> WaitForCancellationFuture<'_> {
         WaitForCancellationFuture {
-            cancellation_token: Some(self),
+            cancellation_token: Some(Cow::Borrowed(self)),
+            wait_node: ListNode::new(WaitQueueEntry::new()),
+            is_registered: false,
+        }
+    }
+
+    /// Wraps provided future, ensuring it will abort when this token is
+    /// cancelled. This function can be  used for simple cancellation
+    /// scenarios, which don't require asynchronous cleanup.
+    /// If such cleanup is desired, you should take CancellationToken
+    /// and manually monitor for cancellations.
+    pub fn wrap_future<F>(&self, fut: F) -> Wrapped<F> {
+        Wrapped {
+            cancelled: self.clone().into_cancelled(),
+            fut: Some(fut),
+        }
+    }
+
+    /// Returns a `Future` that gets fulfilled when cancellation is requested.
+    /// This function consumes `CancellationToken`, and returns future without
+    /// lifetime constraints.
+    pub fn into_cancelled(self) -> WaitForCancellationFuture<'static> {
+        WaitForCancellationFuture {
+            cancellation_token: Some(Cow::Owned(self)),
             wait_node: ListNode::new(WaitQueueEntry::new()),
             is_registered: false,
         }
@@ -313,6 +340,7 @@ impl<'a> Future for WaitForCancellationFuture<'a> {
 
         let cancellation_token = mut_self
             .cancellation_token
+            .as_mut()
             .expect("polled WaitForCancellationFuture after completion");
 
         let poll_res = if !mut_self.is_registered {
@@ -345,7 +373,7 @@ impl<'a> Drop for WaitForCancellationFuture<'a> {
         // If this WaitForCancellationFuture has been polled and it was added to the
         // wait queue at the cancellation_token, it must be removed before dropping.
         // Otherwise the cancellation_token would access invalid memory.
-        if let Some(token) = self.cancellation_token {
+        if let Some(token) = self.cancellation_token.as_mut() {
             if self.is_registered {
                 token.unregister(&mut self.wait_node);
             }
