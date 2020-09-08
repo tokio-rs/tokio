@@ -1,5 +1,4 @@
-use crate::loom;
-use crate::loom::sync::{Condvar, Mutex};
+use crate::loom::sync::Mutex;
 use crate::park::{Park, ParkThread, Unpark};
 use crate::runtime;
 use crate::runtime::task::{self, JoinHandle, Schedule, Task};
@@ -11,7 +10,7 @@ use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
 use std::sync::Arc;
-use std::task::Poll::Ready;
+use std::task::{Poll::Ready, Waker};
 use std::time::Duration;
 
 /// Executes tasks on the current thread
@@ -19,11 +18,8 @@ pub(crate) struct BasicScheduler<P: Park> {
     /// Inner with the dedicated parker P
     inner: Mutex<Option<Inner<P>>>,
 
-    /// Sync items used to notify other threads that called
-    /// block_on concurrently that the dedicated driver is available
-    /// to steal
-    condvar: loom::sync::Arc<Condvar>,
-    mutex: loom::sync::Arc<Mutex<()>>,
+    /// Queue of threads available to steal the dedicated parker P.
+    steal_queue: Mutex<VecDeque<Waker>>,
 
     /// Sendable task spawner
     spawner: Spawner,
@@ -120,8 +116,7 @@ where
         BasicScheduler {
             inner,
             spawner,
-            condvar: loom::sync::Arc::new(Condvar::new()),
-            mutex: loom::sync::Arc::new(Mutex::new(())),
+            steal_queue: Mutex::new(VecDeque::new()),
         }
     }
 
@@ -139,16 +134,15 @@ where
     }
 
     pub(crate) fn block_on<F: Future>(&self, future: F) -> F::Output {
-        // If we can steal the dedicated parker than lets block_on that
-        // otherwise, lets block_on and attempt to steal it back if we can.
+        // If we can steal the dedicated parker then lets block_on that
+        // Otherwise, we'll block_on the future and attempt to steal the
+        // parker later, if we can.
         if let Some(mut inner) = self.take_inner() {
             inner.block_on(future)
         } else {
-            // TODO: should this be false or true? In the origina block_on for
-            // basic_scheduler we have false?
             let enter = crate::runtime::enter(false);
 
-            let mut park = ParkThread::with_condvar(self.condvar.clone(), self.mutex.clone());
+            let mut park = ParkThread::new();
             let waker = park.unpark().into_waker();
             let mut cx = std::task::Context::from_waker(&waker);
 
@@ -159,17 +153,23 @@ where
                     return v;
                 }
 
-                // Check if we can steal the driver
+                // Check if we can steal the dedicated parker P.
+                //
                 // TODO: Consider using an atomic load here intead of locking
                 // the mutex.
                 if let Some(mut inner) = self.take_inner() {
                     // We will enter again on in the inner implementation below
                     drop(enter);
                     return inner.block_on(future);
+                } else {
+                    let waker = park.unpark().into_waker();
+                    let mut lock = self.steal_queue.lock().unwrap();
+                    lock.push_back(waker);
                 }
 
-                // Park this thread waiting for some external wake up from
-                // a waker or a notification that we can steal the driver again.
+                // Park this thread, waiting for some external wakeup: either
+                // from the future we are currently polling or a wakeup from the
+                // block_on that contains the parker, notifying us to steal the parker.
                 park.park().expect("failed to park");
             }
         }
@@ -284,11 +284,17 @@ where
 
 impl<P: Park> Drop for BasicScheduler<P> {
     fn drop(&mut self) {
-        let mut inner = {
-            let mut lock = self.inner.lock().expect("BasicScheduler Inner lock");
-            lock.take()
-                .expect("Oh no! We never placed the Inner state back!")
-        };
+        // Avoid double panicking, since it makes debugging much harder.
+        if std::thread::panicking() {
+            return;
+        }
+
+        let mut inner = self
+            .inner
+            .lock()
+            .unwrap()
+            .take()
+            .expect("Oh no! We never placed the Inner state back, this is a bug!");
 
         enter(&mut inner, |scheduler, context| {
             // Loop required here to ensure borrow is dropped between iterations
@@ -404,7 +410,7 @@ impl Wake for Shared {
 // ===== InnerGuard =====
 
 /// Used to ensure we always place the Inner value
-/// back into its slot in `BasicScheduler` even if the
+/// back into its slot in `BasicScheduler`, even if the
 /// future panics.
 struct InnerGuard<'a, P: Park> {
     inner: Option<Inner<P>>,
@@ -421,15 +427,19 @@ impl<P: Park> InnerGuard<'_, P> {
 
 impl<P: Park> Drop for InnerGuard<'_, P> {
     fn drop(&mut self) {
-        if let Some(inner) = self.inner.take() {
-            let mut lock = self.scheduler.inner.lock().unwrap();
-            lock.replace(inner);
+        // Avoid double panicking, since it makes debugging much harder.
+        if std::thread::panicking() {
+            return;
+        }
 
-            // Wake up possible other threads
-            // notifying them that they might need
-            // to steal the driver.
-            drop(self.scheduler.mutex.lock().unwrap());
-            self.scheduler.condvar.notify_one();
+        if let Some(inner) = self.inner.take() {
+            self.scheduler.inner.lock().unwrap().replace(inner);
+
+            // Wake up other possible threads that could steal
+            // the dedicated parker P.
+            if let Some(waker) = self.scheduler.steal_queue.lock().unwrap().pop_front() {
+                waker.wake();
+            }
         }
     }
 }

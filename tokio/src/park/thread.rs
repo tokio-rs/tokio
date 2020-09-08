@@ -21,8 +21,8 @@ pub(crate) struct UnparkThread {
 #[derive(Debug)]
 struct Inner {
     state: AtomicUsize,
-    mutex: Arc<Mutex<()>>,
-    condvar: Arc<Condvar>,
+    mutex: Mutex<()>,
+    condvar: Condvar,
 }
 
 const EMPTY: usize = 0;
@@ -37,15 +37,11 @@ thread_local! {
 
 impl ParkThread {
     pub(crate) fn new() -> Self {
-        ParkThread::with_condvar(Arc::new(Condvar::new()), Arc::new(Mutex::new(())))
-    }
-
-    pub(crate) fn with_condvar(condvar: Arc<Condvar>, mutex: Arc<Mutex<()>>) -> Self {
         Self {
             inner: Arc::new(Inner {
                 state: AtomicUsize::new(EMPTY),
-                mutex,
-                condvar,
+                mutex: Mutex::new(()),
+                condvar: Condvar::new(),
             }),
         }
     }
