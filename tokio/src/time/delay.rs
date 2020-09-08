@@ -15,14 +15,19 @@ use std::task::{self, Poll};
 ///
 /// Canceling a delay is done by dropping the returned future. No additional
 /// cleanup work is required.
-pub fn delay_until(deadline: Instant) -> Delay {
+pub fn sleep_until(deadline: Instant) -> Delay {
     let registration = Registration::new(deadline, Duration::from_millis(0));
     Delay { registration }
 }
 
+/// Waits until `deadline` is reached. Alias for [`sleep_until`](sleep_until).
+pub fn delay_until(deadline: Instant) -> Delay {
+    sleep_until(deadline)
+}
+
 /// Waits until `duration` has elapsed.
 ///
-/// Equivalent to `delay_until(Instant::now() + duration)`. An asynchronous
+/// Equivalent to `sleep_until(Instant::now() + duration)`. An asynchronous
 /// analog to `std::thread::sleep`.
 ///
 /// No work is performed while awaiting on the delay to complete. The delay
@@ -41,23 +46,27 @@ pub fn delay_until(deadline: Instant) -> Delay {
 /// Wait 100ms and print "100 ms have elapsed".
 ///
 /// ```
-/// use tokio::time::{delay_for, Duration};
+/// use tokio::time::{sleep, Duration};
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     delay_for(Duration::from_millis(100)).await;
+///     sleep(Duration::from_millis(100)).await;
 ///     println!("100 ms have elapsed");
 /// }
 /// ```
 ///
 /// [`interval`]: crate::time::interval()
-#[cfg_attr(docsrs, doc(alias = "sleep"))]
-pub fn delay_for(duration: Duration) -> Delay {
-    delay_until(Instant::now() + duration)
+pub fn sleep(duration: Duration) -> Delay {
+    sleep_until(Instant::now() + duration)
 }
 
-/// Future returned by [`delay_until`](delay_until) and
-/// [`delay_for`](delay_for).
+/// Waits until `duration` has elapsed. Alias for [`sleep`](sleep).
+pub fn delay_for(duration: Duration) -> Delay {
+    sleep(duration)
+}
+
+/// Future returned by [`sleep`](sleep) and
+/// [`sleep_until`](sleep_until).
 #[derive(Debug)]
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct Delay {
@@ -103,7 +112,7 @@ impl Future for Delay {
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
         // `poll_elapsed` can return an error in two cases:
         //
-        // - AtCapacity: this is a pathlogical case where far too many
+        // - AtCapacity: this is a pathological case where far too many
         //   delays have been scheduled.
         // - Shutdown: No timer has been setup, which is a mis-use error.
         //
