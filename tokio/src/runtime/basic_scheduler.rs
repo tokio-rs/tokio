@@ -284,17 +284,18 @@ where
 
 impl<P: Park> Drop for BasicScheduler<P> {
     fn drop(&mut self) {
-        // Avoid double panicking, since it makes debugging much harder.
-        if std::thread::panicking() {
-            return;
-        }
-
-        let mut inner = self
-            .inner
-            .lock()
-            .unwrap()
-            .take()
-            .expect("Oh no! We never placed the Inner state back, this is a bug!");
+        // Avoid a double panic if we are currently panicking and
+        // the lock may be poisoned.
+        let mut inner = if let Ok(lock) = &mut self.inner.lock() {
+            lock.take()
+                .expect("Oh no! We never placed the Inner state back, this is a bug!")
+        } else {
+            if std::thread::panicking() {
+                return;
+            } else {
+                panic!("Inner lock poisoned");
+            }
+        };
 
         enter(&mut inner, |scheduler, context| {
             // Loop required here to ensure borrow is dropped between iterations
@@ -427,13 +428,18 @@ impl<P: Park> InnerGuard<'_, P> {
 
 impl<P: Park> Drop for InnerGuard<'_, P> {
     fn drop(&mut self) {
-        // Avoid double panicking, since it makes debugging much harder.
-        if std::thread::panicking() {
-            return;
-        }
-
         if let Some(inner) = self.inner.take() {
-            self.scheduler.inner.lock().unwrap().replace(inner);
+            // Avoid a double panic if we are currently panicking and
+            // the lock may be poisoned.
+            if let Ok(lock) = &mut self.scheduler.inner.lock() {
+                lock.replace(inner);
+            } else {
+                if std::thread::panicking() {
+                    return;
+                } else {
+                    panic!("Inner lock poisoned");
+                }
+            }
 
             // Wake up other possible threads that could steal
             // the dedicated parker P.
