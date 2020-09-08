@@ -1,7 +1,8 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::time::{self, throttle};
+use tokio::stream::StreamExt;
+use tokio::time;
 use tokio_test::*;
 
 use std::time::Duration;
@@ -10,10 +11,7 @@ use std::time::Duration;
 async fn usage() {
     time::pause();
 
-    let mut stream = task::spawn(throttle(
-        Duration::from_millis(100),
-        futures::stream::repeat(()),
-    ));
+    let mut stream = task::spawn(futures::stream::repeat(()).throttle(Duration::from_millis(100)));
 
     assert_ready!(stream.poll_next());
     assert_pending!(stream.poll_next());

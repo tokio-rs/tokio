@@ -1,7 +1,7 @@
 //! Runs `!Send` futures on the current thread.
 use crate::runtime::task::{self, JoinHandle, Task};
 use crate::sync::AtomicWaker;
-use crate::util::linked_list::LinkedList;
+use crate::util::linked_list::{Link, LinkedList};
 
 use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
@@ -132,7 +132,7 @@ struct Context {
 
 struct Tasks {
     /// Collection of all active tasks spawned onto this executor.
-    owned: LinkedList<Task<Arc<Shared>>>,
+    owned: LinkedList<Task<Arc<Shared>>, <Task<Arc<Shared>> as Link>::Target>,
 
     /// Local run queue sender and receiver.
     queue: VecDeque<task::Notified<Arc<Shared>>>,

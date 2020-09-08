@@ -4,6 +4,8 @@ use crate::runtime::shell::Shell;
 use crate::runtime::{blocking, io, time, Callback, Runtime, Spawner};
 
 use std::fmt;
+#[cfg(feature = "blocking")]
+use std::time::Duration;
 
 /// Builds Tokio Runtime with custom configuration values.
 ///
@@ -65,6 +67,11 @@ pub struct Builder {
 
     /// To run before each worker thread stops
     pub(super) before_stop: Option<Callback>,
+
+    #[cfg(feature = "blocking")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
+    /// Customizable keep alive timeout for BlockingPool
+    pub(super) keep_alive: Option<Duration>,
 }
 
 pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync + 'static>;
@@ -108,6 +115,9 @@ impl Builder {
             // No worker thread callbacks
             after_start: None,
             before_stop: None,
+
+            #[cfg(feature = "blocking")]
+            keep_alive: None,
         }
     }
 
@@ -374,6 +384,30 @@ impl Builder {
             },
             blocking_pool,
         })
+    }
+
+    #[cfg(feature = "blocking")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
+    /// Sets a custom timeout for a thread in the blocking pool.
+    ///
+    /// By default, the timeout for a thread is set to 10 seconds. This can
+    /// be overriden using .thread_keep_alive().
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use tokio::runtime;
+    /// # use std::time::Duration;
+    ///
+    /// # pub fn main() {
+    /// let rt = runtime::Builder::new()
+    ///     .thread_keep_alive(Duration::from_millis(100))
+    ///     .build();
+    /// # }
+    /// ```
+    pub fn thread_keep_alive(&mut self, duration: Duration) -> &mut Self {
+        self.keep_alive = Some(duration);
+        self
     }
 }
 

@@ -10,6 +10,8 @@ use std::ptr::NonNull;
 use std::sync::atomic::Ordering::SeqCst;
 use std::task::{Context, Poll, Waker};
 
+type WaitList = LinkedList<Waiter, <Waiter as linked_list::Link>::Target>;
+
 /// Notify a single task to wake up.
 ///
 /// `Notify` provides a basic mechanism to notify a single task of an event.
@@ -17,20 +19,20 @@ use std::task::{Context, Poll, Waker};
 /// another task to perform an operation.
 ///
 /// `Notify` can be thought of as a [`Semaphore`] starting with 0 permits.
-/// [`notified().await`] waits for a permit to become available, and [`notify()`]
+/// [`notified().await`] waits for a permit to become available, and [`notify_one()`]
 /// sets a permit **if there currently are no available permits**.
 ///
 /// The synchronization details of `Notify` are similar to
 /// [`thread::park`][park] and [`Thread::unpark`][unpark] from std. A [`Notify`]
 /// value contains a single permit. [`notified().await`] waits for the permit to
-/// be made available, consumes the permit, and resumes.  [`notify()`] sets the
+/// be made available, consumes the permit, and resumes.  [`notify_one()`] sets the
 /// permit, waking a pending task if there is one.
 ///
-/// If `notify()` is called **before** `notified().await`, then the next call to
+/// If `notify_one()` is called **before** `notified().await`, then the next call to
 /// `notified().await` will complete immediately, consuming the permit. Any
 /// subsequent calls to `notified().await` will wait for a new permit.
 ///
-/// If `notify()` is called **multiple** times before `notified().await`, only a
+/// If `notify_one()` is called **multiple** times before `notified().await`, only a
 /// **single** permit is stored. The next call to `notified().await` will
 /// complete immediately, but the one after will wait for a new permit.
 ///
@@ -53,7 +55,7 @@ use std::task::{Context, Poll, Waker};
 ///     });
 ///
 ///     println!("sending notification");
-///     notify.notify();
+///     notify.notify_one();
 /// }
 /// ```
 ///
@@ -76,7 +78,7 @@ use std::task::{Context, Poll, Waker};
 ///             .push_back(value);
 ///
 ///         // Notify the consumer a value is available
-///         self.notify.notify();
+///         self.notify.notify_one();
 ///     }
 ///
 ///     pub async fn recv(&self) -> T {
@@ -96,12 +98,12 @@ use std::task::{Context, Poll, Waker};
 /// [park]: std::thread::park
 /// [unpark]: std::thread::Thread::unpark
 /// [`notified().await`]: Notify::notified()
-/// [`notify()`]: Notify::notify()
+/// [`notify_one()`]: Notify::notify_one()
 /// [`Semaphore`]: crate::sync::Semaphore
 #[derive(Debug)]
 pub struct Notify {
     state: AtomicU8,
-    waiters: Mutex<LinkedList<Waiter>>,
+    waiters: Mutex<WaitList>,
 }
 
 #[derive(Debug)]
@@ -171,11 +173,11 @@ impl Notify {
     /// Wait for a notification.
     ///
     /// Each `Notify` value holds a single permit. If a permit is available from
-    /// an earlier call to [`notify()`], then `notified().await` will complete
+    /// an earlier call to [`notify_one()`], then `notified().await` will complete
     /// immediately, consuming that permit. Otherwise, `notified().await` waits
-    /// for a permit to be made available by the next call to `notify()`.
+    /// for a permit to be made available by the next call to `notify_one()`.
     ///
-    /// [`notify()`]: Notify::notify
+    /// [`notify_one()`]: Notify::notify_one
     ///
     /// # Examples
     ///
@@ -194,7 +196,7 @@ impl Notify {
     ///     });
     ///
     ///     println!("sending notification");
-    ///     notify.notify();
+    ///     notify.notify_one();
     /// }
     /// ```
     pub async fn notified(&self) {
@@ -216,10 +218,10 @@ impl Notify {
     /// If a task is currently waiting, that task is notified. Otherwise, a
     /// permit is stored in this `Notify` value and the **next** call to
     /// [`notified().await`] will complete immediately consuming the permit made
-    /// available by this call to `notify()`.
+    /// available by this call to `notify_one()`.
     ///
     /// At most one permit may be stored by `Notify`. Many sequential calls to
-    /// `notify` will result in a single permit being stored. The next call to
+    /// `notify_one` will result in a single permit being stored. The next call to
     /// `notified().await` will complete immediately, but the one after that
     /// will wait.
     ///
@@ -242,10 +244,10 @@ impl Notify {
     ///     });
     ///
     ///     println!("sending notification");
-    ///     notify.notify();
+    ///     notify.notify_one();
     /// }
     /// ```
-    pub fn notify(&self) {
+    pub fn notify_one(&self) {
         // Load the current state
         let mut curr = self.state.load(SeqCst);
 
@@ -285,7 +287,7 @@ impl Default for Notify {
     }
 }
 
-fn notify_locked(waiters: &mut LinkedList<Waiter>, state: &AtomicU8, curr: u8) -> Option<Waker> {
+fn notify_locked(waiters: &mut WaitList, state: &AtomicU8, curr: u8) -> Option<Waker> {
     loop {
         match curr {
             EMPTY | NOTIFIED => {
@@ -488,7 +490,7 @@ impl Drop for Notified<'_> {
             // `Notify.state` may be in any of the three states (Empty, Waiting,
             // Notified). It doesn't actually matter what the atomic is set to
             // at this point. We hold the lock and will ensure the atomic is in
-            // the correct state once th elock is dropped.
+            // the correct state once the lock is dropped.
             //
             // Because the atomic state is not checked, at first glance, it may
             // seem like this routine does not handle the case where the

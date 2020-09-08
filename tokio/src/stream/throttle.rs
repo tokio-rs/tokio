@@ -10,27 +10,7 @@ use std::task::{self, Poll};
 
 use pin_project_lite::pin_project;
 
-/// Slows down a stream by enforcing a delay between items.
-/// They will be produced not more often than the specified interval.
-///
-/// # Example
-///
-/// Create a throttled stream.
-/// ```rust,no_run
-/// use std::time::Duration;
-/// use tokio::stream::StreamExt;
-/// use tokio::time::throttle;
-///
-/// # async fn dox() {
-/// let mut item_stream = throttle(Duration::from_secs(2), futures::stream::repeat("one"));
-///
-/// loop {
-///     // The string will be produced at most every 2 seconds
-///     println!("{:?}", item_stream.next().await);
-/// }
-/// # }
-/// ```
-pub fn throttle<T>(duration: Duration, stream: T) -> Throttle<T>
+pub(super) fn throttle<T>(duration: Duration, stream: T) -> Throttle<T>
 where
     T: Stream,
 {

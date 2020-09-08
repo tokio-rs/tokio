@@ -47,6 +47,9 @@ struct Inner {
 
     // Maximum number of threads
     thread_cap: usize,
+
+    // Customizable wait timeout
+    keep_alive: Duration,
 }
 
 struct Shared {
@@ -91,6 +94,10 @@ where
 impl BlockingPool {
     pub(crate) fn new(builder: &Builder, thread_cap: usize) -> BlockingPool {
         let (shutdown_tx, shutdown_rx) = shutdown::channel();
+        #[cfg(feature = "blocking")]
+        let keep_alive = builder.keep_alive.unwrap_or(KEEP_ALIVE);
+        #[cfg(not(feature = "blocking"))]
+        let keep_alive = KEEP_ALIVE;
 
         BlockingPool {
             spawner: Spawner {
@@ -110,6 +117,7 @@ impl BlockingPool {
                     after_start: builder.after_start.clone(),
                     before_stop: builder.before_stop.clone(),
                     thread_cap,
+                    keep_alive,
                 }),
             },
             shutdown_rx,
@@ -258,7 +266,7 @@ impl Inner {
             shared.num_idle += 1;
 
             while !shared.shutdown {
-                let lock_result = self.condvar.wait_timeout(shared, KEEP_ALIVE).unwrap();
+                let lock_result = self.condvar.wait_timeout(shared, self.keep_alive).unwrap();
 
                 shared = lock_result.0;
                 let timeout_result = lock_result.1;

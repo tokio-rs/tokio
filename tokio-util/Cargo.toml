@@ -25,11 +25,12 @@ publish = false
 default = []
 
 # Shorthand for enabling everything
-full = ["codec", "udp", "compat"]
+full = ["codec", "udp", "compat", "io"]
 
 compat = ["futures-io",]
 codec = ["tokio/stream"]
 udp = ["tokio/udp"]
+io = []
 
 [dependencies]
 tokio = { version = "0.3.0", path = "../tokio" }

@@ -12,7 +12,7 @@ fn single_rx_recv() {
 
     {
         let mut t = spawn(rx.recv());
-        let v = assert_ready!(t.poll()).unwrap();
+        let v = assert_ready!(t.poll());
         assert_eq!(v, "one");
     }
 
@@ -21,11 +21,11 @@ fn single_rx_recv() {
 
         assert_pending!(t.poll());
 
-        tx.broadcast("two").unwrap();
+        tx.send("two").unwrap();
 
         assert!(t.is_woken());
 
-        let v = assert_ready!(t.poll()).unwrap();
+        let v = assert_ready!(t.poll());
         assert_eq!(v, "two");
     }
 
@@ -37,7 +37,7 @@ fn single_rx_recv() {
         drop(tx);
 
         let res = assert_ready!(t.poll());
-        assert!(res.is_none());
+        assert_eq!(res, "two");
     }
 }
 
@@ -51,10 +51,10 @@ fn multi_rx() {
         let mut t2 = spawn(rx2.recv());
 
         let res = assert_ready!(t1.poll());
-        assert_eq!(res.unwrap(), "one");
+        assert_eq!(res, "one");
 
         let res = assert_ready!(t2.poll());
-        assert_eq!(res.unwrap(), "one");
+        assert_eq!(res, "one");
     }
 
     let mut t2 = spawn(rx2.recv());
@@ -65,13 +65,13 @@ fn multi_rx() {
         assert_pending!(t1.poll());
         assert_pending!(t2.poll());
 
-        tx.broadcast("two").unwrap();
+        tx.send("two").unwrap();
 
         assert!(t1.is_woken());
         assert!(t2.is_woken());
 
         let res = assert_ready!(t1.poll());
-        assert_eq!(res.unwrap(), "two");
+        assert_eq!(res, "two");
     }
 
     {
@@ -79,16 +79,16 @@ fn multi_rx() {
 
         assert_pending!(t1.poll());
 
-        tx.broadcast("three").unwrap();
+        tx.send("three").unwrap();
 
         assert!(t1.is_woken());
         assert!(t2.is_woken());
 
         let res = assert_ready!(t1.poll());
-        assert_eq!(res.unwrap(), "three");
+        assert_eq!(res, "three");
 
         let res = assert_ready!(t2.poll());
-        assert_eq!(res.unwrap(), "three");
+        assert_eq!(res, "three");
     }
 
     drop(t2);
@@ -100,10 +100,10 @@ fn multi_rx() {
         assert_pending!(t1.poll());
         assert_pending!(t2.poll());
 
-        tx.broadcast("four").unwrap();
+        tx.send("four").unwrap();
 
         let res = assert_ready!(t1.poll());
-        assert_eq!(res.unwrap(), "four");
+        assert_eq!(res, "four");
         drop(t1);
 
         let mut t1 = spawn(rx1.recv());
@@ -113,15 +113,15 @@ fn multi_rx() {
 
         assert!(t1.is_woken());
         let res = assert_ready!(t1.poll());
-        assert!(res.is_none());
+        assert_eq!(res, "four");
 
         let res = assert_ready!(t2.poll());
-        assert_eq!(res.unwrap(), "four");
+        assert_eq!(res, "four");
 
         drop(t2);
         let mut t2 = spawn(rx2.recv());
         let res = assert_ready!(t2.poll());
-        assert!(res.is_none());
+        assert_eq!(res, "four");
     }
 }
 
@@ -135,44 +135,44 @@ fn rx_observes_final_value() {
     {
         let mut t1 = spawn(rx.recv());
         let res = assert_ready!(t1.poll());
-        assert_eq!(res.unwrap(), "one");
+        assert_eq!(res, "one");
     }
 
     {
         let mut t1 = spawn(rx.recv());
         let res = assert_ready!(t1.poll());
-        assert!(res.is_none());
+        assert_eq!(res, "one");
     }
 
     // Sending a value
 
     let (tx, mut rx) = watch::channel("one");
 
-    tx.broadcast("two").unwrap();
+    tx.send("two").unwrap();
 
     {
         let mut t1 = spawn(rx.recv());
         let res = assert_ready!(t1.poll());
-        assert_eq!(res.unwrap(), "two");
+        assert_eq!(res, "two");
     }
 
     {
         let mut t1 = spawn(rx.recv());
         assert_pending!(t1.poll());
 
-        tx.broadcast("three").unwrap();
+        tx.send("three").unwrap();
         drop(tx);
 
         assert!(t1.is_woken());
 
         let res = assert_ready!(t1.poll());
-        assert_eq!(res.unwrap(), "three");
+        assert_eq!(res, "three");
     }
 
     {
         let mut t1 = spawn(rx.recv());
         let res = assert_ready!(t1.poll());
-        assert!(res.is_none());
+        assert_eq!(res, "three");
     }
 }
 
@@ -190,7 +190,7 @@ fn poll_close() {
         assert_ready!(t.poll());
     }
 
-    assert!(tx.broadcast("two").is_err());
+    assert!(tx.send("two").is_err());
 }
 
 #[test]
@@ -210,7 +210,7 @@ fn stream_impl() {
 
         assert_pending!(t.poll());
 
-        tx.broadcast("two").unwrap();
+        tx.send("two").unwrap();
 
         assert!(t.is_woken());
 
@@ -226,6 +226,6 @@ fn stream_impl() {
         drop(tx);
 
         let res = assert_ready!(t.poll());
-        assert!(res.is_none());
+        assert_eq!(res, Some("two"));
     }
 }

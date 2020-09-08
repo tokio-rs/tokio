@@ -16,7 +16,7 @@ fn notify_one() {
             });
         });
 
-        tx.notify();
+        tx.notify_one();
         th.join().unwrap();
     });
 }
@@ -34,12 +34,12 @@ fn notify_multi() {
             ths.push(thread::spawn(move || {
                 block_on(async {
                     notify.notified().await;
-                    notify.notify();
+                    notify.notify_one();
                 })
             }));
         }
 
-        notify.notify();
+        notify.notify_one();
 
         for th in ths.drain(..) {
             th.join().unwrap();
@@ -67,7 +67,7 @@ fn notify_drop() {
 
             block_on(poll_fn(|cx| {
                 if recv.as_mut().poll(cx).is_ready() {
-                    rx1.notify();
+                    rx1.notify_one();
                 }
                 Poll::Ready(())
             }));
@@ -77,12 +77,12 @@ fn notify_drop() {
             block_on(async {
                 rx2.notified().await;
                 // Trigger second notification
-                rx2.notify();
+                rx2.notify_one();
                 rx2.notified().await;
             });
         });
 
-        notify.notify();
+        notify.notify_one();
 
         th1.join().unwrap();
         th2.join().unwrap();

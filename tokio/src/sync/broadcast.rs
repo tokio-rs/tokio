@@ -273,7 +273,7 @@ struct Tail {
     closed: bool,
 
     /// Receivers waiting for a value
-    waiters: LinkedList<Waiter>,
+    waiters: LinkedList<Waiter, <Waiter as linked_list::Link>::Target>,
 }
 
 /// Slot in the buffer
