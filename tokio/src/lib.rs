@@ -189,7 +189,7 @@
 //! In order to use `tokio::time`, the "time" feature flag must be enabled.
 //!
 //! [`tokio::time`]: crate::time
-//! [delay]: crate::time::delay_for()
+//! [delay]: crate::time::sleep()
 //! [interval]: crate::time::interval()
 //! [timeout]: crate::time::timeout()
 //!

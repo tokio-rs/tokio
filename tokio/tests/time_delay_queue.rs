@@ -2,7 +2,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::time::{self, delay_for, DelayQueue, Duration, Instant};
+use tokio::time::{self, sleep, DelayQueue, Duration, Instant};
 use tokio_test::{assert_ok, assert_pending, assert_ready, task};
 
 macro_rules! poll {
@@ -28,7 +28,7 @@ async fn single_immediate_delay() {
     let _key = queue.insert_at("foo", Instant::now());
 
     // Advance time by 1ms to handle thee rounding
-    delay_for(ms(1)).await;
+    sleep(ms(1)).await;
 
     assert_ready_ok!(poll!(queue));
 
@@ -46,7 +46,7 @@ async fn multi_immediate_delays() {
     let _k = queue.insert_at("2", Instant::now());
     let _k = queue.insert_at("3", Instant::now());
 
-    delay_for(ms(1)).await;
+    sleep(ms(1)).await;
 
     let mut res = vec![];
 
@@ -74,11 +74,11 @@ async fn single_short_delay() {
 
     assert_pending!(poll!(queue));
 
-    delay_for(ms(1)).await;
+    sleep(ms(1)).await;
 
     assert!(!queue.is_woken());
 
-    delay_for(ms(5)).await;
+    sleep(ms(5)).await;
 
     assert!(queue.is_woken());
 
@@ -107,7 +107,7 @@ async fn multi_delay_at_start() {
     assert!(!queue.is_woken());
 
     for elapsed in 0..1200 {
-        delay_for(ms(1)).await;
+        sleep(ms(1)).await;
         let elapsed = elapsed + 1;
 
         if delays.contains(&elapsed) {
@@ -130,7 +130,7 @@ async fn insert_in_past_fires_immediately() {
     let mut queue = task::spawn(DelayQueue::new());
     let now = Instant::now();
 
-    delay_for(ms(10)).await;
+    sleep(ms(10)).await;
 
     queue.insert_at("foo", now);
 
@@ -150,7 +150,7 @@ async fn remove_entry() {
     let entry = queue.remove(&key);
     assert_eq!(entry.into_inner(), "foo");
 
-    delay_for(ms(10)).await;
+    sleep(ms(10)).await;
 
     let entry = assert_ready!(poll!(queue));
     assert!(entry.is_none());
@@ -166,19 +166,19 @@ async fn reset_entry() {
     let key = queue.insert_at("foo", now + ms(5));
 
     assert_pending!(poll!(queue));
-    delay_for(ms(1)).await;
+    sleep(ms(1)).await;
 
     queue.reset_at(&key, now + ms(10));
 
     assert_pending!(poll!(queue));
 
-    delay_for(ms(7)).await;
+    sleep(ms(7)).await;
 
     assert!(!queue.is_woken());
 
     assert_pending!(poll!(queue));
 
-    delay_for(ms(3)).await;
+    sleep(ms(3)).await;
 
     assert!(queue.is_woken());
 
@@ -197,16 +197,16 @@ async fn reset_much_later() {
     let mut queue = task::spawn(DelayQueue::new());
 
     let now = Instant::now();
-    delay_for(ms(1)).await;
+    sleep(ms(1)).await;
 
     let key = queue.insert_at("foo", now + ms(200));
     assert_pending!(poll!(queue));
 
-    delay_for(ms(3)).await;
+    sleep(ms(3)).await;
 
     queue.reset_at(&key, now + ms(5));
 
-    delay_for(ms(20)).await;
+    sleep(ms(20)).await;
 
     assert!(queue.is_woken());
 }
@@ -219,21 +219,21 @@ async fn reset_twice() {
     let mut queue = task::spawn(DelayQueue::new());
     let now = Instant::now();
 
-    delay_for(ms(1)).await;
+    sleep(ms(1)).await;
 
     let key = queue.insert_at("foo", now + ms(200));
 
     assert_pending!(poll!(queue));
 
-    delay_for(ms(3)).await;
+    sleep(ms(3)).await;
 
     queue.reset_at(&key, now + ms(50));
 
-    delay_for(ms(20)).await;
+    sleep(ms(20)).await;
 
     queue.reset_at(&key, now + ms(40));
 
-    delay_for(ms(20)).await;
+    sleep(ms(20)).await;
 
     assert!(queue.is_woken());
 }
@@ -246,7 +246,7 @@ async fn remove_expired_item() {
 
     let now = Instant::now();
 
-    delay_for(ms(10)).await;
+    sleep(ms(10)).await;
 
     let key = queue.insert_at("foo", now);
 
@@ -272,7 +272,7 @@ async fn expires_before_last_insert() {
 
     assert_pending!(poll!(queue));
 
-    delay_for(ms(600)).await;
+    sleep(ms(600)).await;
 
     assert!(queue.is_woken());
 
@@ -297,18 +297,18 @@ async fn multi_reset() {
     queue.reset_at(&two, now + ms(350));
     queue.reset_at(&one, now + ms(400));
 
-    delay_for(ms(310)).await;
+    sleep(ms(310)).await;
 
     assert_pending!(poll!(queue));
 
-    delay_for(ms(50)).await;
+    sleep(ms(50)).await;
 
     let entry = assert_ready_ok!(poll!(queue));
     assert_eq!(*entry.get_ref(), "two");
 
     assert_pending!(poll!(queue));
 
-    delay_for(ms(50)).await;
+    sleep(ms(50)).await;
 
     let entry = assert_ready_ok!(poll!(queue));
     assert_eq!(*entry.get_ref(), "one");
@@ -332,7 +332,7 @@ async fn expire_first_key_when_reset_to_expire_earlier() {
 
     queue.reset_at(&one, now + ms(100));
 
-    delay_for(ms(100)).await;
+    sleep(ms(100)).await;
 
     assert!(queue.is_woken());
 
@@ -355,7 +355,7 @@ async fn expire_second_key_when_reset_to_expire_earlier() {
 
     queue.reset_at(&two, now + ms(100));
 
-    delay_for(ms(100)).await;
+    sleep(ms(100)).await;
 
     assert!(queue.is_woken());
 
@@ -377,7 +377,7 @@ async fn reset_first_expiring_item_to_expire_later() {
     assert_pending!(poll!(queue));
 
     queue.reset_at(&one, now + ms(300));
-    delay_for(ms(250)).await;
+    sleep(ms(250)).await;
 
     assert!(queue.is_woken());
 
@@ -399,11 +399,11 @@ async fn insert_before_first_after_poll() {
 
     let _two = queue.insert_at("two", now + ms(100));
 
-    delay_for(ms(99)).await;
+    sleep(ms(99)).await;
 
     assert!(!queue.is_woken());
 
-    delay_for(ms(1)).await;
+    sleep(ms(1)).await;
 
     assert!(queue.is_woken());
 
@@ -425,7 +425,7 @@ async fn insert_after_ready_poll() {
 
     assert_pending!(poll!(queue));
 
-    delay_for(ms(100)).await;
+    sleep(ms(100)).await;
 
     assert!(queue.is_woken());
 
@@ -456,7 +456,7 @@ async fn reset_later_after_slot_starts() {
 
     assert_pending!(poll!(queue));
 
-    delay_for(ms(80)).await;
+    sleep(ms(80)).await;
 
     assert!(!queue.is_woken());
 
@@ -471,10 +471,10 @@ async fn reset_later_after_slot_starts() {
 
     assert_pending!(poll!(queue));
 
-    delay_for(ms(39)).await;
+    sleep(ms(39)).await;
     assert!(!queue.is_woken());
 
-    delay_for(ms(1)).await;
+    sleep(ms(1)).await;
     assert!(queue.is_woken());
 
     let entry = assert_ready_ok!(poll!(queue)).into_inner();
@@ -494,7 +494,7 @@ async fn reset_inserted_expired() {
 
     assert_eq!(1, queue.len());
 
-    delay_for(ms(200)).await;
+    sleep(ms(200)).await;
 
     let entry = assert_ready_ok!(poll!(queue)).into_inner();
     assert_eq!(entry, "foo");
@@ -514,7 +514,7 @@ async fn reset_earlier_after_slot_starts() {
 
     assert_pending!(poll!(queue));
 
-    delay_for(ms(80)).await;
+    sleep(ms(80)).await;
 
     assert!(!queue.is_woken());
 
@@ -529,10 +529,10 @@ async fn reset_earlier_after_slot_starts() {
 
     assert_pending!(poll!(queue));
 
-    delay_for(ms(39)).await;
+    sleep(ms(39)).await;
     assert!(!queue.is_woken());
 
-    delay_for(ms(1)).await;
+    sleep(ms(1)).await;
     assert!(queue.is_woken());
 
     let entry = assert_ready_ok!(poll!(queue)).into_inner();
@@ -551,7 +551,7 @@ async fn insert_in_past_after_poll_fires_immediately() {
 
     assert_pending!(poll!(queue));
 
-    delay_for(ms(80)).await;
+    sleep(ms(80)).await;
 
     assert!(!queue.is_woken());
     queue.insert_at("bar", now + ms(40));

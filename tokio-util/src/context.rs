@@ -46,7 +46,7 @@ pub trait RuntimeExt {
     ///
     /// ```no_run
     /// use tokio_util::context::RuntimeExt;
-    /// use tokio::time::{delay_for, Duration};
+    /// use tokio::time::{sleep, Duration};
     ///
     /// let rt = tokio::runtime::Builder::new()
     ///     .threaded_scheduler()
@@ -57,11 +57,11 @@ pub trait RuntimeExt {
     ///     .threaded_scheduler()
     ///     .build().unwrap();
     ///
-    /// let fut = delay_for(Duration::from_millis(2));
+    /// let fut = sleep(Duration::from_millis(2));
     ///
     /// rt.block_on(
     ///     rt2
-    ///         .wrap(async { delay_for(Duration::from_millis(2)).await }),
+    ///         .wrap(async { sleep(Duration::from_millis(2)).await }),
     /// );
     ///```
     fn wrap<F: Future>(&self, fut: F) -> TokioContext<'_, F>;

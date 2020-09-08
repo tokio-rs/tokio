@@ -76,7 +76,7 @@
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let mut delay = time::delay_for(Duration::from_millis(50));
+///     let mut delay = time::sleep(Duration::from_millis(50));
 ///
 ///     while !delay.is_elapsed() {
 ///         tokio::select! {
@@ -103,13 +103,13 @@
 /// use tokio::time::{self, Duration};
 ///
 /// async fn some_async_work() {
-/// # time::delay_for(Duration::from_millis(10)).await;
+/// # time::sleep(Duration::from_millis(10)).await;
 ///     // do work
 /// }
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let mut delay = time::delay_for(Duration::from_millis(50));
+///     let mut delay = time::sleep(Duration::from_millis(50));
 ///
 ///     loop {
 ///         tokio::select! {
@@ -226,7 +226,7 @@
 /// #[tokio::main]
 /// async fn main() {
 ///     let mut stream = stream::iter(vec![1, 2, 3]);
-///     let mut delay = time::delay_for(Duration::from_secs(1));
+///     let mut delay = time::sleep(Duration::from_secs(1));
 ///
 ///     loop {
 ///         tokio::select! {

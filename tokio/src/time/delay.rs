@@ -60,7 +60,8 @@ pub fn sleep(duration: Duration) -> Delay {
     sleep_until(Instant::now() + duration)
 }
 
-/// Waits until `duration` has elapsed. Alias for [`sleep`](sleep).
+/// Waits until `duration` has elapsed.
+#[deprecated(note = "delay_for will be removed in Tokio 0.3. Use time::sleep")]
 pub fn delay_for(duration: Duration) -> Delay {
     sleep(duration)
 }

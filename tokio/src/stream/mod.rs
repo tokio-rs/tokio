@@ -281,18 +281,18 @@ pub trait StreamExt: Stream {
     ///         tx1.send(2).await.unwrap();
     ///
     ///         // Let the other task send values
-    ///         time::delay_for(Duration::from_millis(20)).await;
+    ///         time::sleep(Duration::from_millis(20)).await;
     ///
     ///         tx1.send(4).await.unwrap();
     ///     });
     ///
     ///     tokio::spawn(async move {
     ///         // Wait for the first task to send values
-    ///         time::delay_for(Duration::from_millis(5)).await;
+    ///         time::sleep(Duration::from_millis(5)).await;
     ///
     ///         tx2.send(3).await.unwrap();
     ///
-    ///         time::delay_for(Duration::from_millis(25)).await;
+    ///         time::sleep(Duration::from_millis(25)).await;
     ///
     ///         // Send the final value
     ///         tx2.send(5).await.unwrap();

@@ -4,7 +4,7 @@
 //!
 //! [`Timeout`]: struct@Timeout
 
-use crate::time::{delay_until, Delay, Duration, Instant};
+use crate::time::{sleep_until, Delay, Duration, Instant};
 
 use pin_project_lite::pin_project;
 use std::fmt;
@@ -92,7 +92,7 @@ pub fn timeout_at<T>(deadline: Instant, future: T) -> Timeout<T>
 where
     T: Future,
 {
-    let delay = delay_until(deadline);
+    let delay = sleep_until(deadline);
 
     Timeout {
         value: future,
