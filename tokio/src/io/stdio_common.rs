@@ -102,6 +102,7 @@ mod tests {
         }
     }
     #[test]
+    #[cfg(not(loom))]
     fn test_splitter() {
         let data = str::repeat("█", MAX_BUF);
         let mut wr = super::SplitByUtf8BoundaryIfWindows::new(MockWriter);
