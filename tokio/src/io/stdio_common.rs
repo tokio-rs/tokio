@@ -40,15 +40,28 @@ where
         // now remove possible trailing incomplete character
         #[cfg(any(target_os = "windows", test))]
         let buf = match std::str::from_utf8(buf) {
-            // `buf` is already utf-8, no need to trim it
+            // `buf` is already utf-8, no need to trim it futher
             Ok(_) => buf,
-            Err(err) if err.valid_up_to() == 0 => {
-                return Poll::Ready(Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    "provided buffer does not contain utf-8 data",
-                )));
+            Err(err) => {
+                let bad_bytes = buf.len() - err.valid_up_to();
+                // TODO: this is too conservative
+                const MAX_BYTES_PER_CHAR: usize = 8;
+
+                if bad_bytes <= MAX_BYTES_PER_CHAR && err.valid_up_to() > 0 {
+                    // Input data is probably UTF-8, but last char was split
+                    // after trimming.
+                    // let's exclude this character from the buf
+                    &buf[..err.valid_up_to()]
+                } else {
+                    // UTF-8 violation could not be caused by trimming.
+                    // Let's pass buffer to underlying writer as is.
+                    // Why do not we return error here? It is possible
+                    // that stdout is not console. Such streams allow
+                    // non-utf8 data. That's why, let's defer to underlying
+                    // writer and let it return error if needed
+                    buf
+                }
             }
-            Err(err) => &buf[..err.valid_up_to()],
         };
         // now pass trimmed input buffer to inner writer
         Pin::new(&mut self.inner).poll_write(cx, buf)
