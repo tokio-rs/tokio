@@ -360,24 +360,7 @@ impl Semaphore for (crate::sync::batch_semaphore::Semaphore, usize) {
     }
 
     fn is_closed(&self) -> bool {
-        // TODO find more efficient way
-        struct NoopWaker;
-        impl crate::util::Wake for NoopWaker {
-            fn wake(self: std::sync::Arc<Self>) {}
-            fn wake_by_ref(_arc_self: &std::sync::Arc<Self>) {}
-        }
-        let waker = std::sync::Arc::new(NoopWaker);
-        let waker = crate::util::waker_ref(&waker);
-        let mut noop_cx = std::task::Context::from_waker(&*waker);
-        let mut permit = Permit::new();
-        match permit.poll_acquire(&mut noop_cx, 1, &self.0) {
-            Poll::Ready(Err(_)) => true,
-            Poll::Ready(Ok(())) => {
-                permit.release(1, &self.0);
-                false
-            }
-            Poll::Pending => false,
-        }
+        self.0.is_closed()
     }
 
     fn is_idle(&self) -> bool {
