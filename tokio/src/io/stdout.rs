@@ -35,7 +35,7 @@ cfg_io_std! {
     /// ```
     #[derive(Debug)]
     pub struct Stdout {
-        std: SplitByUtf8BoundaryIfWindows<Blocking< std::io::Stdout>>,
+        std: SplitByUtf8BoundaryIfWindows<Blocking<std::io::Stdout>>,
     }
 
     /// Constructs a new handle to the standard output of the current process.
