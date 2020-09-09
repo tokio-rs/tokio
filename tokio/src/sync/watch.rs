@@ -310,8 +310,7 @@ impl<T> Sender<T> {
             return Err(error::SendError { inner: value });
         }
 
-        let mut lock = self.shared.value.write().unwrap();
-        *lock = value;
+        *self.shared.value.write().unwrap() = value;
 
         // Update the version. 2 is used so that the CLOSED bit is not set.
         self.shared.version.fetch_add(2, SeqCst);
