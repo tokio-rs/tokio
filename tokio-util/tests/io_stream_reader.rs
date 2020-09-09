@@ -1,14 +1,14 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
 
 use bytes::Bytes;
-use tokio::io::{stream_reader, AsyncReadExt};
+use tokio::io::AsyncReadExt;
 use tokio::stream::iter;
+use tokio_util::io::StreamReader;
 
 #[tokio::test]
 async fn test_stream_reader() -> std::io::Result<()> {
     let stream = iter(vec![
-        Ok(Bytes::from_static(&[])),
+        std::io::Result::Ok(Bytes::from_static(&[])),
         Ok(Bytes::from_static(&[0, 1, 2, 3])),
         Ok(Bytes::from_static(&[])),
         Ok(Bytes::from_static(&[4, 5, 6, 7])),
@@ -17,7 +17,7 @@ async fn test_stream_reader() -> std::io::Result<()> {
         Ok(Bytes::from_static(&[])),
     ]);
 
-    let mut read = stream_reader(stream);
+    let mut read = StreamReader::new(stream);
 
     let mut buf = [0; 5];
     read.read_exact(&mut buf).await?;

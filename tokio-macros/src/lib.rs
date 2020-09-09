@@ -26,7 +26,12 @@ use proc_macro::TokenStream;
 
 /// Marks async function to be executed by selected runtime. This macro helps set up a `Runtime`
 /// without requiring the user to use [Runtime](../tokio/runtime/struct.Runtime.html) or
-/// [Builder](../tokio/runtime/struct.builder.html) directly.
+/// [Builder](../tokio/runtime/struct.Builder.html) directly.
+///
+/// Note: This macro is designed to be simplistic and targets applications that do not require
+/// a complex setup. If provided functionality is not sufficient, user may be interested in
+/// using [Builder](../tokio/runtime/struct.Builder.html), which provides a more powerful
+/// interface.
 ///
 /// ## Options:
 ///
@@ -133,7 +138,12 @@ pub fn main_threaded(args: TokenStream, item: TokenStream) -> TokenStream {
 
 /// Marks async function to be executed by selected runtime. This macro helps set up a `Runtime`
 /// without requiring the user to use [Runtime](../tokio/runtime/struct.Runtime.html) or
-/// [Builder](../tokio/runtime/struct.builder.html) directly.
+/// [Builder](../tokio/runtime/struct.Builder.html) directly.
+///
+/// Note: This macro is designed to be simplistic and targets applications that do not require
+/// a complex setup. If provided functionality is not sufficient, user may be interested in
+/// using [Builder](../tokio/runtime/struct.Builder.html), which provides a more powerful
+/// interface.
 ///
 /// ## Options:
 ///

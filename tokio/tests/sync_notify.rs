@@ -13,7 +13,7 @@ fn notify_notified_one() {
     let notify = Notify::new();
     let mut notified = spawn(async { notify.notified().await });
 
-    notify.notify();
+    notify.notify_one();
     assert_ready!(notified.poll());
 }
 
@@ -24,7 +24,7 @@ fn notified_one_notify() {
 
     assert_pending!(notified.poll());
 
-    notify.notify();
+    notify.notify_one();
     assert!(notified.is_woken());
     assert_ready!(notified.poll());
 }
@@ -38,7 +38,7 @@ fn notified_multi_notify() {
     assert_pending!(notified1.poll());
     assert_pending!(notified2.poll());
 
-    notify.notify();
+    notify.notify_one();
     assert!(notified1.is_woken());
     assert!(!notified2.is_woken());
 
@@ -50,7 +50,7 @@ fn notified_multi_notify() {
 fn notify_notified_multi() {
     let notify = Notify::new();
 
-    notify.notify();
+    notify.notify_one();
 
     let mut notified1 = spawn(async { notify.notified().await });
     let mut notified2 = spawn(async { notify.notified().await });
@@ -58,7 +58,7 @@ fn notify_notified_multi() {
     assert_ready!(notified1.poll());
     assert_pending!(notified2.poll());
 
-    notify.notify();
+    notify.notify_one();
 
     assert!(notified2.is_woken());
     assert_ready!(notified2.poll());
@@ -76,7 +76,7 @@ fn notified_drop_notified_notify() {
 
     assert_pending!(notified2.poll());
 
-    notify.notify();
+    notify.notify_one();
     assert!(notified2.is_woken());
     assert_ready!(notified2.poll());
 }
@@ -90,7 +90,7 @@ fn notified_multi_notify_drop_one() {
     assert_pending!(notified1.poll());
     assert_pending!(notified2.poll());
 
-    notify.notify();
+    notify.notify_one();
 
     assert!(notified1.is_woken());
     assert!(!notified2.is_woken());

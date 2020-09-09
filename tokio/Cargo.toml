@@ -63,9 +63,7 @@ process = [
   "mio-named-pipes",
   "signal",
   "winapi/consoleapi",
-  "winapi/minwindef",
   "winapi/threadpoollegacyapiset",
-  "winapi/winerror",
 ]
 # Includes basic task execution capabilities
 rt-core = ["slab"]
@@ -81,7 +79,6 @@ signal = [
   "mio-uds",
   "signal-hook-registry",
   "winapi/consoleapi",
-  "winapi/minwindef",
 ]
 stream = ["futures-core"]
 sync = ["fnv"]
