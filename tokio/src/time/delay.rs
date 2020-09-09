@@ -20,7 +20,8 @@ pub fn sleep_until(deadline: Instant) -> Delay {
     Delay { registration }
 }
 
-/// Waits until `deadline` is reached. Alias for [`sleep_until`](sleep_until).
+/// use [`sleep_until`](sleep_until)
+#[deprecated(note = "delay_until will be removed in Tokio 0.3. Use time::sleep_until")]
 pub fn delay_until(deadline: Instant) -> Delay {
     sleep_until(deadline)
 }
@@ -60,7 +61,7 @@ pub fn sleep(duration: Duration) -> Delay {
     sleep_until(Instant::now() + duration)
 }
 
-/// Waits until `duration` has elapsed.
+/// use [`sleep`](sleep)
 #[deprecated(note = "delay_for will be removed in Tokio 0.3. Use time::sleep")]
 pub fn delay_for(duration: Duration) -> Delay {
     sleep(duration)

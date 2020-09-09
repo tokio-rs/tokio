@@ -172,12 +172,12 @@ impl<T> JoinHandle<T> {
     ///    let mut handles = Vec::new();
     ///
     ///    handles.push(tokio::spawn(async {
-    ///       time::delay_for(time::Duration::from_secs(10)).await;
+    ///       time::sleep(time::Duration::from_secs(10)).await;
     ///       true
     ///    }));
     ///
     ///    handles.push(tokio::spawn(async {
-    ///       time::delay_for(time::Duration::from_secs(10)).await;
+    ///       time::sleep(time::Duration::from_secs(10)).await;
     ///       false
     ///    }));
     ///
