@@ -1,8 +1,6 @@
 //! An asynchronously awaitable `CancellationToken`.
 //! The token allows to signal a cancellation request to one or more tasks.
-mod wrapped;
-
-pub use wrapped::{Aborted, Wrapped};
+pub(crate) mod wrapped;
 
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Mutex;
@@ -284,8 +282,8 @@ impl CancellationToken {
     /// scenarios, which don't require asynchronous cleanup.
     /// If such cleanup is desired, you should take CancellationToken
     /// and manually monitor for cancellations.
-    pub fn wrap_future<F>(&self, fut: F) -> Wrapped<F> {
-        Wrapped {
+    pub fn wrap_future<F>(&self, fut: F) -> wrapped::Wrapped<F> {
+        wrapped::Wrapped {
             cancelled: self.clone().into_cancelled(),
             fut: Some(fut),
         }
