@@ -72,7 +72,6 @@ unsafe impl<T: Sync> Sync for Pointers<T> {}
 
 impl<L, T> LinkedList<L, T> {
     /// Creates an empty linked list.
-    #[allow(dead_code)] // NOTE: This will get removed with: https://github.com/tokio-rs/tokio/pull/2790
     pub(crate) const fn new() -> LinkedList<L, T> {
         LinkedList {
             head: None,
