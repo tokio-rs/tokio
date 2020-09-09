@@ -240,7 +240,7 @@ impl<T> Receiver<T> {
     /// }
     /// ```
     pub async fn changed(&mut self) -> Result<(), error::RecvError> {
-        // In order to avoid a race condition, we first request a notification
+        // In order to avoid a race condition, we first request a notification,
         // **then** check the current value's version. If a new version exists,
         // the notification request is dropped.
         let notified = self.shared.notify_rx.notified();
@@ -349,7 +349,7 @@ impl<T> Sender<T> {
     pub async fn closed(&self) {
         let notified = self.shared.notify_tx.notified();
 
-        if 0 == self.shared.ref_count_rx.load(Relaxed) {
+        if self.shared.ref_count_rx.load(Relaxed) == 0 {
             return;
         }
 

@@ -308,7 +308,7 @@ impl Notify {
         }
 
         // At this point, it is guaranteed that the state will not
-        // concurrently change as holding the lock is required to
+        // concurrently change, as holding the lock is required to
         // transition **out** of `WAITING`.
         //
         // Get pending waiters
@@ -325,7 +325,7 @@ impl Notify {
             }
         }
 
-        // All waiers have been notified, the state must be transitioned to
+        // All waiters have been notified, the state must be transitioned to
         // `EMPTY`. As transitioning **from** `WAITING` requires the lock to be
         // held, a `store` is sufficient.
         self.state.store(EMPTY, SeqCst);
