@@ -205,15 +205,16 @@ impl TcpListener {
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<io::Result<(net::TcpStream, SocketAddr)>> {
-        ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
+        loop {
+            let ev = ready!(self.io.poll_read_ready(cx))?;
 
-        match self.io.get_ref().accept_std() {
-            Ok(pair) => Poll::Ready(Ok(pair)),
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(cx, mio::Ready::readable())?;
-                Poll::Pending
+            match self.io.get_ref().accept_std() {
+                Ok(pair) => return Poll::Ready(Ok(pair)),
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    self.io.clear_readiness(ev);
+                }
+                Err(e) => return Poll::Ready(Err(e)),
             }
-            Err(e) => Poll::Ready(Err(e)),
         }
     }
 

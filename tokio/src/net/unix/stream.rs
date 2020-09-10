@@ -211,26 +211,28 @@ impl UnixStream {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
+        loop {
+            let ev = ready!(self.io.poll_read_ready(cx))?;
 
-        // Safety: `UnixStream::read` will not peak at the maybe uinitialized bytes.
-        let b =
-            unsafe { &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
-        match self.io.get_ref().read(b) {
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(cx, mio::Ready::readable())?;
-                Poll::Pending
-            }
-            Ok(n) => {
-                // Safety: We trust `UnixStream::read` to have filled up `n` bytes
-                // in the buffer.
-                unsafe {
-                    buf.assume_init(n);
+            // Safety: `UnixStream::read` will not peak at the maybe uinitialized bytes.
+            let b = unsafe {
+                &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
+            };
+            match self.io.get_ref().read(b) {
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    self.io.clear_readiness(ev);
                 }
-                buf.add_filled(n);
-                Poll::Ready(Ok(()))
+                Ok(n) => {
+                    // Safety: We trust `UnixStream::read` to have filled up `n` bytes
+                    // in the buffer.
+                    unsafe {
+                        buf.assume_init(n);
+                    }
+                    buf.add_filled(n);
+                    return Poll::Ready(Ok(()));
+                }
+                Err(e) => return Poll::Ready(Err(e)),
             }
-            Err(e) => Poll::Ready(Err(e)),
         }
     }
 
@@ -239,14 +241,15 @@ impl UnixStream {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        ready!(self.io.poll_write_ready(cx))?;
+        loop {
+            let ev = ready!(self.io.poll_write_ready(cx))?;
 
-        match self.io.get_ref().write(buf) {
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_write_ready(cx)?;
-                Poll::Pending
+            match self.io.get_ref().write(buf) {
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    self.io.clear_readiness(ev);
+                }
+                x => return Poll::Ready(x),
             }
-            x => Poll::Ready(x),
         }
     }
 }

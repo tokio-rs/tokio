@@ -141,6 +141,8 @@ unsafe impl<T: Sync> Sync for Page<T> {}
 unsafe impl<T: Sync> Send for Page<T> {}
 unsafe impl<T: Sync> Sync for CachedPage<T> {}
 unsafe impl<T: Sync> Send for CachedPage<T> {}
+unsafe impl<T: Sync> Sync for Ref<T> {}
+unsafe impl<T: Sync> Send for Ref<T> {}
 
 /// A slot in the slab. Contains slot-specific metadata.
 ///

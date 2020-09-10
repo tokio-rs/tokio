@@ -18,6 +18,7 @@ macro_rules! cfg_compat {
     }
 }
 
+/*
 macro_rules! cfg_udp {
     ($($item:item)*) => {
         $(
@@ -27,6 +28,7 @@ macro_rules! cfg_udp {
         )*
     }
 }
+*/
 
 macro_rules! cfg_io {
     ($($item:item)*) => {

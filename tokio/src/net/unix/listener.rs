@@ -2,7 +2,6 @@ use crate::future::poll_fn;
 use crate::io::PollEvented;
 use crate::net::unix::{Incoming, UnixStream};
 
-use mio::Ready;
 use std::convert::TryFrom;
 use std::fmt;
 use std::io;
@@ -118,19 +117,19 @@ impl UnixListener {
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<io::Result<(net::UnixStream, SocketAddr)>> {
-        ready!(self.io.poll_read_ready(cx, Ready::readable()))?;
+        loop {
+            let ev = ready!(self.io.poll_read_ready(cx))?;
 
-        match self.io.get_ref().accept_std() {
-            Ok(None) => {
-                self.io.clear_read_ready(cx, Ready::readable())?;
-                Poll::Pending
+            match self.io.get_ref().accept_std() {
+                Ok(None) => {
+                    self.io.clear_readiness(ev);
+                }
+                Ok(Some((sock, addr))) => return Ok((sock, addr)).into(),
+                Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => {
+                    self.io.clear_readiness(ev);
+                }
+                Err(err) => return Err(err).into(),
             }
-            Ok(Some((sock, addr))) => Ok((sock, addr)).into(),
-            Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(cx, Ready::readable())?;
-                Poll::Pending
-            }
-            Err(err) => Err(err).into(),
         }
     }
 

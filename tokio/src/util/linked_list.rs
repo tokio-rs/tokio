@@ -181,6 +181,12 @@ impl<L: Link> fmt::Debug for LinkedList<L, L::Target> {
     }
 }
 
+impl<L: Link> Default for LinkedList<L, L::Target> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 cfg_sync! {
     impl<L: Link> LinkedList<L, L::Target> {
         pub(crate) fn last(&self) -> Option<&L::Target> {
@@ -219,6 +225,52 @@ cfg_rt_threaded! {
 
             // safety: the value is still owned by the linked list.
             Some(unsafe { &*curr.as_ptr() })
+        }
+    }
+}
+
+// ===== impl DrainFilter =====
+
+cfg_io_driver! {
+    pub(crate) struct DrainFilter<'a, T: Link, F> {
+        list: &'a mut LinkedList<T, T::Target>,
+        filter: F,
+        curr: Option<NonNull<T::Target>>,
+    }
+
+    impl<T: Link> LinkedList<T, T::Target> {
+        pub(crate) fn drain_filter<F>(&mut self, filter: F) -> DrainFilter<'_, T, F>
+        where
+            F: FnMut(&mut T::Target) -> bool,
+        {
+            let curr = self.head;
+            DrainFilter {
+                curr,
+                filter,
+                list: self,
+            }
+        }
+    }
+
+    impl<'a, T, F> Iterator for DrainFilter<'a, T, F>
+    where
+        T: Link,
+        F: FnMut(&mut T::Target) -> bool,
+    {
+        type Item = T::Handle;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            while let Some(curr) = self.curr {
+                // safety: the pointer references data contained by the list
+                self.curr = unsafe { T::pointers(curr).as_ref() }.next;
+
+                // safety: the value is still owned by the linked list.
+                if (self.filter)(unsafe { &mut *curr.as_ptr() }) {
+                    return unsafe { self.list.remove(curr) };
+                }
+            }
+
+            None
         }
     }
 }
