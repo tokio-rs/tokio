@@ -13,4 +13,5 @@ cfg_loom! {
     mod loom_oneshot;
     mod loom_semaphore_batch;
     mod loom_semaphore_ll;
+    mod loom_watch;
 }

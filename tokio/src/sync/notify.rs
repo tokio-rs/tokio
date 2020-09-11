@@ -285,21 +285,12 @@ impl Notify {
 
     /// Notifies all waiting tasks
     pub(crate) fn notify_waiters(&self) {
-        // Load the current state
-        let mut curr = self.state.load(SeqCst);
-
-        if let EMPTY | NOTIFIED = curr {
-            // There are no waiting tasks. In this case, no synchronization is
-            // established between `notify` and `notified().await`.
-            return;
-        }
-
         // There are waiters, the lock must be acquired to notify.
         let mut waiters = self.waiters.lock().unwrap();
 
         // The state must be reloaded while the lock is held. The state may only
         // transition out of WAITING while the lock is held.
-        curr = self.state.load(SeqCst);
+        let curr = self.state.load(SeqCst);
 
         if let EMPTY | NOTIFIED = curr {
             // There are no waiting tasks. In this case, no synchronization is
@@ -481,6 +472,8 @@ impl Future for Notified<'_> {
                     waiters.push_front(unsafe { NonNull::new_unchecked(waiter.get()) });
 
                     *state = Waiting;
+
+                    return Poll::Pending;
                 }
                 Waiting => {
                     // Currently in the "Waiting" state, implying the caller has
