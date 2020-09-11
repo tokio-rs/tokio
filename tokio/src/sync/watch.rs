@@ -257,7 +257,8 @@ impl<T> Receiver<T> {
             let res = Pin::new(&mut notified).poll(cx);
             assert!(!res.is_ready());
             Poll::Ready(())
-        }).await;
+        })
+        .await;
 
         if let Some(ret) = maybe_changed(&self.shared, &mut self.version) {
             return ret;
