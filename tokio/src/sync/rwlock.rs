@@ -11,7 +11,7 @@ const MAX_READS: usize = 32;
 #[cfg(loom)]
 const MAX_READS: usize = 10;
 
-/// An asynchronous reader-writer lock
+/// An asynchronous reader-writer lock.
 ///
 /// This type of lock allows a number of readers or at most one writer at any
 /// point in time. The write portion of this lock typically allows modification
