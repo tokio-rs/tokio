@@ -495,6 +495,7 @@ impl<T: ?Sized> RwLock<T> {
     /// static LOCK: RwLock<i32> = RwLock::const_new(5);
     /// ```
     #[cfg(all(feature = "parking_lot", not(all(loom, test))))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "parking_lot")))]
     pub const fn const_new(value: T) -> RwLock<T>
     where
         T: Sized,

@@ -180,6 +180,7 @@ impl Notify {
     /// static NOTIFY: Notify = Notify::const_new();
     /// ```
     #[cfg(all(feature = "parking_lot", not(all(loom, test))))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "parking_lot")))]
     pub const fn const_new() -> Notify {
         Notify {
             state: AtomicU8::new(0),
