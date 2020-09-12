@@ -45,6 +45,9 @@ pub struct Builder {
     /// Whether or not to enable the I/O driver
     enable_io: bool,
 
+    /// Whether or not to enable the signal driver
+    enable_signal: bool,
+
     /// Whether or not to enable the time driver
     enable_time: bool,
 
@@ -98,6 +101,9 @@ impl Builder {
             // I/O defaults to "off"
             enable_io: false,
 
+            // Signal defaults to "off"
+            enable_signal: false,
+
             // Time defaults to "off"
             enable_time: false,
 
@@ -141,6 +147,8 @@ impl Builder {
     pub fn enable_all(&mut self) -> &mut Self {
         #[cfg(feature = "io-driver")]
         self.enable_io();
+        #[cfg(feature = "signal")]
+        self.enable_signal();
         #[cfg(feature = "time")]
         self.enable_time();
 
@@ -362,6 +370,7 @@ impl Builder {
     fn get_cfg(&self) -> driver::Cfg {
         driver::Cfg {
             enable_io: self.enable_io,
+            enable_signal: self.enable_signal,
             enable_time: self.enable_time,
         }
     }
@@ -382,6 +391,7 @@ impl Builder {
                 spawner,
                 io_handle: resources.io_handle,
                 time_handle: resources.time_handle,
+                signal_handle: resources.signal_handle,
                 clock: resources.clock,
                 blocking_spawner,
             },
@@ -433,6 +443,29 @@ cfg_io_driver! {
         /// ```
         pub fn enable_io(&mut self) -> &mut Self {
             self.enable_io = true;
+            self
+        }
+    }
+}
+
+cfg_signal! {
+    impl Builder {
+        /// Enables the signal driver.
+        ///
+        /// Doing this enables using `tokio::signal` on the runtime.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new()
+        ///     .enable_signal()
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        pub fn enable_signal(&mut self) -> &mut Self {
+            self.enable_signal = true;
             self
         }
     }
@@ -500,6 +533,7 @@ cfg_rt_core! {
                     spawner,
                     io_handle: resources.io_handle,
                     time_handle: resources.time_handle,
+                    signal_handle: resources.signal_handle,
                     clock: resources.clock,
                     blocking_spawner,
                 },
@@ -545,6 +579,7 @@ cfg_rt_threaded! {
                 spawner,
                 io_handle: resources.io_handle,
                 time_handle: resources.time_handle,
+                signal_handle: resources.signal_handle,
                 clock: resources.clock,
                 blocking_spawner,
             };

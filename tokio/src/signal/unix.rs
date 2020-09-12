@@ -17,6 +17,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
 use std::task::{Context, Poll};
 
+pub(crate) mod driver;
+
 pub(crate) type OsStorage = Vec<SignalInfo>;
 
 // Number of different unix signals

@@ -13,6 +13,9 @@ pub(crate) struct Handle {
     /// Handles to the I/O drivers
     pub(super) io_handle: driver::IoHandle,
 
+    /// Handles to the signal drivers
+    pub(super) signal_handle: driver::SignalHandle,
+
     /// Handles to the time drivers
     pub(super) time_handle: driver::TimeHandle,
 

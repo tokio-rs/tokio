@@ -22,6 +22,15 @@ cfg_io_driver! {
     }
 }
 
+cfg_signal! {
+    pub(crate) fn signal_handle() -> driver::SignalHandle {
+        CONTEXT.with(|ctx| match *ctx.borrow() {
+            Some(ref ctx) => ctx.signal_handle.clone(),
+            None => Default::default(),
+        })
+    }
+}
+
 cfg_time! {
     pub(crate) fn time_handle() -> driver::TimeHandle {
         CONTEXT.with(|ctx| match *ctx.borrow() {
