@@ -208,13 +208,18 @@ cfg_blocking_impl! {
 mod builder;
 pub use self::builder::Builder;
 
+pub(crate) mod driver;
+
 pub(crate) mod enter;
 use self::enter::enter;
 
 mod handle;
 use handle::Handle;
 
-mod io;
+mod io {
+    /// Re-exported for convenience.
+    pub(crate) use std::io::Result;
+}
 
 cfg_rt_threaded! {
     mod park;
@@ -226,8 +231,6 @@ use self::shell::Shell;
 
 mod spawner;
 use self::spawner::Spawner;
-
-mod time;
 
 cfg_rt_threaded! {
     mod queue;
@@ -293,7 +296,7 @@ enum Kind {
 
     /// Execute all tasks on the current-thread.
     #[cfg(feature = "rt-core")]
-    Basic(Mutex<Option<BasicScheduler<time::Driver>>>),
+    Basic(Mutex<Option<BasicScheduler<driver::Driver>>>),
 
     /// Execute tasks across multiple threads.
     #[cfg(feature = "rt-threaded")]

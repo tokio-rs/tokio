@@ -1,8 +1,8 @@
 #![allow(clippy::redundant_clone)]
 
 use crate::park::{Park, Unpark};
+use crate::runtime::driver::Driver;
 use crate::runtime::enter;
-use crate::runtime::time;
 use crate::util::{waker_ref, Wake};
 
 use std::future::Future;
@@ -12,17 +12,17 @@ use std::task::Poll::Ready;
 
 #[derive(Debug)]
 pub(super) struct Shell {
-    driver: time::Driver,
+    driver: Driver,
 
     /// TODO: don't store this
     unpark: Arc<Handle>,
 }
 
 #[derive(Debug)]
-struct Handle(<time::Driver as Park>::Unpark);
+struct Handle(<Driver as Park>::Unpark);
 
 impl Shell {
-    pub(super) fn new(driver: time::Driver) -> Shell {
+    pub(super) fn new(driver: Driver) -> Shell {
         let unpark = Arc::new(Handle(driver.unpark()));
 
         Shell { driver, unpark }
