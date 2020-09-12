@@ -107,6 +107,7 @@ impl<L: Link> LinkedList<L, L::Target> {
 
     /// Removes the last element from a list and returns it, or None if it is
     /// empty.
+    #[cfg_attr(any(feature = "udp", feature = "uds"), allow(unused))]
     pub(crate) fn pop_back(&mut self) -> Option<L::Handle> {
         unsafe {
             let last = self.tail?;
@@ -126,6 +127,7 @@ impl<L: Link> LinkedList<L, L::Target> {
     }
 
     /// Returns whether the linked list doesn not contain any node
+    #[cfg_attr(any(feature = "udp", feature = "uds"), allow(unused))]
     pub(crate) fn is_empty(&self) -> bool {
         if self.head.is_some() {
             return false;
@@ -231,7 +233,7 @@ cfg_rt_threaded! {
 
 // ===== impl DrainFilter =====
 
-cfg_io_driver! {
+cfg_io_readiness! {
     pub(crate) struct DrainFilter<'a, T: Link, F> {
         list: &'a mut LinkedList<T, T::Target>,
         filter: F,

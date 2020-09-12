@@ -127,11 +127,6 @@ impl Registration {
         inner.deregister_source(io)
     }
 
-    pub(super) async fn readiness(&self, interest: mio::Ready) -> io::Result<ReadyEvent> {
-        // TODO: does this need to return a `Result`?
-        Ok(self.shared.readiness(interest).await)
-    }
-
     pub(super) fn clear_readiness(&self, event: ReadyEvent) {
         self.shared.clear_readiness(event);
     }
@@ -154,5 +149,14 @@ impl Registration {
         let ev = ready!(self.shared.poll_readiness(cx, direction));
         coop.made_progress();
         Poll::Ready(Ok(ev))
+    }
+}
+
+cfg_io_readiness! {
+    impl Registration {
+        pub(super) async fn readiness(&self, interest: mio::Ready) -> io::Result<ReadyEvent> {
+            // TODO: does this need to return a `Result`?
+            Ok(self.shared.readiness(interest).await)
+        }
     }
 }

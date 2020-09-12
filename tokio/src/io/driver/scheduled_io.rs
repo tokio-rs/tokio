@@ -2,16 +2,20 @@ use super::{platform, Direction, ReadyEvent, Tick};
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Mutex;
 use crate::util::bit;
-use crate::util::linked_list::{self, LinkedList};
 use crate::util::slab::Entry;
 
-use std::cell::UnsafeCell;
-use std::future::Future;
-use std::marker::PhantomPinned;
-use std::pin::Pin;
-use std::ptr::NonNull;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::task::{Context, Poll, Waker};
+
+cfg_io_readiness! {
+    use crate::util::linked_list::{self, LinkedList};
+
+    use std::cell::UnsafeCell;
+    use std::future::Future;
+    use std::marker::PhantomPinned;
+    use std::pin::Pin;
+    use std::ptr::NonNull;
+}
 
 /// Stored in the I/O driver resource slab.
 #[derive(Debug)]
@@ -22,10 +26,12 @@ pub(crate) struct ScheduledIo {
     waiters: Mutex<Waiters>,
 }
 
+#[cfg(feature = "io-readiness")]
 type WaitList = LinkedList<Waiter, <Waiter as linked_list::Link>::Target>;
 
 #[derive(Debug, Default)]
 struct Waiters {
+    #[cfg(feature = "io-readiness")]
     /// List of all current waiters
     list: WaitList,
 
@@ -36,36 +42,38 @@ struct Waiters {
     writer: Option<Waker>,
 }
 
-#[derive(Debug)]
-struct Waiter {
-    pointers: linked_list::Pointers<Waiter>,
+cfg_io_readiness! {
+    #[derive(Debug)]
+    struct Waiter {
+        pointers: linked_list::Pointers<Waiter>,
 
-    /// The waker for this task
-    waker: Option<Waker>,
+        /// The waker for this task
+        waker: Option<Waker>,
 
-    /// The interest this waiter is waiting on
-    interest: mio::Ready,
+        /// The interest this waiter is waiting on
+        interest: mio::Ready,
 
-    notified: bool,
+        notified: bool,
 
-    /// Should never be `!Unpin`
-    _p: PhantomPinned,
-}
+        /// Should never be `!Unpin`
+        _p: PhantomPinned,
+    }
 
-/// Future returned by `readiness()`
-struct Readiness<'a> {
-    scheduled_io: &'a ScheduledIo,
+    /// Future returned by `readiness()`
+    struct Readiness<'a> {
+        scheduled_io: &'a ScheduledIo,
 
-    state: State,
+        state: State,
 
-    /// Entry in the waiter `LinkedList`.
-    waiter: UnsafeCell<Waiter>,
-}
+        /// Entry in the waiter `LinkedList`.
+        waiter: UnsafeCell<Waiter>,
+    }
 
-enum State {
-    Init,
-    Waiting,
-    Done,
+    enum State {
+        Init,
+        Waiting,
+        Done,
+    }
 }
 
 // The `ScheduledIo::readiness` (`AtomicUsize`) is packed full of goodness.
@@ -198,15 +206,18 @@ impl ScheduledIo {
             }
         }
 
-        // check list of waiters
-        for waiter in waiters
-            .list
-            .drain_filter(|w| !(w.interest & ready).is_empty())
+        #[cfg(feature = "io-readiness")]
         {
-            let waiter = unsafe { &mut *waiter.as_ptr() };
-            if let Some(waker) = waiter.waker.take() {
-                waiter.notified = true;
-                waker.wake();
+            // check list of waiters
+            for waiter in waiters
+                .list
+                .drain_filter(|w| !(w.interest & ready).is_empty())
+            {
+                let waiter = unsafe { &mut *waiter.as_ptr() };
+                if let Some(waker) = waiter.waker.take() {
+                    waiter.notified = true;
+                    waker.wake();
+                }
             }
         }
     }
@@ -254,29 +265,6 @@ impl ScheduledIo {
         }
     }
 
-    /// An async version of `poll_readiness` which uses a linked list of wakers
-    pub(crate) async fn readiness(&self, interest: mio::Ready) -> ReadyEvent {
-        self.readiness_fut(interest).await
-    }
-
-    // This is in a separate function so that the borrow checker doesn't think
-    // we are borrowing the `UnsafeCell` possibly over await boundaries.
-    //
-    // Go figure.
-    fn readiness_fut(&self, interest: mio::Ready) -> Readiness<'_> {
-        Readiness {
-            scheduled_io: self,
-            state: State::Init,
-            waiter: UnsafeCell::new(Waiter {
-                pointers: linked_list::Pointers::new(),
-                waker: None,
-                notified: false,
-                interest,
-                _p: PhantomPinned,
-            }),
-        }
-    }
-
     pub(crate) fn clear_readiness(&self, event: ReadyEvent) {
         // This consumes the current readiness state **except** for HUP and
         // error. HUP and error are excluded because a) they are final states
@@ -310,114 +298,141 @@ impl Drop for ScheduledIo {
 unsafe impl Send for ScheduledIo {}
 unsafe impl Sync for ScheduledIo {}
 
-unsafe impl linked_list::Link for Waiter {
-    type Handle = NonNull<Waiter>;
-    type Target = Waiter;
+cfg_io_readiness! {
+    impl ScheduledIo {
+        /// An async version of `poll_readiness` which uses a linked list of wakers
+        pub(crate) async fn readiness(&self, interest: mio::Ready) -> ReadyEvent {
+            self.readiness_fut(interest).await
+        }
 
-    fn as_raw(handle: &NonNull<Waiter>) -> NonNull<Waiter> {
-        *handle
+        // This is in a separate function so that the borrow checker doesn't think
+        // we are borrowing the `UnsafeCell` possibly over await boundaries.
+        //
+        // Go figure.
+        fn readiness_fut(&self, interest: mio::Ready) -> Readiness<'_> {
+            Readiness {
+                scheduled_io: self,
+                state: State::Init,
+                waiter: UnsafeCell::new(Waiter {
+                    pointers: linked_list::Pointers::new(),
+                    waker: None,
+                    notified: false,
+                    interest,
+                    _p: PhantomPinned,
+                }),
+            }
+        }
     }
 
-    unsafe fn from_raw(ptr: NonNull<Waiter>) -> NonNull<Waiter> {
-        ptr
+    unsafe impl linked_list::Link for Waiter {
+        type Handle = NonNull<Waiter>;
+        type Target = Waiter;
+
+        fn as_raw(handle: &NonNull<Waiter>) -> NonNull<Waiter> {
+            *handle
+        }
+
+        unsafe fn from_raw(ptr: NonNull<Waiter>) -> NonNull<Waiter> {
+            ptr
+        }
+
+        unsafe fn pointers(mut target: NonNull<Waiter>) -> NonNull<linked_list::Pointers<Waiter>> {
+            NonNull::from(&mut target.as_mut().pointers)
+        }
     }
 
-    unsafe fn pointers(mut target: NonNull<Waiter>) -> NonNull<linked_list::Pointers<Waiter>> {
-        NonNull::from(&mut target.as_mut().pointers)
-    }
-}
+    // ===== impl Readiness =====
 
-// ===== impl Readiness =====
+    impl Future for Readiness<'_> {
+        type Output = ReadyEvent;
 
-impl Future for Readiness<'_> {
-    type Output = ReadyEvent;
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            let (scheduled_io, state, waiter) = unsafe {
+                let me = self.get_unchecked_mut();
+                (&me.scheduled_io, &mut me.state, &me.waiter)
+            };
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let (scheduled_io, state, waiter) = unsafe {
-            let me = self.get_unchecked_mut();
-            (&me.scheduled_io, &mut me.state, &me.waiter)
-        };
+            loop {
+                match *state {
+                    State::Init => {
+                        let mut waiters = scheduled_io.waiters.lock().unwrap();
 
-        loop {
-            match *state {
-                State::Init => {
-                    let mut waiters = scheduled_io.waiters.lock().unwrap();
-
-                    // Safety: called while locked
-                    unsafe {
-                        (*waiter.get()).waker = Some(cx.waker().clone());
-                    }
-
-                    // Insert the waiter into the linked list
-                    //
-                    // safety: pointers from `UnsafeCell` are never null.
-                    waiters
-                        .list
-                        .push_front(unsafe { NonNull::new_unchecked(waiter.get()) });
-                    *state = State::Waiting;
-                }
-                State::Waiting => {
-                    // Currently in the "Waiting" state, implying the caller has
-                    // a waiter stored in the waiter list (guarded by
-                    // `notify.waiters`). In order to access the waker fields,
-                    // we must hold the lock.
-
-                    let waiters = scheduled_io.waiters.lock().unwrap();
-
-                    // Safety: called while locked
-                    let w = unsafe { &mut *waiter.get() };
-
-                    if w.notified {
-                        // Our waker has been notified. Reset the fields and
-                        // remove it from the list.
-                        w.waker = None;
-                        w.notified = false;
-
-                        *state = State::Done;
-                    } else {
-                        // Update the waker, if necessary.
-                        if !w.waker.as_ref().unwrap().will_wake(cx.waker()) {
-                            w.waker = Some(cx.waker().clone());
+                        // Safety: called while locked
+                        unsafe {
+                            (*waiter.get()).waker = Some(cx.waker().clone());
                         }
 
-                        return Poll::Pending;
+                        // Insert the waiter into the linked list
+                        //
+                        // safety: pointers from `UnsafeCell` are never null.
+                        waiters
+                            .list
+                            .push_front(unsafe { NonNull::new_unchecked(waiter.get()) });
+                        *state = State::Waiting;
                     }
+                    State::Waiting => {
+                        // Currently in the "Waiting" state, implying the caller has
+                        // a waiter stored in the waiter list (guarded by
+                        // `notify.waiters`). In order to access the waker fields,
+                        // we must hold the lock.
 
-                    // Explicit drop of the lock to indicate the scope that the
-                    // lock is held. Because holding the lock is required to
-                    // ensure safe access to fields not held within the lock, it
-                    // is helpful to visualize the scope of the critical
-                    // section.
-                    drop(waiters);
-                }
-                State::Done => {
-                    let tick = TICK.unpack(scheduled_io.readiness.load(Acquire)) as u8;
+                        let waiters = scheduled_io.waiters.lock().unwrap();
 
-                    // Safety: State::Done means it is no longer shared
-                    let w = unsafe { &mut *waiter.get() };
+                        // Safety: called while locked
+                        let w = unsafe { &mut *waiter.get() };
 
-                    return Poll::Ready(ReadyEvent {
-                        tick,
-                        readiness: w.interest,
-                    });
+                        if w.notified {
+                            // Our waker has been notified. Reset the fields and
+                            // remove it from the list.
+                            w.waker = None;
+                            w.notified = false;
+
+                            *state = State::Done;
+                        } else {
+                            // Update the waker, if necessary.
+                            if !w.waker.as_ref().unwrap().will_wake(cx.waker()) {
+                                w.waker = Some(cx.waker().clone());
+                            }
+
+                            return Poll::Pending;
+                        }
+
+                        // Explicit drop of the lock to indicate the scope that the
+                        // lock is held. Because holding the lock is required to
+                        // ensure safe access to fields not held within the lock, it
+                        // is helpful to visualize the scope of the critical
+                        // section.
+                        drop(waiters);
+                    }
+                    State::Done => {
+                        let tick = TICK.unpack(scheduled_io.readiness.load(Acquire)) as u8;
+
+                        // Safety: State::Done means it is no longer shared
+                        let w = unsafe { &mut *waiter.get() };
+
+                        return Poll::Ready(ReadyEvent {
+                            tick,
+                            readiness: w.interest,
+                        });
+                    }
                 }
             }
         }
     }
-}
 
-impl Drop for Readiness<'_> {
-    fn drop(&mut self) {
-        let mut waiters = self.scheduled_io.waiters.lock().unwrap();
+    impl Drop for Readiness<'_> {
+        fn drop(&mut self) {
+            let mut waiters = self.scheduled_io.waiters.lock().unwrap();
 
-        // Safety: `waiter` is only ever stored in `waiters`
-        unsafe {
-            waiters
-                .list
-                .remove(NonNull::new_unchecked(self.waiter.get()))
-        };
+            // Safety: `waiter` is only ever stored in `waiters`
+            unsafe {
+                waiters
+                    .list
+                    .remove(NonNull::new_unchecked(self.waiter.get()))
+            };
+        }
     }
-}
 
-unsafe impl Send for Readiness<'_> {}
-unsafe impl Sync for Readiness<'_> {}
+    unsafe impl Send for Readiness<'_> {}
+    unsafe impl Sync for Readiness<'_> {}
+}

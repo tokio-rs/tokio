@@ -128,6 +128,7 @@ where
 
     /// Returns a shared reference to the underlying I/O object this readiness
     /// stream is wrapping.
+    #[cfg(any(feature = "process", feature = "tcp", feature = "udp", feature = "uds",))]
     pub(crate) fn get_ref(&self) -> &E {
         self.io.as_ref().unwrap()
     }
@@ -146,14 +147,11 @@ where
     /// Note that deregistering does not guarantee that the I/O resource can be
     /// registered with a different reactor. Some I/O resource types can only be
     /// associated with a single reactor instance for their lifetime.
+    #[cfg(any(feature = "tcp", feature = "udp", feature = "uds"))]
     pub(crate) fn into_inner(mut self) -> io::Result<E> {
         let io = self.io.take().unwrap();
         self.registration.deregister(&io)?;
         Ok(io)
-    }
-
-    pub(crate) async fn readiness(&self, interest: mio::Ready) -> io::Result<ReadyEvent> {
-        self.registration.readiness(interest).await
     }
 
     pub(crate) fn clear_readiness(&self, event: ReadyEvent) {
@@ -216,6 +214,17 @@ where
     /// calling it concurrently with `poll_read_ready`.
     pub(crate) fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<ReadyEvent>> {
         self.registration.poll_readiness(cx, Direction::Write)
+    }
+}
+
+cfg_io_readiness! {
+    impl<E> PollEvented<E>
+    where
+        E: Evented,
+    {
+        pub(crate) async fn readiness(&self, interest: mio::Ready) -> io::Result<ReadyEvent> {
+            self.registration.readiness(interest).await
+        }
     }
 }
 
