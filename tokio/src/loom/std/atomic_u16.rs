@@ -11,7 +11,7 @@ unsafe impl Send for AtomicU16 {}
 unsafe impl Sync for AtomicU16 {}
 
 impl AtomicU16 {
-    pub(crate) fn new(val: u16) -> AtomicU16 {
+    pub(crate) const fn new(val: u16) -> AtomicU16 {
         let inner = UnsafeCell::new(std::sync::atomic::AtomicU16::new(val));
         AtomicU16 { inner }
     }

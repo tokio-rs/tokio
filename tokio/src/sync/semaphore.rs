@@ -74,6 +74,15 @@ impl Semaphore {
         }
     }
 
+    /// Creates a new semaphore with the initial number of permits.
+    #[cfg(all(feature = "parking_lot", not(all(loom, test))))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "parking_lot")))]
+    pub const fn const_new(permits: usize) -> Self {
+        Self {
+            ll_sem: ll::Semaphore::const_new(permits),
+        }
+    }
+
     /// Returns the current number of available permits.
     pub fn available_permits(&self) -> usize {
         self.ll_sem.available_permits()

@@ -170,6 +170,24 @@ impl Notify {
         }
     }
 
+    /// Create a new `Notify`, initialized without a permit.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::Notify;
+    ///
+    /// static NOTIFY: Notify = Notify::const_new();
+    /// ```
+    #[cfg(all(feature = "parking_lot", not(all(loom, test))))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "parking_lot")))]
+    pub const fn const_new() -> Notify {
+        Notify {
+            state: AtomicU8::new(0),
+            waiters: Mutex::const_new(LinkedList::new()),
+        }
+    }
+
     /// Wait for a notification.
     ///
     /// Equivalent to:

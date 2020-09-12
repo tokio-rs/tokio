@@ -485,6 +485,27 @@ impl<T: ?Sized> RwLock<T> {
         }
     }
 
+    /// Creates a new instance of an `RwLock<T>` which is unlocked.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::RwLock;
+    ///
+    /// static LOCK: RwLock<i32> = RwLock::const_new(5);
+    /// ```
+    #[cfg(all(feature = "parking_lot", not(all(loom, test))))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "parking_lot")))]
+    pub const fn const_new(value: T) -> RwLock<T>
+    where
+        T: Sized,
+    {
+        RwLock {
+            c: UnsafeCell::new(value),
+            s: Semaphore::const_new(MAX_READS),
+        }
+    }
+
     /// Locks this rwlock with shared read access, causing the current task
     /// to yield until the lock has been acquired.
     ///
