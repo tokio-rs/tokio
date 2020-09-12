@@ -219,6 +219,27 @@ impl<T: ?Sized> Mutex<T> {
         }
     }
 
+    /// Creates a new lock in an unlocked state ready for use.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::Mutex;
+    ///
+    /// static LOCK: Mutex<i32> = Mutex::const_new(5);
+    /// ```
+    #[cfg(all(feature = "parking_lot", not(all(loom, test)),))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "parking_lot")))]
+    pub const fn const_new(t: T) -> Self
+    where
+        T: Sized,
+    {
+        Self {
+            c: UnsafeCell::new(t),
+            s: semaphore::Semaphore::const_new(1),
+        }
+    }
+
     /// Locks this mutex, causing the current task
     /// to yield until the lock has been acquired.
     /// When the lock has been acquired, function returns a [`MutexGuard`].
