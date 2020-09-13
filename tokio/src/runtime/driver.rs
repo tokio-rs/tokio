@@ -64,14 +64,14 @@ cfg_unix_and_signal! {
     fn create_signal_driver(
         enable: bool,
         io_driver: IoDriver,
-    ) -> (SignalDriver, SignalHandle) {
+    ) -> io::Result<(SignalDriver, SignalHandle)> {
         if enable {
-            let driver = crate::signal::unix::driver::Driver::new(io_driver);
+            let driver = crate::signal::unix::driver::Driver::new(io_driver)?;
             let handle = driver.handle();
 
-            (Either::A(driver), Some(handle))
+            Ok((Either::A(driver), Some(handle)))
         } else {
-            (Either::B(io_driver), None)
+            Ok((Either::B(io_driver), None))
         }
     }
 }
@@ -160,7 +160,7 @@ impl Driver {
         let clock = create_clock();
 
         let (io_driver, io_handle) = create_io_driver(cfg.enable_io)?;
-        let (signal_driver, signal_handle) = create_signal_driver(cfg.enable_signal, io_driver);
+        let (signal_driver, signal_handle) = create_signal_driver(cfg.enable_signal, io_driver)?;
         let (time_driver, time_handle) =
             create_time_driver(cfg.enable_time, signal_driver, clock.clone());
 
