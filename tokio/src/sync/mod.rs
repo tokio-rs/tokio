@@ -397,8 +397,8 @@
 //! }
 //! ```
 //!
-//! [`watch` channel]: crate::sync::watch
-//! [`broadcast` channel]: crate::sync::broadcast
+//! [`watch` channel]: mod@crate::sync::watch
+//! [`broadcast` channel]: mod@crate::sync::broadcast
 //!
 //! # State synchronization
 //!
