@@ -229,10 +229,7 @@ fn signal_enable(signal: c_int) -> io::Result<()> {
     }
 
     // Check that we have a signal driver running
-    match driver::Handle::current().inner() {
-        Some(inner) => inner.ensure_registration()?,
-        None => return Err(io::Error::new(io::ErrorKind::Other, "signal driver gone")),
-    }
+    driver::Handle::current().check_inner()?;
 
     let globals = globals();
     let siginfo = match globals.storage().get(signal as EventId) {

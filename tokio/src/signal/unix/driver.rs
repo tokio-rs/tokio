@@ -1,12 +1,13 @@
 //! Signal driver
 
+use crate::io::driver::Driver as IoDriver;
 use crate::io::Registration;
 use crate::park::Park;
 use crate::runtime::context;
 use crate::signal::registry::globals;
 use mio_uds::UnixStream;
 use std::io::{self, Read};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
 use std::time::Duration;
 
 /// Responsible for registering wakeups when an OS signal is received, and
@@ -15,9 +16,16 @@ use std::time::Duration;
 /// Note: this driver relies on having an enabled IO driver in order to listen to
 /// pipe write wakeups.
 #[derive(Debug)]
-pub(crate) struct Driver<T: Park> {
+pub(crate) struct Driver {
     /// Thread parker. The `Driver` park implementation delegates to this.
-    park: T,
+    park: IoDriver,
+
+    /// A pipe for receiving wake events from the signal handler
+    receiver: UnixStream,
+
+    /// The actual registraiton for `receiver` when active.
+    /// Lazily bound at the first signal registration.
+    registration: Registration,
 
     /// Shared state
     inner: Arc<Inner>,
@@ -29,23 +37,13 @@ pub(crate) struct Handle {
 }
 
 #[derive(Debug)]
-pub(super) struct Inner {
-    /// A pipe for receiving wake events from the signal handler
-    receiver: UnixStream,
-
-    /// The actual registraiton for `receiver` when active.
-    /// Lazily bound at the first signal registration.
-    registration: Mutex<Option<Registration>>,
-}
+pub(super) struct Inner(());
 
 // ===== impl Driver =====
 
-impl<T> Driver<T>
-where
-    T: Park,
-{
+impl Driver {
     /// Creates a new signal `Driver` instance that delegates wakeups to `park`.
-    pub(crate) fn new(park: T) -> io::Result<Self> {
+    pub(crate) fn new(park: IoDriver) -> io::Result<Self> {
         // NB: We give each driver a "fresh" reciever file descriptor to avoid
         // the issues described in alexcrichton/tokio-process#42.
         //
@@ -60,10 +58,14 @@ where
         // either, since we can't compare Handles or assume they will always
         // point to the exact same reactor.
         let receiver = globals().receiver.try_clone()?;
+        let registration =
+            Registration::new_with_ready_and_handle(&receiver, mio::Ready::all(), park.handle())?;
 
         Ok(Self {
             park,
-            inner: Arc::new(Inner::new(receiver)),
+            receiver,
+            registration,
+            inner: Arc::new(Inner(())),
         })
     }
 
@@ -74,76 +76,13 @@ where
             inner: Arc::downgrade(&self.inner),
         }
     }
-}
-
-// ===== impl Park for Driver =====
-
-impl<T> Park for Driver<T>
-where
-    T: Park,
-{
-    type Unpark = T::Unpark;
-    type Error = T::Error;
-
-    fn unpark(&self) -> Self::Unpark {
-        self.park.unpark()
-    }
-
-    fn park(&mut self) -> Result<(), Self::Error> {
-        self.park.park()?;
-        self.inner.process();
-        Ok(())
-    }
-
-    fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
-        self.park.park_timeout(duration)?;
-        self.inner.process();
-        Ok(())
-    }
-
-    fn shutdown(&mut self) {
-        self.park.shutdown()
-    }
-}
-
-impl<T> Drop for Driver<T>
-where
-    T: Park,
-{
-    fn drop(&mut self) {
-        self.shutdown();
-    }
-}
-
-// ===== impl Inner =====
-
-impl Inner {
-    fn new(receiver: UnixStream) -> Self {
-        Self {
-            receiver,
-            registration: Mutex::new(None),
-        }
-    }
-
-    pub(super) fn ensure_registration(&self) -> io::Result<()> {
-        let mut guard = self.registration.lock().unwrap();
-
-        if guard.is_none() {
-            *guard = Some(Registration::new(&self.receiver).unwrap());
-        }
-
-        Ok(())
-    }
 
     fn process(&self) {
         // Check if the pipe is ready to read and therefore has "woken" us up
-        match self.registration.lock().unwrap().as_ref() {
-            None => return, // Not registered, bail
-            Some(registration) => match registration.take_read_ready() {
-                Ok(Some(ready)) => assert!(ready.is_readable()),
-                Ok(None) => return, // No wake has arrived, bail
-                Err(e) => panic!("reactor gone: {}", e),
-            },
+        match self.registration.take_read_ready() {
+            Ok(Some(ready)) => assert!(ready.is_readable()),
+            Ok(None) => return, // No wake has arrived, bail
+            Err(e) => panic!("reactor gone: {}", e),
         }
 
         // Drain the pipe completely so we can receive a new readiness event
@@ -163,6 +102,33 @@ impl Inner {
     }
 }
 
+// ===== impl Park for Driver =====
+
+impl Park for Driver {
+    type Unpark = <IoDriver as Park>::Unpark;
+    type Error = io::Error;
+
+    fn unpark(&self) -> Self::Unpark {
+        self.park.unpark()
+    }
+
+    fn park(&mut self) -> Result<(), Self::Error> {
+        self.park.park()?;
+        self.process();
+        Ok(())
+    }
+
+    fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
+        self.park.park_timeout(duration)?;
+        self.process();
+        Ok(())
+    }
+
+    fn shutdown(&mut self) {
+        self.park.shutdown()
+    }
+}
+
 // ===== impl Handle =====
 
 impl Handle {
@@ -177,7 +143,11 @@ impl Handle {
         )
     }
 
-    pub(super) fn inner(&self) -> Option<Arc<Inner>> {
-        self.inner.upgrade()
+    pub(super) fn check_inner(&self) -> io::Result<()> {
+        if self.inner.strong_count() > 0 {
+            Ok(())
+        } else {
+            Err(io::Error::new(io::ErrorKind::Other, "signal driver gone"))
+        }
     }
 }

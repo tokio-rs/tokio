@@ -58,7 +58,7 @@ macro_rules! cfg_neither_unix_nor_windows {
 }
 
 cfg_unix_and_signal! {
-    type SignalDriver = Either<crate::signal::unix::driver::Driver<IoDriver>, IoDriver>;
+    type SignalDriver = Either<crate::signal::unix::driver::Driver, IoDriver>;
     pub(crate) type SignalHandle = Option<crate::signal::unix::driver::Handle>;
 
     fn create_signal_driver(
@@ -66,7 +66,10 @@ cfg_unix_and_signal! {
         io_driver: IoDriver,
     ) -> io::Result<(SignalDriver, SignalHandle)> {
         if enable {
-            let driver = crate::signal::unix::driver::Driver::new(io_driver)?;
+            let driver = match io_driver {
+                Either::A(io_driver) => crate::signal::unix::driver::Driver::new(io_driver)?,
+                Either::B(_) => panic!("the `enable_signal` feature requires `enable_io`"),
+            };
             let handle = driver.handle();
 
             Ok((Either::A(driver), Some(handle)))

@@ -460,6 +460,7 @@ cfg_signal! {
         /// use tokio::runtime;
         ///
         /// let rt = runtime::Builder::new()
+        ///     .enable_io() // Required by the signal driver
         ///     .enable_signal()
         ///     .build()
         ///     .unwrap();
