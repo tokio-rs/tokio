@@ -1,22 +1,22 @@
 //! Abstracts out the entire chain of runtime sub-drivers into common types.
-use crate::io::driver as io_driver;
-use crate::park::{Either, Park, ParkThread};
-use crate::time::{self, driver as time_driver};
+use crate::park::{Park, ParkThread};
 use std::io;
 use std::time::Duration;
 
 // ===== io driver =====
 
 cfg_io_driver! {
-    type IoDriver = Either<io_driver::Driver, ParkThread>;
-    pub(crate) type IoHandle = Option<io_driver::Handle>;
+    type IoDriver = crate::park::Either<crate::io::driver::Driver, crate::park::ParkThread>;
+    pub(crate) type IoHandle = Option<crate::io::driver::Handle>;
 
     fn create_io_driver(enable: bool) -> io::Result<(IoDriver, IoHandle)> {
+        use crate::park::Either;
+
         #[cfg(loom)]
         assert!(!enable);
 
         if enable {
-            let driver = io_driver::Driver::new()?;
+            let driver = crate::io::driver::Driver::new()?;
             let handle = driver.handle();
 
             Ok((Either::A(driver), Some(handle)))
@@ -58,13 +58,15 @@ macro_rules! cfg_neither_unix_nor_windows {
 }
 
 cfg_unix_and_signal! {
-    type SignalDriver = Either<crate::signal::unix::driver::Driver, IoDriver>;
+    type SignalDriver = crate::park::Either<crate::signal::unix::driver::Driver, IoDriver>;
     pub(crate) type SignalHandle = Option<crate::signal::unix::driver::Handle>;
 
     fn create_signal_driver(
         enable: bool,
         io_driver: IoDriver,
     ) -> io::Result<(SignalDriver, SignalHandle)> {
+        use crate::park::Either;
+
         if enable {
             let driver = match io_driver {
                 Either::A(io_driver) => crate::signal::unix::driver::Driver::new(io_driver)?,
@@ -86,21 +88,21 @@ cfg_neither_unix_nor_windows! {
     fn create_signal_driver(
         _enable: bool,
         io_driver: IoDriver,
-    ) -> (SignalDriver, SignalHandle) {
-        (io_driver, ())
+    ) -> io::Result<(SignalDriver, SignalHandle)> {
+        Ok((io_driver, ()))
     }
 }
 
 // ===== time driver =====
 
 cfg_time! {
-    type TimeDriver = Either<time_driver::Driver<SignalDriver>, SignalDriver>;
+    type TimeDriver = crate::park::Either<crate::time::driver::Driver<SignalDriver>, SignalDriver>;
 
-    pub(crate) type Clock = time::Clock;
-    pub(crate) type TimeHandle = Option<time_driver::Handle>;
+    pub(crate) type Clock = crate::time::Clock;
+    pub(crate) type TimeHandle = Option<crate::time::driver::Handle>;
 
     fn create_clock() -> Clock {
-        time::Clock::new()
+        crate::time::Clock::new()
     }
 
     fn create_time_driver(
@@ -108,8 +110,10 @@ cfg_time! {
         signal_driver: SignalDriver,
         clock: Clock,
     ) -> (TimeDriver, TimeHandle) {
+        use crate::park::Either;
+
         if enable {
-            let driver = time_driver::Driver::new(signal_driver, clock);
+            let driver = crate::time::driver::Driver::new(signal_driver, clock);
             let handle = driver.handle();
 
             (Either::A(driver), Some(handle))
