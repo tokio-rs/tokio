@@ -23,6 +23,7 @@ cfg_io_driver! {
 }
 
 cfg_signal! {
+    #[cfg(unix)]
     pub(crate) fn signal_handle() -> crate::runtime::driver::SignalHandle {
         CONTEXT.with(|ctx| match *ctx.borrow() {
             Some(ref ctx) => ctx.signal_handle.clone(),

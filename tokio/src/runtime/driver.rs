@@ -42,7 +42,7 @@ cfg_not_io_driver! {
 macro_rules! cfg_unix_and_signal {
     ($($item:item)*) => {
         $(
-            #[cfg(all(unix, feature = "signal"))]
+            #[cfg(all(not(loom), unix, feature = "signal"))]
             $item
         )*
     }
@@ -51,7 +51,7 @@ macro_rules! cfg_unix_and_signal {
 macro_rules! cfg_neither_unix_nor_windows {
     ($($item:item)*) => {
         $(
-            #[cfg(not(all(unix, feature = "signal")))]
+            #[cfg(any(loom, not(all(unix, feature = "signal"))))]
             $item
         )*
     }
