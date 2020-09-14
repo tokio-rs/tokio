@@ -53,7 +53,7 @@ cfg_io_readiness! {
         /// The interest this waiter is waiting on
         interest: mio::Ready,
 
-        notified: bool,
+        is_ready: bool,
 
         /// Should never be `!Unpin`
         _p: PhantomPinned,
@@ -215,7 +215,7 @@ impl ScheduledIo {
             {
                 let waiter = unsafe { &mut *waiter.as_ptr() };
                 if let Some(waker) = waiter.waker.take() {
-                    waiter.notified = true;
+                    waiter.is_ready = true;
                     waker.wake();
                 }
             }
@@ -316,7 +316,7 @@ cfg_io_readiness! {
                 waiter: UnsafeCell::new(Waiter {
                     pointers: linked_list::Pointers::new(),
                     waker: None,
-                    notified: false,
+                    is_ready: false,
                     interest,
                     _p: PhantomPinned,
                 }),
@@ -347,6 +347,8 @@ cfg_io_readiness! {
         type Output = ReadyEvent;
 
         fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            use std::sync::atomic::Ordering::SeqCst;
+
             let (scheduled_io, state, waiter) = unsafe {
                 let me = self.get_unchecked_mut();
                 (&me.scheduled_io, &mut me.state, &me.waiter)
@@ -355,7 +357,34 @@ cfg_io_readiness! {
             loop {
                 match *state {
                     State::Init => {
+                        // Optimistically check existing readiness
+                        let curr = scheduled_io.readiness.load(SeqCst);
+                        let readiness = mio::Ready::from_usize(READINESS.unpack(curr));
+
+                        // Safety: `waiter.interest` never changes
+                        let interest = unsafe { (*waiter.get()).interest };
+
+                        if readiness.contains(interest) {
+                            // Currently ready!
+                            let tick = TICK.unpack(curr) as u8;
+                            *state = State::Done;
+                            return Poll::Ready(ReadyEvent { readiness, tick });
+                        }
+
+                        // Wasn't ready, take the lock (and check again while locked).
                         let mut waiters = scheduled_io.waiters.lock().unwrap();
+
+                        let curr = scheduled_io.readiness.load(SeqCst);
+                        let readiness = mio::Ready::from_usize(READINESS.unpack(curr));
+
+                        if readiness.contains(interest) {
+                            // Currently ready!
+                            let tick = TICK.unpack(curr) as u8;
+                            *state = State::Done;
+                            return Poll::Ready(ReadyEvent { readiness, tick });
+                        }
+
+                        // Not ready even after locked, insert into list...
 
                         // Safety: called while locked
                         unsafe {
@@ -381,12 +410,8 @@ cfg_io_readiness! {
                         // Safety: called while locked
                         let w = unsafe { &mut *waiter.get() };
 
-                        if w.notified {
-                            // Our waker has been notified. Reset the fields and
-                            // remove it from the list.
-                            w.waker = None;
-                            w.notified = false;
-
+                        if w.is_ready {
+                            // Our waker has been notified.
                             *state = State::Done;
                         } else {
                             // Update the waker, if necessary.
