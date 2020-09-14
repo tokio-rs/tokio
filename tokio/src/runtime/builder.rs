@@ -148,6 +148,7 @@ impl Builder {
         #[cfg(feature = "io-driver")]
         self.enable_io();
         #[cfg(feature = "signal")]
+        #[cfg(not(loom))]
         self.enable_signal();
         #[cfg(feature = "time")]
         self.enable_time();
