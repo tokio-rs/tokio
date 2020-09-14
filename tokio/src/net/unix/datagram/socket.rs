@@ -34,9 +34,9 @@ cfg_uds! {
     ///
     /// // Bind each socket to a filesystem path
     /// let tx_path = tmp.path().join("tx");
-    /// let mut tx = UnixDatagram::bind(&tx_path)?;
+    /// let tx = UnixDatagram::bind(&tx_path)?;
     /// let rx_path = tmp.path().join("rx");
-    /// let mut rx = UnixDatagram::bind(&rx_path)?;
+    /// let rx = UnixDatagram::bind(&rx_path)?;
     ///
     /// let bytes = b"hello world";
     /// tx.send_to(bytes, &rx_path).await?;
@@ -60,7 +60,7 @@ cfg_uds! {
     /// use tokio::net::UnixDatagram;
     ///
     /// // Create the pair of sockets
-    /// let (mut sock1, mut sock2) = UnixDatagram::pair()?;
+    /// let (sock1, sock2) = UnixDatagram::pair()?;
     ///
     /// // Since the sockets are paired, the paired send/recv
     /// // functions can be used
@@ -124,7 +124,7 @@ impl UnixDatagram {
     /// use tokio::net::UnixDatagram;
     ///
     /// // Create the pair of sockets
-    /// let (mut sock1, mut sock2) = UnixDatagram::pair()?;
+    /// let (sock1, sock2) = UnixDatagram::pair()?;
     ///
     /// // Since the sockets are paired, the paired send/recv
     /// // functions can be used
@@ -204,12 +204,12 @@ impl UnixDatagram {
     /// use tempfile::tempdir;
     ///
     /// // Create an unbound socket
-    /// let mut tx = UnixDatagram::unbound()?;
+    /// let tx = UnixDatagram::unbound()?;
     ///
     /// // Create another, bound socket
     /// let tmp = tempdir()?;
     /// let rx_path = tmp.path().join("rx");
-    /// let mut rx = UnixDatagram::bind(&rx_path)?;
+    /// let rx = UnixDatagram::bind(&rx_path)?;
     ///
     /// // Send to the bound socket
     /// let bytes = b"hello world";
@@ -243,12 +243,12 @@ impl UnixDatagram {
     /// use tempfile::tempdir;
     ///
     /// // Create an unbound socket
-    /// let mut tx = UnixDatagram::unbound()?;
+    /// let tx = UnixDatagram::unbound()?;
     ///
     /// // Create another, bound socket
     /// let tmp = tempdir()?;
     /// let rx_path = tmp.path().join("rx");
-    /// let mut rx = UnixDatagram::bind(&rx_path)?;
+    /// let rx = UnixDatagram::bind(&rx_path)?;
     ///
     /// // Connect to the bound socket
     /// tx.connect(&rx_path)?;
@@ -280,7 +280,7 @@ impl UnixDatagram {
     /// use tokio::net::UnixDatagram;
     ///
     /// // Create the pair of sockets
-    /// let (mut sock1, mut sock2) = UnixDatagram::pair()?;
+    /// let (sock1, sock2) = UnixDatagram::pair()?;
     ///
     /// // Since the sockets are paired, the paired send/recv
     /// // functions can be used
@@ -378,7 +378,7 @@ impl UnixDatagram {
     /// use tokio::net::UnixDatagram;
     ///
     /// // Create the pair of sockets
-    /// let (mut sock1, mut sock2) = UnixDatagram::pair()?;
+    /// let (sock1, sock2) = UnixDatagram::pair()?;
     ///
     /// // Since the sockets are paired, the paired send/recv
     /// // functions can be used
@@ -443,9 +443,9 @@ impl UnixDatagram {
     ///
     /// // Bind each socket to a filesystem path
     /// let tx_path = tmp.path().join("tx");
-    /// let mut tx = UnixDatagram::bind(&tx_path)?;
+    /// let tx = UnixDatagram::bind(&tx_path)?;
     /// let rx_path = tmp.path().join("rx");
-    /// let mut rx = UnixDatagram::bind(&rx_path)?;
+    /// let rx = UnixDatagram::bind(&rx_path)?;
     ///
     /// let bytes = b"hello world";
     /// tx.send_to(bytes, &rx_path).await?;
@@ -486,9 +486,9 @@ impl UnixDatagram {
     ///
     /// // Bind each socket to a filesystem path
     /// let tx_path = tmp.path().join("tx");
-    /// let mut tx = UnixDatagram::bind(&tx_path)?;
+    /// let tx = UnixDatagram::bind(&tx_path)?;
     /// let rx_path = tmp.path().join("rx");
-    /// let mut rx = UnixDatagram::bind(&rx_path)?;
+    /// let rx = UnixDatagram::bind(&rx_path)?;
     ///
     /// let bytes = b"hello world";
     /// tx.send_to(bytes, &rx_path).await?;
@@ -675,7 +675,7 @@ impl UnixDatagram {
     /// use std::net::Shutdown;
     ///
     /// // Create an unbound socket
-    /// let (mut socket, other) = UnixDatagram::pair()?;
+    /// let (socket, other) = UnixDatagram::pair()?;
     ///
     /// socket.shutdown(Shutdown::Both)?;
     ///
