@@ -84,3 +84,17 @@ async fn mock_panics_write_data_left() {
     use tokio_test::io::Builder;
     Builder::new().write(b"write").build();
 }
+
+#[tokio::test]
+async fn write_with_failing_assert_callback() {
+    static mut CALLED: bool = false;
+
+    let mut mock = Builder::new()
+        .write(b"test")
+        .set_assert_callback(|_, _| unsafe { CALLED = true })
+        .build();
+
+    mock.write_all(b"test").await.expect("write 1");
+
+    assert!(unsafe { CALLED }, "assert_callback should be called");
+}

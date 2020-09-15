@@ -46,11 +46,24 @@ pub struct Handle {
     tx: mpsc::UnboundedSender<Action>,
 }
 
+trait AssertCallbckFn: Fn(&[u8], &[u8]) + Send + Sync {}
+
+impl<F> AssertCallbckFn for F where F: Fn(&[u8], &[u8]) + Send + Sync {}
+
+impl std::fmt::Debug for dyn AssertCallbckFn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AssertCallbckFn").finish()
+    }
+}
+
+type AsserCallback = Arc<dyn AssertCallbckFn>;
+
 /// Builds `Mock` instances.
 #[derive(Debug, Clone)]
 pub struct Builder {
     // Sequence of actions for the Mock to take
     actions: VecDeque<Action>,
+    assert_callback: AsserCallback,
 }
 
 #[derive(Debug, Clone)]
@@ -67,10 +80,17 @@ enum Action {
 #[derive(Debug)]
 struct Inner {
     actions: VecDeque<Action>,
+    assert_callback: AsserCallback,
     waiting: Option<Instant>,
     sleep: Option<Delay>,
     read_wait: Option<Waker>,
     rx: mpsc::UnboundedReceiver<Action>,
+}
+
+impl Default for Builder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Builder {
@@ -78,6 +98,7 @@ impl Builder {
     pub fn new() -> Self {
         Self {
             actions: VecDeque::new(),
+            assert_callback: Arc::new(|actual, expected| assert_eq!(actual, expected)),
         }
     }
 
@@ -129,6 +150,15 @@ impl Builder {
         self
     }
 
+    /// Sets a custom assert callback for comparing actual and expected slices
+    pub fn set_assert_callback(
+        &mut self,
+        assert_callback: impl Fn(&[u8], &[u8]) + Send + Sync + 'static,
+    ) -> &mut Self {
+        self.assert_callback = Arc::new(assert_callback);
+        self
+    }
+
     /// Build a `Mock` value according to the defined script.
     pub fn build(&mut self) -> Mock {
         let (mock, _) = self.build_with_handle();
@@ -137,7 +167,7 @@ impl Builder {
 
     /// Build a `Mock` value paired with a handle
     pub fn build_with_handle(&mut self) -> (Mock, Handle) {
-        let (inner, handle) = Inner::new(self.actions.clone());
+        let (inner, handle) = Inner::new(self.actions.clone(), self.assert_callback.clone());
 
         let mock = Mock { inner };
 
@@ -186,11 +216,12 @@ impl Handle {
 }
 
 impl Inner {
-    fn new(actions: VecDeque<Action>) -> (Inner, Handle) {
+    fn new(actions: VecDeque<Action>, assert_callback: AsserCallback) -> (Inner, Handle) {
         let (tx, rx) = mpsc::unbounded_channel();
 
         let inner = Inner {
             actions,
+            assert_callback,
             sleep: None,
             read_wait: None,
             rx,
@@ -256,7 +287,7 @@ impl Inner {
                 Action::Write(ref mut expect) => {
                     let n = cmp::min(src.len(), expect.len());
 
-                    assert_eq!(&src[..n], &expect[..n]);
+                    (*self.assert_callback)(&src[..n], &expect[..n]);
 
                     // Drop data that was matched
                     expect.drain(..n);
