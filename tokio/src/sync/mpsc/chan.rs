@@ -1,13 +1,15 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::future::AtomicWaker;
+use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Arc;
 use crate::sync::mpsc::error::TryRecvError;
 use crate::sync::mpsc::list;
+use crate::sync::Notify;
 
 use std::fmt;
 use std::process;
-use std::sync::atomic::Ordering::{AcqRel, Relaxed};
+use std::sync::atomic::Ordering::{AcqRel, Relaxed, SeqCst};
 use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll};
 
@@ -44,6 +46,12 @@ pub(crate) trait Semaphore {
 }
 
 struct Chan<T, S> {
+    /// Notifies all tasks listening for the receiver being dropped
+    notify_rx_closed: Notify,
+
+    /// Indicates whether the receiver has been dropped
+    rx_closed: AtomicBool,
+
     /// Handle to the push half of the lock-free list.
     tx: list::Tx<T>,
 
@@ -102,6 +110,8 @@ pub(crate) fn channel<T, S: Semaphore>(semaphore: S) -> (Tx<T, S>, Rx<T, S>) {
     let (tx, rx) = list::channel();
 
     let chan = Arc::new(Chan {
+        rx_closed: AtomicBool::new(false),
+        notify_rx_closed: Notify::new(),
         tx,
         semaphore,
         rx_waker: AtomicWaker::new(),
@@ -129,6 +139,38 @@ impl<T, S> Tx<T, S> {
     /// Send a message and notify the receiver.
     pub(crate) fn send(&self, value: T) {
         self.inner.send(value);
+    }
+
+    pub(crate) async fn closed(&mut self) {
+        use std::future::Future;
+        use std::pin::Pin;
+        use std::task::Poll;
+
+        // In order to avoid a race condition, we first request a notification,
+        // **then** check the current value's version. If a new version exists,
+        // the notification request is dropped. Requesting the notification
+        // requires polling the future once.
+        let notified = self.inner.notify_rx_closed.notified();
+        pin!(notified);
+
+        // Polling this for first time will register the waiter and
+        // return `Pending` or return `Ready` right away. If `Ready`
+        // is returned we are done
+        let aquired_lost_notification =
+            crate::future::poll_fn(|cx| match Pin::new(&mut notified).poll(cx) {
+                Poll::Ready(()) => Poll::Ready(true),
+                Poll::Pending => Poll::Ready(false),
+            })
+            .await;
+
+        if aquired_lost_notification {
+            return;
+        }
+
+        if self.inner.rx_closed.load(SeqCst) {
+            return;
+        }
+        notified.await;
     }
 
     /// Wake the receive half
@@ -182,6 +224,8 @@ impl<T, S: Semaphore> Rx<T, S> {
         });
 
         self.inner.semaphore.close();
+        self.inner.rx_closed.store(true, SeqCst);
+        self.inner.notify_rx_closed.notify_waiters();
     }
 
     /// Receive the next value

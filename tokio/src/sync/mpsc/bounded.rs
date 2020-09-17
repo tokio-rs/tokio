@@ -320,6 +320,41 @@ impl<T> Sender<T> {
         }
     }
 
+    /// Completes when the receiver has dropped.
+    ///
+    /// This allows the producers to get notified when interest in the produced
+    /// values is canceled and immediately stop doing work.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (mut tx1, rx) = mpsc::channel::<()>(1);
+    ///     let mut tx2 = tx1.clone();
+    ///     let mut tx3 = tx1.clone();
+    ///     let mut tx4 = tx1.clone();
+    ///     let mut tx5 = tx1.clone();
+    ///     tokio::spawn(async move {
+    ///         drop(rx);
+    ///     });
+    ///
+    ///     futures::join!(
+    ///         tx1.closed(),
+    ///         tx2.closed(),
+    ///         tx3.closed(),
+    ///         tx4.closed(),
+    ///         tx5.closed()
+    ///     );
+    ////     println!("Receiver dropped");
+    /// }
+    /// ```
+    pub async fn closed(&mut self) {
+        self.chan.closed().await
+    }
+
     /// Attempts to immediately send a message on this `Sender`
     ///
     /// This method differs from [`send`] by returning immediately if the channel's
