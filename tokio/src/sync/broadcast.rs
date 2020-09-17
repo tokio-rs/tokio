@@ -793,7 +793,7 @@ where
     /// This is useful for a flavor of "optimistic check" before deciding to
     /// await on a receiver.
     ///
-    /// Compared with [`recv`], this function has three failure cases instead of one
+    /// Compared with [`recv`], this function has three failure cases instead of two
     /// (one for closed, one for an empty buffer, one for a lagging receiver).
     ///
     /// `Err(TryRecvError::Closed)` is returned when all `Sender` halves have
