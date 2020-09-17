@@ -251,14 +251,22 @@ impl<T> Receiver<T> {
         let notified = self.shared.notify_rx.notified();
         pin!(notified);
 
-        // Polling the future once is guaranteed to return `Pending` as `watch`
-        // only notifies using `notify_waiters`.
-        crate::future::poll_fn(|cx| {
-            let res = Pin::new(&mut notified).poll(cx);
-            assert!(!res.is_ready());
-            Poll::Ready(())
-        })
-        .await;
+        // Polling the future here has dual purpose. The first one is to register
+        // the waiter so when `notify_waiters` is called it is notified. The second
+        // is to cover the case where another instance of `Notiified` has been dropped
+        // without receiving its notification. If that was the case polling the
+        // future for the first time will use this "lost" notification and return
+        // `Ready` immediatelly without registering any waiter
+        let aquired_lost_notification =
+            crate::future::poll_fn(|cx| match Pin::new(&mut notified).poll(cx) {
+                Poll::Ready(()) => Poll::Ready(true),
+                Poll::Pending => Poll::Ready(false),
+            })
+            .await;
+
+        if aquired_lost_notification {
+            return Ok(());
+        }
 
         if let Some(ret) = maybe_changed(&self.shared, &mut self.version) {
             return ret;
