@@ -20,7 +20,7 @@
 //! few flavors of channels provided by Tokio. Each channel flavor supports
 //! different message passing patterns. When a channel supports multiple
 //! producers, many separate tasks may **send** messages. When a channel
-//! supports muliple consumers, many different separate tasks may **receive**
+//! supports multiple consumers, many different separate tasks may **receive**
 //! messages.
 //!
 //! Tokio provides many different channel flavors as different message passing

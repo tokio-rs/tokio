@@ -1,7 +1,7 @@
 use super::batch_semaphore as ll; // low level implementation
 use std::sync::Arc;
 
-/// Counting semaphore performing asynchronous permit aquisition.
+/// Counting semaphore performing asynchronous permit acquisition.
 ///
 /// A semaphore maintains a set of permits. Permits are used to synchronize
 /// access to a shared resource. A semaphore differs from a mutex in that it
