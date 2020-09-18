@@ -103,7 +103,7 @@
 //! paradigm of dropping-implies-cancellation, a spawned process will, by
 //! default, continue to execute even after the `Child` handle has been dropped.
 //!
-//! The `Command::kill_on_drop` method can be used to modify this behavior
+//! The [`Command::kill_on_drop`] method can be used to modify this behavior
 //! and kill the child process if the `Child` wrapper is dropped before it
 //! has exited.
 //!
@@ -581,8 +581,10 @@ impl Command {
     /// All I/O this child does will be associated with the current default
     /// event loop.
     ///
-    /// If this future is dropped before the future resolves, then
-    /// the child will be killed, if it was spawned.
+    /// The destructor of the future returned by this function will kill
+    /// the child if [`kill_on_drop`] is set to true.
+    ///
+    /// [`kill_on_drop`]: fn@Self::kill_on_drop
     ///
     /// # Errors
     ///
@@ -602,6 +604,7 @@ impl Command {
     ///         .await
     ///         .expect("ls command failed to run")
     /// }
+    /// ```
     pub fn status(&mut self) -> impl Future<Output = io::Result<ExitStatus>> {
         let child = self.spawn();
 
@@ -637,8 +640,10 @@ impl Command {
     /// All I/O this child does will be associated with the current default
     /// event loop.
     ///
-    /// If this future is dropped before the future resolves, then
-    /// the child will be killed, if it was spawned.
+    /// The destructor of the future returned by this function will kill
+    /// the child if [`kill_on_drop`] is set to true.
+    ///
+    /// [`kill_on_drop`]: fn@Self::kill_on_drop
     ///
     /// # Examples
     ///
@@ -654,6 +659,7 @@ impl Command {
     ///         .expect("ls command failed to run");
     ///     println!("stderr of ls: {:?}", output.stderr);
     /// }
+    /// ```
     pub fn output(&mut self) -> impl Future<Output = io::Result<Output>> {
         self.std.stdout(Stdio::piped());
         self.std.stderr(Stdio::piped());
