@@ -103,7 +103,7 @@
 //! paradigm of dropping-implies-cancellation, a spawned process will, by
 //! default, continue to execute even after the `Child` handle has been dropped.
 //!
-//! The `Command::kill_on_drop` method can be used to modify this behavior
+//! The [`Command::kill_on_drop`] method can be used to modify this behavior
 //! and kill the child process if the `Child` wrapper is dropped before it
 //! has exited.
 //!
