@@ -604,6 +604,7 @@ impl Command {
     ///         .await
     ///         .expect("ls command failed to run")
     /// }
+    /// ```
     pub fn status(&mut self) -> impl Future<Output = io::Result<ExitStatus>> {
         let child = self.spawn();
 
@@ -658,6 +659,7 @@ impl Command {
     ///         .expect("ls command failed to run");
     ///     println!("stderr of ls: {:?}", output.stderr);
     /// }
+    /// ```
     pub fn output(&mut self) -> impl Future<Output = io::Result<Output>> {
         self.std.stdout(Stdio::piped());
         self.std.stderr(Stdio::piped());
