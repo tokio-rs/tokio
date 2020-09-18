@@ -581,8 +581,10 @@ impl Command {
     /// All I/O this child does will be associated with the current default
     /// event loop.
     ///
-    /// If this future is dropped before the future resolves, then
-    /// the child will be killed, if it was spawned.
+    /// The destructor of the future returned by this function will kill
+    /// the child if [`kill_on_drop`] is set to true.
+    ///
+    /// [`kill_on_drop`]: fn@Self::kill_on_drop
     ///
     /// # Errors
     ///
@@ -637,8 +639,10 @@ impl Command {
     /// All I/O this child does will be associated with the current default
     /// event loop.
     ///
-    /// If this future is dropped before the future resolves, then
-    /// the child will be killed, if it was spawned.
+    /// The destructor of the future returned by this function will kill
+    /// the child if [`kill_on_drop`] is set to true.
+    ///
+    /// [`kill_on_drop`]: fn@Self::kill_on_drop
     ///
     /// # Examples
     ///
