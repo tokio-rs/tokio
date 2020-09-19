@@ -4,12 +4,14 @@ use std::io::{self, SeekFrom};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// Future for the [`seek`](crate::io::AsyncSeekExt::seek) method.
-#[derive(Debug)]
-#[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct Seek<'a, S: ?Sized> {
-    seek: &'a mut S,
-    pos: Option<SeekFrom>,
+cfg_io_util! {
+    /// Future for the [`seek`](crate::io::AsyncSeekExt::seek) method.
+    #[derive(Debug)]
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
+    pub struct Seek<'a, S: ?Sized> {
+        seek: &'a mut S,
+        pos: Option<SeekFrom>,
+    }
 }
 
 pub(crate) fn seek<S>(seek: &mut S, pos: SeekFrom) -> Seek<'_, S>
