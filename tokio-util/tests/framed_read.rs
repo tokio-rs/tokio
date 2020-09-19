@@ -185,8 +185,8 @@ fn read_partial_would_block_then_err() {
 #[test]
 fn huge_size() {
     let mut task = task::spawn(());
-    let data = [0; 32 * 1024];
-    let mut framed = FramedRead::new(Slice(&data[..]), BigDecoder);
+    let data = &[0; 32 * 1024][..];
+    let mut framed = FramedRead::new(data, BigDecoder);
 
     task.enter(|cx, _| {
         assert_read!(pin!(framed).poll_next(cx), 0);
@@ -212,7 +212,7 @@ fn huge_size() {
 #[test]
 fn data_remaining_is_error() {
     let mut task = task::spawn(());
-    let slice = Slice(&[0; 5]);
+    let slice = &[0; 5][..];
     let mut framed = FramedRead::new(slice, U32Decoder);
 
     task.enter(|cx, _| {
@@ -278,18 +278,5 @@ impl AsyncRead for Mock {
             Some(Err(e)) => Ready(Err(e)),
             None => Ready(Ok(())),
         }
-    }
-}
-
-// TODO this newtype is necessary because `&[u8]` does not currently implement `AsyncRead`
-struct Slice<'a>(&'a [u8]);
-
-impl AsyncRead for Slice<'_> {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.0).poll_read(cx, buf)
     }
 }
