@@ -141,7 +141,7 @@ pub struct DelayQueue<T> {
     delay: Option<Delay>,
 
     /// Wheel polling state
-    poll: wheel::Poll,
+    wheel_now: u64,
 
     /// Instant at which the timer starts
     start: Instant,
@@ -251,7 +251,7 @@ impl<T> DelayQueue<T> {
             slab: Slab::with_capacity(capacity),
             expired: Stack::default(),
             delay: None,
-            poll: wheel::Poll::new(0),
+            wheel_now: 0,
             start: Instant::now(),
         }
     }
@@ -733,11 +733,11 @@ impl<T> DelayQueue<T> {
 
                 let now = crate::time::ms(delay.deadline() - self.start, crate::time::Round::Down);
 
-                self.poll = wheel::Poll::new(now);
+                self.wheel_now = now;
             }
 
             // We poll the wheel to get the next value out before finding the next deadline.
-            let wheel_idx = self.wheel.poll(&mut self.poll, &mut self.slab);
+            let wheel_idx = self.wheel.poll(self.wheel_now, &mut self.slab);
 
             self.delay = self.next_deadline().map(sleep_until);
 

@@ -112,12 +112,12 @@ const ERROR: u64 = u64::MAX;
 impl Entry {
     pub(crate) fn new(handle: &Handle, deadline: Instant, duration: Duration) -> Arc<Entry> {
         let inner = handle.inner().unwrap();
-        let entry: Entry;
 
-        // Increment the number of active timeouts
-        if let Err(err) = inner.increment() {
-            entry = Entry::new2(deadline, duration, Weak::new(), ERROR);
+        // Attempt to increment the number of active timeouts
+        let entry = if let Err(err) = inner.increment() {
+            let entry = Entry::new2(deadline, duration, Weak::new(), ERROR);
             entry.error(err);
+            entry
         } else {
             let when = inner.normalize_deadline(deadline);
             let state = if when <= inner.elapsed() {
@@ -125,8 +125,8 @@ impl Entry {
             } else {
                 when
             };
-            entry = Entry::new2(deadline, duration, Arc::downgrade(&inner), state);
-        }
+            Entry::new2(deadline, duration, Arc::downgrade(&inner), state)
+        };
 
         let entry = Arc::new(entry);
         if let Err(err) = inner.queue(&entry) {

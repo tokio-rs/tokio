@@ -73,7 +73,7 @@ use std::{cmp, fmt};
 /// When the timer processes entries at level zero, it will notify all the
 /// `Delay` instances as their deadlines have been reached. For all higher
 /// levels, all entries will be redistributed across the wheel at the next level
-/// down. Eventually, as time progresses, entries will [`Delay`][delay] instances will
+/// down. Eventually, as time progresses, entries with [`Delay`][delay] instances will
 /// either be canceled (dropped) or their associated entries will reach level
 /// zero and be notified.
 ///
@@ -163,9 +163,8 @@ where
             self.clock.now() - self.inner.start,
             crate::time::Round::Down,
         );
-        let mut poll = wheel::Poll::new(now);
 
-        while let Some(entry) = self.wheel.poll(&mut poll, &mut ()) {
+        while let Some(entry) = self.wheel.poll(now, &mut ()) {
             let when = entry.when_internal().expect("invalid internal entry state");
 
             // Fire the entry
@@ -193,7 +192,7 @@ where
                     self.clear_entry(&entry);
                 }
                 (None, Some(when)) => {
-                    // Queue the entry
+                    // Add the entry to the timer wheel
                     self.add_entry(entry, when);
                 }
                 (Some(_), Some(next)) => {
@@ -210,8 +209,6 @@ where
     }
 
     /// Fires the entry if it needs to, otherwise queue it to be processed later.
-    ///
-    /// Returns `None` if the entry was fired.
     fn add_entry(&mut self, entry: Arc<Entry>, when: u64) {
         use crate::time::wheel::InsertError;
 
@@ -320,9 +317,9 @@ where
         self.inner.process.shutdown();
 
         // Clear the wheel, using u64::MAX allows us to drain everything
-        let mut poll = wheel::Poll::new(u64::MAX);
+        let end_of_time = u64::MAX;
 
-        while let Some(entry) = self.wheel.poll(&mut poll, &mut ()) {
+        while let Some(entry) = self.wheel.poll(end_of_time, &mut ()) {
             entry.error(Error::shutdown());
         }
 
@@ -387,6 +384,10 @@ impl Inner {
         debug_assert!(prev <= MAX_TIMEOUTS);
     }
 
+    /// add the entry to the "process queue".  entries are not immediately
+    /// pushed into the timer wheel but are instead pushed into the
+    /// process queue and then moved from the process queue into the timer
+    /// wheel on next `process`
     fn queue(&self, entry: &Arc<Entry>) -> Result<(), Error> {
         if self.process.push(entry)? {
             // The timer is notified so that it can process the timeout
