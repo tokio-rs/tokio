@@ -490,3 +490,25 @@ fn try_recv_unbounded() {
         _ => panic!(),
     }
 }
+
+#[test]
+fn ready_close_cancel_bounded() {
+    use futures::future::poll_fn;
+
+    let (mut tx, mut rx) = mpsc::channel::<()>(100);
+    let _tx2 = tx.clone();
+
+    {
+        let mut ready = task::spawn(async { poll_fn(|cx| tx.poll_ready(cx)).await });
+        assert_ready_ok!(ready.poll());
+    }
+
+    rx.close();
+
+    let mut recv = task::spawn(async { rx.recv().await });
+    assert_pending!(recv.poll());
+
+    drop(tx);
+
+    assert!(recv.is_woken());
+}
