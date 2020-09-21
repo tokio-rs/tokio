@@ -9,7 +9,7 @@ name: CI
 env:
   RUSTFLAGS: -Dwarnings
   RUST_BACKTRACE: 1
-  nightly: nightly-2020-07-12
+  nightly: nightly-2020-09-21
   minrust: 1.45.2
 
 jobs:
@@ -110,7 +110,7 @@ jobs:
           rm -rf tokio/tests
 
       - name: miri
-        run: cargo miri test --features rt-core,rt-threaded,rt-util,sync -- -- task
+        run: cargo miri test --features rt-core,rt-threaded,rt-util,sync task
         working-directory: tokio
 
   cross:
