@@ -1067,7 +1067,7 @@ cfg_io_util! {
         /// (See also the [`crate::fs::read_to_string`] convenience function for
         /// reading from a file.)
         ///
-        /// [`crate::fs::read_to_string`]: crate::fs::read_to_string::read_to_string
+        /// [`crate::fs::read_to_string`]: fn@crate::fs::read_to_string
         fn read_to_string<'a>(&'a mut self, dst: &'a mut String) -> ReadToString<'a, Self>
         where
             Self: Unpin,
