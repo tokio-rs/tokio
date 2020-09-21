@@ -83,7 +83,6 @@ pub(crate) trait Semaphore {
 
     fn is_idle(&self) -> bool;
 
-    // Returns `true` if the receiver should be notified for shutdown.
     fn add_permit(&self);
 
     fn poll_acquire(
