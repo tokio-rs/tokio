@@ -109,7 +109,18 @@ impl Registration {
     where
         T: Evented,
     {
-        let handle = Handle::current();
+        Self::new_with_ready_and_handle(io, ready, Handle::current())
+    }
+
+    /// Same as `new_with_ready` but also accepts an explicit handle.
+    pub(crate) fn new_with_ready_and_handle<T>(
+        io: &T,
+        ready: mio::Ready,
+        handle: Handle,
+    ) -> io::Result<Registration>
+    where
+        T: Evented,
+    {
         let shared = if let Some(inner) = handle.inner() {
             inner.add_source(io, ready)?
         } else {

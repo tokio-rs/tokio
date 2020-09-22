@@ -1,7 +1,7 @@
 use crate::loom::sync::Mutex;
 use crate::runtime::handle::Handle;
 use crate::runtime::shell::Shell;
-use crate::runtime::{blocking, io, time, Callback, Runtime, Spawner};
+use crate::runtime::{blocking, driver, io, Callback, Runtime, Spawner};
 
 use std::fmt;
 #[cfg(feature = "blocking")]
@@ -359,14 +359,17 @@ impl Builder {
         }
     }
 
+    fn get_cfg(&self) -> driver::Cfg {
+        driver::Cfg {
+            enable_io: self.enable_io,
+            enable_time: self.enable_time,
+        }
+    }
+
     fn build_shell_runtime(&mut self) -> io::Result<Runtime> {
         use crate::runtime::Kind;
 
-        let clock = time::create_clock();
-
-        // Create I/O driver
-        let (io_driver, io_handle) = io::create_driver(self.enable_io)?;
-        let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone());
+        let (driver, resources) = driver::Driver::new(self.get_cfg())?;
 
         let spawner = Spawner::Shell;
 
@@ -377,9 +380,10 @@ impl Builder {
             kind: Kind::Shell(Mutex::new(Some(Shell::new(driver)))),
             handle: Handle {
                 spawner,
-                io_handle,
-                time_handle,
-                clock,
+                io_handle: resources.io_handle,
+                time_handle: resources.time_handle,
+                signal_handle: resources.signal_handle,
+                clock: resources.clock,
                 blocking_spawner,
             },
             blocking_pool,
@@ -478,12 +482,7 @@ cfg_rt_core! {
         fn build_basic_runtime(&mut self) -> io::Result<Runtime> {
             use crate::runtime::{BasicScheduler, Kind};
 
-            let clock = time::create_clock();
-
-            // Create I/O driver
-            let (io_driver, io_handle) = io::create_driver(self.enable_io)?;
-
-            let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone());
+            let (driver, resources) = driver::Driver::new(self.get_cfg())?;
 
             // And now put a single-threaded scheduler on top of the timer. When
             // there are no futures ready to do something, it'll let the timer or
@@ -500,9 +499,10 @@ cfg_rt_core! {
                 kind: Kind::Basic(Mutex::new(Some(scheduler))),
                 handle: Handle {
                     spawner,
-                    io_handle,
-                    time_handle,
-                    clock,
+                    io_handle: resources.io_handle,
+                    time_handle: resources.time_handle,
+                    signal_handle: resources.signal_handle,
+                    clock: resources.clock,
                     blocking_spawner,
                 },
                 blocking_pool,
@@ -533,10 +533,8 @@ cfg_rt_threaded! {
             let core_threads = self.core_threads.unwrap_or_else(|| cmp::min(self.max_threads, num_cpus()));
             assert!(core_threads <= self.max_threads, "Core threads number cannot be above max limit");
 
-            let clock = time::create_clock();
+            let (driver, resources) = driver::Driver::new(self.get_cfg())?;
 
-            let (io_driver, io_handle) = io::create_driver(self.enable_io)?;
-            let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone());
             let (scheduler, launch) = ThreadPool::new(core_threads, Parker::new(driver));
             let spawner = Spawner::ThreadPool(scheduler.spawner().clone());
 
@@ -547,9 +545,10 @@ cfg_rt_threaded! {
             // Create the runtime handle
             let handle = Handle {
                 spawner,
-                io_handle,
-                time_handle,
-                clock,
+                io_handle: resources.io_handle,
+                time_handle: resources.time_handle,
+                signal_handle: resources.signal_handle,
+                clock: resources.clock,
                 blocking_spawner,
             };
 
