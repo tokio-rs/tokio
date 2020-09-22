@@ -105,11 +105,12 @@ pub struct Notify {
     state: AtomicU8,
     waiters: Mutex<WaitList>,
 }
+
 #[derive(Debug, Clone, Copy)]
 enum NotificationType {
-    // Notification trigerred by calling `notify_waiters`
+    // Notification triggered by calling `notify_waiters`
     AllWaiters,
-    // Notification trigerred by calling `notify_one`
+    // Notification triggered by calling `notify_one`
     OneWaiter,
 }
 
@@ -589,9 +590,9 @@ impl Drop for Notified<'_> {
                 notify.state.store(EMPTY, SeqCst);
             }
 
-            // See if the node was notified but not received. In this case, the
-            // notification must be sent to another waiter, only if it was
-            // triggered via `notify_one`
+            // See if the node was notified but not received. In this case, if
+            // the notification was triggered via `notify_one`, it must be sent
+            // to the next waiter.
             //
             // Safety: with the entry removed from the linked list, there can be
             // no concurrent access to the entry
