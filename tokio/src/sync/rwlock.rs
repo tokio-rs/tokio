@@ -585,6 +585,30 @@ impl<T: ?Sized> RwLock<T> {
         }
     }
 
+    /// Returns a mutable reference to the underlying data.
+    ///
+    /// Since this call borrows the `RwLock` mutably, no actual locking needs to
+    /// take place -- the mutable borrow statically guarantees no locks exist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::RwLock;
+    ///
+    /// fn main() {
+    ///     let mut lock = RwLock::new(1);
+    ///
+    ///     let n = lock.get_mut();
+    ///     *n = 2;
+    /// }
+    /// ```
+    pub fn get_mut(&mut self) -> &mut T {
+        unsafe {
+            // Safety: This is https://github.com/rust-lang/rust/pull/76936
+            &mut *self.c.get()
+        }
+    }
+
     /// Consumes the lock, returning the underlying data.
     pub fn into_inner(self) -> T
     where
