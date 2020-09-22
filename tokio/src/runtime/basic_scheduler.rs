@@ -1,31 +1,36 @@
 use crate::loom::sync::Mutex;
-use crate::park::{Park, ParkThread, Unpark};
+use crate::park::{CachedParkThread, Park, Unpark};
 use crate::runtime;
 use crate::runtime::task::{self, JoinHandle, Schedule, Task};
+use crate::sync::Notify;
 use crate::util::linked_list::{Link, LinkedList};
 use crate::util::{waker_ref, Wake, WakerRef};
 
-use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
 use std::sync::Arc;
-use std::task::{Poll::Ready, Waker};
+use std::task::Poll::Ready;
 use std::time::Duration;
+use std::{cell::RefCell, sync::PoisonError};
 
 /// Executes tasks on the current thread
 pub(crate) struct BasicScheduler<P: Park> {
-    /// Inner with the dedicated parker P
-    inner: Mutex<Option<Inner<P>>>,
-
-    /// Queue of threads available to steal the dedicated parker P.
-    steal_queue: Mutex<VecDeque<Waker>>,
+    /// Inner state guarded by a mutex that is shared
+    /// between all `block_on` calls.
+    inner: Mutex<Inner<P>>,
 
     /// Sendable task spawner
     spawner: Spawner,
 }
 
 struct Inner<P: Park> {
+    scheduler: Option<Scheduler<P>>,
+    steal_queue: Arc<Notify>,
+}
+
+/// The inner scheduler that owns the task queue and the main parker P.
+struct Scheduler<P: Park> {
     /// Scheduler run queue
     ///
     /// When the scheduler is executed, the queue is removed from `self` and
@@ -89,10 +94,7 @@ const REMOTE_FIRST_INTERVAL: u8 = 31;
 // Tracks the current BasicScheduler.
 scoped_thread_local!(static CURRENT: Context);
 
-impl<P> BasicScheduler<P>
-where
-    P: Park,
-{
+impl<P: Park> BasicScheduler<P> {
     pub(crate) fn new(park: P) -> BasicScheduler<P> {
         let unpark = Box::new(park.unpark());
 
@@ -103,7 +105,7 @@ where
             }),
         };
 
-        let inner = Mutex::new(Some(Inner {
+        let scheduler = Some(Scheduler {
             tasks: Some(Tasks {
                 owned: LinkedList::new(),
                 queue: VecDeque::with_capacity(INITIAL_CAPACITY),
@@ -111,13 +113,14 @@ where
             spawner: spawner.clone(),
             tick: 0,
             park,
-        }));
+        });
 
-        BasicScheduler {
-            inner,
-            spawner,
-            steal_queue: Mutex::new(VecDeque::new()),
-        }
+        let inner = Mutex::new(Inner {
+            scheduler,
+            steal_queue: Arc::new(Notify::new()),
+        });
+
+        BasicScheduler { inner, spawner }
     }
 
     pub(crate) fn spawner(&self) -> &Spawner {
@@ -142,29 +145,39 @@ where
         } else {
             let enter = crate::runtime::enter(false);
 
-            let mut park = ParkThread::new();
+            let mut park = CachedParkThread::new();
             let waker = park.unpark().into_waker();
             let mut cx = std::task::Context::from_waker(&waker);
 
             pin!(future);
 
+            let notifier = {
+                let lock = self.inner.lock().unwrap();
+                lock.steal_queue.clone()
+            };
+
+            let mut notified = Box::pin(notifier.notified());
+
             loop {
-                if let Ready(v) = crate::coop::budget(|| future.as_mut().poll(&mut cx)) {
-                    return v;
+                if let Ready(_) = notified.as_mut().poll(&mut cx) {
+                    // Check if we can steal the dedicated parker P.
+                    //
+                    // TODO: Consider using an atomic load here intead of locking
+                    // the mutex.
+                    if let Some(mut inner) = self.take_inner() {
+                        // We will enter again on in the inner implementation below
+                        drop(enter);
+                        return inner.block_on(future);
+                    } else {
+                        // Since the notify future polled to ready, it will panic if polled again
+                        // beyond ready. To avoid this, lets create a new future. This allocation is
+                        // unfortunate but should be extremely rare.
+                        notified = Box::pin(notifier.notified());
+                    }
                 }
 
-                // Check if we can steal the dedicated parker P.
-                //
-                // TODO: Consider using an atomic load here intead of locking
-                // the mutex.
-                if let Some(mut inner) = self.take_inner() {
-                    // We will enter again on in the inner implementation below
-                    drop(enter);
-                    return inner.block_on(future);
-                } else {
-                    let waker = park.unpark().into_waker();
-                    let mut lock = self.steal_queue.lock().unwrap();
-                    lock.push_back(waker);
+                if let Ready(v) = crate::coop::budget(|| future.as_mut().poll(&mut cx)) {
+                    return v;
                 }
 
                 // Park this thread, waiting for some external wakeup: either
@@ -177,16 +190,16 @@ where
 
     fn take_inner(&self) -> Option<InnerGuard<'_, P>> {
         let mut lock = self.inner.lock().unwrap();
-        let inner = lock.take()?;
+        let inner = lock.scheduler.take()?;
 
         Some(InnerGuard {
             inner: Some(inner),
-            scheduler: &self,
+            basic_scheduler: &self,
         })
     }
 }
 
-impl<P: Park> Inner<P> {
+impl<P: Park> Scheduler<P> {
     /// Block on the future provided and drive the runtime's driver.
     fn block_on<F: Future>(&mut self, future: F) -> F::Output {
         enter(self, |scheduler, context| {
@@ -246,16 +259,16 @@ impl<P: Park> Inner<P> {
 
 /// Enter the scheduler context. This sets the queue and other necessary
 /// scheduler state in the thread-local
-fn enter<F, R, P>(scheduler: &mut Inner<P>, f: F) -> R
+fn enter<F, R, P>(scheduler: &mut Scheduler<P>, f: F) -> R
 where
-    F: FnOnce(&mut Inner<P>, &Context) -> R,
+    F: FnOnce(&mut Scheduler<P>, &Context) -> R,
     P: Park,
 {
     // Ensures the run queue is placed back in the `BasicScheduler` instance
     // once `block_on` returns.`
     struct Guard<'a, P: Park> {
         context: Option<Context>,
-        scheduler: &'a mut Inner<P>,
+        scheduler: &'a mut Scheduler<P>,
     }
 
     impl<P: Park> Drop for Guard<'_, P> {
@@ -286,14 +299,14 @@ impl<P: Park> Drop for BasicScheduler<P> {
     fn drop(&mut self) {
         // Avoid a double panic if we are currently panicking and
         // the lock may be poisoned.
-        let mut inner = if let Ok(lock) = &mut self.inner.lock() {
-            lock.take()
-                .expect("Oh no! We never placed the Inner state back, this is a bug!")
-        } else {
-            if std::thread::panicking() {
-                return;
-            } else {
-                panic!("Inner lock poisoned");
+
+        let mut inner = {
+            let mut lock = self.inner.lock().unwrap_or_else(PoisonError::into_inner);
+
+            match lock.scheduler.take() {
+                Some(inner) => inner,
+                None if std::thread::panicking() => return,
+                None => panic!("Oh no! We never placed the Inner state back, this is a bug!"),
             }
         };
 
@@ -414,8 +427,8 @@ impl Wake for Shared {
 /// back into its slot in `BasicScheduler`, even if the
 /// future panics.
 struct InnerGuard<'a, P: Park> {
-    inner: Option<Inner<P>>,
-    scheduler: &'a BasicScheduler<P>,
+    inner: Option<Scheduler<P>>,
+    basic_scheduler: &'a BasicScheduler<P>,
 }
 
 impl<P: Park> InnerGuard<'_, P> {
@@ -428,24 +441,22 @@ impl<P: Park> InnerGuard<'_, P> {
 
 impl<P: Park> Drop for InnerGuard<'_, P> {
     fn drop(&mut self) {
-        if let Some(inner) = self.inner.take() {
-            // Avoid a double panic if we are currently panicking and
-            // the lock may be poisoned.
-            if let Ok(lock) = &mut self.scheduler.inner.lock() {
-                lock.replace(inner);
-            } else {
-                if std::thread::panicking() {
-                    return;
-                } else {
-                    panic!("Inner lock poisoned");
-                }
-            }
+        if let Some(scheduler) = self.inner.take() {
+            // We can ignore the poison error here since we are
+            // just replacing the state.
+            let mut lock = self
+                .basic_scheduler
+                .inner
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
+
+            // Replace old scheduler back into the state to allow
+            // other threads to pick it up and drive it.
+            lock.scheduler.replace(scheduler);
 
             // Wake up other possible threads that could steal
             // the dedicated parker P.
-            if let Some(waker) = self.scheduler.steal_queue.lock().unwrap().pop_front() {
-                waker.wake();
-            }
+            lock.steal_queue.notify_one()
         }
     }
 }
