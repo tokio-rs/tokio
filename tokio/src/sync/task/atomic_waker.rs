@@ -141,12 +141,12 @@ impl AtomicWaker {
         }
     }
 
+    /*
     /// Registers the current waker to be notified on calls to `wake`.
-    #[cfg(feature = "io-driver")]
-    #[allow(unused)]
     pub(crate) fn register(&self, waker: Waker) {
         self.do_register(waker);
     }
+    */
 
     /// Registers the provided waker to be notified on calls to `wake`.
     ///

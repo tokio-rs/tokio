@@ -125,6 +125,8 @@ impl ScheduledIo {
     ///
     /// # Arguments
     /// - `token`: the token for this `ScheduledIo`.
+    /// - `tick`: whether setting the tick or trying to clear readiness for a
+    ///    specific tick.
     /// - `f`: a closure returning a new readiness value given the previous
     ///   readiness.
     ///
