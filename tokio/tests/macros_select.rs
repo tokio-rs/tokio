@@ -1,4 +1,5 @@
 #![allow(clippy::blacklisted_name)]
+#![deny(warnings)]
 use tokio::sync::{mpsc, oneshot};
 use tokio::task;
 use tokio_test::{assert_ok, assert_pending, assert_ready};
@@ -462,3 +463,20 @@ async fn async_never() -> ! {
         tokio::time::delay_for(Duration::from_millis(10)).await;
     }
 }
+
+// From https://github.com/tokio-rs/tokio/issues/2857
+#[tokio::test]
+async fn mut_on_left_hand_side() {
+    let v = async move {
+        let ok = async { 1 };
+        tokio::pin!(ok);
+        tokio::select! {
+            mut a = &mut ok => {
+                a += 1;
+                a
+            }
+        }
+    }.await;
+    assert_eq!(v, 2);
+}
+
