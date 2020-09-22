@@ -214,7 +214,7 @@ impl UnixStream {
         loop {
             let ev = ready!(self.io.poll_read_ready(cx))?;
 
-            // Safety: `UnixStream::read` will not peak at the maybe uinitialized bytes.
+            // Safety: `UnixStream::read` will not peek at the maybe uinitialized bytes.
             let b = unsafe {
                 &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
             };

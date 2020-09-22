@@ -268,7 +268,7 @@ impl ScheduledIo {
     pub(crate) fn clear_readiness(&self, event: ReadyEvent) {
         // This consumes the current readiness state **except** for HUP and
         // error. HUP and error are excluded because a) they are final states
-        // and never transitition out and b) both the read AND the write
+        // and never transition out and b) both the read AND the write
         // directions need to be able to obvserve these states.
         //
         // # Platform-specific behavior
@@ -282,9 +282,9 @@ impl ScheduledIo {
         // AND write. A specific case that `EPOLLERR` occurs is when the read
         // end of a pipe is closed. When this occurs, a peer blocked by
         // writing to the pipe should be notified.
-        // result isn't important
         let mask_no_hup = (event.readiness - platform::hup() - platform::error()).as_usize();
-
+        
+        // result isn't important
         let _ = self.set_readiness(None, Tick::Clear(event.tick), |curr| curr & (!mask_no_hup));
     }
 }
