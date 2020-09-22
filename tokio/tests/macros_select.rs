@@ -476,7 +476,7 @@ async fn mut_on_left_hand_side() {
                 a
             }
         }
-    }.await;
+    }
+    .await;
     assert_eq!(v, 2);
 }
-
