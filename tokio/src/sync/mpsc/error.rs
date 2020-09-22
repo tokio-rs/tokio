@@ -94,26 +94,6 @@ impl fmt::Display for TryRecvError {
 
 impl Error for TryRecvError {}
 
-// ===== ClosedError =====
-
-/// Error returned by [`Sender::poll_ready`](super::Sender::poll_ready).
-#[derive(Debug)]
-pub struct ClosedError(());
-
-impl ClosedError {
-    pub(crate) fn new() -> ClosedError {
-        ClosedError(())
-    }
-}
-
-impl fmt::Display for ClosedError {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "channel closed")
-    }
-}
-
-impl Error for ClosedError {}
-
 cfg_time! {
     // ===== SendTimeoutError =====
 

@@ -484,8 +484,11 @@ impl Signal {
     /// }
     /// ```
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
+        /*
         let _ = self.driver.poll(cx);
         self.rx.poll_recv(cx)
+        */
+        unimplemented!();
     }
 }
 

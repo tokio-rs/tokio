@@ -443,7 +443,6 @@ cfg_sync! {
     pub mod oneshot;
 
     pub(crate) mod batch_semaphore;
-    pub(crate) mod semaphore_ll;
     mod semaphore;
     pub use semaphore::{Semaphore, SemaphorePermit, OwnedSemaphorePermit};
 
