@@ -45,9 +45,6 @@ pub struct Builder {
     /// Whether or not to enable the I/O driver
     enable_io: bool,
 
-    /// Whether or not to enable the signal driver
-    enable_signal: bool,
-
     /// Whether or not to enable the time driver
     enable_time: bool,
 
@@ -101,9 +98,6 @@ impl Builder {
             // I/O defaults to "off"
             enable_io: false,
 
-            // Signal defaults to "off"
-            enable_signal: false,
-
             // Time defaults to "off"
             enable_time: false,
 
@@ -147,9 +141,6 @@ impl Builder {
     pub fn enable_all(&mut self) -> &mut Self {
         #[cfg(feature = "io-driver")]
         self.enable_io();
-        #[cfg(feature = "signal")]
-        #[cfg(not(loom))]
-        self.enable_signal();
         #[cfg(feature = "time")]
         self.enable_time();
 
@@ -371,7 +362,6 @@ impl Builder {
     fn get_cfg(&self) -> driver::Cfg {
         driver::Cfg {
             enable_io: self.enable_io,
-            enable_signal: self.enable_signal,
             enable_time: self.enable_time,
         }
     }
@@ -444,30 +434,6 @@ cfg_io_driver! {
         /// ```
         pub fn enable_io(&mut self) -> &mut Self {
             self.enable_io = true;
-            self
-        }
-    }
-}
-
-cfg_signal! {
-    impl Builder {
-        /// Enables the signal driver.
-        ///
-        /// Doing this enables using `tokio::signal` on the runtime.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// use tokio::runtime;
-        ///
-        /// let rt = runtime::Builder::new()
-        ///     .enable_io() // Required by the signal driver
-        ///     .enable_signal()
-        ///     .build()
-        ///     .unwrap();
-        /// ```
-        pub fn enable_signal(&mut self) -> &mut Self {
-            self.enable_signal = true;
             self
         }
     }

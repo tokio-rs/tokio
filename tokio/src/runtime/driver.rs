@@ -61,22 +61,17 @@ cfg_unix_and_signal! {
     type SignalDriver = crate::park::Either<crate::signal::unix::driver::Driver, IoDriver>;
     pub(crate) type SignalHandle = Option<crate::signal::unix::driver::Handle>;
 
-    fn create_signal_driver(
-        enable: bool,
-        io_driver: IoDriver,
-    ) -> io::Result<(SignalDriver, SignalHandle)> {
+    fn create_signal_driver(io_driver: IoDriver) -> io::Result<(SignalDriver, SignalHandle)> {
         use crate::park::Either;
 
-        if enable {
-            let driver = match io_driver {
-                Either::A(io_driver) => crate::signal::unix::driver::Driver::new(io_driver)?,
-                Either::B(_) => panic!("the `enable_signal` feature requires `enable_io`"),
-            };
-            let handle = driver.handle();
-
-            Ok((Either::A(driver), Some(handle)))
-        } else {
-            Ok((Either::B(io_driver), None))
+        // Enable the signal driver if IO is also enabled
+        match io_driver {
+            Either::A(io_driver) => {
+                let driver = crate::signal::unix::driver::Driver::new(io_driver)?;
+                let handle = driver.handle();
+                Ok((Either::A(driver), Some(handle)))
+            }
+            Either::B(_) => Ok((Either::B(io_driver), None)),
         }
     }
 }
@@ -85,10 +80,7 @@ cfg_neither_unix_nor_windows! {
     type SignalDriver = IoDriver;
     pub(crate) type SignalHandle = ();
 
-    fn create_signal_driver(
-        _enable: bool,
-        io_driver: IoDriver,
-    ) -> io::Result<(SignalDriver, SignalHandle)> {
+    fn create_signal_driver(io_driver: IoDriver) -> io::Result<(SignalDriver, SignalHandle)> {
         Ok((io_driver, ()))
     }
 }
@@ -158,7 +150,6 @@ pub(crate) struct Resources {
 
 pub(crate) struct Cfg {
     pub(crate) enable_io: bool,
-    pub(crate) enable_signal: bool,
     pub(crate) enable_time: bool,
 }
 
@@ -167,7 +158,7 @@ impl Driver {
         let clock = create_clock();
 
         let (io_driver, io_handle) = create_io_driver(cfg.enable_io)?;
-        let (signal_driver, signal_handle) = create_signal_driver(cfg.enable_signal, io_driver)?;
+        let (signal_driver, signal_handle) = create_signal_driver(io_driver)?;
         let (time_driver, time_handle) =
             create_time_driver(cfg.enable_time, signal_driver, clock.clone());
 
