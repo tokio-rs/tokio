@@ -1,4 +1,4 @@
-use crate::loom::sync::{Arc, Mutex};
+use crate::loom::sync::Mutex;
 use crate::runtime::handle::Handle;
 use crate::runtime::shell::Shell;
 use crate::runtime::{blocking, io, time, Callback, Runtime, Spawner};
@@ -330,7 +330,7 @@ impl Builder {
     where
         F: Fn() + Send + Sync + 'static,
     {
-        self.before_stop = Some(Arc::new(f));
+        self.before_stop = Some(std::sync::Arc::new(f));
         self
     }
 
