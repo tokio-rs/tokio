@@ -297,7 +297,8 @@ impl UnixDatagram {
     /// # }
     /// ```
     pub async fn send(&self, buf: &[u8]) -> io::Result<usize> {
-        self.do_io(mio::Ready::writable(), |sock| sock.send(buf))
+        self.io
+            .async_io(mio::Ready::writable(), |sock| sock.send(buf))
             .await
     }
 
@@ -395,7 +396,8 @@ impl UnixDatagram {
     /// # }
     /// ```
     pub async fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
-        self.do_io(mio::Ready::readable(), |sock| sock.recv(buf))
+        self.io
+            .async_io(mio::Ready::readable(), |sock| sock.recv(buf))
             .await
     }
 
@@ -464,10 +466,11 @@ impl UnixDatagram {
     where
         P: AsRef<Path>,
     {
-        self.do_io(mio::Ready::writable(), |sock| {
-            sock.send_to(buf, target.as_ref())
-        })
-        .await
+        self.io
+            .async_io(mio::Ready::writable(), |sock| {
+                sock.send_to(buf, target.as_ref())
+            })
+            .await
     }
 
     /// Receives data from the socket.
@@ -504,7 +507,8 @@ impl UnixDatagram {
     /// # }
     /// ```
     pub async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        self.do_io(mio::Ready::readable(), |sock| sock.recv_from(buf))
+        self.io
+            .async_io(mio::Ready::readable(), |sock| sock.recv_from(buf))
             .await
     }
 
@@ -694,22 +698,6 @@ impl UnixDatagram {
     /// ```
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         self.io.get_ref().shutdown(how)
-    }
-
-    async fn do_io<F, R>(&self, interest: mio::Ready, mut op: F) -> io::Result<R>
-    where
-        F: FnMut(&mio_uds::UnixDatagram) -> io::Result<R>,
-    {
-        loop {
-            let event = self.io.readiness(interest).await?;
-
-            match op(self.io.get_ref()) {
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    self.io.clear_readiness(event);
-                }
-                x => return x,
-            }
-        }
     }
 }
 

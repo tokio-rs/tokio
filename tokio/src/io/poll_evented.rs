@@ -225,6 +225,22 @@ cfg_io_readiness! {
         pub(crate) async fn readiness(&self, interest: mio::Ready) -> io::Result<ReadyEvent> {
             self.registration.readiness(interest).await
         }
+
+        pub(crate) async fn async_io<F, R>(&self, interest: mio::Ready, mut op: F) -> io::Result<R>
+        where
+            F: FnMut(&E) -> io::Result<R>,
+        {
+            loop {
+                let event = self.readiness(interest).await?;
+
+                match op(self.get_ref()) {
+                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                        self.clear_readiness(event);
+                    }
+                    x => return x,
+                }
+            }
+        }
     }
 }
 

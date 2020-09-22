@@ -102,7 +102,8 @@ impl UdpSocket {
     ///
     /// [`connect`]: method@Self::connect
     pub async fn send(&self, buf: &[u8]) -> io::Result<usize> {
-        self.do_io(mio::Ready::writable(), |sock| sock.send(buf))
+        self.io
+            .async_io(mio::Ready::writable(), |sock| sock.send(buf))
             .await
     }
 
@@ -133,7 +134,8 @@ impl UdpSocket {
     ///
     /// [`connect`]: method@Self::connect
     pub async fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
-        self.do_io(mio::Ready::readable(), |sock| sock.recv(buf))
+        self.io
+            .async_io(mio::Ready::readable(), |sock| sock.recv(buf))
             .await
     }
 
@@ -170,7 +172,8 @@ impl UdpSocket {
     }
 
     async fn send_to_addr(&self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
-        self.do_io(mio::Ready::writable(), |sock| sock.send_to(buf, target))
+        self.io
+            .async_io(mio::Ready::writable(), |sock| sock.send_to(buf, target))
             .await
     }
 
@@ -181,24 +184,9 @@ impl UdpSocket {
     /// to hold the message bytes. If a message is too long to fit in the supplied
     /// buffer, excess bytes may be discarded.
     pub async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        self.do_io(mio::Ready::readable(), |sock| sock.recv_from(buf))
+        self.io
+            .async_io(mio::Ready::readable(), |sock| sock.recv_from(buf))
             .await
-    }
-
-    async fn do_io<F, R>(&self, interest: mio::Ready, mut op: F) -> io::Result<R>
-    where
-        F: FnMut(&mio::net::UdpSocket) -> io::Result<R>,
-    {
-        loop {
-            let event = self.io.readiness(interest).await?;
-
-            match op(self.io.get_ref()) {
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    self.io.clear_readiness(event);
-                }
-                x => return x,
-            }
-        }
     }
 
     /// Gets the value of the `SO_BROADCAST` option for this socket.

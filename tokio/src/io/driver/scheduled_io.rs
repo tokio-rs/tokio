@@ -283,7 +283,7 @@ impl ScheduledIo {
         // end of a pipe is closed. When this occurs, a peer blocked by
         // writing to the pipe should be notified.
         let mask_no_hup = (event.readiness - platform::hup() - platform::error()).as_usize();
-        
+
         // result isn't important
         let _ = self.set_readiness(None, Tick::Clear(event.tick), |curr| curr & (!mask_no_hup));
     }
