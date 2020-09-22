@@ -91,7 +91,7 @@ jobs:
         run: cargo test --features full
         working-directory: tokio
         env:
-          RUSTFLAGS: '--cfg tokio_unstable'
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
   miri:
     name: miri
@@ -156,7 +156,7 @@ jobs:
       - name: check --each-feature --unstable
         run: cargo hack check --all --each-feature -Z avoid-dev-deps
         env:
-          RUSTFLAGS: --cfg tokio_unstable
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
   minrust:
     name: minrust
@@ -239,6 +239,6 @@ jobs:
         run: cargo test --lib --release --features full -- --nocapture $SCOPE
         working-directory: tokio
         env:
-          RUSTFLAGS: --cfg loom --cfg tokio_unstable
+          RUSTFLAGS: --cfg loom --cfg tokio_unstable -Dwarnings
           LOOM_MAX_PREEMPTIONS: 2
           SCOPE: ${{ matrix.scope }}
