@@ -8,6 +8,9 @@ edition = "2018"
 tokio = { version = "0.3.0", path = "../tokio", features = ["full"] }
 bencher = "0.1.5"
 
+[target.'cfg(unix)'.dependencies]
+libc = "0.2.42"
+
 [[bench]]
 name = "spawn"
 path = "spawn.rs"
@@ -32,4 +35,9 @@ harness = false
 [[bench]]
 name = "sync_semaphore"
 path = "sync_semaphore.rs"
+harness = false
+
+[[bench]]
+name = "signal"
+path = "signal.rs"
 harness = false

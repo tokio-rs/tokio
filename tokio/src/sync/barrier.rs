@@ -110,9 +110,11 @@ impl Barrier {
         let mut wait = self.wait.clone();
 
         loop {
+            let _ = wait.changed().await;
+
             // note that the first time through the loop, this _will_ yield a generation
             // immediately, since we cloned a receiver that has never seen any values.
-            if wait.recv().await >= generation {
+            if *wait.borrow() >= generation {
                 break;
             }
         }

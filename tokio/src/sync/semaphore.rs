@@ -1,7 +1,7 @@
 use super::batch_semaphore as ll; // low level implementation
 use std::sync::Arc;
 
-/// Counting semaphore performing asynchronous permit aquisition.
+/// Counting semaphore performing asynchronous permit acquisition.
 ///
 /// A semaphore maintains a set of permits. Permits are used to synchronize
 /// access to a shared resource. A semaphore differs from a mutex in that it
@@ -71,6 +71,15 @@ impl Semaphore {
     pub fn new(permits: usize) -> Self {
         Self {
             ll_sem: ll::Semaphore::new(permits),
+        }
+    }
+
+    /// Creates a new semaphore with the initial number of permits.
+    #[cfg(all(feature = "parking_lot", not(all(loom, test))))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "parking_lot")))]
+    pub const fn const_new(permits: usize) -> Self {
+        Self {
+            ll_sem: ll::Semaphore::const_new(permits),
         }
     }
 
