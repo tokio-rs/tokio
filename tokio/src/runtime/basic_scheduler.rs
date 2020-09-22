@@ -26,7 +26,7 @@ pub(crate) struct BasicScheduler<P: Park> {
 
 struct Inner<P: Park> {
     scheduler: Option<Scheduler<P>>,
-    steal_queue: Arc<Notify>,
+    notify: Arc<Notify>,
 }
 
 /// The inner scheduler that owns the task queue and the main parker P.
@@ -117,7 +117,7 @@ impl<P: Park> BasicScheduler<P> {
 
         let inner = Mutex::new(Inner {
             scheduler,
-            steal_queue: Arc::new(Notify::new()),
+            notify: Arc::new(Notify::new()),
         });
 
         BasicScheduler { inner, spawner }
@@ -153,7 +153,7 @@ impl<P: Park> BasicScheduler<P> {
 
             let notifier = {
                 let lock = self.inner.lock().unwrap();
-                lock.steal_queue.clone()
+                lock.notify.clone()
             };
 
             let mut notified = Box::pin(notifier.notified());
@@ -456,7 +456,7 @@ impl<P: Park> Drop for InnerGuard<'_, P> {
 
             // Wake up other possible threads that could steal
             // the dedicated parker P.
-            lock.steal_queue.notify_one()
+            lock.notify.notify_one()
         }
     }
 }
