@@ -1,5 +1,4 @@
 #![allow(clippy::blacklisted_name)]
-#![deny(warnings)]
 use tokio::sync::{mpsc, oneshot};
 use tokio::task;
 use tokio_test::{assert_ok, assert_pending, assert_ready};
