@@ -1,6 +1,5 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::future::AtomicWaker;
-use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Arc;
 use crate::sync::mpsc::error::TryRecvError;
@@ -48,9 +47,6 @@ pub(crate) trait Semaphore {
 struct Chan<T, S> {
     /// Notifies all tasks listening for the receiver being dropped
     notify_rx_closed: Notify,
-
-    /// Indicates whether the receiver has been dropped
-    rx_closed: AtomicBool,
 
     /// Handle to the push half of the lock-free list.
     tx: list::Tx<T>,
@@ -110,7 +106,6 @@ pub(crate) fn channel<T, S: Semaphore>(semaphore: S) -> (Tx<T, S>, Rx<T, S>) {
     let (tx, rx) = list::channel();
 
     let chan = Arc::new(Chan {
-        rx_closed: AtomicBool::new(false),
         notify_rx_closed: Notify::new(),
         tx,
         semaphore,
@@ -167,7 +162,7 @@ impl<T, S> Tx<T, S> {
             return;
         }
 
-        if self.inner.rx_closed.load(SeqCst) {
+        if self.inner.semaphore.is_closed() {
             return;
         }
         notified.await;
@@ -224,7 +219,6 @@ impl<T, S: Semaphore> Rx<T, S> {
         });
 
         self.inner.semaphore.close();
-        self.inner.rx_closed.store(true, SeqCst);
         self.inner.notify_rx_closed.notify_waiters();
     }
 
