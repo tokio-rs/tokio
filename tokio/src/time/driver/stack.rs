@@ -19,13 +19,12 @@ impl Default for Stack {
 impl wheel::Stack for Stack {
     type Owned = Arc<Entry>;
     type Borrowed = Entry;
-    type Store = ();
 
     fn is_empty(&self) -> bool {
         self.head.is_none()
     }
 
-    fn push(&mut self, entry: Self::Owned, _: &mut Self::Store) {
+    fn push(&mut self, entry: Self::Owned) {
         // Get a pointer to the entry to for the prev link
         let ptr: *const Entry = &*entry as *const _;
 
@@ -56,7 +55,7 @@ impl wheel::Stack for Stack {
     }
 
     /// Pops an item from the stack
-    fn pop(&mut self, _: &mut ()) -> Option<Arc<Entry>> {
+    fn pop(&mut self) -> Option<Arc<Entry>> {
         let entry = self.head.take();
 
         unsafe {
@@ -74,7 +73,7 @@ impl wheel::Stack for Stack {
         entry
     }
 
-    fn remove(&mut self, entry: &Entry, _: &mut ()) {
+    fn remove(&mut self, entry: &Entry) {
         unsafe {
             // Ensure that the entry is in fact contained by the stack
             debug_assert!({
@@ -115,7 +114,7 @@ impl wheel::Stack for Stack {
         }
     }
 
-    fn when(item: &Entry, _: &()) -> u64 {
+    fn when(item: &Entry) -> u64 {
         item.when_internal().expect("invalid internal state")
     }
 }

@@ -164,7 +164,7 @@ where
             crate::time::Round::Down,
         );
 
-        while let Some(entry) = self.wheel.poll(now, &mut ()) {
+        while let Some(entry) = self.wheel.poll(now) {
             let when = entry.when_internal().expect("invalid internal entry state");
 
             // Fire the entry
@@ -204,7 +204,7 @@ where
     }
 
     fn clear_entry(&mut self, entry: &Arc<Entry>) {
-        self.wheel.remove(entry, &mut ());
+        self.wheel.remove(entry);
         entry.set_when_internal(None);
     }
 
@@ -214,7 +214,7 @@ where
 
         entry.set_when_internal(Some(when));
 
-        match self.wheel.insert(when, entry, &mut ()) {
+        match self.wheel.insert(when, entry) {
             Ok(_) => {}
             Err((entry, InsertError::Elapsed)) => {
                 // The entry's deadline has elapsed, so fire it and update the
@@ -319,7 +319,7 @@ where
         // Clear the wheel, using u64::MAX allows us to drain everything
         let end_of_time = u64::MAX;
 
-        while let Some(entry) = self.wheel.poll(end_of_time, &mut ()) {
+        while let Some(entry) = self.wheel.poll(end_of_time) {
             entry.error(Error::shutdown());
         }
 

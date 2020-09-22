@@ -173,17 +173,17 @@ impl<T: Stack> Level<T> {
         Some(slot)
     }
 
-    pub(crate) fn add_entry(&mut self, when: u64, item: T::Owned, store: &mut T::Store) {
+    pub(crate) fn add_entry(&mut self, when: u64, item: T::Owned) {
         let slot = slot_for(when, self.level);
 
-        self.slot[slot].push(item, store);
+        self.slot[slot].push(item);
         self.occupied |= occupied_bit(slot);
     }
 
-    pub(crate) fn remove_entry(&mut self, when: u64, item: &T::Borrowed, store: &mut T::Store) {
+    pub(crate) fn remove_entry(&mut self, when: u64, item: &T::Borrowed) {
         let slot = slot_for(when, self.level);
 
-        self.slot[slot].remove(item, store);
+        self.slot[slot].remove(item);
 
         if self.slot[slot].is_empty() {
             // The bit is currently set
@@ -194,8 +194,8 @@ impl<T: Stack> Level<T> {
         }
     }
 
-    pub(crate) fn pop_entry_slot(&mut self, slot: usize, store: &mut T::Store) -> Option<T::Owned> {
-        let ret = self.slot[slot].pop(store);
+    pub(crate) fn pop_entry_slot(&mut self, slot: usize) -> Option<T::Owned> {
+        let ret = self.slot[slot].pop();
 
         if ret.is_some() && self.slot[slot].is_empty() {
             // The bit is currently set

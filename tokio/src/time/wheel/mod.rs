@@ -93,7 +93,6 @@ where
         &mut self,
         when: u64,
         item: T::Owned,
-        store: &mut T::Store,
     ) -> Result<(), (T::Owned, InsertError)> {
         if when <= self.elapsed {
             return Err((item, InsertError::Elapsed));
@@ -104,7 +103,7 @@ where
         // Get the level at which the entry should be stored
         let level = self.level_for(when);
 
-        self.levels[level].add_entry(when, item, store);
+        self.levels[level].add_entry(when, item);
 
         debug_assert!({
             self.levels[level]
@@ -117,11 +116,11 @@ where
     }
 
     /// Remove `item` from thee timing wheel.
-    pub(crate) fn remove(&mut self, item: &T::Borrowed, store: &mut T::Store) {
-        let when = T::when(item, store);
+    pub(crate) fn remove(&mut self, item: &T::Borrowed) {
+        let when = T::when(item);
         let level = self.level_for(when);
 
-        self.levels[level].remove_entry(when, item, store);
+        self.levels[level].remove_entry(when, item);
     }
 
     /// Instant at which to poll
@@ -130,7 +129,7 @@ where
     }
 
     /// Advances the timer up to the instant represented by `now`.
-    pub(crate) fn poll(&mut self, now: u64, store: &mut T::Store) -> Option<T::Owned> {
+    pub(crate) fn poll(&mut self, now: u64) -> Option<T::Owned> {
         loop {
             // under what circumstances is poll.expiration Some vs. None?
             let expiration = self.next_expiration().and_then(|expiration| {
@@ -143,7 +142,7 @@ where
 
             match expiration {
                 Some(ref expiration) => {
-                    if let Some(item) = self.poll_expiration(expiration, store) {
+                    if let Some(item) = self.poll_expiration(expiration) {
                         return Some(item);
                     }
 
@@ -199,19 +198,18 @@ where
     pub(crate) fn poll_expiration(
         &mut self,
         expiration: &Expiration,
-        store: &mut T::Store,
     ) -> Option<T::Owned> {
-        while let Some(item) = self.pop_entry(expiration, store) {
+        while let Some(item) = self.pop_entry(expiration) {
             if expiration.level == 0 {
-                debug_assert_eq!(T::when(item.borrow(), store), expiration.deadline);
+                debug_assert_eq!(T::when(item.borrow()), expiration.deadline);
 
                 return Some(item);
             } else {
-                let when = T::when(item.borrow(), store);
+                let when = T::when(item.borrow());
 
                 let next_level = expiration.level - 1;
 
-                self.levels[next_level].add_entry(when, item, store);
+                self.levels[next_level].add_entry(when, item);
             }
         }
 
@@ -231,8 +229,8 @@ where
         }
     }
 
-    fn pop_entry(&mut self, expiration: &Expiration, store: &mut T::Store) -> Option<T::Owned> {
-        self.levels[expiration.level].pop_entry_slot(expiration.slot, store)
+    fn pop_entry(&mut self, expiration: &Expiration) -> Option<T::Owned> {
+        self.levels[expiration.level].pop_entry_slot(expiration.slot)
     }
 
     fn level_for(&self, when: u64) -> usize {

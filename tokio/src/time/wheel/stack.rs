@@ -8,19 +8,16 @@ pub(crate) trait Stack: Default {
     /// Borrowed item
     type Borrowed;
 
-    /// Item storage, this allows a slab to be used instead of just the heap
-    type Store;
-
     /// Returns `true` if the stack is empty
     fn is_empty(&self) -> bool;
 
     /// Push an item onto the stack
-    fn push(&mut self, item: Self::Owned, store: &mut Self::Store);
+    fn push(&mut self, item: Self::Owned);
 
     /// Pop an item from the stack
-    fn pop(&mut self, store: &mut Self::Store) -> Option<Self::Owned>;
+    fn pop(&mut self) -> Option<Self::Owned>;
 
-    fn remove(&mut self, item: &Self::Borrowed, store: &mut Self::Store);
+    fn remove(&mut self, item: &Self::Borrowed);
 
-    fn when(item: &Self::Borrowed, store: &Self::Store) -> u64;
+    fn when(item: &Self::Borrowed) -> u64;
 }
