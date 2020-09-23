@@ -207,10 +207,10 @@ cfg_io_driver! {
     pub(crate) mod driver;
 
     mod poll_evented;
-    pub use poll_evented::PollEvented;
+    #[cfg(not(loom))]
+    pub(crate) use poll_evented::PollEvented;
 
     mod registration;
-    pub use registration::Registration;
 }
 
 cfg_io_std! {

@@ -129,7 +129,6 @@ macro_rules! cfg_io_driver {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "io-driver")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "io-driver")))]
             $item
         )*
     }
@@ -139,6 +138,15 @@ macro_rules! cfg_not_io_driver {
     ($($item:item)*) => {
         $(
             #[cfg(not(feature = "io-driver"))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_io_readiness {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "io-readiness")]
             $item
         )*
     }

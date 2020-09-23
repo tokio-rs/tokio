@@ -141,13 +141,12 @@ impl AtomicWaker {
         }
     }
 
+    /*
     /// Registers the current waker to be notified on calls to `wake`.
-    ///
-    /// This is the same as calling `register_task` with `task::current()`.
-    #[cfg(feature = "io-driver")]
     pub(crate) fn register(&self, waker: Waker) {
         self.do_register(waker);
     }
+    */
 
     /// Registers the provided waker to be notified on calls to `wake`.
     ///

@@ -3,7 +3,7 @@ cfg_io_driver! {
     pub(crate) mod slab;
 }
 
-#[cfg(any(feature = "sync", feature = "rt-core"))]
+#[cfg(any(feature = "io-readiness", feature = "sync", feature = "rt-core"))]
 pub(crate) mod linked_list;
 
 #[cfg(any(feature = "rt-threaded", feature = "macros", feature = "stream"))]
