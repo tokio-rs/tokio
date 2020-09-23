@@ -296,7 +296,7 @@ enum Kind {
 
     /// Execute all tasks on the current-thread.
     #[cfg(feature = "rt-core")]
-    Basic(Mutex<Option<BasicScheduler<driver::Driver>>>),
+    Basic(BasicScheduler<driver::Driver>),
 
     /// Execute tasks across multiple threads.
     #[cfg(feature = "rt-threaded")]
@@ -401,7 +401,7 @@ impl Runtime {
             Kind::Shell(_) => panic!("task execution disabled"),
             #[cfg(feature = "rt-threaded")]
             Kind::ThreadPool(exec) => exec.spawn(future),
-            Kind::Basic(_exec) => self.handle.spawner.spawn(future),
+            Kind::Basic(exec) => exec.spawn(future),
         }
     }
 
@@ -461,24 +461,7 @@ impl Runtime {
                 }
             }
             #[cfg(feature = "rt-core")]
-            Kind::Basic(exec) => {
-                // TODO(lucio): clean this up and move this impl into
-                // `basic_scheduler.rs`, this is hacky and bad but will work for
-                // now.
-                let exec_temp = {
-                    let mut lock = exec.lock().unwrap();
-                    lock.take()
-                };
-
-                if let Some(mut exec_temp) = exec_temp {
-                    let res = exec_temp.block_on(future);
-                    exec.lock().unwrap().replace(exec_temp);
-                    res
-                } else {
-                    let mut enter = crate::runtime::enter(true);
-                    enter.block_on(future).unwrap()
-                }
-            }
+            Kind::Basic(exec) => exec.block_on(future),
             #[cfg(feature = "rt-threaded")]
             Kind::ThreadPool(exec) => exec.block_on(future),
         })
