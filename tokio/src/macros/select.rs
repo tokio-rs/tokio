@@ -404,6 +404,7 @@ macro_rules! select {
                                 // The future returned a value, check if matches
                                 // the specified pattern.
                                 #[allow(unused_variables)]
+                                #[allow(unused_mut)]
                                 match &out {
                                     $bind => {}
                                     _ => continue,

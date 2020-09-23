@@ -209,7 +209,7 @@ mod group_b {
     #[test]
     fn complete_block_on_under_load() {
         loom::model(|| {
-            let mut pool = mk_pool(1);
+            let pool = mk_pool(1);
 
             pool.block_on(async {
                 // Trigger a re-schedule

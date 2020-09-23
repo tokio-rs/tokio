@@ -138,6 +138,10 @@ impl<T> Receiver<T> {
         poll_fn(|cx| self.chan.recv(cx)).await
     }
 
+    pub(crate) fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        self.chan.recv(cx)
+    }
+
     /// Blocking receive to call outside of asynchronous contexts.
     ///
     /// # Panics
