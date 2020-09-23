@@ -1,4 +1,4 @@
-use crate::runtime::{blocking, context, io, time, Spawner};
+use crate::runtime::{blocking, context, driver, Spawner};
 
 /// Handle to the runtime.
 ///
@@ -11,13 +11,16 @@ pub(crate) struct Handle {
     pub(super) spawner: Spawner,
 
     /// Handles to the I/O drivers
-    pub(super) io_handle: io::Handle,
+    pub(super) io_handle: driver::IoHandle,
+
+    /// Handles to the signal drivers
+    pub(super) signal_handle: driver::SignalHandle,
 
     /// Handles to the time drivers
-    pub(super) time_handle: time::Handle,
+    pub(super) time_handle: driver::TimeHandle,
 
     /// Source of `Instant::now()`
-    pub(super) clock: time::Clock,
+    pub(super) clock: driver::Clock,
 
     /// Blocking pool spawner
     pub(super) blocking_spawner: blocking::Spawner,

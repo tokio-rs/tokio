@@ -366,23 +366,25 @@ impl<T> DelayQueue<T> {
     /// This function is identical to `insert_at`, but takes a `Duration`
     /// instead of an `Instant`.
     ///
-    /// `value` is stored in the queue until `when` is reached. At which point,
-    /// `value` will be returned from [`poll_expired`]. If `when` has already been
-    /// reached, then `value` is immediately made available to poll.
+    /// `value` is stored in the queue until `timeout` duration has
+    /// elapsed after `insert` was called. At that point, `value` will
+    /// be returned from [`poll_expired`]. If `timeout` a Duration of
+    /// zero, then `value` is immediately made available to poll.
     ///
-    /// The return value represents the insertion and is used at an argument to
-    /// [`remove`] and [`reset`]. Note that [`Key`] is token and is reused once
-    /// `value` is removed from the queue either by calling [`poll_expired`] after
-    /// `when` is reached or by calling [`remove`]. At this point, the caller
-    /// must take care to not use the returned [`Key`] again as it may reference
-    /// a different item in the queue.
+    /// The return value represents the insertion and is used as an
+    /// argument to [`remove`] and [`reset`]. Note that [`Key`] is a
+    /// token and is reused once `value` is removed from the queue
+    /// either by calling [`poll_expired`] after `timeout` has elapsed
+    /// or by calling [`remove`]. At this point, the caller must not
+    /// use the returned [`Key`] again as it may reference a different
+    /// item in the queue.
     ///
     /// See [type] level documentation for more details.
     ///
     /// # Panics
     ///
-    /// This function panics if `timeout` is greater than the maximum supported
-    /// duration.
+    /// This function panics if `timeout` is greater than the maximum
+    /// duration supported by the timer in the current `Runtime`.
     ///
     /// # Examples
     ///

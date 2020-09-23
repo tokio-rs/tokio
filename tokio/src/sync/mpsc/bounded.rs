@@ -49,8 +49,12 @@ impl<T> fmt::Debug for Receiver<T> {
     }
 }
 
-/// Creates a bounded mpsc channel for communicating between asynchronous tasks,
-/// returning the sender/receiver halves.
+/// Creates a bounded mpsc channel for communicating between asynchronous tasks
+/// with backpressure.
+///
+/// The channel will buffer up to the provided number of messages.  Once the
+/// buffer is full, attempts to `send` new messages will wait until a message is
+/// received from the channel. The provided buffer capacity must be at least 1.
 ///
 /// All data sent on `Sender` will become available on `Receiver` in the same
 /// order as it was sent.
@@ -61,6 +65,10 @@ impl<T> fmt::Debug for Receiver<T> {
 /// If the `Receiver` is disconnected while trying to `send`, the `send` method
 /// will return a `SendError`. Similarly, if `Sender` is disconnected while
 /// trying to `recv`, the `recv` method will return a `RecvError`.
+///
+/// # Panics
+///
+/// Panics if the buffer capacity is 0.
 ///
 /// # Examples
 ///
@@ -184,8 +192,6 @@ impl<T> Receiver<T> {
     ///     sync_code.join().unwrap()
     /// }
     /// ```
-    #[cfg(feature = "rt-core")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "rt-core")))]
     pub fn blocking_recv(&mut self) -> Option<T> {
         let mut enter_handle = crate::runtime::enter::enter(false);
         enter_handle.block_on(self.recv()).unwrap()
@@ -456,8 +462,6 @@ impl<T> Sender<T> {
     ///     sync_code.join().unwrap()
     /// }
     /// ```
-    #[cfg(feature = "rt-core")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "rt-core")))]
     pub fn blocking_send(&mut self, value: T) -> Result<(), SendError<T>> {
         let mut enter_handle = crate::runtime::enter::enter(false);
         enter_handle.block_on(self.send(value)).unwrap()

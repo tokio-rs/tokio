@@ -11,7 +11,7 @@ unsafe impl Send for AtomicUsize {}
 unsafe impl Sync for AtomicUsize {}
 
 impl AtomicUsize {
-    pub(crate) fn new(val: usize) -> AtomicUsize {
+    pub(crate) const fn new(val: usize) -> AtomicUsize {
         let inner = UnsafeCell::new(std::sync::atomic::AtomicUsize::new(val));
         AtomicUsize { inner }
     }

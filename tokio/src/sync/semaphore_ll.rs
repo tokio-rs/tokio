@@ -910,7 +910,7 @@ impl Waiter {
     }
 
     /// Try to decrement the number of permits to acquire. This returns the
-    /// actual number of permits that were decremented. The delta betweeen `n`
+    /// actual number of permits that were decremented. The delta between `n`
     /// and the return has been assigned to the permit and the caller must
     /// assign these back to the semaphore.
     fn try_dec_permits_to_acquire(&self, n: usize) -> usize {

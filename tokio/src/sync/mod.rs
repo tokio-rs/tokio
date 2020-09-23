@@ -20,7 +20,7 @@
 //! few flavors of channels provided by Tokio. Each channel flavor supports
 //! different message passing patterns. When a channel supports multiple
 //! producers, many separate tasks may **send** messages. When a channel
-//! supports muliple consumers, many different separate tasks may **receive**
+//! supports multiple consumers, many different separate tasks may **receive**
 //! messages.
 //!
 //! Tokio provides many different channel flavors as different message passing
@@ -355,10 +355,8 @@
 //!             let op = my_async_operation();
 //!             tokio::pin!(op);
 //!
-//!             // Receive the **initial** configuration value. As this is the
-//!             // first time the config is received from the watch, it will
-//!             // always complete immediatedly.
-//!             let mut conf = rx.recv().await;
+//!             // Get the initial config value
+//!             let mut conf = rx.borrow().clone();
 //!
 //!             let mut op_start = Instant::now();
 //!             let mut delay = time::delay_until(op_start + conf.timeout);
@@ -375,8 +373,8 @@
 //!                         // Restart the timeout
 //!                         delay = time::delay_until(op_start + conf.timeout);
 //!                     }
-//!                     new_conf = rx.recv() => {
-//!                         conf = new_conf;
+//!                     _ = rx.changed() => {
+//!                         conf = rx.borrow().clone();
 //!
 //!                         // The configuration has been updated. Update the
 //!                         // `delay` using the new `timeout` value.
@@ -399,14 +397,14 @@
 //! }
 //! ```
 //!
-//! [`watch` channel]: crate::sync::watch
-//! [`broadcast` channel]: crate::sync::broadcast
+//! [`watch` channel]: mod@crate::sync::watch
+//! [`broadcast` channel]: mod@crate::sync::broadcast
 //!
 //! # State synchronization
 //!
 //! The remaining synchronization primitives focus on synchronizing state.
 //! These are asynchronous equivalents to versions provided by `std`. They
-//! operate in a similar way as their `std` counterparts parts but will wait
+//! operate in a similar way as their `std` counterparts but will wait
 //! asynchronously instead of blocking the thread.
 //!
 //! * [`Barrier`](Barrier) Ensures multiple tasks will wait for each other to

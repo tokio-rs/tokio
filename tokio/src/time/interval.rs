@@ -159,7 +159,6 @@ impl Interval {
     ///     // approximately 20ms have elapsed.
     /// }
     /// ```
-    #[allow(clippy::should_implement_trait)] // TODO: rename (tokio-rs/tokio#1261)
     pub async fn tick(&mut self) -> Instant {
         poll_fn(|cx| self.poll_tick(cx)).await
     }

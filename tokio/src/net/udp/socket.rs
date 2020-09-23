@@ -125,7 +125,7 @@ impl UdpSocket {
     /// should ensure that when the remote cannot receive, the
     /// [`ErrorKind::WouldBlock`] is properly handled.
     ///
-    /// [`ErrorKind::WouldBlock`]: std::io::error::ErrorKind::WouldBlock
+    /// [`ErrorKind::WouldBlock`]: std::io::ErrorKind::WouldBlock
     pub fn try_send(&self, buf: &[u8]) -> io::Result<usize> {
         self.io.get_ref().send(buf)
     }
@@ -209,7 +209,7 @@ impl UdpSocket {
     /// [`ErrorKind::WouldBlock`] is properly handled. An error can also occur
     /// if the IP version of the socket does not match that of `target`.
     ///
-    /// [`ErrorKind::WouldBlock`]: std::io::error::ErrorKind::WouldBlock
+    /// [`ErrorKind::WouldBlock`]: std::io::ErrorKind::WouldBlock
     pub fn try_send_to(&self, buf: &[u8], target: SocketAddr) -> io::Result<usize> {
         self.io.get_ref().send_to(buf, &target)
     }

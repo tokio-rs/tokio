@@ -157,6 +157,44 @@ impl<T> JoinHandle<T> {
             _p: PhantomData,
         }
     }
+
+    /// Abort the task associated with the handle.
+    ///
+    /// Awaiting a cancelled task might complete as usual if the task was
+    /// already completed at the time it was cancelled, but most likely it
+    /// will complete with a `Err(JoinError::Cancelled)`.
+    ///
+    /// ```rust
+    /// use tokio::time;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///    let mut handles = Vec::new();
+    ///
+    ///    handles.push(tokio::spawn(async {
+    ///       time::delay_for(time::Duration::from_secs(10)).await;
+    ///       true
+    ///    }));
+    ///
+    ///    handles.push(tokio::spawn(async {
+    ///       time::delay_for(time::Duration::from_secs(10)).await;
+    ///       false
+    ///    }));
+    ///
+    ///    for handle in &handles {
+    ///        handle.abort();
+    ///    }
+    ///
+    ///    for handle in handles {
+    ///        assert!(handle.await.unwrap_err().is_cancelled());
+    ///    }
+    /// }
+    /// ```
+    pub fn abort(&self) {
+        if let Some(raw) = self.raw {
+            raw.shutdown();
+        }
+    }
 }
 
 impl<T> Unpin for JoinHandle<T> {}
