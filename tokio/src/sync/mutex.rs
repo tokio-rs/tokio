@@ -325,6 +325,30 @@ impl<T: ?Sized> Mutex<T> {
         }
     }
 
+    /// Returns a mutable reference to the underlying data.
+    ///
+    /// Since this call borrows the `Mutex` mutably, no actual locking needs to
+    /// take place -- the mutable borrow statically guarantees no locks exist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::Mutex;
+    ///
+    /// fn main() {
+    ///     let mut mutex = Mutex::new(1);
+    ///
+    ///     let n = mutex.get_mut();
+    ///     *n = 2;
+    /// }
+    /// ```
+    pub fn get_mut(&mut self) -> &mut T {
+        unsafe {
+            // Safety: This is https://github.com/rust-lang/rust/pull/76936
+            &mut *self.c.get()
+        }
+    }
+
     /// Attempts to acquire the lock, and returns [`TryLockError`] if the lock
     /// is currently held somewhere else.
     ///
