@@ -18,7 +18,12 @@ pub struct Sender<T> {
     chan: chan::Tx<T, Semaphore>,
 }
 
-/// Permit to send one value into the channel
+/// Permit to send one value into the channel.
+///
+/// `Permit` values are returned by [`Sender::reserve()`] and are used to
+/// guarantee channel capacity before generating a message to send.
+///
+/// [`Sender::reserve()`]: Sender::reserve
 pub struct Permit<'a, T> {
     chan: &'a chan::Tx<T, Semaphore>,
 }
@@ -196,7 +201,40 @@ impl<T> Receiver<T> {
     /// Closes the receiving half of a channel, without dropping it.
     ///
     /// This prevents any further messages from being sent on the channel while
-    /// still enabling the receiver to drain messages that are buffered.
+    /// still enabling the receiver to drain messages that are buffered. Any
+    /// outstanding [`Permit`] values will still be able to send messages.
+    ///
+    /// In order to guarantee no messages are dropped, after calling `close()`,
+    /// `recv()` must be called until `None` is returned.
+    ///
+    /// [`Permit`]: Permit
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::channel(20);
+    ///
+    ///     tokio::spawn(async move {
+    ///         let mut i = 0;
+    ///         while let Ok(permit) = tx.reserve().await {
+    ///             permit.send(i);
+    ///             i += 1;
+    ///         }
+    ///     });
+    ///
+    ///     rx.close();
+    ///
+    ///     while let Some(msg) = rx.recv().await {
+    ///         println!("got {}", msg);
+    ///     }
+    ///
+    ///     // Channel closed and no messages are lost.
+    /// }
+    /// ```
     pub fn close(&mut self) {
         self.chan.close();
     }
@@ -274,7 +312,7 @@ impl<T> Sender<T> {
     /// ```
     pub async fn send(&self, value: T) -> Result<(), SendError<T>> {
         match self.reserve().await {
-            Ok(permit) => permit.send(value),
+            Ok(permit) => Ok(permit.send(value)),
             Err(_) => Err(SendError(value)),
         }
     }
@@ -411,10 +449,7 @@ impl<T> Sender<T> {
             Ok(Ok(permit)) => permit,
         };
 
-        match permit.send(value) {
-            Ok(()) => Ok(()),
-            Err(SendError(value)) => Err(SendTimeoutError::Closed(value)),
-        }
+        Ok(permit.send(value))
     }
 
     /// Blocking send to call outside of asynchronous contexts.
@@ -481,7 +516,7 @@ impl<T> Sender<T> {
     ///     assert!(tx.try_send(123).is_err());
     ///
     ///     // Sending on the permit succeeds
-    ///     assert!(permit.send(456).is_ok());
+    ///     permit.send(456);
     ///
     ///     // The value sent on the permit is received
     ///     assert_eq!(rx.recv().await.unwrap(), 456);
@@ -516,17 +551,45 @@ impl<T> fmt::Debug for Sender<T> {
 // ===== impl Permit =====
 
 impl<T> Permit<'_, T> {
-    /// TODO: Dox
-    pub fn send(self, value: T) -> Result<(), SendError<T>> {
+    /// Sends a value using the reserved capacity.
+    ///
+    /// Capacity for the message has already been reserved. The message is sent
+    /// to the receiver and the permit is consumed. The operation will succeed
+    /// even if the receiver half has been closed. See [`Receiver::close`] for
+    /// more details on performing a clean shutdown.
+    ///
+    /// [`Receiver::close`]: Receiver::close
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::channel(1);
+    ///
+    ///     // Reserve capacity
+    ///     let permit = tx.reserve().await.unwrap();
+    ///
+    ///     // Trying to send directly on the `tx` will fail due to no
+    ///     // available capacity.
+    ///     assert!(tx.try_send(123).is_err());
+    ///
+    ///     // Send a message on the permit
+    ///     permit.send(456);
+    ///
+    ///     // The value sent on the permit is received
+    ///     assert_eq!(rx.recv().await.unwrap(), 456);
+    /// }
+    /// ```
+    pub fn send(self, value: T) {
         use std::mem;
 
         self.chan.send(value);
 
         // Avoid the drop logic
         mem::forget(self);
-
-        // Not currently fallable
-        Ok(())
     }
 }
 
