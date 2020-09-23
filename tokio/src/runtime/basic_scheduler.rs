@@ -1,16 +1,16 @@
-use crate::loom::sync::Mutex;
 use crate::park::{CachedParkThread, Park, Unpark};
 use crate::runtime;
 use crate::runtime::task::{self, JoinHandle, Schedule, Task};
 use crate::sync::Notify;
 use crate::util::linked_list::{Link, LinkedList};
 use crate::util::{waker_ref, Wake, WakerRef};
+use crate::{future::poll_fn, loom::sync::Mutex};
 
 use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
 use std::sync::Arc;
-use std::task::Poll::Ready;
+use std::task::Poll::{Pending, Ready};
 use std::time::Duration;
 use std::{cell::RefCell, sync::PoisonError};
 
@@ -135,47 +135,36 @@ impl<P: Park> BasicScheduler<P> {
     }
 
     pub(crate) fn block_on<F: Future>(&self, future: F) -> F::Output {
-        // If we can steal the dedicated parker then lets block_on that
-        // Otherwise, we'll block_on the future and attempt to steal the
-        // parker later, if we can.
-        if let Some(mut inner) = self.take_inner() {
-            inner.block_on(future)
-        } else {
-            let enter = crate::runtime::enter(false);
-            let mut park = CachedParkThread::new();
-            let waker = park.unpark().into_waker();
-            let mut cx = std::task::Context::from_waker(&waker);
+        pin!(future);
 
-            pin!(future);
+        // Attempt to steal the dedicated parker and block_on the future if we can there,
+        // othwerwise, lets select on a notification that the parker is available
+        // or the future is complete.
+        loop {
+            if let Some(inner) = &mut self.take_inner() {
+                return inner.block_on(future);
+            } else {
+                let mut enter = crate::runtime::enter(false);
 
-            let mut notified = Box::pin(self.notify.notified());
+                let notified = self.notify.notified();
+                pin!(notified);
 
-            loop {
-                if let Ready(_) = notified.as_mut().poll(&mut cx) {
-                    // Check if we can steal the dedicated parker P.
-                    //
-                    // TODO: Consider using an atomic load here intead of locking
-                    // the mutex.
-                    if let Some(mut inner) = self.take_inner() {
-                        // We will enter again on in the inner implementation below
-                        drop(enter);
-                        return inner.block_on(future);
-                    } else {
-                        // Since the notify future polled to ready, it will panic if polled again
-                        // beyond ready. To avoid this, lets create a new future. This allocation is
-                        // unfortunate but should be extremely rare.
-                        notified = Box::pin(self.notify.notified());
-                    }
+                if let Some(out) = enter
+                    .block_on(poll_fn(|cx| {
+                        if notified.as_mut().poll(cx).is_ready() {
+                            return Ready(None);
+                        }
+
+                        if let Ready(out) = future.as_mut().poll(cx) {
+                            return Ready(Some(out));
+                        }
+
+                        Pending
+                    }))
+                    .expect("Failed to `Enter::block_on`")
+                {
+                    return out;
                 }
-
-                if let Ready(v) = crate::coop::budget(|| future.as_mut().poll(&mut cx)) {
-                    return v;
-                }
-
-                // Park this thread, waiting for some external wakeup: either
-                // from the future we are currently polling or a wakeup from the
-                // block_on that contains the parker, notifying us to steal the parker.
-                park.park().expect("failed to park");
             }
         }
     }
