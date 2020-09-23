@@ -24,7 +24,7 @@ async fn send_recv_with_buffer() {
     // Using poll_ready / try_send
     // let permit assert_ready_ok!(tx.reserve());
     let permit = tx.reserve().await.unwrap();
-    assert_ok!(permit.send(1));
+    permit.send(1);
 
     // Without poll_ready
     tx.try_send(2).unwrap();
@@ -61,7 +61,7 @@ async fn reserve_disarm() {
     assert_pending!(r4.poll());
 
     // Using one of the reserved slots should allow a new handle to become ready
-    assert_ok!(permit1.send(1));
+    permit1.send(1);
 
     // We also need to receive for the slot to be free
     assert!(!r3.is_woken());
@@ -232,7 +232,7 @@ async fn send_recv_buffer_limited() {
     let p1 = assert_ok!(tx.reserve().await);
 
     // Send first message
-    assert_ok!(p1.send(1));
+    p1.send(1);
 
     // Not ready
     let mut p2 = task::spawn(tx.reserve());
@@ -249,7 +249,7 @@ async fn send_recv_buffer_limited() {
 
     // Send second
     let permit = assert_ready_ok!(p2.poll());
-    assert_ok!(permit.send(2));
+    permit.send(2);
 
     assert!(rx.recv().await.is_some());
 }
@@ -283,7 +283,7 @@ async fn recv_close_gets_none_reserved() {
         let mut recv = task::spawn(rx.recv());
         assert_pending!(recv.poll());
 
-        assert_ok!(permit1.send(123));
+        permit1.send(123);
         assert!(recv.is_woken());
 
         let v = assert_ready!(recv.poll());
