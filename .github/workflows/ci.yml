@@ -150,11 +150,11 @@ jobs:
         run: cargo install cargo-hack
 
       - name: check --each-feature
-        run: cargo hack check --all --each-feature -Z avoid-dev-deps
+        run: cargo hack check --all --each-feature --skip io-driver,io-readiness -Z avoid-dev-deps
 
       # Try with unstable feature flags
       - name: check --each-feature --unstable
-        run: cargo hack check --all --each-feature -Z avoid-dev-deps
+        run: cargo hack check --all --each-feature --skip io-driver,io-readiness -Z avoid-dev-deps
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 

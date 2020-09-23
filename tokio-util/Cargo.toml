@@ -25,11 +25,10 @@ publish = false
 default = []
 
 # Shorthand for enabling everything
-full = ["codec", "udp", "compat", "io"]
+full = ["codec", "compat", "io"]
 
 compat = ["futures-io",]
 codec = ["tokio/stream"]
-udp = ["tokio/udp"]
 io = []
 
 [dependencies]

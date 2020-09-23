@@ -96,7 +96,6 @@ mod udp {
     use std::error::Error;
     use std::io;
     use std::net::SocketAddr;
-    use tokio::net::udp::{RecvHalf, SendHalf};
     use tokio::net::UdpSocket;
 
     pub async fn connect(
@@ -114,16 +113,15 @@ mod udp {
 
         let socket = UdpSocket::bind(&bind_addr).await?;
         socket.connect(addr).await?;
-        let (mut r, mut w) = socket.split();
 
-        future::try_join(send(stdin, &mut w), recv(stdout, &mut r)).await?;
+        future::try_join(send(stdin, &socket), recv(stdout, &socket)).await?;
 
         Ok(())
     }
 
     async fn send(
         mut stdin: impl Stream<Item = Result<Bytes, io::Error>> + Unpin,
-        writer: &mut SendHalf,
+        writer: &UdpSocket,
     ) -> Result<(), io::Error> {
         while let Some(item) = stdin.next().await {
             let buf = item?;
@@ -135,7 +133,7 @@ mod udp {
 
     async fn recv(
         mut stdout: impl Sink<Bytes, Error = io::Error> + Unpin,
-        reader: &mut RecvHalf,
+        reader: &UdpSocket,
     ) -> Result<(), io::Error> {
         loop {
             let mut buf = vec![0; 1024];

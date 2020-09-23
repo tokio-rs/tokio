@@ -1,3 +1,8 @@
+fn main() {}
+
+// Disabled while future of UdpFramed is decided on.
+// See https://github.com/tokio-rs/tokio/issues/2830
+/*
 //! This example leverages `BytesCodec` to create a UDP client and server which
 //! speak a custom protocol.
 //!
@@ -78,3 +83,4 @@ async fn pong(socket: &mut UdpFramed<BytesCodec>) -> Result<(), io::Error> {
 
     Ok(())
 }
+*/

@@ -1,13 +1,15 @@
 //! Signal driver
 
 use crate::io::driver::Driver as IoDriver;
-use crate::io::Registration;
+use crate::io::PollEvented;
 use crate::park::Park;
 use crate::runtime::context;
 use crate::signal::registry::globals;
 use mio_uds::UnixStream;
 use std::io::{self, Read};
+use std::ptr;
 use std::sync::{Arc, Weak};
+use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 use std::time::Duration;
 
 /// Responsible for registering wakeups when an OS signal is received, and
@@ -21,11 +23,7 @@ pub(crate) struct Driver {
     park: IoDriver,
 
     /// A pipe for receiving wake events from the signal handler
-    receiver: UnixStream,
-
-    /// The actual registraiton for `receiver` when active.
-    /// Lazily bound at the first signal registration.
-    registration: Registration,
+    receiver: PollEvented<UnixStream>,
 
     /// Shared state
     inner: Arc<Inner>,
@@ -58,13 +56,12 @@ impl Driver {
         // either, since we can't compare Handles or assume they will always
         // point to the exact same reactor.
         let receiver = globals().receiver.try_clone()?;
-        let registration =
-            Registration::new_with_ready_and_handle(&receiver, mio::Ready::all(), park.handle())?;
+        let receiver =
+            PollEvented::new_with_ready_and_handle(receiver, mio::Ready::all(), park.handle())?;
 
         Ok(Self {
             park,
             receiver,
-            registration,
             inner: Arc::new(Inner(())),
         })
     }
@@ -79,17 +76,23 @@ impl Driver {
 
     fn process(&self) {
         // Check if the pipe is ready to read and therefore has "woken" us up
-        match self.registration.take_read_ready() {
-            Ok(Some(ready)) => assert!(ready.is_readable()),
-            Ok(None) => return, // No wake has arrived, bail
-            Err(e) => panic!("reactor gone: {}", e),
-        }
+        //
+        // To do so, we will `poll_read_ready` with a noop waker, since we don't
+        // need to actually be notified when read ready...
+        let waker = unsafe { Waker::from_raw(RawWaker::new(ptr::null(), &NOOP_WAKER_VTABLE)) };
+        let mut cx = Context::from_waker(&waker);
+
+        let ev = match self.receiver.poll_read_ready(&mut cx) {
+            Poll::Ready(Ok(ev)) => ev,
+            Poll::Ready(Err(e)) => panic!("reactor gone: {}", e),
+            Poll::Pending => return, // No wake has arrived, bail
+        };
 
         // Drain the pipe completely so we can receive a new readiness event
         // if another signal has come in.
         let mut buf = [0; 128];
         loop {
-            match (&self.receiver).read(&mut buf) {
+            match self.receiver.get_ref().read(&mut buf) {
                 Ok(0) => panic!("EOF on self-pipe"),
                 Ok(_) => continue, // Keep reading
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => break,
@@ -97,10 +100,20 @@ impl Driver {
             }
         }
 
+        self.receiver.clear_readiness(ev);
+
         // Broadcast any signals which were received
         globals().broadcast();
     }
 }
+
+const NOOP_WAKER_VTABLE: RawWakerVTable = RawWakerVTable::new(noop_clone, noop, noop, noop);
+
+unsafe fn noop_clone(_data: *const ()) -> RawWaker {
+    RawWaker::new(ptr::null(), &NOOP_WAKER_VTABLE)
+}
+
+unsafe fn noop(_data: *const ()) {}
 
 // ===== impl Park for Driver =====
 

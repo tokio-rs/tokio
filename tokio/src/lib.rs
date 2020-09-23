@@ -77,7 +77,6 @@
 //! - `rt-core`: Enables `tokio::spawn` and the basic (single-threaded) scheduler.
 //! - `rt-threaded`: Enables the heavier, multi-threaded, work-stealing scheduler.
 //! - `rt-util`: Enables non-scheduler utilities.
-//! - `io-driver`: Enables the `mio` based IO driver.
 //! - `io-util`: Enables the IO based `Ext` traits.
 //! - `io-std`: Enable `Stdout`, `Stdin` and `Stderr` types.
 //! - `net`: Enables `tokio::net` types such as `TcpStream`, `UnixStream` and `UdpSocket`.
@@ -269,8 +268,7 @@
 //! the [`AsyncRead`], [`AsyncWrite`], and [`AsyncBufRead`] traits. In addition,
 //! when the "io-util" feature flag is enabled, it also provides combinators and
 //! functions for working with these traits, forming as an asynchronous
-//! counterpart to [`std::io`]. When the "io-driver" feature flag is enabled, it
-//! also provides utilities for library authors implementing I/O resources.
+//! counterpart to [`std::io`].
 //!
 //! Tokio also includes APIs for performing various kinds of I/O and interacting
 //! with the operating system asynchronously. These include:

@@ -55,7 +55,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
     .parse()?;
 
-    let mut socket = UdpSocket::bind(local_addr).await?;
+    let socket = UdpSocket::bind(local_addr).await?;
     const MAX_DATAGRAM_SIZE: usize = 65_507;
     socket.connect(&remote_addr).await?;
     let data = get_stdin_data()?;
