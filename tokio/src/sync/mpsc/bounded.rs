@@ -312,7 +312,10 @@ impl<T> Sender<T> {
     /// ```
     pub async fn send(&self, value: T) -> Result<(), SendError<T>> {
         match self.reserve().await {
-            Ok(permit) => Ok(permit.send(value)),
+            Ok(permit) => {
+                permit.send(value);
+                Ok(())
+            }
             Err(_) => Err(SendError(value)),
         }
     }
@@ -449,7 +452,8 @@ impl<T> Sender<T> {
             Ok(Ok(permit)) => permit,
         };
 
-        Ok(permit.send(value))
+        permit.send(value);
+        Ok(())
     }
 
     /// Blocking send to call outside of asynchronous contexts.
