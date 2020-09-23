@@ -125,6 +125,7 @@ impl<L: Link> LinkedList<L, L::Target> {
     }
 
     /// Returns whether the linked list doesn not contain any node
+    #[cfg(any(feature = "sync", feature = "rt-core"))]
     pub(crate) fn is_empty(&self) -> bool {
         if self.head.is_some() {
             return false;
@@ -180,14 +181,11 @@ impl<L: Link> fmt::Debug for LinkedList<L, L::Target> {
     }
 }
 
-cfg_sync! {
-    impl<L: Link> LinkedList<L, L::Target> {
-        pub(crate) fn last(&self) -> Option<&L::Target> {
-            let tail = self.tail.as_ref()?;
-            unsafe {
-                Some(&*tail.as_ptr())
-            }
-        }
+#[cfg(any(feature = "sync", feature = "signal"))]
+impl<L: Link> LinkedList<L, L::Target> {
+    pub(crate) fn last(&self) -> Option<&L::Target> {
+        let tail = self.tail.as_ref()?;
+        unsafe { Some(&*tail.as_ptr()) }
     }
 }
 

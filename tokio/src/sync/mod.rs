@@ -469,7 +469,7 @@ cfg_not_sync! {
 
     cfg_signal! {
         pub(crate) mod mpsc;
-        pub(crate) mod semaphore_ll;
+        pub(crate) mod batch_semaphore;
     }
 }
 

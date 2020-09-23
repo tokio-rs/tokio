@@ -7,7 +7,7 @@ use loom::thread;
 #[test]
 fn closing_tx() {
     loom::model(|| {
-        let (mut tx, mut rx) = mpsc::channel(16);
+        let (tx, mut rx) = mpsc::channel(16);
 
         thread::spawn(move || {
             tx.try_send(()).unwrap();
