@@ -1,4 +1,5 @@
 use crate::io::blocking::Blocking;
+use crate::io::stdio_common::SplitByUtf8BoundaryIfWindows;
 use crate::io::AsyncWrite;
 
 use std::io;
@@ -35,7 +36,7 @@ cfg_io_std! {
     /// ```
     #[derive(Debug)]
     pub struct Stderr {
-        std: Blocking<std::io::Stderr>,
+        std: SplitByUtf8BoundaryIfWindows<Blocking<std::io::Stderr>>,
     }
 
     /// Constructs a new handle to the standard error of the current process.
@@ -67,7 +68,7 @@ cfg_io_std! {
     pub fn stderr() -> Stderr {
         let std = io::stderr();
         Stderr {
-            std: Blocking::new(std),
+            std: SplitByUtf8BoundaryIfWindows::new(Blocking::new(std)),
         }
     }
 }

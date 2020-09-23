@@ -1,6 +1,6 @@
 use crate::io::blocking::Blocking;
+use crate::io::stdio_common::SplitByUtf8BoundaryIfWindows;
 use crate::io::AsyncWrite;
-
 use std::io;
 use std::pin::Pin;
 use std::task::Context;
@@ -35,7 +35,7 @@ cfg_io_std! {
     /// ```
     #[derive(Debug)]
     pub struct Stdout {
-        std: Blocking<std::io::Stdout>,
+        std: SplitByUtf8BoundaryIfWindows<Blocking<std::io::Stdout>>,
     }
 
     /// Constructs a new handle to the standard output of the current process.
@@ -67,7 +67,7 @@ cfg_io_std! {
     pub fn stdout() -> Stdout {
         let std = io::stdout();
         Stdout {
-            std: Blocking::new(std),
+            std: SplitByUtf8BoundaryIfWindows::new(Blocking::new(std)),
         }
     }
 }
