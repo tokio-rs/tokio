@@ -285,9 +285,6 @@ impl<T> Sender<T> {
     /// with [`send`], this function has two failure cases instead of one (one for
     /// disconnection, one for a full buffer).
     ///
-    /// This function may be paired with [`poll_ready`] in order to wait for
-    /// channel capacity before trying to send a value.
-    ///
     /// # Errors
     ///
     /// If the channel capacity has been reached, i.e., the channel has `n`
@@ -299,7 +296,6 @@ impl<T> Sender<T> {
     /// an error. The error includes the value passed to `send`.
     ///
     /// [`send`]: Sender::send
-    /// [`poll_ready`]: Sender::poll_ready
     /// [`channel`]: channel
     /// [`close`]: Receiver::close
     ///
