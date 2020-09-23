@@ -83,6 +83,7 @@ where
 }
 
 #[cfg(test)]
+#[cfg(not(loom))]
 mod tests {
     use crate::io::AsyncWriteExt;
     use std::io;
@@ -114,8 +115,8 @@ mod tests {
             Poll::Ready(Ok(()))
         }
     }
+
     #[test]
-    #[cfg(not(loom))]
     fn test_splitter() {
         let data = str::repeat("█", MAX_BUF);
         let mut wr = super::SplitByUtf8BoundaryIfWindows::new(MockWriter);
