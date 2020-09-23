@@ -446,7 +446,7 @@ async fn blocking_recv_async() {
 
 #[test]
 fn blocking_send() {
-    let (mut tx, mut rx) = mpsc::channel::<u8>(1);
+    let (tx, mut rx) = mpsc::channel::<u8>(1);
 
     let sync_code = thread::spawn(move || {
         tx.blocking_send(10).unwrap();
@@ -461,7 +461,7 @@ fn blocking_send() {
 #[tokio::test]
 #[should_panic]
 async fn blocking_send_async() {
-    let (mut tx, _rx) = mpsc::channel::<()>(1);
+    let (tx, _rx) = mpsc::channel::<()>(1);
     let _ = tx.blocking_send(());
 }
 

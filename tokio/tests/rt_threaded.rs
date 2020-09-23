@@ -70,7 +70,7 @@ fn many_multishot_futures() {
             let (start_tx, mut chain_rx) = tokio::sync::mpsc::channel(10);
 
             for _ in 0..CHAIN {
-                let (mut next_tx, next_rx) = tokio::sync::mpsc::channel(10);
+                let (next_tx, next_rx) = tokio::sync::mpsc::channel(10);
 
                 // Forward all the messages
                 rt.spawn(async move {
@@ -83,8 +83,8 @@ fn many_multishot_futures() {
             }
 
             // This final task cycles if needed
-            let (mut final_tx, final_rx) = tokio::sync::mpsc::channel(10);
-            let mut cycle_tx = start_tx.clone();
+            let (final_tx, final_rx) = tokio::sync::mpsc::channel(10);
+            let cycle_tx = start_tx.clone();
             let mut rem = CYCLES;
 
             rt.spawn(async move {
@@ -107,7 +107,7 @@ fn many_multishot_futures() {
 
         {
             rt.block_on(async move {
-                for mut start_tx in start_txs {
+                for start_tx in start_txs {
                     start_tx.send("ping").await.unwrap();
                 }
 
@@ -340,7 +340,7 @@ fn coop_and_block_in_place() {
         .unwrap();
 
     rt.block_on(async move {
-        let (mut tx, mut rx) = tokio::sync::mpsc::channel(1024);
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1024);
 
         // Fill the channel
         for _ in 0..1024 {

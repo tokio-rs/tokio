@@ -399,7 +399,7 @@ impl<T> Sender<T> {
     #[cfg(feature = "time")]
     #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
     pub async fn send_timeout(
-        &mut self,
+        &self,
         value: T,
         timeout: Duration,
     ) -> Result<(), SendTimeoutError<T>> {
@@ -446,7 +446,7 @@ impl<T> Sender<T> {
     ///     sync_code.join().unwrap()
     /// }
     /// ```
-    pub fn blocking_send(&mut self, value: T) -> Result<(), SendError<T>> {
+    pub fn blocking_send(&self, value: T) -> Result<(), SendError<T>> {
         let mut enter_handle = crate::runtime::enter::enter(false);
         enter_handle.block_on(self.send(value)).unwrap()
     }
