@@ -290,7 +290,7 @@ mod tests {
 
     fn rt() -> Runtime {
         crate::runtime::Builder::new()
-            .basic_scheduler()
+            .core_threads(0)
             .build()
             .unwrap()
     }

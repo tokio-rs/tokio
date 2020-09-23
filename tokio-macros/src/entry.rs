@@ -1,6 +1,5 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use std::num::NonZeroUsize;
 
 #[derive(Clone, Copy, PartialEq)]
 enum Runtime {
@@ -43,8 +42,8 @@ fn parse_knobs(
                         if rt_threaded {
                             match &namevalue.lit {
                                 syn::Lit::Int(expr) => {
-                                    let num = expr.base10_parse::<NonZeroUsize>().unwrap();
-                                    if num.get() > 1 {
+                                    let num = expr.base10_parse::<usize>().unwrap();
+                                    if num > 1 {
                                         runtime = Some(Runtime::Threaded);
                                     } else {
                                         runtime = Some(Runtime::Basic);
@@ -77,7 +76,7 @@ fn parse_knobs(
                     }
                     "max_threads" => match &namevalue.lit {
                         syn::Lit::Int(expr) => {
-                            let num = expr.base10_parse::<NonZeroUsize>().unwrap();
+                            let num = expr.base10_parse::<usize>().unwrap();
 
                             if let Some(v) = core_threads {
                                 if num < v {
@@ -128,16 +127,27 @@ fn parse_knobs(
         }
     }
 
-    let mut rt = quote! { tokio::runtime::Builder::new().basic_scheduler() };
+    let mut rt = quote! { tokio::runtime::Builder::new() };
+
     if rt_threaded && (runtime == Some(Runtime::Threaded) || (runtime.is_none() && !is_test)) {
-        rt = quote! { #rt.threaded_scheduler() };
+        rt = quote! { #rt };
     }
-    if let Some(v) = core_threads.map(|v| v.get()) {
-        rt = quote! { #rt.core_threads(#v) };
+
+    // if let Some(v) = core_threads {
+    //     rt = quote! { #rt.core_threads(#v) };
+    // }
+
+    // if let Some(v) = max_threads {
+    //     rt = quote! { #rt.max_threads(#v) };
+    // }
+
+    if is_test {
+        rt = quote! { #rt.core_threads(0) };
     }
-    if let Some(v) = max_threads.map(|v| v.get()) {
-        rt = quote! { #rt.max_threads(#v) };
-    }
+
+    // if is_test && core_threads.is_none() {
+    //     rt = quote! { #rt.core_threads(0) };
+    // }
 
     let header = {
         if is_test {
@@ -269,7 +279,7 @@ pub(crate) mod old {
                 #(#attrs)*
                 #vis #sig {
                     tokio::runtime::Builder::new()
-                        .basic_scheduler()
+                        .core_threads(0)
                         .enable_all()
                         .build()
                         .unwrap()
@@ -345,7 +355,7 @@ pub(crate) mod old {
                 #(#attrs)*
                 #vis fn #name() #ret {
                     tokio::runtime::Builder::new()
-                        .basic_scheduler()
+                        .core_threads(0)
                         .enable_all()
                         .build()
                         .unwrap()

@@ -49,13 +49,13 @@ pub trait RuntimeExt {
     /// use tokio::time::{delay_for, Duration};
     ///
     /// let rt = tokio::runtime::Builder::new()
-    ///     .threaded_scheduler()
     ///     .enable_all()
-    ///     .build().unwrap();
+    ///     .build()
+    ///     .unwrap();
     ///
     /// let rt2 = tokio::runtime::Builder::new()
-    ///     .threaded_scheduler()
-    ///     .build().unwrap();
+    ///     .build()
+    ///     .unwrap();
     ///
     /// let fut = delay_for(Duration::from_millis(2));
     ///

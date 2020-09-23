@@ -133,11 +133,7 @@ fn local_threadpool_blocking_in_place() {
 
     ON_RT_THREAD.with(|cell| cell.set(true));
 
-    let rt = runtime::Builder::new()
-        .threaded_scheduler()
-        .enable_all()
-        .build()
-        .unwrap();
+    let rt = runtime::Builder::new().enable_all().build().unwrap();
     LocalSet::new().block_on(&rt, async {
         assert!(ON_RT_THREAD.with(|cell| cell.get()));
         let join = task::spawn_local(async move {
@@ -246,10 +242,7 @@ fn join_local_future_elsewhere() {
 
     ON_RT_THREAD.with(|cell| cell.set(true));
 
-    let rt = runtime::Builder::new()
-        .threaded_scheduler()
-        .build()
-        .unwrap();
+    let rt = runtime::Runtime::new().unwrap();
     let local = LocalSet::new();
     local.block_on(&rt, async move {
         let (tx, rx) = oneshot::channel();
@@ -492,7 +485,7 @@ async fn acquire_mutex_in_drop() {
 
 fn rt() -> Runtime {
     tokio::runtime::Builder::new()
-        .basic_scheduler()
+        .core_threads(0)
         .enable_all()
         .build()
         .unwrap()

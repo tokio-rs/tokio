@@ -115,17 +115,21 @@
 //!
 //! The basic scheduler provides a _single-threaded_ future executor. All tasks
 //! will be created and executed on the current thread. The basic scheduler
-//! requires the `rt-core` feature flag, and can be selected using the
-//! [`Builder::basic_scheduler`] method:
+//! requires the `rt-core` feature flag, and can be selected by setting
+//! [`Builder::core_threads`] to `0` or `1`.
 //! ```
 //! use tokio::runtime;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let basic_rt = runtime::Builder::new()
-//!     .basic_scheduler()
+//!     .core_threads(0)
 //!     .build()?;
 //! # Ok(()) }
 //! ```
+//!
+//! Setting `core_threads(0)` will allow you to run the scheduler on the current
+//! thread. When setting `core_threads(1)`, the runtime will spawn one background
+//! thread that will run the runtime.
 //!
 //! If the `rt-core` feature is enabled and `rt-threaded` is not,
 //! [`Runtime::new`] will return a basic scheduler runtime by default.
@@ -136,14 +140,12 @@
 //! work-stealing strategy. By default, it will start a worker thread for each
 //! CPU core available on the system. This tends to be the ideal configurations
 //! for most applications. The threaded scheduler requires the `rt-threaded` feature
-//! flag, and can be selected using the  [`Builder::threaded_scheduler`] method:
+//! flag, and is selected by default:
 //! ```
 //! use tokio::runtime;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let threaded_rt = runtime::Builder::new()
-//!     .threaded_scheduler()
-//!     .build()?;
+//! let threaded_rt = runtime::Runtime::new()?;
 //! # Ok(()) }
 //! ```
 //!
@@ -343,10 +345,10 @@ impl Runtime {
     /// [runtime builder]: crate::runtime::Builder
     pub fn new() -> io::Result<Runtime> {
         #[cfg(feature = "rt-threaded")]
-        let ret = Builder::new().threaded_scheduler().enable_all().build();
+        let ret = Builder::new().enable_all().build();
 
         #[cfg(all(not(feature = "rt-threaded"), feature = "rt-core"))]
-        let ret = Builder::new().basic_scheduler().enable_all().build();
+        let ret = Builder::new().core_threads(0).enable_all().build();
 
         #[cfg(not(feature = "rt-core"))]
         let ret = Builder::new().enable_all().build();

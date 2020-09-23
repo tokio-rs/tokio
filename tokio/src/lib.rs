@@ -408,32 +408,9 @@ cfg_macros! {
     #[doc(hidden)]
     pub use tokio_macros::select_priv_declare_output_enum;
 
-    doc_rt_core! {
-        cfg_rt_threaded! {
-            // This is the docs.rs case (with all features) so make sure macros
-            // is included in doc(cfg).
-
-            #[cfg(not(test))] // Work around for rust-lang/rust#62127
-            #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
-            pub use tokio_macros::main_threaded as main;
-
-            #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
-            pub use tokio_macros::test_threaded as test;
-        }
-
-        cfg_not_rt_threaded! {
-            #[cfg(not(test))] // Work around for rust-lang/rust#62127
-            pub use tokio_macros::main_basic as main;
-            pub use tokio_macros::test_basic as test;
-        }
-    }
-
-    // Maintains old behavior
-    cfg_not_rt_core! {
-        #[cfg(not(test))]
-        pub use tokio_macros::main;
-        pub use tokio_macros::test;
-    }
+    #[cfg(not(test))]
+    pub use tokio_macros::main;
+    pub use tokio_macros::test;
 }
 
 // TODO: rm

@@ -18,11 +18,7 @@ use std::task::{Context, Poll};
 #[test]
 fn single_thread() {
     // No panic when starting a runtime w/ a single thread
-    let _ = runtime::Builder::new()
-        .threaded_scheduler()
-        .enable_all()
-        .core_threads(1)
-        .build();
+    let _ = runtime::Builder::new().enable_all().core_threads(1).build();
 }
 
 #[test]
@@ -189,7 +185,6 @@ fn drop_threadpool_drops_futures() {
         let b = num_dec.clone();
 
         let rt = runtime::Builder::new()
-            .threaded_scheduler()
             .enable_all()
             .on_thread_start(move || {
                 a.fetch_add(1, Relaxed);
@@ -229,7 +224,6 @@ fn start_stop_callbacks_called() {
     let after_inner = after_start.clone();
     let before_inner = before_stop.clone();
     let rt = tokio::runtime::Builder::new()
-        .threaded_scheduler()
         .enable_all()
         .on_thread_start(move || {
             after_inner.clone().fetch_add(1, Ordering::Relaxed);
@@ -330,7 +324,6 @@ fn multi_threadpool() {
 #[test]
 fn coop_and_block_in_place() {
     let rt = tokio::runtime::Builder::new()
-        .threaded_scheduler()
         // Setting max threads to 1 prevents another thread from claiming the
         // runtime worker yielded as part of `block_in_place` and guarantees the
         // same thread will reclaim the worker at the end of the
@@ -381,7 +374,6 @@ fn coop_and_block_in_place() {
 #[test]
 fn max_threads() {
     let _rt = tokio::runtime::Builder::new()
-        .threaded_scheduler()
         .max_threads(1)
         .build()
         .unwrap();

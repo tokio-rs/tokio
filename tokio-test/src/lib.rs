@@ -29,7 +29,7 @@ pub fn block_on<F: std::future::Future>(future: F) -> F::Output {
     use tokio::runtime;
 
     let rt = runtime::Builder::new()
-        .basic_scheduler()
+        .core_threads(0)
         .enable_all()
         .build()
         .unwrap();

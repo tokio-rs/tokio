@@ -140,7 +140,6 @@ fn chained_spawn(b: &mut Bencher) {
 
 fn rt() -> Runtime {
     runtime::Builder::new()
-        .threaded_scheduler()
         .core_threads(4)
         .enable_all()
         .build()

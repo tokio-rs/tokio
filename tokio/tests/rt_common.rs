@@ -11,7 +11,7 @@ macro_rules! rt_test {
 
             fn rt() -> Arc<Runtime> {
                 tokio::runtime::Builder::new()
-                    .basic_scheduler()
+                    .core_threads(0)
                     .enable_all()
                     .build()
                     .unwrap()
@@ -24,7 +24,6 @@ macro_rules! rt_test {
 
             fn rt() -> Arc<Runtime> {
                 tokio::runtime::Builder::new()
-                    .threaded_scheduler()
                     .core_threads(4)
                     .enable_all()
                     .build()
@@ -38,7 +37,6 @@ macro_rules! rt_test {
 
             fn rt() -> Arc<Runtime> {
                 tokio::runtime::Builder::new()
-                    .threaded_scheduler()
                     .core_threads(1)
                     .enable_all()
                     .build()

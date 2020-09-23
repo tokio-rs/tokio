@@ -130,7 +130,7 @@ fn acquire_mutex_in_drop() {
 
 fn rt() -> Runtime {
     tokio::runtime::Builder::new()
-        .basic_scheduler()
+        .core_threads(0)
         .enable_all()
         .build()
         .unwrap()

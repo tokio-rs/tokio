@@ -45,7 +45,6 @@ fn send_large(b: &mut Bencher) {
 fn contention_bounded(b: &mut Bencher) {
     let rt = tokio::runtime::Builder::new()
         .core_threads(6)
-        .threaded_scheduler()
         .build()
         .unwrap();
 
@@ -72,7 +71,6 @@ fn contention_bounded(b: &mut Bencher) {
 fn contention_bounded_full(b: &mut Bencher) {
     let rt = tokio::runtime::Builder::new()
         .core_threads(6)
-        .threaded_scheduler()
         .build()
         .unwrap();
 
@@ -99,7 +97,6 @@ fn contention_bounded_full(b: &mut Bencher) {
 fn contention_unbounded(b: &mut Bencher) {
     let rt = tokio::runtime::Builder::new()
         .core_threads(6)
-        .threaded_scheduler()
         .build()
         .unwrap();
 
@@ -126,7 +123,6 @@ fn contention_unbounded(b: &mut Bencher) {
 fn uncontented_bounded(b: &mut Bencher) {
     let rt = tokio::runtime::Builder::new()
         .core_threads(6)
-        .threaded_scheduler()
         .build()
         .unwrap();
 
@@ -148,7 +144,6 @@ fn uncontented_bounded(b: &mut Bencher) {
 fn uncontented_unbounded(b: &mut Bencher) {
     let rt = tokio::runtime::Builder::new()
         .core_threads(6)
-        .threaded_scheduler()
         .build()
         .unwrap();
 

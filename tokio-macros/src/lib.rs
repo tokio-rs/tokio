@@ -62,7 +62,6 @@ use proc_macro::TokenStream;
 /// ```rust
 /// fn main() {
 ///     tokio::runtime::Builder::new()
-///         .threaded_scheduler()
 ///         .enable_all()
 ///         .build()
 ///         .unwrap()
@@ -88,7 +87,7 @@ use proc_macro::TokenStream;
 /// ```rust
 /// fn main() {
 ///     tokio::runtime::Builder::new()
-///         .basic_scheduler()
+///         .core_threads(0)
 ///         .enable_all()
 ///         .build()
 ///         .unwrap()
@@ -112,7 +111,6 @@ use proc_macro::TokenStream;
 /// ```rust
 /// fn main() {
 ///     tokio::runtime::Builder::new()
-///         .threaded_scheduler()
 ///         .core_threads(2)
 ///         .enable_all()
 ///         .build()
@@ -191,7 +189,7 @@ pub fn main_threaded(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ```rust
 /// fn main() {
 ///     tokio::runtime::Builder::new()
-///         .basic_scheduler()
+///         .core_threads(0)
 ///         .enable_all()
 ///         .build()
 ///         .unwrap()
@@ -242,7 +240,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ```rust
 /// fn main() {
 ///     tokio::runtime::Builder::new()
-///         .basic_scheduler()
+///         .core_threads(0)
 ///         .enable_all()
 ///         .build()
 ///         .unwrap()

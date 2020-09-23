@@ -47,7 +47,7 @@ fn many_signals(bench: &mut Bencher) {
 
     let rt = runtime::Builder::new()
         // Intentionally single threaded to measure delays in propagating wakes
-        .basic_scheduler()
+        .core_threads(0)
         .enable_all()
         .build()
         .unwrap();

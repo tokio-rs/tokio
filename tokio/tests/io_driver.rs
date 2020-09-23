@@ -46,7 +46,7 @@ fn test_drop_on_notify() {
     // dropped.
 
     let rt = runtime::Builder::new()
-        .basic_scheduler()
+        .core_threads(0)
         .enable_all()
         .build()
         .unwrap();

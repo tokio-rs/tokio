@@ -46,7 +46,7 @@ fn drop_wakes() {
 
 fn rt() -> runtime::Runtime {
     runtime::Builder::new()
-        .basic_scheduler()
+        .core_threads(0)
         .enable_all()
         .build()
         .unwrap()

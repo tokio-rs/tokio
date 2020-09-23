@@ -124,7 +124,7 @@ mod tests {
             wr.write_all(data.as_bytes()).await.unwrap();
         };
         crate::runtime::Builder::new()
-            .basic_scheduler()
+            .core_threads(0)
             .build()
             .unwrap()
             .block_on(fut);

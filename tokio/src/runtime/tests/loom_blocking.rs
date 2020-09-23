@@ -24,7 +24,6 @@ fn blocking_shutdown() {
 
 fn mk_runtime(num_threads: usize) -> Runtime {
     runtime::Builder::new()
-        .threaded_scheduler()
         .core_threads(num_threads)
         .build()
         .unwrap()
