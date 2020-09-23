@@ -1,18 +1,18 @@
-use crate::park::{CachedParkThread, Park, Unpark};
-use crate::runtime;
+use crate::future::poll_fn;
+use crate::loom::sync::Mutex;
+use crate::park::{Park, Unpark};
 use crate::runtime::task::{self, JoinHandle, Schedule, Task};
 use crate::sync::Notify;
 use crate::util::linked_list::{Link, LinkedList};
 use crate::util::{waker_ref, Wake, WakerRef};
-use crate::{future::poll_fn, loom::sync::Mutex};
 
+use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
-use std::sync::Arc;
+use std::sync::{Arc, PoisonError};
 use std::task::Poll::{Pending, Ready};
 use std::time::Duration;
-use std::{cell::RefCell, sync::PoisonError};
 
 /// Executes tasks on the current thread
 pub(crate) struct BasicScheduler<P: Park> {
@@ -183,7 +183,7 @@ impl<P: Park> Inner<P> {
     /// Block on the future provided and drive the runtime's driver.
     fn block_on<F: Future>(&mut self, future: F) -> F::Output {
         enter(self, |scheduler, context| {
-            let _enter = runtime::enter(false);
+            let _enter = crate::runtime::enter(false);
             let waker = scheduler.spawner.waker_ref();
             let mut cx = std::task::Context::from_waker(&waker);
 
