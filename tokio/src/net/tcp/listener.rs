@@ -185,10 +185,10 @@ impl TcpListener {
         poll_fn(|cx| self.poll_accept(cx)).await
     }
 
-    /// Attempts to poll `SocketAddr` and `TcpStream` bound to this address.
+    /// Polls to accept a new incoming connection to this listener.
     ///
-    /// In case if I/O resource isn't ready yet, `Poll::Pending` is returned and
-    /// current task will be notified by a waker.
+    /// If there is no connection to accept, `Poll::Pending` is returned and
+    /// the current task will be notified by a waker.
     pub fn poll_accept(
         &mut self,
         cx: &mut Context<'_>,
@@ -205,15 +205,16 @@ impl TcpListener {
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<io::Result<(net::TcpStream, SocketAddr)>> {
-        ready!(self.io.poll_read_ready(cx, mio::Ready::readable()))?;
+        loop {
+            let ev = ready!(self.io.poll_read_ready(cx))?;
 
-        match self.io.get_ref().accept_std() {
-            Ok(pair) => Poll::Ready(Ok(pair)),
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(cx, mio::Ready::readable())?;
-                Poll::Pending
+            match self.io.get_ref().accept_std() {
+                Ok(pair) => return Poll::Ready(Ok(pair)),
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    self.io.clear_readiness(ev);
+                }
+                Err(e) => return Poll::Ready(Err(e)),
             }
-            Err(e) => Poll::Ready(Err(e)),
         }
     }
 
@@ -411,11 +412,6 @@ impl TryFrom<TcpListener> for mio::net::TcpListener {
     type Error = io::Error;
 
     /// Consumes value, returning the mio I/O object.
-    ///
-    /// See [`PollEvented::into_inner`] for more details about
-    /// resource deregistration that happens during the call.
-    ///
-    /// [`PollEvented::into_inner`]: crate::io::PollEvented::into_inner
     fn try_from(value: TcpListener) -> Result<Self, Self::Error> {
         value.io.into_inner()
     }

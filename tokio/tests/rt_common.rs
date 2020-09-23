@@ -575,6 +575,38 @@ rt_test! {
     }
 
     #[test]
+    fn always_active_parker() {
+        // This test it to show that we will always have
+        // an active parker even if we call block_on concurrently
+
+        let rt = rt();
+        let rt2 = rt.clone();
+
+        let (tx1, rx1) = oneshot::channel();
+        let (tx2, rx2) = oneshot::channel();
+
+        let jh1 = thread::spawn(move || {
+                rt.block_on(async move {
+                    rx2.await.unwrap();
+                    time::delay_for(Duration::from_millis(5)).await;
+                    tx1.send(()).unwrap();
+                });
+        });
+
+        let jh2 = thread::spawn(move || {
+            rt2.block_on(async move {
+                tx2.send(()).unwrap();
+                time::delay_for(Duration::from_millis(5)).await;
+                rx1.await.unwrap();
+                time::delay_for(Duration::from_millis(5)).await;
+            });
+        });
+
+        jh1.join().unwrap();
+        jh2.join().unwrap();
+    }
+
+    #[test]
     // IOCP requires setting the "max thread" concurrency value. The sane,
     // default, is to set this to the number of cores. Threads that poll I/O
     // become associated with the IOCP handle. Once those threads sleep for any
@@ -795,6 +827,7 @@ rt_test! {
     #[test]
     fn io_notify_while_shutting_down() {
         use std::net::Ipv6Addr;
+        use std::sync::Arc;
 
         for _ in 1..10 {
             let runtime = rt();
@@ -802,7 +835,8 @@ rt_test! {
             runtime.block_on(async {
                 let socket = UdpSocket::bind((Ipv6Addr::LOCALHOST, 0)).await.unwrap();
                 let addr = socket.local_addr().unwrap();
-                let (mut recv_half, mut send_half) = socket.split();
+                let send_half = Arc::new(socket);
+                let recv_half = send_half.clone();
 
                 tokio::spawn(async move {
                     let mut buf = [0];

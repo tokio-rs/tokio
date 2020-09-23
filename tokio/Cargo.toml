@@ -33,7 +33,6 @@ full = [
   "blocking",
   "dns",
   "fs",
-  "io-driver",
   "io-util",
   "io-std",
   "macros",
@@ -51,7 +50,8 @@ full = [
 blocking = ["rt-core"]
 dns = ["rt-core"]
 fs = ["rt-core", "io-util"]
-io-driver = ["mio", "lazy_static"]
+io-driver = ["mio", "lazy_static"] # internal only
+io-readiness = [] # internal only
 io-util = ["memchr"]
 # stdin, stdout, stderr
 io-std = ["rt-core"]
@@ -85,8 +85,8 @@ sync = ["fnv"]
 test-util = []
 tcp = ["io-driver", "iovec"]
 time = ["slab"]
-udp = ["io-driver"]
-uds = ["io-driver", "mio-uds", "libc"]
+udp = ["io-driver", "io-readiness"]
+uds = ["io-driver", "io-readiness", "mio-uds", "libc"]
 
 [dependencies]
 tokio-macros = { version = "0.3.0", path = "../tokio-macros", optional = true }

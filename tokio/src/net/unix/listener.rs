@@ -2,7 +2,6 @@ use crate::future::poll_fn;
 use crate::io::PollEvented;
 use crate::net::unix::{Incoming, UnixStream};
 
-use mio::Ready;
 use std::convert::TryFrom;
 use std::fmt;
 use std::io;
@@ -104,7 +103,11 @@ impl UnixListener {
         poll_fn(|cx| self.poll_accept(cx)).await
     }
 
-    pub(crate) fn poll_accept(
+    /// Polls to accept a new incoming connection to this listener.
+    ///
+    /// If there is no connection to accept, `Poll::Pending` is returned and
+    /// the current task will be notified by a waker.
+    pub fn poll_accept(
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<io::Result<(UnixStream, SocketAddr)>> {
@@ -118,19 +121,19 @@ impl UnixListener {
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<io::Result<(net::UnixStream, SocketAddr)>> {
-        ready!(self.io.poll_read_ready(cx, Ready::readable()))?;
+        loop {
+            let ev = ready!(self.io.poll_read_ready(cx))?;
 
-        match self.io.get_ref().accept_std() {
-            Ok(None) => {
-                self.io.clear_read_ready(cx, Ready::readable())?;
-                Poll::Pending
+            match self.io.get_ref().accept_std() {
+                Ok(None) => {
+                    self.io.clear_readiness(ev);
+                }
+                Ok(Some((sock, addr))) => return Ok((sock, addr)).into(),
+                Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => {
+                    self.io.clear_readiness(ev);
+                }
+                Err(err) => return Err(err).into(),
             }
-            Ok(Some((sock, addr))) => Ok((sock, addr)).into(),
-            Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(cx, Ready::readable())?;
-                Poll::Pending
-            }
-            Err(err) => Err(err).into(),
         }
     }
 
@@ -193,11 +196,6 @@ impl TryFrom<UnixListener> for mio_uds::UnixListener {
     type Error = io::Error;
 
     /// Consumes value, returning the mio I/O object.
-    ///
-    /// See [`PollEvented::into_inner`] for more details about
-    /// resource deregistration that happens during the call.
-    ///
-    /// [`PollEvented::into_inner`]: crate::io::PollEvented::into_inner
     fn try_from(value: UnixListener) -> Result<Self, Self::Error> {
         value.io.into_inner()
     }
