@@ -473,6 +473,7 @@ cfg_not_sync! {
     cfg_signal_internal! {
         pub(crate) mod mpsc;
         pub(crate) mod batch_semaphore;
+        pub(crate) mod notify;
     }
 }
 
