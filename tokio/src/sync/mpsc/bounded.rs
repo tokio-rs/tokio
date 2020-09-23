@@ -274,7 +274,7 @@ impl<T> Sender<T> {
     pub async fn send(&self, value: T) -> Result<(), SendError<T>> {
         match self.reserve().await {
             Ok(permit) => permit.send(value),
-            Err(_) => return Err(SendError(value)),
+            Err(_) => Err(SendError(value)),
         }
     }
 
