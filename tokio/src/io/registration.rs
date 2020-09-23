@@ -38,7 +38,7 @@ cfg_io_driver! {
     /// [`poll_read_ready`]: method@Self::poll_read_ready`
     /// [`poll_write_ready`]: method@Self::poll_write_ready`
     #[derive(Debug)]
-    pub(super) struct Registration {
+    pub(crate) struct Registration {
         /// Handle to the associated driver.
         handle: Handle,
 
@@ -74,23 +74,6 @@ impl Registration {
     ///
     /// - `Ok` if the registration happened successfully
     /// - `Err` if an error was encountered during registration
-    ///
-    ///
-    /// # Panics
-    ///
-    /// This function panics if thread-local runtime is not set.
-    ///
-    /// The runtime is usually set implicitly when this function is called
-    /// from a future driven by a tokio runtime, otherwise runtime can be set
-    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
-    pub(super) fn new_with_ready<T>(io: &T, ready: mio::Ready) -> io::Result<Registration>
-    where
-        T: Evented,
-    {
-        Self::new_with_ready_and_handle(io, ready, Handle::current())
-    }
-
-    /// Same as `new_with_ready` but also accepts an explicit handle.
     pub(crate) fn new_with_ready_and_handle<T>(
         io: &T,
         ready: mio::Ready,

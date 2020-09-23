@@ -143,11 +143,6 @@ impl TryFrom<UnixStream> for mio_uds::UnixStream {
     type Error = io::Error;
 
     /// Consumes value, returning the mio I/O object.
-    ///
-    /// See [`PollEvented::into_inner`] for more details about
-    /// resource deregistration that happens during the call.
-    ///
-    /// [`PollEvented::into_inner`]: crate::io::PollEvented::into_inner
     fn try_from(value: UnixStream) -> Result<Self, Self::Error> {
         value.io.into_inner()
     }

@@ -1,4 +1,4 @@
-use crate::io::driver::{Direction, ReadyEvent};
+use crate::io::driver::{Direction, Handle, ReadyEvent};
 use crate::io::registration::Registration;
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 
@@ -90,6 +90,7 @@ where
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
+    #[cfg_attr(feature = "signal", allow(unused))]
     pub(crate) fn new(io: E) -> io::Result<Self> {
         PollEvented::new_with_ready(io, mio::Ready::all())
     }
@@ -118,8 +119,17 @@ where
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
+    #[cfg_attr(feature = "signal", allow(unused))]
     pub(crate) fn new_with_ready(io: E, ready: mio::Ready) -> io::Result<Self> {
-        let registration = Registration::new_with_ready(&io, ready)?;
+        Self::new_with_ready_and_handle(io, ready, Handle::current())
+    }
+
+    pub(crate) fn new_with_ready_and_handle(
+        io: E,
+        ready: mio::Ready,
+        handle: Handle,
+    ) -> io::Result<Self> {
+        let registration = Registration::new_with_ready_and_handle(&io, ready, handle)?;
         Ok(Self {
             io: Some(io),
             registration,
@@ -128,7 +138,13 @@ where
 
     /// Returns a shared reference to the underlying I/O object this readiness
     /// stream is wrapping.
-    #[cfg(any(feature = "process", feature = "tcp", feature = "udp", feature = "uds",))]
+    #[cfg(any(
+        feature = "process",
+        feature = "tcp",
+        feature = "udp",
+        feature = "uds",
+        feature = "signal"
+    ))]
     pub(crate) fn get_ref(&self) -> &E {
         self.io.as_ref().unwrap()
     }
