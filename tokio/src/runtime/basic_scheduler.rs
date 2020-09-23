@@ -18,19 +18,18 @@ use std::{cell::RefCell, sync::PoisonError};
 pub(crate) struct BasicScheduler<P: Park> {
     /// Inner state guarded by a mutex that is shared
     /// between all `block_on` calls.
-    inner: Mutex<Inner<P>>,
+    inner: Mutex<Option<Inner<P>>>,
+
+    /// Notifier for waking up other threads to steal the
+    /// parker.
+    notify: Notify,
 
     /// Sendable task spawner
     spawner: Spawner,
 }
 
-struct Inner<P: Park> {
-    scheduler: Option<Scheduler<P>>,
-    notify: Arc<Notify>,
-}
-
 /// The inner scheduler that owns the task queue and the main parker P.
-struct Scheduler<P: Park> {
+struct Inner<P: Park> {
     /// Scheduler run queue
     ///
     /// When the scheduler is executed, the queue is removed from `self` and
@@ -105,7 +104,7 @@ impl<P: Park> BasicScheduler<P> {
             }),
         };
 
-        let scheduler = Some(Scheduler {
+        let inner = Mutex::new(Some(Inner {
             tasks: Some(Tasks {
                 owned: LinkedList::new(),
                 queue: VecDeque::with_capacity(INITIAL_CAPACITY),
@@ -113,14 +112,13 @@ impl<P: Park> BasicScheduler<P> {
             spawner: spawner.clone(),
             tick: 0,
             park,
-        });
+        }));
 
-        let inner = Mutex::new(Inner {
-            scheduler,
-            notify: Arc::new(Notify::new()),
-        });
-
-        BasicScheduler { inner, spawner }
+        BasicScheduler {
+            inner,
+            notify: Notify::new(),
+            spawner,
+        }
     }
 
     pub(crate) fn spawner(&self) -> &Spawner {
@@ -144,19 +142,13 @@ impl<P: Park> BasicScheduler<P> {
             inner.block_on(future)
         } else {
             let enter = crate::runtime::enter(false);
-
             let mut park = CachedParkThread::new();
             let waker = park.unpark().into_waker();
             let mut cx = std::task::Context::from_waker(&waker);
 
             pin!(future);
 
-            let notifier = {
-                let lock = self.inner.lock().unwrap();
-                lock.notify.clone()
-            };
-
-            let mut notified = Box::pin(notifier.notified());
+            let mut notified = Box::pin(self.notify.notified());
 
             loop {
                 if let Ready(_) = notified.as_mut().poll(&mut cx) {
@@ -172,7 +164,7 @@ impl<P: Park> BasicScheduler<P> {
                         // Since the notify future polled to ready, it will panic if polled again
                         // beyond ready. To avoid this, lets create a new future. This allocation is
                         // unfortunate but should be extremely rare.
-                        notified = Box::pin(notifier.notified());
+                        notified = Box::pin(self.notify.notified());
                     }
                 }
 
@@ -189,8 +181,7 @@ impl<P: Park> BasicScheduler<P> {
     }
 
     fn take_inner(&self) -> Option<InnerGuard<'_, P>> {
-        let mut lock = self.inner.lock().unwrap();
-        let inner = lock.scheduler.take()?;
+        let inner = self.inner.lock().unwrap().take()?;
 
         Some(InnerGuard {
             inner: Some(inner),
@@ -199,7 +190,7 @@ impl<P: Park> BasicScheduler<P> {
     }
 }
 
-impl<P: Park> Scheduler<P> {
+impl<P: Park> Inner<P> {
     /// Block on the future provided and drive the runtime's driver.
     fn block_on<F: Future>(&mut self, future: F) -> F::Output {
         enter(self, |scheduler, context| {
@@ -259,16 +250,16 @@ impl<P: Park> Scheduler<P> {
 
 /// Enter the scheduler context. This sets the queue and other necessary
 /// scheduler state in the thread-local
-fn enter<F, R, P>(scheduler: &mut Scheduler<P>, f: F) -> R
+fn enter<F, R, P>(scheduler: &mut Inner<P>, f: F) -> R
 where
-    F: FnOnce(&mut Scheduler<P>, &Context) -> R,
+    F: FnOnce(&mut Inner<P>, &Context) -> R,
     P: Park,
 {
     // Ensures the run queue is placed back in the `BasicScheduler` instance
     // once `block_on` returns.`
     struct Guard<'a, P: Park> {
         context: Option<Context>,
-        scheduler: &'a mut Scheduler<P>,
+        scheduler: &'a mut Inner<P>,
     }
 
     impl<P: Park> Drop for Guard<'_, P> {
@@ -300,14 +291,15 @@ impl<P: Park> Drop for BasicScheduler<P> {
         // Avoid a double panic if we are currently panicking and
         // the lock may be poisoned.
 
-        let mut inner = {
-            let mut lock = self.inner.lock().unwrap_or_else(PoisonError::into_inner);
-
-            match lock.scheduler.take() {
-                Some(inner) => inner,
-                None if std::thread::panicking() => return,
-                None => panic!("Oh no! We never placed the Inner state back, this is a bug!"),
-            }
+        let mut inner = match self
+            .inner
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take()
+        {
+            Some(inner) => inner,
+            None if std::thread::panicking() => return,
+            None => panic!("Oh no! We never placed the Inner state back, this is a bug!"),
         };
 
         enter(&mut inner, |scheduler, context| {
@@ -427,7 +419,7 @@ impl Wake for Shared {
 /// back into its slot in `BasicScheduler`, even if the
 /// future panics.
 struct InnerGuard<'a, P: Park> {
-    inner: Option<Scheduler<P>>,
+    inner: Option<Inner<P>>,
     basic_scheduler: &'a BasicScheduler<P>,
 }
 
@@ -452,11 +444,11 @@ impl<P: Park> Drop for InnerGuard<'_, P> {
 
             // Replace old scheduler back into the state to allow
             // other threads to pick it up and drive it.
-            lock.scheduler.replace(scheduler);
+            lock.replace(scheduler);
 
             // Wake up other possible threads that could steal
             // the dedicated parker P.
-            lock.notify.notify_one()
+            self.basic_scheduler.notify.notify_one()
         }
     }
 }
