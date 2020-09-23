@@ -12,6 +12,10 @@ mod rand;
 mod wake;
 pub(crate) use wake::{waker_ref, Wake};
 
+cfg_rt_core! {
+    pub(crate) use wake::WakerRef;
+}
+
 cfg_rt_threaded! {
     pub(crate) use rand::FastRand;
 

@@ -185,10 +185,10 @@ impl TcpListener {
         poll_fn(|cx| self.poll_accept(cx)).await
     }
 
-    /// Attempts to poll `SocketAddr` and `TcpStream` bound to this address.
+    /// Polls to accept a new incoming connection to this listener.
     ///
-    /// In case if I/O resource isn't ready yet, `Poll::Pending` is returned and
-    /// current task will be notified by a waker.
+    /// If there is no connection to accept, `Poll::Pending` is returned and
+    /// the current task will be notified by a waker.
     pub fn poll_accept(
         &mut self,
         cx: &mut Context<'_>,

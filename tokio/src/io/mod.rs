@@ -214,6 +214,8 @@ cfg_io_driver! {
 }
 
 cfg_io_std! {
+    mod stdio_common;
+
     mod stderr;
     pub use stderr::{stderr, Stderr};
 
