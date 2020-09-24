@@ -3,7 +3,14 @@
 macro_rules! cfg_resource_drivers {
     ($($item:item)*) => {
         $(
-            #[cfg(any(feature = "io-driver", feature = "time"))]
+            #[cfg(any(
+                feature = "process",
+                all(unix, feature = "signal"),
+                all(not(loom), feature = "tcp"),
+                feature = "time",
+                all(not(loom), feature = "udp"),
+                all(not(loom), feature = "uds"),
+            ))]
             $item
         )*
     }
@@ -89,9 +96,13 @@ macro_rules! cfg_atomic_waker_impl {
     ($($item:item)*) => {
         $(
             #[cfg(any(
-                feature = "io-driver",
+                feature = "process",
+                all(feature = "rt-core", feature = "rt-util"),
+                feature = "signal",
+                feature = "tcp",
                 feature = "time",
-                all(feature = "rt-core", feature = "rt-util")
+                feature = "udp",
+                feature = "uds",
             ))]
             #[cfg(not(loom))]
             $item
@@ -128,7 +139,20 @@ macro_rules! cfg_io_blocking {
 macro_rules! cfg_io_driver {
     ($($item:item)*) => {
         $(
-            #[cfg(feature = "io-driver")]
+            #[cfg(any(
+                feature = "process",
+                all(unix, feature = "signal"),
+                feature = "tcp",
+                feature = "udp",
+                feature = "uds",
+            ))]
+            #[cfg_attr(docsrs, doc(cfg(any(
+                feature = "process",
+                all(unix, feature = "signal"),
+                feature = "tcp",
+                feature = "udp",
+                feature = "uds",
+            ))))]
             $item
         )*
     }
@@ -137,7 +161,13 @@ macro_rules! cfg_io_driver {
 macro_rules! cfg_not_io_driver {
     ($($item:item)*) => {
         $(
-            #[cfg(not(feature = "io-driver"))]
+            #[cfg(not(any(
+                feature = "process",
+                all(unix, feature = "signal"),
+                feature = "tcp",
+                feature = "udp",
+                feature = "uds",
+            )))]
             $item
         )*
     }
@@ -407,13 +437,16 @@ macro_rules! cfg_coop {
                     feature = "blocking",
                     feature = "dns",
                     feature = "fs",
-                    feature = "io-driver",
                     feature = "io-std",
                     feature = "process",
                     feature = "rt-core",
+                    feature = "signal",
                     feature = "sync",
                     feature = "stream",
-                    feature = "time"
+                    feature = "tcp",
+                    feature = "time",
+                    feature = "udp",
+                    feature = "uds",
                     ))]
             $item
         )*
