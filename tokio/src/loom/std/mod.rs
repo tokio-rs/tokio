@@ -66,7 +66,6 @@ pub(crate) mod sync {
     pub(crate) use std::sync::{Condvar, MutexGuard, RwLock, RwLockReadGuard, WaitTimeoutResult};
 
     #[cfg(not(feature = "parking_lot"))]
-    #[allow(unused_imports, dead_code)]
     pub(crate) use crate::loom::std::mutex::Mutex;
 
     pub(crate) mod atomic {

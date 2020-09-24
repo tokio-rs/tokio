@@ -5,6 +5,7 @@ use std::sync::{self, MutexGuard, TryLockError};
 #[derive(Debug)]
 pub(crate) struct Mutex<T: ?Sized>(sync::Mutex<T>);
 
+#[allow(dead_code)]
 impl<T> Mutex<T> {
     #[inline]
     pub(crate) fn new(t: T) -> Mutex<T> {
