@@ -199,7 +199,7 @@ impl Semaphore {
         let mut curr = self.permits.load(Acquire);
         loop {
             // Has the semaphore closed?
-            if curr & Self::CLOSED > 0 {
+            if curr & Self::CLOSED == Self::CLOSED {
                 return Err(TryAcquireError::Closed);
             }
 
