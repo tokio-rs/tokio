@@ -26,12 +26,13 @@ pub(crate) struct ScheduledIo {
     waiters: Mutex<Waiters>,
 }
 
-#[cfg(feature = "io-readiness")]
-type WaitList = LinkedList<Waiter, <Waiter as linked_list::Link>::Target>;
+cfg_io_readiness! {
+    type WaitList = LinkedList<Waiter, <Waiter as linked_list::Link>::Target>;
+}
 
 #[derive(Debug, Default)]
 struct Waiters {
-    #[cfg(feature = "io-readiness")]
+    #[cfg(any(feature = "udp", feature = "uds"))]
     /// List of all current waiters
     list: WaitList,
 
@@ -208,7 +209,7 @@ impl ScheduledIo {
             }
         }
 
-        #[cfg(feature = "io-readiness")]
+        #[cfg(any(feature = "udp", feature = "uds"))]
         {
             // check list of waiters
             for waiter in waiters
