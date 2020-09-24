@@ -118,7 +118,7 @@ where
     type Item = Result<U::Item, U::Error>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        use crate::io::poll_read_buf;
+        use crate::util::poll_read_buf;
 
         let mut pinned = self.project();
         let state: &mut ReadFrame = pinned.state.borrow_mut();

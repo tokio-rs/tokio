@@ -70,7 +70,7 @@ impl<R: AsyncRead> ReaderStream<R> {
 impl<R: AsyncRead> Stream for ReaderStream<R> {
     type Item = std::io::Result<Bytes>;
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        use crate::io::poll_read_buf;
+        use crate::util::poll_read_buf;
 
         let mut this = self.as_mut().project();
 
