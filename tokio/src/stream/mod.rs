@@ -125,6 +125,7 @@ cfg_time! {
     use crate::stream::throttle::{throttle, Throttle};
 }
 
+#[doc(no_inline)]
 pub use futures_core::Stream;
 
 /// An extension trait for `Stream`s that provides a variety of convenient
