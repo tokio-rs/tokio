@@ -1,7 +1,6 @@
 use crate::io::util::DEFAULT_BUF_SIZE;
 use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite, ReadBuf};
 
-use bytes::Buf;
 use pin_project_lite::pin_project;
 use std::io;
 use std::pin::Pin;
@@ -149,14 +148,6 @@ impl<R: AsyncRead + AsyncWrite> AsyncWrite for BufReader<R> {
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
         self.get_pin_mut().poll_write(cx, buf)
-    }
-
-    fn poll_write_buf<B: Buf>(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        self.get_pin_mut().poll_write_buf(cx, buf)
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
