@@ -83,7 +83,7 @@ pub(crate) struct Entry {
     /// Next entry in the State's linked list.
     ///
     /// This is only accessed by the timer
-    pub(super) next_stack: UnsafeCell<Option<Arc<Entry>>>,
+    pub(crate) next_stack: UnsafeCell<Option<Arc<Entry>>>,
 
     /// Previous entry in the State's linked list.
     ///
@@ -91,7 +91,7 @@ pub(crate) struct Entry {
     /// entry.
     ///
     /// This is a weak reference.
-    pub(super) prev_stack: UnsafeCell<*const Entry>,
+    pub(crate) prev_stack: UnsafeCell<*const Entry>,
 }
 
 /// Stores the info for `Delay`.
@@ -145,6 +145,10 @@ impl Entry {
     #[allow(clippy::mut_from_ref)] // https://github.com/rust-lang/rust-clippy/issues/4281
     pub(crate) unsafe fn time_mut(&self) -> &mut Time {
         &mut *self.time.0.get()
+    }
+
+    pub(crate) fn when(&self) -> u64 {
+        self.when_internal().expect("invalid internal state")
     }
 
     /// The current entry state as known by the timer. This is not the value of

@@ -12,9 +12,6 @@ pub(crate) use self::handle::Handle;
 mod registration;
 pub(crate) use self::registration::Registration;
 
-mod stack;
-use self::stack::Stack;
-
 use crate::loom::sync::atomic::{AtomicU64, AtomicUsize};
 use crate::park::{Park, Unpark};
 use crate::time::{wheel, Error};
@@ -87,7 +84,7 @@ pub(crate) struct Driver<T: Park> {
     inner: Arc<Inner>,
 
     /// Timer wheel
-    wheel: wheel::Wheel<Stack>,
+    wheel: wheel::Wheel,
 
     /// Thread parker. The `Driver` park implementation delegates to this.
     park: T,
