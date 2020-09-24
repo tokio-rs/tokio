@@ -72,12 +72,14 @@ mod util {
             return Poll::Ready(Ok(0));
         }
 
+        let orig = buf.bytes_mut().as_ptr() as *const u8;
         let mut b = ReadBuf::uninit(buf.bytes_mut());
 
         ready!(io.poll_read(cx, &mut b))?;
         let n = b.filled().len();
 
         // Safety: we can assume `n` bytes were read, since they are in`filled`.
+        assert_eq!(orig, b.filled().as_ptr());
         unsafe {
             buf.advance_mut(n);
         }
