@@ -456,13 +456,9 @@ cfg_sync! {
 }
 
 cfg_not_sync! {
-    cfg_rt_core! {
-        mod notify;
-        pub(crate) use notify::Notify;
-    }
-}
+    mod notify;
+    pub(crate) use notify::Notify;
 
-cfg_not_sync! {
     cfg_atomic_waker_impl! {
         mod task;
         pub(crate) use task::AtomicWaker;
@@ -474,7 +470,7 @@ cfg_not_sync! {
             feature = "signal"))]
     pub(crate) mod oneshot;
 
-    cfg_signal! {
+    cfg_signal_internal! {
         pub(crate) mod mpsc;
         pub(crate) mod batch_semaphore;
     }

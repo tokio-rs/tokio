@@ -8,7 +8,7 @@ cfg_time! {
 }
 
 use std::fmt;
-#[cfg(any(feature = "signal", feature = "stream"))]
+#[cfg(any(feature = "signal", feature = "process", feature = "stream"))]
 use std::task::{Context, Poll};
 
 /// Send values to the associated `Receiver`.
@@ -144,7 +144,7 @@ impl<T> Receiver<T> {
         poll_fn(|cx| self.chan.recv(cx)).await
     }
 
-    #[cfg(feature = "signal")]
+    #[cfg(any(feature = "signal", feature = "process"))]
     pub(crate) fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         self.chan.recv(cx)
     }

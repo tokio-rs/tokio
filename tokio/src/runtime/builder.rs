@@ -1,4 +1,3 @@
-use crate::loom::sync::Mutex;
 use crate::runtime::handle::Handle;
 use crate::runtime::shell::Shell;
 use crate::runtime::{blocking, driver, io, Callback, Runtime, Spawner};
@@ -139,7 +138,13 @@ impl Builder {
     ///     .unwrap();
     /// ```
     pub fn enable_all(&mut self) -> &mut Self {
-        #[cfg(feature = "io-driver")]
+        #[cfg(any(
+            feature = "process",
+            all(unix, feature = "signal"),
+            feature = "tcp",
+            feature = "udp",
+            feature = "uds",
+        ))]
         self.enable_io();
         #[cfg(feature = "time")]
         self.enable_time();
@@ -377,7 +382,7 @@ impl Builder {
         let blocking_spawner = blocking_pool.spawner().clone();
 
         Ok(Runtime {
-            kind: Kind::Shell(Mutex::new(Some(Shell::new(driver)))),
+            kind: Kind::Shell(Shell::new(driver)),
             handle: Handle {
                 spawner,
                 io_handle: resources.io_handle,

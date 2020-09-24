@@ -38,26 +38,14 @@ cfg_not_io_driver! {
 }
 
 // ===== signal driver =====
-
-macro_rules! cfg_unix_and_signal {
+macro_rules! cfg_signal_internal_and_unix {
     ($($item:item)*) => {
-        $(
-            #[cfg(all(not(loom), unix, feature = "signal"))]
-            $item
-        )*
+        #[cfg(unix)]
+        cfg_signal_internal! { $($item)* }
     }
 }
 
-macro_rules! cfg_neither_unix_nor_windows {
-    ($($item:item)*) => {
-        $(
-            #[cfg(any(loom, not(all(unix, feature = "signal"))))]
-            $item
-        )*
-    }
-}
-
-cfg_unix_and_signal! {
+cfg_signal_internal_and_unix! {
     type SignalDriver = crate::park::Either<crate::signal::unix::driver::Driver, IoDriver>;
     pub(crate) type SignalHandle = Option<crate::signal::unix::driver::Handle>;
 
@@ -76,7 +64,7 @@ cfg_unix_and_signal! {
     }
 }
 
-cfg_neither_unix_nor_windows! {
+cfg_not_signal_internal! {
     type SignalDriver = IoDriver;
     pub(crate) type SignalHandle = ();
 
