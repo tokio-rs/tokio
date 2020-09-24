@@ -146,7 +146,7 @@ macro_rules! cfg_not_io_driver {
 macro_rules! cfg_io_readiness {
     ($($item:item)*) => {
         $(
-            #[cfg(feature = "io-readiness")]
+            #[cfg(any(feature = "udp", feature = "uds"))]
             $item
         )*
     }
