@@ -125,6 +125,7 @@ mod wheel;
 mod tests;
 
 // Re-export for convenience
+#[doc(no_inline)]
 pub use std::time::Duration;
 
 // ===== Internal utils =====
