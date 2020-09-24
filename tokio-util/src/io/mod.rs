@@ -20,7 +20,11 @@ use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-pub(crate) fn poll_read_buf<T: AsyncRead>(cx: &mut Context<'_>, io: Pin<&mut T>, buf: &mut impl BufMut) -> Poll<io::Result<usize>> {
+pub(crate) fn poll_read_buf<T: AsyncRead>(
+    cx: &mut Context<'_>,
+    io: Pin<&mut T>,
+    buf: &mut impl BufMut,
+) -> Poll<io::Result<usize>> {
     if !buf.has_remaining_mut() {
         return Poll::Ready(Ok(0));
     }
