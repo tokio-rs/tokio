@@ -1,4 +1,3 @@
-use crate::loom::sync::Mutex;
 use crate::runtime::handle::Handle;
 use crate::runtime::shell::Shell;
 use crate::runtime::{blocking, driver, io, Callback, Runtime, Spawner};
@@ -377,7 +376,7 @@ impl Builder {
         let blocking_spawner = blocking_pool.spawner().clone();
 
         Ok(Runtime {
-            kind: Kind::Shell(Mutex::new(Some(Shell::new(driver)))),
+            kind: Kind::Shell(Shell::new(driver)),
             handle: Handle {
                 spawner,
                 io_handle: resources.io_handle,
