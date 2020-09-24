@@ -100,7 +100,7 @@ impl AsyncRead for DuplexStream {
         cx: &mut task::Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<std::io::Result<()>> {
-        Pin::new(&mut *self.read.lock().unwrap()).poll_read(cx, buf)
+        Pin::new(&mut *self.read.lock()).poll_read(cx, buf)
     }
 }
 
@@ -111,7 +111,7 @@ impl AsyncWrite for DuplexStream {
         cx: &mut task::Context<'_>,
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
-        Pin::new(&mut *self.write.lock().unwrap()).poll_write(cx, buf)
+        Pin::new(&mut *self.write.lock()).poll_write(cx, buf)
     }
 
     #[allow(unused_mut)]
@@ -119,7 +119,7 @@ impl AsyncWrite for DuplexStream {
         mut self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
     ) -> Poll<std::io::Result<()>> {
-        Pin::new(&mut *self.write.lock().unwrap()).poll_flush(cx)
+        Pin::new(&mut *self.write.lock()).poll_flush(cx)
     }
 
     #[allow(unused_mut)]
@@ -127,14 +127,14 @@ impl AsyncWrite for DuplexStream {
         mut self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
     ) -> Poll<std::io::Result<()>> {
-        Pin::new(&mut *self.write.lock().unwrap()).poll_shutdown(cx)
+        Pin::new(&mut *self.write.lock()).poll_shutdown(cx)
     }
 }
 
 impl Drop for DuplexStream {
     fn drop(&mut self) {
         // notify the other side of the closure
-        self.write.lock().unwrap().close();
+        self.write.lock().close();
     }
 }
 

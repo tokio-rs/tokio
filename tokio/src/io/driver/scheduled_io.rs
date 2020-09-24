@@ -193,7 +193,7 @@ impl ScheduledIo {
     }
 
     pub(super) fn wake(&self, ready: mio::Ready) {
-        let mut waiters = self.waiters.lock().unwrap();
+        let mut waiters = self.waiters.lock();
 
         // check for AsyncRead slot
         if !(ready & (!mio::Ready::writable())).is_empty() {
@@ -241,7 +241,7 @@ impl ScheduledIo {
 
         if ready.is_empty() {
             // Update the task info
-            let mut waiters = self.waiters.lock().unwrap();
+            let mut waiters = self.waiters.lock();
             let slot = match direction {
                 Direction::Read => &mut waiters.reader,
                 Direction::Write => &mut waiters.writer,
@@ -375,7 +375,7 @@ cfg_io_readiness! {
                         }
 
                         // Wasn't ready, take the lock (and check again while locked).
-                        let mut waiters = scheduled_io.waiters.lock().unwrap();
+                        let mut waiters = scheduled_io.waiters.lock();
 
                         let curr = scheduled_io.readiness.load(SeqCst);
                         let readiness = mio::Ready::from_usize(READINESS.unpack(curr));
@@ -408,7 +408,7 @@ cfg_io_readiness! {
                         // `notify.waiters`). In order to access the waker fields,
                         // we must hold the lock.
 
-                        let waiters = scheduled_io.waiters.lock().unwrap();
+                        let waiters = scheduled_io.waiters.lock();
 
                         // Safety: called while locked
                         let w = unsafe { &mut *waiter.get() };
@@ -450,7 +450,7 @@ cfg_io_readiness! {
 
     impl Drop for Readiness<'_> {
         fn drop(&mut self) {
-            let mut waiters = self.scheduled_io.waiters.lock().unwrap();
+            let mut waiters = self.scheduled_io.waiters.lock();
 
             // Safety: `waiter` is only ever stored in `waiters`
             unsafe {
