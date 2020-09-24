@@ -223,6 +223,25 @@ macro_rules! cfg_signal {
     }
 }
 
+macro_rules! cfg_signal_internal {
+    ($($item:item)*) => {
+        $(
+            #[cfg(any(feature = "signal", all(unix, feature = "process")))]
+            #[cfg(not(loom))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_not_signal_internal {
+    ($($item:item)*) => {
+        $(
+            #[cfg(any(loom, not(unix), not(any(feature = "signal", all(unix, feature = "process")))))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_stream {
     ($($item:item)*) => {
         $(

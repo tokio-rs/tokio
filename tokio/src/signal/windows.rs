@@ -14,9 +14,9 @@ use std::convert::TryFrom;
 use std::io;
 use std::sync::Once;
 use std::task::{Context, Poll};
-use winapi::shared::minwindef::*;
+use winapi::shared::minwindef::{BOOL, DWORD, FALSE, TRUE};
 use winapi::um::consoleapi::SetConsoleCtrlHandler;
-use winapi::um::wincon::*;
+use winapi::um::wincon::{CTRL_BREAK_EVENT, CTRL_C_EVENT};
 
 #[derive(Debug)]
 pub(crate) struct OsStorage {
