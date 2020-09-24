@@ -471,7 +471,7 @@ cfg_not_sync! {
             feature = "signal"))]
     pub(crate) mod oneshot;
 
-    cfg_signal! {
+    cfg_signal_internal! {
         pub(crate) mod mpsc;
         pub(crate) mod semaphore_ll;
     }

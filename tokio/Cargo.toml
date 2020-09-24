@@ -59,10 +59,11 @@ macros = ["tokio-macros"]
 net = ["dns", "tcp", "udp", "uds"]
 process = [
   "io-driver",
+  "lazy_static",
   "libc",
   "mio-named-pipes",
-  "signal",
-  "winapi/consoleapi",
+  "mio-uds",
+  "signal-hook-registry",
   "winapi/threadpoollegacyapiset",
 ]
 # Includes basic task execution capabilities
