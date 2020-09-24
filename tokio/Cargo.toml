@@ -50,16 +50,15 @@ full = [
 blocking = ["rt-core"]
 dns = ["rt-core"]
 fs = ["rt-core", "io-util"]
-io-driver = ["mio", "lazy_static"] # internal only
 io-util = ["memchr"]
 # stdin, stdout, stderr
 io-std = ["rt-core"]
 macros = ["tokio-macros"]
 net = ["dns", "tcp", "udp", "uds"]
 process = [
-  "io-driver",
   "lazy_static",
   "libc",
+  "mio",
   "mio-named-pipes",
   "mio-uds",
   "signal-hook-registry",
@@ -73,9 +72,9 @@ rt-threaded = [
   "rt-core",
 ]
 signal = [
-  "io-driver",
   "lazy_static",
   "libc",
+  "mio",
   "mio-uds",
   "signal-hook-registry",
   "winapi/consoleapi",
@@ -83,10 +82,10 @@ signal = [
 stream = ["futures-core"]
 sync = ["fnv"]
 test-util = []
-tcp = ["io-driver", "iovec"]
+tcp = ["iovec", "lazy_static", "mio"]
 time = ["slab"]
-udp = ["io-driver"]
-uds = ["io-driver", "mio-uds", "libc"]
+udp = ["lazy_static", "mio"]
+uds = ["lazy_static", "libc", "mio", "mio-uds"]
 
 [dependencies]
 tokio-macros = { version = "0.3.0", path = "../tokio-macros", optional = true }

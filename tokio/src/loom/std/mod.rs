@@ -14,7 +14,14 @@ pub(crate) mod cell {
     pub(crate) use super::unsafe_cell::UnsafeCell;
 }
 
-#[cfg(any(feature = "sync", feature = "io-driver"))]
+#[cfg(any(
+    feature = "process",
+    feature = "signal",
+    feature = "sync",
+    feature = "tcp",
+    feature = "udp",
+    feature = "uds",
+))]
 pub(crate) mod future {
     pub(crate) use crate::sync::AtomicWaker;
 }
