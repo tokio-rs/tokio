@@ -27,5 +27,4 @@ impl<T> Mutex<T> {
             Err(TryLockError::WouldBlock) => None,
         }
     }
-
 }
