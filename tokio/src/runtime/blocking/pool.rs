@@ -129,7 +129,7 @@ impl BlockingPool {
     }
 
     pub(crate) fn shutdown(&mut self, timeout: Option<Duration>) {
-        let mut shared = self.spawner.inner.shared.lock().unwrap();
+        let mut shared = self.spawner.inner.shared.lock();
 
         // The function can be called multiple times. First, by explicitly
         // calling `shutdown` then by the drop handler calling `shutdown`. This
@@ -170,7 +170,7 @@ impl fmt::Debug for BlockingPool {
 impl Spawner {
     pub(crate) fn spawn(&self, task: Task, rt: &Handle) -> Result<(), ()> {
         let shutdown_tx = {
-            let mut shared = self.inner.shared.lock().unwrap();
+            let mut shared = self.inner.shared.lock();
 
             if shared.shutdown {
                 // Shutdown the task
@@ -207,7 +207,7 @@ impl Spawner {
         };
 
         if let Some(shutdown_tx) = shutdown_tx {
-            let mut shared = self.inner.shared.lock().unwrap();
+            let mut shared = self.inner.shared.lock();
             let entry = shared.worker_threads.vacant_entry();
 
             let handle = self.spawn_thread(shutdown_tx, rt, entry.key());
@@ -251,7 +251,7 @@ impl Inner {
             f()
         }
 
-        let mut shared = self.shared.lock().unwrap();
+        let mut shared = self.shared.lock();
 
         'main: loop {
             // BUSY
@@ -259,7 +259,7 @@ impl Inner {
                 drop(shared);
                 task.run();
 
-                shared = self.shared.lock().unwrap();
+                shared = self.shared.lock();
             }
 
             // IDLE
@@ -296,7 +296,7 @@ impl Inner {
                     drop(shared);
                     task.shutdown();
 
-                    shared = self.shared.lock().unwrap();
+                    shared = self.shared.lock();
                 }
 
                 // Work was produced, and we "took" it (by decrementing num_notify).

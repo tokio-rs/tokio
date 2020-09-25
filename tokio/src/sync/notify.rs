@@ -306,7 +306,7 @@ impl Notify {
         }
 
         // There are waiters, the lock must be acquired to notify.
-        let mut waiters = self.waiters.lock().unwrap();
+        let mut waiters = self.waiters.lock();
 
         // The state must be reloaded while the lock is held. The state may only
         // transition out of WAITING while the lock is held.
@@ -321,7 +321,7 @@ impl Notify {
     /// Notifies all waiting tasks
     pub(crate) fn notify_waiters(&self) {
         // There are waiters, the lock must be acquired to notify.
-        let mut waiters = self.waiters.lock().unwrap();
+        let mut waiters = self.waiters.lock();
 
         // The state must be reloaded while the lock is held. The state may only
         // transition out of WAITING while the lock is held.
@@ -452,7 +452,7 @@ impl Future for Notified<'_> {
 
                     // Acquire the lock and attempt to transition to the waiting
                     // state.
-                    let mut waiters = notify.waiters.lock().unwrap();
+                    let mut waiters = notify.waiters.lock();
 
                     // Reload the state with the lock held
                     let mut curr = notify.state.load(SeqCst);
@@ -516,7 +516,7 @@ impl Future for Notified<'_> {
                     // `notify.waiters`). In order to access the waker fields,
                     // we must hold the lock.
 
-                    let waiters = notify.waiters.lock().unwrap();
+                    let waiters = notify.waiters.lock();
 
                     // Safety: called while locked
                     let w = unsafe { &mut *waiter.get() };
@@ -564,7 +564,7 @@ impl Drop for Notified<'_> {
         // longer stored in the linked list.
         if let Waiting = *state {
             let mut notify_state = WAITING;
-            let mut waiters = notify.waiters.lock().unwrap();
+            let mut waiters = notify.waiters.lock();
 
             // `Notify.state` may be in any of the three states (Empty, Waiting,
             // Notified). It doesn't actually matter what the atomic is set to
