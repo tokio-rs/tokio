@@ -236,8 +236,8 @@ cfg_io_util! {
 
     pub(crate) mod util;
     pub use util::{
-        copy, duplex, empty, repeat, sink, AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt,
-        BufReader, BufStream, BufWriter, DuplexStream, Copy, Empty, Lines, Repeat, Sink, Split, Take,
+        copy, copy_buf, duplex, empty, repeat, sink, AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt,
+        BufReader, BufStream, BufWriter, DuplexStream, Copy, CopyBuf, Empty, Lines, Repeat, Sink, Split, Take,
     };
 }
 
