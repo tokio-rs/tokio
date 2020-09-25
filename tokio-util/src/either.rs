@@ -125,12 +125,12 @@ where
     L: AsyncSeek,
     R: AsyncSeek,
 {
-    fn start_seek(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        position: SeekFrom,
-    ) -> Poll<Result<()>> {
-        delegate_call!(self.start_seek(cx, position))
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
+        delegate_call!(self.poll_ready(cx))
+    }
+
+    fn start_seek(self: Pin<&mut Self>, position: SeekFrom) -> Result<()> {
+        delegate_call!(self.start_seek(position))
     }
 
     fn poll_complete(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<u64>> {

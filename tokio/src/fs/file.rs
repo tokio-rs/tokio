@@ -537,13 +537,31 @@ impl AsyncRead for File {
 }
 
 impl AsyncSeek for File {
-    fn start_seek(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        mut pos: SeekFrom,
-    ) -> Poll<io::Result<()>> {
+    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         loop {
             match self.state {
+                Idle(_) => return Poll::Ready(Ok(())),
+                Busy(ref mut rx) => {
+                    let (op, buf) = ready!(Pin::new(rx).poll(cx))?;
+                    self.state = Idle(Some(buf));
+                    match op {
+                        Operation::Read(_) => {}
+                        Operation::Write(Err(e)) => {
+                            assert!(self.last_write_err.is_none());
+                            self.last_write_err = Some(e.kind());
+                        }
+                        Operation::Write(_) => {}
+                        Operation::Seek(_) => {}
+                    }
+                }
+            }
+        }
+    }
+
+    fn start_seek(mut self: Pin<&mut Self>, mut pos: SeekFrom) -> io::Result<()> {
+        loop {
+            match self.state {
+                Busy(_) => panic!("must wait for poll_ready before calling start_seek"),
                 Idle(ref mut buf_cell) => {
                     let mut buf = buf_cell.take().unwrap();
 
@@ -562,22 +580,7 @@ impl AsyncSeek for File {
                         let res = (&*std).seek(pos);
                         (Operation::Seek(res), buf)
                     }));
-
-                    return Ready(Ok(()));
-                }
-                Busy(ref mut rx) => {
-                    let (op, buf) = ready!(Pin::new(rx).poll(cx))?;
-                    self.state = Idle(Some(buf));
-
-                    match op {
-                        Operation::Read(_) => {}
-                        Operation::Write(Err(e)) => {
-                            assert!(self.last_write_err.is_none());
-                            self.last_write_err = Some(e.kind());
-                        }
-                        Operation::Write(_) => {}
-                        Operation::Seek(_) => {}
-                    }
+                    return Ok(());
                 }
             }
         }

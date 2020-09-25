@@ -32,14 +32,14 @@ where
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let me = &mut *self;
+        ready!(Pin::new(&mut me.seek).poll_ready(cx))?;
         match me.pos {
-            Some(pos) => match Pin::new(&mut me.seek).start_seek(cx, pos) {
-                Poll::Ready(Ok(())) => {
+            Some(pos) => match Pin::new(&mut me.seek).start_seek(pos) {
+                Ok(()) => {
                     me.pos = None;
                     Pin::new(&mut me.seek).poll_complete(cx)
                 }
-                Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
-                Poll::Pending => Poll::Pending,
+                Err(e) => Poll::Ready(Err(e)),
             },
             None => Pin::new(&mut me.seek).poll_complete(cx),
         }
