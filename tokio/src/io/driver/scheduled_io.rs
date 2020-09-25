@@ -371,7 +371,7 @@ cfg_io_readiness! {
                             // Currently ready!
                             let tick = TICK.unpack(curr) as u8;
                             *state = State::Done;
-                            return Poll::Ready(ReadyEvent { readiness, tick });
+                            return Poll::Ready(ReadyEvent { readiness: interest, tick });
                         }
 
                         // Wasn't ready, take the lock (and check again while locked).
