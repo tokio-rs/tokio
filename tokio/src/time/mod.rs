@@ -101,8 +101,7 @@ pub mod delay_queue;
 pub use delay_queue::DelayQueue;
 
 mod delay;
-#[allow(deprecated)]
-pub use delay::{delay_for, delay_until, sleep, sleep_until, Delay};
+pub use delay::{sleep, sleep_until, Delay};
 
 pub(crate) mod driver;
 
