@@ -17,7 +17,7 @@ cfg_rt_threaded! {
     /// using the [`join!`] macro. To avoid this issue, use [`spawn_blocking`]
     /// instead.
     ///
-    /// Note that this function can only be used on the [threaded scheduler].
+    /// Note that this function can only be used when `core_threads > 1`.
     ///
     /// Code running behind `block_in_place` cannot be cancelled. When you shut
     /// down the executor, it will wait indefinitely for all blocking operations
@@ -27,7 +27,6 @@ cfg_rt_threaded! {
     /// returns.
     ///
     /// [blocking]: ../index.html#cpu-bound-tasks-and-blocking-code
-    /// [threaded scheduler]: fn@crate::runtime::Builder::threaded_scheduler
     /// [`spawn_blocking`]: fn@crate::task::spawn_blocking
     /// [`join!`]: macro@join
     /// [`thread::spawn`]: fn@std::thread::spawn
@@ -83,14 +82,13 @@ cfg_blocking! {
     /// cancel the tasks — they are simply allowed to keep running after the
     /// method returns.
     ///
-    /// Note that if you are using the [basic scheduler], this function will
+    /// Note that if you are using the single threaded runtime, this function will
     /// still spawn additional threads for blocking operations. The basic
     /// scheduler's single thread is only used for asynchronous code.
     ///
     /// [`Builder`]: struct@crate::runtime::Builder
     /// [blocking]: ../index.html#cpu-bound-tasks-and-blocking-code
     /// [rayon]: https://docs.rs/rayon
-    /// [basic scheduler]: fn@crate::runtime::Builder::basic_scheduler
     /// [`thread::spawn`]: fn@std::thread::spawn
     /// [`shutdown_timeout`]: fn@crate::runtime::Runtime::shutdown_timeout
     ///

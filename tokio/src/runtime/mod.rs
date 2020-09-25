@@ -384,14 +384,8 @@ impl Runtime {
     ///
     /// # Panics
     ///
-    /// This function will not panic unless task execution is disabled on the
-    /// executor. This can only happen if the runtime was built using
-    /// [`Builder`] without picking either [`basic_scheduler`] or
-    /// [`threaded_scheduler`].
-    ///
-    /// [`Builder`]: struct@Builder
-    /// [`threaded_scheduler`]: fn@Builder::threaded_scheduler
-    /// [`basic_scheduler`]: fn@Builder::basic_scheduler
+    /// This function will panic if `rt-core` or `rt-threaded` features
+    /// are not enabled.
     #[cfg(feature = "rt-core")]
     pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
