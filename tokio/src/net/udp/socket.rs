@@ -8,6 +8,64 @@ use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 cfg_udp! {
     /// A UDP socket
+    ///
+    /// UDP is "connectionless", unlike TCP. In tokio there are basically two main ways to use `UdpSocket`:
+    ///     - one to many: [`bind`](`UdpSocket::bind`) and use [`send_to`](`UdpSocket::send_to`) and `[`recv_from`](`UdpSocket::recv_from`) to communicate with many different addresses
+    ///     - one to one: [`connect`](`UdpSocket::connect`) and use [`send`](`UdpSocket::send`) and `[`recv`](`UdpSocket::recv`) only from the "connected" address
+    ///
+    /// `UdpSocket` can also be [`split`](`UdpSocket::split`) in order to send and receive data concurrently, by moving the `SendHalf` or `RecvHalf` to a different task.
+    ///
+    /// # One to many example (bind)
+    ///
+    /// Using `bind` we can create a simple echo server that sends and recv's with many different clients:
+    /// ```no_run
+    ///    use tokio::net::UdpSocket;
+    ///    use std::{io, net::SocketAddr};
+    ///
+    ///    #[tokio::main]
+    ///    async fn main() -> io::Result<()> {
+    ///        let mut sock = UdpSocket::bind("0.0.0.0:8080".parse::<SocketAddr>().unwrap()).await?;
+    ///        let mut buf = [0; 1024];
+    ///        loop {
+    ///            let (len, addr) = sock.recv_from(&mut buf).await?;
+    ///            println!("{:?} bytes received from {:?}", len, addr);
+    ///
+    ///            let len = sock.send_to(&buf[..len], addr).await?;
+    ///            println!("{:?} bytes sent", len);
+    ///        }
+    ///    }
+    /// ```
+    ///
+    /// # One to one example (connect)
+    ///
+    /// Or using `connect` we can echo with a single remote address using `send` and `recv`:
+    /// ```no_run
+    ///    use tokio::net::UdpSocket;
+    ///    use std::{io, net::SocketAddr};
+    ///
+    ///    #[tokio::main]
+    ///    async fn main() -> io::Result<()> {
+    ///        let mut sock = UdpSocket::bind("0.0.0.0:8080".parse::<SocketAddr>().unwrap()).await?;
+    ///
+    ///        let remote_addr = "127.0.0.1:59611".parse::<SocketAddr>().unwrap();
+    ///        sock.connect(remote_addr).await?;
+    ///        let mut buf = [0; 1024];
+    ///        loop {
+    ///            let len = sock.recv(&mut buf).await?;
+    ///            println!("{:?} bytes received from {:?}", len, remote_addr);
+    ///
+    ///            let len = sock.send(&buf[..len]).await?;
+    ///            println!("{:?} bytes sent", len);
+    ///        }
+    ///    }
+    /// ```
+    ///
+    /// # Streams
+    ///
+    /// If you need to listen over UDP and produce a [`Stream`](`crate::stream::Stream`), you can look
+    /// at [`UdpFramed`].
+    ///
+    /// [`UdpFramed`]: https://docs.rs/tokio-util/latest/tokio_util/udp/struct.UdpFramed.html
     pub struct UdpSocket {
         io: PollEvented<mio::net::UdpSocket>,
     }
