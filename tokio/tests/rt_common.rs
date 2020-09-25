@@ -588,7 +588,7 @@ rt_test! {
         let jh1 = thread::spawn(move || {
                 rt.block_on(async move {
                     rx2.await.unwrap();
-                    time::delay_for(Duration::from_millis(5)).await;
+                    time::sleep(Duration::from_millis(5)).await;
                     tx1.send(()).unwrap();
                 });
         });
@@ -596,9 +596,9 @@ rt_test! {
         let jh2 = thread::spawn(move || {
             rt2.block_on(async move {
                 tx2.send(()).unwrap();
-                time::delay_for(Duration::from_millis(5)).await;
+                time::sleep(Duration::from_millis(5)).await;
                 rx1.await.unwrap();
-                time::delay_for(Duration::from_millis(5)).await;
+                time::sleep(Duration::from_millis(5)).await;
             });
         });
 
