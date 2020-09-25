@@ -143,17 +143,16 @@ impl UdpSocket {
     ///
     /// ```no_run
     ///    use tokio::net::UdpSocket;
-    ///    use std::{io, net::SocketAddr};
+    /// #   use std::{io, net::SocketAddr};
     ///
-    ///    #[tokio::main]
-    ///    async fn main() -> io::Result<()> {
+    /// #   #[tokio::main]
+    /// #   async fn main() -> io::Result<()> {
     ///        let addr = "0.0.0.0:8080".parse::<SocketAddr>().unwrap();
     ///        let std_sock = std::net::UdpSocket::bind(addr)?;
     ///        let sock = UdpSocket::from_std(std_sock)?;
     ///        // use `sock`
-    ///      # let _ = sock;
-    ///        Ok(())
-    ///    }
+    /// #       Ok(())
+    /// #   }
     /// ```
     pub fn from_std(socket: net::UdpSocket) -> io::Result<UdpSocket> {
         let io = mio::net::UdpSocket::from_socket(socket)?;
@@ -166,17 +165,16 @@ impl UdpSocket {
     ///
     /// ```no_run
     ///    use tokio::net::UdpSocket;
-    ///    use std::{io, net::SocketAddr};
+    /// #   use std::{io, net::SocketAddr};
     ///
-    ///    #[tokio::main]
-    ///    async fn main() -> io::Result<()> {
+    /// #   #[tokio::main]
+    /// #   async fn main() -> io::Result<()> {
     ///        let addr = "0.0.0.0:8080".parse::<SocketAddr>().unwrap();
     ///        let sock = UdpSocket::bind(addr).await?;
     ///        // the address the socket is bound to
     ///        let local_addr = sock.local_addr()?;
-    ///      # let _ = sock;
-    ///        Ok(())
-    ///    }
+    /// #       Ok(())
+    /// #   }
     /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.io.get_ref().local_addr()
@@ -192,8 +190,8 @@ impl UdpSocket {
     ///    use tokio::net::UdpSocket;
     ///    # use std::{io, net::SocketAddr};
     ///
-    ///    #[tokio::main]
-    ///    async fn main() -> io::Result<()> {
+    /// #   #[tokio::main]
+    /// #   async fn main() -> io::Result<()> {
     ///        let sock = UdpSocket::bind("0.0.0.0:8080".parse::<SocketAddr>().unwrap()).await?;
     ///
     ///        let remote_addr = "127.0.0.1:59600".parse::<SocketAddr>().unwrap();
@@ -203,8 +201,8 @@ impl UdpSocket {
     ///        let len = sock.recv(&mut buf).await?;
     ///        // send to remote_addr
     ///        let _len = sock.send(&buf[..len]).await?;
-    ///        Ok(())
-    ///    }
+    /// #       Ok(())
+    /// #   }
     /// ```
     pub async fn connect<A: ToSocketAddrs>(&self, addr: A) -> io::Result<()> {
         let addrs = addr.to_socket_addrs().await?;
@@ -280,16 +278,16 @@ impl UdpSocket {
     ///
     /// ```no_run
     ///    use tokio::net::UdpSocket;
-    ///    use std::{io, net::SocketAddr};
+    /// #   use std::{io, net::SocketAddr};
     ///
-    ///    #[tokio::main]
-    ///    async fn main() -> io::Result<()> {
+    /// #   #[tokio::main]
+    /// #   async fn main() -> io::Result<()> {
     ///        let sock = UdpSocket::bind("0.0.0.0:8080".parse::<SocketAddr>().unwrap()).await?;
     ///        let buf = b"hello world";
     ///        let remote_addr = "127.0.0.1:58000".parse::<SocketAddr>().unwrap();
     ///        let _len = sock.send_to(&buf[..], remote_addr).await?;
-    ///        Ok(())
-    ///    }
+    /// #       Ok(())
+    /// #   }
     /// ```
     pub async fn send_to<A: ToSocketAddrs>(&self, buf: &[u8], target: A) -> io::Result<usize> {
         let mut addrs = target.to_socket_addrs().await?;
@@ -318,16 +316,16 @@ impl UdpSocket {
     ///
     /// ```no_run
     ///    use tokio::net::UdpSocket;
-    ///    use std::{io, net::SocketAddr};
+    /// #   use std::{io, net::SocketAddr};
     ///
-    ///    #[tokio::main]
-    ///    async fn main() -> io::Result<()> {
+    /// #   #[tokio::main]
+    /// #   async fn main() -> io::Result<()> {
     ///        let sock = UdpSocket::bind("0.0.0.0:8080".parse::<SocketAddr>().unwrap()).await?;
     ///        let buf = b"hello world";
     ///        let remote_addr = "127.0.0.1:58000".parse::<SocketAddr>().unwrap();
     ///        let _len = sock.try_send_to(&buf[..], remote_addr)?;
-    ///        Ok(())
-    ///    }
+    /// #       Ok(())
+    /// #   }
     /// ```
     ///
     /// [`ErrorKind::WouldBlock`]: std::io::ErrorKind::WouldBlock
@@ -352,16 +350,16 @@ impl UdpSocket {
     ///
     /// ```no_run
     ///    use tokio::net::UdpSocket;
-    ///    use std::{io, net::SocketAddr};
+    ///   # use std::{io, net::SocketAddr};
     ///
-    ///    #[tokio::main]
-    ///    async fn main() -> io::Result<()> {
+    /// #   #[tokio::main]
+    /// #   async fn main() -> io::Result<()> {
     ///        let sock = UdpSocket::bind("0.0.0.0:8080".parse::<SocketAddr>().unwrap()).await?;
     ///        let mut buf = [0u8; 32];
     ///        let (len, addr) = sock.recv_from(&mut buf).await?;
     ///        println!("received {:?} bytes from {:?}", len, addr);
-    ///        Ok(())
-    ///    }
+    ///  #      Ok(())
+    ///  #  }
     /// ```
     pub async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.io
@@ -453,6 +451,20 @@ impl UdpSocket {
     /// For more information about this option, see [`set_ttl`].
     ///
     /// [`set_ttl`]: method@Self::set_ttl
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::UdpSocket;
+    /// # use std::io;
+    ///
+    /// # async fn dox() -> io::Result<()> {
+    /// let sock = UdpSocket::bind("127.0.0.1:8080").await?;
+    ///
+    /// println!("{:?}", sock.ttl()?);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn ttl(&self) -> io::Result<u32> {
         self.io.get_ref().ttl()
     }
@@ -461,6 +473,20 @@ impl UdpSocket {
     ///
     /// This value sets the time-to-live field that is used in every packet sent
     /// from this socket.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::UdpSocket;
+    /// # use std::io;
+    ///
+    /// # async fn dox() -> io::Result<()> {
+    /// let sock = UdpSocket::bind("127.0.0.1:8080").await?;
+    /// sock.set_ttl(60)?;
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.io.get_ref().set_ttl(ttl)
     }
