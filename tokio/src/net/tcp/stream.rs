@@ -4,8 +4,6 @@ use crate::net::tcp::split::{split, ReadHalf, WriteHalf};
 use crate::net::tcp::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
 use crate::net::ToSocketAddrs;
 
-use bytes::Buf;
-use iovec::IoVec;
 use std::convert::TryFrom;
 use std::fmt;
 use std::io::{self, Read, Write};
@@ -745,44 +743,6 @@ impl TcpStream {
             }
         }
     }
-
-    pub(super) fn poll_write_buf_priv<B: Buf>(
-        &self,
-        cx: &mut Context<'_>,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        use std::io::IoSlice;
-
-        loop {
-            let ev = ready!(self.io.poll_write_ready(cx))?;
-
-            // The `IoVec` (v0.1.x) type can't have a zero-length size, so create
-            // a dummy version from a 1-length slice which we'll overwrite with
-            // the `bytes_vectored` method.
-            static S: &[u8] = &[0];
-            const MAX_BUFS: usize = 64;
-
-            let mut slices: [IoSlice<'_>; MAX_BUFS] = [IoSlice::new(S); 64];
-            let cnt = buf.bytes_vectored(&mut slices);
-
-            let iovec = <&IoVec>::from(S);
-            let mut vecs = [iovec; MAX_BUFS];
-            for i in 0..cnt {
-                vecs[i] = (*slices[i]).into();
-            }
-
-            match self.io.get_ref().write_bufs(&vecs[..cnt]) {
-                Ok(n) => {
-                    buf.advance(n);
-                    return Poll::Ready(Ok(n));
-                }
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    self.io.clear_readiness(ev);
-                }
-                Err(e) => return Poll::Ready(Err(e)),
-            }
-        }
-    }
 }
 
 impl TryFrom<TcpStream> for mio::net::TcpStream {
@@ -825,14 +785,6 @@ impl AsyncWrite for TcpStream {
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
         self.poll_write_priv(cx, buf)
-    }
-
-    fn poll_write_buf<B: Buf>(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        self.poll_write_buf_priv(cx, buf)
     }
 
     #[inline]
