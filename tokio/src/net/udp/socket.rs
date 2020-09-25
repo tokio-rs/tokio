@@ -10,21 +10,24 @@ cfg_udp! {
     /// A UDP socket
     ///
     /// UDP is "connectionless", unlike TCP. In tokio there are basically two main ways to use `UdpSocket`:
-    ///     - one to many: [`bind`](`UdpSocket::bind`) and use [`send_to`](`UdpSocket::send_to`) and `[`recv_from`](`UdpSocket::recv_from`) to communicate with many different addresses
-    ///     - one to one: [`connect`](`UdpSocket::connect`) and use [`send`](`UdpSocket::send`) and `[`recv`](`UdpSocket::recv`) only from the "connected" address
+    ///     - one to many: [`bind`](`UdpSocket::bind`) and use [`send_to`](`UdpSocket::send_to`)
+    /// and `[`recv_from`](`UdpSocket::recv_from`) to communicate with many different addresses
+    ///     - one to one: [`connect`](`UdpSocket::connect`) and use [`send`](`UdpSocket::send`)
+    /// and `[`recv`](`UdpSocket::recv`) only from the "connected" address
     ///
-    /// `UdpSocket` can also be [`split`](`UdpSocket::split`) in order to send and receive data concurrently, by moving the `SendHalf` or `RecvHalf` to a different task.
+    /// `UdpSocket` can also be used concurrently to `send_to` and `recv_from` in different tasks,
+    /// all that's required is that you `Arc<UdpSocket>` and clone a reference for each task.
     ///
     /// # One to many example (bind)
     ///
     /// Using `bind` we can create a simple echo server that sends and recv's with many different clients:
     /// ```no_run
     ///    use tokio::net::UdpSocket;
-    ///    use std::{io, net::SocketAddr};
+    ///    use std::io;
     ///
     ///    #[tokio::main]
     ///    async fn main() -> io::Result<()> {
-    ///        let mut sock = UdpSocket::bind("0.0.0.0:8080".parse::<SocketAddr>().unwrap()).await?;
+    ///        let sock = UdpSocket::bind("0.0.0.0:8080").await?;
     ///        let mut buf = [0; 1024];
     ///        loop {
     ///            let (len, addr) = sock.recv_from(&mut buf).await?;
@@ -41,13 +44,13 @@ cfg_udp! {
     /// Or using `connect` we can echo with a single remote address using `send` and `recv`:
     /// ```no_run
     ///    use tokio::net::UdpSocket;
-    ///    use std::{io, net::SocketAddr};
+    ///    use std::io;
     ///
     ///    #[tokio::main]
     ///    async fn main() -> io::Result<()> {
-    ///        let mut sock = UdpSocket::bind("0.0.0.0:8080".parse::<SocketAddr>().unwrap()).await?;
+    ///        let sock = UdpSocket::bind("0.0.0.0:8080").await?;
     ///
-    ///        let remote_addr = "127.0.0.1:59611".parse::<SocketAddr>().unwrap();
+    ///        let remote_addr = "127.0.0.1:59611";
     ///        sock.connect(remote_addr).await?;
     ///        let mut buf = [0; 1024];
     ///        loop {
@@ -74,6 +77,21 @@ cfg_udp! {
 impl UdpSocket {
     /// This function will create a new UDP socket and attempt to bind it to
     /// the `addr` provided.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    ///    use tokio::net::UdpSocket;
+    ///    use std::io;
+    ///
+    ///    #[tokio::main]
+    ///    async fn main() -> io::Result<()> {
+    ///        let sock = UdpSocket::bind("0.0.0.0:8080").await?;
+    ///        // use `sock`
+    ///      # let _ = sock;
+    ///        Ok(())
+    ///    }
+    /// ```
     pub async fn bind<A: ToSocketAddrs>(addr: A) -> io::Result<UdpSocket> {
         let addrs = addr.to_socket_addrs().await?;
         let mut last_err = None;
@@ -120,12 +138,46 @@ impl UdpSocket {
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    ///    use tokio::net::UdpSocket;
+    ///    use std::{io, net::SocketAddr};
+    ///
+    ///    #[tokio::main]
+    ///    async fn main() -> io::Result<()> {
+    ///        let addr = "0.0.0.0:8080".parse::<SocketAddr>().unwrap();
+    ///        let std_sock = std::net::UdpSocket::bind(addr)?;
+    ///        let sock = UdpSocket::from_std(std_sock)?;
+    ///        // use `sock`
+    ///      # let _ = sock;
+    ///        Ok(())
+    ///    }
+    /// ```
     pub fn from_std(socket: net::UdpSocket) -> io::Result<UdpSocket> {
         let io = mio::net::UdpSocket::from_socket(socket)?;
         UdpSocket::new(io)
     }
 
     /// Returns the local address that this socket is bound to.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    ///    use tokio::net::UdpSocket;
+    ///    use std::{io, net::SocketAddr};
+    ///
+    ///    #[tokio::main]
+    ///    async fn main() -> io::Result<()> {
+    ///        let addr = "0.0.0.0:8080".parse::<SocketAddr>().unwrap();
+    ///        let sock = UdpSocket::bind(addr).await?;
+    ///        // the address the socket is bound to
+    ///        let local_addr = sock.local_addr()?;
+    ///      # let _ = sock;
+    ///        Ok(())
+    ///    }
+    /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.io.get_ref().local_addr()
     }
@@ -133,6 +185,27 @@ impl UdpSocket {
     /// Connects the UDP socket setting the default destination for send() and
     /// limiting packets that are read via recv from the address specified in
     /// `addr`.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    ///    use tokio::net::UdpSocket;
+    ///    # use std::{io, net::SocketAddr};
+    ///
+    ///    #[tokio::main]
+    ///    async fn main() -> io::Result<()> {
+    ///        let sock = UdpSocket::bind("0.0.0.0:8080".parse::<SocketAddr>().unwrap()).await?;
+    ///
+    ///        let remote_addr = "127.0.0.1:59600".parse::<SocketAddr>().unwrap();
+    ///        sock.connect(remote_addr).await?;
+    ///        let mut buf = [0u8; 32];
+    ///        // recv from remote_addr
+    ///        let len = sock.recv(&mut buf).await?;
+    ///        // send to remote_addr
+    ///        let _len = sock.send(&buf[..len]).await?;
+    ///        Ok(())
+    ///    }
+    /// ```
     pub async fn connect<A: ToSocketAddrs>(&self, addr: A) -> io::Result<()> {
         let addrs = addr.to_socket_addrs().await?;
         let mut last_err = None;
@@ -202,6 +275,22 @@ impl UdpSocket {
     ///
     /// The future will resolve to an error if the IP version of the socket does
     /// not match that of `target`.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    ///    use tokio::net::UdpSocket;
+    ///    use std::{io, net::SocketAddr};
+    ///
+    ///    #[tokio::main]
+    ///    async fn main() -> io::Result<()> {
+    ///        let sock = UdpSocket::bind("0.0.0.0:8080".parse::<SocketAddr>().unwrap()).await?;
+    ///        let buf = b"hello world";
+    ///        let remote_addr = "127.0.0.1:58000".parse::<SocketAddr>().unwrap();
+    ///        let _len = sock.send_to(&buf[..], remote_addr).await?;
+    ///        Ok(())
+    ///    }
+    /// ```
     pub async fn send_to<A: ToSocketAddrs>(&self, buf: &[u8], target: A) -> io::Result<usize> {
         let mut addrs = target.to_socket_addrs().await?;
 
@@ -214,15 +303,32 @@ impl UdpSocket {
         }
     }
 
-    /// Try to send data on the socket to the given address.
+    /// Try to send data on the socket to the given address, but if the send is blocked
+    /// this will return right away.
     ///
     /// # Returns
     ///
-    /// If successfull, the future resolves to the number of bytes sent.
+    /// If successfull, returns the number of bytes sent
     ///
     /// Users should ensure that when the remote cannot receive, the
     /// [`ErrorKind::WouldBlock`] is properly handled. An error can also occur
     /// if the IP version of the socket does not match that of `target`.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    ///    use tokio::net::UdpSocket;
+    ///    use std::{io, net::SocketAddr};
+    ///
+    ///    #[tokio::main]
+    ///    async fn main() -> io::Result<()> {
+    ///        let sock = UdpSocket::bind("0.0.0.0:8080".parse::<SocketAddr>().unwrap()).await?;
+    ///        let buf = b"hello world";
+    ///        let remote_addr = "127.0.0.1:58000".parse::<SocketAddr>().unwrap();
+    ///        let _len = sock.try_send_to(&buf[..], remote_addr)?;
+    ///        Ok(())
+    ///    }
+    /// ```
     ///
     /// [`ErrorKind::WouldBlock`]: std::io::ErrorKind::WouldBlock
     pub fn try_send_to(&self, buf: &[u8], target: SocketAddr) -> io::Result<usize> {
@@ -241,6 +347,22 @@ impl UdpSocket {
     /// The function must be called with valid byte array `buf` of sufficient size
     /// to hold the message bytes. If a message is too long to fit in the supplied
     /// buffer, excess bytes may be discarded.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    ///    use tokio::net::UdpSocket;
+    ///    use std::{io, net::SocketAddr};
+    ///
+    ///    #[tokio::main]
+    ///    async fn main() -> io::Result<()> {
+    ///        let sock = UdpSocket::bind("0.0.0.0:8080".parse::<SocketAddr>().unwrap()).await?;
+    ///        let mut buf = [0u8; 32];
+    ///        let (len, addr) = sock.recv_from(&mut buf).await?;
+    ///        println!("received {:?} bytes from {:?}", len, addr);
+    ///        Ok(())
+    ///    }
+    /// ```
     pub async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.io
             .async_io(mio::Ready::readable(), |sock| sock.recv_from(buf))
