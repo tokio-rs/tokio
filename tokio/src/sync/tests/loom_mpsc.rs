@@ -7,17 +7,17 @@ use loom::thread;
 #[test]
 fn closing_tx() {
     loom::model(|| {
-        let (mut tx, mut rx) = mpsc::channel(16);
+        let (tx, mut rx) = mpsc::channel(16);
 
         thread::spawn(move || {
             tx.try_send(()).unwrap();
             drop(tx);
         });
 
-        let v = block_on(poll_fn(|cx| rx.poll_recv(cx)));
+        let v = block_on(rx.recv());
         assert!(v.is_some());
 
-        let v = block_on(poll_fn(|cx| rx.poll_recv(cx)));
+        let v = block_on(rx.recv());
         assert!(v.is_none());
     });
 }
@@ -32,10 +32,10 @@ fn closing_unbounded_tx() {
             drop(tx);
         });
 
-        let v = block_on(poll_fn(|cx| rx.poll_recv(cx)));
+        let v = block_on(rx.recv());
         assert!(v.is_some());
 
-        let v = block_on(poll_fn(|cx| rx.poll_recv(cx)));
+        let v = block_on(rx.recv());
         assert!(v.is_none());
     });
 }
@@ -53,7 +53,7 @@ fn dropping_tx() {
         }
         drop(tx);
 
-        let v = block_on(poll_fn(|cx| rx.poll_recv(cx)));
+        let v = block_on(rx.recv());
         assert!(v.is_none());
     });
 }
@@ -71,7 +71,7 @@ fn dropping_unbounded_tx() {
         }
         drop(tx);
 
-        let v = block_on(poll_fn(|cx| rx.poll_recv(cx)));
+        let v = block_on(rx.recv());
         assert!(v.is_none());
     });
 }

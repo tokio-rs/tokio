@@ -270,8 +270,8 @@ pub trait StreamExt: Stream {
     /// # #[tokio::main(basic_scheduler)]
     /// async fn main() {
     /// # time::pause();
-    ///     let (mut tx1, rx1) = mpsc::channel(10);
-    ///     let (mut tx2, rx2) = mpsc::channel(10);
+    ///     let (tx1, rx1) = mpsc::channel(10);
+    ///     let (tx2, rx2) = mpsc::channel(10);
     ///
     ///     let mut rx = rx1.merge(rx2);
     ///

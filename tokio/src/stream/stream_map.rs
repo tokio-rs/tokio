@@ -57,8 +57,8 @@ use std::task::{Context, Poll};
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let (mut tx1, rx1) = mpsc::channel(10);
-///     let (mut tx2, rx2) = mpsc::channel(10);
+///     let (tx1, rx1) = mpsc::channel(10);
+///     let (tx2, rx2) = mpsc::channel(10);
 ///
 ///     tokio::spawn(async move {
 ///         tx1.send(1).await.unwrap();

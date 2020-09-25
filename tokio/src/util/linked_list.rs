@@ -126,7 +126,6 @@ impl<L: Link> LinkedList<L, L::Target> {
     }
 
     /// Returns whether the linked list doesn not contain any node
-    #[cfg_attr(any(feature = "udp", feature = "uds"), allow(unused))]
     pub(crate) fn is_empty(&self) -> bool {
         if self.head.is_some() {
             return false;
@@ -182,20 +181,17 @@ impl<L: Link> fmt::Debug for LinkedList<L, L::Target> {
     }
 }
 
-impl<L: Link> Default for LinkedList<L, L::Target> {
-    fn default() -> Self {
-        Self::new()
+#[cfg(any(feature = "sync", feature = "signal", feature = "process"))]
+impl<L: Link> LinkedList<L, L::Target> {
+    pub(crate) fn last(&self) -> Option<&L::Target> {
+        let tail = self.tail.as_ref()?;
+        unsafe { Some(&*tail.as_ptr()) }
     }
 }
 
-cfg_sync! {
-    impl<L: Link> LinkedList<L, L::Target> {
-        pub(crate) fn last(&self) -> Option<&L::Target> {
-            let tail = self.tail.as_ref()?;
-            unsafe {
-                Some(&*tail.as_ptr())
-            }
-        }
+impl<L: Link> Default for LinkedList<L, L::Target> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

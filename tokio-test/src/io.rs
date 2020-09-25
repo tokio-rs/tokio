@@ -200,7 +200,9 @@ impl Inner {
     }
 
     fn poll_action(&mut self, cx: &mut task::Context<'_>) -> Poll<Option<Action>> {
-        self.rx.poll_recv(cx)
+        use futures_core::stream::Stream;
+
+        Pin::new(&mut self.rx).poll_next(cx)
     }
 
     fn read(&mut self, dst: &mut ReadBuf<'_>) -> io::Result<()> {

@@ -391,35 +391,7 @@ impl Signal {
         poll_fn(|cx| self.poll_recv(cx)).await
     }
 
-    /// Polls to receive the next signal notification event, outside of an
-    /// `async` context.
-    ///
-    /// `None` is returned if no more events can be received by this stream.
-    ///
-    /// # Examples
-    ///
-    /// Polling from a manually implemented future
-    ///
-    /// ```rust,no_run
-    /// use std::pin::Pin;
-    /// use std::future::Future;
-    /// use std::task::{Context, Poll};
-    /// use tokio::signal::unix::Signal;
-    ///
-    /// struct MyFuture {
-    ///     signal: Signal,
-    /// }
-    ///
-    /// impl Future for MyFuture {
-    ///     type Output = Option<()>;
-    ///
-    ///     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-    ///         println!("polling MyFuture");
-    ///         self.signal.poll_recv(cx)
-    ///     }
-    /// }
-    /// ```
-    pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
+    pub(crate) fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
         self.rx.poll_recv(cx)
     }
 }

@@ -165,7 +165,6 @@ impl Semaphore {
     /// permits and notifies all pending waiters.
     // This will be used once the bounded MPSC is updated to use the new
     // semaphore implementation.
-    #[allow(dead_code)]
     pub(crate) fn close(&self) {
         let mut waiters = self.waiters.lock().unwrap();
         // If the semaphore's permits counter has enough permits for an
@@ -185,6 +184,11 @@ impl Semaphore {
         }
     }
 
+    /// Returns true if the semaphore is closed
+    pub(crate) fn is_closed(&self) -> bool {
+        self.permits.load(Acquire) & Self::CLOSED == Self::CLOSED
+    }
+
     pub(crate) fn try_acquire(&self, num_permits: u32) -> Result<(), TryAcquireError> {
         assert!(
             num_permits as usize <= Self::MAX_PERMITS,
@@ -194,8 +198,8 @@ impl Semaphore {
         let num_permits = (num_permits as usize) << Self::PERMIT_SHIFT;
         let mut curr = self.permits.load(Acquire);
         loop {
-            // Has the semaphore closed?git
-            if curr & Self::CLOSED > 0 {
+            // Has the semaphore closed?
+            if curr & Self::CLOSED == Self::CLOSED {
                 return Err(TryAcquireError::Closed);
             }
 

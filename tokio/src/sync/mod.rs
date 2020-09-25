@@ -106,7 +106,7 @@
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!     let (mut tx, mut rx) = mpsc::channel(100);
+//!     let (tx, mut rx) = mpsc::channel(100);
 //!
 //!     tokio::spawn(async move {
 //!         for i in 0..10 {
@@ -150,7 +150,7 @@
 //!     for _ in 0..10 {
 //!         // Each task needs its own `tx` handle. This is done by cloning the
 //!         // original handle.
-//!         let mut tx = tx.clone();
+//!         let tx = tx.clone();
 //!
 //!         tokio::spawn(async move {
 //!             tx.send(&b"data to write"[..]).await.unwrap();
@@ -213,7 +213,7 @@
 //!
 //!     // Spawn tasks that will send the increment command.
 //!     for _ in 0..10 {
-//!         let mut cmd_tx = cmd_tx.clone();
+//!         let cmd_tx = cmd_tx.clone();
 //!
 //!         join_handles.push(tokio::spawn(async move {
 //!             let (resp_tx, resp_rx) = oneshot::channel();
@@ -443,7 +443,6 @@ cfg_sync! {
     pub mod oneshot;
 
     pub(crate) mod batch_semaphore;
-    pub(crate) mod semaphore_ll;
     mod semaphore;
     pub use semaphore::{Semaphore, SemaphorePermit, OwnedSemaphorePermit};
 
@@ -473,7 +472,7 @@ cfg_not_sync! {
 
     cfg_signal_internal! {
         pub(crate) mod mpsc;
-        pub(crate) mod semaphore_ll;
+        pub(crate) mod batch_semaphore;
     }
 }
 
