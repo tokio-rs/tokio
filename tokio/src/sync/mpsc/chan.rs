@@ -136,6 +136,13 @@ impl<T, S> Tx<T, S> {
         self.inner.send(value);
     }
 
+    /// Wake the receive half
+    pub(crate) fn wake_rx(&self) {
+        self.inner.rx_waker.wake();
+    }
+}
+
+impl<T, S: Semaphore> Tx<T, S> {
     pub(crate) async fn closed(&mut self) {
         use std::future::Future;
         use std::pin::Pin;
@@ -161,11 +168,6 @@ impl<T, S> Tx<T, S> {
             return;
         }
         notified.await;
-    }
-
-    /// Wake the receive half
-    pub(crate) fn wake_rx(&self) {
-        self.inner.rx_waker.wake();
     }
 }
 
