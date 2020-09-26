@@ -35,16 +35,6 @@ impl<T, S: Semaphore + fmt::Debug> fmt::Debug for Rx<T, S> {
 }
 
 pub(crate) trait Semaphore {
-    type Permit;
-
-    fn new_permit() -> Self::Permit;
-
-    /// The permit is dropped without a value being sent. In this case, the
-    /// permit must be returned to the semaphore.
-    fn drop_permit(&self, permit: &mut Self::Permit);
-
-    fn is_closed(&self) -> bool;
-
     fn is_idle(&self) -> bool;
 
     fn add_permit(&self);
@@ -137,10 +127,6 @@ impl<T, S> Tx<T, S> {
         Tx { inner: chan }
     }
 
-    pub(crate) fn is_closed(&self) -> bool {
-        self.inner.semaphore.is_closed()
-    }
-
     pub(super) fn semaphore(&self) -> &S {
         &self.inner.semaphore
     }
@@ -157,6 +143,10 @@ impl<T, S> Tx<T, S> {
 }
 
 impl<T, S: Semaphore> Tx<T, S> {
+    pub(crate) fn is_closed(&self) -> bool {
+        self.inner.semaphore.is_closed()
+    }
+
     pub(crate) async fn closed(&mut self) {
         use std::future::Future;
         use std::pin::Pin;
@@ -363,10 +353,6 @@ impl Semaphore for (crate::sync::batch_semaphore::Semaphore, usize) {
     fn close(&self) {
         self.0.close();
     }
-
-    fn is_closed(&self) -> bool {
-        self.0.is_closed()
-    }
 }
 
 // ===== impl Semaphore for AtomicUsize =====
@@ -394,9 +380,5 @@ impl Semaphore for AtomicUsize {
 
     fn close(&self) {
         self.fetch_or(1, Release);
-    }
-
-    fn is_closed(&self) -> bool {
-        self.load(Acquire) & 1 == 1
     }
 }

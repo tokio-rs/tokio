@@ -546,7 +546,6 @@ impl<T> Sender<T> {
     /// message is reserved for the caller. A [`Permit`] is returned to track
     /// the reserved capacity. The [`send`] function on [`Permit`] consumes the
     /// reserved capacity.
-    /// Undo a successful call to `poll_ready`.
     ///
     /// Dropping [`Permit`] without sending a message releases the capacity back
     /// to the channel.
