@@ -134,18 +134,11 @@ pub(crate) fn channel<T, S: Semaphore>(semaphore: S) -> (Tx<T, S>, Rx<T, S>) {
 
 impl<T, S> Tx<T, S> {
     fn new(chan: Arc<Chan<T, S>>) -> Tx<T, S> {
-        Tx {
-            inner: chan,
-            permit: S::new_permit(),
-        }
+        Tx { inner: chan }
     }
 
     pub(crate) fn is_closed(&self) -> bool {
         self.inner.semaphore.is_closed()
-    }
-
-    pub(crate) fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), ClosedError>> {
-        self.inner.semaphore.poll_acquire(cx, &mut self.permit)
     }
 
     pub(super) fn semaphore(&self) -> &S {
