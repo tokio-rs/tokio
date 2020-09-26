@@ -537,7 +537,7 @@ impl<T> Sender<T> {
     pub fn is_closed(&self) -> bool {
         self.chan.is_closed()
     }
-    
+
     /// Wait for channel capacity. Once capacity to send one message is
     /// available, it is reserved for the caller.
     ///
