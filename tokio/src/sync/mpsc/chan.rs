@@ -342,16 +342,16 @@ impl Semaphore for (crate::sync::batch_semaphore::Semaphore, usize) {
         self.0.release(1)
     }
 
-    fn is_closed(&self) -> bool {
-        self.0.is_closed()
-    }
-
     fn is_idle(&self) -> bool {
         self.0.available_permits() == self.1
     }
 
     fn close(&self) {
         self.0.close();
+    }
+
+    fn is_closed(&self) -> bool {
+        self.0.is_closed()
     }
 }
 
@@ -370,15 +370,15 @@ impl Semaphore for AtomicUsize {
         }
     }
 
-    fn is_closed(&self) -> bool {
-        self.load(Acquire) & 1 == 1
-    }
-
     fn is_idle(&self) -> bool {
         self.load(Acquire) >> 1 == 0
     }
 
     fn close(&self) {
         self.fetch_or(1, Release);
+    }
+
+    fn is_closed(&self) -> bool {
+        self.load(Acquire) & 1 == 1
     }
 }
