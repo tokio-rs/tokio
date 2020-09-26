@@ -87,7 +87,8 @@ where
                 .iter()
                 .rev()
                 .position(|byte| *byte < 0b1000_0000 || *byte >= 0b1100_0000)
-                .unwrap()+1;
+                .unwrap()
+                + 1;
             buf = &buf[..buf.len() - trailing_incomplete_char_size];
         }
 
