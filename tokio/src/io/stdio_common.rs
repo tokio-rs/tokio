@@ -23,7 +23,7 @@ impl<W> crate::io::AsyncWrite for SplitByUtf8BoundaryIfWindows<W>
 where
     W: AsyncWrite + Unpin,
 {
-    #[cfg_attr(not(any(target_os = "windows", test)), allow(unreachable_code))]
+    //#[cfg_attr(not(any(target_os = "windows", test)), allow(unreachable_code))]
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -32,18 +32,16 @@ where
         // just a closure to avoid repetitive code
         let mut call_inner = move |buf| Pin::new(&mut self.inner).poll_write(cx, buf);
 
-        // Only windows stdio can suffer from non-utf8.
+        // 1. Only windows stdio can suffer from non-utf8.
         // We also check for `test` so that we can write some tests
         // for further code. Since `AsyncWrite` can always shrink
         // buffer at its discretion, excessive (i.e. in tests) shrinking
         // does not break correctness.
-        #[cfg(not(any(target_os = "windows", test)))]
-        return call_inner(buf);
-
-        // If buffer is small, it will not be shrinked.
+        // 2. If buffer is small, it will not be shrinked.
         // That's why, it's "textness" will not change, so we don't have
-        // to handle this case.
-        if buf.len() <= crate::io::blocking::MAX_BUF {
+        // to fixup it.
+        if cfg!(not(any(target_os = "windows", test))) || buf.len() <= crate::io::blocking::MAX_BUF
+        {
             return call_inner(buf);
         }
 
