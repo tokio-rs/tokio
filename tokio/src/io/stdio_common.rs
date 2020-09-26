@@ -91,7 +91,7 @@ where
             buf = &buf[..buf.len() - trailing_incomplete_char_size];
         }
 
-        return call_inner(buf);
+        call_inner(buf)
     }
 
     fn poll_flush(
