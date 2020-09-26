@@ -72,7 +72,7 @@ where
                 false
             }
             Err(err) => {
-                let bad_bytes = buf.len() - err.valid_up_to();
+                let bad_bytes = (MAX_BYTES_PER_CHAR * MAGIC_CONST) - err.valid_up_to();
                 // this must hold for any shrinked utf8 buffer.
                 bad_bytes < MAX_BYTES_PER_CHAR
             }
@@ -87,7 +87,7 @@ where
                 .iter()
                 .rev()
                 .position(|byte| *byte < 0b1000_0000 || *byte >= 0b1100_0000)
-                .unwrap();
+                .unwrap()+1;
             buf = &buf[..buf.len() - trailing_incomplete_char_size];
         }
 
