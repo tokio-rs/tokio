@@ -9,16 +9,24 @@ use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 cfg_udp! {
     /// A UDP socket
     ///
-    /// UDP is "connectionless", unlike TCP. In tokio there are basically two main ways to use `UdpSocket`:
+    /// UDP is "connectionless", unlike TCP. Meaning, regardless of what address you've bound to, a `UdpSocket`
+    /// is free to communicate with many different remotes. In tokio there are basically two main ways to use `UdpSocket`:
     ///     - one to many: [`bind`](`UdpSocket::bind`) and use [`send_to`](`UdpSocket::send_to`)
     /// and `[`recv_from`](`UdpSocket::recv_from`) to communicate with many different addresses
-    ///     - one to one: [`connect`](`UdpSocket::connect`) and use [`send`](`UdpSocket::send`)
-    /// and `[`recv`](`UdpSocket::recv`) only from the "connected" address
+    ///     - one to one: [`connect`](`UdpSocket::connect`) and associate with a single address, using [`send`](`UdpSocket::send`)
+    /// and `[`recv`](`UdpSocket::recv`) to communicate only with that remote address
     ///
     /// `UdpSocket` can also be used concurrently to `send_to` and `recv_from` in different tasks,
     /// all that's required is that you `Arc<UdpSocket>` and clone a reference for each task.
     ///
-    /// # One to many example (bind)
+    /// # Streams
+    ///
+    /// If you need to listen over UDP and produce a [`Stream`](`crate::stream::Stream`), you can look
+    /// at [`UdpFramed`].
+    ///
+    /// [`UdpFramed`]: https://docs.rs/tokio-util/latest/tokio_util/udp/struct.UdpFramed.html
+    ///
+    /// # Example: one to many (bind)
     ///
     /// Using `bind` we can create a simple echo server that sends and recv's with many different clients:
     /// ```no_run
@@ -39,7 +47,7 @@ cfg_udp! {
     ///    }
     /// ```
     ///
-    /// # One to one example (connect)
+    /// # Example: one to one (connect)
     ///
     /// Or using `connect` we can echo with a single remote address using `send` and `recv`:
     /// ```no_run
@@ -63,12 +71,39 @@ cfg_udp! {
     ///    }
     /// ```
     ///
-    /// # Streams
+    /// # Example: Sending/Receiving concurrently
     ///
-    /// If you need to listen over UDP and produce a [`Stream`](`crate::stream::Stream`), you can look
-    /// at [`UdpFramed`].
+    /// Because `send_to` and `recv_from` take `&self`. It's perfectly alright to `Arc<UdpSocket>`
+    /// and share the references to multiple tasks, in order to send/receive concurrently. Here is
+    /// a similar "echo" example but that supports concurrent sending/receiving:
     ///
-    /// [`UdpFramed`]: https://docs.rs/tokio-util/latest/tokio_util/udp/struct.UdpFramed.html
+    /// ```no_run
+    ///     use tokio::{net::UdpSocket, sync::mpsc};
+    ///     use std::{io, net::SocketAddr, sync::Arc};
+    ///
+    ///     #[tokio::main]
+    ///     async fn main() -> io::Result<()> {
+    ///         let sock = UdpSocket::bind("0.0.0.0:8080".parse::<SocketAddr>().unwrap()).await?;
+    ///         let r = Arc::new(sock);
+    ///         let s = r.clone();
+    ///         let (tx, mut rx) = mpsc::channel::<(Vec<u8>, SocketAddr)>(1_000);
+    ///
+    ///         tokio::spawn(async move {
+    ///             while let Some((bytes, addr)) = rx.recv().await {
+    ///                 let len = s.send_to(&bytes, &addr).await.unwrap();
+    ///                 println!("{:?} bytes sent", len);
+    ///             }
+    ///         });
+    ///
+    ///         let mut buf = [0; 1024];
+    ///         loop {
+    ///             let (len, addr) = r.recv_from(&mut buf).await?;
+    ///             println!("{:?} bytes received from {:?}", len, addr);
+    ///             tx.send((buf[..len].to_vec(), addr)).await.unwrap();
+    ///         }
+    ///     }
+    /// ```
+    ///
     pub struct UdpSocket {
         io: PollEvented<mio::net::UdpSocket>,
     }
