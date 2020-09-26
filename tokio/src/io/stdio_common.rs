@@ -23,7 +23,6 @@ impl<W> crate::io::AsyncWrite for SplitByUtf8BoundaryIfWindows<W>
 where
     W: AsyncWrite + Unpin,
 {
-    //#[cfg_attr(not(any(target_os = "windows", test)), allow(unreachable_code))]
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
