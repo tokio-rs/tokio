@@ -523,7 +523,12 @@ impl<T> Sender<T> {
         enter_handle.block_on(self.send(value)).unwrap()
     }
 
-    /// Checks if `Receiver` is still alive.
+    /// Checks if the channel has been closed. This happens when the
+    /// [`Receiver`] is dropped, or when the [`Receiver::close`] method is
+    /// called.
+    ///
+    /// [`Receiver`]: struct@crate::sync::mpsc::Receiver
+    /// [`Receiver::close`]: fn@crate::sync::mpsc::Receiver::close
     ///
     /// ```
     /// let (tx, rx) = tokio::sync::mpsc::channel::<()>(42);
