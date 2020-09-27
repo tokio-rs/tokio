@@ -527,14 +527,16 @@ impl<T> Sender<T> {
     /// [`Receiver`] is dropped, or when the [`Receiver::close`] method is
     /// called.
     ///
-    /// [`Receiver`]: struct@crate::sync::mpsc::Receiver
-    /// [`Receiver::close`]: fn@crate::sync::mpsc::Receiver::close
+    /// [`Receiver`]: crate::sync::mpsc::Receiver
+    /// [`Receiver::close`]: crate::sync::mpsc::Receiver::close
     ///
     /// ```
     /// let (tx, rx) = tokio::sync::mpsc::channel::<()>(42);
     /// assert!(!tx.is_closed());
+    ///
     /// let tx2 = tx.clone();
     /// assert!(!tx2.is_closed());
+    ///
     /// std::mem::drop(rx);
     /// assert!(tx.is_closed());
     /// assert!(tx2.is_closed());
