@@ -246,8 +246,8 @@ impl<T> UnboundedSender<T> {
         self.chan.closed().await
     }
     /// Checks if the channel has been closed. This happens when the
-    /// [`UnboundedReceiver`] is dropped, or when
-    /// the [`UnboundedReceiver::close`] method is called.
+    /// [`UnboundedReceiver`] is dropped, or when the
+    /// [`UnboundedReceiver::close`] method is called.
     ///
     /// [`UnboundedReceiver`]: crate::sync::mpsc::UnboundedReceiver
     /// [`UnboundedReceiver::close`]: crate::sync::mpsc::UnboundedReceiver::close
