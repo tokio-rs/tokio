@@ -259,7 +259,7 @@ impl<T> UnboundedSender<T> {
     /// let tx2 = tx.clone();
     /// assert!(!tx2.is_closed());
     ///
-    /// std::mem::drop(rx);
+    /// drop(rx);
     /// assert!(tx.is_closed());
     /// assert!(tx2.is_closed());
     /// ```
