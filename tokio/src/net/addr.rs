@@ -23,6 +23,7 @@ pub trait ToSocketAddrs: sealed::ToSocketAddrsPriv {}
 
 type ReadyFuture<T> = future::Ready<io::Result<T>>;
 
+#[cfg(any(feature = "dns", feature = "tcp", feature = "udp"))]
 pub(crate) fn to_socket_addrs<T>(arg: T) -> T::Future
 where
     T: ToSocketAddrs,
