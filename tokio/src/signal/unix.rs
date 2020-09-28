@@ -9,7 +9,7 @@ use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storag
 use crate::sync::mpsc::{channel, Receiver};
 
 use libc::c_int;
-use mio_uds::UnixStream;
+use mio::net::UnixStream;
 use std::io::{self, Error, ErrorKind, Write};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};

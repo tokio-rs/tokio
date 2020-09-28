@@ -150,7 +150,7 @@ impl TcpListener {
     }
 
     fn bind_addr(addr: SocketAddr) -> io::Result<TcpListener> {
-        let listener = mio::net::TcpListener::bind(&addr)?;
+        let listener = mio::net::TcpListener::bind(addr)?;
         TcpListener::new(listener)
     }
 
@@ -193,23 +193,14 @@ impl TcpListener {
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<io::Result<(TcpStream, SocketAddr)>> {
-        let (io, addr) = ready!(self.poll_accept_std(cx))?;
-
-        let io = mio::net::TcpStream::from_stream(io)?;
-        let io = TcpStream::new(io)?;
-
-        Poll::Ready(Ok((io, addr)))
-    }
-
-    fn poll_accept_std(
-        &mut self,
-        cx: &mut Context<'_>,
-    ) -> Poll<io::Result<(net::TcpStream, SocketAddr)>> {
         loop {
             let ev = ready!(self.io.poll_read_ready(cx))?;
 
-            match self.io.get_ref().accept_std() {
-                Ok(pair) => return Poll::Ready(Ok(pair)),
+            match self.io.get_ref().accept() {
+                Ok((io, addr)) => {
+                    let io = TcpStream::new(io)?;
+                    return Poll::Ready(Ok((io, addr)));
+                }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     self.io.clear_readiness(ev);
                 }
@@ -265,7 +256,7 @@ impl TcpListener {
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     pub fn from_std(listener: net::TcpListener) -> io::Result<TcpListener> {
-        let io = mio::net::TcpListener::from_std(listener)?;
+        let io = mio::net::TcpListener::from_std(listener);
         let io = PollEvented::new(io)?;
         Ok(TcpListener { io })
     }
@@ -405,15 +396,6 @@ impl crate::stream::Stream for TcpListener {
     ) -> Poll<Option<Self::Item>> {
         let (socket, _) = ready!(self.poll_accept(cx))?;
         Poll::Ready(Some(Ok(socket)))
-    }
-}
-
-impl TryFrom<TcpListener> for mio::net::TcpListener {
-    type Error = io::Error;
-
-    /// Consumes value, returning the mio I/O object.
-    fn try_from(value: TcpListener) -> Result<Self, Self::Error> {
-        value.io.into_inner()
     }
 }
 
