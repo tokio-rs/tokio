@@ -34,8 +34,8 @@ where
     type Iter = T::Iter;
     type Future = T::Future;
 
-    fn to_socket_addrs(&self) -> Self::Future {
-        (**self).to_socket_addrs()
+    fn to_socket_addrs(&self, _: sealed::Internal) -> Self::Future {
+        (**self).to_socket_addrs(sealed::Internal)
     }
 }
 
@@ -47,7 +47,7 @@ impl sealed::ToSocketAddrsPriv for SocketAddr {
     type Iter = std::option::IntoIter<SocketAddr>;
     type Future = ReadyFuture<Self::Iter>;
 
-    fn to_socket_addrs(&self) -> Self::Future {
+    fn to_socket_addrs(&self, _: sealed::Internal) -> Self::Future {
         let iter = Some(*self).into_iter();
         future::ok(iter)
     }
@@ -61,8 +61,8 @@ impl sealed::ToSocketAddrsPriv for SocketAddrV4 {
     type Iter = std::option::IntoIter<SocketAddr>;
     type Future = ReadyFuture<Self::Iter>;
 
-    fn to_socket_addrs(&self) -> Self::Future {
-        SocketAddr::V4(*self).to_socket_addrs()
+    fn to_socket_addrs(&self, _: sealed::Internal) -> Self::Future {
+        SocketAddr::V4(*self).to_socket_addrs(sealed::Internal)
     }
 }
 
@@ -74,8 +74,8 @@ impl sealed::ToSocketAddrsPriv for SocketAddrV6 {
     type Iter = std::option::IntoIter<SocketAddr>;
     type Future = ReadyFuture<Self::Iter>;
 
-    fn to_socket_addrs(&self) -> Self::Future {
-        SocketAddr::V6(*self).to_socket_addrs()
+    fn to_socket_addrs(&self, _: sealed::Internal) -> Self::Future {
+        SocketAddr::V6(*self).to_socket_addrs(sealed::Internal)
     }
 }
 
@@ -87,7 +87,7 @@ impl sealed::ToSocketAddrsPriv for (IpAddr, u16) {
     type Iter = std::option::IntoIter<SocketAddr>;
     type Future = ReadyFuture<Self::Iter>;
 
-    fn to_socket_addrs(&self) -> Self::Future {
+    fn to_socket_addrs(&self, _: sealed::Internal) -> Self::Future {
         let iter = Some(SocketAddr::from(*self)).into_iter();
         future::ok(iter)
     }
@@ -101,9 +101,9 @@ impl sealed::ToSocketAddrsPriv for (Ipv4Addr, u16) {
     type Iter = std::option::IntoIter<SocketAddr>;
     type Future = ReadyFuture<Self::Iter>;
 
-    fn to_socket_addrs(&self) -> Self::Future {
+    fn to_socket_addrs(&self, _: sealed::Internal) -> Self::Future {
         let (ip, port) = *self;
-        SocketAddrV4::new(ip, port).to_socket_addrs()
+        SocketAddrV4::new(ip, port).to_socket_addrs(sealed::Internal)
     }
 }
 
@@ -115,9 +115,9 @@ impl sealed::ToSocketAddrsPriv for (Ipv6Addr, u16) {
     type Iter = std::option::IntoIter<SocketAddr>;
     type Future = ReadyFuture<Self::Iter>;
 
-    fn to_socket_addrs(&self) -> Self::Future {
+    fn to_socket_addrs(&self, _: sealed::Internal) -> Self::Future {
         let (ip, port) = *self;
-        SocketAddrV6::new(ip, port, 0, 0).to_socket_addrs()
+        SocketAddrV6::new(ip, port, 0, 0).to_socket_addrs(sealed::Internal)
     }
 }
 
@@ -129,7 +129,7 @@ impl sealed::ToSocketAddrsPriv for &[SocketAddr] {
     type Iter = std::vec::IntoIter<SocketAddr>;
     type Future = ReadyFuture<Self::Iter>;
 
-    fn to_socket_addrs(&self) -> Self::Future {
+    fn to_socket_addrs(&self, _: sealed::Internal) -> Self::Future {
         let iter = self.to_vec().into_iter();
         future::ok(iter)
     }
@@ -144,7 +144,7 @@ cfg_dns! {
         type Iter = sealed::OneOrMore;
         type Future = sealed::MaybeReady;
 
-        fn to_socket_addrs(&self) -> Self::Future {
+        fn to_socket_addrs(&self, _: sealed::Internal) -> Self::Future {
             use crate::runtime::spawn_blocking;
             use sealed::MaybeReady;
 
@@ -172,7 +172,7 @@ cfg_dns! {
         type Iter = sealed::OneOrMore;
         type Future = sealed::MaybeReady;
 
-        fn to_socket_addrs(&self) -> Self::Future {
+        fn to_socket_addrs(&self, _: sealed::Internal) -> Self::Future {
             use crate::runtime::spawn_blocking;
             use sealed::MaybeReady;
 
@@ -209,8 +209,8 @@ cfg_dns! {
         type Iter = sealed::OneOrMore;
         type Future = sealed::MaybeReady;
 
-        fn to_socket_addrs(&self) -> Self::Future {
-            (self.0.as_str(), self.1).to_socket_addrs()
+        fn to_socket_addrs(&self, _: sealed::Internal) -> Self::Future {
+            (self.0.as_str(), self.1).to_socket_addrs(sealed::Internal)
         }
     }
 
@@ -222,8 +222,8 @@ cfg_dns! {
         type Iter = <str as sealed::ToSocketAddrsPriv>::Iter;
         type Future = <str as sealed::ToSocketAddrsPriv>::Future;
 
-        fn to_socket_addrs(&self) -> Self::Future {
-            (&self[..]).to_socket_addrs()
+        fn to_socket_addrs(&self, _: sealed::Internal) -> Self::Future {
+            (&self[..]).to_socket_addrs(sealed::Internal)
         }
     }
 }
@@ -251,8 +251,11 @@ pub(crate) mod sealed {
         type Iter: Iterator<Item = SocketAddr> + Send + 'static;
         type Future: Future<Output = io::Result<Self::Iter>> + Send + 'static;
 
-        fn to_socket_addrs(&self) -> Self::Future;
+        fn to_socket_addrs(&self, internal: Internal) -> Self::Future;
     }
+
+    #[allow(missing_debug_implementations)]
+    pub struct Internal;
 
     cfg_dns! {
         #[doc(hidden)]
