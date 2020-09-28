@@ -143,6 +143,10 @@ impl<T, S> Tx<T, S> {
 }
 
 impl<T, S: Semaphore> Tx<T, S> {
+    pub(crate) fn is_closed(&self) -> bool {
+        self.inner.semaphore.is_closed()
+    }
+
     pub(crate) async fn closed(&mut self) {
         use std::future::Future;
         use std::pin::Pin;
