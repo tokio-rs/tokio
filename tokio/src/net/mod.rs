@@ -24,6 +24,8 @@
 
 mod addr;
 pub use addr::ToSocketAddrs;
+#[cfg(any(feature = "tcp", feature = "udp"))]
+pub(crate) use addr::to_socket_addrs;
 
 cfg_dns! {
     mod lookup_host;

@@ -1,7 +1,7 @@
 use crate::future::poll_fn;
 use crate::io::PollEvented;
 use crate::net::tcp::{Incoming, TcpStream};
-use crate::net::ToSocketAddrs;
+use crate::net::{to_socket_addrs, ToSocketAddrs};
 
 use std::convert::TryFrom;
 use std::fmt;
@@ -130,7 +130,7 @@ impl TcpListener {
     /// }
     /// ```
     pub async fn bind<A: ToSocketAddrs>(addr: A) -> io::Result<TcpListener> {
-        let addrs = addr.to_socket_addrs().await?;
+        let addrs = to_socket_addrs(addr).await?;
 
         let mut last_err = None;
 

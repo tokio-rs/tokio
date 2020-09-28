@@ -23,6 +23,13 @@ pub trait ToSocketAddrs: sealed::ToSocketAddrsPriv {}
 
 type ReadyFuture<T> = future::Ready<io::Result<T>>;
 
+pub(crate) fn to_socket_addrs<T>(arg: T) -> T::Future
+where
+    T: ToSocketAddrs,
+{
+    arg.to_socket_addrs(sealed::Internal)
+}
+
 // ===== impl &impl ToSocketAddrs =====
 
 impl<T: ToSocketAddrs + ?Sized> ToSocketAddrs for &T {}

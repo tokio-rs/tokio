@@ -2,7 +2,7 @@ use crate::future::poll_fn;
 use crate::io::{AsyncRead, AsyncWrite, PollEvented, ReadBuf};
 use crate::net::tcp::split::{split, ReadHalf, WriteHalf};
 use crate::net::tcp::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
-use crate::net::ToSocketAddrs;
+use crate::net::{to_socket_addrs, ToSocketAddrs};
 
 use std::convert::TryFrom;
 use std::fmt;
@@ -116,7 +116,7 @@ impl TcpStream {
     /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     pub async fn connect<A: ToSocketAddrs>(addr: A) -> io::Result<TcpStream> {
-        let addrs = addr.to_socket_addrs().await?;
+        let addrs = to_socket_addrs(addr).await?;
 
         let mut last_err = None;
 
