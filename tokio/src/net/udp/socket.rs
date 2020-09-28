@@ -1,5 +1,5 @@
 use crate::io::PollEvented;
-use crate::net::ToSocketAddrs;
+use crate::net::{to_socket_addrs, ToSocketAddrs};
 
 use std::convert::TryFrom;
 use std::fmt;
@@ -17,7 +17,7 @@ impl UdpSocket {
     /// This function will create a new UDP socket and attempt to bind it to
     /// the `addr` provided.
     pub async fn bind<A: ToSocketAddrs>(addr: A) -> io::Result<UdpSocket> {
-        let addrs = addr.to_socket_addrs().await?;
+        let addrs = to_socket_addrs(addr).await?;
         let mut last_err = None;
 
         for addr in addrs {
@@ -76,7 +76,7 @@ impl UdpSocket {
     /// limiting packets that are read via recv from the address specified in
     /// `addr`.
     pub async fn connect<A: ToSocketAddrs>(&self, addr: A) -> io::Result<()> {
-        let addrs = addr.to_socket_addrs().await?;
+        let addrs = to_socket_addrs(addr).await?;
         let mut last_err = None;
 
         for addr in addrs {
@@ -145,7 +145,7 @@ impl UdpSocket {
     /// The future will resolve to an error if the IP version of the socket does
     /// not match that of `target`.
     pub async fn send_to<A: ToSocketAddrs>(&self, buf: &[u8], target: A) -> io::Result<usize> {
-        let mut addrs = target.to_socket_addrs().await?;
+        let mut addrs = to_socket_addrs(target).await?;
 
         match addrs.next() {
             Some(target) => self.send_to_addr(buf, &target).await,
