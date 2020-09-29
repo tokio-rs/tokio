@@ -1,4 +1,4 @@
-use crate::io::{AsyncBufRead, AsyncRead, ReadBuf};
+use crate::io::{async_buf_read, AsyncBufRead, AsyncRead, ReadBuf};
 
 use pin_project_lite::pin_project;
 use std::fmt;
@@ -104,33 +104,48 @@ where
     }
 }
 
-impl<T, U> AsyncBufRead for Chain<T, U>
+impl<T, U> async_buf_read::sealed::AsyncBufReadPriv for Chain<T, U>
 where
     T: AsyncBufRead,
     U: AsyncBufRead,
 {
-    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
+    fn poll_fill_buf(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        _: async_buf_read::sealed::Internal,
+    ) -> Poll<io::Result<&[u8]>> {
         let me = self.project();
 
         if !*me.done_first {
-            match ready!(me.first.poll_fill_buf(cx)?) {
+            match ready!(me
+                .first
+                .poll_fill_buf(cx, async_buf_read::sealed::Internal)?)
+            {
                 buf if buf.is_empty() => {
                     *me.done_first = true;
                 }
                 buf => return Poll::Ready(Ok(buf)),
             }
         }
-        me.second.poll_fill_buf(cx)
+        me.second
+            .poll_fill_buf(cx, async_buf_read::sealed::Internal)
     }
 
-    fn consume(self: Pin<&mut Self>, amt: usize) {
+    fn consume(self: Pin<&mut Self>, internal: async_buf_read::sealed::Internal, amt: usize) {
         let me = self.project();
         if !*me.done_first {
-            me.first.consume(amt)
+            me.first.consume(internal, amt)
         } else {
-            me.second.consume(amt)
+            me.second.consume(internal, amt)
         }
     }
+}
+
+impl<T, U> AsyncBufRead for Chain<T, U>
+where
+    T: AsyncBufRead,
+    U: AsyncBufRead,
+{
 }
 
 #[cfg(test)]

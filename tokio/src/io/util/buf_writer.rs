@@ -1,5 +1,5 @@
 use crate::io::util::DEFAULT_BUF_SIZE;
-use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite, ReadBuf};
+use crate::io::{async_buf_read, AsyncBufRead, AsyncRead, AsyncWrite, ReadBuf};
 
 use pin_project_lite::pin_project;
 use std::fmt;
@@ -152,15 +152,21 @@ impl<W: AsyncWrite + AsyncRead> AsyncRead for BufWriter<W> {
     }
 }
 
-impl<W: AsyncWrite + AsyncBufRead> AsyncBufRead for BufWriter<W> {
-    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
-        self.get_pin_mut().poll_fill_buf(cx)
+impl<W: AsyncWrite + AsyncBufRead> async_buf_read::sealed::AsyncBufReadPriv for BufWriter<W> {
+    fn poll_fill_buf(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        internal: async_buf_read::sealed::Internal,
+    ) -> Poll<io::Result<&[u8]>> {
+        self.get_pin_mut().poll_fill_buf(cx, internal)
     }
 
-    fn consume(self: Pin<&mut Self>, amt: usize) {
-        self.get_pin_mut().consume(amt)
+    fn consume(self: Pin<&mut Self>, internal: async_buf_read::sealed::Internal, amt: usize) {
+        self.get_pin_mut().consume(internal, amt)
     }
 }
+
+impl<W: AsyncWrite + AsyncBufRead> AsyncBufRead for BufWriter<W> {}
 
 impl<W: fmt::Debug> fmt::Debug for BufWriter<W> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

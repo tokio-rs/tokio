@@ -1,4 +1,4 @@
-use crate::io::{AsyncBufRead, AsyncRead, ReadBuf};
+use crate::io::{async_buf_read, AsyncBufRead, AsyncRead, ReadBuf};
 
 use std::fmt;
 use std::io;
@@ -57,15 +57,21 @@ impl AsyncRead for Empty {
     }
 }
 
-impl AsyncBufRead for Empty {
+impl async_buf_read::sealed::AsyncBufReadPriv for Empty {
     #[inline]
-    fn poll_fill_buf(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
+    fn poll_fill_buf(
+        self: Pin<&mut Self>,
+        _: &mut Context<'_>,
+        _: async_buf_read::sealed::Internal,
+    ) -> Poll<io::Result<&[u8]>> {
         Poll::Ready(Ok(&[]))
     }
 
     #[inline]
-    fn consume(self: Pin<&mut Self>, _: usize) {}
+    fn consume(self: Pin<&mut Self>, _: async_buf_read::sealed::Internal, _: usize) {}
 }
+
+impl AsyncBufRead for Empty {}
 
 impl fmt::Debug for Empty {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

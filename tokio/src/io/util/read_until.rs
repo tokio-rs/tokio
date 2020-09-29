@@ -1,4 +1,4 @@
-use crate::io::AsyncBufRead;
+use crate::io::{async_buf_read, AsyncBufRead};
 
 use std::future::Future;
 use std::io;
@@ -46,7 +46,9 @@ pub(super) fn read_until_internal<R: AsyncBufRead + ?Sized>(
 ) -> Poll<io::Result<usize>> {
     loop {
         let (done, used) = {
-            let available = ready!(reader.as_mut().poll_fill_buf(cx))?;
+            let available = ready!(reader
+                .as_mut()
+                .poll_fill_buf(cx, async_buf_read::sealed::Internal))?;
             if let Some(i) = memchr::memchr(delimeter, available) {
                 buf.extend_from_slice(&available[..=i]);
                 (true, i + 1)
@@ -55,7 +57,9 @@ pub(super) fn read_until_internal<R: AsyncBufRead + ?Sized>(
                 (false, available.len())
             }
         };
-        reader.as_mut().consume(used);
+        reader
+            .as_mut()
+            .consume(async_buf_read::sealed::Internal, used);
         *read += used;
         if done || used == 0 {
             return Poll::Ready(Ok(mem::replace(read, 0)));

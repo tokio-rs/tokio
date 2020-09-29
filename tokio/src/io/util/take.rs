@@ -1,4 +1,4 @@
-use crate::io::{AsyncBufRead, AsyncRead, ReadBuf};
+use crate::io::{async_buf_read, AsyncBufRead, AsyncRead, ReadBuf};
 
 use pin_project_lite::pin_project;
 use std::pin::Pin;
@@ -99,8 +99,12 @@ impl<R: AsyncRead> AsyncRead for Take<R> {
     }
 }
 
-impl<R: AsyncBufRead> AsyncBufRead for Take<R> {
-    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
+impl<R: AsyncBufRead> async_buf_read::sealed::AsyncBufReadPriv for Take<R> {
+    fn poll_fill_buf(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        internal: async_buf_read::sealed::Internal,
+    ) -> Poll<io::Result<&[u8]>> {
         let me = self.project();
 
         // Don't call into inner reader at all at EOF because it may still block
@@ -108,19 +112,21 @@ impl<R: AsyncBufRead> AsyncBufRead for Take<R> {
             return Poll::Ready(Ok(&[]));
         }
 
-        let buf = ready!(me.inner.poll_fill_buf(cx)?);
+        let buf = ready!(me.inner.poll_fill_buf(cx, internal)?);
         let cap = cmp::min(buf.len() as u64, *me.limit_) as usize;
         Poll::Ready(Ok(&buf[..cap]))
     }
 
-    fn consume(self: Pin<&mut Self>, amt: usize) {
+    fn consume(self: Pin<&mut Self>, internal: async_buf_read::sealed::Internal, amt: usize) {
         let me = self.project();
         // Don't let callers reset the limit by passing an overlarge value
         let amt = cmp::min(amt as u64, *me.limit_) as usize;
         *me.limit_ -= amt as u64;
-        me.inner.consume(amt);
+        me.inner.consume(internal, amt);
     }
 }
+
+impl<R: AsyncBufRead> AsyncBufRead for Take<R> {}
 
 #[cfg(test)]
 mod tests {

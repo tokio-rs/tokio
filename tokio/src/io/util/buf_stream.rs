@@ -1,5 +1,5 @@
 use crate::io::util::{BufReader, BufWriter};
-use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite, ReadBuf};
+use crate::io::{async_buf_read, AsyncBufRead, AsyncRead, AsyncWrite, ReadBuf};
 
 use pin_project_lite::pin_project;
 use std::io;
@@ -142,15 +142,21 @@ impl<RW: AsyncRead + AsyncWrite> AsyncRead for BufStream<RW> {
     }
 }
 
-impl<RW: AsyncRead + AsyncWrite> AsyncBufRead for BufStream<RW> {
-    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
-        self.project().inner.poll_fill_buf(cx)
+impl<RW: AsyncRead + AsyncWrite> async_buf_read::sealed::AsyncBufReadPriv for BufStream<RW> {
+    fn poll_fill_buf(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        internal: async_buf_read::sealed::Internal,
+    ) -> Poll<io::Result<&[u8]>> {
+        self.project().inner.poll_fill_buf(cx, internal)
     }
 
-    fn consume(self: Pin<&mut Self>, amt: usize) {
-        self.project().inner.consume(amt)
+    fn consume(self: Pin<&mut Self>, internal: async_buf_read::sealed::Internal, amt: usize) {
+        self.project().inner.consume(internal, amt)
     }
 }
+
+impl<RW: AsyncRead + AsyncWrite> AsyncBufRead for BufStream<RW> {}
 
 #[cfg(test)]
 mod tests {

@@ -1,5 +1,5 @@
 use crate::io::util::DEFAULT_BUF_SIZE;
-use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite, ReadBuf};
+use crate::io::{async_buf_read, AsyncBufRead, AsyncRead, AsyncWrite, ReadBuf};
 
 use pin_project_lite::pin_project;
 use std::io;
@@ -109,16 +109,24 @@ impl<R: AsyncRead> AsyncRead for BufReader<R> {
             self.discard_buffer();
             return Poll::Ready(res);
         }
-        let rem = ready!(self.as_mut().poll_fill_buf(cx))?;
+        let rem = ready!(AsyncBufRead::poll_fill_buf(
+            self.as_mut(),
+            cx,
+            async_buf_read::sealed::Internal
+        ))?;
         let amt = std::cmp::min(rem.len(), buf.remaining());
         buf.append(&rem[..amt]);
-        self.consume(amt);
+        AsyncBufRead::consume(self, async_buf_read::sealed::Internal, amt);
         Poll::Ready(Ok(()))
     }
 }
 
-impl<R: AsyncRead> AsyncBufRead for BufReader<R> {
-    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
+impl<R: AsyncRead> async_buf_read::sealed::AsyncBufReadPriv for BufReader<R> {
+    fn poll_fill_buf(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        _: async_buf_read::sealed::Internal,
+    ) -> Poll<io::Result<&[u8]>> {
         let me = self.project();
 
         // If we've reached the end of our internal buffer then we need to fetch
@@ -135,11 +143,13 @@ impl<R: AsyncRead> AsyncBufRead for BufReader<R> {
         Poll::Ready(Ok(&me.buf[*me.pos..*me.cap]))
     }
 
-    fn consume(self: Pin<&mut Self>, amt: usize) {
+    fn consume(self: Pin<&mut Self>, _: async_buf_read::sealed::Internal, amt: usize) {
         let me = self.project();
         *me.pos = cmp::min(*me.pos + amt, *me.cap);
     }
 }
+
+impl<R: AsyncRead> AsyncBufRead for BufReader<R> {}
 
 impl<R: AsyncRead + AsyncWrite> AsyncWrite for BufReader<R> {
     fn poll_write(
