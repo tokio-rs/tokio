@@ -11,7 +11,7 @@ use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
 use tokio::stream::Stream;
 
-/// TOOD: dox
+/// TODO: dox
 pub fn spawn<T>(task: T) -> Spawn<T> {
     Spawn {
         task: MockTask::new(),
