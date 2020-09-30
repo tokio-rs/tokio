@@ -2,8 +2,9 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::time::{self, sleep, DelayQueue, Duration, Instant};
+use tokio::time::{self, sleep, Duration, Instant};
 use tokio_test::{assert_ok, assert_pending, assert_ready, task};
+use tokio_util::time::DelayQueue;
 
 macro_rules! poll {
     ($queue:ident) => {

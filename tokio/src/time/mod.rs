@@ -14,9 +14,6 @@
 //!   of time it is allowed to execute. If the future or stream does not
 //!   complete in time, then it is canceled and an error is returned.
 //!
-//! * `DelayQueue`: A queue where items are returned once the requested delay
-//!   has expired.
-//!
 //! These types are sufficient for handling a large number of scenarios
 //! involving time.
 //!
@@ -95,10 +92,6 @@ mod clock;
 pub(crate) use self::clock::Clock;
 #[cfg(feature = "test-util")]
 pub use clock::{advance, pause, resume};
-
-pub mod delay_queue;
-#[doc(inline)]
-pub use delay_queue::DelayQueue;
 
 mod delay;
 pub use delay::{sleep, sleep_until, Delay};
