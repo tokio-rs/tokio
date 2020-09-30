@@ -10,8 +10,6 @@ use crate::runtime::context;
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{Builder, Callback, Handle};
 
-use slab::Slab;
-
 use std::collections::VecDeque;
 use std::fmt;
 use std::time::Duration;
@@ -59,7 +57,7 @@ struct Shared {
     num_notify: u32,
     shutdown: bool,
     shutdown_tx: Option<shutdown::Sender>,
-    worker_threads: Slab<thread::JoinHandle<()>>,
+    worker_threads: Vec<thread::JoinHandle<()>>,
 }
 
 type Task = task::Notified<NoopSchedule>;
@@ -109,7 +107,7 @@ impl BlockingPool {
                         num_notify: 0,
                         shutdown: false,
                         shutdown_tx: Some(shutdown_tx),
-                        worker_threads: Slab::new(),
+                        worker_threads: Vec::new(),
                     }),
                     condvar: Condvar::new(),
                     thread_name: builder.thread_name.clone(),
@@ -141,12 +139,12 @@ impl BlockingPool {
         shared.shutdown = true;
         shared.shutdown_tx = None;
         self.spawner.inner.condvar.notify_all();
-        let mut workers = std::mem::replace(&mut shared.worker_threads, Slab::new());
+        let mut workers = std::mem::replace(&mut shared.worker_threads, Vec::new());
 
         drop(shared);
 
         if self.shutdown_rx.wait(timeout) {
-            for handle in workers.drain() {
+            for handle in workers.drain(..) {
                 let _ = handle.join();
             }
         }
@@ -208,11 +206,11 @@ impl Spawner {
 
         if let Some(shutdown_tx) = shutdown_tx {
             let mut shared = self.inner.shared.lock();
-            let entry = shared.worker_threads.vacant_entry();
+            let id = shared.worker_threads.len();
 
-            let handle = self.spawn_thread(shutdown_tx, rt, entry.key());
+            let handle = self.spawn_thread(shutdown_tx, rt, id);
 
-            entry.insert(handle);
+            shared.worker_threads.push(handle);
         }
 
         Ok(())
