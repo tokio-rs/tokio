@@ -45,8 +45,7 @@ where
         // 2. If buffer is small, it will not be shrinked.
         // That's why, it's "textness" will not change, so we don't have
         // to fixup it.
-        if cfg!(not(any(target_os = "windows", test)))
-            || buf.len() <= crate::io::blocking::MAX_BUF
+        if cfg!(not(any(target_os = "windows", test))) || buf.len() <= crate::io::blocking::MAX_BUF
         {
             return call_inner(buf);
         }
