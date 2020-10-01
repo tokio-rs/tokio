@@ -899,58 +899,6 @@ impl<T: Clone> Receiver<T> {
         guard.clone_value().ok_or(TryRecvError::Closed)
     }
 
-    #[doc(hidden)]
-    #[deprecated(since = "0.2.21", note = "use async fn recv()")]
-    pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Result<T, RecvError>> {
-        use Poll::{Pending, Ready};
-
-        // The borrow checker prohibits calling `self.poll_ref` while passing in
-        // a mutable ref to a field (as it should). To work around this,
-        // `waiter` is first *removed* from `self` then `poll_recv` is called.
-        //
-        // However, for safety, we must ensure that `waiter` is **not** dropped.
-        // It could be contained in the intrusive linked list. The `Receiver`
-        // drop implementation handles cleanup.
-        //
-        // The guard pattern is used to ensure that, on return, even due to
-        // panic, the waiter node is replaced on `self`.
-
-        struct Guard<'a, T> {
-            waiter: Option<Pin<Box<UnsafeCell<Waiter>>>>,
-            receiver: &'a mut Receiver<T>,
-        }
-
-        impl<'a, T> Drop for Guard<'a, T> {
-            fn drop(&mut self) {
-                self.receiver.waiter = self.waiter.take();
-            }
-        }
-
-        let waiter = self.waiter.take().or_else(|| {
-            Some(Box::pin(UnsafeCell::new(Waiter {
-                queued: false,
-                waker: None,
-                pointers: linked_list::Pointers::new(),
-                _p: PhantomPinned,
-            })))
-        });
-
-        let guard = Guard {
-            waiter,
-            receiver: self,
-        };
-        let res = guard
-            .receiver
-            .recv_ref(Some((&guard.waiter.as_ref().unwrap(), cx.waker())));
-
-        match res {
-            Ok(guard) => Ready(guard.clone_value().ok_or(RecvError::Closed)),
-            Err(TryRecvError::Closed) => Ready(Err(RecvError::Closed)),
-            Err(TryRecvError::Lagged(n)) => Ready(Err(RecvError::Lagged(n))),
-            Err(TryRecvError::Empty) => Pending,
-        }
-    }
-
     /// Convert the receiver into a `Stream`.
     ///
     /// The conversion allows using `Receiver` with APIs that require stream
