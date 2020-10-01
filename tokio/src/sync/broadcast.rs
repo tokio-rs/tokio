@@ -194,9 +194,6 @@ pub struct Receiver<T> {
 
     /// Next position to read from
     next: u64,
-
-    /// Used to support the deprecated `poll_recv` fn
-    waiter: Option<Pin<Box<UnsafeCell<Waiter>>>>,
 }
 
 /// Error returned by [`Sender::send`][Sender::send].
@@ -433,7 +430,6 @@ pub fn channel<T: Clone>(mut capacity: usize) -> (Sender<T>, Receiver<T>) {
     let rx = Receiver {
         shared: shared.clone(),
         next: 0,
-        waiter: None,
     };
 
     let tx = Sender { shared };
@@ -543,7 +539,6 @@ impl<T> Sender<T> {
         Receiver {
             shared,
             next,
-            waiter: None,
         }
     }
 
@@ -945,23 +940,6 @@ impl<T: Clone> Receiver<T> {
 impl<T> Drop for Receiver<T> {
     fn drop(&mut self) {
         let mut tail = self.shared.tail.lock();
-
-        if let Some(waiter) = &self.waiter {
-            // safety: tail lock is held
-            let queued = waiter.with(|ptr| unsafe { (*ptr).queued });
-
-            if queued {
-                // Remove the node
-                //
-                // safety: tail lock is held and the wait node is verified to be in
-                // the list.
-                unsafe {
-                    waiter.with_mut(|ptr| {
-                        tail.waiters.remove((&mut *ptr).into());
-                    });
-                }
-            }
-        }
 
         tail.rx_cnt -= 1;
         let until = tail.pos;
