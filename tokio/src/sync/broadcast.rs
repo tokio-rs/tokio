@@ -952,28 +952,6 @@ impl<T: Clone> Receiver<T> {
     }
 }
 
-#[cfg(feature = "stream")]
-#[doc(hidden)]
-#[deprecated(since = "0.2.21", note = "use `into_stream()`")]
-impl<T> crate::stream::Stream for Receiver<T>
-where
-    T: Clone,
-{
-    type Item = Result<T, RecvError>;
-
-    fn poll_next(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Option<Result<T, RecvError>>> {
-        #[allow(deprecated)]
-        self.poll_recv(cx).map(|v| match v {
-            Ok(v) => Some(Ok(v)),
-            lag @ Err(RecvError::Lagged(_)) => Some(lag),
-            Err(RecvError::Closed) => None,
-        })
-    }
-}
-
 impl<T> Drop for Receiver<T> {
     fn drop(&mut self) {
         let mut tail = self.shared.tail.lock();
