@@ -4,8 +4,8 @@
 use tokio::time::{self, Duration, Instant};
 use tokio_test::{assert_pending, assert_ready_eq, task};
 
-use std::task::Poll;
 use std::future::Future;
+use std::task::Poll;
 
 #[tokio::test]
 #[should_panic]
