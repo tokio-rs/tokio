@@ -55,8 +55,7 @@ impl ReadDir {
         poll_fn(|cx| self.poll_next_entry(cx)).await
     }
 
-    #[doc(hidden)]
-    pub fn poll_next_entry(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<Option<DirEntry>>> {
+    fn poll_next_entry(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<Option<DirEntry>>> {
         loop {
             match self.0 {
                 State::Idle(ref mut std) => {

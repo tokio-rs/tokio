@@ -122,8 +122,7 @@ pub struct Interval {
 }
 
 impl Interval {
-    #[doc(hidden)] // TODO: document
-    pub fn poll_tick(&mut self, cx: &mut Context<'_>) -> Poll<Instant> {
+    fn poll_tick(&mut self, cx: &mut Context<'_>) -> Poll<Instant> {
         // Wait for the delay to be done
         ready!(Pin::new(&mut self.delay).poll(cx));
 
