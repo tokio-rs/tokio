@@ -133,7 +133,7 @@ impl Semaphore {
     pub(crate) const fn const_new(mut permits: usize) -> Self {
         // NOTE: assertions and by extension panics are still being worked on: https://github.com/rust-lang/rust/issues/74925
         // currently we just clamp the permit count when it exceeds the max
-        permits = permits & Self::MAX_PERMITS;
+        permits &= Self::MAX_PERMITS;
 
         Self {
             permits: AtomicUsize::new(permits << Self::PERMIT_SHIFT),

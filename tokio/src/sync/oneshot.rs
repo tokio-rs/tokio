@@ -124,7 +124,6 @@ struct State(usize);
 /// }
 /// ```
 pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
-    #[allow(deprecated)]
     let inner = Arc::new(Inner {
         state: AtomicUsize::new(State::new().as_usize()),
         value: UnsafeCell::new(None),
