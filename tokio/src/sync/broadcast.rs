@@ -537,10 +537,7 @@ impl<T> Sender<T> {
 
         drop(tail);
 
-        Receiver {
-            shared,
-            next,
-        }
+        Receiver { shared, next }
     }
 
     /// Returns the number of active receivers
