@@ -107,6 +107,7 @@
 //!     assert_eq!(20, rx.recv().await.unwrap());
 //!     assert_eq!(30, rx.recv().await.unwrap());
 //! }
+//! ```
 
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicUsize;
@@ -844,6 +845,7 @@ impl<T: Clone> Receiver<T> {
     ///     assert_eq!(20, rx.recv().await.unwrap());
     ///     assert_eq!(30, rx.recv().await.unwrap());
     /// }
+    /// ```
     pub async fn recv(&mut self) -> Result<T, RecvError> {
         let fut = Recv::<_, T>::new(Borrow(self));
         fut.await
@@ -915,7 +917,7 @@ impl<T: Clone> Receiver<T> {
     ///         }
     ///     });
     ///
-    ///    // Streams must be pinned to iterate.
+    ///     // Streams must be pinned to iterate.
     ///     tokio::pin! {
     ///         let stream = rx
     ///             .into_stream()
