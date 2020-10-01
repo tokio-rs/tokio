@@ -207,11 +207,18 @@ pub use std::io::{Error, ErrorKind, Result, SeekFrom};
 cfg_io_driver! {
     pub(crate) mod driver;
 
+    mod registration;
+
     mod poll_evented;
+
     #[cfg(not(loom))]
     pub(crate) use poll_evented::PollEvented;
+}
 
-    mod registration;
+cfg_net_unix! {
+    mod async_fd;
+
+    pub use self::async_fd::{AsyncFd, ReadyGuard};
 }
 
 cfg_io_std! {
