@@ -950,6 +950,48 @@ impl<T: Clone> Receiver<T> {
         let fut = Recv::<_, T>::new(Borrow(self));
         fut.await
     }
+
+    /// Convert the receiver into a `Stream`.
+    ///
+    /// The conversion allows using `Receiver` with APIs that require stream
+    /// values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::stream::StreamExt;
+    /// use tokio::sync::broadcast;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = broadcast::channel(128);
+    ///
+    ///     tokio::spawn(async move {
+    ///         for i in 0..10_i32 {
+    ///             tx.send(i).unwrap();
+    ///         }
+    ///     });
+    ///
+    ///    // Streams must be pinned to iterate.
+    ///     tokio::pin! {
+    ///         let stream = rx
+    ///             .into_stream()
+    ///             .filter(Result::is_ok)
+    ///             .map(Result::unwrap)
+    ///             .filter(|v| v % 2 == 0)
+    ///             .map(|v| v + 1);
+    ///     }
+    ///
+    ///     while let Some(i) = stream.next().await {
+    ///         println!("{}", i);
+    ///     }
+    /// }
+    /// ```
+    #[cfg(feature = "stream")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "stream")))]
+    pub fn into_stream(self) -> impl Stream<Item = Result<T, RecvError>> {
+        Recv::new(Borrow(self))
+    }
 }
 
 impl<T> Drop for Receiver<T> {
@@ -1045,48 +1087,6 @@ where
 
 cfg_stream! {
     use futures_core::Stream;
-
-    impl<T: Clone> Receiver<T> {
-        /// Convert the receiver into a `Stream`.
-        ///
-        /// The conversion allows using `Receiver` with APIs that require stream
-        /// values.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// use tokio::stream::StreamExt;
-        /// use tokio::sync::broadcast;
-        ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let (tx, rx) = broadcast::channel(128);
-        ///
-        ///     tokio::spawn(async move {
-        ///         for i in 0..10_i32 {
-        ///             tx.send(i).unwrap();
-        ///         }
-        ///     });
-        ///
-        ///    // Streams must be pinned to iterate.
-        ///     tokio::pin! {
-        ///         let stream = rx
-        ///             .into_stream()
-        ///             .filter(Result::is_ok)
-        ///             .map(Result::unwrap)
-        ///             .filter(|v| v % 2 == 0)
-        ///             .map(|v| v + 1);
-        ///     }
-        ///
-        ///     while let Some(i) = stream.next().await {
-        ///         println!("{}", i);
-        ///     }
-        /// }
-        /// ```
-        pub fn into_stream(self) -> impl Stream<Item = Result<T, RecvError>> {
-            Recv::new(Borrow(self))
-        }
-    }
 
     impl<R, T: Clone> Stream for Recv<R, T>
     where
