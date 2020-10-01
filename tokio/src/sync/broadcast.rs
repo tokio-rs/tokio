@@ -400,7 +400,7 @@ const MAX_RECEIVERS: usize = usize::MAX >> 2;
 ///     tx.send(20).unwrap();
 /// }
 /// ```
-pub fn channel<T>(mut capacity: usize) -> (Sender<T>, Receiver<T>) {
+pub fn channel<T: Clone>(mut capacity: usize) -> (Sender<T>, Receiver<T>) {
     assert!(capacity > 0, "capacity is empty");
     assert!(capacity <= usize::MAX >> 1, "requested capacity too large");
 
@@ -784,10 +784,7 @@ impl<T> Receiver<T> {
     }
 }
 
-impl<T> Receiver<T>
-where
-    T: Clone,
-{
+impl<T: Clone> Receiver<T> {
     /// Attempts to return a pending value on this receiver without awaiting.
     ///
     /// This is useful for a flavor of "optimistic check" before deciding to
