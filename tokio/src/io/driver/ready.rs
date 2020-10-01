@@ -58,22 +58,6 @@ impl Ready {
         ready
     }
 
-    pub(crate) fn from_interest(interest: mio::Interest) -> Ready {
-        let mut ready = Ready::EMPTY;
-
-        if interest.is_readable() {
-            ready |= Ready::READABLE;
-            ready |= Ready::READ_CLOSED;
-        }
-
-        if interest.is_writable() {
-            ready |= Ready::WRITABLE;
-            ready |= Ready::WRITE_CLOSED;
-        }
-
-        ready
-    }
-
     /// Returns true if `Ready` is the empty set
     pub(crate) fn is_empty(self) -> bool {
         self == Ready::EMPTY
@@ -109,14 +93,6 @@ impl Ready {
         (self & other) == other
     }
 
-    pub(crate) fn scope(self, interest: mio::Interest) -> Ready {
-        Ready(self.0 & Ready::from_interest(interest).0)
-    }
-
-    pub(crate) fn satisfies(self, interest: mio::Interest) -> bool {
-        self.0 & Ready::from_interest(interest).0 != 0
-    }
-
     /// Create a `Ready` instance using the given `usize` representation.
     ///
     /// The `usize` representation must have been obtained from a call to
@@ -134,6 +110,34 @@ impl Ready {
     /// readiness value in an `AtomicUsize`.
     pub(crate) fn as_usize(self) -> usize {
         self.0
+    }
+}
+
+cfg_io_readiness! {
+    impl Ready {
+        pub(crate) fn from_interest(interest: mio::Interest) -> Ready {
+            let mut ready = Ready::EMPTY;
+
+            if interest.is_readable() {
+                ready |= Ready::READABLE;
+                ready |= Ready::READ_CLOSED;
+            }
+
+            if interest.is_writable() {
+                ready |= Ready::WRITABLE;
+                ready |= Ready::WRITE_CLOSED;
+            }
+
+            ready
+        }
+
+        pub(crate) fn scope(self, interest: mio::Interest) -> Ready {
+            Ready(self.0 & Ready::from_interest(interest).0)
+        }
+
+        pub(crate) fn satisfies(self, interest: mio::Interest) -> bool {
+            self.0 & Ready::from_interest(interest).0 != 0
+        }
     }
 }
 
