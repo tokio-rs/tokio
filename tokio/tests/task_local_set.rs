@@ -62,11 +62,11 @@ async fn localset_future_timers() {
 
     let local = LocalSet::new();
     local.spawn_local(async move {
-        time::delay_for(Duration::from_millis(10)).await;
+        time::sleep(Duration::from_millis(10)).await;
         RAN1.store(true, Ordering::SeqCst);
     });
     local.spawn_local(async move {
-        time::delay_for(Duration::from_millis(20)).await;
+        time::sleep(Duration::from_millis(20)).await;
         RAN2.store(true, Ordering::SeqCst);
     });
     local.await;
@@ -114,7 +114,7 @@ async fn local_threadpool_timer() {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
             let join = task::spawn_local(async move {
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
-                time::delay_for(Duration::from_millis(10)).await;
+                time::sleep(Duration::from_millis(10)).await;
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
             });
             join.await.unwrap();
@@ -299,7 +299,7 @@ fn drop_cancels_tasks() {
 
         started_tx.send(()).unwrap();
         loop {
-            time::delay_for(Duration::from_secs(3600)).await;
+            time::sleep(Duration::from_secs(3600)).await;
         }
     });
 
@@ -367,7 +367,7 @@ fn drop_cancels_remote_tasks() {
         let local = LocalSet::new();
         local.spawn_local(async move { while rx.recv().await.is_some() {} });
         local.block_on(&rt, async {
-            time::delay_for(Duration::from_millis(1)).await;
+            time::sleep(Duration::from_millis(1)).await;
         });
 
         drop(tx);
@@ -415,7 +415,7 @@ async fn local_tasks_are_polled_after_tick() {
         .run_until(async {
             let task2 = task::spawn(async move {
                 // Wait a bit
-                time::delay_for(Duration::from_millis(100)).await;
+                time::sleep(Duration::from_millis(100)).await;
 
                 let mut oneshots = Vec::with_capacity(EXPECTED);
 
@@ -426,13 +426,13 @@ async fn local_tasks_are_polled_after_tick() {
                     tx.send(oneshot_rx).unwrap();
                 }
 
-                time::delay_for(Duration::from_millis(100)).await;
+                time::sleep(Duration::from_millis(100)).await;
 
                 for tx in oneshots.drain(..) {
                     tx.send(()).unwrap();
                 }
 
-                time::delay_for(Duration::from_millis(300)).await;
+                time::sleep(Duration::from_millis(300)).await;
                 let rx1 = RX1.load(SeqCst);
                 let rx2 = RX2.load(SeqCst);
                 println!("EXPECT = {}; RX1 = {}; RX2 = {}", EXPECTED, rx1, rx2);

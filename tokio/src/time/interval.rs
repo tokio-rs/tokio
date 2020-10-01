@@ -1,5 +1,5 @@
 use crate::future::poll_fn;
-use crate::time::{delay_until, Delay, Duration, Instant};
+use crate::time::{sleep_until, Delay, Duration, Instant};
 
 use std::future::Future;
 use std::pin::Pin;
@@ -36,12 +36,12 @@ use std::task::{Context, Poll};
 ///
 /// A simple example using `interval` to execute a task every two seconds.
 ///
-/// The difference between `interval` and [`delay_for`] is that an `interval`
+/// The difference between `interval` and [`sleep`] is that an `interval`
 /// measures the time since the last tick, which means that `.tick().await`
 /// may wait for a shorter time than the duration specified for the interval
 /// if some time has passed between calls to `.tick().await`.
 ///
-/// If the tick in the example below was replaced with [`delay_for`], the task
+/// If the tick in the example below was replaced with [`sleep`], the task
 /// would only be executed once every three seconds, and not every two
 /// seconds.
 ///
@@ -50,7 +50,7 @@ use std::task::{Context, Poll};
 ///
 /// async fn task_that_takes_a_second() {
 ///     println!("hello");
-///     time::delay_for(time::Duration::from_secs(1)).await
+///     time::sleep(time::Duration::from_secs(1)).await
 /// }
 ///
 /// #[tokio::main]
@@ -63,7 +63,7 @@ use std::task::{Context, Poll};
 /// }
 /// ```
 ///
-/// [`delay_for`]: crate::time::delay_for()
+/// [`sleep`]: crate::time::sleep()
 pub fn interval(period: Duration) -> Interval {
     assert!(period > Duration::new(0, 0), "`period` must be non-zero.");
 
@@ -101,7 +101,7 @@ pub fn interval_at(start: Instant, period: Duration) -> Interval {
     assert!(period > Duration::new(0, 0), "`period` must be non-zero.");
 
     Interval {
-        delay: delay_until(start),
+        delay: sleep_until(start),
         period,
     }
 }

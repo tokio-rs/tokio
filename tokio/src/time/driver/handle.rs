@@ -25,9 +25,9 @@ impl Handle {
     /// `Builder::enable_all()` are not included in the builder.
     ///
     /// It can also panic whenever a timer is created outside of a Tokio
-    /// runtime. That is why `rt.block_on(delay_for(...))` will panic,
+    /// runtime. That is why `rt.block_on(sleep(...))` will panic,
     /// since the function is executed outside of the runtime.
-    /// Whereas `rt.block_on(async {delay_for(...).await})` doesn't
+    /// Whereas `rt.block_on(async {sleep(...).await})` doesn't
     /// panic. And this is because wrapping the function on an async makes it
     /// lazy, and so gets executed inside the runtime successfuly without
     /// panicking.
