@@ -785,6 +785,75 @@ impl<T> Receiver<T> {
 }
 
 impl<T: Clone> Receiver<T> {
+    /// Receives the next value for this receiver.
+    ///
+    /// Each [`Receiver`] handle will receive a clone of all values sent
+    /// **after** it has subscribed.
+    ///
+    /// `Err(RecvError::Closed)` is returned when all `Sender` halves have
+    /// dropped, indicating that no further values can be sent on the channel.
+    ///
+    /// If the [`Receiver`] handle falls behind, once the channel is full, newly
+    /// sent values will overwrite old values. At this point, a call to [`recv`]
+    /// will return with `Err(RecvError::Lagged)` and the [`Receiver`]'s
+    /// internal cursor is updated to point to the oldest value still held by
+    /// the channel. A subsequent call to [`recv`] will return this value
+    /// **unless** it has been since overwritten.
+    ///
+    /// [`Receiver`]: crate::sync::broadcast::Receiver
+    /// [`recv`]: crate::sync::broadcast::Receiver::recv
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::broadcast;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx1) = broadcast::channel(16);
+    ///     let mut rx2 = tx.subscribe();
+    ///
+    ///     tokio::spawn(async move {
+    ///         assert_eq!(rx1.recv().await.unwrap(), 10);
+    ///         assert_eq!(rx1.recv().await.unwrap(), 20);
+    ///     });
+    ///
+    ///     tokio::spawn(async move {
+    ///         assert_eq!(rx2.recv().await.unwrap(), 10);
+    ///         assert_eq!(rx2.recv().await.unwrap(), 20);
+    ///     });
+    ///
+    ///     tx.send(10).unwrap();
+    ///     tx.send(20).unwrap();
+    /// }
+    /// ```
+    ///
+    /// Handling lag
+    ///
+    /// ```
+    /// use tokio::sync::broadcast;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = broadcast::channel(2);
+    ///
+    ///     tx.send(10).unwrap();
+    ///     tx.send(20).unwrap();
+    ///     tx.send(30).unwrap();
+    ///
+    ///     // The receiver lagged behind
+    ///     assert!(rx.recv().await.is_err());
+    ///
+    ///     // At this point, we can abort or continue with lost messages
+    ///
+    ///     assert_eq!(20, rx.recv().await.unwrap());
+    ///     assert_eq!(30, rx.recv().await.unwrap());
+    /// }
+    pub async fn recv(&mut self) -> Result<T, RecvError> {
+        let fut = Recv::<_, T>::new(Borrow(self));
+        fut.await
+    }
+
     /// Attempts to return a pending value on this receiver without awaiting.
     ///
     /// This is useful for a flavor of "optimistic check" before deciding to
@@ -880,75 +949,6 @@ impl<T: Clone> Receiver<T> {
             Err(TryRecvError::Lagged(n)) => Ready(Err(RecvError::Lagged(n))),
             Err(TryRecvError::Empty) => Pending,
         }
-    }
-
-    /// Receives the next value for this receiver.
-    ///
-    /// Each [`Receiver`] handle will receive a clone of all values sent
-    /// **after** it has subscribed.
-    ///
-    /// `Err(RecvError::Closed)` is returned when all `Sender` halves have
-    /// dropped, indicating that no further values can be sent on the channel.
-    ///
-    /// If the [`Receiver`] handle falls behind, once the channel is full, newly
-    /// sent values will overwrite old values. At this point, a call to [`recv`]
-    /// will return with `Err(RecvError::Lagged)` and the [`Receiver`]'s
-    /// internal cursor is updated to point to the oldest value still held by
-    /// the channel. A subsequent call to [`recv`] will return this value
-    /// **unless** it has been since overwritten.
-    ///
-    /// [`Receiver`]: crate::sync::broadcast::Receiver
-    /// [`recv`]: crate::sync::broadcast::Receiver::recv
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio::sync::broadcast;
-    ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx1) = broadcast::channel(16);
-    ///     let mut rx2 = tx.subscribe();
-    ///
-    ///     tokio::spawn(async move {
-    ///         assert_eq!(rx1.recv().await.unwrap(), 10);
-    ///         assert_eq!(rx1.recv().await.unwrap(), 20);
-    ///     });
-    ///
-    ///     tokio::spawn(async move {
-    ///         assert_eq!(rx2.recv().await.unwrap(), 10);
-    ///         assert_eq!(rx2.recv().await.unwrap(), 20);
-    ///     });
-    ///
-    ///     tx.send(10).unwrap();
-    ///     tx.send(20).unwrap();
-    /// }
-    /// ```
-    ///
-    /// Handling lag
-    ///
-    /// ```
-    /// use tokio::sync::broadcast;
-    ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = broadcast::channel(2);
-    ///
-    ///     tx.send(10).unwrap();
-    ///     tx.send(20).unwrap();
-    ///     tx.send(30).unwrap();
-    ///
-    ///     // The receiver lagged behind
-    ///     assert!(rx.recv().await.is_err());
-    ///
-    ///     // At this point, we can abort or continue with lost messages
-    ///
-    ///     assert_eq!(20, rx.recv().await.unwrap());
-    ///     assert_eq!(30, rx.recv().await.unwrap());
-    /// }
-    pub async fn recv(&mut self) -> Result<T, RecvError> {
-        let fut = Recv::<_, T>::new(Borrow(self));
-        fut.await
     }
 
     /// Convert the receiver into a `Stream`.
