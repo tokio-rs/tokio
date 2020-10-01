@@ -81,12 +81,12 @@ impl Ready {
 
     /// Returns true if the value includes readable readiness
     pub(crate) fn is_readable(self) -> bool {
-        self.contains(Ready::READABLE)
+        self.contains(Ready::READABLE) || self.is_read_closed()
     }
 
     /// Returns true if the value includes writable readiness
     pub(crate) fn is_writable(self) -> bool {
-        self.contains(Ready::WRITABLE)
+        self.contains(Ready::WRITABLE) || self.is_write_closed()
     }
 
     /// Returns true if the value includes read closed readiness
