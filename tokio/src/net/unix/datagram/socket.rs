@@ -398,7 +398,7 @@ impl UnixDatagram {
     /// ```
     pub async fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.io
-            .async_io(mio::Interest::WRITABLE, |sock| sock.recv(buf))
+            .async_io(mio::Interest::READABLE, |sock| sock.recv(buf))
             .await
     }
 
