@@ -1,4 +1,4 @@
-use super::{platform, Direction, ReadyEvent, Tick};
+use super::{Direction, Ready, ReadyEvent, Tick};
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Mutex;
 use crate::util::bit;
@@ -52,7 +52,7 @@ cfg_io_readiness! {
         waker: Option<Waker>,
 
         /// The interest this waiter is waiting on
-        interest: mio::Ready,
+        interest: mio::Interest,
 
         is_ready: bool,
 
@@ -141,8 +141,8 @@ impl ScheduledIo {
         &self,
         token: Option<usize>,
         tick: Tick,
-        f: impl Fn(usize) -> usize,
-    ) -> Result<usize, ()> {
+        f: impl Fn(Ready) -> Ready,
+    ) -> Result<(), ()> {
         let mut current = self.readiness.load(Acquire);
 
         loop {
@@ -158,52 +158,46 @@ impl ScheduledIo {
 
             // Mask out the tick/generation bits so that the modifying
             // function doesn't see them.
-            let current_readiness = current & mio::Ready::all().as_usize();
-            let mut new = f(current_readiness);
+            let current_readiness = Ready::from_usize(current);
+            let new = f(current_readiness);
 
-            debug_assert!(
-                new <= READINESS.max_value(),
-                "new readiness value would overwrite tick/generation bits!"
-            );
-
-            match tick {
-                Tick::Set(t) => {
-                    new = TICK.pack(t as usize, new);
-                }
+            let packed = match tick {
+                Tick::Set(t) => TICK.pack(t as usize, new.as_usize()),
                 Tick::Clear(t) => {
                     if TICK.unpack(current) as u8 != t {
                         // Trying to clear readiness with an old event!
                         return Err(());
                     }
-                    new = TICK.pack(t as usize, new);
-                }
-            }
 
-            new = GENERATION.pack(current_generation, new);
+                    TICK.pack(t as usize, new.as_usize())
+                }
+            };
+
+            let next = GENERATION.pack(current_generation, packed);
 
             match self
                 .readiness
-                .compare_exchange(current, new, AcqRel, Acquire)
+                .compare_exchange(current, next, AcqRel, Acquire)
             {
-                Ok(_) => return Ok(current),
+                Ok(_) => return Ok(()),
                 // we lost the race, retry!
                 Err(actual) => current = actual,
             }
         }
     }
 
-    pub(super) fn wake(&self, ready: mio::Ready) {
+    pub(super) fn wake(&self, ready: Ready) {
         let mut waiters = self.waiters.lock();
 
         // check for AsyncRead slot
-        if !(ready & (!mio::Ready::writable())).is_empty() {
+        if ready.is_readable() {
             if let Some(waker) = waiters.reader.take() {
                 waker.wake();
             }
         }
 
         // check for AsyncWrite slot
-        if ready.is_writable() || platform::is_hup(ready) || platform::is_error(ready) {
+        if ready.is_writable() {
             if let Some(waker) = waiters.writer.take() {
                 waker.wake();
             }
@@ -212,10 +206,7 @@ impl ScheduledIo {
         #[cfg(any(feature = "udp", feature = "uds"))]
         {
             // check list of waiters
-            for waiter in waiters
-                .list
-                .drain_filter(|w| !(w.interest & ready).is_empty())
-            {
+            for waiter in waiters.list.drain_filter(|w| ready.satisfies(w.interest)) {
                 let waiter = unsafe { &mut *waiter.as_ptr() };
                 if let Some(waker) = waiter.waker.take() {
                     waiter.is_ready = true;
@@ -237,7 +228,7 @@ impl ScheduledIo {
     ) -> Poll<ReadyEvent> {
         let curr = self.readiness.load(Acquire);
 
-        let ready = direction.mask() & mio::Ready::from_usize(READINESS.unpack(curr));
+        let ready = direction.mask() & Ready::from_usize(READINESS.unpack(curr));
 
         if ready.is_empty() {
             // Update the task info
@@ -251,50 +242,36 @@ impl ScheduledIo {
             // Try again, in case the readiness was changed while we were
             // taking the waiters lock
             let curr = self.readiness.load(Acquire);
-            let ready = direction.mask() & mio::Ready::from_usize(READINESS.unpack(curr));
+            let ready = direction.mask() & Ready::from_usize(READINESS.unpack(curr));
             if ready.is_empty() {
                 Poll::Pending
             } else {
                 Poll::Ready(ReadyEvent {
                     tick: TICK.unpack(curr) as u8,
-                    readiness: ready,
+                    ready,
                 })
             }
         } else {
             Poll::Ready(ReadyEvent {
                 tick: TICK.unpack(curr) as u8,
-                readiness: ready,
+                ready,
             })
         }
     }
 
     pub(crate) fn clear_readiness(&self, event: ReadyEvent) {
-        // This consumes the current readiness state **except** for HUP and
-        // error. HUP and error are excluded because a) they are final states
-        // and never transition out and b) both the read AND the write
-        // directions need to be able to obvserve these states.
-        //
-        // # Platform-specific behavior
-        //
-        // HUP and error readiness are platform-specific. On epoll platforms,
-        // HUP has specific conditions that must be met by both peers of a
-        // connection in order to be triggered.
-        //
-        // On epoll platforms, `EPOLLERR` is signaled through
-        // `UnixReady::error()` and is important to be observable by both read
-        // AND write. A specific case that `EPOLLERR` occurs is when the read
-        // end of a pipe is closed. When this occurs, a peer blocked by
-        // writing to the pipe should be notified.
-        let mask_no_hup = (event.readiness - platform::hup() - platform::error()).as_usize();
+        // This consumes the current readiness state **except** for closed
+        // states. Closed states are excluded because they are final states.
+        let mask_no_closed = event.ready - Ready::READ_CLOSED - Ready::WRITE_CLOSED;
 
         // result isn't important
-        let _ = self.set_readiness(None, Tick::Clear(event.tick), |curr| curr & (!mask_no_hup));
+        let _ = self.set_readiness(None, Tick::Clear(event.tick), |curr| curr - mask_no_closed);
     }
 }
 
 impl Drop for ScheduledIo {
     fn drop(&mut self) {
-        self.wake(mio::Ready::all());
+        self.wake(Ready::ALL);
     }
 }
 
@@ -304,7 +281,7 @@ unsafe impl Sync for ScheduledIo {}
 cfg_io_readiness! {
     impl ScheduledIo {
         /// An async version of `poll_readiness` which uses a linked list of wakers
-        pub(crate) async fn readiness(&self, interest: mio::Ready) -> ReadyEvent {
+        pub(crate) async fn readiness(&self, interest: mio::Interest) -> ReadyEvent {
             self.readiness_fut(interest).await
         }
 
@@ -312,7 +289,7 @@ cfg_io_readiness! {
         // we are borrowing the `UnsafeCell` possibly over await boundaries.
         //
         // Go figure.
-        fn readiness_fut(&self, interest: mio::Ready) -> Readiness<'_> {
+        fn readiness_fut(&self, interest: mio::Interest) -> Readiness<'_> {
             Readiness {
                 scheduled_io: self,
                 state: State::Init,
@@ -362,29 +339,31 @@ cfg_io_readiness! {
                     State::Init => {
                         // Optimistically check existing readiness
                         let curr = scheduled_io.readiness.load(SeqCst);
-                        let readiness = mio::Ready::from_usize(READINESS.unpack(curr));
+                        let ready = Ready::from_usize(READINESS.unpack(curr));
 
                         // Safety: `waiter.interest` never changes
                         let interest = unsafe { (*waiter.get()).interest };
+                        let ready = ready.intersection(interest);
 
-                        if readiness.contains(interest) {
+                        if !ready.is_empty() {
                             // Currently ready!
                             let tick = TICK.unpack(curr) as u8;
                             *state = State::Done;
-                            return Poll::Ready(ReadyEvent { readiness: interest, tick });
+                            return Poll::Ready(ReadyEvent { ready, tick });
                         }
 
                         // Wasn't ready, take the lock (and check again while locked).
                         let mut waiters = scheduled_io.waiters.lock();
 
                         let curr = scheduled_io.readiness.load(SeqCst);
-                        let readiness = mio::Ready::from_usize(READINESS.unpack(curr));
+                        let ready = Ready::from_usize(READINESS.unpack(curr));
+                        let ready = ready.intersection(interest);
 
-                        if readiness.contains(interest) {
+                        if !ready.is_empty() {
                             // Currently ready!
                             let tick = TICK.unpack(curr) as u8;
                             *state = State::Done;
-                            return Poll::Ready(ReadyEvent { readiness, tick });
+                            return Poll::Ready(ReadyEvent { ready, tick });
                         }
 
                         // Not ready even after locked, insert into list...
@@ -440,7 +419,7 @@ cfg_io_readiness! {
 
                         return Poll::Ready(ReadyEvent {
                             tick,
-                            readiness: w.interest,
+                            ready: Ready::from_interest(w.interest),
                         });
                     }
                 }
