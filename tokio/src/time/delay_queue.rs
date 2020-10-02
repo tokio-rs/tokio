@@ -5,7 +5,7 @@
 //! [`DelayQueue`]: struct@DelayQueue
 
 use crate::time::wheel::{self, Wheel};
-use crate::time::{delay_until, Delay, Duration, Error, Instant};
+use crate::time::{sleep_until, Delay, Duration, Error, Instant};
 
 use slab::Slab;
 use std::cmp;
@@ -51,7 +51,7 @@ use std::task::{self, Poll};
 /// # Implementation
 ///
 /// The [`DelayQueue`] is backed by a separate instance of the same timer wheel used internally by
-/// Tokio's standalone timer utilities such as [`delay_for`]. Because of this, it offers the same
+/// Tokio's standalone timer utilities such as [`sleep`]. Because of this, it offers the same
 /// performance and scalability benefits.
 ///
 /// State associated with each entry is stored in a [`slab`]. This amortizes the cost of allocation,
@@ -118,7 +118,7 @@ use std::task::{self, Poll};
 /// [`poll_expired`]: method@Self::poll_expired
 /// [`Stream::poll_expired`]: method@Self::poll_expired
 /// [`DelayQueue`]: struct@DelayQueue
-/// [`delay_for`]: fn@super::delay_for
+/// [`sleep`]: fn@super::sleep
 /// [`slab`]: slab
 /// [`capacity`]: method@Self::capacity
 /// [`reserve`]: method@Self::reserve
@@ -330,7 +330,7 @@ impl<T> DelayQueue<T> {
             if let Some(ref mut delay) = &mut self.delay {
                 delay.reset(delay_time);
             } else {
-                self.delay = Some(delay_until(delay_time));
+                self.delay = Some(sleep_until(delay_time));
             }
         }
 
@@ -734,7 +734,7 @@ impl<T> DelayQueue<T> {
             // We poll the wheel to get the next value out before finding the next deadline.
             let wheel_idx = self.wheel.poll(&mut self.poll, &mut self.slab);
 
-            self.delay = self.next_deadline().map(delay_until);
+            self.delay = self.next_deadline().map(sleep_until);
 
             if let Some(idx) = wheel_idx {
                 return Poll::Ready(Some(Ok(idx)));

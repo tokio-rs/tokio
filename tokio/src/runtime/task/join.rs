@@ -121,7 +121,7 @@ doc_rt_core! {
     /// let original_task = task::spawn(async {
     ///     let _detached_task = task::spawn(async {
     ///         // Here we sleep to make sure that the first task returns before.
-    ///         time::delay_for(Duration::from_millis(10)).await;
+    ///         time::sleep(Duration::from_millis(10)).await;
     ///         // This will be called, even though the JoinHandle is dropped.
     ///         println!("♫ Still alive ♫");
     ///     });
@@ -133,7 +133,7 @@ doc_rt_core! {
     /// // We make sure that the new task has time to run, before the main
     /// // task returns.
     ///
-    /// time::delay_for(Duration::from_millis(1000)).await;
+    /// time::sleep(Duration::from_millis(1000)).await;
     /// # }
     /// ```
     ///
@@ -172,12 +172,12 @@ impl<T> JoinHandle<T> {
     ///    let mut handles = Vec::new();
     ///
     ///    handles.push(tokio::spawn(async {
-    ///       time::delay_for(time::Duration::from_secs(10)).await;
+    ///       time::sleep(time::Duration::from_secs(10)).await;
     ///       true
     ///    }));
     ///
     ///    handles.push(tokio::spawn(async {
-    ///       time::delay_for(time::Duration::from_secs(10)).await;
+    ///       time::sleep(time::Duration::from_secs(10)).await;
     ///       false
     ///    }));
     ///

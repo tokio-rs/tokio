@@ -243,8 +243,8 @@ async_assert_fn!(tokio::task::LocalSet::run_until(_, BoxFutureSync<()>): !Send &
 assert_value!(tokio::task::LocalSet: !Send & !Sync);
 
 async_assert_fn!(tokio::time::advance(Duration): Send & Sync);
-async_assert_fn!(tokio::time::delay_for(Duration): Send & Sync);
-async_assert_fn!(tokio::time::delay_until(Instant): Send & Sync);
+async_assert_fn!(tokio::time::sleep(Duration): Send & Sync);
+async_assert_fn!(tokio::time::sleep_until(Instant): Send & Sync);
 async_assert_fn!(tokio::time::timeout(Duration, BoxFutureSync<()>): Send & Sync);
 async_assert_fn!(tokio::time::timeout(Duration, BoxFutureSend<()>): Send & !Sync);
 async_assert_fn!(tokio::time::timeout(Duration, BoxFuture<()>): !Send & !Sync);

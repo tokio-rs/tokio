@@ -1,14 +1,14 @@
 #![cfg(feature = "full")]
 
 use tokio::stream::{self, StreamExt};
-use tokio::time::{self, delay_for, Duration};
+use tokio::time::{self, sleep, Duration};
 use tokio_test::*;
 
 use futures::StreamExt as _;
 
 async fn maybe_delay(idx: i32) -> i32 {
     if idx % 2 == 0 {
-        delay_for(ms(200)).await;
+        sleep(ms(200)).await;
     }
     idx
 }

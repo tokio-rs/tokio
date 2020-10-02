@@ -322,7 +322,7 @@
 //!     tokio::spawn(async move {
 //!         loop {
 //!             // Wait 10 seconds between checks
-//!             time::delay_for(Duration::from_secs(10)).await;
+//!             time::sleep(Duration::from_secs(10)).await;
 //!
 //!             // Load the configuration file
 //!             let new_config = Config::load_from_file().await.unwrap();
@@ -359,7 +359,7 @@
 //!             let mut conf = rx.borrow().clone();
 //!
 //!             let mut op_start = Instant::now();
-//!             let mut delay = time::delay_until(op_start + conf.timeout);
+//!             let mut delay = time::sleep_until(op_start + conf.timeout);
 //!
 //!             loop {
 //!                 tokio::select! {
@@ -371,7 +371,7 @@
 //!                         op_start = Instant::now();
 //!
 //!                         // Restart the timeout
-//!                         delay = time::delay_until(op_start + conf.timeout);
+//!                         delay = time::sleep_until(op_start + conf.timeout);
 //!                     }
 //!                     _ = rx.changed() => {
 //!                         conf = rx.borrow().clone();

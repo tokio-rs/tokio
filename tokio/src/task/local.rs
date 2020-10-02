@@ -95,7 +95,7 @@ cfg_rt_util! {
     ///     });
     ///
     ///     local.spawn_local(async move {
-    ///         time::delay_for(time::Duration::from_millis(100)).await;
+    ///         time::sleep(time::Duration::from_millis(100)).await;
     ///         println!("goodbye {}", unsend_data)
     ///     });
     ///

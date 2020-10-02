@@ -449,7 +449,7 @@ impl<T> Sender<T> {
     ///
     /// ```rust
     /// use tokio::sync::mpsc;
-    /// use tokio::time::{delay_for, Duration};
+    /// use tokio::time::{sleep, Duration};
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -466,7 +466,7 @@ impl<T> Sender<T> {
     ///
     ///     while let Some(i) = rx.recv().await {
     ///         println!("got = {}", i);
-    ///         delay_for(Duration::from_millis(200)).await;
+    ///         sleep(Duration::from_millis(200)).await;
     ///     }
     /// }
     /// ```
