@@ -44,6 +44,33 @@ async fn echo() -> io::Result<()> {
     Ok(())
 }
 
+#[tokio::test]
+async fn echo_from() -> io::Result<()> {
+    let dir = tempfile::tempdir().unwrap();
+    let server_path = dir.path().join("server.sock");
+    let client_path = dir.path().join("client.sock");
+
+    let server_socket = UnixDatagram::bind(server_path.clone())?;
+
+    tokio::spawn(async move {
+        if let Err(e) = echo_server(server_socket).await {
+            eprintln!("Error in echo server: {}", e);
+        }
+    });
+
+    {
+        let socket = UnixDatagram::bind(&client_path).unwrap();
+        socket.connect(&server_path)?;
+        socket.send(b"ECHO").await?;
+        let mut recv_buf = [0u8; 16];
+        let (len, addr) = socket.recv_from(&mut recv_buf[..]).await?;
+        assert_eq!(&recv_buf[..len], b"ECHO");
+        assert_eq!(addr.as_pathname(), Some(server_path.as_path()));
+    }
+
+    Ok(())
+}
+
 // Even though we use sync non-blocking io we still need a reactor.
 #[tokio::test]
 async fn try_send_recv_never_block() -> io::Result<()> {

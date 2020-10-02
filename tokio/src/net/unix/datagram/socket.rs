@@ -510,7 +510,7 @@ impl UnixDatagram {
     pub async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         let (n, addr) = self
             .io
-            .async_io(mio::Interest::WRITABLE, |sock| sock.recv_from(buf))
+            .async_io(mio::Interest::READABLE, |sock| sock.recv_from(buf))
             .await?;
 
         Ok((n, SocketAddr(addr)))
