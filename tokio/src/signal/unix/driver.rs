@@ -64,7 +64,7 @@ impl Driver {
         // Mio 0.7 removed `try_clone()` as an API due to unexpected behavior
         // with registering dups with the same reactor. In this case, duping is
         // safe as each dup is registered with separate reactors **and** we
-        // only at least one dup to receive the notification.
+        // only expect at least one dup to receive the notification.
 
         // Manually drop as we don't actually own this instance of UnixStream.
         let receiver_fd = globals().receiver.as_raw_fd();
