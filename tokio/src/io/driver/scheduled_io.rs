@@ -190,14 +190,14 @@ impl ScheduledIo {
         let mut waiters = self.waiters.lock();
 
         // check for AsyncRead slot
-        if ready.is_readable() || ready.is_read_closed() {
+        if ready.is_readable() {
             if let Some(waker) = waiters.reader.take() {
                 waker.wake();
             }
         }
 
         // check for AsyncWrite slot
-        if ready.is_writable() || ready.is_write_closed() {
+        if ready.is_writable() {
             if let Some(waker) = waiters.writer.take() {
                 waker.wake();
             }
@@ -343,7 +343,7 @@ cfg_io_readiness! {
 
                         // Safety: `waiter.interest` never changes
                         let interest = unsafe { (*waiter.get()).interest };
-                        let ready = ready.scope(interest);
+                        let ready = ready.intersection(interest);
 
                         if !ready.is_empty() {
                             // Currently ready!
@@ -357,7 +357,7 @@ cfg_io_readiness! {
 
                         let curr = scheduled_io.readiness.load(SeqCst);
                         let ready = Ready::from_usize(READINESS.unpack(curr));
-                        let ready = ready.scope(interest);
+                        let ready = ready.intersection(interest);
 
                         if !ready.is_empty() {
                             // Currently ready!

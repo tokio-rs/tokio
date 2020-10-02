@@ -131,7 +131,7 @@ cfg_io_readiness! {
             ready
         }
 
-        pub(crate) fn scope(self, interest: mio::Interest) -> Ready {
+        pub(crate) fn intersection(self, interest: mio::Interest) -> Ready {
             Ready(self.0 & Ready::from_interest(interest).0)
         }
 
