@@ -192,9 +192,13 @@ impl TcpStream {
         Ok(TcpStream { io })
     }
 
-    // Connects `TcpStream` asynchronously that may be built with a net2 `TcpBuilder`.
-    //
-    // This should be removed in favor of some in-crate TcpSocket builder API.
+    /// Connects `TcpStream` asynchronously that may be built with a net2 `TcpBuilder`.
+    ///
+    /// This function is intended to be replaced with some sort of TcpSocket builder.
+    /// See https://github.com/tokio-rs/tokio/issues/2902
+    ///
+    /// Despite being hidden, this function is part of the public API of Tokio v0.3, but
+    /// will be removed in v1.0 in favor of a better design.
     #[doc(hidden)]
     pub async fn connect_std(stream: net::TcpStream, addr: &SocketAddr) -> io::Result<TcpStream> {
         let io = mio::net::TcpStream::connect_stream(stream, addr)?;

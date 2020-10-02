@@ -6,10 +6,23 @@ use tokio_test::*;
 
 use std::future::Future;
 use std::pin::Pin;
+use std::task::{Context, Poll};
 
 trait AssertSend: Send {}
 impl AssertSend for oneshot::Sender<i32> {}
 impl AssertSend for oneshot::Receiver<i32> {}
+
+trait SenderExt {
+    fn poll_closed(&mut self, cx: &mut Context<'_>) -> Poll<()>;
+}
+impl<T> SenderExt for oneshot::Sender<T> {
+    fn poll_closed(&mut self, cx: &mut Context<'_>) -> Poll<()> {
+        tokio::pin! {
+            let fut = self.closed();
+        }
+        fut.poll(cx)
+    }
+}
 
 #[test]
 fn send_recv() {

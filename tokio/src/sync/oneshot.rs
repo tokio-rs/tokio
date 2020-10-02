@@ -196,8 +196,7 @@ impl<T> Sender<T> {
         Ok(())
     }
 
-    #[doc(hidden)] // TODO: remove
-    pub fn poll_closed(&mut self, cx: &mut Context<'_>) -> Poll<()> {
+    fn poll_closed(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         // Keep track of task budget
         let coop = ready!(crate::coop::poll_proceed(cx));
 

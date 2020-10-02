@@ -83,8 +83,7 @@ impl<R> Lines<R>
 where
     R: AsyncBufRead,
 {
-    #[doc(hidden)]
-    pub fn poll_next_line(
+    fn poll_next_line(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<io::Result<Option<String>>> {
