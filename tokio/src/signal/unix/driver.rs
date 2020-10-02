@@ -5,7 +5,8 @@ use crate::io::PollEvented;
 use crate::park::Park;
 use crate::runtime::context;
 use crate::signal::registry::globals;
-use mio_uds::UnixStream;
+
+use mio::net::UnixStream;
 use std::io::{self, Read};
 use std::ptr;
 use std::sync::{Arc, Weak};
@@ -42,22 +43,41 @@ pub(super) struct Inner(());
 impl Driver {
     /// Creates a new signal `Driver` instance that delegates wakeups to `park`.
     pub(crate) fn new(park: IoDriver) -> io::Result<Self> {
+        use std::mem::ManuallyDrop;
+        use std::os::unix::io::{AsRawFd, FromRawFd};
+
         // NB: We give each driver a "fresh" reciever file descriptor to avoid
         // the issues described in alexcrichton/tokio-process#42.
         //
         // In the past we would reuse the actual receiver file descriptor and
         // swallow any errors around double registration of the same descriptor.
-        // I'm not sure if the second (failed) registration simply doesn't end up
-        // receiving wake up notifications, or there could be some race condition
-        // when consuming readiness events, but having distinct descriptors for
-        // distinct PollEvented instances appears to mitigate this.
+        // I'm not sure if the second (failed) registration simply doesn't end
+        // up receiving wake up notifications, or there could be some race
+        // condition when consuming readiness events, but having distinct
+        // descriptors for distinct PollEvented instances appears to mitigate
+        // this.
         //
         // Unfortunately we cannot just use a single global PollEvented instance
         // either, since we can't compare Handles or assume they will always
         // point to the exact same reactor.
-        let receiver = globals().receiver.try_clone()?;
-        let receiver =
-            PollEvented::new_with_ready_and_handle(receiver, mio::Ready::all(), park.handle())?;
+        //
+        // Mio 0.7 removed `try_clone()` as an API due to unexpected behavior
+        // with registering dups with the same reactor. In this case, duping is
+        // safe as each dup is registered with separate reactors **and** we
+        // only expect at least one dup to receive the notification.
+
+        // Manually drop as we don't actually own this instance of UnixStream.
+        let receiver_fd = globals().receiver.as_raw_fd();
+
+        // safety: there is nothing unsafe about this, but the `from_raw_fd` fn is marked as unsafe.
+        let original =
+            ManuallyDrop::new(unsafe { std::os::unix::net::UnixStream::from_raw_fd(receiver_fd) });
+        let receiver = UnixStream::from_std(original.try_clone()?);
+        let receiver = PollEvented::new_with_interest_and_handle(
+            receiver,
+            mio::Interest::READABLE | mio::Interest::WRITABLE,
+            park.handle(),
+        )?;
 
         Ok(Self {
             park,

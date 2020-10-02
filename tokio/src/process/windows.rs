@@ -20,7 +20,7 @@ use crate::process::kill::Kill;
 use crate::process::SpawnedChild;
 use crate::sync::oneshot;
 
-use mio_named_pipes::NamedPipe;
+use mio::windows::NamedPipe;
 use std::fmt;
 use std::future::Future;
 use std::io;

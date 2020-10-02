@@ -36,7 +36,7 @@ impl UdpSocket {
     }
 
     fn bind_addr(addr: SocketAddr) -> io::Result<UdpSocket> {
-        let sys = mio::net::UdpSocket::bind(&addr)?;
+        let sys = mio::net::UdpSocket::bind(addr)?;
         UdpSocket::new(sys)
     }
 
@@ -63,7 +63,7 @@ impl UdpSocket {
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     pub fn from_std(socket: net::UdpSocket) -> io::Result<UdpSocket> {
-        let io = mio::net::UdpSocket::from_socket(socket)?;
+        let io = mio::net::UdpSocket::from_std(socket);
         UdpSocket::new(io)
     }
 
@@ -103,7 +103,7 @@ impl UdpSocket {
     /// [`connect`]: method@Self::connect
     pub async fn send(&self, buf: &[u8]) -> io::Result<usize> {
         self.io
-            .async_io(mio::Ready::writable(), |sock| sock.send(buf))
+            .async_io(mio::Interest::WRITABLE, |sock| sock.send(buf))
             .await
     }
 
@@ -135,7 +135,7 @@ impl UdpSocket {
     /// [`connect`]: method@Self::connect
     pub async fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.io
-            .async_io(mio::Ready::readable(), |sock| sock.recv(buf))
+            .async_io(mio::Interest::READABLE, |sock| sock.recv(buf))
             .await
     }
 
@@ -148,7 +148,7 @@ impl UdpSocket {
         let mut addrs = to_socket_addrs(target).await?;
 
         match addrs.next() {
-            Some(target) => self.send_to_addr(buf, &target).await,
+            Some(target) => self.send_to_addr(buf, target).await,
             None => Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "no addresses to send data to",
@@ -168,12 +168,12 @@ impl UdpSocket {
     ///
     /// [`ErrorKind::WouldBlock`]: std::io::ErrorKind::WouldBlock
     pub fn try_send_to(&self, buf: &[u8], target: SocketAddr) -> io::Result<usize> {
-        self.io.get_ref().send_to(buf, &target)
+        self.io.get_ref().send_to(buf, target)
     }
 
-    async fn send_to_addr(&self, buf: &[u8], target: &SocketAddr) -> io::Result<usize> {
+    async fn send_to_addr(&self, buf: &[u8], target: SocketAddr) -> io::Result<usize> {
         self.io
-            .async_io(mio::Ready::writable(), |sock| sock.send_to(buf, target))
+            .async_io(mio::Interest::WRITABLE, |sock| sock.send_to(buf, target))
             .await
     }
 
@@ -185,7 +185,7 @@ impl UdpSocket {
     /// buffer, excess bytes may be discarded.
     pub async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.io
-            .async_io(mio::Ready::readable(), |sock| sock.recv_from(buf))
+            .async_io(mio::Interest::READABLE, |sock| sock.recv_from(buf))
             .await
     }
 
@@ -324,30 +324,21 @@ impl UdpSocket {
     }
 }
 
-impl TryFrom<UdpSocket> for mio::net::UdpSocket {
-    type Error = io::Error;
-
-    /// Consumes value, returning the mio I/O object.
-    fn try_from(value: UdpSocket) -> Result<Self, Self::Error> {
-        value.io.into_inner()
-    }
-}
-
-impl TryFrom<net::UdpSocket> for UdpSocket {
+impl TryFrom<std::net::UdpSocket> for UdpSocket {
     type Error = io::Error;
 
     /// Consumes stream, returning the tokio I/O object.
     ///
     /// This is equivalent to
     /// [`UdpSocket::from_std(stream)`](UdpSocket::from_std).
-    fn try_from(stream: net::UdpSocket) -> Result<Self, Self::Error> {
+    fn try_from(stream: std::net::UdpSocket) -> Result<Self, Self::Error> {
         Self::from_std(stream)
     }
 }
 
 impl fmt::Debug for UdpSocket {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.io.fmt(f)
+        self.io.get_ref().fmt(f)
     }
 }
 

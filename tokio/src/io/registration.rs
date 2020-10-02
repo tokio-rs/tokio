@@ -1,7 +1,7 @@
 use crate::io::driver::{Direction, Handle, ReadyEvent, ScheduledIo};
 use crate::util::slab;
 
-use mio::{self, Evented};
+use mio::event::Source;
 use std::io;
 use std::task::{Context, Poll};
 
@@ -53,37 +53,23 @@ unsafe impl Sync for Registration {}
 // ===== impl Registration =====
 
 impl Registration {
-    /// Registers the I/O resource with the default reactor, for a specific `mio::Ready` state.
-    /// `new_with_ready` should be used over `new` when you need control over the readiness state,
+    /// Registers the I/O resource with the default reactor, for a specific `mio::Interest`.
+    /// `new_with_interest` should be used over `new` when you need control over the readiness state,
     /// such as when a file descriptor only allows reads. This does not add `hup` or `error` so if
     /// you are interested in those states, you will need to add them to the readiness state passed
     /// to this function.
-    ///
-    /// An example to listen to read only
-    ///
-    /// ```rust
-    /// ##[cfg(unix)]
-    ///     mio::Ready::from_usize(
-    ///         mio::Ready::readable().as_usize()
-    ///         | mio::unix::UnixReady::error().as_usize()
-    ///         | mio::unix::UnixReady::hup().as_usize()
-    ///     );
-    /// ```
     ///
     /// # Return
     ///
     /// - `Ok` if the registration happened successfully
     /// - `Err` if an error was encountered during registration
-    pub(crate) fn new_with_ready_and_handle<T>(
-        io: &T,
-        ready: mio::Ready,
+    pub(crate) fn new_with_interest_and_handle(
+        io: &mut impl Source,
+        interest: mio::Interest,
         handle: Handle,
-    ) -> io::Result<Registration>
-    where
-        T: Evented,
-    {
+    ) -> io::Result<Registration> {
         let shared = if let Some(inner) = handle.inner() {
-            inner.add_source(io, ready)?
+            inner.add_source(io, interest)?
         } else {
             return Err(io::Error::new(
                 io::ErrorKind::Other,
@@ -110,10 +96,7 @@ impl Registration {
     /// no longer result in notifications getting sent for this registration.
     ///
     /// `Err` is returned if an error is encountered.
-    pub(super) fn deregister<T>(&mut self, io: &T) -> io::Result<()>
-    where
-        T: Evented,
-    {
+    pub(super) fn deregister(&mut self, io: &mut impl Source) -> io::Result<()> {
         let inner = match self.handle.inner() {
             Some(inner) => inner,
             None => return Err(io::Error::new(io::ErrorKind::Other, "reactor gone")),
@@ -148,7 +131,7 @@ impl Registration {
 
 cfg_io_readiness! {
     impl Registration {
-        pub(super) async fn readiness(&self, interest: mio::Ready) -> io::Result<ReadyEvent> {
+        pub(super) async fn readiness(&self, interest: mio::Interest) -> io::Result<ReadyEvent> {
             // TODO: does this need to return a `Result`?
             Ok(self.shared.readiness(interest).await)
         }

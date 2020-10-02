@@ -3,13 +3,14 @@ use crate::io::{AsyncRead, AsyncWrite, PollEvented, ReadBuf};
 use crate::net::unix::split::{split, ReadHalf, WriteHalf};
 use crate::net::unix::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
 use crate::net::unix::ucred::{self, UCred};
+use crate::net::unix::SocketAddr;
 
 use std::convert::TryFrom;
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, RawFd};
-use std::os::unix::net::{self, SocketAddr};
+use std::os::unix::net;
 use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -21,7 +22,7 @@ cfg_uds! {
     /// from a listener with `UnixListener::incoming`. Additionally, a pair of
     /// anonymous Unix sockets can be created with `UnixStream::pair`.
     pub struct UnixStream {
-        io: PollEvented<mio_uds::UnixStream>,
+        io: PollEvented<mio::net::UnixStream>,
     }
 }
 
@@ -35,7 +36,7 @@ impl UnixStream {
     where
         P: AsRef<Path>,
     {
-        let stream = mio_uds::UnixStream::connect(path)?;
+        let stream = mio::net::UnixStream::connect(path)?;
         let stream = UnixStream::new(stream)?;
 
         poll_fn(|cx| stream.io.poll_write_ready(cx)).await?;
@@ -56,7 +57,7 @@ impl UnixStream {
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     pub fn from_std(stream: net::UnixStream) -> io::Result<UnixStream> {
-        let stream = mio_uds::UnixStream::from_stream(stream)?;
+        let stream = mio::net::UnixStream::from_std(stream);
         let io = PollEvented::new(stream)?;
 
         Ok(UnixStream { io })
@@ -68,26 +69,26 @@ impl UnixStream {
     /// communicating back and forth between one another. Each socket will
     /// be associated with the default event loop's handle.
     pub fn pair() -> io::Result<(UnixStream, UnixStream)> {
-        let (a, b) = mio_uds::UnixStream::pair()?;
+        let (a, b) = mio::net::UnixStream::pair()?;
         let a = UnixStream::new(a)?;
         let b = UnixStream::new(b)?;
 
         Ok((a, b))
     }
 
-    pub(crate) fn new(stream: mio_uds::UnixStream) -> io::Result<UnixStream> {
+    pub(crate) fn new(stream: mio::net::UnixStream) -> io::Result<UnixStream> {
         let io = PollEvented::new(stream)?;
         Ok(UnixStream { io })
     }
 
     /// Returns the socket address of the local half of this connection.
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        self.io.get_ref().local_addr()
+        self.io.get_ref().local_addr().map(SocketAddr)
     }
 
     /// Returns the socket address of the remote half of this connection.
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
-        self.io.get_ref().peer_addr()
+        self.io.get_ref().peer_addr().map(SocketAddr)
     }
 
     /// Returns effective credentials of the process which called `connect` or `pair`.
@@ -136,15 +137,6 @@ impl UnixStream {
     /// [`shutdown(Write)`]: fn@Self::shutdown
     pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
         split_owned(self)
-    }
-}
-
-impl TryFrom<UnixStream> for mio_uds::UnixStream {
-    type Error = io::Error;
-
-    /// Consumes value, returning the mio I/O object.
-    fn try_from(value: UnixStream) -> Result<Self, Self::Error> {
-        value.io.into_inner()
     }
 }
 

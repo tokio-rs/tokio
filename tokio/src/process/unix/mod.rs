@@ -32,9 +32,8 @@ use crate::process::kill::Kill;
 use crate::process::SpawnedChild;
 use crate::signal::unix::{signal, Signal, SignalKind};
 
-use mio::event::Evented;
-use mio::unix::{EventedFd, UnixReady};
-use mio::{Poll as MioPoll, PollOpt, Ready, Token};
+use mio::event::Source;
+use mio::unix::SourceFd;
 use std::fmt;
 use std::future::Future;
 use std::io;
@@ -173,32 +172,30 @@ where
     }
 }
 
-impl<T> Evented for Fd<T>
+impl<T> Source for Fd<T>
 where
     T: AsRawFd,
 {
     fn register(
-        &self,
-        poll: &MioPoll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
+        &mut self,
+        registry: &mio::Registry,
+        token: mio::Token,
+        interest: mio::Interest,
     ) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).register(poll, token, interest | UnixReady::hup(), opts)
+        SourceFd(&self.as_raw_fd()).register(registry, token, interest)
     }
 
     fn reregister(
-        &self,
-        poll: &MioPoll,
-        token: Token,
-        interest: Ready,
-        opts: PollOpt,
+        &mut self,
+        registry: &mio::Registry,
+        token: mio::Token,
+        interest: mio::Interest,
     ) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).reregister(poll, token, interest | UnixReady::hup(), opts)
+        SourceFd(&self.as_raw_fd()).reregister(registry, token, interest)
     }
 
-    fn deregister(&self, poll: &MioPoll) -> io::Result<()> {
-        EventedFd(&self.as_raw_fd()).deregister(poll)
+    fn deregister(&mut self, registry: &mio::Registry) -> io::Result<()> {
+        SourceFd(&self.as_raw_fd()).deregister(registry)
     }
 }
 

@@ -58,9 +58,9 @@ net = ["dns", "tcp", "udp", "uds"]
 process = [
   "lazy_static",
   "libc",
-  "mio",
-  "mio-named-pipes",
-  "mio-uds",
+  "mio/os-poll",
+  "mio/os-util",
+  "mio/uds",
   "signal-hook-registry",
   "winapi/threadpoollegacyapiset",
 ]
@@ -74,18 +74,18 @@ rt-threaded = [
 signal = [
   "lazy_static",
   "libc",
-  "mio",
-  "mio-uds",
+  "mio/os-poll",
+  "mio/uds",
   "signal-hook-registry",
   "winapi/consoleapi",
 ]
 stream = ["futures-core"]
 sync = ["fnv"]
 test-util = []
-tcp = ["lazy_static", "mio"]
+tcp = ["lazy_static", "mio/tcp", "mio/os-poll"]
 time = ["slab"]
-udp = ["lazy_static", "mio"]
-uds = ["lazy_static", "libc", "mio", "mio-uds"]
+udp = ["lazy_static", "mio/udp", "mio/os-poll"]
+uds = ["lazy_static", "libc", "mio/uds", "mio/os-poll"]
 
 [dependencies]
 tokio-macros = { version = "0.3.0", path = "../tokio-macros", optional = true }
@@ -98,19 +98,15 @@ fnv = { version = "1.0.6", optional = true }
 futures-core = { version = "0.3.0", optional = true }
 lazy_static = { version = "1.0.2", optional = true }
 memchr = { version = "2.2", optional = true }
-mio = { version = "0.6.20", optional = true }
+mio = { version = "0.7.2", optional = true }
 num_cpus = { version = "1.8.0", optional = true }
 parking_lot = { version = "0.11.0", optional = true } # Not in full
 slab = { version = "0.4.1", optional = true } # Backs `DelayQueue`
 tracing = { version = "0.1.16", default-features = false, features = ["std"], optional = true } # Not in full
 
 [target.'cfg(unix)'.dependencies]
-mio-uds = { version = "0.6.5", optional = true }
 libc = { version = "0.2.42", optional = true }
 signal-hook-registry = { version = "1.1.1", optional = true }
-
-[target.'cfg(windows)'.dependencies]
-mio-named-pipes = { version = "0.1.6", optional = true }
 
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3.8"
