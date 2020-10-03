@@ -197,10 +197,7 @@ impl Wheel {
     /// time and the expiration time.  for each in that population either
     /// return it for notification (in the case of the last level) or tier
     /// it down to the next level (in all other cases).
-    pub(crate) fn poll_expiration(
-        &mut self,
-        expiration: &Expiration,
-    ) -> Option<OwnedItem> {
+    pub(crate) fn poll_expiration(&mut self, expiration: &Expiration) -> Option<OwnedItem> {
         while let Some(item) = self.pop_entry(expiration) {
             if expiration.level == 0 {
                 debug_assert_eq!(item.when(), expiration.deadline);

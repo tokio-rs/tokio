@@ -139,7 +139,7 @@ where
                     Some(expiration)
                 }
             });
-            
+
             match expiration {
                 Some(ref expiration) => {
                     if let Some(item) = self.poll_expiration(expiration, store) {

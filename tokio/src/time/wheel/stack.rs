@@ -1,5 +1,5 @@
-use crate::time::driver::Entry;
 use super::{Item, OwnedItem};
+use crate::time::driver::Entry;
 
 use std::ptr;
 

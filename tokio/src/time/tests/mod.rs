@@ -8,10 +8,10 @@ fn assert_sync<T: Sync>() {}
 
 #[test]
 fn registration_is_send_and_sync() {
-    use crate::time::driver::Registration;
+    use crate::time::delay::Delay;
 
-    assert_send::<Registration>();
-    assert_sync::<Registration>();
+    assert_send::<Delay>();
+    assert_sync::<Delay>();
 }
 
 #[test]

@@ -1,8 +1,9 @@
-use crate::time::driver::Registration;
-use crate::time::{Duration, Instant};
+use crate::time::driver::{Entry, Handle};
+use crate::time::{Duration, Error, Instant};
 
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{self, Poll};
 
 /// Waits until `deadline` is reached.
@@ -16,8 +17,7 @@ use std::task::{self, Poll};
 /// Canceling a delay is done by dropping the returned future. No additional
 /// cleanup work is required.
 pub fn sleep_until(deadline: Instant) -> Delay {
-    let registration = Registration::new(deadline, Duration::from_millis(0));
-    Delay { registration }
+    Delay::new_timeout(deadline, Duration::from_millis(0))
 }
 
 /// Waits until `duration` has elapsed.
@@ -63,25 +63,27 @@ pub struct Delay {
     /// The link between the `Delay` instance and the timer that drives it.
     ///
     /// This also stores the `deadline` value.
-    registration: Registration,
+    entry: Arc<Entry>,
 }
 
 impl Delay {
     pub(crate) fn new_timeout(deadline: Instant, duration: Duration) -> Delay {
-        let registration = Registration::new(deadline, duration);
-        Delay { registration }
+        let handle = Handle::current();
+        let entry = Entry::new(&handle, deadline, duration);
+
+        Delay { entry }
     }
 
     /// Returns the instant at which the future will complete.
     pub fn deadline(&self) -> Instant {
-        self.registration.deadline()
+        self.entry.time_ref().deadline
     }
 
     /// Returns `true` if the `Delay` has elapsed
     ///
     /// A `Delay` is elapsed when the requested duration has elapsed.
     pub fn is_elapsed(&self) -> bool {
-        self.registration.is_elapsed()
+        self.entry.is_elapsed()
     }
 
     /// Resets the `Delay` instance to a new deadline.
@@ -92,7 +94,21 @@ impl Delay {
     /// This function can be called both before and after the future has
     /// completed.
     pub fn reset(&mut self, deadline: Instant) {
-        self.registration.reset(deadline);
+        unsafe {
+            self.entry.time_mut().deadline = deadline;
+        }
+
+        Entry::reset(&mut self.entry);
+    }
+
+    fn poll_elapsed(&self, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
+        // Keep track of task budget
+        let coop = ready!(crate::coop::poll_proceed(cx));
+
+        self.entry.poll_elapsed(cx).map(move |r| {
+            coop.made_progress();
+            r
+        })
     }
 }
 
@@ -109,9 +125,15 @@ impl Future for Delay {
         // Both cases are extremely rare, and pretty accurately fit into
         // "logic errors", so we just panic in this case. A user couldn't
         // really do much better if we passed the error onwards.
-        match ready!(self.registration.poll_elapsed(cx)) {
+        match ready!(self.poll_elapsed(cx)) {
             Ok(()) => Poll::Ready(()),
             Err(e) => panic!("timer error: {}", e),
         }
+    }
+}
+
+impl Drop for Delay {
+    fn drop(&mut self) {
+        Entry::cancel(&self.entry);
     }
 }

@@ -9,9 +9,6 @@ pub(super) use self::entry::Entry;
 mod handle;
 pub(crate) use self::handle::Handle;
 
-mod registration;
-pub(crate) use self::registration::Registration;
-
 use crate::loom::sync::atomic::{AtomicU64, AtomicUsize};
 use crate::park::{Park, Unpark};
 use crate::time::{wheel, Error};

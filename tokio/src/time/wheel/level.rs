@@ -1,5 +1,5 @@
-use crate::time::wheel::Stack;
 use super::{Item, OwnedItem};
+use crate::time::wheel::Stack;
 
 use std::fmt;
 
