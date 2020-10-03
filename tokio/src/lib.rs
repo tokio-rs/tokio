@@ -415,24 +415,24 @@ cfg_macros! {
 
             #[cfg(not(test))] // Work around for rust-lang/rust#62127
             #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
-            pub use tokio_macros::main_threaded as main;
+            pub use tokio_macros::main;
 
             #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
-            pub use tokio_macros::test_threaded as test;
+            pub use tokio_macros::test;
         }
 
         cfg_not_rt_threaded! {
             #[cfg(not(test))] // Work around for rust-lang/rust#62127
-            pub use tokio_macros::main_basic as main;
-            pub use tokio_macros::test_basic as test;
+            pub use tokio_macros::main_rt_core as main;
+            pub use tokio_macros::test_rt_core as test;
         }
     }
 
-    // Maintains old behavior
+    // Always fail if rt-core is not enabled.
     cfg_not_rt_core! {
         #[cfg(not(test))]
-        pub use tokio_macros::main;
-        pub use tokio_macros::test;
+        pub use tokio_macros::main_fail as main;
+        pub use tokio_macros::test_fail as main;
     }
 }
 
