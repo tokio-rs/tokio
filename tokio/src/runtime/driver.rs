@@ -38,6 +38,7 @@ cfg_not_io_driver! {
 }
 
 // ===== signal driver =====
+
 macro_rules! cfg_signal_internal_and_unix {
     ($($item:item)*) => {
         #[cfg(unix)]
@@ -73,10 +74,37 @@ cfg_not_signal_internal! {
     }
 }
 
+// ===== process driver =====
+
+cfg_process_driver! {
+    type ProcessDriver = crate::park::Either<crate::process::unix::driver::Driver, SignalDriver>;
+
+    fn create_process_driver(signal_driver: SignalDriver) -> io::Result<ProcessDriver> {
+        use crate::park::Either;
+
+        // Enable the signal driver if IO is also enabled
+        match signal_driver {
+            Either::A(signal_driver) => {
+                let driver = crate::process::unix::driver::Driver::new(signal_driver)?;
+                Ok(Either::A(driver))
+            }
+            Either::B(_) => Ok(Either::B(signal_driver)),
+        }
+    }
+}
+
+cfg_not_process_driver! {
+    type ProcessDriver = SignalDriver;
+
+    fn create_process_driver(signal_driver: SignalDriver) -> io::Result<ProcessDriver> {
+        Ok(signal_driver)
+    }
+}
+
 // ===== time driver =====
 
 cfg_time! {
-    type TimeDriver = crate::park::Either<crate::time::driver::Driver<SignalDriver>, SignalDriver>;
+    type TimeDriver = crate::park::Either<crate::time::driver::Driver<ProcessDriver>, ProcessDriver>;
 
     pub(crate) type Clock = crate::time::Clock;
     pub(crate) type TimeHandle = Option<crate::time::driver::Handle>;
@@ -87,24 +115,24 @@ cfg_time! {
 
     fn create_time_driver(
         enable: bool,
-        signal_driver: SignalDriver,
+        process_driver: ProcessDriver,
         clock: Clock,
     ) -> (TimeDriver, TimeHandle) {
         use crate::park::Either;
 
         if enable {
-            let driver = crate::time::driver::Driver::new(signal_driver, clock);
+            let driver = crate::time::driver::Driver::new(process_driver, clock);
             let handle = driver.handle();
 
             (Either::A(driver), Some(handle))
         } else {
-            (Either::B(signal_driver), None)
+            (Either::B(process_driver), None)
         }
     }
 }
 
 cfg_not_time! {
-    type TimeDriver = SignalDriver;
+    type TimeDriver = ProcessDriver;
 
     pub(crate) type Clock = ();
     pub(crate) type TimeHandle = ();
@@ -115,10 +143,10 @@ cfg_not_time! {
 
     fn create_time_driver(
         _enable: bool,
-        signal_driver: SignalDriver,
+        process_driver: ProcessDriver,
         _clock: Clock,
     ) -> (TimeDriver, TimeHandle) {
-        (signal_driver, ())
+        (process_driver, ())
     }
 }
 
@@ -147,8 +175,9 @@ impl Driver {
 
         let (io_driver, io_handle) = create_io_driver(cfg.enable_io)?;
         let (signal_driver, signal_handle) = create_signal_driver(io_driver)?;
+        let process_driver = create_process_driver(signal_driver)?;
         let (time_driver, time_handle) =
-            create_time_driver(cfg.enable_time, signal_driver, clock.clone());
+            create_time_driver(cfg.enable_time, process_driver, clock.clone());
 
         Ok((
             Self { inner: time_driver },

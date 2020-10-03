@@ -113,6 +113,11 @@
 #[cfg(unix)]
 mod imp;
 
+#[cfg(unix)]
+pub(crate) mod unix {
+    pub(crate) use super::imp::*;
+}
+
 #[path = "windows.rs"]
 #[cfg(windows)]
 mod imp;
