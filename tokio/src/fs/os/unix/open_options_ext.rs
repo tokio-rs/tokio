@@ -8,7 +8,7 @@ use std::os::unix::fs::OpenOptionsExt as StdOpenOptionsExt;
 ///
 /// [`fs::OpenOptions`]: crate::fs::OpenOptions
 /// [`std::os::unix::fs::OpenOptionsExt`]: std::os::unix::fs::OpenOptionsExt
-pub trait OpenOptionsExt {
+pub trait OpenOptionsExt: sealed::Sealed {
     /// Sets the mode bits that a new file will be created with.
     ///
     /// If a new file is created as part of an `OpenOptions::open` call then this
@@ -76,4 +76,11 @@ impl OpenOptionsExt for OpenOptions {
         self.as_inner_mut().custom_flags(flags);
         self
     }
+}
+
+impl sealed::Sealed for OpenOptions {}
+
+pub(crate) mod sealed {
+    #[doc(hidden)]
+    pub trait Sealed {}
 }
