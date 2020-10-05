@@ -123,7 +123,7 @@ impl UdpSocket {
     ///    async fn main() -> io::Result<()> {
     ///        let sock = UdpSocket::bind("0.0.0.0:8080").await?;
     ///        // use `sock`
-    ///      # let _ = sock;
+    /// #      let _ = sock;
     ///        Ok(())
     ///    }
     /// ```
