@@ -572,6 +572,12 @@ pub trait StreamExt: Stream {
 
     /// Tests if every element of the stream matches a predicate.
     ///
+    /// Equivalent to:
+    ///
+    /// ```ignore
+    /// async fn all<F>(&mut self, f: F) -> bool;
+    /// ```
+    ///
     /// `all()` takes a closure that returns `true` or `false`. It applies
     /// this closure to each element of the stream, and if they all return
     /// `true`, then so does `all`. If any of them return `false`, it
@@ -626,6 +632,12 @@ pub trait StreamExt: Stream {
     }
 
     /// Tests if any element of the stream matches a predicate.
+    ///
+    /// Equivalent to:
+    ///
+    /// ```ignore
+    /// async fn any<F>(&mut self, f: F) -> bool;
+    /// ```
     ///
     /// `any()` takes a closure that returns `true` or `false`. It applies
     /// this closure to each element of the stream, and if any of them return
@@ -716,6 +728,12 @@ pub trait StreamExt: Stream {
     /// A combinator that applies a function to every element in a stream
     /// producing a single, final value.
     ///
+    /// Equivalent to:
+    ///
+    /// ```ignore
+    /// async fn fold<B, F>(self, init: B, f: F) -> B;
+    /// ```
+    ///
     /// # Examples
     /// Basic usage:
     /// ```
@@ -738,6 +756,12 @@ pub trait StreamExt: Stream {
     }
 
     /// Drain stream pushing all emitted values into a collection.
+    ///
+    /// Equivalent to:
+    ///
+    /// ```ignore
+    /// async fn collect<T>(self) -> T;
+    /// ```
     ///
     /// `collect` streams all values, awaiting as needed. Values are pushed into
     /// a collection. A number of different target collection types are
@@ -871,6 +895,7 @@ pub trait StreamExt: Stream {
     {
         Timeout::new(self, duration)
     }
+
     /// Slows down a stream by enforcing a delay between items.
     ///
     /// # Example
