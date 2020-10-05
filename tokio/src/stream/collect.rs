@@ -1,6 +1,5 @@
 use crate::stream::Stream;
 
-use bytes::{Buf, BufMut, Bytes, BytesMut};
 use core::future::Future;
 use core::marker::PhantomPinned;
 use core::mem;
@@ -202,44 +201,6 @@ where
                 unreachable!();
             }
         }
-    }
-}
-
-impl<T: Buf> FromStream<T> for Bytes {}
-
-impl<T: Buf> sealed::FromStreamPriv<T> for Bytes {
-    type InternalCollection = BytesMut;
-
-    fn initialize(_: sealed::Internal, _lower: usize, _upper: Option<usize>) -> BytesMut {
-        BytesMut::new()
-    }
-
-    fn extend(_: sealed::Internal, collection: &mut BytesMut, item: T) -> bool {
-        collection.put(item);
-        true
-    }
-
-    fn finalize(_: sealed::Internal, collection: &mut BytesMut) -> Bytes {
-        mem::replace(collection, BytesMut::new()).freeze()
-    }
-}
-
-impl<T: Buf> FromStream<T> for BytesMut {}
-
-impl<T: Buf> sealed::FromStreamPriv<T> for BytesMut {
-    type InternalCollection = BytesMut;
-
-    fn initialize(_: sealed::Internal, _lower: usize, _upper: Option<usize>) -> BytesMut {
-        BytesMut::new()
-    }
-
-    fn extend(_: sealed::Internal, collection: &mut BytesMut, item: T) -> bool {
-        collection.put(item);
-        true
-    }
-
-    fn finalize(_: sealed::Internal, collection: &mut BytesMut) -> BytesMut {
-        mem::replace(collection, BytesMut::new())
     }
 }
 
