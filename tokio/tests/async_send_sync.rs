@@ -290,8 +290,7 @@ async_assert_fn!(tokio::stream::StreamExt::try_next(&mut BoxStream<Result<(), ()
 async_assert_fn!(tokio::stream::StreamExt::all(&mut BoxStream<()>, fn(())->bool): !Unpin);
 async_assert_fn!(tokio::stream::StreamExt::any(&mut BoxStream<()>, fn(())->bool): !Unpin);
 async_assert_fn!(tokio::stream::StreamExt::fold(&mut BoxStream<()>, (), fn((), ())->()): !Unpin);
-// TODO: error: type annotations needed for `stream::collect::Collect<&mut Pin<Box<(dyn Stream<Item = ()> + 'static)>>, T>`
-// async_assert_fn!(tokio::stream::StreamExt::collect(&mut BoxStream<()>): !Unpin);
+async_assert_fn!(tokio::stream::StreamExt::collect<Vec<()>>(&mut BoxStream<()>): !Unpin);
 
 async_assert_fn!(tokio::io::AsyncBufReadExt::read_until(&mut BoxAsyncRead, u8, &mut Vec<u8>): !Unpin);
 async_assert_fn!(tokio::io::AsyncBufReadExt::read_line(&mut BoxAsyncRead, &mut String): !Unpin);
