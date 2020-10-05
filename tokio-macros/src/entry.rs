@@ -5,19 +5,19 @@ use syn::spanned::Spanned;
 
 #[derive(Clone, Copy, PartialEq)]
 enum RuntimeFlavor {
-    InPlace,
-    WorkStealing,
+    CurrentThread,
+    Threaded,
 }
 
 impl RuntimeFlavor {
     fn from_str(s: &str) -> Result<RuntimeFlavor, String> {
         match s {
-            "in_place" => Ok(RuntimeFlavor::InPlace),
-            "work_stealing" => Ok(RuntimeFlavor::WorkStealing),
-            "single_threaded" => Err(format!("The single threaded runtime flavor is called `in_place`.")),
-            "basic_scheduler" => Err(format!("The `basic_scheduler` runtime flavor has been renamed to `in_place`.")),
-            "threaded_scheduler" => Err(format!("The `threaded_scheduler` runtime flavor has been renamed to `work_stealing`.")),
-            _ => Err(format!("No such runtime flavor `{}`.", s)),
+            "current_thread" => Ok(RuntimeFlavor::CurrentThread),
+            "threaded" => Ok(RuntimeFlavor::Threaded),
+            "single_threaded" => Err(format!("The single threaded runtime flavor is called `current_thread`.")),
+            "basic_scheduler" => Err(format!("The `basic_scheduler` runtime flavor has been renamed to `current_thread`.")),
+            "threaded_scheduler" => Err(format!("The `threaded_scheduler` runtime flavor has been renamed to `threaded`.")),
+            _ => Err(format!("No such runtime flavor `{}`. The runtime flavors are `current_thread` and `threaded`.", s)),
         }
     }
 }
@@ -25,7 +25,6 @@ impl RuntimeFlavor {
 struct FinalConfig {
     flavor: RuntimeFlavor,
     num_workers: Option<usize>,
-    max_threads: Option<usize>,
 }
 
 struct Configuration {
@@ -33,21 +32,21 @@ struct Configuration {
     default_flavor: RuntimeFlavor,
     flavor: Option<RuntimeFlavor>,
     num_workers: Option<(usize, Span)>,
-    max_threads: Option<(usize, Span)>,
 }
+
 impl Configuration {
     fn new(is_test: bool, rt_threaded: bool) -> Self {
         Configuration {
             rt_threaded_available: rt_threaded,
             default_flavor: match is_test {
-                true => RuntimeFlavor::InPlace,
-                false => RuntimeFlavor::WorkStealing,
+                true => RuntimeFlavor::CurrentThread,
+                false => RuntimeFlavor::Threaded,
             },
             flavor: None,
             num_workers: None,
-            max_threads: None,
         }
     }
+
     fn set_flavor(
         &mut self,
         runtime: syn::Lit,
@@ -63,6 +62,7 @@ impl Configuration {
         self.flavor = Some(runtime);
         Ok(())
     }
+
     fn set_num_workers(
         &mut self,
         num_workers: syn::Lit,
@@ -79,67 +79,37 @@ impl Configuration {
         self.num_workers = Some((num_workers, span));
         Ok(())
     }
-    fn set_max_threads(
-        &mut self,
-        max_threads: syn::Lit,
-        span: Span,
-    ) -> Result<(), syn::Error> {
-        if self.max_threads.is_some() {
-            return Err(syn::Error::new(span, "`max_threads` set multiple times."));
-        }
 
-        let max_threads = parse_int(max_threads, span, "max_threads")?;
-        if max_threads == 0 {
-            return Err(syn::Error::new(span, "`max_threads` may not be 0."));
-        }
-        self.max_threads = Some((max_threads, span));
-        Ok(())
-    }
     fn build(&self) -> Result<FinalConfig, syn::Error> {
         let flavor = self.flavor.unwrap_or(self.default_flavor);
         match flavor {
-            RuntimeFlavor::InPlace => {
+            RuntimeFlavor::CurrentThread => {
                 if let Some((_, num_workers_span)) = &self.num_workers {
                     return Err(syn::Error::new(
                         num_workers_span.clone(),
-                        "The `num_workers` option requires the `work_stealing` runtime flavor."
+                        "The `num_workers` option requires the `threaded` runtime flavor."
                     ));
                 }
+
                 assert!(self.num_workers.is_none());
                 Ok(FinalConfig {
                     flavor,
                     num_workers: None,
-                    max_threads: self.max_threads.map(|(val, _span)| val),
                 })
             },
-            RuntimeFlavor::WorkStealing => {
+            RuntimeFlavor::Threaded => {
                 if !self.rt_threaded_available {
                     let msg = if self.flavor.is_none() {
-                        "The default runtime flavor is `work_stealing`, but the `rt-threaded` feature is disabled."
+                        "The default runtime flavor is `threaded`, but the `rt-threaded` feature is disabled."
                     } else {
-                        "The runtime flavor `work_stealing` requires the `rt-threaded` feature."
+                        "The runtime flavor `threaded` requires the `rt-threaded` feature."
                     };
                     return Err(syn::Error::new(Span::call_site(), msg));
                 }
-                match (self.num_workers, self.max_threads) {
-                    (None, Some((_, span))) => {
-                        return Err(syn::Error::new(
-                                span,
-                                "`num_workers` must also be set when using `max_threads`"
-                        ));
-                    },
-                    (Some((num_workers, _)), Some((max_threads, span))) if max_threads <= num_workers => {
-                        return Err(syn::Error::new(
-                                span,
-                                "`max_threads` must be larger than `num_workers`",
-                        ));
-                    },
-                    _ => {},
-                }
+
                 Ok(FinalConfig {
                     flavor,
                     num_workers: self.num_workers.map(|(val, _span)| val),
-                    max_threads: self.max_threads.map(|(val, _span)| val),
                 })
             },
         }
@@ -160,6 +130,7 @@ fn parse_int(int: syn::Lit, span: Span, field: &str) -> Result<usize, syn::Error
         _ => Err(syn::Error::new(span, format!("Failed to parse {} as integer.", field))),
     }
 }
+
 fn parse_string(int: syn::Lit, span: Span, field: &str) -> Result<String, syn::Error> {
     match int {
         syn::Lit::Str(s) => Ok(s.value()),
@@ -201,12 +172,9 @@ fn parse_knobs(
                     "num_workers" => {
                         config.set_num_workers(namevalue.lit.clone(), namevalue.span())?;
                     }
-                    "max_threads" => {
-                        config.set_max_threads(namevalue.lit.clone(), namevalue.span())?;
-                    },
                     "flavor" => {
                         config.set_flavor(namevalue.lit.clone(), namevalue.span())?;
-                    },
+                    }
                     "core_threads" => {
                         let msg = "Attribute `core_threads` is renamed to `num_workers`";
                         return Err(syn::Error::new_spanned(namevalue, msg));
@@ -225,17 +193,17 @@ fn parse_knobs(
                 }
                 let name = ident.unwrap().to_string().to_lowercase();
                 let msg = match name.as_str() {
-                    "threaded_scheduler" | "work_stealing" => {
-                        format!("Set the runtime flavor with #[{}(flavor = \"work_stealing\")].", macro_name)
+                    "threaded_scheduler" | "threaded" => {
+                        format!("Set the runtime flavor with #[{}(flavor = \"threaded\")].", macro_name)
                     },
-                    "basic_scheduler" | "in_place" => {
-                        format!("Set the runtime flavor with #[{}(flavor = \"in_place\")].", macro_name)
+                    "basic_scheduler" | "current_thread" | "single_threaded" => {
+                        format!("Set the runtime flavor with #[{}(flavor = \"current_thread\")].", macro_name)
                     },
-                    "flavor" | "num_workers" | "max_threads" => {
+                    "flavor" | "num_workers" => {
                         format!("The `{}` attribute requires an argument.", name)
                     },
                     name => {
-                        format!("Unkown attribute {} is specified; expected one of: `flavor`, `num_workers`, `max_threads`", name)
+                        format!("Unkown attribute {} is specified; expected one of: `flavor`, `num_workers`", name)
                     },
                 };
                 return Err(syn::Error::new_spanned(path, msg));
@@ -252,18 +220,15 @@ fn parse_knobs(
     let config = config.build()?;
 
     let mut rt = match config.flavor {
-        RuntimeFlavor::InPlace => quote! {
+        RuntimeFlavor::CurrentThread => quote! {
             tokio::runtime::Builder::new().basic_scheduler()
         },
-        RuntimeFlavor::WorkStealing => quote! {
+        RuntimeFlavor::Threaded => quote! {
             tokio::runtime::Builder::new().threaded_scheduler()
         },
     };
     if let Some(v) = config.num_workers {
         rt = quote! { #rt.core_threads(#v) };
-    }
-    if let Some(v) = config.max_threads {
-        rt = quote! { #rt.max_threads(#v) };
     }
 
     let header = {
