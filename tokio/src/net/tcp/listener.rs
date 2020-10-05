@@ -431,14 +431,12 @@ mod sys {
 
 #[cfg(windows)]
 mod sys {
-    // TODO: let's land these upstream with mio and then we can add them here.
-    //
-    // use std::os::windows::prelude::*;
-    // use super::{TcpListener;
-    //
-    // impl AsRawHandle for TcpListener {
-    //     fn as_raw_handle(&self) -> RawHandle {
-    //         self.listener.io().as_raw_handle()
-    //     }
-    // }
+    use super::TcpListener;
+    use std::os::windows::prelude::*;
+
+    impl AsRawSocket for TcpListener {
+        fn as_raw_socket(&self) -> RawSocket {
+            self.io.get_ref().as_raw_socket()
+        }
+    }
 }

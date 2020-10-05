@@ -596,14 +596,12 @@ mod sys {
 
 #[cfg(windows)]
 mod sys {
-    // TODO: let's land these upstream with mio and then we can add them here.
-    //
-    // use std::os::windows::prelude::*;
-    // use super::TcpStream;
-    //
-    // impl AsRawHandle for TcpStream {
-    //     fn as_raw_handle(&self) -> RawHandle {
-    //         self.io.get_ref().as_raw_handle()
-    //     }
-    // }
+    use super::TcpStream;
+    use std::os::windows::prelude::*;
+
+    impl AsRawSocket for TcpStream {
+        fn as_raw_socket(&self) -> RawSocket {
+            self.io.get_ref().as_raw_socket()
+        }
+    }
 }
