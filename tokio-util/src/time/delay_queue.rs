@@ -5,7 +5,9 @@
 //! [`DelayQueue`]: struct@DelayQueue
 
 use crate::time::wheel::{self, Wheel};
-use crate::time::{sleep_until, Delay, Duration, Error, Instant};
+
+use futures_core::ready;
+use tokio::time::{sleep_until, Delay, Duration, Error, Instant};
 
 use slab::Slab;
 use std::cmp;
@@ -50,8 +52,8 @@ use std::task::{self, Poll};
 ///
 /// # Implementation
 ///
-/// The [`DelayQueue`] is backed by a separate instance of the same timer wheel used internally by
-/// Tokio's standalone timer utilities such as [`sleep`]. Because of this, it offers the same
+/// The [`DelayQueue`] is backed by a separate instance of a timer wheel similar to that used internally
+/// by Tokio's standalone timer utilities such as [`sleep`]. Because of this, it offers the same
 /// performance and scalability benefits.
 ///
 /// State associated with each entry is stored in a [`slab`]. This amortizes the cost of allocation,
@@ -65,7 +67,8 @@ use std::task::{self, Poll};
 /// Using `DelayQueue` to manage cache entries.
 ///
 /// ```rust,no_run
-/// use tokio::time::{delay_queue, DelayQueue, Error};
+/// use tokio::time::Error;
+/// use tokio_util::time::{DelayQueue, delay_queue};
 ///
 /// use futures::ready;
 /// use std::collections::HashMap;
@@ -118,7 +121,7 @@ use std::task::{self, Poll};
 /// [`poll_expired`]: method@Self::poll_expired
 /// [`Stream::poll_expired`]: method@Self::poll_expired
 /// [`DelayQueue`]: struct@DelayQueue
-/// [`sleep`]: fn@super::sleep
+/// [`sleep`]: fn@tokio::time::sleep
 /// [`slab`]: slab
 /// [`capacity`]: method@Self::capacity
 /// [`reserve`]: method@Self::reserve
@@ -210,7 +213,7 @@ impl<T> DelayQueue<T> {
     /// # Examples
     ///
     /// ```rust
-    /// # use tokio::time::DelayQueue;
+    /// # use tokio_util::time::DelayQueue;
     /// let delay_queue: DelayQueue<u32> = DelayQueue::new();
     /// ```
     pub fn new() -> DelayQueue<T> {
@@ -226,7 +229,7 @@ impl<T> DelayQueue<T> {
     /// # Examples
     ///
     /// ```rust
-    /// # use tokio::time::DelayQueue;
+    /// # use tokio_util::time::DelayQueue;
     /// # use std::time::Duration;
     ///
     /// # #[tokio::main]
@@ -281,7 +284,8 @@ impl<T> DelayQueue<T> {
     /// Basic usage
     ///
     /// ```rust
-    /// use tokio::time::{DelayQueue, Duration, Instant};
+    /// use tokio::time::{Duration, Instant};
+    /// use tokio_util::time::DelayQueue;
     ///
     /// # #[tokio::main]
     /// # async fn main() {
@@ -391,7 +395,7 @@ impl<T> DelayQueue<T> {
     /// Basic usage
     ///
     /// ```rust
-    /// use tokio::time::DelayQueue;
+    /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
     /// # #[tokio::main]
@@ -460,7 +464,7 @@ impl<T> DelayQueue<T> {
     /// Basic usage
     ///
     /// ```rust
-    /// use tokio::time::DelayQueue;
+    /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
     /// # #[tokio::main]
@@ -503,7 +507,8 @@ impl<T> DelayQueue<T> {
     /// Basic usage
     ///
     /// ```rust
-    /// use tokio::time::{DelayQueue, Duration, Instant};
+    /// use tokio::time::{Duration, Instant};
+    /// use tokio_util::time::DelayQueue;
     ///
     /// # #[tokio::main]
     /// # async fn main() {
@@ -559,7 +564,7 @@ impl<T> DelayQueue<T> {
     /// Basic usage
     ///
     /// ```rust
-    /// use tokio::time::DelayQueue;
+    /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
     /// # #[tokio::main]
@@ -589,7 +594,7 @@ impl<T> DelayQueue<T> {
     /// # Examples
     ///
     /// ```rust
-    /// use tokio::time::DelayQueue;
+    /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
     /// # #[tokio::main]
@@ -617,7 +622,7 @@ impl<T> DelayQueue<T> {
     /// # Examples
     ///
     /// ```rust
-    /// use tokio::time::DelayQueue;
+    /// use tokio_util::time::DelayQueue;
     ///
     /// let delay_queue: DelayQueue<i32> = DelayQueue::with_capacity(10);
     /// assert_eq!(delay_queue.capacity(), 10);
@@ -631,7 +636,7 @@ impl<T> DelayQueue<T> {
     /// # Examples
     ///
     /// ```rust
-    /// use tokio::time::DelayQueue;
+    /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
     /// # #[tokio::main]
@@ -666,7 +671,7 @@ impl<T> DelayQueue<T> {
     /// # Examples
     ///
     /// ```
-    /// use tokio::time::DelayQueue;
+    /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
     /// # #[tokio::main]
@@ -691,7 +696,7 @@ impl<T> DelayQueue<T> {
     /// # Examples
     ///
     /// ```
-    /// use tokio::time::DelayQueue;
+    /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
     /// # #[tokio::main]

@@ -53,6 +53,9 @@ pub mod sync;
 
 pub mod either;
 
+#[cfg(feature = "time")]
+pub mod time;
+
 #[cfg(any(feature = "io", feature = "codec"))]
 mod util {
     use tokio::io::{AsyncRead, ReadBuf};
