@@ -17,7 +17,7 @@ cfg_io_util! {
         reader: &'a mut R,
         writer: &'a mut W,
         amt: u64,
-        }
+    }
 
     /// Asynchronously copies the entire contents of a reader into a writer.
     ///
@@ -46,7 +46,7 @@ cfg_io_util! {
     ///
     /// io::copy_buf(&mut reader, &mut writer).await?;
     ///
-    /// assert_eq!(&b"hello"[..], &writer[..]);
+    /// assert_eq!(b"hello", &writer[..]);
     /// # Ok(())
     /// # }
     /// ```
