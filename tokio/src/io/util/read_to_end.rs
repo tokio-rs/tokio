@@ -1,20 +1,26 @@
 use crate::io::{AsyncRead, ReadBuf};
 
+use pin_project_lite::pin_project;
 use std::future::Future;
 use std::io;
+use std::marker::PhantomPinned;
 use std::mem::{self, MaybeUninit};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-#[derive(Debug)]
-#[must_use = "futures do nothing unless you `.await` or poll them"]
-#[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
-pub struct ReadToEnd<'a, R: ?Sized> {
-    reader: &'a mut R,
-    buf: &'a mut Vec<u8>,
-    /// The number of bytes appended to buf. This can be less than buf.len() if
-    /// the buffer was not empty when the operation was started.
-    read: usize,
+pin_project! {
+    #[derive(Debug)]
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
+    pub struct ReadToEnd<'a, R: ?Sized> {
+        reader: &'a mut R,
+        buf: &'a mut Vec<u8>,
+        // The number of bytes appended to buf. This can be less than buf.len() if
+        // the buffer was not empty when the operation was started.
+        read: usize,
+        // Make this future `!Unpin` for compatibility with async trait methods.
+        #[pin]
+        _pin: PhantomPinned,
+    }
 }
 
 pub(crate) fn read_to_end<'a, R>(reader: &'a mut R, buffer: &'a mut Vec<u8>) -> ReadToEnd<'a, R>
@@ -25,6 +31,7 @@ where
         reader,
         buf: buffer,
         read: 0,
+        _pin: PhantomPinned,
     }
 }
 
@@ -100,20 +107,9 @@ where
 {
     type Output = io::Result<usize>;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let Self { reader, buf, read } = &mut *self;
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let me = self.project();
 
-        read_to_end_internal(buf, Pin::new(*reader), read, cx)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn assert_unpin() {
-        use std::marker::PhantomPinned;
-        crate::is_unpin::<ReadToEnd<'_, PhantomPinned>>();
+        read_to_end_internal(me.buf, Pin::new(*me.reader), me.read, cx)
     }
 }

@@ -5,6 +5,7 @@ use pin_project_lite::pin_project;
 use std::future::Future;
 use std::io;
 use std::io::ErrorKind::UnexpectedEof;
+use std::marker::PhantomPinned;
 use std::mem::size_of;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -16,11 +17,15 @@ macro_rules! reader {
     ($name:ident, $ty:ty, $reader:ident, $bytes:expr) => {
         pin_project! {
             #[doc(hidden)]
+            #[must_use = "futures do nothing unless you `.await` or poll them"]
             pub struct $name<R> {
                 #[pin]
                 src: R,
                 buf: [u8; $bytes],
                 read: u8,
+                // Make this future `!Unpin` for compatibility with async trait methods.
+                #[pin]
+                _pin: PhantomPinned,
             }
         }
 
@@ -30,6 +35,7 @@ macro_rules! reader {
                     src,
                     buf: [0; $bytes],
                     read: 0,
+                    _pin: PhantomPinned,
                 }
             }
         }
@@ -77,15 +83,22 @@ macro_rules! reader8 {
         pin_project! {
             /// Future returned from `read_u8`
             #[doc(hidden)]
+            #[must_use = "futures do nothing unless you `.await` or poll them"]
             pub struct $name<R> {
                 #[pin]
                 reader: R,
+                // Make this future `!Unpin` for compatibility with async trait methods.
+                #[pin]
+                _pin: PhantomPinned,
             }
         }
 
         impl<R> $name<R> {
             pub(crate) fn new(reader: R) -> $name<R> {
-                $name { reader }
+                $name {
+                    reader,
+                    _pin: PhantomPinned,
+                }
             }
         }
 
