@@ -1,9 +1,10 @@
+use super::{Item, OwnedItem};
 use crate::time::wheel::Stack;
 
 use std::fmt;
 
 /// Wheel for a single level in the timer. This wheel contains 64 slots.
-pub(crate) struct Level<T> {
+pub(crate) struct Level {
     level: usize,
 
     /// Bit field tracking which slots currently contain entries.
@@ -16,7 +17,7 @@ pub(crate) struct Level<T> {
     occupied: u64,
 
     /// Slots
-    slot: [T; LEVEL_MULT],
+    slot: [Stack; LEVEL_MULT],
 }
 
 /// Indicates when a slot must be processed next.
@@ -37,87 +38,90 @@ pub(crate) struct Expiration {
 /// Being a power of 2 is very important.
 const LEVEL_MULT: usize = 64;
 
-impl<T: Stack> Level<T> {
-    pub(crate) fn new(level: usize) -> Level<T> {
-        // Rust's derived implementations for arrays require that the value
-        // contained by the array be `Copy`. So, here we have to manually
-        // initialize every single slot.
-        macro_rules! s {
-            () => {
-                T::default()
-            };
-        };
+impl Level {
+    pub(crate) fn new(level: usize) -> Level {
+        // A value has to be Copy in order to use syntax like:
+        //     let stack = Stack::default();
+        //     ...
+        //     slots: [stack; 64],
+        //
+        // Alternatively, since Stack is Default one can
+        // use syntax like:
+        //     let slots: [Stack; 64] = Default::default();
+        //
+        // However, that is only supported for arrays of size
+        // 32 or fewer.  So in our case we have to explicitly
+        // invoke the constructor for each array element.
+        let ctor = Stack::default;
 
         Level {
             level,
             occupied: 0,
             slot: [
-                // It does not look like the necessary traits are
-                // derived for [T; 64].
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
-                s!(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
+                ctor(),
             ],
         }
     }
@@ -173,17 +177,17 @@ impl<T: Stack> Level<T> {
         Some(slot)
     }
 
-    pub(crate) fn add_entry(&mut self, when: u64, item: T::Owned, store: &mut T::Store) {
+    pub(crate) fn add_entry(&mut self, when: u64, item: OwnedItem) {
         let slot = slot_for(when, self.level);
 
-        self.slot[slot].push(item, store);
+        self.slot[slot].push(item);
         self.occupied |= occupied_bit(slot);
     }
 
-    pub(crate) fn remove_entry(&mut self, when: u64, item: &T::Borrowed, store: &mut T::Store) {
+    pub(crate) fn remove_entry(&mut self, when: u64, item: &Item) {
         let slot = slot_for(when, self.level);
 
-        self.slot[slot].remove(item, store);
+        self.slot[slot].remove(item);
 
         if self.slot[slot].is_empty() {
             // The bit is currently set
@@ -194,8 +198,8 @@ impl<T: Stack> Level<T> {
         }
     }
 
-    pub(crate) fn pop_entry_slot(&mut self, slot: usize, store: &mut T::Store) -> Option<T::Owned> {
-        let ret = self.slot[slot].pop(store);
+    pub(crate) fn pop_entry_slot(&mut self, slot: usize) -> Option<OwnedItem> {
+        let ret = self.slot[slot].pop();
 
         if ret.is_some() && self.slot[slot].is_empty() {
             // The bit is currently set
@@ -208,7 +212,7 @@ impl<T: Stack> Level<T> {
     }
 }
 
-impl<T> fmt::Debug for Level<T> {
+impl fmt::Debug for Level {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Level")
             .field("occupied", &self.occupied)

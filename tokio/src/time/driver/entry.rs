@@ -83,7 +83,7 @@ pub(crate) struct Entry {
     /// Next entry in the State's linked list.
     ///
     /// This is only accessed by the timer
-    pub(super) next_stack: UnsafeCell<Option<Arc<Entry>>>,
+    pub(crate) next_stack: UnsafeCell<Option<Arc<Entry>>>,
 
     /// Previous entry in the State's linked list.
     ///
@@ -91,7 +91,7 @@ pub(crate) struct Entry {
     /// entry.
     ///
     /// This is a weak reference.
-    pub(super) prev_stack: UnsafeCell<*const Entry>,
+    pub(crate) prev_stack: UnsafeCell<*const Entry>,
 }
 
 /// Stores the info for `Delay`.
@@ -112,12 +112,12 @@ const ERROR: u64 = u64::MAX;
 impl Entry {
     pub(crate) fn new(handle: &Handle, deadline: Instant, duration: Duration) -> Arc<Entry> {
         let inner = handle.inner().unwrap();
-        let entry: Entry;
 
-        // Increment the number of active timeouts
-        if let Err(err) = inner.increment() {
-            entry = Entry::new2(deadline, duration, Weak::new(), ERROR);
+        // Attempt to increment the number of active timeouts
+        let entry = if let Err(err) = inner.increment() {
+            let entry = Entry::new2(deadline, duration, Weak::new(), ERROR);
             entry.error(err);
+            entry
         } else {
             let when = inner.normalize_deadline(deadline);
             let state = if when <= inner.elapsed() {
@@ -125,8 +125,8 @@ impl Entry {
             } else {
                 when
             };
-            entry = Entry::new2(deadline, duration, Arc::downgrade(&inner), state);
-        }
+            Entry::new2(deadline, duration, Arc::downgrade(&inner), state)
+        };
 
         let entry = Arc::new(entry);
         if let Err(err) = inner.queue(&entry) {
@@ -145,6 +145,10 @@ impl Entry {
     #[allow(clippy::mut_from_ref)] // https://github.com/rust-lang/rust-clippy/issues/4281
     pub(crate) unsafe fn time_mut(&self) -> &mut Time {
         &mut *self.time.0.get()
+    }
+
+    pub(crate) fn when(&self) -> u64 {
+        self.when_internal().expect("invalid internal state")
     }
 
     /// The current entry state as known by the timer. This is not the value of
