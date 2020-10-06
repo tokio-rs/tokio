@@ -39,15 +39,18 @@ where
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let me = self.project();
-        ready!(Pin::new(&mut *me.seek).poll_ready(cx))?;
         match me.pos {
-            Some(pos) => match Pin::new(&mut *me.seek).start_seek(*pos) {
-                Ok(()) => {
-                    *me.pos = None;
-                    Pin::new(&mut *me.seek).poll_complete(cx)
+            Some(pos) => {
+                // ensure no seek in progress
+                ready!(Pin::new(&mut *me.seek).poll_complete(cx))?;
+                match Pin::new(&mut *me.seek).start_seek(*pos) {
+                    Ok(()) => {
+                        *me.pos = None;
+                        Pin::new(&mut *me.seek).poll_complete(cx)
+                    }
+                    Err(e) => Poll::Ready(Err(e)),
                 }
-                Err(e) => Poll::Ready(Err(e)),
-            },
+            }
             None => Pin::new(&mut *me.seek).poll_complete(cx),
         }
     }

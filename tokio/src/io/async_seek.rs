@@ -16,23 +16,11 @@ use std::task::{Context, Poll};
 /// [`Seek::seek`]: std::io::Seek::seek()
 /// [`AsyncSeekExt`]: crate::io::AsyncSeekExt
 pub trait AsyncSeek {
-    /// Ensures that the `AsyncSeek` is ready for `start_seek` to be called.
-    ///
-    /// This method must be called and return `Poll::Ready(Ok(()))` prior to
-    /// each call to `start_seek`.
-    ///
-    /// If this method returns `Poll::Pending`, the current task
-    /// is registered to be notified (via `cx.waker().wake_by_ref()`) when `poll_ready`
-    /// should be called again.
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>>;
-
     /// Attempts to seek to an offset, in bytes, in a stream.
     ///
     /// A seek beyond the end of a stream is allowed, but behavior is defined
     /// by the implementation.
     ///
-    /// Each call to this function must be preceded by a successful call to
-    /// `poll_ready` which returned `Poll::Ready(Ok(()))`.
     /// If this function returns successfully, then the job has been submitted.
     /// To find out when it completes, call `poll_complete`.
     fn start_seek(self: Pin<&mut Self>, position: SeekFrom) -> io::Result<()>;
@@ -55,10 +43,6 @@ pub trait AsyncSeek {
 
 macro_rules! deref_async_seek {
     () => {
-        fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-            Pin::new(&mut **self).poll_ready(cx)
-        }
-
         fn start_seek(mut self: Pin<&mut Self>, pos: SeekFrom) -> io::Result<()> {
             Pin::new(&mut **self).start_seek(pos)
         }
@@ -82,10 +66,6 @@ where
     P: DerefMut + Unpin,
     P::Target: AsyncSeek,
 {
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.get_mut().as_mut().poll_ready(cx)
-    }
-
     fn start_seek(self: Pin<&mut Self>, pos: SeekFrom) -> io::Result<()> {
         self.get_mut().as_mut().start_seek(pos)
     }
@@ -96,10 +76,6 @@ where
 }
 
 impl<T: AsRef<[u8]> + Unpin> AsyncSeek for io::Cursor<T> {
-    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Poll::Ready(Ok(()))
-    }
-
     fn start_seek(mut self: Pin<&mut Self>, pos: SeekFrom) -> io::Result<()> {
         io::Seek::seek(&mut *self, pos).map(drop)
     }
