@@ -471,7 +471,7 @@ rt_test! {
         rt.block_on(async move {
             let (tx, rx) = oneshot::channel();
 
-            let mut listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
             let addr = listener.local_addr().unwrap();
 
             tokio::spawn(async move {
@@ -539,7 +539,7 @@ rt_test! {
         let rt = rt();
 
         rt.block_on(async move {
-            let mut listener = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+            let listener = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
             let addr = assert_ok!(listener.local_addr());
 
             let peer = tokio::task::spawn_blocking(move || {
@@ -634,7 +634,7 @@ rt_test! {
 
         // Do some I/O work
         rt.block_on(async {
-            let mut listener = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+            let listener = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
             let addr = assert_ok!(listener.local_addr());
 
             let srv = tokio::spawn(async move {
@@ -912,7 +912,7 @@ rt_test! {
     }
 
     async fn client_server(tx: mpsc::Sender<()>) {
-        let mut server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+        let server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
 
         // Get the assigned address
         let addr = assert_ok!(server.local_addr());
@@ -943,7 +943,7 @@ rt_test! {
         local.block_on(&rt, async move {
             let (tx, rx) = oneshot::channel();
 
-            let mut listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
             let addr = listener.local_addr().unwrap();
 
             task::spawn_local(async move {
@@ -970,7 +970,7 @@ rt_test! {
     }
 
     async fn client_server_local(tx: mpsc::Sender<()>) {
-        let mut server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+        let server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
 
         // Get the assigned address
         let addr = assert_ok!(server.local_addr());

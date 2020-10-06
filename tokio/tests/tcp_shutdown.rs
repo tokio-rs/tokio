@@ -8,7 +8,7 @@ use tokio_test::assert_ok;
 
 #[tokio::test]
 async fn shutdown() {
-    let mut srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+    let srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
     let addr = assert_ok!(srv.local_addr());
 
     tokio::spawn(async move {
