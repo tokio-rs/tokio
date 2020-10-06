@@ -1,6 +1,7 @@
 use crate::stream::Stream;
 
 use core::future::Future;
+use core::marker::PhantomPinned;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 use pin_project_lite::pin_project;
@@ -8,11 +9,15 @@ use pin_project_lite::pin_project;
 pin_project! {
     /// Future returned by the [`fold`](super::StreamExt::fold) method.
     #[derive(Debug)]
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct FoldFuture<St, B, F> {
         #[pin]
         stream: St,
         acc: Option<B>,
         f: F,
+        // Make this future `!Unpin` for compatibility with async trait methods.
+        #[pin]
+        _pin: PhantomPinned,
     }
 }
 
@@ -22,6 +27,7 @@ impl<St, B, F> FoldFuture<St, B, F> {
             stream,
             acc: Some(init),
             f,
+            _pin: PhantomPinned,
         }
     }
 }

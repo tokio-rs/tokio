@@ -10,7 +10,7 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
-use std::sync::{Arc, PoisonError};
+use std::sync::Arc;
 use std::task::Poll::{Pending, Ready};
 use std::time::Duration;
 
@@ -170,7 +170,7 @@ impl<P: Park> BasicScheduler<P> {
     }
 
     fn take_inner(&self) -> Option<InnerGuard<'_, P>> {
-        let inner = self.inner.lock().unwrap().take()?;
+        let inner = self.inner.lock().take()?;
 
         Some(InnerGuard {
             inner: Some(inner),
@@ -280,12 +280,7 @@ impl<P: Park> Drop for BasicScheduler<P> {
         // Avoid a double panic if we are currently panicking and
         // the lock may be poisoned.
 
-        let mut inner = match self
-            .inner
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .take()
-        {
+        let mut inner = match self.inner.lock().take() {
             Some(inner) => inner,
             None if std::thread::panicking() => return,
             None => panic!("Oh no! We never placed the Inner state back, this is a bug!"),
@@ -309,7 +304,7 @@ impl<P: Park> Drop for BasicScheduler<P> {
             }
 
             // Drain remote queue
-            for task in scheduler.spawner.shared.queue.lock().unwrap().drain(..) {
+            for task in scheduler.spawner.shared.queue.lock().drain(..) {
                 task.shutdown();
             }
 
@@ -339,7 +334,7 @@ impl Spawner {
     }
 
     fn pop(&self) -> Option<task::Notified<Arc<Shared>>> {
-        self.shared.queue.lock().unwrap().pop_front()
+        self.shared.queue.lock().pop_front()
     }
 
     fn waker_ref(&self) -> WakerRef<'_> {
@@ -384,7 +379,7 @@ impl Schedule for Arc<Shared> {
                 cx.tasks.borrow_mut().queue.push_back(task);
             }
             _ => {
-                self.queue.lock().unwrap().push_back(task);
+                self.queue.lock().push_back(task);
                 self.unpark.unpark();
             }
         });
@@ -423,13 +418,7 @@ impl<P: Park> InnerGuard<'_, P> {
 impl<P: Park> Drop for InnerGuard<'_, P> {
     fn drop(&mut self) {
         if let Some(scheduler) = self.inner.take() {
-            // We can ignore the poison error here since we are
-            // just replacing the state.
-            let mut lock = self
-                .basic_scheduler
-                .inner
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner);
+            let mut lock = self.basic_scheduler.inner.lock();
 
             // Replace old scheduler back into the state to allow
             // other threads to pick it up and drive it.

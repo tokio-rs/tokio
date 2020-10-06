@@ -359,7 +359,7 @@ async fn join_with_select() {
 async fn use_future_in_if_condition() {
     use tokio::time::{self, Duration};
 
-    let mut delay = time::delay_for(Duration::from_millis(50));
+    let mut delay = time::sleep(Duration::from_millis(50));
 
     tokio::select! {
         _ = &mut delay, if !delay.is_elapsed() => {
@@ -459,7 +459,7 @@ async fn async_noop() {}
 async fn async_never() -> ! {
     use tokio::time::Duration;
     loop {
-        tokio::time::delay_for(Duration::from_millis(10)).await;
+        tokio::time::sleep(Duration::from_millis(10)).await;
     }
 }
 

@@ -14,9 +14,6 @@
 //!   of time it is allowed to execute. If the future or stream does not
 //!   complete in time, then it is canceled and an error is returned.
 //!
-//! * `DelayQueue`: A queue where items are returned once the requested delay
-//!   has expired.
-//!
 //! These types are sufficient for handling a large number of scenarios
 //! involving time.
 //!
@@ -27,14 +24,14 @@
 //! Wait 100ms and print "100 ms have elapsed"
 //!
 //! ```
-//! use tokio::time::delay_for;
+//! use tokio::time::sleep;
 //!
 //! use std::time::Duration;
 //!
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!     delay_for(Duration::from_millis(100)).await;
+//!     sleep(Duration::from_millis(100)).await;
 //!     println!("100 ms have elapsed");
 //! }
 //! ```
@@ -61,12 +58,12 @@
 //!
 //! A simple example using [`interval`] to execute a task every two seconds.
 //!
-//! The difference between [`interval`] and [`delay_for`] is that an
+//! The difference between [`interval`] and [`sleep`] is that an
 //! [`interval`] measures the time since the last tick, which means that
 //! `.tick().await` may wait for a shorter time than the duration specified
 //! for the interval if some time has passed between calls to `.tick().await`.
 //!
-//! If the tick in the example below was replaced with [`delay_for`], the task
+//! If the tick in the example below was replaced with [`sleep`], the task
 //! would only be executed once every three seconds, and not every two
 //! seconds.
 //!
@@ -75,7 +72,7 @@
 //!
 //! async fn task_that_takes_a_second() {
 //!     println!("hello");
-//!     time::delay_for(time::Duration::from_secs(1)).await
+//!     time::sleep(time::Duration::from_secs(1)).await
 //! }
 //!
 //! #[tokio::main]
@@ -88,7 +85,7 @@
 //! }
 //! ```
 //!
-//! [`delay_for`]: crate::time::delay_for()
+//! [`sleep`]: crate::time::sleep()
 //! [`interval`]: crate::time::interval()
 
 mod clock;
@@ -96,12 +93,8 @@ pub(crate) use self::clock::Clock;
 #[cfg(feature = "test-util")]
 pub use clock::{advance, pause, resume};
 
-pub mod delay_queue;
-#[doc(inline)]
-pub use delay_queue::DelayQueue;
-
 mod delay;
-pub use delay::{delay_for, delay_until, Delay};
+pub use delay::{sleep, sleep_until, Delay};
 
 pub(crate) mod driver;
 

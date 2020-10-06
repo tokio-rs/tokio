@@ -18,5 +18,5 @@ fn registration_is_send_and_sync() {
 #[should_panic]
 fn delay_is_eager() {
     let when = Instant::now() + Duration::from_millis(100);
-    let _ = time::delay_until(when);
+    let _ = time::sleep_until(when);
 }

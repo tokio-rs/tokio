@@ -15,7 +15,7 @@ fn timer_with_threaded_runtime() {
     rt.spawn(async move {
         let when = Instant::now() + Duration::from_millis(100);
 
-        delay_until(when).await;
+        sleep_until(when).await;
         assert!(Instant::now() >= when);
 
         tx.send(()).unwrap();
@@ -38,7 +38,7 @@ fn timer_with_basic_scheduler() {
     rt.block_on(async move {
         let when = Instant::now() + Duration::from_millis(100);
 
-        delay_until(when).await;
+        sleep_until(when).await;
         assert!(Instant::now() >= when);
 
         tx.send(()).unwrap();
@@ -72,7 +72,7 @@ async fn starving() {
     }
 
     let when = Instant::now() + Duration::from_millis(20);
-    let starve = Starve(delay_until(when), 0);
+    let starve = Starve(sleep_until(when), 0);
 
     starve.await;
     assert!(Instant::now() >= when);

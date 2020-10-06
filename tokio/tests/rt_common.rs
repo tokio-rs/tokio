@@ -437,7 +437,7 @@ rt_test! {
         let dur = Duration::from_millis(50);
 
         rt.block_on(async move {
-            time::delay_for(dur).await;
+            time::sleep(dur).await;
         });
 
         assert!(now.elapsed() >= dur);
@@ -454,7 +454,7 @@ rt_test! {
             let (tx, rx) = oneshot::channel();
 
             tokio::spawn(async move {
-                time::delay_for(dur).await;
+                time::sleep(dur).await;
                 assert_ok!(tx.send(()));
             });
 
@@ -526,7 +526,7 @@ rt_test! {
                 // use the futures' block_on fn to make sure we aren't setting
                 // any Tokio context
                 futures::executor::block_on(async {
-                    tokio::time::delay_for(dur).await;
+                    tokio::time::sleep(dur).await;
                 });
 
                 assert!(now.elapsed() >= dur);
@@ -588,7 +588,7 @@ rt_test! {
         let jh1 = thread::spawn(move || {
                 rt.block_on(async move {
                     rx2.await.unwrap();
-                    time::delay_for(Duration::from_millis(5)).await;
+                    time::sleep(Duration::from_millis(5)).await;
                     tx1.send(()).unwrap();
                 });
         });
@@ -596,9 +596,9 @@ rt_test! {
         let jh2 = thread::spawn(move || {
             rt2.block_on(async move {
                 tx2.send(()).unwrap();
-                time::delay_for(Duration::from_millis(5)).await;
+                time::sleep(Duration::from_millis(5)).await;
                 rx1.await.unwrap();
-                time::delay_for(Duration::from_millis(5)).await;
+                time::sleep(Duration::from_millis(5)).await;
             });
         });
 
@@ -850,11 +850,11 @@ rt_test! {
                     let buf = [0];
                     loop {
                         send_half.send_to(&buf, &addr).await.unwrap();
-                        tokio::time::delay_for(Duration::from_millis(1)).await;
+                        tokio::time::sleep(Duration::from_millis(1)).await;
                     }
                 });
 
-                tokio::time::delay_for(Duration::from_millis(5)).await;
+                tokio::time::sleep(Duration::from_millis(5)).await;
             });
         }
     }
@@ -881,7 +881,7 @@ rt_test! {
         let runtime = rt();
 
         runtime.block_on(async move {
-            tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         });
 
         Arc::try_unwrap(runtime).unwrap().shutdown_timeout(Duration::from_secs(10_000));
@@ -1006,7 +1006,7 @@ rt_test! {
             }).collect::<Vec<_>>();
 
             // Hope that all the tasks complete...
-            time::delay_for(Duration::from_millis(100)).await;
+            time::sleep(Duration::from_millis(100)).await;
 
             poll_fn(|cx| {
                 // At least one task should not be ready

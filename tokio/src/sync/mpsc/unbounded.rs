@@ -210,4 +210,60 @@ impl<T> UnboundedSender<T> {
             }
         }
     }
+
+    /// Completes when the receiver has dropped.
+    ///
+    /// This allows the producers to get notified when interest in the produced
+    /// values is canceled and immediately stop doing work.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (mut tx1, rx) = mpsc::unbounded_channel::<()>();
+    ///     let mut tx2 = tx1.clone();
+    ///     let mut tx3 = tx1.clone();
+    ///     let mut tx4 = tx1.clone();
+    ///     let mut tx5 = tx1.clone();
+    ///     tokio::spawn(async move {
+    ///         drop(rx);
+    ///     });
+    ///
+    ///     futures::join!(
+    ///         tx1.closed(),
+    ///         tx2.closed(),
+    ///         tx3.closed(),
+    ///         tx4.closed(),
+    ///         tx5.closed()
+    ///     );
+    ////     println!("Receiver dropped");
+    /// }
+    /// ```
+    pub async fn closed(&mut self) {
+        self.chan.closed().await
+    }
+    /// Checks if the channel has been closed. This happens when the
+    /// [`UnboundedReceiver`] is dropped, or when the
+    /// [`UnboundedReceiver::close`] method is called.
+    ///
+    /// [`UnboundedReceiver`]: crate::sync::mpsc::UnboundedReceiver
+    /// [`UnboundedReceiver::close`]: crate::sync::mpsc::UnboundedReceiver::close
+    ///
+    /// ```
+    /// let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<()>();
+    /// assert!(!tx.is_closed());
+    ///
+    /// let tx2 = tx.clone();
+    /// assert!(!tx2.is_closed());
+    ///
+    /// drop(rx);
+    /// assert!(tx.is_closed());
+    /// assert!(tx2.is_closed());
+    /// ```
+    pub fn is_closed(&self) -> bool {
+        self.chan.is_closed()
+    }
 }

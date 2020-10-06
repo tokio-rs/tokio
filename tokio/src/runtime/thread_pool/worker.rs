@@ -783,7 +783,7 @@ impl Shared {
     ///
     /// If all workers have reached this point, the final cleanup is performed.
     fn shutdown(&self, core: Box<Core>, worker: Arc<Worker>) {
-        let mut workers = self.shutdown_workers.lock().unwrap();
+        let mut workers = self.shutdown_workers.lock();
         workers.push((core, worker));
 
         if workers.len() != self.remotes.len() {
