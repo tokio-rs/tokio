@@ -23,21 +23,26 @@ pub trait AsyncSeek {
     ///
     /// If this function returns successfully, then the job has been submitted.
     /// To find out when it completes, call `poll_complete`.
+    ///
+    /// # Errors
+    ///
+    /// This function can return [`ErrorKind::Other`] in case there is another
+    /// seek in progress. To avoid this, it is advisable that any call to
+    /// `start_seek` is preceded by a call to `poll_complete` to ensure all
+    /// pending seeks have completed.
     fn start_seek(self: Pin<&mut Self>, position: SeekFrom) -> io::Result<()>;
 
     /// Waits for a seek operation to complete.
     ///
     /// If the seek operation completed successfully,
     /// this method returns the new position from the start of the stream.
-    /// That position can be used later with [`SeekFrom::Start`].
+    /// That position can be used later with [`SeekFrom::Start`]. Repeatedly
+    /// calling this function without calling `start_seek` might return the
+    /// same result.
     ///
     /// # Errors
     ///
     /// Seeking to a negative offset is considered an error.
-    ///
-    /// # Panics
-    ///
-    /// Calling this method without calling `start_seek` first is an error.
     fn poll_complete(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>>;
 }
 

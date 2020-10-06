@@ -337,7 +337,6 @@ impl File {
         match op {
             Operation::Seek(res) => res.map(|pos| {
                 self.pos = pos;
-                ()
             }),
             _ => unreachable!(),
         }
