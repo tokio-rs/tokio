@@ -26,9 +26,9 @@ pub trait AsyncSeek {
     ///
     /// # Errors
     ///
-    /// This function can return [`ErrorKind::Other`] in case there is another
-    /// seek in progress. To avoid this, it is advisable that any call to
-    /// `start_seek` is preceded by a call to `poll_complete` to ensure all
+    /// This function can return [`io::ErrorKind::Other`] in case there is
+    /// another seek in progress. To avoid this, it is advisable that any call
+    /// to `start_seek` is preceded by a call to `poll_complete` to ensure all
     /// pending seeks have completed.
     fn start_seek(self: Pin<&mut Self>, position: SeekFrom) -> io::Result<()>;
 
