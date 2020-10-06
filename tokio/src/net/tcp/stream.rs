@@ -137,6 +137,10 @@ impl TcpStream {
     /// Establishes a connection to the specified `addr`.
     async fn connect_addr(addr: SocketAddr) -> io::Result<TcpStream> {
         let sys = mio::net::TcpStream::connect(addr)?;
+        TcpStream::connect_mio(sys).await
+    }
+
+    pub(crate) async fn connect_mio(sys: mio::net::TcpStream) -> io::Result<TcpStream> {
         let stream = TcpStream::new(sys)?;
 
         // Once we've connected, wait for the stream to be writable as
