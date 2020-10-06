@@ -21,8 +21,10 @@
 //! processes in general aren't scalable (e.g. millions) so it shouldn't be that
 //! bad in theory...
 
-mod orphan;
-use orphan::{OrphanQueue, OrphanQueueImpl, Wait};
+pub(crate) mod driver;
+
+pub(crate) mod orphan;
+use orphan::{OrphanQueue, OrphanQueueImpl, ReapOrphanQueue, Wait};
 
 mod reap;
 use reap::Reaper;
@@ -39,11 +41,11 @@ use std::future::Future;
 use std::io;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::pin::Pin;
-use std::process::ExitStatus;
+use std::process::{Child as StdChild, ExitStatus};
 use std::task::Context;
 use std::task::Poll;
 
-impl Wait for std::process::Child {
+impl Wait for StdChild {
     fn id(&self) -> u32 {
         self.id()
     }
@@ -53,17 +55,17 @@ impl Wait for std::process::Child {
     }
 }
 
-impl Kill for std::process::Child {
+impl Kill for StdChild {
     fn kill(&mut self) -> io::Result<()> {
         self.kill()
     }
 }
 
 lazy_static::lazy_static! {
-    static ref ORPHAN_QUEUE: OrphanQueueImpl<std::process::Child> = OrphanQueueImpl::new();
+    static ref ORPHAN_QUEUE: OrphanQueueImpl<StdChild> = OrphanQueueImpl::new();
 }
 
-struct GlobalOrphanQueue;
+pub(crate) struct GlobalOrphanQueue;
 
 impl fmt::Debug for GlobalOrphanQueue {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -71,19 +73,21 @@ impl fmt::Debug for GlobalOrphanQueue {
     }
 }
 
-impl OrphanQueue<std::process::Child> for GlobalOrphanQueue {
-    fn push_orphan(&self, orphan: std::process::Child) {
-        ORPHAN_QUEUE.push_orphan(orphan)
-    }
-
+impl ReapOrphanQueue for GlobalOrphanQueue {
     fn reap_orphans(&self) {
         ORPHAN_QUEUE.reap_orphans()
     }
 }
 
+impl OrphanQueue<StdChild> for GlobalOrphanQueue {
+    fn push_orphan(&self, orphan: StdChild) {
+        ORPHAN_QUEUE.push_orphan(orphan)
+    }
+}
+
 #[must_use = "futures do nothing unless polled"]
 pub(crate) struct Child {
-    inner: Reaper<std::process::Child, GlobalOrphanQueue, Signal>,
+    inner: Reaper<StdChild, GlobalOrphanQueue, Signal>,
 }
 
 impl fmt::Debug for Child {

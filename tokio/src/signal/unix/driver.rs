@@ -30,7 +30,7 @@ pub(crate) struct Driver {
     inner: Arc<Inner>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct Handle {
     inner: Weak<Inner>,
 }

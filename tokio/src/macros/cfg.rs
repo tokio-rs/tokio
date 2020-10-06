@@ -242,6 +242,23 @@ macro_rules! cfg_process {
     }
 }
 
+macro_rules! cfg_process_driver {
+    ($($item:item)*) => {
+        #[cfg(unix)]
+        #[cfg(not(loom))]
+        cfg_process! { $($item)* }
+    }
+}
+
+macro_rules! cfg_not_process_driver {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(all(unix, not(loom), feature = "process")))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_signal {
     ($($item:item)*) => {
         $(
