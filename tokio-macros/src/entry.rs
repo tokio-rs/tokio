@@ -82,35 +82,33 @@ impl Configuration {
 
     fn build(&self) -> Result<FinalConfig, syn::Error> {
         let flavor = self.flavor.unwrap_or(self.default_flavor);
-        match flavor {
-            RuntimeFlavor::CurrentThread => {
-                if let Some((_, num_workers_span)) = &self.num_workers {
-                    return Err(syn::Error::new(
-                        num_workers_span.clone(),
-                        "The `num_workers` option requires the `threaded` runtime flavor."
-                    ));
-                }
-
-                assert!(self.num_workers.is_none());
+        use RuntimeFlavor::*;
+        match (flavor, self.num_workers) {
+            (CurrentThread, Some((_, num_workers_span))) => {
+                Err(syn::Error::new(
+                    num_workers_span,
+                    "The `num_workers` option requires the `threaded` runtime flavor."
+                ))
+            },
+            (CurrentThread, None) => {
                 Ok(FinalConfig {
                     flavor,
                     num_workers: None,
                 })
             },
-            RuntimeFlavor::Threaded => {
-                if !self.rt_threaded_available {
-                    let msg = if self.flavor.is_none() {
-                        "The default runtime flavor is `threaded`, but the `rt-threaded` feature is disabled."
-                    } else {
-                        "The runtime flavor `threaded` requires the `rt-threaded` feature."
-                    };
-                    return Err(syn::Error::new(Span::call_site(), msg));
-                }
-
+            (Threaded, num_workers) if self.rt_threaded_available => {
                 Ok(FinalConfig {
                     flavor,
-                    num_workers: self.num_workers.map(|(val, _span)| val),
+                    num_workers: num_workers.map(|(val, _span)| val),
                 })
+            },
+            (Threaded, _) => {
+                let msg = if self.flavor.is_none() {
+                    "The default runtime flavor is `threaded`, but the `rt-threaded` feature is disabled."
+                } else {
+                    "The runtime flavor `threaded` requires the `rt-threaded` feature."
+                };
+                Err(syn::Error::new(Span::call_site(), msg))
             },
         }
     }
