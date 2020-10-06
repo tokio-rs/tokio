@@ -184,9 +184,9 @@ impl<L: Link> fmt::Debug for LinkedList<L, L::Target> {
 
 #[cfg(any(
     feature = "fs",
-    feature = "sync",
+    all(unix, feature = "process"),
     feature = "signal",
-    feature = "process"
+    feature = "sync",
 ))]
 impl<L: Link> LinkedList<L, L::Target> {
     pub(crate) fn last(&self) -> Option<&L::Target> {
