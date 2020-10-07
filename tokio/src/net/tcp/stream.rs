@@ -22,8 +22,8 @@ cfg_tcp! {
     /// traits. Examples import these traits through [the prelude].
     ///
     /// [`connect`]: method@TcpStream::connect
-    /// [accepting]: method@super::TcpListener::accept
-    /// [listener]: struct@super::TcpListener
+    /// [accepting]: method@crate::net::TcpListener::accept
+    /// [listener]: struct@crate::net::TcpListener
     /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     /// [the prelude]: crate::prelude
