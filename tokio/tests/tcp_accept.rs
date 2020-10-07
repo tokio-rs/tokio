@@ -93,3 +93,64 @@ async fn no_extra_poll() {
     // should have been polled twice more: once to yield Some(), then once to yield Pending
     assert_eq!(npolls.load(SeqCst), 1 + 2);
 }
+
+#[tokio::test]
+async fn accept_many() {
+    use futures::future::poll_fn;
+    use std::future::Future;
+    use std::sync::atomic::AtomicBool;
+
+    const N: usize = 50;
+
+    let listener = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+    let listener = Arc::new(listener);
+    let addr = listener.local_addr().unwrap();
+    let connected = Arc::new(AtomicBool::new(false));
+
+    let (pending_tx, mut pending_rx) = mpsc::unbounded_channel();
+    let (notified_tx, mut notified_rx) = mpsc::unbounded_channel();
+
+    for _ in 0..N {
+        let listener = listener.clone();
+        let connected = connected.clone();
+        let pending_tx = pending_tx.clone();
+        let notified_tx = notified_tx.clone();
+
+        tokio::spawn(async move {
+            let accept = listener.accept();
+            tokio::pin!(accept);
+
+            let mut polled = false;
+
+            poll_fn(|cx| {
+                if !polled {
+                    polled = true;
+                    assert!(Pin::new(&mut accept).poll(cx).is_pending());
+                    pending_tx.send(()).unwrap();
+                    Poll::Pending
+                } else if connected.load(SeqCst) {
+                    notified_tx.send(()).unwrap();
+                    Poll::Ready(())
+                } else {
+                    Poll::Pending
+                }
+            }).await;
+
+            pending_tx.send(()).unwrap();
+        });
+    }
+
+    // Wait for all tasks to have polled at least once
+    for _ in 0..N {
+        pending_rx.recv().await.unwrap();
+    }
+
+    // Establish a TCP connection
+    connected.store(true, SeqCst);
+    let _sock = TcpStream::connect(addr).await.unwrap();
+
+    // Wait for all notifications
+    for _ in 0..N {
+        notified_rx.recv().await.unwrap();
+    }
+}

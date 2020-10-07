@@ -133,7 +133,13 @@ cfg_io_readiness! {
     impl Registration {
         pub(super) async fn readiness(&self, interest: mio::Interest) -> io::Result<ReadyEvent> {
             // TODO: does this need to return a `Result`?
-            Ok(self.shared.readiness(interest).await)
+            let ready_event = self.shared.readiness(interest).await;
+
+            if self.handle.inner().is_some() {
+                Ok(ready_event)
+            } else {
+                Err(io::Error::new(io::ErrorKind::Other, "reactor gone"))
+            }
         }
     }
 }
