@@ -6,6 +6,8 @@ pub(crate) use listener::TcpListener;
 mod incoming;
 pub use incoming::Incoming;
 
+pub(crate) mod socket;
+
 mod split;
 pub use split::{ReadHalf, WriteHalf};
 
