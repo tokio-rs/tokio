@@ -100,7 +100,7 @@ impl FromRawSocket for TcpSocket {
     /// The caller is responsible for ensuring that the socket is in
     /// non-blocking mode.
     unsafe fn from_raw_socket(socket: RawSocket) -> TcpSocket {
-        let sys = mio::net::TcpSocket::from_raw_socket(socket);
-        TcpSocket { sys }
+        let inner = mio::net::TcpSocket::from_raw_socket(socket);
+        TcpSocket { inner }
     }
 }
