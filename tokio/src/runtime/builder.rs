@@ -89,6 +89,7 @@ impl Builder {
         Builder::new(Kind::SingleThread)
     }
 
+    #[cfg(feature = "rt-threaded")]
     pub fn new_multi_thread() -> Builder {
         Builder::new(Kind::MultiThread)
     }
@@ -391,29 +392,29 @@ impl Builder {
         }
     }
 
-    fn build_shell_runtime(&mut self) -> io::Result<Runtime> {
-        use crate::runtime::Kind;
+    // fn build_shell_runtime(&mut self) -> io::Result<Runtime> {
+    //     use crate::runtime::Kind;
 
-        let (driver, resources) = driver::Driver::new(self.get_cfg())?;
+    //     let (driver, resources) = driver::Driver::new(self.get_cfg())?;
 
-        let spawner = Spawner::Shell;
+    //     let spawner = Spawner::Shell;
 
-        let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
-        let blocking_spawner = blocking_pool.spawner().clone();
+    //     let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
+    //     let blocking_spawner = blocking_pool.spawner().clone();
 
-        Ok(Runtime {
-            kind: Kind::Shell(Shell::new(driver)),
-            handle: Handle {
-                spawner,
-                io_handle: resources.io_handle,
-                time_handle: resources.time_handle,
-                signal_handle: resources.signal_handle,
-                clock: resources.clock,
-                blocking_spawner,
-            },
-            blocking_pool,
-        })
-    }
+    //     Ok(Runtime {
+    //         kind: Kind::Shell(Shell::new(driver)),
+    //         handle: Handle {
+    //             spawner,
+    //             io_handle: resources.io_handle,
+    //             time_handle: resources.time_handle,
+    //             signal_handle: resources.signal_handle,
+    //             clock: resources.clock,
+    //             blocking_spawner,
+    //         },
+    //         blocking_pool,
+    //     })
+    // }
 
     #[cfg(feature = "blocking")]
     #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]

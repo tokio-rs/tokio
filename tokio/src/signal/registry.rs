@@ -247,7 +247,7 @@ mod tests {
 
     #[test]
     fn broadcast_cleans_up_disconnected_listeners() {
-        let rt = Runtime::new().unwrap();
+        let rt = Runtime::new_multi_thread().unwrap();
 
         rt.block_on(async {
             let registry = Registry::new(vec![EventInfo::default()]);

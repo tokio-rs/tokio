@@ -69,7 +69,7 @@
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Create the runtime
-//!     let rt  = Runtime::new()?;
+//!     let rt  = Runtime::new_multi_thread()?;
 //!
 //!     // Spawn the root task
 //!     rt.block_on(async {
@@ -144,12 +144,9 @@
 //! use tokio::runtime;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let threaded_rt = runtime::Runtime::new()?;
+//! let threaded_rt = runtime::Runtime::new_multi_thread()?;
 //! # Ok(()) }
 //! ```
-//!
-//! If the `rt-threaded` feature flag is enabled, [`Runtime::new`] will return a
-//! threaded scheduler runtime by default.
 //!
 //! Most applications should use the threaded scheduler, except in some niche
 //! use-cases, such as when running only a single thread is required.
@@ -252,8 +249,9 @@ use std::time::Duration;
 /// The runtime provides an I/O driver, task scheduler, [timer], and blocking
 /// pool, necessary for running asynchronous tasks.
 ///
-/// Instances of `Runtime` can be created using [`new`] or [`Builder`]. However,
-/// most users will use the `#[tokio::main]` annotation on their entry point instead.
+/// Instances of `Runtime` can be created using [`new_multi_thread`], [`new_current_thread`],
+/// [`new_single_thread`], or [`Builder`]. However, most users will use the `#[tokio::main]`
+/// annotation on their entry point instead.
 ///
 /// See [module level][mod] documentation for more details.
 ///
@@ -307,52 +305,16 @@ enum Kind {
 type Callback = std::sync::Arc<dyn Fn() + Send + Sync>;
 
 impl Runtime {
-    /// Create a new runtime instance with default configuration values.
-    ///
-    /// This results in a scheduler, I/O driver, and time driver being
-    /// initialized. The type of scheduler used depends on what feature flags
-    /// are enabled: if the `rt-threaded` feature is enabled, the [threaded
-    /// scheduler] is used, while if only the `rt-core` feature is enabled, the
-    /// [basic scheduler] is used instead.
-    ///
-    /// If the threaded scheduler is selected, it will not spawn
-    /// any worker threads until it needs to, i.e. tasks are scheduled to run.
-    ///
-    /// Most applications will not need to call this function directly. Instead,
-    /// they will use the  [`#[tokio::main]` attribute][main]. When more complex
-    /// configuration is necessary, the [runtime builder] may be used.
-    ///
-    /// See [module level][mod] documentation for more details.
-    ///
-    /// # Examples
-    ///
-    /// Creating a new `Runtime` with default configuration values.
-    ///
-    /// ```
-    /// use tokio::runtime::Runtime;
-    ///
-    /// let rt = Runtime::new()
-    ///     .unwrap();
-    ///
-    /// // Use the runtime...
-    /// ```
-    ///
-    /// [mod]: index.html
-    /// [main]: ../attr.main.html
-    /// [threaded scheduler]: index.html#threaded-scheduler
-    /// [basic scheduler]: index.html#basic-scheduler
-    /// [runtime builder]: crate::runtime::Builder
-    pub fn new() -> io::Result<Runtime> {
-        #[cfg(feature = "rt-threaded")]
-        let ret = Builder::new_multi_thread().enable_all().build();
+    pub fn new_multi_thread() -> io::Result<Runtime> {
+        Builder::new_multi_thread().enable_all().build()
+    }
 
-        #[cfg(all(not(feature = "rt-threaded"), feature = "rt-core"))]
-        let ret = Builder::new_single_thread().enable_all().build();
+    pub fn new_single_thread() -> io::Result<Runtime> {
+        Builder::new_multi_thread().enable_all().build()
+    }
 
-        #[cfg(not(feature = "rt-core"))]
-        let ret = Builder::new_current_thread().enable_all().build();
-
-        ret
+    pub fn new_current_thread() -> io::Result<Runtime> {
+        Builder::new_multi_thread().enable_all().build()
     }
 
     /// Spawn a future onto the Tokio runtime.
@@ -372,7 +334,7 @@ impl Runtime {
     ///
     /// # fn dox() {
     /// // Create the runtime
-    /// let rt = Runtime::new().unwrap();
+    /// let rt = Runtime::new_multi_thread().unwrap();
     ///
     /// // Spawn a future onto the runtime
     /// rt.spawn(async {
@@ -425,7 +387,7 @@ impl Runtime {
     /// use tokio::runtime::Runtime;
     ///
     /// // Create the runtime
-    /// let rt  = Runtime::new().unwrap();
+    /// let rt  = Runtime::new_multi_thread().unwrap();
     ///
     /// // Execute the future, blocking the current thread until completion
     /// rt.block_on(async {
@@ -465,7 +427,7 @@ impl Runtime {
     /// }
     ///
     /// fn main() {
-    ///     let rt = Runtime::new().unwrap();
+    ///     let rt = Runtime::new_multi_thread().unwrap();
     ///
     ///     let s = "Hello World!".to_string();
     ///
@@ -504,7 +466,7 @@ impl Runtime {
     /// use std::time::Duration;
     ///
     /// fn main() {
-    ///    let runtime = Runtime::new().unwrap();
+    ///    let runtime = Runtime::new_multi_thread().unwrap();
     ///
     ///    runtime.block_on(async move {
     ///        task::spawn_blocking(move || {
@@ -538,10 +500,10 @@ impl Runtime {
     /// use tokio::runtime::Runtime;
     ///
     /// fn main() {
-    ///    let runtime = Runtime::new().unwrap();
+    ///    let runtime = Runtime::new_multi_thread().unwrap();
     ///
     ///    runtime.block_on(async move {
-    ///        let inner_runtime = Runtime::new().unwrap();
+    ///        let inner_runtime = Runtime::new_multi_thread().unwrap();
     ///        // ...
     ///        inner_runtime.shutdown_background();
     ///    });
