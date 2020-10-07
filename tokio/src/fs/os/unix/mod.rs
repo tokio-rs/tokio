@@ -8,3 +8,6 @@ pub use self::open_options_ext::OpenOptionsExt;
 
 mod dir_builder_ext;
 pub use self::dir_builder_ext::DirBuilderExt;
+
+mod dir_entry_ext;
+pub use self::dir_entry_ext::DirEntryExt;
