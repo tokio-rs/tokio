@@ -33,14 +33,23 @@ use proc_macro::TokenStream;
 /// using [Builder](../tokio/runtime/struct.Builder.html), which provides a more powerful
 /// interface.
 ///
-/// ## Options:
+/// # Multi-threaded runtime
+/// To use the multi-threaded runtime, the macro can be configured using
+/// ```
+/// #[tokio::main(flavor = "threaded", num_workers = 10)]
+/// # async fn main() {}
+/// ```
+/// The `num_workers` option configures the number of worker threads, and defaults to the number of
+/// cpus on the system. This is the default flavor.
 ///
-/// If you want to set the number of worker threads used for asynchronous code, use the
-/// `core_threads` option.
+/// # Current thread runtime
 ///
-/// - `core_threads=n` - Sets core threads to `n` (requires `rt-threaded` feature).
-/// - `max_threads=n` - Sets max threads to `n` (requires `rt-core` or `rt-threaded` feature).
-/// - `basic_scheduler` - Use the basic schduler (requires `rt-core`).
+/// To use the single-threaded runtime known as the `current_thread` runtime, the macro can be
+/// configured using
+/// ```
+/// #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {}
+/// ```
 ///
 /// ## Function arguments:
 ///
@@ -48,7 +57,7 @@ use proc_macro::TokenStream;
 ///
 /// ## Usage
 ///
-/// ### Using default
+/// ### Using threaded runtime
 ///
 /// ```rust
 /// #[tokio::main]
@@ -72,12 +81,12 @@ use proc_macro::TokenStream;
 /// }
 /// ```
 ///
-/// ### Using basic scheduler
+/// ### Using current thread runtime
 ///
 /// The basic scheduler is single-threaded.
 ///
 /// ```rust
-/// #[tokio::main(basic_scheduler)]
+/// #[tokio::main(flavor = "current_thread")]
 /// async fn main() {
 ///     println!("Hello world");
 /// }
@@ -98,7 +107,7 @@ use proc_macro::TokenStream;
 /// }
 /// ```
 ///
-/// ### Set number of core threads
+/// ### Set number of worker threads
 ///
 /// ```rust
 /// #[tokio::main(num_workers = 2)]
@@ -139,10 +148,6 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 /// Marks async function to be executed by selected runtime. This macro helps set up a `Runtime`
 /// without requiring the user to use [Runtime](../tokio/runtime/struct.Runtime.html) or
 /// [Builder](../tokio/runtime/struct.builder.html) directly.
-///
-/// ## Options:
-///
-/// - `max_threads=n` - Sets max threads to `n`.
 ///
 /// ## Function arguments:
 ///
@@ -189,23 +194,20 @@ pub fn main_rt_core(args: TokenStream, item: TokenStream) -> TokenStream {
 
 /// Marks async function to be executed by runtime, suitable to test environment
 ///
-/// ## Options:
-///
-/// - `core_threads=n` - Sets core threads to `n` (requires `rt-threaded` feature).
-/// - `max_threads=n` - Sets max threads to `n` (requires `rt-core` or `rt-threaded` feature).
-///
 /// ## Usage
 ///
-/// ### Select runtime
+/// ### Threaded runtime
 ///
 /// ```no_run
-/// #[tokio::test(core_threads = 1)]
+/// #[tokio::test(flavor = "threaded", num_workers = 1)]
 /// async fn my_test() {
 ///     assert!(true);
 /// }
 /// ```
 ///
 /// ### Using default
+///
+/// The default test runtime is single-threaded.
 ///
 /// ```no_run
 /// #[tokio::test]
