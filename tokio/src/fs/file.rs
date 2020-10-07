@@ -548,7 +548,7 @@ impl AsyncSeek for File {
     fn start_seek(mut self: Pin<&mut Self>, mut pos: SeekFrom) -> io::Result<()> {
         loop {
             match self.state {
-                Busy(_) => panic!("must wait for poll_ready before calling start_seek"),
+                Busy(_) => panic!("must wait for poll_complete before calling start_seek"),
                 Idle(ref mut buf_cell) => {
                     let mut buf = buf_cell.take().unwrap();
 
