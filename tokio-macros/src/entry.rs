@@ -47,27 +47,19 @@ impl Configuration {
         }
     }
 
-    fn set_flavor(
-        &mut self,
-        runtime: syn::Lit,
-        span: Span,
-    ) -> Result<(), syn::Error> {
+    fn set_flavor(&mut self, runtime: syn::Lit, span: Span) -> Result<(), syn::Error> {
         if self.flavor.is_some() {
             return Err(syn::Error::new(span, "`flavor` set multiple times."));
         }
 
         let runtime_str = parse_string(runtime, span, "flavor")?;
-        let runtime = RuntimeFlavor::from_str(&runtime_str)
-            .map_err(|err| syn::Error::new(span, err))?;
+        let runtime =
+            RuntimeFlavor::from_str(&runtime_str).map_err(|err| syn::Error::new(span, err))?;
         self.flavor = Some(runtime);
         Ok(())
     }
 
-    fn set_num_workers(
-        &mut self,
-        num_workers: syn::Lit,
-        span: Span,
-    ) -> Result<(), syn::Error> {
+    fn set_num_workers(&mut self, num_workers: syn::Lit, span: Span) -> Result<(), syn::Error> {
         if self.num_workers.is_some() {
             return Err(syn::Error::new(span, "`num_workers` set multiple times."));
         }
@@ -84,24 +76,18 @@ impl Configuration {
         let flavor = self.flavor.unwrap_or(self.default_flavor);
         use RuntimeFlavor::*;
         match (flavor, self.num_workers) {
-            (CurrentThread, Some((_, num_workers_span))) => {
-                Err(syn::Error::new(
-                    num_workers_span,
-                    "The `num_workers` option requires the `threaded` runtime flavor."
-                ))
-            },
-            (CurrentThread, None) => {
-                Ok(FinalConfig {
-                    flavor,
-                    num_workers: None,
-                })
-            },
-            (Threaded, num_workers) if self.rt_threaded_available => {
-                Ok(FinalConfig {
-                    flavor,
-                    num_workers: num_workers.map(|(val, _span)| val),
-                })
-            },
+            (CurrentThread, Some((_, num_workers_span))) => Err(syn::Error::new(
+                num_workers_span,
+                "The `num_workers` option requires the `threaded` runtime flavor.",
+            )),
+            (CurrentThread, None) => Ok(FinalConfig {
+                flavor,
+                num_workers: None,
+            }),
+            (Threaded, num_workers) if self.rt_threaded_available => Ok(FinalConfig {
+                flavor,
+                num_workers: num_workers.map(|(val, _span)| val),
+            }),
             (Threaded, _) => {
                 let msg = if self.flavor.is_none() {
                     "The default runtime flavor is `threaded`, but the `rt-threaded` feature is disabled."
@@ -109,23 +95,24 @@ impl Configuration {
                     "The runtime flavor `threaded` requires the `rt-threaded` feature."
                 };
                 Err(syn::Error::new(Span::call_site(), msg))
-            },
+            }
         }
     }
 }
 
 fn parse_int(int: syn::Lit, span: Span, field: &str) -> Result<usize, syn::Error> {
     match int {
-        syn::Lit::Int(lit) => {
-            match lit.base10_parse::<usize>() {
-                Ok(value) => Ok(value),
-                Err(e) => Err(syn::Error::new(
-                    span,
-                    format!("Failed to parse {} as integer: {}", field, e),
-                )),
-            }
+        syn::Lit::Int(lit) => match lit.base10_parse::<usize>() {
+            Ok(value) => Ok(value),
+            Err(e) => Err(syn::Error::new(
+                span,
+                format!("Failed to parse {} as integer: {}", field, e),
+            )),
         },
-        _ => Err(syn::Error::new(span, format!("Failed to parse {} as integer.", field))),
+        _ => Err(syn::Error::new(
+            span,
+            format!("Failed to parse {} as integer.", field),
+        )),
     }
 }
 
@@ -133,7 +120,10 @@ fn parse_string(int: syn::Lit, span: Span, field: &str) -> Result<String, syn::E
     match int {
         syn::Lit::Str(s) => Ok(s.value()),
         syn::Lit::Verbatim(s) => Ok(s.to_string()),
-        _ => Err(syn::Error::new(span, format!("Failed to parse {} as string.", field))),
+        _ => Err(syn::Error::new(
+            span,
+            format!("Failed to parse {} as string.", field),
+        )),
     }
 }
 
@@ -155,7 +145,11 @@ fn parse_knobs(
 
     sig.asyncness = None;
 
-    let macro_name = if is_test { "tokio::test" } else { "tokio::main" };
+    let macro_name = if is_test {
+        "tokio::test"
+    } else {
+        "tokio::main"
+    };
     let mut config = Configuration::new(is_test, rt_threaded);
 
     for arg in args {
@@ -266,8 +260,7 @@ pub(crate) fn main(args: TokenStream, item: TokenStream, rt_threaded: bool) -> T
             .into();
     }
 
-    parse_knobs(input, args, false, rt_threaded)
-        .unwrap_or_else(|e| e.to_compile_error().into())
+    parse_knobs(input, args, false, rt_threaded).unwrap_or_else(|e| e.to_compile_error().into())
 }
 
 pub(crate) fn test(args: TokenStream, item: TokenStream, rt_threaded: bool) -> TokenStream {
@@ -290,6 +283,5 @@ pub(crate) fn test(args: TokenStream, item: TokenStream, rt_threaded: bool) -> T
             .into();
     }
 
-    parse_knobs(input, args, true, rt_threaded)
-        .unwrap_or_else(|e| e.to_compile_error().into())
+    parse_knobs(input, args, true, rt_threaded).unwrap_or_else(|e| e.to_compile_error().into())
 }

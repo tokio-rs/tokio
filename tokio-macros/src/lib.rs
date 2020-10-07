@@ -262,7 +262,9 @@ pub fn main_fail(_args: TokenStream, _item: TokenStream) -> TokenStream {
     syn::Error::new(
         proc_macro2::Span::call_site(),
         "The #[tokio::main] macro requires rt-core or rt-threaded.",
-    ).to_compile_error().into()
+    )
+    .to_compile_error()
+    .into()
 }
 
 /// Always fails with the error message below.
@@ -274,7 +276,9 @@ pub fn test_fail(_args: TokenStream, _item: TokenStream) -> TokenStream {
     syn::Error::new(
         proc_macro2::Span::call_site(),
         "The #[tokio::test] macro requires rt-core or rt-threaded.",
-    ).to_compile_error().into()
+    )
+    .to_compile_error()
+    .into()
 }
 
 /// Implementation detail of the `select!` macro. This macro is **not** intended
