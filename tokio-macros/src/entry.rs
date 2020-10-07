@@ -14,9 +14,9 @@ impl RuntimeFlavor {
         match s {
             "current_thread" => Ok(RuntimeFlavor::CurrentThread),
             "threaded" => Ok(RuntimeFlavor::Threaded),
-            "single_threaded" => Err(format!("The single threaded runtime flavor is called `current_thread`.")),
-            "basic_scheduler" => Err(format!("The `basic_scheduler` runtime flavor has been renamed to `current_thread`.")),
-            "threaded_scheduler" => Err(format!("The `threaded_scheduler` runtime flavor has been renamed to `threaded`.")),
+            "single_threaded" => Err("The single threaded runtime flavor is called `current_thread`.".to_string()),
+            "basic_scheduler" => Err("The `basic_scheduler` runtime flavor has been renamed to `current_thread`.".to_string()),
+            "threaded_scheduler" => Err("The `threaded_scheduler` runtime flavor has been renamed to `threaded`.".to_string()),
             _ => Err(format!("No such runtime flavor `{}`. The runtime flavors are `current_thread` and `threaded`.", s)),
         }
     }
