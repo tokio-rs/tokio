@@ -432,7 +432,7 @@ cfg_macros! {
     cfg_not_rt_core! {
         #[cfg(not(test))]
         pub use tokio_macros::main_fail as main;
-        pub use tokio_macros::test_fail as main;
+        pub use tokio_macros::test_fail as test;
     }
 }
 
