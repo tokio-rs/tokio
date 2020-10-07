@@ -121,8 +121,7 @@
 //! use tokio::runtime;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let basic_rt = runtime::Builder::new()
-//!     .core_threads(0)
+//! let basic_rt = runtime::Builder::new_current_thread()
 //!     .build()?;
 //! # Ok(()) }
 //! ```
@@ -345,13 +344,13 @@ impl Runtime {
     /// [runtime builder]: crate::runtime::Builder
     pub fn new() -> io::Result<Runtime> {
         #[cfg(feature = "rt-threaded")]
-        let ret = Builder::new().enable_all().build();
+        let ret = Builder::new_multi_thread().enable_all().build();
 
         #[cfg(all(not(feature = "rt-threaded"), feature = "rt-core"))]
-        let ret = Builder::new().core_threads(0).enable_all().build();
+        let ret = Builder::new_single_thread().enable_all().build();
 
         #[cfg(not(feature = "rt-core"))]
-        let ret = Builder::new().enable_all().build();
+        let ret = Builder::new_current_thread().enable_all().build();
 
         ret
     }

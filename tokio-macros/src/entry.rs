@@ -127,7 +127,7 @@ fn parse_knobs(
         }
     }
 
-    let mut rt = quote! { tokio::runtime::Builder::new() };
+    let mut rt = quote! { tokio::runtime::Builder::new_current_thread() };
 
     if rt_threaded && (runtime == Some(Runtime::Threaded) || (runtime.is_none() && !is_test)) {
         rt = quote! { #rt };
@@ -278,8 +278,7 @@ pub(crate) mod old {
             Runtime::Basic => quote! {
                 #(#attrs)*
                 #vis #sig {
-                    tokio::runtime::Builder::new()
-                        .core_threads(0)
+                    tokio::runtime::Builder::new_current_thread()
                         .enable_all()
                         .build()
                         .unwrap()
@@ -354,8 +353,7 @@ pub(crate) mod old {
                 #[::core::prelude::v1::test]
                 #(#attrs)*
                 #vis fn #name() #ret {
-                    tokio::runtime::Builder::new()
-                        .core_threads(0)
+                    tokio::runtime::Builder::new_current_thread()
                         .enable_all()
                         .build()
                         .unwrap()

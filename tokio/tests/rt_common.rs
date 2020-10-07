@@ -6,12 +6,23 @@
 
 macro_rules! rt_test {
     ($($t:tt)*) => {
-        mod basic_scheduler {
+        mod current_thread_scheduler {
             $($t)*
 
             fn rt() -> Arc<Runtime> {
-                tokio::runtime::Builder::new()
-                    .core_threads(0)
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap()
+                    .into()
+            }
+        }
+
+        mod single_thread_scheduler {
+            $($t)*
+
+            fn rt() -> Arc<Runtime> {
+                tokio::runtime::Builder::new_single_thread()
                     .enable_all()
                     .build()
                     .unwrap()
@@ -23,8 +34,8 @@ macro_rules! rt_test {
             $($t)*
 
             fn rt() -> Arc<Runtime> {
-                tokio::runtime::Builder::new()
-                    .core_threads(4)
+                tokio::runtime::Builder::new_multi_thread()
+                    .worker_threads(4)
                     .enable_all()
                     .build()
                     .unwrap()
@@ -36,8 +47,8 @@ macro_rules! rt_test {
             $($t)*
 
             fn rt() -> Arc<Runtime> {
-                tokio::runtime::Builder::new()
-                    .core_threads(1)
+                tokio::runtime::Builder::new_multi_thread()
+                    .worker_threads(1)
                     .enable_all()
                     .build()
                     .unwrap()

@@ -26,8 +26,8 @@ use std::time::Duration;
 ///
 /// fn main() {
 ///     // build runtime
-///     let runtime = Builder::new()
-///         .core_threads(4)
+///     let runtime = Builder::new_multi_thread()
+///         .worker_threads(4)
 ///         .thread_name("my-custom-name")
 ///         .thread_stack_size(3 * 1024 * 1024)
 ///         .build()
@@ -37,6 +37,9 @@ use std::time::Duration;
 /// }
 /// ```
 pub struct Builder {
+    /// Runtime type
+    kind: Kind,
+
     /// Whether or not to enable the I/O driver
     enable_io: bool,
 
@@ -46,7 +49,7 @@ pub struct Builder {
     /// The number of worker threads, used by Runtime.
     ///
     /// Only used when not using the current-thread executor.
-    core_threads: Option<usize>,
+    worker_threads: Option<usize>,
 
     /// Cap on thread usage.
     max_threads: usize,
@@ -71,13 +74,33 @@ pub struct Builder {
 
 pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync + 'static>;
 
+pub(crate) enum Kind {
+    CurrentThread,
+    SingleThread,
+    MultiThread,
+}
+
 impl Builder {
+    pub fn new_current_thread() -> Builder {
+        Builder::new(Kind::CurrentThread)
+    }
+
+    pub fn new_single_thread() -> Builder {
+        Builder::new(Kind::SingleThread)
+    }
+
+    pub fn new_multi_thread() -> Builder {
+        Builder::new(Kind::MultiThread)
+    }
+
     /// Returns a new runtime builder initialized with default configuration
     /// values.
     ///
     /// Configuration methods can be chained on the return value.
-    pub fn new() -> Builder {
+    pub(crate) fn new(kind: Kind) -> Builder {
         Builder {
+            kind,
+
             // I/O defaults to "off"
             enable_io: false,
 
@@ -85,7 +108,7 @@ impl Builder {
             enable_time: false,
 
             // Default to lazy auto-detection (one thread per CPU core)
-            core_threads: None,
+            worker_threads: None,
 
             max_threads: 512,
 
@@ -115,7 +138,7 @@ impl Builder {
     /// ```
     /// use tokio::runtime;
     ///
-    /// let rt = runtime::Builder::new()
+    /// let rt = runtime::Builder::new_multi_thread()
     ///     .enable_all()
     ///     .build()
     ///     .unwrap();
@@ -129,40 +152,45 @@ impl Builder {
         self
     }
 
-    /// Sets the number of threads the `Runtime` will use. When `val` is set to
-    /// `0` or `1` this will use a single-threaded runtime. When `val` is set to
-    /// some value `>1` it will create a work-stealing runtime.
+    /// Sets the number of worker threads the `Runtime` will use.
     ///
     /// This should be a number between 0 and 32,768 though it is advised to keep
     /// this value on the smaller side.
     ///
+    /// # Default
+    ///
     /// The default value is the number of cores available to the system.
+    ///
+    /// # Panic
+    ///
+    /// When using the `current_thread` or `single_thread` runtime's this method will
+    /// panic, since those variants do not allow setting worker thread counts.
+    ///
     ///
     /// # Examples
     ///
-    /// ## Work stealing runtime with 4 threads
+    /// ## Multi threaded runtime with 4 threads
     ///
     /// ```
     /// use tokio::runtime;
     ///
     /// // This will spawn a work-stealing runtime with 4 worker threads.
-    /// let rt = runtime::Builder::new()
-    ///     .core_threads(4)
+    /// let rt = runtime::Builder::new_multi_thread()
+    ///     .worker_threads(4)
     ///     .build()
     ///     .unwrap();
     ///
     /// rt.spawn(async move {});
     /// ```
     ///
-    /// ## Single threaded runtime on the current thread
+    /// ## Current thread runtime (will only run on the current thread via `Runtime::block_on`)
     ///
     /// ```
     /// use tokio::runtime;
     ///
     /// // Create a runtime that _must_ be driven from a call
     /// // to `Runtime::block_on`.
-    /// let rt = runtime::Builder::new()
-    ///     .core_threads(0)
+    /// let rt = runtime::Builder::new_current_thread()
     ///     .build()
     ///     .unwrap();
     ///
@@ -170,32 +198,31 @@ impl Builder {
     /// rt.block_on(async move {});
     /// ```
     ///
-    /// ## Single threaded runtime with 1 worker thread
+    /// ## Single threaded runtime
     ///
     /// ```
     /// use tokio::runtime;
     ///
     /// // Spawn a single threaded runtime on a background thread.
-    /// let rt = runtime::Builder::new()
-    ///     .core_threads(1)
+    /// let rt = runtime::Builder::new_single_thread()
     ///     .build()
     ///     .unwrap();
     ///
     /// // This will run the future on the single worker thread.
     /// rt.spawn(async move {});
     /// ```
-    pub fn core_threads(&mut self, val: usize) -> &mut Self {
-        self.core_threads = Some(val);
+    pub fn worker_threads(&mut self, val: usize) -> &mut Self {
+        self.worker_threads = Some(val);
         self
     }
 
     /// Specifies limit for threads, spawned by the Runtime.
     ///
     /// This is number of threads to be used by Runtime, including `core_threads`
-    /// Having `max_threads` less than `core_threads` results in invalid configuration
+    /// Having `max_threads` less than `worker_threads` results in invalid configuration
     /// when building multi-threaded `Runtime`, which would cause a panic.
     ///
-    /// Similarly to the `core_threads`, this number should be between 0 and 32,768.
+    /// Similarly to the `worker_threads`, this number should be between 0 and 32,768.
     ///
     /// The default value is 512.
     ///
@@ -218,7 +245,7 @@ impl Builder {
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
-    /// let rt = runtime::Builder::new()
+    /// let rt = runtime::Builder::new_multi_thread()
     ///     .thread_name("my-pool")
     ///     .build();
     /// # }
@@ -240,7 +267,7 @@ impl Builder {
     /// # use std::sync::atomic::{AtomicUsize, Ordering};
     ///
     /// # pub fn main() {
-    /// let rt = runtime::Builder::new()
+    /// let rt = runtime::Builder::new_multi_thread()
     ///     .thread_name_fn(|| {
     ///        static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
     ///        let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
@@ -271,7 +298,7 @@ impl Builder {
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
-    /// let rt = runtime::Builder::new()
+    /// let rt = runtime::Builder::new_multi_thread()
     ///     .thread_stack_size(32 * 1024)
     ///     .build();
     /// # }
@@ -292,7 +319,7 @@ impl Builder {
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
-    /// let runtime = runtime::Builder::new()
+    /// let runtime = runtime::Builder::new_multi_thread()
     ///     .on_thread_start(|| {
     ///         println!("thread started");
     ///     })
@@ -318,7 +345,7 @@ impl Builder {
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
-    /// let runtime = runtime::Builder::new()
+    /// let runtime = runtime::Builder::new_multi_thread()
     ///     .on_thread_stop(|| {
     ///         println!("thread stopping");
     ///     })
@@ -343,26 +370,17 @@ impl Builder {
     /// ```
     /// use tokio::runtime::Builder;
     ///
-    /// let rt  = Builder::new().build().unwrap();
+    /// let rt  = Builder::new_multi_thread().build().unwrap();
     ///
     /// rt.block_on(async {
     ///     println!("Hello from the Tokio runtime");
     /// });
     /// ```
     pub fn build(&mut self) -> io::Result<Runtime> {
-        match self.core_threads {
-            #[cfg(feature = "rt-core")]
-            Some(n) if n == 0 => self.build_basic_runtime(),
-
-            #[cfg(feature = "rt-threaded")]
-            Some(_) | None => self.build_threaded_runtime(),
-
-            #[cfg(not(feature = "rt-threaded"))]
-            #[cfg(feature = "rt-core")]
-            Some(_) | None => self.build_basic_runtime(),
-
-            #[cfg(not(feature = "rt-core"))]
-            Some(_) | None => self.build_shell_runtime(),
+        match &self.kind {
+            Kind::SingleThread => self.build_basic_runtime(),
+            Kind::CurrentThread => self.build_basic_runtime(),
+            Kind::MultiThread => self.build_threaded_runtime(),
         }
     }
 
@@ -373,7 +391,6 @@ impl Builder {
         }
     }
 
-    #[cfg_attr(feature = "rt-core", allow(dead_code))]
     fn build_shell_runtime(&mut self) -> io::Result<Runtime> {
         use crate::runtime::Kind;
 
@@ -412,7 +429,7 @@ impl Builder {
     /// # use std::time::Duration;
     ///
     /// # pub fn main() {
-    /// let rt = runtime::Builder::new()
+    /// let rt = runtime::Builder::new_multi_thread()
     ///     .thread_keep_alive(Duration::from_millis(100))
     ///     .build();
     /// # }
@@ -435,7 +452,7 @@ cfg_io_driver! {
         /// ```
         /// use tokio::runtime;
         ///
-        /// let rt = runtime::Builder::new()
+        /// let rt = runtime::Builder::new_multi_thread()
         ///     .enable_io()
         ///     .build()
         ///     .unwrap();
@@ -458,7 +475,7 @@ cfg_time! {
         /// ```
         /// use tokio::runtime;
         ///
-        /// let rt = runtime::Builder::new()
+        /// let rt = runtime::Builder::new_multi_thread()
         ///     .enable_time()
         ///     .build()
         ///     .unwrap();
@@ -512,7 +529,7 @@ cfg_rt_threaded! {
             use crate::runtime::park::Parker;
             use std::cmp;
 
-            let core_threads = self.core_threads.unwrap_or_else(|| cmp::min(self.max_threads, num_cpus()));
+            let core_threads = self.worker_threads.unwrap_or_else(|| cmp::min(self.max_threads, num_cpus()));
             assert!(core_threads <= self.max_threads, "Core threads number cannot be above max limit");
 
             let (driver, resources) = driver::Driver::new(self.get_cfg())?;
@@ -546,16 +563,10 @@ cfg_rt_threaded! {
     }
 }
 
-impl Default for Builder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl fmt::Debug for Builder {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Builder")
-            .field("core_threads", &self.core_threads)
+            .field("worker_threads", &self.worker_threads)
             .field("max_threads", &self.max_threads)
             .field(
                 "thread_name",

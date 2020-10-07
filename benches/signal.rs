@@ -45,9 +45,9 @@ fn many_signals(bench: &mut Bencher) {
     let num_signals = 10;
     let (tx, mut rx) = mpsc::channel(num_signals);
 
-    let rt = runtime::Builder::new()
+    let rt = runtime::Builder::new_multi_thread()
         // Intentionally single threaded to measure delays in propagating wakes
-        .core_threads(0)
+        .worker_threads(0)
         .enable_all()
         .build()
         .unwrap();

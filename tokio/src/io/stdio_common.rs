@@ -123,8 +123,7 @@ mod tests {
         let fut = async move {
             wr.write_all(data.as_bytes()).await.unwrap();
         };
-        crate::runtime::Builder::new()
-            .core_threads(0)
+        crate::runtime::Builder::new_current_thread()
             .build()
             .unwrap()
             .block_on(fut);

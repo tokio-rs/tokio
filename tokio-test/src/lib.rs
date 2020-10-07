@@ -28,8 +28,7 @@ pub mod task;
 pub fn block_on<F: std::future::Future>(future: F) -> F::Output {
     use tokio::runtime;
 
-    let rt = runtime::Builder::new()
-        .core_threads(0)
+    let rt = runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();

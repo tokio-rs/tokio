@@ -133,7 +133,10 @@ fn local_threadpool_blocking_in_place() {
 
     ON_RT_THREAD.with(|cell| cell.set(true));
 
-    let rt = runtime::Builder::new().enable_all().build().unwrap();
+    let rt = runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
     LocalSet::new().block_on(&rt, async {
         assert!(ON_RT_THREAD.with(|cell| cell.get()));
         let join = task::spawn_local(async move {
@@ -484,8 +487,7 @@ async fn acquire_mutex_in_drop() {
 }
 
 fn rt() -> Runtime {
-    tokio::runtime::Builder::new()
-        .core_threads(0)
+    tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap()

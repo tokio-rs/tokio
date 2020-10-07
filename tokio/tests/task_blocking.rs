@@ -88,7 +88,7 @@ fn yes_block_in_threaded_block_on() {
 #[test]
 #[should_panic]
 fn no_block_in_basic_block_on() {
-    let rt = runtime::Builder::new().core_threads(0).build().unwrap();
+    let rt = runtime::Builder::new_current_thread().build().unwrap();
     rt.block_on(async {
         task::block_in_place(|| {});
     });
@@ -100,8 +100,7 @@ fn can_enter_basic_rt_from_within_block_in_place() {
 
     outer.block_on(async {
         tokio::task::block_in_place(|| {
-            let inner = tokio::runtime::Builder::new()
-                .core_threads(0)
+            let inner = tokio::runtime::Builder::new_current_thread()
                 .build()
                 .unwrap();
 
@@ -118,8 +117,7 @@ fn useful_panic_message_when_dropping_rt_in_rt() {
 
     let result = catch_unwind(AssertUnwindSafe(|| {
         outer.block_on(async {
-            let _ = tokio::runtime::Builder::new()
-                .core_threads(0)
+            let _ = tokio::runtime::Builder::new_current_thread()
                 .build()
                 .unwrap();
         });
@@ -141,8 +139,7 @@ fn can_shutdown_with_zero_timeout_in_runtime() {
     let outer = tokio::runtime::Runtime::new().unwrap();
 
     outer.block_on(async {
-        let rt = tokio::runtime::Builder::new()
-            .core_threads(0)
+        let rt = tokio::runtime::Builder::new_current_thread()
             .build()
             .unwrap();
         rt.shutdown_timeout(Duration::from_nanos(0));
@@ -154,8 +151,7 @@ fn can_shutdown_now_in_runtime() {
     let outer = tokio::runtime::Runtime::new().unwrap();
 
     outer.block_on(async {
-        let rt = tokio::runtime::Builder::new()
-            .core_threads(0)
+        let rt = tokio::runtime::Builder::new_current_thread()
             .build()
             .unwrap();
         rt.shutdown_background();
@@ -164,7 +160,7 @@ fn can_shutdown_now_in_runtime() {
 
 #[test]
 fn coop_disabled_in_block_in_place() {
-    let outer = tokio::runtime::Builder::new()
+    let outer = tokio::runtime::Builder::new_multi_thread()
         .enable_time()
         .build()
         .unwrap();
