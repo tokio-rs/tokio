@@ -155,8 +155,10 @@ impl TcpSocket {
 
     /// Allow the socket to bind to an in-use address.
     ///
-    /// The details of the behavior are platform specific. Refer to the target
-    /// platform's documentation for more details.
+    /// Behavior is platform specific. Refer to the target platform's
+    /// documentation for more details.
+    ///
+    /// # Examples
     ///
     /// ```no_run
     /// use tokio::net::TcpSocket;
@@ -181,18 +183,110 @@ impl TcpSocket {
         self.inner.set_reuseaddr(reuseaddr)
     }
 
-    /// TODO
+    /// Bind the socket to the given address.
+    ///
+    /// This calls the `bind(2)` operating-system function. Behavior is
+    /// platform specific. Refer to the target platform's documentation for more
+    /// details.
+    ///
+    /// # Examples
+    ///
+    /// Bind a socket before listening.
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpSocket;
+    ///
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let addr = "127.0.0.1:8080".parse().unwrap();
+    ///
+    ///     let socket = TcpSocket::new_v4()?;
+    ///     socket.bind(addr)?;
+    ///
+    ///     let listener = socket.listen(1024)?;
+    /// # drop(listener);
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
     pub fn bind(&self, addr: SocketAddr) -> io::Result<()> {
         self.inner.bind(addr)
     }
 
-    /// TODO
+    /// Establish a TCP connection with a peer at the specified socket address.
+    ///
+    /// The `TcpSocket` is consumed. Once the connection is established, a
+    /// connected [`TcpStream`] is returned. If the connection fails, the
+    /// encountered error is returned.
+    ///
+    /// [`TcpStream`]: TcpStream
+    ///
+    /// This calls the `connect(2)` operating-system function. Behavior is
+    /// platform specific. Refer to the target platform's documentation for more
+    /// details.
+    ///
+    /// # Examples
+    ///
+    /// Connecting to a peer.
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpSocket;
+    ///
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let addr = "127.0.0.1:8080".parse().unwrap();
+    ///
+    ///     let socket = TcpSocket::new_v4()?;
+    ///     let stream = socket.connect(addr).await?;
+    /// # drop(stream);
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
     pub async fn connect(self, addr: SocketAddr) -> io::Result<TcpStream> {
         let mio = self.inner.connect(addr)?;
         TcpStream::connect_mio(mio).await
     }
 
-    /// TODO
+    /// Convert the socket into a `TcpListener`.
+    ///
+    /// `backlog` defines the maximum number of pending connections are queued
+    /// by the operating system at any given time. Connection are removed from
+    /// the queue with [`TcpListener::accept`]. When the queue is full, the
+    /// operationg-system will start rejecting connections.
+    ///
+    /// [`TcpListener::accept`]: TcpListener::accept
+    ///
+    /// This calls the `listen(2)` operating-system function, marking the socket
+    /// as a passive socket. Behavior is platform specific. Refer to the target
+    /// platform's documentation for more details.
+    ///
+    /// # Examples
+    ///
+    /// Create a `TcpListener`.
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpSocket;
+    ///
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let addr = "127.0.0.1:8080".parse().unwrap();
+    ///
+    ///     let socket = TcpSocket::new_v4()?;
+    ///     socket.bind(addr)?;
+    ///
+    ///     let listener = socket.listen(1024)?;
+    /// # drop(listener);
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
     pub fn listen(self, backlog: u32) -> io::Result<TcpListener> {
         let mio = self.inner.listen(backlog)?;
         TcpListener::new(mio)
