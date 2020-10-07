@@ -52,7 +52,7 @@ fn send_large(b: &mut Bencher) {
 fn contention_bounded(b: &mut Bencher) {
     let rt = rt();
 
-    let rt = b.iter(|| {
+    b.iter(|| {
         rt.block_on(async move {
             let (tx, mut rx) = mpsc::channel::<usize>(1_000_000);
 

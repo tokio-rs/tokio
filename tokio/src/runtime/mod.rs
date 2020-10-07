@@ -181,6 +181,8 @@
 //! [`Builder::enable_time`]: crate::runtime::Builder::enable_time
 //! [`Builder::enable_all`]: crate::runtime::Builder::enable_all
 
+#![allow(missing_docs)]
+
 // At the top due to macros
 #[cfg(test)]
 #[macro_use]
@@ -224,9 +226,6 @@ cfg_rt_threaded! {
     use park::Parker;
 }
 
-mod shell;
-use self::shell::Shell;
-
 mod spawner;
 use self::spawner::Spawner;
 
@@ -239,6 +238,7 @@ cfg_rt_threaded! {
 
 cfg_rt_core! {
     use crate::task::JoinHandle;
+    use crate::loom::sync::Arc;
 }
 
 use std::future::Future;
@@ -288,13 +288,12 @@ pub struct Runtime {
 /// The runtime executor is either a thread-pool or a current-thread executor.
 #[derive(Debug)]
 enum Kind {
-    /// Not able to execute concurrent tasks. This variant is mostly used to get
-    /// access to the driver handles.
-    Shell(Shell),
-
     /// Execute all tasks on the current-thread.
     #[cfg(feature = "rt-core")]
-    Basic(BasicScheduler<driver::Driver>),
+    CurrentThread(BasicScheduler<driver::Driver>),
+
+    #[cfg(feature = "rt-core")]
+    SingleThread(Arc<BasicScheduler<driver::Driver>>),
 
     /// Execute tasks across multiple threads.
     #[cfg(feature = "rt-threaded")]
@@ -354,10 +353,10 @@ impl Runtime {
         F::Output: Send + 'static,
     {
         match &self.kind {
-            Kind::Shell(_) => panic!("task execution disabled"),
             #[cfg(feature = "rt-threaded")]
             Kind::ThreadPool(exec) => exec.spawn(future),
-            Kind::Basic(exec) => exec.spawn(future),
+            Kind::CurrentThread(exec) => exec.spawn(future),
+            Kind::SingleThread(exec) => exec.spawn(future),
         }
     }
 
@@ -398,9 +397,10 @@ impl Runtime {
     /// [handle]: fn@Handle::block_on
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
         self.handle.enter(|| match &self.kind {
-            Kind::Shell(exec) => exec.block_on(future),
             #[cfg(feature = "rt-core")]
-            Kind::Basic(exec) => exec.block_on(future),
+            Kind::CurrentThread(exec) => exec.block_on(future),
+            #[cfg(feature = "rt-core")]
+            Kind::SingleThread(exec) => exec.block_on(future),
             #[cfg(feature = "rt-threaded")]
             Kind::ThreadPool(exec) => exec.block_on(future),
         })
