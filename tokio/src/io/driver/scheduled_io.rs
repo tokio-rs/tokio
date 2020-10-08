@@ -221,8 +221,7 @@ impl ScheduledIo {
         }
 
         #[cfg(any(feature = "tcp", feature = "udp", feature = "uds"))]
-        'outer:
-        loop {
+        'outer: loop {
             let mut iter = waiters.list.drain_filter(|w| ready.satisfies(w.interest));
 
             while curr < NUM_WAKERS {

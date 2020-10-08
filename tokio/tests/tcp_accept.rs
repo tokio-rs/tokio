@@ -134,7 +134,8 @@ async fn accept_many() {
                 } else {
                     Poll::Pending
                 }
-            }).await;
+            })
+            .await;
 
             pending_tx.send(()).unwrap();
         });
