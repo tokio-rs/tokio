@@ -23,36 +23,33 @@ pub trait AsyncSeek {
     ///
     /// If this function returns successfully, then the job has been submitted.
     /// To find out when it completes, call `poll_complete`.
-    fn start_seek(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        position: SeekFrom,
-    ) -> Poll<io::Result<()>>;
+    ///
+    /// # Errors
+    ///
+    /// This function can return [`io::ErrorKind::Other`] in case there is
+    /// another seek in progress. To avoid this, it is advisable that any call
+    /// to `start_seek` is preceded by a call to `poll_complete` to ensure all
+    /// pending seeks have completed.
+    fn start_seek(self: Pin<&mut Self>, position: SeekFrom) -> io::Result<()>;
 
     /// Waits for a seek operation to complete.
     ///
     /// If the seek operation completed successfully,
     /// this method returns the new position from the start of the stream.
-    /// That position can be used later with [`SeekFrom::Start`].
+    /// That position can be used later with [`SeekFrom::Start`]. Repeatedly
+    /// calling this function without calling `start_seek` might return the
+    /// same result.
     ///
     /// # Errors
     ///
     /// Seeking to a negative offset is considered an error.
-    ///
-    /// # Panics
-    ///
-    /// Calling this method without calling `start_seek` first is an error.
     fn poll_complete(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>>;
 }
 
 macro_rules! deref_async_seek {
     () => {
-        fn start_seek(
-            mut self: Pin<&mut Self>,
-            cx: &mut Context<'_>,
-            pos: SeekFrom,
-        ) -> Poll<io::Result<()>> {
-            Pin::new(&mut **self).start_seek(cx, pos)
+        fn start_seek(mut self: Pin<&mut Self>, pos: SeekFrom) -> io::Result<()> {
+            Pin::new(&mut **self).start_seek(pos)
         }
 
         fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
@@ -74,12 +71,8 @@ where
     P: DerefMut + Unpin,
     P::Target: AsyncSeek,
 {
-    fn start_seek(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        pos: SeekFrom,
-    ) -> Poll<io::Result<()>> {
-        self.get_mut().as_mut().start_seek(cx, pos)
+    fn start_seek(self: Pin<&mut Self>, pos: SeekFrom) -> io::Result<()> {
+        self.get_mut().as_mut().start_seek(pos)
     }
 
     fn poll_complete(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
@@ -88,12 +81,8 @@ where
 }
 
 impl<T: AsRef<[u8]> + Unpin> AsyncSeek for io::Cursor<T> {
-    fn start_seek(
-        mut self: Pin<&mut Self>,
-        _: &mut Context<'_>,
-        pos: SeekFrom,
-    ) -> Poll<io::Result<()>> {
-        Poll::Ready(io::Seek::seek(&mut *self, pos).map(drop))
+    fn start_seek(mut self: Pin<&mut Self>, pos: SeekFrom) -> io::Result<()> {
+        io::Seek::seek(&mut *self, pos).map(drop)
     }
     fn poll_complete(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<u64>> {
         Poll::Ready(Ok(self.get_mut().position()))

@@ -86,6 +86,8 @@ pub struct File {
     /// error is observed while performing a read, it is saved until the next
     /// write / flush call.
     last_write_err: Option<io::ErrorKind>,
+
+    pos: u64,
 }
 
 #[derive(Debug)]
@@ -199,6 +201,7 @@ impl File {
             std: Arc::new(std),
             state: State::Idle(Some(Buf::with_capacity(0))),
             last_write_err: None,
+            pos: 0,
         }
     }
 
@@ -332,7 +335,9 @@ impl File {
         self.state = Idle(Some(buf));
 
         match op {
-            Operation::Seek(res) => res.map(|_| ()),
+            Operation::Seek(res) => res.map(|pos| {
+                self.pos = pos;
+            }),
             _ => unreachable!(),
         }
     }
@@ -524,9 +529,12 @@ impl AsyncRead for File {
                             self.last_write_err = Some(e.kind());
                             self.state = Idle(Some(buf));
                         }
-                        Operation::Seek(_) => {
+                        Operation::Seek(result) => {
                             assert!(buf.is_empty());
                             self.state = Idle(Some(buf));
+                            if let Ok(pos) = result {
+                                self.pos = pos;
+                            }
                             continue;
                         }
                     }
@@ -537,13 +545,10 @@ impl AsyncRead for File {
 }
 
 impl AsyncSeek for File {
-    fn start_seek(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        mut pos: SeekFrom,
-    ) -> Poll<io::Result<()>> {
+    fn start_seek(mut self: Pin<&mut Self>, mut pos: SeekFrom) -> io::Result<()> {
         loop {
             match self.state {
+                Busy(_) => panic!("must wait for poll_complete before calling start_seek"),
                 Idle(ref mut buf_cell) => {
                     let mut buf = buf_cell.take().unwrap();
 
@@ -562,22 +567,7 @@ impl AsyncSeek for File {
                         let res = (&*std).seek(pos);
                         (Operation::Seek(res), buf)
                     }));
-
-                    return Ready(Ok(()));
-                }
-                Busy(ref mut rx) => {
-                    let (op, buf) = ready!(Pin::new(rx).poll(cx))?;
-                    self.state = Idle(Some(buf));
-
-                    match op {
-                        Operation::Read(_) => {}
-                        Operation::Write(Err(e)) => {
-                            assert!(self.last_write_err.is_none());
-                            self.last_write_err = Some(e.kind());
-                        }
-                        Operation::Write(_) => {}
-                        Operation::Seek(_) => {}
-                    }
+                    return Ok(());
                 }
             }
         }
@@ -586,7 +576,7 @@ impl AsyncSeek for File {
     fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
         loop {
             match self.state {
-                Idle(_) => panic!("must call start_seek before calling poll_complete"),
+                Idle(_) => return Poll::Ready(Ok(self.pos)),
                 Busy(ref mut rx) => {
                     let (op, buf) = ready!(Pin::new(rx).poll(cx))?;
                     self.state = Idle(Some(buf));
@@ -598,7 +588,12 @@ impl AsyncSeek for File {
                             self.last_write_err = Some(e.kind());
                         }
                         Operation::Write(_) => {}
-                        Operation::Seek(res) => return Ready(res),
+                        Operation::Seek(res) => {
+                            if let Ok(pos) = res {
+                                self.pos = pos;
+                            }
+                            return Ready(res);
+                        }
                     }
                 }
             }
