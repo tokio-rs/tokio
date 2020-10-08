@@ -11,7 +11,7 @@ async fn basic_usage_v4() {
     let srv = assert_ok!(TcpSocket::new_v4());
     assert_ok!(srv.bind(addr));
 
-    let mut srv = assert_ok!(srv.listen(128));
+    let srv = assert_ok!(srv.listen(128));
 
     // Create client & connect
     let addr = srv.local_addr().unwrap();
@@ -29,7 +29,7 @@ async fn basic_usage_v6() {
     let srv = assert_ok!(TcpSocket::new_v6());
     assert_ok!(srv.bind(addr));
 
-    let mut srv = assert_ok!(srv.listen(128));
+    let srv = assert_ok!(srv.listen(128));
 
     // Create client & connect
     let addr = srv.local_addr().unwrap();
@@ -47,7 +47,7 @@ async fn bind_before_connect() {
     let srv = assert_ok!(TcpSocket::new_v4());
     assert_ok!(srv.bind(any_addr));
 
-    let mut srv = assert_ok!(srv.listen(128));
+    let srv = assert_ok!(srv.listen(128));
 
     // Create client & connect
     let addr = srv.local_addr().unwrap();
