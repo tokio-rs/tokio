@@ -243,8 +243,8 @@ impl ScheduledIo {
 
             drop(waiters);
 
-            for i in 0..curr {
-                wakers[i].take().unwrap().wake();
+            for waker in wakers.iter_mut().take(curr) {
+                waker.take().unwrap().wake();
             }
 
             curr = 0;
@@ -256,8 +256,8 @@ impl ScheduledIo {
         // Release the lock before notifying
         drop(waiters);
 
-        for i in 0..curr {
-            wakers[i].take().unwrap().wake();
+        for waker in wakers.iter_mut().take(curr) {
+            waker.take().unwrap().wake();
         }
     }
 
