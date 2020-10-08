@@ -1,6 +1,5 @@
-use crate::future::poll_fn;
 use crate::io::PollEvented;
-use crate::net::tcp::{Incoming, TcpStream};
+use crate::net::tcp::TcpStream;
 use crate::net::{to_socket_addrs, ToSocketAddrs};
 
 use std::convert::TryFrom;
@@ -40,7 +39,7 @@ cfg_tcp! {
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
-    ///     let mut listener = TcpListener::bind("127.0.0.1:8080").await?;
+    ///     let listener = TcpListener::bind("127.0.0.1:8080").await?;
     ///
     ///     loop {
     ///         let (socket, _) = listener.accept().await?;
@@ -171,7 +170,7 @@ impl TcpListener {
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
-    ///     let mut listener = TcpListener::bind("127.0.0.1:8080").await?;
+    ///     let listener = TcpListener::bind("127.0.0.1:8080").await?;
     ///
     ///     match listener.accept().await {
     ///         Ok((_socket, addr)) => println!("new client: {:?}", addr),
@@ -181,18 +180,25 @@ impl TcpListener {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn accept(&mut self) -> io::Result<(TcpStream, SocketAddr)> {
-        poll_fn(|cx| self.poll_accept(cx)).await
+    pub async fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
+        let (mio, addr) = self
+            .io
+            .async_io(mio::Interest::READABLE, |sock| sock.accept())
+            .await?;
+
+        let stream = TcpStream::new(mio)?;
+        Ok((stream, addr))
     }
 
     /// Polls to accept a new incoming connection to this listener.
     ///
-    /// If there is no connection to accept, `Poll::Pending` is returned and
-    /// the current task will be notified by a waker.
-    pub fn poll_accept(
-        &mut self,
-        cx: &mut Context<'_>,
-    ) -> Poll<io::Result<(TcpStream, SocketAddr)>> {
+    /// If there is no connection to accept, `Poll::Pending` is returned and the
+    /// current task will be notified by a waker.
+    ///
+    /// When ready, the most recent task that called `poll_accept` is notified.
+    /// The caller is responsble to ensure that `poll_accept` is called from a
+    /// single task. Failing to do this could result in tasks hanging.
+    pub fn poll_accept(&self, cx: &mut Context<'_>) -> Poll<io::Result<(TcpStream, SocketAddr)>> {
         loop {
             let ev = ready!(self.io.poll_read_ready(cx))?;
 
@@ -293,46 +299,6 @@ impl TcpListener {
         self.io.get_ref().local_addr()
     }
 
-    /// Returns a stream over the connections being received on this listener.
-    ///
-    /// Note that `TcpListener` also directly implements `Stream`.
-    ///
-    /// The returned stream will never return `None` and will also not yield the
-    /// peer's `SocketAddr` structure. Iterating over it is equivalent to
-    /// calling accept in a loop.
-    ///
-    /// # Errors
-    ///
-    /// Note that accepting a connection can lead to various errors and not all
-    /// of them are necessarily fatal ‒ for example having too many open file
-    /// descriptors or the other side closing the connection while it waits in
-    /// an accept queue. These would terminate the stream if not handled in any
-    /// way.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::{net::TcpListener, stream::StreamExt};
-    ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
-    ///     let mut incoming = listener.incoming();
-    ///
-    ///     while let Some(stream) = incoming.next().await {
-    ///         match stream {
-    ///             Ok(stream) => {
-    ///                 println!("new client!");
-    ///             }
-    ///             Err(e) => { /* connection failed */ }
-    ///         }
-    ///     }
-    /// }
-    /// ```
-    pub fn incoming(&mut self) -> Incoming<'_> {
-        Incoming::new(self)
-    }
-
     /// Gets the value of the `IP_TTL` option for this socket.
     ///
     /// For more information about this option, see [`set_ttl`].
@@ -390,10 +356,7 @@ impl TcpListener {
 impl crate::stream::Stream for TcpListener {
     type Item = io::Result<TcpStream>;
 
-    fn poll_next(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Option<Self::Item>> {
+    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let (socket, _) = ready!(self.poll_accept(cx))?;
         Poll::Ready(Some(Ok(socket)))
     }

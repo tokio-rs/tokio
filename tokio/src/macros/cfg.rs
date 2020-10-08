@@ -176,7 +176,7 @@ macro_rules! cfg_not_io_driver {
 macro_rules! cfg_io_readiness {
     ($($item:item)*) => {
         $(
-            #[cfg(any(feature = "udp", feature = "uds"))]
+            #[cfg(any(feature = "udp", feature = "uds", feature = "tcp"))]
             $item
         )*
     }

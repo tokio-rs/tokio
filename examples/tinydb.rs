@@ -89,7 +89,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .nth(1)
         .unwrap_or_else(|| "127.0.0.1:8080".to_string());
 
-    let mut listener = TcpListener::bind(&addr).await?;
+    let listener = TcpListener::bind(&addr).await?;
     println!("Listening on: {}", addr);
 
     // Create the shared state of this server that will be shared amongst all

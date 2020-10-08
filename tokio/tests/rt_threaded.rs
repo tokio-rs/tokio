@@ -139,7 +139,7 @@ fn spawn_shutdown() {
 }
 
 async fn client_server(tx: mpsc::Sender<()>) {
-    let mut server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+    let server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
 
     // Get the assigned address
     let addr = assert_ok!(server.local_addr());

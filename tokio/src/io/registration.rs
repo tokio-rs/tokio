@@ -132,8 +132,19 @@ impl Registration {
 cfg_io_readiness! {
     impl Registration {
         pub(super) async fn readiness(&self, interest: mio::Interest) -> io::Result<ReadyEvent> {
-            // TODO: does this need to return a `Result`?
-            Ok(self.shared.readiness(interest).await)
+            use std::future::Future;
+            use std::pin::Pin;
+
+            let fut = self.shared.readiness(interest);
+            pin!(fut);
+
+            crate::future::poll_fn(|cx| {
+                if self.handle.inner().is_none() {
+                    return Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, "reactor gone")));
+                }
+
+                Pin::new(&mut fut).poll(cx).map(Ok)
+            }).await
         }
     }
 }
