@@ -492,8 +492,5 @@ fn lagging_receiver_recovers_after_wrap_open() {
 }
 
 fn is_closed(err: broadcast::RecvError) -> bool {
-    match err {
-        broadcast::RecvError::Closed => true,
-        _ => false,
-    }
+    matches!(err, broadcast::RecvError::Closed)
 }

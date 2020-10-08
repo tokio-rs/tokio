@@ -59,7 +59,7 @@ async fn multi_immediate_delays() {
     let entry = assert_ready!(poll!(queue));
     assert!(entry.is_none());
 
-    res.sort();
+    res.sort_unstable();
 
     assert_eq!("1", res[0]);
     assert_eq!("2", res[1]);
@@ -438,7 +438,7 @@ async fn insert_after_ready_poll() {
         queue.insert_at("foo", now + ms(500));
     }
 
-    res.sort();
+    res.sort_unstable();
 
     assert_eq!("1", res[0]);
     assert_eq!("2", res[1]);
