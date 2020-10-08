@@ -1,3 +1,4 @@
+#![cfg_attr(not(feature = "sync"), allow(unreachable_pub, dead_code))]
 //! # Implementation Details
 //!
 //! The semaphore is implemented using an intrusive linked list of waiters. An
