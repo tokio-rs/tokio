@@ -63,9 +63,9 @@
 /// Given that `if` preconditions are used to disable `select!` branches, some
 /// caution must be used to avoid missing values.
 ///
-/// For example, here is **incorrect** usage of `delay` with `if`. The objective
+/// For example, here is **incorrect** usage of `sleep` with `if`. The objective
 /// is to repeatedly run an asynchronous task for up to 50 milliseconds.
-/// However, there is a potential for the `delay` completion to be missed.
+/// However, there is a potential for the `sleep` completion to be missed.
 ///
 /// ```no_run
 /// use tokio::time::{self, Duration};
@@ -76,11 +76,11 @@
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let mut delay = time::sleep(Duration::from_millis(50));
+///     let mut sleep = time::sleep(Duration::from_millis(50));
 ///
-///     while !delay.is_elapsed() {
+///     while !sleep.is_elapsed() {
 ///         tokio::select! {
-///             _ = &mut delay, if !delay.is_elapsed() => {
+///             _ = &mut sleep, if !sleep.is_elapsed() => {
 ///                 println!("operation timed out");
 ///             }
 ///             _ = some_async_work() => {
@@ -91,11 +91,11 @@
 /// }
 /// ```
 ///
-/// In the above example, `delay.is_elapsed()` may return `true` even if
-/// `delay.poll()` never returned `Ready`. This opens up a potential race
-/// condition where `delay` expires between the `while !delay.is_elapsed()`
+/// In the above example, `sleep.is_elapsed()` may return `true` even if
+/// `sleep.poll()` never returned `Ready`. This opens up a potential race
+/// condition where `sleep` expires between the `while !sleep.is_elapsed()`
 /// check and the call to `select!` resulting in the `some_async_work()` call to
-/// run uninterrupted despite the delay having elapsed.
+/// run uninterrupted despite the sleep having elapsed.
 ///
 /// One way to write the above example without the race would be:
 ///
@@ -109,11 +109,11 @@
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let mut delay = time::sleep(Duration::from_millis(50));
+///     let mut sleep = time::sleep(Duration::from_millis(50));
 ///
 ///     loop {
 ///         tokio::select! {
-///             _ = &mut delay => {
+///             _ = &mut sleep => {
 ///                 println!("operation timed out");
 ///                 break;
 ///             }
@@ -226,7 +226,7 @@
 /// #[tokio::main]
 /// async fn main() {
 ///     let mut stream = stream::iter(vec![1, 2, 3]);
-///     let mut delay = time::sleep(Duration::from_secs(1));
+///     let mut sleep = time::sleep(Duration::from_secs(1));
 ///
 ///     loop {
 ///         tokio::select! {
@@ -237,7 +237,7 @@
 ///                     break;
 ///                 }
 ///             }
-///             _ = &mut delay => {
+///             _ = &mut sleep => {
 ///                 println!("timeout");
 ///                 break;
 ///             }

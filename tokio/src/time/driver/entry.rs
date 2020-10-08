@@ -11,7 +11,7 @@ use std::sync::{Arc, Weak};
 use std::task::{self, Poll};
 use std::u64;
 
-/// Internal state shared between a `Delay` instance and the timer.
+/// Internal state shared between a `Sleep` instance and the timer.
 ///
 /// This struct is used as a node in two intrusive data structures:
 ///
@@ -28,7 +28,7 @@ pub(crate) struct Entry {
     time: CachePadded<UnsafeCell<Time>>,
 
     /// Timer internals. Using a weak pointer allows the timer to shutdown
-    /// without all `Delay` instances having completed.
+    /// without all `Sleep` instances having completed.
     ///
     /// When empty, it means that the entry has not yet been linked with a
     /// timer instance.
@@ -69,8 +69,8 @@ pub(crate) struct Entry {
     /// When the entry expires, relative to the `start` of the timer
     /// (Inner::start). This is only used by the timer.
     ///
-    /// A `Delay` instance can be reset to a different deadline by the thread
-    /// that owns the `Delay` instance. In this case, the timer thread will not
+    /// A `Sleep` instance can be reset to a different deadline by the thread
+    /// that owns the `Sleep` instance. In this case, the timer thread will not
     /// immediately know that this has happened. The timer thread must know the
     /// last deadline that it saw as it uses this value to locate the entry in
     /// its wheel.
@@ -94,7 +94,7 @@ pub(crate) struct Entry {
     pub(crate) prev_stack: UnsafeCell<*const Entry>,
 }
 
-/// Stores the info for `Delay`.
+/// Stores the info for `Sleep`.
 #[derive(Debug)]
 pub(crate) struct Time {
     pub(crate) deadline: Instant,

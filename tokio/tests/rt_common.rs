@@ -430,7 +430,7 @@ rt_test! {
     }
 
     #[test]
-    fn delay_at_root() {
+    fn sleep_at_root() {
         let rt = rt();
 
         let now = Instant::now();
@@ -444,7 +444,7 @@ rt_test! {
     }
 
     #[test]
-    fn delay_in_spawn() {
+    fn sleep_in_spawn() {
         let rt = rt();
 
         let now = Instant::now();
@@ -515,7 +515,7 @@ rt_test! {
     }
 
     #[test]
-    fn delay_from_blocking() {
+    fn sleep_from_blocking() {
         let rt = rt();
 
         rt.block_on(async move {

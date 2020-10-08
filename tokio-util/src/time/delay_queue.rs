@@ -7,7 +7,7 @@
 use crate::time::wheel::{self, Wheel};
 
 use futures_core::ready;
-use tokio::time::{sleep_until, Delay, Duration, Error, Instant};
+use tokio::time::{sleep_until, Duration, Error, Instant, Sleep};
 
 use slab::Slab;
 use std::cmp;
@@ -138,7 +138,7 @@ pub struct DelayQueue<T> {
     expired: Stack<T>,
 
     /// Delay expiring when the *first* item in the queue expires
-    delay: Option<Delay>,
+    delay: Option<Sleep>,
 
     /// Wheel polling state
     wheel_now: u64,

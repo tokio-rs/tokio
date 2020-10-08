@@ -359,11 +359,11 @@
 //!             let mut conf = rx.borrow().clone();
 //!
 //!             let mut op_start = Instant::now();
-//!             let mut delay = time::sleep_until(op_start + conf.timeout);
+//!             let mut sleep = time::sleep_until(op_start + conf.timeout);
 //!
 //!             loop {
 //!                 tokio::select! {
-//!                     _ = &mut delay => {
+//!                     _ = &mut sleep => {
 //!                         // The operation elapsed. Restart it
 //!                         op.set(my_async_operation());
 //!
@@ -371,14 +371,14 @@
 //!                         op_start = Instant::now();
 //!
 //!                         // Restart the timeout
-//!                         delay = time::sleep_until(op_start + conf.timeout);
+//!                         sleep = time::sleep_until(op_start + conf.timeout);
 //!                     }
 //!                     _ = rx.changed() => {
 //!                         conf = rx.borrow().clone();
 //!
 //!                         // The configuration has been updated. Update the
-//!                         // `delay` using the new `timeout` value.
-//!                         delay.reset(op_start + conf.timeout);
+//!                         // `sleep` using the new `timeout` value.
+//!                         sleep.reset(op_start + conf.timeout);
 //!                     }
 //!                     _ = &mut op => {
 //!                         // The operation completed!

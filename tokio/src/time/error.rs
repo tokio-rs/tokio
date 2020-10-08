@@ -13,7 +13,7 @@ use std::fmt;
 ///   succeed in the future.
 ///
 /// * `at_capacity` occurs when a timer operation is attempted, but the timer
-///   instance is currently handling its maximum number of outstanding delays.
+///   instance is currently handling its maximum number of outstanding sleep instances.
 ///   In this case, the operation is not able to be performed at the current
 ///   moment, and `at_capacity` is returned. This is a transient error, i.e., at
 ///   some point in the future, if the operation is attempted again, it might

@@ -1,5 +1,5 @@
 use crate::future::poll_fn;
-use crate::time::{sleep_until, Delay, Duration, Instant};
+use crate::time::{sleep_until, Duration, Instant, Sleep};
 
 use std::future::Future;
 use std::pin::Pin;
@@ -115,7 +115,7 @@ pub fn interval_at(start: Instant, period: Duration) -> Interval {
 #[derive(Debug)]
 pub struct Interval {
     /// Future that completes the next time the `Interval` yields a value.
-    delay: Delay,
+    delay: Sleep,
 
     /// The duration between values yielded by `Interval`.
     period: Duration,
