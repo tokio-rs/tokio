@@ -2,6 +2,8 @@
 
 pub(crate) mod listener;
 
+pub(crate) mod socket;
+
 mod split;
 pub use split::{ReadHalf, WriteHalf};
 

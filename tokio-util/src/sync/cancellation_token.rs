@@ -624,7 +624,7 @@ impl CancellationTokenState {
 
         if removed_child {
             // If the token removed itself from the parents list, it can reset
-            // the the parent ref status. If it is isn't able to do so, because the
+            // the parent ref status. If it is isn't able to do so, because the
             // parent removed it from the list, there is no need to do this.
             // The parent ref acts as as another reference count. Therefore
             // removing this reference can free the object.

@@ -1,10 +1,9 @@
 use crate::fs::open_options::OpenOptions;
-use std::os::unix::fs::OpenOptionsExt as StdOpenOptionsExt;
+use std::os::unix::fs::OpenOptionsExt as _;
 
 /// Unix-specific extensions to [`fs::OpenOptions`].
 ///
 /// This mirrors the definition of [`std::os::unix::fs::OpenOptionsExt`].
-///
 ///
 /// [`fs::OpenOptions`]: crate::fs::OpenOptions
 /// [`std::os::unix::fs::OpenOptionsExt`]: std::os::unix::fs::OpenOptionsExt

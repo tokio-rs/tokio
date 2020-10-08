@@ -267,7 +267,7 @@ impl TcpListener {
         Ok(TcpListener { io })
     }
 
-    fn new(listener: mio::net::TcpListener) -> io::Result<TcpListener> {
+    pub(crate) fn new(listener: mio::net::TcpListener) -> io::Result<TcpListener> {
         let io = PollEvented::new(listener)?;
         Ok(TcpListener { io })
     }

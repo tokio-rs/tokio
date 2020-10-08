@@ -35,6 +35,7 @@ cfg_dns! {
 cfg_tcp! {
     pub mod tcp;
     pub use tcp::listener::TcpListener;
+    pub use tcp::socket::TcpSocket;
     pub use tcp::stream::TcpStream;
 }
 
