@@ -23,7 +23,7 @@ macro_rules! assert_empty {
     ($e:expr) => {
         match $e.try_recv() {
             Ok(value) => panic!("expected empty; got = {:?}", value),
-            Err(broadcast::TryRecvError::Empty) => {}
+            Err(broadcast::error::TryRecvError::Empty) => {}
             Err(e) => panic!("expected empty; got = {:?}", e),
         }
     };
@@ -32,7 +32,7 @@ macro_rules! assert_empty {
 macro_rules! assert_lagged {
     ($e:expr, $n:expr) => {
         match assert_err!($e) {
-            broadcast::TryRecvError::Lagged(n) => {
+            broadcast::error::TryRecvError::Lagged(n) => {
                 assert_eq!(n, $n);
             }
             _ => panic!("did not lag"),
@@ -43,7 +43,7 @@ macro_rules! assert_lagged {
 macro_rules! assert_closed {
     ($e:expr) => {
         match assert_err!($e) {
-            broadcast::TryRecvError::Closed => {}
+            broadcast::error::TryRecvError::Closed => {}
             _ => panic!("did not lag"),
         }
     };
@@ -491,6 +491,6 @@ fn lagging_receiver_recovers_after_wrap_open() {
     assert_empty!(rx);
 }
 
-fn is_closed(err: broadcast::RecvError) -> bool {
-    matches!(err, broadcast::RecvError::Closed)
+fn is_closed(err: broadcast::error::RecvError) -> bool {
+    matches!(err, broadcast::error::RecvError::Closed)
 }

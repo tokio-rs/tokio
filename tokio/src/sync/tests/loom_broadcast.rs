@@ -1,5 +1,5 @@
 use crate::sync::broadcast;
-use crate::sync::broadcast::RecvError::{Closed, Lagged};
+use crate::sync::broadcast::error::RecvError::{Closed, Lagged};
 
 use loom::future::block_on;
 use loom::sync::Arc;
