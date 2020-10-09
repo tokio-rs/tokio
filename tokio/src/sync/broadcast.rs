@@ -55,8 +55,8 @@
 //! [`Sender::subscribe`]: crate::sync::broadcast::Sender::subscribe
 //! [`Receiver`]: crate::sync::broadcast::Receiver
 //! [`channel`]: crate::sync::broadcast::channel
-//! [`RecvError::Lagged`]: crate::sync::broadcast::RecvError::Lagged
-//! [`RecvError::Closed`]: crate::sync::broadcast::RecvError::Closed
+//! [`RecvError::Lagged`]: crate::sync::broadcast::error::RecvError::Lagged
+//! [`RecvError::Closed`]: crate::sync::broadcast::error::RecvError::Closed
 //! [`recv`]: crate::sync::broadcast::Receiver::recv
 //!
 //! # Examples
@@ -256,7 +256,9 @@ pub mod error {
     #[derive(Debug, PartialEq)]
     pub enum TryRecvError {
         /// The channel is currently empty. There are still active
-        /// [`Sender`][Sender] handles, so data may yet become available.
+        /// [`Sender`] handles, so data may yet become available.
+        ///
+        /// [`Sender`]: crate::sync::broadcast::Sender
         Empty,
 
         /// There are no more active senders implying no further messages will ever
@@ -413,8 +415,8 @@ const MAX_RECEIVERS: usize = usize::MAX >> 2;
 /// [`Sender::subscribe`]: crate::sync::broadcast::Sender::subscribe
 /// [`Receiver`]: crate::sync::broadcast::Receiver
 /// [`recv`]: crate::sync::broadcast::Receiver::recv
-/// [`SendError`]: crate::sync::broadcast::SendError
-/// [`RecvError`]: crate::sync::broadcast::RecvError
+/// [`SendError`]: crate::sync::broadcast::error::SendError
+/// [`RecvError`]: crate::sync::broadcast::error::RecvError
 ///
 /// # Examples
 ///
