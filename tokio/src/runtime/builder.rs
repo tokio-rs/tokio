@@ -73,7 +73,6 @@ pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync +
 
 pub(crate) enum Kind {
     CurrentThread,
-    SingleThread,
     #[cfg(feature = "rt-threaded")]
     MultiThread,
 }
@@ -82,11 +81,6 @@ impl Builder {
     /// TODO
     pub fn new_current_thread() -> Builder {
         Builder::new(Kind::CurrentThread)
-    }
-
-    /// TODO
-    pub fn new_single_thread() -> Builder {
-        Builder::new(Kind::SingleThread)
     }
 
     /// TODO
@@ -161,8 +155,8 @@ impl Builder {
 
     /// Sets the number of worker threads the `Runtime` will use.
     ///
-    /// This should be a number between 0 and 32,768 though it is advised to keep
-    /// this value on the smaller side.
+    /// This should be a number between 0 and 32,768 though it is advised to
+    /// keep this value on the smaller side.
     ///
     /// # Default
     ///
@@ -170,8 +164,8 @@ impl Builder {
     ///
     /// # Panic
     ///
-    /// When using the `current_thread` or `single_thread` runtime's this method will
-    /// panic, since those variants do not allow setting worker thread counts.
+    /// When using the `current_thread` runtime this method will panic, since
+    /// those variants do not allow setting worker thread counts.
     ///
     ///
     /// # Examples
@@ -203,20 +197,6 @@ impl Builder {
     ///
     /// // This will run the runtime and future on the current thread
     /// rt.block_on(async move {});
-    /// ```
-    ///
-    /// ## Single threaded runtime
-    ///
-    /// ```
-    /// use tokio::runtime;
-    ///
-    /// // Spawn a single threaded runtime on a background thread.
-    /// let rt = runtime::Builder::new_single_thread()
-    ///     .build()
-    ///     .unwrap();
-    ///
-    /// // This will run the future on the single worker thread.
-    /// rt.spawn(async move {});
     /// ```
     pub fn worker_threads(&mut self, val: usize) -> &mut Self {
         self.worker_threads = Some(val);
@@ -385,8 +365,7 @@ impl Builder {
     /// ```
     pub fn build(&mut self) -> io::Result<Runtime> {
         match &self.kind {
-            Kind::CurrentThread => self.build_basic_runtime(true),
-            Kind::SingleThread => self.build_basic_runtime(false),
+            Kind::CurrentThread => self.build_basic_runtime(),
             #[cfg(feature = "rt-threaded")]
             Kind::MultiThread => self.build_threaded_runtime(),
         }
@@ -421,66 +400,34 @@ impl Builder {
         self
     }
 
-    fn build_basic_runtime(&mut self, current_thread: bool) -> io::Result<Runtime> {
+    fn build_basic_runtime(&mut self) -> io::Result<Runtime> {
         use crate::runtime::{BasicScheduler, Kind};
 
         let (driver, resources) = driver::Driver::new(self.get_cfg())?;
 
-        if current_thread {
-            // And now put a single-threaded scheduler on top of the timer. When
-            // there are no futures ready to do something, it'll let the timer or
-            // the reactor to generate some new stimuli for the futures to continue
-            // in their life.
-            let scheduler = BasicScheduler::new(driver);
-            let spawner = Spawner::Basic(scheduler.spawner().clone());
+        // And now put a single-threaded scheduler on top of the timer. When
+        // there are no futures ready to do something, it'll let the timer or
+        // the reactor to generate some new stimuli for the futures to continue
+        // in their life.
+        let scheduler = BasicScheduler::new(driver);
+        let spawner = Spawner::Basic(scheduler.spawner().clone());
 
-            // Blocking pool
-            let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
-            let blocking_spawner = blocking_pool.spawner().clone();
+        // Blocking pool
+        let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
+        let blocking_spawner = blocking_pool.spawner().clone();
 
-            Ok(Runtime {
-                kind: Kind::CurrentThread(scheduler),
-                handle: Handle {
-                    spawner,
-                    io_handle: resources.io_handle,
-                    time_handle: resources.time_handle,
-                    signal_handle: resources.signal_handle,
-                    clock: resources.clock,
-                    blocking_spawner,
-                },
-                blocking_pool,
-            })
-        } else {
-            use crate::loom::sync::Arc;
-            // use crate::future::poll_fn;
-            // use std::task::Poll;
-
-            let scheduler = Arc::new(BasicScheduler::new(driver));
-            let spawner = Spawner::Basic(scheduler.spawner().clone());
-
-            // Blocking pool
-            let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
-            let blocking_spawner = blocking_pool.spawner().clone();
-
-            // TODO(lucio): fix this in the basic scheduler
-            // let scheduler2 = scheduler.clone();
-            // std::thread::spawn(move || {
-            //     scheduler2.block_on(poll_fn::<(), _>(|_| Poll::Pending));
-            // });
-
-            Ok(Runtime {
-                kind: Kind::SingleThread(scheduler),
-                handle: Handle {
-                    spawner,
-                    io_handle: resources.io_handle,
-                    time_handle: resources.time_handle,
-                    signal_handle: resources.signal_handle,
-                    clock: resources.clock,
-                    blocking_spawner,
-                },
-                blocking_pool,
-            })
-        }
+        Ok(Runtime {
+            kind: Kind::CurrentThread(scheduler),
+            handle: Handle {
+                spawner,
+                io_handle: resources.io_handle,
+                time_handle: resources.time_handle,
+                signal_handle: resources.signal_handle,
+                clock: resources.clock,
+                blocking_spawner,
+            },
+            blocking_pool,
+        })
     }
 }
 

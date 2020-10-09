@@ -383,5 +383,5 @@ fn max_threads() {
 }
 
 fn rt() -> Runtime {
-    Runtime::new_multi_thread().unwrap()
+    Runtime::new().unwrap()
 }

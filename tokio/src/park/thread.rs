@@ -249,22 +249,22 @@ impl CachedParkThread {
         CURRENT_PARKER.try_with(|inner| f(inner)).map_err(|_| ())
     }
 
-    pub(crate) fn block_on<F: Future>(&mut self, f: F) -> F::Output {
+    pub(crate) fn block_on<F: Future>(&mut self, f: F) -> Result<F::Output, ParkError> {
         use std::task::Context;
         use std::task::Poll::Ready;
 
         // `get_unpark()` should not return a Result
-        let waker = self.get_unpark().unwrap().into_waker();
+        let waker = self.get_unpark()?.into_waker();
         let mut cx = Context::from_waker(&waker);
 
         pin!(f);
 
         loop {
             if let Ready(v) = crate::coop::budget(|| f.as_mut().poll(&mut cx)) {
-                return v;
+                return Ok(v);
             }
 
-            self.park().unwrap();
+            self.park()?;
         }
     }
 }

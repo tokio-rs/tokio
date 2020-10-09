@@ -9,7 +9,7 @@ use std::sync::mpsc;
 fn timer_with_threaded_runtime() {
     use tokio::runtime::Runtime;
 
-    let rt = Runtime::new_multi_thread().unwrap();
+    let rt = Runtime::new().unwrap();
     let (tx, rx) = mpsc::channel();
 
     rt.spawn(async move {

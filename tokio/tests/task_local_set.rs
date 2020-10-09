@@ -245,7 +245,7 @@ fn join_local_future_elsewhere() {
 
     ON_RT_THREAD.with(|cell| cell.set(true));
 
-    let rt = runtime::Runtime::new_multi_thread().unwrap();
+    let rt = runtime::Runtime::new().unwrap();
     let local = LocalSet::new();
     local.block_on(&rt, async move {
         let (tx, rx) = oneshot::channel();

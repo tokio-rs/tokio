@@ -272,7 +272,7 @@ pub(crate) mod old {
             Runtime::Threaded | Runtime::Auto => quote! {
                 #(#attrs)*
                 #vis #sig {
-                    tokio::runtime::Runtime::new_multi_thread().unwrap().block_on(async { #body })
+                    tokio::runtime::Runtime::new().unwrap().block_on(async { #body })
                 }
             },
             Runtime::Basic => quote! {
@@ -346,7 +346,7 @@ pub(crate) mod old {
                 #[::core::prelude::v1::test]
                 #(#attrs)*
                 #vis fn #name() #ret {
-                    tokio::runtime::Runtime::new_multi_thread().unwrap().block_on(async { #body })
+                    tokio::runtime::Runtime::new().unwrap().block_on(async { #body })
                 }
             },
             Runtime::Basic | Runtime::Auto => quote! {

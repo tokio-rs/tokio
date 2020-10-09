@@ -79,7 +79,7 @@ async fn no_block_in_basic_scheduler() {
 
 #[test]
 fn yes_block_in_threaded_block_on() {
-    let rt = runtime::Runtime::new_multi_thread().unwrap();
+    let rt = runtime::Runtime::new().unwrap();
     rt.block_on(async {
         task::block_in_place(|| {});
     });
@@ -96,7 +96,7 @@ fn no_block_in_basic_block_on() {
 
 #[test]
 fn can_enter_basic_rt_from_within_block_in_place() {
-    let outer = tokio::runtime::Runtime::new_multi_thread().unwrap();
+    let outer = tokio::runtime::Runtime::new().unwrap();
 
     outer.block_on(async {
         tokio::task::block_in_place(|| {
@@ -113,7 +113,7 @@ fn can_enter_basic_rt_from_within_block_in_place() {
 fn useful_panic_message_when_dropping_rt_in_rt() {
     use std::panic::{catch_unwind, AssertUnwindSafe};
 
-    let outer = tokio::runtime::Runtime::new_multi_thread().unwrap();
+    let outer = tokio::runtime::Runtime::new().unwrap();
 
     let result = catch_unwind(AssertUnwindSafe(|| {
         outer.block_on(async {
@@ -136,7 +136,7 @@ fn useful_panic_message_when_dropping_rt_in_rt() {
 
 #[test]
 fn can_shutdown_with_zero_timeout_in_runtime() {
-    let outer = tokio::runtime::Runtime::new_multi_thread().unwrap();
+    let outer = tokio::runtime::Runtime::new().unwrap();
 
     outer.block_on(async {
         let rt = tokio::runtime::Builder::new_current_thread()
@@ -148,7 +148,7 @@ fn can_shutdown_with_zero_timeout_in_runtime() {
 
 #[test]
 fn can_shutdown_now_in_runtime() {
-    let outer = tokio::runtime::Runtime::new_multi_thread().unwrap();
+    let outer = tokio::runtime::Runtime::new().unwrap();
 
     outer.block_on(async {
         let rt = tokio::runtime::Builder::new_current_thread()
@@ -193,7 +193,7 @@ fn coop_disabled_in_block_in_place_in_block_on() {
     let (done_tx, done_rx) = std::sync::mpsc::channel();
     let done = done_tx.clone();
     thread::spawn(move || {
-        let outer = tokio::runtime::Runtime::new_multi_thread().unwrap();
+        let outer = tokio::runtime::Runtime::new().unwrap();
 
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
         for i in 0..200 {

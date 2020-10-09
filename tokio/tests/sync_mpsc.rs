@@ -431,7 +431,7 @@ fn blocking_recv() {
         assert_eq!(Some(10), rx.blocking_recv());
     });
 
-    Runtime::new_multi_thread().unwrap().block_on(async move {
+    Runtime::new().unwrap().block_on(async move {
         let _ = tx.send(10).await;
     });
     sync_code.join().unwrap()
@@ -452,7 +452,7 @@ fn blocking_send() {
         tx.blocking_send(10).unwrap();
     });
 
-    Runtime::new_multi_thread().unwrap().block_on(async move {
+    Runtime::new().unwrap().block_on(async move {
         assert_eq!(Some(10), rx.recv().await);
     });
     sync_code.join().unwrap()

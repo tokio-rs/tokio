@@ -18,18 +18,6 @@ macro_rules! rt_test {
             }
         }
 
-        mod single_thread_scheduler {
-            $($t)*
-
-            fn rt() -> Arc<Runtime> {
-                tokio::runtime::Builder::new_single_thread()
-                    .enable_all()
-                    .build()
-                    .unwrap()
-                    .into()
-            }
-        }
-
         mod threaded_scheduler_4_threads {
             $($t)*
 

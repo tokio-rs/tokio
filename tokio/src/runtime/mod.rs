@@ -226,10 +226,10 @@ cfg_rt_threaded! {
 }
 
 cfg_rt_core! {
-    use crate::loom::sync::Arc;
     use crate::task::JoinHandle;
 
     use std::future::Future;
+    use std::io;
     use std::time::Duration;
 
     /// The Tokio runtime.
@@ -280,9 +280,6 @@ cfg_rt_core! {
         #[cfg(feature = "rt-core")]
         CurrentThread(BasicScheduler<driver::Driver>),
 
-        #[cfg(feature = "rt-core")]
-        SingleThread(Arc<BasicScheduler<driver::Driver>>),
-
         /// Execute tasks across multiple threads.
         #[cfg(feature = "rt-threaded")]
         ThreadPool(ThreadPool),
@@ -292,6 +289,46 @@ cfg_rt_core! {
     type Callback = std::sync::Arc<dyn Fn() + Send + Sync>;
 
     impl Runtime {
+        /// Create a new runtime instance with default configuration values.
+        ///
+        /// This results in a scheduler, I/O driver, and time driver being
+        /// initialized. The type of scheduler used depends on what feature flags
+        /// are enabled: if the `rt-threaded` feature is enabled, the [threaded
+        /// scheduler] is used, while if only the `rt-core` feature is enabled, the
+        /// [basic scheduler] is used instead.
+        ///
+        /// If the threaded scheduler is selected, it will not spawn
+        /// any worker threads until it needs to, i.e. tasks are scheduled to run.
+        ///
+        /// Most applications will not need to call this function directly. Instead,
+        /// they will use the  [`#[tokio::main]` attribute][main]. When more complex
+        /// configuration is necessary, the [runtime builder] may be used.
+        ///
+        /// See [module level][mod] documentation for more details.
+        ///
+        /// # Examples
+        ///
+        /// Creating a new `Runtime` with default configuration values.
+        ///
+        /// ```
+        /// use tokio::runtime::Runtime;
+        ///
+        /// let rt = Runtime::new()
+        ///     .unwrap();
+        ///
+        /// // Use the runtime...
+        /// ```
+        ///
+        /// [mod]: index.html
+        /// [main]: ../attr.main.html
+        /// [threaded scheduler]: index.html#threaded-scheduler
+        /// [basic scheduler]: index.html#basic-scheduler
+        /// [runtime builder]: crate::runtime::Builder
+        #[cfg(feature = "rt-threaded")]
+        pub fn new() -> io::Result<Runtime> {
+            Builder::new_multi_thread().enable_all().build()
+        }
+
         /// Spawn a future onto the Tokio runtime.
         ///
         /// This spawns the given future onto the runtime's executor, usually a
@@ -332,7 +369,6 @@ cfg_rt_core! {
                 #[cfg(feature = "rt-threaded")]
                 Kind::ThreadPool(exec) => exec.spawn(future),
                 Kind::CurrentThread(exec) => exec.spawn(future),
-                Kind::SingleThread(exec) => exec.spawn(future),
             }
         }
 
@@ -375,8 +411,6 @@ cfg_rt_core! {
             self.handle.enter(|| match &self.kind {
                 #[cfg(feature = "rt-core")]
                 Kind::CurrentThread(exec) => exec.block_on(future),
-                #[cfg(feature = "rt-core")]
-                Kind::SingleThread(exec) => exec.block_on(future),
                 #[cfg(feature = "rt-threaded")]
                 Kind::ThreadPool(exec) => exec.block_on(future),
             })

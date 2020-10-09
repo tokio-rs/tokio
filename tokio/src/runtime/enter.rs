@@ -148,7 +148,7 @@ cfg_rt_core! {
             use crate::park::thread::CachedParkThread;
 
             let mut park = CachedParkThread::new();
-            Ok(park.block_on(f))
+            park.block_on(f)
         }
 
         /// Blocks the thread on the specified future for **at most** `timeout`
