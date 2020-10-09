@@ -1,13 +1,11 @@
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 
-use pin_project_lite::pin_project;
 use std::future::Future;
 use std::io;
-use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-pin_project! {
+cfg_io_util! {
     /// A future that asynchronously copies the entire contents of a reader into a
     /// writer.
     ///
@@ -25,13 +23,8 @@ pin_project! {
         cap: usize,
         amt: u64,
         buf: Box<[u8]>,
-        // Make this future `!Unpin` for compatibility with async functions.
-        #[pin]
-        _pin: PhantomPinned,
     }
-}
 
-cfg_io_util! {
     /// Asynchronously copies the entire contents of a reader into a writer.
     ///
     /// This function returns a future that will continuously read data from
@@ -78,7 +71,6 @@ cfg_io_util! {
             pos: 0,
             cap: 0,
             buf: vec![0; 2048].into_boxed_slice(),
-            _pin: PhantomPinned,
         }
     }
 }
@@ -90,44 +82,56 @@ where
 {
     type Output = io::Result<u64>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
-        let mut me = self.project();
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
         loop {
             // If our buffer is empty, then we need to read some data to
             // continue.
-            if *me.pos == *me.cap && !*me.read_done {
+            if self.pos == self.cap && !self.read_done {
+                let me = &mut *self;
                 let mut buf = ReadBuf::new(&mut me.buf);
                 ready!(Pin::new(&mut *me.reader).poll_read(cx, &mut buf))?;
                 let n = buf.filled().len();
                 if n == 0 {
-                    *me.read_done = true;
+                    self.read_done = true;
                 } else {
-                    *me.pos = 0;
-                    *me.cap = n;
+                    self.pos = 0;
+                    self.cap = n;
                 }
             }
 
             // If our buffer has some data, let's write it out!
-            while *me.pos < *me.cap {
-                let i =
-                    ready!(Pin::new(&mut *me.writer).poll_write(cx, &me.buf[*me.pos..*me.cap]))?;
+            while self.pos < self.cap {
+                let me = &mut *self;
+                let i = ready!(Pin::new(&mut *me.writer).poll_write(cx, &me.buf[me.pos..me.cap]))?;
                 if i == 0 {
                     return Poll::Ready(Err(io::Error::new(
                         io::ErrorKind::WriteZero,
                         "write zero byte into writer",
                     )));
                 } else {
-                    *me.pos += i;
-                    *me.amt += i as u64;
+                    self.pos += i;
+                    self.amt += i as u64;
                 }
             }
 
             // If we've written all the data and we've seen EOF, flush out the
             // data and finish the transfer.
-            if *me.pos == *me.cap && *me.read_done {
+            if self.pos == self.cap && self.read_done {
+                let me = &mut *self;
                 ready!(Pin::new(&mut *me.writer).poll_flush(cx))?;
-                return Poll::Ready(Ok(*me.amt));
+                return Poll::Ready(Ok(self.amt));
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn assert_unpin() {
+        use std::marker::PhantomPinned;
+        crate::is_unpin::<Copy<'_, PhantomPinned, PhantomPinned>>();
     }
 }
