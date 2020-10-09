@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "sync"), allow(unreachable_pub, dead_code))]
+
 use crate::sync::batch_semaphore as semaphore;
 
 use std::cell::UnsafeCell;

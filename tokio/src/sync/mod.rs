@@ -456,6 +456,14 @@ cfg_sync! {
 }
 
 cfg_not_sync! {
+    #[cfg(any(feature = "fs", feature = "signal", all(unix, feature = "process")))]
+    pub(crate) mod batch_semaphore;
+
+    cfg_fs! {
+        mod mutex;
+        pub(crate) use mutex::Mutex;
+    }
+
     mod notify;
     pub(crate) use notify::Notify;
 
@@ -472,7 +480,6 @@ cfg_not_sync! {
 
     cfg_signal_internal! {
         pub(crate) mod mpsc;
-        pub(crate) mod batch_semaphore;
     }
 }
 
