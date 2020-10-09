@@ -178,9 +178,9 @@ impl<T> Receiver<T> {
     ///     sync_code.join().unwrap()
     /// }
     /// ```
+    #[cfg(feature = "sync")]
     pub fn blocking_recv(&mut self) -> Option<T> {
-        let mut enter_handle = crate::runtime::enter::enter(false);
-        enter_handle.block_on(self.recv()).unwrap()
+        crate::future::block_on(self.recv())
     }
 
     /// Attempts to return a pending value on this receiver without blocking.
@@ -518,9 +518,9 @@ impl<T> Sender<T> {
     ///     sync_code.join().unwrap()
     /// }
     /// ```
+    #[cfg(feature = "sync")]
     pub fn blocking_send(&self, value: T) -> Result<(), SendError<T>> {
-        let mut enter_handle = crate::runtime::enter::enter(false);
-        enter_handle.block_on(self.send(value)).unwrap()
+        crate::future::block_on(self.send(value))
     }
 
     /// Checks if the channel has been closed. This happens when the

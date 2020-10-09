@@ -349,8 +349,7 @@ cfg_fs! {
     pub mod fs;
 }
 
-#[doc(hidden)]
-pub mod future;
+mod future;
 
 pub mod io;
 pub mod net;
@@ -364,9 +363,14 @@ cfg_process! {
     pub mod process;
 }
 
+#[cfg(any(feature = "dns", feature = "fs", feature = "io-std"))]
+mod blocking;
+
 cfg_rt_core! {
     pub mod runtime;
 }
+#[cfg(all(not(feature = "rt-core"), feature = "rt-util"))]
+mod runtime;
 
 pub(crate) mod coop;
 
@@ -392,8 +396,8 @@ cfg_not_sync! {
     mod sync;
 }
 
+pub mod task;
 cfg_rt_core! {
-    pub mod task;
     pub use task::spawn;
 }
 

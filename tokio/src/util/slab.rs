@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "rt-core"), allow(dead_code))]
+
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
 use crate::loom::sync::{Arc, Mutex};

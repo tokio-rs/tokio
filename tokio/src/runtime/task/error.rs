@@ -3,7 +3,7 @@ use std::fmt;
 use std::io;
 use std::sync::Mutex;
 
-doc_rt_core! {
+cfg_task! {
     /// Task failed to execute to completion.
     pub struct JoinError {
         repr: Repr,

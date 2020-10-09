@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "rt-core"), allow(dead_code))]
+
 //! Source of time abstraction.
 //!
 //! By default, `std::time::Instant::now()` is used. However, when the

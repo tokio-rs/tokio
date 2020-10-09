@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "full"), allow(dead_code))]
+
 //! Opt-in yield points for improved cooperative scheduling.
 //!
 //! A single call to [`poll`] on a top-level task may potentially do a lot of
@@ -67,21 +69,19 @@ impl Budget {
     }
 }
 
-cfg_rt_core! {
-    impl Budget {
-        /// Budget assigned to a task on each poll.
-        ///
-        /// The value itself is chosen somewhat arbitrarily. It needs to be high
-        /// enough to amortize wakeup and scheduling costs, but low enough that we
-        /// do not starve other tasks for too long. The value also needs to be high
-        /// enough that particularly deep tasks are able to do at least some useful
-        /// work at all.
-        ///
-        /// Note that as more yield points are added in the ecosystem, this value
-        /// will probably also have to be raised.
-        const fn initial() -> Budget {
-            Budget(Some(128))
-        }
+impl Budget {
+    /// Budget assigned to a task on each poll.
+    ///
+    /// The value itself is chosen somewhat arbitrarily. It needs to be high
+    /// enough to amortize wakeup and scheduling costs, but low enough that we
+    /// do not starve other tasks for too long. The value also needs to be high
+    /// enough that particularly deep tasks are able to do at least some useful
+    /// work at all.
+    ///
+    /// Note that as more yield points are added in the ecosystem, this value
+    /// will probably also have to be raised.
+    const fn initial() -> Budget {
+        Budget(Some(128))
     }
 }
 
@@ -93,21 +93,11 @@ cfg_rt_threaded! {
     }
 }
 
-cfg_rt_core! {
-    /// Run the given closure with a cooperative task budget. When the function
-    /// returns, the budget is reset to the value prior to calling the function.
-    #[inline(always)]
-    pub(crate) fn budget<R>(f: impl FnOnce() -> R) -> R {
-        with_budget(Budget::initial(), f)
-    }
-}
-
-cfg_rt_threaded! {
-    /// Set the current task's budget
-    #[cfg(feature = "blocking")]
-    pub(crate) fn set(budget: Budget) {
-        CURRENT.with(|cell| cell.set(budget))
-    }
+/// Run the given closure with a cooperative task budget. When the function
+/// returns, the budget is reset to the value prior to calling the function.
+#[inline(always)]
+pub(crate) fn budget<R>(f: impl FnOnce() -> R) -> R {
+    with_budget(Budget::initial(), f)
 }
 
 #[inline(always)]
@@ -135,13 +125,18 @@ fn with_budget<R>(budget: Budget, f: impl FnOnce() -> R) -> R {
 }
 
 cfg_rt_threaded! {
+    /// Set the current task's budget
+    pub(crate) fn set(budget: Budget) {
+        CURRENT.with(|cell| cell.set(budget))
+    }
+
     #[inline(always)]
     pub(crate) fn has_budget_remaining() -> bool {
         CURRENT.with(|cell| cell.get().has_remaining())
     }
 }
 
-cfg_blocking_impl! {
+cfg_rt_core! {
     /// Forcibly remove the budgeting constraints early.
     ///
     /// Returns the remaining budget

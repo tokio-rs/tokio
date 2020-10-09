@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "rt-core"), allow(dead_code))]
+
 //! Process driver
 
 use crate::park::Park;

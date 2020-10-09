@@ -1,7 +1,8 @@
 use crate::runtime::handle::Handle;
-use crate::runtime::{blocking, driver, io, Callback, Runtime, Spawner};
+use crate::runtime::{blocking, driver, Callback, Runtime, Spawner};
 
 use std::fmt;
+use std::io;
 #[cfg(feature = "blocking")]
 use std::time::Duration;
 
@@ -81,14 +82,17 @@ pub(crate) enum Kind {
 }
 
 impl Builder {
+    /// TODO
     pub fn new_current_thread() -> Builder {
         Builder::new(Kind::CurrentThread)
     }
 
+    /// TODO
     pub fn new_single_thread() -> Builder {
         Builder::new(Kind::SingleThread)
     }
 
+    /// TODO
     #[cfg(feature = "rt-threaded")]
     pub fn new_multi_thread() -> Builder {
         Builder::new(Kind::MultiThread)
