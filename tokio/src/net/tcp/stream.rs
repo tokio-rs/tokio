@@ -257,7 +257,7 @@ impl TcpStream {
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
-    ///     let mut stream = TcpStream::connect("127.0.0.1:8000").await?;
+    ///     let stream = TcpStream::connect("127.0.0.1:8000").await?;
     ///     let mut buf = [0; 10];
     ///
     ///     poll_fn(|cx| {
@@ -267,15 +267,7 @@ impl TcpStream {
     ///     Ok(())
     /// }
     /// ```
-    pub fn poll_peek(&mut self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
-        self.poll_peek2(cx, buf)
-    }
-
-    pub(super) fn poll_peek2(
-        &self,
-        cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+    pub fn poll_peek(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         loop {
             let ev = ready!(self.io.poll_read_ready(cx))?;
 
@@ -326,8 +318,10 @@ impl TcpStream {
     ///
     /// [`read`]: fn@crate::io::AsyncReadExt::read
     /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
-    pub async fn peek(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        poll_fn(|cx| self.poll_peek(cx, buf)).await
+    pub async fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
+        self.io
+            .async_io(mio::Interest::READABLE, |io| io.peek(buf))
+            .await
     }
 
     /// Shuts down the read, write, or both halves of this connection.
