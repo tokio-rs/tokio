@@ -527,20 +527,14 @@ impl TryAcquireError {
     /// Returns `true` if the error was caused by a closed semaphore.
     #[allow(dead_code)] // may be used later!
     pub(crate) fn is_closed(&self) -> bool {
-        match self {
-            TryAcquireError::Closed => true,
-            _ => false,
-        }
+        matches!(self, TryAcquireError::Closed)
     }
 
     /// Returns `true` if the error was caused by calling `try_acquire` on a
     /// semaphore with no available permits.
     #[allow(dead_code)] // may be used later!
     pub(crate) fn is_no_permits(&self) -> bool {
-        match self {
-            TryAcquireError::NoPermits => true,
-            _ => false,
-        }
+        matches!(self, TryAcquireError::NoPermits)
     }
 }
 

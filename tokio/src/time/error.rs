@@ -40,10 +40,7 @@ impl Error {
 
     /// Returns `true` if the error was caused by the timer being shutdown.
     pub fn is_shutdown(&self) -> bool {
-        match self.0 {
-            Kind::Shutdown => true,
-            _ => false,
-        }
+        matches!(self.0, Kind::Shutdown)
     }
 
     /// Creates an error representing a timer at capacity.
@@ -53,10 +50,7 @@ impl Error {
 
     /// Returns `true` if the error was caused by the timer being at capacity.
     pub fn is_at_capacity(&self) -> bool {
-        match self.0 {
-            Kind::AtCapacity => true,
-            _ => false,
-        }
+        matches!(self.0, Kind::AtCapacity)
     }
 
     /// Create an error representing a misconfigured timer.
@@ -66,10 +60,7 @@ impl Error {
 
     /// Returns `true` if the error was caused by the timer being misconfigured.
     pub fn is_invalid(&self) -> bool {
-        match self.0 {
-            Kind::Invalid => true,
-            _ => false,
-        }
+        matches!(self.0, Kind::Invalid)
     }
 
     pub(crate) fn as_u8(&self) -> u8 {
