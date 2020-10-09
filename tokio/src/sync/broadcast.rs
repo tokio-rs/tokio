@@ -213,6 +213,14 @@ pub mod error {
     #[derive(Debug)]
     pub struct SendError<T>(pub T);
 
+    impl<T> fmt::Display for SendError<T> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "channel closed")
+        }
+    }
+
+    impl<T: fmt::Debug> std::error::Error for SendError<T> {}
+
     /// An error returned from the [`recv`] function on a [`Receiver`].
     ///
     /// [`recv`]: crate::sync::broadcast::Receiver::recv
