@@ -936,6 +936,25 @@ impl<T: Clone> Receiver<T> {
     }
 }
 
+impl<T> Clone for Receiver<T> {
+    fn clone(&self) -> Self {
+        let shared = self.shared.clone();
+
+        let mut tail = shared.tail.lock();
+
+        if tail.rx_cnt == MAX_RECEIVERS {
+            panic!("max receivers");
+        }
+
+        tail.rx_cnt = tail.rx_cnt.checked_add(1).expect("overflow");
+        let next = tail.pos;
+
+        drop(tail);
+
+        Receiver { shared, next }
+    }
+}
+
 impl<T> Drop for Receiver<T> {
     fn drop(&mut self) {
         let mut tail = self.shared.tail.lock();
