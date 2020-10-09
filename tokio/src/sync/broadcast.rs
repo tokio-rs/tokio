@@ -197,52 +197,86 @@ pub struct Receiver<T> {
     next: u64,
 }
 
-/// Error returned by [`Sender::send`][Sender::send].
-///
-/// A **send** operation can only fail if there are no active receivers,
-/// implying that the message could never be received. The error contains the
-/// message being sent as a payload so it can be recovered.
-#[derive(Debug)]
-pub struct SendError<T>(pub T);
+pub mod error {
+    //! Broadcast error types
 
-/// An error returned from the [`recv`] function on a [`Receiver`].
-///
-/// [`recv`]: crate::sync::broadcast::Receiver::recv
-/// [`Receiver`]: crate::sync::broadcast::Receiver
-#[derive(Debug, PartialEq)]
-pub enum RecvError {
-    /// There are no more active senders implying no further messages will ever
-    /// be sent.
-    Closed,
+    use std::fmt;
 
-    /// The receiver lagged too far behind. Attempting to receive again will
-    /// return the oldest message still retained by the channel.
+    /// Error returned by from the [`send`] function on a [`Sender`].
     ///
-    /// Includes the number of skipped messages.
-    Lagged(u64),
+    /// A **send** operation can only fail if there are no active receivers,
+    /// implying that the message could never be received. The error contains the
+    /// message being sent as a payload so it can be recovered.
+    ///
+    /// [`send`]: crate::sync::broadcast::Sender::send
+    /// [`Sender`]: crate::sync::broadcast::Sender
+    #[derive(Debug)]
+    pub struct SendError<T>(pub T);
+
+    /// An error returned from the [`recv`] function on a [`Receiver`].
+    ///
+    /// [`recv`]: crate::sync::broadcast::Receiver::recv
+    /// [`Receiver`]: crate::sync::broadcast::Receiver
+    #[derive(Debug, PartialEq)]
+    pub enum RecvError {
+        /// There are no more active senders implying no further messages will ever
+        /// be sent.
+        Closed,
+
+        /// The receiver lagged too far behind. Attempting to receive again will
+        /// return the oldest message still retained by the channel.
+        ///
+        /// Includes the number of skipped messages.
+        Lagged(u64),
+    }
+
+    impl fmt::Display for RecvError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                RecvError::Closed => write!(f, "channel closed"),
+                RecvError::Lagged(amt) => write!(f, "channel lagged by {}", amt),
+            }
+        }
+    }
+
+    impl std::error::Error for RecvError {}
+
+    /// An error returned from the [`try_recv`] function on a [`Receiver`].
+    ///
+    /// [`try_recv`]: crate::sync::broadcast::Receiver::try_recv
+    /// [`Receiver`]: crate::sync::broadcast::Receiver
+    #[derive(Debug, PartialEq)]
+    pub enum TryRecvError {
+        /// The channel is currently empty. There are still active
+        /// [`Sender`][Sender] handles, so data may yet become available.
+        Empty,
+
+        /// There are no more active senders implying no further messages will ever
+        /// be sent.
+        Closed,
+
+        /// The receiver lagged too far behind and has been forcibly disconnected.
+        /// Attempting to receive again will return the oldest message still
+        /// retained by the channel.
+        ///
+        /// Includes the number of skipped messages.
+        Lagged(u64),
+    }
+
+    impl fmt::Display for TryRecvError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                TryRecvError::Empty => write!(f, "channel empty"),
+                TryRecvError::Closed => write!(f, "channel closed"),
+                TryRecvError::Lagged(amt) => write!(f, "channel lagged by {}", amt),
+            }
+        }
+    }
+
+    impl std::error::Error for TryRecvError {}
 }
 
-/// An error returned from the [`try_recv`] function on a [`Receiver`].
-///
-/// [`try_recv`]: crate::sync::broadcast::Receiver::try_recv
-/// [`Receiver`]: crate::sync::broadcast::Receiver
-#[derive(Debug, PartialEq)]
-pub enum TryRecvError {
-    /// The channel is currently empty. There are still active
-    /// [`Sender`][Sender] handles, so data may yet become available.
-    Empty,
-
-    /// There are no more active senders implying no further messages will ever
-    /// be sent.
-    Closed,
-
-    /// The receiver lagged too far behind and has been forcibly disconnected.
-    /// Attempting to receive again will return the oldest message still
-    /// retained by the channel.
-    ///
-    /// Includes the number of skipped messages.
-    Lagged(u64),
-}
+use self::error::*;
 
 /// Data shared between senders and receivers
 struct Shared<T> {
@@ -1111,28 +1145,5 @@ impl<'a, T> Drop for RecvGuard<'a, T> {
         }
     }
 }
-
-impl fmt::Display for RecvError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            RecvError::Closed => write!(f, "channel closed"),
-            RecvError::Lagged(amt) => write!(f, "channel lagged by {}", amt),
-        }
-    }
-}
-
-impl std::error::Error for RecvError {}
-
-impl fmt::Display for TryRecvError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            TryRecvError::Empty => write!(f, "channel empty"),
-            TryRecvError::Closed => write!(f, "channel closed"),
-            TryRecvError::Lagged(amt) => write!(f, "channel lagged by {}", amt),
-        }
-    }
-}
-
-impl std::error::Error for TryRecvError {}
 
 fn is_unpin<T: Unpin>() {}
