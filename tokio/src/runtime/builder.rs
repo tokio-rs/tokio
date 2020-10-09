@@ -76,6 +76,7 @@ pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync +
 pub(crate) enum Kind {
     CurrentThread,
     SingleThread,
+    #[cfg(feature = "rt-threaded")]
     MultiThread,
 }
 
@@ -380,6 +381,7 @@ impl Builder {
         match &self.kind {
             Kind::CurrentThread => self.build_basic_runtime(true),
             Kind::SingleThread => self.build_basic_runtime(false),
+            #[cfg(feature = "rt-threaded")]
             Kind::MultiThread => self.build_threaded_runtime(),
         }
     }
@@ -413,6 +415,68 @@ impl Builder {
     pub fn thread_keep_alive(&mut self, duration: Duration) -> &mut Self {
         self.keep_alive = Some(duration);
         self
+    }
+
+    fn build_basic_runtime(&mut self, current_thread: bool) -> io::Result<Runtime> {
+        use crate::runtime::{BasicScheduler, Kind};
+
+        let (driver, resources) = driver::Driver::new(self.get_cfg())?;
+
+        if current_thread {
+            // And now put a single-threaded scheduler on top of the timer. When
+            // there are no futures ready to do something, it'll let the timer or
+            // the reactor to generate some new stimuli for the futures to continue
+            // in their life.
+            let scheduler = BasicScheduler::new(driver);
+            let spawner = Spawner::Basic(scheduler.spawner().clone());
+
+            // Blocking pool
+            let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
+            let blocking_spawner = blocking_pool.spawner().clone();
+
+            Ok(Runtime {
+                kind: Kind::CurrentThread(scheduler),
+                handle: Handle {
+                    spawner,
+                    io_handle: resources.io_handle,
+                    time_handle: resources.time_handle,
+                    signal_handle: resources.signal_handle,
+                    clock: resources.clock,
+                    blocking_spawner,
+                },
+                blocking_pool,
+            })
+        } else {
+            use crate::loom::sync::Arc;
+            // use crate::future::poll_fn;
+            // use std::task::Poll;
+
+            let scheduler = Arc::new(BasicScheduler::new(driver));
+            let spawner = Spawner::Basic(scheduler.spawner().clone());
+
+            // Blocking pool
+            let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
+            let blocking_spawner = blocking_pool.spawner().clone();
+
+            // TODO(lucio): fix this in the basic scheduler
+            // let scheduler2 = scheduler.clone();
+            // std::thread::spawn(move || {
+            //     scheduler2.block_on(poll_fn::<(), _>(|_| Poll::Pending));
+            // });
+
+            Ok(Runtime {
+                kind: Kind::SingleThread(scheduler),
+                handle: Handle {
+                    spawner,
+                    io_handle: resources.io_handle,
+                    time_handle: resources.time_handle,
+                    signal_handle: resources.signal_handle,
+                    clock: resources.clock,
+                    blocking_spawner,
+                },
+                blocking_pool,
+            })
+        }
     }
 }
 
@@ -459,72 +523,6 @@ cfg_time! {
         pub fn enable_time(&mut self) -> &mut Self {
             self.enable_time = true;
             self
-        }
-    }
-}
-
-cfg_rt_core! {
-    impl Builder {
-        fn build_basic_runtime(&mut self, current_thread: bool) -> io::Result<Runtime> {
-            use crate::runtime::{BasicScheduler, Kind};
-
-            let (driver, resources) = driver::Driver::new(self.get_cfg())?;
-
-            if current_thread {
-                // And now put a single-threaded scheduler on top of the timer. When
-                // there are no futures ready to do something, it'll let the timer or
-                // the reactor to generate some new stimuli for the futures to continue
-                // in their life.
-                let scheduler = BasicScheduler::new(driver);
-                let spawner = Spawner::Basic(scheduler.spawner().clone());
-
-                // Blocking pool
-                let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
-                let blocking_spawner = blocking_pool.spawner().clone();
-
-                Ok(Runtime {
-                    kind: Kind::CurrentThread(scheduler),
-                    handle: Handle {
-                        spawner,
-                        io_handle: resources.io_handle,
-                        time_handle: resources.time_handle,
-                        signal_handle: resources.signal_handle,
-                        clock: resources.clock,
-                        blocking_spawner,
-                    },
-                    blocking_pool,
-                })
-            } else {
-                use crate::loom::sync::Arc;
-                // use crate::future::poll_fn;
-                // use std::task::Poll;
-
-                let scheduler = Arc::new(BasicScheduler::new(driver));
-                let spawner = Spawner::Basic(scheduler.spawner().clone());
-
-                // Blocking pool
-                let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
-                let blocking_spawner = blocking_pool.spawner().clone();
-
-                // TODO(lucio): fix this in the basic scheduler
-                // let scheduler2 = scheduler.clone();
-                // std::thread::spawn(move || {
-                //     scheduler2.block_on(poll_fn::<(), _>(|_| Poll::Pending));
-                // });
-
-                Ok(Runtime {
-                    kind: Kind::SingleThread(scheduler),
-                    handle: Handle {
-                        spawner,
-                        io_handle: resources.io_handle,
-                        time_handle: resources.time_handle,
-                        signal_handle: resources.signal_handle,
-                        clock: resources.clock,
-                        blocking_spawner,
-                    },
-                    blocking_pool,
-                })
-            }
         }
     }
 }

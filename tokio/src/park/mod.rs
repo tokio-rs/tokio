@@ -39,10 +39,11 @@ cfg_resource_drivers! {
     pub(crate) use self::either::Either;
 }
 
-mod thread;
-pub(crate) use self::thread::ParkThread;
-
-pub(crate) use self::thread::{CachedParkThread, ParkError};
+cfg_rt_core! {
+    mod thread;
+    pub(crate) use self::thread::ParkThread;
+    pub(crate) use self::thread::{CachedParkThread, ParkError};
+}
 
 use std::sync::Arc;
 use std::time::Duration;

@@ -457,8 +457,10 @@ cfg_sync! {
 }
 
 cfg_not_sync! {
-    mod notify;
-    pub(crate) use notify::Notify;
+    cfg_rt_core! {
+        mod notify;
+        pub(crate) use notify::Notify;
+    }
 
     cfg_atomic_waker_impl! {
         mod task;

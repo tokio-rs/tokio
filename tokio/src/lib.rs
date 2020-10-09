@@ -364,7 +364,9 @@ cfg_process! {
     pub mod process;
 }
 
-pub mod runtime;
+cfg_rt_core! {
+    pub mod runtime;
+}
 
 pub(crate) mod coop;
 

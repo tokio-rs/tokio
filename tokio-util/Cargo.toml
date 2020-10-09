@@ -30,6 +30,7 @@ full = ["codec", "compat", "io"]
 compat = ["futures-io",]
 codec = ["tokio/stream"]
 io = []
+rt-core = ["tokio/rt-core"]
 
 [dependencies]
 tokio = { version = "0.3.0", path = "../tokio" }

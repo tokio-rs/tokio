@@ -61,23 +61,27 @@ thread_local! {
 pub(crate) struct Budget(Option<u8>);
 
 impl Budget {
-    /// Budget assigned to a task on each poll.
-    ///
-    /// The value itself is chosen somewhat arbitrarily. It needs to be high
-    /// enough to amortize wakeup and scheduling costs, but low enough that we
-    /// do not starve other tasks for too long. The value also needs to be high
-    /// enough that particularly deep tasks are able to do at least some useful
-    /// work at all.
-    ///
-    /// Note that as more yield points are added in the ecosystem, this value
-    /// will probably also have to be raised.
-    const fn initial() -> Budget {
-        Budget(Some(128))
-    }
-
     /// Returns an unconstrained budget. Operations will not be limited.
     const fn unconstrained() -> Budget {
         Budget(None)
+    }
+}
+
+cfg_rt_core! {
+    impl Budget {
+        /// Budget assigned to a task on each poll.
+        ///
+        /// The value itself is chosen somewhat arbitrarily. It needs to be high
+        /// enough to amortize wakeup and scheduling costs, but low enough that we
+        /// do not starve other tasks for too long. The value also needs to be high
+        /// enough that particularly deep tasks are able to do at least some useful
+        /// work at all.
+        ///
+        /// Note that as more yield points are added in the ecosystem, this value
+        /// will probably also have to be raised.
+        const fn initial() -> Budget {
+            Budget(Some(128))
+        }
     }
 }
 
@@ -89,11 +93,13 @@ cfg_rt_threaded! {
     }
 }
 
-/// Run the given closure with a cooperative task budget. When the function
-/// returns, the budget is reset to the value prior to calling the function.
-#[inline(always)]
-pub(crate) fn budget<R>(f: impl FnOnce() -> R) -> R {
-    with_budget(Budget::initial(), f)
+cfg_rt_core! {
+    /// Run the given closure with a cooperative task budget. When the function
+    /// returns, the budget is reset to the value prior to calling the function.
+    #[inline(always)]
+    pub(crate) fn budget<R>(f: impl FnOnce() -> R) -> R {
+        with_budget(Budget::initial(), f)
+    }
 }
 
 cfg_rt_threaded! {

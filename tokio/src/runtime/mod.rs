@@ -190,12 +190,10 @@ mod tests;
 
 pub(crate) mod context;
 
-cfg_rt_core! {
-    mod basic_scheduler;
-    use basic_scheduler::BasicScheduler;
+mod basic_scheduler;
+use basic_scheduler::BasicScheduler;
 
-    pub(crate) mod task;
-}
+pub(crate) mod task;
 
 mod blocking;
 use blocking::BlockingPool;
@@ -236,10 +234,8 @@ cfg_rt_threaded! {
     use self::thread_pool::ThreadPool;
 }
 
-cfg_rt_core! {
-    use crate::task::JoinHandle;
-    use crate::loom::sync::Arc;
-}
+use crate::loom::sync::Arc;
+use crate::task::JoinHandle;
 
 use std::future::Future;
 use std::time::Duration;
@@ -304,16 +300,17 @@ enum Kind {
 type Callback = std::sync::Arc<dyn Fn() + Send + Sync>;
 
 impl Runtime {
+    #[cfg(feature = "rt-threaded")]
     pub fn new_multi_thread() -> io::Result<Runtime> {
         Builder::new_multi_thread().enable_all().build()
     }
 
     pub fn new_single_thread() -> io::Result<Runtime> {
-        Builder::new_multi_thread().enable_all().build()
+        Builder::new_single_thread().enable_all().build()
     }
 
     pub fn new_current_thread() -> io::Result<Runtime> {
-        Builder::new_multi_thread().enable_all().build()
+        Builder::new_current_thread().enable_all().build()
     }
 
     /// Spawn a future onto the Tokio runtime.
