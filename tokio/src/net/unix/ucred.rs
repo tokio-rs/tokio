@@ -15,19 +15,9 @@ impl UCred {
         self.uid
     }
 
-    /// Gets a mutable reference to UID (user ID) of the process.
-    pub fn uid_mut(&mut self) -> &mut uid_t {
-        &mut self.uid
-    }
-
     /// Gets GID (group ID) of the process.
     pub fn gid(&self) -> gid_t {
         self.gid
-    }
-
-    /// Gets a mutable reference to GID (group ID) of the process.
-    pub fn gid_mut(&mut self) -> &mut gid_t {
-        &mut self.gid
     }
 }
 
