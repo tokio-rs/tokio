@@ -526,7 +526,7 @@ impl<T> Sender<T> {
     /// ```
     pub fn subscribe(&self) -> Receiver<T> {
         let shared = self.shared.clone();
-        shared.new_receiver()
+        new_receiver(shared)
     }
 
     /// Returns the number of active receivers
@@ -944,7 +944,7 @@ impl<T: Clone> Receiver<T> {
 impl<T> Clone for Receiver<T> {
     fn clone(&self) -> Self {
         let shared = self.shared.clone();
-        shared.new_receiver()
+        new_receiver(shared)
     }
 }
 
