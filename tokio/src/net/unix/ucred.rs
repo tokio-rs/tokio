@@ -10,9 +10,9 @@ pub struct UCred {
 }
 
 impl UCred {
-    /// Gets a reference to UID (user ID) of the process.
-    pub fn uid(&self) -> &uid_t {
-        &self.uid
+    /// Gets UID (user ID) of the process.
+    pub fn uid(&self) -> uid_t {
+        self.uid
     }
 
     /// Gets a mutable reference to UID (user ID) of the process.
@@ -20,9 +20,9 @@ impl UCred {
         &mut self.uid
     }
 
-    /// Gets a reference to GID (group ID) of the process.
-    pub fn gid(&self) -> &gid_t {
-        &self.gid
+    /// Gets GID (group ID) of the process.
+    pub fn gid(&self) -> gid_t {
+        self.gid
     }
 
     /// Gets a mutable reference to GID (group ID) of the process.
