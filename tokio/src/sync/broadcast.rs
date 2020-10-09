@@ -526,18 +526,7 @@ impl<T> Sender<T> {
     /// ```
     pub fn subscribe(&self) -> Receiver<T> {
         let shared = self.shared.clone();
-
-        let mut tail = shared.tail.lock();
-
-        if tail.rx_cnt == MAX_RECEIVERS {
-            panic!("max receivers");
-        }
-
-        tail.rx_cnt = tail.rx_cnt.checked_add(1).expect("overflow");
-        let next = tail.pos;
-
-        drop(tail);
-
+        let next = new_receiver(&shared);
         Receiver { shared, next }
     }
 
@@ -940,18 +929,7 @@ impl<T: Clone> Receiver<T> {
 impl<T> Clone for Receiver<T> {
     fn clone(&self) -> Self {
         let shared = self.shared.clone();
-
-        let mut tail = shared.tail.lock();
-
-        if tail.rx_cnt == MAX_RECEIVERS {
-            panic!("max receivers");
-        }
-
-        tail.rx_cnt = tail.rx_cnt.checked_add(1).expect("overflow");
-        let next = tail.pos;
-
-        drop(tail);
-
+        let next = new_receiver(&shared);
         Receiver { shared, next }
     }
 }
@@ -1156,3 +1134,17 @@ impl fmt::Display for TryRecvError {
 impl std::error::Error for TryRecvError {}
 
 fn is_unpin<T: Unpin>() {}
+
+/// Updates the Tail of the given "shared" to add a new Receiver to
+/// the count, and returns the current end position of the tail.
+fn new_receiver<T>(shared: &Shared<T>) -> u64 {
+    let mut tail = shared.tail.lock();
+
+    if tail.rx_cnt == MAX_RECEIVERS {
+        panic!("max receivers");
+    }
+
+    tail.rx_cnt = tail.rx_cnt.checked_add(1).expect("overflow");
+
+    tail.pos
+}
