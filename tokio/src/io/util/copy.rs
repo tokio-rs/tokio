@@ -5,26 +5,21 @@ use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-cfg_io_util! {
-    /// A future that asynchronously copies the entire contents of a reader into a
-    /// writer.
-    ///
-    /// This struct is generally created by calling [`copy`][copy]. Please
-    /// see the documentation of `copy()` for more details.
-    ///
-    /// [copy]: copy()
-    #[derive(Debug)]
-    #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub struct Copy<'a, R: ?Sized, W: ?Sized> {
-        reader: &'a mut R,
-        read_done: bool,
-        writer: &'a mut W,
-        pos: usize,
-        cap: usize,
-        amt: u64,
-        buf: Box<[u8]>,
-    }
+/// A future that asynchronously copies the entire contents of a reader into a
+/// writer.
+#[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
+struct Copy<'a, R: ?Sized, W: ?Sized> {
+    reader: &'a mut R,
+    read_done: bool,
+    writer: &'a mut W,
+    pos: usize,
+    cap: usize,
+    amt: u64,
+    buf: Box<[u8]>,
+}
 
+cfg_io_util! {
     /// Asynchronously copies the entire contents of a reader into a writer.
     ///
     /// This function returns a future that will continuously read data from
@@ -58,7 +53,7 @@ cfg_io_util! {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn copy<'a, R, W>(reader: &'a mut R, writer: &'a mut W) -> Copy<'a, R, W>
+    pub async fn copy<'a, R, W>(reader: &'a mut R, writer: &'a mut W) -> io::Result<u64>
     where
         R: AsyncRead + Unpin + ?Sized,
         W: AsyncWrite + Unpin + ?Sized,
@@ -71,7 +66,7 @@ cfg_io_util! {
             pos: 0,
             cap: 0,
             buf: vec![0; 2048].into_boxed_slice(),
-        }
+        }.await
     }
 }
 
@@ -122,16 +117,5 @@ where
                 return Poll::Ready(Ok(self.amt));
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn assert_unpin() {
-        use std::marker::PhantomPinned;
-        crate::is_unpin::<Copy<'_, PhantomPinned, PhantomPinned>>();
     }
 }

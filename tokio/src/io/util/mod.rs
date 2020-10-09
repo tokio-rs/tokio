@@ -25,7 +25,7 @@ cfg_io_util! {
     mod chain;
 
     mod copy;
-    pub use copy::{copy, Copy};
+    pub use copy::copy;
 
     mod empty;
     pub use empty::{empty, Empty};
