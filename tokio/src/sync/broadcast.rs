@@ -616,22 +616,20 @@ impl<T> Sender<T> {
     }
 }
 
-impl<T> Shared<T> {
-    fn new_receiver(self: Arc<Self>) -> Receiver<T> {
-        let mut tail = self.tail.lock();
+fn new_receiver<T>(shared: Arc<Shared<T>>) -> Receiver<T> {
+    let mut tail = shared.tail.lock();
 
-        if tail.rx_cnt == MAX_RECEIVERS {
-            panic!("max receivers");
-        }
-
-        tail.rx_cnt = tail.rx_cnt.checked_add(1).expect("overflow");
-
-        let next = tail.pos;
-
-        drop(tail);
-
-        Receiver { shared: self, next }
+    if tail.rx_cnt == MAX_RECEIVERS {
+        panic!("max receivers");
     }
+
+    tail.rx_cnt = tail.rx_cnt.checked_add(1).expect("overflow");
+
+    let next = tail.pos;
+
+    drop(tail);
+
+    Receiver { shared, next }
 }
 
 impl Tail {
