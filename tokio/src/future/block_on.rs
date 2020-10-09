@@ -10,6 +10,6 @@ cfg_rt_core! {
 cfg_not_rt_core! {
     pub(crate) fn block_on<F: Future>(f: F) -> F::Output {
         let mut park = crate::park::thread::CachedParkThread::new();
-        park.block_on(f)
+        park.block_on(f).unwrap()
     }
 }

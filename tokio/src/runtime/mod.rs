@@ -229,7 +229,6 @@ cfg_rt_core! {
     use crate::task::JoinHandle;
 
     use std::future::Future;
-    use std::io;
     use std::time::Duration;
 
     /// The Tokio runtime.
@@ -325,7 +324,7 @@ cfg_rt_core! {
         /// [basic scheduler]: index.html#basic-scheduler
         /// [runtime builder]: crate::runtime::Builder
         #[cfg(feature = "rt-threaded")]
-        pub fn new() -> io::Result<Runtime> {
+        pub fn new() -> std::io::Result<Runtime> {
             Builder::new_multi_thread().enable_all().build()
         }
 
