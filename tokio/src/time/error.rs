@@ -32,6 +32,18 @@ enum Kind {
     Invalid = 3,
 }
 
+/// Error returned by `Timeout`.
+#[derive(Debug, PartialEq)]
+pub struct Elapsed(());
+
+#[derive(Debug)]
+pub(crate) enum InsertError {
+    Elapsed,
+    Invalid,
+}
+
+// ===== impl Error =====
+
 impl Error {
     /// Creates an error representing a shutdown timer.
     pub fn shutdown() -> Error {
@@ -88,5 +100,27 @@ impl fmt::Display for Error {
             Invalid => "timer duration exceeds maximum duration",
         };
         write!(fmt, "{}", descr)
+    }
+}
+
+// ===== impl Elapsed =====
+
+impl Elapsed {
+    pub(crate) fn new() -> Self {
+        Elapsed(())
+    }
+}
+
+impl fmt::Display for Elapsed {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        "deadline has elapsed".fmt(fmt)
+    }
+}
+
+impl std::error::Error for Elapsed {}
+
+impl From<Elapsed> for std::io::Error {
+    fn from(_err: Elapsed) -> std::io::Error {
+        std::io::ErrorKind::TimedOut.into()
     }
 }

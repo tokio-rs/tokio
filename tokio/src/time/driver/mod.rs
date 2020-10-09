@@ -204,7 +204,7 @@ where
 
     /// Fires the entry if it needs to, otherwise queue it to be processed later.
     fn add_entry(&mut self, entry: Arc<Entry>, when: u64) {
-        use crate::time::wheel::InsertError;
+        use crate::time::error::InsertError;
 
         entry.set_when_internal(Some(when));
 

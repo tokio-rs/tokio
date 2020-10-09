@@ -99,7 +99,7 @@ pub use sleep::{sleep, sleep_until, Sleep};
 pub(crate) mod driver;
 
 mod error;
-pub use error::Error;
+pub use error::{Elapsed, Error};
 
 mod instant;
 pub use self::instant::Instant;
@@ -109,7 +109,7 @@ pub use interval::{interval, interval_at, Interval};
 
 mod timeout;
 #[doc(inline)]
-pub use timeout::{timeout, timeout_at, Elapsed, Timeout};
+pub use timeout::{timeout, timeout_at, Timeout};
 
 mod wheel;
 
