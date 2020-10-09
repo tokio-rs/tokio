@@ -6,10 +6,11 @@
 #![cfg(unix)]
 
 use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
+use crate::sync::mpsc::error::TryRecvError;
 use crate::sync::mpsc::{channel, Receiver};
 
 use libc::c_int;
-use mio_uds::UnixStream;
+use mio::net::UnixStream;
 use std::io::{self, Error, ErrorKind, Write};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -17,6 +18,7 @@ use std::sync::Once;
 use std::task::{Context, Poll};
 
 pub(crate) mod driver;
+use self::driver::Handle;
 
 pub(crate) type OsStorage = Vec<SignalInfo>;
 
@@ -220,7 +222,7 @@ fn action(globals: Pin<&'static Globals>, signal: c_int) {
 ///
 /// This will register the signal handler if it hasn't already been registered,
 /// returning any error along the way if that fails.
-fn signal_enable(signal: c_int) -> io::Result<()> {
+fn signal_enable(signal: c_int, handle: Handle) -> io::Result<()> {
     if signal < 0 || signal_hook_registry::FORBIDDEN.contains(&signal) {
         return Err(Error::new(
             ErrorKind::Other,
@@ -229,7 +231,7 @@ fn signal_enable(signal: c_int) -> io::Result<()> {
     }
 
     // Check that we have a signal driver running
-    driver::Handle::current().check_inner()?;
+    handle.check_inner()?;
 
     let globals = globals();
     let siginfo = match globals.storage().get(signal as EventId) {
@@ -349,10 +351,14 @@ pub struct Signal {
 /// * If the signal is one of
 ///   [`signal_hook::FORBIDDEN`](fn@signal_hook_registry::register#panics)
 pub fn signal(kind: SignalKind) -> io::Result<Signal> {
+    signal_with_handle(kind, Handle::current())
+}
+
+pub(crate) fn signal_with_handle(kind: SignalKind, handle: Handle) -> io::Result<Signal> {
     let signal = kind.0;
 
     // Turn the signal delivery on once we are ready for it
-    signal_enable(signal)?;
+    signal_enable(signal, handle)?;
 
     // One wakeup in a queue is enough, no need for us to buffer up any
     // more.
@@ -391,36 +397,13 @@ impl Signal {
         poll_fn(|cx| self.poll_recv(cx)).await
     }
 
-    /// Polls to receive the next signal notification event, outside of an
-    /// `async` context.
-    ///
-    /// `None` is returned if no more events can be received by this stream.
-    ///
-    /// # Examples
-    ///
-    /// Polling from a manually implemented future
-    ///
-    /// ```rust,no_run
-    /// use std::pin::Pin;
-    /// use std::future::Future;
-    /// use std::task::{Context, Poll};
-    /// use tokio::signal::unix::Signal;
-    ///
-    /// struct MyFuture {
-    ///     signal: Signal,
-    /// }
-    ///
-    /// impl Future for MyFuture {
-    ///     type Output = Option<()>;
-    ///
-    ///     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-    ///         println!("polling MyFuture");
-    ///         self.signal.poll_recv(cx)
-    ///     }
-    /// }
-    /// ```
-    pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
+    pub(crate) fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
         self.rx.poll_recv(cx)
+    }
+
+    /// Try to receive a signal notification without blocking or registering a waker.
+    pub(crate) fn try_recv(&mut self) -> Result<(), TryRecvError> {
+        self.rx.try_recv()
     }
 }
 
@@ -434,6 +417,22 @@ cfg_stream! {
     }
 }
 
+// Work around for abstracting streams internally
+pub(crate) trait InternalStream: Unpin {
+    fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>>;
+    fn try_recv(&mut self) -> Result<(), TryRecvError>;
+}
+
+impl InternalStream for Signal {
+    fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
+        self.poll_recv(cx)
+    }
+
+    fn try_recv(&mut self) -> Result<(), TryRecvError> {
+        self.try_recv()
+    }
+}
+
 pub(crate) fn ctrl_c() -> io::Result<Signal> {
     signal(SignalKind::interrupt())
 }
@@ -444,11 +443,11 @@ mod tests {
 
     #[test]
     fn signal_enable_error_on_invalid_input() {
-        signal_enable(-1).unwrap_err();
+        signal_enable(-1, Handle::default()).unwrap_err();
     }
 
     #[test]
     fn signal_enable_error_on_forbidden_input() {
-        signal_enable(signal_hook_registry::FORBIDDEN[0]).unwrap_err();
+        signal_enable(signal_hook_registry::FORBIDDEN[0], Handle::default()).unwrap_err();
     }
 }

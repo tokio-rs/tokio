@@ -13,7 +13,7 @@ use std::fmt;
 ///   succeed in the future.
 ///
 /// * `at_capacity` occurs when a timer operation is attempted, but the timer
-///   instance is currently handling its maximum number of outstanding delays.
+///   instance is currently handling its maximum number of outstanding sleep instances.
 ///   In this case, the operation is not able to be performed at the current
 ///   moment, and `at_capacity` is returned. This is a transient error, i.e., at
 ///   some point in the future, if the operation is attempted again, it might
@@ -40,10 +40,7 @@ impl Error {
 
     /// Returns `true` if the error was caused by the timer being shutdown.
     pub fn is_shutdown(&self) -> bool {
-        match self.0 {
-            Kind::Shutdown => true,
-            _ => false,
-        }
+        matches!(self.0, Kind::Shutdown)
     }
 
     /// Creates an error representing a timer at capacity.
@@ -53,10 +50,7 @@ impl Error {
 
     /// Returns `true` if the error was caused by the timer being at capacity.
     pub fn is_at_capacity(&self) -> bool {
-        match self.0 {
-            Kind::AtCapacity => true,
-            _ => false,
-        }
+        matches!(self.0, Kind::AtCapacity)
     }
 
     /// Create an error representing a misconfigured timer.
@@ -66,10 +60,7 @@ impl Error {
 
     /// Returns `true` if the error was caused by the timer being misconfigured.
     pub fn is_invalid(&self) -> bool {
-        match self.0 {
-            Kind::Invalid => true,
-            _ => false,
-        }
+        matches!(self.0, Kind::Invalid)
     }
 
     pub(crate) fn as_u8(&self) -> u8 {

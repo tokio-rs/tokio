@@ -77,7 +77,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Bind a TCP listener to the socket address.
     //
     // Note that this is the Tokio TcpListener, which is fully async.
-    let mut listener = TcpListener::bind(&addr).await?;
+    let listener = TcpListener::bind(&addr).await?;
 
     tracing::info!("server running on {}", addr);
 

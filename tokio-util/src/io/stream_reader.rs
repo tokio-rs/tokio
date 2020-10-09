@@ -1,4 +1,4 @@
-use bytes::{Buf, BufMut};
+use bytes::Buf;
 use futures_core::stream::Stream;
 use pin_project_lite::pin_project;
 use std::io;
@@ -118,29 +118,6 @@ where
 
         self.consume(len);
         Poll::Ready(Ok(()))
-    }
-    fn poll_read_buf<BM: BufMut>(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut BM,
-    ) -> Poll<io::Result<usize>>
-    where
-        Self: Sized,
-    {
-        if !buf.has_remaining_mut() {
-            return Poll::Ready(Ok(0));
-        }
-
-        let inner_buf = match self.as_mut().poll_fill_buf(cx) {
-            Poll::Ready(Ok(buf)) => buf,
-            Poll::Ready(Err(err)) => return Poll::Ready(Err(err)),
-            Poll::Pending => return Poll::Pending,
-        };
-        let len = std::cmp::min(inner_buf.len(), buf.remaining_mut());
-        buf.put_slice(&inner_buf[..len]);
-
-        self.consume(len);
-        Poll::Ready(Ok(len))
     }
 }
 

@@ -37,14 +37,14 @@ use core::task::{Context, Poll, Waker};
 ///                 // The token was cancelled
 ///                 5
 ///             }
-///             _ = tokio::time::delay_for(std::time::Duration::from_secs(9999)) => {
+///             _ = tokio::time::sleep(std::time::Duration::from_secs(9999)) => {
 ///                 99
 ///             }
 ///         }
 ///     });
 ///
 ///     tokio::spawn(async move {
-///         tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
+///         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
 ///         token.cancel();
 ///     });
 ///
@@ -185,14 +185,14 @@ impl CancellationToken {
     ///                 // The token was cancelled
     ///                 5
     ///             }
-    ///             _ = tokio::time::delay_for(std::time::Duration::from_secs(9999)) => {
+    ///             _ = tokio::time::sleep(std::time::Duration::from_secs(9999)) => {
     ///                 99
     ///             }
     ///         }
     ///     });
     ///
     ///     tokio::spawn(async move {
-    ///         tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
+    ///         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     ///         token.cancel();
     ///     });
     ///
@@ -624,7 +624,7 @@ impl CancellationTokenState {
 
         if removed_child {
             // If the token removed itself from the parents list, it can reset
-            // the the parent ref status. If it is isn't able to do so, because the
+            // the parent ref status. If it is isn't able to do so, because the
             // parent removed it from the list, there is no need to do this.
             // The parent ref acts as as another reference count. Therefore
             // removing this reference can free the object.

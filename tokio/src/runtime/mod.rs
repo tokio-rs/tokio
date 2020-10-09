@@ -25,7 +25,7 @@
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let mut listener = TcpListener::bind("127.0.0.1:8080").await?;
+//!     let listener = TcpListener::bind("127.0.0.1:8080").await?;
 //!
 //!     loop {
 //!         let (mut socket, _) = listener.accept().await?;
@@ -73,7 +73,7 @@
 //!
 //!     // Spawn the root task
 //!     rt.block_on(async {
-//!         let mut listener = TcpListener::bind("127.0.0.1:8080").await?;
+//!         let listener = TcpListener::bind("127.0.0.1:8080").await?;
 //!
 //!         loop {
 //!             let (mut socket, _) = listener.accept().await?;
@@ -404,10 +404,10 @@ impl Runtime {
     }
 
     /// Enter the runtime context. This allows you to construct types that must
-    /// have an executor available on creation such as [`Delay`] or [`TcpStream`].
+    /// have an executor available on creation such as [`Sleep`] or [`TcpStream`].
     /// It will also allow you to call methods such as [`tokio::spawn`].
     ///
-    /// [`Delay`]: struct@crate::time::Delay
+    /// [`Sleep`]: struct@crate::time::Sleep
     /// [`TcpStream`]: struct@crate::net::TcpStream
     /// [`tokio::spawn`]: fn@crate::spawn
     ///

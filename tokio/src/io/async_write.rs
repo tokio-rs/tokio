@@ -1,4 +1,3 @@
-use bytes::Buf;
 use std::io;
 use std::ops::DerefMut;
 use std::pin::Pin;
@@ -128,27 +127,6 @@ pub trait AsyncWrite {
     /// This function will panic if not called within the context of a future's
     /// task.
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>>;
-
-    /// Writes a `Buf` into this value, returning how many bytes were written.
-    ///
-    /// Note that this method will advance the `buf` provided automatically by
-    /// the number of bytes written.
-    fn poll_write_buf<B: Buf>(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut B,
-    ) -> Poll<Result<usize, io::Error>>
-    where
-        Self: Sized,
-    {
-        if !buf.has_remaining() {
-            return Poll::Ready(Ok(0));
-        }
-
-        let n = ready!(self.poll_write(cx, buf.bytes()))?;
-        buf.advance(n);
-        Poll::Ready(Ok(n))
-    }
 }
 
 macro_rules! deref_async_write {

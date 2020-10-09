@@ -215,7 +215,7 @@ rt_test! {
                 out.push(i);
             }
 
-            out.sort();
+            out.sort_unstable();
             out
         });
 
@@ -274,7 +274,7 @@ rt_test! {
                     out.push(i);
                 }
 
-                out.sort();
+                out.sort_unstable();
                 out
             }).await.unwrap()
         });
@@ -439,21 +439,21 @@ rt_test! {
     }
 
     #[test]
-    fn delay_at_root() {
+    fn sleep_at_root() {
         let rt = rt();
 
         let now = Instant::now();
         let dur = Duration::from_millis(50);
 
         rt.block_on(async move {
-            time::delay_for(dur).await;
+            time::sleep(dur).await;
         });
 
         assert!(now.elapsed() >= dur);
     }
 
     #[test]
-    fn delay_in_spawn() {
+    fn sleep_in_spawn() {
         let rt = rt();
 
         let now = Instant::now();
@@ -463,7 +463,7 @@ rt_test! {
             let (tx, rx) = oneshot::channel();
 
             tokio::spawn(async move {
-                time::delay_for(dur).await;
+                time::sleep(dur).await;
                 assert_ok!(tx.send(()));
             });
 
@@ -480,7 +480,7 @@ rt_test! {
         rt.block_on(async move {
             let (tx, rx) = oneshot::channel();
 
-            let mut listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
             let addr = listener.local_addr().unwrap();
 
             tokio::spawn(async move {
@@ -524,7 +524,7 @@ rt_test! {
     }
 
     #[test]
-    fn delay_from_blocking() {
+    fn sleep_from_blocking() {
         let rt = rt();
 
         rt.block_on(async move {
@@ -535,7 +535,7 @@ rt_test! {
                 // use the futures' block_on fn to make sure we aren't setting
                 // any Tokio context
                 futures::executor::block_on(async {
-                    tokio::time::delay_for(dur).await;
+                    tokio::time::sleep(dur).await;
                 });
 
                 assert!(now.elapsed() >= dur);
@@ -548,7 +548,7 @@ rt_test! {
         let rt = rt();
 
         rt.block_on(async move {
-            let mut listener = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+            let listener = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
             let addr = assert_ok!(listener.local_addr());
 
             let peer = tokio::task::spawn_blocking(move || {
@@ -597,7 +597,7 @@ rt_test! {
         let jh1 = thread::spawn(move || {
                 rt.block_on(async move {
                     rx2.await.unwrap();
-                    time::delay_for(Duration::from_millis(5)).await;
+                    time::sleep(Duration::from_millis(5)).await;
                     tx1.send(()).unwrap();
                 });
         });
@@ -605,9 +605,9 @@ rt_test! {
         let jh2 = thread::spawn(move || {
             rt2.block_on(async move {
                 tx2.send(()).unwrap();
-                time::delay_for(Duration::from_millis(5)).await;
+                time::sleep(Duration::from_millis(5)).await;
                 rx1.await.unwrap();
-                time::delay_for(Duration::from_millis(5)).await;
+                time::sleep(Duration::from_millis(5)).await;
             });
         });
 
@@ -643,7 +643,7 @@ rt_test! {
 
         // Do some I/O work
         rt.block_on(async {
-            let mut listener = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+            let listener = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
             let addr = assert_ok!(listener.local_addr());
 
             let srv = tokio::spawn(async move {
@@ -859,11 +859,11 @@ rt_test! {
                     let buf = [0];
                     loop {
                         send_half.send_to(&buf, &addr).await.unwrap();
-                        tokio::time::delay_for(Duration::from_millis(1)).await;
+                        tokio::time::sleep(Duration::from_millis(1)).await;
                     }
                 });
 
-                tokio::time::delay_for(Duration::from_millis(5)).await;
+                tokio::time::sleep(Duration::from_millis(5)).await;
             });
         }
     }
@@ -890,7 +890,7 @@ rt_test! {
         let runtime = rt();
 
         runtime.block_on(async move {
-            tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         });
 
         Arc::try_unwrap(runtime).unwrap().shutdown_timeout(Duration::from_secs(10_000));
@@ -921,7 +921,7 @@ rt_test! {
     }
 
     async fn client_server(tx: mpsc::Sender<()>) {
-        let mut server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+        let server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
 
         // Get the assigned address
         let addr = assert_ok!(server.local_addr());
@@ -952,7 +952,7 @@ rt_test! {
         local.block_on(&rt, async move {
             let (tx, rx) = oneshot::channel();
 
-            let mut listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
             let addr = listener.local_addr().unwrap();
 
             task::spawn_local(async move {
@@ -979,7 +979,7 @@ rt_test! {
     }
 
     async fn client_server_local(tx: mpsc::Sender<()>) {
-        let mut server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+        let server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
 
         // Get the assigned address
         let addr = assert_ok!(server.local_addr());
@@ -1015,7 +1015,7 @@ rt_test! {
             }).collect::<Vec<_>>();
 
             // Hope that all the tasks complete...
-            time::delay_for(Duration::from_millis(100)).await;
+            time::sleep(Duration::from_millis(100)).await;
 
             poll_fn(|cx| {
                 // At least one task should not be ready

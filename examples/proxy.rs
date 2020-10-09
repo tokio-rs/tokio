@@ -43,7 +43,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Listening on: {}", listen_addr);
     println!("Proxying to: {}", server_addr);
 
-    let mut listener = TcpListener::bind(listen_addr).await?;
+    let listener = TcpListener::bind(listen_addr).await?;
 
     while let Ok((inbound, _)) = listener.accept().await {
         let transfer = transfer(inbound, server_addr.clone()).map(|r| {

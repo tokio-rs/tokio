@@ -106,7 +106,7 @@
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!     let (mut tx, mut rx) = mpsc::channel(100);
+//!     let (tx, mut rx) = mpsc::channel(100);
 //!
 //!     tokio::spawn(async move {
 //!         for i in 0..10 {
@@ -150,7 +150,7 @@
 //!     for _ in 0..10 {
 //!         // Each task needs its own `tx` handle. This is done by cloning the
 //!         // original handle.
-//!         let mut tx = tx.clone();
+//!         let tx = tx.clone();
 //!
 //!         tokio::spawn(async move {
 //!             tx.send(&b"data to write"[..]).await.unwrap();
@@ -213,7 +213,7 @@
 //!
 //!     // Spawn tasks that will send the increment command.
 //!     for _ in 0..10 {
-//!         let mut cmd_tx = cmd_tx.clone();
+//!         let cmd_tx = cmd_tx.clone();
 //!
 //!         join_handles.push(tokio::spawn(async move {
 //!             let (resp_tx, resp_rx) = oneshot::channel();
@@ -322,7 +322,7 @@
 //!     tokio::spawn(async move {
 //!         loop {
 //!             // Wait 10 seconds between checks
-//!             time::delay_for(Duration::from_secs(10)).await;
+//!             time::sleep(Duration::from_secs(10)).await;
 //!
 //!             // Load the configuration file
 //!             let new_config = Config::load_from_file().await.unwrap();
@@ -359,11 +359,11 @@
 //!             let mut conf = rx.borrow().clone();
 //!
 //!             let mut op_start = Instant::now();
-//!             let mut delay = time::delay_until(op_start + conf.timeout);
+//!             let mut sleep = time::sleep_until(op_start + conf.timeout);
 //!
 //!             loop {
 //!                 tokio::select! {
-//!                     _ = &mut delay => {
+//!                     _ = &mut sleep => {
 //!                         // The operation elapsed. Restart it
 //!                         op.set(my_async_operation());
 //!
@@ -371,14 +371,14 @@
 //!                         op_start = Instant::now();
 //!
 //!                         // Restart the timeout
-//!                         delay = time::delay_until(op_start + conf.timeout);
+//!                         sleep = time::sleep_until(op_start + conf.timeout);
 //!                     }
 //!                     _ = rx.changed() => {
 //!                         conf = rx.borrow().clone();
 //!
 //!                         // The configuration has been updated. Update the
-//!                         // `delay` using the new `timeout` value.
-//!                         delay.reset(op_start + conf.timeout);
+//!                         // `sleep` using the new `timeout` value.
+//!                         sleep.reset(op_start + conf.timeout);
 //!                     }
 //!                     _ = &mut op => {
 //!                         // The operation completed!
@@ -443,7 +443,6 @@ cfg_sync! {
     pub mod oneshot;
 
     pub(crate) mod batch_semaphore;
-    pub(crate) mod semaphore_ll;
     mod semaphore;
     pub use semaphore::{Semaphore, SemaphorePermit, OwnedSemaphorePermit};
 
@@ -457,10 +456,16 @@ cfg_sync! {
 }
 
 cfg_not_sync! {
-    cfg_rt_core! {
-        mod notify;
-        pub(crate) use notify::Notify;
+    #[cfg(any(feature = "fs", feature = "signal", all(unix, feature = "process")))]
+    pub(crate) mod batch_semaphore;
+
+    cfg_fs! {
+        mod mutex;
+        pub(crate) use mutex::Mutex;
     }
+
+    mod notify;
+    pub(crate) use notify::Notify;
 
     cfg_atomic_waker_impl! {
         mod task;
@@ -475,7 +480,6 @@ cfg_not_sync! {
 
     cfg_signal_internal! {
         pub(crate) mod mpsc;
-        pub(crate) mod semaphore_ll;
     }
 }
 

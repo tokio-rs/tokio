@@ -12,7 +12,6 @@ use crate::future::poll_fn;
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 use crate::net::TcpStream;
 
-use bytes::Buf;
 use std::io;
 use std::net::Shutdown;
 use std::pin::Pin;
@@ -82,7 +81,7 @@ impl ReadHalf<'_> {
     ///
     /// [`TcpStream::poll_peek`]: TcpStream::poll_peek
     pub fn poll_peek(&mut self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
-        self.0.poll_peek2(cx, buf)
+        self.0.poll_peek(cx, buf)
     }
 
     /// Receives data on the socket from the remote address to which it is
@@ -146,14 +145,6 @@ impl AsyncWrite for WriteHalf<'_> {
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
         self.0.poll_write_priv(cx, buf)
-    }
-
-    fn poll_write_buf<B: Buf>(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        self.0.poll_write_buf_priv(cx, buf)
     }
 
     #[inline]

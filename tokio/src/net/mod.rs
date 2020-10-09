@@ -23,6 +23,8 @@
 //! [`UnixDatagram`]: UnixDatagram
 
 mod addr;
+#[cfg(any(feature = "tcp", feature = "udp"))]
+pub(crate) use addr::to_socket_addrs;
 pub use addr::ToSocketAddrs;
 
 cfg_dns! {
@@ -33,6 +35,7 @@ cfg_dns! {
 cfg_tcp! {
     pub mod tcp;
     pub use tcp::listener::TcpListener;
+    pub use tcp::socket::TcpSocket;
     pub use tcp::stream::TcpStream;
 }
 

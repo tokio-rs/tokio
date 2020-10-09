@@ -4,8 +4,6 @@ use std::ffi::OsString;
 use std::fs::{FileType, Metadata};
 use std::future::Future;
 use std::io;
-#[cfg(unix)]
-use std::os::unix::fs::DirEntryExt;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::Arc;
@@ -55,8 +53,7 @@ impl ReadDir {
         poll_fn(|cx| self.poll_next_entry(cx)).await
     }
 
-    #[doc(hidden)]
-    pub fn poll_next_entry(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<Option<DirEntry>>> {
+    fn poll_next_entry(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<Option<DirEntry>>> {
         loop {
             match self.0 {
                 State::Idle(ref mut std) => {
@@ -234,11 +231,10 @@ impl DirEntry {
         let std = self.0.clone();
         asyncify(move || std.file_type()).await
     }
-}
 
-#[cfg(unix)]
-impl DirEntryExt for DirEntry {
-    fn ino(&self) -> u64 {
-        self.0.ino()
+    /// Returns a reference to the underlying `std::fs::DirEntry`
+    #[cfg(unix)]
+    pub(super) fn as_inner(&self) -> &std::fs::DirEntry {
+        &self.0
     }
 }

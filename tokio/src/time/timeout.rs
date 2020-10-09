@@ -4,7 +4,7 @@
 //!
 //! [`Timeout`]: struct@Timeout
 
-use crate::time::{delay_until, Delay, Duration, Instant};
+use crate::time::{sleep_until, Duration, Instant, Sleep};
 
 use pin_project_lite::pin_project;
 use std::fmt;
@@ -50,7 +50,7 @@ pub fn timeout<T>(duration: Duration, future: T) -> Timeout<T>
 where
     T: Future,
 {
-    let delay = Delay::new_timeout(Instant::now() + duration, duration);
+    let delay = Sleep::new_timeout(Instant::now() + duration, duration);
     Timeout::new_with_delay(future, delay)
 }
 
@@ -92,7 +92,7 @@ pub fn timeout_at<T>(deadline: Instant, future: T) -> Timeout<T>
 where
     T: Future,
 {
-    let delay = delay_until(deadline);
+    let delay = sleep_until(deadline);
 
     Timeout {
         value: future,
@@ -108,7 +108,7 @@ pin_project! {
         #[pin]
         value: T,
         #[pin]
-        delay: Delay,
+        delay: Sleep,
     }
 }
 
@@ -125,7 +125,7 @@ impl Elapsed {
 }
 
 impl<T> Timeout<T> {
-    pub(crate) fn new_with_delay(value: T, delay: Delay) -> Timeout<T> {
+    pub(crate) fn new_with_delay(value: T, delay: Sleep) -> Timeout<T> {
         Timeout { value, delay }
     }
 

@@ -53,7 +53,7 @@ fn many_signals(bench: &mut Bencher) {
         .unwrap();
 
     let spawn_signal = |kind| {
-        let mut tx = tx.clone();
+        let tx = tx.clone();
         rt.spawn(async move {
             let mut signal = signal(kind).expect("failed to create signal");
 

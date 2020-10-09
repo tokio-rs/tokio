@@ -65,8 +65,7 @@ impl<R> Split<R>
 where
     R: AsyncBufRead,
 {
-    #[doc(hidden)]
-    pub fn poll_next_segment(
+    fn poll_next_segment(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<io::Result<Option<Vec<u8>>>> {

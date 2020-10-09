@@ -30,19 +30,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let addr = env::args()
         .nth(1)
         .unwrap_or_else(|| "127.0.0.1:8080".to_string());
-    let mut server = TcpListener::bind(&addr).await?;
-    let mut incoming = server.incoming();
+    let server = TcpListener::bind(&addr).await?;
     println!("Listening on: {}", addr);
 
-    while let Some(Ok(stream)) = incoming.next().await {
+    loop {
+        let (stream, _) = server.accept().await?;
         tokio::spawn(async move {
             if let Err(e) = process(stream).await {
                 println!("failed to process connection; error = {}", e);
             }
         });
     }
-
-    Ok(())
 }
 
 async fn process(stream: TcpStream) -> Result<(), Box<dyn Error>> {

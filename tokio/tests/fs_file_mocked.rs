@@ -57,6 +57,9 @@ pub(crate) mod fs {
 
     pub(crate) use crate::support::mock_pool::asyncify;
 }
+pub(crate) mod sync {
+    pub(crate) use tokio::sync::Mutex;
+}
 use fs::sys;
 
 use tokio::prelude::*;
@@ -710,7 +713,7 @@ fn open_set_len_ok() {
     let (mock, file) = sys::File::mock();
     mock.set_len(123);
 
-    let mut file = File::from_std(file);
+    let file = File::from_std(file);
     let mut t = task::spawn(file.set_len(123));
 
     assert_pending!(t.poll());
@@ -728,7 +731,7 @@ fn open_set_len_err() {
     let (mock, file) = sys::File::mock();
     mock.set_len_err(123);
 
-    let mut file = File::from_std(file);
+    let file = File::from_std(file);
     let mut t = task::spawn(file.set_len(123));
 
     assert_pending!(t.poll());

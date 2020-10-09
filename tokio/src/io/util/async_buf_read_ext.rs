@@ -14,7 +14,7 @@ cfg_io_util! {
         /// Equivalent to:
         ///
         /// ```ignore
-        /// async fn read_until(&mut self, buf: &mut Vec<u8>) -> io::Result<usize>;
+        /// async fn read_until(&mut self, byte: u8, buf: &mut Vec<u8>) -> io::Result<usize>;
         /// ```
         ///
         /// This function will read bytes from the underlying stream until the

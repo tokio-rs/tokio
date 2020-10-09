@@ -124,7 +124,6 @@ struct State(usize);
 /// }
 /// ```
 pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
-    #[allow(deprecated)]
     let inner = Arc::new(Inner {
         state: AtomicUsize::new(State::new().as_usize()),
         value: UnsafeCell::new(None),
@@ -197,8 +196,7 @@ impl<T> Sender<T> {
         Ok(())
     }
 
-    #[doc(hidden)] // TODO: remove
-    pub fn poll_closed(&mut self, cx: &mut Context<'_>) -> Poll<()> {
+    fn poll_closed(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         // Keep track of task budget
         let coop = ready!(crate::coop::poll_proceed(cx));
 

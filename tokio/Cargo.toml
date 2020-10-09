@@ -50,19 +50,17 @@ full = [
 blocking = ["rt-core"]
 dns = ["rt-core"]
 fs = ["rt-core", "io-util"]
-io-driver = ["mio", "lazy_static"] # internal only
-io-readiness = [] # internal only
 io-util = ["memchr"]
 # stdin, stdout, stderr
 io-std = ["rt-core"]
 macros = ["tokio-macros"]
 net = ["dns", "tcp", "udp", "uds"]
 process = [
-  "io-driver",
   "lazy_static",
   "libc",
-  "mio-named-pipes",
-  "mio-uds",
+  "mio/os-poll",
+  "mio/os-util",
+  "mio/uds",
   "signal-hook-registry",
   "winapi/threadpoollegacyapiset",
 ]
@@ -74,20 +72,20 @@ rt-threaded = [
   "rt-core",
 ]
 signal = [
-  "io-driver",
   "lazy_static",
   "libc",
-  "mio-uds",
+  "mio/os-poll",
+  "mio/uds",
   "signal-hook-registry",
   "winapi/consoleapi",
 ]
 stream = ["futures-core"]
 sync = ["fnv"]
 test-util = []
-tcp = ["io-driver", "iovec"]
-time = ["slab"]
-udp = ["io-driver", "io-readiness"]
-uds = ["io-driver", "io-readiness", "mio-uds", "libc"]
+tcp = ["lazy_static", "mio/tcp", "mio/os-poll"]
+time = []
+udp = ["lazy_static", "mio/udp", "mio/os-poll"]
+uds = ["lazy_static", "libc", "mio/uds", "mio/os-poll"]
 
 [dependencies]
 tokio-macros = { version = "0.3.0", path = "../tokio-macros", optional = true }
@@ -100,20 +98,15 @@ fnv = { version = "1.0.6", optional = true }
 futures-core = { version = "0.3.0", optional = true }
 lazy_static = { version = "1.0.2", optional = true }
 memchr = { version = "2.2", optional = true }
-mio = { version = "0.6.20", optional = true }
-iovec = { version = "0.1.4", optional = true }
+mio = { version = "0.7.3", optional = true }
 num_cpus = { version = "1.8.0", optional = true }
 parking_lot = { version = "0.11.0", optional = true } # Not in full
-slab = { version = "0.4.1", optional = true } # Backs `DelayQueue`
+slab = { version = "0.4.1", optional = true }
 tracing = { version = "0.1.16", default-features = false, features = ["std"], optional = true } # Not in full
 
 [target.'cfg(unix)'.dependencies]
-mio-uds = { version = "0.6.5", optional = true }
 libc = { version = "0.2.42", optional = true }
 signal-hook-registry = { version = "1.1.1", optional = true }
-
-[target.'cfg(windows)'.dependencies]
-mio-named-pipes = { version = "0.1.6", optional = true }
 
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3.8"

@@ -1,6 +1,6 @@
 #![warn(rust_2018_idioms)]
 
-use tokio::time::{delay_until, Duration, Instant};
+use tokio::time::{sleep_until, Duration, Instant};
 use tokio_test::block_on;
 
 #[test]
@@ -18,10 +18,10 @@ fn async_fn() {
 }
 
 #[test]
-fn test_delay() {
+fn test_sleep() {
     let deadline = Instant::now() + Duration::from_millis(100);
 
     block_on(async {
-        delay_until(deadline).await;
+        sleep_until(deadline).await;
     });
 }

@@ -37,6 +37,12 @@ cfg_io_util! {
         /// Creates a future which will seek an IO object, and then yield the
         /// new position in the object and the object itself.
         ///
+        /// Equivalent to:
+        ///
+        /// ```ignore
+        /// async fn seek(&mut self, pos: SeekFrom) -> io::Result<u64>;
+        /// ```
+        ///
         /// In the case of an error the buffer and the object will be discarded, with
         /// the error yielded.
         ///

@@ -31,7 +31,7 @@ fn create_100_000_medium(b: &mut Bencher) {
 
 fn send_medium(b: &mut Bencher) {
     b.iter(|| {
-        let (mut tx, mut rx) = mpsc::channel::<Medium>(1000);
+        let (tx, mut rx) = mpsc::channel::<Medium>(1000);
 
         let _ = tx.try_send([0; 64]);
 
@@ -41,7 +41,7 @@ fn send_medium(b: &mut Bencher) {
 
 fn send_large(b: &mut Bencher) {
     b.iter(|| {
-        let (mut tx, mut rx) = mpsc::channel::<Large>(1000);
+        let (tx, mut rx) = mpsc::channel::<Large>(1000);
 
         let _ = tx.try_send([[0; 64]; 64]);
 
@@ -57,7 +57,7 @@ fn contention_bounded(b: &mut Bencher) {
             let (tx, mut rx) = mpsc::channel::<usize>(1_000_000);
 
             for _ in 0..5 {
-                let mut tx = tx.clone();
+                let tx = tx.clone();
                 tokio::spawn(async move {
                     for i in 0..1000 {
                         tx.send(i).await.unwrap();
@@ -80,7 +80,7 @@ fn contention_bounded_full(b: &mut Bencher) {
             let (tx, mut rx) = mpsc::channel::<usize>(100);
 
             for _ in 0..5 {
-                let mut tx = tx.clone();
+                let tx = tx.clone();
                 tokio::spawn(async move {
                     for i in 0..1000 {
                         tx.send(i).await.unwrap();
@@ -123,7 +123,7 @@ fn uncontented_bounded(b: &mut Bencher) {
 
     b.iter(|| {
         rt.block_on(async move {
-            let (mut tx, mut rx) = mpsc::channel::<usize>(1_000_000);
+            let (tx, mut rx) = mpsc::channel::<usize>(1_000_000);
 
             for i in 0..5000 {
                 tx.send(i).await.unwrap();

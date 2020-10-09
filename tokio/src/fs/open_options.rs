@@ -383,8 +383,7 @@ impl OpenOptions {
         Ok(File::from_std(std))
     }
 
-    /// Returns a mutable reference to the the underlying std::fs::OpenOptions
-    #[cfg(unix)]
+    /// Returns a mutable reference to the underlying `std::fs::OpenOptions`
     pub(super) fn as_inner_mut(&mut self) -> &mut std::fs::OpenOptions {
         &mut self.0
     }

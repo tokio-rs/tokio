@@ -6,6 +6,7 @@ mod atomic_u32;
 mod atomic_u64;
 mod atomic_u8;
 mod atomic_usize;
+mod mutex;
 #[cfg(feature = "parking_lot")]
 mod parking_lot;
 mod unsafe_cell;
@@ -14,7 +15,14 @@ pub(crate) mod cell {
     pub(crate) use super::unsafe_cell::UnsafeCell;
 }
 
-#[cfg(any(feature = "sync", feature = "io-driver"))]
+#[cfg(any(
+    feature = "process",
+    feature = "signal",
+    feature = "sync",
+    feature = "tcp",
+    feature = "udp",
+    feature = "uds",
+))]
 pub(crate) mod future {
     pub(crate) use crate::sync::AtomicWaker;
 }
@@ -55,9 +63,10 @@ pub(crate) mod sync {
 
     #[cfg(not(feature = "parking_lot"))]
     #[allow(unused_imports)]
-    pub(crate) use std::sync::{
-        Condvar, Mutex, MutexGuard, RwLock, RwLockReadGuard, WaitTimeoutResult,
-    };
+    pub(crate) use std::sync::{Condvar, MutexGuard, RwLock, RwLockReadGuard, WaitTimeoutResult};
+
+    #[cfg(not(feature = "parking_lot"))]
+    pub(crate) use crate::loom::std::mutex::Mutex;
 
     pub(crate) mod atomic {
         pub(crate) use crate::loom::std::atomic_ptr::AtomicPtr;

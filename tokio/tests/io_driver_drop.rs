@@ -9,7 +9,7 @@ use tokio_test::{assert_err, assert_pending, assert_ready, task};
 fn tcp_doesnt_block() {
     let rt = rt();
 
-    let mut listener = rt.enter(|| {
+    let listener = rt.enter(|| {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         TcpListener::from_std(listener).unwrap()
     });
@@ -27,7 +27,7 @@ fn tcp_doesnt_block() {
 fn drop_wakes() {
     let rt = rt();
 
-    let mut listener = rt.enter(|| {
+    let listener = rt.enter(|| {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         TcpListener::from_std(listener).unwrap()
     });

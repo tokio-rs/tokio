@@ -1,5 +1,4 @@
 use super::ReadBuf;
-use bytes::BufMut;
 use std::io;
 use std::ops::DerefMut;
 use std::pin::Pin;
@@ -54,36 +53,6 @@ pub trait AsyncRead {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>>;
-
-    /// Pulls some bytes from this source into the specified `BufMut`, returning
-    /// how many bytes were read.
-    ///
-    /// The `buf` provided will have bytes read into it and the internal cursor
-    /// will be advanced if any bytes were read. Note that this method typically
-    /// will not reallocate the buffer provided.
-    fn poll_read_buf<B: BufMut>(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>>
-    where
-        Self: Sized,
-    {
-        if !buf.has_remaining_mut() {
-            return Poll::Ready(Ok(0));
-        }
-
-        let mut b = ReadBuf::uninit(buf.bytes_mut());
-
-        ready!(self.poll_read(cx, &mut b))?;
-        let n = b.filled().len();
-
-        // Safety: we can assume `n` bytes were read, since they are in`filled`.
-        unsafe {
-            buf.advance_mut(n);
-        }
-        Poll::Ready(Ok(n))
-    }
 }
 
 macro_rules! deref_async_read {

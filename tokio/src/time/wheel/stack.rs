@@ -1,26 +1,112 @@
-use std::borrow::Borrow;
+use super::{Item, OwnedItem};
+use crate::time::driver::Entry;
 
-/// Abstracts the stack operations needed to track timeouts.
-pub(crate) trait Stack: Default {
-    /// Type of the item stored in the stack
-    type Owned: Borrow<Self::Borrowed>;
+use std::ptr;
 
-    /// Borrowed item
-    type Borrowed;
+/// A doubly linked stack
+#[derive(Debug)]
+pub(crate) struct Stack {
+    head: Option<OwnedItem>,
+}
 
-    /// Item storage, this allows a slab to be used instead of just the heap
-    type Store;
+impl Default for Stack {
+    fn default() -> Stack {
+        Stack { head: None }
+    }
+}
 
-    /// Returns `true` if the stack is empty
-    fn is_empty(&self) -> bool;
+impl Stack {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.head.is_none()
+    }
 
-    /// Push an item onto the stack
-    fn push(&mut self, item: Self::Owned, store: &mut Self::Store);
+    pub(crate) fn push(&mut self, entry: OwnedItem) {
+        // Get a pointer to the entry to for the prev link
+        let ptr: *const Entry = &*entry as *const _;
 
-    /// Pop an item from the stack
-    fn pop(&mut self, store: &mut Self::Store) -> Option<Self::Owned>;
+        // Remove the old head entry
+        let old = self.head.take();
 
-    fn remove(&mut self, item: &Self::Borrowed, store: &mut Self::Store);
+        unsafe {
+            // Ensure the entry is not already in a stack.
+            debug_assert!((*entry.next_stack.get()).is_none());
+            debug_assert!((*entry.prev_stack.get()).is_null());
 
-    fn when(item: &Self::Borrowed, store: &Self::Store) -> u64;
+            if let Some(ref entry) = old.as_ref() {
+                debug_assert!({
+                    // The head is not already set to the entry
+                    ptr != &***entry as *const _
+                });
+
+                // Set the previous link on the old head
+                *entry.prev_stack.get() = ptr;
+            }
+
+            // Set this entry's next pointer
+            *entry.next_stack.get() = old;
+        }
+
+        // Update the head pointer
+        self.head = Some(entry);
+    }
+
+    /// Pops an item from the stack
+    pub(crate) fn pop(&mut self) -> Option<OwnedItem> {
+        let entry = self.head.take();
+
+        unsafe {
+            if let Some(entry) = entry.as_ref() {
+                self.head = (*entry.next_stack.get()).take();
+
+                if let Some(entry) = self.head.as_ref() {
+                    *entry.prev_stack.get() = ptr::null();
+                }
+
+                *entry.prev_stack.get() = ptr::null();
+            }
+        }
+
+        entry
+    }
+
+    pub(crate) fn remove(&mut self, entry: &Item) {
+        unsafe {
+            // Ensure that the entry is in fact contained by the stack
+            debug_assert!({
+                // This walks the full linked list even if an entry is found.
+                let mut next = self.head.as_ref();
+                let mut contains = false;
+
+                while let Some(n) = next {
+                    if entry as *const _ == &**n as *const _ {
+                        debug_assert!(!contains);
+                        contains = true;
+                    }
+
+                    next = (*n.next_stack.get()).as_ref();
+                }
+
+                contains
+            });
+
+            // Unlink `entry` from the next node
+            let next = (*entry.next_stack.get()).take();
+
+            if let Some(next) = next.as_ref() {
+                (*next.prev_stack.get()) = *entry.prev_stack.get();
+            }
+
+            // Unlink `entry` from the prev node
+
+            if let Some(prev) = (*entry.prev_stack.get()).as_ref() {
+                *prev.next_stack.get() = next;
+            } else {
+                // It is the head
+                self.head = next;
+            }
+
+            // Unset the prev pointer
+            *entry.prev_stack.get() = ptr::null();
+        }
+    }
 }

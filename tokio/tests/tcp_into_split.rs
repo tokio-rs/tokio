@@ -13,7 +13,7 @@ use tokio::try_join;
 async fn split() -> Result<()> {
     const MSG: &[u8] = b"split";
 
-    let mut listener = TcpListener::bind("127.0.0.1:0").await?;
+    let listener = TcpListener::bind("127.0.0.1:0").await?;
     let addr = listener.local_addr()?;
 
     let (stream1, (mut stream2, _)) = try_join! {

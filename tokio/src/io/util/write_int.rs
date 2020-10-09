@@ -4,6 +4,7 @@ use bytes::BufMut;
 use pin_project_lite::pin_project;
 use std::future::Future;
 use std::io;
+use std::marker::PhantomPinned;
 use std::mem::size_of;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -15,20 +16,25 @@ macro_rules! writer {
     ($name:ident, $ty:ty, $writer:ident, $bytes:expr) => {
         pin_project! {
             #[doc(hidden)]
+            #[must_use = "futures do nothing unless you `.await` or poll them"]
             pub struct $name<W> {
                 #[pin]
                 dst: W,
                 buf: [u8; $bytes],
                 written: u8,
+                // Make this future `!Unpin` for compatibility with async trait methods.
+                #[pin]
+                _pin: PhantomPinned,
             }
         }
 
         impl<W> $name<W> {
             pub(crate) fn new(w: W, value: $ty) -> Self {
-                let mut writer = $name {
+                let mut writer = Self {
                     buf: [0; $bytes],
                     written: 0,
                     dst: w,
+                    _pin: PhantomPinned,
                 };
                 BufMut::$writer(&mut &mut writer.buf[..], value);
                 writer
@@ -72,16 +78,24 @@ macro_rules! writer8 {
     ($name:ident, $ty:ty) => {
         pin_project! {
             #[doc(hidden)]
+            #[must_use = "futures do nothing unless you `.await` or poll them"]
             pub struct $name<W> {
                 #[pin]
                 dst: W,
                 byte: $ty,
+                // Make this future `!Unpin` for compatibility with async trait methods.
+                #[pin]
+                _pin: PhantomPinned,
             }
         }
 
         impl<W> $name<W> {
             pub(crate) fn new(dst: W, byte: $ty) -> Self {
-                Self { dst, byte }
+                Self {
+                    dst,
+                    byte,
+                    _pin: PhantomPinned,
+                }
             }
         }
 

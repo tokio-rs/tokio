@@ -50,12 +50,12 @@ impl Instant {
     /// # Examples
     ///
     /// ```
-    /// use tokio::time::{Duration, Instant, delay_for};
+    /// use tokio::time::{Duration, Instant, sleep};
     ///
     /// #[tokio::main]
     /// async fn main() {
     ///     let now = Instant::now();
-    ///     delay_for(Duration::new(1, 0)).await;
+    ///     sleep(Duration::new(1, 0)).await;
     ///     let new_now = Instant::now();
     ///     println!("{:?}", new_now.checked_duration_since(now));
     ///     println!("{:?}", now.checked_duration_since(new_now)); // None
@@ -71,12 +71,12 @@ impl Instant {
     /// # Examples
     ///
     /// ```
-    /// use tokio::time::{Duration, Instant, delay_for};
+    /// use tokio::time::{Duration, Instant, sleep};
     ///
     /// #[tokio::main]
     /// async fn main() {
     ///     let now = Instant::now();
-    ///     delay_for(Duration::new(1, 0)).await;
+    ///     sleep(Duration::new(1, 0)).await;
     ///     let new_now = Instant::now();
     ///     println!("{:?}", new_now.saturating_duration_since(now));
     ///     println!("{:?}", now.saturating_duration_since(new_now)); // 0ns
@@ -97,13 +97,13 @@ impl Instant {
     /// # Examples
     ///
     /// ```
-    /// use tokio::time::{Duration, Instant, delay_for};
+    /// use tokio::time::{Duration, Instant, sleep};
     ///
     /// #[tokio::main]
     /// async fn main() {
     ///     let instant = Instant::now();
     ///     let three_secs = Duration::from_secs(3);
-    ///     delay_for(three_secs).await;
+    ///     sleep(three_secs).await;
     ///     assert!(instant.elapsed() >= three_secs);
     /// }
     /// ```
