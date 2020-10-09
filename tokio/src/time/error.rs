@@ -1,3 +1,5 @@
+//! Time error types
+
 use self::Kind::*;
 use std::error;
 use std::fmt;

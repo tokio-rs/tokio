@@ -4,7 +4,7 @@
 //!
 //! [`Timeout`]: struct@Timeout
 
-use crate::time::{sleep_until, Duration, Elapsed, Instant, Sleep};
+use crate::time::{error::Elapsed, sleep_until, Duration, Instant, Sleep};
 
 use pin_project_lite::pin_project;
 use std::future::Future;

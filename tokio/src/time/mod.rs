@@ -98,8 +98,7 @@ pub use sleep::{sleep, sleep_until, Sleep};
 
 pub(crate) mod driver;
 
-mod error;
-pub use error::{Elapsed, Error};
+pub mod error;
 
 mod instant;
 pub use self::instant::Instant;

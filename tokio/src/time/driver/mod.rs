@@ -11,7 +11,7 @@ pub(crate) use self::handle::Handle;
 
 use crate::loom::sync::atomic::{AtomicU64, AtomicUsize};
 use crate::park::{Park, Unpark};
-use crate::time::{wheel, Error};
+use crate::time::{error::Error, wheel};
 use crate::time::{Clock, Duration, Instant};
 
 use std::sync::atomic::Ordering::{Acquire, Relaxed, Release, SeqCst};
