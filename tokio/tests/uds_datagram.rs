@@ -78,7 +78,7 @@ async fn try_send_recv_never_block() -> io::Result<()> {
     let payload = b"PAYLOAD";
     let mut count = 0;
 
-    let (mut dgram1, mut dgram2) = UnixDatagram::pair()?;
+    let (dgram1, dgram2) = UnixDatagram::pair()?;
 
     // Send until we hit the OS `net.unix.max_dgram_qlen`.
     loop {

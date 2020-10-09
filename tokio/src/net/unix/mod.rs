@@ -2,11 +2,7 @@
 
 pub mod datagram;
 
-mod incoming;
-pub use incoming::Incoming;
-
 pub(crate) mod listener;
-pub(crate) use listener::UnixListener;
 
 mod split;
 pub use split::{ReadHalf, WriteHalf};

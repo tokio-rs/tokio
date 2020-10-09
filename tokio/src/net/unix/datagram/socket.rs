@@ -314,7 +314,7 @@ impl UnixDatagram {
     /// let bytes = b"bytes";
     /// // We use a socket pair so that they are assigned
     /// // each other as a peer.
-    /// let (mut first, mut second) = UnixDatagram::pair()?;
+    /// let (first, second) = UnixDatagram::pair()?;
     ///
     /// let size = first.try_send(bytes)?;
     /// assert_eq!(size, bytes.len());
@@ -327,7 +327,7 @@ impl UnixDatagram {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn try_send(&mut self, buf: &[u8]) -> io::Result<usize> {
+    pub fn try_send(&self, buf: &[u8]) -> io::Result<usize> {
         self.io.get_ref().send(buf)
     }
 
@@ -346,10 +346,10 @@ impl UnixDatagram {
     /// let tmp = tempdir().unwrap();
     ///
     /// let server_path = tmp.path().join("server");
-    /// let mut server = UnixDatagram::bind(&server_path)?;
+    /// let server = UnixDatagram::bind(&server_path)?;
     ///
     /// let client_path = tmp.path().join("client");
-    /// let mut client = UnixDatagram::bind(&client_path)?;
+    /// let client = UnixDatagram::bind(&client_path)?;
     ///
     /// let size = client.try_send_to(bytes, &server_path)?;
     /// assert_eq!(size, bytes.len());
@@ -363,7 +363,7 @@ impl UnixDatagram {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn try_send_to<P>(&mut self, buf: &[u8], target: P) -> io::Result<usize>
+    pub fn try_send_to<P>(&self, buf: &[u8], target: P) -> io::Result<usize>
     where
         P: AsRef<Path>,
     {
@@ -413,7 +413,7 @@ impl UnixDatagram {
     /// let bytes = b"bytes";
     /// // We use a socket pair so that they are assigned
     /// // each other as a peer.
-    /// let (mut first, mut second) = UnixDatagram::pair()?;
+    /// let (first, second) = UnixDatagram::pair()?;
     ///
     /// let size = first.try_send(bytes)?;
     /// assert_eq!(size, bytes.len());
@@ -426,7 +426,7 @@ impl UnixDatagram {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn try_recv(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+    pub fn try_recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.io.get_ref().recv(buf)
     }
 
@@ -531,10 +531,10 @@ impl UnixDatagram {
     /// let tmp = tempdir().unwrap();
     ///
     /// let server_path = tmp.path().join("server");
-    /// let mut server = UnixDatagram::bind(&server_path)?;
+    /// let server = UnixDatagram::bind(&server_path)?;
     ///
     /// let client_path = tmp.path().join("client");
-    /// let mut client = UnixDatagram::bind(&client_path)?;
+    /// let client = UnixDatagram::bind(&client_path)?;
     ///
     /// let size = client.try_send_to(bytes, &server_path)?;
     /// assert_eq!(size, bytes.len());
@@ -548,7 +548,7 @@ impl UnixDatagram {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn try_recv_from(&mut self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+    pub fn try_recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         let (n, addr) = self.io.get_ref().recv_from(buf)?;
         Ok((n, SocketAddr(addr)))
     }
