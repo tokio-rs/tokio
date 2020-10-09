@@ -289,8 +289,7 @@ mod tests {
     }
 
     fn rt() -> Runtime {
-        crate::runtime::Builder::new()
-            .core_threads(0)
+        crate::runtime::Builder::new_current_thread()
             .build()
             .unwrap()
     }
