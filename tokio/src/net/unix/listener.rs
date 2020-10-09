@@ -98,7 +98,7 @@ impl UnixListener {
     }
 
     /// Accepts a new incoming connection to this listener.
-    pub async fn accept(&mut self) -> io::Result<(UnixStream, SocketAddr)> {
+    pub async fn accept(&self) -> io::Result<(UnixStream, SocketAddr)> {
         let (mio, addr) = self
             .io
             .async_io(mio::Interest::READABLE, |sock| sock.accept())
