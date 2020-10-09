@@ -43,7 +43,6 @@ cfg_rt_threaded! {
     /// });
     /// # }
     /// ```
-    #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
     pub fn block_in_place<F, R>(f: F) -> R
     where
         F: FnOnce() -> R,

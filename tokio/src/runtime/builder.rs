@@ -3,7 +3,6 @@ use crate::runtime::{blocking, driver, Callback, Runtime, Spawner};
 
 use std::fmt;
 use std::io;
-#[cfg(feature = "blocking")]
 use std::time::Duration;
 
 /// Builds Tokio Runtime with custom configuration values.
@@ -66,8 +65,6 @@ pub struct Builder {
     /// To run before each worker thread stops
     pub(super) before_stop: Option<Callback>,
 
-    #[cfg(feature = "blocking")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
     /// Customizable keep alive timeout for BlockingPool
     pub(super) keep_alive: Option<Duration>,
 }
@@ -127,7 +124,6 @@ impl Builder {
             after_start: None,
             before_stop: None,
 
-            #[cfg(feature = "blocking")]
             keep_alive: None,
         }
     }
@@ -403,8 +399,6 @@ impl Builder {
         }
     }
 
-    #[cfg(feature = "blocking")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
     /// Sets a custom timeout for a thread in the blocking pool.
     ///
     /// By default, the timeout for a thread is set to 10 seconds. This can
