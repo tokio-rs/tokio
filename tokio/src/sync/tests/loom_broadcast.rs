@@ -92,11 +92,12 @@ fn broadcast_two() {
     });
 }
 
+// Exercise the Receiver Clone impl as well
 #[test]
 fn broadcast_wrap() {
     loom::model(|| {
         let (tx, mut rx1) = broadcast::channel(2);
-        let mut rx2 = tx.subscribe();
+        let mut rx2 = rx1.clone();
 
         let th1 = thread::spawn(move || {
             block_on(async {
