@@ -25,7 +25,7 @@
 //! provides a few major components:
 //!
 //! * Tools for [working with asynchronous tasks][tasks], including
-//!   [synchronization primitives and channels][sync] and [timeouts, delays, and
+//!   [synchronization primitives and channels][sync] and [timeouts, sleeps, and
 //!   intervals][time].
 //! * APIs for [performing asynchronous I/O][io], including [TCP and UDP][net] sockets,
 //!   [filesystem][fs] operations, and [process] and [signal] management.
@@ -183,13 +183,13 @@
 //!
 //! The [`tokio::time`] module provides utilities for tracking time and
 //! scheduling work. This includes functions for setting [timeouts][timeout] for
-//! tasks, [delaying][delay] work to run in the future, or [repeating an operation at an
+//! tasks, [sleeping][sleep] work to run in the future, or [repeating an operation at an
 //! interval][interval].
 //!
 //! In order to use `tokio::time`, the "time" feature flag must be enabled.
 //!
 //! [`tokio::time`]: crate::time
-//! [delay]: crate::time::sleep()
+//! [sleep]: crate::time::sleep()
 //! [interval]: crate::time::interval()
 //! [timeout]: crate::time::timeout()
 //!

@@ -3,7 +3,7 @@
 //! This module provides a number of types for executing code after a set period
 //! of time.
 //!
-//! * `Delay` is a future that does no work and completes at a specific `Instant`
+//! * `Sleep` is a future that does no work and completes at a specific `Instant`
 //!   in time.
 //!
 //! * `Interval` is a stream yielding a value at a fixed period. It is
@@ -93,8 +93,8 @@ pub(crate) use self::clock::Clock;
 #[cfg(feature = "test-util")]
 pub use clock::{advance, pause, resume};
 
-mod delay;
-pub use delay::{sleep, sleep_until, Delay};
+mod sleep;
+pub use sleep::{sleep, sleep_until, Sleep};
 
 pub(crate) mod driver;
 

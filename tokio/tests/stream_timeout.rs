@@ -6,7 +6,7 @@ use tokio_test::*;
 
 use futures::StreamExt as _;
 
-async fn maybe_delay(idx: i32) -> i32 {
+async fn maybe_sleep(idx: i32) -> i32 {
     if idx % 2 == 0 {
         sleep(ms(200)).await;
     }
@@ -26,7 +26,7 @@ async fn basic_usage() {
     //
     // [Ok(1), Err(Elapsed), Ok(2), Ok(3), Err(Elapsed), Ok(4)]
 
-    let stream = stream::iter(1..=4).then(maybe_delay).timeout(ms(100));
+    let stream = stream::iter(1..=4).then(maybe_sleep).timeout(ms(100));
     let mut stream = task::spawn(stream);
 
     // First item completes immediately
@@ -68,7 +68,7 @@ async fn basic_usage() {
 async fn return_elapsed_errors_only_once() {
     time::pause();
 
-    let stream = stream::iter(1..=3).then(maybe_delay).timeout(ms(50));
+    let stream = stream::iter(1..=3).then(maybe_sleep).timeout(ms(50));
     let mut stream = task::spawn(stream);
 
     // First item completes immediately
@@ -97,7 +97,7 @@ async fn return_elapsed_errors_only_once() {
 #[tokio::test]
 async fn no_timeouts() {
     let stream = stream::iter(vec![1, 3, 5])
-        .then(maybe_delay)
+        .then(maybe_sleep)
         .timeout(ms(100));
 
     let mut stream = task::spawn(stream);

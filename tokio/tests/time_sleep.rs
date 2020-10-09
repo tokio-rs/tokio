@@ -20,7 +20,7 @@ macro_rules! assert_elapsed {
 }
 
 #[tokio::test]
-async fn immediate_delay() {
+async fn immediate_sleep() {
     time::pause();
 
     let now = Instant::now();
@@ -31,7 +31,7 @@ async fn immediate_delay() {
 }
 
 #[tokio::test]
-async fn delayed_delay_level_0() {
+async fn delayed_sleep_level_0() {
     time::pause();
 
     for &i in &[1, 10, 60] {
@@ -44,7 +44,7 @@ async fn delayed_delay_level_0() {
 }
 
 #[tokio::test]
-async fn sub_ms_delayed_delay() {
+async fn sub_ms_delayed_sleep() {
     time::pause();
 
     for _ in 0..5 {
@@ -58,7 +58,7 @@ async fn sub_ms_delayed_delay() {
 }
 
 #[tokio::test]
-async fn delayed_delay_wrapping_level_0() {
+async fn delayed_sleep_wrapping_level_0() {
     time::pause();
 
     time::sleep(ms(5)).await;
@@ -70,96 +70,96 @@ async fn delayed_delay_wrapping_level_0() {
 }
 
 #[tokio::test]
-async fn reset_future_delay_before_fire() {
+async fn reset_future_sleep_before_fire() {
     time::pause();
 
     let now = Instant::now();
 
-    let mut delay = task::spawn(time::sleep_until(now + ms(100)));
-    assert_pending!(delay.poll());
+    let mut sleep = task::spawn(time::sleep_until(now + ms(100)));
+    assert_pending!(sleep.poll());
 
-    let mut delay = delay.into_inner();
+    let mut sleep = sleep.into_inner();
 
-    delay.reset(Instant::now() + ms(200));
-    delay.await;
+    sleep.reset(Instant::now() + ms(200));
+    sleep.await;
 
     assert_elapsed!(now, 200);
 }
 
 #[tokio::test]
-async fn reset_past_delay_before_turn() {
+async fn reset_past_sleep_before_turn() {
     time::pause();
 
     let now = Instant::now();
 
-    let mut delay = task::spawn(time::sleep_until(now + ms(100)));
-    assert_pending!(delay.poll());
+    let mut sleep = task::spawn(time::sleep_until(now + ms(100)));
+    assert_pending!(sleep.poll());
 
-    let mut delay = delay.into_inner();
+    let mut sleep = sleep.into_inner();
 
-    delay.reset(now + ms(80));
-    delay.await;
+    sleep.reset(now + ms(80));
+    sleep.await;
 
     assert_elapsed!(now, 80);
 }
 
 #[tokio::test]
-async fn reset_past_delay_before_fire() {
+async fn reset_past_sleep_before_fire() {
     time::pause();
 
     let now = Instant::now();
 
-    let mut delay = task::spawn(time::sleep_until(now + ms(100)));
-    assert_pending!(delay.poll());
+    let mut sleep = task::spawn(time::sleep_until(now + ms(100)));
+    assert_pending!(sleep.poll());
 
-    let mut delay = delay.into_inner();
+    let mut sleep = sleep.into_inner();
 
     time::sleep(ms(10)).await;
 
-    delay.reset(now + ms(80));
-    delay.await;
+    sleep.reset(now + ms(80));
+    sleep.await;
 
     assert_elapsed!(now, 80);
 }
 
 #[tokio::test]
-async fn reset_future_delay_after_fire() {
+async fn reset_future_sleep_after_fire() {
     time::pause();
 
     let now = Instant::now();
-    let mut delay = time::sleep_until(now + ms(100));
+    let mut sleep = time::sleep_until(now + ms(100));
 
-    (&mut delay).await;
+    (&mut sleep).await;
     assert_elapsed!(now, 100);
 
-    delay.reset(now + ms(110));
-    delay.await;
+    sleep.reset(now + ms(110));
+    sleep.await;
     assert_elapsed!(now, 110);
 }
 
 #[tokio::test]
-async fn reset_delay_to_past() {
+async fn reset_sleep_to_past() {
     time::pause();
 
     let now = Instant::now();
 
-    let mut delay = task::spawn(time::sleep_until(now + ms(100)));
-    assert_pending!(delay.poll());
+    let mut sleep = task::spawn(time::sleep_until(now + ms(100)));
+    assert_pending!(sleep.poll());
 
     time::sleep(ms(50)).await;
 
-    assert!(!delay.is_woken());
+    assert!(!sleep.is_woken());
 
-    delay.reset(now + ms(40));
+    sleep.reset(now + ms(40));
 
-    assert!(delay.is_woken());
+    assert!(sleep.is_woken());
 
-    assert_ready!(delay.poll());
+    assert_ready!(sleep.poll());
 }
 
 #[test]
 #[should_panic]
-fn creating_delay_outside_of_context() {
+fn creating_sleep_outside_of_context() {
     let now = Instant::now();
 
     // This creates a delay outside of the context of a mock timer. This tests

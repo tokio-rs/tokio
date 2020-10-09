@@ -1,5 +1,5 @@
 use crate::stream::{Fuse, Stream};
-use crate::time::{Delay, Elapsed, Instant};
+use crate::time::{Elapsed, Instant, Sleep};
 
 use core::future::Future;
 use core::pin::Pin;
@@ -14,7 +14,7 @@ pin_project! {
     pub struct Timeout<S> {
         #[pin]
         stream: Fuse<S>,
-        deadline: Delay,
+        deadline: Sleep,
         duration: Duration,
         poll_deadline: bool,
     }
@@ -23,7 +23,7 @@ pin_project! {
 impl<S: Stream> Timeout<S> {
     pub(super) fn new(stream: S, duration: Duration) -> Self {
         let next = Instant::now() + duration;
-        let deadline = Delay::new_timeout(next, duration);
+        let deadline = Sleep::new_timeout(next, duration);
 
         Timeout {
             stream: Fuse::new(stream),

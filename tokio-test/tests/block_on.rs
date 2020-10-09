@@ -18,7 +18,7 @@ fn async_fn() {
 }
 
 #[test]
-fn test_delay() {
+fn test_sleep() {
     let deadline = Instant::now() + Duration::from_millis(100);
 
     block_on(async {
