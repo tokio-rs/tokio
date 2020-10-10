@@ -43,8 +43,8 @@ fn closing_unbounded_tx() {
 #[test]
 fn closing_bounded_rx() {
     loom::model(|| {
-        let (mut tx1, rx) = mpsc::channel::<()>(16);
-        let mut tx2 = tx1.clone();
+        let (tx1, rx) = mpsc::channel::<()>(16);
+        let tx2 = tx1.clone();
         thread::spawn(move || {
             drop(rx);
         });
@@ -57,8 +57,8 @@ fn closing_bounded_rx() {
 #[test]
 fn closing_unbounded_rx() {
     loom::model(|| {
-        let (mut tx1, rx) = mpsc::unbounded_channel::<()>();
-        let mut tx2 = tx1.clone();
+        let (tx1, rx) = mpsc::unbounded_channel::<()>();
+        let tx2 = tx1.clone();
         thread::spawn(move || {
             drop(rx);
         });
