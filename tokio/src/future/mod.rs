@@ -9,8 +9,10 @@ pub(crate) mod maybe_done;
 mod poll_fn;
 pub use poll_fn::poll_fn;
 
-mod ready;
-pub(crate) use ready::{ok, Ready};
+cfg_not_loom! {
+    mod ready;
+    pub(crate) use ready::{ok, Ready};
+}
 
 cfg_process! {
     mod try_join;
