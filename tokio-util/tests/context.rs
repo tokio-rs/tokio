@@ -7,11 +7,16 @@ use tokio_util::context::RuntimeExt;
 
 #[test]
 fn tokio_context_with_another_runtime() {
-    let rt1 = Builder::new_single_thread()
+    let rt1 = Builder::new_multi_thread()
+        .worker_threads(1)
         // no timer!
         .build()
         .unwrap();
-    let rt2 = Builder::new_single_thread().enable_all().build().unwrap();
+    let rt2 = Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_all()
+        .build()
+        .unwrap();
 
     // Without the `HandleExt.wrap()` there would be a panic because there is
     // no timer running, since it would be referencing runtime r1.
