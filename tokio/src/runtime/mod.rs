@@ -69,7 +69,7 @@
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Create the runtime
-//!     let rt  = Runtime::new_multi_thread()?;
+//!     let rt  = Runtime::new()?;
 //!
 //!     // Spawn the root task
 //!     rt.block_on(async {
@@ -144,7 +144,7 @@
 //! use tokio::runtime;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let threaded_rt = runtime::Runtime::new_multi_thread()?;
+//! let threaded_rt = runtime::Runtime::new()?;
 //! # Ok(()) }
 //! ```
 //!
@@ -233,19 +233,19 @@ cfg_rt_core! {
 
     /// The Tokio runtime.
     ///
-    /// The runtime provides an I/O driver, task scheduler, [timer], and blocking
-    /// pool, necessary for running asynchronous tasks.
+    /// The runtime provides an I/O driver, task scheduler, [timer], and
+    /// blocking pool, necessary for running asynchronous tasks.
     ///
-    /// Instances of `Runtime` can be created using [`new_multi_thread`], [`new_current_thread`],
-    /// [`new_single_thread`], or [`Builder`]. However, most users will use the `#[tokio::main]`
-    /// annotation on their entry point instead.
+    /// Instances of `Runtime` can be created using [`new`], or [`Builder`].
+    /// However, most users will use the `#[tokio::main]` annotation on their
+    /// entry point instead.
     ///
     /// See [module level][mod] documentation for more details.
     ///
     /// # Shutdown
     ///
-    /// Shutting down the runtime is done by dropping the value. The current thread
-    /// will block until the shut down operation has completed.
+    /// Shutting down the runtime is done by dropping the value. The current
+    /// thread will block until the shut down operation has completed.
     ///
     /// * Drain any scheduled work queues.
     /// * Drop any futures that have not yet completed.
@@ -255,11 +255,8 @@ cfg_rt_core! {
     /// that reactor will no longer function. Calling any method on them will
     /// result in an error.
     ///
-    /// [timer]: crate::time
-    /// [mod]: index.html
-    /// [`new`]: method@Self::new
-    /// [`Builder`]: struct@Builder
-    /// [`tokio::run`]: fn@run
+    /// [timer]: crate::time [mod]: index.html [`new`]: method@Self::new
+    /// [`Builder`]: struct@Builder [`tokio::run`]: fn@run
     #[derive(Debug)]
     pub struct Runtime {
         /// Task executor
@@ -345,7 +342,7 @@ cfg_rt_core! {
         ///
         /// # fn dox() {
         /// // Create the runtime
-        /// let rt = Runtime::new_multi_thread().unwrap();
+        /// let rt = Runtime::new().unwrap();
         ///
         /// // Spawn a future onto the runtime
         /// rt.spawn(async {
@@ -397,7 +394,7 @@ cfg_rt_core! {
         /// use tokio::runtime::Runtime;
         ///
         /// // Create the runtime
-        /// let rt  = Runtime::new_multi_thread().unwrap();
+        /// let rt  = Runtime::new().unwrap();
         ///
         /// // Execute the future, blocking the current thread until completion
         /// rt.block_on(async {
@@ -436,7 +433,7 @@ cfg_rt_core! {
         /// }
         ///
         /// fn main() {
-        ///     let rt = Runtime::new_multi_thread().unwrap();
+        ///     let rt = Runtime::new().unwrap();
         ///
         ///     let s = "Hello World!".to_string();
         ///
@@ -475,7 +472,7 @@ cfg_rt_core! {
         /// use std::time::Duration;
         ///
         /// fn main() {
-        ///    let runtime = Runtime::new_multi_thread().unwrap();
+        ///    let runtime = Runtime::new().unwrap();
         ///
         ///    runtime.block_on(async move {
         ///        task::spawn_blocking(move || {
@@ -509,10 +506,10 @@ cfg_rt_core! {
         /// use tokio::runtime::Runtime;
         ///
         /// fn main() {
-        ///    let runtime = Runtime::new_multi_thread().unwrap();
+        ///    let runtime = Runtime::new().unwrap();
         ///
         ///    runtime.block_on(async move {
-        ///        let inner_runtime = Runtime::new_multi_thread().unwrap();
+        ///        let inner_runtime = Runtime::new().unwrap();
         ///        // ...
         ///        inner_runtime.shutdown_background();
         ///    });

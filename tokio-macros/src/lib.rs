@@ -167,7 +167,7 @@ pub fn main_threaded(args: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ```rust
 /// fn main() {
-///     tokio::runtime::Runtime::new_multi_thread()
+///     tokio::runtime::Runtime::new()
 ///         .unwrap()
 ///         .block_on(async {
 ///             println!("Hello world");
