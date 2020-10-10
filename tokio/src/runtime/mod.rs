@@ -115,8 +115,7 @@
 //!
 //! The basic scheduler provides a _single-threaded_ future executor. All tasks
 //! will be created and executed on the current thread. The basic scheduler
-//! requires the `rt-core` feature flag, and can be selected by setting
-//! [`Builder::core_threads`] to `0` or `1`.
+//! requires the `rt-core` feature flag.
 //! ```
 //! use tokio::runtime;
 //!
@@ -255,8 +254,10 @@ cfg_rt_core! {
     /// that reactor will no longer function. Calling any method on them will
     /// result in an error.
     ///
-    /// [timer]: crate::time [mod]: index.html [`new`]: method@Self::new
-    /// [`Builder`]: struct@Builder [`tokio::run`]: fn@run
+    /// [timer]: crate::time
+    /// [mod]: index.html
+    /// [`new`]: method@Self::new
+    /// [`Builder`]: struct@Builder
     #[derive(Debug)]
     pub struct Runtime {
         /// Task executor
