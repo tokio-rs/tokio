@@ -24,7 +24,7 @@ async fn read() {
             assert_eq!(0, self.poll_cnt);
             self.poll_cnt += 1;
 
-            buf.append(b"hello world");
+            buf.put_slice(b"hello world");
             Poll::Ready(Ok(()))
         }
     }

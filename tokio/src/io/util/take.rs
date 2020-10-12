@@ -93,7 +93,7 @@ impl<R: AsyncRead> AsyncRead for Take<R> {
         unsafe {
             buf.assume_init(n);
         }
-        buf.add_filled(n);
+        buf.advance(n);
         *me.limit_ -= n as u64;
         Poll::Ready(Ok(()))
     }
