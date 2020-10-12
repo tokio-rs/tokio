@@ -107,6 +107,6 @@ mod sys {
     pub(crate) use std::fs::File;
 
     // TODO: don't rename
-    pub(crate) use crate::runtime::spawn_blocking as run;
-    pub(crate) use crate::task::JoinHandle as Blocking;
+    pub(crate) use crate::blocking::spawn_blocking as run;
+    pub(crate) use crate::blocking::JoinHandle as Blocking;
 }

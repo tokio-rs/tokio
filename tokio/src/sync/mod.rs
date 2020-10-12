@@ -437,7 +437,7 @@ cfg_sync! {
     mod mutex;
     pub use mutex::{Mutex, MutexGuard, TryLockError, OwnedMutexGuard};
 
-    mod notify;
+    pub(crate) mod notify;
     pub use notify::Notify;
 
     pub mod oneshot;
@@ -464,8 +464,8 @@ cfg_not_sync! {
         pub(crate) use mutex::Mutex;
     }
 
-    mod notify;
-    pub(crate) use notify::Notify;
+    #[cfg(any(feature = "rt-core", feature = "signal", all(unix, feature = "process")))]
+    pub(crate) mod notify;
 
     cfg_atomic_waker_impl! {
         mod task;

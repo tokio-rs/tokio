@@ -30,7 +30,6 @@ default = []
 
 # enable everything
 full = [
-  "blocking",
   "dns",
   "fs",
   "io-util",
@@ -47,12 +46,11 @@ full = [
   "time",
 ]
 
-blocking = ["rt-core"]
-dns = ["rt-core"]
-fs = ["rt-core", "io-util"]
+dns = []
+fs = []
 io-util = ["memchr"]
 # stdin, stdout, stderr
-io-std = ["rt-core"]
+io-std = []
 macros = ["tokio-macros"]
 net = ["dns", "tcp", "udp", "uds"]
 process = [

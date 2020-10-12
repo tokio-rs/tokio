@@ -28,11 +28,7 @@ fn timer_with_threaded_runtime() {
 fn timer_with_basic_scheduler() {
     use tokio::runtime::Builder;
 
-    let rt = Builder::new()
-        .basic_scheduler()
-        .enable_all()
-        .build()
-        .unwrap();
+    let rt = Builder::new_current_thread().enable_all().build().unwrap();
     let (tx, rx) = mpsc::channel();
 
     rt.block_on(async move {

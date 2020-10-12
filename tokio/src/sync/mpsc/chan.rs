@@ -4,7 +4,7 @@ use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Arc;
 use crate::sync::mpsc::error::TryRecvError;
 use crate::sync::mpsc::list;
-use crate::sync::Notify;
+use crate::sync::notify::Notify;
 
 use std::fmt;
 use std::process;

@@ -47,7 +47,9 @@ cfg_io! {
     pub mod io;
 }
 
-pub mod context;
+cfg_rt_core! {
+    pub mod context;
+}
 
 pub mod sync;
 

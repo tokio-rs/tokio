@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 //! Definition of the `PollFn` adapter combinator
 
 use std::fmt;

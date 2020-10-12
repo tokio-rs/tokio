@@ -45,8 +45,7 @@ fn test_drop_on_notify() {
     // shutting down. Then, when the task handle is dropped, the task itself is
     // dropped.
 
-    let rt = runtime::Builder::new()
-        .basic_scheduler()
+    let rt = runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();

@@ -1,91 +1,15 @@
 #![allow(unused_macros)]
 
-macro_rules! cfg_resource_drivers {
-    ($($item:item)*) => {
-        $(
-            #[cfg(any(
-                feature = "process",
-                all(unix, feature = "signal"),
-                all(not(loom), feature = "tcp"),
-                feature = "time",
-                all(not(loom), feature = "udp"),
-                all(not(loom), feature = "uds"),
-            ))]
-            $item
-        )*
-    }
-}
-
-macro_rules! cfg_blocking {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "blocking")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
-            $item
-        )*
-    }
-}
-
-/// Enables blocking API internals
-macro_rules! cfg_blocking_impl {
-    ($($item:item)*) => {
-        $(
-            #[cfg(any(
-                    feature = "blocking",
-                    feature = "fs",
-                    feature = "dns",
-                    feature = "io-std",
-                    feature = "rt-threaded",
-                    ))]
-            $item
-        )*
-    }
-}
-
-/// Enables blocking API internals
-macro_rules! cfg_blocking_impl_or_task {
-    ($($item:item)*) => {
-        $(
-            #[cfg(any(
-                    feature = "blocking",
-                    feature = "fs",
-                    feature = "dns",
-                    feature = "io-std",
-                    feature = "rt-threaded",
-                    feature = "task",
-                    ))]
-            $item
-        )*
-    }
-}
-
 /// Enables enter::block_on
 macro_rules! cfg_block_on {
     ($($item:item)*) => {
         $(
             #[cfg(any(
-                    feature = "blocking",
                     feature = "fs",
                     feature = "dns",
                     feature = "io-std",
                     feature = "rt-core",
                     ))]
-            $item
-        )*
-    }
-}
-
-/// Enables blocking API internals
-macro_rules! cfg_not_blocking_impl {
-    ($($item:item)*) => {
-        $(
-            #[cfg(not(any(
-                        feature = "blocking",
-                        feature = "fs",
-                        feature = "dns",
-                        feature = "io-std",
-                        feature = "rt-threaded",
-                        )))]
             $item
         )*
     }
@@ -97,7 +21,7 @@ macro_rules! cfg_atomic_waker_impl {
         $(
             #[cfg(any(
                 feature = "process",
-                all(feature = "rt-core", feature = "rt-util"),
+                feature = "rt-util",
                 feature = "signal",
                 feature = "tcp",
                 feature = "time",
@@ -324,6 +248,16 @@ macro_rules! cfg_rt_core {
     }
 }
 
+macro_rules! cfg_task {
+    ($($item:item)*) => {
+        $(
+            #[cfg(any(feature = "rt-core", feature = "rt-util"))]
+            #[cfg_attr(docsrs, doc(cfg(any(feature = "rt-core", feature = "rt-util"))))]
+            $item
+        )*
+    }
+}
+
 macro_rules! doc_rt_core {
     ($($item:item)*) => {
         $(
@@ -451,12 +385,12 @@ macro_rules! cfg_coop {
     ($($item:item)*) => {
         $(
             #[cfg(any(
-                    feature = "blocking",
                     feature = "dns",
                     feature = "fs",
                     feature = "io-std",
                     feature = "process",
                     feature = "rt-core",
+                    feature = "rt-util",
                     feature = "signal",
                     feature = "sync",
                     feature = "stream",

@@ -183,8 +183,7 @@ mod tests {
         let fut = async move {
             wr.write_all(data.as_bytes()).await.unwrap();
         };
-        crate::runtime::Builder::new()
-            .basic_scheduler()
+        crate::runtime::Builder::new_current_thread()
             .build()
             .unwrap()
             .block_on(fut);
@@ -200,8 +199,7 @@ mod tests {
         data.extend(std::iter::repeat(0b1010_1010).take(MAX_BUF - checked_count + 1));
         let mut writer = LoggingMockWriter::new();
         let mut splitter = super::SplitByUtf8BoundaryIfWindows::new(&mut writer);
-        crate::runtime::Builder::new()
-            .basic_scheduler()
+        crate::runtime::Builder::new_current_thread()
             .build()
             .unwrap()
             .block_on(async {

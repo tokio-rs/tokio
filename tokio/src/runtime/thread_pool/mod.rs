@@ -9,9 +9,7 @@ use self::idle::Idle;
 mod worker;
 pub(crate) use worker::Launch;
 
-cfg_blocking! {
-    pub(crate) use worker::block_in_place;
-}
+pub(crate) use worker::block_in_place;
 
 use crate::loom::sync::Arc;
 use crate::runtime::task::{self, JoinHandle};

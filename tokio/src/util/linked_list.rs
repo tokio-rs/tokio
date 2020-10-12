@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "full"), allow(dead_code))]
+
 //! An intrusive double linked list of data
 //!
 //! The data structure supports tracking pinned nodes. Most of the data

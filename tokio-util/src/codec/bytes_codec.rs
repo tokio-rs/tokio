@@ -33,7 +33,7 @@ use std::io;
 /// #     }
 /// # }
 /// #
-/// # #[tokio::main(core_threads = 1)]
+/// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() -> Result<(), std::io::Error> {
 /// let my_async_read = File::open("filename.txt").await?;
 /// let my_stream_of_bytes = FramedRead::new(my_async_read, BytesCodec::new());

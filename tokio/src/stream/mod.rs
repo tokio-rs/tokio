@@ -267,7 +267,7 @@ pub trait StreamExt: Stream {
     /// # /*
     /// #[tokio::main]
     /// # */
-    /// # #[tokio::main(basic_scheduler)]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// async fn main() {
     /// # time::pause();
     ///     let (tx1, rx1) = mpsc::channel(10);

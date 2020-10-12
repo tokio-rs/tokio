@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "full"), allow(dead_code))]
+
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::park::{Park, Unpark};
@@ -212,10 +214,10 @@ impl Unpark for UnparkThread {
     }
 }
 
+use std::future::Future;
 use std::marker::PhantomData;
-use std::rc::Rc;
-
 use std::mem;
+use std::rc::Rc;
 use std::task::{RawWaker, RawWakerVTable, Waker};
 
 /// Blocks the current thread using a condition variable.
@@ -245,6 +247,25 @@ impl CachedParkThread {
         F: FnOnce(&ParkThread) -> R,
     {
         CURRENT_PARKER.try_with(|inner| f(inner)).map_err(|_| ())
+    }
+
+    pub(crate) fn block_on<F: Future>(&mut self, f: F) -> Result<F::Output, ParkError> {
+        use std::task::Context;
+        use std::task::Poll::Ready;
+
+        // `get_unpark()` should not return a Result
+        let waker = self.get_unpark()?.into_waker();
+        let mut cx = Context::from_waker(&waker);
+
+        pin!(f);
+
+        loop {
+            if let Ready(v) = crate::coop::budget(|| f.as_mut().poll(&mut cx)) {
+                return Ok(v);
+            }
+
+            self.park()?;
+        }
     }
 }
 

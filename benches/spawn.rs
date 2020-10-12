@@ -10,8 +10,7 @@ async fn work() -> usize {
 }
 
 fn basic_scheduler_local_spawn(bench: &mut Bencher) {
-    let runtime = tokio::runtime::Builder::new()
-        .basic_scheduler()
+    let runtime = tokio::runtime::Builder::new_current_thread()
         .build()
         .unwrap();
     runtime.block_on(async {
@@ -23,8 +22,7 @@ fn basic_scheduler_local_spawn(bench: &mut Bencher) {
 }
 
 fn threaded_scheduler_local_spawn(bench: &mut Bencher) {
-    let runtime = tokio::runtime::Builder::new()
-        .threaded_scheduler()
+    let runtime = tokio::runtime::Builder::new_current_thread()
         .build()
         .unwrap();
     runtime.block_on(async {
@@ -36,8 +34,7 @@ fn threaded_scheduler_local_spawn(bench: &mut Bencher) {
 }
 
 fn basic_scheduler_remote_spawn(bench: &mut Bencher) {
-    let runtime = tokio::runtime::Builder::new()
-        .basic_scheduler()
+    let runtime = tokio::runtime::Builder::new_current_thread()
         .build()
         .unwrap();
 
@@ -48,10 +45,7 @@ fn basic_scheduler_remote_spawn(bench: &mut Bencher) {
 }
 
 fn threaded_scheduler_remote_spawn(bench: &mut Bencher) {
-    let runtime = tokio::runtime::Builder::new()
-        .threaded_scheduler()
-        .build()
-        .unwrap();
+    let runtime = tokio::runtime::Builder::new_multi_thread().build().unwrap();
 
     bench.iter(|| {
         let h = runtime.spawn(work());

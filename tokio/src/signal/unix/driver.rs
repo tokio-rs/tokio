@@ -1,9 +1,10 @@
+#![cfg_attr(not(feature = "rt-core"), allow(dead_code))]
+
 //! Signal driver
 
 use crate::io::driver::Driver as IoDriver;
 use crate::io::PollEvented;
 use crate::park::Park;
-use crate::runtime::context;
 use crate::signal::registry::globals;
 
 use mio::net::UnixStream;
@@ -165,22 +166,42 @@ impl Park for Driver {
 // ===== impl Handle =====
 
 impl Handle {
-    /// Returns a handle to the current driver
-    ///
-    /// # Panics
-    ///
-    /// This function panics if there is no current signal driver set.
-    pub(super) fn current() -> Self {
-        context::signal_handle().expect(
-            "there is no signal driver running, must be called from the context of Tokio runtime",
-        )
-    }
-
     pub(super) fn check_inner(&self) -> io::Result<()> {
         if self.inner.strong_count() > 0 {
             Ok(())
         } else {
             Err(io::Error::new(io::ErrorKind::Other, "signal driver gone"))
+        }
+    }
+}
+
+cfg_rt_core! {
+    impl Handle {
+        /// Returns a handle to the current driver
+        ///
+        /// # Panics
+        ///
+        /// This function panics if there is no current signal driver set.
+        pub(super) fn current() -> Self {
+            crate::runtime::context::signal_handle().expect(
+                "there is no signal driver running, must be called from the context of Tokio runtime",
+            )
+        }
+    }
+}
+
+cfg_not_rt_core! {
+    impl Handle {
+        /// Returns a handle to the current driver
+        ///
+        /// # Panics
+        ///
+        /// This function panics if there is no current signal driver set.
+        pub(super) fn current() -> Self {
+            panic!(
+                "there is no signal driver running, must be called from the context of Tokio runtime or with\
+                `rt-core` enabled.",
+            )
         }
     }
 }

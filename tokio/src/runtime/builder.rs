@@ -1,9 +1,8 @@
 use crate::runtime::handle::Handle;
-use crate::runtime::shell::Shell;
-use crate::runtime::{blocking, driver, io, Callback, Runtime, Spawner};
+use crate::runtime::{blocking, driver, Callback, Runtime, Spawner};
 
 use std::fmt;
-#[cfg(feature = "blocking")]
+use std::io;
 use std::time::Duration;
 
 /// Builds Tokio Runtime with custom configuration values.
@@ -26,9 +25,8 @@ use std::time::Duration;
 ///
 /// fn main() {
 ///     // build runtime
-///     let runtime = Builder::new()
-///         .threaded_scheduler()
-///         .core_threads(4)
+///     let runtime = Builder::new_multi_thread()
+///         .worker_threads(4)
 ///         .thread_name("my-custom-name")
 ///         .thread_stack_size(3 * 1024 * 1024)
 ///         .build()
@@ -38,7 +36,7 @@ use std::time::Duration;
 /// }
 /// ```
 pub struct Builder {
-    /// The task execution model to use.
+    /// Runtime type
     kind: Kind,
 
     /// Whether or not to enable the I/O driver
@@ -50,7 +48,7 @@ pub struct Builder {
     /// The number of worker threads, used by Runtime.
     ///
     /// Only used when not using the current-thread executor.
-    core_threads: Option<usize>,
+    worker_threads: Option<usize>,
 
     /// Cap on thread usage.
     max_threads: usize,
@@ -67,32 +65,37 @@ pub struct Builder {
     /// To run before each worker thread stops
     pub(super) before_stop: Option<Callback>,
 
-    #[cfg(feature = "blocking")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
     /// Customizable keep alive timeout for BlockingPool
     pub(super) keep_alive: Option<Duration>,
 }
 
 pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync + 'static>;
 
-#[derive(Debug, Clone, Copy)]
-enum Kind {
-    Shell,
-    #[cfg(feature = "rt-core")]
-    Basic,
+pub(crate) enum Kind {
+    CurrentThread,
     #[cfg(feature = "rt-threaded")]
-    ThreadPool,
+    MultiThread,
 }
 
 impl Builder {
+    /// TODO
+    pub fn new_current_thread() -> Builder {
+        Builder::new(Kind::CurrentThread)
+    }
+
+    /// TODO
+    #[cfg(feature = "rt-threaded")]
+    pub fn new_multi_thread() -> Builder {
+        Builder::new(Kind::MultiThread)
+    }
+
     /// Returns a new runtime builder initialized with default configuration
     /// values.
     ///
     /// Configuration methods can be chained on the return value.
-    pub fn new() -> Builder {
+    pub(crate) fn new(kind: Kind) -> Builder {
         Builder {
-            // No task execution by default
-            kind: Kind::Shell,
+            kind,
 
             // I/O defaults to "off"
             enable_io: false,
@@ -101,7 +104,7 @@ impl Builder {
             enable_time: false,
 
             // Default to lazy auto-detection (one thread per CPU core)
-            core_threads: None,
+            worker_threads: None,
 
             max_threads: 512,
 
@@ -115,7 +118,6 @@ impl Builder {
             after_start: None,
             before_stop: None,
 
-            #[cfg(feature = "blocking")]
             keep_alive: None,
         }
     }
@@ -131,8 +133,7 @@ impl Builder {
     /// ```
     /// use tokio::runtime;
     ///
-    /// let rt = runtime::Builder::new()
-    ///     .threaded_scheduler()
+    /// let rt = runtime::Builder::new_multi_thread()
     ///     .enable_all()
     ///     .build()
     ///     .unwrap();
@@ -152,51 +153,63 @@ impl Builder {
         self
     }
 
-    #[deprecated(note = "In future will be replaced by core_threads method")]
-    /// Sets the maximum number of worker threads for the `Runtime`'s thread pool.
+    /// Sets the number of worker threads the `Runtime` will use.
     ///
-    /// This must be a number between 1 and 32,768 though it is advised to keep
-    /// this value on the smaller side.
+    /// This should be a number between 0 and 32,768 though it is advised to
+    /// keep this value on the smaller side.
     ///
-    /// The default value is the number of cores available to the system.
-    pub fn num_threads(&mut self, val: usize) -> &mut Self {
-        self.core_threads = Some(val);
-        self
-    }
-
-    /// Sets the core number of worker threads for the `Runtime`'s thread pool.
-    ///
-    /// This should be a number between 1 and 32,768 though it is advised to keep
-    /// this value on the smaller side.
+    /// # Default
     ///
     /// The default value is the number of cores available to the system.
     ///
-    /// These threads will be always active and running.
+    /// # Panic
+    ///
+    /// When using the `current_thread` runtime this method will panic, since
+    /// those variants do not allow setting worker thread counts.
+    ///
     ///
     /// # Examples
+    ///
+    /// ## Multi threaded runtime with 4 threads
     ///
     /// ```
     /// use tokio::runtime;
     ///
-    /// let rt = runtime::Builder::new()
-    ///     .threaded_scheduler()
-    ///     .core_threads(4)
+    /// // This will spawn a work-stealing runtime with 4 worker threads.
+    /// let rt = runtime::Builder::new_multi_thread()
+    ///     .worker_threads(4)
     ///     .build()
     ///     .unwrap();
+    ///
+    /// rt.spawn(async move {});
     /// ```
-    pub fn core_threads(&mut self, val: usize) -> &mut Self {
-        assert_ne!(val, 0, "Core threads cannot be zero");
-        self.core_threads = Some(val);
+    ///
+    /// ## Current thread runtime (will only run on the current thread via `Runtime::block_on`)
+    ///
+    /// ```
+    /// use tokio::runtime;
+    ///
+    /// // Create a runtime that _must_ be driven from a call
+    /// // to `Runtime::block_on`.
+    /// let rt = runtime::Builder::new_current_thread()
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// // This will run the runtime and future on the current thread
+    /// rt.block_on(async move {});
+    /// ```
+    pub fn worker_threads(&mut self, val: usize) -> &mut Self {
+        self.worker_threads = Some(val);
         self
     }
 
     /// Specifies limit for threads, spawned by the Runtime.
     ///
     /// This is number of threads to be used by Runtime, including `core_threads`
-    /// Having `max_threads` less than `core_threads` results in invalid configuration
+    /// Having `max_threads` less than `worker_threads` results in invalid configuration
     /// when building multi-threaded `Runtime`, which would cause a panic.
     ///
-    /// Similarly to the `core_threads`, this number should be between 1 and 32,768.
+    /// Similarly to the `worker_threads`, this number should be between 0 and 32,768.
     ///
     /// The default value is 512.
     ///
@@ -205,7 +218,6 @@ impl Builder {
     /// Otherwise as `core_threads` are always active, it limits additional threads (e.g. for
     /// blocking annotations) as `max_threads - core_threads`.
     pub fn max_threads(&mut self, val: usize) -> &mut Self {
-        assert_ne!(val, 0, "Thread limit cannot be zero");
         self.max_threads = val;
         self
     }
@@ -220,7 +232,7 @@ impl Builder {
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
-    /// let rt = runtime::Builder::new()
+    /// let rt = runtime::Builder::new_multi_thread()
     ///     .thread_name("my-pool")
     ///     .build();
     /// # }
@@ -242,7 +254,7 @@ impl Builder {
     /// # use std::sync::atomic::{AtomicUsize, Ordering};
     ///
     /// # pub fn main() {
-    /// let rt = runtime::Builder::new()
+    /// let rt = runtime::Builder::new_multi_thread()
     ///     .thread_name_fn(|| {
     ///        static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
     ///        let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
@@ -273,8 +285,7 @@ impl Builder {
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
-    /// let rt = runtime::Builder::new()
-    ///     .threaded_scheduler()
+    /// let rt = runtime::Builder::new_multi_thread()
     ///     .thread_stack_size(32 * 1024)
     ///     .build();
     /// # }
@@ -295,8 +306,7 @@ impl Builder {
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
-    /// let runtime = runtime::Builder::new()
-    ///     .threaded_scheduler()
+    /// let runtime = runtime::Builder::new_multi_thread()
     ///     .on_thread_start(|| {
     ///         println!("thread started");
     ///     })
@@ -322,8 +332,7 @@ impl Builder {
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
-    /// let runtime = runtime::Builder::new()
-    ///     .threaded_scheduler()
+    /// let runtime = runtime::Builder::new_multi_thread()
     ///     .on_thread_stop(|| {
     ///         println!("thread stopping");
     ///     })
@@ -341,26 +350,24 @@ impl Builder {
 
     /// Creates the configured `Runtime`.
     ///
-    /// The returned `ThreadPool` instance is ready to spawn tasks.
+    /// The returned `Runtime` instance is ready to spawn tasks.
     ///
     /// # Examples
     ///
     /// ```
     /// use tokio::runtime::Builder;
     ///
-    /// let rt  = Builder::new().build().unwrap();
+    /// let rt  = Builder::new_multi_thread().build().unwrap();
     ///
     /// rt.block_on(async {
     ///     println!("Hello from the Tokio runtime");
     /// });
     /// ```
     pub fn build(&mut self) -> io::Result<Runtime> {
-        match self.kind {
-            Kind::Shell => self.build_shell_runtime(),
-            #[cfg(feature = "rt-core")]
-            Kind::Basic => self.build_basic_runtime(),
+        match &self.kind {
+            Kind::CurrentThread => self.build_basic_runtime(),
             #[cfg(feature = "rt-threaded")]
-            Kind::ThreadPool => self.build_threaded_runtime(),
+            Kind::MultiThread => self.build_threaded_runtime(),
         }
     }
 
@@ -371,32 +378,6 @@ impl Builder {
         }
     }
 
-    fn build_shell_runtime(&mut self) -> io::Result<Runtime> {
-        use crate::runtime::Kind;
-
-        let (driver, resources) = driver::Driver::new(self.get_cfg())?;
-
-        let spawner = Spawner::Shell;
-
-        let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
-        let blocking_spawner = blocking_pool.spawner().clone();
-
-        Ok(Runtime {
-            kind: Kind::Shell(Shell::new(driver)),
-            handle: Handle {
-                spawner,
-                io_handle: resources.io_handle,
-                time_handle: resources.time_handle,
-                signal_handle: resources.signal_handle,
-                clock: resources.clock,
-                blocking_spawner,
-            },
-            blocking_pool,
-        })
-    }
-
-    #[cfg(feature = "blocking")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
     /// Sets a custom timeout for a thread in the blocking pool.
     ///
     /// By default, the timeout for a thread is set to 10 seconds. This can
@@ -409,7 +390,7 @@ impl Builder {
     /// # use std::time::Duration;
     ///
     /// # pub fn main() {
-    /// let rt = runtime::Builder::new()
+    /// let rt = runtime::Builder::new_multi_thread()
     ///     .thread_keep_alive(Duration::from_millis(100))
     ///     .build();
     /// # }
@@ -417,6 +398,36 @@ impl Builder {
     pub fn thread_keep_alive(&mut self, duration: Duration) -> &mut Self {
         self.keep_alive = Some(duration);
         self
+    }
+
+    fn build_basic_runtime(&mut self) -> io::Result<Runtime> {
+        use crate::runtime::{BasicScheduler, Kind};
+
+        let (driver, resources) = driver::Driver::new(self.get_cfg())?;
+
+        // And now put a single-threaded scheduler on top of the timer. When
+        // there are no futures ready to do something, it'll let the timer or
+        // the reactor to generate some new stimuli for the futures to continue
+        // in their life.
+        let scheduler = BasicScheduler::new(driver);
+        let spawner = Spawner::Basic(scheduler.spawner().clone());
+
+        // Blocking pool
+        let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
+        let blocking_spawner = blocking_pool.spawner().clone();
+
+        Ok(Runtime {
+            kind: Kind::CurrentThread(scheduler),
+            handle: Handle {
+                spawner,
+                io_handle: resources.io_handle,
+                time_handle: resources.time_handle,
+                signal_handle: resources.signal_handle,
+                clock: resources.clock,
+                blocking_spawner,
+            },
+            blocking_pool,
+        })
     }
 }
 
@@ -432,7 +443,7 @@ cfg_io_driver! {
         /// ```
         /// use tokio::runtime;
         ///
-        /// let rt = runtime::Builder::new()
+        /// let rt = runtime::Builder::new_multi_thread()
         ///     .enable_io()
         ///     .build()
         ///     .unwrap();
@@ -455,7 +466,7 @@ cfg_time! {
         /// ```
         /// use tokio::runtime;
         ///
-        /// let rt = runtime::Builder::new()
+        /// let rt = runtime::Builder::new_multi_thread()
         ///     .enable_time()
         ///     .build()
         ///     .unwrap();
@@ -467,75 +478,15 @@ cfg_time! {
     }
 }
 
-cfg_rt_core! {
-    impl Builder {
-        /// Sets runtime to use a simpler scheduler that runs all tasks on the current-thread.
-        ///
-        /// The executor and all necessary drivers will all be run on the current
-        /// thread during [`block_on`] calls.
-        ///
-        /// See also [the module level documentation][1], which has a section on scheduler
-        /// types.
-        ///
-        /// [1]: index.html#runtime-configurations
-        /// [`block_on`]: Runtime::block_on
-        pub fn basic_scheduler(&mut self) -> &mut Self {
-            self.kind = Kind::Basic;
-            self
-        }
-
-        fn build_basic_runtime(&mut self) -> io::Result<Runtime> {
-            use crate::runtime::{BasicScheduler, Kind};
-
-            let (driver, resources) = driver::Driver::new(self.get_cfg())?;
-
-            // And now put a single-threaded scheduler on top of the timer. When
-            // there are no futures ready to do something, it'll let the timer or
-            // the reactor to generate some new stimuli for the futures to continue
-            // in their life.
-            let scheduler = BasicScheduler::new(driver);
-            let spawner = Spawner::Basic(scheduler.spawner().clone());
-
-            // Blocking pool
-            let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
-            let blocking_spawner = blocking_pool.spawner().clone();
-
-            Ok(Runtime {
-                kind: Kind::Basic(scheduler),
-                handle: Handle {
-                    spawner,
-                    io_handle: resources.io_handle,
-                    time_handle: resources.time_handle,
-                    signal_handle: resources.signal_handle,
-                    clock: resources.clock,
-                    blocking_spawner,
-                },
-                blocking_pool,
-            })
-        }
-    }
-}
-
 cfg_rt_threaded! {
     impl Builder {
-        /// Sets runtime to use a multi-threaded scheduler for executing tasks.
-        ///
-        /// See also [the module level documentation][1], which has a section on scheduler
-        /// types.
-        ///
-        /// [1]: index.html#runtime-configurations
-        pub fn threaded_scheduler(&mut self) -> &mut Self {
-            self.kind = Kind::ThreadPool;
-            self
-        }
-
         fn build_threaded_runtime(&mut self) -> io::Result<Runtime> {
             use crate::loom::sys::num_cpus;
             use crate::runtime::{Kind, ThreadPool};
             use crate::runtime::park::Parker;
             use std::cmp;
 
-            let core_threads = self.core_threads.unwrap_or_else(|| cmp::min(self.max_threads, num_cpus()));
+            let core_threads = self.worker_threads.unwrap_or_else(|| cmp::min(self.max_threads, num_cpus()));
             assert!(core_threads <= self.max_threads, "Core threads number cannot be above max limit");
 
             let (driver, resources) = driver::Driver::new(self.get_cfg())?;
@@ -569,17 +520,10 @@ cfg_rt_threaded! {
     }
 }
 
-impl Default for Builder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl fmt::Debug for Builder {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Builder")
-            .field("kind", &self.kind)
-            .field("core_threads", &self.core_threads)
+            .field("worker_threads", &self.worker_threads)
             .field("max_threads", &self.max_threads)
             .field(
                 "thread_name",

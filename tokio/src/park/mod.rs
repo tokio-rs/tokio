@@ -34,15 +34,12 @@
 //! * `park_timeout` does the same as `park` but allows specifying a maximum
 //!   time to block the thread for.
 
-cfg_resource_drivers! {
-    mod either;
-    pub(crate) use self::either::Either;
+cfg_rt_core! {
+    pub(crate) mod either;
 }
 
-mod thread;
-pub(crate) use self::thread::ParkThread;
-
-pub(crate) use self::thread::{CachedParkThread, ParkError};
+#[cfg(any(feature = "rt-core", feature = "rt-util", feature = "sync"))]
+pub(crate) mod thread;
 
 use std::sync::Arc;
 use std::time::Duration;

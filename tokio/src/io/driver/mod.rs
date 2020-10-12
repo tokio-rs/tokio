@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "rt-core"), allow(dead_code))]
+
 mod ready;
 use ready::Ready;
 
@@ -5,7 +7,6 @@ mod scheduled_io;
 pub(crate) use scheduled_io::ScheduledIo; // pub(crate) for tests
 
 use crate::park::{Park, Unpark};
-use crate::runtime::context;
 use crate::util::bit;
 use crate::util::slab::{self, Slab};
 
@@ -218,17 +219,36 @@ impl fmt::Debug for Driver {
 
 // ===== impl Handle =====
 
-impl Handle {
-    /// Returns a handle to the current reactor
-    ///
-    /// # Panics
-    ///
-    /// This function panics if there is no current reactor set.
-    pub(super) fn current() -> Self {
-        context::io_handle()
-            .expect("there is no reactor running, must be called from the context of Tokio runtime")
+cfg_rt_core! {
+    impl Handle {
+        /// Returns a handle to the current reactor
+        ///
+        /// # Panics
+        ///
+        /// This function panics if there is no current reactor set and `rt-core` feature
+        /// flag is not enabled.
+        pub(super) fn current() -> Self {
+            crate::runtime::context::io_handle()
+                .expect("there is no reactor running, must be called from the context of Tokio runtime")
+        }
     }
+}
 
+cfg_not_rt_core! {
+    impl Handle {
+        /// Returns a handle to the current reactor
+        ///
+        /// # Panics
+        ///
+        /// This function panics if there is no current reactor set, or if the `rt-core`
+        /// feature flag is not enabled.
+        pub(super) fn current() -> Self {
+            panic!("there is no reactor running, must be called from the context of Tokio runtime with `rt-core` enabled.")
+        }
+    }
+}
+
+impl Handle {
     /// Forces a reactor blocked in a call to `turn` to wakeup, or otherwise
     /// makes the next call to `turn` return immediately.
     ///

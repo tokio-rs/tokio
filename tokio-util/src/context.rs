@@ -48,14 +48,14 @@ pub trait RuntimeExt {
     /// use tokio_util::context::RuntimeExt;
     /// use tokio::time::{sleep, Duration};
     ///
-    /// let rt = tokio::runtime::Builder::new()
-    ///     .threaded_scheduler()
+    /// let rt = tokio::runtime::Builder::new_multi_thread()
     ///     .enable_all()
-    ///     .build().unwrap();
+    ///     .build()
+    ///     .unwrap();
     ///
-    /// let rt2 = tokio::runtime::Builder::new()
-    ///     .threaded_scheduler()
-    ///     .build().unwrap();
+    /// let rt2 = tokio::runtime::Builder::new_multi_thread()
+    ///     .build()
+    ///     .unwrap();
     ///
     /// let fut = sleep(Duration::from_millis(2));
     ///

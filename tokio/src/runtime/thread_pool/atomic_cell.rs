@@ -22,7 +22,6 @@ impl<T> AtomicCell<T> {
         from_raw(old)
     }
 
-    #[cfg(feature = "blocking")]
     pub(super) fn set(&self, val: Box<T>) {
         let _ = self.swap(Some(val));
     }

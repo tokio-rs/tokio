@@ -2,7 +2,7 @@ use crate::future::poll_fn;
 use crate::loom::sync::Mutex;
 use crate::park::{Park, Unpark};
 use crate::runtime::task::{self, JoinHandle, Schedule, Task};
-use crate::sync::Notify;
+use crate::sync::notify::Notify;
 use crate::util::linked_list::{Link, LinkedList};
 use crate::util::{waker_ref, Wake, WakerRef};
 

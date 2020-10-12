@@ -79,22 +79,24 @@ pub(crate) trait Schedule: Sync + Sized + 'static {
     }
 }
 
-/// Create a new task with an associated join handle
-pub(crate) fn joinable<T, S>(task: T) -> (Notified<S>, JoinHandle<T::Output>)
-where
-    T: Future + Send + 'static,
-    S: Schedule,
-{
-    let raw = RawTask::new::<_, S>(task);
+cfg_rt_core! {
+    /// Create a new task with an associated join handle
+    pub(crate) fn joinable<T, S>(task: T) -> (Notified<S>, JoinHandle<T::Output>)
+    where
+        T: Future + Send + 'static,
+        S: Schedule,
+    {
+        let raw = RawTask::new::<_, S>(task);
 
-    let task = Task {
-        raw,
-        _p: PhantomData,
-    };
+        let task = Task {
+            raw,
+            _p: PhantomData,
+        };
 
-    let join = JoinHandle::new(raw);
+        let join = JoinHandle::new(raw);
 
-    (Notified(task), join)
+        (Notified(task), join)
+    }
 }
 
 cfg_rt_util! {
