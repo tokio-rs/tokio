@@ -21,7 +21,7 @@ use self::state::State;
 
 mod waker;
 
-cfg_rt_threaded! {
+cfg_rt_multi_thread! {
     mod stack;
     pub(crate) use self::stack::TransferStack;
 }
@@ -132,7 +132,7 @@ impl<S: 'static> Task<S> {
     }
 }
 
-cfg_rt_threaded! {
+cfg_rt_multi_thread! {
     impl<S: 'static> Notified<S> {
         pub(crate) unsafe fn from_raw(ptr: NonNull<Header>) -> Notified<S> {
             Notified(Task::from_raw(ptr))

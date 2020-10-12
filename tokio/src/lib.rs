@@ -75,7 +75,7 @@
 //! - `full`: Enables all Tokio public API features listed below.
 //! - `rt-core`: Enables `tokio::spawn`, the basic (single-threaded) scheduler,
 //! and non-scheduler utilities.
-//! - `rt-threaded`: Enables the heavier, multi-threaded, work-stealing scheduler.
+//! - `rt-multi-thread`: Enables the heavier, multi-threaded, work-stealing scheduler.
 //! - `io-util`: Enables the IO based `Ext` traits.
 //! - `io-std`: Enable `Stdout`, `Stdin` and `Stderr` types.
 //! - `net`: Enables `tokio::net` types such as `TcpStream`, `UnixStream` and `UdpSocket`.
@@ -196,9 +196,9 @@
 //! and managing runtimes. You should use that module if the `#[tokio::main]` macro doesn't
 //! provide the functionality you need.
 //!
-//! Using the runtime requires the "rt" or "rt-threaded" feature flags, to
+//! Using the runtime requires the "rt" or "rt-multi-thread" feature flags, to
 //! enable the basic [single-threaded scheduler][rt] and the [thread-pool
-//! scheduler][rt-threaded], respectively. See the [`runtime` module
+//! scheduler][rt-multi-thread], respectively. See the [`runtime` module
 //! documentation][rt-features] for details. In addition, the "macros" feature
 //! flag enables the `#[tokio::main]` and `#[tokio::test]` attributes.
 //!
@@ -207,7 +207,7 @@
 //! [`Builder`]: crate::runtime::Builder
 //! [`Runtime`]: crate::runtime::Runtime
 //! [rt]: runtime/index.html#basic-scheduler
-//! [rt-threaded]: runtime/index.html#threaded-scheduler
+//! [rt-multi-thread]: runtime/index.html#threaded-scheduler
 //! [rt-features]: runtime/index.html#runtime-scheduler
 //!
 //! ## CPU-bound tasks and blocking code
@@ -409,7 +409,7 @@ cfg_macros! {
     pub use tokio_macros::select_priv_declare_output_enum;
 
     cfg_rt! {
-        cfg_rt_threaded! {
+        cfg_rt_multi_thread! {
             // This is the docs.rs case (with all features) so make sure macros
             // is included in doc(cfg).
 
@@ -421,7 +421,7 @@ cfg_macros! {
             pub use tokio_macros::test;
         }
 
-        cfg_not_rt_threaded! {
+        cfg_not_rt_multi_thread! {
             #[cfg(not(test))] // Work around for rust-lang/rust#62127
             pub use tokio_macros::main_rt as main;
             pub use tokio_macros::test_rt as test;

@@ -65,7 +65,7 @@ cfg_rt! {
 //
 // This is hidden for a reason. Do not use without fully understanding
 // executors. Misuing can easily cause your program to deadlock.
-cfg_rt_threaded! {
+cfg_rt_multi_thread! {
     pub(crate) fn exit<F: FnOnce() -> R, R>(f: F) -> R {
         // Reset in case the closure panics
         struct Reset(EnterContext);
@@ -130,7 +130,7 @@ cfg_rt! {
     }
 }
 
-cfg_rt_threaded! {
+cfg_rt_multi_thread! {
     /// Returns true if in a runtime context.
     pub(crate) fn context() -> EnterContext {
         ENTERED.with(|c| c.get())

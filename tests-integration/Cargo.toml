@@ -9,7 +9,7 @@ publish = false
 full = [
     "macros",
     "rt",
-    "rt-threaded",
+    "rt-multi-thread",
 
     "tokio/full",
     "tokio-test"
@@ -17,7 +17,7 @@ full = [
 macros = ["tokio/macros"]
 sync = ["tokio/sync"]
 rt = ["tokio/rt"]
-rt-threaded = ["rt", "tokio/rt-threaded"]
+rt-multi-thread = ["rt", "tokio/rt-multi-thread"]
 
 [dependencies]
 tokio = { path = "../tokio" }

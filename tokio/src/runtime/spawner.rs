@@ -5,7 +5,7 @@ cfg_rt! {
     use std::future::Future;
 }
 
-cfg_rt_threaded! {
+cfg_rt_multi_thread! {
     use crate::runtime::thread_pool;
 }
 
@@ -13,13 +13,13 @@ cfg_rt_threaded! {
 pub(crate) enum Spawner {
     #[cfg(feature = "rt")]
     Basic(basic_scheduler::Spawner),
-    #[cfg(feature = "rt-threaded")]
+    #[cfg(feature = "rt-multi-thread")]
     ThreadPool(thread_pool::Spawner),
 }
 
 impl Spawner {
     pub(crate) fn shutdown(&mut self) {
-        #[cfg(feature = "rt-threaded")]
+        #[cfg(feature = "rt-multi-thread")]
         {
             if let Spawner::ThreadPool(spawner) = self {
                 spawner.shutdown();
@@ -38,7 +38,7 @@ cfg_rt! {
             match self {
                 #[cfg(feature = "rt")]
                 Spawner::Basic(spawner) => spawner.spawn(future),
-                #[cfg(feature = "rt-threaded")]
+                #[cfg(feature = "rt-multi-thread")]
                 Spawner::ThreadPool(spawner) => spawner.spawn(future),
             }
         }

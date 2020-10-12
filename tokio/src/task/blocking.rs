@@ -1,6 +1,6 @@
 use crate::task::JoinHandle;
 
-cfg_rt_threaded! {
+cfg_rt_multi_thread! {
     /// Runs the provided blocking function on the current thread without
     /// blocking the executor.
     ///
