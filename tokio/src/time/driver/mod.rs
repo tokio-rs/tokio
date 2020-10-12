@@ -11,7 +11,7 @@ pub(crate) use self::handle::Handle;
 
 use crate::loom::sync::atomic::{AtomicU64, AtomicUsize};
 use crate::park::{Park, Unpark};
-use crate::time::{wheel, Error};
+use crate::time::{error::Error, wheel};
 use crate::time::{Clock, Duration, Instant};
 
 use std::sync::atomic::Ordering::{Acquire, Relaxed, Release, SeqCst};
@@ -204,7 +204,7 @@ where
 
     /// Fires the entry if it needs to, otherwise queue it to be processed later.
     fn add_entry(&mut self, entry: Arc<Entry>, when: u64) {
-        use crate::time::wheel::InsertError;
+        use crate::time::error::InsertError;
 
         entry.set_when_internal(Some(when));
 

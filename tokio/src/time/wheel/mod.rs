@@ -1,4 +1,4 @@
-use crate::time::driver::Entry;
+use crate::time::{driver::Entry, error::InsertError};
 
 mod level;
 pub(crate) use self::level::Expiration;
@@ -49,12 +49,6 @@ const NUM_LEVELS: usize = 6;
 
 /// The maximum duration of a `Sleep`
 const MAX_DURATION: u64 = (1 << (6 * NUM_LEVELS)) - 1;
-
-#[derive(Debug)]
-pub(crate) enum InsertError {
-    Elapsed,
-    Invalid,
-}
 
 impl Wheel {
     /// Create a new timing wheel

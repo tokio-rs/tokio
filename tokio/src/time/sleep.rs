@@ -1,5 +1,5 @@
 use crate::time::driver::{Entry, Handle};
-use crate::time::{Duration, Error, Instant};
+use crate::time::{error::Error, Duration, Instant};
 
 use std::future::Future;
 use std::pin::Pin;
