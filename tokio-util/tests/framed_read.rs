@@ -271,7 +271,7 @@ impl AsyncRead for Mock {
         match self.calls.pop_front() {
             Some(Ok(data)) => {
                 debug_assert!(buf.remaining() >= data.len());
-                buf.append(&data);
+                buf.put_slice(&data);
                 Ready(Ok(()))
             }
             Some(Err(ref e)) if e.kind() == WouldBlock => Pending,

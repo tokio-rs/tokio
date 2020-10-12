@@ -118,7 +118,7 @@ where
             cx,
             slice
         ))?;
-        buf.add_filled(n);
+        buf.advance(n);
         Poll::Ready(Ok(()))
     }
 }

@@ -205,7 +205,7 @@ impl Buf {
 
     pub(crate) fn copy_to(&mut self, dst: &mut ReadBuf<'_>) -> usize {
         let n = cmp::min(self.len(), dst.remaining());
-        dst.append(&self.bytes()[..n]);
+        dst.put_slice(&self.bytes()[..n]);
         self.pos += n;
 
         if self.pos == self.buf.len() {

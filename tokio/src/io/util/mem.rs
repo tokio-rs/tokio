@@ -167,7 +167,7 @@ impl AsyncRead for Pipe {
     ) -> Poll<std::io::Result<()>> {
         if self.buffer.has_remaining() {
             let max = self.buffer.remaining().min(buf.remaining());
-            buf.append(&self.buffer[..max]);
+            buf.put_slice(&self.buffer[..max]);
             self.buffer.advance(max);
             if max > 0 {
                 // The passed `buf` might have been empty, don't wake up if

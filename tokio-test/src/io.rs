@@ -212,7 +212,7 @@ impl Inner {
                 let n = cmp::min(dst.remaining(), data.len());
 
                 // Copy the data into the `dst` slice
-                dst.append(&data[..n]);
+                dst.put_slice(&data[..n]);
 
                 // Drain the data from the source
                 data.drain(..n);

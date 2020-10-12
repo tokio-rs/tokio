@@ -712,7 +712,7 @@ impl AsyncRead for Mock {
         match self.calls.pop_front() {
             Some(Ready(Ok(Op::Data(data)))) => {
                 debug_assert!(dst.remaining() >= data.len());
-                dst.append(&data);
+                dst.put_slice(&data);
                 Ready(Ok(()))
             }
             Some(Ready(Ok(_))) => panic!(),

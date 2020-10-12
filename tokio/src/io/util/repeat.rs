@@ -55,7 +55,7 @@ impl AsyncRead for Repeat {
     ) -> Poll<io::Result<()>> {
         // TODO: could be faster, but should we unsafe it?
         while buf.remaining() != 0 {
-            buf.append(&[self.byte]);
+            buf.put_slice(&[self.byte]);
         }
         Poll::Ready(Ok(()))
     }

@@ -25,7 +25,7 @@ impl AsyncRead for Reader {
             for x in &mut buf.initialize_unfilled_to(n)[..n] {
                 *x = 0;
             }
-            buf.add_filled(n);
+            buf.advance(n);
             this.remaining -= n;
             Poll::Ready(Ok(()))
         } else {
