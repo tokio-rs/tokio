@@ -61,7 +61,7 @@ impl TcpStream {
     ///
     /// `addr` is an address of the remote host. Anything which implements the
     /// [`ToSocketAddrs`] trait can be supplied as the address. Note that
-    /// strings only implement this trait when the **`dns`** feature is enabled,
+    /// strings only implement this trait when the **`net`** feature is enabled,
     /// as strings may contain domain names that need to be resolved.
     ///
     /// If `addr` yields multiple addresses, connect will be attempted with each
@@ -82,26 +82,6 @@ impl TcpStream {
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     // Connect to a peer
     ///     let mut stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///
-    ///     // Write some data.
-    ///     stream.write_all(b"hello world!").await?;
-    ///
-    ///     Ok(())
-    /// }
-    /// ```
-    ///
-    /// Without the `dns` feature:
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    /// use tokio::prelude::*;
-    /// use std::error::Error;
-    /// use std::net::Ipv4Addr;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     // Connect to a peer
-    ///     let mut stream = TcpStream::connect((Ipv4Addr::new(127, 0, 0, 1), 8080)).await?;
     ///
     ///     // Write some data.
     ///     stream.write_all(b"hello world!").await?;

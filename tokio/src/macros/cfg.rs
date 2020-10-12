@@ -6,7 +6,7 @@ macro_rules! cfg_block_on {
         $(
             #[cfg(any(
                     feature = "fs",
-                    feature = "dns",
+                    feature = "net",
                     feature = "io-std",
                     feature = "rt",
                     ))]
@@ -27,16 +27,6 @@ macro_rules! cfg_atomic_waker_impl {
                 feature = "time",
             ))]
             #[cfg(not(loom))]
-            $item
-        )*
-    }
-}
-
-macro_rules! cfg_dns {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "dns")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "dns")))]
             $item
         )*
     }
@@ -338,7 +328,6 @@ macro_rules! cfg_coop {
     ($($item:item)*) => {
         $(
             #[cfg(any(
-                    feature = "dns",
                     feature = "fs",
                     feature = "io-std",
                     feature = "net",

@@ -30,12 +30,12 @@ default = []
 
 # enable everything
 full = [
-  "dns",
   "fs",
   "io-util",
   "io-std",
   "macros",
   "net",
+  "parking_lot",
   "process",
   "rt",
   "rt-multi-thread",
@@ -45,14 +45,12 @@ full = [
   "time",
 ]
 
-dns = []
 fs = []
 io-util = ["memchr"]
 # stdin, stdout, stderr
 io-std = []
 macros = ["tokio-macros"]
 net = [
-  "dns",
   "lazy_static",
   "libc",
   "mio/os-poll",

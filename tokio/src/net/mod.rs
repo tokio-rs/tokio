@@ -27,12 +27,10 @@ mod addr;
 pub(crate) use addr::to_socket_addrs;
 pub use addr::ToSocketAddrs;
 
-cfg_dns! {
+cfg_net! {
     mod lookup_host;
     pub use lookup_host::lookup_host;
-}
 
-cfg_net! {
     pub mod tcp;
     pub use tcp::listener::TcpListener;
     pub use tcp::socket::TcpSocket;
