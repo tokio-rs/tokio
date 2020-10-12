@@ -24,7 +24,7 @@ mod select;
 
 use proc_macro::TokenStream;
 
-/// Marks async function to be executed by selected runtime. This macro helps
+/// Marks async function to be executed by the selected runtime. This macro helps
 /// set up a `Runtime` without requiring the user to use
 /// [Runtime](../tokio/runtime/struct.Runtime.html) or
 /// [Builder](../tokio/runtime/struct.Builder.html) directly.

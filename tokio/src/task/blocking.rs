@@ -17,7 +17,7 @@ cfg_rt_threaded! {
     /// using the [`join!`] macro. To avoid this issue, use [`spawn_blocking`]
     /// instead.
     ///
-    /// Note that this function can only be used when `core_threads > 1`.
+    /// Note that this function can only be used when using the `multi_thread` runtime.
     ///
     /// Code running behind `block_in_place` cannot be cancelled. When you shut
     /// down the executor, it will wait indefinitely for all blocking operations
