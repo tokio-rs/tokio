@@ -70,7 +70,7 @@ use proc_macro::TokenStream;
 ///
 /// ```rust
 /// fn main() {
-///     tokio::runtime::Builder::new()
+///     tokio::runtime::Builder::new_multi_thread()
 ///         .enable_all()
 ///         .build()
 ///         .unwrap()
@@ -95,8 +95,7 @@ use proc_macro::TokenStream;
 ///
 /// ```rust
 /// fn main() {
-///     tokio::runtime::Builder::new()
-///         .core_threads(0)
+///     tokio::runtime::Builder::new_current_thread()
 ///         .enable_all()
 ///         .build()
 ///         .unwrap()
@@ -119,8 +118,8 @@ use proc_macro::TokenStream;
 ///
 /// ```rust
 /// fn main() {
-///     tokio::runtime::Builder::new()
-///         .core_threads(2)
+///     tokio::runtime::Builder::new_multi_thread()
+///         .worker_threads(2)
 ///         .enable_all()
 ///         .build()
 ///         .unwrap()
@@ -156,7 +155,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ### Using default
 ///
 /// ```rust
-/// #[tokio::main]
+/// #[tokio::main(flavor = "current_thread")]
 /// async fn main() {
 ///     println!("Hello world");
 /// }
@@ -166,8 +165,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ```rust
 /// fn main() {
-///     tokio::runtime::Builder::new()
-///         .core_threads(0)
+///     tokio::runtime::Builder::new_current_thread()
 ///         .enable_all()
 ///         .build()
 ///         .unwrap()
