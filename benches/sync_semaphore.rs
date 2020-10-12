@@ -49,8 +49,7 @@ fn uncontended_concurrent_multi(b: &mut Bencher) {
 }
 
 fn uncontended_concurrent_single(b: &mut Bencher) {
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(0)
+    let rt = tokio::runtime::Builder::new_current_thread()
         .build()
         .unwrap();
 
