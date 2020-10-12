@@ -5,14 +5,12 @@ cfg_io_driver! {
 
 #[cfg(any(
     feature = "fs",
+    feature = "net",
     feature = "process",
     feature = "rt-core",
     feature = "rt-util",
     feature = "sync",
     feature = "signal",
-    feature = "tcp",
-    feature = "udp",
-    feature = "uds",
 ))]
 pub(crate) mod linked_list;
 
