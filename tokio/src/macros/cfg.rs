@@ -261,26 +261,6 @@ macro_rules! cfg_rt {
     }
 }
 
-macro_rules! cfg_task {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "rt")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
-            $item
-        )*
-    }
-}
-
-macro_rules! doc_rt {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "rt")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
-            $item
-        )*
-    }
-}
-
 macro_rules! cfg_not_rt {
     ($($item:item)*) => {
         $( #[cfg(not(feature = "rt"))] $item )*

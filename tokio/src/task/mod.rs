@@ -215,7 +215,7 @@
 //! [`task::yield_now`]: crate::task::yield_now()
 //! [`thread::yield_now`]: std::thread::yield_now
 
-cfg_task! {
+cfg_rt! {
     pub use crate::runtime::task::{JoinError, JoinHandle};
 }
 

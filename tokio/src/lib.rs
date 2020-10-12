@@ -408,7 +408,7 @@ cfg_macros! {
     #[doc(hidden)]
     pub use tokio_macros::select_priv_declare_output_enum;
 
-    doc_rt! {
+    cfg_rt! {
         cfg_rt_threaded! {
             // This is the docs.rs case (with all features) so make sure macros
             // is included in doc(cfg).

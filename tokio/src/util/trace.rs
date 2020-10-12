@@ -1,5 +1,5 @@
 cfg_trace! {
-    cfg_task! {
+    cfg_rt! {
         use std::future::Future;
         use std::pin::Pin;
         use std::task::{Context, Poll};
@@ -47,7 +47,7 @@ cfg_trace! {
 }
 
 cfg_not_trace! {
-    cfg_task! {
+    cfg_rt! {
         #[inline]
         pub(crate) fn task<F>(task: F, _: &'static str) -> F {
             // nop
