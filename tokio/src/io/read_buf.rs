@@ -171,7 +171,7 @@ impl<'a> ReadBuf<'a> {
         self.filled = 0;
     }
 
-    /// Increases the size of the filled region of the buffer.
+    /// Advances the size of the filled region of the buffer.
     ///
     /// The number of initialized bytes is not changed.
     ///
@@ -179,7 +179,7 @@ impl<'a> ReadBuf<'a> {
     ///
     /// Panics if the filled region of the buffer would become larger than the initialized region.
     #[inline]
-    pub fn add_filled(&mut self, n: usize) {
+    pub fn advance(&mut self, n: usize) {
         let new = self.filled.checked_add(n).expect("filled overflow");
         self.set_filled(new);
     }
@@ -225,7 +225,7 @@ impl<'a> ReadBuf<'a> {
     ///
     /// Panics if `self.remaining()` is less than `buf.len()`.
     #[inline]
-    pub fn append(&mut self, buf: &[u8]) {
+    pub fn put_slice(&mut self, buf: &[u8]) {
         assert!(
             self.remaining() >= buf.len(),
             "buf.len() must fit in remaining()"

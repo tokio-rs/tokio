@@ -25,6 +25,6 @@ async fn test_socket_pair() {
     let uid = unsafe { geteuid() };
     let gid = unsafe { getegid() };
 
-    assert_eq!(cred_a.uid, uid);
-    assert_eq!(cred_a.gid, gid);
+    assert_eq!(cred_a.uid(), uid);
+    assert_eq!(cred_a.gid(), gid);
 }

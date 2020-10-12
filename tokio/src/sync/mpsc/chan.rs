@@ -147,7 +147,7 @@ impl<T, S: Semaphore> Tx<T, S> {
         self.inner.semaphore.is_closed()
     }
 
-    pub(crate) async fn closed(&mut self) {
+    pub(crate) async fn closed(&self) {
         use std::future::Future;
         use std::pin::Pin;
         use std::task::Poll;

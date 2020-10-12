@@ -332,11 +332,11 @@ impl<T> Sender<T> {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let (mut tx1, rx) = mpsc::channel::<()>(1);
-    ///     let mut tx2 = tx1.clone();
-    ///     let mut tx3 = tx1.clone();
-    ///     let mut tx4 = tx1.clone();
-    ///     let mut tx5 = tx1.clone();
+    ///     let (tx1, rx) = mpsc::channel::<()>(1);
+    ///     let tx2 = tx1.clone();
+    ///     let tx3 = tx1.clone();
+    ///     let tx4 = tx1.clone();
+    ///     let tx5 = tx1.clone();
     ///     tokio::spawn(async move {
     ///         drop(rx);
     ///     });
@@ -351,7 +351,7 @@ impl<T> Sender<T> {
     ////     println!("Receiver dropped");
     /// }
     /// ```
-    pub async fn closed(&mut self) {
+    pub async fn closed(&self) {
         self.chan.closed().await
     }
 
