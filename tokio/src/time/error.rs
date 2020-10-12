@@ -1,4 +1,4 @@
-//! Time error types
+//! Time error types.
 
 use self::Kind::*;
 use std::error;
