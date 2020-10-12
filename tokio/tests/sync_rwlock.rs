@@ -166,7 +166,7 @@ async fn write_order() {
 }
 
 // A single RwLock is contested by tasks in multiple threads
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "threaded", num_workers = 8)]
 async fn multithreaded() {
     let barrier = Arc::new(Barrier::new(5));
     let rwlock = Arc::new(RwLock::<u32>::new(0));

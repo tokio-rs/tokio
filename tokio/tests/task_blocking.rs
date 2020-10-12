@@ -28,7 +28,7 @@ async fn basic_blocking() {
     }
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "threaded")]
 async fn block_in_blocking() {
     // Run a few times
     for _ in 0..100 {
@@ -51,7 +51,7 @@ async fn block_in_blocking() {
     }
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "threaded")]
 async fn block_in_block() {
     // Run a few times
     for _ in 0..100 {
@@ -71,7 +71,7 @@ async fn block_in_block() {
     }
 }
 
-#[tokio::test(basic_scheduler)]
+#[tokio::test(flavor = "current_thread")]
 #[should_panic]
 async fn no_block_in_basic_scheduler() {
     task::block_in_place(|| {});
