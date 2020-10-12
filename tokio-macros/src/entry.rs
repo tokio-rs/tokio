@@ -13,11 +13,11 @@ impl RuntimeFlavor {
     fn from_str(s: &str) -> Result<RuntimeFlavor, String> {
         match s {
             "current_thread" => Ok(RuntimeFlavor::CurrentThread),
-            "threaded" => Ok(RuntimeFlavor::Threaded),
+            "multi_thread" => Ok(RuntimeFlavor::Threaded),
             "single_threaded" => Err("The single threaded runtime flavor is called `current_thread`.".to_string()),
             "basic_scheduler" => Err("The `basic_scheduler` runtime flavor has been renamed to `current_thread`.".to_string()),
-            "threaded_scheduler" => Err("The `threaded_scheduler` runtime flavor has been renamed to `threaded`.".to_string()),
-            _ => Err(format!("No such runtime flavor `{}`. The runtime flavors are `current_thread` and `threaded`.", s)),
+            "threaded_scheduler" => Err("The `threaded_scheduler` runtime flavor has been renamed to `multi_thread`.".to_string()),
+            _ => Err(format!("No such runtime flavor `{}`. The runtime flavors are `current_thread` and `multi_thread`.", s)),
         }
     }
 }
@@ -85,7 +85,7 @@ impl Configuration {
         match (flavor, self.worker_threads) {
             (CurrentThread, Some((_, worker_threads_span))) => Err(syn::Error::new(
                 worker_threads_span,
-                "The `worker_threads` option requires the `threaded` runtime flavor.",
+                "The `worker_threads` option requires the `multi_thread` runtime flavor.",
             )),
             (CurrentThread, None) => Ok(FinalConfig {
                 flavor,
@@ -97,9 +97,9 @@ impl Configuration {
             }),
             (Threaded, _) => {
                 let msg = if self.flavor.is_none() {
-                    "The default runtime flavor is `threaded`, but the `rt-threaded` feature is disabled."
+                    "The default runtime flavor is `multi_thread`, but the `rt-threaded` feature is disabled."
                 } else {
-                    "The runtime flavor `threaded` requires the `rt-threaded` feature."
+                    "The runtime flavor `multi_thread` requires the `rt-threaded` feature."
                 };
                 Err(syn::Error::new(Span::call_site(), msg))
             }
@@ -192,8 +192,8 @@ fn parse_knobs(
                 }
                 let name = ident.unwrap().to_string().to_lowercase();
                 let msg = match name.as_str() {
-                    "threaded_scheduler" | "threaded" => {
-                        format!("Set the runtime flavor with #[{}(flavor = \"threaded\")].", macro_name)
+                    "threaded_scheduler" | "multi_thread" => {
+                        format!("Set the runtime flavor with #[{}(flavor = \"multi_thread\")].", macro_name)
                     },
                     "basic_scheduler" | "current_thread" | "single_threaded" => {
                         format!("Set the runtime flavor with #[{}(flavor = \"current_thread\")].", macro_name)

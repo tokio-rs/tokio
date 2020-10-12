@@ -28,7 +28,7 @@ async fn basic_blocking() {
     }
 }
 
-#[tokio::test(flavor = "threaded")]
+#[tokio::test(flavor = "multi_thread")]
 async fn block_in_blocking() {
     // Run a few times
     for _ in 0..100 {
@@ -51,7 +51,7 @@ async fn block_in_blocking() {
     }
 }
 
-#[tokio::test(flavor = "threaded")]
+#[tokio::test(flavor = "multi_thread")]
 async fn block_in_block() {
     // Run a few times
     for _ in 0..100 {

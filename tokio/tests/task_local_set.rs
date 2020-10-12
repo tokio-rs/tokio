@@ -20,7 +20,7 @@ async fn local_basic_scheduler() {
         .await;
 }
 
-#[tokio::test(flavor = "threaded")]
+#[tokio::test(flavor = "multi_thread")]
 async fn local_threadpool() {
     thread_local! {
         static ON_RT_THREAD: Cell<bool> = Cell::new(false);
@@ -40,7 +40,7 @@ async fn local_threadpool() {
         .await;
 }
 
-#[tokio::test(flavor = "threaded")]
+#[tokio::test(flavor = "multi_thread")]
 async fn localset_future_threadpool() {
     thread_local! {
         static ON_LOCAL_THREAD: Cell<bool> = Cell::new(false);
@@ -55,7 +55,7 @@ async fn localset_future_threadpool() {
     local.await;
 }
 
-#[tokio::test(flavor = "threaded")]
+#[tokio::test(flavor = "multi_thread")]
 async fn localset_future_timers() {
     static RAN1: AtomicBool = AtomicBool::new(false);
     static RAN2: AtomicBool = AtomicBool::new(false);
@@ -99,7 +99,7 @@ async fn localset_future_drives_all_local_futs() {
     assert!(RAN3.load(Ordering::SeqCst));
 }
 
-#[tokio::test(flavor = "threaded")]
+#[tokio::test(flavor = "multi_thread")]
 async fn local_threadpool_timer() {
     // This test ensures that runtime services like the timer are properly
     // set for the local task set.
@@ -148,7 +148,7 @@ fn local_threadpool_blocking_in_place() {
     });
 }
 
-#[tokio::test(flavor = "threaded")]
+#[tokio::test(flavor = "multi_thread")]
 async fn local_threadpool_blocking_run() {
     thread_local! {
         static ON_RT_THREAD: Cell<bool> = Cell::new(false);
@@ -176,7 +176,7 @@ async fn local_threadpool_blocking_run() {
         .await;
 }
 
-#[tokio::test(flavor = "threaded")]
+#[tokio::test(flavor = "multi_thread")]
 async fn all_spawns_are_local() {
     use futures::future;
     thread_local! {
@@ -202,7 +202,7 @@ async fn all_spawns_are_local() {
         .await;
 }
 
-#[tokio::test(flavor = "threaded")]
+#[tokio::test(flavor = "multi_thread")]
 async fn nested_spawn_is_local() {
     thread_local! {
         static ON_RT_THREAD: Cell<bool> = Cell::new(false);
