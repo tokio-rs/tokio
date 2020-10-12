@@ -159,7 +159,7 @@
 //!
 //! #### block_in_place
 //!
-//! When using the [threaded runtime][rt-threaded], the [`task::block_in_place`]
+//! When using the [threaded runtime][rt-multi-thread], the [`task::block_in_place`]
 //! function is also available. Like `task::spawn_blocking`, this function
 //! allows running a blocking operation from an asynchronous context. Unlike
 //! `spawn_blocking`, however, `block_in_place` works by transitioning the
@@ -211,7 +211,7 @@
 //!
 //! [`task::spawn_blocking`]: crate::task::spawn_blocking
 //! [`task::block_in_place`]: crate::task::block_in_place
-//! [rt-threaded]: ../runtime/index.html#threaded-scheduler
+//! [rt-multi-thread]: ../runtime/index.html#threaded-scheduler
 //! [`task::yield_now`]: crate::task::yield_now()
 //! [`thread::yield_now`]: std::thread::yield_now
 

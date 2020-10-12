@@ -277,8 +277,8 @@ macro_rules! cfg_not_rt_core {
 macro_rules! cfg_rt_threaded {
     ($($item:item)*) => {
         $(
-            #[cfg(feature = "rt-threaded")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "rt-threaded")))]
+            #[cfg(feature = "rt-multi-thread")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
             $item
         )*
     }
@@ -296,7 +296,7 @@ macro_rules! cfg_rt_util {
 
 macro_rules! cfg_not_rt_threaded {
     ($($item:item)*) => {
-        $( #[cfg(not(feature = "rt-threaded"))] $item )*
+        $( #[cfg(not(feature = "rt-multi-thread"))] $item )*
     }
 }
 

@@ -39,7 +39,7 @@ full = [
   "process",
   "rt-core",
   "rt-util",
-  "rt-threaded",
+  "rt-multi-thread",
   "signal",
   "stream",
   "sync",
@@ -65,7 +65,7 @@ process = [
 # Includes basic task execution capabilities
 rt-core = ["slab"]
 rt-util = []
-rt-threaded = [
+rt-multi-thread = [
   "num_cpus",
   "rt-core",
 ]

@@ -97,9 +97,9 @@ impl Configuration {
             }),
             (Threaded, _) => {
                 let msg = if self.flavor.is_none() {
-                    "The default runtime flavor is `multi_thread`, but the `rt-threaded` feature is disabled."
+                    "The default runtime flavor is `multi_thread`, but the `rt-multi-thread` feature is disabled."
                 } else {
-                    "The runtime flavor `multi_thread` requires the `rt-threaded` feature."
+                    "The runtime flavor `multi_thread` requires the `rt-multi-thread` feature."
                 };
                 Err(syn::Error::new(Span::call_site(), msg))
             }

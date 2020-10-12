@@ -16,7 +16,7 @@ cfg_io_driver! {
 ))]
 pub(crate) mod linked_list;
 
-#[cfg(any(feature = "rt-threaded", feature = "macros", feature = "stream"))]
+#[cfg(any(feature = "rt-multi-thread", feature = "macros", feature = "stream"))]
 mod rand;
 
 cfg_rt_core! {

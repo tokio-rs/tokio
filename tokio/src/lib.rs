@@ -74,7 +74,7 @@
 //!
 //! - `full`: Enables all Tokio public API features listed below.
 //! - `rt-core`: Enables `tokio::spawn` and the basic (single-threaded) scheduler.
-//! - `rt-threaded`: Enables the heavier, multi-threaded, work-stealing scheduler.
+//! - `rt-multi-thread`: Enables the heavier, multi-threaded, work-stealing scheduler.
 //! - `rt-util`: Enables non-scheduler utilities.
 //! - `io-util`: Enables the IO based `Ext` traits.
 //! - `io-std`: Enable `Stdout`, `Stdin` and `Stderr` types.
@@ -199,9 +199,9 @@
 //! and managing runtimes. You should use that module if the `#[tokio::main]` macro doesn't
 //! provide the functionality you need.
 //!
-//! Using the runtime requires the "rt-core" or "rt-threaded" feature flags, to
+//! Using the runtime requires the "rt-core" or "rt-multi-thread" feature flags, to
 //! enable the basic [single-threaded scheduler][rt-core] and the [thread-pool
-//! scheduler][rt-threaded], respectively. See the [`runtime` module
+//! scheduler][rt-multi-thread], respectively. See the [`runtime` module
 //! documentation][rt-features] for details. In addition, the "macros" feature
 //! flag enables the `#[tokio::main]` and `#[tokio::test]` attributes.
 //!
@@ -210,7 +210,7 @@
 //! [`Builder`]: crate::runtime::Builder
 //! [`Runtime`]: crate::runtime::Runtime
 //! [rt-core]: runtime/index.html#basic-scheduler
-//! [rt-threaded]: runtime/index.html#threaded-scheduler
+//! [rt-multi-thread]: runtime/index.html#threaded-scheduler
 //! [rt-features]: runtime/index.html#runtime-scheduler
 //!
 //! ## CPU-bound tasks and blocking code
