@@ -114,7 +114,7 @@ use proc_macro::TokenStream;
 /// ### Set number of worker threads
 ///
 /// ```rust
-/// #[tokio::main(num_workers = 2)]
+/// #[tokio::main(worker_threads = 2)]
 /// async fn main() {
 ///     println!("Hello world");
 /// }
