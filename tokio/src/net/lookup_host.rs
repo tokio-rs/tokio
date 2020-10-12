@@ -1,4 +1,4 @@
-cfg_dns! {
+cfg_net! {
     use crate::net::addr::{self, ToSocketAddrs};
 
     use std::io;

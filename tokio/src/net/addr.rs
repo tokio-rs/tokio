@@ -9,7 +9,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV
 ///
 /// Implementations of `ToSocketAddrs` for string types require a DNS lookup.
 /// These implementations are only provided when Tokio is used with the
-/// **`dns`** feature flag.
+/// **`net`** feature flag.
 ///
 /// # Calling
 ///
@@ -23,12 +23,13 @@ pub trait ToSocketAddrs: sealed::ToSocketAddrsPriv {}
 
 type ReadyFuture<T> = future::Ready<io::Result<T>>;
 
-#[cfg(any(feature = "dns", feature = "net"))]
-pub(crate) fn to_socket_addrs<T>(arg: T) -> T::Future
-where
-    T: ToSocketAddrs,
-{
-    arg.to_socket_addrs(sealed::Internal)
+cfg_net! {
+    pub(crate) fn to_socket_addrs<T>(arg: T) -> T::Future
+    where
+        T: ToSocketAddrs,
+    {
+        arg.to_socket_addrs(sealed::Internal)
+    }
 }
 
 // ===== impl &impl ToSocketAddrs =====
@@ -143,7 +144,7 @@ impl sealed::ToSocketAddrsPriv for &[SocketAddr] {
     }
 }
 
-cfg_dns! {
+cfg_net! {
     // ===== impl str =====
 
     impl ToSocketAddrs for str {}
@@ -256,7 +257,7 @@ pub(crate) mod sealed {
     #[allow(missing_debug_implementations)]
     pub struct Internal;
 
-    cfg_dns! {
+    cfg_net! {
         use crate::blocking::JoinHandle;
 
         use std::option;

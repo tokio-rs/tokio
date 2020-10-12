@@ -80,7 +80,7 @@ impl TcpListener {
     /// method.
     ///
     /// The address type can be any implementor of the [`ToSocketAddrs`] trait.
-    /// Note that strings only implement this trait when the **`dns`** feature
+    /// Note that strings only implement this trait when the **`net`** feature
     /// is enabled, as strings may contain domain names that need to be resolved.
     ///
     /// If `addr` yields multiple addresses, bind will be attempted with each of
@@ -102,25 +102,6 @@ impl TcpListener {
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
     ///     let listener = TcpListener::bind("127.0.0.1:2345").await?;
-    ///
-    ///     // use the listener
-    ///
-    ///     # let _ = listener;
-    ///     Ok(())
-    /// }
-    /// ```
-    ///
-    /// Without the `dns` feature:
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpListener;
-    /// use std::net::Ipv4Addr;
-    ///
-    /// use std::io;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> io::Result<()> {
-    ///     let listener = TcpListener::bind((Ipv4Addr::new(127, 0, 0, 1), 2345)).await?;
     ///
     ///     // use the listener
     ///

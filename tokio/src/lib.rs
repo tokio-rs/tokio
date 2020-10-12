@@ -17,7 +17,7 @@
 ))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-//! A runtime for writing reliable, asynchronous, and slim applications.
+//! A runtime for writing reliable network applications without compromising speed.
 //!
 //! Tokio is an event-driven, non-blocking I/O platform for writing asynchronous
 //! applications with the Rust programming language. At a high level, it
@@ -59,52 +59,6 @@
 //! ```toml
 //! tokio = { version = "0.2", features = ["full"] }
 //! ```
-//!
-//! ## Feature flags
-//!
-//! Tokio uses a set of [feature flags] to reduce the amount of compiled code. It
-//! is possible to just enable certain features over others. By default, Tokio
-//! does not enable any features but allows one to enable a subset for their use
-//! case. Below is a list of the available feature flags. You may also notice
-//! above each function, struct and trait there is listed one or more feature flags
-//! that are required for that item to be used. If you are new to Tokio it is
-//! recommended that you use the `full` feature flag which will enable all public APIs.
-//! Beware though that this will pull in many extra dependencies that you may not
-//! need.
-//!
-//! - `full`: Enables all Tokio public API features listed below.
-//! - `rt-core`: Enables `tokio::spawn`, the basic (current thread) scheduler,
-//! and non-scheduler utilities.
-//! - `rt-multi-thread`: Enables the heavier, multi-threaded, work-stealing scheduler.
-//! - `io-util`: Enables the IO based `Ext` traits.
-//! - `io-std`: Enable `Stdout`, `Stdin` and `Stderr` types.
-//! - `net`: Enables `tokio::net` types such as `TcpStream`, `UnixStream` and `UdpSocket`.
-//! - `time`: Enables `tokio::time` types and allows the schedulers to enable
-//! the built in timer.
-//! - `process`: Enables `tokio::process` types.
-//! - `macros`: Enables `#[tokio::main]` and `#[tokio::test]` macros.
-//! - `sync`: Enables all `tokio::sync` types.
-//! - `stream`: Enables optional `Stream` implementations for types within Tokio.
-//! - `signal`: Enables all `tokio::signal` types.
-//! - `fs`: Enables `tokio::fs` types.
-//! - `dns`: Enables async `tokio::net::ToSocketAddrs`.
-//! - `test-util`: Enables testing based infrastructure for the Tokio runtime.
-//! - `blocking`: Enables `block_in_place` and `spawn_blocking`.
-//!
-//! _Note: `AsyncRead` and `AsyncWrite` traits do not require any features and are
-//! always available._
-//!
-//! ### Internal features
-//!
-//! These features do not expose any new API, but influence internal
-//! implementation aspects of Tokio, and can pull in additional
-//! dependencies. They are not included in `full`:
-//!
-//! - `parking_lot`: As a potential optimization, use the _parking_lot_ crate's
-//! synchronization primitives internally. MSRV may increase according to the
-//! _parking_lot_ release in use.
-//!
-//! [feature flags]: https://doc.rust-lang.org/cargo/reference/manifest.html#the-features-section
 //!
 //! ### Authoring applications
 //!
@@ -332,6 +286,50 @@
 //!     }
 //! }
 //! ```
+//!
+//! ## Feature flags
+//!
+//! Tokio uses a set of [feature flags] to reduce the amount of compiled code. It
+//! is possible to just enable certain features over others. By default, Tokio
+//! does not enable any features but allows one to enable a subset for their use
+//! case. Below is a list of the available feature flags. You may also notice
+//! above each function, struct and trait there is listed one or more feature flags
+//! that are required for that item to be used. If you are new to Tokio it is
+//! recommended that you use the `full` feature flag which will enable all public APIs.
+//! Beware though that this will pull in many extra dependencies that you may not
+//! need.
+//!
+//! - `full`: Enables all Tokio public API features listed below.
+//! - `rt`: Enables `tokio::spawn`, the basic (current thread) scheduler,
+//!         and non-scheduler utilities.
+//! - `rt-multi-thread`: Enables the heavier, multi-threaded, work-stealing scheduler.
+//! - `io-util`: Enables the IO based `Ext` traits.
+//! - `io-std`: Enable `Stdout`, `Stdin` and `Stderr` types.
+//! - `net`: Enables `tokio::net` types such as `TcpStream`, `UnixStream` and `UdpSocket`.
+//! - `time`: Enables `tokio::time` types and allows the schedulers to enable
+//!           the built in timer.
+//! - `process`: Enables `tokio::process` types.
+//! - `macros`: Enables `#[tokio::main]` and `#[tokio::test]` macros.
+//! - `sync`: Enables all `tokio::sync` types.
+//! - `stream`: Enables optional `Stream` implementations for types within Tokio.
+//! - `signal`: Enables all `tokio::signal` types.
+//! - `fs`: Enables `tokio::fs` types.
+//! - `test-util`: Enables testing based infrastructure for the Tokio runtime.
+//!
+//! _Note: `AsyncRead` and `AsyncWrite` traits do not require any features and are
+//! always available._
+//!
+//! ### Internal features
+//!
+//! These features do not expose any new API, but influence internal
+//! implementation aspects of Tokio, and can pull in additional
+//! dependencies.
+//!
+//! - `parking_lot`: As a potential optimization, use the _parking_lot_ crate's
+//! synchronization primitives internally. MSRV may increase according to the
+//! _parking_lot_ release in use.
+//!
+//! [feature flags]: https://doc.rust-lang.org/cargo/reference/manifest.html#the-features-section
 
 // Includes re-exports used by macros.
 //
@@ -359,7 +357,7 @@ cfg_process! {
     pub mod process;
 }
 
-#[cfg(any(feature = "dns", feature = "fs", feature = "io-std"))]
+#[cfg(any(feature = "net", feature = "fs", feature = "io-std"))]
 mod blocking;
 
 cfg_rt! {
