@@ -11,7 +11,7 @@ use std::net::{Shutdown, SocketAddr};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-cfg_tcp! {
+cfg_net! {
     /// A TCP stream between a local and a remote socket.
     ///
     /// A TCP stream can either be created by connecting to an endpoint, via the

@@ -6,7 +6,7 @@ use std::fmt;
 use std::io;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 
-cfg_udp! {
+cfg_net! {
     /// A UDP socket
     ///
     /// UDP is "connectionless", unlike TCP. Meaning, regardless of what address you've bound to, a `UdpSocket`

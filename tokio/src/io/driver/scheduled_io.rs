@@ -32,7 +32,7 @@ cfg_io_readiness! {
 
 #[derive(Debug, Default)]
 struct Waiters {
-    #[cfg(any(feature = "tcp", feature = "udp", feature = "uds"))]
+    #[cfg(feature = "net")]
     /// List of all current waiters
     list: WaitList,
 
@@ -220,7 +220,7 @@ impl ScheduledIo {
             }
         }
 
-        #[cfg(any(feature = "tcp", feature = "udp", feature = "uds"))]
+        #[cfg(feature = "net")]
         'outer: loop {
             let mut iter = waiters.list.drain_filter(|w| ready.satisfies(w.interest));
 

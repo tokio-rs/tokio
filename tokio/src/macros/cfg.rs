@@ -4,12 +4,10 @@ macro_rules! cfg_resource_drivers {
     ($($item:item)*) => {
         $(
             #[cfg(any(
+                all(not(loom), feature = "net"),
                 feature = "process",
                 all(unix, feature = "signal"),
-                all(not(loom), feature = "tcp"),
                 feature = "time",
-                all(not(loom), feature = "udp"),
-                all(not(loom), feature = "uds"),
             ))]
             $item
         )*
@@ -96,13 +94,11 @@ macro_rules! cfg_atomic_waker_impl {
     ($($item:item)*) => {
         $(
             #[cfg(any(
+                feature = "net",
                 feature = "process",
                 all(feature = "rt-core", feature = "rt-util"),
                 feature = "signal",
-                feature = "tcp",
                 feature = "time",
-                feature = "udp",
-                feature = "uds",
             ))]
             #[cfg(not(loom))]
             $item
@@ -140,18 +136,14 @@ macro_rules! cfg_io_driver {
     ($($item:item)*) => {
         $(
             #[cfg(any(
+                feature = "net",
                 feature = "process",
                 all(unix, feature = "signal"),
-                feature = "tcp",
-                feature = "udp",
-                feature = "uds",
             ))]
             #[cfg_attr(docsrs, doc(cfg(any(
+                feature = "net",
                 feature = "process",
                 all(unix, feature = "signal"),
-                feature = "tcp",
-                feature = "udp",
-                feature = "uds",
             ))))]
             $item
         )*
@@ -162,11 +154,9 @@ macro_rules! cfg_not_io_driver {
     ($($item:item)*) => {
         $(
             #[cfg(not(any(
+                feature = "net",
                 feature = "process",
                 all(unix, feature = "signal"),
-                feature = "tcp",
-                feature = "udp",
-                feature = "uds",
             )))]
             $item
         )*
@@ -176,7 +166,7 @@ macro_rules! cfg_not_io_driver {
 macro_rules! cfg_io_readiness {
     ($($item:item)*) => {
         $(
-            #[cfg(any(feature = "udp", feature = "uds", feature = "tcp"))]
+            #[cfg(feature = "net")]
             $item
         )*
     }
@@ -226,6 +216,26 @@ macro_rules! cfg_macros {
             #[cfg(feature = "macros")]
             #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
             #[doc(inline)]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_net {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "net")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "net")))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_net_unix {
+    ($($item:item)*) => {
+        $(
+            #[cfg(all(unix, feature = "net"))]
+            #[cfg_attr(docsrs, doc(cfg(feature = "net")))]
             $item
         )*
     }
@@ -366,16 +376,6 @@ macro_rules! cfg_not_rt_threaded {
     }
 }
 
-macro_rules! cfg_tcp {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "tcp")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "tcp")))]
-            $item
-        )*
-    }
-}
-
 macro_rules! cfg_test_util {
     ($($item:item)*) => {
         $(
@@ -408,26 +408,6 @@ macro_rules! cfg_not_time {
     }
 }
 
-macro_rules! cfg_udp {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "udp")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "udp")))]
-            $item
-        )*
-    }
-}
-
-macro_rules! cfg_uds {
-    ($($item:item)*) => {
-        $(
-            #[cfg(all(unix, feature = "uds"))]
-            #[cfg_attr(docsrs, doc(cfg(feature = "uds")))]
-            $item
-        )*
-    }
-}
-
 macro_rules! cfg_trace {
     ($($item:item)*) => {
         $(
@@ -455,15 +435,13 @@ macro_rules! cfg_coop {
                     feature = "dns",
                     feature = "fs",
                     feature = "io-std",
+                    feature = "net",
                     feature = "process",
                     feature = "rt-core",
                     feature = "signal",
                     feature = "sync",
                     feature = "stream",
-                    feature = "tcp",
                     feature = "time",
-                    feature = "udp",
-                    feature = "uds",
                     ))]
             $item
         )*

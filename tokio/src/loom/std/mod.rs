@@ -16,12 +16,10 @@ pub(crate) mod cell {
 }
 
 #[cfg(any(
+    feature = "net",
     feature = "process",
     feature = "signal",
     feature = "sync",
-    feature = "tcp",
-    feature = "udp",
-    feature = "uds",
 ))]
 pub(crate) mod future {
     pub(crate) use crate::sync::AtomicWaker;

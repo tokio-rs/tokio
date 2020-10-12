@@ -8,7 +8,7 @@ use std::io;
 use std::net::{self, SocketAddr};
 use std::task::{Context, Poll};
 
-cfg_tcp! {
+cfg_net! {
     /// A TCP socket server, listening for connections.
     ///
     /// You can accept a new connection by using the [`accept`](`TcpListener::accept`) method. Alternatively `TcpListener`

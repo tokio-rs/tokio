@@ -15,7 +15,7 @@ use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-cfg_uds! {
+cfg_net_unix! {
     /// A structure representing a connected Unix socket.
     ///
     /// This socket can be connected directly with `UnixStream::connect` or accepted
