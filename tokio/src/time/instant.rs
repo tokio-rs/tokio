@@ -27,7 +27,7 @@ use std::time::Duration;
 ///
 /// # Note
 ///
-/// This type wraps the inner `std` variant and is used to align the tokio
+/// This type wraps the inner `std` variant and is used to align the Tokio
 /// clock for uses of `now()`. This can be useful for testing where you can
 /// take advantage of `time::pause()` and `time::advance()`.
 #[derive(Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Hash)]
