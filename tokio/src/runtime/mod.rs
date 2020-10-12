@@ -114,7 +114,7 @@
 //!
 //! The current-thread scheduler provides a _single-threaded_ future executor.
 //! All tasks will be created and executed on the current thread. This requires
-//! the `rt-core` feature flag.
+//! the `rt` feature flag.
 //! ```
 //! use tokio::runtime;
 //!
@@ -181,7 +181,7 @@ pub(crate) mod enter;
 
 pub(crate) mod task;
 
-cfg_rt_core! {
+cfg_rt! {
     mod basic_scheduler;
     use basic_scheduler::BasicScheduler;
 
@@ -216,7 +216,7 @@ cfg_rt_threaded! {
     use self::thread_pool::ThreadPool;
 }
 
-cfg_rt_core! {
+cfg_rt! {
     use crate::task::JoinHandle;
 
     use std::future::Future;
@@ -266,7 +266,7 @@ cfg_rt_core! {
     #[derive(Debug)]
     enum Kind {
         /// Execute all tasks on the current-thread.
-        #[cfg(feature = "rt-core")]
+        #[cfg(feature = "rt")]
         CurrentThread(BasicScheduler<driver::Driver>),
 
         /// Execute tasks across multiple threads.
@@ -283,7 +283,7 @@ cfg_rt_core! {
         /// This results in a scheduler, I/O driver, and time driver being
         /// initialized. The type of scheduler used depends on what feature flags
         /// are enabled: if the `rt-threaded` feature is enabled, the [threaded
-        /// scheduler] is used, while if only the `rt-core` feature is enabled, the
+        /// scheduler] is used, while if only the `rt` feature is enabled, the
         /// [basic scheduler] is used instead.
         ///
         /// If the threaded scheduler is selected, it will not spawn
@@ -343,7 +343,7 @@ cfg_rt_core! {
         /// });
         /// # }
         /// ```
-        #[cfg(feature = "rt-core")]
+        #[cfg(feature = "rt")]
         pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
         where
             F: Future + Send + 'static,
@@ -393,7 +393,7 @@ cfg_rt_core! {
         /// [handle]: fn@Handle::block_on
         pub fn block_on<F: Future>(&self, future: F) -> F::Output {
             self.handle.enter(|| match &self.kind {
-                #[cfg(feature = "rt-core")]
+                #[cfg(feature = "rt")]
                 Kind::CurrentThread(exec) => exec.block_on(future),
                 #[cfg(feature = "rt-threaded")]
                 Kind::ThreadPool(exec) => exec.block_on(future),

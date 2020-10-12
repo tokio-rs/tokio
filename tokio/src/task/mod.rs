@@ -102,7 +102,7 @@
 //! # }
 //! ```
 //!
-//! `spawn`, `JoinHandle`, and `JoinError` are present when the "rt-core"
+//! `spawn`, `JoinHandle`, and `JoinError` are present when the "rt"
 //! feature flag is enabled.
 //!
 //! [`task::spawn`]: crate::task::spawn()
@@ -219,7 +219,7 @@ cfg_task! {
     pub use crate::runtime::task::{JoinError, JoinHandle};
 }
 
-cfg_rt_core! {
+cfg_rt! {
     mod blocking;
     pub use blocking::spawn_blocking;
 
@@ -231,7 +231,7 @@ cfg_rt_core! {
     }
 }
 
-cfg_rt_util! {
+cfg_rt! {
     mod yield_now;
     pub use yield_now::yield_now;
 

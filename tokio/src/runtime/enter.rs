@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum EnterContext {
-    #[cfg_attr(not(feature = "rt-core"), allow(dead_code))]
+    #[cfg_attr(not(feature = "rt"), allow(dead_code))]
     Entered {
         allow_blocking: bool,
     },
@@ -24,7 +24,7 @@ pub(crate) struct Enter {
     _p: PhantomData<RefCell<()>>,
 }
 
-cfg_rt_core! {
+cfg_rt! {
     use crate::park::thread::ParkError;
 
     use std::time::Duration;
@@ -91,7 +91,7 @@ cfg_rt_threaded! {
     }
 }
 
-cfg_rt_util! {
+cfg_rt! {
     /// Disallow blocking in the current runtime context until the guard is dropped.
     pub(crate) fn disallow_blocking() -> DisallowBlockingGuard {
         let reset = ENTERED.with(|c| {
@@ -137,7 +137,7 @@ cfg_rt_threaded! {
     }
 }
 
-cfg_rt_core! {
+cfg_rt! {
     impl Enter {
         /// Blocks the thread on the specified future, returning the value with
         /// which that future completes.

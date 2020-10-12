@@ -37,8 +37,7 @@ full = [
   "macros",
   "net",
   "process",
-  "rt-core",
-  "rt-util",
+  "rt",
   "rt-threaded",
   "signal",
   "stream",
@@ -71,11 +70,10 @@ process = [
   "winapi/threadpoollegacyapiset",
 ]
 # Includes basic task execution capabilities
-rt-core = ["slab"]
-rt-util = []
+rt = ["slab"]
 rt-threaded = [
   "num_cpus",
-  "rt-core",
+  "rt",
 ]
 signal = [
   "lazy_static",

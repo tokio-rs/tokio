@@ -1,4 +1,4 @@
-#![cfg_attr(not(feature = "rt-core"), allow(dead_code))]
+#![cfg_attr(not(feature = "rt"), allow(dead_code))]
 
 //! Signal driver
 
@@ -175,7 +175,7 @@ impl Handle {
     }
 }
 
-cfg_rt_core! {
+cfg_rt! {
     impl Handle {
         /// Returns a handle to the current driver
         ///
@@ -190,7 +190,7 @@ cfg_rt_core! {
     }
 }
 
-cfg_not_rt_core! {
+cfg_not_rt! {
     impl Handle {
         /// Returns a handle to the current driver
         ///
@@ -200,7 +200,7 @@ cfg_not_rt_core! {
         pub(super) fn current() -> Self {
             panic!(
                 "there is no signal driver running, must be called from the context of Tokio runtime or with\
-                `rt-core` enabled.",
+                `rt` enabled.",
             )
         }
     }

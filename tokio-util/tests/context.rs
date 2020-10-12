@@ -1,4 +1,4 @@
-#![cfg(feature = "rt-core")]
+#![cfg(feature = "rt")]
 #![warn(rust_2018_idioms)]
 
 use tokio::runtime::Builder;

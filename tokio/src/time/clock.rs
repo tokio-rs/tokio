@@ -1,4 +1,4 @@
-#![cfg_attr(not(feature = "rt-core"), allow(dead_code))]
+#![cfg_attr(not(feature = "rt"), allow(dead_code))]
 
 //! Source of time abstraction.
 //!
@@ -39,13 +39,13 @@ cfg_test_util! {
     use crate::time::{Duration, Instant};
     use std::sync::{Arc, Mutex};
 
-    cfg_rt_core! {
+    cfg_rt! {
         fn clock() -> Option<Clock> {
             crate::runtime::context::clock()
         }
     }
 
-    cfg_not_rt_core! {
+    cfg_not_rt! {
         fn clock() -> Option<Clock> {
             None
         }

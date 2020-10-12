@@ -48,7 +48,7 @@ cfg_time! {
     }
 }
 
-cfg_rt_core! {
+cfg_rt! {
     pub(crate) fn spawn_handle() -> Option<crate::runtime::Spawner> {
         CONTEXT.with(|ctx| match *ctx.borrow() {
             Some(ref ctx) => Some(ctx.spawner.clone()),

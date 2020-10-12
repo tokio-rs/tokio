@@ -5,7 +5,7 @@ fn compile_fail_full() {
     #[cfg(feature = "full")]
     t.compile_fail("tests/fail/macros_invalid_input.rs");
 
-    #[cfg(all(feature = "rt-core", not(feature = "full")))]
+    #[cfg(all(feature = "rt", not(feature = "full")))]
     t.compile_fail("tests/fail/macros_core_no_default.rs");
 
     drop(t);

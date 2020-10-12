@@ -79,7 +79,7 @@ pub(crate) trait Schedule: Sync + Sized + 'static {
     }
 }
 
-cfg_rt_core! {
+cfg_rt! {
     /// Create a new task with an associated join handle
     pub(crate) fn joinable<T, S>(task: T) -> (Notified<S>, JoinHandle<T::Output>)
     where
@@ -99,7 +99,7 @@ cfg_rt_core! {
     }
 }
 
-cfg_rt_util! {
+cfg_rt! {
     /// Create a new `!Send` task with an associated join handle
     pub(crate) unsafe fn joinable_local<T, S>(task: T) -> (Notified<S>, JoinHandle<T::Output>)
     where

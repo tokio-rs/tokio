@@ -134,7 +134,7 @@ cfg_rt_threaded! {
     }
 }
 
-cfg_rt_core! {
+cfg_rt! {
     /// Forcibly remove the budgeting constraints early.
     ///
     /// Returns the remaining budget

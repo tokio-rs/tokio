@@ -20,7 +20,7 @@ impl Handle {
     }
 }
 
-cfg_rt_core! {
+cfg_rt! {
     impl Handle {
         /// Tries to get a handle to the current timer.
         ///
@@ -45,7 +45,7 @@ cfg_rt_core! {
     }
 }
 
-cfg_not_rt_core! {
+cfg_not_rt! {
     impl Handle {
         /// Tries to get a handle to the current timer.
         ///
@@ -65,7 +65,7 @@ cfg_not_rt_core! {
         /// panicking.
         pub(crate) fn current() -> Self {
             panic!("there is no timer running, must be called from the context of Tokio runtime or \
-            `rt-core` is not enabled")
+            `rt` is not enabled")
         }
     }
 }
