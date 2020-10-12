@@ -14,7 +14,7 @@ use std::task::Poll;
 
 use pin_project_lite::pin_project;
 
-cfg_rt_util! {
+cfg_rt! {
     /// A set of tasks which are executed on the same thread.
     ///
     /// In some cases, it is necessary to run one or more futures that do not
@@ -158,7 +158,7 @@ pin_project! {
 
 scoped_thread_local!(static CURRENT: Context);
 
-cfg_rt_util! {
+cfg_rt! {
     /// Spawns a `!Send` future on the local task set.
     ///
     /// The spawned future will be run on the same thread that called `spawn_local.`
@@ -346,8 +346,8 @@ impl LocalSet {
     /// [`Runtime::block_on`]: method@crate::runtime::Runtime::block_on
     /// [in-place blocking]: fn@crate::task::block_in_place
     /// [`spawn_blocking`]: fn@crate::task::spawn_blocking
-    #[cfg(feature = "rt-core")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "rt-core")))]
+    #[cfg(feature = "rt")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
     pub fn block_on<F>(&self, rt: &crate::runtime::Runtime, future: F) -> F::Output
     where
         F: Future,

@@ -73,7 +73,7 @@ pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync +
 
 pub(crate) enum Kind {
     CurrentThread,
-    #[cfg(feature = "rt-threaded")]
+    #[cfg(feature = "rt-multi-thread")]
     MultiThread,
 }
 
@@ -84,7 +84,7 @@ impl Builder {
     }
 
     /// TODO
-    #[cfg(feature = "rt-threaded")]
+    #[cfg(feature = "rt-multi-thread")]
     pub fn new_multi_thread() -> Builder {
         Builder::new(Kind::MultiThread)
     }
@@ -365,7 +365,7 @@ impl Builder {
     pub fn build(&mut self) -> io::Result<Runtime> {
         match &self.kind {
             Kind::CurrentThread => self.build_basic_runtime(),
-            #[cfg(feature = "rt-threaded")]
+            #[cfg(feature = "rt-multi-thread")]
             Kind::MultiThread => self.build_threaded_runtime(),
         }
     }
@@ -477,7 +477,7 @@ cfg_time! {
     }
 }
 
-cfg_rt_threaded! {
+cfg_rt_multi_thread! {
     impl Builder {
         fn build_threaded_runtime(&mut self) -> io::Result<Runtime> {
             use crate::loom::sys::num_cpus;

@@ -3,7 +3,7 @@ use crate::task::JoinHandle;
 
 use std::future::Future;
 
-doc_rt_core! {
+cfg_rt! {
     /// Spawns a new asynchronous task, returning a
     /// [`JoinHandle`](super::JoinHandle) for it.
     ///

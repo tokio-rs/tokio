@@ -189,7 +189,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 /// macro is expanded.
 #[proc_macro_attribute]
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
-pub fn main_rt_core(args: TokenStream, item: TokenStream) -> TokenStream {
+pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::main(args, item, false)
 }
 
@@ -252,19 +252,19 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
 /// tokio 0.2 crate available as `tokio` in the module where this
 /// macro is expanded.
 #[proc_macro_attribute]
-pub fn test_rt_core(args: TokenStream, item: TokenStream) -> TokenStream {
+pub fn test_rt(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::test(args, item, false)
 }
 
 /// Always fails with the error message below.
 /// ```text
-/// The #[tokio::main] macro requires rt-core or rt-threaded.
+/// The #[tokio::main] macro requires rt or rt-multi-thread.
 /// ```
 #[proc_macro_attribute]
 pub fn main_fail(_args: TokenStream, _item: TokenStream) -> TokenStream {
     syn::Error::new(
         proc_macro2::Span::call_site(),
-        "The #[tokio::main] macro requires rt-core or rt-threaded.",
+        "The #[tokio::main] macro requires rt or rt-multi-thread.",
     )
     .to_compile_error()
     .into()
@@ -272,13 +272,13 @@ pub fn main_fail(_args: TokenStream, _item: TokenStream) -> TokenStream {
 
 /// Always fails with the error message below.
 /// ```text
-/// The #[tokio::test] macro requires rt-core or rt-threaded.
+/// The #[tokio::test] macro requires rt or rt-multi-thread.
 /// ```
 #[proc_macro_attribute]
 pub fn test_fail(_args: TokenStream, _item: TokenStream) -> TokenStream {
     syn::Error::new(
         proc_macro2::Span::call_site(),
-        "The #[tokio::test] macro requires rt-core or rt-threaded.",
+        "The #[tokio::test] macro requires rt or rt-multi-thread.",
     )
     .to_compile_error()
     .into()

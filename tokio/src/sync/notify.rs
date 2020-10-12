@@ -1,7 +1,7 @@
 // Allow `unreachable_pub` warnings when sync is not enabled
-// due to the usage of `Notify` within the `rt-core` feature set.
+// due to the usage of `Notify` within the `rt` feature set.
 // When this module is compiled with `sync` enabled we will warn on
-// this lint. When `rt-core` is enabled we use `pub(crate)` which
+// this lint. When `rt` is enabled we use `pub(crate)` which
 // triggers this warning but it is safe to ignore in this case.
 #![cfg_attr(not(feature = "sync"), allow(unreachable_pub, dead_code))]
 

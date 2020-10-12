@@ -1,9 +1,9 @@
-cfg_rt_core! {
+cfg_rt! {
     pub(crate) use crate::runtime::spawn_blocking;
     pub(crate) use crate::task::JoinHandle;
 }
 
-cfg_not_rt_core! {
+cfg_not_rt! {
     use std::fmt;
     use std::future::Future;
     use std::pin::Pin;
@@ -15,7 +15,7 @@ cfg_not_rt_core! {
         R: Send + 'static,
     {
         assert_send_sync::<JoinHandle<std::cell::Cell<()>>>();
-        panic!("requires the `rt-core` Tokio feature flag")
+        panic!("requires the `rt` Tokio feature flag")
 
     }
 

@@ -83,7 +83,7 @@ impl Budget {
     }
 }
 
-cfg_rt_threaded! {
+cfg_rt_multi_thread! {
     impl Budget {
         fn has_remaining(self) -> bool {
             self.0.map(|budget| budget > 0).unwrap_or(true)
@@ -122,7 +122,7 @@ fn with_budget<R>(budget: Budget, f: impl FnOnce() -> R) -> R {
     })
 }
 
-cfg_rt_threaded! {
+cfg_rt_multi_thread! {
     /// Set the current task's budget
     pub(crate) fn set(budget: Budget) {
         CURRENT.with(|cell| cell.set(budget))
@@ -134,7 +134,7 @@ cfg_rt_threaded! {
     }
 }
 
-cfg_rt_core! {
+cfg_rt! {
     /// Forcibly remove the budgeting constraints early.
     ///
     /// Returns the remaining budget

@@ -8,7 +8,7 @@ macro_rules! cfg_block_on {
                     feature = "fs",
                     feature = "dns",
                     feature = "io-std",
-                    feature = "rt-core",
+                    feature = "rt",
                     ))]
             $item
         )*
@@ -22,7 +22,7 @@ macro_rules! cfg_atomic_waker_impl {
             #[cfg(any(
                 feature = "net",
                 feature = "process",
-                feature = "rt-util",
+                feature = "rt",
                 feature = "signal",
                 feature = "time",
             ))]
@@ -251,64 +251,35 @@ macro_rules! cfg_not_sync {
     }
 }
 
-macro_rules! cfg_rt_core {
+macro_rules! cfg_rt {
     ($($item:item)*) => {
         $(
-            #[cfg(feature = "rt-core")]
+            #[cfg(feature = "rt")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
             $item
         )*
     }
 }
 
-macro_rules! cfg_task {
+macro_rules! cfg_not_rt {
+    ($($item:item)*) => {
+        $( #[cfg(not(feature = "rt"))] $item )*
+    }
+}
+
+macro_rules! cfg_rt_multi_thread {
     ($($item:item)*) => {
         $(
-            #[cfg(any(feature = "rt-core", feature = "rt-util"))]
-            #[cfg_attr(docsrs, doc(cfg(any(feature = "rt-core", feature = "rt-util"))))]
+            #[cfg(feature = "rt-multi-thread")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
             $item
         )*
     }
 }
 
-macro_rules! doc_rt_core {
+macro_rules! cfg_not_rt_multi_thread {
     ($($item:item)*) => {
-        $(
-            #[cfg(feature = "rt-core")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "rt-core")))]
-            $item
-        )*
-    }
-}
-
-macro_rules! cfg_not_rt_core {
-    ($($item:item)*) => {
-        $( #[cfg(not(feature = "rt-core"))] $item )*
-    }
-}
-
-macro_rules! cfg_rt_threaded {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "rt-threaded")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "rt-threaded")))]
-            $item
-        )*
-    }
-}
-
-macro_rules! cfg_rt_util {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "rt-util")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "rt-util")))]
-            $item
-        )*
-    }
-}
-
-macro_rules! cfg_not_rt_threaded {
-    ($($item:item)*) => {
-        $( #[cfg(not(feature = "rt-threaded"))] $item )*
+        $( #[cfg(not(feature = "rt-multi-thread"))] $item )*
     }
 }
 
@@ -372,8 +343,7 @@ macro_rules! cfg_coop {
                     feature = "io-std",
                     feature = "net",
                     feature = "process",
-                    feature = "rt-core",
-                    feature = "rt-util",
+                    feature = "rt",
                     feature = "signal",
                     feature = "sync",
                     feature = "stream",

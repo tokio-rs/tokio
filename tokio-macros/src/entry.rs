@@ -28,16 +28,16 @@ struct FinalConfig {
 }
 
 struct Configuration {
-    rt_threaded_available: bool,
+    rt_multi_thread_available: bool,
     default_flavor: RuntimeFlavor,
     flavor: Option<RuntimeFlavor>,
     worker_threads: Option<(usize, Span)>,
 }
 
 impl Configuration {
-    fn new(is_test: bool, rt_threaded: bool) -> Self {
+    fn new(is_test: bool, rt_multi_thread: bool) -> Self {
         Configuration {
-            rt_threaded_available: rt_threaded,
+            rt_multi_thread_available: rt_multi_thread,
             default_flavor: match is_test {
                 true => RuntimeFlavor::CurrentThread,
                 false => RuntimeFlavor::Threaded,
@@ -91,15 +91,15 @@ impl Configuration {
                 flavor,
                 worker_threads: None,
             }),
-            (Threaded, worker_threads) if self.rt_threaded_available => Ok(FinalConfig {
+            (Threaded, worker_threads) if self.rt_multi_thread_available => Ok(FinalConfig {
                 flavor,
                 worker_threads: worker_threads.map(|(val, _span)| val),
             }),
             (Threaded, _) => {
                 let msg = if self.flavor.is_none() {
-                    "The default runtime flavor is `multi_thread`, but the `rt-threaded` feature is disabled."
+                    "The default runtime flavor is `multi_thread`, but the `rt-multi-thread` feature is disabled."
                 } else {
-                    "The runtime flavor `multi_thread` requires the `rt-threaded` feature."
+                    "The runtime flavor `multi_thread` requires the `rt-multi-thread` feature."
                 };
                 Err(syn::Error::new(Span::call_site(), msg))
             }
@@ -138,7 +138,7 @@ fn parse_knobs(
     mut input: syn::ItemFn,
     args: syn::AttributeArgs,
     is_test: bool,
-    rt_threaded: bool,
+    rt_multi_thread: bool,
 ) -> Result<TokenStream, syn::Error> {
     let sig = &mut input.sig;
     let body = &input.block;
@@ -157,7 +157,7 @@ fn parse_knobs(
     } else {
         "tokio::main"
     };
-    let mut config = Configuration::new(is_test, rt_threaded);
+    let mut config = Configuration::new(is_test, rt_multi_thread);
 
     for arg in args {
         match arg {
@@ -256,7 +256,7 @@ fn parse_knobs(
 }
 
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
-pub(crate) fn main(args: TokenStream, item: TokenStream, rt_threaded: bool) -> TokenStream {
+pub(crate) fn main(args: TokenStream, item: TokenStream, rt_multi_thread: bool) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::ItemFn);
     let args = syn::parse_macro_input!(args as syn::AttributeArgs);
 
@@ -267,10 +267,10 @@ pub(crate) fn main(args: TokenStream, item: TokenStream, rt_threaded: bool) -> T
             .into();
     }
 
-    parse_knobs(input, args, false, rt_threaded).unwrap_or_else(|e| e.to_compile_error().into())
+    parse_knobs(input, args, false, rt_multi_thread).unwrap_or_else(|e| e.to_compile_error().into())
 }
 
-pub(crate) fn test(args: TokenStream, item: TokenStream, rt_threaded: bool) -> TokenStream {
+pub(crate) fn test(args: TokenStream, item: TokenStream, rt_multi_thread: bool) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::ItemFn);
     let args = syn::parse_macro_input!(args as syn::AttributeArgs);
 
@@ -290,5 +290,5 @@ pub(crate) fn test(args: TokenStream, item: TokenStream, rt_threaded: bool) -> T
             .into();
     }
 
-    parse_knobs(input, args, true, rt_threaded).unwrap_or_else(|e| e.to_compile_error().into())
+    parse_knobs(input, args, true, rt_multi_thread).unwrap_or_else(|e| e.to_compile_error().into())
 }

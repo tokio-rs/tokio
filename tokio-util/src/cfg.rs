@@ -40,11 +40,11 @@ macro_rules! cfg_io {
     }
 }
 
-macro_rules! cfg_rt_core {
+macro_rules! cfg_rt {
     ($($item:item)*) => {
         $(
-            #[cfg(feature = "rt-core")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "rt-core")))]
+            #[cfg(feature = "rt")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
             $item
         )*
     }

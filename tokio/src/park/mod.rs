@@ -34,11 +34,11 @@
 //! * `park_timeout` does the same as `park` but allows specifying a maximum
 //!   time to block the thread for.
 
-cfg_rt_core! {
+cfg_rt! {
     pub(crate) mod either;
 }
 
-#[cfg(any(feature = "rt-core", feature = "rt-util", feature = "sync"))]
+#[cfg(any(feature = "rt", feature = "sync"))]
 pub(crate) mod thread;
 
 use std::sync::Arc;

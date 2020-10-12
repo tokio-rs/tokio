@@ -31,7 +31,7 @@ compat = ["futures-io",]
 codec = ["tokio/stream"]
 time = ["tokio/time","slab"]
 io = []
-rt-core = ["tokio/rt-core"]
+rt = ["tokio/rt"]
 
 [dependencies]
 tokio = { version = "0.3.0", path = "../tokio" }

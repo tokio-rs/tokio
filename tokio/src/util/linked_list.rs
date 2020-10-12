@@ -203,7 +203,7 @@ impl<L: Link> Default for LinkedList<L, L::Target> {
 
 // ===== impl Iter =====
 
-cfg_rt_threaded! {
+cfg_rt_multi_thread! {
     pub(crate) struct Iter<'a, T: Link> {
         curr: Option<NonNull<T::Target>>,
         _p: core::marker::PhantomData<&'a T>,

@@ -114,7 +114,7 @@
 //!
 //! The current-thread scheduler provides a _single-threaded_ future executor.
 //! All tasks will be created and executed on the current thread. This requires
-//! the `rt-core` feature flag.
+//! the `rt` feature flag.
 //! ```
 //! use tokio::runtime;
 //!
@@ -129,7 +129,7 @@
 //! The multi-thread scheduler executes futures on a _thread pool_, using a
 //! work-stealing strategy. By default, it will start a worker thread for each
 //! CPU core available on the system. This tends to be the ideal configurations
-//! for most applications. The multi-thread scheduler requires the `rt-threaded`
+//! for most applications. The multi-thread scheduler requires the `rt-multi-thread`
 //! feature flag, and is selected by default:
 //! ```
 //! use tokio::runtime;
@@ -181,7 +181,7 @@ pub(crate) mod enter;
 
 pub(crate) mod task;
 
-cfg_rt_core! {
+cfg_rt! {
     mod basic_scheduler;
     use basic_scheduler::BasicScheduler;
 
@@ -204,19 +204,19 @@ cfg_rt_core! {
     use self::spawner::Spawner;
 }
 
-cfg_rt_threaded! {
+cfg_rt_multi_thread! {
     mod park;
     use park::Parker;
 }
 
-cfg_rt_threaded! {
+cfg_rt_multi_thread! {
     mod queue;
 
     pub(crate) mod thread_pool;
     use self::thread_pool::ThreadPool;
 }
 
-cfg_rt_core! {
+cfg_rt! {
     use crate::task::JoinHandle;
 
     use std::future::Future;
@@ -266,11 +266,11 @@ cfg_rt_core! {
     #[derive(Debug)]
     enum Kind {
         /// Execute all tasks on the current-thread.
-        #[cfg(feature = "rt-core")]
+        #[cfg(feature = "rt")]
         CurrentThread(BasicScheduler<driver::Driver>),
 
         /// Execute tasks across multiple threads.
-        #[cfg(feature = "rt-threaded")]
+        #[cfg(feature = "rt-multi-thread")]
         ThreadPool(ThreadPool),
     }
 
@@ -282,8 +282,8 @@ cfg_rt_core! {
         ///
         /// This results in a scheduler, I/O driver, and time driver being
         /// initialized. The type of scheduler used depends on what feature flags
-        /// are enabled: if the `rt-threaded` feature is enabled, the [threaded
-        /// scheduler] is used, while if only the `rt-core` feature is enabled, the
+        /// are enabled: if the `rt-multi-thread` feature is enabled, the [threaded
+        /// scheduler] is used, while if only the `rt` feature is enabled, the
         /// [basic scheduler] is used instead.
         ///
         /// If the threaded scheduler is selected, it will not spawn
@@ -313,7 +313,7 @@ cfg_rt_core! {
         /// [threaded scheduler]: index.html#threaded-scheduler
         /// [basic scheduler]: index.html#basic-scheduler
         /// [runtime builder]: crate::runtime::Builder
-        #[cfg(feature = "rt-threaded")]
+        #[cfg(feature = "rt-multi-thread")]
         pub fn new() -> std::io::Result<Runtime> {
             Builder::new_multi_thread().enable_all().build()
         }
@@ -343,14 +343,14 @@ cfg_rt_core! {
         /// });
         /// # }
         /// ```
-        #[cfg(feature = "rt-core")]
+        #[cfg(feature = "rt")]
         pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
         where
             F: Future + Send + 'static,
             F::Output: Send + 'static,
         {
             match &self.kind {
-                #[cfg(feature = "rt-threaded")]
+                #[cfg(feature = "rt-multi-thread")]
                 Kind::ThreadPool(exec) => exec.spawn(future),
                 Kind::CurrentThread(exec) => exec.spawn(future),
             }
@@ -393,9 +393,9 @@ cfg_rt_core! {
         /// [handle]: fn@Handle::block_on
         pub fn block_on<F: Future>(&self, future: F) -> F::Output {
             self.handle.enter(|| match &self.kind {
-                #[cfg(feature = "rt-core")]
+                #[cfg(feature = "rt")]
                 Kind::CurrentThread(exec) => exec.block_on(future),
-                #[cfg(feature = "rt-threaded")]
+                #[cfg(feature = "rt-multi-thread")]
                 Kind::ThreadPool(exec) => exec.block_on(future),
             })
         }

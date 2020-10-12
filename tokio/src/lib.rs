@@ -73,9 +73,9 @@
 //! need.
 //!
 //! - `full`: Enables all Tokio public API features listed below.
-//! - `rt-core`: Enables `tokio::spawn` and the basic (single-threaded) scheduler.
-//! - `rt-threaded`: Enables the heavier, multi-threaded, work-stealing scheduler.
-//! - `rt-util`: Enables non-scheduler utilities.
+//! - `rt-core`: Enables `tokio::spawn`, the basic (current thread) scheduler,
+//! and non-scheduler utilities.
+//! - `rt-multi-thread`: Enables the heavier, multi-threaded, work-stealing scheduler.
 //! - `io-util`: Enables the IO based `Ext` traits.
 //! - `io-std`: Enable `Stdout`, `Stdin` and `Stderr` types.
 //! - `net`: Enables `tokio::net` types such as `TcpStream`, `UnixStream` and `UdpSocket`.
@@ -134,7 +134,7 @@
 //! needs to `tokio::spawn` and use a `TcpStream`.
 //!
 //! ```toml
-//! tokio = { version = "0.2", features = ["rt-core", "net"] }
+//! tokio = { version = "0.2", features = ["rt", "net"] }
 //! ```
 //!
 //! ## Working With Tasks
@@ -148,7 +148,7 @@
 //! * Functions for [running blocking operations][blocking] in an asynchronous
 //!   task context.
 //!
-//! The [`tokio::task`] module is present only when the "rt-core" feature flag
+//! The [`tokio::task`] module is present only when the "rt" feature flag
 //! is enabled.
 //!
 //! [tasks]: task/index.html#what-are-tasks
@@ -196,9 +196,9 @@
 //! and managing runtimes. You should use that module if the `#[tokio::main]` macro doesn't
 //! provide the functionality you need.
 //!
-//! Using the runtime requires the "rt-core" or "rt-threaded" feature flags, to
-//! enable the basic [single-threaded scheduler][rt-core] and the [thread-pool
-//! scheduler][rt-threaded], respectively. See the [`runtime` module
+//! Using the runtime requires the "rt" or "rt-multi-thread" feature flags, to
+//! enable the basic [single-threaded scheduler][rt] and the [thread-pool
+//! scheduler][rt-multi-thread], respectively. See the [`runtime` module
 //! documentation][rt-features] for details. In addition, the "macros" feature
 //! flag enables the `#[tokio::main]` and `#[tokio::test]` attributes.
 //!
@@ -206,8 +206,8 @@
 //! [`tokio::runtime`]: crate::runtime
 //! [`Builder`]: crate::runtime::Builder
 //! [`Runtime`]: crate::runtime::Runtime
-//! [rt-core]: runtime/index.html#basic-scheduler
-//! [rt-threaded]: runtime/index.html#threaded-scheduler
+//! [rt]: runtime/index.html#basic-scheduler
+//! [rt-multi-thread]: runtime/index.html#threaded-scheduler
 //! [rt-features]: runtime/index.html#runtime-scheduler
 //!
 //! ## CPU-bound tasks and blocking code
@@ -362,11 +362,9 @@ cfg_process! {
 #[cfg(any(feature = "dns", feature = "fs", feature = "io-std"))]
 mod blocking;
 
-cfg_rt_core! {
+cfg_rt! {
     pub mod runtime;
 }
-#[cfg(all(not(feature = "rt-core"), feature = "rt-util"))]
-mod runtime;
 
 pub(crate) mod coop;
 
@@ -393,7 +391,7 @@ cfg_not_sync! {
 }
 
 pub mod task;
-cfg_rt_core! {
+cfg_rt! {
     pub use task::spawn;
 }
 
@@ -410,8 +408,8 @@ cfg_macros! {
     #[doc(hidden)]
     pub use tokio_macros::select_priv_declare_output_enum;
 
-    doc_rt_core! {
-        cfg_rt_threaded! {
+    cfg_rt! {
+        cfg_rt_multi_thread! {
             // This is the docs.rs case (with all features) so make sure macros
             // is included in doc(cfg).
 
@@ -423,15 +421,15 @@ cfg_macros! {
             pub use tokio_macros::test;
         }
 
-        cfg_not_rt_threaded! {
+        cfg_not_rt_multi_thread! {
             #[cfg(not(test))] // Work around for rust-lang/rust#62127
-            pub use tokio_macros::main_rt_core as main;
-            pub use tokio_macros::test_rt_core as test;
+            pub use tokio_macros::main_rt as main;
+            pub use tokio_macros::test_rt as test;
         }
     }
 
-    // Always fail if rt-core is not enabled.
-    cfg_not_rt_core! {
+    // Always fail if rt is not enabled.
+    cfg_not_rt! {
         #[cfg(not(test))]
         pub use tokio_macros::main_fail as main;
         pub use tokio_macros::test_fail as test;

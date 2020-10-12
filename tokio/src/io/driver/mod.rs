@@ -1,4 +1,4 @@
-#![cfg_attr(not(feature = "rt-core"), allow(dead_code))]
+#![cfg_attr(not(feature = "rt"), allow(dead_code))]
 
 mod ready;
 use ready::Ready;
@@ -219,13 +219,13 @@ impl fmt::Debug for Driver {
 
 // ===== impl Handle =====
 
-cfg_rt_core! {
+cfg_rt! {
     impl Handle {
         /// Returns a handle to the current reactor
         ///
         /// # Panics
         ///
-        /// This function panics if there is no current reactor set and `rt-core` feature
+        /// This function panics if there is no current reactor set and `rt` feature
         /// flag is not enabled.
         pub(super) fn current() -> Self {
             crate::runtime::context::io_handle()
@@ -234,16 +234,16 @@ cfg_rt_core! {
     }
 }
 
-cfg_not_rt_core! {
+cfg_not_rt! {
     impl Handle {
         /// Returns a handle to the current reactor
         ///
         /// # Panics
         ///
-        /// This function panics if there is no current reactor set, or if the `rt-core`
+        /// This function panics if there is no current reactor set, or if the `rt`
         /// feature flag is not enabled.
         pub(super) fn current() -> Self {
-            panic!("there is no reactor running, must be called from the context of Tokio runtime with `rt-core` enabled.")
+            panic!("there is no reactor running, must be called from the context of Tokio runtime with `rt` enabled.")
         }
     }
 }

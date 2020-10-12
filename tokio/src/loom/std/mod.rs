@@ -79,12 +79,12 @@ pub(crate) mod sync {
 }
 
 pub(crate) mod sys {
-    #[cfg(feature = "rt-threaded")]
+    #[cfg(feature = "rt-multi-thread")]
     pub(crate) fn num_cpus() -> usize {
         usize::max(1, num_cpus::get())
     }
 
-    #[cfg(not(feature = "rt-threaded"))]
+    #[cfg(not(feature = "rt-multi-thread"))]
     pub(crate) fn num_cpus() -> usize {
         1
     }
