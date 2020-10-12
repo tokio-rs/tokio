@@ -73,7 +73,7 @@
 //! need.
 //!
 //! - `full`: Enables all Tokio public API features listed below.
-//! - `rt-core`: Enables `tokio::spawn`, the basic (single-threaded) scheduler,
+//! - `rt-core`: Enables `tokio::spawn`, the basic (current thread) scheduler,
 //! and non-scheduler utilities.
 //! - `rt-multi-thread`: Enables the heavier, multi-threaded, work-stealing scheduler.
 //! - `io-util`: Enables the IO based `Ext` traits.
