@@ -240,8 +240,8 @@ cfg_not_rt_core! {
         ///
         /// # Panics
         ///
-        /// This function panics if there is no current reactor set and `rt-core` feature
-        /// flag is not enabled.
+        /// This function panics if there is no current reactor set, or if the `rt-core`
+        /// feature flag is not enabled.
         pub(super) fn current() -> Self {
             panic!("there is no reactor running, must be called from the context of Tokio runtime with `rt-core` enabled.")
         }
