@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "full"), allow(dead_code))]
+
 use crate::park::{Park, Unpark};
 
 use std::fmt;

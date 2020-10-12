@@ -1,5 +1,5 @@
 use crate::stream::{Fuse, Stream};
-use crate::time::{Elapsed, Instant, Sleep};
+use crate::time::{error::Elapsed, Instant, Sleep};
 
 use core::future::Future;
 use core::pin::Pin;

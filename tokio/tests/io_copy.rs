@@ -18,7 +18,7 @@ async fn copy() {
             buf: &mut ReadBuf<'_>,
         ) -> Poll<io::Result<()>> {
             if self.0 {
-                buf.append(b"hello world");
+                buf.put_slice(b"hello world");
                 self.0 = false;
                 Poll::Ready(Ok(()))
             } else {

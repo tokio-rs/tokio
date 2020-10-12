@@ -4,7 +4,7 @@ use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Arc;
 use crate::sync::mpsc::error::TryRecvError;
 use crate::sync::mpsc::list;
-use crate::sync::Notify;
+use crate::sync::notify::Notify;
 
 use std::fmt;
 use std::process;
@@ -147,7 +147,7 @@ impl<T, S: Semaphore> Tx<T, S> {
         self.inner.semaphore.is_closed()
     }
 
-    pub(crate) async fn closed(&mut self) {
+    pub(crate) async fn closed(&self) {
         use std::future::Future;
         use std::pin::Pin;
         use std::task::Poll;

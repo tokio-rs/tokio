@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "full"), allow(dead_code))]
+
 //! Opt-in yield points for improved cooperative scheduling.
 //!
 //! A single call to [`poll`] on a top-level task may potentially do a lot of
@@ -96,14 +98,6 @@ pub(crate) fn budget<R>(f: impl FnOnce() -> R) -> R {
     with_budget(Budget::initial(), f)
 }
 
-cfg_rt_threaded! {
-    /// Set the current task's budget
-    #[cfg(feature = "blocking")]
-    pub(crate) fn set(budget: Budget) {
-        CURRENT.with(|cell| cell.set(budget))
-    }
-}
-
 #[inline(always)]
 fn with_budget<R>(budget: Budget, f: impl FnOnce() -> R) -> R {
     struct ResetGuard<'a> {
@@ -129,13 +123,18 @@ fn with_budget<R>(budget: Budget, f: impl FnOnce() -> R) -> R {
 }
 
 cfg_rt_threaded! {
+    /// Set the current task's budget
+    pub(crate) fn set(budget: Budget) {
+        CURRENT.with(|cell| cell.set(budget))
+    }
+
     #[inline(always)]
     pub(crate) fn has_budget_remaining() -> bool {
         CURRENT.with(|cell| cell.get().has_remaining())
     }
 }
 
-cfg_blocking_impl! {
+cfg_rt_core! {
     /// Forcibly remove the budgeting constraints early.
     ///
     /// Returns the remaining budget

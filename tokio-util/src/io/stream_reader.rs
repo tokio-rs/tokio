@@ -114,7 +114,7 @@ where
             Poll::Pending => return Poll::Pending,
         };
         let len = std::cmp::min(inner_buf.len(), buf.remaining());
-        buf.append(&inner_buf[..len]);
+        buf.put_slice(&inner_buf[..len]);
 
         self.consume(len);
         Poll::Ready(Ok(()))

@@ -243,7 +243,7 @@ impl<E: Source + Read + Unpin> AsyncRead for PollEvented<E> {
             }
 
             return Poll::Ready(r.map(|n| {
-                buf.add_filled(n);
+                buf.advance(n);
             }));
         }
     }

@@ -214,26 +214,27 @@
 //! [rt-threaded]: ../runtime/index.html#threaded-scheduler
 //! [`task::yield_now`]: crate::task::yield_now()
 //! [`thread::yield_now`]: std::thread::yield_now
-cfg_blocking! {
+
+cfg_task! {
+    pub use crate::runtime::task::{JoinError, JoinHandle};
+}
+
+cfg_rt_core! {
     mod blocking;
     pub use blocking::spawn_blocking;
+
+    mod spawn;
+    pub use spawn::spawn;
 
     cfg_rt_threaded! {
         pub use blocking::block_in_place;
     }
 }
 
-cfg_rt_core! {
-    pub use crate::runtime::task::{JoinError, JoinHandle};
-
-    mod spawn;
-    pub use spawn::spawn;
-
+cfg_rt_util! {
     mod yield_now;
     pub use yield_now::yield_now;
-}
 
-cfg_rt_util! {
     mod local;
     pub use local::{spawn_local, LocalSet};
 

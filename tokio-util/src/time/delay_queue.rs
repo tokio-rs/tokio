@@ -7,7 +7,7 @@
 use crate::time::wheel::{self, Wheel};
 
 use futures_core::ready;
-use tokio::time::{sleep_until, Duration, Error, Instant, Sleep};
+use tokio::time::{error::Error, sleep_until, Duration, Instant, Sleep};
 
 use slab::Slab;
 use std::cmp;
@@ -67,7 +67,7 @@ use std::task::{self, Poll};
 /// Using `DelayQueue` to manage cache entries.
 ///
 /// ```rust,no_run
-/// use tokio::time::Error;
+/// use tokio::time::error::Error;
 /// use tokio_util::time::{DelayQueue, delay_queue};
 ///
 /// use futures::ready;

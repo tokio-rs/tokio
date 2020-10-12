@@ -503,7 +503,7 @@ impl TcpStream {
                     unsafe {
                         buf.assume_init(n);
                     }
-                    buf.add_filled(n);
+                    buf.advance(n);
                     return Poll::Ready(Ok(()));
                 }
                 Err(e) => return Poll::Ready(Err(e)),

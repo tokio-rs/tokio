@@ -3,7 +3,7 @@ tokio::task_local! {
     pub static FOO: bool;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn local() {
     let j1 = tokio::spawn(REQ_ID.scope(1, async move {
         assert_eq!(REQ_ID.get(), 1);

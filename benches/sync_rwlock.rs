@@ -3,9 +3,8 @@ use std::sync::Arc;
 use tokio::{sync::RwLock, task};
 
 fn read_uncontended(b: &mut Bencher) {
-    let rt = tokio::runtime::Builder::new()
-        .core_threads(6)
-        .threaded_scheduler()
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(6)
         .build()
         .unwrap();
 
@@ -22,9 +21,8 @@ fn read_uncontended(b: &mut Bencher) {
 }
 
 fn read_concurrent_uncontended_multi(b: &mut Bencher) {
-    let rt = tokio::runtime::Builder::new()
-        .core_threads(6)
-        .threaded_scheduler()
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(6)
         .build()
         .unwrap();
 
@@ -51,8 +49,7 @@ fn read_concurrent_uncontended_multi(b: &mut Bencher) {
 }
 
 fn read_concurrent_uncontended(b: &mut Bencher) {
-    let rt = tokio::runtime::Builder::new()
-        .basic_scheduler()
+    let rt = tokio::runtime::Builder::new_current_thread()
         .build()
         .unwrap();
 
@@ -78,9 +75,8 @@ fn read_concurrent_uncontended(b: &mut Bencher) {
 }
 
 fn read_concurrent_contended_multi(b: &mut Bencher) {
-    let rt = tokio::runtime::Builder::new()
-        .core_threads(6)
-        .threaded_scheduler()
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(6)
         .build()
         .unwrap();
 
@@ -108,8 +104,7 @@ fn read_concurrent_contended_multi(b: &mut Bencher) {
 }
 
 fn read_concurrent_contended(b: &mut Bencher) {
-    let rt = tokio::runtime::Builder::new()
-        .basic_scheduler()
+    let rt = tokio::runtime::Builder::new_current_thread()
         .build()
         .unwrap();
 

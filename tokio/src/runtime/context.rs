@@ -7,10 +7,8 @@ thread_local! {
     static CONTEXT: RefCell<Option<Handle>> = RefCell::new(None)
 }
 
-cfg_blocking_impl! {
-    pub(crate) fn current() -> Option<Handle> {
-        CONTEXT.with(|ctx| ctx.borrow().clone())
-    }
+pub(crate) fn current() -> Option<Handle> {
+    CONTEXT.with(|ctx| ctx.borrow().clone())
 }
 
 cfg_io_driver! {

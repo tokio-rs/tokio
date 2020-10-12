@@ -97,7 +97,7 @@ impl AsyncRead for &[u8] {
     ) -> Poll<io::Result<()>> {
         let amt = std::cmp::min(self.len(), buf.remaining());
         let (a, b) = self.split_at(amt);
-        buf.append(a);
+        buf.put_slice(a);
         *self = b;
         Poll::Ready(Ok(()))
     }
@@ -121,7 +121,7 @@ impl<T: AsRef<[u8]> + Unpin> AsyncRead for io::Cursor<T> {
         let amt = std::cmp::min(slice.len() - start, buf.remaining());
         // Add won't overflow because of pos check above.
         let end = start + amt;
-        buf.append(&slice[start..end]);
+        buf.put_slice(&slice[start..end]);
         self.set_position(end as u64);
 
         Poll::Ready(Ok(()))

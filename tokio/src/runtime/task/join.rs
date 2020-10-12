@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-doc_rt_core! {
+cfg_task! {
     /// An owned permission to join on a task (await its termination).
     ///
     /// This can be thought of as the equivalent of [`std::thread::JoinHandle`] for
