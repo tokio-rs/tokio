@@ -52,7 +52,15 @@ io-util = ["memchr"]
 # stdin, stdout, stderr
 io-std = []
 macros = ["tokio-macros"]
-net = ["dns", "tcp", "udp", "uds"]
+net = [
+  "dns",
+  "lazy_static",
+  "libc",
+  "mio/os-poll",
+  "mio/tcp",
+  "mio/udp",
+  "mio/uds",
+]
 process = [
   "lazy_static",
   "libc",
@@ -80,10 +88,7 @@ signal = [
 stream = ["futures-core"]
 sync = ["fnv"]
 test-util = []
-tcp = ["lazy_static", "mio/tcp", "mio/os-poll"]
 time = []
-udp = ["lazy_static", "mio/udp", "mio/os-poll"]
-uds = ["lazy_static", "libc", "mio/uds", "mio/os-poll"]
 
 [dependencies]
 tokio-macros = { version = "0.3.0", path = "../tokio-macros", optional = true }

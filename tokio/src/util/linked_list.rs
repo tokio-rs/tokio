@@ -108,7 +108,6 @@ impl<L: Link> LinkedList<L, L::Target> {
 
     /// Removes the last element from a list and returns it, or None if it is
     /// empty.
-    #[cfg_attr(any(feature = "udp", feature = "uds"), allow(unused))]
     pub(crate) fn pop_back(&mut self) -> Option<L::Handle> {
         unsafe {
             let last = self.tail?;

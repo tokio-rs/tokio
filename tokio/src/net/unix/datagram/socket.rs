@@ -9,7 +9,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::os::unix::net;
 use std::path::Path;
 
-cfg_uds! {
+cfg_net_unix! {
     /// An I/O object representing a Unix datagram socket.
     ///
     /// A socket can be either named (associated with a filesystem path) or

@@ -79,9 +79,6 @@
 //! - `io-util`: Enables the IO based `Ext` traits.
 //! - `io-std`: Enable `Stdout`, `Stdin` and `Stderr` types.
 //! - `net`: Enables `tokio::net` types such as `TcpStream`, `UnixStream` and `UdpSocket`.
-//! - `tcp`: Enables all `tokio::net::tcp` types.
-//! - `udp`: Enables all `tokio::net::udp` types.
-//! - `uds`: Enables all `tokio::net::unix` types.
 //! - `time`: Enables `tokio::time` types and allows the schedulers to enable
 //! the built in timer.
 //! - `process`: Enables `tokio::process` types.
@@ -137,7 +134,7 @@
 //! needs to `tokio::spawn` and use a `TcpStream`.
 //!
 //! ```toml
-//! tokio = { version = "0.2", features = ["rt-core", "tcp"] }
+//! tokio = { version = "0.2", features = ["rt-core", "net"] }
 //! ```
 //!
 //! ## Working With Tasks

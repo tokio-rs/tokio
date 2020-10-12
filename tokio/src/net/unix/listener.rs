@@ -9,7 +9,7 @@ use std::os::unix::net;
 use std::path::Path;
 use std::task::{Context, Poll};
 
-cfg_uds! {
+cfg_net_unix! {
     /// A Unix socket which can accept connections from other Unix sockets.
     ///
     /// You can accept a new connection by using the [`accept`](`UnixListener::accept`) method. Alternatively `UnixListener`
@@ -112,7 +112,7 @@ impl UnixListener {
     /// Polls to accept a new incoming connection to this listener.
     ///
     /// If there is no connection to accept, `Poll::Pending` is returned and
-    /// the current task will be notified by a waker.    
+    /// the current task will be notified by a waker.
     ///
     /// When ready, the most recent task that called `poll_accept` is notified.
     /// The caller is responsble to ensure that `poll_accept` is called from a

@@ -124,13 +124,7 @@ impl<E: Source> PollEvented<E> {
 
     /// Returns a shared reference to the underlying I/O object this readiness
     /// stream is wrapping.
-    #[cfg(any(
-        feature = "process",
-        feature = "tcp",
-        feature = "udp",
-        feature = "uds",
-        feature = "signal"
-    ))]
+    #[cfg(any(feature = "net", feature = "process", feature = "signal"))]
     pub(crate) fn get_ref(&self) -> &E {
         self.io.as_ref().unwrap()
     }
