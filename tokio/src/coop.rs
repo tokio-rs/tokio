@@ -63,13 +63,6 @@ thread_local! {
 pub(crate) struct Budget(Option<u8>);
 
 impl Budget {
-    /// Returns an unconstrained budget. Operations will not be limited.
-    const fn unconstrained() -> Budget {
-        Budget(None)
-    }
-}
-
-impl Budget {
     /// Budget assigned to a task on each poll.
     ///
     /// The value itself is chosen somewhat arbitrarily. It needs to be high
@@ -82,6 +75,11 @@ impl Budget {
     /// will probably also have to be raised.
     const fn initial() -> Budget {
         Budget(Some(128))
+    }
+
+    /// Returns an unconstrained budget. Operations will not be limited.
+    const fn unconstrained() -> Budget {
+        Budget(None)
     }
 }
 
