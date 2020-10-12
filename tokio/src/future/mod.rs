@@ -1,4 +1,3 @@
-// #![allow(unused_imports, dead_code)]
 #![cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
 
 //! Asynchronous values.

@@ -24,14 +24,14 @@ impl RuntimeFlavor {
 
 struct FinalConfig {
     flavor: RuntimeFlavor,
-    num_workers: Option<usize>,
+    worker_threads: Option<usize>,
 }
 
 struct Configuration {
     rt_threaded_available: bool,
     default_flavor: RuntimeFlavor,
     flavor: Option<RuntimeFlavor>,
-    num_workers: Option<(usize, Span)>,
+    worker_threads: Option<(usize, Span)>,
 }
 
 impl Configuration {
@@ -43,7 +43,7 @@ impl Configuration {
                 false => RuntimeFlavor::Threaded,
             },
             flavor: None,
-            num_workers: None,
+            worker_threads: None,
         }
     }
 
@@ -59,34 +59,41 @@ impl Configuration {
         Ok(())
     }
 
-    fn set_num_workers(&mut self, num_workers: syn::Lit, span: Span) -> Result<(), syn::Error> {
-        if self.num_workers.is_some() {
-            return Err(syn::Error::new(span, "`num_workers` set multiple times."));
+    fn set_worker_threads(
+        &mut self,
+        worker_threads: syn::Lit,
+        span: Span,
+    ) -> Result<(), syn::Error> {
+        if self.worker_threads.is_some() {
+            return Err(syn::Error::new(
+                span,
+                "`worker_threads` set multiple times.",
+            ));
         }
 
-        let num_workers = parse_int(num_workers, span, "num_workers")?;
-        if num_workers == 0 {
-            return Err(syn::Error::new(span, "`num_workers` may not be 0."));
+        let worker_threads = parse_int(worker_threads, span, "worker_threads")?;
+        if worker_threads == 0 {
+            return Err(syn::Error::new(span, "`worker_threads` may not be 0."));
         }
-        self.num_workers = Some((num_workers, span));
+        self.worker_threads = Some((worker_threads, span));
         Ok(())
     }
 
     fn build(&self) -> Result<FinalConfig, syn::Error> {
         let flavor = self.flavor.unwrap_or(self.default_flavor);
         use RuntimeFlavor::*;
-        match (flavor, self.num_workers) {
-            (CurrentThread, Some((_, num_workers_span))) => Err(syn::Error::new(
-                num_workers_span,
-                "The `num_workers` option requires the `threaded` runtime flavor.",
+        match (flavor, self.worker_threads) {
+            (CurrentThread, Some((_, worker_threads_span))) => Err(syn::Error::new(
+                worker_threads_span,
+                "The `worker_threads` option requires the `threaded` runtime flavor.",
             )),
             (CurrentThread, None) => Ok(FinalConfig {
                 flavor,
-                num_workers: None,
+                worker_threads: None,
             }),
-            (Threaded, num_workers) if self.rt_threaded_available => Ok(FinalConfig {
+            (Threaded, worker_threads) if self.rt_threaded_available => Ok(FinalConfig {
                 flavor,
-                num_workers: num_workers.map(|(val, _span)| val),
+                worker_threads: worker_threads.map(|(val, _span)| val),
             }),
             (Threaded, _) => {
                 let msg = if self.flavor.is_none() {
@@ -161,18 +168,18 @@ fn parse_knobs(
                     return Err(syn::Error::new_spanned(namevalue, msg));
                 }
                 match ident.unwrap().to_string().to_lowercase().as_str() {
-                    "num_workers" => {
-                        config.set_num_workers(namevalue.lit.clone(), namevalue.span())?;
+                    "worker_threads" => {
+                        config.set_worker_threads(namevalue.lit.clone(), namevalue.span())?;
                     }
                     "flavor" => {
                         config.set_flavor(namevalue.lit.clone(), namevalue.span())?;
                     }
                     "core_threads" => {
-                        let msg = "Attribute `core_threads` is renamed to `num_workers`";
+                        let msg = "Attribute `core_threads` is renamed to `worker_threads`";
                         return Err(syn::Error::new_spanned(namevalue, msg));
                     }
                     name => {
-                        let msg = format!("Unknown attribute {} is specified; expected one of: `flavor`, `num_workers`, `max_threads`", name);
+                        let msg = format!("Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`, `max_threads`", name);
                         return Err(syn::Error::new_spanned(namevalue, msg));
                     }
                 }
@@ -191,11 +198,11 @@ fn parse_knobs(
                     "basic_scheduler" | "current_thread" | "single_threaded" => {
                         format!("Set the runtime flavor with #[{}(flavor = \"current_thread\")].", macro_name)
                     },
-                    "flavor" | "num_workers" => {
+                    "flavor" | "worker_threads" => {
                         format!("The `{}` attribute requires an argument.", name)
                     },
                     name => {
-                        format!("Unknown attribute {} is specified; expected one of: `flavor`, `num_workers`", name)
+                        format!("Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`", name)
                     },
                 };
                 return Err(syn::Error::new_spanned(path, msg));
@@ -219,7 +226,7 @@ fn parse_knobs(
             tokio::runtime::Builder::new_multi_thread()
         },
     };
-    if let Some(v) = config.num_workers {
+    if let Some(v) = config.worker_threads {
         rt = quote! { #rt.worker_threads(#v) };
     }
 

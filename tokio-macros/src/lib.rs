@@ -24,28 +24,34 @@ mod select;
 
 use proc_macro::TokenStream;
 
-/// Marks async function to be executed by selected runtime. This macro helps set up a `Runtime`
-/// without requiring the user to use [Runtime](../tokio/runtime/struct.Runtime.html) or
+/// Marks async function to be executed by selected runtime. This macro helps
+/// set up a `Runtime` without requiring the user to use
+/// [Runtime](../tokio/runtime/struct.Runtime.html) or
 /// [Builder](../tokio/runtime/struct.Builder.html) directly.
 ///
-/// Note: This macro is designed to be simplistic and targets applications that do not require
-/// a complex setup. If the provided functionality is not sufficient, you may be interested in
-/// using [Builder](../tokio/runtime/struct.Builder.html), which provides a more powerful
-/// interface.
+/// Note: This macro is designed to be simplistic and targets applications that
+/// do not require a complex setup. If the provided functionality is not
+/// sufficient, you may be interested in using
+/// [Builder](../tokio/runtime/struct.Builder.html), which provides a more
+/// powerful interface.
 ///
 /// # Multi-threaded runtime
+///
 /// To use the multi-threaded runtime, the macro can be configured using
+///
 /// ```
-/// #[tokio::main(flavor = "threaded", num_workers = 10)]
+/// #[tokio::main(flavor = "multi_thread", worker_threads = 10)]
 /// # async fn main() {}
 /// ```
-/// The `num_workers` option configures the number of worker threads, and defaults to the number of
-/// cpus on the system. This is the default flavor.
+///
+/// The `worker_threads` option configures the number of worker threads, and
+/// defaults to the number of cpus on the system. This is the default flavor.
 ///
 /// # Current thread runtime
 ///
-/// To use the single-threaded runtime known as the `current_thread` runtime, the macro can be
-/// configured using
+/// To use the single-threaded runtime known as the `current_thread` runtime,
+/// the macro can be configured using
+///
 /// ```
 /// #[tokio::main(flavor = "current_thread")]
 /// # async fn main() {}
@@ -57,7 +63,7 @@ use proc_macro::TokenStream;
 ///
 /// ## Usage
 ///
-/// ### Using threaded runtime
+/// ### Using the multi-thread runtime
 ///
 /// ```rust
 /// #[tokio::main]
@@ -131,11 +137,10 @@ use proc_macro::TokenStream;
 ///
 /// ### NOTE:
 ///
-/// If you rename the tokio crate in your dependencies this macro
-/// will not work. If you must rename the 0.2 version of tokio because
-/// you're also using the 0.1 version of tokio, you _must_ make the
-/// tokio 0.2 crate available as `tokio` in the module where this
-/// macro is expanded.
+/// If you rename the tokio crate in your dependencies this macro will not work.
+/// If you must rename the 0.2 version of tokio because you're also using the
+/// 0.1 version of tokio, you _must_ make the tokio 0.2 crate available as
+/// `tokio` in the module where this macro is expanded.
 #[proc_macro_attribute]
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
@@ -192,10 +197,10 @@ pub fn main_rt_core(args: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ## Usage
 ///
-/// ### Threaded runtime
+/// ### Multi-thread runtime
 ///
 /// ```no_run
-/// #[tokio::test(flavor = "threaded", num_workers = 1)]
+/// #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 /// async fn my_test() {
 ///     assert!(true);
 /// }
@@ -203,7 +208,7 @@ pub fn main_rt_core(args: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ### Using default
 ///
-/// The default test runtime is single-threaded.
+/// The default test runtime is multi-threaded.
 ///
 /// ```no_run
 /// #[tokio::test]

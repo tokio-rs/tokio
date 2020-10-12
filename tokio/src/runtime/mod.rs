@@ -1,8 +1,7 @@
 //! The Tokio runtime.
 //!
-//! Unlike other Rust programs, asynchronous applications require
-//! runtime support. In particular, the following runtime services are
-//! necessary:
+//! Unlike other Rust programs, asynchronous applications require runtime
+//! support. In particular, the following runtime services are necessary:
 //!
 //! * An **I/O event loop**, called the driver, which drives I/O resources and
 //!   dispatches I/O events to tasks that depend on them.
@@ -10,14 +9,14 @@
 //! * A **timer** for scheduling work to run after a set period of time.
 //!
 //! Tokio's [`Runtime`] bundles all of these services as a single type, allowing
-//! them to be started, shut down, and configured together. However, often
-//! it is not required to configure a [`Runtime`] manually, and user may just
-//! use the [`tokio::main`] attribute macro, which creates a [`Runtime`] under
-//! the hood.
+//! them to be started, shut down, and configured together. However, often it is
+//! not required to configure a [`Runtime`] manually, and user may just use the
+//! [`tokio::main`] attribute macro, which creates a [`Runtime`] under the hood.
 //!
 //! # Usage
 //!
-//! When no fine tuning is required, the [`tokio::main`] attribute macro can be used.
+//! When no fine tuning is required, the [`tokio::main`] attribute macro can be
+//! used.
 //!
 //! ```no_run
 //! use tokio::net::TcpListener;
@@ -111,11 +110,11 @@
 //! applications. The [runtime builder] or `#[tokio::main]` attribute may be
 //! used to select which scheduler to use.
 //!
-//! #### Basic Scheduler
+//! #### Current-Thread Scheduler
 //!
-//! The basic scheduler provides a _single-threaded_ future executor. All tasks
-//! will be created and executed on the current thread. The basic scheduler
-//! requires the `rt-core` feature flag.
+//! The current-thread scheduler provides a _single-threaded_ future executor.
+//! All tasks will be created and executed on the current thread. This requires
+//! the `rt-core` feature flag.
 //! ```
 //! use tokio::runtime;
 //!
@@ -125,20 +124,13 @@
 //! # Ok(()) }
 //! ```
 //!
-//! Setting `core_threads(0)` will allow you to run the scheduler on the current
-//! thread. When setting `core_threads(1)`, the runtime will spawn one background
-//! thread that will run the runtime.
+//! #### Multi-Thread Scheduler
 //!
-//! If the `rt-core` feature is enabled and `rt-threaded` is not,
-//! [`Runtime::new`] will return a basic scheduler runtime by default.
-//!
-//! #### Threaded Scheduler
-//!
-//! The threaded scheduler executes futures on a _thread pool_, using a
+//! The multi-thread scheduler executes futures on a _thread pool_, using a
 //! work-stealing strategy. By default, it will start a worker thread for each
 //! CPU core available on the system. This tends to be the ideal configurations
-//! for most applications. The threaded scheduler requires the `rt-threaded` feature
-//! flag, and is selected by default:
+//! for most applications. The multi-thread scheduler requires the `rt-threaded`
+//! feature flag, and is selected by default:
 //! ```
 //! use tokio::runtime;
 //!
@@ -147,8 +139,8 @@
 //! # Ok(()) }
 //! ```
 //!
-//! Most applications should use the threaded scheduler, except in some niche
-//! use-cases, such as when running only a single thread is required.
+//! Most applications should use the multi-thread scheduler, except in some
+//! niche use-cases, such as when running only a single thread is required.
 //!
 //! #### Resource drivers
 //!
@@ -168,12 +160,9 @@
 //! idle. Once `Runtime` is dropped, all runtime threads are forcibly shutdown.
 //! Any tasks that have not yet completed will be dropped.
 //!
-//! [tasks]: crate::task
-//! [`Runtime`]: Runtime
-//! [`tokio::spawn`]: crate::spawn
-//! [`tokio::main`]: ../attr.main.html
-//! [runtime builder]: crate::runtime::Builder
-//! [`Runtime::new`]: crate::runtime::Runtime::new
+//! [tasks]: crate::task [`Runtime`]: Runtime [`tokio::spawn`]: crate::spawn
+//! [`tokio::main`]: ../attr.main.html [runtime builder]:
+//! crate::runtime::Builder [`Runtime::new`]: crate::runtime::Runtime::new
 //! [`Builder::basic_scheduler`]: crate::runtime::Builder::basic_scheduler
 //! [`Builder::threaded_scheduler`]: crate::runtime::Builder::threaded_scheduler
 //! [`Builder::enable_io`]: crate::runtime::Builder::enable_io
@@ -351,11 +340,6 @@ cfg_rt_core! {
         /// });
         /// # }
         /// ```
-        ///
-        /// # Panics
-        ///
-        /// This function will panic if `rt-core` or `rt-threaded` features
-        /// are not enabled.
         #[cfg(feature = "rt-core")]
         pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
         where
