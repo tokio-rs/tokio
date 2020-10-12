@@ -14,6 +14,7 @@ cfg_not_rt_core! {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
+        assert_send_sync::<JoinHandle<std::cell::Cell<()>>>();
         panic!("requires the `rt-core` Tokio feature flag")
 
     }
@@ -21,6 +22,9 @@ cfg_not_rt_core! {
     pub(crate) struct JoinHandle<R> {
         _p: std::marker::PhantomData<R>,
     }
+
+    unsafe impl<T: Send> Send for JoinHandle<T> {}
+    unsafe impl<T: Send> Sync for JoinHandle<T> {}
 
     impl<R> Future for JoinHandle<R> {
         type Output = Result<R, std::io::Error>;
@@ -37,5 +41,8 @@ cfg_not_rt_core! {
         fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
             fmt.debug_struct("JoinHandle").finish()
         }
+    }
+
+    fn assert_send_sync<T: Send + Sync>() {
     }
 }
