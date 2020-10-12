@@ -160,9 +160,12 @@
 //! idle. Once `Runtime` is dropped, all runtime threads are forcibly shutdown.
 //! Any tasks that have not yet completed will be dropped.
 //!
-//! [tasks]: crate::task [`Runtime`]: Runtime [`tokio::spawn`]: crate::spawn
-//! [`tokio::main`]: ../attr.main.html [runtime builder]:
-//! crate::runtime::Builder [`Runtime::new`]: crate::runtime::Runtime::new
+//! [tasks]: crate::task
+//! [`Runtime`]: Runtime
+//! [`tokio::spawn`]: crate::spawn
+//! [`tokio::main`]: ../attr.main.html
+//! [runtime builder]: crate::runtime::Builder
+//! [`Runtime::new`]: crate::runtime::Runtime::new
 //! [`Builder::basic_scheduler`]: crate::runtime::Builder::basic_scheduler
 //! [`Builder::threaded_scheduler`]: crate::runtime::Builder::threaded_scheduler
 //! [`Builder::enable_io`]: crate::runtime::Builder::enable_io
