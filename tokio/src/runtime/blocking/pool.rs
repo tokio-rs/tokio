@@ -232,11 +232,9 @@ impl Spawner {
         builder
             .spawn(move || {
                 // Only the reference should be moved into the closure
-                let rt = &rt;
-                rt.enter(move || {
-                    rt.blocking_spawner.inner.run(worker_id);
-                    drop(shutdown_tx);
-                })
+                let _enter = crate::runtime::context::enter(rt.clone());
+                rt.blocking_spawner.inner.run(worker_id);
+                drop(shutdown_tx);
             })
             .unwrap()
     }

@@ -60,24 +60,20 @@ cfg_rt! {
 /// Set this [`Handle`] as the current active [`Handle`].
 ///
 /// [`Handle`]: Handle
-pub(crate) fn enter<F, R>(new: Handle, f: F) -> R
-where
-    F: FnOnce() -> R,
-{
-    struct DropGuard(Option<Handle>);
-
-    impl Drop for DropGuard {
-        fn drop(&mut self) {
-            CONTEXT.with(|ctx| {
-                *ctx.borrow_mut() = self.0.take();
-            });
-        }
-    }
-
-    let _guard = CONTEXT.with(|ctx| {
+pub(crate) fn enter(new: Handle) -> EnterGuard {
+    CONTEXT.with(|ctx| {
         let old = ctx.borrow_mut().replace(new);
-        DropGuard(old)
-    });
+        EnterGuard(old)
+    })
+}
 
-    f()
+#[derive(Debug)]
+pub(crate) struct EnterGuard(Option<Handle>);
+
+impl Drop for EnterGuard {
+    fn drop(&mut self) {
+        CONTEXT.with(|ctx| {
+            *ctx.borrow_mut() = self.0.take();
+        });
+    }
 }
