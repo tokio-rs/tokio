@@ -99,6 +99,8 @@
 //!
 //! # Caveats
 //!
+//! ## Dropping/Cancellation
+//!
 //! Similar to the behavior to the standard library, and unlike the futures
 //! paradigm of dropping-implies-cancellation, a spawned process will, by
 //! default, continue to execute even after the `Child` handle has been dropped.
@@ -107,7 +109,25 @@
 //! and kill the child process if the `Child` wrapper is dropped before it
 //! has exited.
 //!
+//! ## Unix Processes
+//!
+//! On Unix platforms processes must be "reaped" by their parent process after
+//! they have exited in order to release all OS resources. A child process which
+//! has exited, but has not yet been reaped by its parent is considered a "zombie"
+//! process. Such processes continue to count against limits imposed by the system,
+//! and having too many zombie processes present can prevent additional processes
+//! from being spawned.
+//!
+//! The tokio runtime will, on a best-effort basis, attempt to reap and clean up
+//! any process which it has spawned. No additional guarantees are made with regards
+//! how quickly or how often this procedure will take place.
+//!
+//! It is recommended to avoid dropping a [`Child`] process handle before it has been
+//! fully `await`ed if stricter cleanup guarantees are required.
+//!
 //! [`Command`]: crate::process::Command
+//! [`Command::kill_on_drop`]: crate::process::Command::kill_on_drop
+//! [`Child`]: crate::process::Child
 
 #[path = "unix/mod.rs"]
 #[cfg(unix)]
@@ -454,6 +474,26 @@ impl Command {
     /// By default, this value is assumed to be `false`, meaning the next spawned
     /// process will not be killed on drop, similar to the behavior of the standard
     /// library.
+    ///
+    /// # Caveats
+    ///
+    /// On Unix platforms processes must be "reaped" by their parent process after
+    /// they have exited in order to release all OS resources. A child process which
+    /// has exited, but has not yet been reaped by its parent is considered a "zombie"
+    /// process. Such processes continue to count against limits imposed by the system,
+    /// and having too many zombie processes present can prevent additional processes
+    /// from being spawned.
+    ///
+    /// Although issuing a `kill` signal to the child process is a synchronous
+    /// operation, the resulting zombie process cannot be `.await`ed inside of the
+    /// destructor to avoid blocking other tasks. The tokio runtime will, on a
+    /// best-effort basis, attempt to reap and clean up such processes in the
+    /// background, but makes no additional guarantees are made with regards
+    /// how quickly or how often this procedure will take place.
+    ///
+    /// If stronger guarantees are required, it is recommended to avoid dropping
+    /// a [`Child`] handle where possible, and instead utilize `child.wait().await`
+    /// or `child.kill().await` where possible.
     pub fn kill_on_drop(&mut self, kill_on_drop: bool) -> &mut Command {
         self.kill_on_drop = kill_on_drop;
         self
@@ -538,16 +578,6 @@ impl Command {
     /// All I/O this child does will be associated with the current default
     /// event loop.
     ///
-    /// # Caveats
-    ///
-    /// Similar to the behavior to the standard library, and unlike the futures
-    /// paradigm of dropping-implies-cancellation, the spawned process will, by
-    /// default, continue to execute even after the `Child` handle has been dropped.
-    ///
-    /// The `Command::kill_on_drop` method can be used to modify this behavior
-    /// and kill the child process if the `Child` wrapper is dropped before it
-    /// has exited.
-    ///
     /// # Examples
     ///
     /// Basic usage:
@@ -564,6 +594,44 @@ impl Command {
     ///         .expect("ls command failed to run")
     /// }
     /// ```
+    ///
+    /// # Caveats
+    ///
+    /// ## Dropping/Cancellation
+    ///
+    /// Similar to the behavior to the standard library, and unlike the futures
+    /// paradigm of dropping-implies-cancellation, a spawned process will, by
+    /// default, continue to execute even after the `Child` handle has been dropped.
+    ///
+    /// The [`Command::kill_on_drop`] method can be used to modify this behavior
+    /// and kill the child process if the `Child` wrapper is dropped before it
+    /// has exited.
+    ///
+    /// ## Unix Processes
+    ///
+    /// On Unix platforms processes must be "reaped" by their parent process after
+    /// they have exited in order to release all OS resources. A child process which
+    /// has exited, but has not yet been reaped by its parent is considered a "zombie"
+    /// process. Such processes continue to count against limits imposed by the system,
+    /// and having too many zombie processes present can prevent additional processes
+    /// from being spawned.
+    ///
+    /// The tokio runtime will, on a best-effort basis, attempt to reap and clean up
+    /// any process which it has spawned. No additional guarantees are made with regards
+    /// how quickly or how often this procedure will take place.
+    ///
+    /// It is recommended to avoid dropping a [`Child`] process handle before it has been
+    /// fully `await`ed if stricter cleanup guarantees are required.
+    ///
+    /// [`Command`]: crate::process::Command
+    /// [`Command::kill_on_drop`]: crate::process::Command::kill_on_drop
+    /// [`Child`]: crate::process::Child
+    ///
+    /// # Errors
+    ///
+    /// On Unix platforms this method will fail with `std::io::ErrorKind::WouldBlock`
+    /// if the system process limit is reached (which includes other applications
+    /// running on the system).
     pub fn spawn(&mut self) -> io::Result<Child> {
         imp::spawn_child(&mut self.std).map(|spawned_child| Child {
             child: FusedChild::Child(ChildDropGuard {
@@ -595,6 +663,10 @@ impl Command {
     ///
     /// This future will return an error if the child process cannot be spawned
     /// or if there is an error while awaiting its status.
+    ///
+    /// On Unix platforms this method will fail with `std::io::ErrorKind::WouldBlock`
+    /// if the system process limit is reached (which includes other applications
+    /// running on the system).
     ///
     /// # Examples
     ///
@@ -650,6 +722,14 @@ impl Command {
     ///
     /// [`kill_on_drop`]: fn@Self::kill_on_drop
     ///
+    /// # Errors
+    ///
+    /// This future will return an error if the child process cannot be spawned
+    /// or if there is an error while awaiting its status.
+    ///
+    /// On Unix platforms this method will fail with `std::io::ErrorKind::WouldBlock`
+    /// if the system process limit is reached (which includes other applications
+    /// running on the system).
     /// # Examples
     ///
     /// Basic usage:
