@@ -16,6 +16,8 @@ pub(crate) enum Spawner {
     Basic(basic_scheduler::Spawner),
     #[cfg(feature = "rt-threaded")]
     ThreadPool(thread_pool::Spawner),
+    #[cfg(feature = "compat")]
+    Compat03(crate::runtime::compat::Compat03Handle),
 }
 
 impl Spawner {
@@ -42,6 +44,8 @@ cfg_rt_core! {
                 Spawner::Basic(spawner) => spawner.spawn(future),
                 #[cfg(feature = "rt-threaded")]
                 Spawner::ThreadPool(spawner) => spawner.spawn(future),
+                #[cfg(feature = "compat")]
+                Spawner::Compat03(handle) => handle.spawn(future),
             }
         }
     }

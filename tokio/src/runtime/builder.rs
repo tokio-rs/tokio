@@ -310,12 +310,22 @@ impl Builder {
     /// });
     /// ```
     pub fn build(&mut self) -> io::Result<Runtime> {
-        match self.kind {
-            Kind::Shell => self.build_shell_runtime(),
-            #[cfg(feature = "rt-core")]
-            Kind::Basic => self.build_basic_runtime(),
-            #[cfg(feature = "rt-threaded")]
-            Kind::ThreadPool => self.build_threaded_runtime(),
+        if cfg!(feature = "compat") {
+            match self.kind {
+                Kind::Shell => self.build_shell_runtime(),
+                #[cfg(feature = "rt-core")]
+                Kind::Basic => self.build_compat_runtime(),
+                #[cfg(feature = "rt-threaded")]
+                Kind::ThreadPool => self.build_compat_runtime(),
+            }
+        } else {
+            match self.kind {
+                Kind::Shell => self.build_shell_runtime(),
+                #[cfg(feature = "rt-core")]
+                Kind::Basic => self.build_basic_runtime(),
+                #[cfg(feature = "rt-threaded")]
+                Kind::ThreadPool => self.build_threaded_runtime(),
+            }
         }
     }
 
@@ -390,6 +400,47 @@ cfg_time! {
         pub fn enable_time(&mut self) -> &mut Self {
             self.enable_time = true;
             self
+        }
+    }
+}
+
+cfg_compat! {
+    impl Builder {
+        fn make_03_builder(&self) -> tokio_03::runtime::Builder {
+            let mut builder = match self.kind {
+                // the make_03_builder function should not be called when building
+                // a shell runtime
+                Kind::Shell => unreachable!(),
+                Kind::Basic => tokio_03::runtime::Builder::new_current_thread(),
+                Kind::ThreadPool => tokio_03::runtime::Builder::new_multi_thread(),
+            };
+
+            if self.enable_io {
+                builder.enable_io();
+            }
+            if self.enable_time {
+                builder.enable_time();
+            }
+
+            if let Some(core_threads) = self.core_threads {
+                builder.worker_threads(core_threads);
+            }
+            builder.max_threads(self.max_threads);
+
+            if self.thread_name.as_str() != "tokio-runtime-worker" {
+                builder.thread_name(self.thread_name.as_str());
+            }
+            if let Some(thread_stack_size) = self.thread_stack_size {
+                builder.thread_stack_size(thread_stack_size);
+            }
+            if let Some(after_start) = self.after_start.clone() {
+                builder.on_thread_start(move || after_start());
+            }
+            if let Some(before_stop) = self.before_stop.clone() {
+                builder.on_thread_stop(move || before_stop());
+            }
+
+            builder
         }
     }
 }
@@ -495,6 +546,38 @@ cfg_rt_threaded! {
             Ok(Runtime {
                 kind: Kind::ThreadPool(scheduler),
                 handle,
+                blocking_pool,
+            })
+        }
+    }
+}
+
+cfg_compat! {
+    use crate::runtime::Compat03Runtime;
+
+    impl Builder {
+        fn build_compat_runtime(&mut self) -> io::Result<Runtime> {
+            use crate::runtime::Kind;
+
+            let rt02 = self.build_shell_runtime()?;
+            let rt03 = Compat03Runtime::new(self.make_03_builder().build()?, rt02);
+
+            let spawner = Spawner::Compat03(rt03.handle());
+            let io_handle = rt02.handle.io_handle.clone();
+            let time_handle = rt02.handle.time_handle.clone();
+            let clock = rt02.handle.clock.clone();
+            let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
+            let blocking_spawner = blocking_pool.spawner().clone();
+
+            Ok(Runtime {
+                kind: Kind::Compat03(rt03),
+                handle: Handle {
+                    spawner,
+                    io_handle,
+                    time_handle,
+                    clock,
+                    blocking_spawner,
+                },
                 blocking_pool,
             })
         }

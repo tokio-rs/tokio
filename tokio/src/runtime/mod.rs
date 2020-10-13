@@ -208,6 +208,11 @@ cfg_blocking_impl! {
 mod builder;
 pub use self::builder::Builder;
 
+cfg_compat! {
+    pub(crate) mod compat;
+    use self::compat::Compat03Runtime;
+}
+
 pub(crate) mod enter;
 use self::enter::enter;
 
@@ -242,6 +247,7 @@ cfg_rt_core! {
 
 use std::future::Future;
 use std::time::Duration;
+use std::sync::Arc;
 
 /// The Tokio runtime.
 ///
@@ -297,10 +303,13 @@ enum Kind {
     /// Execute tasks across multiple threads.
     #[cfg(feature = "rt-threaded")]
     ThreadPool(ThreadPool),
+
+    #[cfg(feature = "compat")]
+    Compat03(Compat03Runtime),
 }
 
 /// After thread starts / before thread stops
-type Callback = std::sync::Arc<dyn Fn() + Send + Sync>;
+type Callback = Arc<dyn Fn() + Send + Sync>;
 
 impl Runtime {
     /// Create a new runtime instance with default configuration values.
@@ -395,6 +404,8 @@ impl Runtime {
     {
         match &self.kind {
             Kind::Shell(_) => panic!("task execution disabled"),
+            #[cfg(feature = "compat")]
+            Kind::Compat03(handle) => handle.spawn(future),
             #[cfg(feature = "rt-threaded")]
             Kind::ThreadPool(exec) => exec.spawn(future),
             Kind::Basic(exec) => exec.spawn(future),
@@ -444,6 +455,8 @@ impl Runtime {
             Kind::Basic(exec) => exec.block_on(future),
             #[cfg(feature = "rt-threaded")]
             Kind::ThreadPool(exec) => exec.block_on(future),
+            #[cfg(feature = "compat")]
+            Kind::Compat03(exec) => exec.block_on(future),
         })
     }
 
@@ -546,6 +559,21 @@ impl Runtime {
         // Wakeup and shutdown all the worker threads
         self.handle.spawner.shutdown();
         self.blocking_pool.shutdown(Some(duration));
+
+        #[cfg(feature = "compat")]
+        {
+            if let Kind::Compat03(compat) = self.kind {
+                let deadline = std::time::Instant::now() + duration;
+                if let Some(rt) = compat.take(duration) {
+                    let now = std::time::Instant::now();
+                    rt.shutdown_timeout(
+                        deadline
+                            .checked_duration_since(now)
+                            .unwrap_or(Duration::from_nanos(0))
+                    );
+                }
+            }
+        }
     }
 
     /// Shutdown the runtime, without waiting for any spawned tasks to shutdown.

@@ -76,6 +76,8 @@ doc_rt_core! {
     /// [`task::spawn_blocking`]: crate::task::spawn_blocking
     /// [`std::thread::JoinHandle`]: std::thread::JoinHandle
     pub struct JoinHandle<T> {
+        #[cfg(feature = "compat")]
+        compat: Option<tokio_03::task::JoinHandle<T>>,
         raw: Option<RawTask>,
         _p: PhantomData<T>,
     }
@@ -87,7 +89,17 @@ unsafe impl<T: Send> Sync for JoinHandle<T> {}
 impl<T> JoinHandle<T> {
     pub(super) fn new(raw: RawTask) -> JoinHandle<T> {
         JoinHandle {
+            #[cfg(feature = "compat")]
+            compat: None,
             raw: Some(raw),
+            _p: PhantomData,
+        }
+    }
+    #[cfg(feature = "compat")]
+    pub(crate) fn new_compat(compat: tokio_03::task::JoinHandle<T>) -> JoinHandle<T> {
+        JoinHandle {
+            compat: Some(compat),
+            raw: None,
             _p: PhantomData,
         }
     }
@@ -98,7 +110,14 @@ impl<T> Unpin for JoinHandle<T> {}
 impl<T> Future for JoinHandle<T> {
     type Output = super::Result<T>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        #[cfg(feature = "compat")]
+        {
+            if let Some(compat) = &mut self.compat {
+                return Pin::new(compat).poll(cx)?.map(Ok);
+            }
+        }
+
         let mut ret = Poll::Pending;
 
         // Keep track of task budget

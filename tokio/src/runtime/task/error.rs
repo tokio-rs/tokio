@@ -13,6 +13,8 @@ doc_rt_core! {
 enum Repr {
     Cancelled,
     Panic(Mutex<Box<dyn Any + Send + 'static>>),
+    #[cfg(feature = "compat")]
+    Compat03(tokio_03::task::JoinError),
 }
 
 impl JoinError {
@@ -44,6 +46,8 @@ impl JoinError {
     pub fn is_cancelled(&self) -> bool {
         match &self.repr {
             Repr::Cancelled => true,
+            #[cfg(feature = "compat")]
+            Repr::Compat03(join) => join.is_cancelled(),
             _ => false,
         }
     }
@@ -67,6 +71,8 @@ impl JoinError {
     pub fn is_panic(&self) -> bool {
         match &self.repr {
             Repr::Panic(_) => true,
+            #[cfg(feature = "compat")]
+            Repr::Compat03(join) => join.is_panic(),
             _ => false,
         }
     }
@@ -125,6 +131,8 @@ impl JoinError {
     pub fn try_into_panic(self) -> Result<Box<dyn Any + Send + 'static>, JoinError> {
         match self.repr {
             Repr::Panic(p) => Ok(p.into_inner().expect("Extracting panic from mutex")),
+            #[cfg(feature = "compat")]
+            Repr::Compat03(join) => Ok(join.try_into_panic()?),
             _ => Err(self),
         }
     }
@@ -135,6 +143,8 @@ impl fmt::Display for JoinError {
         match &self.repr {
             Repr::Cancelled => write!(fmt, "cancelled"),
             Repr::Panic(_) => write!(fmt, "panic"),
+            #[cfg(feature = "compat")]
+            Repr::Compat03(inner) => fmt::Display::fmt(inner, fmt),
         }
     }
 }
@@ -144,6 +154,8 @@ impl fmt::Debug for JoinError {
         match &self.repr {
             Repr::Cancelled => write!(fmt, "JoinError::Cancelled"),
             Repr::Panic(_) => write!(fmt, "JoinError::Panic(...)"),
+            #[cfg(feature = "compat")]
+            Repr::Compat03(inner) => fmt::Debug::fmt(inner, fmt),
         }
     }
 }
@@ -157,7 +169,19 @@ impl From<JoinError> for io::Error {
             match src.repr {
                 Repr::Cancelled => "task was cancelled",
                 Repr::Panic(_) => "task panicked",
+                #[cfg(feature = "compat")]
+                Repr::Compat03(inner) => return io::Error::from(inner),
             },
         )
+    }
+}
+
+cfg_compat! {
+    impl From<tokio_03::task::JoinError> for JoinError {
+        fn from(src: tokio_03::task::JoinError) -> JoinError {
+            JoinError {
+                repr: Repr::Compat03(src),
+            }
+        }
     }
 }

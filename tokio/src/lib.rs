@@ -433,3 +433,6 @@ cfg_macros! {
 #[cfg(feature = "io-util")]
 #[cfg(test)]
 fn is_unpin<T: Unpin>() {}
+
+#[cfg(all(feature = "tokio_03", not(feature = "compat")))]
+compile_error!("Enable the `compat` feature rather than the `tokio_03` feature.");

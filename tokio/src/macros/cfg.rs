@@ -402,3 +402,21 @@ macro_rules! cfg_coop {
         )*
     }
 }
+
+macro_rules! cfg_compat {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "compat")]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_not_compat {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "compat")]
+            $item
+        )*
+    }
+}
