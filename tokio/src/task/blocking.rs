@@ -83,9 +83,10 @@ cfg_rt_multi_thread! {
 /// still spawn additional threads for blocking operations. The basic
 /// scheduler's single thread is only used for asynchronous code.
 ///
-/// [`Builder`]: struct@crate::runtime::Builder [blocking]:
-/// ../index.html#cpu-bound-tasks-and-blocking-code [rayon]:
-/// https://docs.rs/rayon [`thread::spawn`]: fn@std::thread::spawn
+/// [`Builder`]: struct@crate::runtime::Builder
+/// [blocking]: ../index.html#cpu-bound-tasks-and-blocking-code
+/// [rayon]: https://docs.rs/rayon
+/// [`thread::spawn`]: fn@std::thread::spawn
 /// [`shutdown_timeout`]: fn@crate::runtime::Runtime::shutdown_timeout
 ///
 /// # Examples
