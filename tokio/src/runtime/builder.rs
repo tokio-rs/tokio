@@ -508,7 +508,8 @@ cfg_rt_multi_thread! {
             };
 
             // Spawn the thread pool workers
-            handle.enter(|| launch.launch());
+            let _enter = crate::runtime::context::enter(handle.clone());
+            launch.launch();
 
             Ok(Runtime {
                 kind: Kind::ThreadPool(scheduler),

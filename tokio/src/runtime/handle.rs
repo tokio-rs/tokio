@@ -1,4 +1,4 @@
-use crate::runtime::{blocking, context, driver, Spawner};
+use crate::runtime::{blocking, driver, Spawner};
 
 /// Handle to the runtime.
 ///
@@ -27,13 +27,13 @@ pub(crate) struct Handle {
 }
 
 impl Handle {
-    /// Enter the runtime context. This allows you to construct types that must
-    /// have an executor available on creation such as [`Sleep`] or [`TcpStream`].
-    /// It will also allow you to call methods such as [`tokio::spawn`].
-    pub(crate) fn enter<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce() -> R,
-    {
-        context::enter(self.clone(), f)
-    }
+    // /// Enter the runtime context. This allows you to construct types that must
+    // /// have an executor available on creation such as [`Sleep`] or [`TcpStream`].
+    // /// It will also allow you to call methods such as [`tokio::spawn`].
+    // pub(crate) fn enter<F, R>(&self, f: F) -> R
+    // where
+    //     F: FnOnce() -> R,
+    // {
+    //     context::enter(self.clone(), f)
+    // }
 }

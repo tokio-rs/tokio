@@ -67,11 +67,10 @@ fn test_drop_on_notify() {
     }));
 
     {
-        rt.enter(|| {
-            let waker = waker_ref(&task);
-            let mut cx = Context::from_waker(&waker);
-            assert_pending!(task.future.lock().unwrap().as_mut().poll(&mut cx));
-        });
+        let _enter = rt.enter();
+        let waker = waker_ref(&task);
+        let mut cx = Context::from_waker(&waker);
+        assert_pending!(task.future.lock().unwrap().as_mut().poll(&mut cx));
     }
 
     // Get the address

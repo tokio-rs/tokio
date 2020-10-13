@@ -253,21 +253,20 @@ mod tests {
     #[test]
     fn ctrl_c() {
         let rt = rt();
+        let _enter = rt.enter();
 
-        rt.enter(|| {
-            let mut ctrl_c = task::spawn(crate::signal::ctrl_c());
+        let mut ctrl_c = task::spawn(crate::signal::ctrl_c());
 
-            assert_pending!(ctrl_c.poll());
+        assert_pending!(ctrl_c.poll());
 
-            // Windows doesn't have a good programmatic way of sending events
-            // like sending signals on Unix, so we'll stub out the actual OS
-            // integration and test that our handling works.
-            unsafe {
-                super::handler(CTRL_C_EVENT);
-            }
+        // Windows doesn't have a good programmatic way of sending events
+        // like sending signals on Unix, so we'll stub out the actual OS
+        // integration and test that our handling works.
+        unsafe {
+            super::handler(CTRL_C_EVENT);
+        }
 
-            assert_ready_ok!(ctrl_c.poll());
-        });
+        assert_ready_ok!(ctrl_c.poll());
     }
 
     #[test]

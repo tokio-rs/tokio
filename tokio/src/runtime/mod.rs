@@ -262,6 +262,16 @@ cfg_rt! {
         blocking_pool: BlockingPool,
     }
 
+    /// Runtime context guard.
+    ///
+    /// Returned by [`Runtime::enter`], the context guard exits the runtime
+    /// context on drop.
+    #[derive(Debug)]
+    pub struct EnterGuard<'a> {
+        rt: &'a Runtime,
+        guard: context::EnterGuard,
+    }
+
     /// The runtime executor is either a thread-pool or a current-thread executor.
     #[derive(Debug)]
     enum Kind {
@@ -356,25 +366,26 @@ cfg_rt! {
             }
         }
 
-        /// Run a future to completion on the Tokio runtime. This is the runtime's
-        /// entry point.
+        /// Run a future to completion on the Tokio runtime. This is the
+        /// runtime's entry point.
         ///
         /// This runs the given future on the runtime, blocking until it is
-        /// complete, and yielding its resolved result. Any tasks or timers which
-        /// the future spawns internally will be executed on the runtime.
+        /// complete, and yielding its resolved result. Any tasks or timers
+        /// which the future spawns internally will be executed on the runtime.
         ///
-        /// When this runtime is configured with `core_threads = 0`, only the first call
-        /// to `block_on` will run the IO and timer drivers. Calls to other methods _before_ the first
-        /// `block_on` completes will just hook into the driver running on the thread
-        /// that first called `block_on`. This means that the driver may be passed
-        /// from thread to thread by the user between calls to `block_on`.
+        /// When this runtime is configured with `core_threads = 0`, only the
+        /// first call to `block_on` will run the IO and timer drivers. Calls to
+        /// other methods _before_ the first `block_on` completes will just hook
+        /// into the driver running on the thread that first called `block_on`.
+        /// This means that the driver may be passed from thread to thread by
+        /// the user between calls to `block_on`.
         ///
         /// This method may not be called from an asynchronous context.
         ///
         /// # Panics
         ///
-        /// This function panics if the provided future panics, or if called within an
-        /// asynchronous execution context.
+        /// This function panics if the provided future panics, or if called
+        /// within an asynchronous execution context.
         ///
         /// # Examples
         ///
@@ -392,17 +403,21 @@ cfg_rt! {
         ///
         /// [handle]: fn@Handle::block_on
         pub fn block_on<F: Future>(&self, future: F) -> F::Output {
-            self.handle.enter(|| match &self.kind {
+            let _enter = self.enter();
+
+            match &self.kind {
                 #[cfg(feature = "rt")]
                 Kind::CurrentThread(exec) => exec.block_on(future),
                 #[cfg(feature = "rt-multi-thread")]
                 Kind::ThreadPool(exec) => exec.block_on(future),
-            })
+            }
         }
 
-        /// Enter the runtime context. This allows you to construct types that must
-        /// have an executor available on creation such as [`Sleep`] or [`TcpStream`].
-        /// It will also allow you to call methods such as [`tokio::spawn`].
+        /// Enter the runtime context.
+        ///
+        /// This allows you to construct types that must have an executor
+        /// available on creation such as [`Sleep`] or [`TcpStream`]. It will
+        /// also allow you to call methods such as [`tokio::spawn`].
         ///
         /// [`Sleep`]: struct@crate::time::Sleep
         /// [`TcpStream`]: struct@crate::net::TcpStream
@@ -426,14 +441,15 @@ cfg_rt! {
         ///     let s = "Hello World!".to_string();
         ///
         ///     // By entering the context, we tie `tokio::spawn` to this executor.
-        ///     rt.enter(|| function_that_spawns(s));
+        ///     let _guard = rt.enter();
+        ///     function_that_spawns(s);
         /// }
         /// ```
-        pub fn enter<F, R>(&self, f: F) -> R
-        where
-            F: FnOnce() -> R,
-        {
-            self.handle.enter(f)
+        pub fn enter(&self) -> EnterGuard<'_> {
+            EnterGuard {
+                rt: self,
+                guard: context::enter(self.handle.clone()),
+            }
         }
 
         /// Shutdown the runtime, waiting for at most `duration` for all spawned
