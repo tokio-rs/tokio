@@ -10,13 +10,15 @@ use std::time::Duration;
 /// Methods can be chained in order to set the configuration values. The
 /// Runtime is constructed by calling [`build`].
 ///
-/// New instances of `Builder` are obtained via [`Builder::new`].
+/// New instances of `Builder` are obtained via [`Builder::new_multi_thread`]
+/// or [`Builder::new_current_thread`].
 ///
 /// See function level documentation for details on the various configuration
 /// settings.
 ///
 /// [`build`]: method@Self::build
-/// [`Builder::new`]: method@Self::new
+/// [`Builder::new_multi_thread`]: method@Self::new_multi_thread
+/// [`Builder::new_current_thread`]: method@Self::new_current_thread
 ///
 /// # Examples
 ///
@@ -78,13 +80,18 @@ pub(crate) enum Kind {
 }
 
 impl Builder {
-    /// TODO
+    /// Returns a new builder with the multi thread scheduler selected.
+    ///
+    /// Configuration methods can be chained on the return value.
     pub fn new_current_thread() -> Builder {
         Builder::new(Kind::CurrentThread)
     }
 
-    /// TODO
+    /// Returns a new builder with the multi thread scheduler selected.
+    ///
+    /// Configuration methods can be chained on the return value.
     #[cfg(feature = "rt-multi-thread")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
     pub fn new_multi_thread() -> Builder {
         Builder::new(Kind::MultiThread)
     }
