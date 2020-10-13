@@ -555,23 +555,6 @@ rt_test! {
     }
 
     #[test]
-    fn spawn_blocking_after_shutdown() {
-        let rt = rt();
-        let handle = rt.clone();
-
-        // Shutdown
-        drop(rt);
-
-        handle.enter(|| {
-            let res = task::spawn_blocking(|| unreachable!());
-
-            // Avoid using a tokio runtime
-            let out = futures::executor::block_on(res);
-            assert!(out.is_err());
-        });
-    }
-
-    #[test]
     fn always_active_parker() {
         // This test it to show that we will always have
         // an active parker even if we call block_on concurrently
@@ -713,9 +696,10 @@ rt_test! {
     #[test]
     fn enter_and_spawn() {
         let rt = rt();
-        let handle = rt.enter(|| {
+        let handle = {
+            let _enter = rt.enter();
             tokio::spawn(async {})
-        });
+        };
 
         assert_ok!(rt.block_on(handle));
     }

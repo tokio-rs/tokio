@@ -54,31 +54,30 @@ cfg_rt_multi_thread! {
 /// Runs the provided closure on a thread where blocking is acceptable.
 ///
 /// In general, issuing a blocking call or performing a lot of compute in a
-/// future without yielding is not okay, as it may prevent the executor from
-/// driving other futures forward. This function runs the provided closure
-/// on a thread dedicated to blocking operations. See the [CPU-bound tasks
-/// and blocking code][blocking] section for more information.
+/// future without yielding is problematic, as it may prevent the executor from
+/// driving other futures forward. This function runs the provided closure on a
+/// thread dedicated to blocking operations. See the [CPU-bound tasks and
+/// blocking code][blocking] section for more information.
 ///
-/// Tokio will spawn more blocking threads when they are requested through
-/// this function until the upper limit configured on the [`Builder`] is
-/// reached.  This limit is very large by default, because `spawn_blocking` is
-/// often used for various kinds of IO operations that cannot be performed
-/// asynchronously. When you run CPU-bound code using `spawn_blocking`, you
-/// should keep this large upper limit in mind; to run your CPU-bound
-/// computations on only a few threads, you should use a separate thread
-/// pool such as [rayon] rather than configuring the number of blocking
-/// threads.
+/// Tokio will spawn more blocking threads when they are requested through this
+/// function until the upper limit configured on the [`Builder`] is reached.
+/// This limit is very large by default, because `spawn_blocking` is often used
+/// for various kinds of IO operations that cannot be performed asynchronously.
+/// When you run CPU-bound code using `spawn_blocking`, you should keep this
+/// large upper limit in mind. When running many CPU-bound computations, a
+/// semaphore or some other synchronization primitive should be used to limit
+/// the number of computation executed in parallel. Specialized CPU-bound
+/// executors, such as [rayon], may also be a good fit.
 ///
-/// This function is intended for non-async operations that eventually
-/// finish on their own. If you want to spawn an ordinary thread, you should
-/// use [`thread::spawn`] instead.
+/// This function is intended for non-async operations that eventually finish on
+/// their own. If you want to spawn an ordinary thread, you should use
+/// [`thread::spawn`] instead.
 ///
-/// Closures spawned using `spawn_blocking` cannot be cancelled. When you
-/// shut down the executor, it will wait indefinitely for all blocking
-/// operations to finish. You can use [`shutdown_timeout`] to stop waiting
-/// for them after a certain timeout. Be aware that this will still not
-/// cancel the tasks — they are simply allowed to keep running after the
-/// method returns.
+/// Closures spawned using `spawn_blocking` cannot be cancelled. When you shut
+/// down the executor, it will wait indefinitely for all blocking operations to
+/// finish. You can use [`shutdown_timeout`] to stop waiting for them after a
+/// certain timeout. Be aware that this will still not cancel the tasks — they
+/// are simply allowed to keep running after the method returns.
 ///
 /// Note that if you are using the single threaded runtime, this function will
 /// still spawn additional threads for blocking operations. The basic

@@ -34,7 +34,8 @@ impl<F: Future> Future for TokioContext<'_, F> {
         let handle = me.handle;
         let fut = me.inner;
 
-        handle.enter(|| fut.poll(cx))
+        let _enter = handle.enter();
+        fut.poll(cx)
     }
 }
 
