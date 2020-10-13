@@ -110,20 +110,6 @@
 //! applications. The [runtime builder] or `#[tokio::main]` attribute may be
 //! used to select which scheduler to use.
 //!
-//! #### Current-Thread Scheduler
-//!
-//! The current-thread scheduler provides a _single-threaded_ future executor.
-//! All tasks will be created and executed on the current thread. This requires
-//! the `rt` feature flag.
-//! ```
-//! use tokio::runtime;
-//!
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let basic_rt = runtime::Builder::new_current_thread()
-//!     .build()?;
-//! # Ok(()) }
-//! ```
-//!
 //! #### Multi-Thread Scheduler
 //!
 //! The multi-thread scheduler executes futures on a _thread pool_, using a
@@ -142,6 +128,20 @@
 //! Most applications should use the multi-thread scheduler, except in some
 //! niche use-cases, such as when running only a single thread is required.
 //!
+//! #### Current-Thread Scheduler
+//!
+//! The current-thread scheduler provides a _single-threaded_ future executor.
+//! All tasks will be created and executed on the current thread. This requires
+//! the `rt-core` feature flag.
+//! ```
+//! use tokio::runtime;
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let basic_rt = runtime::Builder::new_current_thread()
+//!     .build()?;
+//! # Ok(()) }
+//! ```
+//!
 //! #### Resource drivers
 //!
 //! When configuring a runtime by hand, no resource drivers are enabled by
@@ -153,8 +153,8 @@
 //! ## Lifetime of spawned threads
 //!
 //! The runtime may spawn threads depending on its configuration and usage. The
-//! threaded scheduler spawns threads to schedule tasks and calls to
-//! `spawn_blocking` spawn threads to run blocking operations.
+//! multi-thread scheduler spawns threads to schedule tasks and for `spawn_blocking`
+//! calls.
 //!
 //! While the `Runtime` is active, threads may shutdown after periods of being
 //! idle. Once `Runtime` is dropped, all runtime threads are forcibly shutdown.
@@ -246,6 +246,16 @@ cfg_rt! {
     /// that reactor will no longer function. Calling any method on them will
     /// result in an error.
     ///
+    /// # Sharing
+    ///
+    /// The Tokio runtime implements `Sync` and `Send` to allow you to wrap it
+    /// in a `Arc`. Most fn take `&self` to allow you to call them concurrently
+    /// accross multiple threads.
+    ///
+    /// Calls to `shutdown` and `shutdown_timeout` require exclusive ownership of
+    /// the runtime type and this can be achieved via `Arc::try_unwrap` when only
+    /// one strong count reference is left over.
+    ///
     /// [timer]: crate::time
     /// [mod]: index.html
     /// [`new`]: method@Self::new
@@ -290,17 +300,11 @@ cfg_rt! {
     impl Runtime {
         /// Create a new runtime instance with default configuration values.
         ///
-        /// This results in a scheduler, I/O driver, and time driver being
-        /// initialized. The type of scheduler used depends on what feature flags
-        /// are enabled: if the `rt-multi-thread` feature is enabled, the [threaded
-        /// scheduler] is used, while if only the `rt` feature is enabled, the
-        /// [basic scheduler] is used instead.
-        ///
-        /// If the threaded scheduler is selected, it will not spawn
-        /// any worker threads until it needs to, i.e. tasks are scheduled to run.
+        /// This results in the multi threaded scheduler, I/O driver, and time driver being
+        /// initialized.
         ///
         /// Most applications will not need to call this function directly. Instead,
-        /// they will use the  [`#[tokio::main]` attribute][main]. When more complex
+        /// they will use the  [`#[tokio::main]` attribute][main]. When a more complex
         /// configuration is necessary, the [runtime builder] may be used.
         ///
         /// See [module level][mod] documentation for more details.
@@ -324,6 +328,7 @@ cfg_rt! {
         /// [basic scheduler]: index.html#basic-scheduler
         /// [runtime builder]: crate::runtime::Builder
         #[cfg(feature = "rt-multi-thread")]
+        #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
         pub fn new() -> std::io::Result<Runtime> {
             Builder::new_multi_thread().enable_all().build()
         }
@@ -373,19 +378,24 @@ cfg_rt! {
         /// complete, and yielding its resolved result. Any tasks or timers
         /// which the future spawns internally will be executed on the runtime.
         ///
-        /// When this runtime is configured with `core_threads = 0`, only the
-        /// first call to `block_on` will run the IO and timer drivers. Calls to
-        /// other methods _before_ the first `block_on` completes will just hook
-        /// into the driver running on the thread that first called `block_on`.
-        /// This means that the driver may be passed from thread to thread by
-        /// the user between calls to `block_on`.
+        /// # Multi thread scheduler
         ///
-        /// This method may not be called from an asynchronous context.
+        /// When the multi thread scheduler is used this will allow futures
+        /// to run within the io driver and timer context of the overall runtime.
+        ///
+        /// # Current thread scheduler
+        ///
+        /// When the current thread scheduler is enabled `block_on`
+        /// can be called concurrently from multiple threads. The first call
+        /// will take ownership of the io and timer drivers. This means
+        /// other threads which do not own the drivers will hook into that one.
+        /// When the first `block_on` completes, other threads will be able to
+        /// "steal" the driver to allow continued execution of their futures.
         ///
         /// # Panics
         ///
-        /// This function panics if the provided future panics, or if called
-        /// within an asynchronous execution context.
+        /// This function panics if the provided future panics, or if not called within an
+        /// asynchronous execution context.
         ///
         /// # Examples
         ///
