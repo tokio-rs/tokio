@@ -22,7 +22,6 @@ backed applications.
 """
 categories = ["asynchronous", "network-programming"]
 keywords = ["io", "async", "non-blocking", "futures"]
-publish = false
 
 [features]
 # Include nothing by default
