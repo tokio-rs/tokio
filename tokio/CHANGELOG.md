@@ -27,7 +27,7 @@ Biggest changes are:
 - process: `Child::kill` is now an `async fn` that cleans zombies (#2823).
 - sync: use `const fn` constructors as possible (#2833, 2790)
 - signal: reduce cross-thread notification (#2835).
-- net: tcp,udp,uds types support operation swith `&self` (#2828, #2919, #2934).
+- net: tcp,udp,uds types support operations with `&self` (#2828, #2919, #2934).
 - sync: blocking `mpsc` channel supports `send` with `&self` (#2861).
 - time: rename `delay_for` and `delay_until` to `sleep_for` and `sleep_until` (#2826).
 - io: upgrade to `mio` 0.7 (#2893).
