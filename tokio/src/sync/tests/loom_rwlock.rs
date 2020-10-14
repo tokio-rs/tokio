@@ -76,3 +76,24 @@ fn concurrent_read_write() {
         assert_eq!(10, *guard);
     });
 }
+#[test]
+fn downgrade() {
+    loom::model(|| {
+        let lock = Arc::new(RwLock::new(1));
+
+        let n = block_on(lock.write());
+
+        let cloned_lock = lock.clone();
+        let handle = thread::spawn(move || {
+            let mut guard = block_on(cloned_lock.write());
+            *guard = 2;
+        });
+
+        let n = n.downgrade();
+        assert_eq!(*n, 1);
+
+        drop(n);
+        handle.join().unwrap();
+        assert_eq!(*block_on(lock.read()), 2);
+    });
+}

@@ -375,8 +375,6 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
     /// let n = n.downgrade();
     /// assert_eq!(*n, 1, "downgrade is atomic");
     ///
-    /// assert_eq!(*lock.read().await, 1, "additional readers can obtain locks");
-    ///
     /// drop(n);
     /// handle.await.unwrap();
     /// assert_eq!(*lock.read().await, 2, "second writer obtained write lock");
@@ -389,7 +387,8 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
 
         // Release all but one of the permits held by the write guard
         s.release(MAX_READS - 1);
-
+        // NB: Forget to avoid drop impl from being called.
+        mem::forget(self);
         RwLockReadGuard {
             s,
             data,
