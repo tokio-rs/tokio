@@ -1,4 +1,4 @@
-#![allow(clippy::cognitive_complexity)]
+#![allow(clippy::cognitive_complexity, clippy::match_like_matches_macro)]
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "sync")]
 

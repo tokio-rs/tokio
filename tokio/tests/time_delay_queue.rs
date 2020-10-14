@@ -1,4 +1,4 @@
-#![allow(clippy::blacklisted_name)]
+#![allow(clippy::blacklisted_name, clippy::stable_sort_primitive)]
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 

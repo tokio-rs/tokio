@@ -29,6 +29,7 @@ full = ["codec", "udp", "compat"]
 compat = ["futures-io",]
 codec = ["tokio/stream"]
 udp = ["tokio/udp"]
+rt = ["tokio/rt-core"]
 
 [dependencies]
 tokio = { version = "0.2.5", path = "../tokio" }
