@@ -16,7 +16,7 @@ Biggest changes are:
   - `parking_lot` is included with `full`
 
 ### Changes
-- meta: Minimum supported Rust version is now 1.47.
+- meta: Minimum supported Rust version is now 1.45.
 - io: `AsyncRead` trait now takes `ReadBuf` in order to safely handle reading
   into uninitialized memory (#2758).
 - io: Internal I/O driver storage is now able to compact (#2757).
@@ -29,7 +29,7 @@ Biggest changes are:
 - signal: reduce cross-thread notification (#2835).
 - net: tcp,udp,uds types support operations with `&self` (#2828, #2919, #2934).
 - sync: blocking `mpsc` channel supports `send` with `&self` (#2861).
-- time: rename `delay_for` and `delay_until` to `sleep_for` and `sleep_until` (#2826).
+- time: rename `delay_for` and `delay_until` to `sleep` and `sleep_until` (#2826).
 - io: upgrade to `mio` 0.7 (#2893).
 - io: `AsyncSeek` trait is tweaked (#2885).
 - fs: `File` operations take `&self` (#2930).
