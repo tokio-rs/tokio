@@ -55,7 +55,7 @@ Biggest changes are:
 
 ### Removed
 - io: vectored ops are removed from `AsyncRead`, `AsyncWrite` traits (#2882).
-- io: `mio` is removed from the public API. `PolLEvented` and` Registration` are
+- io: `mio` is removed from the public API. `PollEvented` and` Registration` are
   removed (#2893).
 - io: remove `bytes` from public API. `Buf` and `BufMut` implementation are
   removed (#2908).
