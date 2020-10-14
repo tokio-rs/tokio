@@ -1,3 +1,12 @@
+# 0.4.0 (October 15, 2020)
+
+### Added
+- sync: `CancellationToken` for coordinating task cancellation (#2747).
+- rt: `TokioContext` sets the Tokio runtime for the duration of a future (#2791)
+- io: `StreamReader`/`ReaderStream` map between `AsyncRead` values and `Stream`
+  of bytes (#2788).
+- time: `DelayQueue` to manage many delays (#2897).
+
 # 0.3.1 (March 18, 2020)
 
 ### Fixed

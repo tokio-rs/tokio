@@ -1,3 +1,7 @@
+# 0.3.0 (October 15, 2020)
+
+- Track `tokio` 0.3 release.
+
 # 0.2.1 (April 17, 2020)
 
 - Add `Future` and `Stream` implementations for `task::Spawn<T>`.
