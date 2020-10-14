@@ -25,7 +25,7 @@ Biggest changes are:
   receiving the value (#2814, #2806).
 - sync: `Notify::notify` is renamed to `notify_one` (#2822).
 - process: `Child::kill` is now an `async fn` that cleans zombies (#2823).
-- sync: use `const fn` constructors as possible (#2833, 2790)
+- sync: use `const fn` constructors as possible (#2833, #2790)
 - signal: reduce cross-thread notification (#2835).
 - net: tcp,udp,uds types support operations with `&self` (#2828, #2919, #2934).
 - sync: blocking `mpsc` channel supports `send` with `&self` (#2861).
