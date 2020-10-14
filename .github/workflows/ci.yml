@@ -196,7 +196,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Install Rust
-        run: rustup update stable
+        run: rustup update ${{ env.minrust }} && rustup default ${{ env.minrust }}
       - name: Install clippy
         run: rustup component add clippy
 
