@@ -25,7 +25,7 @@ jobs:
       - features
       - minrust
       - fmt
-      - clippy
+      # - clippy
       - docs
       - loom
     steps:
@@ -190,19 +190,21 @@ jobs:
             exit 1
           fi
 
-  clippy:
-    name: clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install Rust
-        run: rustup update stable
-      - name: Install clippy
-        run: rustup component add clippy
-
-      # Run clippy
-      - name: "clippy --all"
-        run: cargo clippy --all --tests
+  # This branch no longer actively developed. Most commits to this
+  # branch are backporting and should not be blocked by clippy.
+  # clippy:
+  #   name: clippy
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v2
+  #     - name: Install Rust
+  #       run: rustup update stable
+  #     - name: Install clippy
+  #       run: rustup component add clippy
+  #
+  #     # Run clippy
+  #     - name: "clippy --all"
+  #       run: cargo clippy --all --tests
 
   docs:
     name: docs
