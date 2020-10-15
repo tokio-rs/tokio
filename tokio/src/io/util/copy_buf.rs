@@ -1,5 +1,6 @@
 use crate::io::{AsyncBufRead, AsyncWrite};
 use std::future::Future;
+use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -13,7 +14,7 @@ cfg_io_util! {
     /// [copy_buf]: copy_buf()
     #[derive(Debug)]
     #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub struct CopyBuf<'a, R: ?Sized, W: ?Sized> {
+    struct CopyBuf<'a, R: ?Sized, W: ?Sized> {
         reader: &'a mut R,
         writer: &'a mut W,
         amt: u64,
@@ -50,7 +51,7 @@ cfg_io_util! {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn copy_buf<'a, R, W>(reader: &'a mut R, writer: &'a mut W) -> CopyBuf<'a, R, W>
+    pub async fn copy_buf<'a, R, W>(reader: &'a mut R, writer: &'a mut W) -> io::Result<u64>
     where
         R: AsyncBufRead + Unpin + ?Sized,
         W: AsyncWrite + Unpin + ?Sized,
@@ -59,7 +60,7 @@ cfg_io_util! {
             reader,
             writer,
             amt: 0,
-        }
+        }.await
     }
 }
 
@@ -68,7 +69,7 @@ where
     R: AsyncBufRead + Unpin + ?Sized,
     W: AsyncWrite + Unpin + ?Sized,
 {
-    type Output = std::io::Result<u64>;
+    type Output = io::Result<u64>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         loop {
