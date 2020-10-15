@@ -18,7 +18,6 @@ description = """
 Tokio's proc macros.
 """
 categories = ["asynchronous"]
-publish = false
 
 [lib]
 proc-macro = true
