@@ -20,22 +20,28 @@ impl<T: Wait> Wait for &mut T {
     }
 }
 
-/// An interface for queueing up an orphaned process so that it can be reaped.
-pub(crate) trait OrphanQueue<T> {
-    /// Adds an orphan to the queue.
-    fn push_orphan(&self, orphan: T);
+/// An interface for reaping a set of orphaned processes.
+pub(crate) trait ReapOrphanQueue {
     /// Attempts to reap every process in the queue, ignoring any errors and
     /// enqueueing any orphans which have not yet exited.
     fn reap_orphans(&self);
 }
 
+impl<T: ReapOrphanQueue> ReapOrphanQueue for &T {
+    fn reap_orphans(&self) {
+        (**self).reap_orphans()
+    }
+}
+
+/// An interface for queueing up an orphaned process so that it can be reaped.
+pub(crate) trait OrphanQueue<T>: ReapOrphanQueue {
+    /// Adds an orphan to the queue.
+    fn push_orphan(&self, orphan: T);
+}
+
 impl<T, O: OrphanQueue<T>> OrphanQueue<T> for &O {
     fn push_orphan(&self, orphan: T) {
         (**self).push_orphan(orphan);
-    }
-
-    fn reap_orphans(&self) {
-        (**self).reap_orphans()
     }
 }
 
@@ -62,41 +68,61 @@ impl<T: Wait> OrphanQueue<T> for OrphanQueueImpl<T> {
     fn push_orphan(&self, orphan: T) {
         self.queue.lock().unwrap().push(orphan)
     }
+}
 
+impl<T: Wait> ReapOrphanQueue for OrphanQueueImpl<T> {
     fn reap_orphans(&self) {
         let mut queue = self.queue.lock().unwrap();
         let queue = &mut *queue;
 
-        let mut i = 0;
-        while i < queue.len() {
+        for i in (0..queue.len()).rev() {
             match queue[i].try_wait() {
-                Ok(Some(_)) => {}
-                Err(_) => {
-                    // TODO: bubble up error some how. Is this an internal bug?
-                    // Shoudl we panic? Is it OK for this to be silently
-                    // dropped?
-                }
-                // Still not done yet
-                Ok(None) => {
-                    i += 1;
-                    continue;
+                Ok(None) => {}
+                Ok(Some(_)) | Err(_) => {
+                    // The stdlib handles interruption errors (EINTR) when polling a child process.
+                    // All other errors represent invalid inputs or pids that have already been
+                    // reaped, so we can drop the orphan in case an error is raised.
+                    queue.swap_remove(i);
                 }
             }
-
-            queue.remove(i);
         }
     }
 }
 
 #[cfg(all(test, not(loom)))]
-mod test {
-    use super::Wait;
-    use super::{OrphanQueue, OrphanQueueImpl};
-    use std::cell::Cell;
+pub(crate) mod test {
+    use super::*;
+    use std::cell::{Cell, RefCell};
     use std::io;
     use std::os::unix::process::ExitStatusExt;
     use std::process::ExitStatus;
     use std::rc::Rc;
+
+    pub(crate) struct MockQueue<W> {
+        pub(crate) all_enqueued: RefCell<Vec<W>>,
+        pub(crate) total_reaps: Cell<usize>,
+    }
+
+    impl<W> MockQueue<W> {
+        pub(crate) fn new() -> Self {
+            Self {
+                all_enqueued: RefCell::new(Vec::new()),
+                total_reaps: Cell::new(0),
+            }
+        }
+    }
+
+    impl<W> OrphanQueue<W> for MockQueue<W> {
+        fn push_orphan(&self, orphan: W) {
+            self.all_enqueued.borrow_mut().push(orphan);
+        }
+    }
+
+    impl<W> ReapOrphanQueue for MockQueue<W> {
+        fn reap_orphans(&self) {
+            self.total_reaps.set(self.total_reaps.get() + 1);
+        }
+    }
 
     struct MockWait {
         total_waits: Rc<Cell<usize>>,

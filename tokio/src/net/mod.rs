@@ -23,25 +23,24 @@
 //! [`UnixDatagram`]: UnixDatagram
 
 mod addr;
+#[cfg(feature = "net")]
+pub(crate) use addr::to_socket_addrs;
 pub use addr::ToSocketAddrs;
 
-cfg_dns! {
+cfg_net! {
     mod lookup_host;
     pub use lookup_host::lookup_host;
-}
 
-cfg_tcp! {
     pub mod tcp;
     pub use tcp::listener::TcpListener;
+    pub use tcp::socket::TcpSocket;
     pub use tcp::stream::TcpStream;
-}
 
-cfg_udp! {
     pub mod udp;
     pub use udp::socket::UdpSocket;
 }
 
-cfg_uds! {
+cfg_net_unix! {
     pub mod unix;
     pub use unix::datagram::socket::UnixDatagram;
     pub use unix::listener::UnixListener;

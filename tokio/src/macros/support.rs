@@ -1,5 +1,6 @@
 cfg_macros! {
-    pub use crate::future::{maybe_done, poll_fn};
+    pub use crate::future::poll_fn;
+    pub use crate::future::maybe_done::maybe_done;
     pub use crate::util::thread_rng_n;
 }
 

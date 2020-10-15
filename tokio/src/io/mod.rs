@@ -232,8 +232,6 @@ cfg_io_util! {
     pub use split::{split, ReadHalf, WriteHalf};
 
     pub(crate) mod seek;
-    pub use self::seek::Seek;
-
     pub(crate) mod util;
     pub use util::{
         copy, copy_buf, duplex, empty, repeat, sink, AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt,
@@ -251,7 +249,7 @@ cfg_io_blocking! {
     /// Types in this module can be mocked out in tests.
     mod sys {
         // TODO: don't rename
-        pub(crate) use crate::runtime::spawn_blocking as run;
-        pub(crate) use crate::task::JoinHandle as Blocking;
+        pub(crate) use crate::blocking::spawn_blocking as run;
+        pub(crate) use crate::blocking::JoinHandle as Blocking;
     }
 }

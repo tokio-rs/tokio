@@ -115,7 +115,7 @@ async fn multiple_entries() {
 
     assert_pending!(map.poll_next());
 
-    v.sort();
+    v.sort_unstable();
     assert_eq!(v[0].0, "bar");
     assert_eq!(v[0].1, 4);
     assert_eq!(v[1].0, "foo");
@@ -213,8 +213,7 @@ fn new_capacity_zero() {
     let map = StreamMap::<&str, stream::Pending<()>>::new();
     assert_eq!(0, map.capacity());
 
-    let keys = map.keys().collect::<Vec<_>>();
-    assert!(keys.is_empty());
+    assert!(map.keys().next().is_none());
 }
 
 #[test]
@@ -222,8 +221,7 @@ fn with_capacity() {
     let map = StreamMap::<&str, stream::Pending<()>>::with_capacity(10);
     assert!(10 <= map.capacity());
 
-    let keys = map.keys().collect::<Vec<_>>();
-    assert!(keys.is_empty());
+    assert!(map.keys().next().is_none());
 }
 
 #[test]
@@ -235,7 +233,7 @@ fn iter_keys() {
     map.insert("c", pending());
 
     let mut keys = map.keys().collect::<Vec<_>>();
-    keys.sort();
+    keys.sort_unstable();
 
     assert_eq!(&keys[..], &[&"a", &"b", &"c"]);
 }
@@ -250,7 +248,7 @@ fn iter_values() {
 
     let mut size_hints = map.values().map(|s| s.size_hint().0).collect::<Vec<_>>();
 
-    size_hints.sort();
+    size_hints.sort_unstable();
 
     assert_eq!(&size_hints[..], &[1, 2, 3]);
 }
@@ -268,7 +266,7 @@ fn iter_values_mut() {
         .map(|s: &mut _| s.size_hint().0)
         .collect::<Vec<_>>();
 
-    size_hints.sort();
+    size_hints.sort_unstable();
 
     assert_eq!(&size_hints[..], &[1, 2, 3]);
 }

@@ -2,8 +2,6 @@ use tokio::stream::{self, StreamExt};
 use tokio::sync::mpsc;
 use tokio_test::{assert_pending, assert_ready, assert_ready_err, assert_ready_ok, task};
 
-use bytes::{Bytes, BytesMut};
-
 #[allow(clippy::let_unit_value)]
 #[tokio::test]
 async fn empty_unit() {
@@ -22,18 +20,6 @@ async fn empty_vec() {
 #[tokio::test]
 async fn empty_box_slice() {
     let coll: Box<[u32]> = stream::empty().collect().await;
-    assert!(coll.is_empty());
-}
-
-#[tokio::test]
-async fn empty_bytes() {
-    let coll: Bytes = stream::empty::<&[u8]>().collect().await;
-    assert!(coll.is_empty());
-}
-
-#[tokio::test]
-async fn empty_bytes_mut() {
-    let coll: BytesMut = stream::empty::<&[u8]>().collect().await;
     assert!(coll.is_empty());
 }
 
@@ -110,27 +96,6 @@ async fn collect_str_items() {
     assert!(fut.is_woken());
     let coll = assert_ready!(fut.poll());
     assert_eq!("hello world", coll);
-}
-
-#[tokio::test]
-async fn collect_bytes() {
-    let (tx, rx) = mpsc::unbounded_channel();
-    let mut fut = task::spawn(rx.collect::<Bytes>());
-
-    assert_pending!(fut.poll());
-
-    tx.send(&b"hello "[..]).unwrap();
-    assert!(fut.is_woken());
-    assert_pending!(fut.poll());
-
-    tx.send(&b"world"[..]).unwrap();
-    assert!(fut.is_woken());
-    assert_pending!(fut.poll());
-
-    drop(tx);
-    assert!(fut.is_woken());
-    let coll = assert_ready!(fut.poll());
-    assert_eq!(&b"hello world"[..], coll);
 }
 
 #[tokio::test]

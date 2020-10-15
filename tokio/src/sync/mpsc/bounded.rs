@@ -178,9 +178,9 @@ impl<T> Receiver<T> {
     ///     sync_code.join().unwrap()
     /// }
     /// ```
+    #[cfg(feature = "sync")]
     pub fn blocking_recv(&mut self) -> Option<T> {
-        let mut enter_handle = crate::runtime::enter::enter(false);
-        enter_handle.block_on(self.recv()).unwrap()
+        crate::future::block_on(self.recv())
     }
 
     /// Attempts to return a pending value on this receiver without blocking.
@@ -320,6 +320,41 @@ impl<T> Sender<T> {
         }
     }
 
+    /// Completes when the receiver has dropped.
+    ///
+    /// This allows the producers to get notified when interest in the produced
+    /// values is canceled and immediately stop doing work.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx1, rx) = mpsc::channel::<()>(1);
+    ///     let tx2 = tx1.clone();
+    ///     let tx3 = tx1.clone();
+    ///     let tx4 = tx1.clone();
+    ///     let tx5 = tx1.clone();
+    ///     tokio::spawn(async move {
+    ///         drop(rx);
+    ///     });
+    ///
+    ///     futures::join!(
+    ///         tx1.closed(),
+    ///         tx2.closed(),
+    ///         tx3.closed(),
+    ///         tx4.closed(),
+    ///         tx5.closed()
+    ///     );
+    ////     println!("Receiver dropped");
+    /// }
+    /// ```
+    pub async fn closed(&self) {
+        self.chan.closed().await
+    }
+
     /// Attempts to immediately send a message on this `Sender`
     ///
     /// This method differs from [`send`] by returning immediately if the channel's
@@ -414,7 +449,7 @@ impl<T> Sender<T> {
     ///
     /// ```rust
     /// use tokio::sync::mpsc;
-    /// use tokio::time::{delay_for, Duration};
+    /// use tokio::time::{sleep, Duration};
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -431,7 +466,7 @@ impl<T> Sender<T> {
     ///
     ///     while let Some(i) = rx.recv().await {
     ///         println!("got = {}", i);
-    ///         delay_for(Duration::from_millis(200)).await;
+    ///         sleep(Duration::from_millis(200)).await;
     ///     }
     /// }
     /// ```
@@ -483,9 +518,31 @@ impl<T> Sender<T> {
     ///     sync_code.join().unwrap()
     /// }
     /// ```
+    #[cfg(feature = "sync")]
     pub fn blocking_send(&self, value: T) -> Result<(), SendError<T>> {
-        let mut enter_handle = crate::runtime::enter::enter(false);
-        enter_handle.block_on(self.send(value)).unwrap()
+        crate::future::block_on(self.send(value))
+    }
+
+    /// Checks if the channel has been closed. This happens when the
+    /// [`Receiver`] is dropped, or when the [`Receiver::close`] method is
+    /// called.
+    ///
+    /// [`Receiver`]: crate::sync::mpsc::Receiver
+    /// [`Receiver::close`]: crate::sync::mpsc::Receiver::close
+    ///
+    /// ```
+    /// let (tx, rx) = tokio::sync::mpsc::channel::<()>(42);
+    /// assert!(!tx.is_closed());
+    ///
+    /// let tx2 = tx.clone();
+    /// assert!(!tx2.is_closed());
+    ///
+    /// drop(rx);
+    /// assert!(tx.is_closed());
+    /// assert!(tx2.is_closed());
+    /// ```
+    pub fn is_closed(&self) -> bool {
+        self.chan.is_closed()
     }
 
     /// Wait for channel capacity. Once capacity to send one message is

@@ -16,7 +16,7 @@ mod ready;
 mod thread_local;
 
 #[macro_use]
-#[cfg(feature = "rt-core")]
+#[cfg(feature = "rt")]
 pub(crate) mod scoped_tls;
 
 cfg_macros! {

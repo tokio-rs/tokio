@@ -2,17 +2,16 @@ use crate::future::poll_fn;
 use crate::io::{AsyncRead, AsyncWrite, PollEvented, ReadBuf};
 use crate::net::tcp::split::{split, ReadHalf, WriteHalf};
 use crate::net::tcp::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
-use crate::net::ToSocketAddrs;
+use crate::net::{to_socket_addrs, ToSocketAddrs};
 
 use std::convert::TryFrom;
 use std::fmt;
 use std::io::{self, Read, Write};
-use std::net::{self, Shutdown, SocketAddr};
+use std::net::{Shutdown, SocketAddr};
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::time::Duration;
 
-cfg_tcp! {
+cfg_net! {
     /// A TCP stream between a local and a remote socket.
     ///
     /// A TCP stream can either be created by connecting to an endpoint, via the
@@ -23,8 +22,8 @@ cfg_tcp! {
     /// traits. Examples import these traits through [the prelude].
     ///
     /// [`connect`]: method@TcpStream::connect
-    /// [accepting]: method@super::TcpListener::accept
-    /// [listener]: struct@super::TcpListener
+    /// [accepting]: method@crate::net::TcpListener::accept
+    /// [listener]: struct@crate::net::TcpListener
     /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     /// [the prelude]: crate::prelude
@@ -62,7 +61,7 @@ impl TcpStream {
     ///
     /// `addr` is an address of the remote host. Anything which implements the
     /// [`ToSocketAddrs`] trait can be supplied as the address. Note that
-    /// strings only implement this trait when the **`dns`** feature is enabled,
+    /// strings only implement this trait when the **`net`** feature is enabled,
     /// as strings may contain domain names that need to be resolved.
     ///
     /// If `addr` yields multiple addresses, connect will be attempted with each
@@ -91,32 +90,12 @@ impl TcpStream {
     /// }
     /// ```
     ///
-    /// Without the `dns` feature:
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    /// use tokio::prelude::*;
-    /// use std::error::Error;
-    /// use std::net::Ipv4Addr;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     // Connect to a peer
-    ///     let mut stream = TcpStream::connect((Ipv4Addr::new(127, 0, 0, 1), 8080)).await?;
-    ///
-    ///     // Write some data.
-    ///     stream.write_all(b"hello world!").await?;
-    ///
-    ///     Ok(())
-    /// }
-    /// ```
-    ///
     /// The [`write_all`] method is defined on the [`AsyncWriteExt`] trait.
     ///
     /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     pub async fn connect<A: ToSocketAddrs>(addr: A) -> io::Result<TcpStream> {
-        let addrs = addr.to_socket_addrs().await?;
+        let addrs = to_socket_addrs(addr).await?;
 
         let mut last_err = None;
 
@@ -137,7 +116,11 @@ impl TcpStream {
 
     /// Establishes a connection to the specified `addr`.
     async fn connect_addr(addr: SocketAddr) -> io::Result<TcpStream> {
-        let sys = mio::net::TcpStream::connect(&addr)?;
+        let sys = mio::net::TcpStream::connect(addr)?;
+        TcpStream::connect_mio(sys).await
+    }
+
+    pub(crate) async fn connect_mio(sys: mio::net::TcpStream) -> io::Result<TcpStream> {
         let stream = TcpStream::new(sys)?;
 
         // Once we've connected, wait for the stream to be writable as
@@ -186,34 +169,10 @@ impl TcpStream {
     /// The runtime is usually set implicitly when this function is called
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
-    pub fn from_std(stream: net::TcpStream) -> io::Result<TcpStream> {
-        let io = mio::net::TcpStream::from_stream(stream)?;
+    pub fn from_std(stream: std::net::TcpStream) -> io::Result<TcpStream> {
+        let io = mio::net::TcpStream::from_std(stream);
         let io = PollEvented::new(io)?;
         Ok(TcpStream { io })
-    }
-
-    // Connects `TcpStream` asynchronously that may be built with a net2 `TcpBuilder`.
-    //
-    // This should be removed in favor of some in-crate TcpSocket builder API.
-    #[doc(hidden)]
-    pub async fn connect_std(stream: net::TcpStream, addr: &SocketAddr) -> io::Result<TcpStream> {
-        let io = mio::net::TcpStream::connect_stream(stream, addr)?;
-        let io = PollEvented::new(io)?;
-        let stream = TcpStream { io };
-
-        // Once we've connected, wait for the stream to be writable as
-        // that's when the actual connection has been initiated. Once we're
-        // writable we check for `take_socket_error` to see if the connect
-        // actually hit an error or not.
-        //
-        // If all that succeeded then we ship everything on up.
-        poll_fn(|cx| stream.io.poll_write_ready(cx)).await?;
-
-        if let Some(e) = stream.io.get_ref().take_error()? {
-            return Err(e);
-        }
-
-        Ok(stream)
     }
 
     /// Returns the local address that this stream is bound to.
@@ -278,7 +237,7 @@ impl TcpStream {
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
-    ///     let mut stream = TcpStream::connect("127.0.0.1:8000").await?;
+    ///     let stream = TcpStream::connect("127.0.0.1:8000").await?;
     ///     let mut buf = [0; 10];
     ///
     ///     poll_fn(|cx| {
@@ -288,15 +247,7 @@ impl TcpStream {
     ///     Ok(())
     /// }
     /// ```
-    pub fn poll_peek(&mut self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
-        self.poll_peek2(cx, buf)
-    }
-
-    pub(super) fn poll_peek2(
-        &self,
-        cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+    pub fn poll_peek(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         loop {
             let ev = ready!(self.io.poll_read_ready(cx))?;
 
@@ -347,8 +298,10 @@ impl TcpStream {
     ///
     /// [`read`]: fn@crate::io::AsyncReadExt::read
     /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
-    pub async fn peek(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        poll_fn(|cx| self.poll_peek(cx, buf)).await
+    pub async fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
+        self.io
+            .async_io(mio::Interest::READABLE, |io| io.peek(buf))
+            .await
     }
 
     /// Shuts down the read, write, or both halves of this connection.
@@ -425,144 +378,6 @@ impl TcpStream {
         self.io.get_ref().set_nodelay(nodelay)
     }
 
-    /// Gets the value of the `SO_RCVBUF` option on this socket.
-    ///
-    /// For more information about this option, see [`set_recv_buffer_size`].
-    ///
-    /// [`set_recv_buffer_size`]: TcpStream::set_recv_buffer_size
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///
-    /// println!("{:?}", stream.recv_buffer_size()?);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn recv_buffer_size(&self) -> io::Result<usize> {
-        self.io.get_ref().recv_buffer_size()
-    }
-
-    /// Sets the value of the `SO_RCVBUF` option on this socket.
-    ///
-    /// Changes the size of the operating system's receive buffer associated
-    /// with the socket.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///
-    /// stream.set_recv_buffer_size(100)?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn set_recv_buffer_size(&self, size: usize) -> io::Result<()> {
-        self.io.get_ref().set_recv_buffer_size(size)
-    }
-
-    /// Gets the value of the `SO_SNDBUF` option on this socket.
-    ///
-    /// For more information about this option, see [`set_send_buffer_size`].
-    ///
-    /// [`set_send_buffer_size`]: TcpStream::set_send_buffer_size
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///
-    /// println!("{:?}", stream.send_buffer_size()?);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn send_buffer_size(&self) -> io::Result<usize> {
-        self.io.get_ref().send_buffer_size()
-    }
-
-    /// Sets the value of the `SO_SNDBUF` option on this socket.
-    ///
-    /// Changes the size of the operating system's send buffer associated with
-    /// the socket.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///
-    /// stream.set_send_buffer_size(100)?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn set_send_buffer_size(&self, size: usize) -> io::Result<()> {
-        self.io.get_ref().set_send_buffer_size(size)
-    }
-
-    /// Returns whether keepalive messages are enabled on this socket, and if so
-    /// the duration of time between them.
-    ///
-    /// For more information about this option, see [`set_keepalive`].
-    ///
-    /// [`set_keepalive`]: TcpStream::set_keepalive
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///
-    /// println!("{:?}", stream.keepalive()?);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn keepalive(&self) -> io::Result<Option<Duration>> {
-        self.io.get_ref().keepalive()
-    }
-
-    /// Sets whether keepalive messages are enabled to be sent on this socket.
-    ///
-    /// On Unix, this option will set the `SO_KEEPALIVE` as well as the
-    /// `TCP_KEEPALIVE` or `TCP_KEEPIDLE` option (depending on your platform).
-    /// On Windows, this will set the `SIO_KEEPALIVE_VALS` option.
-    ///
-    /// If `None` is specified then keepalive messages are disabled, otherwise
-    /// the duration specified will be the time to remain idle before sending a
-    /// TCP keepalive probe.
-    ///
-    /// Some platforms specify this value in seconds, so sub-second
-    /// specifications may be omitted.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///
-    /// stream.set_keepalive(None)?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn set_keepalive(&self, keepalive: Option<Duration>) -> io::Result<()> {
-        self.io.get_ref().set_keepalive(keepalive)
-    }
-
     /// Gets the value of the `IP_TTL` option for this socket.
     ///
     /// For more information about this option, see [`set_ttl`].
@@ -604,57 +419,6 @@ impl TcpStream {
     /// ```
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.io.get_ref().set_ttl(ttl)
-    }
-
-    /// Reads the linger duration for this socket by getting the `SO_LINGER`
-    /// option.
-    ///
-    /// For more information about this option, see [`set_linger`].
-    ///
-    /// [`set_linger`]: TcpStream::set_linger
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///
-    /// println!("{:?}", stream.linger()?);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn linger(&self) -> io::Result<Option<Duration>> {
-        self.io.get_ref().linger()
-    }
-
-    /// Sets the linger duration of this socket by setting the `SO_LINGER`
-    /// option.
-    ///
-    /// This option controls the action taken when a stream has unsent messages
-    /// and the stream is closed. If `SO_LINGER` is set, the system
-    /// shall block the process until it can transmit the data or until the
-    /// time expires.
-    ///
-    /// If `SO_LINGER` is not specified, and the stream is closed, the system
-    /// handles the call in a way that allows the process to continue as quickly
-    /// as possible.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    ///
-    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///
-    /// stream.set_linger(None)?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
-        self.io.get_ref().set_linger(dur)
     }
 
     // These lifetime markers also appear in the generated documentation, and make
@@ -719,7 +483,7 @@ impl TcpStream {
                     unsafe {
                         buf.assume_init(n);
                     }
-                    buf.add_filled(n);
+                    buf.advance(n);
                     return Poll::Ready(Ok(()));
                 }
                 Err(e) => return Poll::Ready(Err(e)),
@@ -745,23 +509,14 @@ impl TcpStream {
     }
 }
 
-impl TryFrom<TcpStream> for mio::net::TcpStream {
-    type Error = io::Error;
-
-    /// Consumes value, returning the mio I/O object.
-    fn try_from(value: TcpStream) -> Result<Self, Self::Error> {
-        value.io.into_inner()
-    }
-}
-
-impl TryFrom<net::TcpStream> for TcpStream {
+impl TryFrom<std::net::TcpStream> for TcpStream {
     type Error = io::Error;
 
     /// Consumes stream, returning the tokio I/O object.
     ///
     /// This is equivalent to
     /// [`TcpStream::from_std(stream)`](TcpStream::from_std).
-    fn try_from(stream: net::TcpStream) -> Result<Self, Self::Error> {
+    fn try_from(stream: std::net::TcpStream) -> Result<Self, Self::Error> {
         Self::from_std(stream)
     }
 }
@@ -819,14 +574,12 @@ mod sys {
 
 #[cfg(windows)]
 mod sys {
-    // TODO: let's land these upstream with mio and then we can add them here.
-    //
-    // use std::os::windows::prelude::*;
-    // use super::TcpStream;
-    //
-    // impl AsRawHandle for TcpStream {
-    //     fn as_raw_handle(&self) -> RawHandle {
-    //         self.io.get_ref().as_raw_handle()
-    //     }
-    // }
+    use super::TcpStream;
+    use std::os::windows::prelude::*;
+
+    impl AsRawSocket for TcpStream {
+        fn as_raw_socket(&self) -> RawSocket {
+            self.io.get_ref().as_raw_socket()
+        }
+    }
 }

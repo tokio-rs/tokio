@@ -9,10 +9,11 @@ use tokio_test::{assert_err, assert_pending, assert_ready, task};
 fn tcp_doesnt_block() {
     let rt = rt();
 
-    let mut listener = rt.enter(|| {
+    let listener = {
+        let _enter = rt.enter();
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         TcpListener::from_std(listener).unwrap()
-    });
+    };
 
     drop(rt);
 
@@ -27,10 +28,11 @@ fn tcp_doesnt_block() {
 fn drop_wakes() {
     let rt = rt();
 
-    let mut listener = rt.enter(|| {
+    let listener = {
+        let _enter = rt.enter();
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         TcpListener::from_std(listener).unwrap()
-    });
+    };
 
     let mut task = task::spawn(async move {
         assert_err!(listener.accept().await);
@@ -45,8 +47,7 @@ fn drop_wakes() {
 }
 
 fn rt() -> runtime::Runtime {
-    runtime::Builder::new()
-        .basic_scheduler()
+    runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap()

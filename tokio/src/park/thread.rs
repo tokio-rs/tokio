@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "full"), allow(dead_code))]
+
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::park::{Park, Unpark};
@@ -87,7 +89,7 @@ impl Inner {
         }
 
         // Otherwise we need to coordinate going to sleep
-        let mut m = self.mutex.lock().unwrap();
+        let mut m = self.mutex.lock();
 
         match self.state.compare_exchange(EMPTY, PARKED, SeqCst, SeqCst) {
             Ok(_) => {}
@@ -137,7 +139,7 @@ impl Inner {
             return;
         }
 
-        let m = self.mutex.lock().unwrap();
+        let m = self.mutex.lock();
 
         match self.state.compare_exchange(EMPTY, PARKED, SeqCst, SeqCst) {
             Ok(_) => {}
@@ -188,7 +190,7 @@ impl Inner {
         // Releasing `lock` before the call to `notify_one` means that when the
         // parked thread wakes it doesn't get woken only to have to wait for us
         // to release `lock`.
-        drop(self.mutex.lock().unwrap());
+        drop(self.mutex.lock());
 
         self.condvar.notify_one()
     }
@@ -212,10 +214,10 @@ impl Unpark for UnparkThread {
     }
 }
 
+use std::future::Future;
 use std::marker::PhantomData;
-use std::rc::Rc;
-
 use std::mem;
+use std::rc::Rc;
 use std::task::{RawWaker, RawWakerVTable, Waker};
 
 /// Blocks the current thread using a condition variable.
@@ -245,6 +247,25 @@ impl CachedParkThread {
         F: FnOnce(&ParkThread) -> R,
     {
         CURRENT_PARKER.try_with(|inner| f(inner)).map_err(|_| ())
+    }
+
+    pub(crate) fn block_on<F: Future>(&mut self, f: F) -> Result<F::Output, ParkError> {
+        use std::task::Context;
+        use std::task::Poll::Ready;
+
+        // `get_unpark()` should not return a Result
+        let waker = self.get_unpark()?.into_waker();
+        let mut cx = Context::from_waker(&waker);
+
+        pin!(f);
+
+        loop {
+            if let Ready(v) = crate::coop::budget(|| f.as_mut().poll(&mut cx)) {
+                return Ok(v);
+            }
+
+            self.park()?;
+        }
     }
 }
 

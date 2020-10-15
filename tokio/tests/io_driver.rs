@@ -45,8 +45,7 @@ fn test_drop_on_notify() {
     // shutting down. Then, when the task handle is dropped, the task itself is
     // dropped.
 
-    let rt = runtime::Builder::new()
-        .basic_scheduler()
+    let rt = runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
@@ -56,7 +55,7 @@ fn test_drop_on_notify() {
     // Define a task that just drains the listener
     let task = Arc::new(Task::new(async move {
         // Create a listener
-        let mut listener = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+        let listener = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
 
         // Send the address
         let addr = listener.local_addr().unwrap();
@@ -68,11 +67,10 @@ fn test_drop_on_notify() {
     }));
 
     {
-        rt.enter(|| {
-            let waker = waker_ref(&task);
-            let mut cx = Context::from_waker(&waker);
-            assert_pending!(task.future.lock().unwrap().as_mut().poll(&mut cx));
-        });
+        let _enter = rt.enter();
+        let waker = waker_ref(&task);
+        let mut cx = Context::from_waker(&waker);
+        assert_pending!(task.future.lock().unwrap().as_mut().poll(&mut cx));
     }
 
     // Get the address

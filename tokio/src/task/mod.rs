@@ -102,7 +102,7 @@
 //! # }
 //! ```
 //!
-//! `spawn`, `JoinHandle`, and `JoinError` are present when the "rt-core"
+//! `spawn`, `JoinHandle`, and `JoinError` are present when the "rt"
 //! feature flag is enabled.
 //!
 //! [`task::spawn`]: crate::task::spawn()
@@ -159,7 +159,7 @@
 //!
 //! #### block_in_place
 //!
-//! When using the [threaded runtime][rt-threaded], the [`task::block_in_place`]
+//! When using the [multi-threaded runtime][rt-multi-thread], the [`task::block_in_place`]
 //! function is also available. Like `task::spawn_blocking`, this function
 //! allows running a blocking operation from an asynchronous context. Unlike
 //! `spawn_blocking`, however, `block_in_place` works by transitioning the
@@ -211,29 +211,26 @@
 //!
 //! [`task::spawn_blocking`]: crate::task::spawn_blocking
 //! [`task::block_in_place`]: crate::task::block_in_place
-//! [rt-threaded]: ../runtime/index.html#threaded-scheduler
+//! [rt-multi-thread]: ../runtime/index.html#threaded-scheduler
 //! [`task::yield_now`]: crate::task::yield_now()
 //! [`thread::yield_now`]: std::thread::yield_now
-cfg_blocking! {
+
+cfg_rt! {
+    pub use crate::runtime::task::{JoinError, JoinHandle};
+
     mod blocking;
     pub use blocking::spawn_blocking;
-
-    cfg_rt_threaded! {
-        pub use blocking::block_in_place;
-    }
-}
-
-cfg_rt_core! {
-    pub use crate::runtime::task::{JoinError, JoinHandle};
 
     mod spawn;
     pub use spawn::spawn;
 
+    cfg_rt_multi_thread! {
+        pub use blocking::block_in_place;
+    }
+
     mod yield_now;
     pub use yield_now::yield_now;
-}
 
-cfg_rt_util! {
     mod local;
     pub use local::{spawn_local, LocalSet};
 

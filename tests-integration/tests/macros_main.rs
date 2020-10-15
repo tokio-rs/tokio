@@ -1,4 +1,4 @@
-#![cfg(feature = "macros")]
+#![cfg(all(feature = "macros", feature = "rt"))]
 
 #[tokio::main]
 async fn basic_main() -> usize {
@@ -10,18 +10,15 @@ async fn generic_fun<T: Default>() -> T {
     T::default()
 }
 
-#[cfg(feature = "rt-core")]
-mod spawn {
-    #[tokio::main]
-    async fn spawning() -> usize {
-        let join = tokio::spawn(async { 1 });
-        join.await.unwrap()
-    }
+#[tokio::main]
+async fn spawning() -> usize {
+    let join = tokio::spawn(async { 1 });
+    join.await.unwrap()
+}
 
-    #[test]
-    fn main_with_spawn() {
-        assert_eq!(1, spawning());
-    }
+#[test]
+fn main_with_spawn() {
+    assert_eq!(1, spawning());
 }
 
 #[test]

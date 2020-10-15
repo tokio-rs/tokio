@@ -142,7 +142,7 @@ impl Inner {
 
     fn park_condvar(&self) {
         // Otherwise we need to coordinate going to sleep
-        let mut m = self.mutex.lock().unwrap();
+        let mut m = self.mutex.lock();
 
         match self
             .state
@@ -238,7 +238,7 @@ impl Inner {
         // Releasing `lock` before the call to `notify_one` means that when the
         // parked thread wakes it doesn't get woken only to have to wait for us
         // to release `lock`.
-        drop(self.mutex.lock().unwrap());
+        drop(self.mutex.lock());
 
         self.condvar.notify_one()
     }

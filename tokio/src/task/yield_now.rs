@@ -2,7 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-doc_rt_core! {
+cfg_rt! {
     /// Yields execution back to the Tokio runtime.
     ///
     /// A task yields by awaiting on `yield_now()`, and may resume when that

@@ -110,7 +110,7 @@ jobs:
           rm -rf tokio/tests
 
       - name: miri
-        run: cargo miri test --features rt-core,rt-threaded,rt-util,sync task
+        run: cargo miri test --features rt,rt-multi-thread,sync task
         working-directory: tokio
 
   cross:
@@ -196,7 +196,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Install Rust
-        run: rustup update stable
+        run: rustup update ${{ env.minrust }} && rustup default ${{ env.minrust }}
       - name: Install clippy
         run: rustup component add clippy
 

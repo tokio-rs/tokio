@@ -23,7 +23,7 @@ macro_rules! assert_empty {
     ($e:expr) => {
         match $e.try_recv() {
             Ok(value) => panic!("expected empty; got = {:?}", value),
-            Err(broadcast::TryRecvError::Empty) => {}
+            Err(broadcast::error::TryRecvError::Empty) => {}
             Err(e) => panic!("expected empty; got = {:?}", e),
         }
     };
@@ -32,7 +32,7 @@ macro_rules! assert_empty {
 macro_rules! assert_lagged {
     ($e:expr, $n:expr) => {
         match assert_err!($e) {
-            broadcast::TryRecvError::Lagged(n) => {
+            broadcast::error::TryRecvError::Lagged(n) => {
                 assert_eq!(n, $n);
             }
             _ => panic!("did not lag"),
@@ -43,7 +43,7 @@ macro_rules! assert_lagged {
 macro_rules! assert_closed {
     ($e:expr) => {
         match assert_err!($e) {
-            broadcast::TryRecvError::Closed => {}
+            broadcast::error::TryRecvError::Closed => {}
             _ => panic!("did not lag"),
         }
     };
@@ -491,42 +491,6 @@ fn lagging_receiver_recovers_after_wrap_open() {
     assert_empty!(rx);
 }
 
-#[tokio::test]
-async fn send_recv_stream_ready_deprecated() {
-    use tokio::stream::StreamExt;
-
-    let (tx, mut rx) = broadcast::channel::<i32>(8);
-
-    assert_ok!(tx.send(1));
-    assert_ok!(tx.send(2));
-
-    assert_eq!(Some(Ok(1)), rx.next().await);
-    assert_eq!(Some(Ok(2)), rx.next().await);
-
-    drop(tx);
-
-    assert_eq!(None, rx.next().await);
-}
-
-#[tokio::test]
-async fn send_recv_stream_pending_deprecated() {
-    use tokio::stream::StreamExt;
-
-    let (tx, mut rx) = broadcast::channel::<i32>(8);
-
-    let mut recv = task::spawn(rx.next());
-    assert_pending!(recv.poll());
-
-    assert_ok!(tx.send(1));
-
-    assert!(recv.is_woken());
-    let val = assert_ready!(recv.poll());
-    assert_eq!(val, Some(Ok(1)));
-}
-
-fn is_closed(err: broadcast::RecvError) -> bool {
-    match err {
-        broadcast::RecvError::Closed => true,
-        _ => false,
-    }
+fn is_closed(err: broadcast::error::RecvError) -> bool {
+    matches!(err, broadcast::error::RecvError::Closed)
 }

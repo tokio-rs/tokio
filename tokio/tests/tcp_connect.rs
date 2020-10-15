@@ -9,7 +9,7 @@ use futures::join;
 
 #[tokio::test]
 async fn connect_v4() {
-    let mut srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+    let srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
     let addr = assert_ok!(srv.local_addr());
     assert!(addr.is_ipv4());
 
@@ -36,7 +36,7 @@ async fn connect_v4() {
 
 #[tokio::test]
 async fn connect_v6() {
-    let mut srv = assert_ok!(TcpListener::bind("[::1]:0").await);
+    let srv = assert_ok!(TcpListener::bind("[::1]:0").await);
     let addr = assert_ok!(srv.local_addr());
     assert!(addr.is_ipv6());
 
@@ -63,7 +63,7 @@ async fn connect_v6() {
 
 #[tokio::test]
 async fn connect_addr_ip_string() {
-    let mut srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+    let srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
     let addr = assert_ok!(srv.local_addr());
     let addr = format!("127.0.0.1:{}", addr.port());
 
@@ -80,7 +80,7 @@ async fn connect_addr_ip_string() {
 
 #[tokio::test]
 async fn connect_addr_ip_str_slice() {
-    let mut srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+    let srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
     let addr = assert_ok!(srv.local_addr());
     let addr = format!("127.0.0.1:{}", addr.port());
 
@@ -97,7 +97,7 @@ async fn connect_addr_ip_str_slice() {
 
 #[tokio::test]
 async fn connect_addr_host_string() {
-    let mut srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+    let srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
     let addr = assert_ok!(srv.local_addr());
     let addr = format!("localhost:{}", addr.port());
 
@@ -114,7 +114,7 @@ async fn connect_addr_host_string() {
 
 #[tokio::test]
 async fn connect_addr_ip_port_tuple() {
-    let mut srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+    let srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
     let addr = assert_ok!(srv.local_addr());
     let addr = (addr.ip(), addr.port());
 
@@ -131,7 +131,7 @@ async fn connect_addr_ip_port_tuple() {
 
 #[tokio::test]
 async fn connect_addr_ip_str_port_tuple() {
-    let mut srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+    let srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
     let addr = assert_ok!(srv.local_addr());
     let addr = ("127.0.0.1", addr.port());
 
@@ -148,7 +148,7 @@ async fn connect_addr_ip_str_port_tuple() {
 
 #[tokio::test]
 async fn connect_addr_host_str_port_tuple() {
-    let mut srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+    let srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
     let addr = assert_ok!(srv.local_addr());
     let addr = ("localhost", addr.port());
 

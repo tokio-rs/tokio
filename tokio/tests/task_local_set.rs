@@ -11,7 +11,7 @@ use std::sync::atomic::Ordering::{self, SeqCst};
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::time::Duration;
 
-#[tokio::test(basic_scheduler)]
+#[tokio::test(flavor = "current_thread")]
 async fn local_basic_scheduler() {
     LocalSet::new()
         .run_until(async {
@@ -20,7 +20,7 @@ async fn local_basic_scheduler() {
         .await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn local_threadpool() {
     thread_local! {
         static ON_RT_THREAD: Cell<bool> = Cell::new(false);
@@ -40,7 +40,7 @@ async fn local_threadpool() {
         .await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn localset_future_threadpool() {
     thread_local! {
         static ON_LOCAL_THREAD: Cell<bool> = Cell::new(false);
@@ -55,18 +55,18 @@ async fn localset_future_threadpool() {
     local.await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn localset_future_timers() {
     static RAN1: AtomicBool = AtomicBool::new(false);
     static RAN2: AtomicBool = AtomicBool::new(false);
 
     let local = LocalSet::new();
     local.spawn_local(async move {
-        time::delay_for(Duration::from_millis(10)).await;
+        time::sleep(Duration::from_millis(10)).await;
         RAN1.store(true, Ordering::SeqCst);
     });
     local.spawn_local(async move {
-        time::delay_for(Duration::from_millis(20)).await;
+        time::sleep(Duration::from_millis(20)).await;
         RAN2.store(true, Ordering::SeqCst);
     });
     local.await;
@@ -99,7 +99,7 @@ async fn localset_future_drives_all_local_futs() {
     assert!(RAN3.load(Ordering::SeqCst));
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn local_threadpool_timer() {
     // This test ensures that runtime services like the timer are properly
     // set for the local task set.
@@ -114,7 +114,7 @@ async fn local_threadpool_timer() {
             assert!(ON_RT_THREAD.with(|cell| cell.get()));
             let join = task::spawn_local(async move {
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
-                time::delay_for(Duration::from_millis(10)).await;
+                time::sleep(Duration::from_millis(10)).await;
                 assert!(ON_RT_THREAD.with(|cell| cell.get()));
             });
             join.await.unwrap();
@@ -133,8 +133,7 @@ fn local_threadpool_blocking_in_place() {
 
     ON_RT_THREAD.with(|cell| cell.set(true));
 
-    let rt = runtime::Builder::new()
-        .threaded_scheduler()
+    let rt = runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
@@ -149,7 +148,7 @@ fn local_threadpool_blocking_in_place() {
     });
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn local_threadpool_blocking_run() {
     thread_local! {
         static ON_RT_THREAD: Cell<bool> = Cell::new(false);
@@ -177,7 +176,7 @@ async fn local_threadpool_blocking_run() {
         .await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn all_spawns_are_local() {
     use futures::future;
     thread_local! {
@@ -203,7 +202,7 @@ async fn all_spawns_are_local() {
         .await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn nested_spawn_is_local() {
     thread_local! {
         static ON_RT_THREAD: Cell<bool> = Cell::new(false);
@@ -246,10 +245,7 @@ fn join_local_future_elsewhere() {
 
     ON_RT_THREAD.with(|cell| cell.set(true));
 
-    let rt = runtime::Builder::new()
-        .threaded_scheduler()
-        .build()
-        .unwrap();
+    let rt = runtime::Runtime::new().unwrap();
     let local = LocalSet::new();
     local.block_on(&rt, async move {
         let (tx, rx) = oneshot::channel();
@@ -299,7 +295,7 @@ fn drop_cancels_tasks() {
 
         started_tx.send(()).unwrap();
         loop {
-            time::delay_for(Duration::from_secs(3600)).await;
+            time::sleep(Duration::from_secs(3600)).await;
         }
     });
 
@@ -367,7 +363,7 @@ fn drop_cancels_remote_tasks() {
         let local = LocalSet::new();
         local.spawn_local(async move { while rx.recv().await.is_some() {} });
         local.block_on(&rt, async {
-            time::delay_for(Duration::from_millis(1)).await;
+            time::sleep(Duration::from_millis(1)).await;
         });
 
         drop(tx);
@@ -415,7 +411,7 @@ async fn local_tasks_are_polled_after_tick() {
         .run_until(async {
             let task2 = task::spawn(async move {
                 // Wait a bit
-                time::delay_for(Duration::from_millis(100)).await;
+                time::sleep(Duration::from_millis(100)).await;
 
                 let mut oneshots = Vec::with_capacity(EXPECTED);
 
@@ -426,13 +422,13 @@ async fn local_tasks_are_polled_after_tick() {
                     tx.send(oneshot_rx).unwrap();
                 }
 
-                time::delay_for(Duration::from_millis(100)).await;
+                time::sleep(Duration::from_millis(100)).await;
 
                 for tx in oneshots.drain(..) {
                     tx.send(()).unwrap();
                 }
 
-                time::delay_for(Duration::from_millis(300)).await;
+                time::sleep(Duration::from_millis(300)).await;
                 let rx1 = RX1.load(SeqCst);
                 let rx2 = RX2.load(SeqCst);
                 println!("EXPECT = {}; RX1 = {}; RX2 = {}", EXPECTED, rx1, rx2);
@@ -491,8 +487,7 @@ async fn acquire_mutex_in_drop() {
 }
 
 fn rt() -> Runtime {
-    tokio::runtime::Builder::new()
-        .basic_scheduler()
+    tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap()

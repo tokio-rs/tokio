@@ -2,25 +2,30 @@ use crate::io::util::read_line::finish_string_read;
 use crate::io::util::read_to_end::read_to_end_internal;
 use crate::io::AsyncRead;
 
+use pin_project_lite::pin_project;
 use std::future::Future;
+use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{io, mem};
 
-cfg_io_util! {
+pin_project! {
     /// Future for the [`read_to_string`](super::AsyncReadExt::read_to_string) method.
     #[derive(Debug)]
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct ReadToString<'a, R: ?Sized> {
         reader: &'a mut R,
-        /// This is the buffer we were provided. It will be replaced with an empty string
-        /// while reading to postpone utf-8 handling until after reading.
+        // This is the buffer we were provided. It will be replaced with an empty string
+        // while reading to postpone utf-8 handling until after reading.
         output: &'a mut String,
-        /// The actual allocation of the string is moved into this vector instead.
+        // The actual allocation of the string is moved into this vector instead.
         buf: Vec<u8>,
-        /// The number of bytes appended to buf. This can be less than buf.len() if
-        /// the buffer was not empty when the operation was started.
+        // The number of bytes appended to buf. This can be less than buf.len() if
+        // the buffer was not empty when the operation was started.
         read: usize,
+        // Make this future `!Unpin` for compatibility with async trait methods.
+        #[pin]
+        _pin: PhantomPinned,
     }
 }
 
@@ -37,6 +42,7 @@ where
         buf,
         output: string,
         read: 0,
+        _pin: PhantomPinned,
     }
 }
 
@@ -68,26 +74,10 @@ where
 {
     type Output = io::Result<usize>;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let Self {
-            reader,
-            buf,
-            output,
-            read,
-        } = &mut *self;
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let me = self.project();
 
         // safety: The constructor of ReadToString called `prepare_buffer`.
-        unsafe { read_to_string_internal(Pin::new(*reader), output, buf, read, cx) }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn assert_unpin() {
-        use std::marker::PhantomPinned;
-        crate::is_unpin::<ReadToString<'_, PhantomPinned>>();
+        unsafe { read_to_string_internal(Pin::new(*me.reader), me.output, me.buf, me.read, cx) }
     }
 }

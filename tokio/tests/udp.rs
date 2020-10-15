@@ -56,6 +56,38 @@ async fn split() -> std::io::Result<()> {
     Ok(())
 }
 
+#[tokio::test]
+async fn split_chan() -> std::io::Result<()> {
+    // setup UdpSocket that will echo all sent items
+    let socket = UdpSocket::bind("127.0.0.1:0").await?;
+    let addr = socket.local_addr().unwrap();
+    let s = Arc::new(socket);
+    let r = s.clone();
+
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<(Vec<u8>, std::net::SocketAddr)>(1_000);
+    tokio::spawn(async move {
+        while let Some((bytes, addr)) = rx.recv().await {
+            s.send_to(&bytes, &addr).await.unwrap();
+        }
+    });
+
+    tokio::spawn(async move {
+        let mut buf = [0u8; 32];
+        loop {
+            let (len, addr) = r.recv_from(&mut buf).await.unwrap();
+            tx.send((buf[..len].to_vec(), addr)).await.unwrap();
+        }
+    });
+
+    // test that we can send a value and get back some response
+    let sender = UdpSocket::bind("127.0.0.1:0").await?;
+    sender.send_to(MSG, addr).await?;
+    let mut recv_buf = [0u8; 32];
+    let (len, _) = sender.recv_from(&mut recv_buf).await?;
+    assert_eq!(&recv_buf[..len], MSG);
+    Ok(())
+}
+
 // # Note
 //
 // This test is purposely written such that each time `sender` sends data on

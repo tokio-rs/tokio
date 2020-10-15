@@ -3,9 +3,8 @@ use std::sync::Arc;
 use tokio::{sync::Semaphore, task};
 
 fn uncontended(b: &mut Bencher) {
-    let rt = tokio::runtime::Builder::new()
-        .core_threads(6)
-        .threaded_scheduler()
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(6)
         .build()
         .unwrap();
 
@@ -27,9 +26,8 @@ async fn task(s: Arc<Semaphore>) {
 }
 
 fn uncontended_concurrent_multi(b: &mut Bencher) {
-    let rt = tokio::runtime::Builder::new()
-        .core_threads(6)
-        .threaded_scheduler()
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(6)
         .build()
         .unwrap();
 
@@ -51,8 +49,7 @@ fn uncontended_concurrent_multi(b: &mut Bencher) {
 }
 
 fn uncontended_concurrent_single(b: &mut Bencher) {
-    let rt = tokio::runtime::Builder::new()
-        .basic_scheduler()
+    let rt = tokio::runtime::Builder::new_current_thread()
         .build()
         .unwrap();
 
@@ -73,9 +70,8 @@ fn uncontended_concurrent_single(b: &mut Bencher) {
 }
 
 fn contended_concurrent_multi(b: &mut Bencher) {
-    let rt = tokio::runtime::Builder::new()
-        .core_threads(6)
-        .threaded_scheduler()
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(6)
         .build()
         .unwrap();
 
@@ -97,8 +93,7 @@ fn contended_concurrent_multi(b: &mut Bencher) {
 }
 
 fn contended_concurrent_single(b: &mut Bencher) {
-    let rt = tokio::runtime::Builder::new()
-        .basic_scheduler()
+    let rt = tokio::runtime::Builder::new_current_thread()
         .build()
         .unwrap();
 

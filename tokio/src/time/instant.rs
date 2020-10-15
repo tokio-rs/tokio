@@ -4,8 +4,32 @@ use std::fmt;
 use std::ops;
 use std::time::Duration;
 
-/// A measurement of the system clock, useful for talking to
-/// external entities like the file system or other processes.
+/// A measurement of a monotonically nondecreasing clock.
+/// Opaque and useful only with `Duration`.
+///
+/// Instants are always guaranteed to be no less than any previously measured
+/// instant when created, and are often useful for tasks such as measuring
+/// benchmarks or timing how long an operation takes.
+///
+/// Note, however, that instants are not guaranteed to be **steady**. In other
+/// words, each tick of the underlying clock may not be the same length (e.g.
+/// some seconds may be longer than others). An instant may jump forwards or
+/// experience time dilation (slow down or speed up), but it will never go
+/// backwards.
+///
+/// Instants are opaque types that can only be compared to one another. There is
+/// no method to get "the number of seconds" from an instant. Instead, it only
+/// allows measuring the duration between two instants (or comparing two
+/// instants).
+///
+/// The size of an `Instant` struct may vary depending on the target operating
+/// system.
+///
+/// # Note
+///
+/// This type wraps the inner `std` variant and is used to align the Tokio
+/// clock for uses of `now()`. This can be useful for testing where you can
+/// take advantage of `time::pause()` and `time::advance()`.
 #[derive(Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct Instant {
     std: std::time::Instant,
@@ -50,12 +74,12 @@ impl Instant {
     /// # Examples
     ///
     /// ```
-    /// use tokio::time::{Duration, Instant, delay_for};
+    /// use tokio::time::{Duration, Instant, sleep};
     ///
     /// #[tokio::main]
     /// async fn main() {
     ///     let now = Instant::now();
-    ///     delay_for(Duration::new(1, 0)).await;
+    ///     sleep(Duration::new(1, 0)).await;
     ///     let new_now = Instant::now();
     ///     println!("{:?}", new_now.checked_duration_since(now));
     ///     println!("{:?}", now.checked_duration_since(new_now)); // None
@@ -71,12 +95,12 @@ impl Instant {
     /// # Examples
     ///
     /// ```
-    /// use tokio::time::{Duration, Instant, delay_for};
+    /// use tokio::time::{Duration, Instant, sleep};
     ///
     /// #[tokio::main]
     /// async fn main() {
     ///     let now = Instant::now();
-    ///     delay_for(Duration::new(1, 0)).await;
+    ///     sleep(Duration::new(1, 0)).await;
     ///     let new_now = Instant::now();
     ///     println!("{:?}", new_now.saturating_duration_since(now));
     ///     println!("{:?}", now.saturating_duration_since(new_now)); // 0ns
@@ -97,13 +121,13 @@ impl Instant {
     /// # Examples
     ///
     /// ```
-    /// use tokio::time::{Duration, Instant, delay_for};
+    /// use tokio::time::{Duration, Instant, sleep};
     ///
     /// #[tokio::main]
     /// async fn main() {
     ///     let instant = Instant::now();
     ///     let three_secs = Duration::from_secs(3);
-    ///     delay_for(three_secs).await;
+    ///     sleep(three_secs).await;
     ///     assert!(instant.elapsed() >= three_secs);
     /// }
     /// ```

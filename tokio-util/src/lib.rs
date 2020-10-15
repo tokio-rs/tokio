@@ -47,11 +47,16 @@ cfg_io! {
     pub mod io;
 }
 
-pub mod context;
+cfg_rt! {
+    pub mod context;
+}
 
 pub mod sync;
 
 pub mod either;
+
+#[cfg(feature = "time")]
+pub mod time;
 
 #[cfg(any(feature = "io", feature = "codec"))]
 mod util {

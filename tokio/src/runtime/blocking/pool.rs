@@ -94,10 +94,7 @@ where
 impl BlockingPool {
     pub(crate) fn new(builder: &Builder, thread_cap: usize) -> BlockingPool {
         let (shutdown_tx, shutdown_rx) = shutdown::channel();
-        #[cfg(feature = "blocking")]
         let keep_alive = builder.keep_alive.unwrap_or(KEEP_ALIVE);
-        #[cfg(not(feature = "blocking"))]
-        let keep_alive = KEEP_ALIVE;
 
         BlockingPool {
             spawner: Spawner {
@@ -129,7 +126,7 @@ impl BlockingPool {
     }
 
     pub(crate) fn shutdown(&mut self, timeout: Option<Duration>) {
-        let mut shared = self.spawner.inner.shared.lock().unwrap();
+        let mut shared = self.spawner.inner.shared.lock();
 
         // The function can be called multiple times. First, by explicitly
         // calling `shutdown` then by the drop handler calling `shutdown`. This
@@ -170,7 +167,7 @@ impl fmt::Debug for BlockingPool {
 impl Spawner {
     pub(crate) fn spawn(&self, task: Task, rt: &Handle) -> Result<(), ()> {
         let shutdown_tx = {
-            let mut shared = self.inner.shared.lock().unwrap();
+            let mut shared = self.inner.shared.lock();
 
             if shared.shutdown {
                 // Shutdown the task
@@ -207,7 +204,7 @@ impl Spawner {
         };
 
         if let Some(shutdown_tx) = shutdown_tx {
-            let mut shared = self.inner.shared.lock().unwrap();
+            let mut shared = self.inner.shared.lock();
             let entry = shared.worker_threads.vacant_entry();
 
             let handle = self.spawn_thread(shutdown_tx, rt, entry.key());
@@ -235,11 +232,9 @@ impl Spawner {
         builder
             .spawn(move || {
                 // Only the reference should be moved into the closure
-                let rt = &rt;
-                rt.enter(move || {
-                    rt.blocking_spawner.inner.run(worker_id);
-                    drop(shutdown_tx);
-                })
+                let _enter = crate::runtime::context::enter(rt.clone());
+                rt.blocking_spawner.inner.run(worker_id);
+                drop(shutdown_tx);
             })
             .unwrap()
     }
@@ -251,7 +246,7 @@ impl Inner {
             f()
         }
 
-        let mut shared = self.shared.lock().unwrap();
+        let mut shared = self.shared.lock();
 
         'main: loop {
             // BUSY
@@ -259,7 +254,7 @@ impl Inner {
                 drop(shared);
                 task.run();
 
-                shared = self.shared.lock().unwrap();
+                shared = self.shared.lock();
             }
 
             // IDLE
@@ -296,7 +291,7 @@ impl Inner {
                     drop(shared);
                     task.shutdown();
 
-                    shared = self.shared.lock().unwrap();
+                    shared = self.shared.lock();
                 }
 
                 // Work was produced, and we "took" it (by decrementing num_notify).

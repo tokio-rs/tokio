@@ -269,7 +269,7 @@ impl<T: Future, S: Schedule> Core<T, S> {
     }
 }
 
-cfg_rt_threaded! {
+cfg_rt_multi_thread! {
     impl Header {
         pub(crate) fn shutdown(&self) {
             use crate::runtime::task::RawTask;

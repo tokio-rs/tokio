@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "rt"), allow(dead_code))]
+
 //! Source of time abstraction.
 //!
 //! By default, `std::time::Instant::now()` is used. However, when the
@@ -36,7 +38,18 @@ cfg_not_test_util! {
 cfg_test_util! {
     use crate::time::{Duration, Instant};
     use std::sync::{Arc, Mutex};
-    use crate::runtime::context;
+
+    cfg_rt! {
+        fn clock() -> Option<Clock> {
+            crate::runtime::context::clock()
+        }
+    }
+
+    cfg_not_rt! {
+        fn clock() -> Option<Clock> {
+            None
+        }
+    }
 
     /// A handle to a source of time.
     #[derive(Debug, Clone)]
@@ -58,14 +71,14 @@ cfg_test_util! {
     /// The current value of `Instant::now()` is saved and all subsequent calls
     /// to `Instant::now()` until the timer wheel is checked again will return the saved value.
     /// Once the timer wheel is checked, time will immediately advance to the next registered
-    /// `Delay`. This is useful for running tests that depend on time.
+    /// `Sleep`. This is useful for running tests that depend on time.
     ///
     /// # Panics
     ///
     /// Panics if time is already frozen or if called from outside of the Tokio
     /// runtime.
     pub fn pause() {
-        let clock = context::clock().expect("time cannot be frozen from outside the Tokio runtime");
+        let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
         clock.pause();
     }
 
@@ -79,7 +92,7 @@ cfg_test_util! {
     /// Panics if time is not frozen or if called from outside of the Tokio
     /// runtime.
     pub fn resume() {
-        let clock = context::clock().expect("time cannot be frozen from outside the Tokio runtime");
+        let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
         let mut inner = clock.inner.lock().unwrap();
 
         if inner.unfrozen.is_some() {
@@ -99,14 +112,27 @@ cfg_test_util! {
     /// Panics if time is not frozen or if called from outside of the Tokio
     /// runtime.
     pub async fn advance(duration: Duration) {
-        let clock = context::clock().expect("time cannot be frozen from outside the Tokio runtime");
+        use crate::future::poll_fn;
+        use std::task::Poll;
+
+        let clock = clock().expect("time cannot be frozen from outside the Tokio runtime");
         clock.advance(duration);
-        crate::task::yield_now().await;
+
+        let mut yielded = false;
+        poll_fn(|cx| {
+            if yielded {
+                Poll::Ready(())
+            } else {
+                yielded = true;
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            }
+        }).await;
     }
 
     /// Return the current instant, factoring in frozen time.
     pub(crate) fn now() -> Instant {
-        if let Some(clock) = context::clock() {
+        if let Some(clock) = clock() {
             clock.now()
         } else {
             Instant::from_std(std::time::Instant::now())

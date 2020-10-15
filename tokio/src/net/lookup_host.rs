@@ -1,5 +1,5 @@
-cfg_dns! {
-    use crate::net::addr::ToSocketAddrs;
+cfg_net! {
+    use crate::net::addr::{self, ToSocketAddrs};
 
     use std::io;
     use std::net::SocketAddr;
@@ -33,6 +33,6 @@ cfg_dns! {
     where
         T: ToSocketAddrs
     {
-        host.to_socket_addrs().await
+        addr::to_socket_addrs(host).await
     }
 }

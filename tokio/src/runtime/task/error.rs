@@ -3,7 +3,7 @@ use std::fmt;
 use std::io;
 use std::sync::Mutex;
 
-doc_rt_core! {
+cfg_rt! {
     /// Task failed to execute to completion.
     pub struct JoinError {
         repr: Repr,
@@ -16,25 +16,13 @@ enum Repr {
 }
 
 impl JoinError {
-    #[doc(hidden)]
-    #[deprecated]
-    pub fn cancelled() -> JoinError {
-        Self::cancelled2()
-    }
-
-    pub(crate) fn cancelled2() -> JoinError {
+    pub(crate) fn cancelled() -> JoinError {
         JoinError {
             repr: Repr::Cancelled,
         }
     }
 
-    #[doc(hidden)]
-    #[deprecated]
-    pub fn panic(err: Box<dyn Any + Send + 'static>) -> JoinError {
-        Self::panic2(err)
-    }
-
-    pub(crate) fn panic2(err: Box<dyn Any + Send + 'static>) -> JoinError {
+    pub(crate) fn panic(err: Box<dyn Any + Send + 'static>) -> JoinError {
         JoinError {
             repr: Repr::Panic(Mutex::new(err)),
         }
@@ -42,10 +30,7 @@ impl JoinError {
 
     /// Returns true if the error was caused by the task being cancelled
     pub fn is_cancelled(&self) -> bool {
-        match &self.repr {
-            Repr::Cancelled => true,
-            _ => false,
-        }
+        matches!(&self.repr, Repr::Cancelled)
     }
 
     /// Returns true if the error was caused by the task panicking
@@ -65,10 +50,7 @@ impl JoinError {
     /// }
     /// ```
     pub fn is_panic(&self) -> bool {
-        match &self.repr {
-            Repr::Panic(_) => true,
-            _ => false,
-        }
+        matches!(&self.repr, Repr::Panic(_))
     }
 
     /// Consumes the join error, returning the object with which the task panicked.

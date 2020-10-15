@@ -3,7 +3,7 @@ use crate::task::JoinHandle;
 
 use std::future::Future;
 
-doc_rt_core! {
+cfg_rt! {
     /// Spawns a new asynchronous task, returning a
     /// [`JoinHandle`](super::JoinHandle) for it.
     ///
@@ -37,7 +37,7 @@ doc_rt_core! {
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
-    ///     let mut listener = TcpListener::bind("127.0.0.1:8080").await?;
+    ///     let listener = TcpListener::bind("127.0.0.1:8080").await?;
     ///
     ///     loop {
     ///         let (socket, _) = listener.accept().await?;

@@ -45,15 +45,14 @@ fn many_signals(bench: &mut Bencher) {
     let num_signals = 10;
     let (tx, mut rx) = mpsc::channel(num_signals);
 
-    let rt = runtime::Builder::new()
-        // Intentionally single threaded to measure delays in propagating wakes
-        .basic_scheduler()
+    // Intentionally single threaded to measure delays in propagating wakes
+    let rt = runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
 
     let spawn_signal = |kind| {
-        let mut tx = tx.clone();
+        let tx = tx.clone();
         rt.spawn(async move {
             let mut signal = signal(kind).expect("failed to create signal");
 

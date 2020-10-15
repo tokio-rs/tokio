@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "full"), allow(dead_code))]
+
 //! An intrusive double linked list of data
 //!
 //! The data structure supports tracking pinned nodes. Most of the data
@@ -106,7 +108,6 @@ impl<L: Link> LinkedList<L, L::Target> {
 
     /// Removes the last element from a list and returns it, or None if it is
     /// empty.
-    #[cfg_attr(any(feature = "udp", feature = "uds"), allow(unused))]
     pub(crate) fn pop_back(&mut self) -> Option<L::Handle> {
         unsafe {
             let last = self.tail?;
@@ -181,7 +182,12 @@ impl<L: Link> fmt::Debug for LinkedList<L, L::Target> {
     }
 }
 
-#[cfg(any(feature = "sync", feature = "signal", feature = "process"))]
+#[cfg(any(
+    feature = "fs",
+    all(unix, feature = "process"),
+    feature = "signal",
+    feature = "sync",
+))]
 impl<L: Link> LinkedList<L, L::Target> {
     pub(crate) fn last(&self) -> Option<&L::Target> {
         let tail = self.tail.as_ref()?;
@@ -197,7 +203,7 @@ impl<L: Link> Default for LinkedList<L, L::Target> {
 
 // ===== impl Iter =====
 
-cfg_rt_threaded! {
+cfg_rt_multi_thread! {
     pub(crate) struct Iter<'a, T: Link> {
         curr: Option<NonNull<T::Target>>,
         _p: core::marker::PhantomData<&'a T>,

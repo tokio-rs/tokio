@@ -322,7 +322,7 @@
 //!     tokio::spawn(async move {
 //!         loop {
 //!             // Wait 10 seconds between checks
-//!             time::delay_for(Duration::from_secs(10)).await;
+//!             time::sleep(Duration::from_secs(10)).await;
 //!
 //!             // Load the configuration file
 //!             let new_config = Config::load_from_file().await.unwrap();
@@ -359,11 +359,11 @@
 //!             let mut conf = rx.borrow().clone();
 //!
 //!             let mut op_start = Instant::now();
-//!             let mut delay = time::delay_until(op_start + conf.timeout);
+//!             let mut sleep = time::sleep_until(op_start + conf.timeout);
 //!
 //!             loop {
 //!                 tokio::select! {
-//!                     _ = &mut delay => {
+//!                     _ = &mut sleep => {
 //!                         // The operation elapsed. Restart it
 //!                         op.set(my_async_operation());
 //!
@@ -371,14 +371,14 @@
 //!                         op_start = Instant::now();
 //!
 //!                         // Restart the timeout
-//!                         delay = time::delay_until(op_start + conf.timeout);
+//!                         sleep = time::sleep_until(op_start + conf.timeout);
 //!                     }
 //!                     _ = rx.changed() => {
 //!                         conf = rx.borrow().clone();
 //!
 //!                         // The configuration has been updated. Update the
-//!                         // `delay` using the new `timeout` value.
-//!                         delay.reset(op_start + conf.timeout);
+//!                         // `sleep` using the new `timeout` value.
+//!                         sleep.reset(op_start + conf.timeout);
 //!                     }
 //!                     _ = &mut op => {
 //!                         // The operation completed!
@@ -437,7 +437,7 @@ cfg_sync! {
     mod mutex;
     pub use mutex::{Mutex, MutexGuard, TryLockError, OwnedMutexGuard};
 
-    mod notify;
+    pub(crate) mod notify;
     pub use notify::Notify;
 
     pub mod oneshot;
@@ -456,8 +456,16 @@ cfg_sync! {
 }
 
 cfg_not_sync! {
-    mod notify;
-    pub(crate) use notify::Notify;
+    #[cfg(any(feature = "fs", feature = "signal", all(unix, feature = "process")))]
+    pub(crate) mod batch_semaphore;
+
+    cfg_fs! {
+        mod mutex;
+        pub(crate) use mutex::Mutex;
+    }
+
+    #[cfg(any(feature = "rt", feature = "signal", all(unix, feature = "process")))]
+    pub(crate) mod notify;
 
     cfg_atomic_waker_impl! {
         mod task;
@@ -465,14 +473,13 @@ cfg_not_sync! {
     }
 
     #[cfg(any(
-            feature = "rt-core",
+            feature = "rt",
             feature = "process",
             feature = "signal"))]
     pub(crate) mod oneshot;
 
     cfg_signal_internal! {
         pub(crate) mod mpsc;
-        pub(crate) mod batch_semaphore;
     }
 }
 

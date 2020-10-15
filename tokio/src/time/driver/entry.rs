@@ -1,7 +1,7 @@
 use crate::loom::sync::atomic::AtomicU64;
 use crate::sync::AtomicWaker;
 use crate::time::driver::{Handle, Inner};
-use crate::time::{Duration, Error, Instant};
+use crate::time::{error::Error, Duration, Instant};
 
 use std::cell::UnsafeCell;
 use std::ptr;
@@ -11,7 +11,7 @@ use std::sync::{Arc, Weak};
 use std::task::{self, Poll};
 use std::u64;
 
-/// Internal state shared between a `Delay` instance and the timer.
+/// Internal state shared between a `Sleep` instance and the timer.
 ///
 /// This struct is used as a node in two intrusive data structures:
 ///
@@ -28,7 +28,7 @@ pub(crate) struct Entry {
     time: CachePadded<UnsafeCell<Time>>,
 
     /// Timer internals. Using a weak pointer allows the timer to shutdown
-    /// without all `Delay` instances having completed.
+    /// without all `Sleep` instances having completed.
     ///
     /// When empty, it means that the entry has not yet been linked with a
     /// timer instance.
@@ -69,8 +69,8 @@ pub(crate) struct Entry {
     /// When the entry expires, relative to the `start` of the timer
     /// (Inner::start). This is only used by the timer.
     ///
-    /// A `Delay` instance can be reset to a different deadline by the thread
-    /// that owns the `Delay` instance. In this case, the timer thread will not
+    /// A `Sleep` instance can be reset to a different deadline by the thread
+    /// that owns the `Sleep` instance. In this case, the timer thread will not
     /// immediately know that this has happened. The timer thread must know the
     /// last deadline that it saw as it uses this value to locate the entry in
     /// its wheel.
@@ -83,7 +83,7 @@ pub(crate) struct Entry {
     /// Next entry in the State's linked list.
     ///
     /// This is only accessed by the timer
-    pub(super) next_stack: UnsafeCell<Option<Arc<Entry>>>,
+    pub(crate) next_stack: UnsafeCell<Option<Arc<Entry>>>,
 
     /// Previous entry in the State's linked list.
     ///
@@ -91,10 +91,10 @@ pub(crate) struct Entry {
     /// entry.
     ///
     /// This is a weak reference.
-    pub(super) prev_stack: UnsafeCell<*const Entry>,
+    pub(crate) prev_stack: UnsafeCell<*const Entry>,
 }
 
-/// Stores the info for `Delay`.
+/// Stores the info for `Sleep`.
 #[derive(Debug)]
 pub(crate) struct Time {
     pub(crate) deadline: Instant,
@@ -112,12 +112,12 @@ const ERROR: u64 = u64::MAX;
 impl Entry {
     pub(crate) fn new(handle: &Handle, deadline: Instant, duration: Duration) -> Arc<Entry> {
         let inner = handle.inner().unwrap();
-        let entry: Entry;
 
-        // Increment the number of active timeouts
-        if let Err(err) = inner.increment() {
-            entry = Entry::new2(deadline, duration, Weak::new(), ERROR);
+        // Attempt to increment the number of active timeouts
+        let entry = if let Err(err) = inner.increment() {
+            let entry = Entry::new2(deadline, duration, Weak::new(), ERROR);
             entry.error(err);
+            entry
         } else {
             let when = inner.normalize_deadline(deadline);
             let state = if when <= inner.elapsed() {
@@ -125,8 +125,8 @@ impl Entry {
             } else {
                 when
             };
-            entry = Entry::new2(deadline, duration, Arc::downgrade(&inner), state);
-        }
+            Entry::new2(deadline, duration, Arc::downgrade(&inner), state)
+        };
 
         let entry = Arc::new(entry);
         if let Err(err) = inner.queue(&entry) {
@@ -145,6 +145,10 @@ impl Entry {
     #[allow(clippy::mut_from_ref)] // https://github.com/rust-lang/rust-clippy/issues/4281
     pub(crate) unsafe fn time_mut(&self) -> &mut Time {
         &mut *self.time.0.get()
+    }
+
+    pub(crate) fn when(&self) -> u64 {
+        self.when_internal().expect("invalid internal state")
     }
 
     /// The current entry state as known by the timer. This is not the value of

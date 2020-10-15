@@ -481,7 +481,7 @@ impl<T: 'static> Inject<T> {
     /// Close the injection queue, returns `true` if the queue is open when the
     /// transition is made.
     pub(super) fn close(&self) -> bool {
-        let mut p = self.pointers.lock().unwrap();
+        let mut p = self.pointers.lock();
 
         if p.is_closed {
             return false;
@@ -492,7 +492,7 @@ impl<T: 'static> Inject<T> {
     }
 
     pub(super) fn is_closed(&self) -> bool {
-        self.pointers.lock().unwrap().is_closed
+        self.pointers.lock().is_closed
     }
 
     pub(super) fn len(&self) -> usize {
@@ -502,7 +502,7 @@ impl<T: 'static> Inject<T> {
     /// Pushes a value into the queue.
     pub(super) fn push(&self, task: task::Notified<T>) {
         // Acquire queue lock
-        let mut p = self.pointers.lock().unwrap();
+        let mut p = self.pointers.lock();
 
         if p.is_closed {
             // Drop the mutex to avoid a potential deadlock when
@@ -541,7 +541,7 @@ impl<T: 'static> Inject<T> {
 
         debug_assert!(get_next(batch_tail).is_none());
 
-        let mut p = self.pointers.lock().unwrap();
+        let mut p = self.pointers.lock();
 
         if let Some(tail) = p.tail {
             set_next(tail, Some(batch_head));
@@ -566,7 +566,7 @@ impl<T: 'static> Inject<T> {
             return None;
         }
 
-        let mut p = self.pointers.lock().unwrap();
+        let mut p = self.pointers.lock();
 
         // It is possible to hit null here if another thread poped the last
         // task between us checking `len` and acquiring the lock.

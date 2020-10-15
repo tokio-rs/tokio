@@ -15,7 +15,7 @@ async fn accept_read_write() -> std::io::Result<()> {
         .unwrap();
     let sock_path = dir.path().join("connect.sock");
 
-    let mut listener = UnixListener::bind(&sock_path)?;
+    let listener = UnixListener::bind(&sock_path)?;
 
     let accept = listener.accept();
     let connect = UnixStream::connect(&sock_path);
@@ -42,7 +42,7 @@ async fn shutdown() -> std::io::Result<()> {
         .unwrap();
     let sock_path = dir.path().join("connect.sock");
 
-    let mut listener = UnixListener::bind(&sock_path)?;
+    let listener = UnixListener::bind(&sock_path)?;
 
     let accept = listener.accept();
     let connect = UnixStream::connect(&sock_path);

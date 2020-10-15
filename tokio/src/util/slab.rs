@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "rt"), allow(dead_code))]
+
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
 use crate::loom::sync::{Arc, Mutex};
@@ -278,7 +280,7 @@ impl<T> Slab<T> {
             }
 
             let mut slots = match page.slots.try_lock() {
-                Ok(slots) => slots,
+                Some(slots) => slots,
                 // If the lock cannot be acquired due to being held by another
                 // thread, don't try to compact the page.
                 _ => continue,
@@ -376,7 +378,7 @@ impl<T: Entry> Page<T> {
         }
 
         // Allocating objects requires synchronization
-        let mut locked = me.slots.lock().unwrap();
+        let mut locked = me.slots.lock();
 
         if locked.head < locked.slots.len() {
             // Re-use an already initialized slot.
@@ -471,7 +473,7 @@ impl<T> Default for Page<T> {
 impl<T> Page<T> {
     /// Release a slot into the page's free list
     fn release(&self, value: *const Value<T>) {
-        let mut locked = self.slots.lock().unwrap();
+        let mut locked = self.slots.lock();
 
         let idx = locked.index_for(value);
         locked.slots[idx].next = locked.head as u32;
@@ -485,7 +487,7 @@ impl<T> Page<T> {
 impl<T> CachedPage<T> {
     /// Refresh the cache
     fn refresh(&mut self, page: &Page<T>) {
-        let slots = page.slots.lock().unwrap();
+        let slots = page.slots.lock();
         self.slots = slots.slots.as_ptr();
         self.init = slots.slots.len();
     }

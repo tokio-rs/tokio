@@ -4,9 +4,21 @@ use libc::{gid_t, uid_t};
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub struct UCred {
     /// UID (user ID) of the process
-    pub uid: uid_t,
+    uid: uid_t,
     /// GID (group ID) of the process
-    pub gid: gid_t,
+    gid: gid_t,
+}
+
+impl UCred {
+    /// Gets UID (user ID) of the process.
+    pub fn uid(&self) -> uid_t {
+        self.uid
+    }
+
+    /// Gets GID (group ID) of the process.
+    pub fn gid(&self) -> gid_t {
+        self.gid
+    }
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]

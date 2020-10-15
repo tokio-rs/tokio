@@ -34,7 +34,8 @@ impl<F: Future> Future for TokioContext<'_, F> {
         let handle = me.handle;
         let fut = me.inner;
 
-        handle.enter(|| fut.poll(cx))
+        let _enter = handle.enter();
+        fut.poll(cx)
     }
 }
 
@@ -46,22 +47,22 @@ pub trait RuntimeExt {
     ///
     /// ```no_run
     /// use tokio_util::context::RuntimeExt;
-    /// use tokio::time::{delay_for, Duration};
+    /// use tokio::time::{sleep, Duration};
     ///
-    /// let rt = tokio::runtime::Builder::new()
-    ///     .threaded_scheduler()
+    /// let rt = tokio::runtime::Builder::new_multi_thread()
     ///     .enable_all()
-    ///     .build().unwrap();
+    ///     .build()
+    ///     .unwrap();
     ///
-    /// let rt2 = tokio::runtime::Builder::new()
-    ///     .threaded_scheduler()
-    ///     .build().unwrap();
+    /// let rt2 = tokio::runtime::Builder::new_multi_thread()
+    ///     .build()
+    ///     .unwrap();
     ///
-    /// let fut = delay_for(Duration::from_millis(2));
+    /// let fut = sleep(Duration::from_millis(2));
     ///
     /// rt.block_on(
     ///     rt2
-    ///         .wrap(async { delay_for(Duration::from_millis(2)).await }),
+    ///         .wrap(async { sleep(Duration::from_millis(2)).await }),
     /// );
     ///```
     fn wrap<F: Future>(&self, fut: F) -> TokioContext<'_, F>;

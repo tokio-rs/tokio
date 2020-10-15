@@ -13,7 +13,7 @@ use std::thread;
 async fn echo_server() {
     const N: usize = 1024;
 
-    let mut srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+    let srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
     let addr = assert_ok!(srv.local_addr());
 
     let msg = "foo bar baz";

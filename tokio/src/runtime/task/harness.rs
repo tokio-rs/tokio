@@ -102,7 +102,7 @@ where
             // If the task is cancelled, avoid polling it, instead signalling it
             // is complete.
             if snapshot.is_cancelled() {
-                Poll::Ready(Err(JoinError::cancelled2()))
+                Poll::Ready(Err(JoinError::cancelled()))
             } else {
                 let res = guard.core.poll(self.header());
 
@@ -132,7 +132,7 @@ where
                 }
             }
             Err(err) => {
-                self.complete(Err(JoinError::panic2(err)), snapshot.is_join_interested());
+                self.complete(Err(JoinError::panic(err)), snapshot.is_join_interested());
             }
         }
     }
@@ -297,9 +297,9 @@ where
             // Dropping the future panicked, complete the join
             // handle with the panic to avoid dropping the panic
             // on the ground.
-            self.complete(Err(JoinError::panic2(err)), true);
+            self.complete(Err(JoinError::panic(err)), true);
         } else {
-            self.complete(Err(JoinError::cancelled2()), true);
+            self.complete(Err(JoinError::cancelled()), true);
         }
     }
 

@@ -7,6 +7,7 @@ publish = false
 
 [features]
 full = ["tokio/full"]
+rt = ["tokio/rt", "tokio/macros"]
 
 [dependencies]
 tokio = { path = "../tokio", optional = true }
