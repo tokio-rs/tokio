@@ -1,3 +1,11 @@
+# 0.3.0 (October 15, 2020)
+
+- Track `tokio` 0.3 release.
+
+### Changed
+- options are renamed to track `tokio` runtime builder fn names.
+- `#[tokio::main]` macro requires `rt-multi-thread` when no `flavor` is specified.
+
 # 0.2.5 (February 27, 2019)
 
 ### Fixed
