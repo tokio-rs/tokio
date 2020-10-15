@@ -42,7 +42,8 @@ use std::task::{Context, Poll};
 pub trait AsyncRead {
     /// Attempts to read from the `AsyncRead` into `buf`.
     ///
-    /// On success, returns `Poll::Ready(Ok(num_bytes_read))`.
+    /// On success, returns `Poll::Ready(Ok(()))`. The `filled` cursor in the
+    /// provided `ReadBuf` is incremented by the number of bytes read.
     ///
     /// If no data is available for reading, the method returns
     /// `Poll::Pending` and arranges for the current task (via

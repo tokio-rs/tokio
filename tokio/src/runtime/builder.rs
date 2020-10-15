@@ -80,7 +80,7 @@ pub(crate) enum Kind {
 }
 
 impl Builder {
-    /// Returns a new builder with the multi thread scheduler selected.
+    /// Returns a new builder with the current thread scheduler selected.
     ///
     /// Configuration methods can be chained on the return value.
     pub fn new_current_thread() -> Builder {
