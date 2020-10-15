@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 #[test]
 fn concurrent_write() {
-    let mut b = loom::model::Builder::new();
+    let b = loom::model::Builder::new();
 
     b.check(|| {
         let rwlock = Arc::new(RwLock::<u32>::new(0));
@@ -37,7 +37,7 @@ fn concurrent_write() {
 
 #[test]
 fn concurrent_read_write() {
-    let mut b = loom::model::Builder::new();
+    let b = loom::model::Builder::new();
 
     b.check(|| {
         let rwlock = Arc::new(RwLock::<u32>::new(0));
