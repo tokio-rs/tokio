@@ -15,9 +15,9 @@ use std::task::{Context, Poll};
 /// Specifically, this means that the `poll_read` function will return one of
 /// the following:
 ///
-/// * `Poll::Ready(Ok(n))` means that `n` bytes of data was immediately read
-///   and placed into the output buffer, where `n` == 0 implies that EOF has
-///   been reached.
+/// * `Poll::Ready(Ok(()))` means that data was immediately read and placed into
+///   the output buffer. If no data was read (`buf.filled().is_empty()`) it
+///   implies that EOF has been reached.
 ///
 /// * `Poll::Pending` means that no data was read into the buffer
 ///   provided. The I/O object is not currently readable but may become readable
@@ -42,12 +42,13 @@ use std::task::{Context, Poll};
 pub trait AsyncRead {
     /// Attempts to read from the `AsyncRead` into `buf`.
     ///
-    /// On success, returns `Poll::Ready(Ok(num_bytes_read))`.
+    /// On success, returns `Poll::Ready(Ok(()))` and fills `buf` with data
+    /// read. If no data was read (`buf.filled().is_empty()`) it implies that
+    /// EOF has been reached.
     ///
-    /// If no data is available for reading, the method returns
-    /// `Poll::Pending` and arranges for the current task (via
-    /// `cx.waker()`) to receive a notification when the object becomes
-    /// readable or is closed.
+    /// If no data is available for reading, the method returns `Poll::Pending`
+    /// and arranges for the current task (via `cx.waker()`) to receive a
+    /// notification when the object becomes readable or is closed.
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
