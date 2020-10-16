@@ -52,14 +52,18 @@ where
     R: AsyncRead,
     B: BufMut,
 {
+    if !buf.has_remaining_mut() {
+        return Poll::Ready(Ok(0));
+    }
+
     let n = {
         let mut buf = ReadBuf::uninit(buf.bytes_mut());
         ready!(read.poll_read(cx, &mut buf)?);
         buf.filled().len()
     };
 
-    // Safety: This is guaranteed to be the number of initialized bytes due to
-    // the invariants guaranteed by `ReadBuf`.
+    // Safety: This is guaranteed to be the number of initialized (and read)
+    // bytes due to the invariants provided by `ReadBuf::filled`.
     unsafe {
         buf.advance_mut(n);
     }
