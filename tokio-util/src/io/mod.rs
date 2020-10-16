@@ -8,6 +8,8 @@
 
 mod reader_stream;
 mod stream_reader;
+mod poll_read_buf;
 
+pub use self::poll_read_buf::poll_read_buf;
 pub use self::reader_stream::ReaderStream;
 pub use self::stream_reader::StreamReader;
