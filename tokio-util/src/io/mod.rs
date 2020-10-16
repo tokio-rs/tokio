@@ -6,9 +6,9 @@
 //! [`Body`]: https://docs.rs/hyper/0.13/hyper/struct.Body.html
 //! [`AsyncRead`]: tokio::io::AsyncRead
 
+mod poll_read_buf;
 mod reader_stream;
 mod stream_reader;
-mod poll_read_buf;
 
 pub use self::poll_read_buf::poll_read_buf;
 pub use self::reader_stream::ReaderStream;
