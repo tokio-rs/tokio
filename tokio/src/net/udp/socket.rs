@@ -5,6 +5,7 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::task::{Context, Poll};
 
 cfg_net! {
     /// A UDP socket
@@ -272,6 +273,38 @@ impl UdpSocket {
             .await
     }
 
+    /// Attempts to send data on the socket to the remote address to which it was previously
+    /// `connect`ed.
+    ///
+    /// The [`connect`] method will connect this socket to a remote address. The future
+    /// will resolve to an error if the socket is not connected..
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the socket is not available to write
+    /// * `Poll::Ready(Ok(n))` `n` is the number of bytes sent
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    ///
+    /// [`connect`]: method@Self::connect
+    pub fn poll_send(&self, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
+        loop {
+            let ev = ready!(self.io.poll_write_ready(cx))?;
+
+            match self.io.get_ref().send(buf) {
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    self.io.clear_readiness(ev);
+                }
+                x => return Poll::Ready(x),
+            }
+        }
+    }
+
     /// Try to send data on the socket to the remote address to which it is
     /// connected.
     ///
@@ -304,6 +337,38 @@ impl UdpSocket {
             .await
     }
 
+    /// Attempts to receive a single datagram message on the socket from the remote
+    /// address to which it is `connect`ed.
+    ///
+    /// The [`connect`] method will connect this socket to a remote address. The future
+    /// will resolve to an error if the socket is not connected..
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the socket is not ready to read
+    /// * `Poll::Ready(Ok(n))` `n` is the number of bytes read.
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    ///
+    /// [`connect`]: method@Self::connect
+    pub fn poll_recv(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
+        loop {
+            let ev = ready!(self.io.poll_read_ready(cx))?;
+
+            match self.io.get_ref().recv(buf) {
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    self.io.clear_readiness(ev);
+                }
+                x => return Poll::Ready(x),
+            }
+        }
+    }
+
     /// Returns a future that sends data on the socket to the given address.
     /// On success, the future will resolve to the number of bytes written.
     ///
@@ -334,6 +399,37 @@ impl UdpSocket {
                 io::ErrorKind::InvalidInput,
                 "no addresses to send data to",
             )),
+        }
+    }
+
+    /// Attempts to send data on the socket to a given address.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the socket is not ready to write
+    /// * `Poll::Ready(Ok(n))` `n` is the number of bytes sent.
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    pub fn poll_send_to(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+        target: &SocketAddr,
+    ) -> Poll<io::Result<usize>> {
+        loop {
+            let ev = ready!(self.io.poll_write_ready(cx))?;
+
+            match self.io.get_ref().send_to(buf, *target) {
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    self.io.clear_readiness(ev);
+                }
+                x => return Poll::Ready(x),
+            }
         }
     }
 
@@ -401,6 +497,36 @@ impl UdpSocket {
         self.io
             .async_io(mio::Interest::READABLE, |sock| sock.recv_from(buf))
             .await
+    }
+
+    /// Attempts to receive a single datagram on the socket.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the socket is not ready to read
+    /// * `Poll::Ready(Ok((n, addr)))` a tuple where `n` is the number of bytes received from `addr`
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    pub fn poll_recv_from(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<io::Result<(usize, SocketAddr)>> {
+        loop {
+            let ev = ready!(self.io.poll_read_ready(cx))?;
+
+            match self.io.get_ref().recv_from(buf) {
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    self.io.clear_readiness(ev);
+                }
+                x => return Poll::Ready(x),
+            }
+        }
     }
 
     /// Gets the value of the `SO_BROADCAST` option for this socket.
