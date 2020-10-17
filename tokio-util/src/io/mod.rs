@@ -7,9 +7,11 @@
 //! [`AsyncRead`]: tokio::io::AsyncRead
 
 mod poll_read_buf;
+mod read_buf;
 mod reader_stream;
 mod stream_reader;
 
 pub use self::poll_read_buf::poll_read_buf;
+pub use self::read_buf::read_buf;
 pub use self::reader_stream::ReaderStream;
 pub use self::stream_reader::StreamReader;

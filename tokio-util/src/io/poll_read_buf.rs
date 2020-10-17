@@ -6,8 +6,8 @@ use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, ReadBuf};
 
 /// Adapter function which implements the now deprecated
-/// `AsyncRead::poll_read_buf` API to ease when moving projects to Tokio
-/// 0.3.x.
+/// `AsyncRead::poll_read_buf` API to ease the process of moving projects to
+/// Tokio 0.3.x.
 ///
 /// # Example
 ///
