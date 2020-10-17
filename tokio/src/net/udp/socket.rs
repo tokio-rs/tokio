@@ -13,9 +13,9 @@ cfg_net! {
     /// is free to communicate with many different remotes. In tokio there are basically two main ways to use `UdpSocket`:
     ///
     /// * one to many: [`bind`](`UdpSocket::bind`) and use [`send_to`](`UdpSocket::send_to`)
-    /// and [`recv_from`](`UdpSocket::recv_from`) to communicate with many different addresses
+    ///   and [`recv_from`](`UdpSocket::recv_from`) to communicate with many different addresses
     /// * one to one: [`connect`](`UdpSocket::connect`) and associate with a single address, using [`send`](`UdpSocket::send`)
-    /// and [`recv`](`UdpSocket::recv`) to communicate only with that remote address
+    ///   and [`recv`](`UdpSocket::recv`) to communicate only with that remote address
     ///
     /// `UdpSocket` can also be used concurrently to `send_to` and `recv_from` in different tasks,
     /// all that's required is that you `Arc<UdpSocket>` and clone a reference for each task.
