@@ -10,8 +10,10 @@ use crate::park::{Park, Unpark};
 use crate::util::bit;
 use crate::util::slab::{self, Slab};
 
+use crate::loom::sync::atomic::AtomicUsize;
 use std::fmt;
 use std::io;
+use std::sync::atomic::Ordering::*;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 
@@ -32,7 +34,7 @@ pub(crate) struct Driver {
     poll: mio::Poll,
 
     /// State shared between the reactor and the handles.
-    inner: Arc<Inner>,
+    inner: Option<Arc<Inner>>,
 }
 
 /// A reference to an I/O driver
@@ -55,7 +57,18 @@ pub(super) struct Inner {
 
     /// Used to wake up the reactor from a call to `turn`
     waker: mio::Waker,
+
+    state: AtomicUsize,
 }
+
+/// Idle state
+const WAITING: usize = 0;
+
+/// An IO resource is being added
+const REGISTERING: usize = 1;
+
+/// Closed state
+const CLOSED: usize = 2;
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub(super) enum Direction {
@@ -106,11 +119,12 @@ impl Driver {
             events: Some(mio::Events::with_capacity(1024)),
             resources: slab,
             poll,
-            inner: Arc::new(Inner {
+            inner: Some(Arc::new(Inner {
                 registry,
                 io_dispatch: allocator,
                 waker,
-            }),
+                state: AtomicUsize::new(WAITING),
+            })),
         })
     }
 
@@ -122,7 +136,7 @@ impl Driver {
     /// to bind them to this event loop.
     pub(crate) fn handle(&self) -> Handle {
         Handle {
-            inner: Arc::downgrade(&self.inner),
+            inner: Arc::downgrade(self.inner.as_ref().expect("reactor closed")),
         }
     }
 
@@ -181,12 +195,24 @@ impl Driver {
 
 impl Drop for Driver {
     fn drop(&mut self) {
-        self.resources.for_each(|io| {
-            // If a task is waiting on the I/O resource, notify it. The task
-            // will then attempt to use the I/O resource and fail due to the
-            // driver being shutdown.
-            io.wake(Ready::ALL);
-        })
+        let inner = self.inner.take().expect("reactor closed");
+        loop {
+            if inner
+                .state
+                .compare_exchange(WAITING, CLOSED, AcqRel, Acquire)
+                .is_ok()
+            {
+                drop(inner);
+                /// we drop the arc first
+                self.resources.for_each(|io| {
+                    // If a task is waiting on the I/O resource, notify it. The task
+                    // will then attempt to use the I/O resource and fail due to the
+                    // driver being shutdown.
+                    io.wake(Ready::ALL);
+                });
+                return;
+            }
+        }
     }
 }
 
@@ -292,6 +318,17 @@ impl Inner {
         source: &mut impl mio::event::Source,
         interest: mio::Interest,
     ) -> io::Result<slab::Ref<ScheduledIo>> {
+        loop {
+            match self
+                .state
+                .compare_exchange(WAITING, REGISTERING, AcqRel, Acquire)
+            {
+                Ok(_) | Err(REGISTERING) => break,
+                Err(CLOSED) => return Err(io::Error::new(io::ErrorKind::Other, "reactor gone")),
+                _ => unreachable!(),
+            }
+        }
+
         let (address, shared) = self.io_dispatch.allocate().ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::Other,
@@ -303,7 +340,7 @@ impl Inner {
 
         self.registry
             .register(source, mio::Token(token), interest)?;
-
+        self.state.store(WAITING, Release);
         Ok(shared)
     }
 
