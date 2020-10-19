@@ -98,7 +98,8 @@ fn reserve(buf: &mut Vec<u8>, bytes: usize) {
 
 /// Returns the unused capacity of the provided vector.
 fn get_unused_capacity(buf: &mut Vec<u8>) -> &mut [MaybeUninit<u8>] {
-    bytes::BufMut::bytes_mut(buf)
+    let uninit = bytes::BufMut::bytes_mut(buf);
+    unsafe { &mut *(uninit as *mut _ as *mut [MaybeUninit<u8>]) }
 }
 
 impl<A> Future for ReadToEnd<'_, A>
