@@ -373,6 +373,7 @@ cfg_rt! {
         }
 
         /// Run the provided function on an executor dedicated to blocking operations.
+        ///
         /// # Examples
         ///
         /// ```
