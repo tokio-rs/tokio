@@ -407,7 +407,6 @@ cfg_rt! {
                 }
             };
 
-
             let (task, handle) = task::joinable(BlockingTask::new(func));
             let _ = self.handle.blocking_spawner.spawn(task, &self.handle);
             handle
