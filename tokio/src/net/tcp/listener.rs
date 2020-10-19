@@ -213,9 +213,6 @@ impl TcpListener {
     ///
     /// The platform specific behavior of this function looks like:
     ///
-    /// * On Unix, the socket is placed into nonblocking mode and connections
-    ///   can be accepted as normal
-    ///
     /// * On Windows, the address is stored internally and all future accepts
     ///   will only be for the same IP version as `addr` specified. That is, if
     ///   `addr` is an IPv4 address then all sockets accepted will be IPv4 as
