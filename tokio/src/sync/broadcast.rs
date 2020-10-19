@@ -405,7 +405,8 @@ const MAX_RECEIVERS: usize = usize::MAX >> 2;
 ///
 /// The `Sender` can be cloned to `send` to the same channel from multiple
 /// points in the process or it can be used concurrently from an `Arc`. New
-/// `Receiver` handles are created by calling [`Sender::subscribe`].
+/// `Receiver` handles can be cloned from an existing `Receiver` or created by
+/// calling [`Sender::subscribe`].
 ///
 /// If all [`Receiver`] handles are dropped, the `send` method will return a
 /// [`SendError`]. Similarly, if all [`Sender`] handles are dropped, the [`recv`]
@@ -569,19 +570,7 @@ impl<T> Sender<T> {
     /// ```
     pub fn subscribe(&self) -> Receiver<T> {
         let shared = self.shared.clone();
-
-        let mut tail = shared.tail.lock();
-
-        if tail.rx_cnt == MAX_RECEIVERS {
-            panic!("max receivers");
-        }
-
-        tail.rx_cnt = tail.rx_cnt.checked_add(1).expect("overflow");
-        let next = tail.pos;
-
-        drop(tail);
-
-        Receiver { shared, next }
+        new_receiver(shared)
     }
 
     /// Returns the number of active receivers
@@ -669,6 +658,22 @@ impl<T> Sender<T> {
 
         Ok(rem)
     }
+}
+
+fn new_receiver<T>(shared: Arc<Shared<T>>) -> Receiver<T> {
+    let mut tail = shared.tail.lock();
+
+    if tail.rx_cnt == MAX_RECEIVERS {
+        panic!("max receivers");
+    }
+
+    tail.rx_cnt = tail.rx_cnt.checked_add(1).expect("overflow");
+
+    let next = tail.pos;
+
+    drop(tail);
+
+    Receiver { shared, next }
 }
 
 impl Tail {
@@ -977,6 +982,13 @@ impl<T: Clone> Receiver<T> {
     #[cfg_attr(docsrs, doc(cfg(feature = "stream")))]
     pub fn into_stream(self) -> impl Stream<Item = Result<T, RecvError>> {
         Recv::new(Borrow(self))
+    }
+}
+
+impl<T> Clone for Receiver<T> {
+    fn clone(&self) -> Self {
+        let shared = self.shared.clone();
+        new_receiver(shared)
     }
 }
 
