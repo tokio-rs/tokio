@@ -287,7 +287,6 @@ cfg_rt! {
     #[derive(Debug)]
     enum Kind {
         /// Execute all tasks on the current-thread.
-        #[cfg(feature = "rt")]
         CurrentThread(BasicScheduler<driver::Driver>),
 
         /// Execute tasks across multiple threads.
@@ -359,7 +358,6 @@ cfg_rt! {
         /// });
         /// # }
         /// ```
-        #[cfg(feature = "rt")]
         pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
         where
             F: Future + Send + 'static,
@@ -388,7 +386,6 @@ cfg_rt! {
         ///     println!("now running on a worker thread");
         /// });
         /// # }
-        #[cfg(feature = "rt")]
         pub fn spawn_blocking<F, R>(&self, func: F) -> JoinHandle<R>
         where
             F: FnOnce() -> R + Send + 'static,
@@ -443,7 +440,6 @@ cfg_rt! {
             let _enter = self.enter();
 
             match &self.kind {
-                #[cfg(feature = "rt")]
                 Kind::CurrentThread(exec) => exec.block_on(future),
                 #[cfg(feature = "rt-multi-thread")]
                 Kind::ThreadPool(exec) => exec.block_on(future),
