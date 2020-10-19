@@ -187,6 +187,7 @@ cfg_rt! {
 
     mod blocking;
     use blocking::BlockingPool;
+    use blocking::task::BlockingTask;
     pub(crate) use blocking::spawn_blocking;
 
     mod builder;
@@ -369,6 +370,32 @@ cfg_rt! {
                 Kind::ThreadPool(exec) => exec.spawn(future),
                 Kind::CurrentThread(exec) => exec.spawn(future),
             }
+        }
+
+        /// Run the provided function on an executor dedicated to blocking operations.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::Runtime;
+        ///
+        /// # fn dox() {
+        /// // Create the runtime
+        /// let rt = Runtime::new().unwrap();
+        ///
+        /// // Spawn a blocking function onto the runtime
+        /// rt.spawn_blocking(|| {
+        ///     println!("now running on a worker thread");
+        /// });
+        /// # }
+        #[cfg(feature = "rt")]
+        pub fn spawn_blocking<F, R>(&self, func: F) -> JoinHandle<R>
+        where
+            F: FnOnce() -> R + Send + 'static,
+        {
+            let (task, handle) = task::joinable(BlockingTask::new(func));
+            let _ = self.handle.blocking_spawner.spawn(task, &self.handle);
+            handle
         }
 
         /// Run a future to completion on the Tokio runtime. This is the
