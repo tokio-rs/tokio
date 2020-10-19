@@ -393,6 +393,21 @@ cfg_rt! {
         where
             F: FnOnce() -> R + Send + 'static,
         {
+            #[cfg(feature = "tracing")]
+            let func = {
+                let span = tracing::trace_span!(
+                    target: "tokio::task",
+                    "task",
+                    kind = %"blocking",
+                    function = %std::any::type_name::<F>(),
+                );
+                move || {
+                    let _g = span.enter();
+                    func()
+                }
+            };
+
+
             let (task, handle) = task::joinable(BlockingTask::new(func));
             let _ = self.handle.blocking_spawner.spawn(task, &self.handle);
             handle
