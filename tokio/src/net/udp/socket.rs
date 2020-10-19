@@ -1,4 +1,4 @@
-use crate::io::PollEvented;
+use crate::io::{PollEvented, ReadBuf};
 use crate::net::{to_socket_addrs, ToSocketAddrs};
 
 use std::convert::TryFrom;
@@ -279,6 +279,10 @@ impl UdpSocket {
     /// The [`connect`] method will connect this socket to a remote address. The future
     /// will resolve to an error if the socket is not connected..
     ///
+    /// Note that on multiple calls to a `poll_*` method in the send direction, only the
+    /// `Waker` from the `Context` passed to the most recent call will be scheduled to
+    /// receive a wakeup.
+    ///
     /// # Return value
     ///
     /// The function returns:
@@ -343,6 +347,10 @@ impl UdpSocket {
     /// The [`connect`] method will connect this socket to a remote address. The future
     /// will resolve to an error if the socket is not connected..
     ///
+    /// Note that on multiple calls to a `poll_*` method in the recv direction, only the
+    /// `Waker` from the `Context` passed to the most recent call will be scheduled to
+    /// receive a wakeup.
+    ///
     /// # Return value
     ///
     /// The function returns:
@@ -356,15 +364,32 @@ impl UdpSocket {
     /// This function may encounter any standard I/O error except `WouldBlock`.
     ///
     /// [`connect`]: method@Self::connect
-    pub fn poll_recv(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
+    pub fn poll_recv(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<usize>> {
         loop {
             let ev = ready!(self.io.poll_read_ready(cx))?;
 
-            match self.io.get_ref().recv(buf) {
+            // Safety: will not read the maybe uinitialized bytes.
+            let b = unsafe {
+                &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
+            };
+            match self.io.get_ref().recv(b) {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     self.io.clear_readiness(ev);
                 }
-                x => return Poll::Ready(x),
+                Err(e) => return Poll::Ready(Err(e)),
+                Ok(n) => {
+                    // Safety: We trust `recv` to have filled up `n` bytes
+                    // in the buffer.
+                    unsafe {
+                        buf.assume_init(n);
+                    }
+                    buf.advance(n);
+                    return Poll::Ready(Ok(n));
+                }
             }
         }
     }
@@ -403,6 +428,10 @@ impl UdpSocket {
     }
 
     /// Attempts to send data on the socket to a given address.
+    ///
+    /// Note that on multiple calls to a `poll_*` method in the send direction, only the
+    /// `Waker` from the `Context` passed to the most recent call will be scheduled to
+    /// receive a wakeup.
     ///
     /// # Return value
     ///
@@ -501,6 +530,10 @@ impl UdpSocket {
 
     /// Attempts to receive a single datagram on the socket.
     ///
+    /// Note that on multiple calls to a `poll_*` method in the recv direction, only the
+    /// `Waker` from the `Context` passed to the most recent call will be scheduled to
+    /// receive a wakeup
+    ///
     /// # Return value
     ///
     /// The function returns:
@@ -515,16 +548,29 @@ impl UdpSocket {
     pub fn poll_recv_from(
         &self,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
+        buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<(usize, SocketAddr)>> {
         loop {
             let ev = ready!(self.io.poll_read_ready(cx))?;
 
-            match self.io.get_ref().recv_from(buf) {
+            // Safety: will not read the maybe uinitialized bytes.
+            let b = unsafe {
+                &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
+            };
+            match self.io.get_ref().recv_from(b) {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     self.io.clear_readiness(ev);
                 }
-                x => return Poll::Ready(x),
+                Err(e) => return Poll::Ready(Err(e)),
+                Ok((n, addr)) => {
+                    // Safety: We trust `recv` to have filled up `n` bytes
+                    // in the buffer.
+                    unsafe {
+                        buf.assume_init(n);
+                    }
+                    buf.advance(n);
+                    return Poll::Ready(Ok((n, addr)));
+                }
             }
         }
     }

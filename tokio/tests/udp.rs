@@ -3,7 +3,7 @@
 
 use futures::future::poll_fn;
 use std::sync::Arc;
-use tokio::net::UdpSocket;
+use tokio::{io::ReadBuf, net::UdpSocket};
 
 const MSG: &[u8] = b"hello";
 const MSG_LEN: usize = MSG.len();
@@ -36,9 +36,10 @@ async fn send_recv_poll() -> std::io::Result<()> {
     poll_fn(|cx| sender.poll_send(cx, MSG)).await?;
 
     let mut recv_buf = [0u8; 32];
-    let len = poll_fn(|cx| receiver.poll_recv(cx, &mut recv_buf[..])).await?;
+    let mut read = ReadBuf::new(&mut recv_buf);
+    let _len = poll_fn(|cx| receiver.poll_recv(cx, &mut read)).await?;
 
-    assert_eq!(&recv_buf[..len], MSG);
+    assert_eq!(read.filled(), MSG);
     Ok(())
 }
 
@@ -67,9 +68,10 @@ async fn send_to_recv_from_poll() -> std::io::Result<()> {
     poll_fn(|cx| sender.poll_send_to(cx, MSG, &receiver_addr)).await?;
 
     let mut recv_buf = [0u8; 32];
-    let (len, addr) = poll_fn(|cx| receiver.poll_recv_from(cx, &mut recv_buf[..])).await?;
+    let mut read = ReadBuf::new(&mut recv_buf);
+    let (_len, addr) = poll_fn(|cx| receiver.poll_recv_from(cx, &mut read)).await?;
 
-    assert_eq!(&recv_buf[..len], MSG);
+    assert_eq!(read.filled(), MSG);
     assert_eq!(addr, sender.local_addr()?);
     Ok(())
 }
@@ -140,19 +142,22 @@ async fn split_chan_poll() -> std::io::Result<()> {
     });
 
     tokio::spawn(async move {
-        let mut buf = [0u8; 32];
+        let mut recv_buf = [0u8; 32];
+        let mut read = ReadBuf::new(&mut recv_buf);
         loop {
-            let (len, addr) = poll_fn(|cx| r.poll_recv_from(cx, &mut buf)).await.unwrap();
-            tx.send((buf[..len].to_vec(), addr)).await.unwrap();
+            let (_len, addr) = poll_fn(|cx| r.poll_recv_from(cx, &mut read)).await.unwrap();
+            tx.send((read.filled().to_vec(), addr)).await.unwrap();
         }
     });
 
     // test that we can send a value and get back some response
     let sender = UdpSocket::bind("127.0.0.1:0").await?;
     poll_fn(|cx| sender.poll_send_to(cx, MSG, &addr)).await?;
+
     let mut recv_buf = [0u8; 32];
-    let (len, _) = poll_fn(|cx| sender.poll_recv_from(cx, &mut recv_buf)).await?;
-    assert_eq!(&recv_buf[..len], MSG);
+    let mut read = ReadBuf::new(&mut recv_buf);
+    let (_len, _) = poll_fn(|cx| sender.poll_recv_from(cx, &mut read)).await?;
+    assert_eq!(read.filled(), MSG);
     Ok(())
 }
 
