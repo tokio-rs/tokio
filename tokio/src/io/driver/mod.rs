@@ -203,7 +203,7 @@ impl Drop for Driver {
                 .is_ok()
             {
                 drop(inner);
-                /// we drop the arc first
+                // we drop the arc first
                 self.resources.for_each(|io| {
                     // If a task is waiting on the I/O resource, notify it. The task
                     // will then attempt to use the I/O resource and fail due to the
