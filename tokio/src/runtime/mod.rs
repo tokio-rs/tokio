@@ -132,7 +132,7 @@
 //!
 //! The current-thread scheduler provides a _single-threaded_ future executor.
 //! All tasks will be created and executed on the current thread. This requires
-//! the `rt-core` feature flag.
+//! the `rt` feature flag.
 //! ```
 //! use tokio::runtime;
 //!
