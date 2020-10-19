@@ -27,6 +27,9 @@ cfg_io_util! {
     mod copy;
     pub use copy::copy;
 
+    mod copy_buf;
+    pub use copy_buf::copy_buf;
+
     mod empty;
     pub use empty::{empty, Empty};
 
