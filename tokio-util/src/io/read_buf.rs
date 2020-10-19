@@ -5,9 +5,9 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::AsyncRead;
 
-/// Adapter function which implements the now deprecated
-/// `AsyncReadExt::read_buf` API to ease the process of moving projects to Tokio
-/// 0.3.x.
+/// Read data from an `AsyncRead` into an implementer of the [`Buf`] trait.
+///
+/// [`Buf`]: bytes::Buf
 ///
 /// # Example
 ///
