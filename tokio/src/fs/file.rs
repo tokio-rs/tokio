@@ -682,9 +682,8 @@ impl AsyncWrite for File {
         inner.poll_flush(cx)
     }
 
-    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        // Flush is a noop for files so it's fine not to call it.
-        Poll::Ready(Ok(()))
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        self.poll_flush(cx)
     }
 }
 
