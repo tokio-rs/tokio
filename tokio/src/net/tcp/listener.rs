@@ -198,28 +198,16 @@ impl TcpListener {
 
     /// Creates a new TCP listener from the standard library's TCP listener.
     ///
-    /// This method can be used when the `Handle::tcp_listen` method isn't
-    /// sufficient because perhaps some more configuration is needed in terms of
-    /// before the calls to `bind` and `listen`.
+    /// This function is intended to be used to wrap a TCP listener from the
+    /// standard library in the Tokio equivalent. The conversion assumes nothing
+    /// about the underlying listener; it is left up to the user to set it in
+    /// non-blocking mode.
     ///
     /// This API is typically paired with the `net2` crate and the `TcpBuilder`
     /// type to build up and customize a listener before it's shipped off to the
     /// backing event loop. This allows configuration of options like
     /// `SO_REUSEPORT`, binding to multiple addresses, etc.
     ///
-    /// The `addr` argument here is one of the addresses that `listener` is
-    /// bound to and the listener will only be guaranteed to accept connections
-    /// of the same address type currently.
-    ///
-    /// The platform specific behavior of this function looks like:
-    ///
-    /// * On Unix, the socket is placed into nonblocking mode and connections
-    ///   can be accepted as normal
-    ///
-    /// * On Windows, the address is stored internally and all future accepts
-    ///   will only be for the same IP version as `addr` specified. That is, if
-    ///   `addr` is an IPv4 address then all sockets accepted will be IPv4 as
-    ///   well (same for IPv6).
     ///
     /// # Examples
     ///
