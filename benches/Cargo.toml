@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 tokio = { version = "0.3.0", path = "../tokio", features = ["full"] }
+tokio-util = { version = "0.4.0", path = "../tokio-util", features = ["full"] }
 bencher = "0.1.5"
 
 [target.'cfg(unix)'.dependencies]
@@ -40,4 +41,9 @@ harness = false
 [[bench]]
 name = "signal"
 path = "signal.rs"
+harness = false
+
+[[bench]]
+name = "fs"
+path = "fs.rs"
 harness = false
