@@ -66,6 +66,8 @@ mod collect;
 use collect::Collect;
 pub use collect::FromStream;
 
+mod extend;
+pub use extend::extend;
 mod empty;
 pub use empty::{empty, Empty};
 
