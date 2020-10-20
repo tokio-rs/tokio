@@ -58,6 +58,7 @@ net = [
   "mio/uds",
 ]
 process = [
+  "bytes",
   "lazy_static",
   "libc",
   "mio/os-poll",
