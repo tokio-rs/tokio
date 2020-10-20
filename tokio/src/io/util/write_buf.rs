@@ -29,6 +29,7 @@ where
     WriteBuf {
         writer,
         buf,
+        #[pin]
         _pin: PhantomPinned,
     }
 }

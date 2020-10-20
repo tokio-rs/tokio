@@ -27,6 +27,7 @@ pin_project! {
     pub struct ReadBuf<'a, R, B> {
         reader: &'a mut R,
         buf: &'a mut B,
+        #[pin]
         _pin: PhantomPinned,
     }
 }
