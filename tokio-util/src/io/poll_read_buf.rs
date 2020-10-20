@@ -58,7 +58,25 @@ where
 
     let n = {
         let mut buf = ReadBuf::uninit(buf.bytes_mut());
+        let before = buf.filled().as_ptr();
+
         ready!(read.poll_read(cx, &mut buf)?);
+
+        // This prevents a malicious read implementation from swapping out the
+        // buffer being read, which would allow `filled` to be advanced without
+        // actually initializing the provided buffer.
+        //
+        // We avoid this by asserting that the `ReadBuf` instance wraps the same
+        // memory address both before and after the poll. Which will panic in
+        // case its swapped.
+        //
+        // See https://github.com/tokio-rs/tokio/issues/2827 for more info.
+        assert! {
+            std::ptr::eq(before, buf.filled().as_ptr()),
+            "Read buffer must not be changed during a read poll. \
+            See https://github.com/tokio-rs/tokio/issues/2827 for more info."
+        };
+
         buf.filled().len()
     };
 
