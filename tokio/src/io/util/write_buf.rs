@@ -15,6 +15,7 @@ pin_project! {
     pub struct WriteBuf<'a, W, B> {
         writer: &'a mut W,
         buf: &'a mut B,
+        #[pin]
         _pin: PhantomPinned,
     }
 }
@@ -29,7 +30,6 @@ where
     WriteBuf {
         writer,
         buf,
-        #[pin]
         _pin: PhantomPinned,
     }
 }
