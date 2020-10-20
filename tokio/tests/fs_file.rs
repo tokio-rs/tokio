@@ -38,6 +38,19 @@ async fn basic_write() {
 }
 
 #[tokio::test]
+async fn basic_write_and_shutdown() {
+    let tempfile = tempfile();
+
+    let mut file = File::create(tempfile.path()).await.unwrap();
+
+    file.write_all(HELLO).await.unwrap();
+    file.shutdown().await.unwrap();
+
+    let file = std::fs::read(tempfile.path()).unwrap();
+    assert_eq!(file, HELLO);
+}
+
+#[tokio::test]
 async fn coop() {
     let mut tempfile = tempfile();
     tempfile.write_all(HELLO).unwrap();
