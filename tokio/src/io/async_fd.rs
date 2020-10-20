@@ -51,7 +51,7 @@ use crate::util::slab;
 /// Because these functions don't create a future to hold their state, they have
 /// the limitation that only one task can wait on each direction (read or write)
 /// at a time.
-
+///
 /// [`readable`]: method@Self::readable
 /// [`writable`]: method@Self::writable
 /// [`ReadyGuard`]: struct@self::ReadyGuard
@@ -295,7 +295,16 @@ impl<T> AsyncFd<T> {
     }
 
     async fn readiness(&self, interest: mio::Interest) -> io::Result<ReadyGuard<'_, T>> {
-        let event = self.shared.readiness(interest).await;
+        let event = self.shared.readiness(interest);
+
+        if !self.handle.is_alive() {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "IO driver has terminated",
+            ));
+        }
+
+        let event = event.await;
         Ok(ReadyGuard {
             async_fd: self,
             event: Some(event),
