@@ -2,9 +2,9 @@
 
 use tokio::stream::StreamExt;
 
-use tokio_util::codec::{BytesCodec, FramedRead, /*FramedWrite*/};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
+use tokio_util::codec::{BytesCodec, FramedRead /*FramedWrite*/};
 
 use bencher::{benchmark_group, benchmark_main, Bencher};
 
@@ -18,66 +18,55 @@ fn rt() -> tokio::runtime::Runtime {
         .unwrap()
 }
 
-const BLOCK_COUNT:usize = 1_000;
+const BLOCK_COUNT: usize = 1_000;
 
-const BUFFER_SIZE:usize = 4096; 
-const DEV_ZERO: &'static str = "/dev/zero"; 
+const BUFFER_SIZE: usize = 4096;
+const DEV_ZERO: &'static str = "/dev/zero";
 
 fn async_read_codec(b: &mut Bencher) {
     let rt = rt();
 
     b.iter(|| {
+        let task = || async {
+            let file = File::open(DEV_ZERO).await.unwrap();
+            let mut input_stream = FramedRead::with_capacity(file, BytesCodec::new(), BUFFER_SIZE);
 
-        let task = || async { 
-                let file = File::open(DEV_ZERO)
-                    .await
-                    .unwrap();
-                let mut input_stream = FramedRead::with_capacity(file , BytesCodec::new(), BUFFER_SIZE);
+            for _i in 0..BLOCK_COUNT {
+                let _bytes = input_stream.next().await.unwrap();
+            }
+        };
 
-                for _i in 0 .. BLOCK_COUNT {
-                    let _bytes = input_stream.next()
-                        .await .unwrap();
-                }
-            };
-        
         rt.block_on(task());
     });
-
 }
 
 fn async_read(b: &mut Bencher) {
     let rt = rt();
 
     b.iter(|| {
-        let task = || async { 
-                let mut file = File::open(DEV_ZERO)
-                    .await
-                    .unwrap();
-                let mut buffer = [0u8; BUFFER_SIZE];
+        let task = || async {
+            let mut file = File::open(DEV_ZERO).await.unwrap();
+            let mut buffer = [0u8; BUFFER_SIZE];
 
-                for _i in 0 .. BLOCK_COUNT {
-                    let count = file.read(&mut buffer)
-                        .await
-                        .unwrap();
-                    if count == 0 { break; }
+            for _i in 0..BLOCK_COUNT {
+                let count = file.read(&mut buffer).await.unwrap();
+                if count == 0 {
+                    break;
                 }
-            };
+            }
+        };
 
-       
         rt.block_on(task());
     });
-
 }
 
 fn async_read_std_file(b: &mut Bencher) {
     let rt = rt();
-    
-    let task = || async { 
-        let mut file = tokio::task::block_in_place(||
-            Box::pin(StdFile::open(DEV_ZERO).unwrap())
-        );
 
-        for _i in 0 .. BLOCK_COUNT {
+    let task = || async {
+        let mut file = tokio::task::block_in_place(|| Box::pin(StdFile::open(DEV_ZERO).unwrap()));
+
+        for _i in 0..BLOCK_COUNT {
             let mut buffer = [0u8; BUFFER_SIZE];
             let mut file_ref = file.as_mut();
 
@@ -88,7 +77,6 @@ fn async_read_std_file(b: &mut Bencher) {
     };
 
     b.iter(|| {
-
         rt.block_on(task());
     });
 }
@@ -98,13 +86,18 @@ fn sync_read(b: &mut Bencher) {
         let mut file = StdFile::open(DEV_ZERO).unwrap();
         let mut buffer = [0u8; BUFFER_SIZE];
 
-        for _i in 0 .. BLOCK_COUNT {
-            file.read_exact(&mut buffer)
-                .unwrap();
+        for _i in 0..BLOCK_COUNT {
+            file.read_exact(&mut buffer).unwrap();
         }
     });
 }
 
-benchmark_group!(file, async_read_std_file, async_read, async_read_codec, sync_read);
+benchmark_group!(
+    file,
+    async_read_std_file,
+    async_read,
+    async_read_codec,
+    sync_read
+);
 
 benchmark_main!(file);
