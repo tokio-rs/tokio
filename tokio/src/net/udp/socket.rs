@@ -277,7 +277,7 @@ impl UdpSocket {
     /// `connect`ed.
     ///
     /// The [`connect`] method will connect this socket to a remote address. The future
-    /// will resolve to an error if the socket is not connected..
+    /// will resolve to an error if the socket is not connected.
     ///
     /// Note that on multiple calls to a `poll_*` method in the send direction, only the
     /// `Waker` from the `Context` passed to the most recent call will be scheduled to
@@ -345,7 +345,7 @@ impl UdpSocket {
     /// address to which it is `connect`ed.
     ///
     /// The [`connect`] method will connect this socket to a remote address. The future
-    /// will resolve to an error if the socket is not connected..
+    /// will resolve to an error if the socket is not connected.
     ///
     /// Note that on multiple calls to a `poll_*` method in the recv direction, only the
     /// `Waker` from the `Context` passed to the most recent call will be scheduled to
@@ -532,7 +532,7 @@ impl UdpSocket {
     ///
     /// Note that on multiple calls to a `poll_*` method in the recv direction, only the
     /// `Waker` from the `Context` passed to the most recent call will be scheduled to
-    /// receive a wakeup
+    /// receive a wakeup.
     ///
     /// # Return value
     ///
