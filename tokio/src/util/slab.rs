@@ -272,7 +272,9 @@ impl<T> Slab<T> {
     pub(crate) fn compact(&mut self) {
         // Iterate each page except the very first one. The very first page is
         // never freed.
-        for (idx, page) in (&self.pages[1..]).iter().enumerate() {
+        for (n, page) in (&self.pages[1..]).iter().enumerate() {
+            let idx = n + 1;
+
             if page.used.load(Relaxed) != 0 || !page.allocated.load(Relaxed) {
                 // If the page has slots in use or the memory has not been
                 // allocated then it cannot be compacted.
@@ -301,6 +303,8 @@ impl<T> Slab<T> {
 
             // Drop the lock so we can drop the vector outside the lock below.
             drop(slots);
+
+            debug_assert!(self.cached[idx].slots.is_null() || self.cached[idx].slots == vec.as_ptr());
 
             // Clear cache
             self.cached[idx].slots = ptr::null();
@@ -788,6 +792,43 @@ mod test {
             // The first page is never freed
             for addr in &addrs[PAGE_INITIAL_SIZE..] {
                 assert!(slab.get(*addr).is_none());
+            }
+        }
+    }
+
+    #[test]
+    fn issue_3014() {
+        let mut slab = Slab::<Foo>::new();
+        let alloc = slab.allocator();
+        let mut entries = vec![];
+
+        for _ in 0..5 {
+            entries.clear();
+
+            // Allocate a few pages + 1
+            for i in 0..(32 + 64 + 128 + 1) {
+                let (addr, val) = alloc.allocate().unwrap();
+                val.id.store(i, SeqCst);
+
+                entries.push((addr, val, i));
+            }
+
+            for (addr, val, i) in &entries {
+                assert_eq!(*i, val.id.load(SeqCst));
+                assert_eq!(*i, slab.get(*addr).unwrap().id.load(SeqCst));
+            }
+
+            // Release the last entry
+            entries.pop();
+
+            // Compact
+            slab.compact();
+
+            // Check all the addresses
+
+            for (addr, val, i) in &entries {
+                assert_eq!(*i, val.id.load(SeqCst));
+                assert_eq!(*i, slab.get(*addr).unwrap().id.load(SeqCst));
             }
         }
     }
