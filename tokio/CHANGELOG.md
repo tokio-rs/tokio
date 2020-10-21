@@ -1,6 +1,7 @@
 # 0.3.1 (October 21, 2020)
 
 ### Fixed
+- net: fix use-after-free (#3019).
 - fs: ensure buffered data is written on shutdown (#3009).
 
 ### Added
