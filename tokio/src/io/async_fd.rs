@@ -9,7 +9,9 @@ use crate::io::driver::{Direction, Handle, ReadyEvent, ScheduledIo};
 use crate::util::slab;
 
 /// Associates an IO object backed by a Unix file descriptor with the tokio
-/// reactor, allowing for readiness to be polled.
+/// reactor, allowing for readiness to be polled. The file descriptor must be of
+/// a type that can be used with the OS polling facilities (ie, `poll`, `epoll`,
+/// `kqueue`, etc), such as a network socket or pipe.
 ///
 /// Creating an AsyncFd registers the file descriptor with the current tokio
 /// Reactor, allowing you to directly await the file descriptor being readable
