@@ -291,8 +291,10 @@ impl Handle {
         self.inner.upgrade()
     }
 
-    pub(super) fn is_alive(&self) -> bool {
-        self.inner.strong_count() > 0
+    cfg_net_unix! {
+        pub(super) fn is_alive(&self) -> bool {
+            self.inner.strong_count() > 0
+        }
     }
 }
 
