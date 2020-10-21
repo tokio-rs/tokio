@@ -272,9 +272,7 @@ impl<T> Slab<T> {
     pub(crate) fn compact(&mut self) {
         // Iterate each page except the very first one. The very first page is
         // never freed.
-        for (n, page) in (&self.pages[1..]).iter().enumerate() {
-            let idx = n + 1;
-
+        for (idx, page) in self.pages.iter().enumerate().skip(1) {
             if page.used.load(Relaxed) != 0 || !page.allocated.load(Relaxed) {
                 // If the page has slots in use or the memory has not been
                 // allocated then it cannot be compacted.
@@ -306,7 +304,9 @@ impl<T> Slab<T> {
 
             debug_assert!(
                 self.cached[idx].slots.is_null() || self.cached[idx].slots == vec.as_ptr(),
-                "cached = {:?}; actual = {:?}", self.cached[idx].slots, vec.as_ptr(),
+                "cached = {:?}; actual = {:?}",
+                self.cached[idx].slots,
+                vec.as_ptr(),
             );
 
             // Clear cache
