@@ -1,5 +1,9 @@
 # 0.3.1 (October 21, 2020)
 
+This release fixes an use-after-free in the IO driver. Additionally, the `read_buf`
+and `write_buf` methods have been added back to the IO traits, as the bytes crate
+is now on track to reach version 1.0 together with Tokio.
+
 ### Fixed
 - net: fix use-after-free (#3019).
 - fs: ensure buffered data is written on shutdown (#3009).
