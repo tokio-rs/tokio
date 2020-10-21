@@ -266,6 +266,14 @@ impl<T> AsyncFd<T> {
     ) -> Poll<io::Result<ReadyGuard<'a, T>>> {
         let event = ready!(self.shared.poll_readiness(cx, Direction::Read));
 
+        if !self.handle.is_alive() {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "IO driver has terminated",
+            ))
+            .into();
+        }
+
         Ok(ReadyGuard {
             async_fd: self,
             event: Some(event),
@@ -286,6 +294,14 @@ impl<T> AsyncFd<T> {
         cx: &mut Context<'cx>,
     ) -> Poll<io::Result<ReadyGuard<'a, T>>> {
         let event = ready!(self.shared.poll_readiness(cx, Direction::Write));
+
+        if !self.handle.is_alive() {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "IO driver has terminated",
+            ))
+            .into();
+        }
 
         Ok(ReadyGuard {
             async_fd: self,
