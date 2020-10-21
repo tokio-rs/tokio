@@ -304,7 +304,10 @@ impl<T> Slab<T> {
             // Drop the lock so we can drop the vector outside the lock below.
             drop(slots);
 
-            debug_assert!(self.cached[idx].slots.is_null() || self.cached[idx].slots == vec.as_ptr());
+            debug_assert!(
+                self.cached[idx].slots.is_null() || self.cached[idx].slots == vec.as_ptr(),
+                "cached = {:?}; actual = {:?}", self.cached[idx].slots, vec.as_ptr(),
+            );
 
             // Clear cache
             self.cached[idx].slots = ptr::null();
@@ -492,8 +495,11 @@ impl<T> CachedPage<T> {
     /// Refresh the cache
     fn refresh(&mut self, page: &Page<T>) {
         let slots = page.slots.lock();
-        self.slots = slots.slots.as_ptr();
-        self.init = slots.slots.len();
+
+        if !slots.slots.is_empty() {
+            self.slots = slots.slots.as_ptr();
+            self.init = slots.slots.len();
+        }
     }
 
     // Get a value by index
