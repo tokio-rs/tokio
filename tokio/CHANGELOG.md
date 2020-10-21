@@ -1,3 +1,15 @@
+# 0.3.1 (October 21, 2020)
+
+### Fixed
+- fs: ensure buffered data is written on shutdown (#3009).
+
+### Added
+- io: `copy_buf()` (#2884).
+- io: `AsyncReadExt::read_buf()`, `AsyncReadExt::write_buf()` for working with
+  `Buf`/`BufMut` (#3003).
+- rt: `Runtime::spawn_blocking()` (#2980).
+- sync: `watch::Sender::is_closed()` (#2991).
+
 # 0.3.0 (October 15, 2020)
 
 This represents a 1.0 beta release. APIs are polished and future-proofed. APIs
