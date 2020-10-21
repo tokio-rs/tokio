@@ -1,3 +1,20 @@
+# 0.3.1 (October 21, 2020)
+
+This release fixes an use-after-free in the IO driver. Additionally, the `read_buf`
+and `write_buf` methods have been added back to the IO traits, as the bytes crate
+is now on track to reach version 1.0 together with Tokio.
+
+### Fixed
+- net: fix use-after-free (#3019).
+- fs: ensure buffered data is written on shutdown (#3009).
+
+### Added
+- io: `copy_buf()` (#2884).
+- io: `AsyncReadExt::read_buf()`, `AsyncReadExt::write_buf()` for working with
+  `Buf`/`BufMut` (#3003).
+- rt: `Runtime::spawn_blocking()` (#2980).
+- sync: `watch::Sender::is_closed()` (#2991).
+
 # 0.3.0 (October 15, 2020)
 
 This represents a 1.0 beta release. APIs are polished and future-proofed. APIs
