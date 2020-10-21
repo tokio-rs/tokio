@@ -405,8 +405,7 @@ const MAX_RECEIVERS: usize = usize::MAX >> 2;
 ///
 /// The `Sender` can be cloned to `send` to the same channel from multiple
 /// points in the process or it can be used concurrently from an `Arc`. New
-/// `Receiver` handles can be cloned from an existing `Receiver` or created by
-/// calling [`Sender::subscribe`].
+/// `Receiver` handles are created by calling [`Sender::subscribe`].
 ///
 /// If all [`Receiver`] handles are dropped, the `send` method will return a
 /// [`SendError`]. Similarly, if all [`Sender`] handles are dropped, the [`recv`]
@@ -982,13 +981,6 @@ impl<T: Clone> Receiver<T> {
     #[cfg_attr(docsrs, doc(cfg(feature = "stream")))]
     pub fn into_stream(self) -> impl Stream<Item = Result<T, RecvError>> {
         Recv::new(Borrow(self))
-    }
-}
-
-impl<T> Clone for Receiver<T> {
-    fn clone(&self) -> Self {
-        let shared = self.shared.clone();
-        new_receiver(shared)
     }
 }
 
