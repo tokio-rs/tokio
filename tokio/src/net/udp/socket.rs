@@ -356,7 +356,7 @@ impl UdpSocket {
     /// The function returns:
     ///
     /// * `Poll::Pending` if the socket is not ready to read
-    /// * `Poll::Ready(Ok(n))` `n` is the number of bytes read.
+    /// * `Poll::Ready(Ok(()))` reads data `ReadBuf` if the socket is ready
     /// * `Poll::Ready(Err(e))` if an error is encountered.
     ///
     /// # Errors
@@ -364,11 +364,7 @@ impl UdpSocket {
     /// This function may encounter any standard I/O error except `WouldBlock`.
     ///
     /// [`connect`]: method@Self::connect
-    pub fn poll_recv(
-        &self,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<io::Result<usize>> {
+    pub fn poll_recv(&self, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
         loop {
             let ev = ready!(self.io.poll_read_ready(cx))?;
 
@@ -388,7 +384,7 @@ impl UdpSocket {
                         buf.assume_init(n);
                     }
                     buf.advance(n);
-                    return Poll::Ready(Ok(n));
+                    return Poll::Ready(Ok(()));
                 }
             }
         }
@@ -539,7 +535,7 @@ impl UdpSocket {
     /// The function returns:
     ///
     /// * `Poll::Pending` if the socket is not ready to read
-    /// * `Poll::Ready(Ok((n, addr)))` a tuple where `n` is the number of bytes received from `addr`
+    /// * `Poll::Ready(Ok(addr))` reads data from `addr` into `ReadBuf` if the socket is ready
     /// * `Poll::Ready(Err(e))` if an error is encountered.
     ///
     /// # Errors
@@ -549,7 +545,7 @@ impl UdpSocket {
         &self,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
-    ) -> Poll<io::Result<(usize, SocketAddr)>> {
+    ) -> Poll<io::Result<SocketAddr>> {
         loop {
             let ev = ready!(self.io.poll_read_ready(cx))?;
 
@@ -569,7 +565,96 @@ impl UdpSocket {
                         buf.assume_init(n);
                     }
                     buf.advance(n);
-                    return Poll::Ready(Ok((n, addr)));
+                    return Poll::Ready(Ok(addr));
+                }
+            }
+        }
+    }
+
+    /// Receives data from the socket, without removing it from the input queue.
+    /// On success, returns the number of bytes read and the address from whence
+    /// the data came.
+    ///
+    /// # Notes
+    ///
+    /// On Windows, if the data is larger than the buffer specified, the buffer
+    /// is filled with the first part of the data, and peek_from returns the error
+    /// WSAEMSGSIZE(10040). The excess data is lost.
+    /// Make sure to always use a sufficiently large buffer to hold the
+    /// maximum UDP packet size, which can be up to 65536 bytes in size.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::UdpSocket;
+    /// # use std::{io, net::SocketAddr};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> io::Result<()> {
+    /// let sock = UdpSocket::bind("0.0.0.0:8080".parse::<SocketAddr>().unwrap()).await?;
+    /// let mut buf = [0u8; 32];
+    /// let (len, addr) = sock.peek_from(&mut buf).await?;
+    /// println!("peeked {:?} bytes from {:?}", len, addr);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn peek_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+        self.io
+            .async_io(mio::Interest::READABLE, |sock| sock.peek_from(buf))
+            .await
+    }
+
+    /// Receives data from the socket, without removing it from the input queue.
+    /// On success, returns the number of bytes read.
+    ///
+    /// # Notes
+    ///
+    /// Note that on multiple calls to a `poll_*` method in the recv direction, only the
+    /// `Waker` from the `Context` passed to the most recent call will be scheduled to
+    /// receive a wakeup
+    ///
+    /// On Windows, if the data is larger than the buffer specified, the buffer
+    /// is filled with the first part of the data, and peek returns the error
+    /// WSAEMSGSIZE(10040). The excess data is lost.
+    /// Make sure to always use a sufficiently large buffer to hold the
+    /// maximum UDP packet size, which can be up to 65536 bytes in size.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the socket is not ready to read
+    /// * `Poll::Ready(Ok(addr))` reads data from `addr` into `ReadBuf` if the socket is ready
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    pub fn poll_peek_from(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<SocketAddr>> {
+        loop {
+            let ev = ready!(self.io.poll_read_ready(cx))?;
+
+            // Safety: will not read the maybe uinitialized bytes.
+            let b = unsafe {
+                &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
+            };
+            match self.io.get_ref().peek_from(b) {
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    self.io.clear_readiness(ev);
+                }
+                Err(e) => return Poll::Ready(Err(e)),
+                Ok((n, addr)) => {
+                    // Safety: We trust `recv` to have filled up `n` bytes
+                    // in the buffer.
+                    unsafe {
+                        buf.assume_init(n);
+                    }
+                    buf.advance(n);
+                    return Poll::Ready(Ok(addr));
                 }
             }
         }

@@ -69,10 +69,66 @@ async fn send_to_recv_from_poll() -> std::io::Result<()> {
 
     let mut recv_buf = [0u8; 32];
     let mut read = ReadBuf::new(&mut recv_buf);
-    let (_len, addr) = poll_fn(|cx| receiver.poll_recv_from(cx, &mut read)).await?;
+    let addr = poll_fn(|cx| receiver.poll_recv_from(cx, &mut read)).await?;
 
     assert_eq!(read.filled(), MSG);
     assert_eq!(addr, sender.local_addr()?);
+    Ok(())
+}
+
+#[tokio::test]
+async fn send_to_peek_from() -> std::io::Result<()> {
+    let sender = UdpSocket::bind("127.0.0.1:0").await?;
+    let receiver = UdpSocket::bind("127.0.0.1:0").await?;
+
+    let receiver_addr = receiver.local_addr()?;
+    poll_fn(|cx| sender.poll_send_to(cx, MSG, &receiver_addr)).await?;
+
+    // peek
+    let mut recv_buf = [0u8; 32];
+    let (n, addr) = receiver.peek_from(&mut recv_buf).await?;
+    assert_eq!(&recv_buf[..n], MSG);
+    assert_eq!(addr, sender.local_addr()?);
+
+    // peek
+    let mut recv_buf = [0u8; 32];
+    let (n, addr) = receiver.peek_from(&mut recv_buf).await?;
+    assert_eq!(&recv_buf[..n], MSG);
+    assert_eq!(addr, sender.local_addr()?);
+
+    let mut recv_buf = [0u8; 32];
+    let (n, addr) = receiver.recv_from(&mut recv_buf).await?;
+    assert_eq!(&recv_buf[..n], MSG);
+    assert_eq!(addr, sender.local_addr()?);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn send_to_peek_from_poll() -> std::io::Result<()> {
+    let sender = UdpSocket::bind("127.0.0.1:0").await?;
+    let receiver = UdpSocket::bind("127.0.0.1:0").await?;
+
+    let receiver_addr = receiver.local_addr()?;
+    poll_fn(|cx| sender.poll_send_to(cx, MSG, &receiver_addr)).await?;
+
+    let mut recv_buf = [0u8; 32];
+    let mut read = ReadBuf::new(&mut recv_buf);
+    let addr = poll_fn(|cx| receiver.poll_peek_from(cx, &mut read)).await?;
+
+    assert_eq!(read.filled(), MSG);
+    assert_eq!(addr, sender.local_addr()?);
+
+    let mut recv_buf = [0u8; 32];
+    let mut read = ReadBuf::new(&mut recv_buf);
+    poll_fn(|cx| receiver.poll_peek_from(cx, &mut read)).await?;
+
+    assert_eq!(read.filled(), MSG);
+    let mut recv_buf = [0u8; 32];
+    let mut read = ReadBuf::new(&mut recv_buf);
+
+    poll_fn(|cx| receiver.poll_recv_from(cx, &mut read)).await?;
+    assert_eq!(read.filled(), MSG);
     Ok(())
 }
 
@@ -145,7 +201,7 @@ async fn split_chan_poll() -> std::io::Result<()> {
         let mut recv_buf = [0u8; 32];
         let mut read = ReadBuf::new(&mut recv_buf);
         loop {
-            let (_len, addr) = poll_fn(|cx| r.poll_recv_from(cx, &mut read)).await.unwrap();
+            let addr = poll_fn(|cx| r.poll_recv_from(cx, &mut read)).await.unwrap();
             tx.send((read.filled().to_vec(), addr)).await.unwrap();
         }
     });
@@ -156,7 +212,7 @@ async fn split_chan_poll() -> std::io::Result<()> {
 
     let mut recv_buf = [0u8; 32];
     let mut read = ReadBuf::new(&mut recv_buf);
-    let (_len, _) = poll_fn(|cx| sender.poll_recv_from(cx, &mut read)).await?;
+    let _ = poll_fn(|cx| sender.poll_recv_from(cx, &mut read)).await?;
     assert_eq!(read.filled(), MSG);
     Ok(())
 }
