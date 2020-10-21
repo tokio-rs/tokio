@@ -43,11 +43,12 @@ impl UnixStream {
         Ok(stream)
     }
 
-    /// Consumes a `UnixStream` in the standard library and returns a
-    /// nonblocking `UnixStream` from this crate.
+    /// Creates new `UnixStream` from a `std::os::unix::net::UnixStream`.
     ///
-    /// The returned stream will be associated with the given event loop
-    /// specified by `handle` and is ready to perform I/O.
+    /// This function is intended to be used to wrap a UnixStream from the
+    /// standard library in the Tokio equivalent. The conversion assumes
+    /// nothing about the underlying stream; it is left up to the user to set
+    /// it in non-blocking mode.
     ///
     /// # Panics
     ///

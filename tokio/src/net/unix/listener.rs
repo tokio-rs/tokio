@@ -68,11 +68,12 @@ impl UnixListener {
         Ok(UnixListener { io })
     }
 
-    /// Consumes a `UnixListener` in the standard library and returns a
-    /// nonblocking `UnixListener` from this crate.
+    /// Creates new `UnixListener` from a `std::os::unix::net::UnixListener `.
     ///
-    /// The returned listener will be associated with the given event loop
-    /// specified by `handle` and is ready to perform I/O.
+    /// This function is intended to be used to wrap a UnixListener from the
+    /// standard library in the Tokio equivalent. The conversion assumes
+    /// nothing about the underlying listener; it is left up to the user to set
+    /// it in non-blocking mode.
     ///
     /// # Panics
     ///

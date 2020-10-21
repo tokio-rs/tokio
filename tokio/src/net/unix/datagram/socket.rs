@@ -149,11 +149,12 @@ impl UnixDatagram {
         Ok((a, b))
     }
 
-    /// Consumes a `UnixDatagram` in the standard library and returns a
-    /// nonblocking `UnixDatagram` from this crate.
+    /// Creates new `UnixDatagram` from a `std::os::unix::net::UnixDatagram`.
     ///
-    /// The returned datagram will be associated with the given event loop
-    /// specified by `handle` and is ready to perform I/O.
+    /// This function is intended to be used to wrap a UnixDatagram from the
+    /// standard library in the Tokio equivalent. The conversion assumes
+    /// nothing about the underlying datagram; it is left up to the user to set
+    /// it in non-blocking mode.
     ///
     /// # Panics
     ///

@@ -145,8 +145,10 @@ impl TcpStream {
 
     /// Creates new `TcpStream` from a `std::net::TcpStream`.
     ///
-    /// This function will convert a TCP stream created by the standard library
-    /// to a TCP stream ready to be used with the provided event loop handle.
+    /// This function is intended to be used to wrap a TCP stream from the
+    /// standard library in the Tokio equivalent. The conversion assumes nothing
+    /// about the underlying stream; it is left up to the user to set it in
+    /// non-blocking mode.
     ///
     /// # Examples
     ///
