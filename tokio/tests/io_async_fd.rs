@@ -51,7 +51,7 @@ impl TestWaker {
         self.inner.awoken.swap(false, Ordering::SeqCst)
     }
 
-    fn context<'a>(&'a self) -> Context<'a> {
+    fn context(&self) -> Context<'_> {
         Context::from_waker(&self.waker)
     }
 }
@@ -226,7 +226,7 @@ async fn reset_readable() {
 
 #[tokio::test]
 async fn reset_writable() {
-    let (a, mut b) = socketpair();
+    let (a, b) = socketpair();
 
     let afd_a = AsyncFd::new(a).unwrap();
 
@@ -250,7 +250,7 @@ async fn reset_writable() {
     }
 
     // Read from the other side; we should become writable now.
-    drain(&mut b);
+    drain(&b);
 
     let _ = writable.await.unwrap();
 }
