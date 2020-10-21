@@ -16,8 +16,9 @@ use std::task::{Context, Poll};
 /// the following:
 ///
 /// * `Poll::Ready(Ok(()))` means that data was immediately read and placed into
-///   the output buffer. If no data was read (`buf.filled().is_empty()`) it
-///   implies that EOF has been reached.
+///   the output buffer. The amount of data read can be determined by the
+///   increase in the length of the slice returned by `ReadBuf::filled`. If the
+///   difference is 0, EOF has been reached.
 ///
 /// * `Poll::Pending` means that no data was read into the buffer
 ///   provided. The I/O object is not currently readable but may become readable
