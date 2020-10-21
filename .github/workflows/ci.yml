@@ -112,6 +112,21 @@ jobs:
       - name: miri
         run: cargo miri test --features rt,rt-multi-thread,sync task
         working-directory: tokio
+  san:
+    name: san
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.nightly }}
+          override: true
+      - name: asan
+        run: cargo test --all-features --target x86_64-unknown-linux-gnu --lib -- --test-threads 1
+        working-directory: tokio
+        env:
+          RUSTFLAGS: -Z sanitizer=address
+          ASAN_OPTIONS: detect_leaks=0
 
   cross:
     name: cross
