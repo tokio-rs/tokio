@@ -1,3 +1,5 @@
+use crate::runtime::blocking::task::BlockingTask;
+use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{blocking, driver, Spawner};
 
 /// Handle to the runtime.
@@ -36,4 +38,27 @@ impl Handle {
     // {
     //     context::enter(self.clone(), f)
     // }
+
+    /// Run the provided function on an executor dedicated to blocking operations.
+    pub(crate) fn spawn_blocking<F, R>(&self, func: F) -> JoinHandle<R>
+    where
+        F: FnOnce() -> R + Send + 'static,
+    {
+        #[cfg(feature = "tracing")]
+        let func = {
+            let span = tracing::trace_span!(
+                target: "tokio::task",
+                "task",
+                kind = %"blocking",
+                function = %std::any::type_name::<F>(),
+            );
+            move || {
+                let _g = span.enter();
+                func()
+            }
+        };
+        let (task, handle) = task::joinable(BlockingTask::new(func));
+        let _ = self.blocking_spawner.spawn(task, &self);
+        handle
+    }
 }
