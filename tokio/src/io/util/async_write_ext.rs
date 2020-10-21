@@ -135,7 +135,7 @@ cfg_io_util! {
         /// internal cursor is advanced by the number of bytes written. A
         /// subsequent call to `write_buf` using the **same** `buf` value will
         /// resume from the point that the first call to `write_buf` completed.
-        /// A call to `write` represents *at most one* attempt to write to any
+        /// A call to `write_buf` represents *at most one* attempt to write to any
         /// wrapped object.
         ///
         /// # Return
