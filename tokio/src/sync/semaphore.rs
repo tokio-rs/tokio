@@ -123,7 +123,7 @@ impl Semaphore {
     pub async fn acquire_owned(self: Arc<Self>) -> OwnedSemaphorePermit {
         self.ll_sem.acquire(1).await.unwrap();
         OwnedSemaphorePermit {
-            sem: self.clone(),
+            sem: self,
             permits: 1,
         }
     }
@@ -136,7 +136,7 @@ impl Semaphore {
     pub fn try_acquire_owned(self: Arc<Self>) -> Result<OwnedSemaphorePermit, TryAcquireError> {
         match self.ll_sem.try_acquire(1) {
             Ok(_) => Ok(OwnedSemaphorePermit {
-                sem: self.clone(),
+                sem: self,
                 permits: 1,
             }),
             Err(_) => Err(TryAcquireError(())),
