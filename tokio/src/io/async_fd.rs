@@ -78,9 +78,7 @@ impl<T: std::fmt::Debug> std::fmt::Debug for AsyncFd<T> {
     }
 }
 
-const fn all_interest() -> mio::Interest {
-    mio::Interest::READABLE.add(mio::Interest::WRITABLE)
-}
+const ALL_INTEREST: mio::Interest = mio::Interest::READABLE.add(mio::Interest::WRITABLE);
 
 /// Represents an IO-ready event detected on a particular file descriptor, which
 /// has not yet been acknowledged. This is a `must_use` structure to help ensure
@@ -93,7 +91,7 @@ pub struct ReadyGuard<'a, T> {
 
 impl<'a, T: std::fmt::Debug> std::fmt::Debug for ReadyGuard<'a, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ClearReady")
+        f.debug_struct("ReadyGuard")
             .field("async_fd", self.async_fd)
             .finish()
     }
@@ -218,7 +216,7 @@ impl<T> AsyncFd<T> {
 
     pub(crate) fn new_with_handle(inner: T, fd: RawFd, handle: Handle) -> io::Result<Self> {
         let shared = if let Some(inner) = handle.inner() {
-            inner.add_source(&mut SourceFd(&fd), all_interest())?
+            inner.add_source(&mut SourceFd(&fd), ALL_INTEREST)?
         } else {
             return Err(io::Error::new(
                 io::ErrorKind::Other,
