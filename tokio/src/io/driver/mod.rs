@@ -202,14 +202,14 @@ impl Drop for Inner {
     fn drop(&mut self) {
         let resources = self.resources.lock().take();
 
-        resources.map(|mut slab| {
+        if let Some(mut slab) = resources {
             slab.for_each(|io| {
                 // If a task is waiting on the I/O resource, notify it. The task
                 // will then attempt to use the I/O resource and fail due to the
                 // driver being shutdown.
                 io.shutdown();
-            })
-        });
+            });
+        }
     }
 }
 

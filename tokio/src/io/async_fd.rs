@@ -258,6 +258,10 @@ impl<T> AsyncFd<T> {
     /// This function is intended for cases where creating and pinning a future
     /// via [`readable`] is not feasible. Where possible, using [`readable`] is
     /// preferred, as this supports polling from multiple tasks at once.
+    ///
+    /// [`poll_read_ready`]: method@self::poll_read_ready
+    /// [`poll_write_ready`]: method@self::poll_write_ready
+    /// [`readable`]: method@self::readable
     pub fn poll_read_ready<'a, 'cx>(
         &'a self,
         cx: &mut Context<'cx>,
@@ -287,6 +291,10 @@ impl<T> AsyncFd<T> {
     /// This function is intended for cases where creating and pinning a future
     /// via [`writable`] is not feasible. Where possible, using [`writable`] is
     /// preferred, as this supports polling from multiple tasks at once.
+    ///
+    /// [`poll_read_ready`]: method@self::poll_read_ready
+    /// [`poll_write_ready`]: method@self::poll_write_ready
+    /// [`writable`]: method@self::writable
     pub fn poll_write_ready<'a, 'cx>(
         &'a self,
         cx: &mut Context<'cx>,
