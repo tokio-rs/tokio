@@ -1,5 +1,5 @@
 use crate::stream::{Stream, StreamExt};
-use std::marker::Unpin;
+use std::{iter::Extend, marker::Unpin};
 /// Extends a slice from a Stream
 /// # Example
 /// `rust,no_run`
@@ -10,11 +10,12 @@ use std::marker::Unpin;
 ///
 /// stream::extend(&mut buff, s).await;
 /// assert_eq!(vec![-2, 0, 2, 4, 6], buff);
-pub async fn extend<T, S>(buff: &mut Vec<T>, mut b: S)
+pub async fn extend<E, S, T>(buff: &mut E, mut b: S)
 where
     S: Stream<Item = T> + Unpin,
+    E: Extend<T>,
 {
     while let Some(item) = b.next().await {
-        buff.push(item)
+        buff.extend(std::iter::once(item))
     }
 }
