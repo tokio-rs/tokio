@@ -218,7 +218,10 @@ cfg_io_driver! {
 cfg_net_unix! {
     mod async_fd;
 
-    pub use self::async_fd::{AsyncFd, ReadyGuard};
+    pub mod unix {
+        //! Asynchronous IO structures specific to Unix-like operating systems.
+        pub use super::async_fd::{AsyncFd, ReadyGuard};
+    }
 }
 
 cfg_io_std! {

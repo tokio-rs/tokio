@@ -25,6 +25,11 @@ use crate::util::slab;
 /// The [`AsyncFd::into_inner`] function can be used to extract the inner object
 /// to retake control from the tokio IO reactor.
 ///
+/// The inner object is required to implement [`AsRawFd`]. This file descriptor
+/// must not change while [`AsyncFd`] owns the inner object. Changing the file
+/// descriptor results in unspecified behavior in the IO driver, which may
+/// include breaking notifications for other sockets/etc.
+///
 /// Polling for readiness is done by calling the async functions [`readable`]
 /// and [`writable`]. These functions complete when the associated readiness
 /// condition is observed. Any number of tasks can query the same `AsyncFd` in
@@ -58,23 +63,21 @@ use crate::util::slab;
 /// [`writable`]: method@Self::writable
 /// [`ReadyGuard`]: struct@self::ReadyGuard
 /// [`TcpStream::poll_read_ready`]: struct@crate::net::TcpStream
-pub struct AsyncFd<T> {
+pub struct AsyncFd<T: AsRawFd> {
     handle: Handle,
-    fd: RawFd,
     shared: slab::Ref<ScheduledIo>,
     inner: Option<T>,
 }
 
-impl<T> AsRawFd for AsyncFd<T> {
+impl<T: AsRawFd> AsRawFd for AsyncFd<T> {
     fn as_raw_fd(&self) -> RawFd {
-        self.fd
+        self.inner.as_ref().unwrap().as_raw_fd()
     }
 }
 
-impl<T: std::fmt::Debug> std::fmt::Debug for AsyncFd<T> {
+impl<T: std::fmt::Debug + AsRawFd> std::fmt::Debug for AsyncFd<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AsyncFd")
-            .field("fd", &self.fd)
             .field("inner", &self.inner)
             .finish()
     }
@@ -86,20 +89,20 @@ const ALL_INTEREST: mio::Interest = mio::Interest::READABLE.add(mio::Interest::W
 /// has not yet been acknowledged. This is a `must_use` structure to help ensure
 /// that you do not forget to explicitly clear (or not clear) the event.
 #[must_use = "You must explicitly choose whether to clear the readiness state by calling a method on ReadyGuard"]
-pub struct ReadyGuard<'a, T> {
+pub struct ReadyGuard<'a, T: AsRawFd> {
     async_fd: &'a AsyncFd<T>,
     event: Option<ReadyEvent>,
 }
 
-impl<'a, T: std::fmt::Debug> std::fmt::Debug for ReadyGuard<'a, T> {
+impl<'a, T: std::fmt::Debug + AsRawFd> std::fmt::Debug for ReadyGuard<'a, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ReadyGuard")
-            .field("async_fd", self.async_fd)
+            .field("async_fd", &self.async_fd)
             .finish()
     }
 }
 
-impl<'a, T> ReadyGuard<'a, T> {
+impl<'a, Inner: AsRawFd> ReadyGuard<'a, Inner> {
     /// Indicates to tokio that the file descriptor is no longer ready. The
     /// internal readiness flag will be cleared, and tokio will wait for the
     /// next edge-triggered readiness notification from the OS.
@@ -137,26 +140,12 @@ impl<'a, T> ReadyGuard<'a, T> {
     /// create this `ReadyGuard`.
     ///
     /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
-    pub fn with_io<R, E>(&mut self, f: impl FnOnce() -> Result<R, E>) -> Result<R, E>
-    where
-        E: std::error::Error + 'static,
-    {
-        use std::error::Error;
-
+    pub fn with_io<R>(&mut self, f: impl FnOnce() -> io::Result<R>) -> io::Result<R> {
         let result = f();
 
         if let Err(e) = result.as_ref() {
-            // Is this a WouldBlock error?
-            let mut error_ref: Option<&(dyn Error + 'static)> = Some(e);
-
-            while let Some(current) = error_ref {
-                if let Some(e) = Error::downcast_ref::<std::io::Error>(current) {
-                    if e.kind() == std::io::ErrorKind::WouldBlock {
-                        self.clear_ready();
-                        break;
-                    }
-                }
-                error_ref = current.source();
+            if e.kind() == io::ErrorKind::WouldBlock {
+                self.clear_ready();
             }
         }
 
@@ -186,15 +175,18 @@ impl<'a, T> ReadyGuard<'a, T> {
     }
 }
 
-impl<T> Drop for AsyncFd<T> {
+impl<T: AsRawFd> Drop for AsyncFd<T> {
     fn drop(&mut self) {
-        if let Some(inner) = self.handle.inner() {
-            let _ = inner.deregister_source(&mut SourceFd(&self.fd));
+        if let Some(driver) = self.handle.inner() {
+            if let Some(inner) = self.inner.as_ref() {
+                let fd = inner.as_raw_fd();
+                let _ = driver.deregister_source(&mut SourceFd(&fd));
+            }
         }
     }
 }
 
-impl<T> AsyncFd<T> {
+impl<T: AsRawFd> AsyncFd<T> {
     /// Creates an AsyncFd backed by (and taking ownership of) an object
     /// implementing [`AsRawFd`]. The backing file descriptor is cached at the
     /// time of creation.
@@ -204,19 +196,12 @@ impl<T> AsyncFd<T> {
     where
         T: AsRawFd,
     {
+        Self::new_with_handle(inner, Handle::current())
+    }
+
+    pub(crate) fn new_with_handle(inner: T, handle: Handle) -> io::Result<Self> {
         let fd = inner.as_raw_fd();
-        Self::new_with_fd(inner, fd)
-    }
 
-    /// Constructs a new AsyncFd, explicitly specifying the backing file
-    /// descriptor.
-    ///
-    /// This function must be called in the context of a tokio runtime.
-    pub fn new_with_fd(inner: T, fd: RawFd) -> io::Result<Self> {
-        Self::new_with_handle(inner, fd, Handle::current())
-    }
-
-    pub(crate) fn new_with_handle(inner: T, fd: RawFd, handle: Handle) -> io::Result<Self> {
         let shared = if let Some(inner) = handle.inner() {
             inner.add_source(&mut SourceFd(&fd), ALL_INTEREST)?
         } else {
@@ -228,7 +213,6 @@ impl<T> AsyncFd<T> {
 
         Ok(AsyncFd {
             handle,
-            fd,
             shared,
             inner: Some(inner),
         })
@@ -236,13 +220,13 @@ impl<T> AsyncFd<T> {
 
     /// Returns a shared reference to the backing object of this [`AsyncFd`]
     #[inline]
-    pub fn inner(&self) -> &T {
+    pub fn get_ref(&self) -> &T {
         self.inner.as_ref().unwrap()
     }
 
     /// Returns a mutable reference to the backing object of this [`AsyncFd`]
     #[inline]
-    pub fn inner_mut(&mut self) -> &mut T {
+    pub fn get_mut(&mut self) -> &mut T {
         self.inner.as_mut().unwrap()
     }
 
@@ -264,9 +248,9 @@ impl<T> AsyncFd<T> {
     /// [`poll_read_ready`]: method@Self::poll_read_ready
     /// [`poll_write_ready`]: method@Self::poll_write_ready
     /// [`readable`]: method@Self::readable
-    pub fn poll_read_ready<'a, 'cx>(
+    pub fn poll_read_ready<'a>(
         &'a self,
-        cx: &mut Context<'cx>,
+        cx: &mut Context<'_>,
     ) -> Poll<io::Result<ReadyGuard<'a, T>>> {
         let event = ready!(self.shared.poll_readiness(cx, Direction::Read));
 
@@ -297,9 +281,9 @@ impl<T> AsyncFd<T> {
     /// [`poll_read_ready`]: method@Self::poll_read_ready
     /// [`poll_write_ready`]: method@Self::poll_write_ready
     /// [`writable`]: method@Self::writable
-    pub fn poll_write_ready<'a, 'cx>(
+    pub fn poll_write_ready<'a>(
         &'a self,
-        cx: &mut Context<'cx>,
+        cx: &mut Context<'_>,
     ) -> Poll<io::Result<ReadyGuard<'a, T>>> {
         let event = ready!(self.shared.poll_readiness(cx, Direction::Write));
 

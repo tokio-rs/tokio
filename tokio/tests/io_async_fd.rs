@@ -18,7 +18,7 @@ use nix::unistd::{close, read, write};
 
 use futures::{poll, FutureExt};
 
-use tokio::io::{AsyncFd, ReadyGuard};
+use tokio::io::unix::{AsyncFd, ReadyGuard};
 use tokio_test::{assert_err, assert_pending};
 
 struct TestWaker {
@@ -201,7 +201,7 @@ async fn reset_readable() {
 
     let mut guard = readable.await.unwrap();
 
-    guard.with_io(|| afd_a.inner().read(&mut [0])).unwrap();
+    guard.with_io(|| afd_a.get_ref().read(&mut [0])).unwrap();
 
     // `a` is not readable, but the reactor still thinks it is
     // (because we have not observed a not-ready error yet)
@@ -234,7 +234,7 @@ async fn reset_writable() {
 
     // Write until we get a WouldBlock. This also clears the ready state.
     loop {
-        if let Err(e) = guard.with_io(|| afd_a.inner().write(&[0; 512][..])) {
+        if let Err(e) = guard.with_io(|| afd_a.get_ref().write(&[0; 512][..])) {
             assert_eq!(ErrorKind::WouldBlock, e.kind());
             break;
         }
@@ -253,6 +253,14 @@ async fn reset_writable() {
     drain(&b);
 
     let _ = writable.await.unwrap();
+}
+
+#[derive(Debug)]
+struct ArcFd<T>(Arc<T>);
+impl<T: AsRawFd> AsRawFd for ArcFd<T> {
+    fn as_raw_fd(&self) -> RawFd {
+        self.0.as_raw_fd()
+    }
 }
 
 #[tokio::test]
@@ -283,7 +291,8 @@ async fn drop_closes() {
 
     // Drop closure behavior is delegated to the inner object
     let (a, mut b) = socketpair();
-    let afd_a = AsyncFd::new_with_fd((), a.fd).unwrap();
+    let arc_fd = Arc::new(a);
+    let afd_a = AsyncFd::new(ArcFd(arc_fd.clone())).unwrap();
     std::mem::drop(afd_a);
 
     assert_eq!(
@@ -304,7 +313,7 @@ async fn with_poll() {
 
     let mut guard = afd_a.readable().await.unwrap();
 
-    afd_a.inner().read_exact(&mut [0]).unwrap();
+    afd_a.get_ref().read_exact(&mut [0]).unwrap();
 
     // Should not clear the readable state
     let _ = guard.with_poll(|| Poll::Ready(()));
@@ -383,7 +392,7 @@ async fn poll_fns() {
     let afd_b = Arc::new(AsyncFd::new(b).unwrap());
 
     // Fill up the write side of A
-    while afd_a.inner().write(&[0; 512]).is_ok() {}
+    while afd_a.get_ref().write(&[0; 512]).is_ok() {}
 
     let waker = TestWaker::new();
 
@@ -429,7 +438,7 @@ async fn poll_fns() {
     }
 
     // Make A readable. We expect that 'readable' and 'read_fut' will both complete quickly
-    afd_b.inner().write_all(b"0").unwrap();
+    afd_b.get_ref().write_all(b"0").unwrap();
 
     let _ = tokio::join!(readable, read_fut);
 
@@ -443,7 +452,7 @@ async fn poll_fns() {
     }
 
     // Make it writable now
-    drain(afd_b.inner());
+    drain(afd_b.get_ref());
 
     // now we should be writable (ie - the waker for poll_write should still be registered after we wake the read side)
     let _ = write_fut.await;
@@ -524,11 +533,11 @@ fn driver_shutdown_wakes_pending_race() {
     }
 }
 
-async fn poll_readable<T>(fd: &AsyncFd<T>) -> std::io::Result<ReadyGuard<'_, T>> {
+async fn poll_readable<T: AsRawFd>(fd: &AsyncFd<T>) -> std::io::Result<ReadyGuard<'_, T>> {
     futures::future::poll_fn(|cx| fd.poll_read_ready(cx)).await
 }
 
-async fn poll_writable<T>(fd: &AsyncFd<T>) -> std::io::Result<ReadyGuard<'_, T>> {
+async fn poll_writable<T: AsRawFd>(fd: &AsyncFd<T>) -> std::io::Result<ReadyGuard<'_, T>> {
     futures::future::poll_fn(|cx| fd.poll_write_ready(cx)).await
 }
 
@@ -542,7 +551,7 @@ fn driver_shutdown_wakes_currently_pending_polls() {
         AsyncFd::new(a).unwrap()
     };
 
-    while afd_a.inner().write(&[0; 512]).is_ok() {} // make not writable
+    while afd_a.get_ref().write(&[0; 512]).is_ok() {} // make not writable
 
     let readable = assert_pending(poll_readable(&afd_a));
     let writable = assert_pending(poll_writable(&afd_a));
@@ -582,7 +591,7 @@ fn driver_shutdown_wakes_poll_race() {
             AsyncFd::new(a).unwrap()
         };
 
-        while afd_a.inner().write(&[0; 512]).is_ok() {} // make not writable
+        while afd_a.get_ref().write(&[0; 512]).is_ok() {} // make not writable
 
         let _ = std::thread::spawn(move || std::mem::drop(rt));
 
