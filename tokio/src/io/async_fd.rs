@@ -45,9 +45,9 @@ use crate::util::slab;
 ///
 /// This however does mean that it is critical to ensure that this ready flag is
 /// cleared when (and only when) the file descriptor ceases to be ready. The
-/// [`ReadyGuard`] returned from readiness checking functions serves this
+/// [`AsyncFdReadyGuard`] returned from readiness checking functions serves this
 /// function; after calling a readiness-checking async function, you must use
-/// this [`ReadyGuard`] to signal to tokio whether the file descriptor is no
+/// this [`AsyncFdReadyGuard`] to signal to tokio whether the file descriptor is no
 /// longer in a ready state.
 ///
 /// ## Use with to a poll-based API
@@ -61,7 +61,7 @@ use crate::util::slab;
 ///
 /// [`readable`]: method@Self::readable
 /// [`writable`]: method@Self::writable
-/// [`ReadyGuard`]: struct@self::ReadyGuard
+/// [`AsyncFdReadyGuard`]: struct@self::AsyncFdReadyGuard
 /// [`TcpStream::poll_read_ready`]: struct@crate::net::TcpStream
 pub struct AsyncFd<T: AsRawFd> {
     handle: Handle,
@@ -89,12 +89,12 @@ const ALL_INTEREST: mio::Interest = mio::Interest::READABLE.add(mio::Interest::W
 /// has not yet been acknowledged. This is a `must_use` structure to help ensure
 /// that you do not forget to explicitly clear (or not clear) the event.
 #[must_use = "You must explicitly choose whether to clear the readiness state by calling a method on ReadyGuard"]
-pub struct ReadyGuard<'a, T: AsRawFd> {
+pub struct AsyncFdReadyGuard<'a, T: AsRawFd> {
     async_fd: &'a AsyncFd<T>,
     event: Option<ReadyEvent>,
 }
 
-impl<'a, T: std::fmt::Debug + AsRawFd> std::fmt::Debug for ReadyGuard<'a, T> {
+impl<'a, T: std::fmt::Debug + AsRawFd> std::fmt::Debug for AsyncFdReadyGuard<'a, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ReadyGuard")
             .field("async_fd", &self.async_fd)
@@ -102,7 +102,7 @@ impl<'a, T: std::fmt::Debug + AsRawFd> std::fmt::Debug for ReadyGuard<'a, T> {
     }
 }
 
-impl<'a, Inner: AsRawFd> ReadyGuard<'a, Inner> {
+impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// Indicates to tokio that the file descriptor is no longer ready. The
     /// internal readiness flag will be cleared, and tokio will wait for the
     /// next edge-triggered readiness notification from the OS.
@@ -123,7 +123,7 @@ impl<'a, Inner: AsRawFd> ReadyGuard<'a, Inner> {
     /// ready flag asserted.
     ///
     /// While this function is itself a no-op, it satisfies the `#[must_use]`
-    /// constraint on the [`ReadyGuard`] type.
+    /// constraint on the [`AsyncFdReadyGuard`] type.
     pub fn retain_ready(&mut self) {
         // no-op
     }
@@ -136,8 +136,8 @@ impl<'a, Inner: AsRawFd> ReadyGuard<'a, Inner> {
     /// clearing the tokio-side state only when a [`WouldBlock`] condition
     /// occurs. It is the responsibility of the caller to ensure that `f`
     /// returns [`WouldBlock`] only if the file descriptor that originated this
-    /// `ReadyGuard` no longer expresses the readiness state that was queried to
-    /// create this `ReadyGuard`.
+    /// `AsyncFdReadyGuard` no longer expresses the readiness state that was queried to
+    /// create this `AsyncFdReadyGuard`.
     ///
     /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
     pub fn with_io<R>(&mut self, f: impl FnOnce() -> io::Result<R>) -> io::Result<R> {
@@ -160,8 +160,8 @@ impl<'a, Inner: AsRawFd> ReadyGuard<'a, Inner> {
     /// clearing the tokio-side state only when a [`Pending`] condition occurs.
     /// It is the responsibility of the caller to ensure that `f` returns
     /// [`Pending`] only if the file descriptor that originated this
-    /// `ReadyGuard` no longer expresses the readiness state that was queried to
-    /// create this `ReadyGuard`.
+    /// `AsyncFdReadyGuard` no longer expresses the readiness state that was queried to
+    /// create this `AsyncFdReadyGuard`.
     ///
     /// [`Pending`]: std::task::Poll::Pending
     pub fn with_poll<R>(&mut self, f: impl FnOnce() -> std::task::Poll<R>) -> std::task::Poll<R> {
@@ -251,7 +251,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     pub fn poll_read_ready<'a>(
         &'a self,
         cx: &mut Context<'_>,
-    ) -> Poll<io::Result<ReadyGuard<'a, T>>> {
+    ) -> Poll<io::Result<AsyncFdReadyGuard<'a, T>>> {
         let event = ready!(self.shared.poll_readiness(cx, Direction::Read));
 
         if !self.handle.is_alive() {
@@ -262,7 +262,7 @@ impl<T: AsRawFd> AsyncFd<T> {
             .into();
         }
 
-        Ok(ReadyGuard {
+        Ok(AsyncFdReadyGuard {
             async_fd: self,
             event: Some(event),
         })
@@ -284,7 +284,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     pub fn poll_write_ready<'a>(
         &'a self,
         cx: &mut Context<'_>,
-    ) -> Poll<io::Result<ReadyGuard<'a, T>>> {
+    ) -> Poll<io::Result<AsyncFdReadyGuard<'a, T>>> {
         let event = ready!(self.shared.poll_readiness(cx, Direction::Write));
 
         if !self.handle.is_alive() {
@@ -295,14 +295,14 @@ impl<T: AsRawFd> AsyncFd<T> {
             .into();
         }
 
-        Ok(ReadyGuard {
+        Ok(AsyncFdReadyGuard {
             async_fd: self,
             event: Some(event),
         })
         .into()
     }
 
-    async fn readiness(&self, interest: mio::Interest) -> io::Result<ReadyGuard<'_, T>> {
+    async fn readiness(&self, interest: mio::Interest) -> io::Result<AsyncFdReadyGuard<'_, T>> {
         let event = self.shared.readiness(interest);
 
         if !self.handle.is_alive() {
@@ -313,25 +313,25 @@ impl<T: AsRawFd> AsyncFd<T> {
         }
 
         let event = event.await;
-        Ok(ReadyGuard {
+        Ok(AsyncFdReadyGuard {
             async_fd: self,
             event: Some(event),
         })
     }
 
     /// Waits for the file descriptor to become readable, returning a
-    /// [`ReadyGuard`] that must be dropped to resume read-readiness polling.
+    /// [`AsyncFdReadyGuard`] that must be dropped to resume read-readiness polling.
     ///
-    /// [`ReadyGuard`]: struct@self::ReadyGuard
-    pub async fn readable(&self) -> io::Result<ReadyGuard<'_, T>> {
+    /// [`AsyncFdReadyGuard`]: struct@self::AsyncFdReadyGuard
+    pub async fn readable(&self) -> io::Result<AsyncFdReadyGuard<'_, T>> {
         self.readiness(mio::Interest::READABLE).await
     }
 
     /// Waits for the file descriptor to become writable, returning a
-    /// [`ReadyGuard`] that must be dropped to resume write-readiness polling.
+    /// [`AsyncFdReadyGuard`] that must be dropped to resume write-readiness polling.
     ///
-    /// [`ReadyGuard`]: struct@self::ReadyGuard
-    pub async fn writable(&self) -> io::Result<ReadyGuard<'_, T>> {
+    /// [`AsyncFdReadyGuard`]: struct@self::AsyncFdReadyGuard
+    pub async fn writable(&self) -> io::Result<AsyncFdReadyGuard<'_, T>> {
         self.readiness(mio::Interest::WRITABLE).await
     }
 }

@@ -18,7 +18,7 @@ use nix::unistd::{close, read, write};
 
 use futures::{poll, FutureExt};
 
-use tokio::io::unix::{AsyncFd, ReadyGuard};
+use tokio::io::unix::{AsyncFd, AsyncFdReadyGuard};
 use tokio_test::{assert_err, assert_pending};
 
 struct TestWaker {
@@ -299,6 +299,8 @@ async fn drop_closes() {
         ErrorKind::WouldBlock,
         b.read(&mut [0]).err().unwrap().kind()
     );
+
+    std::mem::drop(arc_fd); // suppress unnecessary clone clippy warning
 }
 
 #[tokio::test]
@@ -533,11 +535,11 @@ fn driver_shutdown_wakes_pending_race() {
     }
 }
 
-async fn poll_readable<T: AsRawFd>(fd: &AsyncFd<T>) -> std::io::Result<ReadyGuard<'_, T>> {
+async fn poll_readable<T: AsRawFd>(fd: &AsyncFd<T>) -> std::io::Result<AsyncFdReadyGuard<'_, T>> {
     futures::future::poll_fn(|cx| fd.poll_read_ready(cx)).await
 }
 
-async fn poll_writable<T: AsRawFd>(fd: &AsyncFd<T>) -> std::io::Result<ReadyGuard<'_, T>> {
+async fn poll_writable<T: AsRawFd>(fd: &AsyncFd<T>) -> std::io::Result<AsyncFdReadyGuard<'_, T>> {
     futures::future::poll_fn(|cx| fd.poll_write_ready(cx)).await
 }
 
