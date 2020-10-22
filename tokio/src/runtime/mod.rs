@@ -187,7 +187,6 @@ cfg_rt! {
 
     mod blocking;
     use blocking::BlockingPool;
-    use blocking::task::BlockingTask;
     pub(crate) use blocking::spawn_blocking;
 
     mod builder;
@@ -390,9 +389,7 @@ cfg_rt! {
         where
             F: FnOnce() -> R + Send + 'static,
         {
-            let (task, handle) = task::joinable(BlockingTask::new(func));
-            let _ = self.handle.blocking_spawner.spawn(task, &self.handle);
-            handle
+            self.handle.spawn_blocking(func)
         }
 
         /// Run a future to completion on the Tokio runtime. This is the

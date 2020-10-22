@@ -33,9 +33,9 @@
 //!
 //! # Closing
 //!
-//! [`Sender::closed`] allows the producer to detect when all [`Receiver`]
-//! handles have been dropped. This indicates that there is no further interest
-//! in the values being produced and work can be stopped.
+//! [`Sender::is_closed`] and [`Sender::closed`] allow the producer to detect
+//! when all [`Receiver`] handles have been dropped. This indicates that there
+//! is no further interest in the values being produced and work can be stopped.
 //!
 //! # Thread safety
 //!
@@ -48,6 +48,7 @@
 //! [`Receiver::changed()`]: crate::sync::watch::Receiver::changed
 //! [`Receiver::borrow()`]: crate::sync::watch::Receiver::borrow
 //! [`channel`]: crate::sync::watch::channel
+//! [`Sender::is_closed`]: crate::sync::watch::Sender::is_closed
 //! [`Sender::closed`]: crate::sync::watch::Sender::closed
 
 use crate::sync::Notify;
@@ -334,6 +335,22 @@ impl<T> Sender<T> {
         self.shared.notify_rx.notify_waiters();
 
         Ok(())
+    }
+
+    /// Checks if the channel has been closed. This happens when all receivers
+    /// have dropped.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let (tx, rx) = tokio::sync::watch::channel(());
+    /// assert!(!tx.is_closed());
+    ///
+    /// drop(rx);
+    /// assert!(tx.is_closed());
+    /// ```
+    pub fn is_closed(&self) -> bool {
+        self.shared.ref_count_rx.load(Relaxed) == 0
     }
 
     /// Completes when all receivers have dropped.

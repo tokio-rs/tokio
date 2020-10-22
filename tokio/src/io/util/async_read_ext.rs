@@ -1,5 +1,6 @@
 use crate::io::util::chain::{chain, Chain};
 use crate::io::util::read::{read, Read};
+use crate::io::util::read_buf::{read_buf, ReadBuf};
 use crate::io::util::read_exact::{read_exact, ReadExact};
 use crate::io::util::read_int::{
     ReadI128, ReadI128Le, ReadI16, ReadI16Le, ReadI32, ReadI32Le, ReadI64, ReadI64Le, ReadI8,
@@ -11,6 +12,8 @@ use crate::io::util::read_to_end::{read_to_end, ReadToEnd};
 use crate::io::util::read_to_string::{read_to_string, ReadToString};
 use crate::io::util::take::{take, Take};
 use crate::io::AsyncRead;
+
+use bytes::BufMut;
 
 cfg_io_util! {
     /// Defines numeric reader
@@ -161,6 +164,71 @@ cfg_io_util! {
             Self: Unpin,
         {
             read(self, buf)
+        }
+
+        /// Pulls some bytes from this source into the specified buffer,
+        /// advancing the buffer's internal cursor.
+        ///
+        /// Equivalent to:
+        ///
+        /// ```ignore
+        /// async fn read_buf<B: BufMut>(&mut self, buf: &mut B) -> io::Result<usize>;
+        /// ```
+        ///
+        /// Usually, only a single `read` syscall is issued, even if there is
+        /// more space in the supplied buffer.
+        ///
+        /// This function does not provide any guarantees about whether it
+        /// completes immediately or asynchronously
+        ///
+        /// # Return
+        ///
+        /// On a successful read, the number of read bytes is returned. If the
+        /// supplied buffer is not empty and the function returns `Ok(0)` then
+        /// the source as reached an "end-of-file" event.
+        ///
+        /// # Errors
+        ///
+        /// If this function encounters any form of I/O or other error, an error
+        /// variant will be returned. If an error is returned then it must be
+        /// guaranteed that no bytes were read.
+        ///
+        /// # Examples
+        ///
+        /// [`File`] implements `Read` and [`BytesMut`] implements [`BufMut`]:
+        ///
+        /// [`File`]: crate::fs::File
+        /// [`BytesMut`]: bytes::BytesMut
+        /// [`BufMut`]: bytes::BufMut
+        ///
+        /// ```no_run
+        /// use tokio::fs::File;
+        /// use tokio::io::{self, AsyncReadExt};
+        ///
+        /// use bytes::BytesMut;
+        ///
+        /// #[tokio::main]
+        /// async fn main() -> io::Result<()> {
+        ///     let mut f = File::open("foo.txt").await?;
+        ///     let mut buffer = BytesMut::with_capacity(10);
+        ///
+        ///     assert!(buffer.is_empty());
+        ///
+        ///     // read up to 10 bytes, note that the return value is not needed
+        ///     // to access the data that was read as `buffer`'s internal
+        ///     // cursor is updated.
+        ///     f.read_buf(&mut buffer).await?;
+        ///
+        ///     println!("The bytes: {:?}", &buffer[..]);
+        ///     Ok(())
+        /// }
+        /// ```
+        fn read_buf<'a, B>(&'a mut self, buf: &'a mut B) -> ReadBuf<'a, Self, B>
+        where
+            Self: Sized + Unpin,
+            B: BufMut,
+        {
+            read_buf(self, buf)
         }
 
         /// Reads the exact number of bytes required to fill `buf`.

@@ -115,7 +115,7 @@ impl UnixListener {
     /// the current task will be notified by a waker.
     ///
     /// When ready, the most recent task that called `poll_accept` is notified.
-    /// The caller is responsble to ensure that `poll_accept` is called from a
+    /// The caller is responsible to ensure that `poll_accept` is called from a
     /// single task. Failing to do this could result in tasks hanging.
     pub fn poll_accept(&self, cx: &mut Context<'_>) -> Poll<io::Result<(UnixStream, SocketAddr)>> {
         loop {

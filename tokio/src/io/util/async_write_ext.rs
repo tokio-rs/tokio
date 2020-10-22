@@ -2,6 +2,7 @@ use crate::io::util::flush::{flush, Flush};
 use crate::io::util::shutdown::{shutdown, Shutdown};
 use crate::io::util::write::{write, Write};
 use crate::io::util::write_all::{write_all, WriteAll};
+use crate::io::util::write_buf::{write_buf, WriteBuf};
 use crate::io::util::write_int::{
     WriteI128, WriteI128Le, WriteI16, WriteI16Le, WriteI32, WriteI32Le, WriteI64, WriteI64Le,
     WriteI8,
@@ -11,6 +12,8 @@ use crate::io::util::write_int::{
     WriteU8,
 };
 use crate::io::AsyncWrite;
+
+use bytes::Buf;
 
 cfg_io_util! {
     /// Defines numeric writer
@@ -114,6 +117,80 @@ cfg_io_util! {
             Self: Unpin,
         {
             write(self, src)
+        }
+
+
+        /// Writes a buffer into this writer, advancing the buffer's internal
+        /// cursor.
+        ///
+        /// Equivalent to:
+        ///
+        /// ```ignore
+        /// async fn write_buf<B: Buf>(&mut self, buf: &mut B) -> io::Result<usize>;
+        /// ```
+        ///
+        /// This function will attempt to write the entire contents of `buf`, but
+        /// the entire write may not succeed, or the write may also generate an
+        /// error. After the operation completes, the buffer's
+        /// internal cursor is advanced by the number of bytes written. A
+        /// subsequent call to `write_buf` using the **same** `buf` value will
+        /// resume from the point that the first call to `write_buf` completed.
+        /// A call to `write_buf` represents *at most one* attempt to write to any
+        /// wrapped object.
+        ///
+        /// # Return
+        ///
+        /// If the return value is `Ok(n)` then it must be guaranteed that `n <=
+        /// buf.len()`. A return value of `0` typically means that the
+        /// underlying object is no longer able to accept bytes and will likely
+        /// not be able to in the future as well, or that the buffer provided is
+        /// empty.
+        ///
+        /// # Errors
+        ///
+        /// Each call to `write` may generate an I/O error indicating that the
+        /// operation could not be completed. If an error is returned then no bytes
+        /// in the buffer were written to this writer.
+        ///
+        /// It is **not** considered an error if the entire buffer could not be
+        /// written to this writer.
+        ///
+        /// # Examples
+        ///
+        /// [`File`] implements `Read` and [`Cursor<&[u8]>`] implements [`Buf`]:
+        ///
+        /// [`File`]: crate::fs::File
+        /// [`Buf`]: bytes::Buf
+        ///
+        /// ```no_run
+        /// use tokio::io::{self, AsyncWriteExt};
+        /// use tokio::fs::File;
+        ///
+        /// use bytes::Buf;
+        /// use std::io::Cursor;
+        ///
+        /// #[tokio::main]
+        /// async fn main() -> io::Result<()> {
+        ///     let mut file = File::create("foo.txt").await?;
+        ///     let mut buffer = Cursor::new(b"data to write");
+        ///
+        ///     // Loop until the entire contents of the buffer are written to
+        ///     // the file.
+        ///     while buffer.has_remaining() {
+        ///         // Writes some prefix of the byte string, not necessarily
+        ///         // all of it.
+        ///         file.write_buf(&mut buffer).await?;
+        ///     }
+        ///
+        ///     Ok(())
+        /// }
+        /// ```
+        fn write_buf<'a, B>(&'a mut self, src: &'a mut B) -> WriteBuf<'a, Self, B>
+        where
+            Self: Sized + Unpin,
+            B: Buf,
+        {
+            write_buf(self, src)
         }
 
         /// Attempts to write an entire buffer into this writer.
