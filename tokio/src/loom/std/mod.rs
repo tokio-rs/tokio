@@ -74,7 +74,7 @@ pub(crate) mod sync {
         pub(crate) use crate::loom::std::atomic_u8::AtomicU8;
         pub(crate) use crate::loom::std::atomic_usize::AtomicUsize;
 
-        pub(crate) use std::sync::atomic::{spin_loop_hint, AtomicBool};
+        pub(crate) use std::sync::atomic::{fence, spin_loop_hint, AtomicBool, Ordering};
     }
 }
 
