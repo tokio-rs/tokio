@@ -12,4 +12,5 @@ cfg_loom! {
     mod loom_oneshot;
     mod loom_semaphore_batch;
     mod loom_watch;
+    mod loom_rwlock;
 }
