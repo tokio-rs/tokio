@@ -240,15 +240,21 @@ fn parse_knobs(
         }
     };
 
+    let ret_ty = &sig.output;
+
     let result = quote! {
         #header
         #(#attrs)*
         #vis #sig {
+            // Asssert the return type here,
+            // which produces a better diagnostic
+            async fn main_inner() #ret_ty #body
+
             #rt
                 .enable_all()
                 .build()
                 .unwrap()
-                .block_on(async { #body })
+                .block_on(main_inner())
         }
     };
 
