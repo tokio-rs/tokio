@@ -231,10 +231,6 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
 
 /// Marks async function to be executed by runtime, suitable to test environment
 ///
-/// ## Options:
-///
-/// - `max_threads=n` - Sets max threads to `n`.
-///
 /// ## Usage
 ///
 /// ```no_run

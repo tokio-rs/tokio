@@ -179,7 +179,7 @@ fn parse_knobs(
                         return Err(syn::Error::new_spanned(namevalue, msg));
                     }
                     name => {
-                        let msg = format!("Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`, `max_threads`", name);
+                        let msg = format!("Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`", name);
                         return Err(syn::Error::new_spanned(namevalue, msg));
                     }
                 }
