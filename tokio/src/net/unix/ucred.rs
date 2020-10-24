@@ -10,6 +10,11 @@ pub struct UCred {
 }
 
 impl UCred {
+    /// Creates a new credentials struct from a user ID and a group ID.
+    pub fn new(uid: uid_t, gid: gid_t) -> Self {
+        Self { uid, gid }
+    }
+
     /// Gets UID (user ID) of the process.
     pub fn uid(&self) -> uid_t {
         self.uid
