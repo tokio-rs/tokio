@@ -10,11 +10,12 @@ use std::{iter::Extend, marker::Unpin};
 ///
 /// stream::extend(&mut buff, s).await;
 /// assert_eq!(vec![-2, 0, 2, 4, 6], buff);
-pub async fn extend<E, S, T>(buff: &mut E, mut b: S)
+pub async fn extend<E, S>(buff: &mut E, mut b: S)
 where
-    S: Stream<Item = T> + Unpin,
-    E: Extend<T>,
+    S: Stream,
+    E: Extend<S::Item>,
 {
+    crate::pin!(b);
     while let Some(item) = b.next().await {
         buff.extend(std::iter::once(item))
     }
