@@ -158,11 +158,12 @@ impl UdpSocket {
         Ok(UdpSocket { io })
     }
 
-    /// Creates a new `UdpSocket` from the previously bound socket provided.
+    /// Creates new `UdpSocket` from a previously bound `std::net::UdpSocket`.
     ///
-    /// The socket given will be registered with the event loop that `handle`
-    /// is associated with. This function requires that `socket` has previously
-    /// been bound to an address to work correctly.
+    /// This function is intended to be used to wrap a UDP socket from the
+    /// standard library in the Tokio equivalent. The conversion assumes nothing
+    /// about the underlying socket; it is left up to the user to set it in
+    /// non-blocking mode.
     ///
     /// This can be used in conjunction with net2's `UdpBuilder` interface to
     /// configure a socket before it's handed off, such as setting options like

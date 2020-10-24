@@ -196,7 +196,7 @@ impl TcpListener {
         }
     }
 
-    /// Creates a new TCP listener from the standard library's TCP listener.
+    /// Creates new `TcpListener` from a `std::net::TcpListener`.
     ///
     /// This function is intended to be used to wrap a TCP listener from the
     /// standard library in the Tokio equivalent. The conversion assumes nothing
