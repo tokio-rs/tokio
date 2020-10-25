@@ -1,8 +1,4 @@
 use crate::io::{PollEvented, ReadBuf};
-use crate::net::udp::{
-    split::{split, RecvHalf, SendHalf},
-    split_owned::{split_owned, OwnedRecvHalf, OwnedSendHalf},
-};
 use crate::net::{to_socket_addrs, ToSocketAddrs};
 
 use std::convert::TryFrom;
@@ -15,8 +11,7 @@ cfg_net! {
     /// A UDP socket
     ///
     /// UDP is "connectionless", unlike TCP. Meaning, regardless of what address you've bound to, a `UdpSocket`
-    /// is free to communicate with many different remotes. `UdpSocket` differs from other tokio `net` types in that
-    /// it does not implement `AsyncRead` or `AsyncWrite` either. In tokio, there are basically two main ways to use `UdpSocket`:
+    /// is free to communicate with many different remotes. In tokio there are basically two main ways to use `UdpSocket`:
     ///
     /// * one to many: [`bind`](`UdpSocket::bind`) and use [`send_to`](`UdpSocket::send_to`)
     ///   and [`recv_from`](`UdpSocket::recv_from`) to communicate with many different addresses
@@ -666,34 +661,6 @@ impl UdpSocket {
         }
     }
 
-    // These lifetime markers also appear in the generated documentation, and make
-    // it more clear that this is a *borrowed* split.
-    #[allow(clippy::needless_lifetimes)]
-    /// Split a `UnixStream` into a read half and a write half, which can be used
-    /// to read and write the stream concurrently.
-    ///
-    /// This method is more efficient than [`into_split`], but the halves cannot be
-    /// moved into independently spawned tasks.
-    ///
-    /// [`into_split`]: Self::into_split()
-    pub fn split<'a>(&'a mut self) -> (RecvHalf<'a>, SendHalf<'a>) {
-        split(self)
-    }
-
-    /// Splits a `UnixStream` into a read half and a write half, which can be used
-    /// to read and write the stream concurrently.
-    ///
-    /// Unlike [`split`], the owned halves can be moved to separate tasks, however
-    /// this comes at the cost of a heap allocation.
-    ///
-    /// **Note:** Dropping the write half will shut down the write half of the
-    /// stream. This is equivalent to calling [`shutdown(Write)`] on the `UnixStream`.
-    ///
-    /// [`split`]: Self::split()
-    /// [`shutdown(Write)`]: fn@Self::shutdown
-    pub fn into_split(self) -> (OwnedRecvHalf, OwnedSendHalf) {
-        split_owned(self)
-    }
     /// Gets the value of the `SO_BROADCAST` option for this socket.
     ///
     /// For more information about this option, see [`set_broadcast`].

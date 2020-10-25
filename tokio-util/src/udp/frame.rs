@@ -1,7 +1,4 @@
-use crate::{
-    codec::{Decoder, Encoder},
-    udp::{INITIAL_RD_CAPACITY, INITIAL_WR_CAPACITY},
-};
+use crate::codec::{Decoder, Encoder};
 
 use tokio::{io::ReadBuf, net::UdpSocket, stream::Stream};
 
@@ -43,6 +40,9 @@ pub struct UdpFramed<C> {
     is_readable: bool,
     current_addr: Option<SocketAddr>,
 }
+
+const INITIAL_RD_CAPACITY: usize = 64 * 1024;
+const INITIAL_WR_CAPACITY: usize = 8 * 1024;
 
 impl<C: Decoder + Unpin> Stream for UdpFramed<C> {
     type Item = Result<(C::Item, SocketAddr), C::Error>;

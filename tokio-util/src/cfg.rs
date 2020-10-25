@@ -22,7 +22,7 @@ macro_rules! cfg_udp {
     ($($item:item)*) => {
         $(
             #[cfg(all(feature = "udp", feature = "codec"))]
-            #[cfg_attr(docsrs, doc(cfg(all(feature = "udp", feature = "net"))))]
+            #[cfg_attr(docsrs, doc(cfg(all(feature = "udp", feature = "codec"))))]
             $item
         )*
     }
