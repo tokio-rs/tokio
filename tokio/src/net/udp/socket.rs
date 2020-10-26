@@ -822,6 +822,29 @@ impl UdpSocket {
     pub fn leave_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
         self.io.get_ref().leave_multicast_v6(multiaddr, interface)
     }
+
+    /// Returns the value of the `SO_ERROR` option.
+    ///
+    /// # Examples
+    /// ```
+    /// # use std::error::Error;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn Error>> {
+    /// use tokio::net::UdpSocket;
+    ///
+    /// // Create a socket
+    /// let socket = UdpSocket::bind("0.0.0.0:8080").await?;
+    ///
+    /// if let Ok(Some(err)) = socket.take_error() {
+    ///     println!("Got error: {:?}", err);
+    /// }
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn take_error(&self) -> io::Result<Option<io::Error>> {
+        self.io.get_ref().take_error()
+    }
 }
 
 impl TryFrom<std::net::UdpSocket> for UdpSocket {
