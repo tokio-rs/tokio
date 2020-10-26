@@ -2,7 +2,7 @@ use crate::codec::decoder::Decoder;
 use crate::codec::encoder::Encoder;
 
 use tokio::{
-    io::{AsyncRead, AsyncWrite},
+    io::{AsyncRead, AsyncReadExt, AsyncWrite},
     stream::Stream,
 };
 
@@ -118,8 +118,6 @@ where
     type Item = Result<U::Item, U::Error>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        use crate::util::poll_read_buf;
-
         let mut pinned = self.project();
         let state: &mut ReadFrame = pinned.state.borrow_mut();
         loop {
@@ -150,7 +148,7 @@ where
             // got room for at least one byte to read to ensure that we don't
             // get a spurious 0 that looks like EOF
             state.buffer.reserve(1);
-            let bytect = match poll_read_buf(cx, pinned.inner.as_mut(), &mut state.buffer)? {
+            let bytect = match pinned.inner.as_mut().poll_read_buf(&mut state.buffer, cx)? {
                 Poll::Ready(ct) => ct,
                 Poll::Pending => return Poll::Pending,
             };

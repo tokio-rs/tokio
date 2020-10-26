@@ -7,7 +7,7 @@ name = "tokio-util"
 #   - Cargo.toml
 # - Update CHANGELOG.md.
 # - Create "v0.2.x" git tag.
-version = "0.4.0"
+version = "0.5.0"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
@@ -27,15 +27,15 @@ default = []
 full = ["codec", "compat", "io", "time"]
 
 compat = ["futures-io",]
-codec = ["tokio/stream"]
+codec = ["tokio/io-util", "tokio/stream"]
 time = ["tokio/time","slab"]
-io = []
+io = ["tokio/io-util"]
 rt = ["tokio/rt"]
 
 [dependencies]
 tokio = { version = "0.3.0", path = "../tokio" }
 
-bytes = "0.5.0"
+bytes = "0.6.0"
 futures-core = "0.3.0"
 futures-sink = "0.3.0"
 futures-io = { version = "0.3.0", optional = true }
