@@ -157,7 +157,7 @@ several other libraries, including:
 
 ## Supported Rust Versions
 
-Tokio is built against the latest stable release. The minimum supported version is 1.39.
+Tokio is built against the latest stable release. The minimum supported version is 1.45.
 The current Tokio version is not guaranteed to build on Rust versions earlier than the
 minimum supported version.
 
