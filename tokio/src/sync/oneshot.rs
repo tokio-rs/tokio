@@ -285,8 +285,6 @@ impl<T> Sender<T> {
     /// use tokio::sync::oneshot;
     /// use tokio::time::{self, Duration};
     ///
-    /// use futures::{select, FutureExt};
-    ///
     /// async fn compute() -> String {
     ///     // Complex computation returning a `String`
     /// # "hello".to_string()
@@ -297,12 +295,14 @@ impl<T> Sender<T> {
     ///     let (mut tx, rx) = oneshot::channel();
     ///
     ///     tokio::spawn(async move {
-    ///         select! {
-    ///             _ = tx.closed().fuse() => {
+    ///         tokio::select! {
+    ///             _ = tx.closed() => {
     ///                 // The receiver dropped, no need to do any further work
     ///             }
-    ///             value = compute().fuse() => {
-    ///                 tx.send(value).unwrap()
+    ///             value = compute() => {
+    ///                 // The send can fail if the channel was closed at the exact same
+    ///                 // time as when compute() finished, so just ignore the failure.
+    ///                 let _ = tx.send(value);
     ///             }
     ///         }
     ///     });
