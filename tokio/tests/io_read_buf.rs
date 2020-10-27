@@ -59,7 +59,7 @@ async fn poll_read_buf() {
 
     let res = tokio::spawn(async move {
         poll_fn(|cx| {
-            let res = rd.poll_read_buf(&mut buf, cx);
+            let res = Pin::new(&mut rd).poll_read_buf(cx, &mut buf);
             assert_eq!(1, rd.cnt);
             assert_eq!(buf[..], b"hello world"[..]);
             res
