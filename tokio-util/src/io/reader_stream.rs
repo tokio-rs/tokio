@@ -72,7 +72,7 @@ impl<R: AsyncRead> Stream for ReaderStream<R> {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.as_mut().project();
 
-        let mut reader = match this.reader.as_pin_mut() {
+        let reader = match this.reader.as_pin_mut() {
             Some(r) => r,
             None => return Poll::Ready(None),
         };
@@ -81,7 +81,7 @@ impl<R: AsyncRead> Stream for ReaderStream<R> {
             this.buf.reserve(CAPACITY);
         }
 
-        match reader.poll_read_buf(&mut this.buf, cx) {
+        match reader.poll_read_buf(cx, &mut this.buf) {
             Poll::Pending => Poll::Pending,
             Poll::Ready(Err(err)) => {
                 self.project().reader.set(None);

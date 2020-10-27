@@ -41,17 +41,17 @@ where
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<usize>> {
         let mut me = self.project();
-        poll_read_buf(&mut me.reader, &mut me.buf, cx)
+        poll_read_buf(Pin::new(&mut me.reader), cx, &mut me.buf)
     }
 }
 
-pub(crate) fn poll_read_buf<'a, R, B>(
-    reader: &'a mut R,
-    buf: &'a mut B,
+pub(crate) fn poll_read_buf<R, B>(
+    reader: Pin<&mut R>,
     cx: &mut Context<'_>,
+    buf: &mut B,
 ) -> Poll<io::Result<usize>>
 where
-    R: AsyncRead + Unpin,
+    R: AsyncRead,
     B: BufMut,
 {
     use crate::io::ReadBuf;
@@ -66,7 +66,7 @@ where
         let dst = unsafe { &mut *(dst as *mut _ as *mut [MaybeUninit<u8>]) };
         let mut buf = ReadBuf::uninit(dst);
         let ptr = buf.filled().as_ptr();
-        ready!(Pin::new(reader).poll_read(cx, &mut buf)?);
+        ready!(reader.poll_read(cx, &mut buf)?);
 
         // Ensure the pointer does not change from under us
         assert_eq!(ptr, buf.filled().as_ptr());

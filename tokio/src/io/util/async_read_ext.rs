@@ -15,6 +15,7 @@ use crate::io::AsyncRead;
 
 use bytes::BufMut;
 use std::io;
+use std::pin::Pin;
 use std::task::{Context, Poll};
 
 cfg_io_util! {
@@ -250,9 +251,12 @@ cfg_io_util! {
         /// If this function encounters any form of I/O or other error, an error
         /// variant will be returned. If an error is returned then it must be
         /// guaranteed that no bytes were read.
-        /// ```
-        fn poll_read_buf<'a, B>(&'a mut self, buf: &'a mut B, cx: &mut Context<'_>) -> Poll<io::Result<usize>> where Self: Unpin + Sized, B: BufMut {
-            poll_read_buf(self, buf, cx)
+        fn poll_read_buf<B>(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut B) -> Poll<io::Result<usize>>
+        where
+            Self: Sized,
+            B: BufMut,
+        {
+            poll_read_buf(self, cx, buf)
         }
 
         /// Reads the exact number of bytes required to fill `buf`.

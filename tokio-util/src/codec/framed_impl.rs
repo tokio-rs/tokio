@@ -148,7 +148,7 @@ where
             // got room for at least one byte to read to ensure that we don't
             // get a spurious 0 that looks like EOF
             state.buffer.reserve(1);
-            let bytect = match pinned.inner.as_mut().poll_read_buf(&mut state.buffer, cx)? {
+            let bytect = match pinned.inner.as_mut().poll_read_buf(cx, &mut state.buffer)? {
                 Poll::Ready(ct) => ct,
                 Poll::Pending => return Poll::Pending,
             };
