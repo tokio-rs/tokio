@@ -1,6 +1,6 @@
 use crate::io::util::chain::{chain, Chain};
 use crate::io::util::read::{read, Read};
-use crate::io::util::read_buf::{poll_read_buf, read_buf, ReadBuf};
+use crate::io::util::read_buf::{read_buf, ReadBuf};
 use crate::io::util::read_exact::{read_exact, ReadExact};
 use crate::io::util::read_int::{
     ReadI128, ReadI128Le, ReadI16, ReadI16Le, ReadI32, ReadI32Le, ReadI64, ReadI64Le, ReadI8,
@@ -14,8 +14,6 @@ use crate::io::util::take::{take, Take};
 use crate::io::AsyncRead;
 
 use bytes::BufMut;
-use std::io;
-use std::task::{Context, Poll};
 
 cfg_io_util! {
     /// Defines numeric reader
@@ -231,28 +229,6 @@ cfg_io_util! {
             B: BufMut,
         {
             read_buf(self, buf)
-        }
-
-        /// Attempts to pull some bytes from this source into the specified buffer,
-        /// advancing the buffer's internal cursor if the underlying reader is ready.
-        ///
-        /// Usually, only a single `read` syscall is issued, even if there is
-        /// more space in the supplied buffer.
-        ///
-        /// # Return
-        ///
-        /// On a successful read, the number of read bytes is returned. If the
-        /// supplied buffer is not empty and the function returns `Ok(0)` then
-        /// the source has reached an "end-of-file" event.
-        ///
-        /// # Errors
-        ///
-        /// If this function encounters any form of I/O or other error, an error
-        /// variant will be returned. If an error is returned then it must be
-        /// guaranteed that no bytes were read.
-        /// ```
-        fn poll_read_buf<'a, B>(&'a mut self, buf: &'a mut B, cx: &mut Context<'_>) -> Poll<io::Result<usize>> where Self: Unpin + Sized, B: BufMut {
-            poll_read_buf(self, buf, cx)
         }
 
         /// Reads the exact number of bytes required to fill `buf`.
