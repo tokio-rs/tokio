@@ -203,7 +203,7 @@ impl TcpListener {
     /// about the underlying listener; it is left up to the user to set it in
     /// non-blocking mode.
     ///
-    /// This API is typically paired with the `net2` crate and the `TcpBuilder`
+    /// This API is typically paired with the `socket2` crate and the `Socket`
     /// type to build up and customize a listener before it's shipped off to the
     /// backing event loop. This allows configuration of options like
     /// `SO_REUSEPORT`, binding to multiple addresses, etc.

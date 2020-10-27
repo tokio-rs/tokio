@@ -165,7 +165,7 @@ impl UdpSocket {
     /// about the underlying socket; it is left up to the user to set it in
     /// non-blocking mode.
     ///
-    /// This can be used in conjunction with net2's `UdpBuilder` interface to
+    /// This can be used in conjunction with socket2's `Socket` interface to
     /// configure a socket before it's handed off, such as setting options like
     /// `reuse_address` or binding to multiple addresses.
     ///
