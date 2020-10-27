@@ -1,3 +1,17 @@
+# 0.3.2 (October 27, 2020)
+
+Adds `AsyncFd` as a replacement for v0.2's `PollEvented`.
+
+### Fixed
+- io: fix a potential deadlock when shutting down the I/O driver (#2903).
+- sync: `RwLockWriteGuard::downgrade()` bug (#2957).
+
+### Added
+- io: `AsyncFd` for receiving readiness events on raw FDs (#2903).
+- net: `poll_*` function on `UdpSocket` (#2981).
+- net: `UdpSocket::take_error()` (#3051).
+- sync: `oneshot::Sender::poll_closed()` (#3032).
+
 # 0.3.1 (October 21, 2020)
 
 This release fixes an use-after-free in the IO driver. Additionally, the `read_buf`
