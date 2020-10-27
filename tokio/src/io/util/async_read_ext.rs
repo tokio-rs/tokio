@@ -253,7 +253,6 @@ cfg_io_util! {
         /// guaranteed that no bytes were read.
         fn poll_read_buf<B>(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut B) -> Poll<io::Result<usize>>
         where
-            Self: Sized,
             B: BufMut,
         {
             poll_read_buf(self, cx, buf)

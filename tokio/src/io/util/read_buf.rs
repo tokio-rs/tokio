@@ -51,7 +51,7 @@ pub(crate) fn poll_read_buf<R, B>(
     buf: &mut B,
 ) -> Poll<io::Result<usize>>
 where
-    R: AsyncRead,
+    R: AsyncRead + ?Sized,
     B: BufMut,
 {
     use crate::io::ReadBuf;
