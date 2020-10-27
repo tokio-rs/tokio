@@ -5,10 +5,10 @@ use tokio::{io::ReadBuf, net::UdpSocket, stream::Stream};
 use bytes::{BufMut, BytesMut};
 use futures_core::ready;
 use futures_sink::Sink;
-use std::io;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::{io, mem::MaybeUninit};
 
 /// A unified `Stream` and `Sink` interface to an underlying `UdpSocket`, using
 /// the `Encoder` and `Decoder` traits to encode and decode frames.
@@ -71,8 +71,8 @@ impl<C: Decoder + Unpin> Stream for UdpFramed<C> {
             let addr = unsafe {
                 // Convert `&mut [MaybeUnit<u8>]` to `&mut [u8]` because we will be
                 // writing to it via `poll_recv_from` and therefore initializing the memory.
-                let buf: &mut [u8] = &mut *(pin.rd.bytes_mut() as *mut _ as *mut [u8]);
-                let mut read = ReadBuf::new(buf);
+                let buf = &mut *(pin.rd.bytes_mut() as *mut _ as *mut [MaybeUninit<u8>]);
+                let mut read = ReadBuf::uninit(buf);
                 let res = ready!(Pin::new(&mut pin.socket).poll_recv_from(cx, &mut read));
 
                 let addr = res?;
