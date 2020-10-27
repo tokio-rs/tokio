@@ -1,3 +1,9 @@
+# 0.5.0 (October 27, 2020)
+
+### Changed
+
+- Upgrade to bytes 0.6. (#3071)
+
 # 0.4.0 (October 15, 2020)
 
 ### Added
