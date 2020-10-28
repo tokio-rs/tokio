@@ -59,7 +59,7 @@ where
 
         fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
             let this = &mut *self;
-            super::poll_read_buf(Pin::new(this.0), cx, this.1)
+            crate::util::poll_read_buf(cx, Pin::new(this.0), this.1)
         }
     }
 }
