@@ -78,7 +78,7 @@ async fn return_elapsed_errors_only_once() {
     // error is returned.
     assert_pending!(stream.poll_next());
     //
-    time::advance(ms(50)).await;
+    time::advance(ms(51)).await;
     let v = assert_ready!(stream.poll_next());
     assert!(v.unwrap().is_err()); // timeout!
 

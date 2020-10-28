@@ -76,7 +76,7 @@
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let mut sleep = time::sleep(Duration::from_millis(50));
+///     let mut sleep = Box::pin(time::sleep(Duration::from_millis(50)));
 ///
 ///     while !sleep.is_elapsed() {
 ///         tokio::select! {
@@ -109,7 +109,7 @@
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let mut sleep = time::sleep(Duration::from_millis(50));
+///     let mut sleep = Box::pin(time::sleep(Duration::from_millis(50)));
 ///
 ///     loop {
 ///         tokio::select! {
@@ -226,7 +226,7 @@
 /// #[tokio::main]
 /// async fn main() {
 ///     let mut stream = stream::iter(vec![1, 2, 3]);
-///     let mut sleep = time::sleep(Duration::from_secs(1));
+///     let mut sleep = Box::pin(time::sleep(Duration::from_secs(1)));
 ///
 ///     loop {
 ///         tokio::select! {

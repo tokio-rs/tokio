@@ -1,17 +1,11 @@
-use crate::time::{driver::Entry, error::InsertError};
+use crate::time::driver::{TimerHandle, TimerShared};
+use crate::time::error::InsertError;
 
 mod level;
 pub(crate) use self::level::Expiration;
 use self::level::Level;
 
-mod stack;
-pub(crate) use self::stack::Stack;
-
-use std::sync::Arc;
-use std::usize;
-
-pub(super) type Item = Entry;
-pub(super) type OwnedItem = Arc<Item>;
+use std::ptr::NonNull;
 
 /// Timing wheel implementation.
 ///
@@ -68,13 +62,7 @@ impl Wheel {
     ///
     /// # Arguments
     ///
-    /// * `when`: is the instant at which the entry should be fired. It is
-    ///           represented as the number of milliseconds since the creation
-    ///           of the timing wheel.
-    ///
     /// * `item`: The item to insert into the wheel.
-    ///
-    /// * `store`: The slab or `()` when using heap storage.
     ///
     /// # Return
     ///
@@ -85,11 +73,18 @@ impl Wheel {
     /// immediately.
     ///
     /// `Err(Invalid)` indicates an invalid `when` argument as been supplied.
-    pub(crate) fn insert(
+    ///
+    /// # Safety
+    ///
+    /// This function registers item into an intrusive linked list. The caller
+    /// must ensure that `item` is pinned and will not be dropped without first
+    /// being deregistered.
+    pub(crate) unsafe fn insert(
         &mut self,
-        when: u64,
-        item: OwnedItem,
-    ) -> Result<(), (OwnedItem, InsertError)> {
+        item: TimerHandle,
+    ) -> Result<u64, (TimerHandle, InsertError)> {
+        let when = item.sync_when();
+
         if when <= self.elapsed {
             return Err((item, InsertError::Elapsed));
         } else if when - self.elapsed > MAX_DURATION {
@@ -99,7 +94,9 @@ impl Wheel {
         // Get the level at which the entry should be stored
         let level = self.level_for(when);
 
-        self.levels[level].add_entry(when, item);
+        unsafe {
+            self.levels[level].add_entry(item);
+        }
 
         debug_assert!({
             self.levels[level]
@@ -108,15 +105,17 @@ impl Wheel {
                 .unwrap_or(true)
         });
 
-        Ok(())
+        Ok(when)
     }
 
-    /// Remove `item` from thee timing wheel.
-    pub(crate) fn remove(&mut self, item: &Item) {
-        let when = item.when();
+    /// Remove `item` from the timing wheel.
+    pub(crate) unsafe fn remove(&mut self, item: NonNull<TimerShared>) {
+        let when = unsafe { item.as_ref() }.cached_when();
         let level = self.level_for(when);
 
-        self.levels[level].remove_entry(when, item);
+        unsafe {
+            self.levels[level].remove_entry(item);
+        }
     }
 
     /// Instant at which to poll
@@ -125,7 +124,7 @@ impl Wheel {
     }
 
     /// Advances the timer up to the instant represented by `now`.
-    pub(crate) fn poll(&mut self, now: u64) -> Option<OwnedItem> {
+    pub(crate) fn poll(&mut self, now: u64) -> Option<TimerHandle> {
         loop {
             // under what circumstances is poll.expiration Some vs. None?
             let expiration = self.next_expiration().and_then(|expiration| {
@@ -191,18 +190,23 @@ impl Wheel {
     /// time and the expiration time.  for each in that population either
     /// return it for notification (in the case of the last level) or tier
     /// it down to the next level (in all other cases).
-    pub(crate) fn poll_expiration(&mut self, expiration: &Expiration) -> Option<OwnedItem> {
+    pub(crate) fn poll_expiration(&mut self, expiration: &Expiration) -> Option<TimerHandle> {
         while let Some(item) = self.pop_entry(expiration) {
             if expiration.level == 0 {
-                debug_assert_eq!(item.when(), expiration.deadline);
+                debug_assert_eq!(unsafe { item.cached_when() }, expiration.deadline);
+            }
 
+            // The expiration time may have been reset, so sync up and
+            // potentially reinsert at a different time than before
+            let sync_when = unsafe { item.sync_when() };
+
+            if sync_when <= expiration.deadline {
                 return Some(item);
             } else {
-                let when = item.when();
-
-                let next_level = expiration.level - 1;
-
-                self.levels[next_level].add_entry(when, item);
+                let level = level_for(expiration.deadline, sync_when);
+                unsafe {
+                    self.levels[level].add_entry(item);
+                }
             }
         }
 
@@ -222,7 +226,9 @@ impl Wheel {
         }
     }
 
-    fn pop_entry(&mut self, expiration: &Expiration) -> Option<OwnedItem> {
+    /// Pops an entry based on the expiration provided.
+    ///
+    fn pop_entry(&mut self, expiration: &Expiration) -> Option<TimerHandle> {
         self.levels[expiration.level].pop_entry_slot(expiration.slot)
     }
 

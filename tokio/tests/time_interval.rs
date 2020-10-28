@@ -49,7 +49,8 @@ async fn usage_stream() {
     use tokio::stream::StreamExt;
 
     let start = Instant::now();
-    let mut interval = time::interval(ms(10));
+    let interval = time::interval(ms(10));
+    tokio::pin!(interval);
 
     for _ in 0..3 {
         interval.next().await.unwrap();
@@ -59,7 +60,7 @@ async fn usage_stream() {
 }
 
 fn poll_next(interval: &mut task::Spawn<time::Interval>) -> Poll<Instant> {
-    interval.enter(|cx, mut interval| {
+    interval.enter(|cx, interval| {
         tokio::pin! {
             let fut = interval.tick();
         }

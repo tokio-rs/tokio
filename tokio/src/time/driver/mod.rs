@@ -1,26 +1,31 @@
+// Currently, rust warns when an unsafe fn contains an unsafe {} block. However,
+// in the future, this will change to the reverse. For now, suppress this
+// warning and generally stick with being explicit about unsafety.
+#![allow(unused_unsafe)]
 #![cfg_attr(not(feature = "rt"), allow(dead_code))]
 
 //! Time driver
 
-mod atomic_stack;
-use self::atomic_stack::AtomicStack;
-
 mod entry;
-pub(super) use self::entry::Entry;
+pub(self) use self::entry::TimerEntry;
+pub(self) use self::entry::{EntryList, EntryState, TimerHandle, TimerShared};
 
 mod handle;
 pub(crate) use self::handle::Handle;
+use self::handle::InternalHandle;
 
-use crate::loom::sync::atomic::{AtomicU64, AtomicUsize};
+mod wheel;
+
+pub(super) mod sleep;
+
+use crate::loom::sync::{atomic::AtomicBool, atomic::Ordering, Arc, Mutex, MutexGuard};
 use crate::park::{Park, Unpark};
-use crate::time::{error::Error, wheel};
+use crate::time::error::Error;
 use crate::time::{Clock, Duration, Instant};
 
-use std::sync::atomic::Ordering::{Acquire, Relaxed, Release, SeqCst};
-
-use std::sync::Arc;
-use std::usize;
-use std::{cmp, fmt};
+use std::convert::TryInto;
+use std::fmt;
+use std::{num::NonZeroU64, ptr::NonNull, task::Waker};
 
 /// Time implementation that drives [`Sleep`][sleep], [`Interval`][interval], and [`Timeout`][timeout].
 ///
@@ -78,63 +83,121 @@ use std::{cmp, fmt};
 /// [timeout]: crate::time::Timeout
 /// [interval]: crate::time::Interval
 #[derive(Debug)]
-pub(crate) struct Driver<T: Park> {
+pub(crate) struct Driver<P: Park + 'static> {
+    /// Timing backend in use
+    time_source: ClockTime,
+
     /// Shared state
-    inner: Arc<Inner>,
+    inner: InternalHandle<ClockTime>,
+
+    /// Parker to delegate to
+    park: P,
+
+    /// Unparker for this time driver
+    unpark: TimeUnpark<P::Unpark>,
+}
+
+/// A time source trait used for mocks in tests.
+///
+/// This is distinct from Clock as it 1) handles the conversion to u64 ticks, 2)
+/// avoids any global state, and 3) is agnostic to any particular strategy for
+/// updating it. In particular, we'll be using this in loom-based testing for
+/// the concurrency aspects of this driver.
+///
+/// The Driver frontend uses Clock to back the TimeSource, but some tests will
+/// define their own lightweight mocks.
+pub(super) trait TimeSource: Clone {
+    fn deadline_to_tick(&self, t: Instant) -> u64;
+    fn instant_to_tick(&self, t: Instant) -> u64;
+    fn tick_to_instant(&self, t: u64) -> Instant;
+    fn tick_to_duration(&self, t: u64) -> Duration {
+        Duration::from_millis(t)
+    }
+    fn now(&self) -> u64;
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct ClockTime {
+    clock: super::clock::Clock,
+    start_time: Instant,
+}
+
+impl ClockTime {
+    fn new(clock: Clock) -> Self {
+        Self {
+            clock,
+            start_time: super::clock::now(),
+        }
+    }
+}
+
+impl TimeSource for ClockTime {
+    fn deadline_to_tick(&self, t: Instant) -> u64 {
+        // Round up to the end of a ms
+        self.instant_to_tick(t + Duration::from_nanos(999_999))
+    }
+
+    fn instant_to_tick(&self, t: Instant) -> u64 {
+        // round up
+        let dur: Duration = t
+            .checked_duration_since(self.start_time)
+            .unwrap_or_else(|| Duration::from_secs(0));
+        let ms = dur.as_millis();
+
+        ms.try_into().expect("Duration too far into the future")
+    }
+
+    fn tick_to_instant(&self, t: u64) -> Instant {
+        self.start_time + Duration::from_millis(t)
+    }
+
+    fn now(&self) -> u64 {
+        self.instant_to_tick(self.clock.now())
+    }
+}
+
+/// Timer state shared between `Driver`, `Handle`, and `Registration`.
+pub(self) struct Inner<TS: TimeSource> {
+    /// Timing backend in use
+    time_source: TS,
+
+    /// The last published timer `elapsed` value.
+    elapsed: u64,
+
+    /// The earliest time at which we promise to wake up without unparking
+    next_wake: Option<NonZeroU64>,
 
     /// Timer wheel
     wheel: wheel::Wheel,
 
-    /// Thread parker. The `Driver` park implementation delegates to this.
-    park: T,
-
-    /// Source of "now" instances
-    clock: Clock,
-
     /// True if the driver is being shutdown
     is_shutdown: bool,
+
+    /// Access to the TimeUnparker
+    unpark: TimeUnpark<dyn Unpark>,
 }
-
-/// Timer state shared between `Driver`, `Handle`, and `Registration`.
-pub(crate) struct Inner {
-    /// The instant at which the timer started running.
-    start: Instant,
-
-    /// The last published timer `elapsed` value.
-    elapsed: AtomicU64,
-
-    /// Number of active timeouts
-    num: AtomicUsize,
-
-    /// Head of the "process" linked list.
-    process: AtomicStack,
-
-    /// Unparks the timer thread.
-    unpark: Box<dyn Unpark>,
-}
-
-/// Maximum number of timeouts the system can handle concurrently.
-const MAX_TIMEOUTS: usize = usize::MAX >> 1;
 
 // ===== impl Driver =====
 
-impl<T> Driver<T>
+impl<P> Driver<P>
 where
-    T: Park,
+    P: Park + 'static,
 {
     /// Creates a new `Driver` instance that uses `park` to block the current
-    /// thread and `clock` to get the current `Instant`.
+    /// thread and `time_source` to get the current time and convert to ticks.
     ///
     /// Specifying the source of time is useful when testing.
-    pub(crate) fn new(park: T, clock: Clock) -> Driver<T> {
-        let unpark = Box::new(park.unpark());
+    pub(crate) fn new(park: P, clock: Clock) -> Driver<P> {
+        let time_source = ClockTime::new(clock);
+        let unpark = TimeUnpark::new(park.unpark());
+
+        let inner = Inner::new(time_source.clone(), unpark.clone().coerce_unsized());
 
         Driver {
-            inner: Arc::new(Inner::new(clock.now(), unpark)),
-            wheel: wheel::Wheel::new(),
+            time_source,
+            inner: InternalHandle::new(Arc::new(Mutex::new(inner))),
             park,
-            clock,
-            is_shutdown: false,
+            unpark,
         }
     }
 
@@ -145,145 +208,36 @@ where
     /// `with_default`, setting the timer as the default timer for the execution
     /// context.
     pub(crate) fn handle(&self) -> Handle {
-        Handle::new(Arc::downgrade(&self.inner))
+        self.inner.clone().into()
     }
 
-    /// Converts an `Expiration` to an `Instant`.
-    fn expiration_instant(&self, when: u64) -> Instant {
-        self.inner.start + Duration::from_millis(when)
-    }
+    fn park_internal(&mut self, limit: Option<Duration>) -> Result<(), P::Error> {
+        let clock = &self.time_source.clock;
 
-    /// Runs timer related logic
-    fn process(&mut self) {
-        let now = crate::time::ms(
-            self.clock.now() - self.inner.start,
-            crate::time::Round::Down,
-        );
-
-        while let Some(entry) = self.wheel.poll(now) {
-            let when = entry.when_internal().expect("invalid internal entry state");
-
-            // Fire the entry
-            entry.fire(when);
-
-            // Track that the entry has been fired
-            entry.set_when_internal(None);
-        }
-
-        // Update the elapsed cache
-        self.inner.elapsed.store(self.wheel.elapsed(), SeqCst);
-    }
-
-    /// Processes the entry queue
-    ///
-    /// This handles adding and canceling timeouts.
-    fn process_queue(&mut self) {
-        for entry in self.inner.process.take() {
-            match (entry.when_internal(), entry.load_state()) {
-                (None, None) => {
-                    // Nothing to do
-                }
-                (Some(_), None) => {
-                    // Remove the entry
-                    self.clear_entry(&entry);
-                }
-                (None, Some(when)) => {
-                    // Add the entry to the timer wheel
-                    self.add_entry(entry, when);
-                }
-                (Some(_), Some(next)) => {
-                    self.clear_entry(&entry);
-                    self.add_entry(entry, next);
-                }
-            }
-        }
-    }
-
-    fn clear_entry(&mut self, entry: &Arc<Entry>) {
-        self.wheel.remove(entry);
-        entry.set_when_internal(None);
-    }
-
-    /// Fires the entry if it needs to, otherwise queue it to be processed later.
-    fn add_entry(&mut self, entry: Arc<Entry>, when: u64) {
-        use crate::time::error::InsertError;
-
-        entry.set_when_internal(Some(when));
-
-        match self.wheel.insert(when, entry) {
-            Ok(_) => {}
-            Err((entry, InsertError::Elapsed)) => {
-                // The entry's deadline has elapsed, so fire it and update the
-                // internal state accordingly.
-                entry.set_when_internal(None);
-                entry.fire(when);
-            }
-            Err((entry, InsertError::Invalid)) => {
-                // The entry's deadline is invalid, so error it and update the
-                // internal state accordingly.
-                entry.set_when_internal(None);
-                entry.error(Error::invalid());
-            }
-        }
-    }
-}
-
-impl<T> Park for Driver<T>
-where
-    T: Park,
-{
-    type Unpark = T::Unpark;
-    type Error = T::Error;
-
-    fn unpark(&self) -> Self::Unpark {
-        self.park.unpark()
-    }
-
-    fn park(&mut self) -> Result<(), Self::Error> {
-        self.process_queue();
-
-        match self.wheel.poll_at() {
+        match self.inner.process() {
             Some(when) => {
-                let now = self.clock.now();
-                let deadline = self.expiration_instant(when);
+                let when = when.get();
 
-                if deadline > now {
-                    let dur = deadline - now;
+                let now = self.time_source.now();
+                // Note that we effectively round up to 1ms here - this avoids
+                // very short-duration microsecond-resolution sleeps that the OS
+                // might treat as zero-length.
+                let mut duration = self.time_source.tick_to_duration(when.saturating_sub(now));
 
-                    if self.clock.is_paused() {
-                        self.park.park_timeout(Duration::from_secs(0))?;
-                        self.clock.advance(dur);
-                    } else {
-                        self.park.park_timeout(dur)?;
+                if duration > Duration::from_millis(0) {
+                    if let Some(limit) = limit {
+                        duration = std::cmp::min(limit, duration);
                     }
-                } else {
-                    self.park.park_timeout(Duration::from_secs(0))?;
-                }
-            }
-            None => {
-                self.park.park()?;
-            }
-        }
 
-        self.process();
-
-        Ok(())
-    }
-
-    fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
-        self.process_queue();
-
-        match self.wheel.poll_at() {
-            Some(when) => {
-                let now = self.clock.now();
-                let deadline = self.expiration_instant(when);
-
-                if deadline > now {
-                    let duration = cmp::min(deadline - now, duration);
-
-                    if self.clock.is_paused() {
+                    if clock.is_paused() {
                         self.park.park_timeout(Duration::from_secs(0))?;
-                        self.clock.advance(duration);
+
+                        // If we were unparked recently, we need to return to
+                        // the scheduler to deal with that before we advance
+                        // time.
+                        if !self.unpark.get_and_clear() {
+                            clock.advance(duration);
+                        }
                     } else {
                         self.park.park_timeout(duration)?;
                     }
@@ -292,42 +246,307 @@ where
                 }
             }
             None => {
-                self.park.park_timeout(duration)?;
+                if let Some(duration) = limit {
+                    if clock.is_paused() {
+                        self.park.park_timeout(Duration::from_secs(0))?;
+                        if !self.unpark.get_and_clear() {
+                            clock.advance(duration);
+                        }
+                    } else {
+                        self.park.park_timeout(duration)?;
+                    }
+                } else {
+                    self.park.park()?;
+                }
             }
         }
 
-        self.process();
+        // Process pending timers after waking up
+        self.inner.process();
 
         Ok(())
     }
+}
 
-    fn shutdown(&mut self) {
-        if self.is_shutdown {
+impl<TS: TimeSource> InternalHandle<TS> {
+    /// Acquires and then immediately releases the lock. This is used to
+    /// synchronize with the driver when a race is detected polling a timer.
+    pub(self) fn sync(&self) {
+        let _ = self.lock();
+    }
+
+    /// Runs timer related logic, and returns the next wakeup time
+    pub(self) fn process(&self) -> Option<NonZeroU64> {
+        let now = self.time_source().now();
+
+        self.process_at_time(now)
+    }
+
+    pub(self) fn process_at_time(&self, now: u64) -> Option<NonZeroU64> {
+        let mut any_awoken = false;
+
+        let mut waker_list: [Option<Waker>; 32] = Default::default();
+        let mut waker_idx = 0;
+
+        let mut lock = self.lock();
+
+        assert!(now >= lock.elapsed);
+
+        while let Some(entry) = lock.wheel.poll(now) {
+            // Fire the entry
+            let waker = unsafe { entry.fire(EntryState::Fired) };
+
+            if waker.is_some() {
+                any_awoken = true;
+
+                waker_list[waker_idx] = waker;
+
+                waker_idx += 1;
+
+                if waker_idx == waker_list.len() {
+                    // Wake a batch of wakers. To avoid deadlock, we must do this with the lock temporarily dropped.
+                    std::mem::drop(lock);
+
+                    for waker in waker_list.iter_mut() {
+                        waker.take().unwrap().wake();
+                    }
+
+                    waker_idx = 0;
+
+                    lock = self.lock();
+                }
+            }
+        }
+
+        // Update the elapsed cache
+        lock.elapsed = lock.wheel.elapsed();
+        lock.next_wake = lock
+            .wheel
+            .poll_at()
+            .map(|t| NonZeroU64::new(t).unwrap_or_else(|| NonZeroU64::new(1).unwrap()));
+
+        let mut next_wake = lock.next_wake;
+
+        if any_awoken {
+            // Wakers don't call unpark when invoked from the thread they need
+            // to awaken, so yield back to the runtime so it can check for
+            // pending tasks.
+            next_wake =
+                Some(NonZeroU64::new(lock.elapsed).unwrap_or_else(|| NonZeroU64::new(1).unwrap()));
+        }
+
+        std::mem::drop(lock);
+
+        for waker in waker_list[0..waker_idx].iter_mut() {
+            waker.take().unwrap().wake();
+        }
+
+        next_wake
+    }
+
+    /// Removes a registered timer from the driver.
+    ///
+    /// The timer will be moved to the cancelled state. Wakers will _not_ be invoked.
+    /// If the timer is already completed, this function is a no-op.
+    ///
+    /// SAFETY: The timer must not be registered with some other driver, and
+    /// `add_entry` must not be called concurrently.
+    pub(self) unsafe fn clear_entry(&self, entry: NonNull<TimerShared>) {
+        unsafe {
+            let mut lock = self.lock();
+
+            if unsafe { entry.as_ref().is_registered() } {
+                lock.wheel.remove(entry);
+            }
+
+            entry.as_ref().handle().fire(EntryState::Cancelled);
+        }
+    }
+
+    /// Removes and re-adds an entry to the driver.
+    ///
+    /// SAFETY: The timer must be either unregistered, or registered with this
+    /// driver. No other threads are allowed to concurrently manipulate the
+    /// timer at all (the current thread should hold an exclusive reference to
+    /// the `TimerEntry`)
+    pub(self) unsafe fn reregister(&self, entry: NonNull<TimerShared>) {
+        unsafe {
+            let mut lock = self.lock();
+
+            // We may have raced with a firing/deregistration, so check before
+            // deregistering.
+            if unsafe { entry.as_ref().is_registered() } {
+                lock.wheel.remove(entry);
+            }
+
+            // Always attempt to reregister. We'll fire it again if it's already
+            // expired/shutdown/etc.
+            Self::add_entry0(lock, entry.as_ref().handle())
+        }
+    }
+
+    /// Adds a new timer to the driver.
+    ///
+    /// If the timer is already expired, or if an error occurs, the timer will
+    /// be automatically transitioned to a completed state. The waker will _not_
+    /// be fired in this case, so the caller must check the timer state after
+    /// calling add_entry.
+    ///
+    /// SAFETY: The corresponding entry must remain pinned until timer
+    /// completion or deregistration, and must not yet be registered.
+    pub(self) unsafe fn add_entry(&self, entry: TimerHandle) {
+        debug_assert!(unsafe { entry.is_pre_registration() });
+
+        Self::add_entry0(self.lock(), entry);
+    }
+
+    unsafe fn add_entry0(mut lock: MutexGuard<'_, Inner<TS>>, entry: TimerHandle) {
+        if lock.is_shutdown {
+            unsafe {
+                entry.fire(EntryState::Error(crate::time::error::Kind::Shutdown));
+                return;
+            }
+        }
+
+        if !entry.set_registered() {
             return;
         }
 
-        use std::u64;
+        match unsafe { lock.wheel.insert(entry) } {
+            Ok(when) => {
+                if lock
+                    .next_wake
+                    .map(|next_wake| when < next_wake.get())
+                    .unwrap_or(true)
+                {
+                    lock.unpark.unpark();
+                }
 
-        // Shutdown the stack of entries to process, preventing any new entries
-        // from being pushed.
-        self.inner.process.shutdown();
-
-        // Clear the wheel, using u64::MAX allows us to drain everything
-        let end_of_time = u64::MAX;
-
-        while let Some(entry) = self.wheel.poll(end_of_time) {
-            entry.error(Error::shutdown());
-        }
-
-        self.park.shutdown();
-
-        self.is_shutdown = true;
+                None
+            }
+            Err((entry, super::error::InsertError::Elapsed)) => unsafe {
+                entry.fire(EntryState::Fired)
+            },
+            Err((entry, super::error::InsertError::Invalid)) => unsafe {
+                entry.fire(EntryState::Error(crate::time::error::Kind::Invalid))
+            },
+        };
     }
 }
 
-impl<T> Drop for Driver<T>
+pub(crate) struct TimeUnpark<U: Unpark + ?Sized> {
+    // loom's Arc does not support trait objects
+    unpark: std::sync::Arc<U>,
+    unparked: Arc<AtomicBool>,
+}
+
+impl<U: Unpark + ?Sized> Clone for TimeUnpark<U> {
+    fn clone(&self) -> Self {
+        Self {
+            unpark: self.unpark.clone(),
+            unparked: self.unparked.clone(),
+        }
+    }
+}
+
+impl TimeUnpark<dyn Unpark> {
+    #[cfg(test)]
+    pub(self) fn mock() -> Self {
+        struct MockUnpark;
+
+        impl Unpark for MockUnpark {
+            fn unpark(&self) {}
+        }
+
+        Self {
+            unpark: std::sync::Arc::new(MockUnpark),
+            unparked: Arc::new(AtomicBool::new(false)),
+        }
+    }
+}
+
+impl<U: Unpark + ?Sized> TimeUnpark<U> {
+    fn new(unpark: U) -> Self
+    where
+        U: Sized,
+    {
+        Self {
+            unpark: std::sync::Arc::new(unpark),
+            unparked: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    fn coerce_unsized(self) -> TimeUnpark<dyn Unpark>
+    where
+        U: Sized,
+    {
+        TimeUnpark {
+            unpark: self.unpark,
+            unparked: self.unparked,
+        }
+    }
+
+    fn get_and_clear(&self) -> bool {
+        self.unparked.swap(false, Ordering::AcqRel)
+    }
+}
+
+impl<U: Unpark + ?Sized> std::fmt::Debug for TimeUnpark<U> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TimeUnpark")
+            .field("unparked", &self.unparked.load(Ordering::SeqCst))
+            .finish()
+    }
+}
+
+impl<U: Unpark + ?Sized> Unpark for TimeUnpark<U> {
+    fn unpark(&self) {
+        self.unparked.store(true, Ordering::Release);
+        self.unpark.unpark();
+    }
+}
+
+impl<P> Park for Driver<P>
 where
-    T: Park,
+    P: Park + 'static,
+{
+    type Unpark = TimeUnpark<P::Unpark>;
+    type Error = P::Error;
+
+    fn unpark(&self) -> Self::Unpark {
+        self.unpark.clone()
+    }
+
+    fn park(&mut self) -> Result<(), Self::Error> {
+        self.park_internal(None)
+    }
+
+    fn park_timeout(&mut self, duration: Duration) -> Result<(), Self::Error> {
+        self.park_internal(Some(duration))
+    }
+
+    fn shutdown(&mut self) {
+        let mut lock = self.inner.lock();
+
+        if lock.is_shutdown {
+            return;
+        }
+
+        lock.is_shutdown = true;
+
+        std::mem::drop(lock);
+
+        // Advance time forward to the end of time.
+
+        self.inner.process_at_time(u64::MAX);
+
+        self.park.shutdown();
+    }
+}
+
+impl<P> Drop for Driver<P>
+where
+    P: Park + 'static,
 {
     fn drop(&mut self) {
         self.shutdown();
@@ -336,77 +555,30 @@ where
 
 // ===== impl Inner =====
 
-impl Inner {
-    fn new(start: Instant, unpark: Box<dyn Unpark>) -> Inner {
+impl<TS> Inner<TS>
+where
+    TS: TimeSource,
+{
+    pub(self) fn new(time_source: TS, unpark: TimeUnpark<dyn Unpark>) -> Self {
         Inner {
-            num: AtomicUsize::new(0),
-            elapsed: AtomicU64::new(0),
-            process: AtomicStack::new(),
-            start,
+            time_source,
+            elapsed: 0,
+            next_wake: None,
             unpark,
+            wheel: wheel::Wheel::new(),
+            is_shutdown: false,
         }
-    }
-
-    fn elapsed(&self) -> u64 {
-        self.elapsed.load(SeqCst)
-    }
-
-    #[cfg(all(test, loom))]
-    fn num(&self, ordering: std::sync::atomic::Ordering) -> usize {
-        self.num.load(ordering)
-    }
-
-    /// Increments the number of active timeouts
-    fn increment(&self) -> Result<(), Error> {
-        let mut curr = self.num.load(Relaxed);
-        loop {
-            if curr == MAX_TIMEOUTS {
-                return Err(Error::at_capacity());
-            }
-
-            match self
-                .num
-                .compare_exchange_weak(curr, curr + 1, Release, Relaxed)
-            {
-                Ok(_) => return Ok(()),
-                Err(next) => curr = next,
-            }
-        }
-    }
-
-    /// Decrements the number of active timeouts
-    fn decrement(&self) {
-        let prev = self.num.fetch_sub(1, Acquire);
-        debug_assert!(prev <= MAX_TIMEOUTS);
-    }
-
-    /// add the entry to the "process queue".  entries are not immediately
-    /// pushed into the timer wheel but are instead pushed into the
-    /// process queue and then moved from the process queue into the timer
-    /// wheel on next `process`
-    fn queue(&self, entry: &Arc<Entry>) -> Result<(), Error> {
-        if self.process.push(entry)? {
-            // The timer is notified so that it can process the timeout
-            self.unpark.unpark();
-        }
-
-        Ok(())
-    }
-
-    fn normalize_deadline(&self, deadline: Instant) -> u64 {
-        if deadline < self.start {
-            return 0;
-        }
-
-        crate::time::ms(deadline - self.start, crate::time::Round::Up)
     }
 }
 
-impl fmt::Debug for Inner {
+impl<TS: TimeSource> fmt::Debug for Inner<TS> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Inner").finish()
     }
 }
 
-#[cfg(all(test, loom))]
+//#[cfg(all(test, loom))]
+//mod tests;
+
+#[cfg(test)]
 mod tests;

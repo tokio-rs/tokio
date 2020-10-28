@@ -1,9 +1,11 @@
-use crate::time::driver::{Entry, Handle};
+use pin_project_lite::pin_project;
+
+use crate::time::driver::{Handle, TimerEntry};
 use crate::time::{error::Error, Duration, Instant};
 
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::Arc;
+
 use std::task::{self, Poll};
 
 /// Waits until `deadline` is reached.
@@ -17,7 +19,7 @@ use std::task::{self, Poll};
 /// Canceling a sleep instance is done by dropping the returned future. No additional
 /// cleanup work is required.
 pub fn sleep_until(deadline: Instant) -> Sleep {
-    Sleep::new_timeout(deadline, Duration::from_millis(0))
+    Sleep::new_timeout(deadline)
 }
 
 /// Waits until `duration` has elapsed.
@@ -55,28 +57,31 @@ pub fn sleep(duration: Duration) -> Sleep {
     sleep_until(Instant::now() + duration)
 }
 
-/// Future returned by [`sleep`](sleep) and
-/// [`sleep_until`](sleep_until).
-#[derive(Debug)]
-#[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct Sleep {
-    /// The link between the `Sleep` instance and the timer that drives it.
-    ///
-    /// This also stores the `deadline` value.
-    entry: Arc<Entry>,
+pin_project! {
+    /// Future returned by [`sleep`](sleep) and
+    /// [`sleep_until`](sleep_until).
+    #[derive(Debug)]
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
+    pub struct Sleep {
+        deadline: Instant,
+
+        // The link between the `Sleep` instance and the timer that drives it.
+        #[pin]
+        entry: TimerEntry<super::ClockTime>,
+    }
 }
 
 impl Sleep {
-    pub(crate) fn new_timeout(deadline: Instant, duration: Duration) -> Sleep {
+    pub(crate) fn new_timeout(deadline: Instant) -> Sleep {
         let handle = Handle::current();
-        let entry = Entry::new(&handle, deadline, duration);
+        let entry = TimerEntry::new(handle.internal(), deadline);
 
-        Sleep { entry }
+        Sleep { deadline, entry }
     }
 
     /// Returns the instant at which the future will complete.
     pub fn deadline(&self) -> Instant {
-        self.entry.time_ref().deadline
+        self.deadline
     }
 
     /// Returns `true` if `Sleep` has elapsed.
@@ -93,19 +98,17 @@ impl Sleep {
     ///
     /// This function can be called both before and after the future has
     /// completed.
-    pub fn reset(&mut self, deadline: Instant) {
-        unsafe {
-            self.entry.time_mut().deadline = deadline;
-        }
-
-        Entry::reset(&mut self.entry);
+    pub fn reset(self: Pin<&mut Self>, deadline: Instant) {
+        let this = self.project();
+        this.entry.reset(deadline);
+        *this.deadline = deadline;
     }
 
-    fn poll_elapsed(&self, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
+    fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
         // Keep track of task budget
         let coop = ready!(crate::coop::poll_proceed(cx));
 
-        self.entry.poll_elapsed(cx).map(move |r| {
+        self.project().entry.poll_elapsed(cx).map(move |r| {
             coop.made_progress();
             r
         })
@@ -129,11 +132,5 @@ impl Future for Sleep {
             Ok(()) => Poll::Ready(()),
             Err(e) => panic!("timer error: {}", e),
         }
-    }
-}
-
-impl Drop for Sleep {
-    fn drop(&mut self) {
-        Entry::cancel(&self.entry);
     }
 }

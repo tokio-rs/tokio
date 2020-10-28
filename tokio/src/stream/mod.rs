@@ -862,7 +862,7 @@ pub trait StreamExt: Stream {
     /// use std::time::Duration;
     /// # let int_stream = stream::iter(1..=3);
     ///
-    /// let mut int_stream = int_stream.timeout(Duration::from_secs(1));
+    /// let mut int_stream = Box::pin(int_stream.timeout(Duration::from_secs(1)));
     ///
     /// // When no items time out, we get the 3 elements in succession:
     /// assert_eq!(int_stream.try_next().await, Ok(Some(1)));

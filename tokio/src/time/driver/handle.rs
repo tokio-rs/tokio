@@ -1,22 +1,49 @@
-use crate::time::driver::Inner;
+use crate::loom::sync::{Arc, Mutex};
+use crate::time::driver::{ClockTime, TimeSource};
 use std::fmt;
-use std::sync::{Arc, Weak};
 
 /// Handle to time driver instance.
 #[derive(Clone)]
+pub(super) struct InternalHandle<TS: TimeSource> {
+    time_source: TS,
+    inner: Arc<Mutex<super::Inner<TS>>>,
+}
+
+impl<TS: TimeSource> InternalHandle<TS> {
+    /// Creates a new timer `Handle` from a shared `Inner` timer state.
+    pub(crate) fn new(inner: Arc<Mutex<super::Inner<TS>>>) -> Self {
+        let time_source = inner.lock().time_source.clone();
+        InternalHandle { time_source, inner }
+    }
+
+    /// Returns the time source associated with this handle
+    pub(super) fn time_source(&self) -> &TS {
+        &self.time_source
+    }
+
+    /// Locks the driver's inner structure
+    pub(super) fn lock(&self) -> crate::loom::sync::MutexGuard<'_, super::Inner<TS>> {
+        self.inner.lock()
+    }
+}
+
+/// "Public" handle, exposed outside of the time submodule. This avoids exposing
+/// the timesource details to consumer code.
+#[derive(Clone)]
 pub(crate) struct Handle {
-    inner: Weak<Inner>,
+    inner: InternalHandle<super::ClockTime>,
+}
+
+impl From<InternalHandle<ClockTime>> for Handle {
+    fn from(inner: InternalHandle<ClockTime>) -> Self {
+        Self { inner }
+    }
 }
 
 impl Handle {
-    /// Creates a new timer `Handle` from a shared `Inner` timer state.
-    pub(crate) fn new(inner: Weak<Inner>) -> Self {
-        Handle { inner }
-    }
-
-    /// Tries to return a strong ref to the inner
-    pub(crate) fn inner(&self) -> Option<Arc<Inner>> {
-        self.inner.upgrade()
+    /// Obtains the inner InternalHandle
+    pub(super) fn internal(&self) -> &InternalHandle<ClockTime> {
+        &self.inner
     }
 }
 
@@ -73,5 +100,11 @@ cfg_not_rt! {
 impl fmt::Debug for Handle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Handle")
+    }
+}
+
+impl<TS: TimeSource> fmt::Debug for InternalHandle<TS> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "InternalHandle")
     }
 }
