@@ -162,6 +162,13 @@ impl Semaphore {
             Err(_) => Err(TryAcquireError(())),
         }
     }
+
+    /// Closes the semaphore.
+    ///
+    /// This prevents the semaphore from issuing new permits and notifies all pending waiters.
+    pub fn close(&self) {
+        self.ll_sem.close();
+    }
 }
 
 impl<'a> SemaphorePermit<'a> {
