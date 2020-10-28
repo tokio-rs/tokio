@@ -84,7 +84,7 @@ signal = [
   "winapi/consoleapi",
 ]
 stream = ["futures-core"]
-sync = ["fnv"]
+sync = []
 test-util = []
 time = []
 
@@ -95,7 +95,6 @@ pin-project-lite = "0.1.1"
 
 # Everything else is optional...
 bytes = { version = "0.6.0", optional = true }
-fnv = { version = "1.0.6", optional = true }
 futures-core = { version = "0.3.0", optional = true }
 lazy_static = { version = "1.0.2", optional = true }
 memchr = { version = "2.2", optional = true }
