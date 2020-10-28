@@ -164,8 +164,6 @@ impl Semaphore {
 
     /// Closes the semaphore. This prevents the semaphore from issuing new
     /// permits and notifies all pending waiters.
-    // This will be used once the bounded MPSC is updated to use the new
-    // semaphore implementation.
     pub(crate) fn close(&self) {
         let mut waiters = self.waiters.lock();
         // If the semaphore's permits counter has enough permits for an
