@@ -65,6 +65,7 @@ mod util {
     use bytes::BufMut;
     use futures_core::ready;
     use std::io;
+    use std::mem::MaybeUninit;
     use std::pin::Pin;
     use std::task::{Context, Poll};
 
@@ -77,17 +78,24 @@ mod util {
             return Poll::Ready(Ok(0));
         }
 
-        let orig = buf.bytes_mut().as_ptr() as *const u8;
-        let mut b = ReadBuf::uninit(buf.bytes_mut());
+        let n = {
+            let dst = buf.bytes_mut();
+            let dst = unsafe { &mut *(dst as *mut _ as *mut [MaybeUninit<u8>]) };
+            let mut buf = ReadBuf::uninit(dst);
+            let ptr = buf.filled().as_ptr();
+            ready!(io.poll_read(cx, &mut buf)?);
 
-        ready!(io.poll_read(cx, &mut b))?;
-        let n = b.filled().len();
+            // Ensure the pointer does not change from under us
+            assert_eq!(ptr, buf.filled().as_ptr());
+            buf.filled().len()
+        };
 
-        // Safety: we can assume `n` bytes were read, since they are in`filled`.
-        assert_eq!(orig, b.filled().as_ptr());
+        // Safety: This is guaranteed to be the number of initialized (and read)
+        // bytes due to the invariants provided by `ReadBuf::filled`.
         unsafe {
             buf.advance_mut(n);
         }
+
         Poll::Ready(Ok(n))
     }
 }
