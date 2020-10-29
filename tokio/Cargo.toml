@@ -72,7 +72,7 @@ process = [
 rt = ["slab"]
 rt-multi-thread = [
   "num_cpus",
-  "rt"
+  "rt",
 ]
 signal = [
   "lazy_static",
