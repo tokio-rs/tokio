@@ -9,7 +9,6 @@ cfg_trace! {
                 target: "tokio::task",
                 "task",
                 %kind,
-                future = %std::any::type_name::<F>(),
             ))
         }
     }
