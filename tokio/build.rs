@@ -20,10 +20,11 @@ fn rustc_minor_version() -> Result<usize, Box<dyn std::error::Error>> {
     if let Some(part) = parts.next() {
         let mut parts = part.split('.');
         if parts.next() != Some("1") {
-            Err(format!(
+            return Err(format!(
                 "weird rustc version: {:?} (does not start with 1)",
                 version_str
-            ))?;
+            )
+            .into());
         }
         if let Some(middle) = parts.next() {
             Ok(middle.parse()?)
