@@ -15,10 +15,7 @@ fn rustc_minor_version() -> Result<usize, Box<dyn std::error::Error>> {
     let version_str = std::str::from_utf8(&out.stdout)?;
     let mut parts = version_str.split(' ');
     if parts.next() != Some("rustc") {
-        Err(format!(
-            "weird rustc version: {:?} (missing 'rustc') ",
-            version_str
-        ))?;
+        return Err(format!("weird rustc version: {:?} (missing 'rustc') ", version_str).into());
     }
     if let Some(part) = parts.next() {
         let mut parts = part.split('.');
