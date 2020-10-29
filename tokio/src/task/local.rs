@@ -190,6 +190,7 @@ cfg_rt! {
     ///     }).await;
     /// }
     /// ```
+    #[cfg_attr(tokio_track_caller, track_caller)]
     pub fn spawn_local<F>(future: F) -> JoinHandle<F::Output>
     where
         F: Future + 'static,
@@ -273,6 +274,7 @@ impl LocalSet {
     /// }
     /// ```
     /// [`spawn_local`]: fn@spawn_local
+    #[cfg_attr(tokio_track_caller, track_caller)]
     pub fn spawn_local<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + 'static,
