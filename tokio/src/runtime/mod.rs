@@ -415,7 +415,7 @@ cfg_rt! {
         ///
         /// # Panics
         ///
-        /// This function panics if the provided future panics, or if not called within an
+        /// This function panics if the provided future panics, or if called within an
         /// asynchronous execution context.
         ///
         /// # Examples
