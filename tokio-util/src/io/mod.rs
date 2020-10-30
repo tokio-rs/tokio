@@ -10,6 +10,7 @@ mod read_buf;
 mod reader_stream;
 mod stream_reader;
 
+pub use crate::util::poll_read_buf;
 pub use self::read_buf::read_buf;
 pub use self::reader_stream::ReaderStream;
 pub use self::stream_reader::StreamReader;
