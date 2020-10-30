@@ -18,7 +18,7 @@ use nix::unistd::{close, read, write};
 
 use futures::{poll, FutureExt};
 
-use tokio::io::unix::{AsyncFd, AsyncFdReadyGuard};
+use tokio::io::unix::{AsyncFd, AsyncFdBuilder, AsyncFdReadyGuard};
 use tokio_test::{assert_err, assert_pending};
 
 struct TestWaker {
@@ -175,6 +175,23 @@ async fn initially_writable() {
 
     afd_a.writable().await.unwrap().clear_ready();
     afd_b.writable().await.unwrap().clear_ready();
+
+    futures::select_biased! {
+        _ = tokio::time::sleep(Duration::from_millis(10)).fuse() => {},
+        _ = afd_a.readable().fuse() => panic!("Unexpected readable state"),
+        _ = afd_b.readable().fuse() => panic!("Unexpected readable state"),
+    }
+}
+
+#[tokio::test]
+async fn initially_not_writable() {
+    let (a, b) = socketpair();
+
+    let afd_a = AsyncFdBuilder::read().build(a).unwrap();
+    let afd_b = AsyncFdBuilder::read().build(b).unwrap();
+
+    afd_a.writable().await.unwrap_err();
+    afd_b.writable().await.unwrap_err();
 
     futures::select_biased! {
         _ = tokio::time::sleep(Duration::from_millis(10)).fuse() => {},

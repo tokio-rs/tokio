@@ -335,3 +335,64 @@ impl<T: AsRawFd> AsyncFd<T> {
         self.readiness(mio::Interest::WRITABLE).await
     }
 }
+
+#[derive(Clone, Copy, Debug)]
+/// Builder for `AsyncFd` allowing to choose interest on creation.
+///
+/// By default unless user chooses anything, all interest is assumed.
+pub struct AsyncFdBuilder {
+    is_read: bool,
+    is_write: bool,
+}
+
+impl AsyncFdBuilder {
+    /// Creates new instance.
+    pub const fn new() -> Self {
+        Self {
+            is_read: false,
+            is_write: false,
+        }
+    }
+
+    /// Sets `read` interest
+    pub const fn read(mut self) -> Self {
+        self.is_read = true;
+        self
+    }
+
+    /// Sets `write` interest
+    pub const fn write(mut self) -> Self {
+        self.is_write = true;
+        self
+    }
+
+    #[inline]
+    /// Constructs new `AsyncFd` instance
+    pub fn build<T: AsRawFd>(self, fd: T) -> io::Result<AsyncFd<T>> {
+        Self::build_with_handle(self, fd, Handle::current())
+    }
+
+    fn build_with_handle<T: AsRawFd>(self, inner: T, handle: Handle) -> io::Result<AsyncFd<T>> {
+        let fd = inner.as_raw_fd();
+        let interest = match (self.is_read, self.is_write) {
+            (true, true) | (false, false) => ALL_INTEREST,
+            (true, false) => mio::Interest::READABLE,
+            (false, true) => mio::Interest::WRITABLE,
+        };
+
+        let shared = if let Some(inner) = handle.inner() {
+            inner.add_source(&mut SourceFd(&fd), interest)?
+        } else {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "failed to find event loop",
+            ));
+        };
+
+        Ok(AsyncFd {
+            handle,
+            shared,
+            inner: Some(inner),
+        })
+    }
+}
