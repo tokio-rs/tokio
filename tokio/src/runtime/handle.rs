@@ -40,7 +40,24 @@ impl Handle {
     // }
 
     /// Run the provided function on an executor dedicated to blocking operations.
-    pub(crate) fn spawn_blocking<F, R>(&self, func: F) -> JoinHandle<R>
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Runtime;
+    ///
+    /// # fn dox() {
+    /// // Create the runtime
+    /// let rt = Runtime::new().unwrap();
+    /// // Get a handle from this runtime
+    /// let handle = rt.handle();
+    ///
+    /// // Spawn a blocking function onto the runtime using the handle
+    /// handle.spawn_blocking(|| {
+    ///     println!("now running on a worker thread");
+    /// });
+    /// # }
+    pub fn spawn_blocking<F, R>(&self, func: F) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
     {
