@@ -125,15 +125,6 @@ impl<P: Park> BasicScheduler<P> {
         &self.spawner
     }
 
-    /// Spawns a future onto the thread pool
-    pub(crate) fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
-    where
-        F: Future + Send + 'static,
-        F::Output: Send + 'static,
-    {
-        self.spawner.spawn(future)
-    }
-
     pub(crate) fn block_on<F: Future>(&self, future: F) -> F::Output {
         pin!(future);
 

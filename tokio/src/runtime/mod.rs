@@ -383,11 +383,7 @@ cfg_rt! {
             F: Future + Send + 'static,
             F::Output: Send + 'static,
         {
-            match &self.kind {
-                #[cfg(feature = "rt-multi-thread")]
-                Kind::ThreadPool(exec) => exec.spawn(future),
-                Kind::CurrentThread(exec) => exec.spawn(future),
-            }
+            self.handle.spawn(future)
         }
 
         /// Run the provided function on an executor dedicated to blocking operations.
