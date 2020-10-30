@@ -1,4 +1,5 @@
 use crate::runtime::blocking::task::BlockingTask;
+use crate::runtime::context::{self, EnterGuard};
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{blocking, driver, Spawner};
 
@@ -28,16 +29,16 @@ pub struct Handle {
     pub(super) blocking_spawner: blocking::Spawner,
 }
 
+#[derive(Debug)]
+pub struct HandleEnterGuard(EnterGuard);
+
 impl Handle {
-    // /// Enter the runtime context. This allows you to construct types that must
-    // /// have an executor available on creation such as [`Sleep`] or [`TcpStream`].
-    // /// It will also allow you to call methods such as [`tokio::spawn`].
-    // pub(crate) fn enter<F, R>(&self, f: F) -> R
-    // where
-    //     F: FnOnce() -> R,
-    // {
-    //     context::enter(self.clone(), f)
-    // }
+    /// Enter the runtime context. This allows you to construct types that must
+    /// have an executor available on creation such as [`Sleep`] or [`TcpStream`].
+    /// It will also allow you to call methods such as [`tokio::spawn`].
+    pub fn enter(&self) -> HandleEnterGuard {
+        HandleEnterGuard(context::enter(self.clone()))
+    }
 
     /// Run the provided function on an executor dedicated to blocking operations.
     ///
