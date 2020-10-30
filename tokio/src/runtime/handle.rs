@@ -9,7 +9,7 @@ use crate::runtime::{blocking, driver, Spawner};
 ///
 /// [`Runtime::handle`]: crate::runtime::Runtime::handle()
 #[derive(Debug, Clone)]
-pub(crate) struct Handle {
+pub struct Handle {
     pub(super) spawner: Spawner,
 
     /// Handles to the I/O drivers

@@ -198,7 +198,7 @@ cfg_rt! {
     use self::enter::enter;
 
     mod handle;
-    use handle::Handle;
+    pub use handle::Handle;
 
     mod spawner;
     use self::spawner::Spawner;
@@ -330,6 +330,27 @@ cfg_rt! {
         #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
         pub fn new() -> std::io::Result<Runtime> {
             Builder::new_multi_thread().enable_all().build()
+        }
+
+        /// Return a handle to the runtime's spawner.
+        ///
+        /// The returned handle can be used to spawn tasks that run on this runtime, and can
+        /// be cloned to allow moving the `Handle` to other threads.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::Runtime;
+        ///
+        /// let rt = Runtime::new()
+        ///     .unwrap();
+        ///
+        /// let handle = rt.handle();
+        ///
+        /// // Use the handle...
+        /// ```
+        pub fn handle(&self) -> &Handle {
+            &self.handle
         }
 
         /// Spawn a future onto the Tokio runtime.
