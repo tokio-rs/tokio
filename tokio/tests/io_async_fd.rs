@@ -187,8 +187,8 @@ async fn initially_writable() {
 async fn initially_not_writable() {
     let (a, b) = socketpair();
 
-    let afd_a = AsyncFdBuilder.read().build(a).unwrap();
-    let afd_b = AsyncFdBuilder.read().build(b).unwrap();
+    let afd_a = AsyncFdBuilder::new().read().build(a).unwrap();
+    let afd_b = AsyncFdBuilder::new().read().build(b).unwrap();
 
     afd_a.writable().await.unwrap_err();
     afd_b.writable().await.unwrap_err();
