@@ -107,6 +107,7 @@ mod util {
     /// # Ok(())
     /// # }
     /// ```
+    #[cfg_attr(not(feature = "io"), allow(unreachable_pub))]
     pub fn poll_read_buf<T: AsyncRead>(
         cx: &mut Context<'_>,
         io: Pin<&mut T>,
