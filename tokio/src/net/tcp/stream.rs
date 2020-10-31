@@ -1,4 +1,5 @@
 use crate::future::poll_fn;
+use crate::io::vec::AsyncVectoredWrite;
 use crate::io::{AsyncRead, AsyncWrite, PollEvented, ReadBuf};
 use crate::net::tcp::split::{split, ReadHalf, WriteHalf};
 use crate::net::tcp::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
@@ -6,7 +7,7 @@ use crate::net::{to_socket_addrs, ToSocketAddrs};
 
 use std::convert::TryFrom;
 use std::fmt;
-use std::io::{self, Read, Write};
+use std::io::{self, IoSlice, Read, Write};
 use std::net::{Shutdown, SocketAddr};
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -510,6 +511,23 @@ impl TcpStream {
             }
         }
     }
+
+    fn poll_write_vectored_priv(
+        &self,
+        cx: &mut Context<'_>,
+        slices: &[IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        loop {
+            let ev = ready!(self.io.poll_write_ready(cx))?;
+
+            match self.io.get_ref().write_vectored(slices) {
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    self.io.clear_readiness(ev);
+                }
+                x => return Poll::Ready(x),
+            }
+        }
+    }
 }
 
 impl TryFrom<std::net::TcpStream> for TcpStream {
@@ -554,6 +572,16 @@ impl AsyncWrite for TcpStream {
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.shutdown(std::net::Shutdown::Write)?;
         Poll::Ready(Ok(()))
+    }
+}
+
+impl AsyncVectoredWrite for TcpStream {
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        slices: &[IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        self.poll_write_vectored_priv(cx, slices)
     }
 }
 
