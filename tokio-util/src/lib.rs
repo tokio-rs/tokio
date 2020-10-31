@@ -108,10 +108,10 @@ mod util {
     /// # }
     /// ```
     #[cfg_attr(not(feature = "io"), allow(unreachable_pub))]
-    pub fn poll_read_buf<T: AsyncRead>(
-        cx: &mut Context<'_>,
+    pub fn poll_read_buf<T: AsyncRead, B: BufMut>(
         io: Pin<&mut T>,
-        buf: &mut impl BufMut,
+        cx: &mut Context<'_>,
+        buf: &mut B,
     ) -> Poll<io::Result<usize>> {
         if !buf.has_remaining_mut() {
             return Poll::Ready(Ok(0));
