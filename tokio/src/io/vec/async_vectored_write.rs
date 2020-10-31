@@ -66,3 +66,36 @@ where
         self.get_mut().as_mut().poll_write_vectored(cx, slices)
     }
 }
+
+macro_rules! delegate_async_vectored_write_to_std {
+    () => {
+        #[inline]
+        fn poll_write_vectored(
+            self: Pin<&mut Self>,
+            _: &mut Context<'_>,
+            slices: &[IoSlice<'_>],
+        ) -> Poll<io::Result<usize>> {
+            Poll::Ready(io::Write::write_vectored(self.get_mut(), slices))
+        }
+    };
+}
+
+impl AsyncVectoredWrite for Vec<u8> {
+    delegate_async_vectored_write_to_std!();
+}
+
+impl AsyncVectoredWrite for io::Cursor<&mut [u8]> {
+    delegate_async_vectored_write_to_std!();
+}
+
+impl AsyncVectoredWrite for io::Cursor<&mut Vec<u8>> {
+    delegate_async_vectored_write_to_std!();
+}
+
+impl AsyncVectoredWrite for io::Cursor<Vec<u8>> {
+    delegate_async_vectored_write_to_std!();
+}
+
+impl AsyncVectoredWrite for io::Cursor<Box<[u8]>> {
+    delegate_async_vectored_write_to_std!();
+}
