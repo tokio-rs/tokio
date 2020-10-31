@@ -1,5 +1,6 @@
 use crate::io::AsyncWrite;
 use std::io::{self, IoSlice};
+use std::ops::DerefMut;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -30,4 +31,38 @@ pub trait AsyncVectoredWrite: AsyncWrite {
         cx: &mut Context<'_>,
         slices: &[IoSlice<'_>],
     ) -> Poll<io::Result<usize>>;
+}
+
+macro_rules! deref_async_vectored_write {
+    () => {
+        fn poll_write_vectored(
+            mut self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            slices: &[IoSlice<'_>],
+        ) -> Poll<io::Result<usize>> {
+            Pin::new(&mut **self).poll_write_vectored(cx, slices)
+        }
+    };
+}
+
+impl<T: ?Sized + AsyncVectoredWrite + Unpin> AsyncVectoredWrite for Box<T> {
+    deref_async_vectored_write!();
+}
+
+impl<T: ?Sized + AsyncVectoredWrite + Unpin> AsyncVectoredWrite for &mut T {
+    deref_async_vectored_write!();
+}
+
+impl<P> AsyncVectoredWrite for Pin<P>
+where
+    P: DerefMut + Unpin,
+    P::Target: AsyncVectoredWrite,
+{
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        slices: &[IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        self.get_mut().as_mut().poll_write_vectored(cx, slices)
+    }
 }
