@@ -94,7 +94,7 @@ mod util {
     ///
     /// loop {
     ///     reads += 1;
-    ///     let n = poll_fn(|cx| poll_read_buf(cx, Pin::new(&mut read), &mut buf)).await?;
+    ///     let n = poll_fn(|cx| poll_read_buf(Pin::new(&mut read), cx, &mut buf)).await?;
     ///
     ///     if n == 0 {
     ///         break;
