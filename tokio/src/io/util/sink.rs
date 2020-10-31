@@ -1,7 +1,8 @@
+use crate::io::vec::AsyncVectoredWrite;
 use crate::io::AsyncWrite;
 
 use std::fmt;
-use std::io;
+use std::io::{self, IoSlice};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -67,6 +68,17 @@ impl AsyncWrite for Sink {
     #[inline]
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         Poll::Ready(Ok(()))
+    }
+}
+
+impl AsyncVectoredWrite for Sink {
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        _: &mut Context<'_>,
+        slices: &[IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        let total_len = slices.iter().map(|s| s.len()).sum();
+        Poll::Ready(Ok(total_len))
     }
 }
 
