@@ -9,10 +9,11 @@
 //! level.
 
 use crate::future::poll_fn;
+use crate::io::vec::AsyncVectoredWrite;
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 use crate::net::TcpStream;
 
-use std::io;
+use std::io::{self, IoSlice};
 use std::net::Shutdown;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -156,6 +157,16 @@ impl AsyncWrite for WriteHalf<'_> {
     // `poll_shutdown` on a write half shutdowns the stream in the "write" direction.
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.0.shutdown(Shutdown::Write).into()
+    }
+}
+
+impl AsyncVectoredWrite for WriteHalf<'_> {
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        slices: &[IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        self.0.poll_write_vectored_priv(cx, slices)
     }
 }
 

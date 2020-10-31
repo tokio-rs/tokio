@@ -512,7 +512,7 @@ impl TcpStream {
         }
     }
 
-    fn poll_write_vectored_priv(
+    pub(super) fn poll_write_vectored_priv(
         &self,
         cx: &mut Context<'_>,
         slices: &[IoSlice<'_>],

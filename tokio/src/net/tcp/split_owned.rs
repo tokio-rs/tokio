@@ -9,15 +9,17 @@
 //! level.
 
 use crate::future::poll_fn;
+use crate::io::vec::AsyncVectoredWrite;
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 use crate::net::TcpStream;
 
 use std::error::Error;
+use std::fmt;
+use std::io::{self, IoSlice};
 use std::net::Shutdown;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use std::{fmt, io};
 
 /// Owned read half of a [`TcpStream`], created by [`into_split`].
 ///
@@ -242,6 +244,16 @@ impl AsyncWrite for OwnedWriteHalf {
             Pin::into_inner(self).shutdown_on_drop = false;
         }
         res.into()
+    }
+}
+
+impl AsyncVectoredWrite for OwnedWriteHalf {
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        slices: &[IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        self.inner.poll_write_vectored_priv(cx, slices)
     }
 }
 
