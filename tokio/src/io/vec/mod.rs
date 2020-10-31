@@ -5,3 +5,6 @@
 
 mod async_vectored_write;
 pub use async_vectored_write::AsyncVectoredWrite;
+
+mod util;
+pub use util::{AsyncVectoredWriteExt, WriteVectored};
