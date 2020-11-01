@@ -1,9 +1,10 @@
 use crate::io::util::DEFAULT_BUF_SIZE;
+use crate::io::vec::AsyncVectoredWrite;
 use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite, ReadBuf};
 
 use pin_project_lite::pin_project;
 use std::fmt;
-use std::io::{self, Write};
+use std::io::{self, IoSlice, Write};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -81,6 +82,21 @@ impl<W: AsyncWrite> BufWriter<W> {
         Poll::Ready(ret)
     }
 
+    fn poll_finish_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        let me = self.project();
+        if buf.len() >= me.buf.capacity() {
+            debug_assert!(me.buf.is_empty());
+            me.inner.poll_write(cx, buf)
+        } else {
+            debug_assert!(me.buf.len() + buf.len() <= me.buf.capacity());
+            Poll::Ready(me.buf.write(buf))
+        }
+    }
+
     /// Gets a reference to the underlying writer.
     pub fn get_ref(&self) -> &W {
         &self.inner
@@ -122,13 +138,7 @@ impl<W: AsyncWrite> AsyncWrite for BufWriter<W> {
         if self.buf.len() + buf.len() > self.buf.capacity() {
             ready!(self.as_mut().flush_buf(cx))?;
         }
-
-        let me = self.project();
-        if buf.len() >= me.buf.capacity() {
-            me.inner.poll_write(cx, buf)
-        } else {
-            Poll::Ready(me.buf.write(buf))
-        }
+        self.poll_finish_write(cx, buf)
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
@@ -139,6 +149,46 @@ impl<W: AsyncWrite> AsyncWrite for BufWriter<W> {
     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         ready!(self.as_mut().flush_buf(cx))?;
         self.get_pin_mut().poll_shutdown(cx)
+    }
+}
+
+/// This implementation takes advantage of the buffering to emulate
+/// efficient vectored output on writers that don't natively support it.
+/// With this, `BufWriter` can be used as an adapter for generic code
+/// that requires `AsyncVectoredWrite`.
+impl<W: AsyncWrite> AsyncVectoredWrite for BufWriter<W> {
+    fn poll_write_vectored(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        let mut total_written = 0;
+
+        // Try to fill the buffer, stopping at the first non-empty slice
+        // that does not fit.
+        // Note that this may leave some buffer capacity unfilled. However,
+        // more aggressive packing would require extra logic to avoid
+        // buffering roundtrips for oversized slices that are more
+        // efficiently written directly. We optimize for small inputs,
+        // because a scenario where writes made to BufWriter are often large
+        // is likely optimized wrongly anyway.
+        let stopped_on = bufs.iter().find(|&buf| {
+            let me = self.as_mut().project();
+            if me.buf.len() + buf.len() > me.buf.capacity() {
+                return true;
+            }
+            me.buf.extend_from_slice(buf);
+            total_written += buf.len();
+            false
+        });
+
+        if total_written == 0 {
+            if let Some(buf) = stopped_on {
+                ready!(self.as_mut().flush_buf(cx))?;
+                return self.poll_finish_write(cx, buf);
+            }
+        }
+        Poll::Ready(Ok(total_written))
     }
 }
 
