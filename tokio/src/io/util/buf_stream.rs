@@ -1,8 +1,9 @@
 use crate::io::util::{BufReader, BufWriter};
+use crate::io::vec::AsyncVectoredWrite;
 use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite, ReadBuf};
 
 use pin_project_lite::pin_project;
-use std::io;
+use std::io::{self, IoSlice};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -129,6 +130,20 @@ impl<RW: AsyncRead + AsyncWrite> AsyncWrite for BufStream<RW> {
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.project().inner.poll_shutdown(cx)
+    }
+}
+
+/// This implementation takes advantage of the buffering to emulate
+/// efficient vectored output on I/O objects that don't natively support it.
+/// With this, `BufStream` can be used as an adapter for generic code
+/// that requires `AsyncVectoredWrite`.
+impl<RW: AsyncRead + AsyncWrite> AsyncVectoredWrite for BufStream<RW> {
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        self.project().inner.poll_write_vectored(cx, bufs)
     }
 }
 

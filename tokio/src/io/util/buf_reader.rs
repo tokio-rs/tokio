@@ -1,8 +1,9 @@
 use crate::io::util::DEFAULT_BUF_SIZE;
+use crate::io::vec::AsyncVectoredWrite;
 use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite, ReadBuf};
 
 use pin_project_lite::pin_project;
-use std::io;
+use std::io::{self, IoSlice};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{cmp, fmt};
@@ -156,6 +157,16 @@ impl<R: AsyncRead + AsyncWrite> AsyncWrite for BufReader<R> {
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.get_pin_mut().poll_shutdown(cx)
+    }
+}
+
+impl<R: AsyncRead + AsyncVectoredWrite> AsyncVectoredWrite for BufReader<R> {
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        self.get_pin_mut().poll_write_vectored(cx, bufs)
     }
 }
 
