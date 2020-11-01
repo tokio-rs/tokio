@@ -39,13 +39,26 @@ impl Handle {
     //     context::enter(self.clone(), f)
     // }
 
-    /// Run the provided function on an executor dedicated to blocking operations.
+    /// Run the provided function on an executor dedicated to blocking
+    /// operations.
+    #[cfg_attr(tokio_track_caller, track_caller)]
     pub(crate) fn spawn_blocking<F, R>(&self, func: F) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
     {
         #[cfg(feature = "tracing")]
         let func = {
+            #[cfg(tokio_track_caller)]
+            let location = std::panic::Location::caller();
+            #[cfg(tokio_track_caller)]
+            let span = tracing::trace_span!(
+                target: "tokio::task",
+                "task",
+                kind = %"blocking",
+                function = %std::any::type_name::<F>(),
+                spawn.location = %format_args!("{}:{}:{}", location.file(), location.line(), location.column()),
+            );
+            #[cfg(not(tokio_track_caller))]
             let span = tracing::trace_span!(
                 target: "tokio::task",
                 "task",
