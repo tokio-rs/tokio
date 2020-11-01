@@ -1,4 +1,5 @@
 use crate::future::poll_fn;
+use crate::io::vec::AsyncVectoredWrite;
 use crate::io::{AsyncRead, AsyncWrite, PollEvented, ReadBuf};
 use crate::net::unix::split::{split, ReadHalf, WriteHalf};
 use crate::net::unix::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
@@ -7,7 +8,7 @@ use crate::net::unix::SocketAddr;
 
 use std::convert::TryFrom;
 use std::fmt;
-use std::io::{self, Read, Write};
+use std::io::{self, IoSlice, Read, Write};
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::os::unix::net;
@@ -182,6 +183,16 @@ impl AsyncWrite for UnixStream {
     }
 }
 
+impl AsyncVectoredWrite for UnixStream {
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        slices: &[IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        self.poll_write_vectored_priv(cx, slices)
+    }
+}
+
 impl UnixStream {
     // == Poll IO functions that takes `&self` ==
     //
@@ -233,6 +244,23 @@ impl UnixStream {
             let ev = ready!(self.io.poll_write_ready(cx))?;
 
             match self.io.get_ref().write(buf) {
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    self.io.clear_readiness(ev);
+                }
+                x => return Poll::Ready(x),
+            }
+        }
+    }
+
+    pub(super) fn poll_write_vectored_priv(
+        &self,
+        cx: &mut Context<'_>,
+        slices: &[IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        loop {
+            let ev = ready!(self.io.poll_write_ready(cx))?;
+
+            match self.io.get_ref().write_vectored(slices) {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     self.io.clear_readiness(ev);
                 }
