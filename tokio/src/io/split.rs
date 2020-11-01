@@ -4,11 +4,12 @@
 //! To restore this read/write object from its `split::ReadHalf` and
 //! `split::WriteHalf` use `unsplit`.
 
+use crate::io::vec::AsyncVectoredWrite;
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 use std::cell::UnsafeCell;
 use std::fmt;
-use std::io;
+use std::io::{self, IoSlice};
 use std::pin::Pin;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::{Acquire, Release};
@@ -126,6 +127,17 @@ impl<T: AsyncWrite> AsyncWrite for WriteHalf<T> {
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         let mut inner = ready!(self.inner.poll_lock(cx));
         inner.stream_pin().poll_shutdown(cx)
+    }
+}
+
+impl<T: AsyncVectoredWrite> AsyncVectoredWrite for WriteHalf<T> {
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        let mut inner = ready!(self.inner.poll_lock(cx));
+        inner.stream_pin().poll_write_vectored(cx, bufs)
     }
 }
 
