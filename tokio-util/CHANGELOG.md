@@ -1,10 +1,10 @@
+### Added
+- io: `poll_read_buf` util fn (#2972).
+
 # 0.5.0 (October 30, 2020)
 
 ### Changed
 - io: update `bytes` to 0.6 (#3071).
-
-### Added
-- io: `poll_read_buf` util fn (#2972).
 
 # 0.4.0 (October 15, 2020)
 
