@@ -771,7 +771,6 @@ impl<T> Default for DelayQueue<T> {
     }
 }
 
-#[cfg(feature = "stream")]
 impl<T> futures_core::Stream for DelayQueue<T> {
     // DelayQueue seems much more specific, where a user may care that it
     // has reached capacity, so return those errors instead of panicking.
