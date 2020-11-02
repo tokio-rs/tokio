@@ -1,3 +1,18 @@
+# 0.3.3 (November 2, 2020)
+
+Fixes a soundness hole by adding a missing `Send` bound to
+`Runtime::spawn_blocking()`.
+
+### Fixed
+- rt: include missing `Send`, fixing soundness hole (#3089).
+- tracing: avoid huge trace span names (#3074).
+
+### Added
+- net: `TcpSocket::reuseport()`, `TcpSocket::set_reuseport()` (#3083).
+- net: `TcpSocket::reuseaddr()` (#3093).
+- net: `TcpSocket::local_addr()` (#3093).
+- net: add pid to `UCred` (#2633).
+
 # 0.3.2 (October 27, 2020)
 
 Adds `AsyncFd` as a replacement for v0.2's `PollEvented`.
