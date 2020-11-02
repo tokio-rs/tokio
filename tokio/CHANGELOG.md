@@ -66,6 +66,7 @@ Biggest changes are:
 - fs: `File` operations take `&self` (#2930).
 - rt: runtime API, and `#[tokio::main]` macro polish (#2876)
 - rt: `Runtime::enter` uses an RAII guard instead of a closure (#2954).
+- net: the `from_std` function on all sockets no longer sets socket into non-blocking mode (#2893)
 
 ### Added
 - sync: `map` function to lock guards (#2445).
