@@ -125,15 +125,19 @@ impl Handle {
     /// });
     /// # }
     /// ```
+    #[cfg_attr(tokio_track_caller, track_caller)]
     pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
+        #[cfg(feature = "tracing")]
+        let future = crate::util::trace::task(future, "task");
         self.spawner.spawn(future)
     }
 
-    /// Run the provided function on an executor dedicated to blocking operations.
+    /// Run the provided function on an executor dedicated to blocking
+    /// operations.
     ///
     /// # Examples
     ///
@@ -151,12 +155,24 @@ impl Handle {
     ///     println!("now running on a worker thread");
     /// });
     /// # }
+    #[cfg_attr(tokio_track_caller, track_caller)]
     pub fn spawn_blocking<F, R>(&self, func: F) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
     {
         #[cfg(feature = "tracing")]
         let func = {
+            #[cfg(tokio_track_caller)]
+            let location = std::panic::Location::caller();
+            #[cfg(tokio_track_caller)]
+            let span = tracing::trace_span!(
+                target: "tokio::task",
+                "task",
+                kind = %"blocking",
+                function = %std::any::type_name::<F>(),
+                spawn.location = %format_args!("{}:{}:{}", location.file(), location.line(), location.column()),
+            );
+            #[cfg(not(tokio_track_caller))]
             let span = tracing::trace_span!(
                 target: "tokio::task",
                 "task",

@@ -1,8 +1,10 @@
-use libc::{gid_t, uid_t};
+use libc::{gid_t, pid_t, uid_t};
 
 /// Credentials of a process
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub struct UCred {
+    /// PID (process ID) of the process
+    pid: Option<pid_t>,
     /// UID (user ID) of the process
     uid: uid_t,
     /// GID (group ID) of the process
@@ -19,6 +21,13 @@ impl UCred {
     pub fn gid(&self) -> gid_t {
         self.gid
     }
+
+    /// Gets PID (process ID) of the process.
+    ///
+    /// This is only implemented under linux, android, IOS and MacOS
+    pub fn pid(&self) -> Option<pid_t> {
+        self.pid
+    }
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -26,12 +35,13 @@ pub(crate) use self::impl_linux::get_peer_cred;
 
 #[cfg(any(
     target_os = "dragonfly",
-    target_os = "macos",
-    target_os = "ios",
     target_os = "freebsd",
     target_os = "netbsd",
     target_os = "openbsd"
 ))]
+pub(crate) use self::impl_bsd::get_peer_cred;
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 pub(crate) use self::impl_macos::get_peer_cred;
 
 #[cfg(any(target_os = "solaris", target_os = "illumos"))]
@@ -77,6 +87,7 @@ pub(crate) mod impl_linux {
                 Ok(super::UCred {
                     uid: ucred.uid,
                     gid: ucred.gid,
+                    pid: Some(ucred.pid),
                 })
             } else {
                 Err(io::Error::last_os_error())
@@ -87,13 +98,11 @@ pub(crate) mod impl_linux {
 
 #[cfg(any(
     target_os = "dragonfly",
-    target_os = "macos",
-    target_os = "ios",
     target_os = "freebsd",
     target_os = "netbsd",
     target_os = "openbsd"
 ))]
-pub(crate) mod impl_macos {
+pub(crate) mod impl_bsd {
     use crate::net::unix::UnixStream;
 
     use libc::getpeereid;
@@ -114,6 +123,54 @@ pub(crate) mod impl_macos {
                 Ok(super::UCred {
                     uid: uid.assume_init(),
                     gid: gid.assume_init(),
+                    pid: None,
+                })
+            } else {
+                Err(io::Error::last_os_error())
+            }
+        }
+    }
+}
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+pub(crate) mod impl_macos {
+    use crate::net::unix::UnixStream;
+
+    use libc::{c_void, getpeereid, getsockopt, pid_t, LOCAL_PEEREPID, SOL_LOCAL};
+    use std::io;
+    use std::mem::size_of;
+    use std::mem::MaybeUninit;
+    use std::os::unix::io::AsRawFd;
+
+    pub(crate) fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {
+        unsafe {
+            let raw_fd = sock.as_raw_fd();
+
+            let mut uid = MaybeUninit::uninit();
+            let mut gid = MaybeUninit::uninit();
+            let mut pid: MaybeUninit<pid_t> = MaybeUninit::uninit();
+            let mut pid_size: MaybeUninit<u32> = MaybeUninit::new(size_of::<pid_t>() as u32);
+
+            if getsockopt(
+                raw_fd,
+                SOL_LOCAL,
+                LOCAL_PEEREPID,
+                pid.as_mut_ptr() as *mut c_void,
+                pid_size.as_mut_ptr(),
+            ) != 0
+            {
+                return Err(io::Error::last_os_error());
+            }
+
+            assert!(pid_size.assume_init() == (size_of::<pid_t>() as u32));
+
+            let ret = getpeereid(raw_fd, uid.as_mut_ptr(), gid.as_mut_ptr());
+
+            if ret == 0 {
+                Ok(super::UCred {
+                    uid: uid.assume_init(),
+                    gid: gid.assume_init(),
+                    pid: Some(pid.assume_init()),
                 })
             } else {
                 Err(io::Error::last_os_error())
@@ -154,7 +211,11 @@ pub(crate) mod impl_solaris {
 
                 ucred_free(cred);
 
-                Ok(super::UCred { uid, gid })
+                Ok(super::UCred {
+                    uid,
+                    gid,
+                    pid: None,
+                })
             } else {
                 Err(io::Error::last_os_error())
             }
