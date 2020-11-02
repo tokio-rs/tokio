@@ -45,6 +45,7 @@ impl Handle {
     pub(crate) fn spawn_blocking<F, R>(&self, func: F) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
     {
         #[cfg(feature = "tracing")]
         let func = {
