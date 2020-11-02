@@ -1,7 +1,6 @@
 use crate::runtime::blocking::task::BlockingTask;
-use crate::runtime::context::{self, EnterGuard};
 use crate::runtime::task::{self, JoinHandle};
-use crate::runtime::{blocking, driver, Spawner};
+use crate::runtime::{blocking, context, driver, Spawner};
 
 use std::future::Future;
 use std::{error, fmt};
@@ -32,8 +31,15 @@ pub struct Handle {
     pub(super) blocking_spawner: blocking::Spawner,
 }
 
+/// Runtime context guard.
+///
+/// Returned by [`Runtime::enter`] and [^Handle::enter^], the context guard exits
+/// the runtime context on drop.
 #[derive(Debug)]
-pub struct HandleEnterGuard(EnterGuard);
+pub struct EnterGuard<'a> {
+    handle: &'a Handle,
+    guard: context::EnterGuard,
+}
 
 impl Handle {
     /// Enter the runtime context. This allows you to construct types that must
@@ -43,8 +49,11 @@ impl Handle {
     /// [`Sleep`]: struct@crate::time::Sleep
     /// [`TcpStream`]: struct@crate::net::TcpStream
     /// [`tokio::spawn`]: fn@crate::spawn
-    pub fn enter(&self) -> HandleEnterGuard {
-        HandleEnterGuard(context::enter(self.clone()))
+    pub fn enter(&self) -> EnterGuard<'_> {
+        EnterGuard {
+            handle: self,
+            guard: context::enter(self.clone()),
+        }
     }
 
     /// Returns a `Handle` view over the currently running `Runtime`

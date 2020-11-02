@@ -198,7 +198,7 @@ cfg_rt! {
     use self::enter::enter;
 
     mod handle;
-    pub use handle::Handle;
+    pub use handle::{EnterGuard, Handle};
 
     mod spawner;
     use self::spawner::Spawner;
@@ -270,16 +270,6 @@ cfg_rt! {
 
         /// Blocking pool handle, used to signal shutdown
         blocking_pool: BlockingPool,
-    }
-
-    /// Runtime context guard.
-    ///
-    /// Returned by [`Runtime::enter`], the context guard exits the runtime
-    /// context on drop.
-    #[derive(Debug)]
-    pub struct EnterGuard<'a> {
-        rt: &'a Runtime,
-        guard: context::EnterGuard,
     }
 
     /// The runtime executor is either a thread-pool or a current-thread executor.
@@ -495,10 +485,7 @@ cfg_rt! {
         /// }
         /// ```
         pub fn enter(&self) -> EnterGuard<'_> {
-            EnterGuard {
-                rt: self,
-                guard: context::enter(self.handle.clone()),
-            }
+            self.handle.enter()
         }
 
         /// Shutdown the runtime, waiting for at most `duration` for all spawned
