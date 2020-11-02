@@ -8,7 +8,7 @@ Fixes a soundness hole by adding a missing `Send` bound to
 - tracing: avoid huge trace span names (#3074).
 
 ### Added
-- net: `TcpSocket::reuseport()`, `TcpSocket::set_reuseport()` (#3083)
+- net: `TcpSocket::reuseport()`, `TcpSocket::set_reuseport()` (#3083).
 - net: `TcpSocket::reuseaddr()` (#3093).
 - net: `TcpSocket::local_addr()` (#3093).
 - net: add pid to `UCred` (#2633).
