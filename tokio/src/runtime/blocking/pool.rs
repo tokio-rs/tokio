@@ -70,6 +70,7 @@ const KEEP_ALIVE: Duration = Duration::from_secs(10);
 pub(crate) fn spawn_blocking<F, R>(func: F) -> JoinHandle<R>
 where
     F: FnOnce() -> R + Send + 'static,
+    R: Send + 'static,
 {
     let rt = context::current().expect("not currently running on the Tokio runtime.");
     rt.spawn_blocking(func)
@@ -79,6 +80,7 @@ where
 pub(crate) fn try_spawn_blocking<F, R>(func: F) -> Result<(), ()>
 where
     F: FnOnce() -> R + Send + 'static,
+    R: Send + 'static,
 {
     let rt = context::current().expect("not currently running on the Tokio runtime.");
 

@@ -392,6 +392,7 @@ cfg_rt! {
         pub fn spawn_blocking<F, R>(&self, func: F) -> JoinHandle<R>
         where
             F: FnOnce() -> R + Send + 'static,
+            R: Send + 'static,
         {
             self.handle.spawn_blocking(func)
         }
