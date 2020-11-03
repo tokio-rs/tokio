@@ -271,6 +271,7 @@ where
 impl<TS: TimeSource> InternalHandle<TS> {
     /// Acquires and then immediately releases the lock. This is used to
     /// synchronize with the driver when a race is detected polling a timer.
+    #[cold]
     pub(self) fn sync(&self) {
         let _ = self.lock();
     }

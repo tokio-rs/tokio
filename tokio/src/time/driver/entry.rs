@@ -356,7 +356,10 @@ impl TimerShared {
     /// Sets the true time-of-expiration value, with relaxed memory ordering.
     /// Returns the old value.
     pub(super) fn set_when(&self, t: u64) -> u64 {
-        self.padded.0.true_when.swap(t, Ordering::Relaxed)
+        let old_when = self.padded.0.true_when.load(Ordering::Relaxed);
+        self.padded.0.true_when.store(t, Ordering::Relaxed);
+
+        old_when
     }
 
     /// Returns an EntryHandle for this timer.
