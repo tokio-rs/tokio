@@ -336,7 +336,9 @@ impl<T> DelayQueue<T> {
         };
 
         if should_set_delay {
-            self.waker.take().map(Waker::wake);
+            if let Some(waker) = self.waker.take() {
+                waker.wake();
+            }
 
             let delay_time = self.start + Duration::from_millis(when);
             if let Some(ref mut delay) = &mut self.delay {

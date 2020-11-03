@@ -170,7 +170,7 @@ impl Wheel {
             }
         }
 
-        return self.pending.pop_back();
+        self.pending.pop_back()
     }
 
     /// Returns the instant at which the next timeout expires.
