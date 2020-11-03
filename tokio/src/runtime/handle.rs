@@ -35,6 +35,8 @@ pub struct Handle {
 ///
 /// Returned by [`Runtime::enter`] and [`Handle::enter`], the context guard exits
 /// the runtime context on drop.
+///
+/// [`Runtime::enter`]: fn@crate::runtime::Runtime::enter
 #[derive(Debug)]
 pub struct EnterGuard<'a> {
     handle: &'a Handle,
