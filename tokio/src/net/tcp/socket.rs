@@ -183,6 +183,127 @@ impl TcpSocket {
         self.inner.set_reuseaddr(reuseaddr)
     }
 
+    /// Retrieves the value set for `SO_REUSEADDR` on this socket
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpSocket;
+    ///
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let addr = "127.0.0.1:8080".parse().unwrap();
+    ///
+    ///     let socket = TcpSocket::new_v4()?;
+    ///     socket.set_reuseaddr(true)?;
+    ///     assert!(socket.reuseaddr().unwrap());
+    ///     socket.bind(addr)?;
+    ///
+    ///     let listener = socket.listen(1024)?;
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn reuseaddr(&self) -> io::Result<bool> {
+        self.inner.get_reuseaddr()
+    }
+
+    /// Allow the socket to bind to an in-use port. Only available for unix systems
+    /// (excluding Solaris & Illumos).
+    ///
+    /// Behavior is platform specific. Refer to the target platform's
+    /// documentation for more details.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpSocket;
+    ///
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let addr = "127.0.0.1:8080".parse().unwrap();
+    ///
+    ///     let socket = TcpSocket::new_v4()?;
+    ///     socket.set_reuseport(true)?;
+    ///     socket.bind(addr)?;
+    ///
+    ///     let listener = socket.listen(1024)?;
+    ///     Ok(())
+    /// }
+    /// ```
+    #[cfg(all(unix, not(target_os = "solaris"), not(target_os = "illumos")))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(all(unix, not(target_os = "solaris"), not(target_os = "illumos"))))
+    )]
+    pub fn set_reuseport(&self, reuseport: bool) -> io::Result<()> {
+        self.inner.set_reuseport(reuseport)
+    }
+
+    /// Allow the socket to bind to an in-use port. Only available for unix systems
+    /// (excluding Solaris & Illumos).
+    ///
+    /// Behavior is platform specific. Refer to the target platform's
+    /// documentation for more details.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpSocket;
+    ///
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let addr = "127.0.0.1:8080".parse().unwrap();
+    ///
+    ///     let socket = TcpSocket::new_v4()?;
+    ///     socket.set_reuseport(true)?;
+    ///     assert!(socket.reuseport().unwrap());
+    ///     socket.bind(addr)?;
+    ///
+    ///     let listener = socket.listen(1024)?;
+    ///     Ok(())
+    /// }
+    /// ```
+    #[cfg(all(unix, not(target_os = "solaris"), not(target_os = "illumos")))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(all(unix, not(target_os = "solaris"), not(target_os = "illumos"))))
+    )]
+    pub fn reuseport(&self) -> io::Result<bool> {
+        self.inner.get_reuseport()
+    }
+
+    /// Get the local address of this socket.
+    ///
+    /// Will fail on windows if called before `bind`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpSocket;
+    ///
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let addr = "127.0.0.1:8080".parse().unwrap();
+    ///
+    ///     let socket = TcpSocket::new_v4()?;
+    ///     socket.bind(addr)?;
+    ///     assert_eq!(socket.local_addr().unwrap().to_string(), "127.0.0.1:8080");
+    ///     let listener = socket.listen(1024)?;
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+        self.inner.get_localaddr()
+    }
+
     /// Bind the socket to the given address.
     ///
     /// This calls the `bind(2)` operating-system function. Behavior is

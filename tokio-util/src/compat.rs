@@ -20,7 +20,7 @@ pin_project! {
 /// `futures_io::AsyncRead` to implement `tokio::io::AsyncRead`.
 pub trait FuturesAsyncReadCompatExt: futures_io::AsyncRead {
     /// Wraps `self` with a compatibility layer that implements
-    /// `tokio_io::AsyncWrite`.
+    /// `tokio_io::AsyncRead`.
     fn compat(self) -> Compat<Self>
     where
         Self: Sized,

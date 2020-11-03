@@ -80,6 +80,7 @@ where
 pub(crate) fn try_spawn_blocking<F, R>(func: F) -> Result<(), ()>
 where
     F: FnOnce() -> R + Send + 'static,
+    R: Send + 'static,
 {
     let rt = context::current().expect("not currently running on the Tokio runtime.");
 
