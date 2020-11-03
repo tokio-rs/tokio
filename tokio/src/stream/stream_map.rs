@@ -156,7 +156,7 @@ use std::task::{Context, Poll};
 ///     }
 /// }
 /// ```
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct StreamMap<K, V> {
     /// Streams stored in the map
     entries: Vec<(K, V)>,
@@ -510,6 +510,12 @@ where
         } else {
             Pending
         }
+    }
+}
+
+impl<K, V> Default for StreamMap<K, V> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
