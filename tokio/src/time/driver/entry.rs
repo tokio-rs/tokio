@@ -121,31 +121,12 @@ impl EntryState {
 }
 
 impl EntryState {
-    const fn to_repr(self) -> u8 {
-        match self {
-            EntryState::NotRegistered => 0,
-            EntryState::Registered => 1,
-            EntryState::FiringInProgress => 2,
-            EntryState::Fired => 3,
-            EntryState::Cancelled => 4,
-            EntryState::Error(crate::time::error::Kind::Shutdown) => 5,
-            EntryState::Error(crate::time::error::Kind::Invalid) => 6,
-            EntryState::Error(crate::time::error::Kind::AtCapacity) => 7,
-        }
+    fn to_repr(self) -> u8 {
+        unsafe { std::mem::transmute(self) }
     }
 
-    fn from_repr(n: u8) -> Self {
-        match n {
-            0 => EntryState::NotRegistered,
-            1 => EntryState::Registered,
-            2 => EntryState::FiringInProgress,
-            3 => EntryState::Fired,
-            4 => EntryState::Cancelled,
-            5 => EntryState::Error(crate::time::error::Kind::Shutdown),
-            6 => EntryState::Error(crate::time::error::Kind::Invalid),
-            7 => EntryState::Error(crate::time::error::Kind::AtCapacity),
-            _ => panic!("Illegal timer state {:?}", n),
-        }
+    unsafe fn from_repr(n: u8) -> Self {
+        unsafe { std::mem::transmute(n) }       
     }
 }
 
@@ -179,7 +160,7 @@ mod state_cell {
 
         /// Gets the current state.
         pub(super) fn get(&self, ordering: Ordering) -> EntryState {
-            EntryState::from_repr(self.0.load(ordering))
+            unsafe { EntryState::from_repr(self.0.load(ordering)) }
         }
 
         /// Sets the current state.
