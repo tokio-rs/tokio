@@ -16,9 +16,7 @@ async fn usage() {
     assert_ready!(stream.poll_next());
     assert_pending!(stream.poll_next());
 
-    eprintln!("=== pre advance");
     time::advance(Duration::from_millis(90)).await;
-    eprintln!("=== post advance");
 
     assert_pending!(stream.poll_next());
 

@@ -1,8 +1,6 @@
 use crate::future::poll_fn;
 use crate::time::{sleep_until, Duration, Instant, Sleep};
 
-use pin_project_lite::pin_project;
-
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -26,12 +24,11 @@ use std::task::{Context, Poll};
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let interval = time::interval(Duration::from_millis(10));
-///     tokio::pin!(interval);
+///     let mut interval = time::interval(Duration::from_millis(10));
 ///
-///     interval.as_mut().tick().await;
-///     interval.as_mut().tick().await;
-///     interval.as_mut().tick().await;
+///     interval.tick().await;
+///     interval.tick().await;
+///     interval.tick().await;
 ///
 ///     // approximately 20ms have elapsed.
 /// }
@@ -58,11 +55,9 @@ use std::task::{Context, Poll};
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let interval = time::interval(time::Duration::from_secs(2));
-///     tokio::pin!(interval);
-///
+///     let mut interval = time::interval(time::Duration::from_secs(2));
 ///     for _i in 0..5 {
-///         interval.as_mut().tick().await;
+///         interval.tick().await;
 ///         task_that_takes_a_second().await;
 ///     }
 /// }
@@ -93,12 +88,11 @@ pub fn interval(period: Duration) -> Interval {
 /// #[tokio::main]
 /// async fn main() {
 ///     let start = Instant::now() + Duration::from_millis(50);
-///     let interval = interval_at(start, Duration::from_millis(10));
-///     tokio::pin!(interval);
+///     let mut interval = interval_at(start, Duration::from_millis(10));
 ///
-///     interval.as_mut().tick().await;
-///     interval.as_mut().tick().await;
-///     interval.as_mut().tick().await;
+///     interval.tick().await;
+///     interval.tick().await;
+///     interval.tick().await;
 ///
 ///     // approximately 70ms have elapsed.
 /// }
@@ -112,38 +106,33 @@ pub fn interval_at(start: Instant, period: Duration) -> Interval {
     }
 }
 
-pin_project! {
-    /// Stream returned by [`interval`](interval) and [`interval_at`](interval_at).
-    ///
-    /// This type only implements the [`Stream`] trait if the "stream" feature is
-    /// enabled.
-    ///
-    /// [`Stream`]: trait@crate::stream::Stream
-    #[derive(Debug)]
-    pub struct Interval {
-        // Future that completes the next time the `Interval` yields a value.
-        #[pin]
-        delay: Sleep,
+/// Stream returned by [`interval`](interval) and [`interval_at`](interval_at).
+///
+/// This type only implements the [`Stream`] trait if the "stream" feature is
+/// enabled.
+///
+/// [`Stream`]: trait@crate::stream::Stream
+#[derive(Debug)]
+pub struct Interval {
+    /// Future that completes the next time the `Interval` yields a value.
+    delay: Sleep,
 
-        // The duration between values yielded by `Interval`.
-        period: Duration,
-    }
+    /// The duration between values yielded by `Interval`.
+    period: Duration,
 }
 
 impl Interval {
-    fn poll_tick(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Instant> {
-        let mut this = self.project();
-
+    fn poll_tick(&mut self, cx: &mut Context<'_>) -> Poll<Instant> {
         // Wait for the delay to be done
-        ready!(this.delay.as_mut().poll(cx));
+        ready!(Pin::new(&mut self.delay).poll(cx));
 
         // Get the `now` by looking at the `delay` deadline
-        let now = this.delay.deadline();
+        let now = self.delay.deadline();
 
         // The next interval value is `duration` after the one that just
         // yielded.
-        let next = now + *this.period;
-        this.delay.reset(next);
+        let next = now + self.period;
+        self.delay.reset(next);
 
         // Return the current instant
         Poll::Ready(now)
@@ -160,18 +149,17 @@ impl Interval {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let interval = time::interval(Duration::from_millis(10));
-    ///     tokio::pin!(interval);
+    ///     let mut interval = time::interval(Duration::from_millis(10));
     ///
-    ///     interval.as_mut().tick().await;
-    ///     interval.as_mut().tick().await;
-    ///     interval.as_mut().tick().await;
+    ///     interval.tick().await;
+    ///     interval.tick().await;
+    ///     interval.tick().await;
     ///
     ///     // approximately 20ms have elapsed.
     /// }
     /// ```
-    pub async fn tick(mut self: Pin<&mut Self>) -> Instant {
-        poll_fn(move |cx| self.as_mut().poll_tick(cx)).await
+    pub async fn tick(&mut self) -> Instant {
+        poll_fn(|cx| self.poll_tick(cx)).await
     }
 }
 
@@ -179,7 +167,7 @@ impl Interval {
 impl crate::stream::Stream for Interval {
     type Item = Instant;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Instant>> {
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Instant>> {
         Poll::Ready(Some(ready!(self.poll_tick(cx))))
     }
 }

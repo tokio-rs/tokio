@@ -14,7 +14,6 @@ pin_project! {
     pub struct Timeout<S> {
         #[pin]
         stream: Fuse<S>,
-        #[pin]
         deadline: Sleep,
         duration: Duration,
         poll_deadline: bool,
@@ -52,7 +51,7 @@ impl<S: Stream> Stream for Timeout<S> {
         };
 
         if self.poll_deadline {
-            ready!(self.as_mut().project().deadline.poll(cx));
+            ready!(Pin::new(self.as_mut().project().deadline).poll(cx));
             *self.as_mut().project().poll_deadline = false;
             return Poll::Ready(Some(Err(Elapsed::new())));
         }

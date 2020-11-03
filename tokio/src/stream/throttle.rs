@@ -4,7 +4,7 @@ use crate::stream::Stream;
 use crate::time::{Duration, Instant, Sleep};
 
 use std::future::Future;
-
+use std::marker::Unpin;
 use std::pin::Pin;
 use std::task::{self, Poll};
 
@@ -46,28 +46,13 @@ pin_project! {
     }
 }
 
-impl<T> Throttle<T> {
-    fn get_sleep_mut(self: Pin<&mut Self>) -> Option<Pin<&mut Sleep>> {
-        unsafe {
-            // SAFETY: We project here to the inner Sleep object. Because we
-            // allow access only via a Pin<&mut Sleep>, our returned reference
-            // does not allow the pinning guarantees to be violated.
-
-            self.get_unchecked_mut()
-                .delay
-                .as_mut()
-                .map(|delay| Pin::new_unchecked(delay))
-        }
-    }
-
+// XXX: are these safe if `T: !Unpin`?
+impl<T: Unpin> Throttle<T> {
     /// Acquires a reference to the underlying stream that this combinator is
     /// pulling from.
     pub fn get_ref(&self) -> &T {
         &self.stream
     }
-
-    // The following combinators are safe even if T is !Unpin, because we take
-    // an unpinned Self.
 
     /// Acquires a mutable reference to the underlying stream that this combinator
     /// is pulling from.
@@ -91,19 +76,17 @@ impl<T: Stream> Stream for Throttle<T> {
     type Item = T::Item;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {
-        if !self.has_delayed {
-            if let Some(_sleep) = self.as_mut().get_sleep_mut() {
-                ready!(self.as_mut().get_sleep_mut().unwrap().poll(cx));
-                *self.as_mut().project().has_delayed = true;
-            }
+        if !self.has_delayed && self.delay.is_some() {
+            ready!(Pin::new(self.as_mut().project().delay.as_mut().unwrap()).poll(cx));
+            *self.as_mut().project().has_delayed = true;
         }
 
         let value = ready!(self.as_mut().project().stream.poll_next(cx));
 
         if value.is_some() {
             let dur = self.duration;
-            if let Some(ref mut delay) = self.as_mut().get_sleep_mut() {
-                delay.as_mut().reset(Instant::now() + dur);
+            if let Some(ref mut delay) = self.as_mut().project().delay {
+                delay.reset(Instant::now() + dur);
             }
 
             *self.as_mut().project().has_delayed = false;

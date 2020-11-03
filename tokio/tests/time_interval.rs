@@ -60,7 +60,7 @@ async fn usage_stream() {
 }
 
 fn poll_next(interval: &mut task::Spawn<time::Interval>) -> Poll<Instant> {
-    interval.enter(|cx, interval| {
+    interval.enter(|cx, mut interval| {
         tokio::pin! {
             let fut = interval.tick();
         }

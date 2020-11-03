@@ -126,7 +126,7 @@ impl EntryState {
     }
 
     unsafe fn from_repr(n: u8) -> Self {
-        unsafe { std::mem::transmute(n) }       
+        unsafe { std::mem::transmute(n) }
     }
 }
 

@@ -1,5 +1,3 @@
-use pin_project_lite::pin_project;
-
 use crate::time::driver::{Handle, TimerEntry};
 use crate::time::{error::Error, Duration, Instant};
 
@@ -57,24 +55,22 @@ pub fn sleep(duration: Duration) -> Sleep {
     sleep_until(Instant::now() + duration)
 }
 
-pin_project! {
-    /// Future returned by [`sleep`](sleep) and
-    /// [`sleep_until`](sleep_until).
-    #[derive(Debug)]
-    #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub struct Sleep {
-        deadline: Instant,
+/// Future returned by [`sleep`](sleep) and
+/// [`sleep_until`](sleep_until).
+#[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
+pub struct Sleep {
+    deadline: Instant,
 
-        // The link between the `Sleep` instance and the timer that drives it.
-        #[pin]
-        entry: TimerEntry<super::ClockTime>,
-    }
+    // The link between the `Sleep` instance and the timer that drives it.
+    // This will be unboxed in tokio 1.0
+    entry: Pin<Box<TimerEntry<super::ClockTime>>>,
 }
 
 impl Sleep {
     pub(crate) fn new_timeout(deadline: Instant) -> Sleep {
         let handle = Handle::current();
-        let entry = TimerEntry::new(handle.internal(), deadline);
+        let entry = Box::pin(TimerEntry::new(handle.internal(), deadline));
 
         Sleep { deadline, entry }
     }
@@ -98,17 +94,16 @@ impl Sleep {
     ///
     /// This function can be called both before and after the future has
     /// completed.
-    pub fn reset(self: Pin<&mut Self>, deadline: Instant) {
-        let this = self.project();
-        this.entry.reset(deadline);
-        *this.deadline = deadline;
+    pub fn reset(&mut self, deadline: Instant) {
+        self.entry.as_mut().reset(deadline);
+        self.deadline = deadline;
     }
 
-    fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
+    fn poll_elapsed(&mut self, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
         // Keep track of task budget
         let coop = ready!(crate::coop::poll_proceed(cx));
 
-        self.project().entry.poll_elapsed(cx).map(move |r| {
+        self.entry.as_mut().poll_elapsed(cx).map(move |r| {
             coop.made_progress();
             r
         })
@@ -118,7 +113,7 @@ impl Sleep {
 impl Future for Sleep {
     type Output = ();
 
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
         // `poll_elapsed` can return an error in two cases:
         //
         // - AtCapacity: this is a pathological case where far too many
@@ -128,7 +123,7 @@ impl Future for Sleep {
         // Both cases are extremely rare, and pretty accurately fit into
         // "logic errors", so we just panic in this case. A user couldn't
         // really do much better if we passed the error onwards.
-        match ready!(self.poll_elapsed(cx)) {
+        match ready!(self.as_mut().poll_elapsed(cx)) {
             Ok(()) => Poll::Ready(()),
             Err(e) => panic!("timer error: {}", e),
         }
