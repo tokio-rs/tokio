@@ -1,5 +1,9 @@
 use std::{task::Context, time::Duration};
 
+use futures::task::noop_waker_ref;
+
+use std::future::Future;
+
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::{Arc, Mutex};
 use crate::loom::thread;
@@ -164,6 +168,65 @@ fn reset_future() {
 
         assert!(finished_early.load(Ordering::Relaxed));
     })
+}
+
+#[test]
+fn poll_process_levels() {
+    let clock = crate::time::clock::Clock::new();
+    clock.pause();
+
+    let time_source = super::ClockTime::new(clock.clone());
+
+    let inner = super::Inner::new(time_source.clone(), TimeUnpark::mock());
+    let handle = InternalHandle::new(Arc::new(Mutex::new(inner)));
+
+    let mut entries = vec![];
+
+    for i in 0..1024 {
+        let mut entry = Box::pin(TimerEntry::new(
+            &handle,
+            clock.now() + Duration::from_millis(i),
+        ));
+
+        let _ = entry
+            .as_mut()
+            .poll_elapsed(&mut Context::from_waker(noop_waker_ref()));
+
+        entries.push(entry);
+    }
+
+    for t in 1..1024 {
+        handle.process_at_time(t as u64);
+        for (deadline, future) in entries.iter_mut().enumerate() {
+            let mut context = Context::from_waker(noop_waker_ref());
+            if deadline <= t {
+                assert!(future.as_mut().poll_elapsed(&mut context).is_ready());
+            } else {
+                assert!(future.as_mut().poll_elapsed(&mut context).is_pending());
+            }
+        }
+    }
+}
+
+#[test]
+fn poll_process_levels_targeted() {
+    let mut context = Context::from_waker(noop_waker_ref());
+
+    let clock = crate::time::clock::Clock::new();
+    clock.pause();
+
+    let time_source = super::ClockTime::new(clock.clone());
+
+    let inner = super::Inner::new(time_source.clone(), TimeUnpark::mock());
+    let handle = InternalHandle::new(Arc::new(Mutex::new(inner)));
+
+    let e1 = TimerEntry::new(&handle, clock.now() + Duration::from_millis(193));
+    pin!(e1);
+
+    handle.process_at_time(62);
+    assert!(e1.as_mut().poll_elapsed(&mut context).is_pending());
+    handle.process_at_time(192);
+    handle.process_at_time(192);
 }
 
 /*

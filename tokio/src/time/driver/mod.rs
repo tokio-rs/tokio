@@ -269,13 +269,6 @@ where
 }
 
 impl<TS: TimeSource> InternalHandle<TS> {
-    /// Acquires and then immediately releases the lock. This is used to
-    /// synchronize with the driver when a race is detected polling a timer.
-    #[cold]
-    pub(self) fn sync(&self) {
-        let _ = self.lock();
-    }
-
     /// Runs timer related logic, and returns the next wakeup time
     pub(self) fn process(&self) -> Option<NonZeroU64> {
         let now = self.time_source().now();
@@ -361,6 +354,21 @@ impl<TS: TimeSource> InternalHandle<TS> {
             }
 
             entry.as_ref().handle().fire(EntryState::Cancelled);
+        }
+    }
+
+    /// Forces a timer in the FiringInProgress state into its final state.
+    /// Timers in any other state will take the driver lock, but otherwise take
+    /// no action.
+    #[cold]
+    pub(self) unsafe fn sync_timer(&self, entry: NonNull<TimerShared>) {
+        unsafe {
+            let mut lock = self.lock();
+
+            if unsafe { entry.as_ref().is_pending() } {
+                lock.wheel.remove(entry);
+                entry.as_ref().handle().fire(EntryState::Fired);
+            }
         }
     }
 

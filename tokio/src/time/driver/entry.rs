@@ -83,21 +83,36 @@ pub(super) enum EntryState {
     Registered,
     /// This EntryState is currently being fired. In order to determine the
     /// final state of the timer, polls need to synchronize with the driver by
-    /// acquiring the driver lock. After writing this state, the driver will
+    /// acquiring the driver lock.
+    ///
+    /// This state can represent one of two conditions: Either the driver is
+    /// working on firing this timer _right now_ (and we'll leave the state
+    /// before unlocking), or it's on the pending_firing queue in the timer
+    /// wheel. In the former case, after writing this state, the driver will
     /// take the waker (as an acq/rel barrier) and arrange to invoke it later,
     /// before moving on to the true completed state.
     ///
-    /// The reason this state exists is because we cannot take the waker after
-    /// transitioning to a completed state (the [`TimerEntry`] could at any time
-    /// observe this and destroy the [`TimerShared`]); however we also can't
-    /// take the waker immediately before transitioning to a completed state, as
-    /// the future might be in the process of being polled and registering a new
-    /// waker.
+    /// There are two reasons this state exists. First, because we cannot take
+    /// the waker after transitioning to a completed state (the [`TimerEntry`]
+    /// could at any time observe this and destroy the [`TimerShared`]); however
+    /// we also can't take the waker immediately before transitioning to a
+    /// completed state, as the future might be in the process of being polled
+    /// and registering a new waker.
     ///
     /// To resolve this, we add this state as an intermediate phase where the
     /// driver can take the waker. If the future is polled at this point, it
     /// will contend on the driver lock; once it acquires and releases the
     /// driver lock, it can reliably observe the final completed timer state.
+    ///
+    /// The second reason this exists is that, in general, when we want to
+    /// advance the 'elapsed' time, we might need to process a slot first; when
+    /// doing so, we need to _atomically_ move all of the timers in that slot
+    /// into their new positions, before dropping the lock. However, during this
+    /// time some timers might also need to be fired. If there are too many
+    /// timers awaiting firing to collect their wakers while holding the lock,
+    /// we queue them onto a separate linked list. This state indicates that we
+    /// need to remove the timer from that pending list instead of a timer wheel
+    /// slot.
     FiringInProgress,
     /// This timer has been fired due to its timeout being reached. This state
     /// can be transitioned back to NotRegistered, either by an explicit reset()
@@ -212,24 +227,24 @@ mod state_cell {
             StateRef(self.0.clone())
         }
 
-        pub(super) fn get(&self) -> EntryState {
-            EntryState::from_repr(self.0.load(Ordering::Relaxed))
+        pub(super) fn get(&self, ordering: Ordering) -> EntryState {
+            unsafe { EntryState::from_repr(self.0.load(ordering)) }
         }
 
-        pub(super) fn set(&self, s: EntryState) {
-            self.0.store(s.to_repr(), Ordering::Relaxed)
+        pub(super) fn set(&self, s: EntryState, ordering: Ordering) {
+            self.0.store(s.to_repr(), ordering)
         }
     }
 
     pub(super) struct StateRef(std::sync::Arc<AtomicU8>);
 
     impl StateRef {
-        pub(super) fn get(&self) -> EntryState {
-            EntryState::from_repr(self.0.load(Ordering::Relaxed))
+        pub(super) fn get(&self, ordering: Ordering) -> EntryState {
+            unsafe { EntryState::from_repr(self.0.load(ordering)) }
         }
 
-        pub(super) fn set(&self, s: EntryState) {
-            self.0.store(s.to_repr(), Ordering::Relaxed)
+        pub(super) fn set(&self, s: EntryState, ordering: Ordering) {
+            self.0.store(s.to_repr(), ordering)
         }
     }
 }
@@ -378,6 +393,11 @@ impl TimerShared {
 
         matches!(state, EntryState::Registered | EntryState::FiringInProgress)
     }
+
+    /// Returns true if this entry is in the FiringInProgress state
+    pub(super) fn is_pending(&self) -> bool {
+        unsafe { self.state.get(Ordering::Relaxed) == EntryState::FiringInProgress }
+    }
 }
 
 /// Additional shared state between the driver and the timer which is cache
@@ -479,21 +499,16 @@ impl<TS: TimeSource> TimerEntry<TS> {
         match self.inner().state.get(Ordering::Relaxed) {
             // We're already done
             EntryState::Cancelled | EntryState::Error(_) | EntryState::Fired => (),
-            EntryState::FiringInProgress => {
-                // The driver is busy deregistering us, all we need to do is sync up with it
-                self.driver.sync();
-                // We should be deregistered now.
-                debug_assert!(self.inner().state.get(Ordering::Relaxed).is_elapsed());
-            }
             EntryState::NotRegistered => {
                 // Relaxed ordering is fine since we're the only thread with access to this object
                 self.inner()
                     .state
                     .set(EntryState::Cancelled, Ordering::Relaxed);
             }
-            EntryState::Registered => {
+            EntryState::FiringInProgress | EntryState::Registered => {
                 // This will update our state as well. Note that this is safe to
-                // call even if we're not registered (due to a race with timer firing)
+                // call even if we're not registered (due to a race with timer
+                // firing, or being on the pending list)
                 unsafe {
                     self.driver
                         .clear_entry(NonNull::new(self.inner() as *const _ as *mut _).unwrap())
@@ -560,8 +575,12 @@ impl<TS: TimeSource> TimerEntry<TS> {
                 EntryState::FiringInProgress => {
                     // Synchronize with the driver, once we finish the true
                     // completed state should be visible.
-                    this.driver.sync();
-                    debug_assert!(this.inner().state.get(Ordering::Relaxed).is_elapsed());
+                    unsafe {
+                        this.driver
+                            .sync_timer(NonNull::new(this.inner.get()).unwrap())
+                    };
+
+                    // We should now be in a completed state, so loop back around
                 }
                 EntryState::Fired => {
                     // We're probably done, but if we were reset, it's possible we
@@ -630,6 +649,20 @@ impl TimerHandle {
         }
     }
 
+    /// Transitions to the FiringInProgress state
+    pub(super) unsafe fn set_pending(&self) {
+        unsafe {
+            assert_eq!(
+                self.inner.as_ref().state.get(Ordering::Relaxed),
+                EntryState::Registered
+            );
+            self.inner
+                .as_ref()
+                .state
+                .set(EntryState::FiringInProgress, Ordering::Relaxed);
+        }
+    }
+
     /// Attempts to transition to a terminal state. If the state is already a
     /// terminal state, does nothing.
     ///
@@ -652,7 +685,10 @@ impl TimerHandle {
         //
         // Note that the state was set by another thread, but the mutex's
         // implicit fences will synchronize this)
-        debug_assert_eq!(pstate.get(Ordering::Relaxed), EntryState::Registered);
+        debug_assert!(matches!(
+            pstate.get(Ordering::Relaxed),
+            EntryState::Registered | EntryState::FiringInProgress
+        ));
 
         pstate.set(EntryState::FiringInProgress, Ordering::Relaxed);
 
