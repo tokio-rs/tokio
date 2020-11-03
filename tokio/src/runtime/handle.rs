@@ -33,7 +33,7 @@ pub struct Handle {
 
 /// Runtime context guard.
 ///
-/// Returned by [`Runtime::enter`] and [^Handle::enter^], the context guard exits
+/// Returned by [`Runtime::enter`] and [`Handle::enter`], the context guard exits
 /// the runtime context on drop.
 #[derive(Debug)]
 pub struct EnterGuard<'a> {
