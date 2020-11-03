@@ -379,7 +379,7 @@ impl<TS: TimeSource> InternalHandle<TS> {
     /// timer at all (the current thread should hold an exclusive reference to
     /// the `TimerEntry`)
     pub(self) unsafe fn reregister(&self, entry: NonNull<TimerShared>) {
-        unsafe {
+        let waker = unsafe {
             let mut lock = self.lock();
 
             // We may have raced with a firing/deregistration, so check before
@@ -391,6 +391,13 @@ impl<TS: TimeSource> InternalHandle<TS> {
             // Always attempt to reregister. We'll fire it again if it's already
             // expired/shutdown/etc.
             Self::add_entry0(lock, entry.as_ref().handle())
+        };
+
+        // The timer was fired synchronously as a result of the reregistration.
+        // Wake the waker; this is needed because we might reset _after_ a poll,
+        // and otherwise the task won't be awoken to poll again.
+        if let Some(waker) = waker {
+            waker.wake();
         }
     }
 
@@ -409,16 +416,15 @@ impl<TS: TimeSource> InternalHandle<TS> {
         Self::add_entry0(self.lock(), entry);
     }
 
-    unsafe fn add_entry0(mut lock: MutexGuard<'_, Inner<TS>>, entry: TimerHandle) {
+    unsafe fn add_entry0(mut lock: MutexGuard<'_, Inner<TS>>, entry: TimerHandle) -> Option<Waker> {
         if lock.is_shutdown {
             unsafe {
-                entry.fire(EntryState::Error(crate::time::error::Kind::Shutdown));
-                return;
+                return entry.fire(EntryState::Error(crate::time::error::Kind::Shutdown));
             }
         }
 
         if !entry.set_registered() {
-            return;
+            return None;
         }
 
         match unsafe { lock.wheel.insert(entry) } {
@@ -439,7 +445,7 @@ impl<TS: TimeSource> InternalHandle<TS> {
             Err((entry, super::error::InsertError::Invalid)) => unsafe {
                 entry.fire(EntryState::Error(crate::time::error::Kind::Invalid))
             },
-        };
+        }
     }
 }
 
