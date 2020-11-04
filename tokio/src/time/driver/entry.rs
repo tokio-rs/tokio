@@ -206,15 +206,13 @@ mod state_cell {
 #[cfg(loom)]
 mod state_cell {
     use super::EntryState;
-    use crate::loom::sync::{
-        atomic::{AtomicU8, Ordering},
-        Arc,
-    };
+    use crate::loom::sync::atomic::{AtomicU8, Ordering};
 
     /// Because loom needs extra tracking around when we start and stop using an UnsafeCell,
     /// we need to make sure the UnsafeCell isn't destroyed before we finish up our bookkeeping.
     ///
     /// As such, when running under loom, we set up an Arc to keep the cell alive.
+    /// (We don't use a loom Arc because this is not part of the production model)
     pub(super) struct StateCell(std::sync::Arc<AtomicU8>);
     impl StateCell {
         pub(super) fn new() -> Self {
