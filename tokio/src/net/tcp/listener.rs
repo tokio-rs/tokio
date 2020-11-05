@@ -218,6 +218,7 @@ impl TcpListener {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     let std_listener = std::net::TcpListener::bind("127.0.0.1:0")?;
+    ///     std_listener.set_nonblocking(true)?;
     ///     let listener = TcpListener::from_std(std_listener)?;
     ///     Ok(())
     /// }

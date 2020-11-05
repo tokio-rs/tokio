@@ -187,6 +187,7 @@ impl UdpSocket {
     /// # async fn main() -> io::Result<()> {
     /// let addr = "0.0.0.0:8080".parse::<SocketAddr>().unwrap();
     /// let std_sock = std::net::UdpSocket::bind(addr)?;
+    /// std_sock.set_nonblocking(true)?;
     /// let sock = UdpSocket::from_std(std_sock)?;
     /// // use `sock`
     /// # Ok(())

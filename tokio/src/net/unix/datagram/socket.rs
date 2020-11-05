@@ -179,6 +179,7 @@ impl UnixDatagram {
     /// // Bind the socket to a filesystem path
     /// let socket_path = tmp.path().join("socket");
     /// let std_socket = StdUDS::bind(&socket_path)?;
+    /// std_socket.set_nonblocking(true)?;
     /// let tokio_socket = UnixDatagram::from_std(std_socket)?;
     ///
     /// # Ok(())
