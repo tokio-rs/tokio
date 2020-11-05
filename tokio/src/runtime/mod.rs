@@ -198,7 +198,7 @@ cfg_rt! {
     use self::enter::enter;
 
     mod handle;
-    use handle::Handle;
+    pub use handle::{EnterGuard, Handle};
 
     mod spawner;
     use self::spawner::Spawner;
@@ -272,16 +272,6 @@ cfg_rt! {
         blocking_pool: BlockingPool,
     }
 
-    /// Runtime context guard.
-    ///
-    /// Returned by [`Runtime::enter`], the context guard exits the runtime
-    /// context on drop.
-    #[derive(Debug)]
-    pub struct EnterGuard<'a> {
-        rt: &'a Runtime,
-        guard: context::EnterGuard,
-    }
-
     /// The runtime executor is either a thread-pool or a current-thread executor.
     #[derive(Debug)]
     enum Kind {
@@ -332,6 +322,27 @@ cfg_rt! {
             Builder::new_multi_thread().enable_all().build()
         }
 
+        /// Return a handle to the runtime's spawner.
+        ///
+        /// The returned handle can be used to spawn tasks that run on this runtime, and can
+        /// be cloned to allow moving the `Handle` to other threads.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::Runtime;
+        ///
+        /// let rt = Runtime::new()
+        ///     .unwrap();
+        ///
+        /// let handle = rt.handle();
+        ///
+        /// // Use the handle...
+        /// ```
+        pub fn handle(&self) -> &Handle {
+            &self.handle
+        }
+
         /// Spawn a future onto the Tokio runtime.
         ///
         /// This spawns the given future onto the runtime's executor, usually a
@@ -363,13 +374,7 @@ cfg_rt! {
             F: Future + Send + 'static,
             F::Output: Send + 'static,
         {
-            #[cfg(feature = "tracing")]
-            let future = crate::util::trace::task(future, "task");
-            match &self.kind {
-                #[cfg(feature = "rt-multi-thread")]
-                Kind::ThreadPool(exec) => exec.spawn(future),
-                Kind::CurrentThread(exec) => exec.spawn(future),
-            }
+            self.handle.spawn(future)
         }
 
         /// Run the provided function on an executor dedicated to blocking operations.
@@ -481,10 +486,7 @@ cfg_rt! {
         /// }
         /// ```
         pub fn enter(&self) -> EnterGuard<'_> {
-            EnterGuard {
-                rt: self,
-                guard: context::enter(self.handle.clone()),
-            }
+            self.handle.enter()
         }
 
         /// Shutdown the runtime, waiting for at most `duration` for all spawned
