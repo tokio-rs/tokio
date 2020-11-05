@@ -149,8 +149,8 @@ impl<T, S: Semaphore> Tx<T, S> {
 
     pub(crate) async fn closed(&self) {
         // In order to avoid a race condition, we first request a notification,
-        // **then** check the current value's version. If a new version exists,
-        // the notification request is dropped.
+        // **then** check whether the semaphore is closed. If the semaphore is
+        // closed the notification request is dropped.
         let notified = self.inner.notify_rx_closed.notified();
 
         if self.inner.semaphore.is_closed() {
