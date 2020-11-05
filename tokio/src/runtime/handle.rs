@@ -271,17 +271,17 @@ impl Handle {
 
                             Pending
                         }))
-                    .expect("Failed to `Enter::block_on`")
+                        .expect("Failed to `Enter::block_on`")
                     {
                         return out;
                     }
                 }
-            },
+            }
             #[cfg(feature = "rt-multi-thread")]
             Spawner::ThreadPool(_) => {
                 let mut enter = crate::runtime::enter(true);
                 enter.block_on(future).expect("failed to park thread")
-            },
+            }
         }
     }
 }

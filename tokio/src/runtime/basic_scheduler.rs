@@ -114,10 +114,7 @@ impl<P: Park> BasicScheduler<P> {
             park,
         }));
 
-        BasicScheduler {
-            inner,
-            spawner,
-        }
+        BasicScheduler { inner, spawner }
     }
 
     pub(crate) fn spawner(&self) -> &Spawner {
