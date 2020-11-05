@@ -1,8 +1,10 @@
+use crate::future::poll_fn;
 use crate::runtime::blocking::task::BlockingTask;
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{blocking, context, driver, Spawner};
 
 use std::future::Future;
+use std::task::Poll::{Pending, Ready};
 use std::{error, fmt};
 
 /// Handle to the runtime.
@@ -199,6 +201,88 @@ impl Handle {
         let (task, handle) = task::joinable(BlockingTask::new(func));
         let _ = self.blocking_spawner.spawn(task, &self);
         handle
+    }
+
+    /// Run a future to completion on the Tokio runtime. This is the
+    /// runtime's entry point.
+    ///
+    /// This runs the given future on the runtime, blocking until it is
+    /// complete, and yielding its resolved result. Any tasks or timers
+    /// which the future spawns internally will be executed on the runtime.
+    ///
+    /// # Multi thread scheduler
+    ///
+    /// When the multi thread scheduler is used this will allow futures
+    /// to run within the io driver and timer context of the overall runtime.
+    ///
+    /// # Current thread scheduler
+    ///
+    /// When the current thread scheduler is enabled `block_on`
+    /// can be called concurrently from multiple threads. The first call
+    /// will take ownership of the io and timer drivers. This means
+    /// other threads which do not own the drivers will hook into that one.
+    /// When the first `block_on` completes, other threads will be able to
+    /// "steal" the driver to allow continued execution of their futures.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the provided future panics, or if called within an
+    /// asynchronous execution context.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::runtime::Runtime;
+    ///
+    /// // Create the runtime
+    /// let rt  = Runtime::new().unwrap();
+    /// // Get a handle to rhe runtime
+    /// let handle = rt.handle();
+    ///
+    /// // Execute the future, blocking the current thread until completion using the handle
+    /// handle.block_on(async {
+    ///     println!("hello");
+    /// });
+    /// ```
+    pub fn block_on<F: Future>(&self, future: F) -> F::Output {
+        let _enter = self.enter();
+
+        match &self.spawner {
+            Spawner::Basic(exec) => {
+                pin!(future);
+
+                // Lets select on a notification that the parker is available or
+                // the future is complete.
+                loop {
+                    let mut enter = crate::runtime::enter(false);
+
+                    let notified = exec.notify().notified();
+                    pin!(notified);
+
+                    if let Some(out) = enter
+                        .block_on(poll_fn(|cx| {
+                            if notified.as_mut().poll(cx).is_ready() {
+                                return Ready(None);
+                            }
+
+                            if let Ready(out) = future.as_mut().poll(cx) {
+                                return Ready(Some(out));
+                            }
+
+                            Pending
+                        }))
+                    .expect("Failed to `Enter::block_on`")
+                    {
+                        return out;
+                    }
+                }
+            },
+            #[cfg(feature = "rt-multi-thread")]
+            Spawner::ThreadPool(_) => {
+                let mut enter = crate::runtime::enter(true);
+                enter.block_on(future).expect("failed to park thread")
+            },
+        }
     }
 }
 

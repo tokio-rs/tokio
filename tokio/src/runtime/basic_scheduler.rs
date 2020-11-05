@@ -1,4 +1,3 @@
-use crate::future::poll_fn;
 use crate::loom::sync::Mutex;
 use crate::park::{Park, Unpark};
 use crate::runtime::task::{self, JoinHandle, Schedule, Task};
@@ -11,7 +10,7 @@ use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
 use std::sync::Arc;
-use std::task::Poll::{Pending, Ready};
+use std::task::Poll::Ready;
 use std::time::Duration;
 
 /// Executes tasks on the current thread
@@ -19,10 +18,6 @@ pub(crate) struct BasicScheduler<P: Park> {
     /// Inner state guarded by a mutex that is shared
     /// between all `block_on` calls.
     inner: Mutex<Option<Inner<P>>>,
-
-    /// Notifier for waking up other threads to steal the
-    /// parker.
-    notify: Notify,
 
     /// Sendable task spawner
     spawner: Spawner,
@@ -70,6 +65,10 @@ struct Shared {
 
     /// Unpark the blocked thread
     unpark: Box<dyn Unpark>,
+
+    /// Notifier for waking up other threads to steal the
+    /// parker.
+    notify: Notify,
 }
 
 /// Thread-local context.
@@ -101,6 +100,7 @@ impl<P: Park> BasicScheduler<P> {
             shared: Arc::new(Shared {
                 queue: Mutex::new(VecDeque::with_capacity(INITIAL_CAPACITY)),
                 unpark: unpark as Box<dyn Unpark>,
+                notify: Notify::new(),
             }),
         };
 
@@ -116,7 +116,6 @@ impl<P: Park> BasicScheduler<P> {
 
         BasicScheduler {
             inner,
-            notify: Notify::new(),
             spawner,
         }
     }
@@ -125,42 +124,7 @@ impl<P: Park> BasicScheduler<P> {
         &self.spawner
     }
 
-    pub(crate) fn block_on<F: Future>(&self, future: F) -> F::Output {
-        pin!(future);
-
-        // Attempt to steal the dedicated parker and block_on the future if we can there,
-        // othwerwise, lets select on a notification that the parker is available
-        // or the future is complete.
-        loop {
-            if let Some(inner) = &mut self.take_inner() {
-                return inner.block_on(future);
-            } else {
-                let mut enter = crate::runtime::enter(false);
-
-                let notified = self.notify.notified();
-                pin!(notified);
-
-                if let Some(out) = enter
-                    .block_on(poll_fn(|cx| {
-                        if notified.as_mut().poll(cx).is_ready() {
-                            return Ready(None);
-                        }
-
-                        if let Ready(out) = future.as_mut().poll(cx) {
-                            return Ready(Some(out));
-                        }
-
-                        Pending
-                    }))
-                    .expect("Failed to `Enter::block_on`")
-                {
-                    return out;
-                }
-            }
-        }
-    }
-
-    fn take_inner(&self) -> Option<InnerGuard<'_, P>> {
+    pub(crate) fn take_inner(&self) -> Option<InnerGuard<'_, P>> {
         let inner = self.inner.lock().take()?;
 
         Some(InnerGuard {
@@ -324,6 +288,10 @@ impl Spawner {
         handle
     }
 
+    pub(crate) fn notify(&self) -> &Notify {
+        &self.shared.notify
+    }
+
     fn pop(&self) -> Option<task::Notified<Arc<Shared>>> {
         self.shared.queue.lock().pop_front()
     }
@@ -393,13 +361,13 @@ impl Wake for Shared {
 /// Used to ensure we always place the Inner value
 /// back into its slot in `BasicScheduler`, even if the
 /// future panics.
-struct InnerGuard<'a, P: Park> {
+pub(crate) struct InnerGuard<'a, P: Park> {
     inner: Option<Inner<P>>,
     basic_scheduler: &'a BasicScheduler<P>,
 }
 
 impl<P: Park> InnerGuard<'_, P> {
-    fn block_on<F: Future>(&mut self, future: F) -> F::Output {
+    pub(crate) fn block_on<F: Future>(&mut self, future: F) -> F::Output {
         // The only time inner gets set to `None` is if we have dropped
         // already so this unwrap is safe.
         self.inner.as_mut().unwrap().block_on(future)
@@ -417,7 +385,7 @@ impl<P: Park> Drop for InnerGuard<'_, P> {
 
             // Wake up other possible threads that could steal
             // the dedicated parker P.
-            self.basic_scheduler.notify.notify_one()
+            self.basic_scheduler.spawner.shared.notify.notify_one()
         }
     }
 }

@@ -58,18 +58,6 @@ impl ThreadPool {
     pub(crate) fn spawner(&self) -> &Spawner {
         &self.spawner
     }
-
-    /// Blocks the current thread waiting for the future to complete.
-    ///
-    /// The future will execute on the current thread, but all spawned tasks
-    /// will be executed on the thread pool.
-    pub(crate) fn block_on<F>(&self, future: F) -> F::Output
-    where
-        F: Future,
-    {
-        let mut enter = crate::runtime::enter(true);
-        enter.block_on(future).expect("failed to park thread")
-    }
 }
 
 impl fmt::Debug for ThreadPool {

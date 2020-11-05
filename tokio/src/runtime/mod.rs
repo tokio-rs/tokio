@@ -444,13 +444,16 @@ cfg_rt! {
         ///
         /// [handle]: fn@Handle::block_on
         pub fn block_on<F: Future>(&self, future: F) -> F::Output {
-            let _enter = self.enter();
-
-            match &self.kind {
-                Kind::CurrentThread(exec) => exec.block_on(future),
-                #[cfg(feature = "rt-multi-thread")]
-                Kind::ThreadPool(exec) => exec.block_on(future),
+            if let Kind::CurrentThread(exec) = &self.kind {
+                // Attempt to steal the dedicated parker and block_on the future if we can there,
+                // othwerwise, lets select on a notification that the parker is available
+                // or the future is complete.
+                if let Some(mut inner) = exec.take_inner() {
+                    let _enter = self.enter();
+                    return inner.block_on(future);
+                }
             }
+            self.handle.block_on(future)
         }
 
         /// Enter the runtime context.
