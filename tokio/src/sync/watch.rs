@@ -241,25 +241,10 @@ impl<T> Receiver<T> {
     /// }
     /// ```
     pub async fn changed(&mut self) -> Result<(), error::RecvError> {
-        use std::future::Future;
-        use std::pin::Pin;
-        use std::task::Poll;
-
         // In order to avoid a race condition, we first request a notification,
         // **then** check the current value's version. If a new version exists,
-        // the notification request is dropped. Requesting the notification
-        // requires polling the future once.
+        // the notification request is dropped.
         let notified = self.shared.notify_rx.notified();
-        pin!(notified);
-
-        // Polling the future once is guaranteed to return `Pending` as `watch`
-        // only notifies using `notify_waiters`.
-        crate::future::poll_fn(|cx| {
-            let res = Pin::new(&mut notified).poll(cx);
-            assert!(!res.is_ready());
-            Poll::Ready(())
-        })
-        .await;
 
         if let Some(ret) = maybe_changed(&self.shared, &mut self.version) {
             return ret;
