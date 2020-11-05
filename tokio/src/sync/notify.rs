@@ -109,7 +109,7 @@ type WaitList = LinkedList<Waiter, <Waiter as linked_list::Link>::Target>;
 /// [`Semaphore`]: crate::sync::Semaphore
 #[derive(Debug)]
 pub struct Notify {
-    // the uses 2 bits to store one of `EMPTY`,
+    // this uses 2 bits to store one of `EMPTY`,
     // `WAITING` or "NOTIFIED". The rest of the bits
     // are used to store the number of times `notify_waiters`
     // was called.
@@ -157,7 +157,7 @@ unsafe impl<'a> Send for Notified<'a> {}
 unsafe impl<'a> Sync for Notified<'a> {}
 
 #[derive(Debug)]
-pub enum State {
+enum State {
     Init(usize),
     Waiting,
     Done,
