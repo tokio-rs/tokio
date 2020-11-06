@@ -30,14 +30,9 @@ cfg_codec! {
     pub mod codec;
 }
 
-/*
-Disabled due to removal of poll_ functions on UdpSocket.
-
-See https://github.com/tokio-rs/tokio/issues/2830
-cfg_udp! {
+cfg_net! {
     pub mod udp;
 }
-*/
 
 cfg_compat! {
     pub mod compat;

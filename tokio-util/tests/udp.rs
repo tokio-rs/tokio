@@ -1,4 +1,3 @@
-/*
 #![warn(rust_2018_idioms)]
 
 use tokio::{net::UdpSocket, stream::StreamExt};
@@ -101,4 +100,3 @@ async fn send_framed_lines_codec() -> std::io::Result<()> {
 
     Ok(())
 }
-*/
