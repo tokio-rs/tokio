@@ -304,6 +304,15 @@ async fn drop_closes() {
 }
 
 #[tokio::test]
+async fn reregister() {
+    let (a, _b) = socketpair();
+
+    let afd_a = AsyncFd::new(a).unwrap();
+    let a = afd_a.into_inner();
+    AsyncFd::new(a).unwrap();
+}
+
+#[tokio::test]
 async fn with_poll() {
     use std::task::Poll;
 

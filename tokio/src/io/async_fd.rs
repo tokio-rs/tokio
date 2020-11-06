@@ -177,11 +177,8 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
 
 impl<T: AsRawFd> Drop for AsyncFd<T> {
     fn drop(&mut self) {
-        if let Some(driver) = self.handle.inner() {
-            if let Some(inner) = self.inner.as_ref() {
-                let fd = inner.as_raw_fd();
-                let _ = driver.deregister_source(&mut SourceFd(&fd));
-            }
+        if self.inner.is_some() {
+            self.into_inner_inplace();
         }
     }
 }
@@ -230,10 +227,18 @@ impl<T: AsRawFd> AsyncFd<T> {
         self.inner.as_mut().unwrap()
     }
 
+    fn into_inner_inplace(&mut self) -> T {
+        let fd = self.inner.as_ref().unwrap().as_raw_fd();
+        if let Some(driver) = self.handle.inner() {
+            let _ = driver.deregister_source(&mut SourceFd(&fd));
+        }
+        self.inner.take().unwrap()
+    }
+
     /// Deregisters this file descriptor, and returns ownership of the backing
     /// object.
     pub fn into_inner(mut self) -> T {
-        self.inner.take().unwrap()
+        self.into_inner_inplace()
     }
 
     /// Polls for read readiness. This function retains the waker for the last
