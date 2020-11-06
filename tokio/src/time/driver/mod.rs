@@ -287,7 +287,10 @@ impl<TS: TimeSource> InternalHandle<TS> {
         assert!(now >= lock.elapsed);
 
         while let Some(entry) = lock.wheel.poll(now) {
-            // Fire the entry
+            // Fire the entry.
+            //
+            // SAFETY: The driver lock is held, and we know the timer is valid
+            // as we just removed it from the wheel.
             let waker = unsafe { entry.fire(EntryState::Fired) };
 
             if waker.is_some() {
