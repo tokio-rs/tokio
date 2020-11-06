@@ -340,8 +340,11 @@ impl<TS: TimeSource> InternalHandle<TS> {
 
     /// Removes a registered timer from the driver.
     ///
-    /// The timer will be moved to the cancelled state. Wakers will _not_ be invoked.
-    /// If the timer is already completed, this function is a no-op.
+    /// The timer will be moved to the cancelled state. Wakers will _not_ be
+    /// invoked. If the timer is already completed, this function is a no-op.
+    ///
+    /// This function always acquires the driver lock, even if the entry does
+    /// not appear to be registered.
     ///
     /// SAFETY: The timer must not be registered with some other driver, and
     /// `add_entry` must not be called concurrently.
@@ -349,7 +352,7 @@ impl<TS: TimeSource> InternalHandle<TS> {
         unsafe {
             let mut lock = self.lock();
 
-            if unsafe { entry.as_ref().is_registered() } {
+            if entry.as_ref().is_registered() {
                 lock.wheel.remove(entry);
             }
 

@@ -169,6 +169,7 @@ fn reset_future() {
 }
 
 #[test]
+#[cfg(not(loom))]
 fn poll_process_levels() {
     let clock = crate::time::clock::Clock::new();
     clock.pause();
@@ -207,6 +208,7 @@ fn poll_process_levels() {
 }
 
 #[test]
+#[cfg(not(loom))]
 fn poll_process_levels_targeted() {
     let mut context = Context::from_waker(noop_waker_ref());
 

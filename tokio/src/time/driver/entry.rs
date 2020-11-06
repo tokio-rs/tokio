@@ -175,12 +175,12 @@ mod state_cell {
 
         /// Gets the current state.
         pub(super) fn get(&self, ordering: Ordering) -> EntryState {
-            unsafe { EntryState::from_repr(self.0.load(ordering)) }
+            unsafe { self.erase().get(ordering) }
         }
 
         /// Sets the current state.
         pub(super) fn set(&self, s: EntryState, ordering: Ordering) {
-            self.0.store(s.to_repr(), ordering)
+            unsafe { self.erase().set(s, ordering) }
         }
     }
 
@@ -494,24 +494,31 @@ impl<TS: TimeSource> TimerEntry<TS> {
 
     /// Cancels and deregisters the timer. This operation is irreversible.
     pub(crate) fn cancel(self: Pin<&mut Self>) {
-        match self.inner().state.get(Ordering::Relaxed) {
-            // We're already done
-            EntryState::Cancelled | EntryState::Error(_) | EntryState::Fired => (),
-            EntryState::NotRegistered => {
-                // Relaxed ordering is fine since we're the only thread with access to this object
-                self.inner()
-                    .state
-                    .set(EntryState::Cancelled, Ordering::Relaxed);
-            }
-            EntryState::FiringInProgress | EntryState::Registered => {
-                // This will update our state as well. Note that this is safe to
-                // call even if we're not registered (due to a race with timer
-                // firing, or being on the pending list)
-                unsafe {
-                    self.driver
-                        .clear_entry(NonNull::new(self.inner() as *const _ as *mut _).unwrap())
-                };
-            }
+        // We need to perform an acq/rel fence with the driver thread, and the
+        // simplest way to do so is to grab the driver lock.
+        //
+        // Why is this necessary? We're about to release this timer's memory for
+        // some other non-timer use. However, we've been doing a bunch of
+        // relaxed (or even non-atomic) writes from the driver thread, and we'll
+        // be doing more from _this thread_ (as this memory is interpreted as
+        // something else).
+        //
+        // It is critical to ensure that, from the point of view of the driver,
+        // those future non-timer writes happen-after the timer is fully fired,
+        // and from the purpose of this thread, the driver's writes all
+        // happen-before we drop the timer. This in turn requires us to perform
+        // an acquire-release barrier in _both_ directions between the driver
+        // and dropping thread.
+        //
+        // This lock acquisition serves this purpose. All of the driver
+        // manipulations happen with the lock held, so we can just take the lock
+        // and be sure that this drop happens-after everything the driver did so
+        // far and happens-before everything the driver does in the future.
+        // While we have the lock held, we also go ahead and deregister the
+        // entry if necessary.
+        unsafe {
+            self.driver
+                .clear_entry(NonNull::new(self.inner() as *const _ as *mut _).unwrap())
         };
     }
 
@@ -545,6 +552,19 @@ impl<TS: TimeSource> TimerEntry<TS> {
 
         // Most of the time we just can do a quick check of our state value without taking the lock.
         loop {
+            // Implicit acquire fence. This fence synchronizes with the
+            // take_waker in fire(). This means that, if the waker will be
+            // ignored, the FiringInProgress write will be a visible side-effect
+            // in this thread after this point. It also means that any writes to
+            // cached_when performed before firing the timer _also_ become
+            // visible side-effects in this thread.
+            //
+            // Note that this is only, in general, guaranteed to be an acquire
+            // fence, as it can in some cases decide to simply invoke its own
+            // waker without performing a store. If we do write a waker here, it
+            // is an acq-rel fence.
+            this.inner().waker.register_by_ref(cx.waker());
+
             let state = this.inner().state.get(Ordering::Relaxed);
             match state {
                 EntryState::NotRegistered => {
@@ -559,16 +579,14 @@ impl<TS: TimeSource> TimerEntry<TS> {
                     // Registered branch below to set the waker.
                 }
                 EntryState::Registered => {
-                    // Implicit acquire fence.
-                    this.inner().waker.register_by_ref(cx.waker());
-
-                    // Need to recheck the state in case we raced with timer
-                    // firing. The above register_by_ref forms an acquire fence
-                    // matched with the corresponding take operation (as a
-                    // release fence) in fire().
-                    if this.inner().state.get(Ordering::Relaxed) == EntryState::Registered {
-                        break Poll::Pending;
-                    }
+                    // We registered the waker before observing ourselves in the
+                    // Registered state. This means that, if there is a
+                    // concurrent call to fire() happening, the update to the
+                    // waker happens-before the take of the waker in the fire()
+                    // call, and so we can be sure that we will be awoken.
+                    //
+                    // Thus, it is safe to return Pending here.
+                    break Poll::Pending;
                 }
                 EntryState::FiringInProgress => {
                     // Synchronize with the driver, once we finish the true
@@ -578,25 +596,31 @@ impl<TS: TimeSource> TimerEntry<TS> {
                             .sync_timer(NonNull::new(this.inner.get()).unwrap())
                     };
 
-                    // We should now be in a completed state, so loop back around
+                    // We should now be in a completed state, so loop back
+                    // around to figure out what we want to return.
+                    debug_assert!(this.inner().state.get(Ordering::Relaxed).is_elapsed());
                 }
                 EntryState::Fired => {
                     // We're probably done, but if we were reset, it's possible we
                     // raced with being fired by the driver. If this happened, we
                     // reset our state and try again.
 
-                    // To check, it's sufficient to see if cached_when and true_when
-                    // are in sync. It's safe to access cached_when here because
-                    // writing FiringInProgress with a release barrier happens after
-                    // the last sync_when on the driver.
-
+                    // To check, it's sufficient to see if cached_when and
+                    // true_when are in sync. cached_when will always reflect
+                    // the last value written by the driver. This is because the
+                    // waker register_by_ref's implicit fence (above) ensures
+                    // that any cached_when writes are visible side-effects
+                    // here.
                     if unsafe { this.inner().cached_when() } == this.inner().true_when() {
                         break Ok(()).into();
                     } else {
-                        this.inner()
-                            .state
-                            .set(EntryState::NotRegistered, Ordering::Relaxed);
-                        // Loop around again to register
+                        // We're unsure of the state of this timer, so
+                        // re-register it, and loop again to figure out what's
+                        // up.
+                        unsafe {
+                            this.driver
+                                .reregister(NonNull::new(this.inner.get()).unwrap())
+                        }
                     }
                 }
                 EntryState::Cancelled => break Ok(()).into(),
@@ -664,9 +688,9 @@ impl TimerHandle {
     /// Attempts to transition to a terminal state. If the state is already a
     /// terminal state, does nothing.
     ///
-    /// Because the entry might be dropped immediately after the state is moved
-    /// to a terminal state, this function consumes the handle to ensure we
-    /// don't access the entry afterwards.
+    /// Because the entry might be dropped after the state is moved to a
+    /// terminal state, this function consumes the handle to ensure we don't
+    /// access the entry afterwards.
     ///
     /// Returns the last-registered waker, if any.
     ///
@@ -678,32 +702,34 @@ impl TimerHandle {
         // elapsed state below.
         let pstate = unsafe { self.inner.as_ref() }.state.erase();
 
-        // We know this is currently registered... so its state should reflect
-        // this.
+        // If we're already in a terminal state, do nothing. This typically
+        // happens when trying to cancel a timer that's already fired.
         //
-        // Note that the state was set by another thread, but the mutex's
-        // implicit fences will synchronize this)
-        debug_assert!(matches!(
-            pstate.get(Ordering::Relaxed),
-            EntryState::Registered | EntryState::FiringInProgress
-        ));
+        // Ordering: State is changed only under the driver lock.
+        match pstate.get(Ordering::Relaxed) {
+            EntryState::FiringInProgress | EntryState::NotRegistered | EntryState::Registered => { /* continue */
+            }
+            EntryState::Fired | EntryState::Cancelled | EntryState::Error(_) => {
+                return None;
+            }
+        };
 
+        // Set the state. This will become visible along with the waker take
+        // operation below.
         pstate.set(EntryState::FiringInProgress, Ordering::Relaxed);
 
         // Acq/rel barrier.
         //
-        // We rely on the waker update/take acq/rel fences to ensure that this
-        // state write is not visible until after we have read any possible
-        // waker change (ie, any thread that might have changed the waker in
-        // between the state change and our taking the waker will definitely see
-        // the state change _after_ updating the waker.).
+        // We rely on the waker update/take acq/rel fences to ensure that the
+        // final state write is not visible until after we have read any
+        // possible waker change (ie, any thread that might have changed the
+        // waker in between the state change and our taking the waker will
+        // definitely see the state change _after_ updating the waker).
         let waker: Option<Waker> = unsafe { self.inner.as_ref().waker.take_waker() };
 
-        // SAFETY: After this point we MUST NOT touch the referent of
-        // `self.inner`.
-        //
-        // Ordering is not critical for this. When we invoke the waker we will
-        // trigger an implicit fence to ensure that our state change is visible.
+        // We do not need a release barrier here; it need only be visible by the
+        // time our later call to the waker causes the task to be awoken
+        // (implied by wake).
         pstate.set(completed_state, Ordering::Relaxed);
 
         waker
