@@ -259,7 +259,12 @@ impl Handle {
         }
     }
 
-    pub(crate) fn block_on_with_basic_scheduler<F: Future, P: Park>(&self, future: F, spawner: &basic_scheduler::Spawner, scheduler: Option<&basic_scheduler::BasicScheduler<P>>) -> F::Output {
+    pub(crate) fn block_on_with_basic_scheduler<F: Future, P: Park>(
+        &self,
+        future: F,
+        spawner: &basic_scheduler::Spawner,
+        scheduler: Option<&basic_scheduler::BasicScheduler<P>>,
+    ) -> F::Output {
         let _enter = self.enter();
 
         pin!(future);
@@ -268,8 +273,9 @@ impl Handle {
         // othwerwise, lets select on a notification that the parker is available
         // or the future is complete.
         loop {
-            if let Some(mut inner) = scheduler.and_then(basic_scheduler::BasicScheduler::take_inner) {
-                return inner.block_on(future)
+            if let Some(mut inner) = scheduler.and_then(basic_scheduler::BasicScheduler::take_inner)
+            {
+                return inner.block_on(future);
             }
 
             let mut enter = crate::runtime::enter(false);
