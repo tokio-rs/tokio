@@ -159,6 +159,7 @@ impl TcpStream {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     let std_stream = std::net::TcpStream::connect("127.0.0.1:34254")?;
+    ///     std_stream.set_nonblocking(true)?;
     ///     let stream = TcpStream::from_std(std_stream)?;
     ///     Ok(())
     /// }
