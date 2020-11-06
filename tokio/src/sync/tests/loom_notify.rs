@@ -26,7 +26,8 @@ fn notify_waiters() {
     loom::model(|| {
         let notify = Arc::new(Notify::new());
         let tx = notify.clone();
-        let notified = notify.notified();
+        let notified1 = notify.notified();
+        let notified2 = notify.notified();
 
         let th = thread::spawn(move || {
             tx.notify_waiters();
@@ -35,7 +36,8 @@ fn notify_waiters() {
         th.join().unwrap();
 
         block_on(async {
-            notified.await;
+            notified1.await;
+            notified2.await;
         });
     });
 }
