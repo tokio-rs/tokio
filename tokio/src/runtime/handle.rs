@@ -1,7 +1,8 @@
 use crate::future::poll_fn;
+use crate::park::Park;
 use crate::runtime::blocking::task::BlockingTask;
 use crate::runtime::task::{self, JoinHandle};
-use crate::runtime::{blocking, context, driver, Spawner};
+use crate::runtime::{basic_scheduler, blocking, context, driver, Spawner};
 
 use std::future::Future;
 use std::task::Poll::{Pending, Ready};
@@ -245,42 +246,52 @@ impl Handle {
     /// });
     /// ```
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
-        let _enter = self.enter();
-
         match &self.spawner {
             Spawner::Basic(exec) => {
-                pin!(future);
-
-                // Lets select on a notification that the parker is available or
-                // the future is complete.
-                loop {
-                    let mut enter = crate::runtime::enter(false);
-
-                    let notified = exec.notify().notified();
-                    pin!(notified);
-
-                    if let Some(out) = enter
-                        .block_on(poll_fn(|cx| {
-                            if notified.as_mut().poll(cx).is_ready() {
-                                return Ready(None);
-                            }
-
-                            if let Ready(out) = future.as_mut().poll(cx) {
-                                return Ready(Some(out));
-                            }
-
-                            Pending
-                        }))
-                        .expect("Failed to `Enter::block_on`")
-                    {
-                        return out;
-                    }
-                }
+                self.block_on_with_basic_scheduler::<F, crate::park::thread::ParkThread>(future, exec, None)
             }
             #[cfg(feature = "rt-multi-thread")]
             Spawner::ThreadPool(_) => {
+                let _enter = self.enter();
                 let mut enter = crate::runtime::enter(true);
                 enter.block_on(future).expect("failed to park thread")
+            }
+        }
+    }
+
+    pub(crate) fn block_on_with_basic_scheduler<F: Future, P: Park>(&self, future: F, spawner: &basic_scheduler::Spawner, scheduler: Option<&basic_scheduler::BasicScheduler<P>>) -> F::Output {
+        let _enter = self.enter();
+
+        pin!(future);
+
+        // Attempt to steal the dedicated parker and block_on the future if we can there,
+        // othwerwise, lets select on a notification that the parker is available
+        // or the future is complete.
+        loop {
+            if let Some(mut inner) = scheduler.and_then(basic_scheduler::BasicScheduler::take_inner) {
+                return inner.block_on(future)
+            }
+
+            let mut enter = crate::runtime::enter(false);
+
+            let notified = spawner.notify().notified();
+            pin!(notified);
+
+            if let Some(out) = enter
+                .block_on(poll_fn(|cx| {
+                    if notified.as_mut().poll(cx).is_ready() {
+                        return Ready(None);
+                    }
+
+                    if let Ready(out) = future.as_mut().poll(cx) {
+                        return Ready(Some(out));
+                    }
+
+                    Pending
+                }))
+                .expect("Failed to `Enter::block_on`")
+            {
+                return out;
             }
         }
     }

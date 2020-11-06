@@ -449,12 +449,7 @@ cfg_rt! {
                     // Attempt to steal the dedicated parker and block_on the future if we can there,
                     // othwerwise, lets select on a notification that the parker is available
                     // or the future is complete.
-                    if let Some(mut inner) = exec.take_inner() {
-                        let _enter = self.enter();
-                        inner.block_on(future)
-                    } else {
-                        self.handle.block_on(future)
-                    }
+                    self.handle.block_on_with_basic_scheduler(future, exec.spawner(), Some(exec))
                 }
                 #[cfg(feature = "rt-multi-thread")]
                 Kind::ThreadPool(_) => self.handle.block_on(future),
