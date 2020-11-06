@@ -358,6 +358,9 @@ impl Notify {
     /// # Examples
     ///
     /// ```
+    /// use tokio::sync::Notify;
+    /// use std::sync::Arc;
+    ///
     /// #[tokio::main]
     /// async fn main() {
     ///     let notify = Arc::new(Notify::new());
