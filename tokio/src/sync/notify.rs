@@ -348,7 +348,35 @@ impl Notify {
     }
 
     /// Notifies all waiting tasks
-    pub(crate) fn notify_waiters(&self) {
+    ///
+    /// If a task is currently waiting, that task is notified. Unlike with
+    /// `notify()`, no permit is stored to be used by the next call to
+    /// [`notified().await`]. The purpose of this method is to notify all
+    /// already registered waiters. Registering for notification is done by
+    /// acquiring an instance of the `Notified` future via calling `notified()`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let notify = Arc::new(Notify::new());
+    ///     let notify2 = notify.clone();
+    ///
+    ///     let notified1 = notify.notified();
+    ///     let notified2 = notify.notified();
+    ///
+    ///     let handle = tokio::spawn(async move {
+    ///         println!("sending notifications");
+    ///         notify2.notify_waiters();
+    ///     });
+    ///
+    ///     notified1.await;
+    ///     notified2.await;
+    ///     println!("received notifications");
+    /// }
+    /// ```
+    pub fn notify_waiters(&self) {
         // There are waiters, the lock must be acquired to notify.
         let mut waiters = self.waiters.lock();
 
