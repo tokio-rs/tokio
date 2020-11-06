@@ -10,6 +10,7 @@ use std::io;
 use std::net::{Shutdown, SocketAddr};
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::time::Duration;
 
 cfg_net! {
     /// A TCP stream between a local and a remote socket.
@@ -664,6 +665,65 @@ impl TcpStream {
         self.io.set_nodelay(nodelay)
     }
 
+    /// Reads the linger duration for this socket by getting the `SO_LINGER`
+    /// option.
+    ///
+    /// For more information about this option, see [`set_linger`].
+    ///
+    /// [`set_linger`]: TcpStream::set_linger
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpStream;
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
+    ///
+    /// println!("{:?}", stream.linger()?);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn linger(&self) -> io::Result<Option<Duration>> {
+        let mio_socket = mio::net::TcpSocket::from(self);
+
+        let result = mio_socket.get_linger();
+
+        std::mem::forget(mio_socket);
+
+        result
+    }
+
+    /// Sets the linger duration of this socket by setting the SO_LINGER option.
+    ///
+    /// This option controls the action taken when a stream has unsent messages and the stream is
+    /// closed. If SO_LINGER is set, the system shall block the process until it can transmit the
+    /// data or until the time expires.
+    ///
+    /// If SO_LINGER is not specified, and the stream is closed, the system handles the call in a
+    /// way that allows the process to continue as quickly as possible.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpStream;
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
+    ///
+    /// stream.set_linger(None)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
+        let mio_socket = mio::net::TcpSocket::from(self);
+
+        let result = mio_socket.set_linger(dur);
+
+        std::mem::forget(mio_socket);
+        result
+    }
+
     /// Gets the value of the `IP_TTL` option for this socket.
     ///
     /// For more information about this option, see [`set_ttl`].
@@ -826,6 +886,12 @@ mod sys {
             self.io.as_raw_fd()
         }
     }
+
+    impl From<&TcpStream> for mio::net::TcpSocket {
+        fn from(stream: &TcpStream) -> Self {
+            unsafe { mio::net::TcpSocket::from_raw_fd(stream.as_raw_fd()) }
+        }
+    }
 }
 
 #[cfg(windows)]
@@ -836,6 +902,12 @@ mod sys {
     impl AsRawSocket for TcpStream {
         fn as_raw_socket(&self) -> RawSocket {
             self.io.as_raw_socket()
+        }
+    }
+
+    impl From<&TcpStream> for mio::net::TcpSocket {
+        fn from(stream: &TcpStream) -> Self {
+            unsafe { mio::net::TcpSocket::from_raw_socket(stream.as_raw_socket()) }
         }
     }
 }
