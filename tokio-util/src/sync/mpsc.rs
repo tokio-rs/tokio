@@ -34,6 +34,8 @@ impl<T: 'static> Sender<T> {
     }
 }
 
+type AcquireFutOutput<T> = Result<Permit<'static, T>, SendError<()>>;
+
 enum State<T: 'static> {
     /// We do not have permit, but we didn't start acquiring it.
     Empty,
@@ -42,7 +44,7 @@ enum State<T: 'static> {
     Ready(Permit<'static, T>),
     /// We are in process of acquiring a permit
     // ALERT: contained future contains self-reference to the sender.
-    Acquire(Pin<Box<dyn Future<Output = Result<Permit<'static, T>, SendError<()>>>>>),
+    Acquire(Pin<Box<dyn Future<Output = AcquireFutOutput<T>>>>),
 }
 
 impl<T: 'static> std::fmt::Debug for State<T> {
