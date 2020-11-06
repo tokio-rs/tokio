@@ -34,6 +34,16 @@ impl<T: 'static> Sender<T> {
     }
 }
 
+impl<T: 'static> Clone for Sender<T> {
+    fn clone(&self) -> Self {
+        Sender {
+            state: State::Empty,
+            inner: self.inner.clone(),
+            pinned: PhantomPinned,
+        }
+    }
+}
+
 type AcquireFutOutput<T> = Result<Permit<'static, T>, SendError<()>>;
 
 enum State<T: 'static> {
