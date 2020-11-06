@@ -112,7 +112,7 @@ jobs:
       - name: miri
         run: |
           cargo miri test --features rt,rt-multi-thread,sync task
-          cargo miri test --features rt,rt-multi-thread,sync 'sync::tests::mpsc'
+          cargo miri test -p tokio-util 'sync::tests::mpsc'
         working-directory: tokio
   san:
     name: san
