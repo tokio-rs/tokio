@@ -247,9 +247,10 @@ impl Handle {
     /// ```
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
         match &self.spawner {
-            Spawner::Basic(exec) => {
-                self.block_on_with_basic_scheduler::<F, crate::park::thread::ParkThread>(future, exec, None)
-            }
+            Spawner::Basic(exec) => self
+                .block_on_with_basic_scheduler::<F, crate::park::thread::ParkThread>(
+                    future, exec, None,
+                ),
             #[cfg(feature = "rt-multi-thread")]
             Spawner::ThreadPool(_) => {
                 let _enter = self.enter();
