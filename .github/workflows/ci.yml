@@ -110,8 +110,9 @@ jobs:
           rm -rf tokio/tests
 
       - name: miri
-        run: cargo miri test --features rt,rt-multi-thread,sync task
-        run: cargo miri test --features rt,rt-multi-thread,sync 'sync::tests::mpsc'
+        run: |
+          cargo miri test --features rt,rt-multi-thread,sync task
+          cargo miri test --features rt,rt-multi-thread,sync 'sync::tests::mpsc'
         working-directory: tokio
   san:
     name: san
