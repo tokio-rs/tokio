@@ -29,8 +29,8 @@ impl<T: 'static> Sender<T> {
     }
 
     /// Sender must be pinned because state can contain references to it
-    fn pin_project_inner(self: Pin<&mut Self>) -> Pin<&mut tokio::sync::mpsc::Sender<T>> {
-        unsafe { self.map_unchecked_mut(|t| &mut t.inner) }
+    unsafe fn pin_project_inner(self: Pin<&mut Self>) -> &mut tokio::sync::mpsc::Sender<T> {
+        unsafe { &mut Pin::into_inner_unchecked(self).inner }
     }
 }
 
