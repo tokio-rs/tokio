@@ -926,6 +926,18 @@ pub trait StreamExt: Stream {
 
 impl<St: ?Sized> StreamExt for St where St: Stream {}
 
+pub trait IntoStream<T>: std::iter::Iterator<Item = T> + Sized {
+    fn into_stream(self) -> Iter<Self>;
+}
+
+impl<I, T> IntoStream<T> for I
+    where I: std::iter::Iterator<Item = T> + Sized
+{
+    fn into_stream(self) -> Iter<Self> {
+        iter(self)
+    }
+}
+
 /// Merge the size hints from two streams.
 fn merge_size_hints(
     (left_low, left_high): (usize, Option<usize>),
