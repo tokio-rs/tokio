@@ -30,7 +30,7 @@ impl<T: 'static> Sender<T> {
 
     /// Sender must be pinned because state can contain references to it
     unsafe fn pin_project_inner(self: Pin<&mut Self>) -> &mut tokio::sync::mpsc::Sender<T> {
-        unsafe { &mut Pin::into_inner_unchecked(self).inner }
+        &mut Pin::into_inner_unchecked(self).inner
     }
 }
 
@@ -95,10 +95,11 @@ impl<T: 'static> Sender<T> {
 
     /// Disarm permit. This releases the reserved slot in the bounded channel.
     ///
-    /// This function can only be called when the `Sender` is ready.
-    pub fn disarm(mut self: Pin<&mut Self>) {
-        assert!(matches!(self.as_mut().pin_project_state(), State::Ready(_)));
+    /// Returns true if before the call this sender owned a permit.
+    pub fn disarm(mut self: Pin<&mut Self>) -> bool {
+        let was_ready = matches!(self.as_mut().pin_project_state(), State::Ready(_));
         *self.pin_project_state() = State::Empty;
+        was_ready
     }
 
     /// Tries to acquire a permit.
@@ -113,15 +114,14 @@ impl<T: 'static> Sender<T> {
             State::Acquire(f) => f,
             State::Empty => {
                 // Extend lifetime here.
-                // Future will not outlive sender, neither does permit.
-                // `Pin::into_inner_unchecked` is OK because it does not move sender.
+                // 1) Future will not outlive sender, neither does permit.
+                // 2) Obtaining mutable reference to sender is OK because
+                // `reserve` does not move it.
                 let long_lived_sender = unsafe {
                     std::mem::transmute::<
                         &mut tokio::sync::mpsc::Sender<T>,
                         &'static mut tokio::sync::mpsc::Sender<T>,
-                    >(Pin::into_inner_unchecked(
-                        self.as_mut().pin_project_inner(),
-                    ))
+                    >(self.as_mut().pin_project_inner())
                 };
                 Box::pin(long_lived_sender.reserve())
             }
