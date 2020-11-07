@@ -54,7 +54,7 @@ enum State<T: 'static> {
     Ready(Permit<'static, T>),
     /// We are in process of acquiring a permit
     // ALERT: contained future contains self-reference to the sender.
-    Acquire(Pin<Box<dyn Future<Output = AcquireFutOutput<T>>>>),
+    Acquire(Pin<Box<dyn Future<Output = AcquireFutOutput<T>> + Send + Sync>>),
 }
 
 impl<T: 'static> std::fmt::Debug for State<T> {
@@ -67,7 +67,7 @@ impl<T: 'static> std::fmt::Debug for State<T> {
     }
 }
 
-impl<T: 'static> Sender<T> {
+impl<T: Send + 'static> Sender<T> {
     /// Wraps a [tokio sender](tokio::sync::mpsc::Sender).
     pub fn new(inner: tokio::sync::mpsc::Sender<T>) -> Self {
         Sender {
@@ -145,16 +145,28 @@ impl<T: 'static> Sender<T> {
 }
 
 #[cfg(test)]
-fn _verify_not_unpin(x: Sender<String>) {
-    trait Foo {
-        fn is_ready(&self) -> bool;
-    }
-
-    impl<T: Unpin> Foo for T {
-        fn is_ready(&self) -> bool {
-            false
+mod _props {
+    use super::*;
+    fn _verify_not_unpin<U: Send>(x: Sender<U>) {
+        trait Foo {
+            fn is_ready(&self) -> bool;
         }
+
+        impl<T: Unpin> Foo for T {
+            fn is_ready(&self) -> bool {
+                false
+            }
+        }
+
+        assert!(x.is_ready());
     }
 
-    assert!(x.is_ready());
+    fn _verify_send<U: Send>(x: Sender<U>) {
+        fn inner(_x: impl Send) {}
+        inner(x)
+    }
+    fn _verify_sync<U: Send + Sync>(x: Sender<U>) {
+        fn inner(_x: impl Sync) {}
+        inner(x)
+    }
 }
