@@ -83,8 +83,8 @@ impl<T: 'static> Sender<T> {
     }
 
     /// Sends a message.
-    /// This function can only be called when `is_ready() == false`,
-    /// otherwise it panics.
+    ///
+    /// This method panics if the `Sender` is not ready.
     pub fn send(self: Pin<&mut Self>, value: T) {
         let permit = match std::mem::replace(self.pin_project_state(), State::Empty) {
             State::Ready(permit) => permit,
@@ -93,17 +93,17 @@ impl<T: 'static> Sender<T> {
         permit.send(value);
     }
 
-    /// Disarms permit, allowing other senders to use freed capacity slot.
-    /// This function can only be called when `is_ready() == true`,
-    /// otherwise it panics.
+    /// Disarm permit. This releases the reserved slot in the bounded channel.
+    ///
+    /// This function can only be called when the `Sender` is ready.
     pub fn disarm(mut self: Pin<&mut Self>) {
         assert!(matches!(self.as_mut().pin_project_state(), State::Ready(_)));
         *self.pin_project_state() = State::Empty;
     }
 
     /// Tries to acquire a permit.
-    /// This function can only be called when `is_ready() == true`,
-    /// otherwise it panics.
+    ///
+    /// This function can not be called when the `Sender` is ready.
     pub fn poll_ready(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
