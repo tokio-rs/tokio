@@ -143,3 +143,18 @@ impl<T: 'static> Sender<T> {
         }
     }
 }
+
+#[cfg(test)]
+fn _verify_not_unpin(x: Sender<String>) {
+    trait Foo {
+        fn is_ready(&self) -> bool;
+    }
+
+    impl<T: Unpin> Foo for T {
+        fn is_ready(&self) -> bool {
+            false
+        }
+    }
+
+    assert!(x.is_ready());
+}
