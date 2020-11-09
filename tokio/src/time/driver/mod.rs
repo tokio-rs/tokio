@@ -12,7 +12,6 @@ pub(self) use self::entry::{EntryList, EntryState, TimerHandle, TimerShared};
 
 mod handle;
 pub(crate) use self::handle::Handle;
-use self::handle::InternalHandle;
 
 mod wheel;
 
@@ -88,7 +87,7 @@ pub(crate) struct Driver<P: Park + 'static> {
     time_source: ClockTime,
 
     /// Shared state
-    inner: InternalHandle<ClockTime>,
+    inner: Handle,
 
     /// Parker to delegate to
     park: P,
@@ -97,47 +96,27 @@ pub(crate) struct Driver<P: Park + 'static> {
     unpark: TimeUnpark<P::Unpark>,
 }
 
-/// A time source trait used for mocks in tests.
-///
-/// This is distinct from Clock as it 1) handles the conversion to u64 ticks, 2)
-/// avoids any global state, and 3) is agnostic to any particular strategy for
-/// updating it. In particular, we'll be using this in loom-based testing for
-/// the concurrency aspects of this driver.
-///
-/// The Driver frontend uses Clock to back the TimeSource, but some tests will
-/// define their own lightweight mocks.
-pub(super) trait TimeSource: Clone {
-    fn deadline_to_tick(&self, t: Instant) -> u64;
-    fn instant_to_tick(&self, t: Instant) -> u64;
-    fn tick_to_instant(&self, t: u64) -> Instant;
-    fn tick_to_duration(&self, t: u64) -> Duration {
-        Duration::from_millis(t)
-    }
-    fn now(&self) -> u64;
-}
-
+/// A structure which handles conversion from Instants to u64 timestamps.
 #[derive(Debug, Clone)]
-pub(super) struct ClockTime {
+pub(self) struct ClockTime {
     clock: super::clock::Clock,
     start_time: Instant,
 }
 
 impl ClockTime {
-    fn new(clock: Clock) -> Self {
+    pub(self) fn new(clock: Clock) -> Self {
         Self {
             clock,
             start_time: super::clock::now(),
         }
     }
-}
 
-impl TimeSource for ClockTime {
-    fn deadline_to_tick(&self, t: Instant) -> u64 {
+    pub(self) fn deadline_to_tick(&self, t: Instant) -> u64 {
         // Round up to the end of a ms
         self.instant_to_tick(t + Duration::from_nanos(999_999))
     }
 
-    fn instant_to_tick(&self, t: Instant) -> u64 {
+    pub(self) fn instant_to_tick(&self, t: Instant) -> u64 {
         // round up
         let dur: Duration = t
             .checked_duration_since(self.start_time)
@@ -147,19 +126,19 @@ impl TimeSource for ClockTime {
         ms.try_into().expect("Duration too far into the future")
     }
 
-    fn tick_to_instant(&self, t: u64) -> Instant {
-        self.start_time + Duration::from_millis(t)
+    pub(self) fn tick_to_duration(&self, t: u64) -> Duration {
+        Duration::from_millis(t)
     }
 
-    fn now(&self) -> u64 {
+    pub(self) fn now(&self) -> u64 {
         self.instant_to_tick(self.clock.now())
     }
 }
 
 /// Timer state shared between `Driver`, `Handle`, and `Registration`.
-pub(self) struct Inner<TS: TimeSource> {
+pub(self) struct Inner {
     /// Timing backend in use
-    time_source: TS,
+    time_source: ClockTime,
 
     /// The last published timer `elapsed` value.
     elapsed: u64,
@@ -195,7 +174,7 @@ where
 
         Driver {
             time_source,
-            inner: InternalHandle::new(Arc::new(Mutex::new(inner))),
+            inner: Handle::new(Arc::new(Mutex::new(inner))),
             park,
             unpark,
         }
@@ -208,7 +187,7 @@ where
     /// `with_default`, setting the timer as the default timer for the execution
     /// context.
     pub(crate) fn handle(&self) -> Handle {
-        self.inner.clone().into()
+        self.inner.clone()
     }
 
     fn park_internal(&mut self, limit: Option<Duration>) -> Result<(), P::Error> {
@@ -268,7 +247,7 @@ where
     }
 }
 
-impl<TS: TimeSource> InternalHandle<TS> {
+impl Handle {
     /// Runs timer related logic, and returns the next wakeup time
     pub(self) fn process(&self) -> Option<NonZeroU64> {
         let now = self.time_source().now();
@@ -422,7 +401,7 @@ impl<TS: TimeSource> InternalHandle<TS> {
         Self::add_entry0(self.lock(), entry);
     }
 
-    unsafe fn add_entry0(mut lock: MutexGuard<'_, Inner<TS>>, entry: TimerHandle) -> Option<Waker> {
+    unsafe fn add_entry0(mut lock: MutexGuard<'_, Inner>, entry: TimerHandle) -> Option<Waker> {
         if lock.is_shutdown {
             unsafe {
                 return entry.fire(EntryState::Error(crate::time::error::Kind::Shutdown));
@@ -576,11 +555,8 @@ where
 
 // ===== impl Inner =====
 
-impl<TS> Inner<TS>
-where
-    TS: TimeSource,
-{
-    pub(self) fn new(time_source: TS, unpark: TimeUnpark<dyn Unpark>) -> Self {
+impl Inner {
+    pub(self) fn new(time_source: ClockTime, unpark: TimeUnpark<dyn Unpark>) -> Self {
         Inner {
             time_source,
             elapsed: 0,
@@ -592,14 +568,11 @@ where
     }
 }
 
-impl<TS: TimeSource> fmt::Debug for Inner<TS> {
+impl fmt::Debug for Inner {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Inner").finish()
     }
 }
-
-//#[cfg(all(test, loom))]
-//mod tests;
 
 #[cfg(test)]
 mod tests;

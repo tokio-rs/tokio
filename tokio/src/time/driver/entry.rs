@@ -56,7 +56,7 @@ use crate::sync::AtomicWaker;
 use crate::time::Instant;
 use crate::util::linked_list;
 
-use super::{InternalHandle, TimeSource};
+use super::Handle;
 
 use std::cell::UnsafeCell as StdUnsafeCell;
 use std::task::{Context, Poll, Waker};
@@ -261,10 +261,10 @@ impl std::fmt::Debug for StateCell {
 /// timer. As this participates in intrusive data structures, it must be pinned
 /// before polling.
 #[derive(Debug)]
-pub(super) struct TimerEntry<TS: TimeSource> {
+pub(super) struct TimerEntry {
     /// Arc reference to the driver. We can only free the driver after
     /// deregistering everything from their respective timer wheels.
-    driver: InternalHandle<TS>,
+    driver: Handle,
     /// Shared inner structure; this is part of an intrusive linked list, and
     /// therefore other references can exist to it while mutable references to
     /// Entry exist.
@@ -274,8 +274,8 @@ pub(super) struct TimerEntry<TS: TimeSource> {
     inner: StdUnsafeCell<TimerShared>,
 }
 
-unsafe impl<TS: TimeSource> Send for TimerEntry<TS> {}
-unsafe impl<TS: TimeSource> Sync for TimerEntry<TS> {}
+unsafe impl Send for TimerEntry {}
+unsafe impl Sync for TimerEntry {}
 
 /// An EntryHandle is the (non-enforced) "unique" pointer from the driver to the
 /// timer entry. Generally, at most one EntryHandle exists for a timer at a time
@@ -461,8 +461,8 @@ unsafe impl linked_list::Link for TimerShared {
 
 // ===== impl Entry =====
 
-impl<TS: TimeSource> TimerEntry<TS> {
-    pub(crate) fn new(handle: &InternalHandle<TS>, deadline: Instant) -> TimerEntry<TS> {
+impl TimerEntry {
+    pub(crate) fn new(handle: &Handle, deadline: Instant) -> Self {
         let deadline = handle.time_source().deadline_to_tick(deadline);
         let driver = handle.clone();
 
@@ -736,7 +736,7 @@ impl TimerHandle {
     }
 }
 
-impl<TS: TimeSource> Drop for TimerEntry<TS> {
+impl Drop for TimerEntry {
     fn drop(&mut self) {
         unsafe { Pin::new_unchecked(self) }.as_mut().cancel()
     }

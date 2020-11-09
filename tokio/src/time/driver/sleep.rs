@@ -64,13 +64,13 @@ pub struct Sleep {
 
     // The link between the `Sleep` instance and the timer that drives it.
     // This will be unboxed in tokio 1.0
-    entry: Pin<Box<TimerEntry<super::ClockTime>>>,
+    entry: Pin<Box<TimerEntry>>,
 }
 
 impl Sleep {
     pub(crate) fn new_timeout(deadline: Instant) -> Sleep {
         let handle = Handle::current();
-        let entry = Box::pin(TimerEntry::new(handle.internal(), deadline));
+        let entry = Box::pin(TimerEntry::new(&handle, deadline));
 
         Sleep { deadline, entry }
     }
