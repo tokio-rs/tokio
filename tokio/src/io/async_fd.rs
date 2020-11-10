@@ -1,12 +1,10 @@
-use std::os::unix::io::{AsRawFd, RawFd};
-use std::{task::Context, task::Poll};
-
-use std::io;
+use crate::io::driver::{Direction, Handle, ReadyEvent};
+use crate::io::registration::Registration;
 
 use mio::unix::SourceFd;
-
-use crate::io::driver::{Direction, Handle, ReadyEvent, ScheduledIo};
-use crate::util::slab;
+use std::io;
+use std::os::unix::io::{AsRawFd, RawFd};
+use std::{task::Context, task::Poll};
 
 /// Associates an IO object backed by a Unix file descriptor with the tokio
 /// reactor, allowing for readiness to be polled. The file descriptor must be of
@@ -64,9 +62,147 @@ use crate::util::slab;
 /// [`AsyncFdReadyGuard`]: struct@self::AsyncFdReadyGuard
 /// [`TcpStream::poll_read_ready`]: struct@crate::net::TcpStream
 pub struct AsyncFd<T: AsRawFd> {
-    handle: Handle,
-    shared: slab::Ref<ScheduledIo>,
+    registration: Registration,
     inner: Option<T>,
+}
+/// Represents an IO-ready event detected on a particular file descriptor, which
+/// has not yet been acknowledged. This is a `must_use` structure to help ensure
+/// that you do not forget to explicitly clear (or not clear) the event.
+#[must_use = "You must explicitly choose whether to clear the readiness state by calling a method on ReadyGuard"]
+pub struct AsyncFdReadyGuard<'a, T: AsRawFd> {
+    async_fd: &'a AsyncFd<T>,
+    event: Option<ReadyEvent>,
+}
+
+const ALL_INTEREST: mio::Interest = mio::Interest::READABLE.add(mio::Interest::WRITABLE);
+
+impl<T: AsRawFd> AsyncFd<T> {
+    /// Creates an AsyncFd backed by (and taking ownership of) an object
+    /// implementing [`AsRawFd`]. The backing file descriptor is cached at the
+    /// time of creation.
+    ///
+    /// This function must be called in the context of a tokio runtime.
+    pub fn new(inner: T) -> io::Result<Self>
+    where
+        T: AsRawFd,
+    {
+        Self::new_with_handle(inner, Handle::current())
+    }
+
+    pub(crate) fn new_with_handle(inner: T, handle: Handle) -> io::Result<Self> {
+        let fd = inner.as_raw_fd();
+
+        let registration =
+            Registration::new_with_interest_and_handle(&mut SourceFd(&fd), ALL_INTEREST, handle)?;
+
+        Ok(AsyncFd {
+            registration,
+            inner: Some(inner),
+        })
+    }
+
+    /// Returns a shared reference to the backing object of this [`AsyncFd`]
+    #[inline]
+    pub fn get_ref(&self) -> &T {
+        self.inner.as_ref().unwrap()
+    }
+
+    /// Returns a mutable reference to the backing object of this [`AsyncFd`]
+    #[inline]
+    pub fn get_mut(&mut self) -> &mut T {
+        self.inner.as_mut().unwrap()
+    }
+
+    fn take_inner(&mut self) -> Option<T> {
+        let fd = self.inner.as_ref().map(AsRawFd::as_raw_fd);
+
+        if let Some(fd) = fd {
+            let _ = self.registration.deregister(&mut SourceFd(&fd));
+        }
+
+        self.inner.take()
+    }
+
+    /// Deregisters this file descriptor, and returns ownership of the backing
+    /// object.
+    pub fn into_inner(mut self) -> T {
+        self.take_inner().unwrap()
+    }
+
+    /// Polls for read readiness. This function retains the waker for the last
+    /// context that called [`poll_read_ready`]; it therefore can only be used
+    /// by a single task at a time (however, [`poll_write_ready`] retains a
+    /// second, independent waker).
+    ///
+    /// This function is intended for cases where creating and pinning a future
+    /// via [`readable`] is not feasible. Where possible, using [`readable`] is
+    /// preferred, as this supports polling from multiple tasks at once.
+    ///
+    /// [`poll_read_ready`]: method@Self::poll_read_ready
+    /// [`poll_write_ready`]: method@Self::poll_write_ready
+    /// [`readable`]: method@Self::readable
+    pub fn poll_read_ready<'a>(
+        &'a self,
+        cx: &mut Context<'_>,
+    ) -> Poll<io::Result<AsyncFdReadyGuard<'a, T>>> {
+        let event = ready!(self.registration.poll_readiness(cx, Direction::Read))?;
+
+        Ok(AsyncFdReadyGuard {
+            async_fd: self,
+            event: Some(event),
+        })
+        .into()
+    }
+
+    /// Polls for write readiness. This function retains the waker for the last
+    /// context that called [`poll_write_ready`]; it therefore can only be used
+    /// by a single task at a time (however, [`poll_read_ready`] retains a
+    /// second, independent waker).
+    ///
+    /// This function is intended for cases where creating and pinning a future
+    /// via [`writable`] is not feasible. Where possible, using [`writable`] is
+    /// preferred, as this supports polling from multiple tasks at once.
+    ///
+    /// [`poll_read_ready`]: method@Self::poll_read_ready
+    /// [`poll_write_ready`]: method@Self::poll_write_ready
+    /// [`writable`]: method@Self::writable
+    pub fn poll_write_ready<'a>(
+        &'a self,
+        cx: &mut Context<'_>,
+    ) -> Poll<io::Result<AsyncFdReadyGuard<'a, T>>> {
+        let event = ready!(self.registration.poll_readiness(cx, Direction::Write))?;
+
+        Ok(AsyncFdReadyGuard {
+            async_fd: self,
+            event: Some(event),
+        })
+        .into()
+    }
+
+    async fn readiness(&self, interest: mio::Interest) -> io::Result<AsyncFdReadyGuard<'_, T>> {
+        let event = self.registration.readiness(interest).await?;
+
+        Ok(AsyncFdReadyGuard {
+            async_fd: self,
+            event: Some(event),
+        })
+    }
+
+    /// Waits for the file descriptor to become readable, returning a
+    /// [`AsyncFdReadyGuard`] that must be dropped to resume read-readiness polling.
+    ///
+    /// [`AsyncFdReadyGuard`]: struct@self::AsyncFdReadyGuard
+    pub async fn readable(&self) -> io::Result<AsyncFdReadyGuard<'_, T>> {
+        self.readiness(mio::Interest::READABLE).await
+    }
+
+    /// Waits for the file descriptor to become writable, returning a
+    /// [`AsyncFdReadyGuard`] that must be dropped to resume write-readiness polling.
+    ///
+    /// [`AsyncFdReadyGuard`]: struct@self::AsyncFdReadyGuard
+    pub async fn writable(&self) -> io::Result<AsyncFdReadyGuard<'_, T>> {
+        self.readiness(mio::Interest::WRITABLE).await
+    }
 }
 
 impl<T: AsRawFd> AsRawFd for AsyncFd<T> {
@@ -83,22 +219,9 @@ impl<T: std::fmt::Debug + AsRawFd> std::fmt::Debug for AsyncFd<T> {
     }
 }
 
-const ALL_INTEREST: mio::Interest = mio::Interest::READABLE.add(mio::Interest::WRITABLE);
-
-/// Represents an IO-ready event detected on a particular file descriptor, which
-/// has not yet been acknowledged. This is a `must_use` structure to help ensure
-/// that you do not forget to explicitly clear (or not clear) the event.
-#[must_use = "You must explicitly choose whether to clear the readiness state by calling a method on ReadyGuard"]
-pub struct AsyncFdReadyGuard<'a, T: AsRawFd> {
-    async_fd: &'a AsyncFd<T>,
-    event: Option<ReadyEvent>,
-}
-
-impl<'a, T: std::fmt::Debug + AsRawFd> std::fmt::Debug for AsyncFdReadyGuard<'a, T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ReadyGuard")
-            .field("async_fd", &self.async_fd)
-            .finish()
+impl<T: AsRawFd> Drop for AsyncFd<T> {
+    fn drop(&mut self) {
+        let _ = self.take_inner();
     }
 }
 
@@ -115,7 +238,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// [`drop`]: method@std::mem::drop
     pub fn clear_ready(&mut self) {
         if let Some(event) = self.event.take() {
-            self.async_fd.shared.clear_readiness(event);
+            self.async_fd.registration.clear_readiness(event);
         }
     }
 
@@ -175,168 +298,10 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     }
 }
 
-impl<T: AsRawFd> Drop for AsyncFd<T> {
-    fn drop(&mut self) {
-        let _ = self.take_inner();
-    }
-}
-
-impl<T: AsRawFd> AsyncFd<T> {
-    /// Creates an AsyncFd backed by (and taking ownership of) an object
-    /// implementing [`AsRawFd`]. The backing file descriptor is cached at the
-    /// time of creation.
-    ///
-    /// This function must be called in the context of a tokio runtime.
-    pub fn new(inner: T) -> io::Result<Self>
-    where
-        T: AsRawFd,
-    {
-        Self::new_with_handle(inner, Handle::current())
-    }
-
-    pub(crate) fn new_with_handle(inner: T, handle: Handle) -> io::Result<Self> {
-        let fd = inner.as_raw_fd();
-
-        let shared = if let Some(inner) = handle.inner() {
-            inner.add_source(&mut SourceFd(&fd), ALL_INTEREST)?
-        } else {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "failed to find event loop",
-            ));
-        };
-
-        Ok(AsyncFd {
-            handle,
-            shared,
-            inner: Some(inner),
-        })
-    }
-
-    /// Returns a shared reference to the backing object of this [`AsyncFd`]
-    #[inline]
-    pub fn get_ref(&self) -> &T {
-        self.inner.as_ref().unwrap()
-    }
-
-    /// Returns a mutable reference to the backing object of this [`AsyncFd`]
-    #[inline]
-    pub fn get_mut(&mut self) -> &mut T {
-        self.inner.as_mut().unwrap()
-    }
-
-    fn take_inner(&mut self) -> Option<T> {
-        let fd = self.inner.as_ref().map(AsRawFd::as_raw_fd);
-        if let Some(fd) = fd {
-            if let Some(driver) = self.handle.inner() {
-                let _ = driver.deregister_source(&mut SourceFd(&fd));
-            }
-        }
-        self.inner.take()
-    }
-
-    /// Deregisters this file descriptor, and returns ownership of the backing
-    /// object.
-    pub fn into_inner(mut self) -> T {
-        self.take_inner().unwrap()
-    }
-
-    /// Polls for read readiness. This function retains the waker for the last
-    /// context that called [`poll_read_ready`]; it therefore can only be used
-    /// by a single task at a time (however, [`poll_write_ready`] retains a
-    /// second, independent waker).
-    ///
-    /// This function is intended for cases where creating and pinning a future
-    /// via [`readable`] is not feasible. Where possible, using [`readable`] is
-    /// preferred, as this supports polling from multiple tasks at once.
-    ///
-    /// [`poll_read_ready`]: method@Self::poll_read_ready
-    /// [`poll_write_ready`]: method@Self::poll_write_ready
-    /// [`readable`]: method@Self::readable
-    pub fn poll_read_ready<'a>(
-        &'a self,
-        cx: &mut Context<'_>,
-    ) -> Poll<io::Result<AsyncFdReadyGuard<'a, T>>> {
-        let event = ready!(self.shared.poll_readiness(cx, Direction::Read));
-
-        if !self.handle.is_alive() {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "IO driver has terminated",
-            ))
-            .into();
-        }
-
-        Ok(AsyncFdReadyGuard {
-            async_fd: self,
-            event: Some(event),
-        })
-        .into()
-    }
-
-    /// Polls for write readiness. This function retains the waker for the last
-    /// context that called [`poll_write_ready`]; it therefore can only be used
-    /// by a single task at a time (however, [`poll_read_ready`] retains a
-    /// second, independent waker).
-    ///
-    /// This function is intended for cases where creating and pinning a future
-    /// via [`writable`] is not feasible. Where possible, using [`writable`] is
-    /// preferred, as this supports polling from multiple tasks at once.
-    ///
-    /// [`poll_read_ready`]: method@Self::poll_read_ready
-    /// [`poll_write_ready`]: method@Self::poll_write_ready
-    /// [`writable`]: method@Self::writable
-    pub fn poll_write_ready<'a>(
-        &'a self,
-        cx: &mut Context<'_>,
-    ) -> Poll<io::Result<AsyncFdReadyGuard<'a, T>>> {
-        let event = ready!(self.shared.poll_readiness(cx, Direction::Write));
-
-        if !self.handle.is_alive() {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "IO driver has terminated",
-            ))
-            .into();
-        }
-
-        Ok(AsyncFdReadyGuard {
-            async_fd: self,
-            event: Some(event),
-        })
-        .into()
-    }
-
-    async fn readiness(&self, interest: mio::Interest) -> io::Result<AsyncFdReadyGuard<'_, T>> {
-        let event = self.shared.readiness(interest);
-
-        if !self.handle.is_alive() {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "IO driver has terminated",
-            ));
-        }
-
-        let event = event.await;
-        Ok(AsyncFdReadyGuard {
-            async_fd: self,
-            event: Some(event),
-        })
-    }
-
-    /// Waits for the file descriptor to become readable, returning a
-    /// [`AsyncFdReadyGuard`] that must be dropped to resume read-readiness polling.
-    ///
-    /// [`AsyncFdReadyGuard`]: struct@self::AsyncFdReadyGuard
-    pub async fn readable(&self) -> io::Result<AsyncFdReadyGuard<'_, T>> {
-        self.readiness(mio::Interest::READABLE).await
-    }
-
-    /// Waits for the file descriptor to become writable, returning a
-    /// [`AsyncFdReadyGuard`] that must be dropped to resume write-readiness polling.
-    ///
-    /// [`AsyncFdReadyGuard`]: struct@self::AsyncFdReadyGuard
-    pub async fn writable(&self) -> io::Result<AsyncFdReadyGuard<'_, T>> {
-        self.readiness(mio::Interest::WRITABLE).await
+impl<'a, T: std::fmt::Debug + AsRawFd> std::fmt::Debug for AsyncFdReadyGuard<'a, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ReadyGuard")
+            .field("async_fd", &self.async_fd)
+            .finish()
     }
 }

@@ -117,16 +117,21 @@ impl Registration {
         cx: &mut Context<'_>,
         direction: Direction,
     ) -> Poll<io::Result<ReadyEvent>> {
-        if self.handle.inner().is_none() {
-            return Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, "reactor gone")));
-        }
-
         // Keep track of task budget
         let coop = ready!(crate::coop::poll_proceed(cx));
         let ev = ready!(self.shared.poll_readiness(cx, direction));
+
+        if self.handle.inner().is_none() {
+            return Poll::Ready(Err(gone()));
+        }
+
         coop.made_progress();
         Poll::Ready(Ok(ev))
     }
+}
+
+fn gone() -> io::Error {
+    io::Error::new(io::ErrorKind::Other, "IO driver has terminated")
 }
 
 cfg_io_readiness! {

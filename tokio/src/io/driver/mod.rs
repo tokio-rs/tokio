@@ -290,12 +290,6 @@ impl Handle {
     pub(super) fn inner(&self) -> Option<Arc<Inner>> {
         self.inner.upgrade()
     }
-
-    cfg_net_unix! {
-        pub(super) fn is_alive(&self) -> bool {
-            self.inner.strong_count() > 0
-        }
-    }
 }
 
 impl Unpark for Handle {
