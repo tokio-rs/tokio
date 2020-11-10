@@ -96,7 +96,7 @@ impl Registration {
     /// no longer result in notifications getting sent for this registration.
     ///
     /// `Err` is returned if an error is encountered.
-    pub(super) fn deregister(&mut self, io: &mut impl Source) -> io::Result<()> {
+    pub(crate) fn deregister(&mut self, io: &mut impl Source) -> io::Result<()> {
         let inner = match self.handle.inner() {
             Some(inner) => inner,
             None => return Err(io::Error::new(io::ErrorKind::Other, "reactor gone")),
@@ -104,15 +104,47 @@ impl Registration {
         inner.deregister_source(io)
     }
 
-    pub(super) fn clear_readiness(&self, event: ReadyEvent) {
+    pub(crate) fn clear_readiness(&self, event: ReadyEvent) {
         self.shared.clear_readiness(event);
+    }
+
+    // Uses the poll path, requiring the caller to ensure mutual exclusion for
+    // correctness. Only the last task to call this function is notified.
+    pub(crate) fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<ReadyEvent>> {
+        self.poll_ready(cx, Direction::Read)
+    }
+
+    // Uses the poll path, requiring the caller to ensure mutual exclusion for
+    // correctness. Only the last task to call this function is notified.
+    pub(crate) fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<ReadyEvent>> {
+        self.poll_ready(cx, Direction::Write)
+    }
+
+    // Uses the poll path, requiring the caller to ensure mutual exclusion for
+    // correctness. Only the last task to call this function is notified.
+    pub(crate) fn poll_read_io<R>(
+        &self,
+        cx: &mut Context<'_>,
+        f: impl FnMut() -> io::Result<R>,
+    ) -> Poll<io::Result<R>> {
+        self.poll_io(cx, Direction::Read, f)
+    }
+
+    // Uses the poll path, requiring the caller to ensure mutual exclusion for
+    // correctness. Only the last task to call this function is notified.
+    pub(crate) fn poll_write_io<R>(
+        &self,
+        cx: &mut Context<'_>,
+        f: impl FnMut() -> io::Result<R>,
+    ) -> Poll<io::Result<R>> {
+        self.poll_io(cx, Direction::Write, f)
     }
 
     /// Polls for events on the I/O resource's `direction` readiness stream.
     ///
     /// If called with a task context, notify the task when a new event is
     /// received.
-    pub(super) fn poll_readiness(
+    fn poll_ready(
         &self,
         cx: &mut Context<'_>,
         direction: Direction,
@@ -128,6 +160,27 @@ impl Registration {
         coop.made_progress();
         Poll::Ready(Ok(ev))
     }
+
+    fn poll_io<R>(
+        &self,
+        cx: &mut Context<'_>,
+        direction: Direction,
+        mut f: impl FnMut() -> io::Result<R>,
+    ) -> Poll<io::Result<R>> {
+        loop {
+            let ev = ready!(self.poll_ready(cx, direction))?;
+
+            match f() {
+                Ok(ret) => {
+                    return Poll::Ready(Ok(ret));
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    self.clear_readiness(ev);
+                }
+                Err(e) => return Poll::Ready(Err(e)),
+            }
+        }
+    }
 }
 
 fn gone() -> io::Error {
@@ -136,7 +189,7 @@ fn gone() -> io::Error {
 
 cfg_io_readiness! {
     impl Registration {
-        pub(super) async fn readiness(&self, interest: mio::Interest) -> io::Result<ReadyEvent> {
+        pub(crate) async fn readiness(&self, interest: mio::Interest) -> io::Result<ReadyEvent> {
             use std::future::Future;
             use std::pin::Pin;
 
@@ -150,6 +203,19 @@ cfg_io_readiness! {
 
                 Pin::new(&mut fut).poll(cx).map(Ok)
             }).await
+        }
+
+        pub(crate) async fn async_io<R>(&self, interest: mio::Interest, mut f: impl FnMut() -> io::Result<R>) -> io::Result<R> {
+            loop {
+                let event = self.readiness(interest).await?;
+
+                match f() {
+                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                        self.clear_readiness(event);
+                    }
+                    x => return x,
+                }
+            }
         }
     }
 }

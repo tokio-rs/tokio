@@ -1,5 +1,4 @@
-use crate::io::driver::{Direction, Handle, ReadyEvent};
-use crate::io::registration::Registration;
+use crate::io::driver::{Handle, ReadyEvent, Registration};
 
 use mio::unix::SourceFd;
 use std::io;
@@ -145,7 +144,7 @@ impl<T: AsRawFd> AsyncFd<T> {
         &'a self,
         cx: &mut Context<'_>,
     ) -> Poll<io::Result<AsyncFdReadyGuard<'a, T>>> {
-        let event = ready!(self.registration.poll_readiness(cx, Direction::Read))?;
+        let event = ready!(self.registration.poll_read_ready(cx))?;
 
         Ok(AsyncFdReadyGuard {
             async_fd: self,
@@ -170,7 +169,7 @@ impl<T: AsRawFd> AsyncFd<T> {
         &'a self,
         cx: &mut Context<'_>,
     ) -> Poll<io::Result<AsyncFdReadyGuard<'a, T>>> {
-        let event = ready!(self.registration.poll_readiness(cx, Direction::Write))?;
+        let event = ready!(self.registration.poll_write_ready(cx))?;
 
         Ok(AsyncFdReadyGuard {
             async_fd: self,

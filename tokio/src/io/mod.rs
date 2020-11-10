@@ -207,8 +207,6 @@ pub use std::io::{Error, ErrorKind, Result, SeekFrom};
 cfg_io_driver! {
     pub(crate) mod driver;
 
-    mod registration;
-
     mod poll_evented;
 
     #[cfg(not(loom))]

@@ -1,5 +1,18 @@
 #![allow(unused_macros)]
 
+macro_rules! feature {
+    (
+        #![$meta:meta]
+        $($item:item)*
+    ) => {
+        $(
+            #[cfg($meta)]
+            #[cfg_attr(docsrs, doc(cfg($meta)))]
+            $item
+        )*
+    }
+}
+
 /// Enables enter::block_on
 macro_rules! cfg_block_on {
     ($($item:item)*) => {

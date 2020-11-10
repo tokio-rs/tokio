@@ -283,7 +283,7 @@ impl ScheduledIo {
     /// These are to support `AsyncRead` and `AsyncWrite` polling methods,
     /// which cannot use the `async fn` version. This uses reserved reader
     /// and writer slots.
-    pub(in crate::io) fn poll_readiness(
+    pub(super) fn poll_readiness(
         &self,
         cx: &mut Context<'_>,
         direction: Direction,
@@ -299,7 +299,19 @@ impl ScheduledIo {
                 Direction::Read => &mut waiters.reader,
                 Direction::Write => &mut waiters.writer,
             };
-            *slot = Some(cx.waker().clone());
+
+            // Avoid cloning the waker if one is already stored that matches the
+            // current task.
+            match slot {
+                Some(existing) => {
+                    if !existing.will_wake(cx.waker()) {
+                        *existing = cx.waker().clone();
+                    }
+                }
+                None => {
+                    *slot = Some(cx.waker().clone());
+                }
+            }
 
             // Try again, in case the readiness was changed while we were
             // taking the waiters lock

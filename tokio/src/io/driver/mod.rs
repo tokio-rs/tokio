@@ -3,8 +3,11 @@
 mod ready;
 use ready::Ready;
 
+mod registration;
+pub(crate) use registration::Registration;
+
 mod scheduled_io;
-pub(crate) use scheduled_io::ScheduledIo; // pub(crate) for tests
+use scheduled_io::ScheduledIo;
 
 use crate::park::{Park, Unpark};
 use crate::util::slab::{self, Slab};
@@ -68,7 +71,7 @@ pub(super) struct Inner {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
-pub(super) enum Direction {
+enum Direction {
     Read,
     Write,
 }
