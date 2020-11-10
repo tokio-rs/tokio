@@ -53,11 +53,6 @@ jobs:
         run: cargo test --features full
         working-directory: tokio
 
-      # Check `tokio` with `full + parking_lot` to make sure it compiles.
-      - name: check tokio full,parking_lot
-        run: cargo check --features full,parking_lot
-        working-directory: tokio
-
       # Test **all** crates in the workspace with all features.
       - name: test all --all-features
         run: cargo test --workspace --all-features
