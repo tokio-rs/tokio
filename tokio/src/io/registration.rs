@@ -130,10 +130,7 @@ impl Registration {
 }
 
 fn gone() -> io::Error {
-    io::Error::new(
-        io::ErrorKind::Other,
-        "IO driver has terminated",
-    )
+    io::Error::new(io::ErrorKind::Other, "IO driver has terminated")
 }
 
 cfg_io_readiness! {

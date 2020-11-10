@@ -1,10 +1,10 @@
-use crate::io::Registration;
 use crate::io::driver::{Direction, Handle, ReadyEvent};
+use crate::io::registration::Registration;
 
 use mio::unix::SourceFd;
+use std::io;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::{task::Context, task::Poll};
-use std::io;
 
 /// Associates an IO object backed by a Unix file descriptor with the tokio
 /// reactor, allowing for readiness to be polled. The file descriptor must be of
@@ -92,7 +92,8 @@ impl<T: AsRawFd> AsyncFd<T> {
     pub(crate) fn new_with_handle(inner: T, handle: Handle) -> io::Result<Self> {
         let fd = inner.as_raw_fd();
 
-        let registration = Registration::new_with_interest_and_handle(&mut SourceFd(&fd), ALL_INTEREST, handle)?;
+        let registration =
+            Registration::new_with_interest_and_handle(&mut SourceFd(&fd), ALL_INTEREST, handle)?;
 
         Ok(AsyncFd {
             registration,

@@ -208,7 +208,6 @@ cfg_io_driver! {
     pub(crate) mod driver;
 
     mod registration;
-    use registration::Registration;
 
     mod poll_evented;
 
