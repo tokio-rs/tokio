@@ -181,6 +181,26 @@ jobs:
       - name: "test --workspace --all-features"
         run: cargo check --workspace --all-features
 
+  minimal-versions:
+    name: minimal-versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.nightly }}
+          override: true
+      - name: Install cargo-hack
+        run: cargo install cargo-hack
+      - name: "check --all-features -Z minimal-versions"
+        run: |
+          # Remove dev-dependencies from Cargo.toml to prevent the next `cargo update`
+          # from determining minimal versions based on dev-dependencies.
+          cargo hack --remove-dev-deps --workspace
+          # Update Cargo.lock to minimal version dependencies.
+          cargo update -Z minimal-versions
+          cargo check --all-features
+
   fmt:
     name: fmt
     runs-on: ubuntu-latest
