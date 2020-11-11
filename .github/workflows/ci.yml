@@ -190,6 +190,8 @@ jobs:
         with:
           toolchain: ${{ env.nightly }}
           override: true
+      - name: Install cargo-hack
+        run: cargo install cargo-hack
       - name: "check --all-features -Z minimal-versions"
         run: |
           # Remove dev-dependencies from Cargo.toml to prevent the next `cargo update`
