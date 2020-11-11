@@ -745,7 +745,7 @@ impl UdpSocket {
         &self,
         cx: &mut Context<'_>,
         buf: &[u8],
-        target: &SocketAddr,
+        target: SocketAddr,
     ) -> Poll<io::Result<usize>> {
         self.io
             .registration()
