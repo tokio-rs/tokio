@@ -120,7 +120,7 @@ impl Wheel {
     /// Remove `item` from the timing wheel.
     pub(crate) unsafe fn remove(&mut self, item: NonNull<TimerShared>) {
         unsafe {
-            if item.as_ref().is_pending() {
+            if !item.as_ref().is_registered() {
                 self.pending.remove(item);
             } else {
                 let when = item.as_ref().cached_when();
@@ -223,17 +223,18 @@ impl Wheel {
                 debug_assert_eq!(unsafe { item.cached_when() }, expiration.deadline);
             }
 
-            // The expiration time may have been reset, so sync up and
-            // potentially reinsert at a different time than before
-            let sync_when = unsafe { item.sync_when() };
-
-            if sync_when <= expiration.deadline {
-                unsafe { item.set_pending() };
-                self.pending.push_front(item);
-            } else {
-                let level = level_for(expiration.deadline, sync_when);
-                unsafe {
-                    self.levels[level].add_entry(item);
+            // Try to expire the entry; this is cheap (doesn't synchronize) if
+            // the timer is not expired, and updates cached_when.
+            match unsafe { item.mark_pending(expiration.deadline) } {
+                Ok(()) => {
+                    // Item was expired
+                    self.pending.push_front(item);
+                }
+                Err(expiration_tick) => {
+                    let level = level_for(expiration.deadline, expiration_tick);
+                    unsafe {
+                        self.levels[level].add_entry(item);
+                    }
                 }
             }
         }

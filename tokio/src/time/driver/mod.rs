@@ -8,7 +8,7 @@
 
 mod entry;
 pub(self) use self::entry::TimerEntry;
-pub(self) use self::entry::{EntryList, EntryState, TimerHandle, TimerShared};
+pub(self) use self::entry::{EntryList, TimerHandle, TimerShared};
 
 mod handle;
 pub(crate) use self::handle::Handle;
@@ -17,7 +17,7 @@ mod wheel;
 
 pub(super) mod sleep;
 
-use crate::loom::sync::{atomic::AtomicBool, atomic::Ordering, Arc, Mutex, MutexGuard};
+use crate::loom::sync::{atomic::AtomicBool, atomic::Ordering, Arc, Mutex};
 use crate::park::{Park, Unpark};
 use crate::time::error::Error;
 use crate::time::{Clock, Duration, Instant};
@@ -266,16 +266,13 @@ impl Handle {
         assert!(now >= lock.elapsed);
 
         while let Some(entry) = lock.wheel.poll(now) {
-            // Fire the entry.
-            //
-            // SAFETY: The driver lock is held, and we know the timer is valid
-            // as we just removed it from the wheel.
-            let waker = unsafe { entry.fire(EntryState::Fired) };
+            debug_assert!(unsafe { entry.is_pending() });
 
-            if waker.is_some() {
+            // SAFETY: We hold the driver lock, and just removed the entry from any linked lists.
+            if let Some(waker) = unsafe { entry.fire(Ok(())) } {
                 any_awoken = true;
 
-                waker_list[waker_idx] = waker;
+                waker_list[waker_idx] = Some(waker);
 
                 waker_idx += 1;
 
@@ -338,22 +335,7 @@ impl Handle {
                 lock.wheel.remove(entry);
             }
 
-            entry.as_ref().handle().fire(EntryState::Cancelled);
-        }
-    }
-
-    /// Forces a timer in the FiringInProgress state into its final state.
-    /// Timers in any other state will take the driver lock, but otherwise take
-    /// no action.
-    #[cold]
-    pub(self) unsafe fn sync_timer(&self, entry: NonNull<TimerShared>) {
-        unsafe {
-            let mut lock = self.lock();
-
-            if unsafe { entry.as_ref().is_pending() } {
-                lock.wheel.remove(entry);
-                entry.as_ref().handle().fire(EntryState::Fired);
-            }
+            entry.as_ref().handle().fire(Ok(()));
         }
     }
 
@@ -363,7 +345,7 @@ impl Handle {
     /// driver. No other threads are allowed to concurrently manipulate the
     /// timer at all (the current thread should hold an exclusive reference to
     /// the `TimerEntry`)
-    pub(self) unsafe fn reregister(&self, entry: NonNull<TimerShared>) {
+    pub(self) unsafe fn reregister(&self, new_tick: u64, entry: NonNull<TimerShared>) {
         let waker = unsafe {
             let mut lock = self.lock();
 
@@ -373,9 +355,39 @@ impl Handle {
                 lock.wheel.remove(entry);
             }
 
-            // Always attempt to reregister. We'll fire it again if it's already
-            // expired/shutdown/etc.
-            Self::add_entry0(lock, entry.as_ref().handle())
+            // Now that we have exclusive control of this entry, mint a handle to reinsert it.
+            let entry = entry.as_ref().handle();
+
+            if lock.is_shutdown {
+                unsafe { entry.fire(Err(crate::time::error::Error::shutdown())) }
+            } else {
+                entry.set_expiration(new_tick);
+
+                // Note: We don't have to worry about racing with some other resetting
+                // thread, because add_entry and reregister require exclusive control of
+                // the timer entry.
+                match unsafe { lock.wheel.insert(entry) } {
+                    Ok(when) => {
+                        if lock
+                            .next_wake
+                            .map(|next_wake| when < next_wake.get())
+                            .unwrap_or(true)
+                        {
+                            lock.unpark.unpark();
+                        }
+
+                        None
+                    }
+                    Err((entry, super::error::InsertError::Elapsed)) => unsafe {
+                        entry.fire(Ok(()))
+                    },
+                    Err((entry, super::error::InsertError::Invalid)) => unsafe {
+                        entry.fire(Err(Error::invalid()))
+                    },
+                }
+            }
+
+            // Must release lock before invoking waker to avoid the risk of deadlock.
         };
 
         // The timer was fired synchronously as a result of the reregistration.
@@ -383,53 +395,6 @@ impl Handle {
         // and otherwise the task won't be awoken to poll again.
         if let Some(waker) = waker {
             waker.wake();
-        }
-    }
-
-    /// Adds a new timer to the driver.
-    ///
-    /// If the timer is already expired, or if an error occurs, the timer will
-    /// be automatically transitioned to a completed state. The waker will _not_
-    /// be fired in this case, so the caller must check the timer state after
-    /// calling add_entry.
-    ///
-    /// SAFETY: The corresponding entry must remain pinned until timer
-    /// completion or deregistration, and must not yet be registered.
-    pub(self) unsafe fn add_entry(&self, entry: TimerHandle) {
-        debug_assert!(unsafe { entry.is_pre_registration() });
-
-        Self::add_entry0(self.lock(), entry);
-    }
-
-    unsafe fn add_entry0(mut lock: MutexGuard<'_, Inner>, entry: TimerHandle) -> Option<Waker> {
-        if lock.is_shutdown {
-            unsafe {
-                return entry.fire(EntryState::Error(crate::time::error::Kind::Shutdown));
-            }
-        }
-
-        if !entry.set_registered() {
-            return None;
-        }
-
-        match unsafe { lock.wheel.insert(entry) } {
-            Ok(when) => {
-                if lock
-                    .next_wake
-                    .map(|next_wake| when < next_wake.get())
-                    .unwrap_or(true)
-                {
-                    lock.unpark.unpark();
-                }
-
-                None
-            }
-            Err((entry, super::error::InsertError::Elapsed)) => unsafe {
-                entry.fire(EntryState::Fired)
-            },
-            Err((entry, super::error::InsertError::Invalid)) => unsafe {
-                entry.fire(EntryState::Error(crate::time::error::Kind::Invalid))
-            },
         }
     }
 }
