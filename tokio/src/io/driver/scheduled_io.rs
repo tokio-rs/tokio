@@ -280,6 +280,15 @@ impl ScheduledIo {
         }
     }
 
+    pub(super) fn ready_event(&self, interest: Interest) -> ReadyEvent {
+        let curr = self.readiness.load(Acquire);
+
+        ReadyEvent {
+            tick: TICK.unpack(curr) as u8,
+            ready: interest.mask() & Ready::from_usize(READINESS.unpack(curr)),
+        }
+    }
+
     /// Poll version of checking readiness for a certain direction.
     ///
     /// These are to support `AsyncRead` and `AsyncWrite` polling methods,

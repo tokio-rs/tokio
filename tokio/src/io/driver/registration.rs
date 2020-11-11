@@ -182,6 +182,27 @@ impl Registration {
             }
         }
     }
+
+    pub(crate) fn try_io<R>(
+        &self,
+        interest: Interest,
+        f: impl FnOnce() -> io::Result<R>,
+    ) -> io::Result<R> {
+        let ev = self.shared.ready_event(interest);
+
+        // Don't attempt the operation if the resource is not ready.
+        if ev.ready.is_empty() {
+            return Err(io::ErrorKind::WouldBlock.into());
+        }
+
+        match f() {
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                self.clear_readiness(ev);
+                Err(io::ErrorKind::WouldBlock.into())
+            }
+            res => res,
+        }
+    }
 }
 
 fn gone() -> io::Error {

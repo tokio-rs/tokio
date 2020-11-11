@@ -206,7 +206,7 @@ pub use std::io::{Error, ErrorKind, Result, SeekFrom};
 
 cfg_io_driver! {
     pub(crate) mod driver;
-    pub(crate) use driver::Interest;
+    pub use driver::{Interest, Ready};
 
     mod poll_evented;
 

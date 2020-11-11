@@ -1,10 +1,12 @@
 #![cfg_attr(not(feature = "rt"), allow(dead_code))]
 
 mod interest;
-pub(crate) use interest::Interest;
+#[allow(unreachable_pub)]
+pub use interest::Interest;
 
 mod ready;
-use ready::Ready;
+#[allow(unreachable_pub)]
+pub use ready::Ready;
 
 mod registration;
 pub(crate) use registration::Registration;
@@ -51,7 +53,7 @@ pub(crate) struct Handle {
 
 pub(crate) struct ReadyEvent {
     tick: u8,
-    ready: Ready,
+    pub(crate) ready: Ready,
 }
 
 pub(super) struct Inner {

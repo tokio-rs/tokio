@@ -1,5 +1,5 @@
 use crate::future::poll_fn;
-use crate::io::{AsyncRead, AsyncWrite, Interest, PollEvented, ReadBuf};
+use crate::io::{AsyncRead, AsyncWrite, Interest, PollEvented, ReadBuf, Ready};
 use crate::net::tcp::split::{split, ReadHalf, WriteHalf};
 use crate::net::tcp::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
 use crate::net::{to_socket_addrs, ToSocketAddrs};
@@ -262,6 +262,33 @@ impl TcpStream {
                 Err(e) => return Poll::Ready(Err(e)),
             }
         }
+    }
+
+    /// Wait for any of the requested ready states.
+    pub async fn ready(&self, interest: Interest) -> io::Result<Ready> {
+        let event = self.io.registration().readiness(interest).await?;
+        Ok(event.ready)
+    }
+
+    /// Attempt a non-blocking read.
+    pub async fn try_read(&self, buf: &mut ReadBuf<'_>) -> io::Result<()> {
+        use std::io::Read;
+
+        let n = self.io.registration().try_io(Interest::READABLE, || {
+            // Safety: respecting the ReadBuf contract
+            let b = unsafe {
+                &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
+            };
+            (&*self.io).read(b)
+        })?;
+
+        // Safety: `TcpStream::read` initializes the memory when reading into the buffer.
+        unsafe {
+            buf.assume_init(n);
+            buf.advance(n);
+        }
+
+        Ok(())
     }
 
     /// Receives data on the socket from the remote address to which it is
