@@ -128,8 +128,39 @@ cfg_time! {
 #[doc(no_inline)]
 pub use futures_core::Stream;
 
-/// An extension trait for `Stream`s that provides a variety of convenient
-/// combinator functions.
+/// An extension trait for the [`Stream`] trait that provides a variety of
+/// convenient combinator functions.
+///
+/// Be aware that the `Stream` trait in Tokio is a re-export of the trait found
+/// in the [futures] crate, however both Tokio and futures provide separate
+/// `StreamExt` utility traits, and some utilities are only available on one of
+/// these traits. Click [here][futures-StreamExt] to see the other `StreamExt`
+/// trait in the futures crate.
+///
+/// If you need utilities from both `StreamExt` traits, you should prefer to
+/// import one of them, and use the other through the fully qualified call
+/// syntax. For example:
+/// ```
+/// // import one of the traits:
+/// use futures::stream::StreamExt;
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+///
+/// let a = tokio::stream::iter(vec![1, 3, 5]);
+/// let b = tokio::stream::iter(vec![2, 4, 6]);
+///
+/// // use the fully qualified call syntax for the other trait:
+/// let merged = tokio::stream::StreamExt::merge(a, b);
+///
+/// // use normal call notation for futures::stream::StreamExt::collect
+/// let output: Vec<_> = merged.collect().await;
+/// assert_eq!(output, vec![1, 2, 3, 4, 5, 6]);
+/// # }
+/// ```
+///
+/// [`Stream`]: crate::stream::Stream
+/// [futures]: https://docs.rs/futures
+/// [futures-StreamExt]: https://docs.rs/futures/0.3/futures/stream/trait.StreamExt.html
 pub trait StreamExt: Stream {
     /// Consumes and returns the next value in the stream or `None` if the
     /// stream is finished.
