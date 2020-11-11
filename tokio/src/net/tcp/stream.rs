@@ -271,24 +271,21 @@ impl TcpStream {
     }
 
     /// Attempt a non-blocking read.
-    pub async fn try_read(&self, buf: &mut ReadBuf<'_>) -> io::Result<()> {
+    pub fn try_read(&self, buf: &mut [u8]) -> io::Result<usize> {
         use std::io::Read;
 
-        let n = self.io.registration().try_io(Interest::READABLE, || {
-            // Safety: respecting the ReadBuf contract
-            let b = unsafe {
-                &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
-            };
-            (&*self.io).read(b)
-        })?;
+        self.io.registration().try_io(Interest::READABLE, || {
+            (&*self.io).read(buf)
+        })
+    }
 
-        // Safety: `TcpStream::read` initializes the memory when reading into the buffer.
-        unsafe {
-            buf.assume_init(n);
-            buf.advance(n);
-        }
+    /// Attempt a non-blocking write.
+    pub fn try_write(&self, buf: &[u8]) -> io::Result<usize> {
+        use std::io::Write;
 
-        Ok(())
+        self.io.registration().try_io(Interest::WRITABLE, || {
+            (&*self.io).write(buf)
+        })
     }
 
     /// Receives data on the socket from the remote address to which it is
