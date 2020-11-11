@@ -182,6 +182,7 @@ const MAX_DURATION: u64 = (1 << (6 * NUM_LEVELS)) - 1;
 #[tokio::test]
 async fn exactly_max() {
     // TODO: this should not panic but `time::ms()` is acting up
+    // If fixed, make sure to update documentation on `time::sleep` too.
     time::sleep(ms(MAX_DURATION)).await;
 }
 
