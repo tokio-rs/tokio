@@ -180,9 +180,16 @@ jobs:
         with:
           toolchain: ${{ env.nightly }}
           override: true
+      - name: Install cargo-hack
+        run: cargo install cargo-hack
       - name: "check --all-features -Z minimal-versions"
-        run: cargo check --all-features -Z minimal-versions
-
+        run: |
+          # Remove dev-dependencies from Cargo.toml to prevent the next `cargo update`
+          # from determining minimal versions based on dev-dependencies.
+          cargo hack --remove-dev-deps --workspace
+          # Update Cargo.lock to minimal version dependencies.
+          cargo update -Z minimal-versions
+          cargo check --all-features
 
   fmt:
     name: fmt
