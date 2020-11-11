@@ -49,6 +49,8 @@ struct Waiters {
 }
 
 cfg_io_readiness! {
+    use crate::io::Interest;
+
     #[derive(Debug)]
     struct Waiter {
         pointers: linked_list::Pointers<Waiter>,
@@ -57,7 +59,7 @@ cfg_io_readiness! {
         waker: Option<Waker>,
 
         /// The interest this waiter is waiting on
-        interest: mio::Interest,
+        interest: Interest,
 
         is_ready: bool,
 
@@ -360,7 +362,7 @@ unsafe impl Sync for ScheduledIo {}
 cfg_io_readiness! {
     impl ScheduledIo {
         /// An async version of `poll_readiness` which uses a linked list of wakers
-        pub(crate) async fn readiness(&self, interest: mio::Interest) -> ReadyEvent {
+        pub(crate) async fn readiness(&self, interest: Interest) -> ReadyEvent {
             self.readiness_fut(interest).await
         }
 
@@ -368,7 +370,7 @@ cfg_io_readiness! {
         // we are borrowing the `UnsafeCell` possibly over await boundaries.
         //
         // Go figure.
-        fn readiness_fut(&self, interest: mio::Interest) -> Readiness<'_> {
+        fn readiness_fut(&self, interest: Interest) -> Readiness<'_> {
             Readiness {
                 scheduled_io: self,
                 state: State::Init,

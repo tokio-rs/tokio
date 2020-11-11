@@ -1,4 +1,4 @@
-use crate::io::{PollEvented, ReadBuf};
+use crate::io::{Interest, PollEvented, ReadBuf};
 use crate::net::{to_socket_addrs, ToSocketAddrs};
 
 use std::convert::TryFrom;
@@ -272,7 +272,7 @@ impl UdpSocket {
     pub async fn send(&self, buf: &[u8]) -> io::Result<usize> {
         self.io
             .registration()
-            .async_io(mio::Interest::WRITABLE, || self.io.send(buf))
+            .async_io(Interest::WRITABLE, || self.io.send(buf))
             .await
     }
 
@@ -334,7 +334,7 @@ impl UdpSocket {
     pub async fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.io
             .registration()
-            .async_io(mio::Interest::READABLE, || self.io.recv(buf))
+            .async_io(Interest::READABLE, || self.io.recv(buf))
             .await
     }
 
@@ -475,7 +475,7 @@ impl UdpSocket {
     async fn send_to_addr(&self, buf: &[u8], target: SocketAddr) -> io::Result<usize> {
         self.io
             .registration()
-            .async_io(mio::Interest::WRITABLE, || self.io.send_to(buf, target))
+            .async_io(Interest::WRITABLE, || self.io.send_to(buf, target))
             .await
     }
 
@@ -504,7 +504,7 @@ impl UdpSocket {
     pub async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.io
             .registration()
-            .async_io(mio::Interest::READABLE, || self.io.recv_from(buf))
+            .async_io(Interest::READABLE, || self.io.recv_from(buf))
             .await
     }
 
@@ -577,7 +577,7 @@ impl UdpSocket {
     pub async fn peek_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.io
             .registration()
-            .async_io(mio::Interest::READABLE, || self.io.peek_from(buf))
+            .async_io(Interest::READABLE, || self.io.peek_from(buf))
             .await
     }
 

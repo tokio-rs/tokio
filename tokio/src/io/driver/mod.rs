@@ -1,5 +1,8 @@
 #![cfg_attr(not(feature = "rt"), allow(dead_code))]
 
+mod interest;
+pub(crate) use interest::Interest;
+
 mod ready;
 use ready::Ready;
 
@@ -316,7 +319,7 @@ impl Inner {
     pub(super) fn add_source(
         &self,
         source: &mut impl mio::event::Source,
-        interest: mio::Interest,
+        interest: Interest,
     ) -> io::Result<slab::Ref<ScheduledIo>> {
         let (address, shared) = self.io_dispatch.allocate().ok_or_else(|| {
             io::Error::new(
@@ -328,7 +331,7 @@ impl Inner {
         let token = GENERATION.pack(shared.generation(), ADDRESS.pack(address.as_usize(), 0));
 
         self.registry
-            .register(source, mio::Token(token), interest)?;
+            .register(source, mio::Token(token), interest.to_mio())?;
 
         Ok(shared)
     }

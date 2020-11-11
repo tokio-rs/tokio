@@ -3,7 +3,7 @@
 //! Signal driver
 
 use crate::io::driver::Driver as IoDriver;
-use crate::io::PollEvented;
+use crate::io::{Interest, PollEvented};
 use crate::park::Park;
 use crate::signal::registry::globals;
 
@@ -76,7 +76,7 @@ impl Driver {
         let receiver = UnixStream::from_std(original.try_clone()?);
         let receiver = PollEvented::new_with_interest_and_handle(
             receiver,
-            mio::Interest::READABLE | mio::Interest::WRITABLE,
+            Interest::READABLE | Interest::WRITABLE,
             park.handle(),
         )?;
 

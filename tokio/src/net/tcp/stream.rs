@@ -1,5 +1,5 @@
 use crate::future::poll_fn;
-use crate::io::{AsyncRead, AsyncWrite, PollEvented, ReadBuf};
+use crate::io::{AsyncRead, AsyncWrite, Interest, PollEvented, ReadBuf};
 use crate::net::tcp::split::{split, ReadHalf, WriteHalf};
 use crate::net::tcp::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
 use crate::net::{to_socket_addrs, ToSocketAddrs};
@@ -304,7 +304,7 @@ impl TcpStream {
     pub async fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.io
             .registration()
-            .async_io(mio::Interest::READABLE, || self.io.peek(buf))
+            .async_io(Interest::READABLE, || self.io.peek(buf))
             .await
     }
 

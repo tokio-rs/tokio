@@ -1,4 +1,4 @@
-use crate::io::driver::{Handle, Registration};
+use crate::io::driver::{Handle, Interest, Registration};
 
 use mio::event::Source;
 use std::fmt;
@@ -85,30 +85,32 @@ impl<E: Source> PollEvented<E> {
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     #[cfg_attr(feature = "signal", allow(unused))]
     pub(crate) fn new(io: E) -> io::Result<Self> {
-        PollEvented::new_with_interest(io, mio::Interest::READABLE | mio::Interest::WRITABLE)
+        PollEvented::new_with_interest(io, Interest::READABLE | Interest::WRITABLE)
     }
 
-    /// Creates a new `PollEvented` associated with the default reactor, for specific `mio::Interest`
-    /// state. `new_with_interest` should be used over `new` when you need control over the readiness
-    /// state, such as when a file descriptor only allows reads. This does not add `hup` or `error`
-    /// so if you are interested in those states, you will need to add them to the readiness state
-    /// passed to this function.
+    /// Creates a new `PollEvented` associated with the default reactor, for
+    /// specific `Interest` state. `new_with_interest` should be used over `new`
+    /// when you need control over the readiness state, such as when a file
+    /// descriptor only allows reads. This does not add `hup` or `error` so if
+    /// you are interested in those states, you will need to add them to the
+    /// readiness state passed to this function.
     ///
     /// # Panics
     ///
     /// This function panics if thread-local runtime is not set.
     ///
-    /// The runtime is usually set implicitly when this function is called
-    /// from a future driven by a tokio runtime, otherwise runtime can be set
-    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
+    /// The runtime is usually set implicitly when this function is called from
+    /// a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter)
+    /// function.
     #[cfg_attr(feature = "signal", allow(unused))]
-    pub(crate) fn new_with_interest(io: E, interest: mio::Interest) -> io::Result<Self> {
+    pub(crate) fn new_with_interest(io: E, interest: Interest) -> io::Result<Self> {
         Self::new_with_interest_and_handle(io, interest, Handle::current())
     }
 
     pub(crate) fn new_with_interest_and_handle(
         mut io: E,
-        interest: mio::Interest,
+        interest: Interest,
         handle: Handle,
     ) -> io::Result<Self> {
         let registration = Registration::new_with_interest_and_handle(&mut io, interest, handle)?;

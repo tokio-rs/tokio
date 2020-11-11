@@ -1,4 +1,4 @@
-use crate::io::PollEvented;
+use crate::io::{Interest, PollEvented};
 use crate::net::unix::{SocketAddr, UnixStream};
 
 use std::convert::TryFrom;
@@ -103,7 +103,7 @@ impl UnixListener {
         let (mio, addr) = self
             .io
             .registration()
-            .async_io(mio::Interest::READABLE, || self.io.accept())
+            .async_io(Interest::READABLE, || self.io.accept())
             .await?;
 
         let addr = SocketAddr(addr);

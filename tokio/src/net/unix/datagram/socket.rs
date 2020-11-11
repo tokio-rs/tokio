@@ -1,4 +1,4 @@
-use crate::io::PollEvented;
+use crate::io::{Interest, PollEvented};
 use crate::net::unix::SocketAddr;
 
 use std::convert::TryFrom;
@@ -302,7 +302,7 @@ impl UnixDatagram {
     pub async fn send(&self, buf: &[u8]) -> io::Result<usize> {
         self.io
             .registration()
-            .async_io(mio::Interest::WRITABLE, || self.io.send(buf))
+            .async_io(Interest::WRITABLE, || self.io.send(buf))
             .await
     }
 
@@ -402,7 +402,7 @@ impl UnixDatagram {
     pub async fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.io
             .registration()
-            .async_io(mio::Interest::READABLE, || self.io.recv(buf))
+            .async_io(Interest::READABLE, || self.io.recv(buf))
             .await
     }
 
@@ -473,9 +473,7 @@ impl UnixDatagram {
     {
         self.io
             .registration()
-            .async_io(mio::Interest::WRITABLE, || {
-                self.io.send_to(buf, target.as_ref())
-            })
+            .async_io(Interest::WRITABLE, || self.io.send_to(buf, target.as_ref()))
             .await
     }
 
@@ -516,7 +514,7 @@ impl UnixDatagram {
         let (n, addr) = self
             .io
             .registration()
-            .async_io(mio::Interest::READABLE, || self.io.recv_from(buf))
+            .async_io(Interest::READABLE, || self.io.recv_from(buf))
             .await?;
 
         Ok((n, SocketAddr(addr)))

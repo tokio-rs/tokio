@@ -1,4 +1,4 @@
-use crate::io::driver::{Direction, Handle, ReadyEvent, ScheduledIo};
+use crate::io::driver::{Direction, Handle, Interest, ReadyEvent, ScheduledIo};
 use crate::util::slab;
 
 use mio::event::Source;
@@ -53,11 +53,12 @@ unsafe impl Sync for Registration {}
 // ===== impl Registration =====
 
 impl Registration {
-    /// Registers the I/O resource with the default reactor, for a specific `mio::Interest`.
-    /// `new_with_interest` should be used over `new` when you need control over the readiness state,
-    /// such as when a file descriptor only allows reads. This does not add `hup` or `error` so if
-    /// you are interested in those states, you will need to add them to the readiness state passed
-    /// to this function.
+    /// Registers the I/O resource with the default reactor, for a specific
+    /// `Interest`. `new_with_interest` should be used over `new` when you need
+    /// control over the readiness state, such as when a file descriptor only
+    /// allows reads. This does not add `hup` or `error` so if you are
+    /// interested in those states, you will need to add them to the readiness
+    /// state passed to this function.
     ///
     /// # Return
     ///
@@ -65,7 +66,7 @@ impl Registration {
     /// - `Err` if an error was encountered during registration
     pub(crate) fn new_with_interest_and_handle(
         io: &mut impl Source,
-        interest: mio::Interest,
+        interest: Interest,
         handle: Handle,
     ) -> io::Result<Registration> {
         let shared = if let Some(inner) = handle.inner() {
@@ -189,7 +190,7 @@ fn gone() -> io::Error {
 
 cfg_io_readiness! {
     impl Registration {
-        pub(crate) async fn readiness(&self, interest: mio::Interest) -> io::Result<ReadyEvent> {
+        pub(crate) async fn readiness(&self, interest: Interest) -> io::Result<ReadyEvent> {
             use std::future::Future;
             use std::pin::Pin;
 
@@ -205,7 +206,7 @@ cfg_io_readiness! {
             }).await
         }
 
-        pub(crate) async fn async_io<R>(&self, interest: mio::Interest, mut f: impl FnMut() -> io::Result<R>) -> io::Result<R> {
+        pub(crate) async fn async_io<R>(&self, interest: Interest, mut f: impl FnMut() -> io::Result<R>) -> io::Result<R> {
             loop {
                 let event = self.readiness(interest).await?;
 

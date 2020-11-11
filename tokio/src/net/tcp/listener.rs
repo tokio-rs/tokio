@@ -1,4 +1,4 @@
-use crate::io::PollEvented;
+use crate::io::{Interest, PollEvented};
 use crate::net::tcp::TcpStream;
 use crate::net::{to_socket_addrs, ToSocketAddrs};
 
@@ -165,7 +165,7 @@ impl TcpListener {
         let (mio, addr) = self
             .io
             .registration()
-            .async_io(mio::Interest::READABLE, || self.io.accept())
+            .async_io(Interest::READABLE, || self.io.accept())
             .await?;
 
         let stream = TcpStream::new(mio)?;
