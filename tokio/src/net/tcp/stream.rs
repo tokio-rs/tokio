@@ -271,18 +271,103 @@ impl TcpStream {
     }
 
     /// Wait for the socket to become readable.
+    ///
+    /// This function is usually paired with `try_read`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpStream;
+    /// use std::error::Error;
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     // Connect to a peer
+    ///     let stream = TcpStream::connect("127.0.0.1:8080").await?;
+    ///
+    ///     let mut msg = vec![0; 1024];
+    ///
+    ///     loop {
+    ///         // Wait for the socket to be readable
+    ///         stream.readable().await?;
+    ///
+    ///         // Try to read data, this may still fail with `WouldBlock`
+    ///         // if the readiness event is a false positive.
+    ///         match stream.try_read(&mut msg) {
+    ///             Ok(n) => {
+    ///                 msg.truncate(n);
+    ///                 break;
+    ///             }
+    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                 continue;
+    ///             }
+    ///             Err(e) => {
+    ///                 return Err(e.into());
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     println!("GOT = {:?}", msg);
+    ///     Ok(())
+    /// }
+    /// ```
     pub async fn readable(&self) -> io::Result<()> {
         self.ready(Interest::READABLE).await?;
         Ok(())
     }
 
     /// Attempt a non-blocking read.
+    ///
+    /// Receives any pending data from the socket but does not wait for new data
+    /// to arrive. On success, returns the number of bytes read.
+    ///
+    /// Usually, [`readable()`] or [`ready()`] is used with this function.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpStream;
+    /// use std::error::Error;
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     // Connect to a peer
+    ///     let stream = TcpStream::connect("127.0.0.1:8080").await?;
+    ///
+    ///     let mut msg = vec![0; 1024];
+    ///
+    ///     loop {
+    ///         // Wait for the socket to be readable
+    ///         stream.readable().await?;
+    ///
+    ///         // Try to read data, this may still fail with `WouldBlock`
+    ///         // if the readiness event is a false positive.
+    ///         match stream.try_read(&mut msg) {
+    ///             Ok(n) => {
+    ///                 msg.truncate(n);
+    ///                 break;
+    ///             }
+    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                 continue;
+    ///             }
+    ///             Err(e) => {
+    ///                 return Err(e.into());
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     println!("GOT = {:?}", msg);
+    ///     Ok(())
+    /// }
+    /// ```
     pub fn try_read(&self, buf: &mut [u8]) -> io::Result<usize> {
         use std::io::Read;
 
-        self.io.registration().try_io(Interest::READABLE, || {
-            (&*self.io).read(buf)
-        })
+        self.io
+            .registration()
+            .try_io(Interest::READABLE, || (&*self.io).read(buf))
     }
 
     /// Wait for the socket to become writable.
@@ -295,9 +380,9 @@ impl TcpStream {
     pub fn try_write(&self, buf: &[u8]) -> io::Result<usize> {
         use std::io::Write;
 
-        self.io.registration().try_io(Interest::WRITABLE, || {
-            (&*self.io).write(buf)
-        })
+        self.io
+            .registration()
+            .try_io(Interest::WRITABLE, || (&*self.io).write(buf))
     }
 
     /// Receives data on the socket from the remote address to which it is

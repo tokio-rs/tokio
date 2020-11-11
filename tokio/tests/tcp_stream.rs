@@ -3,8 +3,8 @@
 
 use tokio::io::Interest;
 use tokio::net::{TcpListener, TcpStream};
-use tokio_test::{assert_pending, assert_ready_ok};
 use tokio_test::task;
+use tokio_test::{assert_pending, assert_ready_ok};
 
 use std::io;
 
@@ -16,7 +16,9 @@ async fn try_read_write() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
 
     // Create socket pair
-    let client = TcpStream::connect(listener.local_addr().unwrap()).await.unwrap();
+    let client = TcpStream::connect(listener.local_addr().unwrap())
+        .await
+        .unwrap();
     let (server, _) = listener.accept().await.unwrap();
     let mut written = DATA.to_vec();
 
@@ -38,7 +40,7 @@ async fn try_read_write() {
         // Still ready
         let mut writable = task::spawn(client.writable());
         assert_ready_ok!(writable.poll());
-    
+
         match client.try_write(DATA) {
             Ok(n) => written.extend(&DATA[..n]),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
