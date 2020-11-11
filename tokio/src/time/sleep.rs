@@ -31,7 +31,7 @@ pub fn sleep_until(deadline: Instant) -> Sleep {
 ///
 /// To run something regularly on a schedule, see [`interval`].
 ///
-/// The maximum duration for a sleep is 68719476734 milliseconds.
+/// The maximum duration for a sleep is 68719476734 milliseconds (approximately 2.2 years).
 ///
 /// # Cancellation
 ///
