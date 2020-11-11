@@ -1,4 +1,4 @@
-use crate::io::PollEvented;
+use crate::io::{Interest, PollEvented};
 use crate::net::unix::SocketAddr;
 
 use std::convert::TryFrom;
@@ -270,7 +270,7 @@ impl UnixDatagram {
     /// # }
     /// ```
     pub fn connect<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
-        self.io.get_ref().connect(path)
+        self.io.connect(path)
     }
 
     /// Sends data on the socket to the socket's peer.
@@ -301,7 +301,8 @@ impl UnixDatagram {
     /// ```
     pub async fn send(&self, buf: &[u8]) -> io::Result<usize> {
         self.io
-            .async_io(mio::Interest::WRITABLE, |sock| sock.send(buf))
+            .registration()
+            .async_io(Interest::WRITABLE, || self.io.send(buf))
             .await
     }
 
@@ -330,7 +331,7 @@ impl UnixDatagram {
     /// # }
     /// ```
     pub fn try_send(&self, buf: &[u8]) -> io::Result<usize> {
-        self.io.get_ref().send(buf)
+        self.io.send(buf)
     }
 
     /// Try to send a datagram to the peer without waiting.
@@ -369,7 +370,7 @@ impl UnixDatagram {
     where
         P: AsRef<Path>,
     {
-        self.io.get_ref().send_to(buf, target)
+        self.io.send_to(buf, target)
     }
 
     /// Receives data from the socket.
@@ -400,7 +401,8 @@ impl UnixDatagram {
     /// ```
     pub async fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.io
-            .async_io(mio::Interest::READABLE, |sock| sock.recv(buf))
+            .registration()
+            .async_io(Interest::READABLE, || self.io.recv(buf))
             .await
     }
 
@@ -429,7 +431,7 @@ impl UnixDatagram {
     /// # }
     /// ```
     pub fn try_recv(&self, buf: &mut [u8]) -> io::Result<usize> {
-        self.io.get_ref().recv(buf)
+        self.io.recv(buf)
     }
 
     /// Sends data on the socket to the specified address.
@@ -470,9 +472,8 @@ impl UnixDatagram {
         P: AsRef<Path>,
     {
         self.io
-            .async_io(mio::Interest::WRITABLE, |sock| {
-                sock.send_to(buf, target.as_ref())
-            })
+            .registration()
+            .async_io(Interest::WRITABLE, || self.io.send_to(buf, target.as_ref()))
             .await
     }
 
@@ -512,7 +513,8 @@ impl UnixDatagram {
     pub async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         let (n, addr) = self
             .io
-            .async_io(mio::Interest::READABLE, |sock| sock.recv_from(buf))
+            .registration()
+            .async_io(Interest::READABLE, || self.io.recv_from(buf))
             .await?;
 
         Ok((n, SocketAddr(addr)))
@@ -551,7 +553,7 @@ impl UnixDatagram {
     /// # }
     /// ```
     pub fn try_recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        let (n, addr) = self.io.get_ref().recv_from(buf)?;
+        let (n, addr) = self.io.recv_from(buf)?;
         Ok((n, SocketAddr(addr)))
     }
 
@@ -596,7 +598,7 @@ impl UnixDatagram {
     /// # }
     /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        self.io.get_ref().local_addr().map(SocketAddr)
+        self.io.local_addr().map(SocketAddr)
     }
 
     /// Returns the address of this socket's peer.
@@ -645,7 +647,7 @@ impl UnixDatagram {
     /// # }
     /// ```
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
-        self.io.get_ref().peer_addr().map(SocketAddr)
+        self.io.peer_addr().map(SocketAddr)
     }
 
     /// Returns the value of the `SO_ERROR` option.
@@ -668,7 +670,7 @@ impl UnixDatagram {
     /// # }
     /// ```
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
-        self.io.get_ref().take_error()
+        self.io.take_error()
     }
 
     /// Shuts down the read, write, or both halves of this connection.
@@ -704,7 +706,7 @@ impl UnixDatagram {
     /// # }
     /// ```
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
-        self.io.get_ref().shutdown(how)
+        self.io.shutdown(how)
     }
 }
 
@@ -722,12 +724,12 @@ impl TryFrom<std::os::unix::net::UnixDatagram> for UnixDatagram {
 
 impl fmt::Debug for UnixDatagram {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.io.get_ref().fmt(f)
+        self.io.fmt(f)
     }
 }
 
 impl AsRawFd for UnixDatagram {
     fn as_raw_fd(&self) -> RawFd {
-        self.io.get_ref().as_raw_fd()
+        self.io.as_raw_fd()
     }
 }

@@ -1,5 +1,4 @@
-use crate::io::driver::{Direction, Handle, ReadyEvent};
-use crate::io::registration::Registration;
+use crate::io::driver::{Handle, Interest, ReadyEvent, Registration};
 
 use mio::unix::SourceFd;
 use std::io;
@@ -74,7 +73,7 @@ pub struct AsyncFdReadyGuard<'a, T: AsRawFd> {
     event: Option<ReadyEvent>,
 }
 
-const ALL_INTEREST: mio::Interest = mio::Interest::READABLE.add(mio::Interest::WRITABLE);
+const ALL_INTEREST: Interest = Interest::READABLE.add(Interest::WRITABLE);
 
 impl<T: AsRawFd> AsyncFd<T> {
     /// Creates an AsyncFd backed by (and taking ownership of) an object
@@ -145,7 +144,7 @@ impl<T: AsRawFd> AsyncFd<T> {
         &'a self,
         cx: &mut Context<'_>,
     ) -> Poll<io::Result<AsyncFdReadyGuard<'a, T>>> {
-        let event = ready!(self.registration.poll_readiness(cx, Direction::Read))?;
+        let event = ready!(self.registration.poll_read_ready(cx))?;
 
         Ok(AsyncFdReadyGuard {
             async_fd: self,
@@ -170,7 +169,7 @@ impl<T: AsRawFd> AsyncFd<T> {
         &'a self,
         cx: &mut Context<'_>,
     ) -> Poll<io::Result<AsyncFdReadyGuard<'a, T>>> {
-        let event = ready!(self.registration.poll_readiness(cx, Direction::Write))?;
+        let event = ready!(self.registration.poll_write_ready(cx))?;
 
         Ok(AsyncFdReadyGuard {
             async_fd: self,
@@ -179,7 +178,7 @@ impl<T: AsRawFd> AsyncFd<T> {
         .into()
     }
 
-    async fn readiness(&self, interest: mio::Interest) -> io::Result<AsyncFdReadyGuard<'_, T>> {
+    async fn readiness(&self, interest: Interest) -> io::Result<AsyncFdReadyGuard<'_, T>> {
         let event = self.registration.readiness(interest).await?;
 
         Ok(AsyncFdReadyGuard {
@@ -193,7 +192,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     ///
     /// [`AsyncFdReadyGuard`]: struct@self::AsyncFdReadyGuard
     pub async fn readable(&self) -> io::Result<AsyncFdReadyGuard<'_, T>> {
-        self.readiness(mio::Interest::READABLE).await
+        self.readiness(Interest::READABLE).await
     }
 
     /// Waits for the file descriptor to become writable, returning a
@@ -201,7 +200,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     ///
     /// [`AsyncFdReadyGuard`]: struct@self::AsyncFdReadyGuard
     pub async fn writable(&self) -> io::Result<AsyncFdReadyGuard<'_, T>> {
-        self.readiness(mio::Interest::WRITABLE).await
+        self.readiness(Interest::WRITABLE).await
     }
 }
 

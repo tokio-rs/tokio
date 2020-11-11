@@ -114,8 +114,10 @@ impl Ready {
 }
 
 cfg_io_readiness! {
+    use crate::io::Interest;
+
     impl Ready {
-        pub(crate) fn from_interest(interest: mio::Interest) -> Ready {
+        pub(crate) fn from_interest(interest: Interest) -> Ready {
             let mut ready = Ready::EMPTY;
 
             if interest.is_readable() {
@@ -131,11 +133,11 @@ cfg_io_readiness! {
             ready
         }
 
-        pub(crate) fn intersection(self, interest: mio::Interest) -> Ready {
+        pub(crate) fn intersection(self, interest: Interest) -> Ready {
             Ready(self.0 & Ready::from_interest(interest).0)
         }
 
-        pub(crate) fn satisfies(self, interest: mio::Interest) -> bool {
+        pub(crate) fn satisfies(self, interest: Interest) -> bool {
             self.0 & Ready::from_interest(interest).0 != 0
         }
     }

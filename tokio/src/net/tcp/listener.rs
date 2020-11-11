@@ -1,4 +1,4 @@
-use crate::io::PollEvented;
+use crate::io::{Interest, PollEvented};
 use crate::net::tcp::TcpStream;
 use crate::net::{to_socket_addrs, ToSocketAddrs};
 
@@ -164,7 +164,8 @@ impl TcpListener {
     pub async fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
         let (mio, addr) = self
             .io
-            .async_io(mio::Interest::READABLE, |sock| sock.accept())
+            .registration()
+            .async_io(Interest::READABLE, || self.io.accept())
             .await?;
 
         let stream = TcpStream::new(mio)?;
@@ -181,15 +182,15 @@ impl TcpListener {
     /// single task. Failing to do this could result in tasks hanging.
     pub fn poll_accept(&self, cx: &mut Context<'_>) -> Poll<io::Result<(TcpStream, SocketAddr)>> {
         loop {
-            let ev = ready!(self.io.poll_read_ready(cx))?;
+            let ev = ready!(self.io.registration().poll_read_ready(cx))?;
 
-            match self.io.get_ref().accept() {
+            match self.io.accept() {
                 Ok((io, addr)) => {
                     let io = TcpStream::new(io)?;
                     return Poll::Ready(Ok((io, addr)));
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    self.io.clear_readiness(ev);
+                    self.io.registration().clear_readiness(ev);
                 }
                 Err(e) => return Poll::Ready(Err(e)),
             }
@@ -266,7 +267,7 @@ impl TcpListener {
     /// }
     /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        self.io.get_ref().local_addr()
+        self.io.local_addr()
     }
 
     /// Gets the value of the `IP_TTL` option for this socket.
@@ -293,7 +294,7 @@ impl TcpListener {
     /// }
     /// ```
     pub fn ttl(&self) -> io::Result<u32> {
-        self.io.get_ref().ttl()
+        self.io.ttl()
     }
 
     /// Sets the value for the `IP_TTL` option on this socket.
@@ -318,7 +319,7 @@ impl TcpListener {
     /// }
     /// ```
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
-        self.io.get_ref().set_ttl(ttl)
+        self.io.set_ttl(ttl)
     }
 }
 
@@ -346,7 +347,7 @@ impl TryFrom<net::TcpListener> for TcpListener {
 
 impl fmt::Debug for TcpListener {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.io.get_ref().fmt(f)
+        self.io.fmt(f)
     }
 }
 
@@ -357,7 +358,7 @@ mod sys {
 
     impl AsRawFd for TcpListener {
         fn as_raw_fd(&self) -> RawFd {
-            self.io.get_ref().as_raw_fd()
+            self.io.as_raw_fd()
         }
     }
 }
@@ -369,7 +370,7 @@ mod sys {
 
     impl AsRawSocket for TcpListener {
         fn as_raw_socket(&self) -> RawSocket {
-            self.io.get_ref().as_raw_socket()
+            self.io.as_raw_socket()
         }
     }
 }
