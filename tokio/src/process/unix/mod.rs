@@ -40,7 +40,7 @@ use std::fmt;
 use std::fs::File;
 use std::future::Future;
 use std::io;
-use std::os::unix::io::{AsRawFd, FromRawFd, RawFd, IntoRawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::pin::Pin;
 use std::process::{Child as StdChild, ExitStatus};
 use std::task::Context;
