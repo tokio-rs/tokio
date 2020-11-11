@@ -198,6 +198,12 @@ impl Wheel {
         None
     }
 
+    /// Returns the tick at which this timer wheel next needs to perform some
+    /// processing, or None if there are no timers registered.
+    pub(super) fn next_expiration_time(&self) -> Option<u64> {
+        self.next_expiration().map(|ex| ex.deadline)
+    }
+
     /// Used for debug assertions
     fn no_expirations_before(&self, start_level: usize, before: u64) -> bool {
         let mut res = true;

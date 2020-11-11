@@ -193,10 +193,15 @@ where
     fn park_internal(&mut self, limit: Option<Duration>) -> Result<(), P::Error> {
         let clock = &self.time_source.clock;
 
-        match self.inner.process() {
-            Some(when) => {
-                let when = when.get();
+        let mut lock = self.inner.lock();
 
+        let next_wake = lock.wheel.next_expiration_time();
+        lock.next_wake = next_wake.map(|t| t.try_into().unwrap_or(NonZeroU64::new(1).unwrap()));
+
+        std::mem::drop(lock);
+
+        match next_wake {
+            Some(when) => {
                 let now = self.time_source.now();
                 // Note that we effectively round up to 1ms here - this avoids
                 // very short-duration microsecond-resolution sleeps that the OS
@@ -211,12 +216,8 @@ where
                     if clock.is_paused() {
                         self.park.park_timeout(Duration::from_secs(0))?;
 
-                        // If we were unparked recently, we need to return to
-                        // the scheduler to deal with that before we advance
-                        // time.
-                        if !self.unpark.get_and_clear() {
-                            clock.advance(duration);
-                        }
+                        // Simulate advancing time
+                        clock.advance(duration);
                     } else {
                         self.park.park_timeout(duration)?;
                     }
