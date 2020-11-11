@@ -80,7 +80,7 @@ impl Ready {
     /// assert!(Ready::READ_CLOSED.is_readable());
     /// assert!(!Ready::WRITABLE.is_readable());
     /// ```
-    pub(crate) fn is_readable(self) -> bool {
+    pub fn is_readable(self) -> bool {
         self.contains(Ready::READABLE) || self.is_read_closed()
     }
 
@@ -96,7 +96,7 @@ impl Ready {
     /// assert!(Ready::WRITABLE.is_writable());
     /// assert!(Ready::WRITE_CLOSED.is_writable());
     /// ```
-    pub(crate) fn is_writable(self) -> bool {
+    pub fn is_writable(self) -> bool {
         self.contains(Ready::WRITABLE) || self.is_write_closed()
     }
 
@@ -111,7 +111,7 @@ impl Ready {
     /// assert!(!Ready::READABLE.is_read_closed());
     /// assert!(Ready::READ_CLOSED.is_read_closed());
     /// ```
-    pub(crate) fn is_read_closed(self) -> bool {
+    pub fn is_read_closed(self) -> bool {
         self.contains(Ready::READ_CLOSED)
     }
 
@@ -126,7 +126,7 @@ impl Ready {
     /// assert!(!Ready::WRITABLE.is_write_closed());
     /// assert!(Ready::WRITE_CLOSED.is_write_closed());
     /// ```
-    pub(crate) fn is_write_closed(self) -> bool {
+    pub fn is_write_closed(self) -> bool {
         self.contains(Ready::WRITE_CLOSED)
     }
 

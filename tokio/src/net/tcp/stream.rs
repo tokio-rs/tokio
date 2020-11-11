@@ -270,6 +270,12 @@ impl TcpStream {
         Ok(event.ready)
     }
 
+    /// Wait for the socket to become readable.
+    pub async fn readable(&self) -> io::Result<()> {
+        self.ready(Interest::READABLE).await?;
+        Ok(())
+    }
+
     /// Attempt a non-blocking read.
     pub fn try_read(&self, buf: &mut [u8]) -> io::Result<usize> {
         use std::io::Read;
@@ -277,6 +283,12 @@ impl TcpStream {
         self.io.registration().try_io(Interest::READABLE, || {
             (&*self.io).read(buf)
         })
+    }
+
+    /// Wait for the socket to become writable.
+    pub async fn writable(&self) -> io::Result<()> {
+        self.ready(Interest::WRITABLE).await?;
+        Ok(())
     }
 
     /// Attempt a non-blocking write.
