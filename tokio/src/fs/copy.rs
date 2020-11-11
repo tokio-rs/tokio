@@ -1,7 +1,8 @@
 use crate::fs::asyncify;
 use std::path::Path;
 
-/// Copies the contents of one file to another. This function will also copy the permission bits of the original file to the destination file.
+/// Copies the contents of one file to another. This function will also copy the permission bits
+/// of the original file to the destination file.
 /// This function will overwrite the contents of to.
 ///
 /// This is the async equivalent of [`std::fs::copy`][std].
