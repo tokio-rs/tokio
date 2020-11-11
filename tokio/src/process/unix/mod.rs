@@ -148,6 +148,13 @@ pub(crate) struct Pipe {
     fd: File,
 }
 
+impl<T: IntoRawFd> From<T> for Pipe {
+    fn from(fd: T) -> Self {
+        let fd = unsafe { File::from_raw_fd(fd.into_raw_fd()) };
+        Self { fd }
+    }
+}
+
 impl<'a> io::Read for &'a Pipe {
     fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
         (&self.fd).read(bytes)
@@ -208,8 +215,9 @@ where
     };
 
     // Set the fd to nonblocking before we pass it to the event loop
-    let fd = unsafe {
-        let fd = io.into_raw_fd();
+    let pipe = unsafe {
+        let pipe = Pipe::from(io);
+        let fd = pipe.as_raw_fd();
         let r = libc::fcntl(fd, libc::F_GETFL);
         if r == -1 {
             return Err(io::Error::last_os_error());
@@ -219,8 +227,8 @@ where
             return Err(io::Error::last_os_error());
         }
 
-        File::from_raw_fd(fd)
+        pipe
     };
 
-    Ok(Some(PollEvented::new(Pipe { fd })?))
+    Ok(Some(PollEvented::new(pipe)?))
 }
