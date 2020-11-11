@@ -171,6 +171,19 @@ jobs:
       - name: "test --workspace --all-features"
         run: cargo check --workspace --all-features
 
+  minimal-versions:
+    name: minimal-versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.nightly }}
+          override: true
+      - name: "check --all-features -Z minimal-versions"
+        run: cargo check --all-features -Z minimal-versions
+
+
   fmt:
     name: fmt
     runs-on: ubuntu-latest
