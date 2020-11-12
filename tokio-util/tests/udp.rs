@@ -144,21 +144,24 @@ async fn framed_read_write_concurrent() -> std::io::Result<()> {
     let mut a = UdpFramedWrite::new(a_soc, ByteCodec);
     let mut b = UdpFramedRead::new(b_soc, LinesCodec::new());
 
-    tokio::spawn(async move {
-        let msg = b"1\r\n2\r\n3\r\n".to_vec();
-        a.send((&msg, b_addr)).await.expect("failed to send");
+    tokio::join!(
+        async move {
+            let msg = b"1\r\n2\r\n3\r\n".to_vec();
+            a.send((&msg, b_addr)).await.expect("failed to send");
 
-        let msg = b"4\r\n5\r\n6\r\n".to_vec();
-        a.send((&msg, b_addr)).await.expect("failed to send");
-    });
+            let msg = b"4\r\n5\r\n6\r\n".to_vec();
+            a.send((&msg, b_addr)).await.expect("failed to send");
+        },
+        async move {
+            assert_eq!(b.next().await.unwrap().unwrap(), ("1".to_string(), a_addr));
+            assert_eq!(b.next().await.unwrap().unwrap(), ("2".to_string(), a_addr));
+            assert_eq!(b.next().await.unwrap().unwrap(), ("3".to_string(), a_addr));
 
-    assert_eq!(b.next().await.unwrap().unwrap(), ("1".to_string(), a_addr));
-    assert_eq!(b.next().await.unwrap().unwrap(), ("2".to_string(), a_addr));
-    assert_eq!(b.next().await.unwrap().unwrap(), ("3".to_string(), a_addr));
-
-    assert_eq!(b.next().await.unwrap().unwrap(), ("4".to_string(), a_addr));
-    assert_eq!(b.next().await.unwrap().unwrap(), ("5".to_string(), a_addr));
-    assert_eq!(b.next().await.unwrap().unwrap(), ("6".to_string(), a_addr));
+            assert_eq!(b.next().await.unwrap().unwrap(), ("4".to_string(), a_addr));
+            assert_eq!(b.next().await.unwrap().unwrap(), ("5".to_string(), a_addr));
+            assert_eq!(b.next().await.unwrap().unwrap(), ("6".to_string(), a_addr));
+        }
+    );
 
     Ok(())
 }
