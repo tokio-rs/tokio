@@ -1,4 +1,4 @@
-use super::{Ready, ReadyEvent, Tick};
+use super::{Interest, Ready, ReadyEvent, Tick};
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Mutex;
 use crate::util::bit;
@@ -49,8 +49,6 @@ struct Waiters {
 }
 
 cfg_io_readiness! {
-    use crate::io::Interest;
-
     #[derive(Debug)]
     struct Waiter {
         pointers: linked_list::Pointers<Waiter>,
