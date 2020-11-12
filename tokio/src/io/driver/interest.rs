@@ -5,14 +5,13 @@ use crate::io::driver::Ready;
 use std::fmt;
 use std::ops;
 
-cfg_net! {
-    /// Readiness event interest
-    ///
-    /// Specifies the readiness events the caller is interested in when awaiting on
-    /// I/O resource readiness states.
-    #[derive(Clone, Copy, Eq, PartialEq)]
-    pub struct Interest(mio::Interest);
-}
+/// Readiness event interest
+///
+/// Specifies the readiness events the caller is interested in when awaiting on
+/// I/O resource readiness states.
+#[cfg_attr(docsrs, doc(cfg(feature = "net")))]
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub struct Interest(mio::Interest);
 
 impl Interest {
     /// Interest in all readable events.
@@ -61,8 +60,7 @@ impl Interest {
 
     /// Add together two `Interst` values.
     ///
-    /// This method is an alias for the `|` operator that works from a
-    /// `const` context.
+    /// This function works from a `const` context.
     ///
     /// # Examples
     ///

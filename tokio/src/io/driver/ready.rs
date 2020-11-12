@@ -8,13 +8,12 @@ const WRITABLE: usize = 0b0_10;
 const READ_CLOSED: usize = 0b0_0100;
 const WRITE_CLOSED: usize = 0b0_1000;
 
-cfg_net! {
-    /// Describes the readiness state of an I/O resources.
-    ///
-    /// `Ready` tracks which operation an I/O resource is ready to perform.
-    #[derive(Clone, Copy, PartialEq, PartialOrd)]
-    pub struct Ready(usize);
-}
+/// Describes the readiness state of an I/O resources.
+///
+/// `Ready` tracks which operation an I/O resource is ready to perform.
+#[cfg_attr(docsrs, doc(cfg(feature = "net")))]
+#[derive(Clone, Copy, PartialEq, PartialOrd)]
+pub struct Ready(usize);
 
 impl Ready {
     /// Returns the empty `Ready` set.
