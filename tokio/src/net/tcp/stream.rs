@@ -366,6 +366,9 @@ impl TcpStream {
     ///
     /// Usually, [`readable()`] or [`ready()`] is used with this function.
     ///
+    /// [`readable()`]: TcpStream::readable()
+    /// [`ready()`]: TcpStream::ready()
+    ///
     /// # Return
     ///
     /// If data is successfully read, `Ok(n)` is returned, where `n` is the
