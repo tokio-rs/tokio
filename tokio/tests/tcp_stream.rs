@@ -82,3 +82,28 @@ async fn try_read_write() {
         }
     }
 }
+
+#[test]
+fn buffer_not_included_in_future() {
+    use std::mem;
+
+    const N: usize = 4096;
+
+    let fut = async {
+        let stream = TcpStream::connect("127.0.0.1:8080").await.unwrap();
+
+        loop {
+            stream.readable().await.unwrap();
+
+            let mut buf = [0; N];
+            let n = stream.try_read(&mut buf[..]).unwrap();
+
+            if n == 0 {
+                break;
+            }
+        }
+    };
+
+    let n = mem::size_of_val(&fut);
+    assert!(n < 1000);
+}
