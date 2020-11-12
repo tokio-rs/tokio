@@ -38,7 +38,7 @@ impl<C> UdpFramedWrite<C> {
                 inner: socket,
                 current_addr: None,
                 out_addr: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0)),
-                flushed: false,
+                flushed: true,
             },
         }
     }

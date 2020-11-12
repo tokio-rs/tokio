@@ -2,8 +2,11 @@
 
 use tokio::net::UdpSocket;
 use tokio_stream::StreamExt;
-use tokio_util::codec::{Decoder, Encoder, LinesCodec};
 use tokio_util::udp::UdpFramed;
+use tokio_util::{
+    codec::{Decoder, Encoder, LinesCodec},
+    udp::{UdpFramedRead, UdpFramedWrite},
+};
 
 use bytes::{BufMut, BytesMut};
 use futures::future::try_join;
@@ -98,6 +101,64 @@ async fn send_framed_lines_codec() -> std::io::Result<()> {
     assert_eq!(b.next().await.unwrap().unwrap(), ("1".to_string(), a_addr));
     assert_eq!(b.next().await.unwrap().unwrap(), ("2".to_string(), a_addr));
     assert_eq!(b.next().await.unwrap().unwrap(), ("3".to_string(), a_addr));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn framed_read_write() -> std::io::Result<()> {
+    let a_soc = UdpSocket::bind("127.0.0.1:0").await?;
+    let b_soc = UdpSocket::bind("127.0.0.1:0").await?;
+
+    let a_addr = a_soc.local_addr()?;
+    let b_addr = b_soc.local_addr()?;
+
+    let mut a = UdpFramedWrite::new(a_soc, ByteCodec);
+    let mut b = UdpFramedRead::new(b_soc, LinesCodec::new());
+
+    let msg = b"1\r\n2\r\n3\r\n".to_vec();
+    a.send((&msg, b_addr)).await?;
+
+    let msg = b"4\r\n5\r\n6\r\n".to_vec();
+    a.send((&msg, b_addr)).await?;
+
+    assert_eq!(b.next().await.unwrap().unwrap(), ("1".to_string(), a_addr));
+    assert_eq!(b.next().await.unwrap().unwrap(), ("2".to_string(), a_addr));
+    assert_eq!(b.next().await.unwrap().unwrap(), ("3".to_string(), a_addr));
+
+    assert_eq!(b.next().await.unwrap().unwrap(), ("4".to_string(), a_addr));
+    assert_eq!(b.next().await.unwrap().unwrap(), ("5".to_string(), a_addr));
+    assert_eq!(b.next().await.unwrap().unwrap(), ("6".to_string(), a_addr));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn framed_read_write_concurrent() -> std::io::Result<()> {
+    let a_soc = UdpSocket::bind("127.0.0.1:0").await?;
+    let b_soc = UdpSocket::bind("127.0.0.1:0").await?;
+
+    let a_addr = a_soc.local_addr()?;
+    let b_addr = b_soc.local_addr()?;
+
+    let mut a = UdpFramedWrite::new(a_soc, ByteCodec);
+    let mut b = UdpFramedRead::new(b_soc, LinesCodec::new());
+
+    tokio::spawn(async move {
+        let msg = b"1\r\n2\r\n3\r\n".to_vec();
+        a.send((&msg, b_addr)).await.expect("failed to send");
+
+        let msg = b"4\r\n5\r\n6\r\n".to_vec();
+        a.send((&msg, b_addr)).await.expect("failed to send");
+    });
+
+    assert_eq!(b.next().await.unwrap().unwrap(), ("1".to_string(), a_addr));
+    assert_eq!(b.next().await.unwrap().unwrap(), ("2".to_string(), a_addr));
+    assert_eq!(b.next().await.unwrap().unwrap(), ("3".to_string(), a_addr));
+
+    assert_eq!(b.next().await.unwrap().unwrap(), ("4".to_string(), a_addr));
+    assert_eq!(b.next().await.unwrap().unwrap(), ("5".to_string(), a_addr));
+    assert_eq!(b.next().await.unwrap().unwrap(), ("6".to_string(), a_addr));
 
     Ok(())
 }
