@@ -62,8 +62,11 @@ async fn try_read_write() {
         while i < read.len() {
             server.readable().await.unwrap();
 
-            let n = server.try_read(&mut read[i..]).unwrap();
-            i += n;
+            match server.try_read(&mut read[i..]) {
+                Ok(n) => i += n,
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => panic!("error = {:?}", e),
+            }
         }
 
         assert_eq!(read, written);
