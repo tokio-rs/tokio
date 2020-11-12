@@ -14,6 +14,10 @@ use std::{
 };
 
 pin_project! {
+    /// A [`Stream`] of messages decoded from a [`UdpSocket`].
+    ///
+    /// [`Stream`]: tokio::stream::Stream
+    /// [`AsyncRead`]: tokio::udp::UdpSocket
     #[cfg_attr(docsrs, doc(all(feature = "codec", feature = "udp")))]
     pub struct UdpFramedRead<C> {
         #[pin]

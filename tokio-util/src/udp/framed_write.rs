@@ -14,6 +14,9 @@ use std::{
 };
 
 pin_project! {
+    /// A [`Sink`] of frames encoded for udp.
+    ///
+    /// [`Sink`]: futures_sink::Sink
     #[cfg_attr(docsrs, doc(all(feature = "codec", feature = "udp")))]
     pub struct UdpFramedWrite<C> {
         #[pin]

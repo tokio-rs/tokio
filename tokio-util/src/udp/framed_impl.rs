@@ -14,16 +14,16 @@ use std::{borrow::BorrowMut, net::SocketAddr};
 use std::{io, mem::MaybeUninit};
 
 pin_project! {
-#[derive(Debug)]
-pub(crate) struct UdpFramedImpl<U, State> {
-    #[pin]
-    pub(crate) inner: UdpSocket,
-    pub(crate) state: State,
-    pub(crate) codec: U,
-    pub(crate) current_addr: Option<SocketAddr>,
-    pub(crate) out_addr: SocketAddr,
-    pub(crate) flushed: bool,
-}
+    #[derive(Debug)]
+    pub(crate) struct UdpFramedImpl<U, State> {
+        #[pin]
+        pub(crate) inner: UdpSocket,
+        pub(crate) state: State,
+        pub(crate) codec: U,
+        pub(crate) current_addr: Option<SocketAddr>,
+        pub(crate) out_addr: SocketAddr,
+        pub(crate) flushed: bool,
+    }
 }
 
 pub(crate) const INITIAL_RD_CAPACITY: usize = 64 * 1024;
