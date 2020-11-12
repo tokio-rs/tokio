@@ -38,7 +38,7 @@ bytes = "0.5.0"
 futures-core = "0.3.0"
 futures-sink = "0.3.0"
 futures-io = { version = "0.3.0", optional = true }
-log = "0.4"
+log = "0.4.6"
 pin-project-lite = "0.1.4"
 
 [dev-dependencies]
