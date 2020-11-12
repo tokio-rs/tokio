@@ -16,6 +16,8 @@
  - coop: reset coop budget when blocking in `block_on` (#2711)
  - sync: better Debug for Mutex (#2725)
  - net: make `UnixListener::poll_accept` public (#2880)
+ - dep: raise `lazy_static` to `1.4.0` (#3132)
+ - dep: raise `slab` to `0.4.2` (#3132)
 
 ### Added
 
