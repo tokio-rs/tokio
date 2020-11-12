@@ -61,7 +61,8 @@ impl Interest {
 
     /// Add together two `Interst` values.
     ///
-    /// This function works from a `const` context.
+    /// This method is an alias for the `|` operator that works from a
+    /// `const` context.
     ///
     /// # Examples
     ///
