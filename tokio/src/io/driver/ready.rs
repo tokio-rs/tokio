@@ -194,37 +194,37 @@ cfg_io_readiness! {
     }
 }
 
-impl<T: Into<Ready>> ops::BitOr<T> for Ready {
+impl ops::BitOr<Ready> for Ready {
     type Output = Ready;
 
     #[inline]
-    fn bitor(self, other: T) -> Ready {
-        Ready(self.0 | other.into().0)
+    fn bitor(self, other: Ready) -> Ready {
+        Ready(self.0 | other.0)
     }
 }
 
-impl<T: Into<Ready>> ops::BitOrAssign<T> for Ready {
+impl ops::BitOrAssign<Ready> for Ready {
     #[inline]
-    fn bitor_assign(&mut self, other: T) {
-        self.0 |= other.into().0;
+    fn bitor_assign(&mut self, other: Ready) {
+        self.0 |= other.0;
     }
 }
 
-impl<T: Into<Ready>> ops::BitAnd<T> for Ready {
+impl ops::BitAnd<Ready> for Ready {
     type Output = Ready;
 
     #[inline]
-    fn bitand(self, other: T) -> Ready {
-        Ready(self.0 & other.into().0)
+    fn bitand(self, other: Ready) -> Ready {
+        Ready(self.0 & other.0)
     }
 }
 
-impl<T: Into<Ready>> ops::Sub<T> for Ready {
+impl ops::Sub<Ready> for Ready {
     type Output = Ready;
 
     #[inline]
-    fn sub(self, other: T) -> Ready {
-        Ready(self.0 & !other.into().0)
+    fn sub(self, other: Ready) -> Ready {
+        Ready(self.0 & !other.0)
     }
 }
 
