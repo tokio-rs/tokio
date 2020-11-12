@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "net"), allow(unreachable_pub))]
+
 use std::fmt;
 use std::ops;
 
@@ -6,11 +8,13 @@ const WRITABLE: usize = 0b0_10;
 const READ_CLOSED: usize = 0b0_0100;
 const WRITE_CLOSED: usize = 0b0_1000;
 
-/// Describes the readiness state of an I/O resources.
-///
-/// `Ready` tracks which operation an I/O resource is ready to perform.
-#[derive(Clone, Copy, PartialEq, PartialOrd)]
-pub struct Ready(usize);
+cfg_net! {
+    /// Describes the readiness state of an I/O resources.
+    ///
+    /// `Ready` tracks which operation an I/O resource is ready to perform.
+    #[derive(Clone, Copy, PartialEq, PartialOrd)]
+    pub struct Ready(usize);
+}
 
 impl Ready {
     /// Returns the empty `Ready` set.

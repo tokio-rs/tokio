@@ -1,14 +1,18 @@
-use crate::io::Ready;
+#![cfg_attr(not(feature = "net"), allow(unreachable_pub))]
+
+use crate::io::driver::Ready;
 
 use std::fmt;
 use std::ops;
 
-/// Readiness event interest
-///
-/// Specifies the readiness events the caller is interested in when awaiting on
-/// I/O resource readiness states.
-#[derive(Clone, Copy, Eq, PartialEq)]
-pub struct Interest(mio::Interest);
+cfg_net! {
+    /// Readiness event interest
+    ///
+    /// Specifies the readiness events the caller is interested in when awaiting on
+    /// I/O resource readiness states.
+    #[derive(Clone, Copy, Eq, PartialEq)]
+    pub struct Interest(mio::Interest);
+}
 
 impl Interest {
     /// Interest in all readable events.
