@@ -1,3 +1,35 @@
+# 0.2.23 (November 12, 2020)
+
+### Fixes
+
+ - time: report correct error for timers that exceed max duration (#2023)
+ - time: fix resetting expired timers causing panics (#2587)
+ - macros: silence `unreachable_code` warning in `select!` (#2678)
+ - rt: fix potential leak during runtime shutdown (#2649)
+ - sync: fix missing notification during mpsc close (#2854)
+
+### Changes
+
+ - io: always re-export `std::io` (#2606)
+ - dependencies: update `parking_lot` dependency to 0.11.0 (#2676)
+ - io: rewrite `read_to_end` and `read_to_string` (#2560)
+ - coop: reset coop budget when blocking in `block_on` (#2711)
+ - sync: better Debug for Mutex (#2725)
+ - net: make `UnixListener::poll_accept` public (#2880)
+ - dep: raise `lazy_static` to `1.4.0` (#3132)
+ - dep: raise `slab` to `0.4.2` (#3132)
+
+### Added
+
+ - io: add `io::duplex()` as bidirectional reader/writer (#2661)
+ - net: introduce split and `into_split` on `UnixDatagram` (#2557)
+ - net: ensure that unix sockets have both `split` and `into_split` (#2687)
+ - net: add `try_recv`/`from` & `try_send`/`to` to UnixDatagram (#1677)
+ - net: Add `UdpSocket::{try_send,try_send_to}` methods (#1979)
+ - net: implement `ToSocketAddrs` for `(String, u16)` (#2724)
+ - io: add `ReaderStream` (#2714)
+ - sync: implement map methods (#2771)
+
 # 0.2.22 (July 21, 2020)
 
 ### Fixes
