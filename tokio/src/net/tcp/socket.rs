@@ -9,79 +9,81 @@ use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 #[cfg(windows)]
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 
-/// A TCP socket that has not yet been converted to a `TcpStream` or
-/// `TcpListener`.
-///
-/// `TcpSocket` wraps an operating system socket and enables the caller to
-/// configure the socket before establishing a TCP connection or accepting
-/// inbound connections. The caller is able to set socket option and explicitly
-/// bind the socket with a socket address.
-///
-/// The underlying socket is closed when the `TcpSocket` value is dropped.
-///
-/// `TcpSocket` should only be used directly if the default configuration used
-/// by `TcpStream::connect` and `TcpListener::bind` does not meet the required
-/// use case.
-///
-/// Calling `TcpStream::connect("127.0.0.1:8080")` is equivalent to:
-///
-/// ```no_run
-/// use tokio::net::TcpSocket;
-///
-/// use std::io;
-///
-/// #[tokio::main]
-/// async fn main() -> io::Result<()> {
-///     let addr = "127.0.0.1:8080".parse().unwrap();
-///
-///     let socket = TcpSocket::new_v4()?;
-///     let stream = socket.connect(addr).await?;
-/// # drop(stream);
-///
-///     Ok(())
-/// }
-/// ```
-///
-/// Calling `TcpListener::bind("127.0.0.1:8080")` is equivalent to:
-///
-/// ```no_run
-/// use tokio::net::TcpSocket;
-///
-/// use std::io;
-///
-/// #[tokio::main]
-/// async fn main() -> io::Result<()> {
-///     let addr = "127.0.0.1:8080".parse().unwrap();
-///
-///     let socket = TcpSocket::new_v4()?;
-///     // On platforms with Berkeley-derived sockets, this allows to quickly
-///     // rebind a socket, without needing to wait for the OS to clean up the
-///     // previous one.
-///     //
-///     // On Windows, this allows rebinding sockets which are actively in use,
-///     // which allows “socket hijacking”, so we explicitly don't set it here.
-///     // https://docs.microsoft.com/en-us/windows/win32/winsock/using-so-reuseaddr-and-so-exclusiveaddruse
-///     socket.set_reuseaddr(true)?;
-///     socket.bind(addr)?;
-///
-///     let listener = socket.listen(1024)?;
-/// # drop(listener);
-///
-///     Ok(())
-/// }
-/// ```
-///
-/// Setting socket options not explicitly provided by `TcpSocket` may be done by
-/// accessing the `RawFd`/`RawSocket` using [`AsRawFd`]/[`AsRawSocket`] and
-/// setting the option with a crate like [`socket2`].
-///
-/// [`RawFd`]: https://doc.rust-lang.org/std/os/unix/io/type.RawFd.html
-/// [`RawSocket`]: https://doc.rust-lang.org/std/os/windows/io/type.RawSocket.html
-/// [`AsRawFd`]: https://doc.rust-lang.org/std/os/unix/io/trait.AsRawFd.html
-/// [`AsRawSocket`]: https://doc.rust-lang.org/std/os/windows/io/trait.AsRawSocket.html
-/// [`socket2`]: https://docs.rs/socket2/
-pub struct TcpSocket {
-    inner: mio::net::TcpSocket,
+cfg_net! {
+    /// A TCP socket that has not yet been converted to a `TcpStream` or
+    /// `TcpListener`.
+    ///
+    /// `TcpSocket` wraps an operating system socket and enables the caller to
+    /// configure the socket before establishing a TCP connection or accepting
+    /// inbound connections. The caller is able to set socket option and explicitly
+    /// bind the socket with a socket address.
+    ///
+    /// The underlying socket is closed when the `TcpSocket` value is dropped.
+    ///
+    /// `TcpSocket` should only be used directly if the default configuration used
+    /// by `TcpStream::connect` and `TcpListener::bind` does not meet the required
+    /// use case.
+    ///
+    /// Calling `TcpStream::connect("127.0.0.1:8080")` is equivalent to:
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpSocket;
+    ///
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let addr = "127.0.0.1:8080".parse().unwrap();
+    ///
+    ///     let socket = TcpSocket::new_v4()?;
+    ///     let stream = socket.connect(addr).await?;
+    /// # drop(stream);
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// Calling `TcpListener::bind("127.0.0.1:8080")` is equivalent to:
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpSocket;
+    ///
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let addr = "127.0.0.1:8080".parse().unwrap();
+    ///
+    ///     let socket = TcpSocket::new_v4()?;
+    ///     // On platforms with Berkeley-derived sockets, this allows to quickly
+    ///     // rebind a socket, without needing to wait for the OS to clean up the
+    ///     // previous one.
+    ///     //
+    ///     // On Windows, this allows rebinding sockets which are actively in use,
+    ///     // which allows “socket hijacking”, so we explicitly don't set it here.
+    ///     // https://docs.microsoft.com/en-us/windows/win32/winsock/using-so-reuseaddr-and-so-exclusiveaddruse
+    ///     socket.set_reuseaddr(true)?;
+    ///     socket.bind(addr)?;
+    ///
+    ///     let listener = socket.listen(1024)?;
+    /// # drop(listener);
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// Setting socket options not explicitly provided by `TcpSocket` may be done by
+    /// accessing the `RawFd`/`RawSocket` using [`AsRawFd`]/[`AsRawSocket`] and
+    /// setting the option with a crate like [`socket2`].
+    ///
+    /// [`RawFd`]: https://doc.rust-lang.org/std/os/unix/io/type.RawFd.html
+    /// [`RawSocket`]: https://doc.rust-lang.org/std/os/windows/io/type.RawSocket.html
+    /// [`AsRawFd`]: https://doc.rust-lang.org/std/os/unix/io/trait.AsRawFd.html
+    /// [`AsRawSocket`]: https://doc.rust-lang.org/std/os/windows/io/trait.AsRawSocket.html
+    /// [`socket2`]: https://docs.rs/socket2/
+    pub struct TcpSocket {
+        inner: mio::net::TcpSocket,
+    }
 }
 
 impl TcpSocket {
