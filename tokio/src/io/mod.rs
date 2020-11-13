@@ -204,9 +204,12 @@ pub use self::read_buf::ReadBuf;
 #[doc(no_inline)]
 pub use std::io::{Error, ErrorKind, Result, SeekFrom};
 
-cfg_io_driver! {
+cfg_io_driver_impl! {
     pub(crate) mod driver;
-    pub(crate) use driver::Interest;
+
+    cfg_net! {
+        pub use driver::{Interest, Ready};
+    }
 
     mod poll_evented;
 

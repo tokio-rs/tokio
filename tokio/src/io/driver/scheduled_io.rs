@@ -1,4 +1,4 @@
-use super::{Ready, ReadyEvent, Tick};
+use super::{Interest, Ready, ReadyEvent, Tick};
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Mutex;
 use crate::util::bit;
@@ -49,8 +49,6 @@ struct Waiters {
 }
 
 cfg_io_readiness! {
-    use crate::io::Interest;
-
     #[derive(Debug)]
     struct Waiter {
         pointers: linked_list::Pointers<Waiter>,
@@ -277,6 +275,15 @@ impl ScheduledIo {
 
         for waker in wakers.iter_mut().take(curr) {
             waker.take().unwrap().wake();
+        }
+    }
+
+    pub(super) fn ready_event(&self, interest: Interest) -> ReadyEvent {
+        let curr = self.readiness.load(Acquire);
+
+        ReadyEvent {
+            tick: TICK.unpack(curr) as u8,
+            ready: interest.mask() & Ready::from_usize(READINESS.unpack(curr)),
         }
     }
 

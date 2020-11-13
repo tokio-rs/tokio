@@ -79,6 +79,19 @@ macro_rules! cfg_io_driver {
     }
 }
 
+macro_rules! cfg_io_driver_impl {
+    ( $( $item:item )* ) => {
+        $(
+            #[cfg(any(
+                feature = "net",
+                feature = "process",
+                all(unix, feature = "signal"),
+            ))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_not_io_driver {
     ($($item:item)*) => {
         $(

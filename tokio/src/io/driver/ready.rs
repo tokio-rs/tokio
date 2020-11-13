@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "net"), allow(unreachable_pub))]
+
 use std::fmt;
 use std::ops;
 
@@ -6,36 +8,33 @@ const WRITABLE: usize = 0b0_10;
 const READ_CLOSED: usize = 0b0_0100;
 const WRITE_CLOSED: usize = 0b0_1000;
 
-/// A set of readiness event kinds.
+/// Describes the readiness state of an I/O resources.
 ///
-/// `Ready` is set of operation descriptors indicating which kind of an
-/// operation is ready to be performed.
-///
-/// This struct only represents portable event kinds. Portable events are
-/// events that can be raised on any platform while guaranteeing no false
-/// positives.
+/// `Ready` tracks which operation an I/O resource is ready to perform.
+#[cfg_attr(docsrs, doc(cfg(feature = "net")))]
 #[derive(Clone, Copy, PartialEq, PartialOrd)]
-pub(crate) struct Ready(usize);
+pub struct Ready(usize);
 
 impl Ready {
     /// Returns the empty `Ready` set.
-    pub(crate) const EMPTY: Ready = Ready(0);
+    pub const EMPTY: Ready = Ready(0);
 
     /// Returns a `Ready` representing readable readiness.
-    pub(crate) const READABLE: Ready = Ready(READABLE);
+    pub const READABLE: Ready = Ready(READABLE);
 
     /// Returns a `Ready` representing writable readiness.
-    pub(crate) const WRITABLE: Ready = Ready(WRITABLE);
+    pub const WRITABLE: Ready = Ready(WRITABLE);
 
     /// Returns a `Ready` representing read closed readiness.
-    pub(crate) const READ_CLOSED: Ready = Ready(READ_CLOSED);
+    pub const READ_CLOSED: Ready = Ready(READ_CLOSED);
 
     /// Returns a `Ready` representing write closed readiness.
-    pub(crate) const WRITE_CLOSED: Ready = Ready(WRITE_CLOSED);
+    pub const WRITE_CLOSED: Ready = Ready(WRITE_CLOSED);
 
     /// Returns a `Ready` representing readiness for all operations.
-    pub(crate) const ALL: Ready = Ready(READABLE | WRITABLE | READ_CLOSED | WRITE_CLOSED);
+    pub const ALL: Ready = Ready(READABLE | WRITABLE | READ_CLOSED | WRITE_CLOSED);
 
+    // Must remain crate-private to avoid adding a public dependency on Mio.
     pub(crate) fn from_mio(event: &mio::event::Event) -> Ready {
         let mut ready = Ready::EMPTY;
 
@@ -59,27 +58,78 @@ impl Ready {
     }
 
     /// Returns true if `Ready` is the empty set
-    pub(crate) fn is_empty(self) -> bool {
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::io::Ready;
+    ///
+    /// assert!(Ready::EMPTY.is_empty());
+    /// assert!(!Ready::READABLE.is_empty());
+    /// ```
+    pub fn is_empty(self) -> bool {
         self == Ready::EMPTY
     }
 
-    /// Returns true if the value includes readable readiness
-    pub(crate) fn is_readable(self) -> bool {
+    /// Returns `true` if the value includes `readable`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::io::Ready;
+    ///
+    /// assert!(!Ready::EMPTY.is_readable());
+    /// assert!(Ready::READABLE.is_readable());
+    /// assert!(Ready::READ_CLOSED.is_readable());
+    /// assert!(!Ready::WRITABLE.is_readable());
+    /// ```
+    pub fn is_readable(self) -> bool {
         self.contains(Ready::READABLE) || self.is_read_closed()
     }
 
-    /// Returns true if the value includes writable readiness
-    pub(crate) fn is_writable(self) -> bool {
+    /// Returns `true` if the value includes writable `readiness`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::io::Ready;
+    ///
+    /// assert!(!Ready::EMPTY.is_writable());
+    /// assert!(!Ready::READABLE.is_writable());
+    /// assert!(Ready::WRITABLE.is_writable());
+    /// assert!(Ready::WRITE_CLOSED.is_writable());
+    /// ```
+    pub fn is_writable(self) -> bool {
         self.contains(Ready::WRITABLE) || self.is_write_closed()
     }
 
-    /// Returns true if the value includes read closed readiness
-    pub(crate) fn is_read_closed(self) -> bool {
+    /// Returns `true` if the value includes read-closed `readiness`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::io::Ready;
+    ///
+    /// assert!(!Ready::EMPTY.is_read_closed());
+    /// assert!(!Ready::READABLE.is_read_closed());
+    /// assert!(Ready::READ_CLOSED.is_read_closed());
+    /// ```
+    pub fn is_read_closed(self) -> bool {
         self.contains(Ready::READ_CLOSED)
     }
 
-    /// Returns true if the value includes write closed readiness
-    pub(crate) fn is_write_closed(self) -> bool {
+    /// Returns `true` if the value includes write-closed `readiness`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::io::Ready;
+    ///
+    /// assert!(!Ready::EMPTY.is_write_closed());
+    /// assert!(!Ready::WRITABLE.is_write_closed());
+    /// assert!(Ready::WRITE_CLOSED.is_write_closed());
+    /// ```
+    pub fn is_write_closed(self) -> bool {
         self.contains(Ready::WRITE_CLOSED)
     }
 
@@ -143,37 +193,37 @@ cfg_io_readiness! {
     }
 }
 
-impl<T: Into<Ready>> ops::BitOr<T> for Ready {
+impl ops::BitOr<Ready> for Ready {
     type Output = Ready;
 
     #[inline]
-    fn bitor(self, other: T) -> Ready {
-        Ready(self.0 | other.into().0)
+    fn bitor(self, other: Ready) -> Ready {
+        Ready(self.0 | other.0)
     }
 }
 
-impl<T: Into<Ready>> ops::BitOrAssign<T> for Ready {
+impl ops::BitOrAssign<Ready> for Ready {
     #[inline]
-    fn bitor_assign(&mut self, other: T) {
-        self.0 |= other.into().0;
+    fn bitor_assign(&mut self, other: Ready) {
+        self.0 |= other.0;
     }
 }
 
-impl<T: Into<Ready>> ops::BitAnd<T> for Ready {
+impl ops::BitAnd<Ready> for Ready {
     type Output = Ready;
 
     #[inline]
-    fn bitand(self, other: T) -> Ready {
-        Ready(self.0 & other.into().0)
+    fn bitand(self, other: Ready) -> Ready {
+        Ready(self.0 & other.0)
     }
 }
 
-impl<T: Into<Ready>> ops::Sub<T> for Ready {
+impl ops::Sub<Ready> for Ready {
     type Output = Ready;
 
     #[inline]
-    fn sub(self, other: T) -> Ready {
-        Ready(self.0 & !other.into().0)
+    fn sub(self, other: Ready) -> Ready {
+        Ready(self.0 & !other.0)
     }
 }
 
