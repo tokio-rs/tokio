@@ -316,6 +316,7 @@ impl UdpSocket {
     ///
     /// ```no_run
     /// use tokio::net::UdpSocket;
+    /// use std::io;
     /// use std::error::Error;
     ///
     /// #[tokio::main]
@@ -330,7 +331,7 @@ impl UdpSocket {
     ///
     ///         // Try to send data, this may still fail with `WouldBlock`
     ///         // if the readiness event is a false positive.
-    ///         match stream.try_send(b"hello world") {
+    ///         match socket.try_send(b"hello world") {
     ///             Ok(n) => {
     ///                 break;
     ///             }
@@ -371,7 +372,7 @@ impl UdpSocket {
     ///     socket.connect("127.0.0.1:8081").await?;
     ///
     ///     // Send a message
-    ///     stream.send(b"hello world").await?;
+    ///     socket.send(b"hello world").await?;
     ///
     ///     Ok(())
     /// }
@@ -482,7 +483,7 @@ impl UdpSocket {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     // Connect to a peer
-    ///     let socket = UdpSocket::connect("127.0.0.1:8080").await?;
+    ///     let socket = UdpSocket::bind("127.0.0.1:8080").await?;
     ///     socket.connect("127.0.0.1:8081").await?;
     ///
     ///     loop {
@@ -491,13 +492,13 @@ impl UdpSocket {
     ///
     ///         // The buffer is **not** included in the async task and will
     ///         // only exist on the stack.
-    ///         let mut data = [0; 1024];
+    ///         let mut buf = [0; 1024];
     ///
     ///         // Try to recv data, this may still fail with `WouldBlock`
     ///         // if the readiness event is a false positive.
-    ///         match socket.try_recv(&mut msg) {
+    ///         match socket.try_recv(&mut buf) {
     ///             Ok(n) => {
-    ///                 println!("GOT {:?}", &data[..n]);
+    ///                 println!("GOT {:?}", &buf[..n]);
     ///                 break;
     ///             }
     ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
@@ -616,7 +617,7 @@ impl UdpSocket {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     // Connect to a peer
-    ///     let socket = UdpSocket::connect("127.0.0.1:8080").await?;
+    ///     let socket = UdpSocket::bind("127.0.0.1:8080").await?;
     ///     socket.connect("127.0.0.1:8081").await?;
     ///
     ///     loop {
@@ -625,13 +626,13 @@ impl UdpSocket {
     ///
     ///         // The buffer is **not** included in the async task and will
     ///         // only exist on the stack.
-    ///         let mut data = [0; 1024];
+    ///         let mut buf = [0; 1024];
     ///
     ///         // Try to recv data, this may still fail with `WouldBlock`
     ///         // if the readiness event is a false positive.
-    ///         match socket.try_recv(&mut msg) {
+    ///         match socket.try_recv(&mut buf) {
     ///             Ok(n) => {
-    ///                 println!("GOT {:?}", &data[..n]);
+    ///                 println!("GOT {:?}", &buf[..n]);
     ///                 break;
     ///             }
     ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
@@ -751,7 +752,7 @@ impl UdpSocket {
     ///     loop {
     ///         socket.writable().await?;
     ///
-    ///         match socket.try_send_to(&b"hello world", dst) {
+    ///         match socket.try_send_to(&b"hello world"[..], dst) {
     ///             Ok(sent) => {
     ///                 println!("sent {} bytes", sent);
     ///                 break;
@@ -794,7 +795,7 @@ impl UdpSocket {
     /// use std::error::Error;
     ///
     /// #[tokio::main]
-    /// async fn main() -> Box<dyn Error> {
+    /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     let socket = UdpSocket::bind("127.0.0.1:8080").await?;
     ///
     ///     let mut buf = vec![0u8; 32];
@@ -871,7 +872,7 @@ impl UdpSocket {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     // Connect to a peer
-    ///     let socket = UdpSocket::connect("127.0.0.1:8080").await?;
+    ///     let socket = UdpSocket::bind("127.0.0.1:8080").await?;
     ///     socket.connect("127.0.0.1:8081").await?;
     ///
     ///     loop {
@@ -880,13 +881,13 @@ impl UdpSocket {
     ///
     ///         // The buffer is **not** included in the async task and will
     ///         // only exist on the stack.
-    ///         let mut data = [0; 1024];
+    ///         let mut buf = [0; 1024];
     ///
     ///         // Try to recv data, this may still fail with `WouldBlock`
     ///         // if the readiness event is a false positive.
-    ///         match socket.try_recv(&mut msg) {
+    ///         match socket.try_recv(&mut buf) {
     ///             Ok(n) => {
-    ///                 println!("GOT {:?}", &data[..n]);
+    ///                 println!("GOT {:?}", &buf[..n]);
     ///                 break;
     ///             }
     ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
