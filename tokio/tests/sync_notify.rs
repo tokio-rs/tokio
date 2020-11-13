@@ -103,9 +103,9 @@ fn notified_multi_notify_drop_one() {
 
 #[test]
 fn notify_in_drop_after_wake() {
-    use std::sync::Arc;
-    use std::future::Future;
     use futures::task::ArcWake;
+    use std::future::Future;
+    use std::sync::Arc;
 
     let notify = Arc::new(Notify::new());
 
