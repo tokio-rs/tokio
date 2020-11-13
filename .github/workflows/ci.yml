@@ -1,6 +1,8 @@
 on:
   push:
     branches: ["master"]
+    branches-ignore:
+      - 'bench-ci'
   pull_request:
     branches: ["master"]
 
