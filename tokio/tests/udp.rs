@@ -239,6 +239,8 @@ async fn try_send_spawn() {
         .await
         .unwrap();
 
+    sender.writable().await.unwrap();
+
     let sent = &sender
         .try_send_to(MSG, receiver.local_addr().unwrap())
         .unwrap();
