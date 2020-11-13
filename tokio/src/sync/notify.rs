@@ -189,8 +189,7 @@ fn get_num_notify_waiters_calls(data: usize) -> usize {
 }
 
 fn inc_num_notify_waiters_calls(data: usize) -> usize {
-    let new = get_num_notify_waiters_calls(data) + 1;
-    (data & STATE_MASK) | (new << NOTIFY_WAITERS_SHIFT)
+    data + (1 << NOTIFY_WAITERS_SHIFT)
 }
 
 impl Notify {
@@ -380,6 +379,11 @@ impl Notify {
     /// }
     /// ```
     pub fn notify_waiters(&self) {
+        const NUM_WAKERS: usize = 32;
+
+        let mut wakers: [Option<Waker>; NUM_WAKERS] = Default::default();
+        let mut curr_waker = 0;
+
         // There are waiters, the lock must be acquired to notify.
         let mut waiters = self.waiters.lock();
 
@@ -399,26 +403,52 @@ impl Notify {
         // At this point, it is guaranteed that the state will not
         // concurrently change, as holding the lock is required to
         // transition **out** of `WAITING`.
-        //
-        // Get pending waiters
-        while let Some(mut waiter) = waiters.pop_back() {
-            // Safety: `waiters` lock is still held.
-            let waiter = unsafe { waiter.as_mut() };
+        'outer: loop {
+            while curr_waker < NUM_WAKERS {
+                match waiters.pop_back() {
+                    Some(mut waiter) => {
+                        // Safety: `waiters` lock is still held.
+                        let waiter = unsafe { waiter.as_mut() };
 
-            assert!(waiter.notified.is_none());
+                        assert!(waiter.notified.is_none());
 
-            waiter.notified = Some(NotificationType::AllWaiters);
+                        waiter.notified = Some(NotificationType::AllWaiters);
 
-            if let Some(waker) = waiter.waker.take() {
-                waker.wake();
+                        if let Some(waker) = waiter.waker.take() {
+                            wakers[curr_waker] = Some(waker);
+                            curr_waker += 1;
+                        }
+                    }
+                    None => {
+                        break 'outer;
+                    }
+                }
             }
+
+            drop(waiters);
+
+            for waker in wakers.iter_mut().take(curr) {
+                waker.take().unwrap().wake();
+            }
+
+            curr_waker = 0;
+
+            // Acquire the lock again.
+            waiters = self.waiters.lock();
         }
 
-        // All waiters have been notified, the state must be transitioned to
+        // All waiters will be notified, the state must be transitioned to
         // `EMPTY`. As transitioning **from** `WAITING` requires the lock to be
         // held, a `store` is sufficient.
         let new = set_state(inc_num_notify_waiters_calls(curr), EMPTY);
         self.state.store(new, SeqCst);
+
+        // Release the lock before notifying
+        drop(waiters);
+
+        for waker in wakers.iter_mut().take(curr_waker) {
+            waker.take().unwrap().wake();
+        }
     }
 }
 
