@@ -17,7 +17,7 @@ mod wheel;
 
 pub(super) mod sleep;
 
-use crate::loom::sync::{atomic::AtomicBool, atomic::Ordering, Arc, Mutex};
+use crate::loom::sync::{Arc, Mutex};
 use crate::park::{Park, Unpark};
 use crate::time::error::Error;
 use crate::time::{Clock, Duration, Instant};
@@ -91,9 +91,6 @@ pub(crate) struct Driver<P: Park + 'static> {
 
     /// Parker to delegate to
     park: P,
-
-    /// Unparker for this time driver
-    unpark: TimeUnpark<P::Unpark>,
 }
 
 /// A structure which handles conversion from Instants to u64 timestamps.
@@ -152,8 +149,8 @@ pub(self) struct Inner {
     /// True if the driver is being shutdown
     is_shutdown: bool,
 
-    /// Access to the TimeUnparker
-    unpark: TimeUnpark<dyn Unpark>,
+    /// Unparker that can be used to wake the time driver
+    unpark: Box<dyn Unpark>,
 }
 
 // ===== impl Driver =====
@@ -168,15 +165,13 @@ where
     /// Specifying the source of time is useful when testing.
     pub(crate) fn new(park: P, clock: Clock) -> Driver<P> {
         let time_source = ClockTime::new(clock);
-        let unpark = TimeUnpark::new(park.unpark());
 
-        let inner = Inner::new(time_source.clone(), unpark.clone().coerce_unsized());
+        let inner = Inner::new(time_source.clone(), Box::new(park.unpark()));
 
         Driver {
             time_source,
             inner: Handle::new(Arc::new(Mutex::new(inner))),
             park,
-            unpark,
         }
     }
 
@@ -229,9 +224,7 @@ where
                 if let Some(duration) = limit {
                     if clock.is_paused() {
                         self.park.park_timeout(Duration::from_secs(0))?;
-                        if !self.unpark.get_and_clear() {
-                            clock.advance(duration);
-                        }
+                        clock.advance(duration);
                     } else {
                         self.park.park_timeout(duration)?;
                     }
@@ -397,87 +390,15 @@ impl Handle {
     }
 }
 
-pub(crate) struct TimeUnpark<U: Unpark + ?Sized> {
-    // loom's Arc does not support trait objects
-    unpark: std::sync::Arc<U>,
-    unparked: Arc<AtomicBool>,
-}
-
-impl<U: Unpark + ?Sized> Clone for TimeUnpark<U> {
-    fn clone(&self) -> Self {
-        Self {
-            unpark: self.unpark.clone(),
-            unparked: self.unparked.clone(),
-        }
-    }
-}
-
-impl TimeUnpark<dyn Unpark> {
-    #[cfg(test)]
-    pub(self) fn mock() -> Self {
-        struct MockUnpark;
-
-        impl Unpark for MockUnpark {
-            fn unpark(&self) {}
-        }
-
-        Self {
-            unpark: std::sync::Arc::new(MockUnpark),
-            unparked: Arc::new(AtomicBool::new(false)),
-        }
-    }
-}
-
-impl<U: Unpark + ?Sized> TimeUnpark<U> {
-    fn new(unpark: U) -> Self
-    where
-        U: Sized,
-    {
-        Self {
-            unpark: std::sync::Arc::new(unpark),
-            unparked: Arc::new(AtomicBool::new(false)),
-        }
-    }
-
-    fn coerce_unsized(self) -> TimeUnpark<dyn Unpark>
-    where
-        U: Sized,
-    {
-        TimeUnpark {
-            unpark: self.unpark,
-            unparked: self.unparked,
-        }
-    }
-
-    fn get_and_clear(&self) -> bool {
-        self.unparked.swap(false, Ordering::AcqRel)
-    }
-}
-
-impl<U: Unpark + ?Sized> std::fmt::Debug for TimeUnpark<U> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("TimeUnpark")
-            .field("unparked", &self.unparked.load(Ordering::SeqCst))
-            .finish()
-    }
-}
-
-impl<U: Unpark + ?Sized> Unpark for TimeUnpark<U> {
-    fn unpark(&self) {
-        self.unparked.store(true, Ordering::Release);
-        self.unpark.unpark();
-    }
-}
-
 impl<P> Park for Driver<P>
 where
     P: Park + 'static,
 {
-    type Unpark = TimeUnpark<P::Unpark>;
+    type Unpark = P::Unpark;
     type Error = P::Error;
 
     fn unpark(&self) -> Self::Unpark {
-        self.unpark.clone()
+        self.park.unpark()
     }
 
     fn park(&mut self) -> Result<(), Self::Error> {
@@ -519,7 +440,7 @@ where
 // ===== impl Inner =====
 
 impl Inner {
-    pub(self) fn new(time_source: ClockTime, unpark: TimeUnpark<dyn Unpark>) -> Self {
+    pub(self) fn new(time_source: ClockTime, unpark: Box<dyn Unpark>) -> Self {
         Inner {
             time_source,
             elapsed: 0,
