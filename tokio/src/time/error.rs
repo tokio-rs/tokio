@@ -47,7 +47,6 @@ pub struct Elapsed(());
 #[derive(Debug)]
 pub(crate) enum InsertError {
     Elapsed,
-    Invalid,
 }
 
 // ===== impl Error =====

@@ -173,11 +173,11 @@ fn creating_sleep_outside_of_context() {
     let _fut = time::sleep_until(now + ms(500));
 }
 
-#[should_panic]
 #[tokio::test]
 async fn greater_than_max() {
     const YR_5: u64 = 5 * 365 * 24 * 60 * 60 * 1000;
 
+    time::pause();
     time::sleep_until(Instant::now() + ms(YR_5)).await;
 }
 
@@ -189,6 +189,55 @@ async fn short_sleeps() {
         }
         tokio::time::sleep(std::time::Duration::from_millis(0)).await;
     }
+}
+
+#[tokio::test]
+async fn multi_long_sleeps() {
+    tokio::time::pause();
+
+    for _ in 0..5u32 {
+        tokio::time::sleep(Duration::from_secs(
+            // about a year
+            365 * 24 * 3600,
+        ))
+        .await;
+    }
+
+    let deadline = tokio::time::Instant::now()
+        + Duration::from_secs(
+            // about 10 years
+            10 * 365 * 24 * 3600,
+        );
+
+    tokio::time::sleep_until(deadline).await;
+
+    assert!(tokio::time::Instant::now() >= deadline);
+}
+
+#[tokio::test]
+async fn long_sleeps() {
+    tokio::time::pause();
+
+    let deadline = tokio::time::Instant::now()
+        + Duration::from_secs(
+            // about 10 years
+            10 * 365 * 24 * 3600,
+        );
+
+    tokio::time::sleep_until(deadline).await;
+
+    assert!(tokio::time::Instant::now() >= deadline);
+    assert!(tokio::time::Instant::now() <= deadline + Duration::from_millis(1));
+}
+
+#[tokio::test]
+#[should_panic(expected = "Duration too far into the future")]
+async fn very_long_sleeps() {
+    tokio::time::pause();
+
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(1u64 << 62);
+
+    tokio::time::sleep_until(deadline).await;
 }
 
 #[tokio::test]
@@ -219,10 +268,9 @@ async fn reset_after_firing() {
 const NUM_LEVELS: usize = 6;
 const MAX_DURATION: u64 = (1 << (6 * NUM_LEVELS)) - 1;
 
-#[should_panic]
 #[tokio::test]
 async fn exactly_max() {
-    // TODO: this should not panic but `time::ms()` is acting up
+    time::pause();
     time::sleep(ms(MAX_DURATION)).await;
 }
 

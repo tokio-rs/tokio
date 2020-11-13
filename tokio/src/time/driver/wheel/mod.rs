@@ -47,7 +47,7 @@ pub(crate) struct Wheel {
 const NUM_LEVELS: usize = 6;
 
 /// The maximum duration of a `Sleep`
-const MAX_DURATION: u64 = (1 << (6 * NUM_LEVELS)) - 1;
+pub(super) const MAX_DURATION: u64 = (1 << (6 * NUM_LEVELS)) - 1;
 
 impl Wheel {
     /// Create a new timing wheel
@@ -96,8 +96,6 @@ impl Wheel {
 
         if when <= self.elapsed {
             return Err((item, InsertError::Elapsed));
-        } else if when - self.elapsed > MAX_DURATION {
-            return Err((item, InsertError::Invalid));
         }
 
         // Get the level at which the entry should be stored
@@ -224,7 +222,19 @@ impl Wheel {
     /// queue it for notification (in the case of the last level) or tier
     /// it down to the next level (in all other cases).
     pub(crate) fn process_expiration(&mut self, expiration: &Expiration) {
-        while let Some(item) = self.pop_entry(expiration) {
+        // Note that we need to take _all_ of the entries off the list before
+        // processing any of them. This is important because it's possible that
+        // those entries might need to be reinserted into the same slot.
+        //
+        // This happens only on the highest level, when an entry is inserted
+        // more than MAX_DURATION into the future. When this happens, we wrap
+        // around, and process some entries a multiple of MAX_DURATION before
+        // they actually need to be dropped down a level. We then reinsert them
+        // back into the same position; we must make sure we don't then process
+        // those entries again or we'll end up in an infinite loop.
+        let mut entries = self.take_entries(expiration);
+
+        while let Some(item) = entries.pop_back() {
             if expiration.level == 0 {
                 debug_assert_eq!(unsafe { item.cached_when() }, expiration.deadline);
             }
@@ -259,10 +269,10 @@ impl Wheel {
         }
     }
 
-    /// Pops an entry based on the expiration provided.
+    /// Obtains the list of entries that need processing for the given expiration.
     ///
-    fn pop_entry(&mut self, expiration: &Expiration) -> Option<TimerHandle> {
-        self.levels[expiration.level].pop_entry_slot(expiration.slot)
+    fn take_entries(&mut self, expiration: &Expiration) -> EntryList {
+        self.levels[expiration.level].take_slot(expiration.slot)
     }
 
     fn level_for(&self, when: u64) -> usize {
@@ -271,12 +281,18 @@ impl Wheel {
 }
 
 fn level_for(elapsed: u64, when: u64) -> usize {
-    let masked = elapsed ^ when;
+    let mut masked = elapsed ^ when;
+
+    if masked >= MAX_DURATION {
+        // Fudge the timer into the top level
+        masked = MAX_DURATION - 1;
+    }
 
     assert!(masked != 0, "elapsed={}; when={}", elapsed, when);
 
     let leading_zeros = masked.leading_zeros() as usize;
     let significant = 63 - leading_zeros;
+
     significant / 6
 }
 

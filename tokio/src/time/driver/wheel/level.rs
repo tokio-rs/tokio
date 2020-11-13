@@ -145,14 +145,38 @@ impl Level {
 
         // TODO: This can probably be simplified w/ power of 2 math
         let level_start = now - (now % level_range);
-        let deadline = level_start + slot as u64 * slot_range;
+        let mut deadline = level_start + slot as u64 * slot_range;
+
+        if deadline <= now {
+            // A timer is in a slot "prior" to the current time. This can occur
+            // because we do not have an infinite heirarchy of timer levels, and
+            // eventually a timer scheduled for a very distant time might end up
+            // being placed in a slot that is beyond the end of all of the
+            // arrays.
+            //
+            // To deal with this, we first limit timers to being scheduled no
+            // more than MAX_DURATION ticks in the future; that is, they're at
+            // most one rotation of the top level away. Then, we force timers
+            // that logically would go into the top+1 level, to instead go into
+            // the top level's slots.
+            //
+            // What this means is that the top level's slots act as a
+            // pseudo-ring buffer, and we rotate around them indefinitely. If we
+            // compute a deadline before now, and it's the top level, it
+            // therefore means we're actually looking at a slot in the future.
+            debug_assert_eq!(self.level, super::NUM_LEVELS - 1);
+
+            deadline += level_range;
+        }
 
         debug_assert!(
             deadline >= now,
-            "deadline={}; now={}; level={}; slot={}; occupied={:b}",
+            "deadline={:016X}; now={:016X}; level={}; lr={:016X}, sr={:016X}, slot={}; occupied={:b}",
             deadline,
             now,
             self.level,
+            level_range,
+            slot_range,
             slot,
             self.occupied
         );
@@ -199,17 +223,10 @@ impl Level {
         }
     }
 
-    pub(crate) fn pop_entry_slot(&mut self, slot: usize) -> Option<TimerHandle> {
-        let ret = self.slot[slot].pop_back();
+    pub(crate) fn take_slot(&mut self, slot: usize) -> EntryList {
+        self.occupied &= !occupied_bit(slot);
 
-        if ret.is_some() && self.slot[slot].is_empty() {
-            // The bit is currently set
-            debug_assert!(self.occupied & occupied_bit(slot) != 0);
-
-            self.occupied ^= occupied_bit(slot);
-        }
-
-        ret
+        std::mem::take(&mut self.slot[slot])
     }
 }
 

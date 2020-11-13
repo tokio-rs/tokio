@@ -382,9 +382,6 @@ impl Handle {
                     Err((entry, super::error::InsertError::Elapsed)) => unsafe {
                         entry.fire(Ok(()))
                     },
-                    Err((entry, super::error::InsertError::Invalid)) => unsafe {
-                        entry.fire(Err(Error::invalid()))
-                    },
                 }
             }
 
