@@ -17,13 +17,13 @@ path = "spawn.rs"
 harness = false
 
 [[bench]]
-name = "mpsc"
-path = "mpsc.rs"
+name = "sync_mpsc"
+path = "sync_mpsc.rs"
 harness = false
 
 [[bench]]
-name = "scheduler"
-path = "scheduler.rs"
+name = "rt_multi_threaded"
+path = "rt_multi_threaded.rs"
 harness = false
 
 
