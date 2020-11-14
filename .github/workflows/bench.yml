@@ -6,7 +6,7 @@ on:
 
 jobs:
   benchmark:
-    name: Performance regression check
+    name: Benchmark
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -34,7 +34,7 @@ jobs:
       - name: Store benchmark result
         uses: rhysd/github-action-benchmark@v1
         with:
-          name: Tokio Benchmarks
+          name: ${{ matrix.bench }}
           # What benchmark tool the output.txt came from
           tool: 'cargo'
           # Where the output from the benchmark tool is stored
