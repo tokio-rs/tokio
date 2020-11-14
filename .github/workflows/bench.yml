@@ -8,6 +8,11 @@ jobs:
   benchmark:
     name: Performance regression check
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        bench:
+          - mpsc
+          - scheduler
     steps:
       - uses: actions/checkout@v2
       - name: Install Rust
@@ -15,7 +20,7 @@ jobs:
 
       # Run benchmark with `go test -bench` and stores the output to a file
       - name: Run benchmark
-        run: cargo bench | tee ../output.txt
+        run: cargo bench --bench ${{ matrix.bench }} | tee ../output.txt
         working-directory: benches
 
       # Download previous benchmark result from cache (if exists)
