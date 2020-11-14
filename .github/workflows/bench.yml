@@ -11,8 +11,10 @@ jobs:
     strategy:
       matrix:
         bench:
-          - mpsc
-          - scheduler
+          - rt_multi_thread
+          - sync_mpsc
+          - sync_rwlock
+          - sync_semaphore
     steps:
       - uses: actions/checkout@v2
       - name: Install Rust
