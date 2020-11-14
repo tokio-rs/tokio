@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1605313131972,
+  "lastUpdate": 1605313149169,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "Tokio Benchmarks": [
@@ -415,6 +415,56 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 806149,
             "range": "± 9924",
+            "unit": "ns/iter"
+          }
+        ]
+      }
+    ],
+    "scheduler": [
+      {
+        "commit": {
+          "author": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "committer": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "distinct": true,
+          "id": "118b44a3fd58015855ba3033c55e2d33bdda9306",
+          "message": "tweak",
+          "timestamp": "2020-11-13T16:17:01-08:00",
+          "tree_id": "45900d207f0e889e9ee5a63fd04c178cc800df9e",
+          "url": "https://github.com/tokio-rs/tokio/commit/118b44a3fd58015855ba3033c55e2d33bdda9306"
+        },
+        "date": 1605313148272,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 194509,
+            "range": "± 22671",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 716972,
+            "range": "± 56194",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5383735,
+            "range": "± 672797",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20233296,
+            "range": "± 2531341",
             "unit": "ns/iter"
           }
         ]
