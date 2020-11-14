@@ -2,7 +2,7 @@ name: Benchmark
 on:
   push:
     branches:
-      - bench-ci
+      - master
 
 jobs:
   benchmark:
