@@ -11,7 +11,7 @@ jobs:
     strategy:
       matrix:
         bench:
-          - rt_multi_thread
+          - rt_multi_threaded
           - sync_mpsc
           - sync_rwlock
           - sync_semaphore
@@ -50,6 +50,6 @@ jobs:
           # Enable alert commit comment
           comment-on-alert: true
           alert-comment-cc-users: '@tokio-rs/maintainers'
-          # auto-push: true
+          auto-push: true
 
       # Upload the updated cache file for the next job by actions/cache
