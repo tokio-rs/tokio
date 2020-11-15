@@ -109,8 +109,8 @@ type WaitList = LinkedList<Waiter, <Waiter as linked_list::Link>::Target>;
 /// [`Semaphore`]: crate::sync::Semaphore
 #[derive(Debug)]
 pub struct Notify {
-    // this uses 2 bits to store one of `EMPTY`,
-    // `WAITING` or "NOTIFIED". The rest of the bits
+    // This uses 2 bits to store one of `EMPTY`,
+    // `WAITING` or `NOTIFIED`. The rest of the bits
     // are used to store the number of times `notify_waiters`
     // was called.
     state: AtomicUsize,
@@ -427,7 +427,7 @@ impl Notify {
 
             drop(waiters);
 
-            for waker in wakers.iter_mut().take(curr) {
+            for waker in wakers.iter_mut().take(curr_waker) {
                 waker.take().unwrap().wake();
             }
 
