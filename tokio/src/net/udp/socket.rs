@@ -309,8 +309,8 @@ impl UdpSocket {
 
     /// Wait for the socket to become writable.
     ///
-    /// This function is equivalent to `ready(Interest::WRITABLE)` is usually
-    /// paired with `try_send()`, or `try_send_to()`.
+    /// This function is equivalent to `ready(Interest::WRITABLE)` and is
+    /// usually paired with `try_send()` or `try_send_to()`.
     ///
     /// # Examples
     ///
@@ -352,7 +352,7 @@ impl UdpSocket {
         Ok(())
     }
 
-    /// Sends data on the socket to the remote address to which it is connected.
+    /// Sends data on the socket to the remote address that the socket is connected to.
     ///
     /// The [`connect`] method will connect this socket to a remote address.
     /// This method will fail if the socket is not connected.
@@ -470,7 +470,7 @@ impl UdpSocket {
 
     /// Wait for the socket to become readable.
     ///
-    /// This function is equivalent to `ready(Interest::READABLE)` is usually
+    /// This function is equivalent to `ready(Interest::READABLE)` and is usually
     /// paired with `try_recv()`.
     ///
     /// # Examples
@@ -659,11 +659,11 @@ impl UdpSocket {
     /// Address type can be any implementor of ToSocketAddrs trait. See its
     /// documentation for concrete examples.
     ///
-    /// It is possible for addr to yield multiple addresses, but send_to will
-    /// only send data to the first address yielded by addr.
+    /// It is possible for `addr` to yield multiple addresses, but `send_to` will
+    /// only send data to the first address yielded by `addr`.
     ///
     /// This will return an error when the IP version of the local socket does
-    /// not match that returned from ToSocketAddrs.
+    /// not match that returned from `ToSocketAddrs`.
     ///
     /// # Example
     ///

@@ -473,7 +473,7 @@ impl TcpStream {
     /// The function will attempt to write the entire contents of `buf`, but
     /// only part of the buffer may be written.
     ///
-    /// This function is usually paired with `writable()`
+    /// This function is usually paired with `writable()`.
     ///
     /// # Return
     ///
