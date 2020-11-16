@@ -374,12 +374,18 @@ impl UdpSocket {
         Ok(())
     }
 
-    /// Sends data on the socket to the remote address that the socket is connected to.
+    /// Sends data on the socket to the remote address that the socket is
+    /// connected to.
     ///
     /// The [`connect`] method will connect this socket to a remote address.
     /// This method will fail if the socket is not connected.
     ///
     /// [`connect`]: method@Self::connect
+    ///
+    /// # Return
+    ///
+    /// On success, the number of bytes sent is returned, otherwise, the
+    /// encountered error is returned.
     ///
     /// # Examples
     ///
@@ -679,14 +685,16 @@ impl UdpSocket {
     /// Sends data on the socket to the given address. On success, returns the
     /// number of bytes written.
     ///
-    /// Address type can be any implementor of ToSocketAddrs trait. See its
+    /// Address type can be any implementor of [`ToSocketAddrs`] trait. See its
     /// documentation for concrete examples.
     ///
-    /// It is possible for `addr` to yield multiple addresses, but `send_to` will
-    /// only send data to the first address yielded by `addr`.
+    /// It is possible for `addr` to yield multiple addresses, but `send_to`
+    /// will only send data to the first address yielded by `addr`.
     ///
     /// This will return an error when the IP version of the local socket does
-    /// not match that returned from `ToSocketAddrs`.
+    /// not match that returned from [`ToSocketAddrs`].
+    ///
+    /// [`ToSocketAddrs`]: crate::net::ToSocketAddrs
     ///
     /// # Example
     ///
