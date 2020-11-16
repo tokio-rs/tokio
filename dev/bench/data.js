@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1605559909188,
+  "lastUpdate": 1605570349421,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -511,6 +511,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21143658,
             "range": "± 1850531",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0ea23076503c5151d68a781a3d91823396c82949",
+          "message": "net: add UdpSocket readiness and non-blocking ops (#3138)\n\nAdds `ready()`, `readable()`, and `writable()` async methods for waiting\r\nfor socket readiness. Adds `try_send`, `try_send_to`, `try_recv`, and\r\n`try_recv_from` for performing non-blocking operations on the socket.\r\n\r\nThis is the UDP equivalent of #3130.",
+          "timestamp": "2020-11-16T15:44:01-08:00",
+          "tree_id": "1e49d7dc0bb3cee6271133d942ba49c5971fde29",
+          "url": "https://github.com/tokio-rs/tokio/commit/0ea23076503c5151d68a781a3d91823396c82949"
+        },
+        "date": 1605570348602,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 179160,
+            "range": "± 73737",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 618494,
+            "range": "± 150449",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4766918,
+            "range": "± 1107083",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19012569,
+            "range": "± 4448367",
             "unit": "ns/iter"
           }
         ]
