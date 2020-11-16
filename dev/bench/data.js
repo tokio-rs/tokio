@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1605549208372,
+  "lastUpdate": 1605558646864,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -307,6 +307,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18946145,
             "range": "± 2027569",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "eliza@buoyant.io",
+            "name": "Eliza Weisman",
+            "username": "hawkw"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f5cb4c20422a35b51bfba3391744f8bcb54f7581",
+          "message": "net: Add send/recv buf size methods to `TcpSocket` (#3145)\n\nThis commit adds `set_{send, recv}_buffer_size` methods to `TcpSocket`\r\nfor setting the size of the TCP send and receive buffers, and `{send,\r\nrecv}_buffer_size` methods for returning the current value. These just\r\ncall into similar methods on `mio`'s `TcpSocket` type, which were added\r\nin tokio-rs/mio#1384.\r\n\r\nRefs: #3082\r\n\r\nSigned-off-by: Eliza Weisman <eliza@buoyant.io>",
+          "timestamp": "2020-11-16T12:29:03-08:00",
+          "tree_id": "fcf642984a21d04533efad0cdde613d294635c4d",
+          "url": "https://github.com/tokio-rs/tokio/commit/f5cb4c20422a35b51bfba3391744f8bcb54f7581"
+        },
+        "date": 1605558645947,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 191217,
+            "range": "± 14072",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 710720,
+            "range": "± 43091",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5226983,
+            "range": "± 533736",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19521931,
+            "range": "± 2271038",
             "unit": "ns/iter"
           }
         ]
