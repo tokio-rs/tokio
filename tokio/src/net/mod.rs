@@ -33,7 +33,7 @@ cfg_net! {
 
     pub mod tcp;
     pub use tcp::listener::TcpListener;
-    pub use tcp::socket::TcpSocket;
+    pub use tcp::socket::{TcpSocket, TcpKeepalive};
     pub use tcp::stream::TcpStream;
 
     pub mod udp;

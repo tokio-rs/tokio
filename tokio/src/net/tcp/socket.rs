@@ -3,6 +3,7 @@ use crate::net::{TcpListener, TcpStream};
 use std::fmt;
 use std::io;
 use std::net::SocketAddr;
+use std::time::Duration;
 
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
@@ -84,6 +85,11 @@ cfg_net! {
     pub struct TcpSocket {
         inner: mio::net::TcpSocket,
     }
+}
+
+cfg_net! {
+    #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
+    pub use mio::net::TcpKeepalive;
 }
 
 impl TcpSocket {
@@ -351,13 +357,188 @@ impl TcpSocket {
     /// Sets whether keepalive messages are enabled to be sent on this socket.
     ///
     /// This will set the `SO_KEEPALIVE` option on this socket.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpSocket;
+    ///
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let addr = "127.0.0.1:8080".parse().unwrap();
+    ///
+    ///     let socket = TcpSocket::new_v4()?;
+    ///     socket.set_keepalive(true)?;
+    ///     assert!(socket.keepalive().unwrap());
+    ///     socket.bind(addr)?;
+    ///
+    ///     let listener = socket.listen(1024)?;
+    ///     Ok(())
+    /// }
+    /// ```
     pub fn set_keepalive(&self, keepalive: bool) -> io::Result<()> {
         self.inner.set_keepalive(keepalive)
     }
 
     /// Returns whether or not TCP keepalive probes will be sent by this socket.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpSocket;
+    ///
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let addr = "127.0.0.1:8080".parse().unwrap();
+    ///
+    ///     let socket = TcpSocket::new_v4()?;
+    ///     socket.set_keepalive(true)?;
+    ///     socket.bind(addr)?;
+    ///
+    ///     let listener = socket.listen(1024)?;
+    ///     Ok(())
+    /// }
+    /// ```
     pub fn keepalive(&self) -> io::Result<bool> {
         self.inner.get_keepalive()
+    }
+
+    /// Sets parameters configuring TCP keepalive probes for this socket.
+    ///
+    /// The supported parameters depend on the operating system, and are
+    /// configured using the [`TcpKeepalive`] struct. At a minimum, all systems
+    /// support configuring the [keepalive time]: the time after which the OS
+    /// will start sending keepalive messages on an idle connection.
+    ///
+    /// # Notes
+    ///
+    /// * This will enable TCP keepalive on this socket, if it is not already
+    ///   enabled.
+    /// * On some platforms, such as Windows, any keepalive parameters *not*
+    ///   configured by the `TcpKeepalive` struct passed to this function may be
+    ///   overwritten with their default values. Therefore, this function should
+    ///   either only be called once per socket, or the same parameters should
+    ///   be passed every time it is called.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::{TcpSocket, TcpKeepalive};
+    /// use std::time::Duration;
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let addr = "127.0.0.1:8080".parse().unwrap();
+    ///
+    ///     let socket = TcpSocket::new_v4()?;
+    ///     let keepalive = TcpKeepalive::default()
+    ///         .with_time(Duration::from_secs(4));
+    ///         // Depending on the target operating system, we may also be able to
+    ///         // configure the keepalive probe interval and/or the number of retries
+    ///         // here as well.
+    ///
+    ///     socket.set_keepalive_params(keepalive)?;
+    ///     socket.bind(addr)?;
+    ///
+    ///     let listener = socket.listen(1024)?;
+    ///     Ok(())
+    /// }
+    /// # #[tokio::main] async fn main() -> Result<(), std::io::Error> {
+    /// let socket = TcpSocket::new_v6()?;
+
+    ///
+    /// socket.set_keepalive_params(keepalive)?;
+    /// # Ok(()) }
+    /// ```
+    ///
+    /// [`TcpKeepalive`]: TcpKeepalive
+    /// [keepalive time]: TcpKeepalive::with_time
+    pub fn set_keepalive_params(&self, keepalive: TcpKeepalive) -> io::Result<()> {
+        self.inner.set_keepalive_params(keepalive)
+    }
+
+    /// Returns the amount of time after which TCP keepalive probes will be sent
+    /// on idle connections.
+    ///
+    /// If `None`, then keepalive messages are disabled.
+    ///
+    /// This returns the value of `SO_KEEPALIVE` + `IPPROTO_TCP` on OpenBSD,
+    /// NetBSD, and Haiku, `TCP_KEEPALIVE` on macOS and iOS, and `TCP_KEEPIDLE`
+    /// on all other Unix operating systems. On Windows, it is not possible to
+    /// access the value of TCP keepalive parameters after they have been set.
+    ///
+    /// Some platforms specify this value in seconds, so sub-second
+    /// specifications may be omitted.
+    #[cfg_attr(docsrs, doc(cfg(not(target_os = "windows"))))]
+    #[cfg(not(target_os = "windows"))]
+    pub fn keepalive_time(&self) -> io::Result<Option<Duration>> {
+        self.inner.get_keepalive_time()
+    }
+
+    /// Returns the time interval between TCP keepalive probes, if TCP keepalive is
+    /// enabled on this socket.
+    ///
+    /// If `None`, then keepalive messages are disabled.
+    ///
+    /// This returns the value of `TCP_KEEPINTVL` on supported Unix operating
+    /// systems. On Windows, it is not possible to access the value of TCP
+    /// keepalive parameters after they have been set..
+    ///
+    /// Some platforms specify this value in seconds, so sub-second
+    /// specifications may be omitted.
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(any(
+            target_os = "linux",
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "freebsd",
+            target_os = "netbsd",
+        )))
+    )]
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "ios",
+        target_os = "freebsd",
+        target_os = "netbsd",
+    ))]
+    pub fn keepalive_interval(&self) -> io::Result<Option<Duration>> {
+        self.inner.get_keepalive_interval()
+    }
+
+    /// Returns the maximum number of TCP keepalive probes that will be sent before
+    /// dropping a connection, if TCP keepalive is enabled on this socket.
+    ///
+    /// If `None`, then keepalive messages are disabled.
+    ///
+    /// This returns the value of `TCP_KEEPCNT` on Unix operating systems that
+    /// support this option. On Windows, it is not possible to access the value
+    /// of TCP keepalive parameters after they have been set.
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(any(
+            target_os = "linux",
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "freebsd",
+            target_os = "netbsd",
+        )))
+    )]
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "ios",
+        target_os = "freebsd",
+        target_os = "netbsd",
+    ))]
+    pub fn keepalive_retries(&self) -> io::Result<Option<u32>> {
+        self.inner.get_keepalive_retries()
     }
 
     /// Get the local address of this socket.
