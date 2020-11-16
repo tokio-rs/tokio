@@ -356,45 +356,13 @@ impl TcpStream {
         Ok(())
     }
 
-    /// Check the TCP stream's read readiness state.
+    /// Polls for read readiness.
     ///
-    /// The mask argument allows specifying what readiness to notify on. This
-    /// can be any value, including platform specific readiness, **except**
-    /// `writable`. HUP is always implicitly included on platforms that support
-    /// it.
+    /// This function is intended for cases where creating and pinning a future
+    /// via [`readable`] is not feasible. Where possible, using [`readable`] is
+    /// preferred, as this supports polling from multiple tasks at once.
     ///
-    /// If the stream is not ready for a read then `Poll::Pending` is returned
-    /// and the current task is notified once a new event is received.
-    ///
-    /// The stream will remain in a read-ready state until calls to
-    /// `poll_read` return `Poll::Pending`.
-    ///
-    /// # Panics
-    ///
-    /// This function panics if:
-    ///
-    /// * `ready` includes writable.
-    /// * called from outside of a task context.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::io;
-    /// use tokio::net::TcpStream;
-    ///
-    /// use futures::future::poll_fn;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> io::Result<()> {
-    ///     let stream = TcpStream::connect("127.0.0.:8080").await?;
-    ///
-    ///     poll_fn(|cx| {
-    ///         stream.poll_read_ready(cx)
-    ///     }).await?;
-    ///
-    ///     Ok(())
-    /// }
-    /// ```
+    /// [`readable`]: method@Self::readable
     pub fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.io.registration().poll_read_ready(cx).map_ok(|_| ())
     }
@@ -510,40 +478,13 @@ impl TcpStream {
         Ok(())
     }
 
-    /// Check the TCP stream's write readiness state.
+    /// Polls for write readiness.
     ///
-    /// This always checks for writable readiness and also checks for HUP
-    /// readiness on platforms that support it.
+    /// This function is intended for cases where creating and pinning a future
+    /// via [`writable`] is not feasible. Where possible, using [`writable`] is
+    /// preferred, as this supports polling from multiple tasks at once.
     ///
-    /// If the stream is not ready for a write then `Poll::Pending` is returned
-    /// and the current task is notified once a new event is received.
-    ///
-    /// The stream will remain in a write-ready state until calls to
-    /// `poll_write` return `Poll::Pending`.
-    ///
-    /// # Panics
-    ///
-    /// This function panics if called from outside of a task context.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::io;
-    /// use tokio::net::TcpStream;
-    ///
-    /// use futures::future::poll_fn;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> io::Result<()> {
-    ///     let stream = TcpStream::connect("127.0.0.:8080").await?;
-    ///
-    ///     poll_fn(|cx| {
-    ///         stream.poll_write_ready(cx)
-    ///     }).await?;
-    ///
-    ///     Ok(())
-    /// }
-    /// ```
+    /// [`writable`]: method@Self::writable
     pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.io.registration().poll_write_ready(cx).map_ok(|_| ())
     }
