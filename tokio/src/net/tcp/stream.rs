@@ -356,6 +356,17 @@ impl TcpStream {
         Ok(())
     }
 
+    /// Polls for read readiness.
+    ///
+    /// This function is intended for cases where creating and pinning a future
+    /// via [`readable`] is not feasible. Where possible, using [`readable`] is
+    /// preferred, as this supports polling from multiple tasks at once.
+    ///
+    /// [`readable`]: method@Self::readable
+    pub fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.io.registration().poll_read_ready(cx).map_ok(|_| ())
+    }
+
     /// Try to read data from the stream into the provided buffer, returning how
     /// many bytes were read.
     ///
@@ -465,6 +476,17 @@ impl TcpStream {
     pub async fn writable(&self) -> io::Result<()> {
         self.ready(Interest::WRITABLE).await?;
         Ok(())
+    }
+
+    /// Polls for write readiness.
+    ///
+    /// This function is intended for cases where creating and pinning a future
+    /// via [`writable`] is not feasible. Where possible, using [`writable`] is
+    /// preferred, as this supports polling from multiple tasks at once.
+    ///
+    /// [`writable`]: method@Self::writable
+    pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.io.registration().poll_write_ready(cx).map_ok(|_| ())
     }
 
     /// Try to write a buffer to the stream, returning how many bytes were
