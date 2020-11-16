@@ -732,12 +732,12 @@ impl TcpStream {
     fn to_mio(&self) -> mio::net::TcpSocket {
         #[cfg(windows)]
         {
-            return unsafe { mio::net::TcpSocket::from_raw_socket(self.as_raw_socket()) };
+           unsafe { mio::net::TcpSocket::from_raw_socket(self.as_raw_socket()) }
         }
 
         #[cfg(unix)]
         {
-            return unsafe { mio::net::TcpSocket::from_raw_fd(self.as_raw_fd()) };
+            unsafe { mio::net::TcpSocket::from_raw_fd(self.as_raw_fd()) }
         }
     }
 
