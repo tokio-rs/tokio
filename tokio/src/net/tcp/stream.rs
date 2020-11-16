@@ -8,6 +8,11 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::net::{Shutdown, SocketAddr};
+#[cfg(windows)]
+use std::os::windows::io::{AsRawSocket, FromRawSocket};
+
+#[cfg(unix)]
+use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -685,7 +690,7 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn linger(&self) -> io::Result<Option<Duration>> {
-        let mio_socket = mio::net::TcpSocket::from(self);
+        let mio_socket = self.to_mio();
 
         let result = mio_socket.get_linger();
 
@@ -716,12 +721,24 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
-        let mio_socket = mio::net::TcpSocket::from(self);
+        let mio_socket = self.to_mio();
 
         let result = mio_socket.set_linger(dur);
 
         std::mem::forget(mio_socket);
         result
+    }
+
+    fn to_mio(&self) -> mio::net::TcpSocket {
+        #[cfg(windows)]
+        {
+            return unsafe { mio::net::TcpSocket::from_raw_socket(self.as_raw_socket()) };
+        }
+
+        #[cfg(unix)]
+        {
+            return unsafe { mio::net::TcpSocket::from_raw_fd(self.as_raw_fd()) };
+        }
     }
 
     /// Gets the value of the `IP_TTL` option for this socket.
@@ -886,12 +903,6 @@ mod sys {
             self.io.as_raw_fd()
         }
     }
-
-    impl From<&TcpStream> for mio::net::TcpSocket {
-        fn from(stream: &TcpStream) -> Self {
-            unsafe { mio::net::TcpSocket::from_raw_fd(stream.as_raw_fd()) }
-        }
-    }
 }
 
 #[cfg(windows)]
@@ -902,12 +913,6 @@ mod sys {
     impl AsRawSocket for TcpStream {
         fn as_raw_socket(&self) -> RawSocket {
             self.io.as_raw_socket()
-        }
-    }
-
-    impl From<&TcpStream> for mio::net::TcpSocket {
-        fn from(stream: &TcpStream) -> Self {
-            unsafe { mio::net::TcpSocket::from_raw_socket(stream.as_raw_socket()) }
         }
     }
 }
