@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1605559891175,
+  "lastUpdate": 1605559897154,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -409,6 +409,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19521931,
             "range": "± 2271038",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "zaharidichev@gmail.com",
+            "name": "Zahari Dichev",
+            "username": "zaharidichev"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d0ebb4154748166a4ba07baa4b424a1c45efd219",
+          "message": "sync: add `Notify::notify_waiters` (#3098)\n\nThis PR makes `Notify::notify_waiters` public. The method\r\nalready exists, but it changes the way `notify_waiters`,\r\nis used. Previously in order for the consumer to\r\nregister interest, in a notification triggered by\r\n`notify_waiters`, the `Notified` future had to be\r\npolled. This introduced friction when using the api\r\nas the future had to be pinned before polled.\r\n\r\nThis change introduces a counter that tracks how many\r\ntimes `notified_waiters` has been called. Upon creation of\r\nthe future the number of times is loaded. When first\r\npolled the future compares this number with the count\r\nstate of the `Notify` type. This avoids the need for\r\nregistering the waiter upfront.\r\n\r\nFixes: #3066",
+          "timestamp": "2020-11-16T12:49:35-08:00",
+          "tree_id": "5ea4d611256290f62baea1a9ffa3333b254181df",
+          "url": "https://github.com/tokio-rs/tokio/commit/d0ebb4154748166a4ba07baa4b424a1c45efd219"
+        },
+        "date": 1605559892943,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 191688,
+            "range": "± 39550",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 724625,
+            "range": "± 52874",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5279089,
+            "range": "± 569953",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21143658,
+            "range": "± 1850531",
             "unit": "ns/iter"
           }
         ]
