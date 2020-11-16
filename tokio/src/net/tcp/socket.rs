@@ -448,12 +448,6 @@ impl TcpSocket {
     ///     let listener = socket.listen(1024)?;
     ///     Ok(())
     /// }
-    /// # #[tokio::main] async fn main() -> Result<(), std::io::Error> {
-    /// let socket = TcpSocket::new_v6()?;
-
-    ///
-    /// socket.set_keepalive_params(keepalive)?;
-    /// # Ok(()) }
     /// ```
     ///
     /// [`TcpKeepalive`]: TcpKeepalive
