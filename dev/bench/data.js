@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1605570357901,
+  "lastUpdate": 1605570394809,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -1361,6 +1361,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 630049,
             "range": "± 83042",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0ea23076503c5151d68a781a3d91823396c82949",
+          "message": "net: add UdpSocket readiness and non-blocking ops (#3138)\n\nAdds `ready()`, `readable()`, and `writable()` async methods for waiting\r\nfor socket readiness. Adds `try_send`, `try_send_to`, `try_recv`, and\r\n`try_recv_from` for performing non-blocking operations on the socket.\r\n\r\nThis is the UDP equivalent of #3130.",
+          "timestamp": "2020-11-16T15:44:01-08:00",
+          "tree_id": "1e49d7dc0bb3cee6271133d942ba49c5971fde29",
+          "url": "https://github.com/tokio-rs/tokio/commit/0ea23076503c5151d68a781a3d91823396c82949"
+        },
+        "date": 1605570390864,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 7194053,
+            "range": "± 2331201",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6928458,
+            "range": "± 1519084",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6464793,
+            "range": "± 2430089",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 923,
+            "range": "± 46",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 911,
+            "range": "± 102",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 920,
+            "range": "± 100",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 66036,
+            "range": "± 6878",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1092,
+            "range": "± 97",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1172665,
+            "range": "± 151747",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 792689,
+            "range": "± 98126",
             "unit": "ns/iter"
           }
         ]
