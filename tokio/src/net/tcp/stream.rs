@@ -385,7 +385,7 @@ impl TcpStream {
     /// If data is successfully read, `Ok(n)` is returned, where `n` is the
     /// number of bytes read. `Ok(n)` indicates the stream's read half is closed
     /// and will no longer yield data. If the stream is not ready to read data
-    /// `Err(io::ErrorKinid::WouldBlock)` is returned.
+    /// `Err(io::ErrorKind::WouldBlock)` is returned.
     ///
     /// # Examples
     ///
@@ -495,8 +495,7 @@ impl TcpStream {
     /// The function will attempt to write the entire contents of `buf`, but
     /// only part of the buffer may be written.
     ///
-    /// This function is equivalent to `ready(Interest::WRITABLE)` is usually
-    /// paired with `try_write()`.
+    /// This function is usually paired with `writable()`.
     ///
     /// # Return
     ///
