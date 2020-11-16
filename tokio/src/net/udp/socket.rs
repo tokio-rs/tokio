@@ -268,6 +268,10 @@ impl UdpSocket {
     /// can be used to concurrently recv / send to the same socket on a single
     /// task without splitting the socket.
     ///
+    /// The function may complete without the socket being ready. This is a
+    /// false-positive and attempting an operation will return with
+    /// `io::ErrorKind::WouldBlock`.
+    ///
     /// # Examples
     ///
     /// Concurrently receive from and send to the socket on the same task
@@ -289,14 +293,30 @@ impl UdpSocket {
     ///             // The buffer is **not** included in the async task and will only exist
     ///             // on the stack.
     ///             let mut data = [0; 1024];
-    ///             let n = socket.try_recv(&mut data[..]).unwrap();
-    ///
-    ///             println!("GOT {:?}", &data[..n]);
+    ///             match socket.try_recv(&mut data[..]) {
+    ///                 Ok(n) => {
+    ///                     println!("received {:?}", &data[..n]);
+    ///                 }
+    ///                 // False-positive, continue
+    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
+    ///                 Err(e) => {
+    ///                     return Err(e);
+    ///                 }
+    ///             }
     ///         }
     ///
     ///         if ready.is_writable() {
     ///             // Write some data
-    ///             socket.try_send(b"hello world").unwrap();
+    ///             match socket.try_send(b"hello world") {
+    ///                 Ok(n) => {
+    ///                     println!("sent {} bytes", n);
+    ///                 }
+    ///                 // False-positive, continue
+    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
+    ///                 Err(e) => {
+    ///                     return Err(e);
+    ///                 }
+    ///             }
     ///         }
     ///     }
     /// }
@@ -310,6 +330,10 @@ impl UdpSocket {
     ///
     /// This function is equivalent to `ready(Interest::WRITABLE)` and is
     /// usually paired with `try_send()` or `try_send_to()`.
+    ///
+    /// The function may complete without the socket being writable. This is a
+    /// false-positive and attempting a `try_send()` will return with
+    /// `io::ErrorKind::WouldBlock`.
     ///
     /// # Examples
     ///
@@ -469,6 +493,10 @@ impl UdpSocket {
     ///
     /// This function is equivalent to `ready(Interest::READABLE)` and is usually
     /// paired with `try_recv()`.
+    ///
+    /// The function may complete without the socket being readable. This is a
+    /// false-positive and attempting a `try_recv()` will return with
+    /// `io::ErrorKind::WouldBlock`.
     ///
     /// # Examples
     ///
