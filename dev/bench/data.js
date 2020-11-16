@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1605570349421,
+  "lastUpdate": 1605570354526,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -269,6 +269,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 568,
             "range": "± 131",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0ea23076503c5151d68a781a3d91823396c82949",
+          "message": "net: add UdpSocket readiness and non-blocking ops (#3138)\n\nAdds `ready()`, `readable()`, and `writable()` async methods for waiting\r\nfor socket readiness. Adds `try_send`, `try_send_to`, `try_recv`, and\r\n`try_recv_from` for performing non-blocking operations on the socket.\r\n\r\nThis is the UDP equivalent of #3130.",
+          "timestamp": "2020-11-16T15:44:01-08:00",
+          "tree_id": "1e49d7dc0bb3cee6271133d942ba49c5971fde29",
+          "url": "https://github.com/tokio-rs/tokio/commit/0ea23076503c5151d68a781a3d91823396c82949"
+        },
+        "date": 1605570348676,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1005,
+            "range": "± 37",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 13752,
+            "range": "± 3698",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 927,
+            "range": "± 136",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 13180,
+            "range": "± 3450",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 541,
+            "range": "± 63",
             "unit": "ns/iter"
           }
         ]
