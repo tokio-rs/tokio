@@ -280,6 +280,74 @@ impl TcpSocket {
         self.inner.get_reuseport()
     }
 
+    /// Sets the size of the TCP send buffer on this socket.
+    ///
+    /// On most operating systems, this sets the `SO_SNDBUF` socket option.
+    pub fn set_send_buffer_size(&self, size: u32) -> io::Result<()> {
+        self.inner.set_send_buffer_size(size)
+    }
+
+    /// Returns the size of the TCP send buffer for this socket.
+    ///
+    /// On most operating systems, this is the value of the `SO_SNDBUF` socket
+    /// option.
+    ///
+    /// Note that if [`set_send_buffer_size`] has been called on this socket
+    /// previously, the value returned by this function may not be the same as
+    /// the argument provided to `set_send_buffer_size`. This is for the
+    /// following reasons:
+    ///
+    /// * Most operating systems have minimum and maximum allowed sizes for the
+    ///   send buffer, and will clamp the provided value if it is below the
+    ///   minimum or above the maximum. The minimum and maximum buffer sizes are
+    ///   OS-dependent.
+    /// * Linux will double the buffer size to account for internal bookkeeping
+    ///   data, and returns the doubled value from `getsockopt(2)`. As per `man
+    ///   7 socket`:
+    ///   > Sets or gets the maximum socket send buffer in bytes. The
+    ///   > kernel doubles this value (to allow space for bookkeeping
+    ///   > overhead) when it is set using `setsockopt(2)`, and this doubled
+    ///   > value is returned by `getsockopt(2)`.
+    ///
+    /// [`set_send_buffer_size`]: #method.set_send_buffer_size
+    pub fn send_buffer_size(&self) -> io::Result<u32> {
+        self.inner.get_send_buffer_size()
+    }
+
+    /// Sets the size of the TCP receive buffer on this socket.
+    ///
+    /// On most operating systems, this sets the `SO_RCVBUF` socket option.
+    pub fn set_recv_buffer_size(&self, size: u32) -> io::Result<()> {
+        self.inner.set_recv_buffer_size(size)
+    }
+
+    /// Returns the size of the TCP receive buffer for this socket.
+    ///
+    /// On most operating systems, this is the value of the `SO_RCVBUF` socket
+    /// option.
+    ///
+    /// Note that if [`set_recv_buffer_size`] has been called on this socket
+    /// previously, the value returned by this function may not be the same as
+    /// the argument provided to `set_send_buffer_size`. This is for the
+    /// following reasons:
+    ///
+    /// * Most operating systems have minimum and maximum allowed sizes for the
+    ///   receive buffer, and will clamp the provided value if it is below the
+    ///   minimum or above the maximum. The minimum and maximum buffer sizes are
+    ///   OS-dependent.
+    /// * Linux will double the buffer size to account for internal bookkeeping
+    ///   data, and returns the doubled value from `getsockopt(2)`. As per `man
+    ///   7 socket`:
+    ///   > Sets or gets the maximum socket send buffer in bytes. The
+    ///   > kernel doubles this value (to allow space for bookkeeping
+    ///   > overhead) when it is set using `setsockopt(2)`, and this doubled
+    ///   > value is returned by `getsockopt(2)`.
+    ///
+    /// [`set_recv_buffer_size`]: #method.set_recv_buffer_size
+    pub fn recv_buffer_size(&self) -> io::Result<u32> {
+        self.inner.get_recv_buffer_size()
+    }
+
     /// Get the local address of this socket.
     ///
     /// Will fail on windows if called before `bind`.
