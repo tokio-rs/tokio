@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1605549196343,
+  "lastUpdate": 1605549204789,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -259,6 +259,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19949182,
             "range": "± 3024767",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "masnagam@gmail.com",
+            "name": "masnagam",
+            "username": "masnagam"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4e39c9b818eb8af064bb9f45f47e3cfc6593de95",
+          "message": "net: restore TcpStream::{poll_read_ready, poll_write_ready} (#2743)",
+          "timestamp": "2020-11-16T09:51:06-08:00",
+          "tree_id": "2222dd2f8638fb64f228badef84814d2f4079a82",
+          "url": "https://github.com/tokio-rs/tokio/commit/4e39c9b818eb8af064bb9f45f47e3cfc6593de95"
+        },
+        "date": 1605549203912,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 182327,
+            "range": "± 35912",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 649727,
+            "range": "± 102719",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4047012,
+            "range": "± 839128",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18946145,
+            "range": "± 2027569",
             "unit": "ns/iter"
           }
         ]
