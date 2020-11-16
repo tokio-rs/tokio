@@ -274,12 +274,11 @@ impl UdpSocket {
     /// without splitting.
     ///
     /// ```no_run
-    /// use tokio::io::Interest;
+    /// use tokio::io::{self, Interest};
     /// use tokio::net::UdpSocket;
-    /// use std::error::Error;
     ///
     /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
+    /// async fn main() -> io::Result<()> {
     ///     let socket = UdpSocket::bind("127.0.0.1:8080").await?;
     ///     socket.connect("127.0.0.1:8081").await?;
     ///
@@ -317,10 +316,9 @@ impl UdpSocket {
     /// ```no_run
     /// use tokio::net::UdpSocket;
     /// use std::io;
-    /// use std::error::Error;
     ///
     /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
+    /// async fn main() -> io::Result<()> {
     ///     // Bind socket
     ///     let socket = UdpSocket::bind("127.0.0.1:8080").await?;
     ///     socket.connect("127.0.0.1:8081").await?;
@@ -339,7 +337,7 @@ impl UdpSocket {
     ///                 continue;
     ///             }
     ///             Err(e) => {
-    ///                 return Err(e.into());
+    ///                 return Err(e);
     ///             }
     ///         }
     ///     }
@@ -362,11 +360,11 @@ impl UdpSocket {
     /// # Examples
     ///
     /// ```no_run
+    /// use tokio::io;
     /// use tokio::net::UdpSocket;
-    /// use std::error::Error;
     ///
     /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
+    /// async fn main() -> io::Result<()> {
     ///     // Bind socket
     ///     let socket = UdpSocket::bind("127.0.0.1:8080").await?;
     ///     socket.connect("127.0.0.1:8081").await?;
@@ -429,11 +427,10 @@ impl UdpSocket {
     ///
     /// ```no_run
     /// use tokio::net::UdpSocket;
-    /// use std::error::Error;
     /// use std::io;
     ///
     /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
+    /// async fn main() -> io::Result<()> {
     ///     // Bind a UDP socket
     ///     let socket = UdpSocket::bind("127.0.0.1:8080").await?;
     ///
@@ -454,7 +451,7 @@ impl UdpSocket {
     ///                 continue;
     ///             }
     ///             Err(e) => {
-    ///                 return Err(e.into());
+    ///                 return Err(e);
     ///             }
     ///         }
     ///     }
@@ -477,11 +474,10 @@ impl UdpSocket {
     ///
     /// ```no_run
     /// use tokio::net::UdpSocket;
-    /// use std::error::Error;
     /// use std::io;
     ///
     /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
+    /// async fn main() -> io::Result<()> {
     ///     // Connect to a peer
     ///     let socket = UdpSocket::bind("127.0.0.1:8080").await?;
     ///     socket.connect("127.0.0.1:8081").await?;
@@ -505,7 +501,7 @@ impl UdpSocket {
     ///                 continue;
     ///             }
     ///             Err(e) => {
-    ///                 return Err(e.into());
+    ///                 return Err(e);
     ///             }
     ///         }
     ///     }
@@ -532,10 +528,10 @@ impl UdpSocket {
     ///
     /// ```no_run
     /// use tokio::net::UdpSocket;
-    /// use std::error::Error;
+    /// use std::io;
     ///
     /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
+    /// async fn main() -> io::Result<()> {
     ///     // Bind socket
     ///     let socket = UdpSocket::bind("127.0.0.1:8080").await?;
     ///     socket.connect("127.0.0.1:8081").await?;
@@ -611,11 +607,10 @@ impl UdpSocket {
     ///
     /// ```no_run
     /// use tokio::net::UdpSocket;
-    /// use std::error::Error;
     /// use std::io;
     ///
     /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
+    /// async fn main() -> io::Result<()> {
     ///     // Connect to a peer
     ///     let socket = UdpSocket::bind("127.0.0.1:8080").await?;
     ///     socket.connect("127.0.0.1:8081").await?;
@@ -639,7 +634,7 @@ impl UdpSocket {
     ///                 continue;
     ///             }
     ///             Err(e) => {
-    ///                 return Err(e.into());
+    ///                 return Err(e);
     ///             }
     ///         }
     ///     }
@@ -669,10 +664,10 @@ impl UdpSocket {
     ///
     /// ```no_run
     /// use tokio::net::UdpSocket;
-    /// use std::error::Error;
+    /// use std::io;
     ///
     /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
+    /// async fn main() -> io::Result<()> {
     ///     let socket = UdpSocket::bind("127.0.0.1:8080").await?;
     ///     let len = socket.send_to(b"hello world", "127.0.0.1:8081").await?;
     ///
@@ -792,10 +787,10 @@ impl UdpSocket {
     ///
     /// ```no_run
     /// use tokio::net::UdpSocket;
-    /// use std::error::Error;
+    /// use std::io;
     ///
     /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
+    /// async fn main() -> io::Result<()> {
     ///     let socket = UdpSocket::bind("127.0.0.1:8080").await?;
     ///
     ///     let mut buf = vec![0u8; 32];
@@ -866,11 +861,10 @@ impl UdpSocket {
     ///
     /// ```no_run
     /// use tokio::net::UdpSocket;
-    /// use std::error::Error;
     /// use std::io;
     ///
     /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
+    /// async fn main() -> io::Result<()> {
     ///     // Connect to a peer
     ///     let socket = UdpSocket::bind("127.0.0.1:8080").await?;
     ///     socket.connect("127.0.0.1:8081").await?;
@@ -894,7 +888,7 @@ impl UdpSocket {
     ///                 continue;
     ///             }
     ///             Err(e) => {
-    ///                 return Err(e.into());
+    ///                 return Err(e);
     ///             }
     ///         }
     ///     }
@@ -924,10 +918,10 @@ impl UdpSocket {
     ///
     /// ```no_run
     /// use tokio::net::UdpSocket;
-    /// use std::error::Error;
+    /// use std::io;
     ///
     /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
+    /// async fn main() -> io::Result<()> {
     ///     let socket = UdpSocket::bind("127.0.0.1:8080").await?;
     ///
     ///     let mut buf = vec![0u8; 32];
@@ -1159,20 +1153,20 @@ impl UdpSocket {
     ///
     /// # Examples
     /// ```
-    /// # use std::error::Error;
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn Error>> {
     /// use tokio::net::UdpSocket;
+    /// use std::io;
     ///
-    /// // Create a socket
-    /// let socket = UdpSocket::bind("0.0.0.0:8080").await?;
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     // Create a socket
+    ///     let socket = UdpSocket::bind("0.0.0.0:8080").await?;
     ///
-    /// if let Ok(Some(err)) = socket.take_error() {
-    ///     println!("Got error: {:?}", err);
+    ///     if let Ok(Some(err)) = socket.take_error() {
+    ///         println!("Got error: {:?}", err);
+    ///     }
+    ///
+    ///     Ok(())
     /// }
-    ///
-    /// # Ok(())
-    /// # }
     /// ```
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
         self.io.take_error()
