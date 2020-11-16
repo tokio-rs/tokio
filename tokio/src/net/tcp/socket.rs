@@ -348,6 +348,18 @@ impl TcpSocket {
         self.inner.get_recv_buffer_size()
     }
 
+    /// Sets whether keepalive messages are enabled to be sent on this socket.
+    ///
+    /// This will set the `SO_KEEPALIVE` option on this socket.
+    pub fn set_keepalive(&self, keepalive: bool) -> io::Result<()> {
+        self.inner.set_keepalive(keepalive)
+    }
+
+    /// Returns whether or not TCP keepalive probes will be sent by this socket.
+    pub fn keepalive(&self) -> io::Result<bool> {
+        self.inner.get_keepalive()
+    }
+
     /// Get the local address of this socket.
     ///
     /// Will fail on windows if called before `bind`.
