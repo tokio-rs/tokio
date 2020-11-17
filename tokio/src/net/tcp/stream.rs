@@ -690,13 +690,9 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn linger(&self) -> io::Result<Option<Duration>> {
-        let mio_socket = self.to_mio();
+        let mio_socket = std::mem::ManuallyDrop::new(self.to_mio());
 
-        let result = mio_socket.get_linger();
-
-        std::mem::forget(mio_socket);
-
-        result
+        mio_socket.get_linger()
     }
 
     /// Sets the linger duration of this socket by setting the SO_LINGER option.
@@ -721,12 +717,9 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
-        let mio_socket = self.to_mio();
+        let mio_socket = std::mem::ManuallyDrop::new(self.to_mio());
 
-        let result = mio_socket.set_linger(dur);
-
-        std::mem::forget(mio_socket);
-        result
+        mio_socket.set_linger(dur)
     }
 
     fn to_mio(&self) -> mio::net::TcpSocket {
