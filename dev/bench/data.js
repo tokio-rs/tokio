@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1605636004400,
+  "lastUpdate": 1605636013136,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -667,6 +667,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19012569,
             "range": "± 4448367",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "9832640+zekisherif@users.noreply.github.com",
+            "name": "Zeki Sherif",
+            "username": "zekisherif"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7d11aa866837eea50a6f1e0ef7e24846a653cbf1",
+          "message": "net: add SO_LINGER get/set to TcpStream (#3143)",
+          "timestamp": "2020-11-17T09:58:00-08:00",
+          "tree_id": "ca0d5edc04a29bbe6e2906c760a22908e032a4c9",
+          "url": "https://github.com/tokio-rs/tokio/commit/7d11aa866837eea50a6f1e0ef7e24846a653cbf1"
+        },
+        "date": 1605636009065,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 214451,
+            "range": "± 25711",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 790044,
+            "range": "± 167979",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5645160,
+            "range": "± 704481",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 22209149,
+            "range": "± 3825346",
             "unit": "ns/iter"
           }
         ]
