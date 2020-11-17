@@ -162,7 +162,7 @@ pub trait AsyncWrite {
     /// Determines if this writer has an efficient [`poll_write_vectored`]
     /// implementation.
     ///
-    /// If a `Write`er does not override the default [`write_vectored`]
+    /// If a writer does not override the default [`poll_write_vectored`]
     /// implementation, code using it may want to avoid the method all together
     /// and coalesce writes into a single buffer for higher performance.
     ///
