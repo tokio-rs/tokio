@@ -1,4 +1,4 @@
-use crate::io::PollEvented;
+use crate::io::{Interest, PollEvented};
 use crate::net::unix::{SocketAddr, UnixStream};
 
 use std::convert::TryFrom;
@@ -68,11 +68,12 @@ impl UnixListener {
         Ok(UnixListener { io })
     }
 
-    /// Consumes a `UnixListener` in the standard library and returns a
-    /// nonblocking `UnixListener` from this crate.
+    /// Creates new `UnixListener` from a `std::os::unix::net::UnixListener `.
     ///
-    /// The returned listener will be associated with the given event loop
-    /// specified by `handle` and is ready to perform I/O.
+    /// This function is intended to be used to wrap a UnixListener from the
+    /// standard library in the Tokio equivalent. The conversion assumes
+    /// nothing about the underlying listener; it is left up to the user to set
+    /// it in non-blocking mode.
     ///
     /// # Panics
     ///
@@ -89,19 +90,20 @@ impl UnixListener {
 
     /// Returns the local socket address of this listener.
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        self.io.get_ref().local_addr().map(SocketAddr)
+        self.io.local_addr().map(SocketAddr)
     }
 
     /// Returns the value of the `SO_ERROR` option.
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
-        self.io.get_ref().take_error()
+        self.io.take_error()
     }
 
     /// Accepts a new incoming connection to this listener.
     pub async fn accept(&self) -> io::Result<(UnixStream, SocketAddr)> {
         let (mio, addr) = self
             .io
-            .async_io(mio::Interest::READABLE, |sock| sock.accept())
+            .registration()
+            .async_io(Interest::READABLE, || self.io.accept())
             .await?;
 
         let addr = SocketAddr(addr);
@@ -118,21 +120,10 @@ impl UnixListener {
     /// The caller is responsible to ensure that `poll_accept` is called from a
     /// single task. Failing to do this could result in tasks hanging.
     pub fn poll_accept(&self, cx: &mut Context<'_>) -> Poll<io::Result<(UnixStream, SocketAddr)>> {
-        loop {
-            let ev = ready!(self.io.poll_read_ready(cx))?;
-
-            match self.io.get_ref().accept() {
-                Ok((sock, addr)) => {
-                    let addr = SocketAddr(addr);
-                    let sock = UnixStream::new(sock)?;
-                    return Poll::Ready(Ok((sock, addr)));
-                }
-                Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => {
-                    self.io.clear_readiness(ev);
-                }
-                Err(err) => return Err(err).into(),
-            }
-        }
+        let (sock, addr) = ready!(self.io.registration().poll_read_io(cx, || self.io.accept()))?;
+        let addr = SocketAddr(addr);
+        let sock = UnixStream::new(sock)?;
+        Poll::Ready(Ok((sock, addr)))
     }
 }
 
@@ -160,12 +151,12 @@ impl TryFrom<std::os::unix::net::UnixListener> for UnixListener {
 
 impl fmt::Debug for UnixListener {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.io.get_ref().fmt(f)
+        self.io.fmt(f)
     }
 }
 
 impl AsRawFd for UnixListener {
     fn as_raw_fd(&self) -> RawFd {
-        self.io.get_ref().as_raw_fd()
+        self.io.as_raw_fd()
     }
 }

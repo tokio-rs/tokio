@@ -7,7 +7,7 @@ use crate::net::unix::SocketAddr;
 
 use std::convert::TryFrom;
 use std::fmt;
-use std::io::{self, Read, Write};
+use std::io;
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::os::unix::net;
@@ -39,15 +39,16 @@ impl UnixStream {
         let stream = mio::net::UnixStream::connect(path)?;
         let stream = UnixStream::new(stream)?;
 
-        poll_fn(|cx| stream.io.poll_write_ready(cx)).await?;
+        poll_fn(|cx| stream.io.registration().poll_write_ready(cx)).await?;
         Ok(stream)
     }
 
-    /// Consumes a `UnixStream` in the standard library and returns a
-    /// nonblocking `UnixStream` from this crate.
+    /// Creates new `UnixStream` from a `std::os::unix::net::UnixStream`.
     ///
-    /// The returned stream will be associated with the given event loop
-    /// specified by `handle` and is ready to perform I/O.
+    /// This function is intended to be used to wrap a UnixStream from the
+    /// standard library in the Tokio equivalent. The conversion assumes
+    /// nothing about the underlying stream; it is left up to the user to set
+    /// it in non-blocking mode.
     ///
     /// # Panics
     ///
@@ -83,12 +84,12 @@ impl UnixStream {
 
     /// Returns the socket address of the local half of this connection.
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        self.io.get_ref().local_addr().map(SocketAddr)
+        self.io.local_addr().map(SocketAddr)
     }
 
     /// Returns the socket address of the remote half of this connection.
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
-        self.io.get_ref().peer_addr().map(SocketAddr)
+        self.io.peer_addr().map(SocketAddr)
     }
 
     /// Returns effective credentials of the process which called `connect` or `pair`.
@@ -98,7 +99,7 @@ impl UnixStream {
 
     /// Returns the value of the `SO_ERROR` option.
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
-        self.io.get_ref().take_error()
+        self.io.take_error()
     }
 
     /// Shuts down the read, write, or both halves of this connection.
@@ -107,7 +108,7 @@ impl UnixStream {
     /// specified portions to immediately return with an appropriate value
     /// (see the documentation of `Shutdown`).
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
-        self.io.get_ref().shutdown(how)
+        self.io.shutdown(how)
     }
 
     // These lifetime markers also appear in the generated documentation, and make
@@ -171,6 +172,18 @@ impl AsyncWrite for UnixStream {
         self.poll_write_priv(cx, buf)
     }
 
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        self.poll_write_vectored_priv(cx, bufs)
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        true
+    }
+
     fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
         Poll::Ready(Ok(()))
     }
@@ -198,29 +211,8 @@ impl UnixStream {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        loop {
-            let ev = ready!(self.io.poll_read_ready(cx))?;
-
-            // Safety: `UnixStream::read` will not peek at the maybe uinitialized bytes.
-            let b = unsafe {
-                &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
-            };
-            match self.io.get_ref().read(b) {
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    self.io.clear_readiness(ev);
-                }
-                Ok(n) => {
-                    // Safety: We trust `UnixStream::read` to have filled up `n` bytes
-                    // in the buffer.
-                    unsafe {
-                        buf.assume_init(n);
-                    }
-                    buf.advance(n);
-                    return Poll::Ready(Ok(()));
-                }
-                Err(e) => return Poll::Ready(Err(e)),
-            }
-        }
+        // Safety: `UnixStream::read` correctly handles reads into uninitialized memory
+        unsafe { self.io.poll_read(cx, buf) }
     }
 
     pub(crate) fn poll_write_priv(
@@ -228,27 +220,26 @@ impl UnixStream {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        loop {
-            let ev = ready!(self.io.poll_write_ready(cx))?;
+        self.io.poll_write(cx, buf)
+    }
 
-            match self.io.get_ref().write(buf) {
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    self.io.clear_readiness(ev);
-                }
-                x => return Poll::Ready(x),
-            }
-        }
+    pub(super) fn poll_write_vectored_priv(
+        &self,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        self.io.poll_write_vectored(cx, bufs)
     }
 }
 
 impl fmt::Debug for UnixStream {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.io.get_ref().fmt(f)
+        self.io.fmt(f)
     }
 }
 
 impl AsRawFd for UnixStream {
     fn as_raw_fd(&self) -> RawFd {
-        self.io.get_ref().as_raw_fd()
+        self.io.as_raw_fd()
     }
 }

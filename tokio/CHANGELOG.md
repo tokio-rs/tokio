@@ -1,3 +1,50 @@
+# 0.3.4 (November 18, 2020)
+
+### Fixed
+- stream: `StreamMap` `Default` impl bound (#3093).
+- io: `AsyncFd::into_inner()` should deregister the FD (#3104).
+
+### Changed
+- meta: `parking_lot` feature enabled with `full` (#3119).
+
+### Added
+- io: `AsyncWrite` vectored writes (#3149).
+- net: TCP/UDP readiness and non-blocking ops (#3130, #2743, #3138).
+- net: TCP socket option (linger, send/recv buf size) (#3145, #3143).
+- net: PID field in `UCred` with solaris/illumos (#3085).
+- rt: `runtime::Handle` allows spawning onto a runtime (#3079).
+- sync: `Notify::notify_waiters()` (#3098).
+- sync: `acquire_many()`, `try_acquire_many()` to `Semaphore` (#3067).
+
+# 0.3.3 (November 2, 2020)
+
+Fixes a soundness hole by adding a missing `Send` bound to
+`Runtime::spawn_blocking()`.
+
+### Fixed
+- rt: include missing `Send`, fixing soundness hole (#3089).
+- tracing: avoid huge trace span names (#3074).
+
+### Added
+- net: `TcpSocket::reuseport()`, `TcpSocket::set_reuseport()` (#3083).
+- net: `TcpSocket::reuseaddr()` (#3093).
+- net: `TcpSocket::local_addr()` (#3093).
+- net: add pid to `UCred` (#2633).
+
+# 0.3.2 (October 27, 2020)
+
+Adds `AsyncFd` as a replacement for v0.2's `PollEvented`.
+
+### Fixed
+- io: fix a potential deadlock when shutting down the I/O driver (#2903).
+- sync: `RwLockWriteGuard::downgrade()` bug (#2957).
+
+### Added
+- io: `AsyncFd` for receiving readiness events on raw FDs (#2903).
+- net: `poll_*` function on `UdpSocket` (#2981).
+- net: `UdpSocket::take_error()` (#3051).
+- sync: `oneshot::Sender::poll_closed()` (#3032).
+
 # 0.3.1 (October 21, 2020)
 
 This release fixes an use-after-free in the IO driver. Additionally, the `read_buf`
@@ -52,6 +99,7 @@ Biggest changes are:
 - fs: `File` operations take `&self` (#2930).
 - rt: runtime API, and `#[tokio::main]` macro polish (#2876)
 - rt: `Runtime::enter` uses an RAII guard instead of a closure (#2954).
+- net: the `from_std` function on all sockets no longer sets socket into non-blocking mode (#2893)
 
 ### Added
 - sync: `map` function to lock guards (#2445).

@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-macros/0.3.0")]
+#![doc(html_root_url = "https://docs.rs/tokio-macros/0.3.1")]
 #![allow(clippy::needless_doctest_main)]
 #![warn(
     missing_debug_implementations,
@@ -230,10 +230,6 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 /// Marks async function to be executed by runtime, suitable to test environment
-///
-/// ## Options:
-///
-/// - `max_threads=n` - Sets max threads to `n`.
 ///
 /// ## Usage
 ///

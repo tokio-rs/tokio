@@ -5,7 +5,9 @@ use std::{io, path::Path};
 /// Creates a future that will open a file for writing and write the entire
 /// contents of `contents` to it.
 ///
-/// This is the async equivalent of `std::fs::write`.
+/// This is the async equivalent of [`std::fs::write`][std].
+///
+/// [std]: fn@std::fs::write
 ///
 /// # Examples
 ///

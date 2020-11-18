@@ -83,7 +83,7 @@ impl<R: AsyncRead> Stream for ReaderStream<R> {
             this.buf.reserve(CAPACITY);
         }
 
-        match poll_read_buf(cx, reader, &mut this.buf) {
+        match poll_read_buf(reader, cx, &mut this.buf) {
             Poll::Pending => Poll::Pending,
             Poll::Ready(Err(err)) => {
                 self.project().reader.set(None);

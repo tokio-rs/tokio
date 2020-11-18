@@ -1038,39 +1038,41 @@ pub struct ChildStderr {
 
 impl AsyncWrite for ChildStdin {
     fn poll_write(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        Pin::new(&mut self.inner).poll_write(cx, buf)
+        self.inner.poll_write(cx, buf)
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.inner).poll_flush(cx)
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
     }
 
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.inner).poll_shutdown(cx)
+    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
     }
 }
 
 impl AsyncRead for ChildStdout {
     fn poll_read(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.inner).poll_read(cx, buf)
+        // Safety: pipes support reading into uninitialized memory
+        unsafe { self.inner.poll_read(cx, buf) }
     }
 }
 
 impl AsyncRead for ChildStderr {
     fn poll_read(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.inner).poll_read(cx, buf)
+        // Safety: pipes support reading into uninitialized memory
+        unsafe { self.inner.poll_read(cx, buf) }
     }
 }
 
@@ -1082,19 +1084,19 @@ mod sys {
 
     impl AsRawFd for ChildStdin {
         fn as_raw_fd(&self) -> RawFd {
-            self.inner.get_ref().as_raw_fd()
+            self.inner.as_raw_fd()
         }
     }
 
     impl AsRawFd for ChildStdout {
         fn as_raw_fd(&self) -> RawFd {
-            self.inner.get_ref().as_raw_fd()
+            self.inner.as_raw_fd()
         }
     }
 
     impl AsRawFd for ChildStderr {
         fn as_raw_fd(&self) -> RawFd {
-            self.inner.get_ref().as_raw_fd()
+            self.inner.as_raw_fd()
         }
     }
 }
@@ -1107,19 +1109,19 @@ mod sys {
 
     impl AsRawHandle for ChildStdin {
         fn as_raw_handle(&self) -> RawHandle {
-            self.inner.get_ref().as_raw_handle()
+            self.inner.as_raw_handle()
         }
     }
 
     impl AsRawHandle for ChildStdout {
         fn as_raw_handle(&self) -> RawHandle {
-            self.inner.get_ref().as_raw_handle()
+            self.inner.as_raw_handle()
         }
     }
 
     impl AsRawHandle for ChildStderr {
         fn as_raw_handle(&self) -> RawHandle {
-            self.inner.get_ref().as_raw_handle()
+            self.inner.as_raw_handle()
         }
     }
 }

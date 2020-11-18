@@ -304,6 +304,15 @@ async fn drop_closes() {
 }
 
 #[tokio::test]
+async fn reregister() {
+    let (a, _b) = socketpair();
+
+    let afd_a = AsyncFd::new(a).unwrap();
+    let a = afd_a.into_inner();
+    AsyncFd::new(a).unwrap();
+}
+
+#[tokio::test]
 async fn with_poll() {
     use std::task::Poll;
 
@@ -491,10 +500,10 @@ fn driver_shutdown_wakes_currently_pending() {
 
     std::mem::drop(rt);
 
-    // Being awoken by a rt drop does not return an error, currently...
-    let _ = futures::executor::block_on(readable).unwrap();
+    // The future was initialized **before** dropping the rt
+    assert_err!(futures::executor::block_on(readable));
 
-    // However, attempting to initiate a readiness wait when the rt is dropped is an error
+    // The future is initialized **after** dropping the rt.
     assert_err!(futures::executor::block_on(afd_a.readable()));
 }
 
