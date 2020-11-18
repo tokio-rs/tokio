@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1605725023176,
+  "lastUpdate": 1605725038262,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -769,6 +769,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 22209149,
             "range": "± 3825346",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "sean@seanmonstar.com",
+            "name": "Sean McArthur",
+            "username": "seanmonstar"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "34fcef258b84d17f8d418b39eb61fa07fa87c390",
+          "message": "io: add vectored writes to `AsyncWrite` (#3149)\n\nThis adds `AsyncWrite::poll_write_vectored`, and implements it for\r\n`TcpStream` and `UnixStream`.\r\n\r\nRefs: #3135.",
+          "timestamp": "2020-11-18T10:41:47-08:00",
+          "tree_id": "98e37fc2d6fa541a9e499331df86ba3d1b7b6e3a",
+          "url": "https://github.com/tokio-rs/tokio/commit/34fcef258b84d17f8d418b39eb61fa07fa87c390"
+        },
+        "date": 1605725037410,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 208313,
+            "range": "± 45110",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 736590,
+            "range": "± 151516",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5234403,
+            "range": "± 831789",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20304040,
+            "range": "± 2144433",
             "unit": "ns/iter"
           }
         ]
