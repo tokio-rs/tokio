@@ -832,6 +832,14 @@ impl TcpStream {
     ) -> Poll<io::Result<usize>> {
         self.io.poll_write(cx, buf)
     }
+
+    pub(super) fn poll_write_vectored_priv(
+        &self,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        self.io.poll_write_vectored(cx, bufs)
+    }
 }
 
 impl TryFrom<std::net::TcpStream> for TcpStream {
@@ -865,6 +873,18 @@ impl AsyncWrite for TcpStream {
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
         self.poll_write_priv(cx, buf)
+    }
+
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        self.poll_write_vectored_priv(cx, bufs)
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        true
     }
 
     #[inline]

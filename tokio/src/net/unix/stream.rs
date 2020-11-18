@@ -172,6 +172,18 @@ impl AsyncWrite for UnixStream {
         self.poll_write_priv(cx, buf)
     }
 
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        self.poll_write_vectored_priv(cx, bufs)
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        true
+    }
+
     fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
         Poll::Ready(Ok(()))
     }
@@ -199,7 +211,7 @@ impl UnixStream {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        // Safety: `UdpStream::read` correctly handles reads into uninitialized memory
+        // Safety: `UnixStream::read` correctly handles reads into uninitialized memory
         unsafe { self.io.poll_read(cx, buf) }
     }
 
@@ -209,6 +221,14 @@ impl UnixStream {
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
         self.io.poll_write(cx, buf)
+    }
+
+    pub(super) fn poll_write_vectored_priv(
+        &self,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        self.io.poll_write_vectored(cx, bufs)
     }
 }
 

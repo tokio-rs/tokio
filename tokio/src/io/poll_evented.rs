@@ -163,6 +163,19 @@ feature! {
             use std::io::Write;
             self.registration.poll_write_io(cx, || self.io.as_ref().unwrap().write(buf))
         }
+
+        #[cfg(feature = "net")]
+        pub(crate) fn poll_write_vectored<'a>(
+            &'a self,
+            cx: &mut Context<'_>,
+            bufs: &[io::IoSlice<'_>],
+        ) -> Poll<io::Result<usize>>
+        where
+            &'a E: io::Write + 'a,
+        {
+            use std::io::Write;
+            self.registration.poll_write_io(cx, || self.io.as_ref().unwrap().write_vectored(bufs))
+        }
     }
 }
 
