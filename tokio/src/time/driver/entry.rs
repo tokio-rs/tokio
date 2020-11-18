@@ -501,12 +501,12 @@ impl TimerEntry {
         // an acquire-release barrier in _both_ directions between the driver
         // and dropping thread.
         //
-        // This lock acquisition serves this purpose. All of the driver
-        // manipulations happen with the lock held, so we can just take the lock
-        // and be sure that this drop happens-after everything the driver did so
-        // far and happens-before everything the driver does in the future.
-        // While we have the lock held, we also go ahead and deregister the
-        // entry if necessary.
+        // The lock acquisition in clear_entry serves this purpose. All of the
+        // driver manipulations happen with the lock held, so we can just take
+        // the lock and be sure that this drop happens-after everything the
+        // driver did so far and happens-before everything the driver does in
+        // the future. While we have the lock held, we also go ahead and
+        // deregister the entry if necessary.
         unsafe { self.driver.clear_entry(NonNull::from(self.inner())) };
     }
 
