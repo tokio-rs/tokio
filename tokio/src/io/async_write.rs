@@ -137,14 +137,18 @@ pub trait AsyncWrite {
     /// The default implementation calls [`poll_write`] with either the first nonempty
     /// buffer provided, or an empty one if none exists.
     ///
-    /// Attempt to write bytes from `buf` into the object.
-    ///
     /// On success, returns `Poll::Ready(Ok(num_bytes_written))`.
     ///
     /// If the object is not ready for writing, the method returns
     /// `Poll::Pending` and arranges for the current task (via
     /// `cx.waker()`) to receive a notification when the object becomes
     /// writable or is closed.
+    ///
+    /// # Note
+    ///
+    /// This should be implemented as a single "atomic" write action. If any
+    /// data has been partially written, it is wrong to return an error or
+    /// pending.
     ///
     /// [`poll_write`]: AsyncWrite::poll_write
     fn poll_write_vectored(
