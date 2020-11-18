@@ -547,12 +547,6 @@ impl TimerHandle {
         unsafe { self.inner.as_ref().sync_when() }
     }
 
-    // used from a debug_assert! only
-    #[allow(dead_code)]
-    pub(super) unsafe fn is_registered(&self) -> bool {
-        unsafe { self.inner.as_ref().might_be_registered() }
-    }
-
     pub(super) unsafe fn is_pending(&self) -> bool {
         unsafe { self.inner.as_ref().state.is_pending() }
     }
