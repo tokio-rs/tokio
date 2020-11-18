@@ -422,8 +422,9 @@ struct TimerSharedPadded {
 
 impl std::fmt::Debug for TimerSharedPadded {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("EntryInner")
+        f.debug_struct("TimerSharedPadded")
             .field("when", &self.true_when.load(Ordering::Relaxed))
+            .field("cached_when", &self.cached_when.load(Ordering::Relaxed))
             .finish()
     }
 }
