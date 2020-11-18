@@ -479,7 +479,7 @@ impl TimerEntry {
     }
 
     pub(crate) fn is_elapsed(&self) -> bool {
-        !self.inner().state.is_registered()
+        !self.inner().state.is_registered() && self.initial_deadline.is_none()
     }
 
     /// Cancels and deregisters the timer. This operation is irreversible.

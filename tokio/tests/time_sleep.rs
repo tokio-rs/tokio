@@ -36,6 +36,25 @@ async fn immediate_sleep() {
 }
 
 #[tokio::test]
+async fn is_elapsed() {
+    time::pause();
+
+    let sleep = time::sleep(Duration::from_millis(50));
+
+    tokio::pin!(sleep);
+
+    assert!(!sleep.is_elapsed());
+
+    assert!(futures::poll!(sleep.as_mut()).is_pending());
+
+    assert!(!sleep.is_elapsed());
+
+    sleep.as_mut().await;
+
+    assert!(sleep.is_elapsed());
+}
+
+#[tokio::test]
 async fn delayed_sleep_level_0() {
     time::pause();
 
