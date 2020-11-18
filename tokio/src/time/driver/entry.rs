@@ -110,7 +110,7 @@ impl std::fmt::Debug for StateCell {
 impl StateCell {
     fn new() -> Self {
         Self {
-            state: AtomicU64::new(u64::max_value()),
+            state: AtomicU64::new(STATE_DEREGISTERED),
             result: UnsafeCell::new(Ok(())),
             waker: CachePadded(AtomicWaker::new()),
         }

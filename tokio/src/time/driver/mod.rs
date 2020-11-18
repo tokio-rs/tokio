@@ -7,8 +7,7 @@
 //! Time driver
 
 mod entry;
-pub(self) use self::entry::TimerEntry;
-pub(self) use self::entry::{EntryList, TimerHandle, TimerShared};
+pub(self) use self::entry::{EntryList, TimerEntry, TimerHandle, TimerShared};
 
 mod handle;
 pub(crate) use self::handle::Handle;
@@ -193,7 +192,7 @@ where
         let next_wake = lock.wheel.next_expiration_time();
         lock.next_wake = next_wake.map(|t| t.try_into().unwrap_or(NonZeroU64::new(1).unwrap()));
 
-        std::mem::drop(lock);
+        drop(lock);
 
         match next_wake {
             Some(when) => {
@@ -243,15 +242,13 @@ where
 
 impl Handle {
     /// Runs timer related logic, and returns the next wakeup time
-    pub(self) fn process(&self) -> Option<NonZeroU64> {
+    pub(self) fn process(&self) {
         let now = self.time_source().now();
 
         self.process_at_time(now)
     }
 
-    pub(self) fn process_at_time(&self, now: u64) -> Option<NonZeroU64> {
-        let mut any_awoken = false;
-
+    pub(self) fn process_at_time(&self, now: u64) {
         let mut waker_list: [Option<Waker>; 32] = Default::default();
         let mut waker_idx = 0;
 
@@ -264,15 +261,13 @@ impl Handle {
 
             // SAFETY: We hold the driver lock, and just removed the entry from any linked lists.
             if let Some(waker) = unsafe { entry.fire(Ok(())) } {
-                any_awoken = true;
-
                 waker_list[waker_idx] = Some(waker);
 
                 waker_idx += 1;
 
                 if waker_idx == waker_list.len() {
                     // Wake a batch of wakers. To avoid deadlock, we must do this with the lock temporarily dropped.
-                    std::mem::drop(lock);
+                    drop(lock);
 
                     for waker in waker_list.iter_mut() {
                         waker.take().unwrap().wake();
@@ -292,23 +287,11 @@ impl Handle {
             .poll_at()
             .map(|t| NonZeroU64::new(t).unwrap_or_else(|| NonZeroU64::new(1).unwrap()));
 
-        let mut next_wake = lock.next_wake;
-
-        if any_awoken {
-            // Wakers don't call unpark when invoked from the thread they need
-            // to awaken, so yield back to the runtime so it can check for
-            // pending tasks.
-            next_wake =
-                Some(NonZeroU64::new(lock.elapsed).unwrap_or_else(|| NonZeroU64::new(1).unwrap()));
-        }
-
-        std::mem::drop(lock);
+        drop(lock);
 
         for waker in waker_list[0..waker_idx].iter_mut() {
             waker.take().unwrap().wake();
         }
-
-        next_wake
     }
 
     /// Removes a registered timer from the driver.
@@ -418,7 +401,7 @@ where
 
         lock.is_shutdown = true;
 
-        std::mem::drop(lock);
+        drop(lock);
 
         // Advance time forward to the end of time.
 
