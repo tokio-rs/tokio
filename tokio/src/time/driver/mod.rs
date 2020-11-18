@@ -325,7 +325,7 @@ impl Handle {
         unsafe {
             let mut lock = self.lock();
 
-            if entry.as_ref().is_registered() {
+            if entry.as_ref().might_be_registered() {
                 lock.wheel.remove(entry);
             }
 
@@ -345,7 +345,7 @@ impl Handle {
 
             // We may have raced with a firing/deregistration, so check before
             // deregistering.
-            if unsafe { entry.as_ref().is_registered() } {
+            if unsafe { entry.as_ref().might_be_registered() } {
                 lock.wheel.remove(entry);
             }
 

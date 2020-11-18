@@ -118,7 +118,7 @@ impl Wheel {
     /// Remove `item` from the timing wheel.
     pub(crate) unsafe fn remove(&mut self, item: NonNull<TimerShared>) {
         unsafe {
-            if !item.as_ref().is_registered() {
+            if !item.as_ref().might_be_registered() {
                 self.pending.remove(item);
             } else {
                 let when = item.as_ref().cached_when();

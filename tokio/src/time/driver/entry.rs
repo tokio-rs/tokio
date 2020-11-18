@@ -269,7 +269,7 @@ impl StateCell {
     /// be registered with the driver. This check is performed with relaxed
     /// ordering, but is conservative - if it returns false, the timer is
     /// definitely _not_ registered.
-    pub(super) fn is_registered(&self) -> bool {
+    pub(super) fn might_be_registered(&self) -> bool {
         self.state.load(Ordering::Relaxed) != u64::max_value()
     }
 }
@@ -395,8 +395,8 @@ impl TimerShared {
     /// be registered with the driver. This check is performed with relaxed
     /// ordering, but is conservative - if it returns false, the timer is
     /// definitely _not_ registered.
-    pub(super) fn is_registered(&self) -> bool {
-        self.state.is_registered()
+    pub(super) fn might_be_registered(&self) -> bool {
+        self.state.might_be_registered()
     }
 }
 
@@ -479,7 +479,7 @@ impl TimerEntry {
     }
 
     pub(crate) fn is_elapsed(&self) -> bool {
-        !self.inner().state.is_registered() && self.initial_deadline.is_none()
+        !self.inner().state.might_be_registered() && self.initial_deadline.is_none()
     }
 
     /// Cancels and deregisters the timer. This operation is irreversible.
@@ -549,7 +549,7 @@ impl TimerHandle {
     // used from a debug_assert! only
     #[allow(dead_code)]
     pub(super) unsafe fn is_registered(&self) -> bool {
-        unsafe { self.inner.as_ref().is_registered() }
+        unsafe { self.inner.as_ref().might_be_registered() }
     }
 
     pub(super) unsafe fn is_pending(&self) -> bool {
