@@ -1,3 +1,21 @@
+# 0.3.4 (November 18, 2020)
+
+### Fixed
+- stream: `StreamMap` `Default` impl bound (#3093).
+- io: `AsyncFd::into_inner()` should deregister the FD (#3104).
+
+### Changed
+- meta: `parking_lot` feature enabled with `full` (#3119).
+
+### Added
+- io: `AsyncWrite` vectored writes (#3149).
+- net: TCP/UDP readiness and non-blocking ops (#3130, #2743, #3138).
+- net: TCP socket option (linger, send/recv buf size) (#3145, #3143).
+- net: PID field in `UCred` with solaris/illumos (#3085).
+- rt: `runtime::Handle` allows spawning onto a runtime (#3079).
+- sync: `Notify::notify_waiters()` (#3098).
+- sync: `acquire_many()`, `try_acquire_many()` to `Semaphore` (#3067).
+
 # 0.3.3 (November 2, 2020)
 
 Fixes a soundness hole by adding a missing `Send` bound to
