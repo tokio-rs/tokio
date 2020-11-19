@@ -565,7 +565,7 @@ impl TimerEntry {
 
         let tick = self.driver.time_source().deadline_to_tick(new_time);
 
-        if let Ok(_) = self.inner().extend_expiration(tick) {
+        if self.inner().extend_expiration(tick).is_ok() {
             return;
         }
 

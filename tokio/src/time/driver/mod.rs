@@ -190,7 +190,7 @@ where
         let mut lock = self.inner.lock();
 
         let next_wake = lock.wheel.next_expiration_time();
-        lock.next_wake = next_wake.map(|t| NonZeroU64::new(t).unwrap_or(NonZeroU64::new(1).unwrap()));
+        lock.next_wake = next_wake.map(|t| NonZeroU64::new(t).unwrap_or_else(|| NonZeroU64::new(1).unwrap()));
 
         drop(lock);
 

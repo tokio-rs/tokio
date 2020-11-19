@@ -1,5 +1,6 @@
 use std::{task::Context, time::Duration};
 
+#[cfg(not(loom))]
 use futures::task::noop_waker_ref;
 
 use crate::loom::sync::{Arc, Mutex};
