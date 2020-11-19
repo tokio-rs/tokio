@@ -55,18 +55,18 @@ pub mod time;
 
 #[cfg(any(feature = "io", feature = "codec"))]
 mod util {
-    use tokio::io::{AsyncRead, ReadBuf};
+    use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
-    use bytes::BufMut;
+    use bytes::{Buf, BufMut};
     use futures_core::ready;
-    use std::io;
+    use std::io::{self, IoSlice};
     use std::mem::MaybeUninit;
     use std::pin::Pin;
     use std::task::{Context, Poll};
 
-    /// Try to read data from an `AsyncRead` into an implementer of the [`Buf`] trait.
+    /// Try to read data from an `AsyncRead` into an implementer of the [`BufMut`] trait.
     ///
-    /// [`Buf`]: bytes::Buf
+    /// [`BufMut`]: bytes::Buf
     ///
     /// # Example
     ///
@@ -129,6 +129,71 @@ mod util {
         unsafe {
             buf.advance_mut(n);
         }
+
+        Poll::Ready(Ok(n))
+    }
+
+    /// Try to write data from an implementer of the [`Buf`] trait to an
+    /// [`AsyncWrite`], advancing the buffer's internal cursor.
+    ///
+    /// This function will use [vectored writes] when the [`AsyncWrite`] supports
+    /// vectored writes.
+    ///
+    /// # Examples
+    ///
+    /// [`File`] implements [`AsyncWrite`] and [`Cursor<&[u8]>`] implements
+    /// [`Buf`]:
+    ///
+    /// ```no_run
+    /// use tokio_util::io::poll_write_buf;
+    /// use tokio::io;
+    /// use tokio::fs::File;
+    ///
+    /// use bytes::Buf;
+    /// use std::io::Cursor;
+    /// use std::pin::Pin;
+    /// use futures::future::poll_fn;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let mut file = File::create("foo.txt").await?;
+    ///     let mut buf = Cursor::new(b"data to write");
+    ///
+    ///     // Loop until the entire contents of the buffer are written to
+    ///     // the file.
+    ///     while buf.has_remaining() {
+    ///         poll_fn(|cx| poll_write_buf(Pin::new(&mut file), cx, &mut buf)).await?;
+    ///     }
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// [`Buf`]: bytes::Buf
+    /// [`AsyncWrite`]: tokio::io::AsyncWrite
+    /// [`File`]: tokio::fs::File
+    /// [vectored writes]: tokio::io::AsyncWrite::poll_write_vectored
+    #[cfg_attr(not(feature = "io"), allow(unreachable_pub))]
+    pub fn poll_write_buf<T: AsyncWrite, B: Buf>(
+        io: Pin<&mut T>,
+        cx: &mut Context<'_>,
+        buf: &mut B,
+    ) -> Poll<io::Result<usize>> {
+        const MAX_BUFS: usize = 64;
+
+        if !buf.has_remaining() {
+            return Poll::Ready(Ok(0));
+        }
+
+        let n = if io.is_write_vectored() {
+            let mut slices = [IoSlice::new(&[]); MAX_BUFS];
+            let cnt = buf.bytes_vectored(&mut slices);
+            ready!(io.poll_write_vectored(cx, &slices[..cnt]))?
+        } else {
+            ready!(io.poll_write(cx, buf.bytes()))?
+        };
+
+        buf.advance(n);
 
         Poll::Ready(Ok(n))
     }

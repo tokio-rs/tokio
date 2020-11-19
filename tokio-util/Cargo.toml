@@ -34,7 +34,7 @@ io = []
 rt = ["tokio/rt"]
 
 [dependencies]
-tokio = { version = "0.3.0", path = "../tokio" }
+tokio = { version = "0.3.4", path = "../tokio" }
 
 bytes = "0.6.0"
 futures-core = "0.3.0"
