@@ -254,9 +254,10 @@ async fn long_sleeps() {
 async fn very_long_sleeps() {
     tokio::time::pause();
 
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(1u64 << 62);
-
-    tokio::time::sleep_until(deadline).await;
+    // Some platforms (eg macos) can't represent times this far in the future
+    if let Some(deadline) = tokio::time::Instant::now().checked_add(Duration::from_secs(1u64 << 62)) {
+        tokio::time::sleep_until(deadline).await;
+    }
 }
 
 #[tokio::test]
