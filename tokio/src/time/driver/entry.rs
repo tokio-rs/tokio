@@ -77,19 +77,30 @@ const STATE_MIN_VALUE: u64 = STATE_PENDING_FIRE;
 ///
 /// Note: We use "x86 or 64-bit pointers" as the condition here because
 /// target_has_atomic is not stable.
-#[cfg(all(not(tokio_force_time_entry_locked), any(target_arch="x86", target_pointer_width="64")))]
+#[cfg(all(
+    not(tokio_force_time_entry_locked),
+    any(target_arch = "x86", target_pointer_width = "64")
+))]
 type AtomicU64 = crate::loom::sync::atomic::AtomicU64;
 
-#[cfg(not(all(not(tokio_force_time_entry_locked), any(target_arch="x86", target_pointer_width="64"))))]
+#[cfg(not(all(
+    not(tokio_force_time_entry_locked),
+    any(target_arch = "x86", target_pointer_width = "64")
+)))]
 #[derive(Debug)]
 struct AtomicU64 {
-    inner: crate::loom::sync::Mutex<u64>
+    inner: crate::loom::sync::Mutex<u64>,
 }
 
-#[cfg(not(all(not(tokio_force_time_entry_locked), any(target_arch="x86", target_pointer_width="64"))))]
+#[cfg(not(all(
+    not(tokio_force_time_entry_locked),
+    any(target_arch = "x86", target_pointer_width = "64")
+)))]
 impl AtomicU64 {
     fn new(v: u64) -> Self {
-        Self { inner: crate::loom::sync::Mutex::new(v) }
+        Self {
+            inner: crate::loom::sync::Mutex::new(v),
+        }
     }
 
     fn load(&self, _order: Ordering) -> u64 {
@@ -102,7 +113,13 @@ impl AtomicU64 {
         *self.inner.lock() = v;
     }
 
-    fn compare_exchange(&self, current: u64, new: u64, _success: Ordering, _failure: Ordering) -> Result<u64, u64> {
+    fn compare_exchange(
+        &self,
+        current: u64,
+        new: u64,
+        _success: Ordering,
+        _failure: Ordering,
+    ) -> Result<u64, u64> {
         debug_assert_ne!(_success, Ordering::SeqCst); // we only provide AcqRel with the lock
         debug_assert_ne!(_failure, Ordering::SeqCst);
 
@@ -116,7 +133,13 @@ impl AtomicU64 {
         }
     }
 
-    fn compare_exchange_weak(&self, current: u64, new: u64, success: Ordering, failure: Ordering) -> Result<u64, u64> {
+    fn compare_exchange_weak(
+        &self,
+        current: u64,
+        new: u64,
+        success: Ordering,
+        failure: Ordering,
+    ) -> Result<u64, u64> {
         self.compare_exchange(current, new, success, failure)
     }
 }

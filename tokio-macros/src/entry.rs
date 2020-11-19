@@ -193,17 +193,23 @@ fn parse_knobs(
                 let name = ident.unwrap().to_string().to_lowercase();
                 let msg = match name.as_str() {
                     "threaded_scheduler" | "multi_thread" => {
-                        format!("Set the runtime flavor with #[{}(flavor = \"multi_thread\")].", macro_name)
-                    },
+                        format!(
+                            "Set the runtime flavor with #[{}(flavor = \"multi_thread\")].",
+                            macro_name
+                        )
+                    }
                     "basic_scheduler" | "current_thread" | "single_threaded" => {
-                        format!("Set the runtime flavor with #[{}(flavor = \"current_thread\")].", macro_name)
-                    },
+                        format!(
+                            "Set the runtime flavor with #[{}(flavor = \"current_thread\")].",
+                            macro_name
+                        )
+                    }
                     "flavor" | "worker_threads" => {
                         format!("The `{}` attribute requires an argument.", name)
-                    },
+                    }
                     name => {
                         format!("Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`", name)
-                    },
+                    }
                 };
                 return Err(syn::Error::new_spanned(path, msg));
             }
