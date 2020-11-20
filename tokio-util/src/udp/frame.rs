@@ -56,7 +56,7 @@ impl<C: Decoder + Unpin> Stream for UdpFramed<C> {
         pin.rd.reserve(INITIAL_RD_CAPACITY);
 
         loop {
-            // Are there are still bytes left in the read buffer to decode?
+            // Are there still bytes left in the read buffer to decode?
             if pin.is_readable {
                 if let Some(frame) = pin.codec.decode_eof(&mut pin.rd)? {
                     let current_addr = pin
