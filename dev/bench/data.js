@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1605732058758,
+  "lastUpdate": 1605852494089,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -919,6 +919,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20820491,
             "range": "± 4055596",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "cssivision@gmail.com",
+            "name": "cssivision",
+            "username": "cssivision"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "49abfdb2ac7f564c638ef99b973b1ab7a2b7ec84",
+          "message": "util: fix typo in udp/frame.rs (#3154)",
+          "timestamp": "2020-11-20T15:06:14+09:00",
+          "tree_id": "f09954c70e26336bdb1bc525f832916c2d7037bf",
+          "url": "https://github.com/tokio-rs/tokio/commit/49abfdb2ac7f564c638ef99b973b1ab7a2b7ec84"
+        },
+        "date": 1605852489821,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 189192,
+            "range": "± 8967",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 702064,
+            "range": "± 44051",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5500810,
+            "range": "± 1053690",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20865377,
+            "range": "± 2857375",
             "unit": "ns/iter"
           }
         ]
