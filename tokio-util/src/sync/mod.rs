@@ -1,6 +1,9 @@
 //! Synchronization primitives
 
-mod mpsc;
+cfg_sync! {
+    mod mpsc;
+}
+#[cfg(feature = "sync")]
 pub use mpsc::Sender;
 
 mod cancellation_token;
