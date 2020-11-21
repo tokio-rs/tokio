@@ -416,6 +416,10 @@ cfg_macros! {
             #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
             pub use tokio_macros::main;
 
+            #[cfg(not(test))] // Work around for rust-lang/rust#62127
+            #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+            pub use async_spawner::register_spawner;
+
             #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
             pub use tokio_macros::test;
         }

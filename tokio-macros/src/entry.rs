@@ -246,10 +246,24 @@ fn parse_knobs(
         }
     };
 
+    let spawner = if is_test {
+        quote! {}
+    } else {
+        quote! {
+            use core::future::Future;
+            use core::pin::Pin;
+            fn spawn(future: Pin<Box<dyn Future<Output = ()> + Send>>) {
+                tokio::spawn(future);
+            }
+            tokio::register_spawner(spawn);
+        }
+    };
+
     let result = quote! {
         #header
         #(#attrs)*
         #vis #sig {
+            #spawner
             #rt
                 .enable_all()
                 .build()

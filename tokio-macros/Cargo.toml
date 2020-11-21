@@ -30,6 +30,7 @@ quote = "1"
 syn = { version = "1.0.3", features = ["full"] }
 
 [dev-dependencies]
+async-spawner = "1.0.0"
 tokio = { version = "0.3.0", path = "../tokio", features = ["full"] }
 
 [package.metadata.docs.rs]
