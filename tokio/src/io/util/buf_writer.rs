@@ -2,7 +2,6 @@ use crate::io::util::DEFAULT_BUF_SIZE;
 use crate::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 
 use pin_project_lite::pin_project;
-use std::cmp;
 use std::fmt;
 use std::io::{self, IoSlice, SeekFrom, Write};
 use std::pin::Pin;
@@ -154,9 +153,8 @@ impl<W: AsyncWrite> AsyncWrite for BufWriter<W> {
                 Poll::Ready(Ok(total_len))
             }
         } else {
-            let mut total_written = 0;
             let mut iter = bufs.iter();
-            if let Some(buf) = iter.by_ref().find(|&buf| !buf.is_empty()) {
+            let mut total_written = if let Some(buf) = iter.by_ref().find(|&buf| !buf.is_empty()) {
                 // This is the first non-empty slice to write, so if it does
                 // not fit in the buffer, we still get to flush and proceed.
                 if self.buf.len() + buf.len() > self.buf.capacity() {
@@ -169,26 +167,19 @@ impl<W: AsyncWrite> AsyncWrite for BufWriter<W> {
                     return me.inner.poll_write(cx, buf);
                 } else {
                     me.buf.extend_from_slice(buf);
-                    total_written += buf.len();
+                    buf.len()
                 }
-                debug_assert!(total_written != 0);
-            }
+            } else {
+                return Poll::Ready(Ok(0));
+            };
+            debug_assert!(total_written != 0);
             for buf in iter {
                 let me = self.as_mut().project();
-                if buf.len() >= me.buf.capacity() {
-                    // This slice should be written directly, but we have already
-                    // buffered some of the input. Bail out, expecting it to be
-                    // handled as the first slice in the next call to
-                    // poll_write_vectored.
+                if me.buf.len() + buf.len() > me.buf.capacity() {
                     break;
                 } else {
-                    let write_to = cmp::min(buf.len(), me.buf.capacity() - me.buf.len());
-                    me.buf.extend_from_slice(&buf[..write_to]);
-                    total_written += write_to;
-                    if me.buf.capacity() == me.buf.len() {
-                        // The buffer is full, bail out
-                        break;
-                    }
+                    me.buf.extend_from_slice(buf);
+                    total_written += buf.len();
                 }
             }
             Poll::Ready(Ok(total_written))
