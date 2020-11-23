@@ -97,7 +97,11 @@ impl<T: AsRawFd> AsyncFd<T> {
         Self::new_with_handle_and_interest(inner, Handle::current(), interest)
     }
 
-    pub(crate) fn new_with_handle_and_interest(inner: T, handle: Handle, interest: Interest) -> io::Result<Self> {
+    pub(crate) fn new_with_handle_and_interest(
+        inner: T,
+        handle: Handle,
+        interest: Interest,
+    ) -> io::Result<Self> {
         let fd = inner.as_raw_fd();
 
         let registration =
