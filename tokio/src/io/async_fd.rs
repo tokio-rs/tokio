@@ -85,14 +85,23 @@ impl<T: AsRawFd> AsyncFd<T> {
     where
         T: AsRawFd,
     {
-        Self::new_with_handle(inner, Handle::current())
+        Self::new_with_handle_and_interest(inner, Handle::current(), ALL_INTEREST)
     }
 
-    pub(crate) fn new_with_handle(inner: T, handle: Handle) -> io::Result<Self> {
+    /// Creates new instance as `new` with additional ability to customize interest,
+    /// allowing to specify whether file descriptor will be polled for read, write or both.
+    pub fn new_with_interest(inner: T, interest: Interest) -> io::Result<Self>
+    where
+        T: AsRawFd,
+    {
+        Self::new_with_handle_and_interest(inner, Handle::current(), interest)
+    }
+
+    pub(crate) fn new_with_handle_and_interest(inner: T, handle: Handle, interest: Interest) -> io::Result<Self> {
         let fd = inner.as_raw_fd();
 
         let registration =
-            Registration::new_with_interest_and_handle(&mut SourceFd(&fd), ALL_INTEREST, handle)?;
+            Registration::new_with_interest_and_handle(&mut SourceFd(&fd), interest, handle)?;
 
         Ok(AsyncFd {
             registration,
