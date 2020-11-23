@@ -17,7 +17,7 @@ where
     let delay = if duration == Duration::from_millis(0) {
         None
     } else {
-        Some(Sleep::new_timeout(Instant::now() + duration, duration))
+        Some(Sleep::new_timeout(Instant::now() + duration))
     };
 
     Throttle {

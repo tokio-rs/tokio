@@ -8,7 +8,7 @@ fn assert_sync<T: Sync>() {}
 
 #[test]
 fn registration_is_send_and_sync() {
-    use crate::time::sleep::Sleep;
+    use crate::time::Sleep;
 
     assert_send::<Sleep>();
     assert_sync::<Sleep>();

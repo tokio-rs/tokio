@@ -77,9 +77,11 @@
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!     let mut interval = time::interval(time::Duration::from_secs(2));
+//!     let interval = time::interval(time::Duration::from_secs(2));
+//!     tokio::pin!(interval);
+//!
 //!     for _i in 0..5 {
-//!         interval.tick().await;
+//!         interval.as_mut().tick().await;
 //!         task_that_takes_a_second().await;
 //!     }
 //! }
@@ -93,10 +95,10 @@ pub(crate) use self::clock::Clock;
 #[cfg(feature = "test-util")]
 pub use clock::{advance, pause, resume};
 
-mod sleep;
-pub use sleep::{sleep, sleep_until, Sleep};
-
 pub(crate) mod driver;
+
+#[doc(inline)]
+pub use driver::sleep::{sleep, sleep_until, Sleep};
 
 pub mod error;
 
@@ -110,8 +112,6 @@ mod timeout;
 #[doc(inline)]
 pub use timeout::{timeout, timeout_at, Timeout};
 
-mod wheel;
-
 #[cfg(test)]
 #[cfg(not(loom))]
 mod tests;
@@ -119,32 +119,3 @@ mod tests;
 // Re-export for convenience
 #[doc(no_inline)]
 pub use std::time::Duration;
-
-// ===== Internal utils =====
-
-enum Round {
-    Up,
-    Down,
-}
-
-/// Convert a `Duration` to milliseconds, rounding up and saturating at
-/// `u64::MAX`.
-///
-/// The saturating is fine because `u64::MAX` milliseconds are still many
-/// million years.
-#[inline]
-fn ms(duration: Duration, round: Round) -> u64 {
-    const NANOS_PER_MILLI: u32 = 1_000_000;
-    const MILLIS_PER_SEC: u64 = 1_000;
-
-    // Round up.
-    let millis = match round {
-        Round::Up => (duration.subsec_nanos() + NANOS_PER_MILLI - 1) / NANOS_PER_MILLI,
-        Round::Down => duration.subsec_millis(),
-    };
-
-    duration
-        .as_secs()
-        .saturating_mul(MILLIS_PER_SEC)
-        .saturating_add(u64::from(millis))
-}

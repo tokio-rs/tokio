@@ -68,7 +68,7 @@ async fn starving() {
     }
 
     let when = Instant::now() + Duration::from_millis(20);
-    let starve = Starve(sleep_until(when), 0);
+    let starve = Starve(Box::pin(sleep_until(when)), 0);
 
     starve.await;
     assert!(Instant::now() >= when);

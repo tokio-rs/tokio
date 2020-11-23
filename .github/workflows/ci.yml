@@ -260,6 +260,7 @@ jobs:
           - loom_pool::group_b
           - loom_pool::group_c
           - loom_pool::group_d
+          - time::driver
     steps:
       - uses: actions/checkout@v2
       - name: Install Rust
