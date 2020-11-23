@@ -149,7 +149,7 @@ impl Level {
 
         if deadline <= now {
             // A timer is in a slot "prior" to the current time. This can occur
-            // because we do not have an infinite heirarchy of timer levels, and
+            // because we do not have an infinite hierarchy of timer levels, and
             // eventually a timer scheduled for a very distant time might end up
             // being placed in a slot that is beyond the end of all of the
             // arrays.
