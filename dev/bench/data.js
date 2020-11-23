@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1605896477343,
+  "lastUpdate": 1606157071283,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -1123,6 +1123,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19153793,
             "range": "± 2780219",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "bdonlan@gmail.com",
+            "name": "bdonlan",
+            "username": "bdonlan"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ae67851f11b7cc1f577de8ce21767ce3e2c7aff9",
+          "message": "time: use intrusive lists for timer tracking (#3080)\n\nMore-or-less a half-rewrite of the current time driver, supporting the\r\nuse of intrusive futures for timer registration.\r\n\r\nFixes: #3028, #3069",
+          "timestamp": "2020-11-23T10:42:50-08:00",
+          "tree_id": "be43cb76333b0e9e42a101d659f9b2e41555d779",
+          "url": "https://github.com/tokio-rs/tokio/commit/ae67851f11b7cc1f577de8ce21767ce3e2c7aff9"
+        },
+        "date": 1606157070461,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 173680,
+            "range": "± 53274",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 657451,
+            "range": "± 137368",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4540370,
+            "range": "± 688983",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18223628,
+            "range": "± 2718440",
             "unit": "ns/iter"
           }
         ]
