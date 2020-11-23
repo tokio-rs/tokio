@@ -38,7 +38,7 @@ impl Receiver {
         use crate::runtime::enter::try_enter;
 
         if timeout == Some(Duration::from_nanos(0)) {
-            return true;
+            return false;
         }
 
         let mut e = match try_enter(false) {
