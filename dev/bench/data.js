@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1606209885432,
+  "lastUpdate": 1606209894459,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -1327,6 +1327,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20258373,
             "range": "± 2845256",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "github@max.sharnoff.org",
+            "name": "Max Sharnoff",
+            "username": "sharnoff"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "de33ee85ce61377b316b630e4355d419cc4abcb7",
+          "message": "time: replace 'ouClockTimeide' in internal docs with 'outside' (#3171)",
+          "timestamp": "2020-11-24T10:23:20+01:00",
+          "tree_id": "5ed85f95ea1846983471a11fe555328e6b0f5f6f",
+          "url": "https://github.com/tokio-rs/tokio/commit/de33ee85ce61377b316b630e4355d419cc4abcb7"
+        },
+        "date": 1606209893658,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 165011,
+            "range": "± 21067",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 627437,
+            "range": "± 58843",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5240104,
+            "range": "± 1229941",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18931567,
+            "range": "± 3824387",
             "unit": "ns/iter"
           }
         ]
