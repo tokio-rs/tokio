@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1606207266237,
+  "lastUpdate": 1606207271232,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -1279,6 +1279,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18223628,
             "range": "± 2718440",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "driftluo@foxmail.com",
+            "name": "漂流",
+            "username": "driftluo"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "874fc3320bc000fee20d63b3ad865a1145122640",
+          "message": "codec: add read_buffer_mut to FramedRead (#3166)",
+          "timestamp": "2020-11-24T09:39:16+01:00",
+          "tree_id": "53540b744f6a915cedc1099afe1b0639443b2436",
+          "url": "https://github.com/tokio-rs/tokio/commit/874fc3320bc000fee20d63b3ad865a1145122640"
+        },
+        "date": 1606207270323,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 189797,
+            "range": "± 31752",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 715813,
+            "range": "± 109946",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5154978,
+            "range": "± 1056989",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20258373,
+            "range": "± 2845256",
             "unit": "ns/iter"
           }
         ]
