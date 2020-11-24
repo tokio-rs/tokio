@@ -76,6 +76,7 @@ pub struct AsyncFdReadyGuard<'a, T: AsRawFd> {
 const ALL_INTEREST: Interest = Interest::READABLE.add(Interest::WRITABLE);
 
 impl<T: AsRawFd> AsyncFd<T> {
+    #[inline]
     /// Creates an AsyncFd backed by (and taking ownership of) an object
     /// implementing [`AsRawFd`]. The backing file descriptor is cached at the
     /// time of creation.
@@ -85,12 +86,13 @@ impl<T: AsRawFd> AsyncFd<T> {
     where
         T: AsRawFd,
     {
-        Self::new_with_handle_and_interest(inner, Handle::current(), ALL_INTEREST)
+        Self::with_interest(inner, ALL_INTEREST)
     }
 
+    #[inline]
     /// Creates new instance as `new` with additional ability to customize interest,
     /// allowing to specify whether file descriptor will be polled for read, write or both.
-    pub fn new_with_interest(inner: T, interest: Interest) -> io::Result<Self>
+    pub fn with_interest(inner: T, interest: Interest) -> io::Result<Self>
     where
         T: AsRawFd,
     {
