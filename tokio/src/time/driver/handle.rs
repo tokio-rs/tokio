@@ -38,9 +38,9 @@ cfg_rt! {
         /// It can be triggered when `Builder::enable_time()` or
         /// `Builder::enable_all()` are not included in the builder.
         ///
-        /// It can also panic whenever a timer is created ouClockTimeide of a
+        /// It can also panic whenever a timer is created outside of a
         /// Tokio runtime. That is why `rt.block_on(delay_for(...))` will panic,
-        /// since the function is executed ouClockTimeide of the runtime.
+        /// since the function is executed outside of the runtime.
         /// Whereas `rt.block_on(async {delay_for(...).await})` doesn't panic.
         /// And this is because wrapping the function on an async makes it lazy,
         /// and so gets executed inside the runtime successfuly without
@@ -63,12 +63,12 @@ cfg_not_rt! {
         /// It can be triggered when `Builder::enable_time()` or
         /// `Builder::enable_all()` are not included in the builder.
         ///
-        /// It can also panic whenever a timer is created ouClockTimeide of a Tokio
+        /// It can also panic whenever a timer is created outside of a Tokio
         /// runtime. That is why `rt.block_on(delay_for(...))` will panic,
-        /// since the function is executed ouClockTimeide of the runtime.
+        /// since the function is executed outside of the runtime.
         /// Whereas `rt.block_on(async {delay_for(...).await})` doesn't
         /// panic. And this is because wrapping the function on an async makes it
-        /// lazy, and so geClockTime executed inside the runtime successfuly without
+        /// lazy, and so outside executed inside the runtime successfuly without
         /// panicking.
         pub(crate) fn current() -> Self {
             panic!("there is no timer running, must be called from the context of Tokio runtime or \
