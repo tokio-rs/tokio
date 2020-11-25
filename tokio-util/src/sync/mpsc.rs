@@ -9,22 +9,21 @@ use tokio::sync::mpsc::{error::SendError, Permit};
 
 /// Fat sender with `poll_ready` support.
 #[derive(Debug)]
-// TODO: it doesn't seem we really need 'static here...
-pub struct Sender<T: 'static> {
+pub struct Sender<'a, T> {
     // field order: `state` can contain reference to `inner`,
     // so it must be dropped first.
     /// State of this sender
-    state: State<T>,
+    state: State<'a, T>,
     /// Underlying channel
     inner: tokio::sync::mpsc::Sender<T>,
     /// Pinned marker
     pinned: PhantomPinned,
 }
 
-impl<T: 'static> Sender<T> {
+impl<'a, T: 'a> Sender<'a, T> {
     /// It is OK to get mutable reference to state, because it is not
     /// self-referencing.
-    fn pin_project_state(self: Pin<&mut Self>) -> &mut State<T> {
+    fn pin_project_state(self: Pin<&mut Self>) -> &mut State<'a, T> {
         unsafe { &mut Pin::into_inner_unchecked(self).state }
     }
 
@@ -34,7 +33,7 @@ impl<T: 'static> Sender<T> {
     }
 }
 
-impl<T: 'static> Clone for Sender<T> {
+impl<'a, T: 'a> Clone for Sender<'a, T> {
     fn clone(&self) -> Self {
         Sender {
             state: State::Empty,
@@ -44,20 +43,20 @@ impl<T: 'static> Clone for Sender<T> {
     }
 }
 
-type AcquireFutOutput<T> = Result<Permit<'static, T>, SendError<()>>;
+type AcquireFutOutput<'a, T> = Result<Permit<'a, T>, SendError<()>>;
 
-enum State<T: 'static> {
+enum State<'a, T> {
     /// We do not have permit, but we didn't start acquiring it.
     Empty,
     /// We have a permit to send.
     // ALERT: this is self-reference to the Sender.
-    Ready(Permit<'static, T>),
+    Ready(Permit<'a, T>),
     /// We are in process of acquiring a permit
     // ALERT: contained future contains self-reference to the sender.
-    Acquire(Pin<Box<dyn Future<Output = AcquireFutOutput<T>> + Send + Sync>>),
+    Acquire(Pin<Box<dyn Future<Output = AcquireFutOutput<'a, T>> + Send + Sync + 'a>>),
 }
 
-impl<T: 'static> std::fmt::Debug for State<T> {
+impl<'a, T: 'a> std::fmt::Debug for State<'a, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             State::Empty => f.debug_tuple("Empty").finish(),
@@ -67,7 +66,7 @@ impl<T: 'static> std::fmt::Debug for State<T> {
     }
 }
 
-impl<T: Send + 'static> Sender<T> {
+impl<'a, T: Send + 'a> Sender<'a, T> {
     /// Wraps a [tokio sender](tokio::sync::mpsc::Sender).
     pub fn new(inner: tokio::sync::mpsc::Sender<T>) -> Self {
         Sender {
@@ -120,7 +119,7 @@ impl<T: Send + 'static> Sender<T> {
                 let long_lived_sender = unsafe {
                     std::mem::transmute::<
                         &mut tokio::sync::mpsc::Sender<T>,
-                        &'static mut tokio::sync::mpsc::Sender<T>,
+                        &'a mut tokio::sync::mpsc::Sender<T>,
                     >(self.as_mut().pin_project_inner())
                 };
                 Box::pin(long_lived_sender.reserve())
@@ -147,7 +146,7 @@ impl<T: Send + 'static> Sender<T> {
 #[cfg(test)]
 mod _props {
     use super::*;
-    fn _verify_not_unpin<U: Send>(x: Sender<U>) {
+    fn _verify_not_unpin<U: Send>(x: Sender<'_, U>) {
         trait Foo {
             fn is_ready(&self) -> bool;
         }
@@ -161,11 +160,11 @@ mod _props {
         assert!(x.is_ready());
     }
 
-    fn _verify_send<U: Send>(x: Sender<U>) {
+    fn _verify_send<U: Send>(x: Sender<'_, U>) {
         fn inner(_x: impl Send) {}
         inner(x)
     }
-    fn _verify_sync<U: Send + Sync>(x: Sender<U>) {
+    fn _verify_sync<U: Send + Sync>(x: Sender<'_, U>) {
         fn inner(_x: impl Sync) {}
         inner(x)
     }
