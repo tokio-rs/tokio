@@ -24,7 +24,8 @@ impl UCred {
 
     /// Gets PID (process ID) of the process.
     ///
-    /// This is only implemented under linux, android, IOS and MacOS
+    /// This is only implemented under Linux, Android, iOS, macOS, Solaris and
+    /// Illumos. On other plaforms this will always return `None`.
     pub fn pid(&self) -> Option<pid_t> {
         self.pid
     }
@@ -186,35 +187,24 @@ pub(crate) mod impl_solaris {
     use std::os::unix::io::AsRawFd;
     use std::ptr;
 
-    #[allow(non_camel_case_types)]
-    enum ucred_t {}
-
-    extern "C" {
-        fn ucred_free(cred: *mut ucred_t);
-        fn ucred_geteuid(cred: *const ucred_t) -> super::uid_t;
-        fn ucred_getegid(cred: *const ucred_t) -> super::gid_t;
-
-        fn getpeerucred(fd: std::os::raw::c_int, cred: *mut *mut ucred_t) -> std::os::raw::c_int;
-    }
-
     pub(crate) fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {
         unsafe {
             let raw_fd = sock.as_raw_fd();
 
-            let mut cred = ptr::null_mut::<*mut ucred_t>() as *mut ucred_t;
-
-            let ret = getpeerucred(raw_fd, &mut cred);
+            let mut cred = ptr::null_mut();
+            let ret = libc::getpeerucred(raw_fd, &mut cred);
 
             if ret == 0 {
-                let uid = ucred_geteuid(cred);
-                let gid = ucred_getegid(cred);
+                let uid = libc::ucred_geteuid(cred);
+                let gid = libc::ucred_getegid(cred);
+                let pid = libc::ucred_getpid(cred);
 
-                ucred_free(cred);
+                libc::ucred_free(cred);
 
                 Ok(super::UCred {
                     uid,
                     gid,
-                    pid: None,
+                    pid: Some(pid),
                 })
             } else {
                 Err(io::Error::last_os_error())

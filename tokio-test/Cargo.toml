@@ -22,7 +22,7 @@ categories = ["asynchronous", "testing"]
 [dependencies]
 tokio = { version = "0.3.0", path = "../tokio", features = ["rt", "stream", "sync", "time", "test-util"] }
 
-bytes = "0.5.0"
+bytes = "0.6.0"
 futures-core = "0.3.0"
 
 [dev-dependencies]

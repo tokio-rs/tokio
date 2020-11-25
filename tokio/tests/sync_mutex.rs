@@ -91,10 +91,11 @@ async fn aborted_future_1() {
         let m2 = m1.clone();
         // Try to lock mutex in a future that is aborted prematurely
         timeout(Duration::from_millis(1u64), async move {
-            let mut iv = interval(Duration::from_millis(1000));
+            let iv = interval(Duration::from_millis(1000));
+            tokio::pin!(iv);
             m2.lock().await;
-            iv.tick().await;
-            iv.tick().await;
+            iv.as_mut().tick().await;
+            iv.as_mut().tick().await;
         })
         .await
         .unwrap_err();

@@ -53,11 +53,6 @@ jobs:
         run: cargo test --features full
         working-directory: tokio
 
-      # Check `tokio` with `full + parking_lot` to make sure it compiles.
-      - name: check tokio full,parking_lot
-        run: cargo check --features full,parking_lot
-        working-directory: tokio
-
       # Test **all** crates in the workspace with all features.
       - name: test all --all-features
         run: cargo test --workspace --all-features
@@ -187,6 +182,26 @@ jobs:
       - name: "test --workspace --all-features"
         run: cargo check --workspace --all-features
 
+  minimal-versions:
+    name: minimal-versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.nightly }}
+          override: true
+      - name: Install cargo-hack
+        run: cargo install cargo-hack
+      - name: "check --all-features -Z minimal-versions"
+        run: |
+          # Remove dev-dependencies from Cargo.toml to prevent the next `cargo update`
+          # from determining minimal versions based on dev-dependencies.
+          cargo hack --remove-dev-deps --workspace
+          # Update Cargo.lock to minimal version dependencies.
+          cargo update -Z minimal-versions
+          cargo check --all-features
+
   fmt:
     name: fmt
     runs-on: ubuntu-latest
@@ -246,6 +261,7 @@ jobs:
           - loom_pool::group_b
           - loom_pool::group_c
           - loom_pool::group_d
+          - time::driver
     steps:
       - uses: actions/checkout@v2
       - name: Install Rust

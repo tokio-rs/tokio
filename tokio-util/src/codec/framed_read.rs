@@ -100,6 +100,11 @@ impl<T, D> FramedRead<T, D> {
     pub fn read_buffer(&self) -> &BytesMut {
         &self.inner.state.buffer
     }
+
+    /// Returns a mutable reference to the read buffer.
+    pub fn read_buffer_mut(&mut self) -> &mut BytesMut {
+        &mut self.inner.state.buffer
+    }
 }
 
 // This impl just defers to the underlying FramedImpl

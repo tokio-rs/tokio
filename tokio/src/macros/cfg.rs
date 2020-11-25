@@ -1,5 +1,18 @@
 #![allow(unused_macros)]
 
+macro_rules! feature {
+    (
+        #![$meta:meta]
+        $($item:item)*
+    ) => {
+        $(
+            #[cfg($meta)]
+            #[cfg_attr(docsrs, doc(cfg($meta)))]
+            $item
+        )*
+    }
+}
+
 /// Enables enter::block_on
 macro_rules! cfg_block_on {
     ($($item:item)*) => {
@@ -61,6 +74,19 @@ macro_rules! cfg_io_driver {
                 feature = "process",
                 all(unix, feature = "signal"),
             ))))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_io_driver_impl {
+    ( $( $item:item )* ) => {
+        $(
+            #[cfg(any(
+                feature = "net",
+                feature = "process",
+                all(unix, feature = "signal"),
+            ))]
             $item
         )*
     }
