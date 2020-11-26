@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1606209921842,
+  "lastUpdate": 1606416465129,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -755,6 +755,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 584,
             "range": "± 41",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "rajiv.chauhan@gmail.com",
+            "name": "Rajiv Chauhan",
+            "username": "chauhraj"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5e406a7a47699d93fa2a77fb72553600cb7abd0f",
+          "message": "macros: fix outdated documentation (#3180)\n\n1. Changed 0.2 to 0.3\r\n2. Changed ‘multi’ to ‘single’ to indicate that the behavior is single threaded",
+          "timestamp": "2020-11-26T19:46:15+01:00",
+          "tree_id": "ac6898684e4b84e4a5d0e781adf42d950bbc9e43",
+          "url": "https://github.com/tokio-rs/tokio/commit/5e406a7a47699d93fa2a77fb72553600cb7abd0f"
+        },
+        "date": 1606416464334,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 840,
+            "range": "± 145",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 13525,
+            "range": "± 4041",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 909,
+            "range": "± 280",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 12807,
+            "range": "± 2584",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 511,
+            "range": "± 100",
             "unit": "ns/iter"
           }
         ]
