@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1606416465129,
+  "lastUpdate": 1606416469029,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -2241,6 +2241,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 906,
             "range": "± 3",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "rajiv.chauhan@gmail.com",
+            "name": "Rajiv Chauhan",
+            "username": "chauhraj"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5e406a7a47699d93fa2a77fb72553600cb7abd0f",
+          "message": "macros: fix outdated documentation (#3180)\n\n1. Changed 0.2 to 0.3\r\n2. Changed ‘multi’ to ‘single’ to indicate that the behavior is single threaded",
+          "timestamp": "2020-11-26T19:46:15+01:00",
+          "tree_id": "ac6898684e4b84e4a5d0e781adf42d950bbc9e43",
+          "url": "https://github.com/tokio-rs/tokio/commit/5e406a7a47699d93fa2a77fb72553600cb7abd0f"
+        },
+        "date": 1606416464760,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 15834,
+            "range": "± 4146",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1092,
+            "range": "± 61",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 655,
+            "range": "± 81",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 16618,
+            "range": "± 5810",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1091,
+            "range": "± 7",
             "unit": "ns/iter"
           }
         ]
