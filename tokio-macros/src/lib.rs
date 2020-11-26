@@ -138,8 +138,8 @@ use proc_macro::TokenStream;
 /// ### NOTE:
 ///
 /// If you rename the tokio crate in your dependencies this macro will not work.
-/// If you must rename the 0.2 version of tokio because you're also using the
-/// 0.1 version of tokio, you _must_ make the tokio 0.2 crate available as
+/// If you must rename the 0.3 version of tokio because you're also using the
+/// 0.1 version of tokio, you _must_ make the tokio 0.3 crate available as
 /// `tokio` in the module where this macro is expanded.
 #[proc_macro_attribute]
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
@@ -183,9 +183,9 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ### NOTE:
 ///
 /// If you rename the tokio crate in your dependencies this macro
-/// will not work. If you must rename the 0.2 version of tokio because
+/// will not work. If you must rename the 0.3 version of tokio because
 /// you're also using the 0.1 version of tokio, you _must_ make the
-/// tokio 0.2 crate available as `tokio` in the module where this
+/// tokio 0.3 crate available as `tokio` in the module where this
 /// macro is expanded.
 #[proc_macro_attribute]
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
@@ -208,7 +208,7 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ### Using default
 ///
-/// The default test runtime is multi-threaded.
+/// The default test runtime is single-threaded.
 ///
 /// ```no_run
 /// #[tokio::test]
@@ -220,9 +220,9 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ### NOTE:
 ///
 /// If you rename the tokio crate in your dependencies this macro
-/// will not work. If you must rename the 0.2 version of tokio because
+/// will not work. If you must rename the 0.3 version of tokio because
 /// you're also using the 0.1 version of tokio, you _must_ make the
-/// tokio 0.2 crate available as `tokio` in the module where this
+/// tokio 0.3 crate available as `tokio` in the module where this
 /// macro is expanded.
 #[proc_macro_attribute]
 pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
@@ -243,9 +243,9 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ### NOTE:
 ///
 /// If you rename the tokio crate in your dependencies this macro
-/// will not work. If you must rename the 0.2 version of tokio because
+/// will not work. If you must rename the 0.3 version of tokio because
 /// you're also using the 0.1 version of tokio, you _must_ make the
-/// tokio 0.2 crate available as `tokio` in the module where this
+/// tokio 0.3 crate available as `tokio` in the module where this
 /// macro is expanded.
 #[proc_macro_attribute]
 pub fn test_rt(args: TokenStream, item: TokenStream) -> TokenStream {
