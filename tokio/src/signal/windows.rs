@@ -145,10 +145,12 @@ unsafe extern "system" fn handler(ty: DWORD) -> BOOL {
 ///     let mut stream = ctrl_c()?;
 ///
 ///     // Print whenever a CTRL-C event is received.
-///     loop {
+///     for countdown in (0..3).rev() {
 ///         stream.recv().await;
-///         println!("got signal CTRL-C");
+///         println!("got CTRL-C. {} more to exit", countdown);
 ///     }
+///
+///     Ok(())
 /// }
 /// ```
 pub fn ctrl_c() -> io::Result<CtrlC> {
@@ -184,10 +186,12 @@ impl CtrlC {
     ///     let mut stream = ctrl_c()?;
     ///
     ///     // Print whenever a CTRL-C event is received.
-    ///     loop {
+    ///     for countdown in (0..3).rev() {
     ///         stream.recv().await;
-    ///         println!("got signal CTRL-C");
+    ///         println!("got CTRL-C. {} more to exit", countdown);
     ///     }
+    ///
+    ///     Ok(())
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<()> {
