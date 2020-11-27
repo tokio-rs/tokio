@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1606416487655,
+  "lastUpdate": 1606506881988,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -2343,6 +2343,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1091,
             "range": "± 7",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "niklas.fiekas@backscattering.de",
+            "name": "Niklas Fiekas",
+            "username": "niklasf"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "49129434198a96444bc0e9582a14062d3a46e93a",
+          "message": "signal: expose CtrlC stream on windows (#3186)\n\n* Make tokio::signal::windows::ctrl_c() public.\r\n* Stop referring to private tokio::signal::windows::Event in module\r\n  documentation.\r\n\r\nCloses #3178",
+          "timestamp": "2020-11-27T19:53:17Z",
+          "tree_id": "904fb6b1fb539bffe69168c7202ccc3db15321dc",
+          "url": "https://github.com/tokio-rs/tokio/commit/49129434198a96444bc0e9582a14062d3a46e93a"
+        },
+        "date": 1606506881117,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 13640,
+            "range": "± 2386",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 902,
+            "range": "± 5",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 548,
+            "range": "± 10",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 13641,
+            "range": "± 2296",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 905,
+            "range": "± 6",
             "unit": "ns/iter"
           }
         ]
