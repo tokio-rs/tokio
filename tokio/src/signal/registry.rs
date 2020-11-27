@@ -165,10 +165,12 @@ where
     OsExtraData: 'static + Send + Sync + Init,
     OsStorage: 'static + Send + Sync + Init,
 {
-    static GLOBALS: Lazy<Pin<Box<Globals>>> = Lazy::new(|| Box::pin(Globals {
-        extra: OsExtraData::init(),
-        registry: Registry::new(OsStorage::init()),
-    }));
+    static GLOBALS: Lazy<Pin<Box<Globals>>> = Lazy::new(|| {
+        Box::pin(Globals {
+            extra: OsExtraData::init(),
+            registry: Registry::new(OsStorage::init()),
+        })
+    });
 
     GLOBALS.as_ref()
 }
