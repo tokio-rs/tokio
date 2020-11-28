@@ -9,10 +9,10 @@ use std::fmt;
 use std::io;
 use std::net::{Shutdown, SocketAddr};
 #[cfg(windows)]
-use std::os::windows::io::{AsRawSocket, FromRawSocket};
+use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket};
 
 #[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -182,6 +182,25 @@ impl TcpStream {
         let io = mio::net::TcpStream::from_std(stream);
         let io = PollEvented::new(io)?;
         Ok(TcpStream { io })
+    }
+
+    /// Turn a `TcpStream` into a `std::net::TcpStream`.
+    pub fn into_std(self) -> io::Result<std::net::TcpStream> {
+        #[cfg(unix)]
+        {
+            self.io
+                .into_inner()
+                .map(|io| io.into_raw_fd())
+                .map(|raw_fd| unsafe { std::net::TcpStream::from_raw_fd(raw_fd) })
+        }
+
+        #[cfg(windows)]
+        {
+            self.io
+                .into_inner()
+                .map(|io| io.into_raw_socket())
+                .map(|raw_socket| unsafe { std::net::TcpStream::from_raw_socket(raw_socket) })
+        }
     }
 
     /// Returns the local address that this stream is bound to.
