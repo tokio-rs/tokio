@@ -79,3 +79,9 @@ async fn stresstest() {
     let _p5 = sem.try_acquire().unwrap();
     assert!(sem.try_acquire().is_err());
 }
+
+#[test]
+fn add_max_amount_permits() {
+    let s = tokio::sync::Semaphore::new(0);
+    s.add_permits(usize::MAX >> 3);
+}
