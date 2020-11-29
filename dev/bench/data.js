@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1606639822023,
+  "lastUpdate": 1606639841906,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -4241,6 +4241,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 824930,
             "range": "± 22589",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c55d846f4b248b4a72335d6c57829fa6396ab9a5",
+          "message": "util: add rt to tokio-util full feature (#3194)",
+          "timestamp": "2020-11-29T09:48:31+01:00",
+          "tree_id": "5f27b29cd1018796f0713d6e87e4823920ba5084",
+          "url": "https://github.com/tokio-rs/tokio/commit/c55d846f4b248b4a72335d6c57829fa6396ab9a5"
+        },
+        "date": 1606639841090,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6677120,
+            "range": "± 2481685",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6671099,
+            "range": "± 1720537",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 5848486,
+            "range": "± 1834868",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 852,
+            "range": "± 197",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 815,
+            "range": "± 261",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 810,
+            "range": "± 155",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 60697,
+            "range": "± 13430",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1011,
+            "range": "± 221",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1035693,
+            "range": "± 193376",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 742766,
+            "range": "± 125277",
             "unit": "ns/iter"
           }
         ]
