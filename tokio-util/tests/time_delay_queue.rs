@@ -2,7 +2,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::time::{self, sleep, Duration, Instant};
+use tokio::time::{self, sleep, sleep_until, Duration, Instant};
 use tokio_test::{assert_ok, assert_pending, assert_ready, task};
 use tokio_util::time::DelayQueue;
 
@@ -107,9 +107,10 @@ async fn multi_delay_at_start() {
     assert_pending!(poll!(queue));
     assert!(!queue.is_woken());
 
+    let start = Instant::now();
     for elapsed in 0..1200 {
-        sleep(ms(1)).await;
         let elapsed = elapsed + 1;
+        tokio::time::sleep_until(start + ms(elapsed)).await;
 
         if delays.contains(&elapsed) {
             assert!(queue.is_woken());
@@ -117,7 +118,12 @@ async fn multi_delay_at_start() {
             assert_pending!(poll!(queue));
         } else if queue.is_woken() {
             let cascade = &[192, 960];
-            assert!(cascade.contains(&elapsed), "elapsed={}", elapsed);
+            assert!(
+                cascade.contains(&elapsed),
+                "elapsed={} dt={:?}",
+                elapsed,
+                Instant::now() - start
+            );
 
             assert_pending!(poll!(queue));
         }
@@ -205,7 +211,7 @@ async fn reset_much_later() {
 
     sleep(ms(3)).await;
 
-    queue.reset_at(&key, now + ms(5));
+    queue.reset_at(&key, now + ms(10));
 
     sleep(ms(20)).await;
 
@@ -402,7 +408,7 @@ async fn insert_before_first_after_poll() {
 
     sleep(ms(99)).await;
 
-    assert!(!queue.is_woken());
+    assert_pending!(poll!(queue));
 
     sleep(ms(1)).await;
 
@@ -457,7 +463,7 @@ async fn reset_later_after_slot_starts() {
 
     assert_pending!(poll!(queue));
 
-    sleep(ms(80)).await;
+    sleep_until(now + Duration::from_millis(80)).await;
 
     assert!(!queue.is_woken());
 
@@ -472,7 +478,7 @@ async fn reset_later_after_slot_starts() {
 
     assert_pending!(poll!(queue));
 
-    sleep(ms(39)).await;
+    sleep_until(now + Duration::from_millis(119)).await;
     assert!(!queue.is_woken());
 
     sleep(ms(1)).await;
@@ -515,7 +521,7 @@ async fn reset_earlier_after_slot_starts() {
 
     assert_pending!(poll!(queue));
 
-    sleep(ms(80)).await;
+    sleep_until(now + Duration::from_millis(80)).await;
 
     assert!(!queue.is_woken());
 
@@ -530,7 +536,7 @@ async fn reset_earlier_after_slot_starts() {
 
     assert_pending!(poll!(queue));
 
-    sleep(ms(39)).await;
+    sleep_until(now + Duration::from_millis(119)).await;
     assert!(!queue.is_woken());
 
     sleep(ms(1)).await;

@@ -24,7 +24,7 @@ categories = ["asynchronous"]
 default = []
 
 # Shorthand for enabling everything
-full = ["codec", "compat", "io", "time", "net"]
+full = ["codec", "compat", "io", "time", "net", "rt"]
 
 net = ["tokio/net"]
 compat = ["futures-io",]

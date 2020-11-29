@@ -49,7 +49,8 @@ async fn usage_stream() {
     use tokio::stream::StreamExt;
 
     let start = Instant::now();
-    let mut interval = time::interval(ms(10));
+    let interval = time::interval(ms(10));
+    tokio::pin!(interval);
 
     for _ in 0..3 {
         interval.next().await.unwrap();

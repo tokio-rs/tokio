@@ -23,7 +23,7 @@ pin_project! {
 impl<S: Stream> Timeout<S> {
     pub(super) fn new(stream: S, duration: Duration) -> Self {
         let next = Instant::now() + duration;
-        let deadline = Sleep::new_timeout(next, duration);
+        let deadline = Sleep::new_timeout(next);
 
         Timeout {
             stream: Fuse::new(stream),

@@ -10,6 +10,7 @@ cfg_io_driver! {
     feature = "rt",
     feature = "sync",
     feature = "signal",
+    feature = "time",
 ))]
 pub(crate) mod linked_list;
 
