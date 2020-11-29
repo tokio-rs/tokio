@@ -1,13 +1,11 @@
 // This example shows how to use the tokio runtime with any other executor
 //
-// The main components are a spawn fn that will wrap futures in a special future
-// that will always enter the tokio context on poll. This only spawns on extra thread
-// to manage and run the tokio drivers in the background.
+//It takes advantage from RuntimeExt which provides the extension to customize your
+//runtime.
 
 use tokio::net::TcpListener;
 use tokio::runtime::Builder;
 use tokio::sync::oneshot;
-use tokio::time::{Duration, Sleep};
 use tokio_util::context::RuntimeExt;
 
 fn main() {
@@ -30,4 +28,5 @@ fn main() {
         println!("addr: {:?}", listener.local_addr());
         tx.send(()).unwrap();
     }));
+    futures::executor::block_on(rx).unwrap();
 }
