@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1606754154447,
+  "lastUpdate": 1606754166500,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -1993,6 +1993,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 17574576,
             "range": "± 3841532",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "pickfire@riseup.net",
+            "name": "Ivan Tham",
+            "username": "pickfire"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "72d6346c0d43d867002dc0cc5527fbd0b0e23c3f",
+          "message": "macros: #[tokio::main] can be used on non-main (#3199)",
+          "timestamp": "2020-11-30T17:34:11+01:00",
+          "tree_id": "c558d1cb380cc67bfc56ea960a7d9e266259367a",
+          "url": "https://github.com/tokio-rs/tokio/commit/72d6346c0d43d867002dc0cc5527fbd0b0e23c3f"
+        },
+        "date": 1606754165584,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 190514,
+            "range": "± 32887",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 721690,
+            "range": "± 154815",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5093712,
+            "range": "± 1286533",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19983728,
+            "range": "± 2824381",
             "unit": "ns/iter"
           }
         ]
