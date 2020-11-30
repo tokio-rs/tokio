@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1606769961219,
+  "lastUpdate": 1606769997120,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -2143,6 +2143,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 22165634,
             "range": "± 3394684",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "08548583b948a0be04338f1b1462917c001dbf4a",
+          "message": "chore: prepare v0.3.5 release (#3201)",
+          "timestamp": "2020-11-30T12:57:31-08:00",
+          "tree_id": "bc964338ba8d03930d53192a1e2288132330ff97",
+          "url": "https://github.com/tokio-rs/tokio/commit/08548583b948a0be04338f1b1462917c001dbf4a"
+        },
+        "date": 1606769996263,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 166879,
+            "range": "± 26242",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 645360,
+            "range": "± 57330",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5110708,
+            "range": "± 663855",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19542729,
+            "range": "± 3389790",
             "unit": "ns/iter"
           }
         ]
