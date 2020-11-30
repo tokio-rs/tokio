@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1606754198765,
+  "lastUpdate": 1606763577805,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -1079,6 +1079,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 594,
             "range": "± 29",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "73653352+HK416-is-all-you-need@users.noreply.github.com",
+            "name": "HK416-is-all-you-need",
+            "username": "HK416-is-all-you-need"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7707ba88efa9b9d78436f1fbdc873d81bfc3f7a5",
+          "message": "io: add AsyncFd::with_interest (#3167)\n\nFixes #3072",
+          "timestamp": "2020-11-30T11:11:18-08:00",
+          "tree_id": "45e9d190af02ab0cdc92c317e3127a1b8227ac3a",
+          "url": "https://github.com/tokio-rs/tokio/commit/7707ba88efa9b9d78436f1fbdc873d81bfc3f7a5"
+        },
+        "date": 1606763576920,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 912,
+            "range": "± 245",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 20691,
+            "range": "± 6127",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 940,
+            "range": "± 224",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 20672,
+            "range": "± 6183",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 517,
+            "range": "± 131",
             "unit": "ns/iter"
           }
         ]
