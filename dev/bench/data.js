@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1606763585808,
+  "lastUpdate": 1606763591133,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -2095,6 +2095,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19983728,
             "range": "± 2824381",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "73653352+HK416-is-all-you-need@users.noreply.github.com",
+            "name": "HK416-is-all-you-need",
+            "username": "HK416-is-all-you-need"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7707ba88efa9b9d78436f1fbdc873d81bfc3f7a5",
+          "message": "io: add AsyncFd::with_interest (#3167)\n\nFixes #3072",
+          "timestamp": "2020-11-30T11:11:18-08:00",
+          "tree_id": "45e9d190af02ab0cdc92c317e3127a1b8227ac3a",
+          "url": "https://github.com/tokio-rs/tokio/commit/7707ba88efa9b9d78436f1fbdc873d81bfc3f7a5"
+        },
+        "date": 1606763587212,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 200536,
+            "range": "± 62617",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 742339,
+            "range": "± 154012",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5566510,
+            "range": "± 1874669",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 22165634,
+            "range": "± 3394684",
             "unit": "ns/iter"
           }
         ]
