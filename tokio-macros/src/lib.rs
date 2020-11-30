@@ -35,6 +35,10 @@ use proc_macro::TokenStream;
 /// [Builder](../tokio/runtime/struct.Builder.html), which provides a more
 /// powerful interface.
 ///
+/// Note: This macro can be used in any functions and not just `main` function.
+/// It may be useful to add it to another function if one only wants to use
+/// async code from another thread while keeping main synchronous.
+///
 /// # Multi-threaded runtime
 ///
 /// To use the multi-threaded runtime, the macro can be configured using
