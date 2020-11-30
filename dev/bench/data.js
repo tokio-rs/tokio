@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1606754148619,
+  "lastUpdate": 1606754154447,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -3021,6 +3021,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 975,
             "range": "± 134",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "pickfire@riseup.net",
+            "name": "Ivan Tham",
+            "username": "pickfire"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "72d6346c0d43d867002dc0cc5527fbd0b0e23c3f",
+          "message": "macros: #[tokio::main] can be used on non-main (#3199)",
+          "timestamp": "2020-11-30T17:34:11+01:00",
+          "tree_id": "c558d1cb380cc67bfc56ea960a7d9e266259367a",
+          "url": "https://github.com/tokio-rs/tokio/commit/72d6346c0d43d867002dc0cc5527fbd0b0e23c3f"
+        },
+        "date": 1606754153608,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 14953,
+            "range": "± 2824",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1152,
+            "range": "± 7",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 673,
+            "range": "± 10",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 14743,
+            "range": "± 2883",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1153,
+            "range": "± 4",
             "unit": "ns/iter"
           }
         ]
