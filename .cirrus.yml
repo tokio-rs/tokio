@@ -6,7 +6,7 @@ freebsd_instance:
 # 64-bit kernel and in a 64-bit environment.  Our tests don't execute any of
 # the system's binaries, so the environment shouldn't matter.
 task:
-  name: FreeBSD 12.2
+  name: FreeBSD
   env:
     LOOM_MAX_PREEMPTIONS: 2
     RUSTFLAGS: -Dwarnings
