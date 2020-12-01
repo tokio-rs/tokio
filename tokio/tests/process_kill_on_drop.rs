@@ -10,7 +10,7 @@ use tokio_test::assert_ok;
 
 #[tokio::test]
 async fn kill_on_drop() {
-    let mut cmd = Command::new("sh");
+    let mut cmd = Command::new("bash");
     cmd.args(&[
         "-c",
         "
