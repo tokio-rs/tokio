@@ -84,6 +84,7 @@ async fn stresstest() {
 fn add_max_amount_permits() {
     let s = tokio::sync::Semaphore::new(0);
     s.add_permits(usize::MAX >> 3);
+    assert_eq!(s.available_permits(), usize::MAX >> 3);
 }
 
 #[test]
