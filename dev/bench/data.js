@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1606785705560,
+  "lastUpdate": 1606785711037,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -5393,6 +5393,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 773018,
             "range": "± 137081",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "asomers@gmail.com",
+            "name": "Alan Somers",
+            "username": "asomers"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "128495168d390092df2cb8ae8577cfec09f666ff",
+          "message": "ci: switch FreeBSD CI environment to 12.2-RELEASE (#3202)\n\n12.1 will be EoL in two months.",
+          "timestamp": "2020-12-01T10:19:54+09:00",
+          "tree_id": "2a289d5667b3ffca2ebfb747785c380ee7eac034",
+          "url": "https://github.com/tokio-rs/tokio/commit/128495168d390092df2cb8ae8577cfec09f666ff"
+        },
+        "date": 1606785710244,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6328276,
+            "range": "± 2246802",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6288952,
+            "range": "± 1380874",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 5754739,
+            "range": "± 2054266",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 655,
+            "range": "± 97",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 698,
+            "range": "± 167",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 649,
+            "range": "± 84",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 49359,
+            "range": "± 6960",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 675,
+            "range": "± 93",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 942974,
+            "range": "± 122454",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 693581,
+            "range": "± 101894",
             "unit": "ns/iter"
           }
         ]
