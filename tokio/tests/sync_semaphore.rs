@@ -85,3 +85,10 @@ fn add_max_amount_permits() {
     let s = tokio::sync::Semaphore::new(0);
     s.add_permits(usize::MAX >> 3);
 }
+
+#[test]
+#[should_panic]
+fn add_more_than_max_amount_permits() {
+    let s = tokio::sync::Semaphore::new(1);
+    s.add_permits(usize::MAX >> 3);
+}
