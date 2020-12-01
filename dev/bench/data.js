@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1606785748789,
+  "lastUpdate": 1606785752987,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -5735,6 +5735,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 693581,
             "range": "± 101894",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "asomers@gmail.com",
+            "name": "Alan Somers",
+            "username": "asomers"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "353b0544a04214e7d6e828641e2045df1d97cda8",
+          "message": "ci: reenable CI on FreeBSD i686 (#3204)\n\nIt was temporarily disabled in 06c473e62842d257ed275497ce906710ea3f8e19\r\nand never reenabled.",
+          "timestamp": "2020-12-01T10:20:18+09:00",
+          "tree_id": "468f282ba9f5116f5ed9a81abacbb7385aaa9c1e",
+          "url": "https://github.com/tokio-rs/tokio/commit/353b0544a04214e7d6e828641e2045df1d97cda8"
+        },
+        "date": 1606785752138,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6423885,
+            "range": "± 2221839",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6583139,
+            "range": "± 1854430",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 5850827,
+            "range": "± 1885891",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 766,
+            "range": "± 121",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 720,
+            "range": "± 116",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 784,
+            "range": "± 161",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 61864,
+            "range": "± 8560",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 946,
+            "range": "± 124",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1072786,
+            "range": "± 132609",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 753761,
+            "range": "± 129416",
             "unit": "ns/iter"
           }
         ]
