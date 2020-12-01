@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1606770006159,
+  "lastUpdate": 1606785693206,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -3435,6 +3435,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1154,
             "range": "± 593",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "asomers@gmail.com",
+            "name": "Alan Somers",
+            "username": "asomers"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "128495168d390092df2cb8ae8577cfec09f666ff",
+          "message": "ci: switch FreeBSD CI environment to 12.2-RELEASE (#3202)\n\n12.1 will be EoL in two months.",
+          "timestamp": "2020-12-01T10:19:54+09:00",
+          "tree_id": "2a289d5667b3ffca2ebfb747785c380ee7eac034",
+          "url": "https://github.com/tokio-rs/tokio/commit/128495168d390092df2cb8ae8577cfec09f666ff"
+        },
+        "date": 1606785692303,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 15125,
+            "range": "± 3614",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1129,
+            "range": "± 8",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 675,
+            "range": "± 16",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 15523,
+            "range": "± 5305",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1154,
+            "range": "± 6",
             "unit": "ns/iter"
           }
         ]
