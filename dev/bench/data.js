@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1606785714991,
+  "lastUpdate": 1606785723323,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -2347,6 +2347,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21796476,
             "range": "± 2603441",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "asomers@gmail.com",
+            "name": "Alan Somers",
+            "username": "asomers"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "353b0544a04214e7d6e828641e2045df1d97cda8",
+          "message": "ci: reenable CI on FreeBSD i686 (#3204)\n\nIt was temporarily disabled in 06c473e62842d257ed275497ce906710ea3f8e19\r\nand never reenabled.",
+          "timestamp": "2020-12-01T10:20:18+09:00",
+          "tree_id": "468f282ba9f5116f5ed9a81abacbb7385aaa9c1e",
+          "url": "https://github.com/tokio-rs/tokio/commit/353b0544a04214e7d6e828641e2045df1d97cda8"
+        },
+        "date": 1606785722311,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 171799,
+            "range": "± 21288",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 669940,
+            "range": "± 65145",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5180493,
+            "range": "± 631157",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20118298,
+            "range": "± 3088825",
             "unit": "ns/iter"
           }
         ]
