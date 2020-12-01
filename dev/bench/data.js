@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1606785741849,
+  "lastUpdate": 1606785748789,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -3747,6 +3747,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1205,
             "range": "± 206",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "asomers@gmail.com",
+            "name": "Alan Somers",
+            "username": "asomers"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7ae8135b62057be6b1691f04b27eabe285b05efd",
+          "message": "process: fix the process_kill_on_drop.rs test on non-Linux systems (#3203)\n\n\"disown\" is a bash builtin, not part of POSIX sh.",
+          "timestamp": "2020-12-01T10:20:49+09:00",
+          "tree_id": "8b211b0f9807692d77be8a64a4835718355afe7b",
+          "url": "https://github.com/tokio-rs/tokio/commit/7ae8135b62057be6b1691f04b27eabe285b05efd"
+        },
+        "date": 1606785747978,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 14082,
+            "range": "± 4841",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 955,
+            "range": "± 145",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 565,
+            "range": "± 212",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 14064,
+            "range": "± 5000",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 943,
+            "range": "± 106",
             "unit": "ns/iter"
           }
         ]
