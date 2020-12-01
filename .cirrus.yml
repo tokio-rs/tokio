@@ -23,8 +23,7 @@ task:
     - . $HOME/.cargo/env
     - cargo test --all
     - cargo doc --all --no-deps
-  # TODO: Re-enable
-  # i686_test_script:
-  #   - . $HOME/.cargo/env
-  #   - |
-  #     cargo test --all --exclude tokio-macros --target i686-unknown-freebsd
+  i686_test_script:
+    - . $HOME/.cargo/env
+    - |
+      cargo test --all --target i686-unknown-freebsd
