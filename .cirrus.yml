@@ -11,7 +11,7 @@ task:
     LOOM_MAX_PREEMPTIONS: 2
     RUSTFLAGS: -Dwarnings
   setup_script:
-    - pkg install -y curl
+    - pkg install -y bash curl
     - curl https://sh.rustup.rs -sSf --output rustup.sh
     - sh rustup.sh -y --profile minimal --default-toolchain stable
     - . $HOME/.cargo/env
