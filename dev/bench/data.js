@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1606792910364,
+  "lastUpdate": 1606792913647,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -2551,6 +2551,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21430533,
             "range": "± 2133099",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "cssivision@gmail.com",
+            "name": "cssivision",
+            "username": "cssivision"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a8e0f0a919663b210627c132d6af3e19a95d8037",
+          "message": "example: add back udp-codec example (#3205)",
+          "timestamp": "2020-12-01T12:20:20+09:00",
+          "tree_id": "b18851ef95641ab2e2d1f632e2ce39cb1fcb1301",
+          "url": "https://github.com/tokio-rs/tokio/commit/a8e0f0a919663b210627c132d6af3e19a95d8037"
+        },
+        "date": 1606792912609,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 160333,
+            "range": "± 15606",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 648572,
+            "range": "± 69638",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5151938,
+            "range": "± 1114416",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18520279,
+            "range": "± 3283676",
             "unit": "ns/iter"
           }
         ]
