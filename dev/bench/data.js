@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1606785723323,
+  "lastUpdate": 1606785735769,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -1241,6 +1241,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 607,
             "range": "± 67",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "asomers@gmail.com",
+            "name": "Alan Somers",
+            "username": "asomers"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "353b0544a04214e7d6e828641e2045df1d97cda8",
+          "message": "ci: reenable CI on FreeBSD i686 (#3204)\n\nIt was temporarily disabled in 06c473e62842d257ed275497ce906710ea3f8e19\r\nand never reenabled.",
+          "timestamp": "2020-12-01T10:20:18+09:00",
+          "tree_id": "468f282ba9f5116f5ed9a81abacbb7385aaa9c1e",
+          "url": "https://github.com/tokio-rs/tokio/commit/353b0544a04214e7d6e828641e2045df1d97cda8"
+        },
+        "date": 1606785734965,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1010,
+            "range": "± 209",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 22260,
+            "range": "± 14628",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 991,
+            "range": "± 248",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 21596,
+            "range": "± 9496",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 555,
+            "range": "± 101",
             "unit": "ns/iter"
           }
         ]
