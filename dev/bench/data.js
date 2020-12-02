@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1606792949527,
+  "lastUpdate": 1606946409221,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -2653,6 +2653,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18520279,
             "range": "± 3283676",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "rodrigblas@gmail.com",
+            "name": "Blas Rodriguez Irizar",
+            "username": "blasrodri"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a6051a61ec5c96113f4b543de3ec55431695347a",
+          "message": "sync: make add_permits panic with usize::MAX >> 3 permits (#3188)",
+          "timestamp": "2020-12-02T22:58:28+01:00",
+          "tree_id": "1a4d4bcc017f6a61a652505b1edd4a3bf36ea1ab",
+          "url": "https://github.com/tokio-rs/tokio/commit/a6051a61ec5c96113f4b543de3ec55431695347a"
+        },
+        "date": 1606946408351,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 158939,
+            "range": "± 17712",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 600250,
+            "range": "± 30952",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4960717,
+            "range": "± 982395",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18440283,
+            "range": "± 3008249",
             "unit": "ns/iter"
           }
         ]
