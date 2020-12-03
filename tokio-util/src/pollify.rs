@@ -8,11 +8,6 @@ use std::{
     task::{Context, Poll},
 };
 
-/// Marker type used as a privacy proof for `AsyncOp::op`.
-/// You should never construct this type.
-#[derive(Debug)]
-pub struct Internal(());
-
 /// Type that has `async fn`.
 /// `Pollify` can wrap instance of such type and
 /// provide `poll`-based api.
