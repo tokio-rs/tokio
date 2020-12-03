@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607023264590,
+  "lastUpdate": 1607023276570,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -2809,6 +2809,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18440283,
             "range": "± 3008249",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "eliza@buoyant.io",
+            "name": "Eliza Weisman",
+            "username": "hawkw"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "647299866a2262c8a1183adad73673e5803293ed",
+          "message": "util: add writev-aware `poll_write_buf` (#3156)\n\n## Motivation\r\n\r\nIn Tokio 0.2, `AsyncRead` and `AsyncWrite` had `poll_write_buf` and\r\n`poll_read_buf` methods for reading and writing to implementers of\r\n`bytes` `Buf` and `BufMut` traits. In 0.3, these were removed, but\r\n`poll_read_buf` was added as a free function in `tokio-util`. However,\r\nthere is currently no `poll_write_buf`.\r\n\r\nNow that `AsyncWrite` has regained support for vectored writes in #3149,\r\nthere's a lot of potential benefit in having a `poll_write_buf` that\r\nuses vectored writes when supported and non-vectored writes when not\r\nsupported, so that users don't have to reimplement this.\r\n\r\n## Solution\r\n\r\nThis PR adds a `poll_write_buf` function to `tokio_util::io`, analogous\r\nto the existing `poll_read_buf` function.\r\n\r\nThis function writes from a `Buf` to an `AsyncWrite`, advancing the\r\n`Buf`'s internal cursor. In addition, when the `AsyncWrite` supports\r\nvectored writes (i.e. its `is_write_vectored` method returns `true`),\r\nit will use vectored IO.\r\n\r\nI copied the documentation for this functions from the docs from Tokio\r\n0.2's `AsyncWrite::poll_write_buf` , with some minor modifications as\r\nappropriate.\r\n\r\nFinally, I fixed a minor issue in the existing docs for `poll_read_buf`\r\nand `read_buf`, and updated `tokio_util::codec` to use `poll_write_buf`.\r\n\r\nSigned-off-by: Eliza Weisman <eliza@buoyant.io>",
+          "timestamp": "2020-12-03T11:19:16-08:00",
+          "tree_id": "c92df9ae491f0a444e694879858d032c3f6a5373",
+          "url": "https://github.com/tokio-rs/tokio/commit/647299866a2262c8a1183adad73673e5803293ed"
+        },
+        "date": 1607023275721,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 160561,
+            "range": "± 6801",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 626121,
+            "range": "± 27061",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4599819,
+            "range": "± 919230",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19634997,
+            "range": "± 3304098",
             "unit": "ns/iter"
           }
         ]
