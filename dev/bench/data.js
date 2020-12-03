@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607023276570,
+  "lastUpdate": 1607038355274,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -2857,6 +2857,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19634997,
             "range": "± 3304098",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "eliza@buoyant.io",
+            "name": "Eliza Weisman",
+            "username": "hawkw"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "00500d1b35f00c68117d8f4e7320303e967e92e3",
+          "message": "util: prepare v0.5.1 release (#3210)\n\n### Added\r\n\r\n- io: `poll_read_buf` util fn (#2972).\r\n- io: `poll_write_buf` util fn with vectored write support (#3156).\r\n\r\nSigned-off-by: Eliza Weisman <eliza@buoyant.io>",
+          "timestamp": "2020-12-03T15:30:52-08:00",
+          "tree_id": "fe18e0f55daa4f26cf53bfe42a713338ac5460d9",
+          "url": "https://github.com/tokio-rs/tokio/commit/00500d1b35f00c68117d8f4e7320303e967e92e3"
+        },
+        "date": 1607038354383,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 188992,
+            "range": "± 11669",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 719349,
+            "range": "± 45791",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5472948,
+            "range": "± 1387124",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20859312,
+            "range": "± 3000318",
             "unit": "ns/iter"
           }
         ]
