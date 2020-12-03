@@ -41,7 +41,10 @@ enum State<F: Future> {
     Progress(F),
 }
 
-type DummyState = State<std::future::Pending<()>>;
+enum StateKind {
+    Empty,
+    Ready,
+}
 
 impl<F: Future> State<F> {
     fn is_in_progress(&self) -> bool {
@@ -62,15 +65,15 @@ impl<F: Future> State<F> {
         }
     }
 
-    fn reset(mut self: Pin<&mut Self>) -> DummyState {
+    fn reset(mut self: Pin<&mut Self>) -> StateKind {
         if self.is_in_progress() {
             self.set(State::Empty);
-            return DummyState::Empty;
+            return StateKind::Empty;
         } else {
             let this = unsafe { Pin::into_inner_unchecked(self) };
             match this {
-                State::Empty => DummyState::Empty,
-                State::Ready(_) => DummyState::Ready(()),
+                State::Empty => StateKind::Empty,
+                State::Ready(_) => StateKind::Ready,
                 State::Progress(_) => unreachable!(),
             }
         }
@@ -157,7 +160,7 @@ impl<A: AsyncOp> Pollify<A> {
     pub fn cancel(mut self: Pin<&mut Self>) -> bool {
         let was_ready = matches!(
             self.as_mut().pin_project_state().reset(),
-            DummyState::Ready(_)
+            StateKind::Ready
         );
         was_ready
     }
