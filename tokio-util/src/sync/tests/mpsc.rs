@@ -57,6 +57,8 @@ fn disarm_during_pending() {
             rx.try_recv(),
             Err(tokio::sync::mpsc::error::TryRecvError::Empty)
         );
+        // cancel pending future
+        tx.as_mut().disarm();
         poll_fn(|cx| tx.as_mut().poll_ready(cx)).await.unwrap();
         tx.disarm();
         assert!(tx2.try_send(2).is_ok());

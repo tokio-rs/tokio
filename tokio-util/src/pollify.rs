@@ -70,12 +70,14 @@ impl<F: Future> State<F> {
             self.set(State::Empty);
             StateKind::Empty
         } else {
-            let this = unsafe { Pin::into_inner_unchecked(self) };
-            match this {
+            let this = unsafe { Pin::into_inner_unchecked(self.as_mut()) };
+            let kind = match this {
                 State::Empty => StateKind::Empty,
                 State::Ready(_) => StateKind::Ready,
                 State::Progress(_) => unreachable!(),
-            }
+            };
+            self.set(State::Empty);
+            kind
         }
     }
 }
