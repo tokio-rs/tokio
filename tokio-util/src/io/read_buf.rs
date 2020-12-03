@@ -5,9 +5,9 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::AsyncRead;
 
-/// Read data from an `AsyncRead` into an implementer of the [`Buf`] trait.
+/// Read data from an `AsyncRead` into an implementer of the [`BufMut`] trait.
 ///
-/// [`Buf`]: bytes::Buf
+/// [`BufMut`]: bytes::BufMut
 ///
 /// # Example
 ///
