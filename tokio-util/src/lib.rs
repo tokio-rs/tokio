@@ -50,6 +50,8 @@ pub mod sync;
 
 pub mod either;
 
+pub mod pollify;
+
 #[cfg(feature = "time")]
 pub mod time;
 

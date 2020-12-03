@@ -1,144 +1,115 @@
 //! Tokio-02 style MPSC channel.
+use crate::pollify::Pollify;
 use std::{
     future::Future,
-    marker::PhantomPinned,
+    marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
 };
 use tokio::sync::mpsc::{error::SendError, Permit};
 
+/// Wrapper for Box<dyn Future> conditionally implementing Send and Sync
+struct FutureBox<'a, T, M>(Pin<Box<dyn Future<Output = T> + 'a>>, PhantomData<Box<M>>);
+
+impl<'a, T, M> Future for FutureBox<'a, T, M> {
+    type Output = T;
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Pin::new(&mut Pin::into_inner(self).0).as_mut().poll(cx)
+    }
+}
+
+unsafe impl<'a, T, M> Send for FutureBox<'a, T, M> where M: Send {}
+unsafe impl<'a, T, M> Sync for FutureBox<'a, T, M> where M: Sync {}
+
+#[derive(Debug)]
+struct Chan<'a, T>(tokio::sync::mpsc::Sender<T>, PhantomData<&'a ()>);
+impl<'a, T: 'a> crate::pollify::AsyncOp for Chan<'a, T> {
+    type Fut = FutureBox<'a, AcquireFutOutput<'a, T>, T>;
+
+    unsafe fn start_operation(&mut self) -> Self::Fut {
+        // SAFETY: guaranteed by AsyncOp invariant.
+        let long_lived_sender = std::mem::transmute::<
+            &mut tokio::sync::mpsc::Sender<T>,
+            &'a mut tokio::sync::mpsc::Sender<T>,
+        >(&mut self.0);
+        FutureBox(Box::pin(long_lived_sender.reserve()), PhantomData)
+    }
+}
+
 /// Fat sender with `poll_ready` support.
 #[derive(Debug)]
-pub struct Sender<'a, T> {
-    // field order: `state` can contain reference to `inner`,
-    // so it must be dropped first.
-    /// State of this sender
-    state: State<'a, T>,
-    /// Underlying channel
-    inner: tokio::sync::mpsc::Sender<T>,
-    /// Pinned marker
-    pinned: PhantomPinned,
+pub struct Sender<'a, T: Send + 'a> {
+    used_in_poll_ready: PhantomData<&'a ()>,
+    pollify: Pollify<Chan<'a, T>>,
 }
 
-impl<'a, T: 'a> Sender<'a, T> {
-    /// It is OK to get mutable reference to state, because it is not
-    /// self-referencing.
-    fn pin_project_state(self: Pin<&mut Self>) -> &mut State<'a, T> {
-        unsafe { &mut Pin::into_inner_unchecked(self).state }
-    }
-
-    /// Sender must be pinned because state can contain references to it
-    unsafe fn pin_project_inner(self: Pin<&mut Self>) -> &mut tokio::sync::mpsc::Sender<T> {
-        &mut Pin::into_inner_unchecked(self).inner
-    }
-}
-
-impl<'a, T: 'a> Clone for Sender<'a, T> {
+impl<'a, T: Send + 'a> Clone for Sender<'a, T> {
     fn clone(&self) -> Self {
-        Sender {
-            state: State::Empty,
-            inner: self.inner.clone(),
-            pinned: PhantomPinned,
-        }
+        Self::new(self.pollify.inner().0.clone())
     }
 }
 
 type AcquireFutOutput<'a, T> = Result<Permit<'a, T>, SendError<()>>;
 
-enum State<'a, T> {
-    /// We do not have permit, but we didn't start acquiring it.
-    Empty,
-    /// We have a permit to send.
-    // ALERT: this is self-reference to the Sender.
-    Ready(Permit<'a, T>),
-    /// We are in process of acquiring a permit
-    // ALERT: contained future contains self-reference to the sender.
-    Acquire(Pin<Box<dyn Future<Output = AcquireFutOutput<'a, T>> + Send + Sync + 'a>>),
-}
-
-impl<'a, T: 'a> std::fmt::Debug for State<'a, T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            State::Empty => f.debug_tuple("Empty").finish(),
-            State::Ready(_) => f.debug_tuple("Ready").field(&"_").finish(),
-            State::Acquire(_) => f.debug_tuple("Acquire").field(&"_").finish(),
-        }
-    }
-}
-
 impl<'a, T: Send + 'a> Sender<'a, T> {
     /// Wraps a [tokio sender](tokio::sync::mpsc::Sender).
     pub fn new(inner: tokio::sync::mpsc::Sender<T>) -> Self {
+        let chan = Chan(inner, PhantomData);
         Sender {
-            inner,
-            state: State::Empty,
-            pinned: PhantomPinned,
+            pollify: Pollify::new(chan),
+            used_in_poll_ready: PhantomData,
         }
+    }
+
+    fn pin_project_inner(self: Pin<&mut Self>) -> Pin<&mut Pollify<Chan<'a, T>>> {
+        unsafe { self.map_unchecked_mut(|this| &mut this.pollify) }
     }
 
     /// Returns sender readiness state
     pub fn is_ready(&self) -> bool {
-        matches!(self.state, State::Ready(_))
+        self.pollify.is_ready()
     }
 
     /// Sends a message.
     ///
     /// This method panics if the `Sender` is not ready.
     pub fn send(self: Pin<&mut Self>, value: T) {
-        let permit = match std::mem::replace(self.pin_project_state(), State::Empty) {
-            State::Ready(permit) => permit,
-            _ => panic!("called send() on non-ready Sender"),
-        };
+        if !self.pollify.is_ready() {
+            panic!("called send() on non-ready Sender")
+        }
+        let permit = self
+            .pin_project_inner()
+            .extract()
+            .expect("poll_ready would handle Err");
         permit.send(value);
     }
 
     /// Disarm permit. This releases the reserved slot in the bounded channel.
+    /// If acquire was in progress, it is aborted.
     ///
     /// Returns true if before the call this sender owned a permit.
-    pub fn disarm(mut self: Pin<&mut Self>) -> bool {
-        let was_ready = matches!(self.as_mut().pin_project_state(), State::Ready(_));
-        *self.pin_project_state() = State::Empty;
-        was_ready
+    pub fn disarm(self: Pin<&mut Self>) -> bool {
+        self.pin_project_inner().cancel()
     }
 
     /// Tries to acquire a permit.
     ///
     /// This function can not be called when the `Sender` is ready.
     pub fn poll_ready(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), SendError<()>>> {
-        let mut fut = match std::mem::replace(self.as_mut().pin_project_state(), State::Empty) {
-            State::Ready(_) => panic!("poll_ready() must not be called on ready sender"),
-            State::Acquire(f) => f,
-            State::Empty => {
-                // Extend lifetime here.
-                // 1) Future will not outlive sender, neither does permit.
-                // 2) Obtaining mutable reference to sender is OK because
-                // `reserve` does not move it.
-                let long_lived_sender = unsafe {
-                    std::mem::transmute::<
-                        &mut tokio::sync::mpsc::Sender<T>,
-                        &'a mut tokio::sync::mpsc::Sender<T>,
-                    >(self.as_mut().pin_project_inner())
-                };
-                Box::pin(long_lived_sender.reserve())
+        let mut inner = self.pin_project_inner();
+        match inner.as_mut().poll(cx) {
+            Poll::Ready(()) => {
+                if inner.as_mut().output_ref().is_ok() {
+                    Poll::Ready(Ok(()))
+                } else {
+                    let output = inner.extract();
+                    Poll::Ready(Err(output.unwrap_err()))
+                }
             }
-        };
-        let poll = fut.as_mut().poll(cx);
-        match poll {
-            Poll::Pending => {
-                *self.pin_project_state() = State::Acquire(fut);
-                Poll::Pending
-            }
-            Poll::Ready(Ok(permit)) => {
-                *self.pin_project_state() = State::Ready(permit);
-                Poll::Ready(Ok(()))
-            }
-            Poll::Ready(Err(err)) => {
-                // leave state in `Empty` state
-                Poll::Ready(Err(err))
-            }
+            Poll::Pending => Poll::Pending,
         }
     }
 }
