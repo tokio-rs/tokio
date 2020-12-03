@@ -87,6 +87,7 @@ stream = ["futures-core"]
 sync = []
 test-util = []
 time = []
+unwind = []
 
 [dependencies]
 tokio-macros = { version = "0.3.0", path = "../tokio-macros", optional = true }

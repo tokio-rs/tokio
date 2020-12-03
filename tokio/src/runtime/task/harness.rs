@@ -86,17 +86,18 @@ where
         // future has been obtained. This also ensures the `*mut T` pointer
         // contains the future (as opposed to the output) and is initialized.
 
+        struct Guard<'a, T: Future, S: Schedule> {
+            core: &'a Core<T, S>,
+        }
+
+        impl<T: Future, S: Schedule> Drop for Guard<'_, T, S> {
+            fn drop(&mut self) {
+                self.core.drop_future_or_output();
+            }
+        }
+
+        #[cfg(not(feature = "unwind"))]
         let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            struct Guard<'a, T: Future, S: Schedule> {
-                core: &'a Core<T, S>,
-            }
-
-            impl<T: Future, S: Schedule> Drop for Guard<'_, T, S> {
-                fn drop(&mut self) {
-                    self.core.drop_future_or_output();
-                }
-            }
-
             let guard = Guard { core: self.core() };
 
             // If the task is cancelled, avoid polling it, instead signalling it
@@ -112,6 +113,24 @@ where
                 res.map(Ok)
             }
         }));
+
+        #[cfg(feature = "unwind")]
+        let res = Ok({
+            let guard = Guard { core: self.core() };
+
+            // If the task is cancelled, avoid polling it, instead signalling it
+            // is complete.
+            if snapshot.is_cancelled() {
+                Poll::Ready(Err(JoinError::cancelled()))
+            } else {
+                let res = guard.core.poll(self.header());
+
+                // prevent the guard from dropping the future
+                mem::forget(guard);
+
+                res.map(Ok)
+            }
+        });
 
         match res {
             Ok(Poll::Ready(out)) => {

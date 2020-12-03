@@ -646,6 +646,7 @@ rt_test! {
         assert_err!(rx.try_recv());
     }
 
+    #[cfg(not(feature = "unwind"))]
     #[test]
     fn panic_in_task() {
         let rt = rt();

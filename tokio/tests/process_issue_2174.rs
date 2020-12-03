@@ -16,6 +16,7 @@ use tokio::process::Command;
 use tokio::time;
 use tokio_test::assert_err;
 
+#[cfg(not(feature = "unwind"))]
 #[tokio::test]
 async fn issue_2174() {
     let mut child = Command::new("sleep")
