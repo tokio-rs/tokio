@@ -50,7 +50,6 @@ io-util = ["memchr", "bytes"]
 io-std = []
 macros = ["tokio-macros"]
 net = [
-  "once_cell",
   "libc",
   "mio/os-poll",
   "mio/os-util",

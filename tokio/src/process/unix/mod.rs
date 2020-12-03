@@ -63,7 +63,7 @@ impl Kill for StdChild {
     }
 }
 
-static ORPHAN_QUEUE: Lazy<OrphanQueueImpl<StdChild>> = Lazy::new(|| OrphanQueueImpl::new());
+static ORPHAN_QUEUE: Lazy<OrphanQueueImpl<StdChild>> = Lazy::new(OrphanQueueImpl::new);
 
 pub(crate) struct GlobalOrphanQueue;
 
