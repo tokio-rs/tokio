@@ -161,10 +161,7 @@ impl<A: AsyncOp> Pollify<A> {
     /// Polls current async operation, starting one if necessary.
     ///
     /// This function can not be called when the `Pollify` is ready.
-    pub fn poll<'a>(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()>
-    where
-        A: 'a,
-    {
+    pub fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
         // let state = unsafe { Pin::into_inner_unchecked(self.as_mut().pin_project_state()) };
 
         let fut = match self.as_mut().pin_project_state().pinned_take() {
