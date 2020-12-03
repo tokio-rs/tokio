@@ -174,14 +174,8 @@ impl<A: AsyncOp> Pollify<A> {
             Ok(State::Ready(_)) => panic!("poll_ready() must not be called on ready sender"),
             Ok(State::Progress(_)) => unreachable!(),
             Ok(State::Empty) => {
-                // Extend lifetime here.
-                // Is is corect. Future will not outlive inner, neither does future.
-                let long_lived_inner = unsafe {
-                    std::mem::transmute::<Pin<&mut A>, Pin<&'a mut A>>(
-                        self.as_mut().pin_project_inner(),
-                    )
-                };
-                let fut = unsafe { Pin::into_inner_unchecked(long_lived_inner).start_operation() };
+                let inner = self.as_mut().pin_project_inner();
+                let fut = unsafe { Pin::into_inner_unchecked(inner).start_operation() };
                 self.as_mut().pin_project_state().set(State::Progress(fut));
                 self.as_mut().pin_project_state().pinned_take().unwrap_err()
             }
