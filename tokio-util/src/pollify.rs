@@ -68,7 +68,7 @@ impl<F: Future> State<F> {
     fn reset(mut self: Pin<&mut Self>) -> StateKind {
         if self.is_in_progress() {
             self.set(State::Empty);
-            return StateKind::Empty;
+            StateKind::Empty
         } else {
             let this = unsafe { Pin::into_inner_unchecked(self) };
             match this {
