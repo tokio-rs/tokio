@@ -138,11 +138,10 @@ impl<A: AsyncOp> Pollify<A> {
     /// # Panics
     /// This method panics if the `Sender` is not ready.
     pub fn extract(self: Pin<&mut Self>) -> <A::Fut as Future>::Output {
-        let output = match self.pin_project_state().pinned_take() {
+        match self.pin_project_state().pinned_take() {
             Ok(State::Ready(out)) => out,
             _ => panic!("extract() called, but no output available"),
-        };
-        output
+        }
     }
 
     /// Returns reference to future result.
@@ -158,10 +157,7 @@ impl<A: AsyncOp> Pollify<A> {
     ///
     /// Returns true if before the call operation was completed.
     pub fn cancel(mut self: Pin<&mut Self>) -> bool {
-        let was_ready = matches!(
-            self.as_mut().pin_project_state().reset(),
-            StateKind::Ready
-        );
+        let was_ready = matches!(self.as_mut().pin_project_state().reset(), StateKind::Ready);
         was_ready
     }
 
