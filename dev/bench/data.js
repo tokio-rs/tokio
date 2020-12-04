@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607073929572,
+  "lastUpdate": 1607073946713,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -3061,6 +3061,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20701229,
             "range": "± 2346646",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "razican@protonmail.ch",
+            "name": "Iban Eguia",
+            "username": "Razican"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0dbba139848de6a8ee88350cc7fc48d0b05016c5",
+          "message": "deps: replace lazy_static with once_cell (#3187)",
+          "timestamp": "2020-12-04T10:23:13+01:00",
+          "tree_id": "73f3366b9c7a0c50d6dd146a2626368cf59b3178",
+          "url": "https://github.com/tokio-rs/tokio/commit/0dbba139848de6a8ee88350cc7fc48d0b05016c5"
+        },
+        "date": 1607073945789,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 187704,
+            "range": "± 9813",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 705204,
+            "range": "± 58345",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5383020,
+            "range": "± 544131",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20944514,
+            "range": "± 2285348",
             "unit": "ns/iter"
           }
         ]
