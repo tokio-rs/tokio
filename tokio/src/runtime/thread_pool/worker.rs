@@ -629,52 +629,72 @@ impl task::Schedule for Arc<Worker> {
     fn release(&self, task: &Task) -> Option<Task> {
         use std::ptr::NonNull;
 
-        CURRENT.with(|maybe_cx| {
-            let cx = maybe_cx.expect("scheduler context missing");
+        enum Immediate {
+            Removed(Option<Task>),
+            Core(bool),
+        }
 
-            if self.eq(&cx.worker) {
-                let mut maybe_core = cx.core.borrow_mut();
+        let immediate = CURRENT.with(|maybe_cx| {
+            let cx = match maybe_cx {
+                Some(cx) => cx,
+                None => return Immediate::Core(false),
+            };
 
-                if let Some(core) = &mut *maybe_core {
-                    // Directly remove the task
-                    //
-                    // safety: the task is inserted in the list in `bind`.
-                    unsafe {
-                        let ptr = NonNull::from(task.header());
-                        return core.tasks.remove(ptr);
-                    }
+            if !self.eq(&cx.worker) {
+                return Immediate::Core(cx.core.borrow().is_some());
+            }
+
+            let mut maybe_core = cx.core.borrow_mut();
+
+            if let Some(core) = &mut *maybe_core {
+                // Directly remove the task
+                //
+                // safety: the task is inserted in the list in `bind`.
+                unsafe {
+                    let ptr = NonNull::from(task.header());
+                    return Immediate::Removed(core.tasks.remove(ptr));
                 }
             }
 
-            // Track the task to be released by the worker that owns it
-            //
-            // Safety: We get a new handle without incrementing the ref-count.
-            // A ref-count is held by the "owned" linked list and it is only
-            // ever removed from that list as part of the release process: this
-            // method or popping the task from `pending_drop`. Thus, we can rely
-            // on the ref-count held by the linked-list to keep the memory
-            // alive.
-            //
-            // When the task is removed from the stack, it is forgotten instead
-            // of dropped.
-            let task = unsafe { Task::from_raw(task.header().into()) };
+            Immediate::Core(false)
+        });
 
-            self.remote().pending_drop.push(task);
+        // Checks if we were called from within a worker, allowing for immediate
+        // removal of a scheduled task. Else we have to go through the slower
+        // process below where we remotely mark a task as dropped.
+        let worker_has_core = match immediate {
+            Immediate::Removed(task) => return task,
+            Immediate::Core(worker_has_core) => worker_has_core,
+        };
 
-            if cx.core.borrow().is_some() {
-                return None;
-            }
+        // Track the task to be released by the worker that owns it
+        //
+        // Safety: We get a new handle without incrementing the ref-count.
+        // A ref-count is held by the "owned" linked list and it is only
+        // ever removed from that list as part of the release process: this
+        // method or popping the task from `pending_drop`. Thus, we can rely
+        // on the ref-count held by the linked-list to keep the memory
+        // alive.
+        //
+        // When the task is removed from the stack, it is forgotten instead
+        // of dropped.
+        let task = unsafe { Task::from_raw(task.header().into()) };
 
-            // The worker core has been handed off to another thread. In the
-            // event that the scheduler is currently shutting down, the thread
-            // that owns the task may be waiting on the release to complete
-            // shutdown.
-            if self.inject().is_closed() {
-                self.remote().unpark.unpark();
-            }
+        self.remote().pending_drop.push(task);
 
-            None
-        })
+        if worker_has_core {
+            return None;
+        }
+
+        // The worker core has been handed off to another thread. In the
+        // event that the scheduler is currently shutting down, the thread
+        // that owns the task may be waiting on the release to complete
+        // shutdown.
+        if self.inject().is_closed() {
+            self.remote().unpark.unpark();
+        }
+
+        None
     }
 
     fn schedule(&self, task: Notified) {
