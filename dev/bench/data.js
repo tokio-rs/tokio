@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607059899060,
+  "lastUpdate": 1607059902725,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -2959,6 +2959,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20859312,
             "range": "± 3000318",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "udoprog@tedro.se",
+            "name": "John-John Tedro",
+            "username": "udoprog"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a125ebd745f31098aa170cb1009ff0fe34508d37",
+          "message": "rt: fix panic in task abort when off rt (#3159)\n\nA call to `JoinHandle::abort` releases a task. When called from outside of the runtime,\r\nthis panics due to the current implementation checking for a thread-local worker context.\r\n\r\nThis change makes accessing the thread-local context optional under release, by falling\r\nback to remotely marking a task remotely as dropped. Behaving the same as if the core\r\nwas stolen by another worker.\r\n\r\nFixes #3157",
+          "timestamp": "2020-12-03T21:29:59-08:00",
+          "tree_id": "8dab5d17383a5f63f7554ec009cf6e1408c46d96",
+          "url": "https://github.com/tokio-rs/tokio/commit/a125ebd745f31098aa170cb1009ff0fe34508d37"
+        },
+        "date": 1607059901868,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 199560,
+            "range": "± 59640",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 729955,
+            "range": "± 120655",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4926021,
+            "range": "± 1324623",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20701229,
+            "range": "± 2346646",
             "unit": "ns/iter"
           }
         ]
