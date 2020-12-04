@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607073908643,
+  "lastUpdate": 1607073917381,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -1565,6 +1565,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 591,
             "range": "± 23",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "razican@protonmail.ch",
+            "name": "Iban Eguia",
+            "username": "Razican"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0dbba139848de6a8ee88350cc7fc48d0b05016c5",
+          "message": "deps: replace lazy_static with once_cell (#3187)",
+          "timestamp": "2020-12-04T10:23:13+01:00",
+          "tree_id": "73f3366b9c7a0c50d6dd146a2626368cf59b3178",
+          "url": "https://github.com/tokio-rs/tokio/commit/0dbba139848de6a8ee88350cc7fc48d0b05016c5"
+        },
+        "date": 1607073916556,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1013,
+            "range": "± 4",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 14762,
+            "range": "± 3372",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1040,
+            "range": "± 12",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 14734,
+            "range": "± 3395",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 594,
+            "range": "± 16",
             "unit": "ns/iter"
           }
         ]
