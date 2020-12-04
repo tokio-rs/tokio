@@ -36,6 +36,7 @@ use crate::signal::unix::{signal, Signal, SignalKind};
 
 use mio::event::Source;
 use mio::unix::SourceFd;
+use once_cell::sync::Lazy;
 use std::fmt;
 use std::fs::File;
 use std::future::Future;
@@ -62,9 +63,7 @@ impl Kill for StdChild {
     }
 }
 
-lazy_static::lazy_static! {
-    static ref ORPHAN_QUEUE: OrphanQueueImpl<StdChild> = OrphanQueueImpl::new();
-}
+static ORPHAN_QUEUE: Lazy<OrphanQueueImpl<StdChild>> = Lazy::new(OrphanQueueImpl::new);
 
 pub(crate) struct GlobalOrphanQueue;
 
