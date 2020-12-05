@@ -103,6 +103,29 @@ impl<T: Future, S: Schedule> Cell<T, S> {
             },
         })
     }
+
+    cfg_rt_test! {
+        /// Allocates a new task cell, containing the header, trailer, and core
+        /// structures.
+        pub(super) fn new_test(future: T, state: State) -> Box<Cell<T, S>> {
+            Box::new(Cell {
+                header: Header {
+                    state,
+                    owned: UnsafeCell::new(linked_list::Pointers::new()),
+                    queue_next: UnsafeCell::new(None),
+                    stack_next: UnsafeCell::new(None),
+                    vtable: raw::vtable_test::<T, S>(),
+                },
+                core: Core {
+                    scheduler: UnsafeCell::new(None),
+                    stage: UnsafeCell::new(Stage::Running(future)),
+                },
+                trailer: Trailer {
+                    waker: UnsafeCell::new(None),
+                },
+            })
+        }
+    }
 }
 
 impl<T: Future, S: Schedule> Core<T, S> {

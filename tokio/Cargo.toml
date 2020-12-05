@@ -38,6 +38,7 @@ full = [
   "process",
   "rt",
   "rt-multi-thread",
+  "rt-test",
   "signal",
   "stream",
   "sync",
@@ -73,6 +74,7 @@ rt-multi-thread = [
   "num_cpus",
   "rt",
 ]
+rt-test = ["rt"]
 signal = [
   "once_cell",
   "libc",

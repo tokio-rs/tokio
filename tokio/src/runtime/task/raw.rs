@@ -37,6 +37,19 @@ pub(super) fn vtable<T: Future, S: Schedule>() -> &'static Vtable {
     }
 }
 
+cfg_rt_test! {
+    /// Get the vtable for the requested `T` and `S` generics.
+    pub(super) fn vtable_test<T: Future, S: Schedule>() -> &'static Vtable {
+        &Vtable {
+            poll: poll_test::<T, S>,
+            dealloc: dealloc::<T, S>,
+            try_read_output: try_read_output::<T, S>,
+            drop_join_handle_slow: drop_join_handle_slow::<T, S>,
+            shutdown: shutdown::<T, S>,
+        }
+    }
+}
+
 impl RawTask {
     pub(super) fn new<T, S>(task: T) -> RawTask
     where
@@ -47,6 +60,19 @@ impl RawTask {
         let ptr = unsafe { NonNull::new_unchecked(ptr as *mut Header) };
 
         RawTask { ptr }
+    }
+
+    cfg_rt_test! {
+        pub(super) fn new_test<T, S>(task: T) -> RawTask
+        where
+            T: Future,
+            S: Schedule,
+        {
+            let ptr = Box::into_raw(Cell::<_, S>::new_test(task, State::new()));
+            let ptr = unsafe { NonNull::new_unchecked(ptr as *mut Header) };
+
+            RawTask { ptr }
+        }
     }
 
     pub(super) unsafe fn from_raw(ptr: NonNull<Header>) -> RawTask {
@@ -102,6 +128,13 @@ impl Copy for RawTask {}
 unsafe fn poll<T: Future, S: Schedule>(ptr: NonNull<Header>) {
     let harness = Harness::<T, S>::from_raw(ptr);
     harness.poll();
+}
+
+cfg_rt_test! {
+    unsafe fn poll_test<T: Future, S: Schedule>(ptr: NonNull<Header>) {
+        let harness = Harness::<T, S>::from_raw(ptr);
+        harness.poll_test();
+    }
 }
 
 unsafe fn dealloc<T: Future, S: Schedule>(ptr: NonNull<Header>) {

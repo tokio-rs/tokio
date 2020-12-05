@@ -119,6 +119,26 @@ cfg_rt! {
     }
 }
 
+cfg_rt_test! {
+    /// Create a new task with an associated join handle
+    pub(crate) fn joinable_test<T, S>(task: T) -> (Notified<S>, JoinHandle<T::Output>)
+    where
+        T: Future + Send + 'static,
+        S: Schedule,
+    {
+        let raw = RawTask::new_test::<_, S>(task);
+
+        let task = Task {
+            raw,
+            _p: PhantomData,
+        };
+
+        let join = JoinHandle::new(raw);
+
+        (Notified(task), join)
+    }
+}
+
 impl<S: 'static> Task<S> {
     pub(crate) unsafe fn from_raw(ptr: NonNull<Header>) -> Task<S> {
         Task {

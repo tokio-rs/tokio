@@ -77,6 +77,8 @@ pub(crate) enum Kind {
     CurrentThread,
     #[cfg(feature = "rt-multi-thread")]
     MultiThread,
+    #[cfg(feature = "rt-test")]
+    TestScheduler,
 }
 
 impl Builder {
@@ -94,6 +96,15 @@ impl Builder {
     #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
     pub fn new_multi_thread() -> Builder {
         Builder::new(Kind::MultiThread)
+    }
+
+    /// Returns a new builder with the current thread scheduler selected.
+    ///
+    /// Configuration methods can be chained on the return value.
+    #[cfg(feature = "rt-test")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "rt-test")))]
+    pub fn new_test() -> Builder {
+        Builder::new(Kind::TestScheduler)
     }
 
     /// Returns a new runtime builder initialized with default configuration
@@ -374,6 +385,8 @@ impl Builder {
             Kind::CurrentThread => self.build_basic_runtime(),
             #[cfg(feature = "rt-multi-thread")]
             Kind::MultiThread => self.build_threaded_runtime(),
+            #[cfg(feature = "rt-test")]
+            Kind::TestScheduler => self.build_test_runtime(),
         }
     }
 
@@ -521,6 +534,40 @@ cfg_rt_multi_thread! {
             Ok(Runtime {
                 kind: Kind::ThreadPool(scheduler),
                 handle,
+                blocking_pool,
+            })
+        }
+    }
+}
+
+cfg_rt_test! {
+    impl Builder {
+        fn build_test_runtime(&mut self) -> io::Result<Runtime> {
+            use crate::runtime::{TestScheduler, Kind};
+
+            let (driver, resources) = driver::Driver::new(self.get_cfg())?;
+
+            // And now put a single-threaded scheduler on top of the timer. When
+            // there are no futures ready to do something, it'll let the timer or
+            // the reactor to generate some new stimuli for the futures to continue
+            // in their life.
+            let scheduler = TestScheduler::new(driver);
+            let spawner = Spawner::TestScheduler(scheduler.spawner().clone());
+
+            // Blocking pool
+            let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
+            let blocking_spawner = blocking_pool.spawner().clone();
+
+            Ok(Runtime {
+                kind: Kind::TestScheduler(scheduler),
+                handle: Handle {
+                    spawner,
+                    io_handle: resources.io_handle,
+                    time_handle: resources.time_handle,
+                    signal_handle: resources.signal_handle,
+                    clock: resources.clock,
+                    blocking_spawner,
+                },
                 blocking_pool,
             })
         }

@@ -137,6 +137,100 @@ where
         }
     }
 
+    cfg_rt_test! {
+        /// Polls the inner future.
+        ///
+        /// All necessary state checks and transitions are performed.
+        ///
+        /// Panics raised while polling the propagated.
+        pub(super) fn poll_test(self) {
+            // If this is the first time the task is polled, the task will be bound
+            // to the scheduler, in which case the task ref count must be
+            // incremented.
+            let is_not_bound = !self.core().is_bound();
+
+            // Transition the task to the running state.
+            //
+            // A failure to transition here indicates the task has been cancelled
+            // while in the run queue pending execution.
+            let snapshot = match self.header().state.transition_to_running(is_not_bound) {
+                Ok(snapshot) => snapshot,
+                Err(_) => {
+                    // The task was shutdown while in the run queue. At this point,
+                    // we just hold a ref counted reference. Drop it here.
+                    self.drop_reference();
+                    return;
+                }
+            };
+
+            if is_not_bound {
+                // Ensure the task is bound to a scheduler instance. Since this is
+                // the first time polling the task, a scheduler instance is pulled
+                // from the local context and assigned to the task.
+                //
+                // The scheduler maintains ownership of the task and responds to
+                // `wake` calls.
+                //
+                // The task reference count has been incremented.
+                //
+                // Safety: Since we have unique access to the task so that we can
+                // safely call `bind_scheduler`.
+                self.core().bind_scheduler(self.to_task());
+            }
+
+            // The transition to `Running` done above ensures that a lock on the
+            // future has been obtained. This also ensures the `*mut T` pointer
+            // contains the future (as opposed to the output) and is initialized.
+
+            let res = {
+                struct Guard<'a, T: Future, S: Schedule> {
+                    core: &'a Core<T, S>,
+                }
+
+                impl<T: Future, S: Schedule> Drop for Guard<'_, T, S> {
+                    fn drop(&mut self) {
+                        self.core.drop_future_or_output();
+                    }
+                }
+
+                let guard = Guard { core: self.core() };
+
+                // If the task is cancelled, avoid polling it, instead signalling it
+                // is complete.
+                if snapshot.is_cancelled() {
+                    Poll::Ready(Err(JoinError::cancelled()))
+                } else {
+                    let res = guard.core.poll(self.header());
+
+                    // prevent the guard from dropping the future
+                    mem::forget(guard);
+
+                    res.map(Ok)
+                }
+            };
+
+            match res {
+                Poll::Ready(out) => {
+                    self.complete(out, snapshot.is_join_interested());
+                }
+                Poll::Pending => {
+                    match self.header().state.transition_to_idle() {
+                        Ok(snapshot) => {
+                            if snapshot.is_notified() {
+                                // Signal yield
+                                self.core().yield_now(Notified(self.to_task()));
+                                // The ref-count was incremented as part of
+                                // `transition_to_idle`.
+                                self.drop_reference();
+                            }
+                        }
+                        Err(_) => self.cancel_task(),
+                    }
+                }
+            }
+        }
+    }
+
     pub(super) fn dealloc(self) {
         // Release the join waker, if there is one.
         self.trailer().waker.with_mut(|_| ());

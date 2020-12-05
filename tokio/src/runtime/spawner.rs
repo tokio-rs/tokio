@@ -9,12 +9,18 @@ cfg_rt_multi_thread! {
     use crate::runtime::thread_pool;
 }
 
+cfg_rt_test! {
+    use crate::runtime::test_scheduler;
+}
+
 #[derive(Debug, Clone)]
 pub(crate) enum Spawner {
     #[cfg(feature = "rt")]
     Basic(basic_scheduler::Spawner),
     #[cfg(feature = "rt-multi-thread")]
     ThreadPool(thread_pool::Spawner),
+    #[cfg(feature = "rt-test")]
+    TestScheduler(test_scheduler::Spawner),
 }
 
 impl Spawner {
@@ -40,6 +46,8 @@ cfg_rt! {
                 Spawner::Basic(spawner) => spawner.spawn(future),
                 #[cfg(feature = "rt-multi-thread")]
                 Spawner::ThreadPool(spawner) => spawner.spawn(future),
+                #[cfg(feature = "rt-test")]
+                Spawner::TestScheduler(spawner) => spawner.spawn(future),
             }
         }
     }

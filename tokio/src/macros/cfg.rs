@@ -299,6 +299,22 @@ macro_rules! cfg_not_rt_multi_thread {
     }
 }
 
+macro_rules! cfg_rt_test {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "rt-test")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "rt-test")))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_not_rt_test {
+    ($($item:item)*) => {
+        $( #[cfg(not(feature = "rt-test"))] $item )*
+    }
+}
+
 macro_rules! cfg_test_util {
     ($($item:item)*) => {
         $(
