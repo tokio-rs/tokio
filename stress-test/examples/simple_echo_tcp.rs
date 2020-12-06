@@ -1,8 +1,5 @@
 //! Simple TCP echo server to check memory leaks using Valgrind.
-use std::{
-    thread::sleep,
-    time::Duration,
-};
+use std::{thread::sleep, time::Duration};
 
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -31,7 +28,7 @@ fn main() {
 
     // create a channel to let the main thread know that all the messages were sent and received.
     let (tx, mut rx) = oneshot::channel();
-    
+
     rt2.spawn(async {
         let addr = TCP_ENDPOINT.parse().unwrap();
         let socket = TcpSocket::new_v4().unwrap();
