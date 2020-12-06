@@ -9,10 +9,10 @@ use std::fmt;
 use std::io;
 use std::net::{Shutdown, SocketAddr};
 #[cfg(windows)]
-use std::os::windows::io::{AsRawSocket, FromRawSocket};
+use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket};
 
 #[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -182,6 +182,58 @@ impl TcpStream {
         let io = mio::net::TcpStream::from_std(stream);
         let io = PollEvented::new(io)?;
         Ok(TcpStream { io })
+    }
+
+    /// Turn a [`tokio::net::TcpStream`] into a [`std::net::TcpStream`].
+    ///
+    /// The returned [`std::net::TcpStream`] will have `nonblocking mode` set as `true`.
+    /// Use [`set_nonblocking`] to change the blocking mode if needed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::error::Error;
+    /// use std::io::Read;
+    /// use tokio::net::TcpListener;
+    /// # use tokio::net::TcpStream;
+    /// # use tokio::io::AsyncWriteExt;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let mut data = [0u8; 12];
+    ///     let listener = TcpListener::bind("127.0.0.1:34254").await?;
+    /// #   let handle = tokio::spawn(async {
+    /// #       let mut stream: TcpStream = TcpStream::connect("127.0.0.1:34254").await.unwrap();
+    /// #       stream.write(b"Hello world!").await.unwrap();
+    /// #   });
+    ///     let (tokio_tcp_stream, _) = listener.accept().await?;
+    ///     let mut std_tcp_stream = tokio_tcp_stream.into_std()?;
+    /// #   handle.await.expect("The task being joined has panicked");
+    ///     std_tcp_stream.set_nonblocking(false)?;
+    ///     std_tcp_stream.read_exact(&mut data)?;
+    /// #   assert_eq!(b"Hello world!", &data);
+    ///     Ok(())
+    /// }
+    /// ```
+    /// [`tokio::net::TcpStream`]: TcpStream
+    /// [`std::net::TcpStream`]: std::net::TcpStream
+    /// [`set_nonblocking`]: fn@std::net::TcpStream::set_nonblocking
+    pub fn into_std(self) -> io::Result<std::net::TcpStream> {
+        #[cfg(unix)]
+        {
+            self.io
+                .into_inner()
+                .map(|io| io.into_raw_fd())
+                .map(|raw_fd| unsafe { std::net::TcpStream::from_raw_fd(raw_fd) })
+        }
+
+        #[cfg(windows)]
+        {
+            self.io
+                .into_inner()
+                .map(|io| io.into_raw_socket())
+                .map(|raw_socket| unsafe { std::net::TcpStream::from_raw_socket(raw_socket) })
+        }
     }
 
     /// Returns the local address that this stream is bound to.
