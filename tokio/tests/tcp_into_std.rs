@@ -24,7 +24,7 @@ async fn tcp_into_std() -> Result<()> {
         .expect("set_nonblocking call failed");
 
     let mut client = handle.await.expect("The task being joined has panicked");
-    let _ = client.write_all(b"Hello world!").await;
+    client.write_all(b"Hello world!").await?;
 
     std_tcp_stream
         .read_exact(&mut data)
@@ -36,7 +36,7 @@ async fn tcp_into_std() -> Result<()> {
         .set_nonblocking(true)
         .expect("set_nonblocking call failed");
     let mut tokio_tcp_stream = TcpStream::from_std(std_tcp_stream)?;
-    let _ = client.write_all(b"Hello tokio!").await;
+    client.write_all(b"Hello tokio!").await?;
     let _size = tokio_tcp_stream.read_exact(&mut data).await?;
     assert_eq!(b"Hello tokio!", &data);
 
