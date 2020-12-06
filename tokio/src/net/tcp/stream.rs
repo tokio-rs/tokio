@@ -197,7 +197,7 @@ impl TcpStream {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     let mut data = [0u8; 50];
+    ///     let mut data = [0u8; 12];
     ///     let listener = TcpListener::bind("127.0.0.1:34254").await?;
     /// #   let handle = tokio::spawn(async {
     /// #       let mut stream: TcpStream = TcpStream::connect("127.0.0.1:34254").await.unwrap();
@@ -206,8 +206,8 @@ impl TcpStream {
     ///     let (tokio_tcp_stream, _) = listener.accept().await?;
     ///     let mut std_tcp_stream = tokio_tcp_stream.into_std()?;
     /// #   handle.await.expect("The task being joined has panicked");
-    ///     let size = std_tcp_stream.read(&mut data)?;
-    /// #   assert_eq!(b"Hello world!", &data[0..size]);
+    ///     std_tcp_stream.read_exact(&mut data)?;
+    /// #   assert_eq!(b"Hello world!", &data);
     ///    Ok(())
     /// }
     /// ```
