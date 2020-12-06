@@ -13,7 +13,7 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use tokio::runtime::{Runtime, Handle};
+use tokio::runtime::{Handle, Runtime};
 
 pin_project! {
     /// `TokioContext` allows running futures that must be inside Tokio's
