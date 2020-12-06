@@ -186,6 +186,9 @@ impl TcpStream {
 
     /// Turn a [`tokio::net::TcpStream`] into a [`std::net::TcpStream`].
     ///
+    /// The returned [`std::net::TcpStream`] will have `nonblocking mode` set as `true`.
+    /// Use [`set_nonblocking`] to change the blocking mode if needed.
+    ///
     /// # Examples
     ///
     /// ```
@@ -206,6 +209,7 @@ impl TcpStream {
     ///     let (tokio_tcp_stream, _) = listener.accept().await?;
     ///     let mut std_tcp_stream = tokio_tcp_stream.into_std()?;
     /// #   handle.await.expect("The task being joined has panicked");
+    ///     std_tcp_stream.set_nonblocking(false)?;
     ///     std_tcp_stream.read_exact(&mut data)?;
     /// #   assert_eq!(b"Hello world!", &data);
     ///    Ok(())
@@ -213,6 +217,7 @@ impl TcpStream {
     /// ```
     /// [`tokio::net::TcpStream`]: TcpStream
     /// [`std::net::TcpStream`]: std::net::TcpStream
+    /// [`set_nonblocking`]: fn@std::net::TcpStream::set_nonblocking
     pub fn into_std(self) -> io::Result<std::net::TcpStream> {
         #[cfg(unix)]
         {
