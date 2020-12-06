@@ -212,7 +212,7 @@ impl TcpStream {
     ///     std_tcp_stream.set_nonblocking(false)?;
     ///     std_tcp_stream.read_exact(&mut data)?;
     /// #   assert_eq!(b"Hello world!", &data);
-    ///    Ok(())
+    ///     Ok(())
     /// }
     /// ```
     /// [`tokio::net::TcpStream`]: TcpStream
