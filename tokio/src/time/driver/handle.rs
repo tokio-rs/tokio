@@ -9,6 +9,12 @@ pub(crate) struct Handle {
     inner: Arc<Mutex<super::Inner>>,
 }
 
+impl std::fmt::Debug for Handle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Handle({:?})", &*self.inner as *const _)
+    }
+}
+
 impl Handle {
     /// Creates a new timer `Handle` from a shared `Inner` timer state.
     pub(super) fn new(inner: Arc<Mutex<super::Inner>>) -> Self {
@@ -74,11 +80,5 @@ cfg_not_rt! {
             panic!("there is no timer running, must be called from the context of Tokio runtime or \
             `rt` is not enabled")
         }
-    }
-}
-
-impl fmt::Debug for Handle {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Handle")
     }
 }

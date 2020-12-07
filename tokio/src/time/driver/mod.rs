@@ -189,6 +189,23 @@ where
 
         let mut lock = self.inner.lock();
 
+        if lock.is_shutdown {
+            drop(lock);
+
+            // In the MT runtime, we can have multiple threads using the same
+            // park. These threads both poll and shutdown the parker, and so we
+            // can end up in park_internal after shutdown. This is probably not
+            // correct behavior from the worker, but for now, deal with this by
+            // short-circuiting the timer logic and delegating to the park
+            // backend.
+
+            if let Some(limit) = limit {
+                return self.park.park_timeout(limit);
+            } else {
+                return self.park.park();
+            }
+        }
+
         let next_wake = lock.wheel.next_expiration_time();
         lock.next_wake =
             next_wake.map(|t| NonZeroU64::new(t).unwrap_or_else(|| NonZeroU64::new(1).unwrap()));
@@ -255,7 +272,12 @@ impl Handle {
 
         let mut lock = self.lock();
 
-        assert!(now >= lock.elapsed);
+        assert!(
+            now >= lock.elapsed,
+            "Attempted to process at a time earlier than last process: {:016X} < {:016X}",
+            now,
+            lock.elapsed
+        );
 
         while let Some(entry) = lock.wheel.poll(now) {
             debug_assert!(unsafe { entry.is_pending() });

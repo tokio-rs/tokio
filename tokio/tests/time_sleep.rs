@@ -308,3 +308,17 @@ async fn no_out_of_bounds_close_to_max() {
 fn ms(n: u64) -> Duration {
     Duration::from_millis(n)
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn hang_on_shutdown() {
+    let (sync_tx, sync_rx) = std::sync::mpsc::channel::<()>();
+    tokio::spawn(async move {
+        tokio::task::block_in_place(|| sync_rx.recv().ok());
+    });
+
+    tokio::spawn(async {
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        drop(sync_tx);
+    });
+    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+}
