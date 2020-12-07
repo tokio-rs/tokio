@@ -27,6 +27,9 @@ cfg_io_util! {
     mod copy;
     pub use copy::copy;
 
+    mod copy_bidirectional;
+    pub use copy_bidirectional::copy_bidirectional;
+
     mod copy_buf;
     pub use copy_buf::copy_buf;
 
