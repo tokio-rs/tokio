@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607261701659,
+  "lastUpdate": 1607369146227,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -1673,6 +1673,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 541,
             "range": "± 62",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "62023dffe5396ee1a0380f12c7530bf4ff59fe4a",
+          "message": "sync: forward port 0.2 mpsc test (#3225)\n\nForward ports the test included in #3215. The mpsc sempahore has been\r\nreplaced in 0.3 and does not include the bug being fixed.",
+          "timestamp": "2020-12-07T11:24:15-08:00",
+          "tree_id": "c891a48ce299e6cfd01090a880d1baf16ebe0ad7",
+          "url": "https://github.com/tokio-rs/tokio/commit/62023dffe5396ee1a0380f12c7530bf4ff59fe4a"
+        },
+        "date": 1607369145414,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 755,
+            "range": "± 185",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 13973,
+            "range": "± 4330",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 768,
+            "range": "± 73",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 13814,
+            "range": "± 3973",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 430,
+            "range": "± 118",
             "unit": "ns/iter"
           }
         ]
