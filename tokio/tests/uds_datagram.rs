@@ -2,6 +2,8 @@
 #![cfg(feature = "full")]
 #![cfg(unix)]
 
+use futures::future::poll_fn;
+use tokio::io::ReadBuf;
 use tokio::net::UnixDatagram;
 use tokio::try_join;
 
@@ -132,5 +134,49 @@ async fn split() -> std::io::Result<()> {
         },
     }?;
 
+    Ok(())
+}
+
+#[tokio::test]
+async fn send_to_recv_from_poll() -> std::io::Result<()> {
+    let dir = tempfile::tempdir().unwrap();
+    let sender_path = dir.path().join("sender.sock");
+    let receiver_path = dir.path().join("receiver.sock");
+
+    let sender = UnixDatagram::bind(&sender_path)?;
+    let receiver = UnixDatagram::bind(&receiver_path)?;
+
+    let msg = b"hello";
+    poll_fn(|cx| sender.poll_send_to(cx, msg, &receiver_path)).await?;
+
+    let mut recv_buf = [0u8; 32];
+    let mut read = ReadBuf::new(&mut recv_buf);
+    let addr = poll_fn(|cx| receiver.poll_recv_from(cx, &mut read)).await?;
+
+    assert_eq!(read.filled(), msg);
+    assert_eq!(addr.as_pathname(), Some(sender_path.as_ref()));
+    Ok(())
+}
+
+#[tokio::test]
+async fn send_recv_poll() -> std::io::Result<()> {
+    let dir = tempfile::tempdir().unwrap();
+    let sender_path = dir.path().join("sender.sock");
+    let receiver_path = dir.path().join("receiver.sock");
+
+    let sender = UnixDatagram::bind(&sender_path)?;
+    let receiver = UnixDatagram::bind(&receiver_path)?;
+
+    sender.connect(&receiver_path)?;
+    receiver.connect(&sender_path)?;
+
+    let msg = b"hello";
+    poll_fn(|cx| sender.poll_send(cx, msg)).await?;
+
+    let mut recv_buf = [0u8; 32];
+    let mut read = ReadBuf::new(&mut recv_buf);
+    let _len = poll_fn(|cx| receiver.poll_recv(cx, &mut read)).await?;
+
+    assert_eq!(read.filled(), msg);
     Ok(())
 }
