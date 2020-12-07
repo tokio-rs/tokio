@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607369158745,
+  "lastUpdate": 1607369164133,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -3265,6 +3265,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21012384,
             "range": "± 4377927",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "62023dffe5396ee1a0380f12c7530bf4ff59fe4a",
+          "message": "sync: forward port 0.2 mpsc test (#3225)\n\nForward ports the test included in #3215. The mpsc sempahore has been\r\nreplaced in 0.3 and does not include the bug being fixed.",
+          "timestamp": "2020-12-07T11:24:15-08:00",
+          "tree_id": "c891a48ce299e6cfd01090a880d1baf16ebe0ad7",
+          "url": "https://github.com/tokio-rs/tokio/commit/62023dffe5396ee1a0380f12c7530bf4ff59fe4a"
+        },
+        "date": 1607369160047,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 197188,
+            "range": "± 19253",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 672718,
+            "range": "± 77763",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4734092,
+            "range": "± 1352744",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19308954,
+            "range": "± 2881973",
             "unit": "ns/iter"
           }
         ]
