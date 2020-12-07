@@ -512,3 +512,27 @@ fn ready_close_cancel_bounded() {
 
     assert!(recv.is_woken());
 }
+
+#[tokio::test]
+async fn permit_available_not_acquired_close() {
+    use futures::future::poll_fn;
+
+    let (mut tx1, mut rx) = mpsc::channel::<()>(1);
+    let mut tx2 = tx1.clone();
+
+    {
+        let mut ready = task::spawn(poll_fn(|cx| tx1.poll_ready(cx)));
+        assert_ready_ok!(ready.poll());
+    }
+
+    let mut ready = task::spawn(poll_fn(|cx| tx2.poll_ready(cx)));
+    assert_pending!(ready.poll());
+
+    rx.close();
+
+    drop(tx1);
+    assert!(ready.is_woken());
+
+    drop(tx2);
+    assert!(rx.recv().await.is_none());
+}
