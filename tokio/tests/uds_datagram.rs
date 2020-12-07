@@ -84,6 +84,8 @@ async fn try_send_recv_never_block() -> io::Result<()> {
 
     // Send until we hit the OS `net.unix.max_dgram_qlen`.
     loop {
+        dgram1.writable().await.unwrap();
+
         match dgram1.try_send(payload) {
             Err(err) => match err.kind() {
                 io::ErrorKind::WouldBlock | io::ErrorKind::Other => break,
@@ -98,6 +100,7 @@ async fn try_send_recv_never_block() -> io::Result<()> {
 
     // Read every dgram we sent.
     while count > 0 {
+        dgram2.readable().await.unwrap();
         let len = dgram2.try_recv(&mut recv_buf[..])?;
         assert_eq!(len, payload.len());
         assert_eq!(payload, &recv_buf[..len]);
@@ -178,5 +181,52 @@ async fn send_recv_poll() -> std::io::Result<()> {
     let _len = poll_fn(|cx| receiver.poll_recv(cx, &mut read)).await?;
 
     assert_eq!(read.filled(), msg);
+    Ok(())
+}
+
+#[tokio::test]
+async fn try_send_to_recv_from() -> std::io::Result<()> {
+    let dir = tempfile::tempdir().unwrap();
+    let server_path = dir.path().join("server.sock");
+    let client_path = dir.path().join("client.sock");
+
+    // Create listener
+    let server = UnixDatagram::bind(&server_path)?;
+
+    // Create socket pair
+    let client = UnixDatagram::bind(&client_path)?;
+
+    for _ in 0..5 {
+        loop {
+            client.writable().await?;
+
+            match client.try_send_to(b"hello world", &server_path) {
+                Ok(n) => {
+                    assert_eq!(n, 11);
+                    break;
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => panic!("{:?}", e),
+            }
+        }
+
+        loop {
+            server.readable().await?;
+
+            let mut buf = [0; 512];
+
+            match server.try_recv_from(&mut buf) {
+                Ok((n, addr)) => {
+                    assert_eq!(n, 11);
+                    assert_eq!(addr.as_pathname(), Some(client_path.as_ref()));
+                    assert_eq!(&buf[0..11], &b"hello world"[..]);
+                    break;
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => panic!("{:?}", e),
+            }
+        }
+    }
+
     Ok(())
 }
