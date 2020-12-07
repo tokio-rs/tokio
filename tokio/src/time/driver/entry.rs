@@ -437,6 +437,17 @@ impl TimerShared {
         true_when
     }
 
+    /// Sets the cached time-of-expiration value.
+    ///
+    /// SAFETY: Must be called with the driver lock held, and when this entry is
+    /// not in any timer wheel lists.
+    pub(super) unsafe fn set_cached_when(&self, when: u64) {
+        self.driver_state
+            .0
+            .cached_when
+            .store(when, Ordering::Relaxed);
+    }
+
     /// Returns the true time-of-expiration value, with relaxed memory ordering.
     pub(super) fn true_when(&self) -> u64 {
         self.state.when().expect("Timer already fired")
@@ -618,6 +629,10 @@ impl TimerHandle {
 
     pub(super) unsafe fn sync_when(&self) -> u64 {
         unsafe { self.inner.as_ref().sync_when() }
+    }
+
+    pub(super) unsafe fn set_cached_when(&self, when: u64) {
+        unsafe { self.inner.as_ref().set_cached_when(when) }
     }
 
     pub(super) unsafe fn is_pending(&self) -> bool {
