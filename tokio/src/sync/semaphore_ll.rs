@@ -917,6 +917,10 @@ impl Waiter {
         let mut curr = WaiterState(self.state.load(Acquire));
 
         loop {
+            if curr.is_closed() {
+                return 0;
+            }
+
             if !curr.is_queued() {
                 assert_eq!(0, curr.permits_to_acquire());
             }
