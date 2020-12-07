@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607369164133,
+  "lastUpdate": 1607369178189,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -7565,6 +7565,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 808080,
             "range": "± 114545",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "62023dffe5396ee1a0380f12c7530bf4ff59fe4a",
+          "message": "sync: forward port 0.2 mpsc test (#3225)\n\nForward ports the test included in #3215. The mpsc sempahore has been\r\nreplaced in 0.3 and does not include the bug being fixed.",
+          "timestamp": "2020-12-07T11:24:15-08:00",
+          "tree_id": "c891a48ce299e6cfd01090a880d1baf16ebe0ad7",
+          "url": "https://github.com/tokio-rs/tokio/commit/62023dffe5396ee1a0380f12c7530bf4ff59fe4a"
+        },
+        "date": 1607369177345,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6052259,
+            "range": "± 1542207",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 5867396,
+            "range": "± 1176250",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 5539724,
+            "range": "± 2075553",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 535,
+            "range": "± 2",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 530,
+            "range": "± 1",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 530,
+            "range": "± 6",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 44703,
+            "range": "± 445",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 688,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 966609,
+            "range": "± 1765",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 690380,
+            "range": "± 2453",
             "unit": "ns/iter"
           }
         ]
