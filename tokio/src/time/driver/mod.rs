@@ -189,6 +189,8 @@ where
 
         let mut lock = self.inner.lock();
 
+        assert!(!lock.is_shutdown);
+
         let next_wake = lock.wheel.next_expiration_time();
         lock.next_wake =
             next_wake.map(|t| NonZeroU64::new(t).unwrap_or_else(|| NonZeroU64::new(1).unwrap()));
