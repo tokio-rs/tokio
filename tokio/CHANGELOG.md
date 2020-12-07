@@ -1,3 +1,9 @@
+# 0.2.24 (December 7, 2020)
+
+### Fixes
+
+ - sync: fix mpsc bug related to closing the channel (#3215)
+
 # 0.2.23 (November 12, 2020)
 
 ### Fixes
