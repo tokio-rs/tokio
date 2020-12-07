@@ -483,3 +483,22 @@ async fn ready_close_cancel_bounded() {
     let val = assert_ready!(recv.poll());
     assert!(val.is_none());
 }
+
+#[tokio::test]
+async fn permit_available_not_acquired_close() {
+    let (tx1, mut rx) = mpsc::channel::<()>(1);
+    let tx2 = tx1.clone();
+
+    let permit1 = assert_ok!(tx1.reserve().await);
+
+    let mut permit2 = task::spawn(tx2.reserve());
+    assert_pending!(permit2.poll());
+
+    rx.close();
+
+    drop(permit1);
+    assert!(permit2.is_woken());
+
+    drop(permit2);
+    assert!(rx.recv().await.is_none());
+}
