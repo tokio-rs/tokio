@@ -382,6 +382,20 @@ fn max_threads() {
         .unwrap();
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn hang_on_shutdown() {
+    let (sync_tx, sync_rx) = std::sync::mpsc::channel::<()>();
+    tokio::spawn(async move {
+        tokio::task::block_in_place(|| sync_rx.recv().ok());
+    });
+
+    tokio::spawn(async {
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        drop(sync_tx);
+    });
+    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+}
+
 fn rt() -> Runtime {
     Runtime::new().unwrap()
 }
