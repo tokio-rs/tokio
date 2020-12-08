@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607404446375,
+  "lastUpdate": 1607467197818,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -5355,6 +5355,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 836,
             "range": "± 122",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "rodrigblas@gmail.com",
+            "name": "Blas Rodriguez Irizar",
+            "username": "blasrodri"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fc7a4b3c6e765d6d2b4ea97266cefbf466d52dc9",
+          "message": "chore: fix stress test (#3233)",
+          "timestamp": "2020-12-09T07:38:25+09:00",
+          "tree_id": "0b92fb11f764a5e88d62a9f79aa2107ebcb75f42",
+          "url": "https://github.com/tokio-rs/tokio/commit/fc7a4b3c6e765d6d2b4ea97266cefbf466d52dc9"
+        },
+        "date": 1607467196988,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 13274,
+            "range": "± 2605",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 908,
+            "range": "± 5",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 541,
+            "range": "± 18",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 13673,
+            "range": "± 2436",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 910,
+            "range": "± 9",
             "unit": "ns/iter"
           }
         ]
