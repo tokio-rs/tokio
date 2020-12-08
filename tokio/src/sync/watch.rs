@@ -53,10 +53,10 @@
 
 use crate::sync::Notify;
 
-use std::ops;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::atomic::Ordering::{Relaxed, SeqCst};
 use crate::loom::sync::{Arc, RwLock, RwLockReadGuard};
+use std::ops;
 
 /// Receives values from the associated [`Sender`](struct@Sender).
 ///
@@ -393,8 +393,8 @@ impl<T> ops::Deref for Ref<'_, T> {
 
 #[cfg(all(test, loom))]
 mod tests {
-    use loom::thread;
     use futures::future::FutureExt;
+    use loom::thread;
 
     // test for https://github.com/tokio-rs/tokio/issues/3168
     #[test]
