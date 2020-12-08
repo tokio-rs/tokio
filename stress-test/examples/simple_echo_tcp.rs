@@ -9,7 +9,7 @@ use tokio::{
 };
 
 const TCP_ENDPOINT: &str = "127.0.0.1:8080";
-const NUM_MSGS: usize = 10_000;
+const NUM_MSGS: usize = 100;
 const MSG_SIZE: usize = 1024;
 
 fn main() {
