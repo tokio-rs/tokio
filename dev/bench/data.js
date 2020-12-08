@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607404430820,
+  "lastUpdate": 1607404438036,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -1781,6 +1781,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 526,
             "range": "± 85",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "rodrigblas@gmail.com",
+            "name": "Blas Rodriguez Irizar",
+            "username": "blasrodri"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e01391351bcb0715f737cefe94e1bc99f19af226",
+          "message": "Add stress test (#3222)\n\nCreated a simple echo TCP server that on two different runtimes that is\r\ncalled from a GitHub action using Valgrind to ensure that there are\r\nno memory leaks.\r\n\r\nFixes: #3022",
+          "timestamp": "2020-12-07T21:12:22-08:00",
+          "tree_id": "5575f27e36e49b887062119225e1d61335a01b9a",
+          "url": "https://github.com/tokio-rs/tokio/commit/e01391351bcb0715f737cefe94e1bc99f19af226"
+        },
+        "date": 1607404437161,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 846,
+            "range": "± 4",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 12458,
+            "range": "± 1944",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 872,
+            "range": "± 4",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 12887,
+            "range": "± 2690",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 492,
+            "range": "± 23",
             "unit": "ns/iter"
           }
         ]
