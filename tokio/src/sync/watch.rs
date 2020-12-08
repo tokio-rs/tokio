@@ -396,6 +396,7 @@ mod tests {
     use loom::thread;
     use futures::future::FutureExt;
 
+    // test for https://github.com/tokio-rs/tokio/issues/3168
     #[test]
     fn watch_spurious_wakeup() {
         loom::model(|| {
