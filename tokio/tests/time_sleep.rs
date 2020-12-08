@@ -370,9 +370,11 @@ async fn drop_from_wake() {
 
     impl futures::task::ArcWake for DropWaker {
         fn wake_by_ref(arc_self: &Arc<Self>) {
-            if let Err(_) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 *arc_self.1.lock().expect("panic in lock") = Vec::new()
-            })) {
+            }))
+            .is_err()
+            {
                 arc_self.0.store(true, Ordering::SeqCst);
             }
         }
