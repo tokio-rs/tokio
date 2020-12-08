@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607404438036,
+  "lastUpdate": 1607404446375,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -8045,6 +8045,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 805312,
             "range": "± 47500",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "rodrigblas@gmail.com",
+            "name": "Blas Rodriguez Irizar",
+            "username": "blasrodri"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e01391351bcb0715f737cefe94e1bc99f19af226",
+          "message": "Add stress test (#3222)\n\nCreated a simple echo TCP server that on two different runtimes that is\r\ncalled from a GitHub action using Valgrind to ensure that there are\r\nno memory leaks.\r\n\r\nFixes: #3022",
+          "timestamp": "2020-12-07T21:12:22-08:00",
+          "tree_id": "5575f27e36e49b887062119225e1d61335a01b9a",
+          "url": "https://github.com/tokio-rs/tokio/commit/e01391351bcb0715f737cefe94e1bc99f19af226"
+        },
+        "date": 1607404445512,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 5954439,
+            "range": "± 2078083",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 5700434,
+            "range": "± 1453585",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 5337747,
+            "range": "± 1671028",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 463,
+            "range": "± 2",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 461,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 461,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 45469,
+            "range": "± 416",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 798,
+            "range": "± 120",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 949077,
+            "range": "± 4029",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 680610,
+            "range": "± 1149",
             "unit": "ns/iter"
           }
         ]
