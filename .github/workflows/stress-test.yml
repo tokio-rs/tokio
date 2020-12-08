@@ -23,7 +23,7 @@ jobs:
 
       # Compiles each of the stress test examples.
       - name: Compile stress test examples
-        run: cargo build -p stress-test --release --examples ${{ matrix.stress-test }}
+        run: cargo build -p stress-test --release --example ${{ matrix.stress-test }}
 
       # Runs each of the examples using Valgrind. Detects leaks and displays them.
       - name: Run valgrind
