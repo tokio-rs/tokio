@@ -2,15 +2,11 @@
 #![cfg(feature = "full")]
 
 use tokio::{
-    io::{self, AsyncRead, AsyncWrite, ReadBuf},
+    io::{self},
     task::JoinHandle,
 };
-use tokio_test::assert_ok;
 
-use std::pin::Pin;
-use std::task::{Context, Poll};
-
-use std::{net::Shutdown, time::Duration};
+use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
@@ -25,13 +21,13 @@ async fn make_socketpair() -> (TcpStream, TcpStream) {
     (c1.unwrap(), c2.unwrap().0)
 }
 
-async fn block_write(mut s: &mut TcpStream) -> usize {
-    static buf: [u8; 2048] = [0; 2048];
+async fn block_write(s: &mut TcpStream) -> usize {
+    static BUF: [u8; 2048] = [0; 2048];
 
     let mut copied = 0;
     loop {
         tokio::select! {
-            result = s.write(&buf) => {
+            result = s.write(&BUF) => {
                 copied += result.expect("write error")
             },
             _ = tokio::time::sleep(Duration::from_millis(100)) => {
@@ -124,17 +120,16 @@ async fn blocking_one_side_does_not_block_other() {
 #[tokio::test]
 async fn immediate_exit_on_error() {
     symmetric(|handle, mut a, mut b| async move {
-        use std::os::unix::io::AsRawFd;
         block_write(&mut a).await;
 
         // Fill up the b->copy->a path. We expect that this will _not_ drain
         // before we exit the copy task.
-        let mut bytes_written = block_write(&mut b).await;
+        let _bytes_written = block_write(&mut b).await;
 
         // Drop b. We should not wait for a to consume the data buffered in the
         // copy loop, since b will be failing writes.
         drop(b);
-        handle.await;
+        assert!(handle.await.unwrap().is_err());
     })
     .await
 }
