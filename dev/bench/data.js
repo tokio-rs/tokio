@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607403396774,
+  "lastUpdate": 1607403405438,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -5097,6 +5097,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1090,
             "range": "± 8",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "bdonlan@gmail.com",
+            "name": "bdonlan",
+            "username": "bdonlan"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "57dffb9dfe9e4c0f12429246540add3975f4a754",
+          "message": "rt: fix deadlock in shutdown (#3228)\n\nPreviously, the runtime shutdown logic would first-hand control over all cores\r\nto a single thread, which would sequentially shut down all tasks on the core\r\nand then wait for them to complete.\r\n\r\nThis could deadlock when one task is waiting for a later core's task to\r\ncomplete. For example, in the newly added test, we have a `block_in_place` task\r\nthat is waiting for another task to be dropped. If the latter task adds its\r\ncore to the shutdown list later than the former, we end up waiting forever for\r\nthe `block_in_place` task to complete.\r\n\r\nAdditionally, there also was a bug wherein we'd attempt to park on the parker\r\nafter shutting it down which was fixed as part of the refactors above.\r\n\r\nThis change restructures the code to bring all tasks to a halt (and do any\r\nparking needed) before we collapse to a single thread to avoid this deadlock.\r\n\r\nThere was also an issue in which canceled tasks would not unpark the\r\noriginating thread, due to what appears to be some sort of optimization gone\r\nwrong. This has been fixed to be much more conservative in selecting when not\r\nto unpark the source thread (this may be too conservative; please take a look\r\nat the changes to `release()`).\r\n\r\nFixes: #2789",
+          "timestamp": "2020-12-07T20:55:02-08:00",
+          "tree_id": "1890e495daa058f06c8a738de4c88b0aeea52f77",
+          "url": "https://github.com/tokio-rs/tokio/commit/57dffb9dfe9e4c0f12429246540add3975f4a754"
+        },
+        "date": 1607403404570,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 14296,
+            "range": "± 4307",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 963,
+            "range": "± 99",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 603,
+            "range": "± 70",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 14548,
+            "range": "± 3094",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 976,
+            "range": "± 133",
             "unit": "ns/iter"
           }
         ]
