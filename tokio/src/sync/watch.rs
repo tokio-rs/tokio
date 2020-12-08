@@ -241,19 +241,19 @@ impl<T> Receiver<T> {
     /// }
     /// ```
     pub async fn changed(&mut self) -> Result<(), error::RecvError> {
-        // In order to avoid a race condition, we first request a notification,
-        // **then** check the current value's version. If a new version exists,
-        // the notification request is dropped.
-        let notified = self.shared.notify_rx.notified();
+        loop {
+            // In order to avoid a race condition, we first request a notification,
+            // **then** check the current value's version. If a new version exists,
+            // the notification request is dropped.
+            let notified = self.shared.notify_rx.notified();
 
-        if let Some(ret) = maybe_changed(&self.shared, &mut self.version) {
-            return ret;
+            if let Some(ret) = maybe_changed(&self.shared, &mut self.version) {
+                return ret;
+            }
+
+            notified.await;
+            // loop around again in case the wake-up was spurious
         }
-
-        notified.await;
-
-        maybe_changed(&self.shared, &mut self.version)
-            .expect("[bug] failed to observe change after notificaton.")
     }
 }
 
