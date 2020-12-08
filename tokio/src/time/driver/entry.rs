@@ -631,10 +631,6 @@ impl TimerHandle {
         unsafe { self.inner.as_ref().sync_when() }
     }
 
-    pub(super) unsafe fn set_cached_when(&self, when: u64) {
-        unsafe { self.inner.as_ref().set_cached_when(when) }
-    }
-
     pub(super) unsafe fn is_pending(&self) -> bool {
         unsafe { self.inner.as_ref().state.is_pending() }
     }
@@ -658,14 +654,13 @@ impl TimerHandle {
     /// After returning Ok, the entry must be added to the pending list.
     pub(super) unsafe fn mark_pending(&self, not_after: u64) -> Result<(), u64> {
         match self.inner.as_ref().state.mark_pending(not_after) {
-            Ok(()) => Ok(()),
+            Ok(()) => {
+                // mark this as being on the pending queue in cached_when
+                self.inner.as_ref().set_cached_when(u64::max_value());
+                Ok(())
+            }
             Err(tick) => {
-                self.inner
-                    .as_ref()
-                    .driver_state
-                    .0
-                    .cached_when
-                    .store(tick, Ordering::Relaxed);
+                self.inner.as_ref().set_cached_when(tick);
                 Err(tick)
             }
         }

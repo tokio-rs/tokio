@@ -338,10 +338,10 @@ async fn drop_from_wake() {
     use std::sync::{Arc, Mutex};
     use std::task::Context;
 
-    let paniced = Arc::new(AtomicBool::new(false));
+    let panicked = Arc::new(AtomicBool::new(false));
     let list: Arc<Mutex<Vec<tokio::time::Sleep>>> = Arc::new(Mutex::new(Vec::new()));
 
-    let arc_wake = Arc::new(DropWaker(paniced.clone(), list.clone()));
+    let arc_wake = Arc::new(DropWaker(panicked.clone(), list.clone()));
     let arc_wake = futures::task::waker(arc_wake);
 
     tokio::time::pause();
@@ -361,7 +361,7 @@ async fn drop_from_wake() {
     tokio::time::sleep(Duration::from_millis(11)).await;
 
     assert!(
-        !paniced.load(Ordering::SeqCst),
+        !panicked.load(Ordering::SeqCst),
         "paniced when dropping timers"
     );
 

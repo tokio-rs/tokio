@@ -244,9 +244,6 @@ impl Wheel {
             match unsafe { item.mark_pending(expiration.deadline) } {
                 Ok(()) => {
                     // Item was expired
-                    unsafe {
-                        item.set_cached_when(u64::max_value());
-                    }
                     self.pending.push_front(item);
                 }
                 Err(expiration_tick) => {
