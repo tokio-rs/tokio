@@ -441,7 +441,7 @@ impl TimerShared {
     ///
     /// SAFETY: Must be called with the driver lock held, and when this entry is
     /// not in any timer wheel lists.
-    pub(super) unsafe fn set_cached_when(&self, when: u64) {
+    unsafe fn set_cached_when(&self, when: u64) {
         self.driver_state
             .0
             .cached_when
