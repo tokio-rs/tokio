@@ -1,5 +1,6 @@
 name: Stress Test
 on:
+  pull_request:
   push:
     branches:
       - master
@@ -18,12 +19,12 @@ jobs:
         run: rustup update stable
 
       - name: Install Valgrind
-        run: apt install -y valgrind
+        run: sudo apt-get install -y valgrind
 
       # Compiles each of the stress test examples.
       - name: Compile stress test examples
-        run: cargo build -p stress-test --release --examples ${{ matrix.stress-test }}
+        run: cargo build -p stress-test --release --example ${{ matrix.stress-test }}
 
       # Runs each of the examples using Valgrind. Detects leaks and displays them.
       - name: Run valgrind
-        run: valgrind  --leak-check=full --show-leak-kinds=all ./target/release/${{ matrix.stress-test }}
+        run: valgrind  --leak-check=full --show-leak-kinds=all ./target/release/examples/${{ matrix.stress-test }}
