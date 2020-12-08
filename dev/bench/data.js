@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607403409143,
+  "lastUpdate": 1607403413101,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -7805,6 +7805,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 690380,
             "range": "± 2453",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "bdonlan@gmail.com",
+            "name": "bdonlan",
+            "username": "bdonlan"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "57dffb9dfe9e4c0f12429246540add3975f4a754",
+          "message": "rt: fix deadlock in shutdown (#3228)\n\nPreviously, the runtime shutdown logic would first-hand control over all cores\r\nto a single thread, which would sequentially shut down all tasks on the core\r\nand then wait for them to complete.\r\n\r\nThis could deadlock when one task is waiting for a later core's task to\r\ncomplete. For example, in the newly added test, we have a `block_in_place` task\r\nthat is waiting for another task to be dropped. If the latter task adds its\r\ncore to the shutdown list later than the former, we end up waiting forever for\r\nthe `block_in_place` task to complete.\r\n\r\nAdditionally, there also was a bug wherein we'd attempt to park on the parker\r\nafter shutting it down which was fixed as part of the refactors above.\r\n\r\nThis change restructures the code to bring all tasks to a halt (and do any\r\nparking needed) before we collapse to a single thread to avoid this deadlock.\r\n\r\nThere was also an issue in which canceled tasks would not unpark the\r\noriginating thread, due to what appears to be some sort of optimization gone\r\nwrong. This has been fixed to be much more conservative in selecting when not\r\nto unpark the source thread (this may be too conservative; please take a look\r\nat the changes to `release()`).\r\n\r\nFixes: #2789",
+          "timestamp": "2020-12-07T20:55:02-08:00",
+          "tree_id": "1890e495daa058f06c8a738de4c88b0aeea52f77",
+          "url": "https://github.com/tokio-rs/tokio/commit/57dffb9dfe9e4c0f12429246540add3975f4a754"
+        },
+        "date": 1607403412209,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6793764,
+            "range": "± 2223193",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6960770,
+            "range": "± 1327814",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6176210,
+            "range": "± 1951380",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 768,
+            "range": "± 89",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 755,
+            "range": "± 41",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 761,
+            "range": "± 36",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 47199,
+            "range": "± 1700",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 824,
+            "range": "± 60",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1115066,
+            "range": "± 37817",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 805312,
+            "range": "± 47500",
             "unit": "ns/iter"
           }
         ]
