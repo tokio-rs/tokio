@@ -1,5 +1,6 @@
 name: Stress Test
 on:
+  pull_request:
   push:
     branches:
       - master
