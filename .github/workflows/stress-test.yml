@@ -27,4 +27,4 @@ jobs:
 
       # Runs each of the examples using Valgrind. Detects leaks and displays them.
       - name: Run valgrind
-        run: valgrind  --leak-check=full --show-leak-kinds=all ./target/release/${{ matrix.stress-test }}
+        run: valgrind  --leak-check=full --show-leak-kinds=all ./target/release/examples/${{ matrix.stress-test }}
