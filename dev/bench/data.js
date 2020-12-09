@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607474668206,
+  "lastUpdate": 1607474765656,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -8525,6 +8525,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 806009,
             "range": "± 10747",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "bdonlan@gmail.com",
+            "name": "bdonlan",
+            "username": "bdonlan"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9706ca92a8deb69d6e29265f21424042fea966c5",
+          "message": "time: Fix race condition in timer drop (#3229)\n\nDropping a timer on the millisecond that it was scheduled for, when it was on\r\nthe pending list, could result in a panic previously, as we did not record the\r\npending-list state in cached_when.\r\n\r\nHopefully fixes: ZcashFoundation/zebra#1452",
+          "timestamp": "2020-12-08T16:42:43-08:00",
+          "tree_id": "cd77e2148b7cdf03d0fcb38e8e27cf3f7eed1ed9",
+          "url": "https://github.com/tokio-rs/tokio/commit/9706ca92a8deb69d6e29265f21424042fea966c5"
+        },
+        "date": 1607474764713,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 7317557,
+            "range": "± 3066683",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 7431812,
+            "range": "± 2100179",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6505435,
+            "range": "± 3180816",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 888,
+            "range": "± 130",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 875,
+            "range": "± 129",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 877,
+            "range": "± 145",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 67029,
+            "range": "± 6153",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1161,
+            "range": "± 156",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1121079,
+            "range": "± 187875",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 799965,
+            "range": "± 96054",
             "unit": "ns/iter"
           }
         ]
