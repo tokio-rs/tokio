@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607554261502,
+  "lastUpdate": 1607554270572,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -3877,6 +3877,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19128441,
             "range": "± 2650473",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "50183564+nylonicious@users.noreply.github.com",
+            "name": "Nylonicious",
+            "username": "nylonicious"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "52cd240053b2e1dd5835186539f563c3496dfd7d",
+          "message": "task: add missing feature flags for task_local and spawn_blocking (#3237)",
+          "timestamp": "2020-12-09T23:49:28+01:00",
+          "tree_id": "bbc90b40091bd716d0269b84da2bafb32288b149",
+          "url": "https://github.com/tokio-rs/tokio/commit/52cd240053b2e1dd5835186539f563c3496dfd7d"
+        },
+        "date": 1607554269706,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 192231,
+            "range": "± 48706",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 725300,
+            "range": "± 123760",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5111998,
+            "range": "± 617868",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20899319,
+            "range": "± 2797104",
             "unit": "ns/iter"
           }
         ]
