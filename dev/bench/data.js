@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607554270572,
+  "lastUpdate": 1607554275861,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -5925,6 +5925,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1088,
             "range": "± 150",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "50183564+nylonicious@users.noreply.github.com",
+            "name": "Nylonicious",
+            "username": "nylonicious"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "52cd240053b2e1dd5835186539f563c3496dfd7d",
+          "message": "task: add missing feature flags for task_local and spawn_blocking (#3237)",
+          "timestamp": "2020-12-09T23:49:28+01:00",
+          "tree_id": "bbc90b40091bd716d0269b84da2bafb32288b149",
+          "url": "https://github.com/tokio-rs/tokio/commit/52cd240053b2e1dd5835186539f563c3496dfd7d"
+        },
+        "date": 1607554262463,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 15620,
+            "range": "± 4397",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1083,
+            "range": "± 18",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 712,
+            "range": "± 78",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 15750,
+            "range": "± 3242",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1085,
+            "range": "± 77",
             "unit": "ns/iter"
           }
         ]
