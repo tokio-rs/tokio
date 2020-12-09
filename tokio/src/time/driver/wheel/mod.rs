@@ -118,10 +118,10 @@ impl Wheel {
     /// Remove `item` from the timing wheel.
     pub(crate) unsafe fn remove(&mut self, item: NonNull<TimerShared>) {
         unsafe {
-            if !item.as_ref().might_be_registered() {
+            let when = item.as_ref().cached_when();
+            if when == u64::max_value() {
                 self.pending.remove(item);
             } else {
-                let when = item.as_ref().cached_when();
                 let level = self.level_for(when);
 
                 self.levels[level].remove_entry(item);

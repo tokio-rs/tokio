@@ -308,3 +308,75 @@ async fn no_out_of_bounds_close_to_max() {
 fn ms(n: u64) -> Duration {
     Duration::from_millis(n)
 }
+
+#[tokio::test]
+async fn drop_after_reschedule_at_new_scheduled_time() {
+    use futures::poll;
+
+    tokio::time::pause();
+
+    let start = tokio::time::Instant::now();
+
+    let mut a = tokio::time::sleep(Duration::from_millis(5));
+    let mut b = tokio::time::sleep(Duration::from_millis(5));
+    let mut c = tokio::time::sleep(Duration::from_millis(10));
+
+    let _ = poll!(&mut a);
+    let _ = poll!(&mut b);
+    let _ = poll!(&mut c);
+
+    b.reset(start + Duration::from_millis(10));
+    a.await;
+
+    drop(b);
+}
+
+#[tokio::test]
+async fn drop_from_wake() {
+    use std::future::Future;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Arc, Mutex};
+    use std::task::Context;
+
+    let panicked = Arc::new(AtomicBool::new(false));
+    let list: Arc<Mutex<Vec<tokio::time::Sleep>>> = Arc::new(Mutex::new(Vec::new()));
+
+    let arc_wake = Arc::new(DropWaker(panicked.clone(), list.clone()));
+    let arc_wake = futures::task::waker(arc_wake);
+
+    tokio::time::pause();
+
+    let mut lock = list.lock().unwrap();
+
+    for _ in 0..100 {
+        let mut timer = tokio::time::sleep(Duration::from_millis(10));
+
+        let _ = std::pin::Pin::new(&mut timer).poll(&mut Context::from_waker(&arc_wake));
+
+        lock.push(timer);
+    }
+
+    drop(lock);
+
+    tokio::time::sleep(Duration::from_millis(11)).await;
+
+    assert!(
+        !panicked.load(Ordering::SeqCst),
+        "paniced when dropping timers"
+    );
+
+    #[derive(Clone)]
+    struct DropWaker(Arc<AtomicBool>, Arc<Mutex<Vec<tokio::time::Sleep>>>);
+
+    impl futures::task::ArcWake for DropWaker {
+        fn wake_by_ref(arc_self: &Arc<Self>) {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                *arc_self.1.lock().expect("panic in lock") = Vec::new()
+            }));
+
+            if result.is_err() {
+                arc_self.0.store(true, Ordering::SeqCst);
+            }
+        }
+    }
+}
