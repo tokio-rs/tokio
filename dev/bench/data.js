@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607467221311,
+  "lastUpdate": 1607474657275,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -3619,6 +3619,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21615448,
             "range": "± 2515932",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "bdonlan@gmail.com",
+            "name": "bdonlan",
+            "username": "bdonlan"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9706ca92a8deb69d6e29265f21424042fea966c5",
+          "message": "time: Fix race condition in timer drop (#3229)\n\nDropping a timer on the millisecond that it was scheduled for, when it was on\r\nthe pending list, could result in a panic previously, as we did not record the\r\npending-list state in cached_when.\r\n\r\nHopefully fixes: ZcashFoundation/zebra#1452",
+          "timestamp": "2020-12-08T16:42:43-08:00",
+          "tree_id": "cd77e2148b7cdf03d0fcb38e8e27cf3f7eed1ed9",
+          "url": "https://github.com/tokio-rs/tokio/commit/9706ca92a8deb69d6e29265f21424042fea966c5"
+        },
+        "date": 1607474656366,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 179734,
+            "range": "± 31815",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 688149,
+            "range": "± 121324",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4546759,
+            "range": "± 1065367",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18779271,
+            "range": "± 2298570",
             "unit": "ns/iter"
           }
         ]
