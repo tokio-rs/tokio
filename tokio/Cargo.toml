@@ -7,13 +7,13 @@ name = "tokio"
 #   - Cargo.toml
 #   - README.md
 # - Update CHANGELOG.md.
-# - Create "v0.3.x" git tag.
-version = "0.3.5"
+# - Create "v1.0.x" git tag.
+version = "1.0.0"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 readme = "README.md"
-documentation = "https://docs.rs/tokio/0.3.5/tokio/"
+documentation = "https://docs.rs/tokio/1.0.0/tokio/"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
 description = """
@@ -22,6 +22,7 @@ backed applications.
 """
 categories = ["asynchronous", "network-programming"]
 keywords = ["io", "async", "non-blocking", "futures"]
+publish = false
 
 [features]
 # Include nothing by default
@@ -88,7 +89,7 @@ test-util = []
 time = []
 
 [dependencies]
-tokio-macros = { version = "0.3.0", path = "../tokio-macros", optional = true }
+tokio-macros = { version = "1.0.0", path = "../tokio-macros", optional = true }
 
 pin-project-lite = "0.2.0"
 
@@ -117,7 +118,7 @@ default-features = false
 optional = true
 
 [dev-dependencies]
-tokio-test = { version = "0.3.0", path = "../tokio-test" }
+tokio-test = { version = "0.4.0", path = "../tokio-test" }
 futures = { version = "0.3.0", features = ["async-await"] }
 proptest = "0.10.0"
 tempfile = "3.1.0"

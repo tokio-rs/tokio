@@ -7,10 +7,10 @@ edition = "2018"
 # If you copy one of the examples into a new project, you should be using
 # [dependencies] instead.
 [dev-dependencies]
-tokio = { version = "0.3.0", path = "../tokio", features = ["full", "tracing"] }
+tokio = { version = "1.0.0", path = "../tokio", features = ["full", "tracing"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.2.7", default-features = false, features = ["fmt", "ansi", "env-filter", "chrono", "tracing-log"] }
-tokio-util = { version = "0.5.0", path = "../tokio-util", features = ["full"] }
+tokio-util = { version = "0.6.0", path = "../tokio-util", features = ["full"] }
 bytes = "0.6"
 futures = "0.3.0"
 http = "0.2"
