@@ -6,27 +6,28 @@ name = "tokio-test"
 # - Update doc url
 #   - Cargo.toml
 # - Update CHANGELOG.md.
-# - Create "v0.3.x" git tag.
-version = "0.3.0"
+# - Create "tokio-test-0.4.x" git tag.
+version = "0.4.0"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-test/0.3.0/tokio_test"
+documentation = "https://docs.rs/tokio-test/0.4.0/tokio_test"
 description = """
 Testing utilities for Tokio- and futures-based code
 """
 categories = ["asynchronous", "testing"]
+publish = false
 
 [dependencies]
-tokio = { version = "0.3.0", path = "../tokio", features = ["rt", "stream", "sync", "time", "test-util"] }
+tokio = { version = "1.0.0", path = "../tokio", features = ["rt", "stream", "sync", "time", "test-util"] }
 
 bytes = "0.6.0"
 futures-core = "0.3.0"
 
 [dev-dependencies]
-tokio = { version = "0.3.0", path = "../tokio", features = ["full"] }
+tokio = { version = "1.0.0", path = "../tokio", features = ["full"] }
 futures-util = "0.3.0"
 
 [package.metadata.docs.rs]

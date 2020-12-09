@@ -5,7 +5,7 @@ publish = false
 edition = "2018"
 
 [dependencies]
-tokio = { version = "0.3.0", path = "../tokio", features = ["full"] }
+tokio = { version = "1.0.0", path = "../tokio", features = ["full"] }
 bencher = "0.1.5"
 
 [target.'cfg(unix)'.dependencies]
