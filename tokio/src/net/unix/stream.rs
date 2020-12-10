@@ -155,7 +155,7 @@ impl UnixStream {
     /// # Return
     ///
     /// If data is successfully read, `Ok(n)` is returned, where `n` is the
-    /// number of bytes read. `Ok(n)` indicates the stream's read half is closed
+    /// number of bytes read. `Ok(0)` indicates the stream's read half is closed
     /// and will no longer yield data. If the stream is not ready to read data
     /// `Err(io::ErrorKind::WouldBlock)` is returned.
     ///
