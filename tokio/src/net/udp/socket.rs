@@ -749,7 +749,7 @@ impl UdpSocket {
     ) -> Poll<io::Result<usize>> {
         self.io
             .registration()
-            .poll_write_io(cx, || self.io.send_to(buf, *target))
+            .poll_write_io(cx, || self.io.send_to(buf, target))
     }
 
     /// Try to send data on the socket to the given address, but if the send is
