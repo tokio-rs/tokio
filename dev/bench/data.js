@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607590075529,
+  "lastUpdate": 1607590079350,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -4081,6 +4081,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19510477,
             "range": "± 3348179",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f60860af7edefef5373d50d77ab605d648d60526",
+          "message": "watch: fix spurious wakeup (#3234)\n\nCo-authored-by: @tijsvd",
+          "timestamp": "2020-12-10T09:46:01+01:00",
+          "tree_id": "44bc86bbaa5393a0dc3a94a2066569dcb1b79df1",
+          "url": "https://github.com/tokio-rs/tokio/commit/f60860af7edefef5373d50d77ab605d648d60526"
+        },
+        "date": 1607590064827,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 203790,
+            "range": "± 83331",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 729613,
+            "range": "± 155547",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5307925,
+            "range": "± 1032487",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21233943,
+            "range": "± 4386394",
             "unit": "ns/iter"
           }
         ]
