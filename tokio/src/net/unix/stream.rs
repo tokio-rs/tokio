@@ -208,7 +208,7 @@ impl UnixStream {
 
     /// Wait for the socket to become writable.
     ///
-    /// This function is equivalent to `ready(Interest::WRITABLE)` is usually
+    /// This function is equivalent to `ready(Interest::WRITABLE)` and is usually
     /// paired with `try_write()`.
     ///
     /// # Examples
