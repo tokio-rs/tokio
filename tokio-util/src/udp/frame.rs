@@ -130,7 +130,7 @@ impl<I, C: Encoder<I> + Unpin> Sink<(I, SocketAddr)> for UdpFramed<C> {
             ..
         } = *self;
 
-        let n = ready!(socket.poll_send_to(cx, &wr, &out_addr))?;
+        let n = ready!(socket.poll_send_to(cx, &wr, *out_addr))?;
 
         let wrote_all = n == self.wr.len();
         self.wr.clear();

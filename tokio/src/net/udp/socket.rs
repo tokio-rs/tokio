@@ -745,11 +745,11 @@ impl UdpSocket {
         &self,
         cx: &mut Context<'_>,
         buf: &[u8],
-        target: &SocketAddr,
+        target: SocketAddr,
     ) -> Poll<io::Result<usize>> {
         self.io
             .registration()
-            .poll_write_io(cx, || self.io.send_to(buf, *target))
+            .poll_write_io(cx, || self.io.send_to(buf, target))
     }
 
     /// Try to send data on the socket to the given address, but if the send is

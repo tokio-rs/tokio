@@ -66,7 +66,7 @@ async fn send_to_recv_from_poll() -> std::io::Result<()> {
     let receiver = UdpSocket::bind("127.0.0.1:0").await?;
 
     let receiver_addr = receiver.local_addr()?;
-    poll_fn(|cx| sender.poll_send_to(cx, MSG, &receiver_addr)).await?;
+    poll_fn(|cx| sender.poll_send_to(cx, MSG, receiver_addr)).await?;
 
     let mut recv_buf = [0u8; 32];
     let mut read = ReadBuf::new(&mut recv_buf);
@@ -83,7 +83,7 @@ async fn send_to_peek_from() -> std::io::Result<()> {
     let receiver = UdpSocket::bind("127.0.0.1:0").await?;
 
     let receiver_addr = receiver.local_addr()?;
-    poll_fn(|cx| sender.poll_send_to(cx, MSG, &receiver_addr)).await?;
+    poll_fn(|cx| sender.poll_send_to(cx, MSG, receiver_addr)).await?;
 
     // peek
     let mut recv_buf = [0u8; 32];
@@ -111,7 +111,7 @@ async fn send_to_peek_from_poll() -> std::io::Result<()> {
     let receiver = UdpSocket::bind("127.0.0.1:0").await?;
 
     let receiver_addr = receiver.local_addr()?;
-    poll_fn(|cx| sender.poll_send_to(cx, MSG, &receiver_addr)).await?;
+    poll_fn(|cx| sender.poll_send_to(cx, MSG, receiver_addr)).await?;
 
     let mut recv_buf = [0u8; 32];
     let mut read = ReadBuf::new(&mut recv_buf);
@@ -192,7 +192,7 @@ async fn split_chan_poll() -> std::io::Result<()> {
     let (tx, mut rx) = tokio::sync::mpsc::channel::<(Vec<u8>, std::net::SocketAddr)>(1_000);
     tokio::spawn(async move {
         while let Some((bytes, addr)) = rx.recv().await {
-            poll_fn(|cx| s.poll_send_to(cx, &bytes, &addr))
+            poll_fn(|cx| s.poll_send_to(cx, &bytes, addr))
                 .await
                 .unwrap();
         }
@@ -209,7 +209,7 @@ async fn split_chan_poll() -> std::io::Result<()> {
 
     // test that we can send a value and get back some response
     let sender = UdpSocket::bind("127.0.0.1:0").await?;
-    poll_fn(|cx| sender.poll_send_to(cx, MSG, &addr)).await?;
+    poll_fn(|cx| sender.poll_send_to(cx, MSG, addr)).await?;
 
     let mut recv_buf = [0u8; 32];
     let mut read = ReadBuf::new(&mut recv_buf);
