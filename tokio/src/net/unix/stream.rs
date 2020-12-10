@@ -91,7 +91,7 @@ impl UnixStream {
 
     /// Wait for the socket to become readable.
     ///
-    /// This function is equivalent to `ready(Interest::READABLE)` is usually
+    /// This function is equivalent to `ready(Interest::READABLE)` and is usually
     /// paired with `try_read()`.
     ///
     /// # Examples
