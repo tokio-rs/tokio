@@ -410,13 +410,13 @@ cfg_macros! {
     cfg_rt! {
         cfg_rt_multi_thread! {
             // This is the docs.rs case (with all features) so make sure macros
-            // is included in doc(cfg).
+            // and rt are included in doc(cfg).
 
             #[cfg(not(test))] // Work around for rust-lang/rust#62127
-            #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+            #[cfg_attr(docsrs, doc(cfg(all(feature = "macros", feature = "rt"))))]
             pub use tokio_macros::main;
 
-            #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+            #[cfg_attr(docsrs, doc(cfg(all(feature = "macros", feature = "rt"))))]
             pub use tokio_macros::test;
         }
 
