@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607590060329,
+  "lastUpdate": 1607590070147,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -6189,6 +6189,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 910,
             "range": "± 5",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f60860af7edefef5373d50d77ab605d648d60526",
+          "message": "watch: fix spurious wakeup (#3234)\n\nCo-authored-by: @tijsvd",
+          "timestamp": "2020-12-10T09:46:01+01:00",
+          "tree_id": "44bc86bbaa5393a0dc3a94a2066569dcb1b79df1",
+          "url": "https://github.com/tokio-rs/tokio/commit/f60860af7edefef5373d50d77ab605d648d60526"
+        },
+        "date": 1607590069272,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 13993,
+            "range": "± 3591",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 988,
+            "range": "± 128",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 584,
+            "range": "± 87",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 14229,
+            "range": "± 4359",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 990,
+            "range": "± 163",
             "unit": "ns/iter"
           }
         ]
