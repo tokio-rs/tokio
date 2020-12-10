@@ -1,4 +1,4 @@
-use crate::io::{Interest, PollEvented};
+use crate::io::{Interest, PollEvented, ReadBuf, Ready};
 use crate::net::unix::SocketAddr;
 
 use std::convert::TryFrom;
@@ -8,6 +8,7 @@ use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::os::unix::net;
 use std::path::Path;
+use std::task::{Context, Poll};
 
 cfg_net_unix! {
     /// An I/O object representing a Unix datagram socket.
@@ -83,6 +84,178 @@ cfg_net_unix! {
 }
 
 impl UnixDatagram {
+    /// Wait for any of the requested ready states.
+    ///
+    /// This function is usually paired with `try_recv()` or `try_send()`. It
+    /// can be used to concurrently recv / send to the same socket on a single
+    /// task without splitting the socket.
+    ///
+    /// The function may complete without the socket being ready. This is a
+    /// false-positive and attempting an operation will return with
+    /// `io::ErrorKind::WouldBlock`.
+    ///
+    /// # Examples
+    ///
+    /// Concurrently receive from and send to the socket on the same task
+    /// without splitting.
+    ///
+    /// ```no_run
+    /// use tokio::io::Interest;
+    /// use tokio::net::UnixDatagram;
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let dir = tempfile::tempdir().unwrap();
+    ///     let client_path = dir.path().join("client.sock");
+    ///     let server_path = dir.path().join("server.sock");
+    ///     let socket = UnixDatagram::bind(&client_path)?;
+    ///     socket.connect(&server_path)?;
+    ///
+    ///     loop {
+    ///         let ready = socket.ready(Interest::READABLE | Interest::WRITABLE).await?;
+    ///
+    ///         if ready.is_readable() {
+    ///             let mut data = [0; 1024];
+    ///             match socket.try_recv(&mut data[..]) {
+    ///                 Ok(n) => {
+    ///                     println!("received {:?}", &data[..n]);
+    ///                 }
+    ///                 // False-positive, continue
+    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
+    ///                 Err(e) => {
+    ///                     return Err(e);
+    ///                 }
+    ///             }
+    ///         }
+    ///
+    ///         if ready.is_writable() {
+    ///             // Write some data
+    ///             match socket.try_send(b"hello world") {
+    ///                 Ok(n) => {
+    ///                     println!("sent {} bytes", n);
+    ///                 }
+    ///                 // False-positive, continue
+    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
+    ///                 Err(e) => {
+    ///                     return Err(e);
+    ///                 }
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    pub async fn ready(&self, interest: Interest) -> io::Result<Ready> {
+        let event = self.io.registration().readiness(interest).await?;
+        Ok(event.ready)
+    }
+
+    /// Wait for the socket to become writable.
+    ///
+    /// This function is equivalent to `ready(Interest::WRITABLE)` and is
+    /// usually paired with `try_send()` or `try_send_to()`.
+    ///
+    /// The function may complete without the socket being writable. This is a
+    /// false-positive and attempting a `try_send()` will return with
+    /// `io::ErrorKind::WouldBlock`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::UnixDatagram;
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let dir = tempfile::tempdir().unwrap();
+    ///     let client_path = dir.path().join("client.sock");
+    ///     let server_path = dir.path().join("server.sock");
+    ///     let socket = UnixDatagram::bind(&client_path)?;
+    ///     socket.connect(&server_path)?;
+    ///
+    ///     loop {
+    ///         // Wait for the socket to be writable
+    ///         socket.writable().await?;
+    ///
+    ///         // Try to send data, this may still fail with `WouldBlock`
+    ///         // if the readiness event is a false positive.
+    ///         match socket.try_send(b"hello world") {
+    ///             Ok(n) => {
+    ///                 break;
+    ///             }
+    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                 continue;
+    ///             }
+    ///             Err(e) => {
+    ///                 return Err(e);
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn writable(&self) -> io::Result<()> {
+        self.ready(Interest::WRITABLE).await?;
+        Ok(())
+    }
+
+    /// Wait for the socket to become readable.
+    ///
+    /// This function is equivalent to `ready(Interest::READABLE)` and is usually
+    /// paired with `try_recv()`.
+    ///
+    /// The function may complete without the socket being readable. This is a
+    /// false-positive and attempting a `try_recv()` will return with
+    /// `io::ErrorKind::WouldBlock`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::UnixDatagram;
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     // Connect to a peer
+    ///     let dir = tempfile::tempdir().unwrap();
+    ///     let client_path = dir.path().join("client.sock");
+    ///     let server_path = dir.path().join("server.sock");
+    ///     let socket = UnixDatagram::bind(&client_path)?;
+    ///     socket.connect(&server_path)?;
+    ///
+    ///     loop {
+    ///         // Wait for the socket to be readable
+    ///         socket.readable().await?;
+    ///
+    ///         // The buffer is **not** included in the async task and will
+    ///         // only exist on the stack.
+    ///         let mut buf = [0; 1024];
+    ///
+    ///         // Try to recv data, this may still fail with `WouldBlock`
+    ///         // if the readiness event is a false positive.
+    ///         match socket.try_recv(&mut buf) {
+    ///             Ok(n) => {
+    ///                 println!("GOT {:?}", &buf[..n]);
+    ///                 break;
+    ///             }
+    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                 continue;
+    ///             }
+    ///             Err(e) => {
+    ///                 return Err(e);
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn readable(&self) -> io::Result<()> {
+        self.ready(Interest::READABLE).await?;
+        Ok(())
+    }
+
     /// Creates a new `UnixDatagram` bound to the specified path.
     ///
     /// # Examples
@@ -309,68 +482,91 @@ impl UnixDatagram {
     /// Try to send a datagram to the peer without waiting.
     ///
     /// # Examples
-    /// ```
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///
+    /// ```no_run
     /// use tokio::net::UnixDatagram;
+    /// use std::io;
     ///
-    /// let bytes = b"bytes";
-    /// // We use a socket pair so that they are assigned
-    /// // each other as a peer.
-    /// let (first, second) = UnixDatagram::pair()?;
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let dir = tempfile::tempdir().unwrap();
+    ///     let client_path = dir.path().join("client.sock");
+    ///     let server_path = dir.path().join("server.sock");
+    ///     let socket = UnixDatagram::bind(&client_path)?;
+    ///     socket.connect(&server_path)?;
     ///
-    /// let size = first.try_send(bytes)?;
-    /// assert_eq!(size, bytes.len());
+    ///     loop {
+    ///         // Wait for the socket to be writable
+    ///         socket.writable().await?;
     ///
-    /// let mut buffer = vec![0u8; 24];
-    /// let size = second.try_recv(&mut buffer)?;
+    ///         // Try to send data, this may still fail with `WouldBlock`
+    ///         // if the readiness event is a false positive.
+    ///         match socket.try_send(b"hello world") {
+    ///             Ok(n) => {
+    ///                 break;
+    ///             }
+    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                 continue;
+    ///             }
+    ///             Err(e) => {
+    ///                 return Err(e);
+    ///             }
+    ///         }
+    ///     }
     ///
-    /// let dgram = &buffer[..size];
-    /// assert_eq!(dgram, bytes);
-    /// # Ok(())
-    /// # }
+    ///     Ok(())
+    /// }
     /// ```
     pub fn try_send(&self, buf: &[u8]) -> io::Result<usize> {
-        self.io.send(buf)
+        self.io
+            .registration()
+            .try_io(Interest::WRITABLE, || self.io.send(buf))
     }
 
     /// Try to send a datagram to the peer without waiting.
     ///
     /// # Examples
-    /// ```
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///
+    /// ```no_run
     /// use tokio::net::UnixDatagram;
-    /// use tempfile::tempdir;
+    /// use std::io;
     ///
-    /// let bytes = b"bytes";
-    /// // We use a temporary directory so that the socket
-    /// // files left by the bound sockets will get cleaned up.
-    /// let tmp = tempdir().unwrap();
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let dir = tempfile::tempdir().unwrap();
+    ///     let client_path = dir.path().join("client.sock");
+    ///     let server_path = dir.path().join("server.sock");
+    ///     let socket = UnixDatagram::bind(&client_path)?;
     ///
-    /// let server_path = tmp.path().join("server");
-    /// let server = UnixDatagram::bind(&server_path)?;
+    ///     loop {
+    ///         // Wait for the socket to be writable
+    ///         socket.writable().await?;
     ///
-    /// let client_path = tmp.path().join("client");
-    /// let client = UnixDatagram::bind(&client_path)?;
+    ///         // Try to send data, this may still fail with `WouldBlock`
+    ///         // if the readiness event is a false positive.
+    ///         match socket.try_send_to(b"hello world", &server_path) {
+    ///             Ok(n) => {
+    ///                 break;
+    ///             }
+    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                 continue;
+    ///             }
+    ///             Err(e) => {
+    ///                 return Err(e);
+    ///             }
+    ///         }
+    ///     }
     ///
-    /// let size = client.try_send_to(bytes, &server_path)?;
-    /// assert_eq!(size, bytes.len());
-    ///
-    /// let mut buffer = vec![0u8; 24];
-    /// let (size, addr) = server.try_recv_from(&mut buffer)?;
-    ///
-    /// let dgram = &buffer[..size];
-    /// assert_eq!(dgram, bytes);
-    /// assert_eq!(addr.as_pathname().unwrap(), &client_path);
-    /// # Ok(())
-    /// # }
+    ///     Ok(())
+    /// }
     /// ```
     pub fn try_send_to<P>(&self, buf: &[u8], target: P) -> io::Result<usize>
     where
         P: AsRef<Path>,
     {
-        self.io.send_to(buf, target)
+        self.io
+            .registration()
+            .try_io(Interest::WRITABLE, || self.io.send_to(buf, target))
     }
 
     /// Receives data from the socket.
@@ -409,29 +605,51 @@ impl UnixDatagram {
     /// Try to receive a datagram from the peer without waiting.
     ///
     /// # Examples
-    /// ```
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///
+    /// ```no_run
     /// use tokio::net::UnixDatagram;
+    /// use std::io;
     ///
-    /// let bytes = b"bytes";
-    /// // We use a socket pair so that they are assigned
-    /// // each other as a peer.
-    /// let (first, second) = UnixDatagram::pair()?;
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     // Connect to a peer
+    ///     let dir = tempfile::tempdir().unwrap();
+    ///     let client_path = dir.path().join("client.sock");
+    ///     let server_path = dir.path().join("server.sock");
+    ///     let socket = UnixDatagram::bind(&client_path)?;
+    ///     socket.connect(&server_path)?;
     ///
-    /// let size = first.try_send(bytes)?;
-    /// assert_eq!(size, bytes.len());
+    ///     loop {
+    ///         // Wait for the socket to be readable
+    ///         socket.readable().await?;
     ///
-    /// let mut buffer = vec![0u8; 24];
-    /// let size = second.try_recv(&mut buffer)?;
+    ///         // The buffer is **not** included in the async task and will
+    ///         // only exist on the stack.
+    ///         let mut buf = [0; 1024];
     ///
-    /// let dgram = &buffer[..size];
-    /// assert_eq!(dgram, bytes);
-    /// # Ok(())
-    /// # }
+    ///         // Try to recv data, this may still fail with `WouldBlock`
+    ///         // if the readiness event is a false positive.
+    ///         match socket.try_recv(&mut buf) {
+    ///             Ok(n) => {
+    ///                 println!("GOT {:?}", &buf[..n]);
+    ///                 break;
+    ///             }
+    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                 continue;
+    ///             }
+    ///             Err(e) => {
+    ///                 return Err(e);
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     Ok(())
+    /// }
     /// ```
     pub fn try_recv(&self, buf: &mut [u8]) -> io::Result<usize> {
-        self.io.recv(buf)
+        self.io
+            .registration()
+            .try_io(Interest::READABLE, || self.io.recv(buf))
     }
 
     /// Sends data on the socket to the specified address.
@@ -520,40 +738,195 @@ impl UnixDatagram {
         Ok((n, SocketAddr(addr)))
     }
 
+    /// Attempts to receive a single datagram on the specified address.
+    ///
+    /// Note that on multiple calls to a `poll_*` method in the recv direction, only the
+    /// `Waker` from the `Context` passed to the most recent call will be scheduled to
+    /// receive a wakeup.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the socket is not ready to read
+    /// * `Poll::Ready(Ok(addr))` reads data from `addr` into `ReadBuf` if the socket is ready
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    pub fn poll_recv_from(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<SocketAddr>> {
+        let (n, addr) = ready!(self.io.registration().poll_read_io(cx, || {
+            // Safety: will not read the maybe uinitialized bytes.
+            let b = unsafe {
+                &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
+            };
+
+            self.io.recv_from(b)
+        }))?;
+
+        // Safety: We trust `recv` to have filled up `n` bytes in the buffer.
+        unsafe {
+            buf.assume_init(n);
+        }
+        buf.advance(n);
+        Poll::Ready(Ok(SocketAddr(addr)))
+    }
+
+    /// Attempts to send data to the specified address.
+    ///
+    /// Note that on multiple calls to a `poll_*` method in the send direction, only the
+    /// `Waker` from the `Context` passed to the most recent call will be scheduled to
+    /// receive a wakeup.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the socket is not ready to write
+    /// * `Poll::Ready(Ok(n))` `n` is the number of bytes sent.
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    pub fn poll_send_to<P>(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+        target: P,
+    ) -> Poll<io::Result<usize>>
+    where
+        P: AsRef<Path>,
+    {
+        self.io
+            .registration()
+            .poll_write_io(cx, || self.io.send_to(buf, target.as_ref()))
+    }
+
+    /// Attempts to send data on the socket to the remote address to which it
+    /// was previously `connect`ed.
+    ///
+    /// The [`connect`] method will connect this socket to a remote address.
+    /// This method will fail if the socket is not connected.
+    ///
+    /// Note that on multiple calls to a `poll_*` method in the send direction,
+    /// only the `Waker` from the `Context` passed to the most recent call will
+    /// be scheduled to receive a wakeup.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the socket is not available to write
+    /// * `Poll::Ready(Ok(n))` `n` is the number of bytes sent
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    ///
+    /// [`connect`]: method@Self::connect
+    pub fn poll_send(&self, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
+        self.io
+            .registration()
+            .poll_write_io(cx, || self.io.send(buf))
+    }
+
+    /// Attempts to receive a single datagram message on the socket from the remote
+    /// address to which it is `connect`ed.
+    ///
+    /// The [`connect`] method will connect this socket to a remote address. This method
+    /// resolves to an error if the socket is not connected.
+    ///
+    /// Note that on multiple calls to a `poll_*` method in the recv direction, only the
+    /// `Waker` from the `Context` passed to the most recent call will be scheduled to
+    /// receive a wakeup.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the socket is not ready to read
+    /// * `Poll::Ready(Ok(()))` reads data `ReadBuf` if the socket is ready
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    ///
+    /// [`connect`]: method@Self::connect
+    pub fn poll_recv(&self, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
+        let n = ready!(self.io.registration().poll_read_io(cx, || {
+            // Safety: will not read the maybe uinitialized bytes.
+            let b = unsafe {
+                &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
+            };
+
+            self.io.recv(b)
+        }))?;
+
+        // Safety: We trust `recv` to have filled up `n` bytes in the buffer.
+        unsafe {
+            buf.assume_init(n);
+        }
+        buf.advance(n);
+        Poll::Ready(Ok(()))
+    }
+
     /// Try to receive data from the socket without waiting.
     ///
     /// # Examples
-    /// ```
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///
+    /// ```no_run
     /// use tokio::net::UnixDatagram;
-    /// use tempfile::tempdir;
+    /// use std::io;
     ///
-    /// let bytes = b"bytes";
-    /// // We use a temporary directory so that the socket
-    /// // files left by the bound sockets will get cleaned up.
-    /// let tmp = tempdir().unwrap();
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     // Connect to a peer
+    ///     let dir = tempfile::tempdir().unwrap();
+    ///     let client_path = dir.path().join("client.sock");
+    ///     let server_path = dir.path().join("server.sock");
+    ///     let socket = UnixDatagram::bind(&client_path)?;
     ///
-    /// let server_path = tmp.path().join("server");
-    /// let server = UnixDatagram::bind(&server_path)?;
+    ///     loop {
+    ///         // Wait for the socket to be readable
+    ///         socket.readable().await?;
     ///
-    /// let client_path = tmp.path().join("client");
-    /// let client = UnixDatagram::bind(&client_path)?;
+    ///         // The buffer is **not** included in the async task and will
+    ///         // only exist on the stack.
+    ///         let mut buf = [0; 1024];
     ///
-    /// let size = client.try_send_to(bytes, &server_path)?;
-    /// assert_eq!(size, bytes.len());
+    ///         // Try to recv data, this may still fail with `WouldBlock`
+    ///         // if the readiness event is a false positive.
+    ///         match socket.try_recv_from(&mut buf) {
+    ///             Ok((n, _addr)) => {
+    ///                 println!("GOT {:?}", &buf[..n]);
+    ///                 break;
+    ///             }
+    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                 continue;
+    ///             }
+    ///             Err(e) => {
+    ///                 return Err(e);
+    ///             }
+    ///         }
+    ///     }
     ///
-    /// let mut buffer = vec![0u8; 24];
-    /// let (size, addr) = server.try_recv_from(&mut buffer)?;
-    ///
-    /// let dgram = &buffer[..size];
-    /// assert_eq!(dgram, bytes);
-    /// assert_eq!(addr.as_pathname().unwrap(), &client_path);
-    /// # Ok(())
-    /// # }
+    ///     Ok(())
+    /// }
     /// ```
     pub fn try_recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        let (n, addr) = self.io.recv_from(buf)?;
+        let (n, addr) = self
+            .io
+            .registration()
+            .try_io(Interest::READABLE, || self.io.recv_from(buf))?;
+
         Ok((n, SocketAddr(addr)))
     }
 
