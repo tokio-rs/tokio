@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607630413422,
+  "lastUpdate": 1607630431722,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -4333,6 +4333,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19854087,
             "range": "± 3455690",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "50183564+nylonicious@users.noreply.github.com",
+            "name": "Nylonicious",
+            "username": "nylonicious"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "16c2e0983cc0ab22f9a0b7a1ac37ea32a42b9a6e",
+          "message": "net: Pass SocketAddr by value (#3125)",
+          "timestamp": "2020-12-10T14:58:27-05:00",
+          "tree_id": "d46d58a79f31dba872aa060ef378743fcedea70e",
+          "url": "https://github.com/tokio-rs/tokio/commit/16c2e0983cc0ab22f9a0b7a1ac37ea32a42b9a6e"
+        },
+        "date": 1607630430834,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 144781,
+            "range": "± 19792",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 638851,
+            "range": "± 35819",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4538210,
+            "range": "± 1067709",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18219426,
+            "range": "± 2328981",
             "unit": "ns/iter"
           }
         ]
