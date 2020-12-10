@@ -98,6 +98,53 @@ impl UnixDatagram {
     ///
     /// Concurrently receive from and send to the socket on the same task
     /// without splitting.
+    ///
+    /// ```no_run
+    /// use tokio::io::Interest;
+    /// use tokio::net::UnixDatagram;
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let dir = tempfile::tempdir().unwrap();
+    ///     let client_path = dir.path().join("client.sock");
+    ///     let server_path = dir.path().join("server.sock");
+    ///     let socket = UnixDatagram::bind(&client_path)?;
+    ///     socket.connect(&server_path)?;
+    ///
+    ///     loop {
+    ///         let ready = socket.ready(Interest::READABLE | Interest::WRITABLE).await?;
+    ///
+    ///         if ready.is_readable() {
+    ///             let mut data = [0; 1024];
+    ///             match socket.try_recv(&mut data[..]) {
+    ///                 Ok(n) => {
+    ///                     println!("received {:?}", &data[..n]);
+    ///                 }
+    ///                 // False-positive, continue
+    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
+    ///                 Err(e) => {
+    ///                     return Err(e);
+    ///                 }
+    ///             }
+    ///         }
+    ///
+    ///         if ready.is_writable() {
+    ///             // Write some data
+    ///             match socket.try_send(b"hello world") {
+    ///                 Ok(n) => {
+    ///                     println!("sent {} bytes", n);
+    ///                 }
+    ///                 // False-positive, continue
+    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
+    ///                 Err(e) => {
+    ///                     return Err(e);
+    ///                 }
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    /// ```
     pub async fn ready(&self, interest: Interest) -> io::Result<Ready> {
         let event = self.io.registration().readiness(interest).await?;
         Ok(event.ready)
