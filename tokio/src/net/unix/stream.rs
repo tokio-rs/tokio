@@ -69,17 +69,37 @@ impl UnixStream {
     ///         let ready = stream.ready(Interest::READABLE | Interest::WRITABLE).await?;
     ///
     ///         if ready.is_readable() {
-    ///             // The buffer is **not** included in the async task and will only exist
-    ///             // on the stack.
-    ///             let mut data = [0; 1024];
-    ///             let n = stream.try_read(&mut data[..]).unwrap();
+    ///             let mut data = vec![0; 1024];
+    ///             // Try to read data, this may still fail with `WouldBlock`
+    ///             // if the readiness event is a false positive.
+    ///             match stream.try_read(&mut data) {
+    ///                 Ok(n) => {
+    ///                     println!("read {} bytes", n);        
+    ///                 }
+    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                     continue;
+    ///                 }
+    ///                 Err(e) => {
+    ///                     return Err(e.into());
+    ///                 }
+    ///             }
     ///
-    ///             println!("GOT {:?}", &data[..n]);
     ///         }
     ///
     ///         if ready.is_writable() {
-    ///             // Write some data
-    ///             stream.try_write(b"hello world").unwrap();
+    ///             // Try to write data, this may still fail with `WouldBlock`
+    ///             // if the readiness event is a false positive.
+    ///             match stream.try_write(b"hello world") {
+    ///                 Ok(n) => {
+    ///                     println!("write {} bytes", n);
+    ///                 }
+    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                     continue
+    ///                 }
+    ///                 Err(e) => {
+    ///                     return Err(e.into());
+    ///                 }
+    ///             }
     ///         }
     ///     }
     /// }
