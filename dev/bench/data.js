@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607716038969,
+  "lastUpdate": 1607716044357,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -4537,6 +4537,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21384401,
             "range": "± 2777800",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "cameron.evan@gmail.com",
+            "name": "Evan Cameron",
+            "username": "leshow"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "68717c7efaced76651915696495dcb04c890be25",
+          "message": "net: remove empty udp module (#3260)",
+          "timestamp": "2020-12-11T14:45:57-05:00",
+          "tree_id": "1b7333194ac78d7ae87c5ca9f423ef830cb486b8",
+          "url": "https://github.com/tokio-rs/tokio/commit/68717c7efaced76651915696495dcb04c890be25"
+        },
+        "date": 1607716039893,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 158153,
+            "range": "± 4278",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 618844,
+            "range": "± 141191",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4498500,
+            "range": "± 571620",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 17725192,
+            "range": "± 2698633",
             "unit": "ns/iter"
           }
         ]
