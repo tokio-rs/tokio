@@ -316,6 +316,7 @@
 //! - `signal`: Enables all `tokio::signal` types.
 //! - `fs`: Enables `tokio::fs` types.
 //! - `test-util`: Enables testing based infrastructure for the Tokio runtime.
+//! - `tracing`: Enables tracing events
 //!
 //! _Note: `AsyncRead` and `AsyncWrite` traits do not require any features and are
 //! always available._
