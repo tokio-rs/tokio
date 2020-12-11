@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607659047382,
+  "lastUpdate": 1607659057791,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -10343,6 +10343,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 805696,
             "range": "± 2027",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "69e62ef89e481e0fb29ce3ef4ddce1eea4114000",
+          "message": "sync: make TryAcquireError public (#3250)\n\nThe [`Semaphore::try_acquire`][1] method currently returns a private error type.\r\n\r\n[1]: https://docs.rs/tokio/0.3/tokio/sync/struct.Semaphore.html#method.try_acquire",
+          "timestamp": "2020-12-10T19:56:05-08:00",
+          "tree_id": "0784747565f6583a726c85dfedcd0527d8373cc6",
+          "url": "https://github.com/tokio-rs/tokio/commit/69e62ef89e481e0fb29ce3ef4ddce1eea4114000"
+        },
+        "date": 1607659056958,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 5883918,
+            "range": "± 1966163",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 5962076,
+            "range": "± 1073729",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 5617932,
+            "range": "± 2406112",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 562,
+            "range": "± 7",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 562,
+            "range": "± 2",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 562,
+            "range": "± 1",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 44870,
+            "range": "± 376",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 713,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 954080,
+            "range": "± 2791",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 688455,
+            "range": "± 1691",
             "unit": "ns/iter"
           }
         ]
