@@ -115,7 +115,7 @@ impl OwnedReadHalf {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::io;
+    /// use tokio::io::{self, ReadBuf};
     /// use tokio::net::TcpStream;
     ///
     /// use futures::future::poll_fn;
@@ -125,6 +125,7 @@ impl OwnedReadHalf {
     ///     let stream = TcpStream::connect("127.0.0.1:8000").await?;
     ///     let (mut read_half, _) = stream.into_split();
     ///     let mut buf = [0; 10];
+    ///     let mut buf = ReadBuf::new(&mut buf);
     ///
     ///     poll_fn(|cx| {
     ///         read_half.poll_peek(cx, &mut buf)
@@ -135,7 +136,11 @@ impl OwnedReadHalf {
     /// ```
     ///
     /// [`TcpStream::poll_peek`]: TcpStream::poll_peek
-    pub fn poll_peek(&mut self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
+    pub fn poll_peek(
+        &mut self,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<usize>> {
         self.inner.poll_peek(cx, buf)
     }
 
@@ -179,7 +184,8 @@ impl OwnedReadHalf {
     /// [`read`]: fn@crate::io::AsyncReadExt::read
     /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
     pub async fn peek(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        poll_fn(|cx| self.poll_peek(cx, buf)).await
+        let mut buf = ReadBuf::new(buf);
+        poll_fn(|cx| self.poll_peek(cx, &mut buf)).await
     }
 }
 
