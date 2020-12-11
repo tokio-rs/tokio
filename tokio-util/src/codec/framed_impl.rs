@@ -124,13 +124,20 @@ where
         let state: &mut ReadFrame = pinned.state.borrow_mut();
         loop {
             // Repeatedly call `decode` or `decode_eof` as long as it is
-            // "readable". Readable is defined as not having returned `None`. If
-            // the upstream has returned EOF, and the decoder is no longer
-            // readable, it can be assumed that the decoder will never become
-            // readable again, at which point the stream is terminated.
+            // "readable". Readable is defined as not having returned `None`.
+            // If the upstream has returned EOF, and the decoder is no longer
+            // readable, it might become readable again if the underlying
+            // AsyncRead is a FIFO or file.
+            // However, we still want to make sure that upon encountering an EOF
+            // we actually finish emmiting all it's associated decode_eof frames.
+            // Furthermore, we don't want to emit any decode_eof frames on retried
+            // reads after an EOF unless we've actually read more data.
             if state.is_readable {
                 if state.eof {
                     let frame = pinned.codec.decode_eof(&mut state.buffer)?;
+                    if let None = frame {
+                        state.is_readable = false;
+                    }
                     return Poll::Ready(frame.map(Ok));
                 }
 
@@ -144,18 +151,28 @@ where
                 state.is_readable = false;
             }
 
-            assert!(!state.eof);
-
-            // Otherwise, try to read more data and try again. Make sure we've
-            // got room for at least one byte to read to ensure that we don't
-            // get a spurious 0 that looks like EOF
-            state.buffer.reserve(1);
+            // If we can't build a frame yet, try to read more data and try again.
+            // Make sure we've got room for at least one byte to read to ensure
+            // that we don't get a spurious 0 that looks like EOF.
+            // Only allocate if we actually need it to prevent slowly leaking bytes,
+            // in less fortunate code that repeatedly polls an EOF file.
+            if state.buffer.capacity() == state.buffer.len() {
+                state.buffer.reserve(1);
+            }
             let bytect = match poll_read_buf(pinned.inner.as_mut(), cx, &mut state.buffer)? {
                 Poll::Ready(ct) => ct,
                 Poll::Pending => return Poll::Pending,
             };
             if bytect == 0 {
+                // We're already at an EOF, and since we've reached this path
+                // we're also not readable. This implies that we've already finished
+                // our decode_eof() handling, so we can simply return None.
+                if state.eof == true {
+                    return Poll::Ready(None);
+                }
                 state.eof = true;
+            } else {
+                state.eof = false;
             }
 
             state.is_readable = true;
