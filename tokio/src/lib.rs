@@ -239,7 +239,7 @@
 //! [`std::io`]: std::io
 //! [`tokio::net`]: crate::net
 //! [TCP]: crate::net::tcp
-//! [UDP]: crate::net::udp
+//! [UDP]: crate::net::UdpSocket
 //! [UDS]: crate::net::unix
 //! [`tokio::fs`]: crate::fs
 //! [`std::fs`]: std::fs
