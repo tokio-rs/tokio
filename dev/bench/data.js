@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607659066956,
+  "lastUpdate": 1607659076860,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -4489,6 +4489,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18219426,
             "range": "± 2328981",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "69e62ef89e481e0fb29ce3ef4ddce1eea4114000",
+          "message": "sync: make TryAcquireError public (#3250)\n\nThe [`Semaphore::try_acquire`][1] method currently returns a private error type.\r\n\r\n[1]: https://docs.rs/tokio/0.3/tokio/sync/struct.Semaphore.html#method.try_acquire",
+          "timestamp": "2020-12-10T19:56:05-08:00",
+          "tree_id": "0784747565f6583a726c85dfedcd0527d8373cc6",
+          "url": "https://github.com/tokio-rs/tokio/commit/69e62ef89e481e0fb29ce3ef4ddce1eea4114000"
+        },
+        "date": 1607659075974,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 196728,
+            "range": "± 54731",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 736156,
+            "range": "± 134368",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5474084,
+            "range": "± 876121",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21384401,
+            "range": "± 2777800",
             "unit": "ns/iter"
           }
         ]
