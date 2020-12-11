@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607716049562,
+  "lastUpdate": 1607716053923,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -10685,6 +10685,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 688455,
             "range": "± 1691",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "cameron.evan@gmail.com",
+            "name": "Evan Cameron",
+            "username": "leshow"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "68717c7efaced76651915696495dcb04c890be25",
+          "message": "net: remove empty udp module (#3260)",
+          "timestamp": "2020-12-11T14:45:57-05:00",
+          "tree_id": "1b7333194ac78d7ae87c5ca9f423ef830cb486b8",
+          "url": "https://github.com/tokio-rs/tokio/commit/68717c7efaced76651915696495dcb04c890be25"
+        },
+        "date": 1607716049611,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6174872,
+            "range": "± 1685197",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 5944085,
+            "range": "± 1168658",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 5366837,
+            "range": "± 1835803",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 582,
+            "range": "± 117",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 558,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 558,
+            "range": "± 12",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 37582,
+            "range": "± 3080",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 719,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 955598,
+            "range": "± 2167",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 686343,
+            "range": "± 1738",
             "unit": "ns/iter"
           }
         ]
