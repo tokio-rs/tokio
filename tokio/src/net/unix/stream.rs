@@ -58,6 +58,7 @@ impl UnixStream {
     /// use tokio::io::Interest;
     /// use tokio::net::UnixStream;
     /// use std::error::Error;
+    /// use std::io;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
