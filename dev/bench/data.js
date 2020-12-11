@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607630443688,
+  "lastUpdate": 1607659047382,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -6759,6 +6759,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1092,
             "range": "± 26",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "69e62ef89e481e0fb29ce3ef4ddce1eea4114000",
+          "message": "sync: make TryAcquireError public (#3250)\n\nThe [`Semaphore::try_acquire`][1] method currently returns a private error type.\r\n\r\n[1]: https://docs.rs/tokio/0.3/tokio/sync/struct.Semaphore.html#method.try_acquire",
+          "timestamp": "2020-12-10T19:56:05-08:00",
+          "tree_id": "0784747565f6583a726c85dfedcd0527d8373cc6",
+          "url": "https://github.com/tokio-rs/tokio/commit/69e62ef89e481e0fb29ce3ef4ddce1eea4114000"
+        },
+        "date": 1607659046414,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 15759,
+            "range": "± 8241",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1090,
+            "range": "± 36",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 646,
+            "range": "± 61",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 15141,
+            "range": "± 4471",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1089,
+            "range": "± 8",
             "unit": "ns/iter"
           }
         ]
