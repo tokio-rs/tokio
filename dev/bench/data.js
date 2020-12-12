@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607791748930,
+  "lastUpdate": 1607791753804,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -11303,6 +11303,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 671285,
             "range": "± 110640",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "sunjay@users.noreply.github.com",
+            "name": "Sunjay Varma",
+            "username": "sunjay"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "df20c162ae1308c07073b6a67c8ba4202f52d208",
+          "message": "sync: add blocking_recv method to UnboundedReceiver, similar to Receiver::blocking_recv (#3262)",
+          "timestamp": "2020-12-12T08:47:35-08:00",
+          "tree_id": "94fe5abd9735b0c4985d5b38a8d96c51953b0f0b",
+          "url": "https://github.com/tokio-rs/tokio/commit/df20c162ae1308c07073b6a67c8ba4202f52d208"
+        },
+        "date": 1607791749733,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6247717,
+            "range": "± 1989646",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6068051,
+            "range": "± 970569",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 5617133,
+            "range": "± 1754676",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 530,
+            "range": "± 71",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 516,
+            "range": "± 2",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 513,
+            "range": "± 2",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 45721,
+            "range": "± 320",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 736,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 958457,
+            "range": "± 2915",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 689873,
+            "range": "± 1221",
             "unit": "ns/iter"
           }
         ]
