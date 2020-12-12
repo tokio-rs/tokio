@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607748116578,
+  "lastUpdate": 1607748121228,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -4639,6 +4639,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 17725192,
             "range": "± 2698633",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "luciofranco14@gmail.com",
+            "name": "Lucio Franco",
+            "username": "LucioFranco"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b01b2dacf2e4136c0237977dac27a3688467d2ea",
+          "message": "net: update `TcpStream::poll_peek` to use `ReadBuf` (#3259)\n\nCloses #2987",
+          "timestamp": "2020-12-11T20:40:24-08:00",
+          "tree_id": "1e0bbb86739731038cc9fd69fe112cad54662d16",
+          "url": "https://github.com/tokio-rs/tokio/commit/b01b2dacf2e4136c0237977dac27a3688467d2ea"
+        },
+        "date": 1607748120154,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 158360,
+            "range": "± 5448",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 627951,
+            "range": "± 22427",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5104077,
+            "range": "± 1265134",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18905967,
+            "range": "± 2124366",
             "unit": "ns/iter"
           }
         ]
