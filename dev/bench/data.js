@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607791757853,
+  "lastUpdate": 1607791763216,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -4897,6 +4897,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18126176,
             "range": "± 2487209",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "sunjay@users.noreply.github.com",
+            "name": "Sunjay Varma",
+            "username": "sunjay"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "df20c162ae1308c07073b6a67c8ba4202f52d208",
+          "message": "sync: add blocking_recv method to UnboundedReceiver, similar to Receiver::blocking_recv (#3262)",
+          "timestamp": "2020-12-12T08:47:35-08:00",
+          "tree_id": "94fe5abd9735b0c4985d5b38a8d96c51953b0f0b",
+          "url": "https://github.com/tokio-rs/tokio/commit/df20c162ae1308c07073b6a67c8ba4202f52d208"
+        },
+        "date": 1607791762227,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 182885,
+            "range": "± 14015",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 677832,
+            "range": "± 70031",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5267872,
+            "range": "± 739704",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21029742,
+            "range": "± 3009567",
             "unit": "ns/iter"
           }
         ]
