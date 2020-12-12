@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607748125112,
+  "lastUpdate": 1607748133375,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -2429,6 +2429,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 492,
             "range": "± 12",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "luciofranco14@gmail.com",
+            "name": "Lucio Franco",
+            "username": "LucioFranco"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b01b2dacf2e4136c0237977dac27a3688467d2ea",
+          "message": "net: update `TcpStream::poll_peek` to use `ReadBuf` (#3259)\n\nCloses #2987",
+          "timestamp": "2020-12-11T20:40:24-08:00",
+          "tree_id": "1e0bbb86739731038cc9fd69fe112cad54662d16",
+          "url": "https://github.com/tokio-rs/tokio/commit/b01b2dacf2e4136c0237977dac27a3688467d2ea"
+        },
+        "date": 1607748129246,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1018,
+            "range": "± 210",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 19283,
+            "range": "± 9824",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1093,
+            "range": "± 205",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 18285,
+            "range": "± 13324",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 613,
+            "range": "± 78",
             "unit": "ns/iter"
           }
         ]
