@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607748133375,
+  "lastUpdate": 1607748179984,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -4741,6 +4741,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18905967,
             "range": "± 2124366",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c1ec469ad2af883b001d54e81dad426c01f918cd",
+          "message": "util: add constructors to TokioContext (#3221)",
+          "timestamp": "2020-12-11T20:41:22-08:00",
+          "tree_id": "cdb1273c1a4eea6c7175578bc8a13f417c3daf00",
+          "url": "https://github.com/tokio-rs/tokio/commit/c1ec469ad2af883b001d54e81dad426c01f918cd"
+        },
+        "date": 1607748177513,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 157855,
+            "range": "± 3120",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 614154,
+            "range": "± 22418",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4519909,
+            "range": "± 292079",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18126176,
+            "range": "± 2487209",
             "unit": "ns/iter"
           }
         ]
