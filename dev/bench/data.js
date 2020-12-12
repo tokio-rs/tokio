@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607791753804,
+  "lastUpdate": 1607791757853,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -7437,6 +7437,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1113,
             "range": "± 6",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "sunjay@users.noreply.github.com",
+            "name": "Sunjay Varma",
+            "username": "sunjay"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "df20c162ae1308c07073b6a67c8ba4202f52d208",
+          "message": "sync: add blocking_recv method to UnboundedReceiver, similar to Receiver::blocking_recv (#3262)",
+          "timestamp": "2020-12-12T08:47:35-08:00",
+          "tree_id": "94fe5abd9735b0c4985d5b38a8d96c51953b0f0b",
+          "url": "https://github.com/tokio-rs/tokio/commit/df20c162ae1308c07073b6a67c8ba4202f52d208"
+        },
+        "date": 1607791757008,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 14433,
+            "range": "± 4357",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 993,
+            "range": "± 150",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 566,
+            "range": "± 66",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 13893,
+            "range": "± 2218",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 919,
+            "range": "± 129",
             "unit": "ns/iter"
           }
         ]
