@@ -68,7 +68,7 @@ impl Error for RecvError {}
 // ===== TryRecvError =====
 
 feature! {
-    #![any(feature = "signal", feature = "process")]
+    #![all(unix, any(feature = "signal", feature = "process"))]
 
     /// This enumeration is the list of the possible reasons that try_recv
     /// could not return data when called.

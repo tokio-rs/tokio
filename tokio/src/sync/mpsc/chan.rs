@@ -261,7 +261,7 @@ impl<T, S: Semaphore> Rx<T, S> {
 }
 
 feature! {
-    #![any(feature = "signal", feature = "process")]
+    #![all(unix, any(feature = "signal", feature = "process"))]
 
     use crate::sync::mpsc::error::TryRecvError;
 
