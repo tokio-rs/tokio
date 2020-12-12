@@ -291,7 +291,7 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::io;
+    /// use tokio::io::{self, ReadBuf};
     /// use tokio::net::TcpStream;
     ///
     /// use futures::future::poll_fn;
@@ -300,6 +300,7 @@ impl TcpStream {
     /// async fn main() -> io::Result<()> {
     ///     let stream = TcpStream::connect("127.0.0.1:8000").await?;
     ///     let mut buf = [0; 10];
+    ///     let mut buf = ReadBuf::new(&mut buf);
     ///
     ///     poll_fn(|cx| {
     ///         stream.poll_peek(cx, &mut buf)
@@ -308,12 +309,24 @@ impl TcpStream {
     ///     Ok(())
     /// }
     /// ```
-    pub fn poll_peek(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
+    pub fn poll_peek(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<usize>> {
         loop {
             let ev = ready!(self.io.registration().poll_read_ready(cx))?;
 
-            match self.io.peek(buf) {
-                Ok(ret) => return Poll::Ready(Ok(ret)),
+            let b = unsafe {
+                &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
+            };
+
+            match self.io.peek(b) {
+                Ok(ret) => {
+                    unsafe { buf.assume_init(ret) };
+                    buf.advance(ret);
+                    return Poll::Ready(Ok(ret));
+                }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     self.io.registration().clear_readiness(ev);
                 }
