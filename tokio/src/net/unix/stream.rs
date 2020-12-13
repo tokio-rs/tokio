@@ -95,7 +95,7 @@ impl UnixStream {
     ///                     println!("write {} bytes", n);
     ///                 }
     ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-    ///                     continue
+    ///                     continue;
     ///                 }
     ///                 Err(e) => {
     ///                     return Err(e.into());
