@@ -1,9 +1,9 @@
 use crate::time::driver::{Handle, TimerEntry};
 use crate::time::{error::Error, Duration, Instant};
 
+use pin_project_lite::pin_project;
 use std::future::Future;
 use std::pin::Pin;
-
 use std::task::{self, Poll};
 
 /// Waits until `deadline` is reached.
@@ -57,22 +57,24 @@ pub fn sleep(duration: Duration) -> Sleep {
     sleep_until(Instant::now() + duration)
 }
 
-/// Future returned by [`sleep`](sleep) and
-/// [`sleep_until`](sleep_until).
-#[derive(Debug)]
-#[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct Sleep {
-    deadline: Instant,
+pin_project! {
+    /// Future returned by [`sleep`](sleep) and
+    /// [`sleep_until`](sleep_until).
+    #[derive(Debug)]
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
+    pub struct Sleep {
+        deadline: Instant,
 
-    // The link between the `Sleep` instance and the timer that drives it.
-    // This will be unboxed in tokio 1.0
-    entry: Pin<Box<TimerEntry>>,
+        // The link between the `Sleep` instance and the timer that drives it.
+        #[pin]
+        entry: TimerEntry,
+    }
 }
 
 impl Sleep {
     pub(crate) fn new_timeout(deadline: Instant) -> Sleep {
         let handle = Handle::current();
-        let entry = Box::pin(TimerEntry::new(&handle, deadline));
+        let entry = TimerEntry::new(&handle, deadline);
 
         Sleep { deadline, entry }
     }
@@ -96,16 +98,19 @@ impl Sleep {
     ///
     /// This function can be called both before and after the future has
     /// completed.
-    pub fn reset(&mut self, deadline: Instant) {
-        self.entry.as_mut().reset(deadline);
-        self.deadline = deadline;
+    pub fn reset(self: Pin<&mut Self>, deadline: Instant) {
+        let me = self.project();
+        me.entry.reset(deadline);
+        *me.deadline = deadline;
     }
 
-    fn poll_elapsed(&mut self, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
+    fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
+        let me = self.project();
+
         // Keep track of task budget
         let coop = ready!(crate::coop::poll_proceed(cx));
 
-        self.entry.as_mut().poll_elapsed(cx).map(move |r| {
+        me.entry.poll_elapsed(cx).map(move |r| {
             coop.made_progress();
             r
         })

@@ -67,7 +67,7 @@ enum Action {
 struct Inner {
     actions: VecDeque<Action>,
     waiting: Option<Instant>,
-    sleep: Option<Sleep>,
+    sleep: Option<Pin<Box<Sleep>>>,
     read_wait: Option<Waker>,
     rx: mpsc::UnboundedReceiver<Action>,
 }
@@ -365,7 +365,7 @@ impl AsyncRead for Mock {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     if let Some(rem) = self.inner.remaining_wait() {
                         let until = Instant::now() + rem;
-                        self.inner.sleep = Some(time::sleep_until(until));
+                        self.inner.sleep = Some(Box::pin(time::sleep_until(until)));
                     } else {
                         self.inner.read_wait = Some(cx.waker().clone());
                         return Poll::Pending;
@@ -410,7 +410,7 @@ impl AsyncWrite for Mock {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     if let Some(rem) = self.inner.remaining_wait() {
                         let until = Instant::now() + rem;
-                        self.inner.sleep = Some(time::sleep_until(until));
+                        self.inner.sleep = Some(Box::pin(time::sleep_until(until)));
                     } else {
                         panic!("unexpected WouldBlock");
                     }
