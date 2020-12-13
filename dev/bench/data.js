@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607869713464,
+  "lastUpdate": 1607869727324,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -11885,6 +11885,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 687187,
             "range": "± 1969",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "40773946+faith@users.noreply.github.com",
+            "name": "Aldas",
+            "username": "faith"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f26f444f42c9369bcf8afe14ea00ea53dd663cc2",
+          "message": "doc: added tracing to the feature flags section (#3254)",
+          "timestamp": "2020-12-13T15:26:56+01:00",
+          "tree_id": "23e7ae2599b67a6ab6faf0586f568b0ff6e0c72d",
+          "url": "https://github.com/tokio-rs/tokio/commit/f26f444f42c9369bcf8afe14ea00ea53dd663cc2"
+        },
+        "date": 1607869726419,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6175381,
+            "range": "± 2235410",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6133687,
+            "range": "± 1048167",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 5593387,
+            "range": "± 1390615",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 504,
+            "range": "± 4",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 499,
+            "range": "± 4",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 498,
+            "range": "± 2",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 39332,
+            "range": "± 1717",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 698,
+            "range": "± 5",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 954229,
+            "range": "± 3006",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 688299,
+            "range": "± 1728",
             "unit": "ns/iter"
           }
         ]
