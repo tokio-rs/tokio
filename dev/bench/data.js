@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607869623696,
+  "lastUpdate": 1607869692069,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -7694,6 +7694,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "uncontended_concurrent_single",
             "value": 914,
+            "range": "± 6",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "40773946+faith@users.noreply.github.com",
+            "name": "Aldas",
+            "username": "faith"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f26f444f42c9369bcf8afe14ea00ea53dd663cc2",
+          "message": "doc: added tracing to the feature flags section (#3254)",
+          "timestamp": "2020-12-13T15:26:56+01:00",
+          "tree_id": "23e7ae2599b67a6ab6faf0586f568b0ff6e0c72d",
+          "url": "https://github.com/tokio-rs/tokio/commit/f26f444f42c9369bcf8afe14ea00ea53dd663cc2"
+        },
+        "date": 1607869691195,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 12682,
+            "range": "± 2378",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 910,
+            "range": "± 5",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 536,
+            "range": "± 20",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 13100,
+            "range": "± 1820",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 912,
             "range": "± 6",
             "unit": "ns/iter"
           }
