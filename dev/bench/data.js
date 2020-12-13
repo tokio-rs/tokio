@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607869698126,
+  "lastUpdate": 1607869713464,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -5101,6 +5101,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21271901,
             "range": "± 2073747",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "40773946+faith@users.noreply.github.com",
+            "name": "Aldas",
+            "username": "faith"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f26f444f42c9369bcf8afe14ea00ea53dd663cc2",
+          "message": "doc: added tracing to the feature flags section (#3254)",
+          "timestamp": "2020-12-13T15:26:56+01:00",
+          "tree_id": "23e7ae2599b67a6ab6faf0586f568b0ff6e0c72d",
+          "url": "https://github.com/tokio-rs/tokio/commit/f26f444f42c9369bcf8afe14ea00ea53dd663cc2"
+        },
+        "date": 1607869712556,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 158749,
+            "range": "± 2437",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 623561,
+            "range": "± 20102",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4602012,
+            "range": "± 408694",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 17709668,
+            "range": "± 1885571",
             "unit": "ns/iter"
           }
         ]
