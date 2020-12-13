@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607869597826,
+  "lastUpdate": 1607869623696,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -4999,6 +4999,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21029742,
             "range": "± 3009567",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "cssivision@gmail.com",
+            "name": "cssivision",
+            "username": "cssivision"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "be2cb7a5ceb1d2abca4a69645d70ce7b6f97ee4a",
+          "message": "net: check for false-positives in TcpStream::ready doc test (#3255)",
+          "timestamp": "2020-12-13T15:24:59+01:00",
+          "tree_id": "89deb6d808e007e1728a43f0a198afe32a4aae1e",
+          "url": "https://github.com/tokio-rs/tokio/commit/be2cb7a5ceb1d2abca4a69645d70ce7b6f97ee4a"
+        },
+        "date": 1607869622153,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 204141,
+            "range": "± 45437",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 754317,
+            "range": "± 145312",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5028642,
+            "range": "± 860987",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21271901,
+            "range": "± 2073747",
             "unit": "ns/iter"
           }
         ]
