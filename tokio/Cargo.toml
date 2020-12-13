@@ -102,6 +102,9 @@ mio = { version = "0.7.6", optional = true }
 num_cpus = { version = "1.8.0", optional = true }
 parking_lot = { version = "0.11.0", optional = true }
 slab = { version = "0.4.1", optional = true }
+
+# Currently unstable. The version of tracing-core may be changed at any time.
+# Requires `--cfg tokio_unstable` to enable in Tokio.
 tracing = { version = "0.1.21", default-features = false, features = ["std"], optional = true } # Not in full
 
 [target.'cfg(unix)'.dependencies]

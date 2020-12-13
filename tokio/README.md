@@ -133,8 +133,7 @@ several other libraries, including:
 
 * [`tower`]: A library of modular and reusable components for building robust networking clients and servers.
 
-* [`tracing`] (formerly `tokio-trace`): A framework for application-level
-  tracing and async-aware diagnostics.
+* [`tracing`]: A framework for application-level tracing and async-aware diagnostics.
 
 * [`rdbc`]: A Rust database connectivity library for MySQL, Postgres and SQLite.
 
