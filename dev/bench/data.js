@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607872970865,
+  "lastUpdate": 1607872974911,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -5149,6 +5149,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 17709668,
             "range": "± 1885571",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "cssivision@gmail.com",
+            "name": "cssivision",
+            "username": "cssivision"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4c5541945348c4614c29a13c06f2e996eb419e42",
+          "message": "net: add UnixStream readiness and non-blocking ops (#3246)",
+          "timestamp": "2020-12-13T16:21:11+01:00",
+          "tree_id": "355917f9e8ba45094e1a3e1f465875f51f56e255",
+          "url": "https://github.com/tokio-rs/tokio/commit/4c5541945348c4614c29a13c06f2e996eb419e42"
+        },
+        "date": 1607872973975,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 190502,
+            "range": "± 14767",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 752208,
+            "range": "± 259149",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5579648,
+            "range": "± 685497",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21038292,
+            "range": "± 2755332",
             "unit": "ns/iter"
           }
         ]
