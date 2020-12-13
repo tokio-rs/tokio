@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607873153547,
+  "lastUpdate": 1607873163634,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -5305,6 +5305,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21038292,
             "range": "± 2755332",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6172808+skerkour@users.noreply.github.com",
+            "name": "Sylvain Kerkour",
+            "username": "skerkour"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9149d7bfae251289cd21aa9ee109b4e2a190d0fa",
+          "message": "docs: mention blocking thread timeout in src/lib.rs (#3253)",
+          "timestamp": "2020-12-13T16:24:16+01:00",
+          "tree_id": "38b69f17cc4644ac6ca081aa1d88d5cfe35825fa",
+          "url": "https://github.com/tokio-rs/tokio/commit/9149d7bfae251289cd21aa9ee109b4e2a190d0fa"
+        },
+        "date": 1607873162553,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 192909,
+            "range": "± 62120",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 720879,
+            "range": "± 58968",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5383073,
+            "range": "± 1599410",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20830210,
+            "range": "± 2732160",
             "unit": "ns/iter"
           }
         ]
