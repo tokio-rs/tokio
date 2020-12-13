@@ -173,16 +173,18 @@
 //! combat this, Tokio provides two kinds of threads: Core threads and blocking
 //! threads. The core threads are where all asynchronous code runs, and Tokio
 //! will by default spawn one for each CPU core. The blocking threads are
-//! spawned on demand, and can be used to run blocking code that would otherwise
-//! block other tasks from running. Since it is not possible for Tokio to swap
-//! out blocking tasks, like it can do with asynchronous code, the upper limit
-//! on the number of blocking threads is very large. These limits can be
-//! configured on the [`Builder`].
+//! spawned on demand, can be used to run blocking code that would otherwise
+//! block other tasks from running and are kept alive when not used for a certain
+//! amount of time which can be configured with [`thread_keep_alive`].
+//! Since it is not possible for Tokio to swap out blocking tasks, like it
+//! can do with asynchronous code, the upper limit on the number of blocking
+//! threads is very large. These limits can be configured on the [`Builder`].
 //!
 //! To spawn a blocking task, you should use the [`spawn_blocking`] function.
 //!
 //! [`Builder`]: crate::runtime::Builder
 //! [`spawn_blocking`]: crate::task::spawn_blocking()
+//! [`thread_keep_alive`]: crate::runtime::Builder::thread_keep_alive()
 //!
 //! ```
 //! #[tokio::main]
