@@ -304,6 +304,24 @@ impl<T> Drop for Receiver<T> {
 }
 
 impl<T> Sender<T> {
+    /// Sends a new value via the channel, notifying all receivers.
+    pub fn send(&self, value: T) -> Result<(), error::SendError<T>> {
+        // This is pretty much only useful as a hint anyway, so synchronization isn't critical.
+        if 0 == self.shared.ref_count_rx.load(Relaxed) {
+            return Err(error::SendError { inner: value });
+        }
+
+        *self.shared.value.write().unwrap() = value;
+
+        // Update the version. 2 is used so that the CLOSED bit is not set.
+        self.shared.version.fetch_add(2, SeqCst);
+
+        // Notify all watchers
+        self.shared.notify_rx.notify_waiters();
+
+        Ok(())
+    }
+
     /// Returns a reference to the most recently sent value
     ///
     /// Outstanding borrows hold a read lock. This means that long lived borrows
@@ -321,24 +339,6 @@ impl<T> Sender<T> {
     pub fn borrow(&self) -> Ref<'_, T> {
         let inner = self.shared.value.read().unwrap();
         Ref { inner }
-    }
-
-    /// Sends a new value via the channel, notifying all receivers.
-    pub fn send(&self, value: T) -> Result<(), error::SendError<T>> {
-        // This is pretty much only useful as a hint anyway, so synchronization isn't critical.
-        if 0 == self.shared.ref_count_rx.load(Relaxed) {
-            return Err(error::SendError { inner: value });
-        }
-
-        *self.shared.value.write().unwrap() = value;
-
-        // Update the version. 2 is used so that the CLOSED bit is not set.
-        self.shared.version.fetch_add(2, SeqCst);
-
-        // Notify all watchers
-        self.shared.notify_rx.notify_waiters();
-
-        Ok(())
     }
 
     /// Checks if the channel has been closed. This happens when all receivers
