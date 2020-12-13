@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607869727324,
+  "lastUpdate": 1607872970865,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -7851,6 +7851,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 912,
             "range": "± 6",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "cssivision@gmail.com",
+            "name": "cssivision",
+            "username": "cssivision"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4c5541945348c4614c29a13c06f2e996eb419e42",
+          "message": "net: add UnixStream readiness and non-blocking ops (#3246)",
+          "timestamp": "2020-12-13T16:21:11+01:00",
+          "tree_id": "355917f9e8ba45094e1a3e1f465875f51f56e255",
+          "url": "https://github.com/tokio-rs/tokio/commit/4c5541945348c4614c29a13c06f2e996eb419e42"
+        },
+        "date": 1607872969881,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 14236,
+            "range": "± 3900",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 973,
+            "range": "± 186",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 564,
+            "range": "± 89",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 13850,
+            "range": "± 5199",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 919,
+            "range": "± 163",
             "unit": "ns/iter"
           }
         ]
