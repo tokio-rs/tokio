@@ -29,14 +29,13 @@ cfg_net_unix! {
     ///
     /// ```no_run
     /// use tokio::net::UnixListener;
-    /// use tokio::stream::StreamExt;
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let mut listener = UnixListener::bind("/path/to/the/socket").unwrap();
-    ///     while let Some(stream) = listener.next().await {
-    ///         match stream {
-    ///             Ok(stream) => {
+    ///     let listener = UnixListener::bind("/path/to/the/socket").unwrap();
+    ///     loop {
+    ///         match listener.accept().await {
+    ///             Ok((stream, _addr)) => {
     ///                 println!("new client!");
     ///             }
     ///             Err(e) => { /* connection failed */ }
@@ -124,16 +123,6 @@ impl UnixListener {
         let addr = SocketAddr(addr);
         let sock = UnixStream::new(sock)?;
         Poll::Ready(Ok((sock, addr)))
-    }
-}
-
-#[cfg(feature = "stream")]
-impl crate::stream::Stream for UnixListener {
-    type Item = io::Result<UnixStream>;
-
-    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let (socket, _) = ready!(self.poll_accept(cx))?;
-        Poll::Ready(Some(Ok(socket)))
     }
 }
 

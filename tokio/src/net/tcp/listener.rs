@@ -47,24 +47,6 @@ cfg_net! {
     ///     }
     /// }
     /// ```
-    ///
-    /// Using `impl Stream`:
-    /// ```no_run
-    /// use tokio::{net::TcpListener, stream::StreamExt};
-    ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
-    ///     while let Some(stream) = listener.next().await {
-    ///         match stream {
-    ///             Ok(stream) => {
-    ///                 println!("new client!");
-    ///             }
-    ///             Err(e) => { /* connection failed */ }
-    ///         }
-    ///     }
-    /// }
-    /// ```
     pub struct TcpListener {
         io: PollEvented<mio::net::TcpListener>,
     }
@@ -320,16 +302,6 @@ impl TcpListener {
     /// ```
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.io.set_ttl(ttl)
-    }
-}
-
-#[cfg(feature = "stream")]
-impl crate::stream::Stream for TcpListener {
-    type Item = io::Result<TcpStream>;
-
-    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let (socket, _) = ready!(self.poll_accept(cx))?;
-        Poll::Ready(Some(Ok(socket)))
     }
 }
 

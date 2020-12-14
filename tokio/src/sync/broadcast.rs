@@ -949,7 +949,7 @@ impl<T: Clone> Receiver<T> {
     /// # Examples
     ///
     /// ```
-    /// use tokio::stream::StreamExt;
+    /// use tokio_stream::StreamExt;
     /// use tokio::sync::broadcast;
     ///
     /// #[tokio::main]

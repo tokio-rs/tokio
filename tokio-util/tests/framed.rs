@@ -1,6 +1,7 @@
 #![warn(rust_2018_idioms)]
 
-use tokio::{prelude::*, stream::StreamExt};
+use tokio::prelude::*;
+use tokio_stream::StreamExt;
 use tokio_test::assert_ok;
 use tokio_util::codec::{Decoder, Encoder, Framed, FramedParts};
 

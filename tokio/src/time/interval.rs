@@ -162,12 +162,3 @@ impl Interval {
         poll_fn(|cx| self.poll_tick(cx)).await
     }
 }
-
-#[cfg(feature = "stream")]
-impl crate::stream::Stream for Interval {
-    type Item = Instant;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Instant>> {
-        Poll::Ready(Some(ready!(self.poll_tick(cx))))
-    }
-}

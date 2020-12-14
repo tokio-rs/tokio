@@ -1,4 +1,5 @@
 #![cfg(not(loom))]
+#![allow(dead_code)]
 
 //! A mock type implementing [`AsyncRead`] and [`AsyncWrite`].
 //!
@@ -24,6 +25,7 @@ use tokio::time::{self, Duration, Instant, Sleep};
 
 use futures_core::ready;
 use std::collections::VecDeque;
+use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -63,13 +65,13 @@ enum Action {
     WriteError(Option<Arc<io::Error>>),
 }
 
-#[derive(Debug)]
 struct Inner {
     actions: VecDeque<Action>,
     waiting: Option<Instant>,
     sleep: Option<Sleep>,
     read_wait: Option<Waker>,
     rx: mpsc::UnboundedReceiver<Action>,
+    rx_fut: Option<Pin<Box<dyn Future<Output = Option<Action>> + Send>>>,
 }
 
 impl Builder {
@@ -191,6 +193,7 @@ impl Inner {
             sleep: None,
             read_wait: None,
             rx,
+            rx_fut: None,
             waiting: None,
         };
 
@@ -200,9 +203,11 @@ impl Inner {
     }
 
     fn poll_action(&mut self, cx: &mut task::Context<'_>) -> Poll<Option<Action>> {
-        use futures_core::stream::Stream;
-
-        Pin::new(&mut self.rx).poll_next(cx)
+        if let Some(fut) = &mut self.rx_fut {
+            Pin::new(&mut *fut).poll(cx)
+        } else {
+            Poll::Ready(None)
+        }
     }
 
     fn read(&mut self, dst: &mut ReadBuf<'_>) -> io::Result<()> {
@@ -485,3 +490,9 @@ fn is_task_ctx() -> bool {
     r
 }
 */
+
+impl fmt::Debug for Inner {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Inner {{...}}")
+    }
+}
