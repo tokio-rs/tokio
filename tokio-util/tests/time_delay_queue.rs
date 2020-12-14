@@ -246,6 +246,30 @@ async fn reset_twice() {
 }
 
 #[tokio::test]
+async fn repeatedly_reset_entry_inserted_as_expired() {
+    time::pause();
+    let mut queue = task::spawn(DelayQueue::new());
+    let now = Instant::now();
+
+    let key = queue.insert_at("foo", now - ms(100));
+
+    queue.reset_at(&key, now + ms(100));
+    queue.reset_at(&key, now + ms(50));
+
+    assert_pending!(poll!(queue));
+
+    time::sleep_until(now + ms(60)).await;
+
+    assert!(queue.is_woken());
+
+    let entry = assert_ready_ok!(poll!(queue)).into_inner();
+    assert_eq!(entry, "foo");
+
+    let entry = assert_ready!(poll!(queue));
+    assert!(entry.is_none());
+}
+
+#[tokio::test]
 async fn remove_expired_item() {
     time::pause();
 

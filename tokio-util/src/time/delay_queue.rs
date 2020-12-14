@@ -538,7 +538,7 @@ impl<T> DelayQueue<T> {
     ///
     ///     delay_queue.reset_at(&key, Instant::now() + Duration::from_secs(10));
     ///
-    ///     // "foo"is now scheduled to be returned in 10 seconds
+    ///     // "foo" is now scheduled to be returned in 10 seconds
     /// # }
     /// ```
     pub fn reset_at(&mut self, key: &Key, when: Instant) {
@@ -548,6 +548,8 @@ impl<T> DelayQueue<T> {
         let when = self.normalize_deadline(when);
 
         self.slab[key.index].when = when;
+        self.slab[key.index].expired = false;
+
         self.insert_idx(when, key.index);
 
         let next_deadline = self.next_deadline();
