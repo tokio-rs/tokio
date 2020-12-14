@@ -334,7 +334,7 @@
 //!
 //! ### Unstable features
 //!
-//! These feature flags enable **unstable** features. The public API may breakin 1.x
+//! These feature flags enable **unstable** features. The public API may break in 1.x
 //! releases. To enable these features, the `--cfg tokio_unstable` must be passed to
 //! `rustc` when compiling. This is easiest done using the `RUSTFLAGS` env variable:
 //! `RUSTFLAGS="--cfg tokio_unstable"`.
