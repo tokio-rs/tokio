@@ -915,8 +915,8 @@ impl UdpSocket {
     ///
     ///         // Try to recv data, this may still fail with `WouldBlock`
     ///         // if the readiness event is a false positive.
-    ///         match socket.try_recv(&mut buf) {
-    ///             Ok(n) => {
+    ///         match socket.try_recv_from(&mut buf) {
+    ///             Ok((n, _addr)) => {
     ///                 println!("GOT {:?}", &buf[..n]);
     ///                 break;
     ///             }

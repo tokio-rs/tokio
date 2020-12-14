@@ -350,6 +350,7 @@ impl TcpStream {
     /// use tokio::io::Interest;
     /// use tokio::net::TcpStream;
     /// use std::error::Error;
+    /// use std::io;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
@@ -359,17 +360,37 @@ impl TcpStream {
     ///         let ready = stream.ready(Interest::READABLE | Interest::WRITABLE).await?;
     ///
     ///         if ready.is_readable() {
-    ///             // The buffer is **not** included in the async task and will only exist
-    ///             // on the stack.
-    ///             let mut data = [0; 1024];
-    ///             let n = stream.try_read(&mut data[..]).unwrap();
+    ///             let mut data = vec![0; 1024];
+    ///             // Try to read data, this may still fail with `WouldBlock`
+    ///             // if the readiness event is a false positive.
+    ///             match stream.try_read(&mut data) {
+    ///                 Ok(n) => {
+    ///                     println!("read {} bytes", n);        
+    ///                 }
+    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                     continue;
+    ///                 }
+    ///                 Err(e) => {
+    ///                     return Err(e.into());
+    ///                 }
+    ///             }
     ///
-    ///             println!("GOT {:?}", &data[..n]);
     ///         }
     ///
     ///         if ready.is_writable() {
-    ///             // Write some data
-    ///             stream.try_write(b"hello world").unwrap();
+    ///             // Try to write data, this may still fail with `WouldBlock`
+    ///             // if the readiness event is a false positive.
+    ///             match stream.try_write(b"hello world") {
+    ///                 Ok(n) => {
+    ///                     println!("write {} bytes", n);
+    ///                 }
+    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                     continue
+    ///                 }
+    ///                 Err(e) => {
+    ///                     return Err(e.into());
+    ///                 }
+    ///             }
     ///         }
     ///     }
     /// }
@@ -381,7 +402,7 @@ impl TcpStream {
 
     /// Wait for the socket to become readable.
     ///
-    /// This function is equivalent to `ready(Interest::READABLE)` is usually
+    /// This function is equivalent to `ready(Interest::READABLE)` and is usually
     /// paired with `try_read()`.
     ///
     /// # Examples
@@ -454,7 +475,7 @@ impl TcpStream {
     /// # Return
     ///
     /// If data is successfully read, `Ok(n)` is returned, where `n` is the
-    /// number of bytes read. `Ok(n)` indicates the stream's read half is closed
+    /// number of bytes read. `Ok(0)` indicates the stream's read half is closed
     /// and will no longer yield data. If the stream is not ready to read data
     /// `Err(io::ErrorKind::WouldBlock)` is returned.
     ///
@@ -507,7 +528,7 @@ impl TcpStream {
 
     /// Wait for the socket to become writable.
     ///
-    /// This function is equivalent to `ready(Interest::WRITABLE)` is usually
+    /// This function is equivalent to `ready(Interest::WRITABLE)` and is usually
     /// paired with `try_write()`.
     ///
     /// # Examples
