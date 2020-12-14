@@ -135,7 +135,7 @@ where
             if state.is_readable {
                 if state.eof {
                     let frame = pinned.codec.decode_eof(&mut state.buffer)?;
-                    if let None = frame {
+                    if frame.is_none() {
                         state.is_readable = false;
                     }
                     return Poll::Ready(frame.map(Ok));
@@ -167,7 +167,7 @@ where
                 // We're already at an EOF, and since we've reached this path
                 // we're also not readable. This implies that we've already finished
                 // our decode_eof() handling, so we can simply return None.
-                if state.eof == true {
+                if state.eof {
                     return Poll::Ready(None);
                 }
                 state.eof = true;
