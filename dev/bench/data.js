@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607873167300,
+  "lastUpdate": 1607921258880,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -5353,6 +5353,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20830210,
             "range": "± 2732160",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jacob@jotpot.co.uk",
+            "name": "Jacob O'Toole",
+            "username": "JOT85"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1f862d2e950bf5f4fb31f202a544e86880f51191",
+          "message": "sync: add `watch::Sender::borrow()` (#3269)",
+          "timestamp": "2020-12-13T20:46:11-08:00",
+          "tree_id": "e203a63415d1b02e7b62f73f8ebeebedeaaef82d",
+          "url": "https://github.com/tokio-rs/tokio/commit/1f862d2e950bf5f4fb31f202a544e86880f51191"
+        },
+        "date": 1607921257933,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 156581,
+            "range": "± 4747",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 627859,
+            "range": "± 31671",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4758742,
+            "range": "± 559274",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 17592883,
+            "range": "± 2594088",
             "unit": "ns/iter"
           }
         ]
