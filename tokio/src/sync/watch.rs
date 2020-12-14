@@ -322,6 +322,25 @@ impl<T> Sender<T> {
         Ok(())
     }
 
+    /// Returns a reference to the most recently sent value
+    ///
+    /// Outstanding borrows hold a read lock. This means that long lived borrows
+    /// could cause the send half to block. It is recommended to keep the borrow
+    /// as short lived as possible.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::watch;
+    ///
+    /// let (tx, _) = watch::channel("hello");
+    /// assert_eq!(*tx.borrow(), "hello");
+    /// ```
+    pub fn borrow(&self) -> Ref<'_, T> {
+        let inner = self.shared.value.read().unwrap();
+        Ref { inner }
+    }
+
     /// Checks if the channel has been closed. This happens when all receivers
     /// have dropped.
     ///
@@ -428,6 +447,46 @@ mod tests {
             recv.changed().now_or_never();
 
             send_thread.join().unwrap();
+        });
+    }
+
+    #[test]
+    fn watch_borrow() {
+        loom::model(|| {
+            let (send, mut recv) = crate::sync::watch::channel(0i32);
+
+            assert!(send.borrow().eq(&0));
+            assert!(recv.borrow().eq(&0));
+
+            send.send(1).unwrap();
+            assert!(send.borrow().eq(&1));
+
+            let send_thread = thread::spawn(move || {
+                send.send(2).unwrap();
+                send
+            });
+
+            recv.changed().now_or_never();
+
+            let send = send_thread.join().unwrap();
+            let recv_thread = thread::spawn(move || {
+                recv.changed().now_or_never();
+                recv.changed().now_or_never();
+                recv
+            });
+
+            send.send(3).unwrap();
+
+            let recv = recv_thread.join().unwrap();
+            assert!(recv.borrow().eq(&3));
+            assert!(send.borrow().eq(&3));
+
+            send.send(2).unwrap();
+
+            thread::spawn(move || {
+                assert!(recv.borrow().eq(&2));
+            });
+            assert!(send.borrow().eq(&2));
         });
     }
 }
