@@ -122,6 +122,13 @@ impl Wheel {
             if when == u64::max_value() {
                 self.pending.remove(item);
             } else {
+                debug_assert!(
+                    self.elapsed <= when,
+                    "elapsed={}; when={}",
+                    self.elapsed,
+                    when
+                );
+
                 let level = self.level_for(when);
 
                 self.levels[level].remove_entry(item);
@@ -281,7 +288,9 @@ impl Wheel {
 }
 
 fn level_for(elapsed: u64, when: u64) -> usize {
-    let mut masked = elapsed ^ when;
+    // Mask in the trailing bits ignored by the level calculation in order to cap
+    // the possible leading zeros
+    let mut masked = elapsed ^ when | 0x3f;
 
     if masked >= MAX_DURATION {
         // Fudge the timer into the top level
@@ -302,7 +311,7 @@ mod test {
 
     #[test]
     fn test_level_for() {
-        for pos in 1..64 {
+        for pos in 0..64 {
             assert_eq!(
                 0,
                 level_for(0, pos),
