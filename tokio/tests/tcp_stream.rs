@@ -29,6 +29,22 @@ async fn set_linger() {
 }
 
 #[tokio::test]
+#[cfg(not(windows))]
+async fn set_keepalive() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+
+    let stream = TcpStream::connect(listener.local_addr().unwrap())
+        .await
+        .unwrap();
+
+    assert_ok!(stream.set_keepalive(Some(Duration::from_secs(1))));
+    assert_eq!(stream.keepalive().unwrap().unwrap().as_secs(), 1);
+
+    assert_ok!(stream.set_keepalive(None));
+    assert!(stream.keepalive().unwrap().is_none());
+}
+
+#[tokio::test]
 async fn try_read_write() {
     const DATA: &[u8] = b"this is some data to write to the socket";
 
