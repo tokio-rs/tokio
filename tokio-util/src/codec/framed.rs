@@ -54,6 +54,53 @@ where
     /// calling [`split`] on the `Framed` returned by this method, which will
     /// break them into separate objects, allowing them to interact more easily.
     ///
+    /// Note that for some underlying byte stream sources, namely files and FIFOs,
+    /// it's possible to temporarily return 0 bytes and reach eof.
+    /// In those cases it is possible to resume the frame stream after
+    /// it as returned `None` by simply attempting to read from it again.
+    ///
+    /// Note that attempts to read from such an eof data source will not wait
+    /// for new data and simply return `None` if it's still eof.
+    ///
+    /// Receiving notifications for filesystem changes is very platform dependent
+    /// and out of scope for this implementation.
+    /// It is up to the caller to ensure rate limiting or implement a
+    /// notification system with the help of e.g.
+    /// inotify, FSEvents, FileSystemWatcher, IPC, or a [`watch`] between tasks.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::fs::OpenOptions;
+    /// use futures::sink::SinkExt;
+    /// use tokio::stream::StreamExt;
+    /// use tokio_util::codec::{LinesCodec, Framed};
+    /// # #[tokio::main]
+    /// # async fn main() -> std::io::Result<()> {
+    ///     let file = OpenOptions::new()
+    ///         .read(true)
+    ///         .append(true)
+    ///         .create(true)
+    ///         .open("/tmp/framed_append_file.txt")
+    ///         .await?;
+    ///
+    ///     let mut frames = Framed::new(file, LinesCodec::new());
+    ///
+    ///     while let Some(frame) = frames.next().await {
+    ///         //Do something with the frame...
+    ///     }
+    ///
+    ///     frames.send("Something that wasn't there before!").await.unwrap();
+    ///
+    ///     while let Some(frame) = frames.next().await {
+    ///         //Do something with the new frame...
+    ///     }
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// [`watch`]: tokio::sync::watch
     /// [`Stream`]: tokio::stream::Stream
     /// [`Sink`]: futures_sink::Sink
     /// [`Decode`]: crate::codec::Decoder
