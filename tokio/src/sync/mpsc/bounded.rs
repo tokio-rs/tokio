@@ -1,6 +1,9 @@
 use crate::sync::batch_semaphore::{self as semaphore, TryAcquireError};
 use crate::sync::mpsc::chan;
-use crate::sync::mpsc::error::{SendError, TryRecvError, TrySendError};
+#[cfg(unix)]
+#[cfg(any(feature = "signal", feature = "process"))]
+use crate::sync::mpsc::error::TryRecvError;
+use crate::sync::mpsc::error::{SendError, TrySendError};
 
 cfg_time! {
     use crate::sync::mpsc::error::SendTimeoutError;
@@ -194,7 +197,9 @@ impl<T> Receiver<T> {
     ///
     /// Compared with recv, this function has two failure cases instead of
     /// one (one for disconnection, one for an empty buffer).
-    pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
+    #[cfg(unix)]
+    #[cfg(any(feature = "signal", feature = "process"))]
+    pub(crate) fn try_recv(&mut self) -> Result<T, TryRecvError> {
         self.chan.try_recv()
     }
 
