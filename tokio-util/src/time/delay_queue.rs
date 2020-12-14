@@ -36,14 +36,14 @@ use std::task::{self, Poll, Waker};
 /// # `Stream` implementation
 ///
 /// Items are retrieved from the queue via [`DelayQueue::poll_expired`]. If no delays have
-/// expired, no items are returned. In this case, `NotReady` is returned and the
+/// expired, no items are returned. In this case, `Pending` is returned and the
 /// current task is registered to be notified once the next item's delay has
 /// expired.
 ///
 /// If no items are in the queue, i.e. `is_empty()` returns `true`, then `poll`
 /// returns `Ready(None)`. This indicates that the stream has reached an end.
 /// However, if a new item is inserted *after*, `poll` will once again start
-/// returning items or `NotReady.
+/// returning items or `Pending.
 ///
 /// Items are returned ordered by their expirations. Items that are configured
 /// to expire first will be returned first. There are no ordering guarantees
@@ -713,7 +713,7 @@ impl<T> DelayQueue<T> {
     /// Returns `true` if there are no items in the queue.
     ///
     /// Note that this function returns `false` even if all items have not yet
-    /// expired and a call to `poll` will return `NotReady`.
+    /// expired and a call to `poll` will return `Pending`.
     ///
     /// # Examples
     ///
