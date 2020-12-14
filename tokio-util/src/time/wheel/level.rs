@@ -233,14 +233,13 @@ fn slot_for(duration: u64, level: usize) -> usize {
     ((duration >> (level * 6)) % LEVEL_MULT as u64) as usize
 }
 
-/*
 #[cfg(all(test, not(loom)))]
 mod test {
     use super::*;
 
     #[test]
     fn test_slot_for() {
-        for pos in 1..64 {
+        for pos in 0..64 {
             assert_eq!(pos as usize, slot_for(pos, 0));
         }
 
@@ -252,4 +251,3 @@ mod test {
         }
     }
 }
-*/

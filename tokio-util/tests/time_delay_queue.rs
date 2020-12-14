@@ -261,6 +261,38 @@ async fn remove_expired_item() {
     assert_eq!(entry.into_inner(), "foo");
 }
 
+/// Regression test: it should be possible to remove entries which fall in the
+/// 0th slot of the internal timer wheel — that is, entries whose expiration
+/// (a) falls at the beginning of one of the wheel's hierarchical levels and (b)
+/// is equal to the wheel's current elapsed time.
+#[tokio::test]
+async fn remove_at_timer_wheel_threshold() {
+    time::pause();
+
+    let mut queue = task::spawn(DelayQueue::new());
+
+    let now = Instant::now();
+
+    let key1 = queue.insert_at("foo", now + ms(64));
+    let key2 = queue.insert_at("bar", now + ms(64));
+
+    sleep(ms(80)).await;
+
+    let entry = assert_ready_ok!(poll!(queue)).into_inner();
+
+    match entry {
+        "foo" => {
+            let entry = queue.remove(&key2).into_inner();
+            assert_eq!(entry, "bar");
+        }
+        "bar" => {
+            let entry = queue.remove(&key1).into_inner();
+            assert_eq!(entry, "foo");
+        }
+        other => panic!("other: {:?}", other),
+    }
+}
+
 #[tokio::test]
 async fn expires_before_last_insert() {
     time::pause();
