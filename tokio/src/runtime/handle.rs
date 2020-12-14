@@ -172,7 +172,7 @@ impl Handle {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        #[cfg(feature = "tracing")]
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
         let func = {
             #[cfg(tokio_track_caller)]
             let location = std::panic::Location::caller();
