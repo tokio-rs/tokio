@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607921280034,
+  "lastUpdate": 1607967034987,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -8319,6 +8319,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1135,
             "range": "± 63",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3f29212cb7743462451293b65d4bb8b5b4973fc5",
+          "message": "fs: use cfgs on fns instead of OS ext traits (#3264)\n\nInstead of using OS specific extension traits, OS specific methods are\r\nmoved onto the structs themselves and guarded with `cfg`. The API\r\ndocumentation should highlight the function is platform specific.\r\n\r\nCloses #2925",
+          "timestamp": "2020-12-14T09:29:10-08:00",
+          "tree_id": "a09b2ea3cce14487af2ace8030dd2ba6a3687cb5",
+          "url": "https://github.com/tokio-rs/tokio/commit/3f29212cb7743462451293b65d4bb8b5b4973fc5"
+        },
+        "date": 1607967034009,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 13907,
+            "range": "± 2517",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 907,
+            "range": "± 4",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 538,
+            "range": "± 16",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 12911,
+            "range": "± 2192",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 926,
+            "range": "± 4",
             "unit": "ns/iter"
           }
         ]
