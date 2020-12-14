@@ -81,6 +81,36 @@ impl ReadDir {
     }
 }
 
+feature! {
+    #![unix]
+
+    use std::os::unix::fs::DirEntryExt;
+
+    impl DirEntry {
+        /// Returns the underlying `d_ino` field in the contained `dirent`
+        /// structure.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::fs;
+        ///
+        /// # #[tokio::main]
+        /// # async fn main() -> std::io::Result<()> {
+        /// let mut entries = fs::read_dir(".").await?;
+        /// while let Some(entry) = entries.next_entry().await? {
+        ///     // Here, `entry` is a `DirEntry`.
+        ///     println!("{:?}: {}", entry.file_name(), entry.ino());
+        /// }
+        /// # Ok(())
+        /// # }
+        /// ```
+        pub fn ino(&self) -> u64 {
+            self.as_inner().ino()
+        }
+    }
+}
+
 #[cfg(feature = "stream")]
 impl crate::stream::Stream for ReadDir {
     type Item = io::Result<DirEntry>;
