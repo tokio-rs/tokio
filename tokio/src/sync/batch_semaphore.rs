@@ -41,15 +41,26 @@ struct Waitlist {
     closed: bool,
 }
 
-/// Error returned by `Semaphore::try_acquire`.
+/// Error returned from the [`Semaphore::try_acquire`] function.
+/// [`Semaphore::try_acquire`]: Semaphore::try_acquire
 #[derive(Debug)]
-pub(crate) enum TryAcquireError {
+pub enum TryAcquireError {
+    /// The semaphore has been closed and cannot issue new permits
     Closed,
+
+    /// The has no available permits.
     NoPermits,
 }
 /// Error returned by `Semaphore::acquire`.
+///
+/// Error returned from the [`Semaphore::acquire`] function.
+///
+/// An `acquire` operation can only fail if the semaphore has been
+/// closed.
+///
+/// [`Semaphore::acquire`]: Semaphore::acquire
 #[derive(Debug)]
-pub(crate) struct AcquireError(());
+pub struct AcquireError(());
 
 pub(crate) struct Acquire<'a> {
     node: Waiter,

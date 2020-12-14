@@ -1,4 +1,5 @@
 use super::batch_semaphore as ll; // low level implementation
+use super::{AcquireError, TryAcquireError};
 use std::sync::Arc;
 
 /// Counting semaphore performing asynchronous permit acquisition.
@@ -41,15 +42,6 @@ pub struct OwnedSemaphorePermit {
     sem: Arc<Semaphore>,
     permits: u32,
 }
-
-/// Error returned from the [`Semaphore::try_acquire`] function.
-///
-/// A `try_acquire` operation can only fail if the semaphore has no available
-/// permits.
-///
-/// [`Semaphore::try_acquire`]: Semaphore::try_acquire
-#[derive(Debug)]
-pub struct TryAcquireError(());
 
 #[test]
 #[cfg(not(loom))]
@@ -96,21 +88,21 @@ impl Semaphore {
     }
 
     /// Acquires permit from the semaphore.
-    pub async fn acquire(&self) -> SemaphorePermit<'_> {
-        self.ll_sem.acquire(1).await.unwrap();
-        SemaphorePermit {
+    pub async fn acquire(&self) -> Result<SemaphorePermit<'_>, AcquireError> {
+        self.ll_sem.acquire(1).await?;
+        Ok(SemaphorePermit {
             sem: &self,
             permits: 1,
-        }
+        })
     }
 
     /// Acquires `n` permits from the semaphore
-    pub async fn acquire_many(&self, n: u32) -> SemaphorePermit<'_> {
-        self.ll_sem.acquire(n).await.unwrap();
-        SemaphorePermit {
+    pub async fn acquire_many(&self, n: u32) -> Result<SemaphorePermit<'_>, AcquireError> {
+        self.ll_sem.acquire(n).await?;
+        Ok(SemaphorePermit {
             sem: &self,
             permits: n,
-        }
+        })
     }
 
     /// Tries to acquire a permit from the semaphore.
@@ -120,7 +112,7 @@ impl Semaphore {
                 sem: self,
                 permits: 1,
             }),
-            Err(_) => Err(TryAcquireError(())),
+            Err(e) => Err(e),
         }
     }
 
@@ -131,7 +123,7 @@ impl Semaphore {
                 sem: self,
                 permits: n,
             }),
-            Err(_) => Err(TryAcquireError(())),
+            Err(e) => Err(e),
         }
     }
 
@@ -140,12 +132,12 @@ impl Semaphore {
     /// The semaphore must be wrapped in an [`Arc`] to call this method.
     ///
     /// [`Arc`]: std::sync::Arc
-    pub async fn acquire_owned(self: Arc<Self>) -> OwnedSemaphorePermit {
-        self.ll_sem.acquire(1).await.unwrap();
-        OwnedSemaphorePermit {
+    pub async fn acquire_owned(self: Arc<Self>) -> Result<OwnedSemaphorePermit, AcquireError> {
+        self.ll_sem.acquire(1).await?;
+        Ok(OwnedSemaphorePermit {
             sem: self,
             permits: 1,
-        }
+        })
     }
 
     /// Tries to acquire a permit from the semaphore.
@@ -159,7 +151,7 @@ impl Semaphore {
                 sem: self,
                 permits: 1,
             }),
-            Err(_) => Err(TryAcquireError(())),
+            Err(e) => Err(e),
         }
     }
 
