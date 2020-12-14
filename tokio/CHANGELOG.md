@@ -1,3 +1,16 @@
+# 0.3.6 (December 14, 2020)
+
+### Fixed
+- rt: fix deadlock in shutdown (#3228)
+- rt: fix panic in task abort when off rt (#3159)
+- sync: make `add_permits` panic with usize::MAX >> 3 permits (#3188)
+- time: Fix race condition in timer drop (#3229)
+- watch: fix spurious wakeup (#3244)
+
+### Added
+- example: add back udp-codec example (#3205)
+- net: add `TcpStream::into_std` (#3189)
+
 # 0.3.5 (November 30, 2020)
 
 ### Fixed
