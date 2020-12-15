@@ -81,7 +81,6 @@ impl<T: Stream> Stream for Throttle<T> {
         let value = ready!(me.stream.poll_next(cx));
 
         if value.is_some() {
-
             if !is_zero(dur) {
                 me.delay.reset(Instant::now() + dur);
             }

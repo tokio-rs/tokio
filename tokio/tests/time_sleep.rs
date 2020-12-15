@@ -367,7 +367,10 @@ async fn drop_from_wake() {
     );
 
     #[derive(Clone)]
-    struct DropWaker(Arc<AtomicBool>, Arc<Mutex<Vec<Pin<Box<tokio::time::Sleep>>>>>);
+    struct DropWaker(
+        Arc<AtomicBool>,
+        Arc<Mutex<Vec<Pin<Box<tokio::time::Sleep>>>>>,
+    );
 
     impl futures::task::ArcWake for DropWaker {
         fn wake_by_ref(arc_self: &Arc<Self>) {

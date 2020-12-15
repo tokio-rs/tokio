@@ -221,7 +221,7 @@
 ///
 /// Here, a stream is consumed for at most 1 second.
 ///
-    /// ```
+/// ```
 /// use tokio::stream::{self, StreamExt};
 /// use tokio::time::{self, Duration};
 ///
