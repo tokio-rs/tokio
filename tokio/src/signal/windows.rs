@@ -231,16 +231,6 @@ impl CtrlC {
     }
 }
 
-cfg_stream! {
-    impl crate::stream::Stream for CtrlC {
-        type Item = ();
-
-        fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<()>> {
-            self.poll_recv(cx)
-        }
-    }
-}
-
 /// Represents a stream which receives "ctrl-break" notifications sent to the process
 /// via `SetConsoleCtrlHandler`.
 ///
@@ -310,16 +300,6 @@ impl CtrlBreak {
     /// ```
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
         self.inner.rx.poll_recv(cx)
-    }
-}
-
-cfg_stream! {
-    impl crate::stream::Stream for CtrlBreak {
-        type Item = ();
-
-        fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<()>> {
-            self.poll_recv(cx)
-        }
     }
 }
 
