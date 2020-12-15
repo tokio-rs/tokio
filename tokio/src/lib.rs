@@ -318,7 +318,6 @@
 //! - `signal`: Enables all `tokio::signal` types.
 //! - `fs`: Enables `tokio::fs` types.
 //! - `test-util`: Enables testing based infrastructure for the Tokio runtime.
-//! - `tracing`: Enables tracing events
 //!
 //! _Note: `AsyncRead` and `AsyncWrite` traits do not require any features and are
 //! always available._
@@ -332,6 +331,15 @@
 //! - `parking_lot`: As a potential optimization, use the _parking_lot_ crate's
 //! synchronization primitives internally. MSRV may increase according to the
 //! _parking_lot_ release in use.
+//!
+//! ### Unstable features
+//!
+//! These feature flags enable **unstable** features. The public API may break in 1.x
+//! releases. To enable these features, the `--cfg tokio_unstable` must be passed to
+//! `rustc` when compiling. This is easiest done using the `RUSTFLAGS` env variable:
+//! `RUSTFLAGS="--cfg tokio_unstable"`.
+//!
+//! - `tracing`: Enables tracing events.
 //!
 //! [feature flags]: https://doc.rust-lang.org/cargo/reference/manifest.html#the-features-section
 
