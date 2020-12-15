@@ -11,7 +11,7 @@ cfg_time! {
 }
 
 use std::fmt;
-#[cfg(any(feature = "signal", feature = "process", feature = "stream"))]
+#[cfg(any(feature = "signal", feature = "process"))]
 use std::task::{Context, Poll};
 
 /// Send values to the associated `Receiver`.

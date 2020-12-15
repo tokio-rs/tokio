@@ -48,7 +48,7 @@ where
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<I::Item>> {
         // TODO: add coop back
-        if self.yield_amt > 32 {
+        if self.yield_amt >= 32 {
             self.yield_amt = 0;
 
             cx.waker().wake_by_ref();

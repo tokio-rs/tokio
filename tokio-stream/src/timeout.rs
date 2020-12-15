@@ -1,10 +1,11 @@
-use crate::time::{error::Elapsed, Instant, Sleep};
 use crate::{Fuse, Stream};
+use tokio::time::{Instant, Sleep};
 
 use core::future::Future;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 use pin_project_lite::pin_project;
+use std::fmt;
 use std::time::Duration;
 
 pin_project! {
@@ -20,10 +21,14 @@ pin_project! {
     }
 }
 
+/// Error returned by `Timeout`.
+#[derive(Debug, PartialEq)]
+pub struct Elapsed(());
+
 impl<S: Stream> Timeout<S> {
     pub(super) fn new(stream: S, duration: Duration) -> Self {
         let next = Instant::now() + duration;
-        let deadline = Sleep::new_timeout(next);
+        let deadline = tokio::time::sleep_until(next);
 
         Timeout {
             stream: Fuse::new(stream),
@@ -61,5 +66,27 @@ impl<S: Stream> Stream for Timeout<S> {
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.stream.size_hint()
+    }
+}
+
+// ===== impl Elapsed =====
+
+impl Elapsed {
+    pub(crate) fn new() -> Self {
+        Elapsed(())
+    }
+}
+
+impl fmt::Display for Elapsed {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        "deadline has elapsed".fmt(fmt)
+    }
+}
+
+impl std::error::Error for Elapsed {}
+
+impl From<Elapsed> for std::io::Error {
+    fn from(_err: Elapsed) -> std::io::Error {
+        std::io::ErrorKind::TimedOut.into()
     }
 }

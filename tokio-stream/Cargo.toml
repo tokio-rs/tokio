@@ -20,10 +20,13 @@ Utilities to work with `Stream` and `tokio`.
 categories = ["asynchronous"]
 publish = false
 
+[features]
+default = ["time"]
+time = ["tokio/time"]
+
 [dependencies]
 futures-core = { version = "0.3.0" }
 pin-project-lite = "0.2.0"
-rand = "0.7.3"
 tokio = { version = "1.0", path = "../tokio", features = ["sync"] }
 async-stream = "0.3"
 

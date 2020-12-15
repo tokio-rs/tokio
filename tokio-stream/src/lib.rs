@@ -123,7 +123,7 @@ use take_while::TakeWhile;
 cfg_time! {
     mod timeout;
     use timeout::Timeout;
-    use crate::time::Duration;
+    use tokio::time::Duration;
     mod throttle;
     use crate::throttle::{throttle, Throttle};
 }

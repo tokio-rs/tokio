@@ -1,5 +1,4 @@
 #![cfg(not(loom))]
-#![allow(dead_code)]
 
 //! A mock type implementing [`AsyncRead`] and [`AsyncWrite`].
 //!
@@ -23,7 +22,7 @@ use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::sync::mpsc;
 use tokio::time::{self, Duration, Instant, Sleep};
 
-use futures_core::ready;
+use futures_core::{ready, Stream};
 use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
@@ -70,8 +69,8 @@ struct Inner {
     waiting: Option<Instant>,
     sleep: Option<Sleep>,
     read_wait: Option<Waker>,
-    rx: mpsc::UnboundedReceiver<Action>,
-    rx_fut: Option<Pin<Box<dyn Future<Output = Option<Action>> + Send>>>,
+    // rx: mpsc::UnboundedReceiver<Action>,
+    rx: Pin<Box<dyn Stream<Item = Action> + Send>>,
 }
 
 impl Builder {
@@ -186,14 +185,19 @@ impl Handle {
 
 impl Inner {
     fn new(actions: VecDeque<Action>) -> (Inner, Handle) {
-        let (tx, rx) = mpsc::unbounded_channel();
+        let (tx, mut rx) = mpsc::unbounded_channel();
+
+        let rx = Box::pin(async_stream::stream! {
+            while let Some(item) = rx.recv().await {
+                yield item;
+            }
+        });
 
         let inner = Inner {
             actions,
             sleep: None,
             read_wait: None,
             rx,
-            rx_fut: None,
             waiting: None,
         };
 
@@ -203,11 +207,7 @@ impl Inner {
     }
 
     fn poll_action(&mut self, cx: &mut task::Context<'_>) -> Poll<Option<Action>> {
-        if let Some(fut) = &mut self.rx_fut {
-            Pin::new(&mut *fut).poll(cx)
-        } else {
-            Poll::Ready(None)
-        }
+        Pin::new(&mut self.rx).poll_next(cx)
     }
 
     fn read(&mut self, dst: &mut ReadBuf<'_>) -> io::Result<()> {

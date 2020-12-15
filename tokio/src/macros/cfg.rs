@@ -241,16 +241,6 @@ macro_rules! cfg_not_signal_internal {
     }
 }
 
-macro_rules! cfg_stream {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "stream")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "stream")))]
-            $item
-        )*
-    }
-}
-
 macro_rules! cfg_sync {
     ($($item:item)*) => {
         $(
@@ -361,7 +351,6 @@ macro_rules! cfg_coop {
                     feature = "rt",
                     feature = "signal",
                     feature = "sync",
-                    feature = "stream",
                     feature = "time",
                     ))]
             $item
