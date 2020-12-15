@@ -1,4 +1,3 @@
-use pin_project_lite::pin_project;
 use std::cell::RefCell;
 use std::error::Error;
 use std::future::Future;
@@ -175,34 +174,33 @@ impl<T: 'static> fmt::Debug for LocalKey<T> {
     }
 }
 
-pin_project! {
-    /// A future that sets a value `T` of a task local for the future `F` during
-    /// its execution.
-    ///
-    /// The value of the task-local must be `'static` and will be dropped on the
-    /// completion of the future.
-    ///
-    /// Created by the function [`LocalKey::scope`](self::LocalKey::scope).
-    ///
-    /// ### Examples
-    ///
-    /// ```
-    /// # async fn dox() {
-    /// tokio::task_local! {
-    ///     static NUMBER: u32;
-    /// }
-    ///
-    /// NUMBER.scope(1, async move {
-    ///     println!("task local value: {}", NUMBER.get());
-    /// }).await;
-    /// # }
-    /// ```
-    pub struct TaskLocalFuture<T: StaticLifetime, F> {
-        local: &'static LocalKey<T>,
-        slot: Option<T>,
-        #[pin]
-        future: F,
-    }
+/// A future that sets a value `T` of a task local for the future `F` during
+/// its execution.
+///
+/// The value of the task-local must be `'static` and will be dropped on the
+/// completion of the future.
+///
+/// Created by the function [`LocalKey::scope`](self::LocalKey::scope).
+///
+/// ### Examples
+///
+/// ```
+/// # async fn dox() {
+/// tokio::task_local! {
+///     static NUMBER: u32;
+/// }
+///
+/// NUMBER.scope(1, async move {
+///     println!("task local value: {}", NUMBER.get());
+/// }).await;
+/// # }
+/// ```
+#[must_use = "futures do nothing unless polled"]
+#[derive(Debug)]
+pub struct TaskLocalFuture<T: 'static, F> {
+    local: &'static LocalKey<T>,
+    slot: Option<T>,
+    future: F,
 }
 
 impl<T: 'static, F: Future> Future for TaskLocalFuture<T, F> {
@@ -222,31 +220,28 @@ impl<T: 'static, F: Future> Future for TaskLocalFuture<T, F> {
             }
         }
 
-        let mut project = self.project();
-        let val = project.slot.take();
+        unsafe {
+            let TaskLocalFuture {
+                local,
+                slot,
+                future,
+            } = self.get_unchecked_mut();
 
-        let prev = project.local.inner.with(|c| c.replace(val));
+            let val = slot.take();
+            let prev = local.inner.with(|c| c.replace(val));
 
-        let _guard = Guard {
-            prev,
-            slot: &mut project.slot,
-            local: *project.local,
-        };
+            let _guard = Guard {
+                prev,
+                slot,
+                local: &local,
+            };
 
-        project.future.poll(cx)
+            Pin::new_unchecked(future).poll(cx)
+        }
     }
 }
 
-mod sealed {
-    pub trait Sealed {}
-
-    impl<T: 'static> Sealed for T {}
-}
-
-/// Required to make `pin_project` happy.
-#[doc(hidden)]
-pub trait StaticLifetime: self::sealed::Sealed + 'static {}
-impl<T: 'static> StaticLifetime for T {}
+impl<T: 'static, F: Unpin> Unpin for TaskLocalFuture<T, F> {}
 
 /// An error returned by [`LocalKey::try_with`](method@LocalKey::try_with).
 #[derive(Clone, Copy, Eq, PartialEq)]
