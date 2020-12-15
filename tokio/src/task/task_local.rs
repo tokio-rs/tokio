@@ -197,7 +197,10 @@ pin_project! {
     /// }).await;
     /// # }
     /// ```
-    pub struct TaskLocalFuture<T: StaticLifetime, F> {
+    pub struct TaskLocalFuture<T, F>
+    where
+        T: 'static
+    {
         local: &'static LocalKey<T>,
         slot: Option<T>,
         #[pin]
@@ -236,17 +239,6 @@ impl<T: 'static, F: Future> Future for TaskLocalFuture<T, F> {
         project.future.poll(cx)
     }
 }
-
-mod sealed {
-    pub trait Sealed {}
-
-    impl<T: 'static> Sealed for T {}
-}
-
-/// Required to make `pin_project` happy.
-#[doc(hidden)]
-pub trait StaticLifetime: self::sealed::Sealed + 'static {}
-impl<T: 'static> StaticLifetime for T {}
 
 /// An error returned by [`LocalKey::try_with`](method@LocalKey::try_with).
 #[derive(Clone, Copy, Eq, PartialEq)]
