@@ -11,7 +11,8 @@ use std::task::{Context, Poll};
 cfg_net! {
     /// A TCP socket server, listening for connections.
     ///
-    /// You can accept a new connection by using the [`accept`](`TcpListener::accept`) method. 
+    /// You can accept a new connection by using the [`accept`](`TcpListener::accept`)
+    /// method.
     ///
     /// # Errors
     ///
