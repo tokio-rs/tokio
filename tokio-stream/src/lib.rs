@@ -1,3 +1,28 @@
+#![doc(html_root_url = "https://docs.rs/tokio-stream/0.1.0")]
+#![allow(
+    clippy::cognitive_complexity,
+    clippy::large_enum_variant,
+    clippy::needless_doctest_main
+)]
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    rust_2018_idioms,
+    unreachable_pub
+)]
+#![cfg_attr(docsrs, deny(broken_intra_doc_links))]
+#![doc(test(
+    no_crate_inject,
+    attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
+))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(docsrs, deny(broken_intra_doc_links))]
+#![doc(test(
+    no_crate_inject,
+    attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
+))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 //! Stream utilities for Tokio.
 //!
 //! A `Stream` is an asynchronous sequence of values. It can be thought of as
