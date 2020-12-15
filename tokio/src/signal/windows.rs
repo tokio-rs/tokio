@@ -331,7 +331,6 @@ pub fn ctrl_break() -> io::Result<CtrlBreak> {
 mod tests {
     use super::*;
     use crate::runtime::Runtime;
-    use crate::StreamExt;
 
     use tokio_test::{assert_ok, assert_pending, assert_ready_ok, task};
 
@@ -368,7 +367,7 @@ mod tests {
                 super::handler(CTRL_BREAK_EVENT);
             }
 
-            ctrl_break.next().await.unwrap();
+            ctrl_break.recv().await.unwrap();
         });
     }
 
