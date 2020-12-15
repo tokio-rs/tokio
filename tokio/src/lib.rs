@@ -407,21 +407,22 @@ cfg_macros! {
     #[doc(hidden)]
     pub use tokio_macros::select_priv_declare_output_enum;
 
-    #[cfg(feature = "rt-multi-thread")]
-    #[cfg(not(test))] // Work around for rust-lang/rust#62127
-    #[cfg_attr(docsrs, doc(cfg(all(feature = "macros", any(feature = "rt-multi-thread", feature = "rt")))))]
-    pub use tokio_macros::main;
+    cfg_rt! {
+        #[cfg(feature = "rt-multi-thread")]
+        #[cfg(not(test))] // Work around for rust-lang/rust#62127
+        #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+        pub use tokio_macros::main;
 
-    #[cfg(feature = "rt-multi-thread")]
-    #[cfg_attr(docsrs, doc(cfg(all(feature = "macros", any(feature = "rt-multi-thread", feature = "rt")))))]
-    pub use tokio_macros::test;
+        #[cfg(feature = "rt-multi-thread")]
+        #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+        pub use tokio_macros::test;
 
-    #[cfg(all(feature = "rt", not(feature = "rt-multi-thread")))]
-    #[cfg(not(test))] // Work around for rust-lang/rust#62127
-    pub use tokio_macros::main_rt as main;
-
-    #[cfg(all(feature = "rt", not(feature = "rt-multi-thread")))]
-    pub use tokio_macros::test_rt as test;
+        cfg_not_rt_multi_thread! {
+            #[cfg(not(test))] // Work around for rust-lang/rust#62127
+            pub use tokio_macros::main_rt as main;
+            pub use tokio_macros::test_rt as test;
+        }
+    }
 
     // Always fail if rt is not enabled.
     cfg_not_rt! {

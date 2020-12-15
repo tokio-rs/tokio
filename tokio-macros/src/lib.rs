@@ -53,6 +53,8 @@ use proc_macro::TokenStream;
 /// The `worker_threads` option configures the number of worker threads, and
 /// defaults to the number of cpus on the system. This is the default flavor.
 ///
+/// Note: The multi-threaded runtime requires the `rt-multi-thread` feature flag.
+///
 /// # Current thread runtime
 ///
 /// To use the single-threaded runtime known as the `current_thread` runtime,
