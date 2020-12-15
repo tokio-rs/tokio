@@ -178,7 +178,7 @@
 //! [`Read`]: std::io::Read
 //! [`SeekFrom`]: enum@SeekFrom
 //! [`Sink`]: https://docs.rs/futures/0.3/futures/sink/trait.Sink.html
-//! [`Stream`]: crate::stream::Stream
+//! [`Stream`]: https://docs.rs/futures/0.3/futures/stream/trait.Stream.html
 //! [`Write`]: std::io::Write
 cfg_io_blocking! {
     pub(crate) mod blocking;

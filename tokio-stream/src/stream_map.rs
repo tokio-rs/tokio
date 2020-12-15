@@ -42,9 +42,9 @@ use std::task::{Context, Poll};
 /// to be merged, it may be advisable to use tasks sending values on a shared
 /// [`mpsc`] channel.
 ///
-/// [`StreamExt::merge`]: crate::stream::StreamExt::merge
-/// [`mpsc`]: crate::sync::mpsc
-/// [`pin!`]: macro@pin
+/// [`StreamExt::merge`]: crate::StreamExt::merge
+/// [`mpsc`]: https://docs.rs/tokio/1.0/tokio/sync/mpsc/index.html
+/// [`pin!`]: https://docs.rs/tokio/1.0/tokio/macro.pin.html
 /// [`Box::pin`]: std::boxed::Box::pin
 ///
 /// # Examples

@@ -16,7 +16,7 @@ unsafe impl<T> Sync for Pending<T> {}
 /// Creates a stream that is never ready
 ///
 /// The returned stream is never ready. Attempting to call
-/// [`next()`](crate::stream::StreamExt::next) will never complete. Use
+/// [`next()`](crate::StreamExt::next) will never complete. Use
 /// [`stream::empty()`](super::empty()) to obtain a stream that is is
 /// immediately empty but returns no values.
 ///

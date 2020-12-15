@@ -46,10 +46,10 @@
 //! [`tokio-util`] provides the [`StreamReader`] and [`ReaderStream`]
 //! types when the io feature is enabled.
 //!
-//! [tokio-util]: https://docs.rs/tokio-util/0.3/tokio_util/codec/index.html
-//! [`tokio::io`]: crate::io
-//! [`AsyncRead`]: crate::io::AsyncRead
-//! [`AsyncWrite`]: crate::io::AsyncWrite
+//! [tokio-util]: https://docs.rs/tokio-util/0.4/tokio_util/codec/index.html
+//! [`tokio::io`]: https://docs.rs/tokio/1.0/tokio/io/index.html
+//! [`AsyncRead`]: https://docs.rs/tokio/1.0/tokio/io/trait.AsyncRead.html
+//! [`AsyncWrite`]: https://docs.rs/tokio/1.0/tokio/io/trait.AsyncWrite.html
 //! [`ReaderStream`]: https://docs.rs/tokio-util/0.4/tokio_util/io/struct.ReaderStream.html
 //! [`StreamReader`]: https://docs.rs/tokio-util/0.4/tokio_util/io/struct.StreamReader.html
 
@@ -161,7 +161,7 @@ pub use futures_core::Stream;
 /// # }
 /// ```
 ///
-/// [`Stream`]: crate::stream::Stream
+/// [`Stream`]: crate::Stream
 /// [futures]: https://docs.rs/futures
 /// [futures-StreamExt]: https://docs.rs/futures/0.3/futures/stream/trait.StreamExt.html
 pub trait StreamExt: Stream {
@@ -287,7 +287,7 @@ pub trait StreamExt: Stream {
     ///
     /// For merging multiple streams, consider using [`StreamMap`] instead.
     ///
-    /// [`StreamMap`]: crate::stream::StreamMap
+    /// [`StreamMap`]: crate::StreamMap
     ///
     /// # Examples
     ///
@@ -814,7 +814,9 @@ pub trait StreamExt: Stream {
     /// `collect` streams all values, awaiting as needed. Values are pushed into
     /// a collection. A number of different target collection types are
     /// supported, including [`Vec`](std::vec::Vec),
-    /// [`String`](std::string::String), and [`Bytes`](bytes::Bytes).
+    /// [`String`](std::string::String), and [`Bytes`].
+    ///
+    /// [`Bytes`]: https://docs.rs/bytes/0.6.0/bytes/struct.Bytes.html
     ///
     /// # `Result`
     ///
