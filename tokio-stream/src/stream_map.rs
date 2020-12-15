@@ -490,7 +490,7 @@ where
     fn poll_next_entry(&mut self, cx: &mut Context<'_>) -> Poll<Option<(usize, V::Item)>> {
         use Poll::*;
 
-        let start = rand::thread_rng_n(self.entries.len() as u32) as usize;
+        let start = self::rand::thread_rng_n(self.entries.len() as u32) as usize;
         let mut idx = start;
 
         for _ in 0..self.entries.len() {
@@ -653,7 +653,7 @@ mod rand {
         }
     }
 
-    // Used by the select macro and `StreamMap`
+    // Used by `StreamMap`
     pub(crate) fn thread_rng_n(n: u32) -> u32 {
         thread_local! {
             static THREAD_RNG: FastRand = FastRand::new(loom::rand::seed());
