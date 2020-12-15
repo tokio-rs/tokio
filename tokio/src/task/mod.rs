@@ -235,5 +235,10 @@ cfg_rt! {
     pub use local::{spawn_local, LocalSet};
 
     mod task_local;
-    pub use task_local::{LocalKey, TaskLocalFuture};
+    pub use task_local::LocalKey;
+
+    /// Task-related futures.
+    pub mod future {
+        pub use super::task_local::TaskLocalFuture;
+    }
 }
