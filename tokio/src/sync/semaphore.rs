@@ -87,7 +87,14 @@ impl Semaphore {
         self.ll_sem.release(n);
     }
 
-    /// Acquires permit from the semaphore.
+    /// Acquires a permit from the semaphore.
+    ///
+    /// If the semaphore has been closed, this returns an [`AcquireError`].
+    /// Otherwise, this returns a [`SemaphorePermit`] representing the
+    /// acquired permit.
+    ///
+    /// [`AcquireError`]: crate::sync::AcquireError
+    /// [`SemaphorePermit`]: crate::sync::SemaphorePermit
     pub async fn acquire(&self) -> Result<SemaphorePermit<'_>, AcquireError> {
         self.ll_sem.acquire(1).await?;
         Ok(SemaphorePermit {
@@ -96,7 +103,14 @@ impl Semaphore {
         })
     }
 
-    /// Acquires `n` permits from the semaphore
+    /// Acquires `n` permits from the semaphore.
+    ///
+    /// If the semaphore has been closed, this returns an [`AcquireError`].
+    /// Otherwise, this returns a [`SemaphorePermit`] representing the
+    /// acquired permits.
+    ///
+    /// [`AcquireError`]: crate::sync::AcquireError
+    /// [`SemaphorePermit`]: crate::sync::SemaphorePermit
     pub async fn acquire_many(&self, n: u32) -> Result<SemaphorePermit<'_>, AcquireError> {
         self.ll_sem.acquire(n).await?;
         Ok(SemaphorePermit {
@@ -106,6 +120,14 @@ impl Semaphore {
     }
 
     /// Tries to acquire a permit from the semaphore.
+    ///
+    /// If the semaphore has been closed, this returns a [`TryAcquireError::Closed`]
+    /// and a [`TryAcquireError::NoPermits`] if there are no permits left. Otherwise,
+    /// this returns a [`SemaphorePermit`] representing the acquired permits.
+    ///
+    /// [`TryAcquireError::Closed`]: crate::sync::TryAcquireError::Closed
+    /// [`TryAcquireError::NoPermits`]: crate::sync::TryAcquireError::NoPermits
+    /// [`SemaphorePermit`]: crate::sync::SemaphorePermit
     pub fn try_acquire(&self) -> Result<SemaphorePermit<'_>, TryAcquireError> {
         match self.ll_sem.try_acquire(1) {
             Ok(_) => Ok(SemaphorePermit {
@@ -116,7 +138,15 @@ impl Semaphore {
         }
     }
 
-    /// Tries to acquire `n` permits from the semaphore.
+    /// Tries to acquire n permits from the semaphore.
+    ///
+    /// If the semaphore has been closed, this returns a [`TryAcquireError::Closed`]
+    /// and a [`TryAcquireError::NoPermits`] if there are no permits left. Otherwise,
+    /// this returns a [`SemaphorePermit`] representing the acquired permits.
+    ///
+    /// [`TryAcquireError::Closed`]: crate::sync::TryAcquireError::Closed
+    /// [`TryAcquireError::NoPermits`]: crate::sync::TryAcquireError::NoPermits
+    /// [`SemaphorePermit`]: crate::sync::SemaphorePermit
     pub fn try_acquire_many(&self, n: u32) -> Result<SemaphorePermit<'_>, TryAcquireError> {
         match self.ll_sem.try_acquire(n) {
             Ok(_) => Ok(SemaphorePermit {
@@ -127,11 +157,16 @@ impl Semaphore {
         }
     }
 
-    /// Acquires permit from the semaphore.
+    /// Acquires a permit from the semaphore.
     ///
     /// The semaphore must be wrapped in an [`Arc`] to call this method.
+    /// If the semaphore has been closed, this returns an [`AcquireError`].
+    /// Otherwise, this returns a [`OwnedSemaphorePermit`] representing the
+    /// acquired permit.
     ///
     /// [`Arc`]: std::sync::Arc
+    /// [`AcquireError`]: crate::sync::AcquireError
+    /// [`OwnedSemaphorePermit`]: crate::sync::OwnedSemaphorePermit
     pub async fn acquire_owned(self: Arc<Self>) -> Result<OwnedSemaphorePermit, AcquireError> {
         self.ll_sem.acquire(1).await?;
         Ok(OwnedSemaphorePermit {
@@ -142,9 +177,16 @@ impl Semaphore {
 
     /// Tries to acquire a permit from the semaphore.
     ///
-    /// The semaphore must be wrapped in an [`Arc`] to call this method.
+    /// The semaphore must be wrapped in an [`Arc`] to call this method. If
+    /// the semaphore has been closed, this returns a [`TryAcquireError::Closed`]
+    /// and a [`TryAcquireError::NoPermits`] if there are no permits left.
+    /// Otherwise, this returns a [`OwnedSemaphorePermit`] representing the
+    /// acquired permit.
     ///
     /// [`Arc`]: std::sync::Arc
+    /// [`TryAcquireError::Closed`]: crate::sync::TryAcquireError::Closed
+    /// [`TryAcquireError::NoPermits`]: crate::sync::TryAcquireError::NoPermits
+    /// [`OwnedSemaphorePermit`]: crate::sync::OwnedSemaphorePermit
     pub fn try_acquire_owned(self: Arc<Self>) -> Result<OwnedSemaphorePermit, TryAcquireError> {
         match self.ll_sem.try_acquire(1) {
             Ok(_) => Ok(OwnedSemaphorePermit {
@@ -158,6 +200,32 @@ impl Semaphore {
     /// Closes the semaphore.
     ///
     /// This prevents the semaphore from issuing new permits and notifies all pending waiters.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::Semaphore;
+    /// use std::sync::Arc;
+    /// use tokio::sync::TryAcquireError;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let semaphore = Arc::new(Semaphore::new(1));
+    ///     let semaphore2 = semaphore.clone();
+    ///
+    ///     tokio::spawn(async move {
+    ///         let permit = semaphore.acquire_many(2).await;
+    ///         assert!(permit.is_err());
+    ///         println!("waiter received error");
+    ///     });
+    ///
+    ///     println!("closing semaphore");
+    ///     semaphore2.close();
+    ///
+    ///     // Cannot obtain more permits
+    ///     assert_eq!(semaphore2.try_acquire().err(), Some(TryAcquireError::Closed))
+    /// }
+    /// ```
     pub fn close(&self) {
         self.ll_sem.close();
     }

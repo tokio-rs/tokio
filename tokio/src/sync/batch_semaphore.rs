@@ -41,19 +41,26 @@ struct Waitlist {
     closed: bool,
 }
 
-/// Error returned from the `Semaphore::try_acquire` function.
-#[derive(Debug)]
+/// Error returned from the [`Semaphore::try_acquire`] function.
+///
+/// [`Semaphore::try_acquire`]: crate::sync::Semaphore::try_acquire
+#[derive(Debug, PartialEq)]
 pub enum TryAcquireError {
-    /// The semaphore has been closed and cannot issue new permits
+    /// The semaphore has been [closed] and cannot issue new permits.
+    ///
+    /// [closed]: crate::sync::Semaphore::close
     Closed,
 
-    /// The has no available permits.
+    /// The semaphore has no available permits.
     NoPermits,
 }
-/// Error returned by `Semaphore::acquire`.
+/// Error returned from the [`Semaphore::acquire`] function.
 ///
 /// An `acquire` operation can only fail if the semaphore has been
-/// closed.
+/// [closed].
+///
+/// [closed]: crate::sync::Semaphore::close
+/// [`Semaphore::acquire`]: crate::sync::Semaphore::acquire
 #[derive(Debug)]
 pub struct AcquireError(());
 
