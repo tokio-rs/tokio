@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608092788621,
+  "lastUpdate": 1608092793932,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -2861,6 +2861,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 575,
             "range": "± 67",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "luciofranco14@gmail.com",
+            "name": "Lucio Franco",
+            "username": "LucioFranco"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8efa62013b551d5130791c3a79ce8ab5cb0b5abf",
+          "message": "Move stream items into `tokio-stream` (#3277)\n\nThis change removes all references to `Stream` from\r\nwithin the `tokio` crate and moves them into a new\r\n`tokio-stream` crate. Most types have had their\r\n`impl Stream` removed as well in-favor of their\r\ninherent methods.\r\n\r\nCloses #2870",
+          "timestamp": "2020-12-15T20:24:38-08:00",
+          "tree_id": "6da8c41c8e1808bea98fd2d23ee1ec03a1cc7e80",
+          "url": "https://github.com/tokio-rs/tokio/commit/8efa62013b551d5130791c3a79ce8ab5cb0b5abf"
+        },
+        "date": 1608092789668,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1118,
+            "range": "± 302",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 21223,
+            "range": "± 8076",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1148,
+            "range": "± 180",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 22028,
+            "range": "± 9063",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 593,
+            "range": "± 70",
             "unit": "ns/iter"
           }
         ]
