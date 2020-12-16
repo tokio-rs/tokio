@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1607967034987,
+  "lastUpdate": 1608092774119,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -5455,6 +5455,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 17592883,
             "range": "± 2594088",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "luciofranco14@gmail.com",
+            "name": "Lucio Franco",
+            "username": "LucioFranco"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8efa62013b551d5130791c3a79ce8ab5cb0b5abf",
+          "message": "Move stream items into `tokio-stream` (#3277)\n\nThis change removes all references to `Stream` from\r\nwithin the `tokio` crate and moves them into a new\r\n`tokio-stream` crate. Most types have had their\r\n`impl Stream` removed as well in-favor of their\r\ninherent methods.\r\n\r\nCloses #2870",
+          "timestamp": "2020-12-15T20:24:38-08:00",
+          "tree_id": "6da8c41c8e1808bea98fd2d23ee1ec03a1cc7e80",
+          "url": "https://github.com/tokio-rs/tokio/commit/8efa62013b551d5130791c3a79ce8ab5cb0b5abf"
+        },
+        "date": 1608092769784,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 182019,
+            "range": "± 15209",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 702811,
+            "range": "± 43087",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5258133,
+            "range": "± 636777",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20769514,
+            "range": "± 3399957",
             "unit": "ns/iter"
           }
         ]
