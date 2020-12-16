@@ -123,9 +123,11 @@ optional = true
 
 [dev-dependencies]
 tokio-test = { version = "0.4.0", path = "../tokio-test" }
+tokio-stream = { version = "0.1", path = "../tokio-stream" }
 futures = { version = "0.3.0", features = ["async-await"] }
 proptest = "0.10.0"
 tempfile = "3.1.0"
+async-stream = "0.3"
 
 [target.'cfg(loom)'.dev-dependencies]
 loom = { version = "0.3.5", features = ["futures", "checkpoint"] }

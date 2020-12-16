@@ -2,10 +2,8 @@ use crate::codec::decoder::Decoder;
 use crate::codec::encoder::Encoder;
 use crate::codec::framed_impl::{FramedImpl, RWFrames, ReadFrame, WriteFrame};
 
-use tokio::{
-    io::{AsyncRead, AsyncWrite},
-    stream::Stream,
-};
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio_stream::Stream;
 
 use bytes::BytesMut;
 use futures_sink::Sink;
@@ -22,7 +20,7 @@ pin_project! {
     /// You can create a `Framed` instance by using the [`Decoder::framed`] adapter, or
     /// by using the `new` function seen below.
     ///
-    /// [`Stream`]: tokio::stream::Stream
+    /// [`Stream`]: tokio_stream::Stream
     /// [`Sink`]: futures_sink::Sink
     /// [`AsyncRead`]: tokio::io::AsyncRead
     /// [`Decoder::framed`]: crate::codec::Decoder::framed()
@@ -54,7 +52,7 @@ where
     /// calling [`split`] on the `Framed` returned by this method, which will
     /// break them into separate objects, allowing them to interact more easily.
     ///
-    /// [`Stream`]: tokio::stream::Stream
+    /// [`Stream`]: tokio_stream::Stream
     /// [`Sink`]: futures_sink::Sink
     /// [`Decode`]: crate::codec::Decoder
     /// [`Encoder`]: crate::codec::Encoder
@@ -88,7 +86,7 @@ where
     /// calling [`split`] on the `Framed` returned by this method, which will
     /// break them into separate objects, allowing them to interact more easily.
     ///
-    /// [`Stream`]: tokio::stream::Stream
+    /// [`Stream`]: tokio_stream::Stream
     /// [`Sink`]: futures_sink::Sink
     /// [`Decode`]: crate::codec::Decoder
     /// [`Encoder`]: crate::codec::Encoder
@@ -133,7 +131,7 @@ impl<T, U> Framed<T, U> {
     /// calling [`split`] on the `Framed` returned by this method, which will
     /// break them into separate objects, allowing them to interact more easily.
     ///
-    /// [`Stream`]: tokio::stream::Stream
+    /// [`Stream`]: tokio_stream::Stream
     /// [`Sink`]: futures_sink::Sink
     /// [`Decoder`]: crate::codec::Decoder
     /// [`Encoder`]: crate::codec::Encoder

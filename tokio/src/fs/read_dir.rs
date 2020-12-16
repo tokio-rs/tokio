@@ -29,12 +29,11 @@ pub async fn read_dir(path: impl AsRef<Path>) -> io::Result<ReadDir> {
 ///
 /// # Errors
 ///
-/// This [`Stream`] will return an [`Err`] if there's some sort of intermittent
+/// This stream will return an [`Err`] if there's some sort of intermittent
 /// IO error during iteration.
 ///
 /// [`read_dir`]: read_dir
 /// [`DirEntry`]: DirEntry
-/// [`Stream`]: crate::stream::Stream
 /// [`Err`]: std::result::Result::Err
 #[derive(Debug)]
 #[must_use = "streams do nothing unless polled"]
@@ -108,19 +107,6 @@ feature! {
         pub fn ino(&self) -> u64 {
             self.as_inner().ino()
         }
-    }
-}
-
-#[cfg(feature = "stream")]
-impl crate::stream::Stream for ReadDir {
-    type Item = io::Result<DirEntry>;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Poll::Ready(match ready!(self.poll_next_entry(cx)) {
-            Ok(Some(entry)) => Some(Ok(entry)),
-            Ok(None) => None,
-            Err(err) => Some(Err(err)),
-        })
     }
 }
 

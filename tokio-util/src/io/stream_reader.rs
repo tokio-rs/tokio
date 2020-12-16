@@ -21,7 +21,7 @@ pin_project! {
     /// # async fn main() -> std::io::Result<()> {
     ///
     /// // Create a stream from an iterator.
-    /// let stream = tokio::stream::iter(vec![
+    /// let stream = tokio_stream::iter(vec![
     ///     Result::Ok(Bytes::from_static(&[0, 1, 2, 3])),
     ///     Result::Ok(Bytes::from_static(&[4, 5, 6, 7])),
     ///     Result::Ok(Bytes::from_static(&[8, 9, 10, 11])),
@@ -51,7 +51,7 @@ pin_project! {
     /// ```
     ///
     /// [`AsyncRead`]: tokio::io::AsyncRead
-    /// [`Stream`]: tokio::stream::Stream
+    /// [`Stream`]: tokio_stream::Stream
     /// [`ReaderStream`]: crate::io::ReaderStream
     #[derive(Debug)]
     pub struct StreamReader<S, B> {

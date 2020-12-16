@@ -9,8 +9,8 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::net::UdpSocket;
-use tokio::stream::StreamExt;
 use tokio::{io, time};
+use tokio_stream::StreamExt;
 use tokio_util::codec::BytesCodec;
 use tokio_util::udp::UdpFramed;
 

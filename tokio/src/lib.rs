@@ -389,10 +389,6 @@ cfg_signal_internal! {
     pub(crate) mod signal;
 }
 
-cfg_stream! {
-    pub mod stream;
-}
-
 cfg_sync! {
     pub mod sync;
 }
@@ -410,6 +406,13 @@ cfg_time! {
 }
 
 mod util;
+
+/// Due to the `Stream` trait's inclusion in `std` landing later than Tokio's 1.0
+/// release, most of the Tokio stream utilities have been moved into the [`tokio-stream`]
+/// crate.
+///
+/// [`tokio-stream`]: https://docs.rs/tokio-stream
+pub mod stream {}
 
 cfg_macros! {
     /// Implementation detail of the `select!` macro. This macro is **not**

@@ -231,16 +231,6 @@ impl CtrlC {
     }
 }
 
-cfg_stream! {
-    impl crate::stream::Stream for CtrlC {
-        type Item = ();
-
-        fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<()>> {
-            self.poll_recv(cx)
-        }
-    }
-}
-
 /// Represents a stream which receives "ctrl-break" notifications sent to the process
 /// via `SetConsoleCtrlHandler`.
 ///
@@ -313,16 +303,6 @@ impl CtrlBreak {
     }
 }
 
-cfg_stream! {
-    impl crate::stream::Stream for CtrlBreak {
-        type Item = ();
-
-        fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<()>> {
-            self.poll_recv(cx)
-        }
-    }
-}
-
 /// Creates a new stream which receives "ctrl-break" notifications sent to the
 /// process.
 ///
@@ -351,7 +331,6 @@ pub fn ctrl_break() -> io::Result<CtrlBreak> {
 mod tests {
     use super::*;
     use crate::runtime::Runtime;
-    use crate::stream::StreamExt;
 
     use tokio_test::{assert_ok, assert_pending, assert_ready_ok, task};
 
@@ -388,7 +367,7 @@ mod tests {
                 super::handler(CTRL_BREAK_EVENT);
             }
 
-            ctrl_break.next().await.unwrap();
+            ctrl_break.recv().await.unwrap();
         });
     }
 

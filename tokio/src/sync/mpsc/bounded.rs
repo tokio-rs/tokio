@@ -11,7 +11,7 @@ cfg_time! {
 }
 
 use std::fmt;
-#[cfg(any(feature = "signal", feature = "process", feature = "stream"))]
+#[cfg(any(feature = "signal", feature = "process"))]
 use std::task::{Context, Poll};
 
 /// Send values to the associated `Receiver`.
@@ -254,16 +254,6 @@ impl<T> fmt::Debug for Receiver<T> {
 }
 
 impl<T> Unpin for Receiver<T> {}
-
-cfg_stream! {
-    impl<T> crate::stream::Stream for Receiver<T> {
-        type Item = T;
-
-        fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
-            self.chan.recv(cx)
-        }
-    }
-}
 
 impl<T> Sender<T> {
     pub(crate) fn new(chan: chan::Tx<T, Semaphore>) -> Sender<T> {

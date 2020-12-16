@@ -72,7 +72,7 @@ mod util {
     ///
     /// ```
     /// use bytes::{Bytes, BytesMut};
-    /// use tokio::stream;
+    /// use tokio_stream as stream;
     /// use tokio::io::Result;
     /// use tokio_util::io::{StreamReader, poll_read_buf};
     /// use futures::future::poll_fn;
