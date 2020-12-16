@@ -11,10 +11,8 @@ use std::task::{Context, Poll};
 cfg_net! {
     /// A TCP socket server, listening for connections.
     ///
-    /// You can accept a new connection by using the [`accept`](`TcpListener::accept`) method. Alternatively `TcpListener`
-    /// implements the [`Stream`](`crate::stream::Stream`) trait, which allows you to use the listener in places that want a
-    /// stream. The stream will never return `None` and will also not yield the peer's `SocketAddr` structure.  Iterating over
-    /// it is equivalent to calling accept in a loop.
+    /// You can accept a new connection by using the [`accept`](`TcpListener::accept`)
+    /// method.
     ///
     /// # Errors
     ///
@@ -44,24 +42,6 @@ cfg_net! {
     ///     loop {
     ///         let (socket, _) = listener.accept().await?;
     ///         process_socket(socket).await;
-    ///     }
-    /// }
-    /// ```
-    ///
-    /// Using `impl Stream`:
-    /// ```no_run
-    /// use tokio::{net::TcpListener, stream::StreamExt};
-    ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
-    ///     while let Some(stream) = listener.next().await {
-    ///         match stream {
-    ///             Ok(stream) => {
-    ///                 println!("new client!");
-    ///             }
-    ///             Err(e) => { /* connection failed */ }
-    ///         }
     ///     }
     /// }
     /// ```
@@ -320,16 +300,6 @@ impl TcpListener {
     /// ```
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.io.set_ttl(ttl)
-    }
-}
-
-#[cfg(feature = "stream")]
-impl crate::stream::Stream for TcpListener {
-    type Item = io::Result<TcpStream>;
-
-    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let (socket, _) = ready!(self.poll_accept(cx))?;
-        Poll::Ready(Some(Ok(socket)))
     }
 }
 

@@ -18,7 +18,7 @@ pin_project! {
     /// ```
     /// # #[tokio::main]
     /// # async fn main() -> std::io::Result<()> {
-    /// use tokio::stream::StreamExt;
+    /// use tokio_stream::StreamExt;
     /// use tokio_util::io::ReaderStream;
     ///
     /// // Create a stream of data.
@@ -40,7 +40,7 @@ pin_project! {
     ///
     /// [`AsyncRead`]: tokio::io::AsyncRead
     /// [`StreamReader`]: crate::io::StreamReader
-    /// [`Stream`]: tokio::stream::Stream
+    /// [`Stream`]: tokio_stream::Stream
     #[derive(Debug)]
     pub struct ReaderStream<R> {
         // Reader itself.
@@ -58,7 +58,7 @@ impl<R: AsyncRead> ReaderStream<R> {
     /// `Result<Bytes, std::io::Error>`.
     ///
     /// [`AsyncRead`]: tokio::io::AsyncRead
-    /// [`Stream`]: tokio::stream::Stream
+    /// [`Stream`]: tokio_stream::Stream
     pub fn new(reader: R) -> Self {
         ReaderStream {
             reader: Some(reader),

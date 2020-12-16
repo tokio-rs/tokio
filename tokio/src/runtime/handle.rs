@@ -142,7 +142,7 @@ impl Handle {
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        #[cfg(feature = "tracing")]
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(future, "task");
         self.spawner.spawn(future)
     }
@@ -172,7 +172,7 @@ impl Handle {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        #[cfg(feature = "tracing")]
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
         let func = {
             #[cfg(tokio_track_caller)]
             let location = std::panic::Location::caller();

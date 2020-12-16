@@ -23,10 +23,11 @@ cfg_net! {
     ///
     /// # Streams
     ///
-    /// If you need to listen over UDP and produce a [`Stream`](`crate::stream::Stream`), you can look
+    /// If you need to listen over UDP and produce a [`Stream`], you can look
     /// at [`UdpFramed`].
     ///
     /// [`UdpFramed`]: https://docs.rs/tokio-util/latest/tokio_util/udp/struct.UdpFramed.html
+    /// [`Stream`]: https://docs.rs/futures/0.3/futures/stream/trait.Stream.html
     ///
     /// # Example: one to many (bind)
     ///

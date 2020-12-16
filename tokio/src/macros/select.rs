@@ -167,7 +167,7 @@
 /// Basic stream selecting.
 ///
 /// ```
-/// use tokio::stream::{self, StreamExt};
+/// use tokio_stream::{self as stream, StreamExt};
 ///
 /// #[tokio::main]
 /// async fn main() {
@@ -188,7 +188,7 @@
 /// is complete, all calls to `next()` return `None`.
 ///
 /// ```
-/// use tokio::stream::{self, StreamExt};
+/// use tokio_stream::{self as stream, StreamExt};
 ///
 /// #[tokio::main]
 /// async fn main() {
@@ -220,7 +220,7 @@
 /// Here, a stream is consumed for at most 1 second.
 ///
 /// ```
-/// use tokio::stream::{self, StreamExt};
+/// use tokio_stream::{self as stream, StreamExt};
 /// use tokio::time::{self, Duration};
 ///
 /// #[tokio::main]
