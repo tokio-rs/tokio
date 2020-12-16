@@ -1,6 +1,7 @@
 #![warn(rust_2018_idioms)]
 
-use tokio::{net::UdpSocket, stream::StreamExt};
+use tokio::net::UdpSocket;
+use tokio_stream::StreamExt;
 use tokio_util::codec::{Decoder, Encoder, LinesCodec};
 use tokio_util::udp::UdpFramed;
 

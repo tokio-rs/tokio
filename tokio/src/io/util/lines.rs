@@ -108,19 +108,6 @@ where
     }
 }
 
-#[cfg(feature = "stream")]
-impl<R: AsyncBufRead> crate::stream::Stream for Lines<R> {
-    type Item = io::Result<String>;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Poll::Ready(match ready!(self.poll_next_line(cx)) {
-            Ok(Some(line)) => Some(Ok(line)),
-            Ok(None) => None,
-            Err(err) => Some(Err(err)),
-        })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

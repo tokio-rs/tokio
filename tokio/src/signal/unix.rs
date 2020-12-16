@@ -407,16 +407,6 @@ impl Signal {
     }
 }
 
-cfg_stream! {
-    impl crate::stream::Stream for Signal {
-        type Item = ();
-
-        fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<()>> {
-            self.poll_recv(cx)
-        }
-    }
-}
-
 // Work around for abstracting streams internally
 pub(crate) trait InternalStream: Unpin {
     fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>>;

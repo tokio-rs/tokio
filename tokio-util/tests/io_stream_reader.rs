@@ -2,7 +2,7 @@
 
 use bytes::Bytes;
 use tokio::io::AsyncReadExt;
-use tokio::stream::iter;
+use tokio_stream::iter;
 use tokio_util::io::StreamReader;
 
 #[tokio::test]

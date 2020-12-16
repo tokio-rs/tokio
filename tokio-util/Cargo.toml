@@ -38,6 +38,7 @@ __docs_rs = ["futures-util"]
 
 [dependencies]
 tokio = { version = "1.0.0", path = "../tokio" }
+tokio-stream = { version = "0.1", path = "../tokio-stream" }
 
 bytes = "0.6.0"
 futures-core = "0.3.0"

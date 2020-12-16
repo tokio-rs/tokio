@@ -161,15 +161,6 @@ impl<T> UnboundedReceiver<T> {
     }
 }
 
-#[cfg(feature = "stream")]
-impl<T> crate::stream::Stream for UnboundedReceiver<T> {
-    type Item = T;
-
-    fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
-        self.poll_recv(cx)
-    }
-}
-
 impl<T> UnboundedSender<T> {
     pub(crate) fn new(chan: chan::Tx<T, Semaphore>) -> UnboundedSender<T> {
         UnboundedSender { chan }
