@@ -435,14 +435,13 @@ mod util;
 /// ```rust,no_run
 /// use tokio::sync::mpsc;
 ///
-/// let (tx, rx) = mpsc::channel::<usize>(16);
+/// let (tx, mut rx) = mpsc::channel::<usize>(16);
 ///
-///
-/// async_stream::stream! {
+/// let stream = async_stream::stream! {
 ///     while let Some(item) = rx.recv().await {
 ///         yield item;
 ///     }
-/// }
+/// };
 /// ```
 pub mod stream {}
 
