@@ -379,6 +379,10 @@ impl Builder {
 
     fn get_cfg(&self) -> driver::Cfg {
         driver::Cfg {
+            enable_pause_time: match self.kind {
+                Kind::CurrentThread => true,
+                Kind::MultiThread => false,
+            },
             enable_io: self.enable_io,
             enable_time: self.enable_time,
         }
