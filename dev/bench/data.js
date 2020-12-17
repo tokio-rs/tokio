@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608223659394,
+  "lastUpdate": 1608223668937,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -8895,6 +8895,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 917,
             "range": "± 4",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "luciofranco14@gmail.com",
+            "name": "Lucio Franco",
+            "username": "LucioFranco"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c5861ef62fb0c1ed6bb8fe07a8e02534264eb7b8",
+          "message": "docs: Add more comprehensive stream docs (#3286)\n\n* docs: Add more comprehensive stream docs\r\n\r\n* Apply suggestions from code review\r\n\r\nCo-authored-by: Alice Ryhl <alice@ryhl.io>\r\n\r\n* Fix doc tests\r\n\r\nCo-authored-by: Alice Ryhl <alice@ryhl.io>",
+          "timestamp": "2020-12-17T11:46:09-05:00",
+          "tree_id": "f7afa84006c8629a0d2c058b8e52042c54436203",
+          "url": "https://github.com/tokio-rs/tokio/commit/c5861ef62fb0c1ed6bb8fe07a8e02534264eb7b8"
+        },
+        "date": 1608223667937,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 15325,
+            "range": "± 3736",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1140,
+            "range": "± 6",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 678,
+            "range": "± 28",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 15449,
+            "range": "± 3288",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1138,
+            "range": "± 11",
             "unit": "ns/iter"
           }
         ]
