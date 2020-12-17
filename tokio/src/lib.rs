@@ -418,7 +418,7 @@ mod util;
 /// reach `std` on a stable compiler in time for the 1.0 release of Tokio. For
 /// this reason, the team has decided to move all `Stream` based utilities to
 /// the [`tokio-stream`] crate. While this is not ideal, once `Stream` has made
-/// it into the standard library and MSRV period has passed we will implement
+/// it into the standard library and the MSRV period has passed, we will implement
 /// stream for our different types.
 ///
 /// While this may seem unfortunate, not all is lost as you can get much of the
