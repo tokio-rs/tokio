@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608184381166,
+  "lastUpdate": 1608184387096,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -2915,6 +2915,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 593,
             "range": "± 70",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d74d17307dd53215061c4a8a1f20a0e30461e296",
+          "message": "time: remove `Box` from `Sleep` (#3278)\n\nRemoves the box from `Sleep`, taking advantage of intrusive wakers. The\r\n`Sleep` future is now `!Unpin`.\r\n\r\nCloses #3267",
+          "timestamp": "2020-12-16T21:51:34-08:00",
+          "tree_id": "0cdbf57e4a9b38302ddae0078eb5a1b9a4977aa2",
+          "url": "https://github.com/tokio-rs/tokio/commit/d74d17307dd53215061c4a8a1f20a0e30461e296"
+        },
+        "date": 1608184386228,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 787,
+            "range": "± 179",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 13193,
+            "range": "± 3142",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 823,
+            "range": "± 245",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 12583,
+            "range": "± 4310",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 479,
+            "range": "± 81",
             "unit": "ns/iter"
           }
         ]
