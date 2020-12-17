@@ -381,6 +381,7 @@ impl Builder {
         driver::Cfg {
             enable_pause_time: match self.kind {
                 Kind::CurrentThread => true,
+                #[cfg(feature = "rt-multi-thread")]
                 Kind::MultiThread => false,
             },
             enable_io: self.enable_io,

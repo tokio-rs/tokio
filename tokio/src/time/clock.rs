@@ -17,7 +17,7 @@ cfg_not_test_util! {
     }
 
     impl Clock {
-        pub(crate) fn new() -> Clock {
+        pub(crate) fn new(_enable_pausing: bool) -> Clock {
             Clock {}
         }
 
