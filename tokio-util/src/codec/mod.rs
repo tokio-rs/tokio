@@ -88,6 +88,8 @@
 //!
 //! struct MyStringDecoder {}
 //!
+//! const MAX: usize = 8 * 1024 * 1024;
+//!
 //! impl Decoder for MyStringDecoder {
 //!     type Item = String;
 //!     type Error = std::io::Error;
@@ -108,7 +110,7 @@
 //!
 //!         // Check that the length is not too large to avoid a denial of
 //!         // service attack where the server runs out of memory.
-//!         if length > 8 * 1024 * 1024 {
+//!         if length > MAX {
 //!             return Err(std::io::Error::new(
 //!                 std::io::ErrorKind::InvalidData,
 //!                 format!("Frame of length {} is too large.", length)
@@ -173,7 +175,8 @@
 //! # #[tokio::main] async fn main() -> std::io::Result<()> {
 //! # let mut io_resource = tokio::io::sink();
 //! # let mut encoder = tokio_util::codec::BytesCodec::new();
-//! # const MAX: usize = 8192;
+//!
+//! const MAX: usize = 8192;
 //!
 //! let mut buf = bytes::BytesMut::new();
 //! loop {
@@ -211,13 +214,15 @@
 //!
 //! struct MyStringEncoder {}
 //!
+//! const MAX: usize = 8 * 1024 * 1024;
+//!
 //! impl Encoder<String> for MyStringEncoder {
 //!     type Error = std::io::Error;
 //!
 //!     fn encode(&mut self, item: String, dst: &mut BytesMut) -> Result<(), Self::Error> {
 //!         // Don't send a string if it is longer than the other end will
 //!         // accept.
-//!         if item.len() > 8 * 1024 * 1024 {
+//!         if item.len() > MAX {
 //!             return Err(std::io::Error::new(
 //!                 std::io::ErrorKind::InvalidData,
 //!                 format!("Frame of length {} is too large.", item.len())
