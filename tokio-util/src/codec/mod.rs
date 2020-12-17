@@ -131,7 +131,7 @@
 //!         let data = src[4..4 + length].to_vec();
 //!         src.advance(4 + length);
 //!
-//!         // Conver the data to a string, or fail if it is not valid utf-8.
+//!         // Convert the data to a string, or fail if it is not valid utf-8.
 //!         match String::from_utf8(data) {
 //!             Ok(string) => Ok(Some(string)),
 //!             Err(utf8_error) => {
