@@ -108,6 +108,9 @@ pub use self::instant::Instant;
 mod interval;
 pub use interval::{interval, interval_at, Interval};
 
+mod system;
+pub use system::{SystemTime, SystemTimeError};
+
 mod timeout;
 #[doc(inline)]
 pub use timeout::{timeout, timeout_at, Timeout};

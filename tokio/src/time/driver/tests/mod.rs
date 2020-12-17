@@ -49,7 +49,7 @@ fn single_timer() {
 
         let handle_ = handle.clone();
         let jh = thread::spawn(move || {
-            let entry = TimerEntry::new(&handle_, clock.now() + Duration::from_secs(1));
+            let entry = TimerEntry::new(&handle_, clock.instant_now() + Duration::from_secs(1));
             pin!(entry);
 
             block_on(futures::future::poll_fn(|cx| {
@@ -80,7 +80,7 @@ fn drop_timer() {
 
         let handle_ = handle.clone();
         let jh = thread::spawn(move || {
-            let entry = TimerEntry::new(&handle_, clock.now() + Duration::from_secs(1));
+            let entry = TimerEntry::new(&handle_, clock.instant_now() + Duration::from_secs(1));
             pin!(entry);
 
             let _ = entry
@@ -111,7 +111,7 @@ fn change_waker() {
 
         let handle_ = handle.clone();
         let jh = thread::spawn(move || {
-            let entry = TimerEntry::new(&handle_, clock.now() + Duration::from_secs(1));
+            let entry = TimerEntry::new(&handle_, clock.instant_now() + Duration::from_secs(1));
             pin!(entry);
 
             let _ = entry
@@ -146,7 +146,7 @@ fn reset_future() {
 
         let handle_ = handle.clone();
         let finished_early_ = finished_early.clone();
-        let start = clock.now();
+        let start = clock.instant_now();
 
         let jh = thread::spawn(move || {
             let entry = TimerEntry::new(&handle_, start + Duration::from_secs(1));
@@ -198,7 +198,7 @@ fn poll_process_levels() {
     for i in 0..1024 {
         let mut entry = Box::pin(TimerEntry::new(
             &handle,
-            clock.now() + Duration::from_millis(i),
+            clock.instant_now() + Duration::from_millis(i),
         ));
 
         let _ = entry
@@ -234,7 +234,7 @@ fn poll_process_levels_targeted() {
     let inner = super::Inner::new(time_source, MockUnpark::mock());
     let handle = Handle::new(Arc::new(Mutex::new(inner)));
 
-    let e1 = TimerEntry::new(&handle, clock.now() + Duration::from_millis(193));
+    let e1 = TimerEntry::new(&handle, clock.instant_now() + Duration::from_millis(193));
     pin!(e1);
 
     handle.process_at_time(62);

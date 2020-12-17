@@ -218,6 +218,6 @@ mod variant {
     use super::Instant;
 
     pub(super) fn now() -> Instant {
-        crate::time::clock::now()
+        crate::time::clock::instant_now()
     }
 }

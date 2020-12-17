@@ -36,7 +36,7 @@ cfg_not_test_util! {
 }
 
 cfg_test_util! {
-    use crate::time::{Duration, Instant};
+    use crate::time::{Duration, Instant, SystemTime};
     use std::sync::{Arc, Mutex};
 
     cfg_rt! {
@@ -60,10 +60,52 @@ cfg_test_util! {
     #[derive(Debug)]
     struct Inner {
         /// Instant to use as the clock's base instant.
-        base: std::time::Instant,
+        base: LocalInstant,
 
         /// Instant at which the clock was last unfrozen
-        unfrozen: Option<std::time::Instant>,
+        unfrozen: Option<LocalInstant>,
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    struct LocalInstant {
+        instant: std::time::Instant,
+        system: std::time::SystemTime,
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    struct LocalDuration {
+        instant: Duration,
+        system: Duration,
+    }
+
+    impl LocalInstant {
+        fn now() -> Self {
+            Self {
+                instant: std::time::Instant::now(),
+                system: std::time::SystemTime::now(),
+            }
+        }
+
+        fn elapsed(&self) -> LocalDuration {
+            LocalDuration {
+                instant: self.instant.elapsed(),
+                system: self.system.elapsed().expect("Time went backwards!"),
+            }
+        }
+    }
+
+    impl std::ops::AddAssign<LocalDuration> for LocalInstant {
+        fn add_assign(&mut self, other: LocalDuration) {
+            self.instant += other.instant;
+            self.system += other.system;
+        }
+    }
+
+    impl std::ops::AddAssign<Duration> for LocalInstant {
+        fn add_assign(&mut self, other: Duration) {
+            self.instant += other;
+            self.system += other;
+        }
     }
 
     /// Pause time
@@ -99,7 +141,7 @@ cfg_test_util! {
             panic!("time is not frozen");
         }
 
-        inner.unfrozen = Some(std::time::Instant::now());
+        inner.unfrozen = Some(LocalInstant::now());
     }
 
     /// Advance time
@@ -131,11 +173,19 @@ cfg_test_util! {
     }
 
     /// Return the current instant, factoring in frozen time.
-    pub(crate) fn now() -> Instant {
+    pub(crate) fn instant_now() -> Instant {
         if let Some(clock) = clock() {
-            clock.now()
+            clock.instant_now()
         } else {
             Instant::from_std(std::time::Instant::now())
+        }
+    }
+
+    pub(crate) fn system_now() -> SystemTime {
+        if let Some(clock) = clock() {
+            clock.system_now()
+        } else {
+            SystemTime::from_std(std::time::SystemTime::now())
         }
     }
 
@@ -143,7 +193,7 @@ cfg_test_util! {
         /// Return a new `Clock` instance that uses the current execution context's
         /// source of time.
         pub(crate) fn new() -> Clock {
-            let now = std::time::Instant::now();
+            let now = LocalInstant::now();
 
             Clock {
                 inner: Arc::new(Mutex::new(Inner {
@@ -176,7 +226,7 @@ cfg_test_util! {
             inner.base += duration;
         }
 
-        pub(crate) fn now(&self) -> Instant {
+        pub(crate) fn instant_now(&self) -> Instant {
             let inner = self.inner.lock().unwrap();
 
             let mut ret = inner.base;
@@ -185,7 +235,19 @@ cfg_test_util! {
                 ret += unfrozen.elapsed();
             }
 
-            Instant::from_std(ret)
+            Instant::from_std(ret.instant)
+        }
+
+        pub(crate) fn system_now(&self) -> SystemTime {
+            let inner = self.inner.lock().unwrap();
+
+            let mut ret = inner.base;
+
+            if let Some(unfrozen) = inner.unfrozen {
+                ret += unfrozen.elapsed();
+            }
+
+            SystemTime::from_std(ret.system)
         }
     }
 }

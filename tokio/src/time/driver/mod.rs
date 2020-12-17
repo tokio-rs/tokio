@@ -103,7 +103,7 @@ impl ClockTime {
     pub(self) fn new(clock: Clock) -> Self {
         Self {
             clock,
-            start_time: super::clock::now(),
+            start_time: super::clock::instant_now(),
         }
     }
 
@@ -127,7 +127,7 @@ impl ClockTime {
     }
 
     pub(self) fn now(&self) -> u64 {
-        self.instant_to_tick(self.clock.now())
+        self.instant_to_tick(self.clock.instant_now())
     }
 }
 

@@ -48,3 +48,16 @@ async fn resuming_time_when_not_frozen_panics() {
     time::resume();
     time::resume();
 }
+
+#[tokio::test]
+async fn system_time_pause() {
+    time::pause();
+
+    let now = time::SystemTime::now();
+
+    time::advance(Duration::from_secs(1)).await;
+
+    let later = time::SystemTime::now();
+
+    assert!(later > now);
+}
