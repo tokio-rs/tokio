@@ -331,7 +331,7 @@ fn coop_and_block_in_place() {
         // runtime worker yielded as part of `block_in_place` and guarantees the
         // same thread will reclaim the worker at the end of the
         // `block_in_place` call.
-        .max_threads(1)
+        .max_blocking_threads(1)
         .build()
         .unwrap();
 
@@ -377,7 +377,7 @@ fn coop_and_block_in_place() {
 #[test]
 fn max_threads() {
     let _rt = tokio::runtime::Builder::new_multi_thread()
-        .max_threads(1)
+        .max_blocking_threads(1)
         .build()
         .unwrap();
 }
