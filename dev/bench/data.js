@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608223683160,
+  "lastUpdate": 1608223687855,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -5815,6 +5815,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18568417,
             "range": "± 2421376",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "luciofranco14@gmail.com",
+            "name": "Lucio Franco",
+            "username": "LucioFranco"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c5861ef62fb0c1ed6bb8fe07a8e02534264eb7b8",
+          "message": "docs: Add more comprehensive stream docs (#3286)\n\n* docs: Add more comprehensive stream docs\r\n\r\n* Apply suggestions from code review\r\n\r\nCo-authored-by: Alice Ryhl <alice@ryhl.io>\r\n\r\n* Fix doc tests\r\n\r\nCo-authored-by: Alice Ryhl <alice@ryhl.io>",
+          "timestamp": "2020-12-17T11:46:09-05:00",
+          "tree_id": "f7afa84006c8629a0d2c058b8e52042c54436203",
+          "url": "https://github.com/tokio-rs/tokio/commit/c5861ef62fb0c1ed6bb8fe07a8e02534264eb7b8"
+        },
+        "date": 1608223685399,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 182889,
+            "range": "± 33852",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 670790,
+            "range": "± 178916",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4696702,
+            "range": "± 1032430",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19645796,
+            "range": "± 2344371",
             "unit": "ns/iter"
           }
         ]
