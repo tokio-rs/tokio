@@ -101,7 +101,7 @@ pub fn interval_at(start: Instant, period: Duration) -> Interval {
     assert!(period > Duration::new(0, 0), "`period` must be non-zero.");
 
     Interval {
-        delay: sleep_until(start),
+        delay: Box::pin(sleep_until(start)),
         period,
     }
 }
@@ -110,7 +110,7 @@ pub fn interval_at(start: Instant, period: Duration) -> Interval {
 #[derive(Debug)]
 pub struct Interval {
     /// Future that completes the next time the `Interval` yields a value.
-    delay: Sleep,
+    delay: Pin<Box<Sleep>>,
 
     /// The duration between values yielded by `Interval`.
     period: Duration,
@@ -127,7 +127,7 @@ impl Interval {
         // The next interval value is `duration` after the one that just
         // yielded.
         let next = now + self.period;
-        self.delay.reset(next);
+        self.delay.as_mut().reset(next);
 
         // Return the current instant
         Poll::Ready(now)

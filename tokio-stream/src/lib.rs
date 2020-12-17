@@ -937,7 +937,8 @@ pub trait StreamExt: Stream {
     /// use std::time::Duration;
     /// # let int_stream = stream::iter(1..=3);
     ///
-    /// let mut int_stream = int_stream.timeout(Duration::from_secs(1));
+    /// let int_stream = int_stream.timeout(Duration::from_secs(1));
+    /// tokio::pin!(int_stream);
     ///
     /// // When no items time out, we get the 3 elements in succession:
     /// assert_eq!(int_stream.try_next().await, Ok(Some(1)));
@@ -981,7 +982,8 @@ pub trait StreamExt: Stream {
     /// use tokio_stream::StreamExt;
     ///
     /// # async fn dox() {
-    /// let mut item_stream = futures::stream::repeat("one").throttle(Duration::from_secs(2));
+    /// let item_stream = futures::stream::repeat("one").throttle(Duration::from_secs(2));
+    /// tokio::pin!(item_stream);
     ///
     /// loop {
     ///     // The string will be produced at most every 2 seconds

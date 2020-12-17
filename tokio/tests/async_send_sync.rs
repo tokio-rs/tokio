@@ -93,6 +93,14 @@ macro_rules! assert_value {
             AmbiguousIfSync::some_item(&f);
         };
     };
+    ($type:ty: Unpin) => {
+        #[allow(unreachable_code)]
+        #[allow(unused_variables)]
+        const _: fn() = || {
+            let f: $type = todo!();
+            require_unpin(&f);
+        };
+    };
 }
 macro_rules! async_assert_fn {
     ($($f:ident $(< $($generic:ty),* > )? )::+($($arg:ty),*): Send & Sync) => {
@@ -280,6 +288,12 @@ async_assert_fn!(tokio::time::timeout_at(Instant, BoxFutureSend<()>): Send & !Sy
 async_assert_fn!(tokio::time::timeout_at(Instant, BoxFuture<()>): !Send & !Sync);
 async_assert_fn!(tokio::time::Interval::tick(_): Send & Sync);
 
+assert_value!(tokio::time::Interval: Unpin);
+async_assert_fn!(tokio::time::sleep(Duration): !Unpin);
+async_assert_fn!(tokio::time::sleep_until(Instant): !Unpin);
+async_assert_fn!(tokio::time::timeout(Duration, BoxFuture<()>): !Unpin);
+async_assert_fn!(tokio::time::timeout_at(Instant, BoxFuture<()>): !Unpin);
+async_assert_fn!(tokio::time::Interval::tick(_): !Unpin);
 async_assert_fn!(tokio::io::AsyncBufReadExt::read_until(&mut BoxAsyncRead, u8, &mut Vec<u8>): !Unpin);
 async_assert_fn!(tokio::io::AsyncBufReadExt::read_line(&mut BoxAsyncRead, &mut String): !Unpin);
 async_assert_fn!(tokio::io::AsyncReadExt::read(&mut BoxAsyncRead, &mut [u8]): !Unpin);

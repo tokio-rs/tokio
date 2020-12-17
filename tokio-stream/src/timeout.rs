@@ -15,6 +15,7 @@ pin_project! {
     pub struct Timeout<S> {
         #[pin]
         stream: Fuse<S>,
+        #[pin]
         deadline: Sleep,
         duration: Duration,
         poll_deadline: bool,
@@ -42,22 +43,24 @@ impl<S: Stream> Timeout<S> {
 impl<S: Stream> Stream for Timeout<S> {
     type Item = Result<S::Item, Elapsed>;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match self.as_mut().project().stream.poll_next(cx) {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let me = self.project();
+
+        match me.stream.poll_next(cx) {
             Poll::Ready(v) => {
                 if v.is_some() {
-                    let next = Instant::now() + self.duration;
-                    self.as_mut().project().deadline.reset(next);
-                    *self.as_mut().project().poll_deadline = true;
+                    let next = Instant::now() + *me.duration;
+                    me.deadline.reset(next);
+                    *me.poll_deadline = true;
                 }
                 return Poll::Ready(v.map(Ok));
             }
             Poll::Pending => {}
         };
 
-        if self.poll_deadline {
-            ready!(Pin::new(self.as_mut().project().deadline).poll(cx));
-            *self.as_mut().project().poll_deadline = false;
+        if *me.poll_deadline {
+            ready!(me.deadline.poll(cx));
+            *me.poll_deadline = false;
             return Poll::Ready(Some(Err(Elapsed::new())));
         }
 

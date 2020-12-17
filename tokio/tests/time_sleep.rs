@@ -317,15 +317,15 @@ async fn drop_after_reschedule_at_new_scheduled_time() {
 
     let start = tokio::time::Instant::now();
 
-    let mut a = tokio::time::sleep(Duration::from_millis(5));
-    let mut b = tokio::time::sleep(Duration::from_millis(5));
-    let mut c = tokio::time::sleep(Duration::from_millis(10));
+    let mut a = Box::pin(tokio::time::sleep(Duration::from_millis(5)));
+    let mut b = Box::pin(tokio::time::sleep(Duration::from_millis(5)));
+    let mut c = Box::pin(tokio::time::sleep(Duration::from_millis(10)));
 
     let _ = poll!(&mut a);
     let _ = poll!(&mut b);
     let _ = poll!(&mut c);
 
-    b.reset(start + Duration::from_millis(10));
+    b.as_mut().reset(start + Duration::from_millis(10));
     a.await;
 
     drop(b);
@@ -334,12 +334,13 @@ async fn drop_after_reschedule_at_new_scheduled_time() {
 #[tokio::test]
 async fn drop_from_wake() {
     use std::future::Future;
+    use std::pin::Pin;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::{Arc, Mutex};
     use std::task::Context;
 
     let panicked = Arc::new(AtomicBool::new(false));
-    let list: Arc<Mutex<Vec<tokio::time::Sleep>>> = Arc::new(Mutex::new(Vec::new()));
+    let list: Arc<Mutex<Vec<Pin<Box<tokio::time::Sleep>>>>> = Arc::new(Mutex::new(Vec::new()));
 
     let arc_wake = Arc::new(DropWaker(panicked.clone(), list.clone()));
     let arc_wake = futures::task::waker(arc_wake);
@@ -349,9 +350,9 @@ async fn drop_from_wake() {
     let mut lock = list.lock().unwrap();
 
     for _ in 0..100 {
-        let mut timer = tokio::time::sleep(Duration::from_millis(10));
+        let mut timer = Box::pin(tokio::time::sleep(Duration::from_millis(10)));
 
-        let _ = std::pin::Pin::new(&mut timer).poll(&mut Context::from_waker(&arc_wake));
+        let _ = timer.as_mut().poll(&mut Context::from_waker(&arc_wake));
 
         lock.push(timer);
     }
@@ -366,7 +367,10 @@ async fn drop_from_wake() {
     );
 
     #[derive(Clone)]
-    struct DropWaker(Arc<AtomicBool>, Arc<Mutex<Vec<tokio::time::Sleep>>>);
+    struct DropWaker(
+        Arc<AtomicBool>,
+        Arc<Mutex<Vec<Pin<Box<tokio::time::Sleep>>>>>,
+    );
 
     impl futures::task::ArcWake for DropWaker {
         fn wake_by_ref(arc_self: &Arc<Self>) {

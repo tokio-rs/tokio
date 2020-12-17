@@ -359,7 +359,8 @@
 //!             let mut conf = rx.borrow().clone();
 //!
 //!             let mut op_start = Instant::now();
-//!             let mut sleep = time::sleep_until(op_start + conf.timeout);
+//!             let sleep = time::sleep_until(op_start + conf.timeout);
+//!             tokio::pin!(sleep);
 //!
 //!             loop {
 //!                 tokio::select! {
@@ -371,14 +372,14 @@
 //!                         op_start = Instant::now();
 //!
 //!                         // Restart the timeout
-//!                         sleep = time::sleep_until(op_start + conf.timeout);
+//!                         sleep.set(time::sleep_until(op_start + conf.timeout));
 //!                     }
 //!                     _ = rx.changed() => {
 //!                         conf = rx.borrow().clone();
 //!
 //!                         // The configuration has been updated. Update the
 //!                         // `sleep` using the new `timeout` value.
-//!                         sleep.reset(op_start + conf.timeout);
+//!                         sleep.as_mut().reset(op_start + conf.timeout);
 //!                     }
 //!                     _ = &mut op => {
 //!                         // The operation completed!

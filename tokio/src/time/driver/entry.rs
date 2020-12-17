@@ -367,6 +367,8 @@ pub(super) struct TimerEntry {
     /// Initial deadline for the timer. This is used to register on the first
     /// poll, as we can't register prior to being pinned.
     initial_deadline: Option<Instant>,
+    /// Ensure the type is !Unpin
+    _m: std::marker::PhantomPinned,
 }
 
 unsafe impl Send for TimerEntry {}
@@ -556,6 +558,7 @@ impl TimerEntry {
             driver,
             inner: StdUnsafeCell::new(TimerShared::new()),
             initial_deadline: Some(deadline),
+            _m: std::marker::PhantomPinned,
         }
     }
 
