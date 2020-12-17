@@ -23,13 +23,8 @@ fn main() {
 
 mod my_custom_runtime {
     use once_cell::sync::Lazy;
-    use pin_project::pin_project;
-    use std::{
-        future::Future,
-        pin::Pin,
-        task::{Context, Poll},
-    };
-    use tokio::runtime::Handle;
+    use std::future::Future;
+    use tokio_util::context::TokioContext;
 
     pub fn spawn(f: impl Future<Output = ()> + Send + 'static) {
         EXECUTOR.spawn(f);
@@ -56,26 +51,7 @@ mod my_custom_runtime {
     impl ThreadPool {
         fn spawn(&self, f: impl Future<Output = ()> + Send + 'static) {
             let handle = self.rt.handle().clone();
-            self.inner.spawn_ok(TokioIo { handle, inner: f });
-        }
-    }
-
-    #[pin_project]
-    struct TokioIo<F> {
-        #[pin]
-        inner: F,
-        handle: Handle,
-    }
-
-    impl<F: Future> Future for TokioIo<F> {
-        type Output = F::Output;
-
-        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            let me = self.project();
-            let handle = me.handle;
-            let fut = me.inner;
-            let _guard = handle.enter();
-            fut.poll(cx)
+            self.inner.spawn_ok(TokioContext::new(f, handle));
         }
     }
 }
