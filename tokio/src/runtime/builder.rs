@@ -212,14 +212,18 @@ impl Builder {
     /// Specifies limit for threads spawned by the Runtime used for blocking operations.
     ///
     ///
-    /// Similarly to the `worker_threads`, this number should be between 0 and 32,768.
+    /// Similarly to the `worker_threads`, this number should be between 1 and 32,768.
     ///
     /// The default value is 512.
     ///
-    ///
     /// Otherwise as `worker_threads` are always active, it limits additional threads (e.g. for
     /// blocking annotations).
+    ///
+    /// # Panic
+    ///
+    /// This will panic if `val` is not larger than `0`.
     pub fn max_blocking_threads(&mut self, val: usize) -> &mut Self {
+        assert!(val > 0, "Max blocking threads cannot be set to 0");
         self.max_blocking_threads = val;
         self
     }
@@ -487,7 +491,7 @@ cfg_rt_multi_thread! {
             use crate::runtime::{Kind, ThreadPool};
             use crate::runtime::park::Parker;
 
-            let core_threads = self.worker_threads.unwrap_or_else(|| num_cpus());
+            let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
 
             let (driver, resources) = driver::Driver::new(self.get_cfg())?;
 
@@ -525,7 +529,7 @@ impl fmt::Debug for Builder {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Builder")
             .field("worker_threads", &self.worker_threads)
-            .field("max_threads", &self.max_blocking_threads)
+            .field("max_blocking_threads", &self.max_blocking_threads)
             .field(
                 "thread_name",
                 &"<dyn Fn() -> String + Send + Sync + 'static>",
