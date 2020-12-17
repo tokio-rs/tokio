@@ -14,7 +14,7 @@ use std::{io, path::Path};
 /// reading into a vector created with `Vec::new()`.
 ///
 /// [`File::open`]: super::File::open
-/// [`read_to_end`]: crate::io::AsyncReadExt::read_to_end
+/// [`read_to_end`]: crate::io::AsyncRead::read_to_end
 ///
 /// # Errors
 ///

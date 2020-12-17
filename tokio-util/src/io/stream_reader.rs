@@ -15,7 +15,7 @@ pin_project! {
     ///
     /// ```
     /// use bytes::Bytes;
-    /// use tokio::io::{AsyncReadExt, Result};
+    /// use tokio::io::{AsyncRead, Result};
     /// use tokio_util::io::StreamReader;
     /// # #[tokio::main]
     /// # async fn main() -> std::io::Result<()> {

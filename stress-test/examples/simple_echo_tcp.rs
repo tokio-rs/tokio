@@ -2,7 +2,7 @@
 use std::{thread::sleep, time::Duration};
 
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::{AsyncRead, AsyncWriteExt},
     net::{TcpListener, TcpSocket},
     runtime::Builder,
     sync::oneshot,

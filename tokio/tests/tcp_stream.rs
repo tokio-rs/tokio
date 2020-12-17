@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::io::{AsyncReadExt, AsyncWriteExt, Interest};
+use tokio::io::{AsyncRead, AsyncWriteExt, Interest};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::try_join;
 use tokio_test::task;

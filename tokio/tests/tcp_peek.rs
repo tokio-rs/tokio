@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::io::AsyncReadExt;
+use tokio::io::AsyncRead;
 use tokio::net::TcpStream;
 
 use tokio_test::assert_ok;

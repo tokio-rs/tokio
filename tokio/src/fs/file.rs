@@ -37,14 +37,14 @@ use std::task::Poll::*;
 /// the data to disk.
 ///
 /// Reading and writing to a `File` is usually done using the convenience
-/// methods found on the [`AsyncReadExt`] and [`AsyncWriteExt`] traits. Examples
+/// methods found on the [`AsyncRead`] and [`AsyncWriteExt`] traits. Examples
 /// import these traits through [the prelude].
 ///
 /// [std]: struct@std::fs::File
 /// [`AsyncSeek`]: trait@crate::io::AsyncSeek
 /// [`flush`]: fn@crate::io::AsyncWriteExt::flush
 /// [`sync_all`]: fn@crate::fs::File::sync_all
-/// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
+/// [`AsyncRead`]: trait@crate::io::AsyncRead
 /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
 /// [the prelude]: crate::prelude
 ///
@@ -138,10 +138,10 @@ impl File {
     /// # }
     /// ```
     ///
-    /// The [`read_to_end`] method is defined on the [`AsyncReadExt`] trait.
+    /// The [`read_to_end`] method is defined on the [`AsyncRead`] trait.
     ///
-    /// [`read_to_end`]: fn@crate::io::AsyncReadExt::read_to_end
-    /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
+    /// [`read_to_end`]: fn@crate::io::AsyncRead::read_to_end
+    /// [`AsyncRead`]: trait@crate::io::AsyncRead
     pub async fn open(path: impl AsRef<Path>) -> io::Result<File> {
         let path = path.as_ref().to_owned();
         let std = asyncify(|| sys::File::open(path)).await?;

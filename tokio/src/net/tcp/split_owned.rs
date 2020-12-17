@@ -22,11 +22,11 @@ use std::{fmt, io};
 /// Owned read half of a [`TcpStream`], created by [`into_split`].
 ///
 /// Reading from an `OwnedReadHalf` is usually done using the convenience methods found
-/// on the [`AsyncReadExt`] trait. Examples import this trait through [the prelude].
+/// on the [`AsyncRead`] trait. Examples import this trait through [the prelude].
 ///
 /// [`TcpStream`]: TcpStream
 /// [`into_split`]: TcpStream::into_split()
-/// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
+/// [`AsyncRead`]: trait@crate::io::AsyncRead
 /// [the prelude]: crate::prelude
 #[derive(Debug)]
 pub struct OwnedReadHalf {
@@ -179,10 +179,10 @@ impl OwnedReadHalf {
     /// }
     /// ```
     ///
-    /// The [`read`] method is defined on the [`AsyncReadExt`] trait.
+    /// The [`read`] method is defined on the [`AsyncRead`] trait.
     ///
-    /// [`read`]: fn@crate::io::AsyncReadExt::read
-    /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
+    /// [`read`]: fn@crate::io::AsyncRead::read
+    /// [`AsyncRead`]: trait@crate::io::AsyncRead
     pub async fn peek(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let mut buf = ReadBuf::new(buf);
         poll_fn(|cx| self.poll_peek(cx, &mut buf)).await

@@ -32,7 +32,7 @@ cfg_io_util! {
     /// A slightly sad example of not reading anything into a buffer:
     ///
     /// ```
-    /// use tokio::io::{self, AsyncReadExt};
+    /// use tokio::io::{self, AsyncRead};
     ///
     /// #[tokio::main]
     /// async fn main() {

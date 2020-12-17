@@ -20,7 +20,7 @@ use std::{
 ///
 /// ```
 /// # async fn ex() -> std::io::Result<()> {
-/// # use tokio::io::{AsyncReadExt, AsyncWriteExt};
+/// # use tokio::io::{AsyncRead, AsyncWriteExt};
 /// let (mut client, mut server) = tokio::io::duplex(64);
 ///
 /// client.write_all(b"ping").await?;

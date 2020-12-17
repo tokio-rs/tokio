@@ -3,7 +3,7 @@
 
 use std::process::Stdio;
 use std::time::Duration;
-use tokio::io::AsyncReadExt;
+use tokio::io::AsyncRead;
 use tokio::process::Command;
 use tokio::time::sleep;
 use tokio_test::assert_ok;

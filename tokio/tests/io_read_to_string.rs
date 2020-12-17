@@ -2,7 +2,7 @@
 #![cfg(feature = "full")]
 
 use std::io;
-use tokio::io::AsyncReadExt;
+use tokio::io::AsyncRead;
 use tokio_test::assert_ok;
 use tokio_test::io::Builder;
 
@@ -22,7 +22,7 @@ async fn to_string_does_not_truncate_on_utf8_error() {
 
     let mut s = "abc".to_string();
 
-    match AsyncReadExt::read_to_string(&mut data.as_slice(), &mut s).await {
+    match AsyncRead::read_to_string(&mut data.as_slice(), &mut s).await {
         Ok(len) => panic!("Should fail: {} bytes.", len),
         Err(err) if err.to_string() == "stream did not contain valid UTF-8" => {}
         Err(err) => panic!("Fail: {}.", err),
@@ -39,7 +39,7 @@ async fn to_string_does_not_truncate_on_io_error() {
         .build();
     let mut s = "abc".to_string();
 
-    match AsyncReadExt::read_to_string(&mut mock, &mut s).await {
+    match AsyncRead::read_to_string(&mut mock, &mut s).await {
         Ok(len) => panic!("Should fail: {} bytes.", len),
         Err(err) if err.to_string() == "whoops" => {}
         Err(err) => panic!("Fail: {}.", err),
@@ -54,7 +54,7 @@ async fn to_string_appends() {
 
     let mut s = "abc".to_string();
 
-    let len = AsyncReadExt::read_to_string(&mut data.as_slice(), &mut s)
+    let len = AsyncRead::read_to_string(&mut data.as_slice(), &mut s)
         .await
         .unwrap();
 

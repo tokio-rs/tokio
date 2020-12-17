@@ -24,13 +24,13 @@ cfg_net! {
     /// [`connect`] method, or by [accepting] a connection from a [listener].
     ///
     /// Reading and writing to a `TcpStream` is usually done using the
-    /// convenience methods found on the [`AsyncReadExt`] and [`AsyncWriteExt`]
+    /// convenience methods found on the [`AsyncRead`] and [`AsyncWriteExt`]
     /// traits. Examples import these traits through [the prelude].
     ///
     /// [`connect`]: method@TcpStream::connect
     /// [accepting]: method@crate::net::TcpListener::accept
     /// [listener]: struct@crate::net::TcpListener
-    /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
+    /// [`AsyncRead`]: trait@crate::io::AsyncRead
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     /// [the prelude]: crate::prelude
     ///
@@ -670,10 +670,10 @@ impl TcpStream {
     /// }
     /// ```
     ///
-    /// The [`read`] method is defined on the [`AsyncReadExt`] trait.
+    /// The [`read`] method is defined on the [`AsyncRead`] trait.
     ///
-    /// [`read`]: fn@crate::io::AsyncReadExt::read
-    /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
+    /// [`read`]: fn@crate::io::AsyncRead::read
+    /// [`AsyncRead`]: trait@crate::io::AsyncRead
     pub async fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.io
             .registration()

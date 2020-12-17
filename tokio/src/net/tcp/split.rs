@@ -20,11 +20,11 @@ use std::task::{Context, Poll};
 /// Borrowed read half of a [`TcpStream`], created by [`split`].
 ///
 /// Reading from a `ReadHalf` is usually done using the convenience methods found on the
-/// [`AsyncReadExt`] trait. Examples import this trait through [the prelude].
+/// [`AsyncRead`] trait. Examples import this trait through [the prelude].
 ///
 /// [`TcpStream`]: TcpStream
 /// [`split`]: TcpStream::split()
-/// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
+/// [`AsyncRead`]: trait@crate::io::AsyncRead
 /// [the prelude]: crate::prelude
 #[derive(Debug)]
 pub struct ReadHalf<'a>(&'a TcpStream);
@@ -124,10 +124,10 @@ impl ReadHalf<'_> {
     /// }
     /// ```
     ///
-    /// The [`read`] method is defined on the [`AsyncReadExt`] trait.
+    /// The [`read`] method is defined on the [`AsyncRead`] trait.
     ///
-    /// [`read`]: fn@crate::io::AsyncReadExt::read
-    /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
+    /// [`read`]: fn@crate::io::AsyncRead::read
+    /// [`AsyncRead`]: trait@crate::io::AsyncRead
     pub async fn peek(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let mut buf = ReadBuf::new(buf);
         poll_fn(|cx| self.poll_peek(cx, &mut buf)).await

@@ -167,7 +167,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::io::{repeat, AsyncReadExt, Repeat};
+    use tokio::io::{repeat, AsyncRead, Repeat};
     use tokio_stream::{once, Once, StreamExt};
 
     #[tokio::test]

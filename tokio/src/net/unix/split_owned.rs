@@ -21,11 +21,11 @@ use std::{fmt, io};
 /// Owned read half of a [`UnixStream`], created by [`into_split`].
 ///
 /// Reading from an `OwnedReadHalf` is usually done using the convenience methods found
-/// on the [`AsyncReadExt`] trait. Examples import this trait through [the prelude].
+/// on the [`AsyncRead`] trait. Examples import this trait through [the prelude].
 ///
 /// [`UnixStream`]: crate::net::UnixStream
 /// [`into_split`]: crate::net::UnixStream::into_split()
-/// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
+/// [`AsyncRead`]: trait@crate::io::AsyncRead
 /// [the prelude]: crate::prelude
 #[derive(Debug)]
 pub struct OwnedReadHalf {

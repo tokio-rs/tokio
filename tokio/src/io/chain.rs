@@ -7,7 +7,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 pin_project! {
-    /// Stream for the [`chain`](super::AsyncReadExt::chain) method.
+    /// Stream for the [`chain`](super::AsyncRead::chain) method.
     #[must_use = "streams do nothing unless polled"]
     #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
     pub struct Chain<T, U> {

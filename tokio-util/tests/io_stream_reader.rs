@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 
 use bytes::Bytes;
-use tokio::io::AsyncReadExt;
+use tokio::io::AsyncRead;
 use tokio_stream::iter;
 use tokio_util::io::StreamReader;
 

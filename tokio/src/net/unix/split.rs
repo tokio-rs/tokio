@@ -19,11 +19,11 @@ use std::task::{Context, Poll};
 /// Borrowed read half of a [`UnixStream`], created by [`split`].
 ///
 /// Reading from a `ReadHalf` is usually done using the convenience methods found on the
-/// [`AsyncReadExt`] trait. Examples import this trait through [the prelude].
+/// [`AsyncRead`] trait. Examples import this trait through [the prelude].
 ///
 /// [`UnixStream`]: UnixStream
 /// [`split`]: UnixStream::split()
-/// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
+/// [`AsyncRead`]: trait@crate::io::AsyncRead
 /// [the prelude]: crate::prelude
 #[derive(Debug)]
 pub struct ReadHalf<'a>(&'a UnixStream);

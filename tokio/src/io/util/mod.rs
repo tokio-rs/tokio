@@ -4,9 +4,6 @@ cfg_io_util! {
     mod async_buf_read_ext;
     pub use async_buf_read_ext::AsyncBufReadExt;
 
-    mod async_read_ext;
-    pub use async_read_ext::AsyncReadExt;
-
     mod async_seek_ext;
     pub use async_seek_ext::AsyncSeekExt;
 
@@ -21,8 +18,6 @@ cfg_io_util! {
 
     mod buf_writer;
     pub use buf_writer::BufWriter;
-
-    mod chain;
 
     mod copy;
     pub use copy::copy;

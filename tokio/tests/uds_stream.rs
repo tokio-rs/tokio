@@ -5,7 +5,7 @@
 use std::io;
 use std::task::Poll;
 
-use tokio::io::{AsyncReadExt, AsyncWriteExt, Interest};
+use tokio::io::{AsyncRead, AsyncWriteExt, Interest};
 use tokio::net::{UnixListener, UnixStream};
 use tokio_test::{assert_ok, assert_pending, assert_ready_ok, task};
 

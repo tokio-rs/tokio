@@ -5,7 +5,7 @@ use std::io::Result;
 use std::io::{Read, Write};
 use std::{net, thread};
 
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncWriteExt};
 use tokio::net::TcpStream;
 
 #[tokio::test]
