@@ -45,6 +45,7 @@
 //! has arrived through the IO resource, that data will have been appended to
 //! the buffer.  This means that reading frames from a `FramedRead` is
 //! essentially equivalent to the following loop:
+//!
 //! ```no_run
 //! use tokio::io::AsyncReadExt;
 //! # // This uses async_stream to create an example that compiles.
@@ -62,7 +63,7 @@
 //!         while let Some(frame) = decoder.decode_eof(&mut buf)? {
 //!             yield frame;
 //!         }
-//!         return;
+//!         break;
 //!     }
 //!
 //!     while let Some(frame) = decoder.decode(&mut buf)? {
@@ -162,6 +163,7 @@
 //! buffer will contain the exact same data as before, except that some of the
 //! data may have been removed from the front of the buffer. Writing to a
 //! `FramedWrite` is essentially equivalent to the following loop:
+//!
 //! ```no_run
 //! use tokio::io::AsyncWriteExt;
 //! use bytes::Buf; // for advance
