@@ -124,6 +124,14 @@ impl<E: Source> PollEvented<E> {
     pub(crate) fn registration(&self) -> &Registration {
         &self.registration
     }
+
+    /// Deregister the inner io from the registration and returns a Result containing the inner io
+    #[cfg(feature = "net")]
+    pub(crate) fn into_inner(mut self) -> io::Result<E> {
+        let mut inner = self.io.take().unwrap(); // As io shouldn't ever be None, just unwrap here.
+        self.registration.deregister(&mut inner)?;
+        Ok(inner)
+    }
 }
 
 feature! {

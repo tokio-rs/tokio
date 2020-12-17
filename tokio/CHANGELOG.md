@@ -1,3 +1,13 @@
+# 0.3.5 (November 30, 2020)
+
+### Fixed
+- rt: fix `shutdown_timeout(0)` (#3196).
+- time: fixed race condition with small sleeps (#3069).
+
+### Added
+- io: `AsyncFd::with_interest()` (#3167).
+- signal: `CtrlC` stream on windows (#3186).
+
 # 0.3.4 (November 18, 2020)
 
 ### Fixed

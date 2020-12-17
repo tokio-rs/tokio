@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio-macros/0.3.1")]
+#![doc(html_root_url = "https://docs.rs/tokio-macros/1.0.0")]
 #![allow(clippy::needless_doctest_main)]
 #![warn(
     missing_debug_implementations,
@@ -34,6 +34,12 @@ use proc_macro::TokenStream;
 /// sufficient, you may be interested in using
 /// [Builder](../tokio/runtime/struct.Builder.html), which provides a more
 /// powerful interface.
+///
+/// Note: This macro can be used on any function and not just the `main`
+/// function. Using it on a non-main function makes the function behave
+/// as if it was synchronous by starting a new runtime each time it is called.
+/// If the function is called often, it is preferable to create the runtime using
+/// the runtime builder so the runtime can be reused across calls.
 ///
 /// # Multi-threaded runtime
 ///

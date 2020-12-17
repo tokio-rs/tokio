@@ -78,11 +78,12 @@ pub(super) struct Shared {
     /// Coordinates idle workers
     idle: Idle,
 
-    /// Workers have have observed the shutdown signal
+    /// Cores that have observed the shutdown signal
     ///
     /// The core is **not** placed back in the worker to avoid it from being
     /// stolen by a thread that was spawned as part of `block_in_place`.
-    shutdown_workers: Mutex<Vec<(Box<Core>, Arc<Worker>)>>,
+    #[allow(clippy::vec_box)] // we're moving an already-boxed value
+    shutdown_cores: Mutex<Vec<Box<Core>>>,
 }
 
 /// Used to communicate with a worker from other threads.
@@ -157,7 +158,7 @@ pub(super) fn create(size: usize, park: Parker) -> (Arc<Shared>, Launch) {
         remotes: remotes.into_boxed_slice(),
         inject: queue::Inject::new(),
         idle: Idle::new(size),
-        shutdown_workers: Mutex::new(vec![]),
+        shutdown_cores: Mutex::new(vec![]),
     });
 
     let mut launch = Launch(vec![]);
@@ -328,8 +329,10 @@ impl Context {
             }
         }
 
+        core.pre_shutdown(&self.worker);
+
         // Signal shutdown
-        self.worker.shared.shutdown(core, self.worker.clone());
+        self.worker.shared.shutdown(core);
         Err(())
     }
 
@@ -546,11 +549,9 @@ impl Core {
         }
     }
 
-    // Shutdown the core
-    fn shutdown(&mut self, worker: &Worker) {
-        // Take the core
-        let mut park = self.park.take().expect("park missing");
-
+    // Signals all tasks to shut down, and waits for them to complete. Must run
+    // before we enter the single-threaded phase of shutdown processing.
+    fn pre_shutdown(&mut self, worker: &Worker) {
         // Signal to all tasks to shut down.
         for header in self.tasks.iter() {
             header.shutdown();
@@ -564,8 +565,17 @@ impl Core {
             }
 
             // Wait until signalled
+            let park = self.park.as_mut().expect("park missing");
             park.park().expect("park failed");
         }
+    }
+
+    // Shutdown the core
+    fn shutdown(&mut self) {
+        assert!(self.tasks.is_empty());
+
+        // Take the core
+        let mut park = self.park.take().expect("park missing");
 
         // Drain the queue
         while self.next_local_task().is_some() {}
@@ -629,52 +639,73 @@ impl task::Schedule for Arc<Worker> {
     fn release(&self, task: &Task) -> Option<Task> {
         use std::ptr::NonNull;
 
-        CURRENT.with(|maybe_cx| {
-            let cx = maybe_cx.expect("scheduler context missing");
+        enum Immediate {
+            // Task has been synchronously removed from the Core owned by the
+            // current thread
+            Removed(Option<Task>),
+            // Task is owned by another thread, so we need to notify it to clean
+            // up the task later.
+            MaybeRemote,
+        }
 
-            if self.eq(&cx.worker) {
-                let mut maybe_core = cx.core.borrow_mut();
+        let immediate = CURRENT.with(|maybe_cx| {
+            let cx = match maybe_cx {
+                Some(cx) => cx,
+                None => return Immediate::MaybeRemote,
+            };
 
-                if let Some(core) = &mut *maybe_core {
-                    // Directly remove the task
-                    //
-                    // safety: the task is inserted in the list in `bind`.
-                    unsafe {
-                        let ptr = NonNull::from(task.header());
-                        return core.tasks.remove(ptr);
-                    }
+            if !self.eq(&cx.worker) {
+                // Task owned by another core, so we need to notify it.
+                return Immediate::MaybeRemote;
+            }
+
+            let mut maybe_core = cx.core.borrow_mut();
+
+            if let Some(core) = &mut *maybe_core {
+                // Directly remove the task
+                //
+                // safety: the task is inserted in the list in `bind`.
+                unsafe {
+                    let ptr = NonNull::from(task.header());
+                    return Immediate::Removed(core.tasks.remove(ptr));
                 }
             }
 
-            // Track the task to be released by the worker that owns it
-            //
-            // Safety: We get a new handle without incrementing the ref-count.
-            // A ref-count is held by the "owned" linked list and it is only
-            // ever removed from that list as part of the release process: this
-            // method or popping the task from `pending_drop`. Thus, we can rely
-            // on the ref-count held by the linked-list to keep the memory
-            // alive.
-            //
-            // When the task is removed from the stack, it is forgotten instead
-            // of dropped.
-            let task = unsafe { Task::from_raw(task.header().into()) };
+            Immediate::MaybeRemote
+        });
 
-            self.remote().pending_drop.push(task);
+        // Checks if we were called from within a worker, allowing for immediate
+        // removal of a scheduled task. Else we have to go through the slower
+        // process below where we remotely mark a task as dropped.
+        match immediate {
+            Immediate::Removed(task) => return task,
+            Immediate::MaybeRemote => (),
+        };
 
-            if cx.core.borrow().is_some() {
-                return None;
-            }
+        // Track the task to be released by the worker that owns it
+        //
+        // Safety: We get a new handle without incrementing the ref-count.
+        // A ref-count is held by the "owned" linked list and it is only
+        // ever removed from that list as part of the release process: this
+        // method or popping the task from `pending_drop`. Thus, we can rely
+        // on the ref-count held by the linked-list to keep the memory
+        // alive.
+        //
+        // When the task is removed from the stack, it is forgotten instead
+        // of dropped.
+        let task = unsafe { Task::from_raw(task.header().into()) };
 
-            // The worker core has been handed off to another thread. In the
-            // event that the scheduler is currently shutting down, the thread
-            // that owns the task may be waiting on the release to complete
-            // shutdown.
-            if self.inject().is_closed() {
-                self.remote().unpark.unpark();
-            }
+        self.remote().pending_drop.push(task);
 
-            None
-        })
+        // The worker core has been handed off to another thread. In the
+        // event that the scheduler is currently shutting down, the thread
+        // that owns the task may be waiting on the release to complete
+        // shutdown.
+        if self.inject().is_closed() {
+            self.remote().unpark.unpark();
+        }
+
+        None
     }
 
     fn schedule(&self, task: Notified) {
@@ -779,16 +810,16 @@ impl Shared {
     /// its core back into its handle.
     ///
     /// If all workers have reached this point, the final cleanup is performed.
-    fn shutdown(&self, core: Box<Core>, worker: Arc<Worker>) {
-        let mut workers = self.shutdown_workers.lock();
-        workers.push((core, worker));
+    fn shutdown(&self, core: Box<Core>) {
+        let mut cores = self.shutdown_cores.lock();
+        cores.push(core);
 
-        if workers.len() != self.remotes.len() {
+        if cores.len() != self.remotes.len() {
             return;
         }
 
-        for (mut core, worker) in workers.drain(..) {
-            core.shutdown(&worker);
+        for mut core in cores.drain(..) {
+            core.shutdown();
         }
 
         // Drain the injection queue

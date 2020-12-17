@@ -4,7 +4,7 @@ use crate::signal::os::{OsExtraData, OsStorage};
 
 use crate::sync::mpsc::Sender;
 
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use std::ops;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -165,12 +165,12 @@ where
     OsExtraData: 'static + Send + Sync + Init,
     OsStorage: 'static + Send + Sync + Init,
 {
-    lazy_static! {
-        static ref GLOBALS: Pin<Box<Globals>> = Box::pin(Globals {
+    static GLOBALS: Lazy<Pin<Box<Globals>>> = Lazy::new(|| {
+        Box::pin(Globals {
             extra: OsExtraData::init(),
             registry: Registry::new(OsStorage::init()),
-        });
-    }
+        })
+    });
 
     GLOBALS.as_ref()
 }

@@ -486,7 +486,6 @@ missing a difficulty rating, and you should feel free to add one.
  - **M-process** The `tokio::process` module.
  - **M-runtime** The `tokio::runtime` module.
  - **M-signal** The `tokio::signal` module.
- - **M-stream** The `tokio::stream` module.
  - **M-sync** The `tokio::sync` module.
  - **M-task** The `tokio::task` module.
  - **M-time** The `tokio::time` module.

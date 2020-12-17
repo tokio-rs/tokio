@@ -1,12 +1,10 @@
 use crate::codec::decoder::Decoder;
 use crate::codec::encoder::Encoder;
 
-use tokio::{
-    io::{AsyncRead, AsyncWrite},
-    stream::Stream,
-};
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio_stream::Stream;
 
-use bytes::{Buf, BytesMut};
+use bytes::BytesMut;
 use futures_core::ready;
 use futures_sink::Sink;
 use log::trace;
@@ -189,6 +187,7 @@ where
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        use crate::util::poll_write_buf;
         trace!("flushing framed transport");
         let mut pinned = self.project();
 
@@ -196,8 +195,7 @@ where
             let WriteFrame { buffer } = pinned.state.borrow_mut();
             trace!("writing; remaining={}", buffer.len());
 
-            let buf = &buffer;
-            let n = ready!(pinned.inner.as_mut().poll_write(cx, &buf))?;
+            let n = ready!(poll_write_buf(pinned.inner.as_mut(), cx, buffer))?;
 
             if n == 0 {
                 return Poll::Ready(Err(io::Error::new(
@@ -207,8 +205,6 @@ where
                 )
                 .into()));
             }
-
-            pinned.state.borrow_mut().buffer.advance(n);
         }
 
         // Try flushing the underlying IO

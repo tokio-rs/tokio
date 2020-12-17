@@ -76,7 +76,8 @@
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let mut sleep = time::sleep(Duration::from_millis(50));
+///     let sleep = time::sleep(Duration::from_millis(50));
+///     tokio::pin!(sleep);
 ///
 ///     while !sleep.is_elapsed() {
 ///         tokio::select! {
@@ -109,7 +110,8 @@
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let mut sleep = time::sleep(Duration::from_millis(50));
+///     let sleep = time::sleep(Duration::from_millis(50));
+///     tokio::pin!(sleep);
 ///
 ///     loop {
 ///         tokio::select! {
@@ -167,7 +169,7 @@
 /// Basic stream selecting.
 ///
 /// ```
-/// use tokio::stream::{self, StreamExt};
+/// use tokio_stream::{self as stream, StreamExt};
 ///
 /// #[tokio::main]
 /// async fn main() {
@@ -188,7 +190,7 @@
 /// is complete, all calls to `next()` return `None`.
 ///
 /// ```
-/// use tokio::stream::{self, StreamExt};
+/// use tokio_stream::{self as stream, StreamExt};
 ///
 /// #[tokio::main]
 /// async fn main() {
@@ -220,13 +222,14 @@
 /// Here, a stream is consumed for at most 1 second.
 ///
 /// ```
-/// use tokio::stream::{self, StreamExt};
+/// use tokio_stream::{self as stream, StreamExt};
 /// use tokio::time::{self, Duration};
 ///
 /// #[tokio::main]
 /// async fn main() {
 ///     let mut stream = stream::iter(vec![1, 2, 3]);
-///     let mut sleep = time::sleep(Duration::from_secs(1));
+///     let sleep = time::sleep(Duration::from_secs(1));
+///     tokio::pin!(sleep);
 ///
 ///     loop {
 ///         tokio::select! {

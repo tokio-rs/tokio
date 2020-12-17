@@ -9,10 +9,10 @@ use std::fmt;
 use std::io;
 use std::net::{Shutdown, SocketAddr};
 #[cfg(windows)]
-use std::os::windows::io::{AsRawSocket, FromRawSocket};
+use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket};
 
 #[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -184,6 +184,58 @@ impl TcpStream {
         Ok(TcpStream { io })
     }
 
+    /// Turn a [`tokio::net::TcpStream`] into a [`std::net::TcpStream`].
+    ///
+    /// The returned [`std::net::TcpStream`] will have `nonblocking mode` set as `true`.
+    /// Use [`set_nonblocking`] to change the blocking mode if needed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::error::Error;
+    /// use std::io::Read;
+    /// use tokio::net::TcpListener;
+    /// # use tokio::net::TcpStream;
+    /// # use tokio::io::AsyncWriteExt;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let mut data = [0u8; 12];
+    ///     let listener = TcpListener::bind("127.0.0.1:34254").await?;
+    /// #   let handle = tokio::spawn(async {
+    /// #       let mut stream: TcpStream = TcpStream::connect("127.0.0.1:34254").await.unwrap();
+    /// #       stream.write(b"Hello world!").await.unwrap();
+    /// #   });
+    ///     let (tokio_tcp_stream, _) = listener.accept().await?;
+    ///     let mut std_tcp_stream = tokio_tcp_stream.into_std()?;
+    /// #   handle.await.expect("The task being joined has panicked");
+    ///     std_tcp_stream.set_nonblocking(false)?;
+    ///     std_tcp_stream.read_exact(&mut data)?;
+    /// #   assert_eq!(b"Hello world!", &data);
+    ///     Ok(())
+    /// }
+    /// ```
+    /// [`tokio::net::TcpStream`]: TcpStream
+    /// [`std::net::TcpStream`]: std::net::TcpStream
+    /// [`set_nonblocking`]: fn@std::net::TcpStream::set_nonblocking
+    pub fn into_std(self) -> io::Result<std::net::TcpStream> {
+        #[cfg(unix)]
+        {
+            self.io
+                .into_inner()
+                .map(|io| io.into_raw_fd())
+                .map(|raw_fd| unsafe { std::net::TcpStream::from_raw_fd(raw_fd) })
+        }
+
+        #[cfg(windows)]
+        {
+            self.io
+                .into_inner()
+                .map(|io| io.into_raw_socket())
+                .map(|raw_socket| unsafe { std::net::TcpStream::from_raw_socket(raw_socket) })
+        }
+    }
+
     /// Returns the local address that this stream is bound to.
     ///
     /// # Examples
@@ -239,7 +291,7 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::io;
+    /// use tokio::io::{self, ReadBuf};
     /// use tokio::net::TcpStream;
     ///
     /// use futures::future::poll_fn;
@@ -248,6 +300,7 @@ impl TcpStream {
     /// async fn main() -> io::Result<()> {
     ///     let stream = TcpStream::connect("127.0.0.1:8000").await?;
     ///     let mut buf = [0; 10];
+    ///     let mut buf = ReadBuf::new(&mut buf);
     ///
     ///     poll_fn(|cx| {
     ///         stream.poll_peek(cx, &mut buf)
@@ -256,12 +309,24 @@ impl TcpStream {
     ///     Ok(())
     /// }
     /// ```
-    pub fn poll_peek(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
+    pub fn poll_peek(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<usize>> {
         loop {
             let ev = ready!(self.io.registration().poll_read_ready(cx))?;
 
-            match self.io.peek(buf) {
-                Ok(ret) => return Poll::Ready(Ok(ret)),
+            let b = unsafe {
+                &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
+            };
+
+            match self.io.peek(b) {
+                Ok(ret) => {
+                    unsafe { buf.assume_init(ret) };
+                    buf.advance(ret);
+                    return Poll::Ready(Ok(ret));
+                }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     self.io.registration().clear_readiness(ev);
                 }
@@ -285,6 +350,7 @@ impl TcpStream {
     /// use tokio::io::Interest;
     /// use tokio::net::TcpStream;
     /// use std::error::Error;
+    /// use std::io;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
@@ -294,17 +360,37 @@ impl TcpStream {
     ///         let ready = stream.ready(Interest::READABLE | Interest::WRITABLE).await?;
     ///
     ///         if ready.is_readable() {
-    ///             // The buffer is **not** included in the async task and will only exist
-    ///             // on the stack.
-    ///             let mut data = [0; 1024];
-    ///             let n = stream.try_read(&mut data[..]).unwrap();
+    ///             let mut data = vec![0; 1024];
+    ///             // Try to read data, this may still fail with `WouldBlock`
+    ///             // if the readiness event is a false positive.
+    ///             match stream.try_read(&mut data) {
+    ///                 Ok(n) => {
+    ///                     println!("read {} bytes", n);        
+    ///                 }
+    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                     continue;
+    ///                 }
+    ///                 Err(e) => {
+    ///                     return Err(e.into());
+    ///                 }
+    ///             }
     ///
-    ///             println!("GOT {:?}", &data[..n]);
     ///         }
     ///
     ///         if ready.is_writable() {
-    ///             // Write some data
-    ///             stream.try_write(b"hello world").unwrap();
+    ///             // Try to write data, this may still fail with `WouldBlock`
+    ///             // if the readiness event is a false positive.
+    ///             match stream.try_write(b"hello world") {
+    ///                 Ok(n) => {
+    ///                     println!("write {} bytes", n);
+    ///                 }
+    ///                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+    ///                     continue
+    ///                 }
+    ///                 Err(e) => {
+    ///                     return Err(e.into());
+    ///                 }
+    ///             }
     ///         }
     ///     }
     /// }
@@ -316,7 +402,7 @@ impl TcpStream {
 
     /// Wait for the socket to become readable.
     ///
-    /// This function is equivalent to `ready(Interest::READABLE)` is usually
+    /// This function is equivalent to `ready(Interest::READABLE)` and is usually
     /// paired with `try_read()`.
     ///
     /// # Examples
@@ -389,7 +475,7 @@ impl TcpStream {
     /// # Return
     ///
     /// If data is successfully read, `Ok(n)` is returned, where `n` is the
-    /// number of bytes read. `Ok(n)` indicates the stream's read half is closed
+    /// number of bytes read. `Ok(0)` indicates the stream's read half is closed
     /// and will no longer yield data. If the stream is not ready to read data
     /// `Err(io::ErrorKind::WouldBlock)` is returned.
     ///
@@ -442,7 +528,7 @@ impl TcpStream {
 
     /// Wait for the socket to become writable.
     ///
-    /// This function is equivalent to `ready(Interest::WRITABLE)` is usually
+    /// This function is equivalent to `ready(Interest::WRITABLE)` and is usually
     /// paired with `try_write()`.
     ///
     /// # Examples

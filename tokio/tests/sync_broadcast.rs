@@ -89,46 +89,6 @@ fn send_two_recv() {
     assert_empty!(rx2);
 }
 
-#[tokio::test]
-async fn send_recv_into_stream_ready() {
-    use tokio::stream::StreamExt;
-
-    let (tx, rx) = broadcast::channel::<i32>(8);
-    tokio::pin! {
-        let rx = rx.into_stream();
-    }
-
-    assert_ok!(tx.send(1));
-    assert_ok!(tx.send(2));
-
-    assert_eq!(Some(Ok(1)), rx.next().await);
-    assert_eq!(Some(Ok(2)), rx.next().await);
-
-    drop(tx);
-
-    assert_eq!(None, rx.next().await);
-}
-
-#[tokio::test]
-async fn send_recv_into_stream_pending() {
-    use tokio::stream::StreamExt;
-
-    let (tx, rx) = broadcast::channel::<i32>(8);
-
-    tokio::pin! {
-        let rx = rx.into_stream();
-    }
-
-    let mut recv = task::spawn(rx.next());
-    assert_pending!(recv.poll());
-
-    assert_ok!(tx.send(1));
-
-    assert!(recv.is_woken());
-    let val = assert_ready!(recv.poll());
-    assert_eq!(val, Some(Ok(1)));
-}
-
 #[test]
 fn send_recv_bounded() {
     let (tx, mut rx) = broadcast::channel(16);

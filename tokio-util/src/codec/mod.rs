@@ -11,7 +11,7 @@
 //!
 //! [`AsyncRead`]: tokio::io::AsyncRead
 //! [`AsyncWrite`]: tokio::io::AsyncWrite
-//! [`Stream`]: tokio::stream::Stream
+//! [`Stream`]: tokio_stream::Stream
 //! [`Sink`]: futures_sink::Sink
 
 mod bytes_codec;

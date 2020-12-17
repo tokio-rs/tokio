@@ -367,6 +367,8 @@ pub(super) struct TimerEntry {
     /// Initial deadline for the timer. This is used to register on the first
     /// poll, as we can't register prior to being pinned.
     initial_deadline: Option<Instant>,
+    /// Ensure the type is !Unpin
+    _m: std::marker::PhantomPinned,
 }
 
 unsafe impl Send for TimerEntry {}
@@ -435,6 +437,17 @@ impl TimerShared {
             .store(true_when, Ordering::Relaxed);
 
         true_when
+    }
+
+    /// Sets the cached time-of-expiration value.
+    ///
+    /// SAFETY: Must be called with the driver lock held, and when this entry is
+    /// not in any timer wheel lists.
+    unsafe fn set_cached_when(&self, when: u64) {
+        self.driver_state
+            .0
+            .cached_when
+            .store(when, Ordering::Relaxed);
     }
 
     /// Returns the true time-of-expiration value, with relaxed memory ordering.
@@ -545,6 +558,7 @@ impl TimerEntry {
             driver,
             inner: StdUnsafeCell::new(TimerShared::new()),
             initial_deadline: Some(deadline),
+            _m: std::marker::PhantomPinned,
         }
     }
 
@@ -643,14 +657,13 @@ impl TimerHandle {
     /// After returning Ok, the entry must be added to the pending list.
     pub(super) unsafe fn mark_pending(&self, not_after: u64) -> Result<(), u64> {
         match self.inner.as_ref().state.mark_pending(not_after) {
-            Ok(()) => Ok(()),
+            Ok(()) => {
+                // mark this as being on the pending queue in cached_when
+                self.inner.as_ref().set_cached_when(u64::max_value());
+                Ok(())
+            }
             Err(tick) => {
-                self.inner
-                    .as_ref()
-                    .driver_state
-                    .0
-                    .cached_when
-                    .store(tick, Ordering::Relaxed);
+                self.inner.as_ref().set_cached_when(tick);
                 Err(tick)
             }
         }

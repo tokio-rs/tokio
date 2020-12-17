@@ -48,8 +48,6 @@ pub use self::metadata::metadata;
 mod open_options;
 pub use self::open_options::OpenOptions;
 
-pub mod os;
-
 mod read;
 pub use self::read::read;
 
@@ -85,6 +83,23 @@ pub use self::write::write;
 
 mod copy;
 pub use self::copy::copy;
+
+feature! {
+    #![unix]
+
+    mod symlink;
+    pub use self::symlink::symlink;
+}
+
+feature! {
+    #![windows]
+
+    mod symlink_dir;
+    pub use self::symlink_dir::symlink_dir;
+
+    mod symlink_file;
+    pub use self::symlink_file::symlink_file;
+}
 
 use std::io;
 

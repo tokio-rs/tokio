@@ -22,8 +22,9 @@ use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::sync::mpsc;
 use tokio::time::{self, Duration, Instant, Sleep};
 
-use futures_core::ready;
+use futures_core::{ready, Stream};
 use std::collections::VecDeque;
+use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -63,13 +64,13 @@ enum Action {
     WriteError(Option<Arc<io::Error>>),
 }
 
-#[derive(Debug)]
 struct Inner {
     actions: VecDeque<Action>,
     waiting: Option<Instant>,
-    sleep: Option<Sleep>,
+    sleep: Option<Pin<Box<Sleep>>>,
     read_wait: Option<Waker>,
-    rx: mpsc::UnboundedReceiver<Action>,
+    // rx: mpsc::UnboundedReceiver<Action>,
+    rx: Pin<Box<dyn Stream<Item = Action> + Send>>,
 }
 
 impl Builder {
@@ -184,7 +185,13 @@ impl Handle {
 
 impl Inner {
     fn new(actions: VecDeque<Action>) -> (Inner, Handle) {
-        let (tx, rx) = mpsc::unbounded_channel();
+        let (tx, mut rx) = mpsc::unbounded_channel();
+
+        let rx = Box::pin(async_stream::stream! {
+            while let Some(item) = rx.recv().await {
+                yield item;
+            }
+        });
 
         let inner = Inner {
             actions,
@@ -200,8 +207,6 @@ impl Inner {
     }
 
     fn poll_action(&mut self, cx: &mut task::Context<'_>) -> Poll<Option<Action>> {
-        use futures_core::stream::Stream;
-
         Pin::new(&mut self.rx).poll_next(cx)
     }
 
@@ -365,7 +370,7 @@ impl AsyncRead for Mock {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     if let Some(rem) = self.inner.remaining_wait() {
                         let until = Instant::now() + rem;
-                        self.inner.sleep = Some(time::sleep_until(until));
+                        self.inner.sleep = Some(Box::pin(time::sleep_until(until)));
                     } else {
                         self.inner.read_wait = Some(cx.waker().clone());
                         return Poll::Pending;
@@ -410,7 +415,7 @@ impl AsyncWrite for Mock {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     if let Some(rem) = self.inner.remaining_wait() {
                         let until = Instant::now() + rem;
-                        self.inner.sleep = Some(time::sleep_until(until));
+                        self.inner.sleep = Some(Box::pin(time::sleep_until(until)));
                     } else {
                         panic!("unexpected WouldBlock");
                     }
@@ -485,3 +490,9 @@ fn is_task_ctx() -> bool {
     r
 }
 */
+
+impl fmt::Debug for Inner {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Inner {{...}}")
+    }
+}

@@ -53,10 +53,10 @@
 
 use crate::sync::Notify;
 
+use crate::loom::sync::atomic::AtomicUsize;
+use crate::loom::sync::atomic::Ordering::{Relaxed, SeqCst};
+use crate::loom::sync::{Arc, RwLock, RwLockReadGuard};
 use std::ops;
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::{Relaxed, SeqCst};
-use std::sync::{Arc, RwLock, RwLockReadGuard};
 
 /// Receives values from the associated [`Sender`](struct@Sender).
 ///
@@ -241,19 +241,19 @@ impl<T> Receiver<T> {
     /// }
     /// ```
     pub async fn changed(&mut self) -> Result<(), error::RecvError> {
-        // In order to avoid a race condition, we first request a notification,
-        // **then** check the current value's version. If a new version exists,
-        // the notification request is dropped.
-        let notified = self.shared.notify_rx.notified();
+        loop {
+            // In order to avoid a race condition, we first request a notification,
+            // **then** check the current value's version. If a new version exists,
+            // the notification request is dropped.
+            let notified = self.shared.notify_rx.notified();
 
-        if let Some(ret) = maybe_changed(&self.shared, &mut self.version) {
-            return ret;
+            if let Some(ret) = maybe_changed(&self.shared, &mut self.version) {
+                return ret;
+            }
+
+            notified.await;
+            // loop around again in case the wake-up was spurious
         }
-
-        notified.await;
-
-        maybe_changed(&self.shared, &mut self.version)
-            .expect("[bug] failed to observe change after notificaton.")
     }
 }
 
@@ -322,6 +322,25 @@ impl<T> Sender<T> {
         Ok(())
     }
 
+    /// Returns a reference to the most recently sent value
+    ///
+    /// Outstanding borrows hold a read lock. This means that long lived borrows
+    /// could cause the send half to block. It is recommended to keep the borrow
+    /// as short lived as possible.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::watch;
+    ///
+    /// let (tx, _) = watch::channel("hello");
+    /// assert_eq!(*tx.borrow(), "hello");
+    /// ```
+    pub fn borrow(&self) -> Ref<'_, T> {
+        let inner = self.shared.value.read().unwrap();
+        Ref { inner }
+    }
+
     /// Checks if the channel has been closed. This happens when all receivers
     /// have dropped.
     ///
@@ -388,5 +407,86 @@ impl<T> ops::Deref for Ref<'_, T> {
 
     fn deref(&self) -> &T {
         self.inner.deref()
+    }
+}
+
+#[cfg(all(test, loom))]
+mod tests {
+    use futures::future::FutureExt;
+    use loom::thread;
+
+    // test for https://github.com/tokio-rs/tokio/issues/3168
+    #[test]
+    fn watch_spurious_wakeup() {
+        loom::model(|| {
+            let (send, mut recv) = crate::sync::watch::channel(0i32);
+
+            send.send(1).unwrap();
+
+            let send_thread = thread::spawn(move || {
+                send.send(2).unwrap();
+                send
+            });
+
+            recv.changed().now_or_never();
+
+            let send = send_thread.join().unwrap();
+            let recv_thread = thread::spawn(move || {
+                recv.changed().now_or_never();
+                recv.changed().now_or_never();
+                recv
+            });
+
+            send.send(3).unwrap();
+
+            let mut recv = recv_thread.join().unwrap();
+            let send_thread = thread::spawn(move || {
+                send.send(2).unwrap();
+            });
+
+            recv.changed().now_or_never();
+
+            send_thread.join().unwrap();
+        });
+    }
+
+    #[test]
+    fn watch_borrow() {
+        loom::model(|| {
+            let (send, mut recv) = crate::sync::watch::channel(0i32);
+
+            assert!(send.borrow().eq(&0));
+            assert!(recv.borrow().eq(&0));
+
+            send.send(1).unwrap();
+            assert!(send.borrow().eq(&1));
+
+            let send_thread = thread::spawn(move || {
+                send.send(2).unwrap();
+                send
+            });
+
+            recv.changed().now_or_never();
+
+            let send = send_thread.join().unwrap();
+            let recv_thread = thread::spawn(move || {
+                recv.changed().now_or_never();
+                recv.changed().now_or_never();
+                recv
+            });
+
+            send.send(3).unwrap();
+
+            let recv = recv_thread.join().unwrap();
+            assert!(recv.borrow().eq(&3));
+            assert!(send.borrow().eq(&3));
+
+            send.send(2).unwrap();
+
+            thread::spawn(move || {
+                assert!(recv.borrow().eq(&2));
+            });
+            assert!(send.borrow().eq(&2));
+        });
     }
 }

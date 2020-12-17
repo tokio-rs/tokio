@@ -27,8 +27,8 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::net::{TcpListener, TcpStream};
-use tokio::stream::{Stream, StreamExt};
 use tokio::sync::{mpsc, Mutex};
+use tokio_stream::{Stream, StreamExt};
 use tokio_util::codec::{Framed, LinesCodec, LinesCodecError};
 
 use futures::SinkExt;
@@ -101,9 +101,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
 /// Shorthand for the transmit half of the message channel.
 type Tx = mpsc::UnboundedSender<String>;
 
-/// Shorthand for the receive half of the message channel.
-type Rx = mpsc::UnboundedReceiver<String>;
-
 /// Data that is shared between all peers in the chat server.
 ///
 /// This is the set of `Tx` handles for all connected clients. Whenever a
@@ -127,7 +124,7 @@ struct Peer {
     ///
     /// This is used to receive messages from peers. When a message is received
     /// off of this `Rx`, it will be written to the socket.
-    rx: Rx,
+    rx: Pin<Box<dyn Stream<Item = String> + Send>>,
 }
 
 impl Shared {
@@ -159,10 +156,16 @@ impl Peer {
         let addr = lines.get_ref().peer_addr()?;
 
         // Create a channel for this peer
-        let (tx, rx) = mpsc::unbounded_channel();
+        let (tx, mut rx) = mpsc::unbounded_channel();
 
         // Add an entry for this `Peer` in the shared state map.
         state.lock().await.peers.insert(addr, tx);
+
+        let rx = Box::pin(async_stream::stream! {
+            while let Some(item) = rx.recv().await {
+                yield item;
+            }
+        });
 
         Ok(Peer { lines, rx })
     }

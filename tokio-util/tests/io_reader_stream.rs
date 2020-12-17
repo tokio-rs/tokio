@@ -3,7 +3,7 @@
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, ReadBuf};
-use tokio::stream::StreamExt;
+use tokio_stream::StreamExt;
 
 /// produces at most `remaining` zeros, that returns error.
 /// each time it reads at most 31 byte.

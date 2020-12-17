@@ -1,7 +1,8 @@
 use crate::codec::framed_impl::{FramedImpl, ReadFrame};
 use crate::codec::Decoder;
 
-use tokio::{io::AsyncRead, stream::Stream};
+use tokio::io::AsyncRead;
+use tokio_stream::Stream;
 
 use bytes::BytesMut;
 use futures_sink::Sink;
@@ -13,7 +14,7 @@ use std::task::{Context, Poll};
 pin_project! {
     /// A [`Stream`] of messages decoded from an [`AsyncRead`].
     ///
-    /// [`Stream`]: tokio::stream::Stream
+    /// [`Stream`]: tokio_stream::Stream
     /// [`AsyncRead`]: tokio::io::AsyncRead
     pub struct FramedRead<T, D> {
         #[pin]

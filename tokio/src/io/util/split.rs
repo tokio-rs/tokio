@@ -89,19 +89,6 @@ where
     }
 }
 
-#[cfg(feature = "stream")]
-impl<R: AsyncBufRead> crate::stream::Stream for Split<R> {
-    type Item = io::Result<Vec<u8>>;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Poll::Ready(match ready!(self.poll_next_segment(cx)) {
-            Ok(Some(segment)) => Some(Ok(segment)),
-            Ok(None) => None,
-            Err(err) => Some(Err(err)),
-        })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

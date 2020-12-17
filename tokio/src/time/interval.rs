@@ -101,21 +101,16 @@ pub fn interval_at(start: Instant, period: Duration) -> Interval {
     assert!(period > Duration::new(0, 0), "`period` must be non-zero.");
 
     Interval {
-        delay: sleep_until(start),
+        delay: Box::pin(sleep_until(start)),
         period,
     }
 }
 
 /// Stream returned by [`interval`](interval) and [`interval_at`](interval_at).
-///
-/// This type only implements the [`Stream`] trait if the "stream" feature is
-/// enabled.
-///
-/// [`Stream`]: trait@crate::stream::Stream
 #[derive(Debug)]
 pub struct Interval {
     /// Future that completes the next time the `Interval` yields a value.
-    delay: Sleep,
+    delay: Pin<Box<Sleep>>,
 
     /// The duration between values yielded by `Interval`.
     period: Duration,
@@ -132,7 +127,7 @@ impl Interval {
         // The next interval value is `duration` after the one that just
         // yielded.
         let next = now + self.period;
-        self.delay.reset(next);
+        self.delay.as_mut().reset(next);
 
         // Return the current instant
         Poll::Ready(now)
@@ -160,14 +155,5 @@ impl Interval {
     /// ```
     pub async fn tick(&mut self) -> Instant {
         poll_fn(|cx| self.poll_tick(cx)).await
-    }
-}
-
-#[cfg(feature = "stream")]
-impl crate::stream::Stream for Interval {
-    type Item = Instant;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Instant>> {
-        Poll::Ready(Some(ready!(self.poll_tick(cx))))
     }
 }

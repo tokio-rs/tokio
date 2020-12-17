@@ -5,13 +5,17 @@
 use std::thread;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
-use tokio::sync::mpsc::error::{TryRecvError, TrySendError};
+use tokio::sync::mpsc::error::TrySendError;
 use tokio_test::task;
 use tokio_test::{
     assert_err, assert_ok, assert_pending, assert_ready, assert_ready_err, assert_ready_ok,
 };
 
 use std::sync::Arc;
+
+mod support {
+    pub(crate) mod mpsc_stream;
+}
 
 trait AssertSend: Send {}
 impl AssertSend for mpsc::Sender<i32> {}
@@ -80,9 +84,10 @@ async fn reserve_disarm() {
 
 #[tokio::test]
 async fn send_recv_stream_with_buffer() {
-    use tokio::stream::StreamExt;
+    use tokio_stream::StreamExt;
 
-    let (tx, mut rx) = mpsc::channel::<i32>(16);
+    let (tx, rx) = support::mpsc_stream::channel_stream::<i32>(16);
+    let mut rx = Box::pin(rx);
 
     tokio::spawn(async move {
         assert_ok!(tx.send(1).await);
@@ -178,9 +183,11 @@ async fn async_send_recv_unbounded() {
 
 #[tokio::test]
 async fn send_recv_stream_unbounded() {
-    use tokio::stream::StreamExt;
+    use tokio_stream::StreamExt;
 
-    let (tx, mut rx) = mpsc::unbounded_channel::<i32>();
+    let (tx, rx) = support::mpsc_stream::unbounded_channel_stream::<i32>();
+
+    let mut rx = Box::pin(rx);
 
     tokio::spawn(async move {
         assert_ok!(tx.send(1));
@@ -386,44 +393,6 @@ fn unconsumed_messages_are_dropped() {
 }
 
 #[test]
-fn try_recv() {
-    let (tx, mut rx) = mpsc::channel(1);
-    match rx.try_recv() {
-        Err(TryRecvError::Empty) => {}
-        _ => panic!(),
-    }
-    tx.try_send(42).unwrap();
-    match rx.try_recv() {
-        Ok(42) => {}
-        _ => panic!(),
-    }
-    drop(tx);
-    match rx.try_recv() {
-        Err(TryRecvError::Closed) => {}
-        _ => panic!(),
-    }
-}
-
-#[test]
-fn try_recv_unbounded() {
-    let (tx, mut rx) = mpsc::unbounded_channel();
-    match rx.try_recv() {
-        Err(TryRecvError::Empty) => {}
-        _ => panic!(),
-    }
-    tx.send(42).unwrap();
-    match rx.try_recv() {
-        Ok(42) => {}
-        _ => panic!(),
-    }
-    drop(tx);
-    match rx.try_recv() {
-        Err(TryRecvError::Closed) => {}
-        _ => panic!(),
-    }
-}
-
-#[test]
 fn blocking_recv() {
     let (tx, mut rx) = mpsc::channel::<u8>(1);
 
@@ -482,4 +451,23 @@ async fn ready_close_cancel_bounded() {
     assert!(recv.is_woken());
     let val = assert_ready!(recv.poll());
     assert!(val.is_none());
+}
+
+#[tokio::test]
+async fn permit_available_not_acquired_close() {
+    let (tx1, mut rx) = mpsc::channel::<()>(1);
+    let tx2 = tx1.clone();
+
+    let permit1 = assert_ok!(tx1.reserve().await);
+
+    let mut permit2 = task::spawn(tx2.reserve());
+    assert_pending!(permit2.poll());
+
+    rx.close();
+
+    drop(permit1);
+    assert!(permit2.is_woken());
+
+    drop(permit2);
+    assert!(rx.recv().await.is_none());
 }

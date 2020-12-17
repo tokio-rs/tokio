@@ -46,7 +46,7 @@ use std::sync::{
     Arc,
 };
 use std::task::{Context, Poll};
-use tokio::stream::{Stream, StreamExt};
+use tokio_stream::{Stream, StreamExt};
 
 struct TrackPolls<'a> {
     npolls: Arc<AtomicUsize>,
@@ -88,7 +88,7 @@ async fn no_extra_poll() {
     assert_eq!(npolls.load(SeqCst), 1);
 
     let _ = assert_ok!(TcpStream::connect(&addr).await);
-    accepted_rx.next().await.unwrap();
+    accepted_rx.recv().await.unwrap();
 
     // should have been polled twice more: once to yield Some(), then once to yield Pending
     assert_eq!(npolls.load(SeqCst), 1 + 2);

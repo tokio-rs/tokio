@@ -2,7 +2,6 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::future::AtomicWaker;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Arc;
-use crate::sync::mpsc::error::TryRecvError;
 use crate::sync::mpsc::list;
 use crate::sync::notify::Notify;
 
@@ -259,21 +258,29 @@ impl<T, S: Semaphore> Rx<T, S> {
             }
         })
     }
+}
 
-    /// Receives the next value without blocking
-    pub(crate) fn try_recv(&mut self) -> Result<T, TryRecvError> {
-        use super::block::Read::*;
-        self.inner.rx_fields.with_mut(|rx_fields_ptr| {
-            let rx_fields = unsafe { &mut *rx_fields_ptr };
-            match rx_fields.list.pop(&self.inner.tx) {
-                Some(Value(value)) => {
-                    self.inner.semaphore.add_permit();
-                    Ok(value)
+feature! {
+    #![all(unix, any(feature = "signal", feature = "process"))]
+
+    use crate::sync::mpsc::error::TryRecvError;
+
+    impl<T, S: Semaphore> Rx<T, S> {
+        /// Receives the next value without blocking
+        pub(crate) fn try_recv(&mut self) -> Result<T, TryRecvError> {
+            use super::block::Read::*;
+            self.inner.rx_fields.with_mut(|rx_fields_ptr| {
+                let rx_fields = unsafe { &mut *rx_fields_ptr };
+                match rx_fields.list.pop(&self.inner.tx) {
+                    Some(Value(value)) => {
+                        self.inner.semaphore.add_permit();
+                        Ok(value)
+                    }
+                    Some(Closed) => Err(TryRecvError::Closed),
+                    None => Err(TryRecvError::Empty),
                 }
-                Some(Closed) => Err(TryRecvError::Closed),
-                None => Err(TryRecvError::Empty),
-            }
-        })
+            })
+        }
     }
 }
 

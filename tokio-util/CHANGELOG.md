@@ -1,5 +1,8 @@
+# 0.5.1 (December 3, 2020)
+
 ### Added
 - io: `poll_read_buf` util fn (#2972).
+- io: `poll_write_buf` util fn with vectored write support (#3156).
 
 # 0.5.0 (October 30, 2020)
 
