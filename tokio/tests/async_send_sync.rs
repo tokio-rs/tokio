@@ -100,7 +100,7 @@ macro_rules! assert_value {
             let f: $type = todo!();
             require_unpin(&f);
         };
-    }
+    };
 }
 macro_rules! async_assert_fn {
     ($($f:ident $(< $($generic:ty),* > )? )::+($($arg:ty),*): Send & Sync) => {
