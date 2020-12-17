@@ -28,7 +28,7 @@
 //! A `Stream` is an asynchronous sequence of values. It can be thought of as
 //! an asynchronous version of the standard library's `Iterator` trait.
 //!
-//! This module provides helpers to work with them. For examples of usage and a more in-depth
+//! This crate provides helpers to work with them. For examples of usage and a more in-depth
 //! description of streams you can also refer to the [streams
 //! tutorial](https://tokio.rs/tokio/tutorial/streams) on the tokio website.
 //!
@@ -71,7 +71,7 @@
 //! [`tokio-util`] provides the [`StreamReader`] and [`ReaderStream`]
 //! types when the io feature is enabled.
 //!
-//! [tokio-util]: https://docs.rs/tokio-util/0.4/tokio_util/codec/index.html
+//! [`tokio-util`]: https://docs.rs/tokio-util/0.4/tokio_util/codec/index.html
 //! [`tokio::io`]: https://docs.rs/tokio/1.0/tokio/io/index.html
 //! [`AsyncRead`]: https://docs.rs/tokio/1.0/tokio/io/trait.AsyncRead.html
 //! [`AsyncWrite`]: https://docs.rs/tokio/1.0/tokio/io/trait.AsyncWrite.html
