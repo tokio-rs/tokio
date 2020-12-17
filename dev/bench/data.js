@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608092793932,
+  "lastUpdate": 1608184381166,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -5557,6 +5557,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20769514,
             "range": "± 3399957",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d74d17307dd53215061c4a8a1f20a0e30461e296",
+          "message": "time: remove `Box` from `Sleep` (#3278)\n\nRemoves the box from `Sleep`, taking advantage of intrusive wakers. The\r\n`Sleep` future is now `!Unpin`.\r\n\r\nCloses #3267",
+          "timestamp": "2020-12-16T21:51:34-08:00",
+          "tree_id": "0cdbf57e4a9b38302ddae0078eb5a1b9a4977aa2",
+          "url": "https://github.com/tokio-rs/tokio/commit/d74d17307dd53215061c4a8a1f20a0e30461e296"
+        },
+        "date": 1608184380207,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 142045,
+            "range": "± 21525",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 595646,
+            "range": "± 31087",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4495614,
+            "range": "± 483148",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 17120102,
+            "range": "± 2528035",
             "unit": "ns/iter"
           }
         ]
