@@ -36,20 +36,6 @@ cfg_io_util! {
     mod mem;
     pub use mem::{duplex, DuplexStream};
 
-    mod read;
-    mod read_buf;
-    mod read_exact;
-    mod read_int;
-    mod read_line;
-
-    mod read_to_end;
-    cfg_process! {
-        pub(crate) use read_to_end::read_to_end;
-    }
-
-    mod read_to_string;
-    mod read_until;
-
     mod repeat;
     pub use repeat::{repeat, Repeat};
 
@@ -60,9 +46,6 @@ cfg_io_util! {
 
     mod split;
     pub use split::Split;
-
-    mod take;
-    pub use take::Take;
 
     mod write;
     mod write_all;

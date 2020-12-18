@@ -6,7 +6,7 @@ use std::task::{Context, Poll};
 use std::{cmp, io};
 
 pin_project! {
-    /// Stream for the [`take`](super::AsyncReadExt::take) method.
+    /// Stream for the [`take`](super::AsyncRead::take) method.
     #[derive(Debug)]
     #[must_use = "streams do nothing unless you `.await` or poll them"]
     #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]

@@ -10,7 +10,7 @@ use std::task::{Context, Poll};
 use std::{io, mem};
 
 pin_project! {
-    /// Future for the [`read_to_string`](super::AsyncReadExt::read_to_string) method.
+    /// Future for the [`read_to_string`](super::AsyncRead::read_to_string) method.
     #[derive(Debug)]
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct ReadToString<'a, R: ?Sized> {

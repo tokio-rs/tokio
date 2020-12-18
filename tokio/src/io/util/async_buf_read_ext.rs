@@ -1,6 +1,6 @@
+use crate::io::read_line::{read_line, ReadLine};
+use crate::io::read_until::{read_until, ReadUntil};
 use crate::io::util::lines::{lines, Lines};
-use crate::io::util::read_line::{read_line, ReadLine};
-use crate::io::util::read_until::{read_until, ReadUntil};
 use crate::io::util::split::{split, Split};
 use crate::io::AsyncBufRead;
 

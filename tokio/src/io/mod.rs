@@ -204,6 +204,8 @@ mod read;
 mod read_exact;
 mod read_int;
 mod read_to_end;
+// Used by process
+pub(crate) use read_to_end::read_to_end;
 mod read_to_string;
 mod take;
 pub use take::Take;

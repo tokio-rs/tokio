@@ -1,4 +1,4 @@
-use crate::io::util::read_line::read_line_internal;
+use crate::io::read_line::read_line_internal;
 use crate::io::AsyncBufRead;
 
 use pin_project_lite::pin_project;

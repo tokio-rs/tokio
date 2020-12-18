@@ -99,7 +99,7 @@ pub trait AsyncRead {
     ///
     /// ```no_run
     /// use tokio::fs::File;
-    /// use tokio::io::{self, AsyncReadExt};
+    /// use tokio::io::{self, AsyncRead};
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
@@ -169,7 +169,7 @@ pub trait AsyncRead {
     ///
     /// ```no_run
     /// use tokio::fs::File;
-    /// use tokio::io::{self, AsyncReadExt};
+    /// use tokio::io::{self, AsyncRead};
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
@@ -227,7 +227,7 @@ pub trait AsyncRead {
     ///
     /// ```no_run
     /// use tokio::fs::File;
-    /// use tokio::io::{self, AsyncReadExt};
+    /// use tokio::io::{self, AsyncRead};
     ///
     /// use bytes::BytesMut;
     ///
@@ -287,7 +287,7 @@ pub trait AsyncRead {
     ///
     /// ```no_run
     /// use tokio::fs::File;
-    /// use tokio::io::{self, AsyncReadExt};
+    /// use tokio::io::{self, AsyncRead};
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
@@ -322,16 +322,16 @@ pub trait AsyncRead {
         ///
         /// # Errors
         ///
-        /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+        /// This method returns the same errors as [`AsyncRead::read_exact`].
         ///
-        /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+        /// [`AsyncRead::read_exact`]: AsyncRead::read_exact
         ///
         /// # Examples
         ///
         /// Read unsigned 8 bit integers from an `AsyncRead`:
         ///
         /// ```rust
-        /// use tokio::io::{self, AsyncReadExt};
+        /// use tokio::io::{self, AsyncRead};
         ///
         /// use std::io::Cursor;
         ///
@@ -360,16 +360,16 @@ pub trait AsyncRead {
         ///
         /// # Errors
         ///
-        /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+        /// This method returns the same errors as [`AsyncRead::read_exact`].
         ///
-        /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+        /// [`AsyncRead::read_exact`]: AsyncRead::read_exact
         ///
         /// # Examples
         ///
         /// Read unsigned 8 bit integers from an `AsyncRead`:
         ///
         /// ```rust
-        /// use tokio::io::{self, AsyncReadExt};
+        /// use tokio::io::{self, AsyncRead};
         ///
         /// use std::io::Cursor;
         ///
@@ -399,16 +399,16 @@ pub trait AsyncRead {
         ///
         /// # Errors
         ///
-        /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+        /// This method returns the same errors as [`AsyncRead::read_exact`].
         ///
-        /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+        /// [`AsyncRead::read_exact`]: AsyncRead::read_exact
         ///
         /// # Examples
         ///
         /// Read unsigned 16 bit big-endian integers from a `AsyncRead`:
         ///
         /// ```rust
-        /// use tokio::io::{self, AsyncReadExt};
+        /// use tokio::io::{self, AsyncRead};
         ///
         /// use std::io::Cursor;
         ///
@@ -437,16 +437,16 @@ pub trait AsyncRead {
         ///
         /// # Errors
         ///
-        /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+        /// This method returns the same errors as [`AsyncRead::read_exact`].
         ///
-        /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+        /// [`AsyncRead::read_exact`]: AsyncRead::read_exact
         ///
         /// # Examples
         ///
         /// Read signed 16 bit big-endian integers from a `AsyncRead`:
         ///
         /// ```rust
-        /// use tokio::io::{self, AsyncReadExt};
+        /// use tokio::io::{self, AsyncRead};
         ///
         /// use std::io::Cursor;
         ///
@@ -475,16 +475,16 @@ pub trait AsyncRead {
         ///
         /// # Errors
         ///
-        /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+        /// This method returns the same errors as [`AsyncRead::read_exact`].
         ///
-        /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+        /// [`AsyncRead::read_exact`]: AsyncRead::read_exact
         ///
         /// # Examples
         ///
         /// Read unsigned 32-bit big-endian integers from a `AsyncRead`:
         ///
         /// ```rust
-        /// use tokio::io::{self, AsyncReadExt};
+        /// use tokio::io::{self, AsyncRead};
         ///
         /// use std::io::Cursor;
         ///
@@ -513,16 +513,16 @@ pub trait AsyncRead {
         ///
         /// # Errors
         ///
-        /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+        /// This method returns the same errors as [`AsyncRead::read_exact`].
         ///
-        /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+        /// [`AsyncRead::read_exact`]: AsyncRead::read_exact
         ///
         /// # Examples
         ///
         /// Read signed 32-bit big-endian integers from a `AsyncRead`:
         ///
         /// ```rust
-        /// use tokio::io::{self, AsyncReadExt};
+        /// use tokio::io::{self, AsyncRead};
         ///
         /// use std::io::Cursor;
         ///
@@ -550,16 +550,16 @@ pub trait AsyncRead {
         ///
         /// # Errors
         ///
-        /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+        /// This method returns the same errors as [`AsyncRead::read_exact`].
         ///
-        /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+        /// [`AsyncRead::read_exact`]: AsyncRead::read_exact
         ///
         /// # Examples
         ///
         /// Read unsigned 64-bit big-endian integers from a `AsyncRead`:
         ///
         /// ```rust
-        /// use tokio::io::{self, AsyncReadExt};
+        /// use tokio::io::{self, AsyncRead};
         ///
         /// use std::io::Cursor;
         ///
@@ -589,16 +589,16 @@ pub trait AsyncRead {
         ///
         /// # Errors
         ///
-        /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+        /// This method returns the same errors as [`AsyncRead::read_exact`].
         ///
-        /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+        /// [`AsyncRead::read_exact`]: AsyncRead::read_exact
         ///
         /// # Examples
         ///
         /// Read signed 64-bit big-endian integers from a `AsyncRead`:
         ///
         /// ```rust
-        /// use tokio::io::{self, AsyncReadExt};
+        /// use tokio::io::{self, AsyncRead};
         ///
         /// use std::io::Cursor;
         ///
@@ -626,16 +626,16 @@ pub trait AsyncRead {
         ///
         /// # Errors
         ///
-        /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+        /// This method returns the same errors as [`AsyncRead::read_exact`].
         ///
-        /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+        /// [`AsyncRead::read_exact`]: AsyncRead::read_exact
         ///
         /// # Examples
         ///
         /// Read unsigned 128-bit big-endian integers from a `AsyncRead`:
         ///
         /// ```rust
-        /// use tokio::io::{self, AsyncReadExt};
+        /// use tokio::io::{self, AsyncRead};
         ///
         /// use std::io::Cursor;
         ///
@@ -666,16 +666,16 @@ pub trait AsyncRead {
         ///
         /// # Errors
         ///
-        /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+        /// This method returns the same errors as [`AsyncRead::read_exact`].
         ///
-        /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+        /// [`AsyncRead::read_exact`]: AsyncRead::read_exact
         ///
         /// # Examples
         ///
         /// Read signed 128-bit big-endian integers from a `AsyncRead`:
         ///
         /// ```rust
-        /// use tokio::io::{self, AsyncReadExt};
+        /// use tokio::io::{self, AsyncRead};
         ///
         /// use std::io::Cursor;
         ///
@@ -706,16 +706,16 @@ pub trait AsyncRead {
         ///
         /// # Errors
         ///
-        /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+        /// This method returns the same errors as [`AsyncRead::read_exact`].
         ///
-        /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+        /// [`AsyncRead::read_exact`]: AsyncRead::read_exact
         ///
         /// # Examples
         ///
         /// Read unsigned 16 bit little-endian integers from a `AsyncRead`:
         ///
         /// ```rust
-        /// use tokio::io::{self, AsyncReadExt};
+        /// use tokio::io::{self, AsyncRead};
         ///
         /// use std::io::Cursor;
         ///
@@ -744,16 +744,16 @@ pub trait AsyncRead {
         ///
         /// # Errors
         ///
-        /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+        /// This method returns the same errors as [`AsyncRead::read_exact`].
         ///
-        /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+        /// [`AsyncRead::read_exact`]: AsyncRead::read_exact
         ///
         /// # Examples
         ///
         /// Read signed 16 bit little-endian integers from a `AsyncRead`:
         ///
         /// ```rust
-        /// use tokio::io::{self, AsyncReadExt};
+        /// use tokio::io::{self, AsyncRead};
         ///
         /// use std::io::Cursor;
         ///
@@ -782,16 +782,16 @@ pub trait AsyncRead {
         ///
         /// # Errors
         ///
-        /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+        /// This method returns the same errors as [`AsyncRead::read_exact`].
         ///
-        /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+        /// [`AsyncRead::read_exact`]: AsyncRead::read_exact
         ///
         /// # Examples
         ///
         /// Read unsigned 32-bit little-endian integers from a `AsyncRead`:
         ///
         /// ```rust
-        /// use tokio::io::{self, AsyncReadExt};
+        /// use tokio::io::{self, AsyncRead};
         ///
         /// use std::io::Cursor;
         ///
@@ -820,16 +820,16 @@ pub trait AsyncRead {
         ///
         /// # Errors
         ///
-        /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+        /// This method returns the same errors as [`AsyncRead::read_exact`].
         ///
-        /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+        /// [`AsyncRead::read_exact`]: AsyncRead::read_exact
         ///
         /// # Examples
         ///
         /// Read signed 32-bit little-endian integers from a `AsyncRead`:
         ///
         /// ```rust
-        /// use tokio::io::{self, AsyncReadExt};
+        /// use tokio::io::{self, AsyncRead};
         ///
         /// use std::io::Cursor;
         ///
@@ -857,16 +857,16 @@ pub trait AsyncRead {
         ///
         /// # Errors
         ///
-        /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+        /// This method returns the same errors as [`AsyncRead::read_exact`].
         ///
-        /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+        /// [`AsyncRead::read_exact`]: AsyncRead::read_exact
         ///
         /// # Examples
         ///
         /// Read unsigned 64-bit little-endian integers from a `AsyncRead`:
         ///
         /// ```rust
-        /// use tokio::io::{self, AsyncReadExt};
+        /// use tokio::io::{self, AsyncRead};
         ///
         /// use std::io::Cursor;
         ///
@@ -896,16 +896,16 @@ pub trait AsyncRead {
         ///
         /// # Errors
         ///
-        /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+        /// This method returns the same errors as [`AsyncRead::read_exact`].
         ///
-        /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+        /// [`AsyncRead::read_exact`]: AsyncRead::read_exact
         ///
         /// # Examples
         ///
         /// Read signed 64-bit little-endian integers from a `AsyncRead`:
         ///
         /// ```rust
-        /// use tokio::io::{self, AsyncReadExt};
+        /// use tokio::io::{self, AsyncRead};
         ///
         /// use std::io::Cursor;
         ///
@@ -933,16 +933,16 @@ pub trait AsyncRead {
         ///
         /// # Errors
         ///
-        /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+        /// This method returns the same errors as [`AsyncRead::read_exact`].
         ///
-        /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+        /// [`AsyncRead::read_exact`]: AsyncRead::read_exact
         ///
         /// # Examples
         ///
         /// Read unsigned 128-bit little-endian integers from a `AsyncRead`:
         ///
         /// ```rust
-        /// use tokio::io::{self, AsyncReadExt};
+        /// use tokio::io::{self, AsyncRead};
         ///
         /// use std::io::Cursor;
         ///
@@ -973,16 +973,16 @@ pub trait AsyncRead {
         ///
         /// # Errors
         ///
-        /// This method returns the same errors as [`AsyncReadExt::read_exact`].
+        /// This method returns the same errors as [`AsyncRead::read_exact`].
         ///
-        /// [`AsyncReadExt::read_exact`]: AsyncReadExt::read_exact
+        /// [`AsyncRead::read_exact`]: AsyncRead::read_exact
         ///
         /// # Examples
         ///
         /// Read signed 128-bit little-endian integers from a `AsyncRead`:
         ///
         /// ```rust
-        /// use tokio::io::{self, AsyncReadExt};
+        /// use tokio::io::{self, AsyncRead};
         ///
         /// use std::io::Cursor;
         ///
@@ -1014,7 +1014,7 @@ pub trait AsyncRead {
     ///
     /// If successful, the total number of bytes read is returned.
     ///
-    /// [`read()`]: AsyncReadExt::read
+    /// [`read()`]: AsyncRead::read
     ///
     /// # Errors
     ///
@@ -1027,7 +1027,7 @@ pub trait AsyncRead {
     /// [`File`][crate::fs::File]s implement `Read`:
     ///
     /// ```no_run
-    /// use tokio::io::{self, AsyncReadExt};
+    /// use tokio::io::{self, AsyncRead};
     /// use tokio::fs::File;
     ///
     /// #[tokio::main]
@@ -1068,14 +1068,14 @@ pub trait AsyncRead {
     /// If the data in this stream is *not* valid UTF-8 then an error is
     /// returned and `buf` is unchanged.
     ///
-    /// See [`read_to_end`][AsyncReadExt::read_to_end] for other error semantics.
+    /// See [`read_to_end`][AsyncRead::read_to_end] for other error semantics.
     ///
     /// # Examples
     ///
     /// [`File`][crate::fs::File]s implement `Read`:
     ///
     /// ```no_run
-    /// use tokio::io::{self, AsyncReadExt};
+    /// use tokio::io::{self, AsyncRead};
     /// use tokio::fs::File;
     ///
     /// #[tokio::main]
@@ -1106,16 +1106,16 @@ pub trait AsyncRead {
     /// (`Ok(0)`). Any read errors will not count towards the number of
     /// bytes read and future calls to [`read()`] may succeed.
     ///
-    /// [`read()`]: fn@crate::io::AsyncReadExt::read
+    /// [`read()`]: fn@crate::io::AsyncRead::read
     ///
-    /// [read]: AsyncReadExt::read
+    /// [read]: AsyncRead::read
     ///
     /// # Examples
     ///
     /// [`File`][crate::fs::File]s implement `Read`:
     ///
     /// ```no_run
-    /// use tokio::io::{self, AsyncReadExt};
+    /// use tokio::io::{self, AsyncRead};
     /// use tokio::fs::File;
     ///
     /// #[tokio::main]
