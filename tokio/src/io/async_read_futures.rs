@@ -8,6 +8,17 @@ use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+pub(crate) fn read_buf<'a, R, B>(reader: &'a mut R, buf: &'a mut B) -> ReadBuf<'a, R, B>
+where
+    R: AsyncRead + Unpin,
+    B: BufMut,
+{
+    ReadBuf {
+        reader,
+        buf,
+        _pin: PhantomPinned,
+    }
+}
 pin_project! {
     /// Future returned by [`read_buf`](crate::io::AsyncRead::read_buf).
     #[derive(Debug)]
@@ -56,17 +67,5 @@ where
         }
 
         Poll::Ready(Ok(n))
-    }
-}
-
-pub(crate) fn read_buf<'a, R, B>(reader: &'a mut R, buf: &'a mut B) -> ReadBuf<'a, R, B>
-where
-    R: AsyncRead + Unpin,
-    B: BufMut,
-{
-    ReadBuf {
-        reader,
-        buf,
-        _pin: PhantomPinned,
     }
 }
