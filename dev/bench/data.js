@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608323637905,
+  "lastUpdate": 1608323641528,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -9255,6 +9255,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1145,
             "range": "± 9",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3ecaf9fd9a519da9b1decb4c7239b48277040522",
+          "message": "codec: write documentation for codec (#3283)\n\nCo-authored-by: Lucio Franco <luciofranco14@gmail.com>",
+          "timestamp": "2020-12-18T21:32:27+01:00",
+          "tree_id": "f116db611cb8144b9ec3e2e97286aab59cdd9556",
+          "url": "https://github.com/tokio-rs/tokio/commit/3ecaf9fd9a519da9b1decb4c7239b48277040522"
+        },
+        "date": 1608323633541,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 15607,
+            "range": "± 3451",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1099,
+            "range": "± 30",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 647,
+            "range": "± 10",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 16848,
+            "range": "± 5366",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1104,
+            "range": "± 104",
             "unit": "ns/iter"
           }
         ]
