@@ -40,7 +40,6 @@ pub struct ReadHalf<'a>(&'a UnixStream);
 /// [`split`]: UnixStream::split()
 /// [`AsyncWrite`]: trait@crate::io::AsyncWrite
 /// [`poll_shutdown`]: fn@crate::io::AsyncWrite::poll_shutdown
-/// [`AsyncWrite`]: trait@crate::io::AsyncWrite
 /// [the prelude]: crate::prelude
 #[derive(Debug)]
 pub struct WriteHalf<'a>(&'a UnixStream);

@@ -46,7 +46,6 @@ pub struct OwnedReadHalf {
 /// [`into_split`]: TcpStream::into_split()
 /// [`AsyncWrite`]: trait@crate::io::AsyncWrite
 /// [`poll_shutdown`]: fn@crate::io::AsyncWrite::poll_shutdown
-/// [`AsyncWrite`]: trait@crate::io::AsyncWrite
 /// [the prelude]: crate::prelude
 #[derive(Debug)]
 pub struct OwnedWriteHalf {
