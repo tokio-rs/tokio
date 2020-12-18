@@ -499,7 +499,7 @@ cfg_rt_multi_thread! {
             let spawner = Spawner::ThreadPool(scheduler.spawner().clone());
 
             // Create the blocking pool
-            let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads);
+            let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads + core_threads);
             let blocking_spawner = blocking_pool.spawner().clone();
 
             // Create the runtime handle
