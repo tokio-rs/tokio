@@ -26,7 +26,7 @@ pin_project! {
     /// buffer, you must manually call flush before the writer is dropped.
     ///
     /// [`AsyncWrite`]: AsyncWrite
-    /// [`flush`]: super::AsyncWriteExt::flush
+    /// [`flush`]: super::AsyncWrite::flush
     ///
     #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
     pub struct BufWriter<W> {
@@ -123,11 +123,11 @@ impl<W: AsyncWrite> AsyncWrite for BufWriter<W> {
             ready!(self.as_mut().flush_buf(cx))?;
         }
 
-        let me = self.project();
+        let mut me = self.project();
         if buf.len() >= me.buf.capacity() {
             me.inner.poll_write(cx, buf)
         } else {
-            Poll::Ready(me.buf.write(buf))
+            Poll::Ready(Write::write(&mut me.buf, buf))
         }
     }
 

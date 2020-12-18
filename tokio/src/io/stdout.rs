@@ -19,12 +19,12 @@ cfg_io_std! {
     ///
     /// [`stdout`]: stdout()
     /// [`AsyncWrite`]: AsyncWrite
-    /// [`write_all`]: crate::io::AsyncWriteExt::write_all()
+    /// [`write_all`]: crate::io::AsyncWrite::write_all()
     ///
     /// # Examples
     ///
     /// ```
-    /// use tokio::io::{self, AsyncWriteExt};
+    /// use tokio::io::{self, AsyncWrite};
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
@@ -50,12 +50,12 @@ cfg_io_std! {
     /// [`write_all`] may result in interleaved output.
     ///
     /// [`AsyncWrite`]: AsyncWrite
-    /// [`write_all`]: crate::io::AsyncWriteExt::write_all()
+    /// [`write_all`]: crate::io::AsyncWrite::write_all()
     ///
     /// # Examples
     ///
     /// ```
-    /// use tokio::io::{self, AsyncWriteExt};
+    /// use tokio::io::{self, AsyncWrite};
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {

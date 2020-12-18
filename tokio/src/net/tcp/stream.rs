@@ -24,14 +24,14 @@ cfg_net! {
     /// [`connect`] method, or by [accepting] a connection from a [listener].
     ///
     /// Reading and writing to a `TcpStream` is usually done using the
-    /// convenience methods found on the [`AsyncRead`] and [`AsyncWriteExt`]
+    /// convenience methods found on the [`AsyncRead`] and [`AsyncWrite`]
     /// traits. Examples import these traits through [the prelude].
     ///
     /// [`connect`]: method@TcpStream::connect
     /// [accepting]: method@crate::net::TcpListener::accept
     /// [listener]: struct@crate::net::TcpListener
     /// [`AsyncRead`]: trait@crate::io::AsyncRead
-    /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
+    /// [`AsyncWrite`]: trait@crate::io::AsyncWrite
     /// [the prelude]: crate::prelude
     ///
     /// # Examples
@@ -53,10 +53,10 @@ cfg_net! {
     /// }
     /// ```
     ///
-    /// The [`write_all`] method is defined on the [`AsyncWriteExt`] trait.
+    /// The [`write_all`] method is defined on the [`AsyncWrite`] trait.
     ///
-    /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
-    /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
+    /// [`write_all`]: fn@crate::io::AsyncWrite::write_all
+    /// [`AsyncWrite`]: trait@crate::io::AsyncWrite
     pub struct TcpStream {
         io: PollEvented<mio::net::TcpStream>,
     }
@@ -96,10 +96,10 @@ impl TcpStream {
     /// }
     /// ```
     ///
-    /// The [`write_all`] method is defined on the [`AsyncWriteExt`] trait.
+    /// The [`write_all`] method is defined on the [`AsyncWrite`] trait.
     ///
-    /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
-    /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
+    /// [`write_all`]: fn@crate::io::AsyncWrite::write_all
+    /// [`AsyncWrite`]: trait@crate::io::AsyncWrite
     pub async fn connect<A: ToSocketAddrs>(addr: A) -> io::Result<TcpStream> {
         let addrs = to_socket_addrs(addr).await?;
 
@@ -196,7 +196,7 @@ impl TcpStream {
     /// use std::io::Read;
     /// use tokio::net::TcpListener;
     /// # use tokio::net::TcpStream;
-    /// # use tokio::io::AsyncWriteExt;
+    /// # use tokio::io::AsyncWrite;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
@@ -980,7 +980,7 @@ impl AsyncWrite for TcpStream {
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.shutdown(std::net::Shutdown::Write)?;
+        TcpStream::shutdown(&self, std::net::Shutdown::Write)?;
         Poll::Ready(Ok(()))
     }
 }

@@ -34,7 +34,7 @@ cfg_io_util! {
     /// # Examples
     ///
     /// ```
-    /// use tokio::io::{self, AsyncWriteExt};
+    /// use tokio::io::{self, AsyncWrite};
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {

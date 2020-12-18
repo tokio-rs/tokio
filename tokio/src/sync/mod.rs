@@ -138,7 +138,7 @@
 //! passing.
 //!
 //! ```no_run
-//! use tokio::io::{self, AsyncWriteExt};
+//! use tokio::io::{self, AsyncWrite};
 //! use tokio::net::TcpStream;
 //! use tokio::sync::mpsc;
 //!

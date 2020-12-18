@@ -7,9 +7,6 @@ cfg_io_util! {
     mod async_seek_ext;
     pub use async_seek_ext::AsyncSeekExt;
 
-    mod async_write_ext;
-    pub use async_write_ext::AsyncWriteExt;
-
     mod buf_reader;
     pub use buf_reader::BufReader;
 
@@ -28,8 +25,6 @@ cfg_io_util! {
     mod empty;
     pub use empty::{empty, Empty};
 
-    mod flush;
-
     mod lines;
     pub use lines::Lines;
 
@@ -39,19 +34,11 @@ cfg_io_util! {
     mod repeat;
     pub use repeat::{repeat, Repeat};
 
-    mod shutdown;
-
     mod sink;
     pub use sink::{sink, Sink};
 
     mod split;
     pub use split::Split;
-
-    mod write;
-    mod write_all;
-    mod write_buf;
-    mod write_int;
-
 
     // used by `BufReader` and `BufWriter`
     // https://github.com/rust-lang/rust/blob/master/src/libstd/sys_common/io.rs#L1

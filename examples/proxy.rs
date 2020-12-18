@@ -23,7 +23,7 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::io;
-use tokio::io::AsyncWriteExt;
+use tokio::io::AsyncWrite;
 use tokio::net::{TcpListener, TcpStream};
 
 use futures::future::try_join;

@@ -18,7 +18,7 @@
 //! Another difference is that `AsyncRead` and `AsyncWrite` only contain
 //! core methods needed to provide asynchronous reading and writing
 //! functionality. Instead, utility methods are defined in the [`AsyncRead`]
-//! and [`AsyncWriteExt`] extension traits. These traits are automatically
+//! and [`AsyncWrite`] extension traits. These traits are automatically
 //! implemented for all values that implement `AsyncRead` and `AsyncWrite`
 //! respectively.
 //!
@@ -93,11 +93,11 @@
 //! ```
 //!
 //! [`BufWriter`] doesn't add any new ways of writing; it just buffers every call
-//! to [`write`](crate::io::AsyncWriteExt::write). However, you **must** flush
+//! to [`write`](crate::io::AsyncWrite::write). However, you **must** flush
 //! [`BufWriter`] to ensure that any buffered data is written.
 //!
 //! ```no_run
-//! use tokio::io::{self, BufWriter, AsyncWriteExt};
+//! use tokio::io::{self, BufWriter, AsyncWrite};
 //! use tokio::fs::File;
 //!
 //! #[tokio::main]
@@ -168,7 +168,6 @@
 //! [`AsyncRead`]: trait@AsyncRead
 //! [`AsyncWrite`]: trait@AsyncWrite
 //! [`AsyncRead`]: trait@AsyncRead
-//! [`AsyncWriteExt`]: trait@AsyncWriteExt
 //! ["codec"]: https://docs.rs/tokio-util/0.3/tokio_util/codec/index.html
 //! [`Encoder`]: https://docs.rs/tokio-util/0.3/tokio_util/codec/trait.Encoder.html
 //! [`Decoder`]: https://docs.rs/tokio-util/0.3/tokio_util/codec/trait.Decoder.html
@@ -200,10 +199,16 @@ mod read_buf;
 pub use self::read_buf::ReadBuf;
 
 mod chain;
+mod flush;
 mod read;
 mod read_exact;
 mod read_int;
 mod read_to_end;
+mod shutdown;
+mod write;
+mod write_all;
+mod write_buf;
+mod write_int;
 // Used by process
 pub(crate) use read_to_end::read_to_end;
 mod read_to_string;
@@ -260,7 +265,7 @@ cfg_io_util! {
     pub(crate) mod seek;
     pub(crate) mod util;
     pub use util::{
-        copy, copy_buf, duplex, empty, repeat, sink, AsyncBufReadExt, AsyncSeekExt, AsyncWriteExt,
+        copy, copy_buf, duplex, empty, repeat, sink, AsyncBufReadExt, AsyncSeekExt,
         BufReader, BufStream, BufWriter, DuplexStream, Empty, Lines, Repeat, Sink, Split,
     };
 }

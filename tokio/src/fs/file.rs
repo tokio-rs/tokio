@@ -37,15 +37,15 @@ use std::task::Poll::*;
 /// the data to disk.
 ///
 /// Reading and writing to a `File` is usually done using the convenience
-/// methods found on the [`AsyncRead`] and [`AsyncWriteExt`] traits. Examples
+/// methods found on the [`AsyncRead`] and [`AsyncWrite`] traits. Examples
 /// import these traits through [the prelude].
 ///
 /// [std]: struct@std::fs::File
 /// [`AsyncSeek`]: trait@crate::io::AsyncSeek
-/// [`flush`]: fn@crate::io::AsyncWriteExt::flush
+/// [`flush`]: fn@crate::io::AsyncWrite::flush
 /// [`sync_all`]: fn@crate::fs::File::sync_all
 /// [`AsyncRead`]: trait@crate::io::AsyncRead
-/// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
+/// [`AsyncWrite`]: trait@crate::io::AsyncWrite
 /// [the prelude]: crate::prelude
 ///
 /// # Examples
@@ -178,10 +178,10 @@ impl File {
     /// # }
     /// ```
     ///
-    /// The [`write_all`] method is defined on the [`AsyncWriteExt`] trait.
+    /// The [`write_all`] method is defined on the [`AsyncWrite`] trait.
     ///
-    /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
-    /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
+    /// [`write_all`]: fn@crate::io::AsyncWrite::write_all
+    /// [`AsyncWrite`]: trait@crate::io::AsyncWrite
     pub async fn create(path: impl AsRef<Path>) -> io::Result<File> {
         let path = path.as_ref().to_owned();
         let std_file = asyncify(move || sys::File::create(path)).await?;
@@ -231,10 +231,10 @@ impl File {
     /// # }
     /// ```
     ///
-    /// The [`write_all`] method is defined on the [`AsyncWriteExt`] trait.
+    /// The [`write_all`] method is defined on the [`AsyncWrite`] trait.
     ///
-    /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
-    /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
+    /// [`write_all`]: fn@crate::io::AsyncWrite::write_all
+    /// [`AsyncWrite`]: trait@crate::io::AsyncWrite
     pub async fn sync_all(&self) -> io::Result<()> {
         let mut inner = self.inner.lock().await;
         inner.complete_inflight().await;
@@ -266,10 +266,10 @@ impl File {
     /// # }
     /// ```
     ///
-    /// The [`write_all`] method is defined on the [`AsyncWriteExt`] trait.
+    /// The [`write_all`] method is defined on the [`AsyncWrite`] trait.
     ///
-    /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
-    /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
+    /// [`write_all`]: fn@crate::io::AsyncWrite::write_all
+    /// [`AsyncWrite`]: trait@crate::io::AsyncWrite
     pub async fn sync_data(&self) -> io::Result<()> {
         let mut inner = self.inner.lock().await;
         inner.complete_inflight().await;
@@ -304,10 +304,10 @@ impl File {
     /// # }
     /// ```
     ///
-    /// The [`write_all`] method is defined on the [`AsyncWriteExt`] trait.
+    /// The [`write_all`] method is defined on the [`AsyncWrite`] trait.
     ///
-    /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
-    /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
+    /// [`write_all`]: fn@crate::io::AsyncWrite::write_all
+    /// [`AsyncWrite`]: trait@crate::io::AsyncWrite
     pub async fn set_len(&self, size: u64) -> io::Result<()> {
         let mut inner = self.inner.lock().await;
         inner.complete_inflight().await;

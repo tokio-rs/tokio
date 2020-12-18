@@ -108,7 +108,7 @@ where
 #[cfg(test)]
 #[cfg(not(loom))]
 mod tests {
-    use crate::io::AsyncWriteExt;
+    use crate::io::AsyncWrite;
     use std::io;
     use std::pin::Pin;
     use std::task::Context;

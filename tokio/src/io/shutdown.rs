@@ -8,13 +8,13 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 pin_project! {
-    /// A future used to fully flush an I/O object.
+    /// A future used to shutdown an I/O object.
     ///
-    /// Created by the [`AsyncWriteExt::flush`][flush] function.
-    /// [flush]: crate::io::AsyncWriteExt::flush
-    #[derive(Debug)]
+    /// Created by the [`AsyncWrite::shutdown`][shutdown] function.
+    /// [shutdown]: crate::io::AsyncWrite::shutdown
     #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub struct Flush<'a, A: ?Sized> {
+    #[derive(Debug)]
+    pub struct Shutdown<'a, A: ?Sized> {
         a: &'a mut A,
         // Make this future `!Unpin` for compatibility with async trait methods.
         #[pin]
@@ -22,18 +22,18 @@ pin_project! {
     }
 }
 
-/// Creates a future which will entirely flush an I/O object.
-pub(super) fn flush<A>(a: &mut A) -> Flush<'_, A>
+/// Creates a future which will shutdown an I/O object.
+pub(super) fn shutdown<A>(a: &mut A) -> Shutdown<'_, A>
 where
     A: AsyncWrite + Unpin + ?Sized,
 {
-    Flush {
+    Shutdown {
         a,
         _pin: PhantomPinned,
     }
 }
 
-impl<A> Future for Flush<'_, A>
+impl<A> Future for Shutdown<'_, A>
 where
     A: AsyncWrite + Unpin + ?Sized,
 {
@@ -41,6 +41,6 @@ where
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let me = self.project();
-        Pin::new(&mut *me.a).poll_flush(cx)
+        Pin::new(me.a).poll_shutdown(cx)
     }
 }

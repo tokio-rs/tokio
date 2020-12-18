@@ -5,7 +5,7 @@
 use std::io;
 use std::task::Poll;
 
-use tokio::io::{AsyncRead, AsyncWriteExt, Interest};
+use tokio::io::{AsyncRead, AsyncWrite, Interest};
 use tokio::net::{UnixListener, UnixStream};
 use tokio_test::{assert_ok, assert_pending, assert_ready_ok, task};
 
@@ -53,7 +53,7 @@ async fn shutdown() -> std::io::Result<()> {
     let ((mut server, _), mut client) = try_join(accept, connect).await?;
 
     // Shut down the client
-    AsyncWriteExt::shutdown(&mut client).await?;
+    AsyncWrite::shutdown(&mut client).await?;
     // Read from the server should return 0 to indicate the channel has been closed.
     let mut buf = [0u8; 1];
     let n = server.read(&mut buf).await?;

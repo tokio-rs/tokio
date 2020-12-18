@@ -40,13 +40,13 @@ pub struct OwnedReadHalf {
 /// will also shut down the write half of the TCP stream.
 ///
 /// Writing to an `OwnedWriteHalf` is usually done using the convenience methods found
-/// on the [`AsyncWriteExt`] trait. Examples import this trait through [the prelude].
+/// on the [`AsyncWrite`] trait. Examples import this trait through [the prelude].
 ///
 /// [`TcpStream`]: TcpStream
 /// [`into_split`]: TcpStream::into_split()
 /// [`AsyncWrite`]: trait@crate::io::AsyncWrite
 /// [`poll_shutdown`]: fn@crate::io::AsyncWrite::poll_shutdown
-/// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
+/// [`AsyncWrite`]: trait@crate::io::AsyncWrite
 /// [the prelude]: crate::prelude
 #[derive(Debug)]
 pub struct OwnedWriteHalf {

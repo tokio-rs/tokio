@@ -3,7 +3,7 @@
 
 use std::io::Read;
 use std::io::Result;
-use tokio::io::{AsyncRead, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 

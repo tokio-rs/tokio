@@ -21,7 +21,7 @@
 
 #![warn(rust_2018_idioms)]
 
-use tokio::io::{AsyncRead, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpListener;
 
 use std::env;

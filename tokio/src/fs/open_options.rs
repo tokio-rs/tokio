@@ -183,8 +183,8 @@ impl OpenOptions {
     /// This function doesn't create the file if it doesn't exist. Use the [`create`]
     /// method to do so.
     ///
-    /// [`write()`]: crate::io::AsyncWriteExt::write
-    /// [`flush()`]: crate::io::AsyncWriteExt::flush
+    /// [`write()`]: crate::io::AsyncWrite::write
+    /// [`flush()`]: crate::io::AsyncWrite::flush
     /// [`seek`]: crate::io::AsyncSeekExt::seek
     /// [`SeekFrom`]: std::io::SeekFrom
     /// [`Current`]: std::io::SeekFrom::Current
