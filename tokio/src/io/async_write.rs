@@ -258,7 +258,7 @@ pub trait AsyncWrite {
     /// ```
     fn write<'a>(&'a mut self, src: &'a [u8]) -> Write<'a, Self>
     where
-        Self: Unpin + Sized,
+        Self: Sized + Unpin,
     {
         write(self, src)
     }
@@ -371,7 +371,7 @@ pub trait AsyncWrite {
     /// [`write`]: AsyncWrite::write
     fn write_all<'a>(&'a mut self, src: &'a [u8]) -> WriteAll<'a, Self>
     where
-        Self: Unpin + Sized,
+        Self: Sized + Unpin,
     {
         write_all(self, src)
     }
@@ -1101,7 +1101,7 @@ pub trait AsyncWrite {
     /// ```
     fn flush(&mut self) -> Flush<'_, Self>
     where
-        Self: Unpin + Sized,
+        Self: Sized + Unpin,
     {
         flush(self)
     }
@@ -1140,7 +1140,7 @@ pub trait AsyncWrite {
     /// ```
     fn shutdown(&mut self) -> Shutdown<'_, Self>
     where
-        Self: Unpin + Sized,
+        Self: Sized + Unpin,
     {
         shutdown(self)
     }

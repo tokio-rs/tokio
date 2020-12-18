@@ -185,7 +185,7 @@ pub trait AsyncRead {
     /// ```
     fn read<'a>(&'a mut self, buf: &'a mut [u8]) -> Read<'a, Self>
     where
-        Self: Unpin + Sized,
+        Self: Sized + Unpin,
     {
         read(self, buf)
     }
@@ -1047,7 +1047,7 @@ pub trait AsyncRead {
     /// [`tokio::fs::read`]: fn@crate::fs::read
     fn read_to_end<'a>(&'a mut self, buf: &'a mut Vec<u8>) -> ReadToEnd<'a, Self>
     where
-        Self: Unpin + Sized,
+        Self: Sized + Unpin,
     {
         read_to_end(self, buf)
     }
@@ -1094,7 +1094,7 @@ pub trait AsyncRead {
     /// [`crate::fs::read_to_string`]: fn@crate::fs::read_to_string
     fn read_to_string<'a>(&'a mut self, dst: &'a mut String) -> ReadToString<'a, Self>
     where
-        Self: Unpin + Sized,
+        Self: Sized + Unpin,
     {
         read_to_string(self, dst)
     }
