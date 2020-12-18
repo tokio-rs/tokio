@@ -8,7 +8,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 pin_project! {
-    /// Future for the [`seek`](crate::io::AsyncSeekExt::seek) method.
+    /// Future for the [`seek`](crate::io::AsyncSeek::seek) method.
     #[derive(Debug)]
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct Seek<'a, S: ?Sized> {

@@ -185,7 +185,7 @@ impl OpenOptions {
     ///
     /// [`write()`]: crate::io::AsyncWrite::write
     /// [`flush()`]: crate::io::AsyncWrite::flush
-    /// [`seek`]: crate::io::AsyncSeekExt::seek
+    /// [`seek`]: crate::io::AsyncSeek::seek
     /// [`SeekFrom`]: std::io::SeekFrom
     /// [`Current`]: std::io::SeekFrom::Current
     /// [`create`]: OpenOptions::create

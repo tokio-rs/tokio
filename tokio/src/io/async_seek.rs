@@ -3,18 +3,16 @@ use std::ops::DerefMut;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+use super::seek::{seek, Seek};
+
 /// Seek bytes asynchronously.
 ///
 /// This trait is analogous to the [`std::io::Seek`] trait, but integrates
 /// with the asynchronous task system. In particular, the `start_seek`
 /// method, unlike [`Seek::seek`], will not block the calling thread.
 ///
-/// Utilities for working with `AsyncSeek` values are provided by
-/// [`AsyncSeekExt`].
-///
 /// [`std::io::Seek`]: std::io::Seek
 /// [`Seek::seek`]: std::io::Seek::seek()
-/// [`AsyncSeekExt`]: crate::io::AsyncSeekExt
 pub trait AsyncSeek {
     /// Attempts to seek to an offset, in bytes, in a stream.
     ///
@@ -44,6 +42,42 @@ pub trait AsyncSeek {
     ///
     /// Seeking to a negative offset is considered an error.
     fn poll_complete(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>>;
+
+    /// Creates a future which will seek an IO object, and then yield the
+    /// new position in the object and the object itself.
+    ///
+    /// Equivalent to:
+    ///
+    /// ```ignore
+    /// async fn seek(&mut self, pos: SeekFrom) -> io::Result<u64>;
+    /// ```
+    ///
+    /// In the case of an error the buffer and the object will be discarded, with
+    /// the error yielded.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::fs::File;
+    /// use tokio::prelude::*;
+    ///
+    /// use std::io::SeekFrom;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let mut file = File::open("foo.txt").await?;
+    /// file.seek(SeekFrom::Start(6)).await?;
+    ///
+    /// let mut contents = vec![0u8; 10];
+    /// file.read_exact(&mut contents).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn seek(&mut self, pos: SeekFrom) -> Seek<'_, Self>
+    where
+        Self: Sized + Unpin,
+    {
+        seek(self, pos)
+    }
 }
 
 macro_rules! deref_async_seek {

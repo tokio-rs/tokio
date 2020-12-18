@@ -318,7 +318,7 @@ async_assert_fn!(tokio::io::AsyncRead::read_u128_le(&mut BoxAsyncRead): !Unpin);
 async_assert_fn!(tokio::io::AsyncRead::read_i128_le(&mut BoxAsyncRead): !Unpin);
 async_assert_fn!(tokio::io::AsyncRead::read_to_end(&mut BoxAsyncRead, &mut Vec<u8>): !Unpin);
 async_assert_fn!(tokio::io::AsyncRead::read_to_string(&mut BoxAsyncRead, &mut String): !Unpin);
-async_assert_fn!(tokio::io::AsyncSeekExt::seek(&mut BoxAsyncSeek, SeekFrom): !Unpin);
+async_assert_fn!(tokio::io::AsyncSeek::seek(&mut BoxAsyncSeek, SeekFrom): !Unpin);
 async_assert_fn!(tokio::io::AsyncWrite::write(&mut BoxAsyncWrite, &[u8]): !Unpin);
 async_assert_fn!(tokio::io::AsyncWrite::write_all(&mut BoxAsyncWrite, &[u8]): !Unpin);
 async_assert_fn!(tokio::io::AsyncWrite::write_u8(&mut BoxAsyncWrite, u8): !Unpin);

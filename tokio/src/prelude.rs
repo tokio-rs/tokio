@@ -13,9 +13,9 @@
 //!
 //! The prelude may grow over time as additional items see ubiquitous use.
 
-pub use crate::io::{self, AsyncBufRead, AsyncRead, AsyncWrite};
+pub use crate::io::{self, AsyncBufRead, AsyncRead, AsyncWrite, AsyncSeek};
 
 cfg_io_util! {
     #[doc(no_inline)]
-    pub use crate::io::{AsyncBufReadExt as _, AsyncSeekExt as _};
+    pub use crate::io::{AsyncBufReadExt as _};
 }
