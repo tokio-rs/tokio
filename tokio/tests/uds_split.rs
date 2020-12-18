@@ -30,7 +30,7 @@ async fn split() -> std::io::Result<()> {
 }
 
 async fn send_recv_all(
-    read: &mut (dyn AsyncRead + Unpin),
+    read: &mut (impl AsyncRead + Unpin),
     write: &mut (dyn AsyncWrite + Unpin),
     input: &[u8],
 ) -> std::io::Result<Vec<u8>> {

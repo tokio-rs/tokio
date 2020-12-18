@@ -205,9 +205,6 @@ mod read_exact;
 mod read_int;
 mod read_to_end;
 mod read_to_string;
-cfg_process! {
-    pub(crate) use read_to_end::read_to_end;
-}
 mod take;
 pub use take::Take;
 mod async_read_futures;
