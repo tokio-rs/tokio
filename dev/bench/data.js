@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608323633122,
+  "lastUpdate": 1608323637905,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -6019,6 +6019,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21738311,
             "range": "± 2335831",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3ecaf9fd9a519da9b1decb4c7239b48277040522",
+          "message": "codec: write documentation for codec (#3283)\n\nCo-authored-by: Lucio Franco <luciofranco14@gmail.com>",
+          "timestamp": "2020-12-18T21:32:27+01:00",
+          "tree_id": "f116db611cb8144b9ec3e2e97286aab59cdd9556",
+          "url": "https://github.com/tokio-rs/tokio/commit/3ecaf9fd9a519da9b1decb4c7239b48277040522"
+        },
+        "date": 1608323636973,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 158828,
+            "range": "± 5915",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 620849,
+            "range": "± 17869",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4751364,
+            "range": "± 608090",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19098313,
+            "range": "± 2576013",
             "unit": "ns/iter"
           }
         ]
