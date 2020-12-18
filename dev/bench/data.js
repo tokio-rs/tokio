@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608323641528,
+  "lastUpdate": 1608323669251,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -14099,6 +14099,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 818448,
             "range": "± 2677",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3ecaf9fd9a519da9b1decb4c7239b48277040522",
+          "message": "codec: write documentation for codec (#3283)\n\nCo-authored-by: Lucio Franco <luciofranco14@gmail.com>",
+          "timestamp": "2020-12-18T21:32:27+01:00",
+          "tree_id": "f116db611cb8144b9ec3e2e97286aab59cdd9556",
+          "url": "https://github.com/tokio-rs/tokio/commit/3ecaf9fd9a519da9b1decb4c7239b48277040522"
+        },
+        "date": 1608323668149,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6520234,
+            "range": "± 1790207",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6002660,
+            "range": "± 1251782",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 5623098,
+            "range": "± 2013594",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 579,
+            "range": "± 24",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 592,
+            "range": "± 18",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 595,
+            "range": "± 16",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 72039,
+            "range": "± 4820",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1264,
+            "range": "± 165",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 951998,
+            "range": "± 5983",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 689296,
+            "range": "± 29919",
             "unit": "ns/iter"
           }
         ]
