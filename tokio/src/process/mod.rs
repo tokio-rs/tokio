@@ -56,7 +56,7 @@
 //! We can also read input line by line.
 //!
 //! ```no_run
-//! use tokio::io::{BufReader, AsyncBufReadExt};
+//! use tokio::io::{BufReader, AsyncBufRead};
 //! use tokio::process::Command;
 //!
 //! use std::process::Stdio;

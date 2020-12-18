@@ -2,7 +2,7 @@
 #![cfg(feature = "full")]
 
 use std::io::ErrorKind;
-use tokio::io::{AsyncBufReadExt, BufReader, Error};
+use tokio::io::{AsyncBufRead, BufReader, Error};
 use tokio_test::{assert_ok, io::Builder};
 
 use std::io::Cursor;

@@ -9,7 +9,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 pin_project! {
-    /// Future for the [`read_until`](crate::io::AsyncBufReadExt::read_until) method.
+    /// Future for the [`read_until`](crate::io::AsyncBufRead::read_until) method.
     /// The delimeter is included in the resulting vector.
     #[derive(Debug)]
     #[must_use = "futures do nothing unless you `.await` or poll them"]

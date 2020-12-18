@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::io::AsyncBufReadExt;
+use tokio::io::AsyncBufRead;
 use tokio_test::assert_ok;
 
 #[tokio::test]

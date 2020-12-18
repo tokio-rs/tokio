@@ -11,7 +11,7 @@ use std::string::FromUtf8Error;
 use std::task::{Context, Poll};
 
 pin_project! {
-    /// Future for the [`read_line`](crate::io::AsyncBufReadExt::read_line) method.
+    /// Future for the [`read_line`](crate::io::AsyncBufRead::read_line) method.
     #[derive(Debug)]
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct ReadLine<'a, R: ?Sized> {

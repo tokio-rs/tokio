@@ -75,7 +75,7 @@
 //! extra methods to any async reader:
 //!
 //! ```no_run
-//! use tokio::io::{self, BufReader, AsyncBufReadExt};
+//! use tokio::io::{self, BufReader, AsyncBufRead};
 //! use tokio::fs::File;
 //!
 //! #[tokio::main]
@@ -217,6 +217,8 @@ pub use take::Take;
 mod async_read_futures;
 mod read_line;
 mod read_until;
+mod lines;
+pub use lines::Lines;
 
 // Re-export some types from `std::io` so that users don't have to deal
 // with conflicts when `use`ing `tokio::io` and `std::io`.
@@ -265,8 +267,8 @@ cfg_io_util! {
     pub(crate) mod seek;
     pub(crate) mod util;
     pub use util::{
-        copy, copy_buf, duplex, empty, repeat, sink, AsyncBufReadExt,
-        BufReader, BufStream, BufWriter, DuplexStream, Empty, Lines, Repeat, Sink, Split,
+        copy, copy_buf, duplex, empty, repeat, sink,
+        BufReader, BufStream, BufWriter, DuplexStream, Empty, Repeat, Sink, Split,
     };
 }
 

@@ -1,9 +1,6 @@
 #![allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 
 cfg_io_util! {
-    mod async_buf_read_ext;
-    pub use async_buf_read_ext::AsyncBufReadExt;
-
     mod buf_reader;
     pub use buf_reader::BufReader;
 
@@ -22,9 +19,6 @@ cfg_io_util! {
     mod empty;
     pub use empty::{empty, Empty};
 
-    mod lines;
-    pub use lines::Lines;
-
     mod mem;
     pub use mem::{duplex, DuplexStream};
 
@@ -34,7 +28,7 @@ cfg_io_util! {
     mod sink;
     pub use sink::{sink, Sink};
 
-    mod split;
+    pub(crate) mod split;
     pub use split::Split;
 
     // used by `BufReader` and `BufWriter`

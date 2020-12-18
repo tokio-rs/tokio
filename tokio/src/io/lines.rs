@@ -8,7 +8,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 pin_project! {
-    /// Stream for the [`lines`](crate::io::AsyncBufReadExt::lines) method.
+    /// Stream for the [`lines`](crate::io::AsyncBufRead::lines) method.
     #[derive(Debug)]
     #[must_use = "streams do nothing unless polled"]
     #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
@@ -42,8 +42,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// # use tokio::io::AsyncBufRead;
-    /// use tokio::io::AsyncBufReadExt;
+    /// use tokio::io::AsyncBufRead;
     ///
     /// # async fn dox(my_buf_read: impl AsyncBufRead + Unpin) -> std::io::Result<()> {
     /// let mut lines = my_buf_read.lines();
