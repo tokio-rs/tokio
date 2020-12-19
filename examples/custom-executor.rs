@@ -1,7 +1,7 @@
 // This example shows how to use the tokio runtime with any other executor
 //
 // The main components are a spawn fn that will wrap futures in a special future
-// that will always enter the tokio context on poll. This only spawns on extra thread
+// that will always enter the tokio context on poll. This only spawns one extra thread
 // to manage and run the tokio drivers in the background.
 
 use tokio::net::TcpListener;
