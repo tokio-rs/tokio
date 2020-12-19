@@ -36,9 +36,7 @@
 //! }
 //! ```
 //!
-//! Require that an operation takes no more than 300ms. Note that this uses the
-//! `timeout` function on the `FutureExt` trait. This trait is included in the
-//! prelude.
+//! Require that an operation takes no more than 300ms.
 //!
 //! ```
 //! use tokio::time::{timeout, Duration};

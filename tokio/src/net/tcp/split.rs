@@ -20,12 +20,11 @@ use std::task::{Context, Poll};
 /// Borrowed read half of a [`TcpStream`], created by [`split`].
 ///
 /// Reading from a `ReadHalf` is usually done using the convenience methods found on the
-/// [`AsyncReadExt`] trait. Examples import this trait through [the prelude].
+/// [`AsyncReadExt`] trait.
 ///
 /// [`TcpStream`]: TcpStream
 /// [`split`]: TcpStream::split()
 /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
-/// [the prelude]: crate::prelude
 #[derive(Debug)]
 pub struct ReadHalf<'a>(&'a TcpStream);
 
@@ -35,14 +34,13 @@ pub struct ReadHalf<'a>(&'a TcpStream);
 /// shut down the TCP stream in the write direction.
 ///
 /// Writing to an `WriteHalf` is usually done using the convenience methods found
-/// on the [`AsyncWriteExt`] trait. Examples import this trait through [the prelude].
+/// on the [`AsyncWriteExt`] trait.
 ///
 /// [`TcpStream`]: TcpStream
 /// [`split`]: TcpStream::split()
 /// [`AsyncWrite`]: trait@crate::io::AsyncWrite
 /// [`poll_shutdown`]: fn@crate::io::AsyncWrite::poll_shutdown
 /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
-/// [the prelude]: crate::prelude
 #[derive(Debug)]
 pub struct WriteHalf<'a>(&'a TcpStream);
 
@@ -101,7 +99,7 @@ impl ReadHalf<'_> {
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use tokio::prelude::*;
+    /// use tokio::io::AsyncReadExt;
     /// use std::error::Error;
     ///
     /// #[tokio::main]

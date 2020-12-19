@@ -25,20 +25,19 @@ cfg_net! {
     ///
     /// Reading and writing to a `TcpStream` is usually done using the
     /// convenience methods found on the [`AsyncReadExt`] and [`AsyncWriteExt`]
-    /// traits. Examples import these traits through [the prelude].
+    /// traits.
     ///
     /// [`connect`]: method@TcpStream::connect
     /// [accepting]: method@crate::net::TcpListener::accept
     /// [listener]: struct@crate::net::TcpListener
     /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
-    /// [the prelude]: crate::prelude
     ///
     /// # Examples
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use tokio::prelude::*;
+    /// use tokio::io::AsyncWriteExt;
     /// use std::error::Error;
     ///
     /// #[tokio::main]
@@ -81,7 +80,7 @@ impl TcpStream {
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use tokio::prelude::*;
+    /// use tokio::io::AsyncWriteExt;
     /// use std::error::Error;
     ///
     /// #[tokio::main]
@@ -648,7 +647,7 @@ impl TcpStream {
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use tokio::prelude::*;
+    /// use tokio::io::AsyncReadExt;
     /// use std::error::Error;
     ///
     /// #[tokio::main]
