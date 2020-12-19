@@ -1,3 +1,10 @@
+# 0.3.2 (December 19, 2020)
+
+### Fixed
+
+- fix outdated macro documentation ([#3180])
+- add portability note to `tokio::main` ([#3199])
+
 # 0.3.1 (October 25, 2020)
 
 ### Fixed
@@ -51,3 +58,5 @@
 [#2177]: https://github.com/tokio-rs/tokio/pull/2177
 [#2225]: https://github.com/tokio-rs/tokio/pull/2225
 [#3038]: https://github.com/tokio-rs/tokio/pull/3038
+[#3180]: https://github.com/tokio-rs/tokio/pull/3180
+[#3199]: https://github.com/tokio-rs/tokio/pull/3199
