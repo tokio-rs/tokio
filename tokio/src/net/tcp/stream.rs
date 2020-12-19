@@ -864,10 +864,10 @@ impl TcpStream {
     /// this comes at the cost of a heap allocation.
     ///
     /// **Note:** Dropping the write half will shut down the write half of the TCP
-    /// stream. This is equivalent to calling [`shutdown_std(Write)`] on the `TcpStream`.
+    /// stream. This is equivalent to calling [`shutdown()`] on the `TcpStream`.
     ///
     /// [`split`]: TcpStream::split()
-    /// [`shutdown_std(Write)`]: fn@crate::net::TcpStream::shutdown_std
+    /// [`shutdown()`]: fn@crate::io::util::AsyncWriteExt::shutdown
     pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
         split_owned(self)
     }
