@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608401642514,
+  "lastUpdate": 1608401649047,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -9723,6 +9723,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1046,
             "range": "± 131",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "flo.huebsch@pm.me",
+            "name": "Florian Hübsch",
+            "username": "fl9"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e41e6cddbba0cf13403924937ffe02aae6639e28",
+          "message": "docs: tokio::main macro is also supported on rt (#3243)\n\nFixes: #3144\r\nRefs: #2225",
+          "timestamp": "2020-12-19T19:12:08+01:00",
+          "tree_id": "ee1af0c8a3b2ab9c9eaae05f2dca96ff966f42f9",
+          "url": "https://github.com/tokio-rs/tokio/commit/e41e6cddbba0cf13403924937ffe02aae6639e28"
+        },
+        "date": 1608401646456,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 16320,
+            "range": "± 9602",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1107,
+            "range": "± 127",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 642,
+            "range": "± 97",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 16822,
+            "range": "± 6462",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1103,
+            "range": "± 163",
             "unit": "ns/iter"
           }
         ]
