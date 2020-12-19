@@ -60,7 +60,7 @@ cfg_net! {
     ///
     /// To shut down the stream in the write direction, you can call the
     /// [`shutdown()`] method. This will cause the other peer to receive a read of
-    /// length EOF, indicating that no more data has been sent. This only closes
+    /// length 0, indicating that no more data will be sent. This only closes
     /// the stream in one direction.
     ///
     /// [`shutdown()`]: fn@crate::io::AsyncWriteExt::shutdown
