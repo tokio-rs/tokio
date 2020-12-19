@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608422322766,
+  "lastUpdate": 1608422326157,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -15779,6 +15779,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 816203,
             "range": "± 11541",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "28933599888a88e601acbb11fa824b0ee9f98c6e",
+          "message": "chore: update to `bytes` 1.0 git branch (#3301)\n\nUpdates the code base to track the `bytes` git branch. This is in\r\npreparation for the 1.0 release.\r\n\r\nCloses #3058",
+          "timestamp": "2020-12-19T15:57:16-08:00",
+          "tree_id": "2021ef3acf9407fcfa39032e0a493a81f1eb74cc",
+          "url": "https://github.com/tokio-rs/tokio/commit/28933599888a88e601acbb11fa824b0ee9f98c6e"
+        },
+        "date": 1608422325042,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6033145,
+            "range": "± 2756062",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 5878919,
+            "range": "± 1257941",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 5758138,
+            "range": "± 1922068",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 528,
+            "range": "± 6",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 537,
+            "range": "± 8",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 538,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 73605,
+            "range": "± 5411",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1196,
+            "range": "± 125",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 949580,
+            "range": "± 3080",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 674192,
+            "range": "± 2575",
             "unit": "ns/iter"
           }
         ]
