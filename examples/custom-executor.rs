@@ -38,11 +38,10 @@ mod my_custom_runtime {
     static EXECUTOR: Lazy<ThreadPool> = Lazy::new(|| {
         // Spawn tokio runtime on a single background thread
         // enabling IO and timers.
-        let rt = tokio::runtime::Builder::new_current_thread()
+        let rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
             .unwrap();
-
         let inner = futures::executor::ThreadPool::builder().create().unwrap();
 
         ThreadPool { inner, rt }
