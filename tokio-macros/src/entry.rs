@@ -226,10 +226,10 @@ fn parse_knobs(
 
     let mut rt = match config.flavor {
         RuntimeFlavor::CurrentThread => quote! {
-            tokio::runtime::Builder::new_current_thread()
+            ::tokio::runtime::Builder::new_current_thread()
         },
         RuntimeFlavor::Threaded => quote! {
-            tokio::runtime::Builder::new_multi_thread()
+            ::tokio::runtime::Builder::new_multi_thread()
         },
     };
     if let Some(v) = config.worker_threads {
