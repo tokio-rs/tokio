@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608407043957,
+  "lastUpdate": 1608407048074,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -6373,6 +6373,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18642677,
             "range": "± 3122913",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "78f2340d259487d4470681f97cc4b5eac719e178",
+          "message": "tokio: remove prelude (#3299)\n\nCloses: #3257",
+          "timestamp": "2020-12-19T11:42:24-08:00",
+          "tree_id": "2a093e994a41bae54e324fd8d20c836e46a5947c",
+          "url": "https://github.com/tokio-rs/tokio/commit/78f2340d259487d4470681f97cc4b5eac719e178"
+        },
+        "date": 1608407043784,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 165174,
+            "range": "± 55262",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 573017,
+            "range": "± 141343",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4436346,
+            "range": "± 1201818",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 17118339,
+            "range": "± 3425792",
             "unit": "ns/iter"
           }
         ]
