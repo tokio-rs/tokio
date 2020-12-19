@@ -440,10 +440,10 @@ impl UnixStream {
     /// this comes at the cost of a heap allocation.
     ///
     /// **Note:** Dropping the write half will shut down the write half of the
-    /// stream. This is equivalent to calling [`shutdown(Write)`] on the `UnixStream`.
+    /// stream. This is equivalent to calling [`shutdown_std(Write)`] on the `UnixStream`.
     ///
     /// [`split`]: Self::split()
-    /// [`shutdown(Write)`]: fn@Self::shutdown
+    /// [`shutdown_std(Write)`]: fn@Self::shutdown_std
     pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
         split_owned(self)
     }
