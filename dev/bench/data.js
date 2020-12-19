@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608409180704,
+  "lastUpdate": 1608409192443,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -15251,6 +15251,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 818353,
             "range": "± 100587",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "arve.knudsen@gmail.com",
+            "name": "Arve Knudsen",
+            "username": "aknuds1"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1b70507894035e066cb488c14ff328bd47ca696d",
+          "message": "net: remove {Tcp,Unix}Stream::shutdown() (#3298)\n\n`shutdown()` on `AsyncWrite` performs a TCP shutdown. This avoids method\r\nconflicts.\r\n\r\nCloses #3294",
+          "timestamp": "2020-12-19T12:17:52-08:00",
+          "tree_id": "dd3c414761b8a3713b63515e7666f108a1391743",
+          "url": "https://github.com/tokio-rs/tokio/commit/1b70507894035e066cb488c14ff328bd47ca696d"
+        },
+        "date": 1608409186215,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 7233913,
+            "range": "± 2727610",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6703943,
+            "range": "± 1675365",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6679825,
+            "range": "± 2792964",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 639,
+            "range": "± 63",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 644,
+            "range": "± 24",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 652,
+            "range": "± 17",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 84547,
+            "range": "± 14221",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1494,
+            "range": "± 167",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1117340,
+            "range": "± 100791",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 816460,
+            "range": "± 104380",
             "unit": "ns/iter"
           }
         ]
