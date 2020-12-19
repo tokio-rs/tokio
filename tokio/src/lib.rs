@@ -453,17 +453,14 @@ cfg_macros! {
     pub use tokio_macros::select_priv_declare_output_enum;
 
     cfg_rt! {
-        cfg_rt_multi_thread! {
-            // This is the docs.rs case (with all features) so make sure macros
-            // is included in doc(cfg).
+        #[cfg(feature = "rt-multi-thread")]
+        #[cfg(not(test))] // Work around for rust-lang/rust#62127
+        #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+        pub use tokio_macros::main;
 
-            #[cfg(not(test))] // Work around for rust-lang/rust#62127
-            #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
-            pub use tokio_macros::main;
-
-            #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
-            pub use tokio_macros::test;
-        }
+        #[cfg(feature = "rt-multi-thread")]
+        #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+        pub use tokio_macros::test;
 
         cfg_not_rt_multi_thread! {
             #[cfg(not(test))] // Work around for rust-lang/rust#62127
