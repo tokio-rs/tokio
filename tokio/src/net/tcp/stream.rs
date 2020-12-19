@@ -686,26 +686,7 @@ impl TcpStream {
     /// This function will cause all pending and future I/O on the specified
     /// portions to return immediately with an appropriate value (see the
     /// documentation of `Shutdown`).
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    /// use std::error::Error;
-    /// use std::net::Shutdown;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     // Connect to a peer
-    ///     let stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///
-    ///     // Shutdown the stream
-    ///     stream.shutdown(Shutdown::Write)?;
-    ///
-    ///     Ok(())
-    /// }
-    /// ```
-    pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
+    pub(super) fn shutdown_std(&self, how: Shutdown) -> io::Result<()> {
         self.io.shutdown(how)
     }
 
@@ -980,7 +961,7 @@ impl AsyncWrite for TcpStream {
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.shutdown(std::net::Shutdown::Write)?;
+        self.shutdown_std(std::net::Shutdown::Write)?;
         Poll::Ready(Ok(()))
     }
 }
