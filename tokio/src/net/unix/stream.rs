@@ -22,7 +22,7 @@ cfg_net_unix! {
     /// from a listener with `UnixListener::incoming`. Additionally, a pair of
     /// anonymous Unix sockets can be created with `UnixStream::pair`.
     ///
-    /// To shut down the stream in the write direction, you can call the 
+    /// To shut down the stream in the write direction, you can call the
     /// [`shutdown()`] method. This will cause the other peer to receive a read of
     /// length EOF, indicating that no more data has been sent. This only closes
     /// the stream in one direction.
