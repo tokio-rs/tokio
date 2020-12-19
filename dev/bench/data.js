@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608376401044,
+  "lastUpdate": 1608376410040,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -3185,6 +3185,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 487,
             "range": "± 12",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d948ccedfce534953a18acf46c8c6572103567c7",
+          "message": "chore: fix stress test (#3297)",
+          "timestamp": "2020-12-19T12:11:10+01:00",
+          "tree_id": "3c417da4134a45bfff1f2d85b9b8cf410dfd9bf9",
+          "url": "https://github.com/tokio-rs/tokio/commit/d948ccedfce534953a18acf46c8c6572103567c7"
+        },
+        "date": 1608376409018,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 976,
+            "range": "± 149",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 16913,
+            "range": "± 10530",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1042,
+            "range": "± 97",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 16996,
+            "range": "± 7770",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 566,
+            "range": "± 85",
             "unit": "ns/iter"
           }
         ]
