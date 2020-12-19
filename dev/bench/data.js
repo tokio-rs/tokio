@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608409200431,
+  "lastUpdate": 1608416188868,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -10089,6 +10089,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1037,
             "range": "± 143",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5e5f513542c0f92f49f6acd31021cc056577be6b",
+          "message": "chore: remove some left over `stream` feature code (#3300)\n\nRemoves the `stream` feature flag from `Cargo.toml` and removes the\r\n`futures-core` dependency. Once `Stream` lands in `std`, a feature flag\r\nis most likely not needed.",
+          "timestamp": "2020-12-19T14:15:00-08:00",
+          "tree_id": "bb5486367eec9a81b5d021202eaf8ab0fe34bdc8",
+          "url": "https://github.com/tokio-rs/tokio/commit/5e5f513542c0f92f49f6acd31021cc056577be6b"
+        },
+        "date": 1608416186341,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 14517,
+            "range": "± 5952",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 890,
+            "range": "± 290",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 508,
+            "range": "± 58",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 14415,
+            "range": "± 5101",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 830,
+            "range": "± 229",
             "unit": "ns/iter"
           }
         ]
