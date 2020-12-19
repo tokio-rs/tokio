@@ -57,6 +57,13 @@ cfg_net! {
     ///
     /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
+    ///
+    /// To shut down the stream in the write direction, you can call the 
+    /// [`shutdown()`] method. This will cause the other peer to receive a read of
+    /// length EOF, indicating that no more data has been sent. This only closes
+    /// the stream in one direction.
+    ///
+    /// [`shutdown()`]: fn@crate::io::AsyncWriteExt::shutdown
     pub struct TcpStream {
         io: PollEvented<mio::net::TcpStream>,
     }
@@ -867,7 +874,7 @@ impl TcpStream {
     /// stream. This is equivalent to calling [`shutdown()`] on the `TcpStream`.
     ///
     /// [`split`]: TcpStream::split()
-    /// [`shutdown()`]: fn@crate::io::util::AsyncWriteExt::shutdown
+    /// [`shutdown()`]: fn@crate::io::AsyncWriteExt::shutdown
     pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
         split_owned(self)
     }
