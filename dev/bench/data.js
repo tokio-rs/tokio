@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608416219733,
+  "lastUpdate": 1608416233505,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -15539,6 +15539,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 816460,
             "range": "± 104380",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5e5f513542c0f92f49f6acd31021cc056577be6b",
+          "message": "chore: remove some left over `stream` feature code (#3300)\n\nRemoves the `stream` feature flag from `Cargo.toml` and removes the\r\n`futures-core` dependency. Once `Stream` lands in `std`, a feature flag\r\nis most likely not needed.",
+          "timestamp": "2020-12-19T14:15:00-08:00",
+          "tree_id": "bb5486367eec9a81b5d021202eaf8ab0fe34bdc8",
+          "url": "https://github.com/tokio-rs/tokio/commit/5e5f513542c0f92f49f6acd31021cc056577be6b"
+        },
+        "date": 1608416218718,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6492835,
+            "range": "± 2983454",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6758909,
+            "range": "± 1904281",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6237752,
+            "range": "± 2579266",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 603,
+            "range": "± 43",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 606,
+            "range": "± 39",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 648,
+            "range": "± 51",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 82004,
+            "range": "± 4926",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1380,
+            "range": "± 73",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1120065,
+            "range": "± 37939",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 816203,
+            "range": "± 11541",
             "unit": "ns/iter"
           }
         ]
