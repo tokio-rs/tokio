@@ -3,15 +3,13 @@ use crate::io::AsyncSeek;
 use std::io::SeekFrom;
 
 cfg_io_util! {
-    /// An extension trait which adds utility methods to [`AsyncSeek`] types.
-    ///
-    /// As a convenience, this trait may be imported using the [`prelude`]:
+    /// An extension trait that adds utility methods to [`AsyncSeek`] types.
     ///
     /// # Examples
     ///
     /// ```
-    /// use std::io::{Cursor, SeekFrom};
-    /// use tokio::prelude::*;
+    /// use std::io::{self, Cursor, SeekFrom};
+    /// use tokio::io::{AsyncSeekExt, AsyncReadExt};
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
@@ -32,7 +30,6 @@ cfg_io_util! {
     /// See [module][crate::io] documentation for more details.
     ///
     /// [`AsyncSeek`]: AsyncSeek
-    /// [`prelude`]: crate::prelude
     pub trait AsyncSeekExt: AsyncSeek {
         /// Creates a future which will seek an IO object, and then yield the
         /// new position in the object and the object itself.
@@ -50,7 +47,7 @@ cfg_io_util! {
         ///
         /// ```no_run
         /// use tokio::fs::File;
-        /// use tokio::prelude::*;
+        /// use tokio::io::{AsyncSeekExt, AsyncReadExt};
         ///
         /// use std::io::SeekFrom;
         ///

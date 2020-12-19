@@ -254,7 +254,7 @@
 //!
 //! ```no_run
 //! use tokio::net::TcpListener;
-//! use tokio::prelude::*;
+//! use tokio::io::{AsyncReadExt, AsyncWriteExt};
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -362,8 +362,6 @@ pub mod net;
 
 mod loom;
 mod park;
-
-pub mod prelude;
 
 cfg_process! {
     pub mod process;
