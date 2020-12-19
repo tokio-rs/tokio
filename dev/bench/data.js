@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608393959079,
+  "lastUpdate": 1608401635616,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -6271,6 +6271,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21856931,
             "range": "± 3304578",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "flo.huebsch@pm.me",
+            "name": "Florian Hübsch",
+            "username": "fl9"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e41e6cddbba0cf13403924937ffe02aae6639e28",
+          "message": "docs: tokio::main macro is also supported on rt (#3243)\n\nFixes: #3144\r\nRefs: #2225",
+          "timestamp": "2020-12-19T19:12:08+01:00",
+          "tree_id": "ee1af0c8a3b2ab9c9eaae05f2dca96ff966f42f9",
+          "url": "https://github.com/tokio-rs/tokio/commit/e41e6cddbba0cf13403924937ffe02aae6639e28"
+        },
+        "date": 1608401632891,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 161661,
+            "range": "± 15750",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 621301,
+            "range": "± 52216",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4860943,
+            "range": "± 996033",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18642677,
+            "range": "± 3122913",
             "unit": "ns/iter"
           }
         ]
