@@ -48,7 +48,7 @@ where
             return Poll::Ready(Ok(0));
         }
 
-        let n = ready!(Pin::new(me.writer).poll_write(cx, me.buf.bytes()))?;
+        let n = ready!(Pin::new(me.writer).poll_write(cx, me.buf.chunk()))?;
         me.buf.advance(n);
         Poll::Ready(Ok(n))
     }
