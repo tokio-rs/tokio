@@ -29,7 +29,7 @@ full = ["codec", "compat", "io", "time", "net", "rt"]
 
 net = ["tokio/net"]
 compat = ["futures-io",]
-codec = ["tokio/stream"]
+codec = []
 time = ["tokio/time","slab"]
 io = []
 rt = ["tokio/rt"]
