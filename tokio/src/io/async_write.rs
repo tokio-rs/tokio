@@ -167,7 +167,7 @@ pub trait AsyncWrite {
     ///
     /// Data is copied from each buffer in order, with the final buffer
     /// read from possibly being only partially consumed. This method must
-    /// behave as a call to [`write`] with the buffers concatenated would.
+    /// behave as a call to `write()` with the buffers concatenated would.
     ///
     /// The default implementation calls [`poll_write`] with either the first nonempty
     /// buffer provided, or an empty one if none exists.
