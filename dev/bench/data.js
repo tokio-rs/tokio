@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608409192443,
+  "lastUpdate": 1608409200431,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -6529,6 +6529,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 17118339,
             "range": "± 3425792",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "arve.knudsen@gmail.com",
+            "name": "Arve Knudsen",
+            "username": "aknuds1"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1b70507894035e066cb488c14ff328bd47ca696d",
+          "message": "net: remove {Tcp,Unix}Stream::shutdown() (#3298)\n\n`shutdown()` on `AsyncWrite` performs a TCP shutdown. This avoids method\r\nconflicts.\r\n\r\nCloses #3294",
+          "timestamp": "2020-12-19T12:17:52-08:00",
+          "tree_id": "dd3c414761b8a3713b63515e7666f108a1391743",
+          "url": "https://github.com/tokio-rs/tokio/commit/1b70507894035e066cb488c14ff328bd47ca696d"
+        },
+        "date": 1608409199359,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 191351,
+            "range": "± 24291",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 719065,
+            "range": "± 130878",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5412410,
+            "range": "± 1050325",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20823708,
+            "range": "± 2690528",
             "unit": "ns/iter"
           }
         ]
