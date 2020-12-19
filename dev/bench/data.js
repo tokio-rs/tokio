@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608376382897,
+  "lastUpdate": 1608376393217,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -6067,6 +6067,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19098313,
             "range": "± 2576013",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d948ccedfce534953a18acf46c8c6572103567c7",
+          "message": "chore: fix stress test (#3297)",
+          "timestamp": "2020-12-19T12:11:10+01:00",
+          "tree_id": "3c417da4134a45bfff1f2d85b9b8cf410dfd9bf9",
+          "url": "https://github.com/tokio-rs/tokio/commit/d948ccedfce534953a18acf46c8c6572103567c7"
+        },
+        "date": 1608376392232,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 199990,
+            "range": "± 84079",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 717738,
+            "range": "± 104746",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5247837,
+            "range": "± 387636",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21456208,
+            "range": "± 2364932",
             "unit": "ns/iter"
           }
         ]
