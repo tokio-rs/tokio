@@ -136,7 +136,7 @@ impl OwnedWriteHalf {
 impl Drop for OwnedWriteHalf {
     fn drop(&mut self) {
         if self.shutdown_on_drop {
-            let _ = self.inner.shutdown(Shutdown::Write);
+            let _ = self.inner.shutdown_std(Shutdown::Write);
         }
     }
 }
@@ -170,7 +170,7 @@ impl AsyncWrite for OwnedWriteHalf {
 
     // `poll_shutdown` on a write half shutdowns the stream in the "write" direction.
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        let res = self.inner.shutdown(Shutdown::Write);
+        let res = self.inner.shutdown_std(Shutdown::Write);
         if res.is_ok() {
             Pin::into_inner(self).shutdown_on_drop = false;
         }

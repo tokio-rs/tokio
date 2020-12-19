@@ -56,6 +56,13 @@ cfg_net! {
     ///
     /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
+    ///
+    /// To shut down the stream in the write direction, you can call the
+    /// [`shutdown()`] method. This will cause the other peer to receive a read of
+    /// length 0, indicating that no more data will be sent. This only closes
+    /// the stream in one direction.
+    ///
+    /// [`shutdown()`]: fn@crate::io::AsyncWriteExt::shutdown
     pub struct TcpStream {
         io: PollEvented<mio::net::TcpStream>,
     }
@@ -685,26 +692,7 @@ impl TcpStream {
     /// This function will cause all pending and future I/O on the specified
     /// portions to return immediately with an appropriate value (see the
     /// documentation of `Shutdown`).
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::net::TcpStream;
-    /// use std::error::Error;
-    /// use std::net::Shutdown;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     // Connect to a peer
-    ///     let stream = TcpStream::connect("127.0.0.1:8080").await?;
-    ///
-    ///     // Shutdown the stream
-    ///     stream.shutdown(Shutdown::Write)?;
-    ///
-    ///     Ok(())
-    /// }
-    /// ```
-    pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
+    pub(super) fn shutdown_std(&self, how: Shutdown) -> io::Result<()> {
         self.io.shutdown(how)
     }
 
@@ -882,10 +870,10 @@ impl TcpStream {
     /// this comes at the cost of a heap allocation.
     ///
     /// **Note:** Dropping the write half will shut down the write half of the TCP
-    /// stream. This is equivalent to calling [`shutdown(Write)`] on the `TcpStream`.
+    /// stream. This is equivalent to calling [`shutdown()`] on the `TcpStream`.
     ///
     /// [`split`]: TcpStream::split()
-    /// [`shutdown(Write)`]: fn@crate::net::TcpStream::shutdown
+    /// [`shutdown()`]: fn@crate::io::AsyncWriteExt::shutdown
     pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
         split_owned(self)
     }
@@ -979,7 +967,7 @@ impl AsyncWrite for TcpStream {
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.shutdown(std::net::Shutdown::Write)?;
+        self.shutdown_std(std::net::Shutdown::Write)?;
         Poll::Ready(Ok(()))
     }
 }

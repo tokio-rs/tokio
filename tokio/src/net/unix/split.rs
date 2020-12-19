@@ -83,7 +83,7 @@ impl AsyncWrite for WriteHalf<'_> {
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.0.shutdown(Shutdown::Write).into()
+        self.0.shutdown_std(Shutdown::Write).into()
     }
 }
 

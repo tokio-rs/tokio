@@ -171,7 +171,7 @@ impl AsyncWrite for WriteHalf<'_> {
 
     // `poll_shutdown` on a write half shutdowns the stream in the "write" direction.
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.0.shutdown(Shutdown::Write).into()
+        self.0.shutdown_std(Shutdown::Write).into()
     }
 }
 
