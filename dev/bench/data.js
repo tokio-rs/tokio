@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608409177029,
+  "lastUpdate": 1608409180704,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -3401,6 +3401,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 529,
             "range": "± 57",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "arve.knudsen@gmail.com",
+            "name": "Arve Knudsen",
+            "username": "aknuds1"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1b70507894035e066cb488c14ff328bd47ca696d",
+          "message": "net: remove {Tcp,Unix}Stream::shutdown() (#3298)\n\n`shutdown()` on `AsyncWrite` performs a TCP shutdown. This avoids method\r\nconflicts.\r\n\r\nCloses #3294",
+          "timestamp": "2020-12-19T12:17:52-08:00",
+          "tree_id": "dd3c414761b8a3713b63515e7666f108a1391743",
+          "url": "https://github.com/tokio-rs/tokio/commit/1b70507894035e066cb488c14ff328bd47ca696d"
+        },
+        "date": 1608409178108,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1011,
+            "range": "± 375",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 17026,
+            "range": "± 5600",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1056,
+            "range": "± 216",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 17211,
+            "range": "± 7207",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 587,
+            "range": "± 89",
             "unit": "ns/iter"
           }
         ]
