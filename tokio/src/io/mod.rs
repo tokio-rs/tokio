@@ -198,25 +198,37 @@ pub use self::async_write::AsyncWrite;
 mod read_buf;
 pub use self::read_buf::ReadBuf;
 
-mod chain;
-mod flush;
-mod read;
-mod read_exact;
-mod read_int;
-mod read_to_end;
-mod shutdown;
-mod write;
-mod write_all;
-mod write_buf;
-mod write_int;
-// Used by process
-pub(crate) use read_to_end::read_to_end;
-mod read_to_string;
-mod take;
-pub use take::Take;
-mod async_read_futures;
-mod read_line;
-mod read_until;
+cfg_io_util! {
+    mod chain;
+    mod flush;
+    mod read;
+    mod read_exact;
+    mod read_int;
+    mod read_to_end;
+    mod shutdown;
+    mod write;
+    mod write_all;
+    mod write_buf;
+    mod write_int;
+
+    mod read_to_string;
+    mod take;
+    pub use take::Take;
+    mod async_read_futures;
+    mod read_line;
+    mod read_until;
+
+    cfg_process! {
+        pub(crate) use read_to_end::read_to_end;
+    }
+}
+
+cfg_not_io_util! {
+    cfg_process! {
+        mod read_to_end;
+        pub(crate) use read_to_end::read_to_end;
+    }
+}
 
 // Re-export some types from `std::io` so that users don't have to deal
 // with conflicts when `use`ing `tokio::io` and `std::io`.
@@ -268,12 +280,6 @@ cfg_io_util! {
         copy, copy_buf, duplex, empty, repeat, sink, AsyncBufReadExt, AsyncSeekExt,
         BufReader, BufStream, BufWriter, DuplexStream, Empty, Lines, Repeat, Sink, Split,
     };
-}
-
-cfg_not_io_util! {
-    cfg_process! {
-        pub(crate) mod util;
-    }
 }
 
 cfg_io_blocking! {

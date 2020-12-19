@@ -1,36 +1,40 @@
-use super::async_read_futures::{self, read_buf};
-use super::chain::{chain, Chain};
-use super::read::{read, Read};
 use super::read_buf::ReadBuf;
-use super::read_exact::{read_exact, ReadExact};
-use super::read_int::{
-    ReadI128, ReadI128Le, ReadI16, ReadI16Le, ReadI32, ReadI32Le, ReadI64, ReadI64Le, ReadI8,
-    ReadU128, ReadU128Le, ReadU16, ReadU16Le, ReadU32, ReadU32Le, ReadU64, ReadU64Le, ReadU8,
-};
-use super::read_to_end::{read_to_end, ReadToEnd};
-use super::read_to_string::{read_to_string, ReadToString};
-use super::take::{take, Take};
+
 use std::io;
 use std::ops::DerefMut;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use bytes::BufMut;
+cfg_io_util! {
+    use super::async_read_futures::{self, read_buf};
+    use super::chain::{chain, Chain};
+    use super::read::{read, Read};
+    use super::read_exact::{read_exact, ReadExact};
+    use super::read_int::{
+        ReadI128, ReadI128Le, ReadI16, ReadI16Le, ReadI32, ReadI32Le, ReadI64, ReadI64Le, ReadI8,
+        ReadU128, ReadU128Le, ReadU16, ReadU16Le, ReadU32, ReadU32Le, ReadU64, ReadU64Le, ReadU8,
+    };
+    use super::read_to_end::{read_to_end, ReadToEnd};
+    use super::read_to_string::{read_to_string, ReadToString};
+    use super::take::{take, Take};
 
-/// Defines numeric reader
-macro_rules! read_impl {
-    (
-        $(
-            $(#[$outer:meta])*
-            fn $name:ident(&mut self) -> $($fut:ident)*;
-        )*
-    ) => {
-        $(
-            $(#[$outer])*
-            fn $name<'a>(&'a mut self) -> $($fut)*<&'a mut Self> where Self: Unpin + Sized {
-                $($fut)*::new(self)
-            }
-        )*
+    use bytes::BufMut;
+
+    /// Defines numeric reader
+    macro_rules! read_impl {
+        (
+            $(
+                $(#[$outer:meta])*
+                fn $name:ident(&mut self) -> $($fut:ident)*;
+            )*
+        ) => {
+            $(
+                $(#[$outer])*
+                fn $name<'a>(&'a mut self) -> $($fut)*<&'a mut Self> where Self: Unpin + Sized {
+                    $($fut)*::new(self)
+                }
+            )*
+        }
     }
 }
 
@@ -115,6 +119,7 @@ pub trait AsyncRead {
     ///     Ok(())
     /// }
     /// ```
+    #[cfg(feature = "io-util")]
     fn chain<R>(self, next: R) -> Chain<Self, R>
     where
         Self: Sized,
@@ -183,6 +188,7 @@ pub trait AsyncRead {
     ///     Ok(())
     /// }
     /// ```
+    #[cfg(feature = "io-util")]
     fn read<'a>(&'a mut self, buf: &'a mut [u8]) -> Read<'a, Self>
     where
         Self: Sized + Unpin,
@@ -247,6 +253,7 @@ pub trait AsyncRead {
     ///     Ok(())
     /// }
     /// ```
+    #[cfg(feature = "io-util")]
     fn read_buf<'a, B>(&'a mut self, buf: &'a mut B) -> async_read_futures::ReadBuf<'a, Self, B>
     where
         Self: Sized + Unpin,
@@ -301,6 +308,7 @@ pub trait AsyncRead {
     /// ```
     ///
     /// [`ErrorKind::UnexpectedEof`]: std::io::ErrorKind::UnexpectedEof
+    #[cfg(feature = "io-util")]
     fn read_exact<'a>(&'a mut self, buf: &'a mut [u8]) -> ReadExact<'a, Self>
     where
         Self: Unpin + Sized,
@@ -308,6 +316,7 @@ pub trait AsyncRead {
         read_exact(self, buf)
     }
 
+    #[cfg(feature = "io-util")]
     read_impl! {
         /// Reads an unsigned 8 bit integer from the underlying reader.
         ///
@@ -1045,6 +1054,7 @@ pub trait AsyncRead {
     /// file.)
     ///
     /// [`tokio::fs::read`]: fn@crate::fs::read
+    #[cfg(feature = "io-util")]
     fn read_to_end<'a>(&'a mut self, buf: &'a mut Vec<u8>) -> ReadToEnd<'a, Self>
     where
         Self: Sized + Unpin,
@@ -1092,6 +1102,7 @@ pub trait AsyncRead {
     /// reading from a file.)
     ///
     /// [`crate::fs::read_to_string`]: fn@crate::fs::read_to_string
+    #[cfg(feature = "io-util")]
     fn read_to_string<'a>(&'a mut self, dst: &'a mut String) -> ReadToString<'a, Self>
     where
         Self: Sized + Unpin,
@@ -1130,6 +1141,7 @@ pub trait AsyncRead {
     ///     Ok(())
     /// }
     /// ```
+    #[cfg(feature = "io-util")]
     fn take(self, limit: u64) -> Take<Self>
     where
         Self: Sized,

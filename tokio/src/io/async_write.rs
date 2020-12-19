@@ -3,36 +3,38 @@ use std::ops::DerefMut;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use super::flush::{flush, Flush};
-use super::shutdown::{shutdown, Shutdown};
-use super::write::{write, Write};
-use super::write_all::{write_all, WriteAll};
-use super::write_buf::{write_buf, WriteBuf};
-use super::write_int::{
-    WriteI128, WriteI128Le, WriteI16, WriteI16Le, WriteI32, WriteI32Le, WriteI64, WriteI64Le,
-    WriteI8,
-};
-use super::write_int::{
-    WriteU128, WriteU128Le, WriteU16, WriteU16Le, WriteU32, WriteU32Le, WriteU64, WriteU64Le,
-    WriteU8,
-};
+cfg_io_util! {
+    use super::flush::{flush, Flush};
+    use super::shutdown::{shutdown, Shutdown};
+    use super::write::{write, Write};
+    use super::write_all::{write_all, WriteAll};
+    use super::write_buf::{write_buf, WriteBuf};
+    use super::write_int::{
+        WriteI128, WriteI128Le, WriteI16, WriteI16Le, WriteI32, WriteI32Le, WriteI64, WriteI64Le,
+        WriteI8,
+    };
+    use super::write_int::{
+        WriteU128, WriteU128Le, WriteU16, WriteU16Le, WriteU32, WriteU32Le, WriteU64, WriteU64Le,
+        WriteU8,
+    };
 
-use bytes::Buf;
+    use bytes::Buf;
 
-/// Defines numeric writer
-macro_rules! write_impl {
-    (
-        $(
-            $(#[$outer:meta])*
-            fn $name:ident(&mut self, n: $ty:ty) -> $($fut:ident)*;
-        )*
-    ) => {
-        $(
-            $(#[$outer])*
-            fn $name<'a>(&'a mut self, n: $ty) -> $($fut)*<&'a mut Self> where Self: Unpin + Sized {
-                $($fut)*::new(self, n)
-            }
-        )*
+    /// Defines numeric writer
+    macro_rules! write_impl {
+        (
+            $(
+                $(#[$outer:meta])*
+                fn $name:ident(&mut self, n: $ty:ty) -> $($fut:ident)*;
+            )*
+        ) => {
+            $(
+                $(#[$outer])*
+                fn $name<'a>(&'a mut self, n: $ty) -> $($fut)*<&'a mut Self> where Self: Unpin + Sized {
+                    $($fut)*::new(self, n)
+                }
+            )*
+        }
     }
 }
 
@@ -256,6 +258,7 @@ pub trait AsyncWrite {
     ///     Ok(())
     /// }
     /// ```
+    #[cfg(feature = "io-util")]
     fn write<'a>(&'a mut self, src: &'a [u8]) -> Write<'a, Self>
     where
         Self: Sized + Unpin,
@@ -328,6 +331,7 @@ pub trait AsyncWrite {
     ///     Ok(())
     /// }
     /// ```
+    #[cfg(feature = "io-util")]
     fn write_buf<'a, B>(&'a mut self, src: &'a mut B) -> WriteBuf<'a, Self, B>
     where
         Self: Sized + Unpin,
@@ -369,6 +373,7 @@ pub trait AsyncWrite {
     /// ```
     ///
     /// [`write`]: AsyncWrite::write
+    #[cfg(feature = "io-util")]
     fn write_all<'a>(&'a mut self, src: &'a [u8]) -> WriteAll<'a, Self>
     where
         Self: Sized + Unpin,
@@ -376,6 +381,7 @@ pub trait AsyncWrite {
         write_all(self, src)
     }
 
+    #[cfg(feature = "io-util")]
     write_impl! {
         /// Writes an unsigned 8-bit integer to the underlying writer.
         ///
@@ -1099,6 +1105,7 @@ pub trait AsyncWrite {
     ///     Ok(())
     /// }
     /// ```
+    #[cfg(feature = "io-util")]
     fn flush(&mut self) -> Flush<'_, Self>
     where
         Self: Sized + Unpin,
@@ -1138,6 +1145,7 @@ pub trait AsyncWrite {
     ///     Ok(())
     /// }
     /// ```
+    #[cfg(feature = "io-util")]
     fn shutdown(&mut self) -> Shutdown<'_, Self>
     where
         Self: Sized + Unpin,
