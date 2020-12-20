@@ -56,7 +56,7 @@ fn send_sync_bound() {
 
 rt_test! {
     use tokio::net::{TcpListener, TcpStream, UdpSocket};
-    use tokio::prelude::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::runtime::Runtime;
     use tokio::sync::oneshot;
     use tokio::{task, time};

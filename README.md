@@ -55,7 +55,7 @@ A basic TCP echo server with Tokio:
 
 ```rust,no_run
 use tokio::net::TcpListener;
-use tokio::prelude::*;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

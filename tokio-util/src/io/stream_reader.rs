@@ -131,7 +131,7 @@ where
         loop {
             if self.as_mut().has_chunk() {
                 // This unwrap is very sad, but it can't be avoided.
-                let buf = self.project().chunk.as_ref().unwrap().bytes();
+                let buf = self.project().chunk.as_ref().unwrap().chunk();
                 return Poll::Ready(Ok(buf));
             } else {
                 match self.as_mut().project().inner.poll_next(cx) {

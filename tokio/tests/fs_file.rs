@@ -2,7 +2,7 @@
 #![cfg(feature = "full")]
 
 use tokio::fs::File;
-use tokio::prelude::*;
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tokio_test::task;
 
 use std::io::prelude::*;

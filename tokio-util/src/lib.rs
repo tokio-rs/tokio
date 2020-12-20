@@ -113,7 +113,7 @@ mod util {
         }
 
         let n = {
-            let dst = buf.bytes_mut();
+            let dst = buf.chunk_mut();
             let dst = unsafe { &mut *(dst as *mut _ as *mut [MaybeUninit<u8>]) };
             let mut buf = ReadBuf::uninit(dst);
             let ptr = buf.filled().as_ptr();
@@ -187,10 +187,10 @@ mod util {
 
         let n = if io.is_write_vectored() {
             let mut slices = [IoSlice::new(&[]); MAX_BUFS];
-            let cnt = buf.bytes_vectored(&mut slices);
+            let cnt = buf.chunks_vectored(&mut slices);
             ready!(io.poll_write_vectored(cx, &slices[..cnt]))?
         } else {
-            ready!(io.poll_write(cx, buf.bytes()))?
+            ready!(io.poll_write(cx, buf.chunk()))?
         };
 
         buf.advance(n);

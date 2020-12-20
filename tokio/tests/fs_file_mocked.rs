@@ -62,7 +62,7 @@ pub(crate) mod sync {
 }
 use fs::sys;
 
-use tokio::prelude::*;
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tokio_test::{assert_pending, assert_ready, assert_ready_err, assert_ready_ok, task};
 
 use std::io::SeekFrom;

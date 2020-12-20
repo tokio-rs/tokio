@@ -76,7 +76,7 @@ impl<C: Decoder + Unpin> Stream for UdpFramed<C> {
             let addr = unsafe {
                 // Convert `&mut [MaybeUnit<u8>]` to `&mut [u8]` because we will be
                 // writing to it via `poll_recv_from` and therefore initializing the memory.
-                let buf = &mut *(pin.rd.bytes_mut() as *mut _ as *mut [MaybeUninit<u8>]);
+                let buf = &mut *(pin.rd.chunk_mut() as *mut _ as *mut [MaybeUninit<u8>]);
                 let mut read = ReadBuf::uninit(buf);
                 let ptr = read.filled().as_ptr();
                 let res = ready!(Pin::new(&mut pin.socket).poll_recv_from(cx, &mut read));

@@ -39,7 +39,7 @@
 //! Specifically, given the following:
 //!
 //! ```
-//! use tokio::prelude::*;
+//! use tokio::io::{AsyncRead, AsyncWrite};
 //! use tokio_util::codec::{Framed, LengthDelimitedCodec};
 //!
 //! use futures::SinkExt;

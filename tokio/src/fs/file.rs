@@ -37,8 +37,7 @@ use std::task::Poll::*;
 /// the data to disk.
 ///
 /// Reading and writing to a `File` is usually done using the convenience
-/// methods found on the [`AsyncReadExt`] and [`AsyncWriteExt`] traits. Examples
-/// import these traits through [the prelude].
+/// methods found on the [`AsyncReadExt`] and [`AsyncWriteExt`] traits.
 ///
 /// [std]: struct@std::fs::File
 /// [`AsyncSeek`]: trait@crate::io::AsyncSeek
@@ -46,7 +45,6 @@ use std::task::Poll::*;
 /// [`sync_all`]: fn@crate::fs::File::sync_all
 /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
 /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
-/// [the prelude]: crate::prelude
 ///
 /// # Examples
 ///
@@ -54,7 +52,7 @@ use std::task::Poll::*;
 ///
 /// ```no_run
 /// use tokio::fs::File;
-/// use tokio::prelude::*; // for write_all()
+/// use tokio::io::AsyncWriteExt; // for write_all()
 ///
 /// # async fn dox() -> std::io::Result<()> {
 /// let mut file = File::create("foo.txt").await?;
@@ -67,7 +65,7 @@ use std::task::Poll::*;
 ///
 /// ```no_run
 /// use tokio::fs::File;
-/// use tokio::prelude::*; // for read_to_end()
+/// use tokio::io::AsyncReadExt; // for read_to_end()
 ///
 /// # async fn dox() -> std::io::Result<()> {
 /// let mut file = File::open("foo.txt").await?;
@@ -125,7 +123,7 @@ impl File {
     ///
     /// ```no_run
     /// use tokio::fs::File;
-    /// use tokio::prelude::*;
+    /// use tokio::io::AsyncReadExt;
     ///
     /// # async fn dox() -> std::io::Result<()> {
     /// let mut file = File::open("foo.txt").await?;
@@ -169,7 +167,7 @@ impl File {
     ///
     /// ```no_run
     /// use tokio::fs::File;
-    /// use tokio::prelude::*;
+    /// use tokio::io::AsyncWriteExt;
     ///
     /// # async fn dox() -> std::io::Result<()> {
     /// let mut file = File::create("foo.txt").await?;
@@ -221,7 +219,7 @@ impl File {
     ///
     /// ```no_run
     /// use tokio::fs::File;
-    /// use tokio::prelude::*;
+    /// use tokio::io::AsyncWriteExt;
     ///
     /// # async fn dox() -> std::io::Result<()> {
     /// let mut file = File::create("foo.txt").await?;
@@ -256,7 +254,7 @@ impl File {
     ///
     /// ```no_run
     /// use tokio::fs::File;
-    /// use tokio::prelude::*;
+    /// use tokio::io::AsyncWriteExt;
     ///
     /// # async fn dox() -> std::io::Result<()> {
     /// let mut file = File::create("foo.txt").await?;
@@ -294,7 +292,7 @@ impl File {
     ///
     /// ```no_run
     /// use tokio::fs::File;
-    /// use tokio::prelude::*;
+    /// use tokio::io::AsyncWriteExt;
     ///
     /// # async fn dox() -> std::io::Result<()> {
     /// let mut file = File::create("foo.txt").await?;
