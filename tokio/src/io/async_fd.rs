@@ -534,7 +534,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
             }
         }
 
-        result.into()
+        result
     }
 
     /// Performs the IO operation `f`; if `f` returns [`Pending`], the readiness
@@ -613,7 +613,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
             }
         }
 
-        result.into()
+        result
     }
 
     /// Performs the IO operation `f`; if `f` returns [`Pending`], the readiness
