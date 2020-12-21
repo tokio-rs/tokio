@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608422326157,
+  "lastUpdate": 1608587568460,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -10401,6 +10401,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 915,
             "range": "± 4",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "bIgBV@users.noreply.github.com",
+            "name": "Bhargav",
+            "username": "bIgBV"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c7671a03840751f58b7a509386b8fe3b5e670a37",
+          "message": "io: add _mut variants of methods on AsyncFd (#3304)\n\nCo-authored-by: Alice Ryhl <alice@ryhl.io>",
+          "timestamp": "2020-12-21T22:51:28+01:00",
+          "tree_id": "9d3f26151c9ddd292c129f43c0fac83792073f62",
+          "url": "https://github.com/tokio-rs/tokio/commit/c7671a03840751f58b7a509386b8fe3b5e670a37"
+        },
+        "date": 1608587567499,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 13156,
+            "range": "± 2267",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 927,
+            "range": "± 4",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 540,
+            "range": "± 18",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 13174,
+            "range": "± 2983",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 920,
+            "range": "± 5",
             "unit": "ns/iter"
           }
         ]
