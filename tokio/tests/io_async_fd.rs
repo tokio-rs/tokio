@@ -201,7 +201,7 @@ async fn reset_readable() {
 
     let mut guard = readable.await.unwrap();
 
-    guard.with_io(|| afd_a.get_ref().read(&mut [0])).unwrap();
+    guard.with_io(|_| afd_a.get_ref().read(&mut [0])).unwrap();
 
     // `a` is not readable, but the reactor still thinks it is
     // (because we have not observed a not-ready error yet)
@@ -234,7 +234,7 @@ async fn reset_writable() {
 
     // Write until we get a WouldBlock. This also clears the ready state.
     loop {
-        if let Err(e) = guard.with_io(|| afd_a.get_ref().write(&[0; 512][..])) {
+        if let Err(e) = guard.with_io(|_| afd_a.get_ref().write(&[0; 512][..])) {
             assert_eq!(ErrorKind::WouldBlock, e.kind());
             break;
         }
@@ -327,13 +327,13 @@ async fn with_poll() {
     afd_a.get_ref().read_exact(&mut [0]).unwrap();
 
     // Should not clear the readable state
-    let _ = guard.with_poll(|| Poll::Ready(()));
+    let _ = guard.with_poll(|_| Poll::Ready(()));
 
     // Still readable...
     let _ = afd_a.readable().await.unwrap();
 
     // Should clear the readable state
-    let _ = guard.with_poll(|| Poll::Pending::<()>);
+    let _ = guard.with_poll(|_| Poll::Pending::<()>);
 
     // Assert not readable
     let readable = afd_a.readable();
