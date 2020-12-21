@@ -539,9 +539,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
         }
 
         match result {
-            Err(err) if err.kind() == io::ErrorKind::WouldBlock => {
-                Err(TryIoError::WouldBlock)
-            },
+            Err(err) if err.kind() == io::ErrorKind::WouldBlock => Err(TryIoError::WouldBlock),
             result => Ok(result),
         }
     }
@@ -602,9 +600,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
         }
 
         match result {
-            Err(err) if err.kind() == io::ErrorKind::WouldBlock => {
-                Err(TryIoError::WouldBlock)
-            },
+            Err(err) if err.kind() == io::ErrorKind::WouldBlock => Err(TryIoError::WouldBlock),
             result => Ok(result),
         }
     }
@@ -636,4 +632,3 @@ pub enum TryIoError {
     /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
     WouldBlock,
 }
-

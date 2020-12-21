@@ -201,7 +201,10 @@ async fn reset_readable() {
 
     let mut guard = readable.await.unwrap();
 
-    guard.try_io(|_| afd_a.get_ref().read(&mut [0])).unwrap().unwrap();
+    guard
+        .try_io(|_| afd_a.get_ref().read(&mut [0]))
+        .unwrap()
+        .unwrap();
 
     // `a` is not readable, but the reactor still thinks it is
     // (because we have not observed a not-ready error yet)
@@ -233,7 +236,10 @@ async fn reset_writable() {
     let mut guard = afd_a.writable().await.unwrap();
 
     // Write until we get a WouldBlock. This also clears the ready state.
-    while guard.try_io(|_| afd_a.get_ref().write(&[0; 512][..])).is_ok() { }
+    while guard
+        .try_io(|_| afd_a.get_ref().write(&[0; 512][..]))
+        .is_ok()
+    {}
 
     // Writable state should be cleared now.
     let writable = afd_a.writable();
