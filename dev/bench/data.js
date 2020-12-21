@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608587596775,
+  "lastUpdate": 1608587604757,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -16019,6 +16019,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 674192,
             "range": "± 2575",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "bIgBV@users.noreply.github.com",
+            "name": "Bhargav",
+            "username": "bIgBV"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c7671a03840751f58b7a509386b8fe3b5e670a37",
+          "message": "io: add _mut variants of methods on AsyncFd (#3304)\n\nCo-authored-by: Alice Ryhl <alice@ryhl.io>",
+          "timestamp": "2020-12-21T22:51:28+01:00",
+          "tree_id": "9d3f26151c9ddd292c129f43c0fac83792073f62",
+          "url": "https://github.com/tokio-rs/tokio/commit/c7671a03840751f58b7a509386b8fe3b5e670a37"
+        },
+        "date": 1608587603668,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6783986,
+            "range": "± 2854254",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6600011,
+            "range": "± 1187726",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6483181,
+            "range": "± 2154498",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 685,
+            "range": "± 30",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 652,
+            "range": "± 24",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 653,
+            "range": "± 56",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 86586,
+            "range": "± 15193",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1446,
+            "range": "± 188",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1140068,
+            "range": "± 23864",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 822555,
+            "range": "± 11110",
             "unit": "ns/iter"
           }
         ]
