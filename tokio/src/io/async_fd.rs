@@ -444,7 +444,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     pub fn with_io<R>(
         &mut self,
         f: impl FnOnce(&AsyncFd<Inner>) -> io::Result<R>,
-    ) -> Poll<io::Result<R>> {
+    ) -> io::Result<R> {
         let result = f(self.async_fd);
 
         if let Err(e) = result.as_ref() {
@@ -468,8 +468,11 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// create this `AsyncFdReadyGuard`.
     ///
     /// [`Pending`]: std::task::Poll::Pending
-    pub fn with_poll<R>(&mut self, f: impl FnOnce() -> std::task::Poll<R>) -> std::task::Poll<R> {
-        let result = f();
+    pub fn with_poll<R>(
+        &mut self,
+        f: impl FnOnce(&AsyncFd<Inner>) -> std::task::Poll<R>,
+    ) -> std::task::Poll<R> {
+        let result = f(&self.async_fd);
 
         if result.is_pending() {
             self.clear_ready();
@@ -520,7 +523,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     pub fn with_io<R>(
         &mut self,
         f: impl FnOnce(&mut AsyncFd<Inner>) -> io::Result<R>,
-    ) -> Poll<io::Result<R>> {
+    ) -> io::Result<R> {
         let result = f(&mut self.async_fd);
 
         if let Err(e) = result.as_ref() {
@@ -544,8 +547,11 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     /// create this `AsyncFdReadyGuard`.
     ///
     /// [`Pending`]: std::task::Poll::Pending
-    pub fn with_poll<R>(&mut self, f: impl FnOnce() -> std::task::Poll<R>) -> std::task::Poll<R> {
-        let result = f();
+    pub fn with_poll<R>(
+        &mut self,
+        f: impl FnOnce(&mut AsyncFd<Inner>) -> std::task::Poll<R>,
+    ) -> std::task::Poll<R> {
+        let result = f(&mut self.async_fd);
 
         if result.is_pending() {
             self.clear_ready();
