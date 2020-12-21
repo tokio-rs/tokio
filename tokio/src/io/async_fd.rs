@@ -56,6 +56,87 @@ use std::{task::Context, task::Poll};
 /// the limitation that only one task can wait on each direction (read or write)
 /// at a time.
 ///
+/// # Examples
+///
+/// This example shows how to turn [`std::net::TcpStream`] asynchronous using
+/// `AsyncFd`.  It implements `read` as an async fn, and `AsyncWrite` as a trait
+/// to show how to implement both approaches.
+///
+/// ```no_run
+/// use futures::ready;
+/// use std::io::{self, Read, Write, ErrorKind};
+/// use std::net::TcpStream;
+/// use std::pin::Pin;
+/// use std::task::{Context, Poll};
+/// use tokio::io::AsyncWrite;
+/// use tokio::io::unix::AsyncFd;
+///
+/// pub struct AsyncTcpStream {
+///     inner: AsyncFd<TcpStream>,
+/// }
+///
+/// impl AsyncTcpStream {
+///     pub fn new(tcp: TcpStream) -> io::Result<Self> {
+///         Ok(Self {
+///             inner: AsyncFd::new(tcp)?,
+///         })
+///     }
+///
+///     pub async fn read(&self, out: &mut [u8]) -> io::Result<usize> {
+///         loop {
+///             let mut guard = self.inner.readable().await?;
+///
+///             match guard.with_io(|inner| inner.get_ref().read(out)) {
+///                 Err(err) if err.kind() == ErrorKind::WouldBlock => continue,
+///                 result => return result,
+///             }
+///         }
+///     }
+/// }
+///
+/// impl AsyncWrite for AsyncTcpStream {
+///     fn poll_write(
+///         self: Pin<&mut Self>,
+///         cx: &mut Context<'_>,
+///         buf: &[u8]
+///     ) -> Poll<io::Result<usize>> {
+///         loop {
+///             let mut guard = ready!(self.inner.poll_write_ready(cx))?;
+///
+///             match guard.with_io(|inner| inner.get_ref().write(buf)) {
+///                 Err(err) if err.kind() == ErrorKind::WouldBlock => continue,
+///                 result => return Poll::Ready(result),
+///             }
+///         }
+///     }
+///
+///     fn poll_flush(
+///         self: Pin<&mut Self>,
+///         cx: &mut Context<'_>,
+///     ) -> Poll<io::Result<()>> {
+///         loop {
+///             let mut guard = ready!(self.inner.poll_write_ready(cx))?;
+///
+///             match guard.with_io(|inner| inner.get_ref().flush()) {
+///                 Err(err) if err.kind() == ErrorKind::WouldBlock => continue,
+///                 result => return Poll::Ready(result),
+///             }
+///         }
+///     }
+///
+///     fn poll_shutdown(
+///         mut self: Pin<&mut Self>,
+///         cx: &mut Context<'_>,
+///     ) -> Poll<io::Result<()>> {
+///         ready!(self.as_mut().poll_flush(cx))?;
+///
+///         self.inner.get_ref().shutdown(std::net::Shutdown::Write)?;
+///
+///         Poll::Ready(Ok(()))
+///     }
+/// }
+/// ```
+///
 /// [`readable`]: method@Self::readable
 /// [`writable`]: method@Self::writable
 /// [`AsyncFdReadyGuard`]: struct@self::AsyncFdReadyGuard
