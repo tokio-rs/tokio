@@ -88,7 +88,7 @@ use std::{task::Context, task::Poll};
 ///
 ///             match guard.try_io(|inner| inner.get_ref().read(out)) {
 ///                 Ok(result) => return result,
-///                 Err(TryIoError::WouldBlock) => continue,
+///                 Err(_would_block) => continue,
 ///             }
 ///         }
 ///     }
@@ -105,7 +105,7 @@ use std::{task::Context, task::Poll};
 ///
 ///             match guard.try_io(|inner| inner.get_ref().write(buf)) {
 ///                 Ok(result) => return Poll::Ready(result),
-///                 Err(TryIoError::WouldBlock) => continue,
+///                 Err(_would_block) => continue,
 ///             }
 ///         }
 ///     }
@@ -119,7 +119,7 @@ use std::{task::Context, task::Poll};
 ///
 ///             match guard.try_io(|inner| inner.get_ref().flush()) {
 ///                 Ok(result) => return Poll::Ready(result),
-///                 Err(TryIoError::WouldBlock) => continue,
+///                 Err(_would_block) => continue,
 ///             }
 ///         }
 ///     }
@@ -539,7 +539,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
         }
 
         match result {
-            Err(err) if err.kind() == io::ErrorKind::WouldBlock => Err(TryIoError::WouldBlock),
+            Err(err) if err.kind() == io::ErrorKind::WouldBlock => Err(TryIoError(())),
             result => Ok(result),
         }
     }
@@ -600,7 +600,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
         }
 
         match result {
-            Err(err) if err.kind() == io::ErrorKind::WouldBlock => Err(TryIoError::WouldBlock),
+            Err(err) if err.kind() == io::ErrorKind::WouldBlock => Err(TryIoError(())),
             result => Ok(result),
         }
     }
@@ -624,11 +624,9 @@ impl<'a, T: std::fmt::Debug + AsRawFd> std::fmt::Debug for AsyncFdReadyMutGuard<
 
 /// The error type returned by [`try_io`].
 ///
+/// This error indicates that the IO resource returned a [`WouldBlock`] error.
+///
+/// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
 /// [`try_io`]: method@AsyncFdReadyGuard::try_io
 #[derive(Debug)]
-pub enum TryIoError {
-    /// This error indicates that the IO resource returned a [`WouldBlock`] error.
-    ///
-    /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
-    WouldBlock,
-}
+pub struct TryIoError(());
