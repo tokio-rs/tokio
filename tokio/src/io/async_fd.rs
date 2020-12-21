@@ -64,7 +64,7 @@ use std::{task::Context, task::Poll};
 ///
 /// ```no_run
 /// use futures::ready;
-/// use std::io::{self, Read, Write, ErrorKind};
+/// use std::io::{self, Read, Write};
 /// use std::net::TcpStream;
 /// use std::pin::Pin;
 /// use std::task::{Context, Poll};
@@ -86,9 +86,9 @@ use std::{task::Context, task::Poll};
 ///         loop {
 ///             let mut guard = self.inner.readable().await?;
 ///
-///             match guard.with_io(|inner| inner.get_ref().read(out)) {
-///                 Err(err) if err.kind() == ErrorKind::WouldBlock => continue,
-///                 result => return result,
+///             match guard.try_io(|inner| inner.get_ref().read(out)) {
+///                 Ok(result) => return result,
+///                 Err(_would_block) => continue,
 ///             }
 ///         }
 ///     }
@@ -103,9 +103,9 @@ use std::{task::Context, task::Poll};
 ///         loop {
 ///             let mut guard = ready!(self.inner.poll_write_ready(cx))?;
 ///
-///             match guard.with_io(|inner| inner.get_ref().write(buf)) {
-///                 Err(err) if err.kind() == ErrorKind::WouldBlock => continue,
-///                 result => return Poll::Ready(result),
+///             match guard.try_io(|inner| inner.get_ref().write(buf)) {
+///                 Ok(result) => return Poll::Ready(result),
+///                 Err(_would_block) => continue,
 ///             }
 ///         }
 ///     }
@@ -114,24 +114,15 @@ use std::{task::Context, task::Poll};
 ///         self: Pin<&mut Self>,
 ///         cx: &mut Context<'_>,
 ///     ) -> Poll<io::Result<()>> {
-///         loop {
-///             let mut guard = ready!(self.inner.poll_write_ready(cx))?;
-///
-///             match guard.with_io(|inner| inner.get_ref().flush()) {
-///                 Err(err) if err.kind() == ErrorKind::WouldBlock => continue,
-///                 result => return Poll::Ready(result),
-///             }
-///         }
+///         // tcp flush is a no-op
+///         Poll::Ready(Ok(()))
 ///     }
 ///
 ///     fn poll_shutdown(
-///         mut self: Pin<&mut Self>,
+///         self: Pin<&mut Self>,
 ///         cx: &mut Context<'_>,
 ///     ) -> Poll<io::Result<()>> {
-///         ready!(self.as_mut().poll_flush(cx))?;
-///
 ///         self.inner.get_ref().shutdown(std::net::Shutdown::Write)?;
-///
 ///         Poll::Ready(Ok(()))
 ///     }
 /// }
@@ -510,8 +501,12 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
         // no-op
     }
 
-    /// Performs the IO operation `f`; if `f` returns a [`WouldBlock`] error,
-    /// the readiness state associated with this file descriptor is cleared.
+    /// Performs the provided IO operation.
+    ///
+    /// If `f` returns a [`WouldBlock`] error, the readiness state associated
+    /// with this file descriptor is cleared, and the method returns
+    /// `Err(TryIoError::WouldBlock)`. You will typically need to poll the
+    /// `AsyncFd` again when this happens.
     ///
     /// This method helps ensure that the readiness state of the underlying file
     /// descriptor remains in sync with the tokio-side readiness state, by
@@ -522,10 +517,10 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// create this `AsyncFdReadyGuard`.
     ///
     /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
-    pub fn with_io<R>(
+    pub fn try_io<R>(
         &mut self,
         f: impl FnOnce(&AsyncFd<Inner>) -> io::Result<R>,
-    ) -> io::Result<R> {
+    ) -> Result<io::Result<R>, TryIoError> {
         let result = f(self.async_fd);
 
         if let Err(e) = result.as_ref() {
@@ -534,32 +529,10 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
             }
         }
 
-        result
-    }
-
-    /// Performs the IO operation `f`; if `f` returns [`Pending`], the readiness
-    /// state associated with this file descriptor is cleared.
-    ///
-    /// This method helps ensure that the readiness state of the underlying file
-    /// descriptor remains in sync with the tokio-side readiness state, by
-    /// clearing the tokio-side state only when a [`Pending`] condition occurs.
-    /// It is the responsibility of the caller to ensure that `f` returns
-    /// [`Pending`] only if the file descriptor that originated this
-    /// `AsyncFdReadyGuard` no longer expresses the readiness state that was queried to
-    /// create this `AsyncFdReadyGuard`.
-    ///
-    /// [`Pending`]: std::task::Poll::Pending
-    pub fn with_poll<R>(
-        &mut self,
-        f: impl FnOnce(&AsyncFd<Inner>) -> std::task::Poll<R>,
-    ) -> std::task::Poll<R> {
-        let result = f(&self.async_fd);
-
-        if result.is_pending() {
-            self.clear_ready();
+        match result {
+            Err(err) if err.kind() == io::ErrorKind::WouldBlock => Err(TryIoError(())),
+            result => Ok(result),
         }
-
-        result
     }
 }
 
@@ -589,8 +562,12 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
         // no-op
     }
 
-    /// Performs the IO operation `f`; if `f` returns a [`WouldBlock`] error,
-    /// the readiness state associated with this file descriptor is cleared.
+    /// Performs the provided IO operation.
+    ///
+    /// If `f` returns a [`WouldBlock`] error, the readiness state associated
+    /// with this file descriptor is cleared, and the method returns
+    /// `Err(TryIoError::WouldBlock)`. You will typically need to poll the
+    /// `AsyncFd` again when this happens.
     ///
     /// This method helps ensure that the readiness state of the underlying file
     /// descriptor remains in sync with the tokio-side readiness state, by
@@ -601,10 +578,10 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     /// create this `AsyncFdReadyGuard`.
     ///
     /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
-    pub fn with_io<R>(
+    pub fn try_io<R>(
         &mut self,
         f: impl FnOnce(&mut AsyncFd<Inner>) -> io::Result<R>,
-    ) -> io::Result<R> {
+    ) -> Result<io::Result<R>, TryIoError> {
         let result = f(&mut self.async_fd);
 
         if let Err(e) = result.as_ref() {
@@ -613,32 +590,10 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
             }
         }
 
-        result
-    }
-
-    /// Performs the IO operation `f`; if `f` returns [`Pending`], the readiness
-    /// state associated with this file descriptor is cleared.
-    ///
-    /// This method helps ensure that the readiness state of the underlying file
-    /// descriptor remains in sync with the tokio-side readiness state, by
-    /// clearing the tokio-side state only when a [`Pending`] condition occurs.
-    /// It is the responsibility of the caller to ensure that `f` returns
-    /// [`Pending`] only if the file descriptor that originated this
-    /// `AsyncFdReadyGuard` no longer expresses the readiness state that was queried to
-    /// create this `AsyncFdReadyGuard`.
-    ///
-    /// [`Pending`]: std::task::Poll::Pending
-    pub fn with_poll<R>(
-        &mut self,
-        f: impl FnOnce(&mut AsyncFd<Inner>) -> std::task::Poll<R>,
-    ) -> std::task::Poll<R> {
-        let result = f(&mut self.async_fd);
-
-        if result.is_pending() {
-            self.clear_ready();
+        match result {
+            Err(err) if err.kind() == io::ErrorKind::WouldBlock => Err(TryIoError(())),
+            result => Ok(result),
         }
-
-        result
     }
 }
 
@@ -657,3 +612,12 @@ impl<'a, T: std::fmt::Debug + AsRawFd> std::fmt::Debug for AsyncFdReadyMutGuard<
             .finish()
     }
 }
+
+/// The error type returned by [`try_io`].
+///
+/// This error indicates that the IO resource returned a [`WouldBlock`] error.
+///
+/// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
+/// [`try_io`]: method@AsyncFdReadyGuard::try_io
+#[derive(Debug)]
+pub struct TryIoError(());
