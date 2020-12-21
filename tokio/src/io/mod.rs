@@ -222,7 +222,7 @@ cfg_net_unix! {
 
     pub mod unix {
         //! Asynchronous IO structures specific to Unix-like operating systems.
-        pub use super::async_fd::{AsyncFd, AsyncFdReadyGuard};
+        pub use super::async_fd::{AsyncFd, AsyncFdReadyGuard, AsyncFdReadyMutGuard};
     }
 }
 

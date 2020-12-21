@@ -19,7 +19,7 @@ use nix::unistd::{close, read, write};
 use futures::{poll, FutureExt};
 
 use tokio::io::unix::{AsyncFd, AsyncFdReadyGuard};
-use tokio_test::{assert_err, assert_pending};
+use tokio_test::{assert_err, assert_pending, assert_ready};
 
 struct TestWaker {
     inner: Arc<TestWakerInner>,
@@ -201,7 +201,7 @@ async fn reset_readable() {
 
     let mut guard = readable.await.unwrap();
 
-    guard.with_io(|| afd_a.get_ref().read(&mut [0])).unwrap();
+    assert_ready!(guard.with_io(|_| afd_a.get_ref().read(&mut [0]))).unwrap();
 
     // `a` is not readable, but the reactor still thinks it is
     // (because we have not observed a not-ready error yet)
@@ -234,7 +234,7 @@ async fn reset_writable() {
 
     // Write until we get a WouldBlock. This also clears the ready state.
     loop {
-        if let Err(e) = guard.with_io(|| afd_a.get_ref().write(&[0; 512][..])) {
+        if let Err(e) = assert_ready!(guard.with_io(|_| afd_a.get_ref().write(&[0; 512][..]))) {
             assert_eq!(ErrorKind::WouldBlock, e.kind());
             break;
         }

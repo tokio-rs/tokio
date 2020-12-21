@@ -73,6 +73,18 @@ pub struct AsyncFdReadyGuard<'a, T: AsRawFd> {
     event: Option<ReadyEvent>,
 }
 
+/// Represents an IO-ready event detected on a particular file descriptor,
+/// which has not yet beeen acknowledged. This is a `must_use` structure to
+/// help ensure that you do not forget to explicitly clear (or not clear ) the
+/// event.
+///
+/// This type exposes mutable APIs to the underlying IO object.
+#[must_use = "You must explicitly cloose whether to clear the readiness state by calling a method on ReadyGuard"]
+pub struct AsyncFdReadyMutGuard<'a, T: AsRawFd> {
+    async_fd: &'a mut AsyncFd<T>,
+    event: Option<ReadyEvent>,
+}
+
 const ALL_INTEREST: Interest = Interest::READABLE.add(Interest::WRITABLE);
 
 impl<T: AsRawFd> AsyncFd<T> {
@@ -277,8 +289,11 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// create this `AsyncFdReadyGuard`.
     ///
     /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
-    pub fn with_io<R>(&mut self, f: impl FnOnce() -> io::Result<R>) -> io::Result<R> {
-        let result = f();
+    pub fn with_io<R>(
+        &mut self,
+        f: impl FnOnce(&AsyncFd<Inner>) -> io::Result<R>,
+    ) -> Poll<io::Result<R>> {
+        let result = f(self.async_fd);
 
         if let Err(e) = result.as_ref() {
             if e.kind() == io::ErrorKind::WouldBlock {
@@ -286,7 +301,83 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
             }
         }
 
+        result.into()
+    }
+
+    /// Performs the IO operation `f`; if `f` returns [`Pending`], the readiness
+    /// state associated with this file descriptor is cleared.
+    ///
+    /// This method helps ensure that the readiness state of the underlying file
+    /// descriptor remains in sync with the tokio-side readiness state, by
+    /// clearing the tokio-side state only when a [`Pending`] condition occurs.
+    /// It is the responsibility of the caller to ensure that `f` returns
+    /// [`Pending`] only if the file descriptor that originated this
+    /// `AsyncFdReadyGuard` no longer expresses the readiness state that was queried to
+    /// create this `AsyncFdReadyGuard`.
+    ///
+    /// [`Pending`]: std::task::Poll::Pending
+    pub fn with_poll<R>(&mut self, f: impl FnOnce() -> std::task::Poll<R>) -> std::task::Poll<R> {
+        let result = f();
+
+        if result.is_pending() {
+            self.clear_ready();
+        }
+
         result
+    }
+}
+
+impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
+    /// Indicates to tokio that the file descriptor is no longer ready. The
+    /// internal readiness flag will be cleared, and tokio will wait for the
+    /// next edge-triggered readiness notification from the OS.
+    ///
+    /// It is critical that this function not be called unless your code
+    /// _actually observes_ that the file descriptor is _not_ ready. Do not call
+    /// it simply because, for example, a read succeeded; it should be called
+    /// when a read is observed to block.
+    ///
+    /// [`drop`]: method@std::mem::drop
+    pub fn clear_ready(&mut self) {
+        if let Some(event) = self.event.take() {
+            self.async_fd.registration.clear_readiness(event);
+        }
+    }
+
+    /// This function should be invoked when you intentionally want to keep the
+    /// ready flag asserted.
+    ///
+    /// While this function is itself a no-op, it satisfies the `#[must_use]`
+    /// constraint on the [`AsyncFdReadyGuard`] type.
+    pub fn retain_ready(&mut self) {
+        // no-op
+    }
+
+    /// Performs the IO operation `f`; if `f` returns a [`WouldBlock`] error,
+    /// the readiness state associated with this file descriptor is cleared.
+    ///
+    /// This method helps ensure that the readiness state of the underlying file
+    /// descriptor remains in sync with the tokio-side readiness state, by
+    /// clearing the tokio-side state only when a [`WouldBlock`] condition
+    /// occurs. It is the responsibility of the caller to ensure that `f`
+    /// returns [`WouldBlock`] only if the file descriptor that originated this
+    /// `AsyncFdReadyGuard` no longer expresses the readiness state that was queried to
+    /// create this `AsyncFdReadyGuard`.
+    ///
+    /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
+    pub fn with_io<R>(
+        &mut self,
+        f: impl FnOnce(&mut AsyncFd<Inner>) -> io::Result<R>,
+    ) -> Poll<io::Result<R>> {
+        let result = f(&mut self.async_fd);
+
+        if let Err(e) = result.as_ref() {
+            if e.kind() == io::ErrorKind::WouldBlock {
+                self.clear_ready();
+            }
+        }
+
+        result.into()
     }
 
     /// Performs the IO operation `f`; if `f` returns [`Pending`], the readiness
@@ -315,6 +406,14 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
 impl<'a, T: std::fmt::Debug + AsRawFd> std::fmt::Debug for AsyncFdReadyGuard<'a, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ReadyGuard")
+            .field("async_fd", &self.async_fd)
+            .finish()
+    }
+}
+
+impl<'a, T: std::fmt::Debug + AsRawFd> std::fmt::Debug for AsyncFdReadyMutGuard<'a, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MutReadyGuard")
             .field("async_fd", &self.async_fd)
             .finish()
     }
