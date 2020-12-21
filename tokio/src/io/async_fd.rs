@@ -114,24 +114,15 @@ use std::{task::Context, task::Poll};
 ///         self: Pin<&mut Self>,
 ///         cx: &mut Context<'_>,
 ///     ) -> Poll<io::Result<()>> {
-///         loop {
-///             let mut guard = ready!(self.inner.poll_write_ready(cx))?;
-///
-///             match guard.try_io(|inner| inner.get_ref().flush()) {
-///                 Ok(result) => return Poll::Ready(result),
-///                 Err(_would_block) => continue,
-///             }
-///         }
+///         // tcp flush is a no-op
+///         Poll::Ready(Ok(()))
 ///     }
 ///
 ///     fn poll_shutdown(
 ///         mut self: Pin<&mut Self>,
 ///         cx: &mut Context<'_>,
 ///     ) -> Poll<io::Result<()>> {
-///         ready!(self.as_mut().poll_flush(cx))?;
-///
 ///         self.inner.get_ref().shutdown(std::net::Shutdown::Write)?;
-///
 ///         Poll::Ready(Ok(()))
 ///     }
 /// }
