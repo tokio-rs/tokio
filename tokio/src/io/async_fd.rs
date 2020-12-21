@@ -119,7 +119,7 @@ use std::{task::Context, task::Poll};
 ///     }
 ///
 ///     fn poll_shutdown(
-///         mut self: Pin<&mut Self>,
+///         self: Pin<&mut Self>,
 ///         cx: &mut Context<'_>,
 ///     ) -> Poll<io::Result<()>> {
 ///         self.inner.get_ref().shutdown(std::net::Shutdown::Write)?;
