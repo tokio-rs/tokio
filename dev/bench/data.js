@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608587577030,
+  "lastUpdate": 1608587596775,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -6835,6 +6835,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18648881,
             "range": "± 1982532",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "bIgBV@users.noreply.github.com",
+            "name": "Bhargav",
+            "username": "bIgBV"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c7671a03840751f58b7a509386b8fe3b5e670a37",
+          "message": "io: add _mut variants of methods on AsyncFd (#3304)\n\nCo-authored-by: Alice Ryhl <alice@ryhl.io>",
+          "timestamp": "2020-12-21T22:51:28+01:00",
+          "tree_id": "9d3f26151c9ddd292c129f43c0fac83792073f62",
+          "url": "https://github.com/tokio-rs/tokio/commit/c7671a03840751f58b7a509386b8fe3b5e670a37"
+        },
+        "date": 1608587595690,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 197920,
+            "range": "± 36460",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 755605,
+            "range": "± 130143",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5526396,
+            "range": "± 1270826",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21887696,
+            "range": "± 2805501",
             "unit": "ns/iter"
           }
         ]
