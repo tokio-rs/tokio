@@ -69,7 +69,7 @@ use std::{task::Context, task::Poll};
 /// use std::pin::Pin;
 /// use std::task::{Context, Poll};
 /// use tokio::io::AsyncWrite;
-/// use tokio::io::unix::{AsyncFd, TryIoError};
+/// use tokio::io::unix::AsyncFd;
 ///
 /// pub struct AsyncTcpStream {
 ///     inner: AsyncFd<TcpStream>,
