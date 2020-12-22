@@ -405,13 +405,13 @@ impl File {
     ///
     /// # async fn dox() -> std::io::Result<()> {
     /// let tokio_file = File::open("foo.txt").await?;
-    /// let std_file = tokio_file.into_std().await;
+    /// let std_file = tokio_file.into_std().await.unwrap();
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn into_std(mut self) -> sys::File {
+    pub async fn into_std(mut self) -> io::Result<sys::File> {
         self.inner.get_mut().complete_inflight().await;
-        Arc::try_unwrap(self.std).expect("Arc::try_unwrap failed")
+        Ok(Arc::try_unwrap(self.std).expect("Arc::try_unwrap failed"))
     }
 
     /// Tries to immediately destructure `File` into a [`std::fs::File`][std].
@@ -434,13 +434,10 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn try_into_std(mut self) -> Result<sys::File, Self> {
+    pub fn try_into_std(self) -> io::Result<sys::File> {
         match Arc::try_unwrap(self.std) {
             Ok(file) => Ok(file),
-            Err(std_file_arc) => {
-                self.std = std_file_arc;
-                Err(self)
-            }
+            Err(_) => Err(io::ErrorKind::Other.into()),
         }
     }
 
