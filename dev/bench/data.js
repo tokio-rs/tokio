@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608658196271,
+  "lastUpdate": 1608658201562,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -3779,6 +3779,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 602,
             "range": "± 125",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0b83b3b8cc61e9d911abec00c33ec3762b2a6437",
+          "message": "fs,sync: expose poll_ fns on misc types (#3308)\n\nIncludes methods on:\r\n\r\n* fs::DirEntry\r\n* io::Lines\r\n* io::Split\r\n* sync::mpsc::Receiver\r\n* sync::misc::UnboundedReceiver",
+          "timestamp": "2020-12-22T09:28:14-08:00",
+          "tree_id": "bd1ae38a53efb2fe78fc8aba0bdd0789cc7a1495",
+          "url": "https://github.com/tokio-rs/tokio/commit/0b83b3b8cc61e9d911abec00c33ec3762b2a6437"
+        },
+        "date": 1608658200133,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 966,
+            "range": "± 96",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 15854,
+            "range": "± 6556",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1038,
+            "range": "± 93",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 14603,
+            "range": "± 4034",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 559,
+            "range": "± 36",
             "unit": "ns/iter"
           }
         ]
