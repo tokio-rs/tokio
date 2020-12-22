@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608651601431,
+  "lastUpdate": 1608651605386,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -3725,6 +3725,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 492,
             "range": "± 4",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f95ad1898041d2bcc09de3db69228e88f5f4abf8",
+          "message": "net: clarify when wakeups are sent (#3310)",
+          "timestamp": "2020-12-22T07:38:14-08:00",
+          "tree_id": "16968a03d8ca55c53da7658c109e47a5f9a8c4e4",
+          "url": "https://github.com/tokio-rs/tokio/commit/f95ad1898041d2bcc09de3db69228e88f5f4abf8"
+        },
+        "date": 1608651600719,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1011,
+            "range": "± 100",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 17898,
+            "range": "± 7485",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 951,
+            "range": "± 233",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 17861,
+            "range": "± 11607",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 602,
+            "range": "± 125",
             "unit": "ns/iter"
           }
         ]
