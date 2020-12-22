@@ -117,22 +117,6 @@ pub struct Interval {
 }
 
 impl Interval {
-    fn poll_tick(&mut self, cx: &mut Context<'_>) -> Poll<Instant> {
-        // Wait for the delay to be done
-        ready!(Pin::new(&mut self.delay).poll(cx));
-
-        // Get the `now` by looking at the `delay` deadline
-        let now = self.delay.deadline();
-
-        // The next interval value is `duration` after the one that just
-        // yielded.
-        let next = now + self.period;
-        self.delay.as_mut().reset(next);
-
-        // Return the current instant
-        Poll::Ready(now)
-    }
-
     /// Completes when the next instant in the interval has been reached.
     ///
     /// # Examples
@@ -155,5 +139,22 @@ impl Interval {
     /// ```
     pub async fn tick(&mut self) -> Instant {
         poll_fn(|cx| self.poll_tick(cx)).await
+    }
+
+    /// Polls when the next instant in the interval has been reached.
+    pub fn poll_tick(&mut self, cx: &mut Context<'_>) -> Poll<Instant> {
+        // Wait for the delay to be done
+        ready!(Pin::new(&mut self.delay).poll(cx));
+
+        // Get the `now` by looking at the `delay` deadline
+        let now = self.delay.deadline();
+
+        // The next interval value is `duration` after the one that just
+        // yielded.
+        let next = now + self.period;
+        self.delay.as_mut().reset(next);
+
+        // Return the current instant
+        Poll::Ready(now)
     }
 }
