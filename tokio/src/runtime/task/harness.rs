@@ -93,7 +93,7 @@ where
 
             impl<T: Future, S: Schedule> Drop for Guard<'_, T, S> {
                 fn drop(&mut self) {
-                    self.core.drop_future_or_output();
+                    self.core.stage.drop_future_or_output();
                 }
             }
 
@@ -203,7 +203,7 @@ where
             }
         }
 
-        *dst = Poll::Ready(self.core().take_output());
+        *dst = Poll::Ready(self.core().stage.take_output());
     }
 
     fn set_join_waker(&self, waker: Waker, snapshot: Snapshot) -> Result<Snapshot, Snapshot> {
@@ -242,7 +242,7 @@ where
             // the scheduler or `JoinHandle`. i.e. if the output remains in the
             // task structure until the task is deallocated, it may be dropped
             // by a Waker on any arbitrary thread.
-            self.core().drop_future_or_output();
+            self.core().stage.drop_future_or_output();
         }
 
         // Drop the `JoinHandle` reference, possibly deallocating the task
@@ -290,7 +290,7 @@ where
     fn cancel_task(self) {
         // Drop the future from a panic guard.
         let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            self.core().drop_future_or_output();
+            self.core().stage.drop_future_or_output();
         }));
 
         if let Err(err) = res {
@@ -309,7 +309,7 @@ where
             //
             // Safety: Mutual exclusion is obtained by having transitioned the task
             // state -> Running
-            self.core().store_output(output);
+            self.core().stage.store_output(output);
 
             // Transition to `Complete`, notifying the `JoinHandle` if necessary.
             self.transition_to_complete();
@@ -350,7 +350,7 @@ where
         if !snapshot.is_join_interested() {
             // The `JoinHandle` is not interested in the output of this task. It
             // is our responsibility to drop the output.
-            self.core().drop_future_or_output();
+            self.core().stage.drop_future_or_output();
         } else if snapshot.has_join_waker() {
             // Notify the join handle. The previous transition obtains the
             // lock on the waker cell.

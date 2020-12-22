@@ -41,6 +41,10 @@ pub(super) struct Scheduler<S> {
     scheduler: UnsafeCell<Option<S>>,
 }
 
+pub(super) struct CoreStage<T: Future> {
+    stage: UnsafeCell<Stage<T>>,
+}
+
 /// The core of the task.
 ///
 /// Holds the future or output, depending on the stage of execution.
@@ -49,7 +53,7 @@ pub(super) struct Core<T: Future, S> {
     pub(super) scheduler: Scheduler<S>,
 
     /// Either the future or the output
-    pub(super) stage: UnsafeCell<Stage<T>>,
+    pub(super) stage: CoreStage<T>,
 }
 
 /// Crate public as this is also needed by the pool.
@@ -102,7 +106,9 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 scheduler: Scheduler {
                     scheduler: UnsafeCell::new(None),
                 },
-                stage: UnsafeCell::new(Stage::Running(future)),
+                stage: CoreStage {
+                    stage: UnsafeCell::new(Stage::Running(future)),
+                },
             },
             trailer: Trailer {
                 waker: UnsafeCell::new(None),
@@ -112,10 +118,6 @@ impl<T: Future, S: Schedule> Cell<T, S> {
 }
 
 impl<S: Schedule> Scheduler<S> {
-    pub(super) fn with<R>(&self, f: impl FnOnce(*const Option<S>) -> R) -> R {
-        self.scheduler.with(f)
-    }
-
     pub(super) fn with_mut<R>(&self, f: impl FnOnce(*mut Option<S>) -> R) -> R {
         self.scheduler.with_mut(f)
     }
@@ -216,6 +218,20 @@ impl<T: Future, S: Schedule> Core<T, S> {
     /// `self` must also be pinned. This is handled by storing the task on the
     /// heap.
     pub(super) fn poll(&self, header: &Header) -> Poll<T::Output> {
+        // The waker passed into the `poll` function does not require a ref
+        // count increment.
+        let waker_ref = waker_ref::<T, S>(header);
+        let cx = Context::from_waker(&*waker_ref);
+        self.stage.poll(cx)
+    }
+}
+
+impl<T: Future> CoreStage<T> {
+    pub(super) fn with_mut<R>(&self, f: impl FnOnce(*mut Stage<T>) -> R) -> R {
+        self.stage.with_mut(f)
+    }
+
+    pub(super) fn poll(&self, mut cx: Context<'_>) -> Poll<T::Output> {
         let res = {
             self.stage.with_mut(|ptr| {
                 // Safety: The caller ensures mutual exclusion to the field.
@@ -226,11 +242,6 @@ impl<T: Future, S: Schedule> Core<T, S> {
 
                 // Safety: The caller ensures the future is pinned.
                 let future = unsafe { Pin::new_unchecked(future) };
-
-                // The waker passed into the `poll` function does not require a ref
-                // count increment.
-                let waker_ref = waker_ref::<T, S>(header);
-                let mut cx = Context::from_waker(&*waker_ref);
 
                 future.poll(&mut cx)
             })
