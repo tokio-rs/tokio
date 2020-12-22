@@ -282,6 +282,11 @@ impl TcpStream {
     /// the queue, registering the current task for wakeup if data is not yet
     /// available.
     ///
+    /// Note that on multiple calls to `poll_peek`, `poll_read` or
+    /// `poll_read_ready`, only the `Waker` from the `Context` passed to the
+    /// most recent call is scheduled to receive a wakeup. (However,
+    /// `poll_write` retains a second, independent waker.)
+    ///
     /// # Return value
     ///
     /// The function returns:
@@ -456,9 +461,31 @@ impl TcpStream {
 
     /// Polls for read readiness.
     ///
+    /// If the tcp stream is not currently ready for reading, this method will
+    /// store a clone of the `Waker` from the provided `Context`. When the tcp
+    /// stream becomes ready for reading, `Waker::wake` will be called on the
+    /// waker.
+    ///
+    /// Note that on multiple calls to `poll_read_ready`, `poll_read` or
+    /// `poll_peek`, only the `Waker` from the `Context` passed to the most
+    /// recent call is scheduled to receive a wakeup. (However,
+    /// `poll_write_ready` retains a second, independent waker.)
+    ///
     /// This function is intended for cases where creating and pinning a future
     /// via [`readable`] is not feasible. Where possible, using [`readable`] is
     /// preferred, as this supports polling from multiple tasks at once.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the tcp stream is not ready for reading.
+    /// * `Poll::Ready(Ok(()))` if the tcp stream is ready for reading.
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
     ///
     /// [`readable`]: method@Self::readable
     pub fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
@@ -578,9 +605,31 @@ impl TcpStream {
 
     /// Polls for write readiness.
     ///
+    /// If the tcp stream is not currently ready for writing, this method will
+    /// store a clone of the `Waker` from the provided `Context`. When the tcp
+    /// stream becomes ready for writing, `Waker::wake` will be called on the
+    /// waker.
+    ///
+    /// Note that on multiple calls to `poll_write_ready` or `poll_write`, only
+    /// the `Waker` from the `Context` passed to the most recent call is
+    /// scheduled to receive a wakeup. (However, `poll_read_ready` retains a
+    /// second, independent waker.)
+    ///
     /// This function is intended for cases where creating and pinning a future
     /// via [`writable`] is not feasible. Where possible, using [`writable`] is
     /// preferred, as this supports polling from multiple tasks at once.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the tcp stream is not ready for writing.
+    /// * `Poll::Ready(Ok(()))` if the tcp stream is ready for writing.
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
     ///
     /// [`writable`]: method@Self::writable
     pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
@@ -877,17 +926,6 @@ impl TcpStream {
     pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
         split_owned(self)
     }
-
-    // == Poll IO functions that takes `&self` ==
-    //
-    // They are not public because (taken from the doc of `PollEvented`):
-    //
-    // While `PollEvented` is `Sync` (if the underlying I/O type is `Sync`), the
-    // caller must ensure that there are at most two tasks that use a
-    // `PollEvented` instance concurrently. One for reading and one for writing.
-    // While violating this requirement is "safe" from a Rust memory model point
-    // of view, it will result in unexpected behavior in the form of lost
-    // notifications and tasks hanging.
 
     pub(crate) fn poll_read_priv(
         &self,

@@ -108,6 +108,10 @@ impl OwnedReadHalf {
     /// the queue, registering the current task for wakeup if data is not yet
     /// available.
     ///
+    /// Note that on multiple calls to `poll_peek` or `poll_read`, only the
+    /// `Waker` from the `Context` passed to the most recent call is scheduled
+    /// to receive a wakeup.
+    ///
     /// See the [`TcpStream::poll_peek`] level documenation for more details.
     ///
     /// # Examples
