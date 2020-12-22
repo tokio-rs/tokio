@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608629407305,
+  "lastUpdate": 1608629418235,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -7039,6 +7039,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21588590,
             "range": "± 2241011",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "te316e89@gmail.com",
+            "name": "Taiki Endo",
+            "username": "taiki-e"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "eee3ca65d6e5b4537915571f663f94184e616e6c",
+          "message": "deps: update rand to 0.8, loom to 0.4 (#3307)",
+          "timestamp": "2020-12-22T10:28:35+01:00",
+          "tree_id": "2f534ebe6cb319f30f72e7a9b2b389825500f051",
+          "url": "https://github.com/tokio-rs/tokio/commit/eee3ca65d6e5b4537915571f663f94184e616e6c"
+        },
+        "date": 1608629417210,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 188655,
+            "range": "± 23492",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 688605,
+            "range": "± 73569",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5583676,
+            "range": "± 1035611",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20280743,
+            "range": "± 2190147",
             "unit": "ns/iter"
           }
         ]
