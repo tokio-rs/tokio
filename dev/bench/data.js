@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608664228582,
+  "lastUpdate": 1608664234018,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -11235,6 +11235,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 938,
             "range": "± 5",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "carlos.baezruiz@gmail.com",
+            "name": "Carlos B",
+            "username": "carlosb1"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7d28e4cdbb63b0ad19e66d1b077690cbebf71353",
+          "message": "examples: add futures executor threadpool (#3198)",
+          "timestamp": "2020-12-22T20:08:43+01:00",
+          "tree_id": "706d894cb4ea97ae1a91b9d2bd42d1800968559c",
+          "url": "https://github.com/tokio-rs/tokio/commit/7d28e4cdbb63b0ad19e66d1b077690cbebf71353"
+        },
+        "date": 1608664226074,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 16288,
+            "range": "± 6221",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1100,
+            "range": "± 24",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 652,
+            "range": "± 54",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 17978,
+            "range": "± 7711",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1092,
+            "range": "± 114",
             "unit": "ns/iter"
           }
         ]
