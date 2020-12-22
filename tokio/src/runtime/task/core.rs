@@ -12,7 +12,6 @@
 use crate::loom::cell::UnsafeCell;
 use crate::runtime::task::raw::{self, Vtable};
 use crate::runtime::task::state::State;
-use crate::runtime::task::waker::waker_ref;
 use crate::runtime::task::{Notified, Schedule, Task};
 use crate::util::linked_list;
 
@@ -203,7 +202,11 @@ impl<S: Schedule> Scheduler<S> {
     }
 }
 
-impl<T: Future, S: Schedule> Core<T, S> {
+impl<T: Future> CoreStage<T> {
+    pub(super) fn with_mut<R>(&self, f: impl FnOnce(*mut Stage<T>) -> R) -> R {
+        self.stage.with_mut(f)
+    }
+
     /// Poll the future
     ///
     /// # Safety
@@ -217,20 +220,6 @@ impl<T: Future, S: Schedule> Core<T, S> {
     ///
     /// `self` must also be pinned. This is handled by storing the task on the
     /// heap.
-    pub(super) fn poll(&self, header: &Header) -> Poll<T::Output> {
-        // The waker passed into the `poll` function does not require a ref
-        // count increment.
-        let waker_ref = waker_ref::<T, S>(header);
-        let cx = Context::from_waker(&*waker_ref);
-        self.stage.poll(cx)
-    }
-}
-
-impl<T: Future> CoreStage<T> {
-    pub(super) fn with_mut<R>(&self, f: impl FnOnce(*mut Stage<T>) -> R) -> R {
-        self.stage.with_mut(f)
-    }
-
     pub(super) fn poll(&self, mut cx: Context<'_>) -> Poll<T::Output> {
         let res = {
             self.stage.with_mut(|ptr| {

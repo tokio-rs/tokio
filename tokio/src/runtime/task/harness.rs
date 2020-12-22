@@ -1,12 +1,13 @@
-use crate::runtime::task::core::{Cell, Core, Header, Trailer};
+use crate::runtime::task::core::{Cell, Core, CoreStage, Header, Trailer};
 use crate::runtime::task::state::Snapshot;
+use crate::runtime::task::waker::waker_ref;
 use crate::runtime::task::{JoinError, Notified, Schedule, Task};
 
 use std::future::Future;
 use std::mem;
 use std::panic;
 use std::ptr::NonNull;
-use std::task::{Poll, Waker};
+use std::task::{Context, Poll, Waker};
 
 /// Typed raw task handle
 pub(super) struct Harness<T: Future, S: 'static> {
@@ -86,38 +87,15 @@ where
         // future has been obtained. This also ensures the `*mut T` pointer
         // contains the future (as opposed to the output) and is initialized.
 
-        let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            struct Guard<'a, T: Future, S: Schedule> {
-                core: &'a Core<T, S>,
-            }
-
-            impl<T: Future, S: Schedule> Drop for Guard<'_, T, S> {
-                fn drop(&mut self) {
-                    self.core.stage.drop_future_or_output();
-                }
-            }
-
-            let guard = Guard { core: self.core() };
-
-            // If the task is cancelled, avoid polling it, instead signalling it
-            // is complete.
-            if snapshot.is_cancelled() {
-                Poll::Ready(Err(JoinError::cancelled()))
-            } else {
-                let res = guard.core.poll(self.header());
-
-                // prevent the guard from dropping the future
-                mem::forget(guard);
-
-                res.map(Ok)
-            }
-        }));
+        let waker_ref = waker_ref::<T, S>(self.header());
+        let cx = Context::from_waker(&*waker_ref);
+        let res = poll_future(&self.core().stage, snapshot, cx);
 
         match res {
-            Ok(Poll::Ready(out)) => {
+            Poll::Ready(out) => {
                 self.complete(out, snapshot.is_join_interested());
             }
-            Ok(Poll::Pending) => {
+            Poll::Pending => {
                 match self.header().state.transition_to_idle() {
                     Ok(snapshot) => {
                         if snapshot.is_notified() {
@@ -130,9 +108,6 @@ where
                     }
                     Err(_) => self.cancel_task(),
                 }
-            }
-            Err(err) => {
-                self.complete(Err(JoinError::panic(err)), snapshot.is_join_interested());
             }
         }
     }
@@ -367,5 +342,42 @@ where
 
     fn to_task(&self) -> Task<S> {
         unsafe { Task::from_raw(self.header().into()) }
+    }
+}
+
+fn poll_future<T: Future>(
+    core: &CoreStage<T>,
+    snapshot: Snapshot,
+    cx: Context<'_>,
+) -> Poll<Result<T::Output, JoinError>> {
+    let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        struct Guard<'a, T: Future> {
+            core: &'a CoreStage<T>,
+        }
+
+        impl<T: Future> Drop for Guard<'_, T> {
+            fn drop(&mut self) {
+                self.core.drop_future_or_output();
+            }
+        }
+
+        let guard = Guard { core };
+
+        // If the task is cancelled, avoid polling it, instead signalling it
+        // is complete.
+        if snapshot.is_cancelled() {
+            Poll::Ready(Err(JoinError::cancelled()))
+        } else {
+            let res = guard.core.poll(cx);
+
+            // prevent the guard from dropping the future
+            mem::forget(guard);
+
+            res.map(Ok)
+        }
+    }));
+    match res {
+        Ok(ok) => ok,
+        Err(err) => Poll::Ready(Err(JoinError::panic(err))),
     }
 }
