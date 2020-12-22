@@ -278,7 +278,7 @@ where
         }
     }
 
-    fn complete(mut self, output: super::Result<T::Output>, is_join_interested: bool) {
+    fn complete(self, output: super::Result<T::Output>, is_join_interested: bool) {
         if is_join_interested {
             // Store the output. The future has already been dropped
             //
@@ -287,7 +287,7 @@ where
             self.core().stage.store_output(output);
 
             // Transition to `Complete`, notifying the `JoinHandle` if necessary.
-            self.transition_to_complete();
+            transition_to_complete(self.header(), &self.core().stage, &self.trailer());
         }
 
         // The task has completed execution and will no longer be scheduled.
@@ -315,34 +315,37 @@ where
         }
     }
 
-    /// Transitions the task's lifecycle to `Complete`. Notifies the
-    /// `JoinHandle` if it still has interest in the completion.
-    fn transition_to_complete(&mut self) {
-        // Transition the task's lifecycle to `Complete` and get a snapshot of
-        // the task's sate.
-        let snapshot = self.header().state.transition_to_complete();
-
-        if !snapshot.is_join_interested() {
-            // The `JoinHandle` is not interested in the output of this task. It
-            // is our responsibility to drop the output.
-            self.core().stage.drop_future_or_output();
-        } else if snapshot.has_join_waker() {
-            // Notify the join handle. The previous transition obtains the
-            // lock on the waker cell.
-            self.wake_join();
-        }
-    }
-
-    fn wake_join(&self) {
-        self.trailer().waker.with(|ptr| match unsafe { &*ptr } {
-            Some(waker) => waker.wake_by_ref(),
-            None => panic!("waker missing"),
-        });
-    }
-
     fn to_task(&self) -> Task<S> {
         unsafe { Task::from_raw(self.header().into()) }
     }
+}
+
+/// Transitions the task's lifecycle to `Complete`. Notifies the
+/// `JoinHandle` if it still has interest in the completion.
+fn transition_to_complete<T>(header: &Header, stage: &CoreStage<T>, trailer: &Trailer)
+where
+    T: Future,
+{
+    // Transition the task's lifecycle to `Complete` and get a snapshot of
+    // the task's sate.
+    let snapshot = header.state.transition_to_complete();
+
+    if !snapshot.is_join_interested() {
+        // The `JoinHandle` is not interested in the output of this task. It
+        // is our responsibility to drop the output.
+        stage.drop_future_or_output();
+    } else if snapshot.has_join_waker() {
+        // Notify the join handle. The previous transition obtains the
+        // lock on the waker cell.
+        wake_join(trailer);
+    }
+}
+
+fn wake_join(trailer: &Trailer) {
+    trailer.waker.with(|ptr| match unsafe { &*ptr } {
+        Some(waker) => waker.wake_by_ref(),
+        None => panic!("waker missing"),
+    });
 }
 
 fn poll_future<T: Future>(
