@@ -129,83 +129,13 @@ where
 
     /// Read the task output into `dst`.
     pub(super) fn try_read_output(self, dst: &mut Poll<super::Result<T::Output>>, waker: &Waker) {
-        // Load a snapshot of the current task state
-        let snapshot = self.header().state.load();
-
-        debug_assert!(snapshot.is_join_interested());
-
-        if !snapshot.is_complete() {
-            // The waker must be stored in the task struct.
-            let res = if snapshot.has_join_waker() {
-                // There already is a waker stored in the struct. If it matches
-                // the provided waker, then there is no further work to do.
-                // Otherwise, the waker must be swapped.
-                let will_wake = unsafe {
-                    // Safety: when `JOIN_INTEREST` is set, only `JOIN_HANDLE`
-                    // may mutate the `waker` field.
-                    self.trailer()
-                        .waker
-                        .with(|ptr| (*ptr).as_ref().unwrap().will_wake(waker))
-                };
-
-                if will_wake {
-                    // The task is not complete **and** the waker is up to date,
-                    // there is nothing further that needs to be done.
-                    return;
-                }
-
-                // Unset the `JOIN_WAKER` to gain mutable access to the `waker`
-                // field then update the field with the new join worker.
-                //
-                // This requires two atomic operations, unsetting the bit and
-                // then resetting it. If the task transitions to complete
-                // concurrently to either one of those operations, then setting
-                // the join waker fails and we proceed to reading the task
-                // output.
-                self.header()
-                    .state
-                    .unset_waker()
-                    .and_then(|snapshot| self.set_join_waker(waker.clone(), snapshot))
-            } else {
-                self.set_join_waker(waker.clone(), snapshot)
-            };
-
-            match res {
-                Ok(_) => return,
-                Err(snapshot) => {
-                    assert!(snapshot.is_complete());
-                }
-            }
-        }
-
-        *dst = Poll::Ready(self.core().stage.take_output());
-    }
-
-    fn set_join_waker(&self, waker: Waker, snapshot: Snapshot) -> Result<Snapshot, Snapshot> {
-        assert!(snapshot.is_join_interested());
-        assert!(!snapshot.has_join_waker());
-
-        // Safety: Only the `JoinHandle` may set the `waker` field. When
-        // `JOIN_INTEREST` is **not** set, nothing else will touch the field.
-        unsafe {
-            self.trailer().waker.with_mut(|ptr| {
-                *ptr = Some(waker);
-            });
-        }
-
-        // Update the `JoinWaker` state accordingly
-        let res = self.header().state.set_join_waker();
-
-        // If the state could not be updated, then clear the join waker
-        if res.is_err() {
-            unsafe {
-                self.trailer().waker.with_mut(|ptr| {
-                    *ptr = None;
-                });
-            }
-        }
-
-        res
+        try_read_output(
+            self.header(),
+            &self.core().stage,
+            self.trailer(),
+            dst,
+            waker,
+        )
     }
 
     pub(super) fn drop_join_handle_slow(self) {
@@ -346,6 +276,97 @@ fn wake_join(trailer: &Trailer) {
         Some(waker) => waker.wake_by_ref(),
         None => panic!("waker missing"),
     });
+}
+
+fn try_read_output<T: Future>(
+    header: &Header,
+    stage: &CoreStage<T>,
+    trailer: &Trailer,
+    dst: &mut Poll<super::Result<T::Output>>,
+    waker: &Waker,
+) {
+    // Load a snapshot of the current task state
+    let snapshot = header.state.load();
+
+    debug_assert!(snapshot.is_join_interested());
+
+    if !snapshot.is_complete() {
+        // The waker must be stored in the task struct.
+        let res = if snapshot.has_join_waker() {
+            // There already is a waker stored in the struct. If it matches
+            // the provided waker, then there is no further work to do.
+            // Otherwise, the waker must be swapped.
+            let will_wake = unsafe {
+                // Safety: when `JOIN_INTEREST` is set, only `JOIN_HANDLE`
+                // may mutate the `waker` field.
+                trailer
+                    .waker
+                    .with(|ptr| (*ptr).as_ref().unwrap().will_wake(waker))
+            };
+
+            if will_wake {
+                // The task is not complete **and** the waker is up to date,
+                // there is nothing further that needs to be done.
+                return;
+            }
+
+            // Unset the `JOIN_WAKER` to gain mutable access to the `waker`
+            // field then update the field with the new join worker.
+            //
+            // This requires two atomic operations, unsetting the bit and
+            // then resetting it. If the task transitions to complete
+            // concurrently to either one of those operations, then setting
+            // the join waker fails and we proceed to reading the task
+            // output.
+            header
+                .state
+                .unset_waker()
+                .and_then(|snapshot| set_join_waker(header, trailer, waker.clone(), snapshot))
+        } else {
+            set_join_waker(header, trailer, waker.clone(), snapshot)
+        };
+
+        match res {
+            Ok(_) => return,
+            Err(snapshot) => {
+                assert!(snapshot.is_complete());
+            }
+        }
+    }
+
+    *dst = Poll::Ready(stage.take_output());
+}
+
+fn set_join_waker(
+    header: &Header,
+    trailer: &Trailer,
+    waker: Waker,
+    snapshot: Snapshot,
+) -> Result<Snapshot, Snapshot> {
+    assert!(snapshot.is_join_interested());
+    assert!(!snapshot.has_join_waker());
+
+    // Safety: Only the `JoinHandle` may set the `waker` field. When
+    // `JOIN_INTEREST` is **not** set, nothing else will touch the field.
+    unsafe {
+        trailer.waker.with_mut(|ptr| {
+            *ptr = Some(waker);
+        });
+    }
+
+    // Update the `JoinWaker` state accordingly
+    let res = header.state.set_join_waker();
+
+    // If the state could not be updated, then clear the join waker
+    if res.is_err() {
+        unsafe {
+            trailer.waker.with_mut(|ptr| {
+                *ptr = None;
+            });
+        }
+    }
+
+    res
 }
 
 fn poll_future<T: Future>(
