@@ -83,7 +83,23 @@ impl<R> Lines<R>
 where
     R: AsyncBufRead,
 {
-    fn poll_next_line(
+    /// Polls for the next line in the stream.
+    ///
+    /// This method returns:
+    ///
+    ///  * `Poll::Pending` if the next line is not yet available.
+    ///  * `Poll::Ready(Ok(Some(line)))` if the next line is available.
+    ///  * `Poll::Ready(Ok(None))` if there are no more lines in this stream.
+    ///  * `Poll::Ready(Err(err))` if an IO error occurred while reading the next line.
+    ///
+    /// When the method returns `Poll::Pending`, the `Waker` in the provided
+    /// `Context` is scheduled to receive a wakeup when more bytes become
+    /// available on the underlying IO resource.
+    ///
+    /// Note that on multiple calls to `poll_next_line`, only the `Waker` from
+    /// the `Context` passed to the most recent call is scheduled to receive a
+    /// wakeup.
+    pub fn poll_next_line(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<io::Result<Option<String>>> {

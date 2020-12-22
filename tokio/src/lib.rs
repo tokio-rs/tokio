@@ -409,7 +409,7 @@ mod util;
 /// release, most of the Tokio stream utilities have been moved into the [`tokio-stream`]
 /// crate.
 ///
-/// # Why was `Stream` no included in Tokio 1.0?
+/// # Why was `Stream` not included in Tokio 1.0?
 ///
 /// Originally, we had planned to ship Tokio 1.0 with a stable `Stream` type
 /// but unfortunetly the [RFC] had not been merged in time for `Stream` to
@@ -424,6 +424,7 @@ mod util;
 /// to create a `impl Stream` from `async fn` using the [`async-stream`] crate.
 ///
 /// [`tokio-stream`]: https://docs.rs/tokio-stream
+/// [`async-stream`]: https://docs.rs/async-stream
 /// [RFC]: https://github.com/rust-lang/rfcs/pull/2996
 ///
 /// # Example

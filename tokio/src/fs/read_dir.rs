@@ -52,7 +52,25 @@ impl ReadDir {
         poll_fn(|cx| self.poll_next_entry(cx)).await
     }
 
-    fn poll_next_entry(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<Option<DirEntry>>> {
+    /// Polls for the next directory entry in the stream.
+    ///
+    /// This method returns:
+    ///
+    ///  * `Poll::Pending` if the next directory entry is not yet available.
+    ///  * `Poll::Ready(Ok(Some(entry)))` if the next directory entry is available.
+    ///  * `Poll::Ready(Ok(None))` if there are no more directory entries in this
+    ///    stream.
+    ///  * `Poll::Ready(Err(err))` if an IO error occurred while reading the next
+    ///    directory entry.
+    ///
+    /// When the method returns `Poll::Pending`, the `Waker` in the provided
+    /// `Context` is scheduled to receive a wakeup when the next directory entry
+    /// becomes available on the underlying IO resource.
+    ///
+    /// Note that on multiple calls to `poll_next_entry`, only the `Waker` from
+    /// the `Context` passed to the most recent call is scheduled to receive a
+    /// wakeup.
+    pub fn poll_next_entry(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<Option<DirEntry>>> {
         loop {
             match self.0 {
                 State::Idle(ref mut std) => {
