@@ -127,7 +127,7 @@ tempfile = "3.1.0"
 async-stream = "0.3"
 
 [target.'cfg(loom)'.dev-dependencies]
-loom = { version = "0.3.5", features = ["futures", "checkpoint"] }
+loom = { version = "0.4", features = ["futures", "checkpoint"] }
 
 [build-dependencies]
 autocfg = "1" # Needed for conditionally enabling `track-caller`
