@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608658177140,
+  "lastUpdate": 1608658196271,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -7189,6 +7189,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19931429,
             "range": "± 2740151",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0b83b3b8cc61e9d911abec00c33ec3762b2a6437",
+          "message": "fs,sync: expose poll_ fns on misc types (#3308)\n\nIncludes methods on:\r\n\r\n* fs::DirEntry\r\n* io::Lines\r\n* io::Split\r\n* sync::mpsc::Receiver\r\n* sync::misc::UnboundedReceiver",
+          "timestamp": "2020-12-22T09:28:14-08:00",
+          "tree_id": "bd1ae38a53efb2fe78fc8aba0bdd0789cc7a1495",
+          "url": "https://github.com/tokio-rs/tokio/commit/0b83b3b8cc61e9d911abec00c33ec3762b2a6437"
+        },
+        "date": 1608658195243,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 190751,
+            "range": "± 25444",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 722817,
+            "range": "± 165554",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5538952,
+            "range": "± 573569",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20765315,
+            "range": "± 2461635",
             "unit": "ns/iter"
           }
         ]
