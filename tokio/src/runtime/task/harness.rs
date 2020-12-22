@@ -51,7 +51,7 @@ where
         // If this is the first time the task is polled, the task will be bound
         // to the scheduler, in which case the task ref count must be
         // incremented.
-        let is_not_bound = !self.core().is_bound();
+        let is_not_bound = !self.core().scheduler.is_bound();
 
         // Transition the task to the running state.
         //
@@ -79,7 +79,7 @@ where
             //
             // Safety: Since we have unique access to the task so that we can
             // safely call `bind_scheduler`.
-            self.core().bind_scheduler(self.to_task());
+            self.core().scheduler.bind_scheduler(self.to_task());
         }
 
         // The transition to `Running` done above ensures that a lock on the
@@ -122,7 +122,7 @@ where
                     Ok(snapshot) => {
                         if snapshot.is_notified() {
                             // Signal yield
-                            self.core().yield_now(Notified(self.to_task()));
+                            self.core().scheduler.yield_now(Notified(self.to_task()));
                             // The ref-count was incremented as part of
                             // `transition_to_idle`.
                             self.drop_reference();
@@ -258,7 +258,7 @@ where
 
     pub(super) fn wake_by_ref(&self) {
         if self.header().state.transition_to_notified() {
-            self.core().schedule(Notified(self.to_task()));
+            self.core().scheduler.schedule(Notified(self.to_task()));
         }
     }
 
@@ -318,8 +318,8 @@ where
         // The task has completed execution and will no longer be scheduled.
         //
         // Attempts to batch a ref-dec with the state transition below.
-        let ref_dec = if self.core().is_bound() {
-            if let Some(task) = self.core().release(self.to_task()) {
+        let ref_dec = if self.core().scheduler.is_bound() {
+            if let Some(task) = self.core().scheduler.release(self.to_task()) {
                 mem::forget(task);
                 true
             } else {
