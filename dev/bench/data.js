@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608664234018,
+  "lastUpdate": 1608664240791,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -7345,6 +7345,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20765315,
             "range": "± 2461635",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "carlos.baezruiz@gmail.com",
+            "name": "Carlos B",
+            "username": "carlosb1"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7d28e4cdbb63b0ad19e66d1b077690cbebf71353",
+          "message": "examples: add futures executor threadpool (#3198)",
+          "timestamp": "2020-12-22T20:08:43+01:00",
+          "tree_id": "706d894cb4ea97ae1a91b9d2bd42d1800968559c",
+          "url": "https://github.com/tokio-rs/tokio/commit/7d28e4cdbb63b0ad19e66d1b077690cbebf71353"
+        },
+        "date": 1608664239639,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 199562,
+            "range": "± 93074",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 740136,
+            "range": "± 310486",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5297487,
+            "range": "± 1950839",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21586341,
+            "range": "± 3863494",
             "unit": "ns/iter"
           }
         ]
