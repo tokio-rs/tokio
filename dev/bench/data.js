@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608664526255,
+  "lastUpdate": 1608664543187,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -7447,6 +7447,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21586341,
             "range": "± 3863494",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2ee9520d10c1089230fc66eaa81f0574038faa82",
+          "message": "fs: misc small API tweaks (#3315)",
+          "timestamp": "2020-12-22T11:13:41-08:00",
+          "tree_id": "0cfded0285a4943e6aac2fd843965f48e9ccc4ff",
+          "url": "https://github.com/tokio-rs/tokio/commit/2ee9520d10c1089230fc66eaa81f0574038faa82"
+        },
+        "date": 1608664541945,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 224482,
+            "range": "± 93279",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 785738,
+            "range": "± 248474",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5012529,
+            "range": "± 947574",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 22020986,
+            "range": "± 3996062",
             "unit": "ns/iter"
           }
         ]
