@@ -73,10 +73,6 @@ impl<T> UnboundedReceiver<T> {
         UnboundedReceiver { chan }
     }
 
-    fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
-        self.chan.recv(cx)
-    }
-
     /// Receives the next value for this receiver.
     ///
     /// `None` is returned when all `Sender` halves have dropped, indicating
@@ -158,6 +154,25 @@ impl<T> UnboundedReceiver<T> {
     /// still enabling the receiver to drain messages that are buffered.
     pub fn close(&mut self) {
         self.chan.close();
+    }
+
+    /// Polls to receive the next message on this channel.
+    ///
+    /// This method returns:
+    ///
+    ///  * `Poll::Pending` if no messages are available but the channel is not
+    ///    closed.
+    ///  * `Poll::Ready(Some(message))` if a message is available.
+    ///  * `Poll::Ready(None)` if the channel has been closed and all messages
+    ///    sent before it was closed have been received.
+    ///
+    /// When the method returns `Poll::Pending`, the `Waker` in the provided
+    /// `Context` is scheduled to receive a wakeup when a message is sent on any
+    /// receiver, or when the channel is closed.  Note that on multiple calls to
+    /// `poll_recv`, only the `Waker` from the `Context` passed to the most
+    /// recent call is scheduled to receive a wakeup.
+    pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        self.chan.recv(cx)
     }
 }
 
