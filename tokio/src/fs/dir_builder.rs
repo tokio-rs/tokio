@@ -96,7 +96,7 @@ impl DirBuilder {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn create<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
+    pub async fn create(&self, path: impl AsRef<Path>) -> io::Result<()> {
         let path = path.as_ref().to_owned();
         let mut builder = std::fs::DirBuilder::new();
         builder.recursive(self.recursive);
