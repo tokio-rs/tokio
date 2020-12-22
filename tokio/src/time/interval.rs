@@ -141,7 +141,17 @@ impl Interval {
         poll_fn(|cx| self.poll_tick(cx)).await
     }
 
-    /// Polls when the next instant in the interval has been reached.
+    /// Poll for the next instant in the interval to be reached.
+    ///
+    /// This method can return the following values:
+    ///
+    ///  * `Poll::Pending` if the next instant has not yet been reached.
+    ///  * `Poll::Ready(instant)` if the next instant has been reached.
+    ///
+    /// When this method returns `Poll::Pending`, the current task is scheduled
+    /// to receive a wakeup when the instant has elapsed. Note that on multiple
+    /// calls to `poll_tick`, only the `Waker` from the `Context` passed to the
+    /// most recent call is scheduled to receive a wakeup.
     pub fn poll_tick(&mut self, cx: &mut Context<'_>) -> Poll<Instant> {
         // Wait for the delay to be done
         ready!(Pin::new(&mut self.delay).poll(cx));
