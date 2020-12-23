@@ -1,4 +1,4 @@
-# 0.4.0 (December 23, 2020)
+# 1.0.0 (December 23, 2020)
 
 - track `tokio` 1.0 release.
 
