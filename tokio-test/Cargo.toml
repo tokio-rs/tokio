@@ -18,7 +18,6 @@ description = """
 Testing utilities for Tokio- and futures-based code
 """
 categories = ["asynchronous", "testing"]
-publish = false
 
 [dependencies]
 tokio = { version = "1.0.0", path = "../tokio", features = ["rt", "sync", "time", "test-util"] }
