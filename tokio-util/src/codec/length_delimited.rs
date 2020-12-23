@@ -409,8 +409,9 @@ pub struct Builder {
 }
 
 /// An error when the number of bytes read is more than max frame length.
-#[non_exhaustive]
-pub struct LengthDelimitedCodecError;
+pub struct LengthDelimitedCodecError {
+    _priv: (),
+}
 
 /// A codec for frames delimited by a frame head specifying their lengths.
 ///
@@ -495,7 +496,7 @@ impl LengthDelimitedCodec {
             if n > self.builder.max_frame_len as u64 {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
-                    LengthDelimitedCodecError,
+                    LengthDelimitedCodecError { _priv: () },
                 ));
             }
 
@@ -585,7 +586,7 @@ impl Encoder<Bytes> for LengthDelimitedCodec {
         if n > self.builder.max_frame_len {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                LengthDelimitedCodecError,
+                LengthDelimitedCodecError { _priv: () },
             ));
         }
 

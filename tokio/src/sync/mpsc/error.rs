@@ -55,8 +55,7 @@ impl<T> From<SendError<T>> for TrySendError<T> {
 
 /// Error returned by `Receiver`.
 #[derive(Debug)]
-#[non_exhaustive]
-pub struct RecvError;
+pub struct RecvError(());
 
 impl fmt::Display for RecvError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {

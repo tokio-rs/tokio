@@ -42,8 +42,7 @@ impl From<Kind> for Error {
 
 /// Error returned by `Timeout`.
 #[derive(Debug, PartialEq)]
-#[non_exhaustive]
-pub struct Elapsed;
+pub struct Elapsed(());
 
 #[derive(Debug)]
 pub(crate) enum InsertError {
@@ -99,6 +98,12 @@ impl fmt::Display for Error {
 }
 
 // ===== impl Elapsed =====
+
+impl Elapsed {
+    pub(crate) fn new() -> Self {
+        Elapsed(())
+    }
+}
 
 impl fmt::Display for Elapsed {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
