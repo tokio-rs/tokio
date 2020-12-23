@@ -1,7 +1,6 @@
-use crate::future::poll_fn;
-use crate::io::{AsyncRead, AsyncWrite, PollEvented, ReadBuf};
-use crate::net::unix::split::{split, ReadHalf, WriteHalf};
-use crate::net::unix::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
+use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
+use crate::net::unix::split::{ReadHalf, WriteHalf};
+use crate::net::unix::split_owned::{OwnedReadHalf, OwnedWriteHalf};
 use crate::net::unix::ucred::{self, UCred};
 use crate::net::unix::SocketAddr;
 
@@ -21,9 +20,7 @@ cfg_net_unix! {
     /// This socket can be connected directly with `UnixStream::connect` or accepted
     /// from a listener with `UnixListener::incoming`. Additionally, a pair of
     /// anonymous Unix sockets can be created with `UnixStream::pair`.
-    pub struct UnixStream {
-        io: PollEvented<mio::net::UnixStream>,
-    }
+    pub struct UnixStream(t10::net::UnixStream);
 }
 
 impl UnixStream {
@@ -36,11 +33,7 @@ impl UnixStream {
     where
         P: AsRef<Path>,
     {
-        let stream = mio::net::UnixStream::connect(path)?;
-        let stream = UnixStream::new(stream)?;
-
-        poll_fn(|cx| stream.io.registration().poll_write_ready(cx)).await?;
-        Ok(stream)
+        t10::net::UnixStream::connect(path).await.map(Self)
     }
 
     /// Creates new `UnixStream` from a `std::os::unix::net::UnixStream`.
@@ -58,10 +51,7 @@ impl UnixStream {
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     pub fn from_std(stream: net::UnixStream) -> io::Result<UnixStream> {
-        let stream = mio::net::UnixStream::from_std(stream);
-        let io = PollEvented::new(stream)?;
-
-        Ok(UnixStream { io })
+        t10::net::UnixStream::from_std(stream).map(Self)
     }
 
     /// Creates an unnamed pair of connected sockets.
@@ -70,36 +60,31 @@ impl UnixStream {
     /// communicating back and forth between one another. Each socket will
     /// be associated with the default event loop's handle.
     pub fn pair() -> io::Result<(UnixStream, UnixStream)> {
-        let (a, b) = mio::net::UnixStream::pair()?;
-        let a = UnixStream::new(a)?;
-        let b = UnixStream::new(b)?;
+        let (a, b) = t10::net::UnixStream::pair()?;
+        let a = UnixStream(a);
+        let b = UnixStream(b);
 
         Ok((a, b))
     }
 
-    pub(crate) fn new(stream: mio::net::UnixStream) -> io::Result<UnixStream> {
-        let io = PollEvented::new(stream)?;
-        Ok(UnixStream { io })
-    }
-
     /// Returns the socket address of the local half of this connection.
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        self.io.local_addr().map(SocketAddr)
+        self.0.local_addr()
     }
 
     /// Returns the socket address of the remote half of this connection.
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
-        self.io.peer_addr().map(SocketAddr)
+        self.0.peer_addr()
     }
 
     /// Returns effective credentials of the process which called `connect` or `pair`.
     pub fn peer_cred(&self) -> io::Result<UCred> {
-        ucred::get_peer_cred(self)
+        self.0.peer_cred()
     }
 
     /// Returns the value of the `SO_ERROR` option.
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
-        self.io.take_error()
+        self.0.take_error()
     }
 
     /// Shuts down the read, write, or both halves of this connection.
@@ -108,7 +93,7 @@ impl UnixStream {
     /// specified portions to immediately return with an appropriate value
     /// (see the documentation of `Shutdown`).
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
-        self.io.shutdown(how)
+        self.0.shutdown(how)
     }
 
     // These lifetime markers also appear in the generated documentation, and make
@@ -122,7 +107,7 @@ impl UnixStream {
     ///
     /// [`into_split`]: Self::into_split()
     pub fn split<'a>(&'a mut self) -> (ReadHalf<'a>, WriteHalf<'a>) {
-        split(self)
+        self.0.split()
     }
 
     /// Splits a `UnixStream` into a read half and a write half, which can be used
@@ -137,7 +122,7 @@ impl UnixStream {
     /// [`split`]: Self::split()
     /// [`shutdown(Write)`]: fn@Self::shutdown
     pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
-        split_owned(self)
+        self.0.into_split()
     }
 }
 
@@ -159,7 +144,7 @@ impl AsyncRead for UnixStream {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        self.poll_read_priv(cx, buf)
+        self.0.poll_read(cx, buf)
     }
 }
 
@@ -169,7 +154,7 @@ impl AsyncWrite for UnixStream {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        self.poll_write_priv(cx, buf)
+        self.0.poll_write(cx, buf)
     }
 
     fn poll_write_vectored(
@@ -177,7 +162,7 @@ impl AsyncWrite for UnixStream {
         cx: &mut Context<'_>,
         bufs: &[io::IoSlice<'_>],
     ) -> Poll<io::Result<usize>> {
-        self.poll_write_vectored_priv(cx, bufs)
+        self.0.poll_write_vectored(cx, bufs)
     }
 
     fn is_write_vectored(&self) -> bool {
@@ -188,58 +173,20 @@ impl AsyncWrite for UnixStream {
         Poll::Ready(Ok(()))
     }
 
-    fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.shutdown(std::net::Shutdown::Write)?;
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.0.poll_shutdown(cx);
         Poll::Ready(Ok(()))
-    }
-}
-
-impl UnixStream {
-    // == Poll IO functions that takes `&self` ==
-    //
-    // They are not public because (taken from the doc of `PollEvented`):
-    //
-    // While `PollEvented` is `Sync` (if the underlying I/O type is `Sync`), the
-    // caller must ensure that there are at most two tasks that use a
-    // `PollEvented` instance concurrently. One for reading and one for writing.
-    // While violating this requirement is "safe" from a Rust memory model point
-    // of view, it will result in unexpected behavior in the form of lost
-    // notifications and tasks hanging.
-
-    pub(crate) fn poll_read_priv(
-        &self,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
-        // Safety: `UnixStream::read` correctly handles reads into uninitialized memory
-        unsafe { self.io.poll_read(cx, buf) }
-    }
-
-    pub(crate) fn poll_write_priv(
-        &self,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
-        self.io.poll_write(cx, buf)
-    }
-
-    pub(super) fn poll_write_vectored_priv(
-        &self,
-        cx: &mut Context<'_>,
-        bufs: &[io::IoSlice<'_>],
-    ) -> Poll<io::Result<usize>> {
-        self.io.poll_write_vectored(cx, bufs)
     }
 }
 
 impl fmt::Debug for UnixStream {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.io.fmt(f)
+        self.0.fmt(f)
     }
 }
 
 impl AsRawFd for UnixStream {
     fn as_raw_fd(&self) -> RawFd {
-        self.io.as_raw_fd()
+        self.0.as_raw_fd()
     }
 }

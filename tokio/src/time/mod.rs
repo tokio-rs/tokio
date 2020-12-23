@@ -91,7 +91,7 @@
 //! [`interval`]: crate::time::interval()
 
 #[cfg(feature = "test-util")]
-pub use clock::{advance, pause, resume};
+pub use t10::time::{advance, pause, resume};
 
 #[doc(inline)]
 pub use t10::time::{sleep, sleep_until, Sleep};

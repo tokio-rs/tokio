@@ -153,7 +153,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     ///
     /// [`AsyncFdReadyGuard`]: struct@self::AsyncFdReadyGuard
     pub async fn readable(&self) -> io::Result<AsyncFdReadyGuard<'_, T>> {
-        self.0.readable().await
+        self.0.readable().await.map(AsyncFdReadyGuard)
     }
 
     /// Waits for the file descriptor to become writable, returning a
@@ -161,7 +161,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     ///
     /// [`AsyncFdReadyGuard`]: struct@self::AsyncFdReadyGuard
     pub async fn writable(&self) -> io::Result<AsyncFdReadyGuard<'_, T>> {
-        self.0.writable().await
+        self.0.writable().await.map(AsyncFdReadyGuard)
     }
 }
 
@@ -214,7 +214,11 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     ///
     /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
     pub fn with_io<R>(&mut self, f: impl FnOnce() -> io::Result<R>) -> io::Result<R> {
-        self.0.with_io(f)
+        // FIXME: is is correct?
+        match self.0.try_io(|_async_fd_ref| f()) {
+            Ok(res) => res,
+            Err(err) => Err(io::ErrorKind::WouldBlock.into()),
+        }
     }
 
     /// Performs the IO operation `f`; if `f` returns [`Pending`], the readiness
@@ -242,8 +246,6 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
 
 impl<'a, T: std::fmt::Debug + AsRawFd> std::fmt::Debug for AsyncFdReadyGuard<'a, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ReadyGuard")
-            .field("async_fd", &self.async_fd)
-            .finish()
+        self.0.fmt(f)
     }
 }

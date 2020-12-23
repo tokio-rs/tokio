@@ -84,7 +84,7 @@ signal = [
 ]
 stream = ["futures-core"]
 sync = []
-test-util = []
+test-util = ["t10/test-util"]
 time = []
 
 [dependencies]

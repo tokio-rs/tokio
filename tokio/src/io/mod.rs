@@ -204,6 +204,8 @@ pub use self::read_buf::ReadBuf;
 #[doc(no_inline)]
 pub use std::io::{Error, ErrorKind, Result, SeekFrom};
 
+pub use t10::io::Interest;
+
 cfg_net_unix! {
     mod async_fd;
 

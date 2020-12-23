@@ -129,23 +129,7 @@
 //! [`Command::kill_on_drop`]: crate::process::Command::kill_on_drop
 //! [`Child`]: crate::process::Child
 
-#[path = "unix/mod.rs"]
-#[cfg(unix)]
-mod imp;
-
-#[cfg(unix)]
-pub(crate) mod unix {
-    pub(crate) use super::imp::*;
-}
-
-#[path = "windows.rs"]
-#[cfg(windows)]
-mod imp;
-
-mod kill;
-
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
-use crate::process::kill::Kill;
 
 use std::ffi::OsStr;
 use std::future::Future;
@@ -170,17 +154,7 @@ use std::task::Poll;
 /// [`std::process::Command`]: std::process::Command
 /// [`Child`]: struct@Child
 #[derive(Debug)]
-pub struct Command {
-    std: StdCommand,
-    kill_on_drop: bool,
-}
-
-pub(crate) struct SpawnedChild {
-    child: imp::Child,
-    stdin: Option<imp::ChildStdin>,
-    stdout: Option<imp::ChildStdout>,
-    stderr: Option<imp::ChildStderr>,
-}
+pub struct Command(t10::process::Command);
 
 impl Command {
     /// Constructs a new `Command` for launching the program at
@@ -213,7 +187,7 @@ impl Command {
     ///
     /// [rust-lang/rust#37519]: https://github.com/rust-lang/rust/issues/37519
     pub fn new<S: AsRef<OsStr>>(program: S) -> Command {
-        Self::from(StdCommand::new(program))
+        Self(t10::process::Command::new(program))
     }
 
     /// Adds an argument to pass to the program.
@@ -249,7 +223,7 @@ impl Command {
     ///         .arg("-a");
     /// ```
     pub fn arg<S: AsRef<OsStr>>(&mut self, arg: S) -> &mut Command {
-        self.std.arg(arg);
+        self.0.arg(arg);
         self
     }
 
@@ -274,7 +248,7 @@ impl Command {
         I: IntoIterator<Item = S>,
         S: AsRef<OsStr>,
     {
-        self.std.args(args);
+        self.0.args(args);
         self
     }
 
@@ -298,7 +272,7 @@ impl Command {
         K: AsRef<OsStr>,
         V: AsRef<OsStr>,
     {
-        self.std.env(key, val);
+        self.0.env(key, val);
         self
     }
 
@@ -331,7 +305,7 @@ impl Command {
         K: AsRef<OsStr>,
         V: AsRef<OsStr>,
     {
-        self.std.envs(vars);
+        self.0.envs(vars);
         self
     }
 
@@ -348,7 +322,7 @@ impl Command {
     ///         .env_remove("PATH");
     /// ```
     pub fn env_remove<K: AsRef<OsStr>>(&mut self, key: K) -> &mut Command {
-        self.std.env_remove(key);
+        self.0.env_remove(key);
         self
     }
 
@@ -365,7 +339,7 @@ impl Command {
     ///         .env_clear();
     /// ```
     pub fn env_clear(&mut self) -> &mut Command {
-        self.std.env_clear();
+        self.0.env_clear();
         self
     }
 
@@ -392,7 +366,7 @@ impl Command {
     ///         .current_dir("/bin");
     /// ```
     pub fn current_dir<P: AsRef<Path>>(&mut self, dir: P) -> &mut Command {
-        self.std.current_dir(dir);
+        self.0.current_dir(dir);
         self
     }
 
@@ -416,7 +390,7 @@ impl Command {
     ///         .stdin(Stdio::null());
     /// ```
     pub fn stdin<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Command {
-        self.std.stdin(cfg);
+        self.0.stdin(cfg);
         self
     }
 
@@ -440,7 +414,7 @@ impl Command {
     ///         .stdout(Stdio::null());
     /// ```
     pub fn stdout<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Command {
-        self.std.stdout(cfg);
+        self.0.stdout(cfg);
         self
     }
 
@@ -464,7 +438,7 @@ impl Command {
     ///         .stderr(Stdio::null());
     /// ```
     pub fn stderr<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Command {
-        self.std.stderr(cfg);
+        self.0.stderr(cfg);
         self
     }
 
@@ -495,7 +469,7 @@ impl Command {
     /// a [`Child`] handle where possible, and instead utilize `child.wait().await`
     /// or `child.kill().await` where possible.
     pub fn kill_on_drop(&mut self, kill_on_drop: bool) -> &mut Command {
-        self.kill_on_drop = kill_on_drop;
+        self.0.kill_on_drop(kill_on_drop);
         self
     }
 
@@ -506,7 +480,7 @@ impl Command {
     /// [1]: https://msdn.microsoft.com/en-us/library/windows/desktop/ms684863(v=vs.85).aspx
     #[cfg(windows)]
     pub fn creation_flags(&mut self, flags: u32) -> &mut Command {
-        self.std.creation_flags(flags);
+        self.0.creation_flags(flags);
         self
     }
 
@@ -515,7 +489,7 @@ impl Command {
     /// call will cause the spawn to fail.
     #[cfg(unix)]
     pub fn uid(&mut self, id: u32) -> &mut Command {
-        self.std.uid(id);
+        self.0.uid(id);
         self
     }
 
@@ -523,7 +497,7 @@ impl Command {
     /// the same semantics as the `uid` field.
     #[cfg(unix)]
     pub fn gid(&mut self, id: u32) -> &mut Command {
-        self.std.gid(id);
+        self.0.gid(id);
         self
     }
 
@@ -561,7 +535,7 @@ impl Command {
     where
         F: FnMut() -> io::Result<()> + Send + Sync + 'static,
     {
-        self.std.pre_exec(f);
+        self.0.pre_exec(f);
         self
     }
 
@@ -633,15 +607,7 @@ impl Command {
     /// if the system process limit is reached (which includes other applications
     /// running on the system).
     pub fn spawn(&mut self) -> io::Result<Child> {
-        imp::spawn_child(&mut self.std).map(|spawned_child| Child {
-            child: FusedChild::Child(ChildDropGuard {
-                inner: spawned_child.child,
-                kill_on_drop: self.kill_on_drop,
-            }),
-            stdin: spawned_child.stdin.map(|inner| ChildStdin { inner }),
-            stdout: spawned_child.stdout.map(|inner| ChildStdout { inner }),
-            stderr: spawned_child.stderr.map(|inner| ChildStderr { inner }),
-        })
+        self.0.spawn().map(Child)
     }
 
     /// Executes the command as a child process, waiting for it to finish and
@@ -683,20 +649,7 @@ impl Command {
     /// }
     /// ```
     pub fn status(&mut self) -> impl Future<Output = io::Result<ExitStatus>> {
-        let child = self.spawn();
-
-        async {
-            let mut child = child?;
-
-            // Ensure we close any stdio handles so we can't deadlock
-            // waiting on the child which may be waiting to read/write
-            // to a pipe we're holding.
-            child.stdin.take();
-            child.stdout.take();
-            child.stderr.take();
-
-            child.wait().await
-        }
+        self.0.status()
     }
 
     /// Executes the command as a child process, waiting for it to finish and
@@ -746,84 +699,15 @@ impl Command {
     /// }
     /// ```
     pub fn output(&mut self) -> impl Future<Output = io::Result<Output>> {
-        self.std.stdout(Stdio::piped());
-        self.std.stderr(Stdio::piped());
-
-        let child = self.spawn();
-
-        async { child?.wait_with_output().await }
+        self.0.output()
     }
 }
 
 impl From<StdCommand> for Command {
     fn from(std: StdCommand) -> Command {
-        Command {
-            std,
-            kill_on_drop: false,
-        }
+        Self(std.into())
     }
 }
-
-/// A drop guard which can ensure the child process is killed on drop if specified.
-#[derive(Debug)]
-struct ChildDropGuard<T: Kill> {
-    inner: T,
-    kill_on_drop: bool,
-}
-
-impl<T: Kill> Kill for ChildDropGuard<T> {
-    fn kill(&mut self) -> io::Result<()> {
-        let ret = self.inner.kill();
-
-        if ret.is_ok() {
-            self.kill_on_drop = false;
-        }
-
-        ret
-    }
-}
-
-impl<T: Kill> Drop for ChildDropGuard<T> {
-    fn drop(&mut self) {
-        if self.kill_on_drop {
-            drop(self.kill());
-        }
-    }
-}
-
-impl<T, E, F> Future for ChildDropGuard<F>
-where
-    F: Future<Output = Result<T, E>> + Kill + Unpin,
-{
-    type Output = Result<T, E>;
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // Keep track of task budget
-        let coop = ready!(crate::coop::poll_proceed(cx));
-
-        let ret = Pin::new(&mut self.inner).poll(cx);
-
-        if let Poll::Ready(Ok(_)) = ret {
-            // Avoid the overhead of trying to kill a reaped process
-            self.kill_on_drop = false;
-        }
-
-        if ret.is_ready() {
-            coop.made_progress();
-        }
-
-        ret
-    }
-}
-
-/// Keeps track of the exit status of a child process without worrying about
-/// polling the underlying futures even after they have completed.
-#[derive(Debug)]
-enum FusedChild {
-    Child(ChildDropGuard<imp::Child>),
-    Done(ExitStatus),
-}
-
 /// Representation of a child process spawned onto an event loop.
 ///
 /// # Caveats
@@ -835,21 +719,7 @@ enum FusedChild {
 /// and kill the child process if the `Child` wrapper is dropped before it
 /// has exited.
 #[derive(Debug)]
-pub struct Child {
-    child: FusedChild,
-
-    /// The handle for writing to the child's standard input (stdin), if it has
-    /// been captured.
-    pub stdin: Option<ChildStdin>,
-
-    /// The handle for reading from the child's standard output (stdout), if it
-    /// has been captured.
-    pub stdout: Option<ChildStdout>,
-
-    /// The handle for reading from the child's standard error (stderr), if it
-    /// has been captured.
-    pub stderr: Option<ChildStderr>,
-}
+pub struct Child(t10::process::Child);
 
 impl Child {
     /// Returns the OS-assigned process identifier associated with this child
@@ -859,10 +729,7 @@ impl Child {
     /// This is done to avoid confusion on platforms like Unix where the OS
     /// identifier could be reused once the process has completed.
     pub fn id(&self) -> Option<u32> {
-        match &self.child {
-            FusedChild::Child(child) => Some(child.inner.id()),
-            FusedChild::Done(_) => None,
-        }
+        self.0.id()
     }
 
     /// Attempts to force the child to exit, but does not wait for the request
@@ -873,13 +740,7 @@ impl Child {
     /// after a kill is sent; to avoid this, the caller should ensure that either
     /// `child.wait().await` or `child.try_wait()` is invoked successfully.
     pub fn start_kill(&mut self) -> io::Result<()> {
-        match &mut self.child {
-            FusedChild::Child(child) => child.kill(),
-            FusedChild::Done(_) => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "invalid argument: can't kill an exited process",
-            )),
-        }
+        self.0.start_kill()
     }
 
     /// Forces the child to exit.
@@ -908,9 +769,7 @@ impl Child {
     /// }
     /// ```
     pub async fn kill(&mut self) -> io::Result<()> {
-        self.start_kill()?;
-        self.wait().await?;
-        Ok(())
+        self.0.kill().await
     }
 
     /// Waits for the child to exit completely, returning the status that it
@@ -922,18 +781,7 @@ impl Child {
     /// child does not block waiting for input from the parent, while
     /// the parent waits for the child to exit.
     pub async fn wait(&mut self) -> io::Result<ExitStatus> {
-        match &mut self.child {
-            FusedChild::Done(exit) => Ok(*exit),
-            FusedChild::Child(child) => {
-                let ret = child.await;
-
-                if let Ok(exit) = ret {
-                    self.child = FusedChild::Done(exit);
-                }
-
-                ret
-            }
-        }
+        self.0.wait()
     }
 
     /// Attempts to collect the exit status of the child if it has already
@@ -952,20 +800,7 @@ impl Child {
     /// Note that unlike `wait`, this function will not attempt to drop stdin,
     /// nor will it wake the current task if the child exits.
     pub fn try_wait(&mut self) -> io::Result<Option<ExitStatus>> {
-        match &mut self.child {
-            FusedChild::Done(exit) => Ok(Some(*exit)),
-            FusedChild::Child(guard) => {
-                let ret = guard.inner.try_wait();
-
-                if let Ok(Some(exit)) = ret {
-                    // Avoid the overhead of trying to kill a reaped process
-                    guard.kill_on_drop = false;
-                    self.child = FusedChild::Done(exit);
-                }
-
-                ret
-            }
-        }
+        self.0.try_wait()
     }
 
     /// Returns a future that will resolve to an `Output`, containing the exit
@@ -985,27 +820,7 @@ impl Child {
     /// new pipes between parent and child. Use `stdout(Stdio::piped())` or
     /// `stderr(Stdio::piped())`, respectively, when creating a `Command`.
     pub async fn wait_with_output(mut self) -> io::Result<Output> {
-        use crate::future::try_join3;
-
-        async fn read_to_end<A: AsyncRead + Unpin>(io: Option<A>) -> io::Result<Vec<u8>> {
-            let mut vec = Vec::new();
-            if let Some(mut io) = io {
-                crate::io::util::read_to_end(&mut io, &mut vec).await?;
-            }
-            Ok(vec)
-        }
-
-        drop(self.stdin.take());
-        let stdout_fut = read_to_end(self.stdout.take());
-        let stderr_fut = read_to_end(self.stderr.take());
-
-        let (status, stdout, stderr) = try_join3(self.wait(), stdout_fut, stderr_fut).await?;
-
-        Ok(Output {
-            status,
-            stdout,
-            stderr,
-        })
+        self.0.wait_with_output()
     }
 }
 
@@ -1014,27 +829,21 @@ impl Child {
 /// This type implements the `AsyncWrite` trait to pass data to the stdin handle of
 /// handle of a child process asynchronously.
 #[derive(Debug)]
-pub struct ChildStdin {
-    inner: imp::ChildStdin,
-}
+pub struct ChildStdin(t10::process::ChildStdin);
 
 /// The standard output stream for spawned children.
 ///
 /// This type implements the `AsyncRead` trait to read data from the stdout
 /// handle of a child process asynchronously.
 #[derive(Debug)]
-pub struct ChildStdout {
-    inner: imp::ChildStdout,
-}
+pub struct ChildStdout(t10::process::ChildStdout);
 
 /// The standard error stream for spawned children.
 ///
 /// This type implements the `AsyncRead` trait to read data from the stderr
 /// handle of a child process asynchronously.
 #[derive(Debug)]
-pub struct ChildStderr {
-    inner: imp::ChildStderr,
-}
+pub struct ChildStderr(t10::process::ChildStderr);
 
 impl AsyncWrite for ChildStdin {
     fn poll_write(
@@ -1042,7 +851,7 @@ impl AsyncWrite for ChildStdin {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        self.inner.poll_write(cx, buf)
+        self.0.poll_write(cx, buf)
     }
 
     fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
@@ -1060,8 +869,7 @@ impl AsyncRead for ChildStdout {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        // Safety: pipes support reading into uninitialized memory
-        unsafe { self.inner.poll_read(cx, buf) }
+        self.0.poll_read(cx, buf)
     }
 }
 
@@ -1071,8 +879,7 @@ impl AsyncRead for ChildStderr {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        // Safety: pipes support reading into uninitialized memory
-        unsafe { self.inner.poll_read(cx, buf) }
+        self.0.poll_read(cx, buf)
     }
 }
 
@@ -1084,19 +891,19 @@ mod sys {
 
     impl AsRawFd for ChildStdin {
         fn as_raw_fd(&self) -> RawFd {
-            self.inner.as_raw_fd()
+            self.0.as_raw_fd()
         }
     }
 
     impl AsRawFd for ChildStdout {
         fn as_raw_fd(&self) -> RawFd {
-            self.inner.as_raw_fd()
+            self.0.as_raw_fd()
         }
     }
 
     impl AsRawFd for ChildStderr {
         fn as_raw_fd(&self) -> RawFd {
-            self.inner.as_raw_fd()
+            self.0.as_raw_fd()
         }
     }
 }
@@ -1109,155 +916,19 @@ mod sys {
 
     impl AsRawHandle for ChildStdin {
         fn as_raw_handle(&self) -> RawHandle {
-            self.inner.as_raw_handle()
+            self.0.as_raw_handle()
         }
     }
 
     impl AsRawHandle for ChildStdout {
         fn as_raw_handle(&self) -> RawHandle {
-            self.inner.as_raw_handle()
+            self.0.as_raw_handle()
         }
     }
 
     impl AsRawHandle for ChildStderr {
         fn as_raw_handle(&self) -> RawHandle {
-            self.inner.as_raw_handle()
+            self.0.as_raw_handle()
         }
-    }
-}
-
-#[cfg(all(test, not(loom)))]
-mod test {
-    use super::kill::Kill;
-    use super::ChildDropGuard;
-
-    use futures::future::FutureExt;
-    use std::future::Future;
-    use std::io;
-    use std::pin::Pin;
-    use std::task::{Context, Poll};
-
-    struct Mock {
-        num_kills: usize,
-        num_polls: usize,
-        poll_result: Poll<Result<(), ()>>,
-    }
-
-    impl Mock {
-        fn new() -> Self {
-            Self::with_result(Poll::Pending)
-        }
-
-        fn with_result(result: Poll<Result<(), ()>>) -> Self {
-            Self {
-                num_kills: 0,
-                num_polls: 0,
-                poll_result: result,
-            }
-        }
-    }
-
-    impl Kill for Mock {
-        fn kill(&mut self) -> io::Result<()> {
-            self.num_kills += 1;
-            Ok(())
-        }
-    }
-
-    impl Future for Mock {
-        type Output = Result<(), ()>;
-
-        fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
-            let inner = Pin::get_mut(self);
-            inner.num_polls += 1;
-            inner.poll_result
-        }
-    }
-
-    #[test]
-    fn kills_on_drop_if_specified() {
-        let mut mock = Mock::new();
-
-        {
-            let guard = ChildDropGuard {
-                inner: &mut mock,
-                kill_on_drop: true,
-            };
-            drop(guard);
-        }
-
-        assert_eq!(1, mock.num_kills);
-        assert_eq!(0, mock.num_polls);
-    }
-
-    #[test]
-    fn no_kill_on_drop_by_default() {
-        let mut mock = Mock::new();
-
-        {
-            let guard = ChildDropGuard {
-                inner: &mut mock,
-                kill_on_drop: false,
-            };
-            drop(guard);
-        }
-
-        assert_eq!(0, mock.num_kills);
-        assert_eq!(0, mock.num_polls);
-    }
-
-    #[test]
-    fn no_kill_if_already_killed() {
-        let mut mock = Mock::new();
-
-        {
-            let mut guard = ChildDropGuard {
-                inner: &mut mock,
-                kill_on_drop: true,
-            };
-            let _ = guard.kill();
-            drop(guard);
-        }
-
-        assert_eq!(1, mock.num_kills);
-        assert_eq!(0, mock.num_polls);
-    }
-
-    #[test]
-    fn no_kill_if_reaped() {
-        let mut mock_pending = Mock::with_result(Poll::Pending);
-        let mut mock_reaped = Mock::with_result(Poll::Ready(Ok(())));
-        let mut mock_err = Mock::with_result(Poll::Ready(Err(())));
-
-        let waker = futures::task::noop_waker();
-        let mut context = Context::from_waker(&waker);
-        {
-            let mut guard = ChildDropGuard {
-                inner: &mut mock_pending,
-                kill_on_drop: true,
-            };
-            let _ = guard.poll_unpin(&mut context);
-
-            let mut guard = ChildDropGuard {
-                inner: &mut mock_reaped,
-                kill_on_drop: true,
-            };
-            let _ = guard.poll_unpin(&mut context);
-
-            let mut guard = ChildDropGuard {
-                inner: &mut mock_err,
-                kill_on_drop: true,
-            };
-            let _ = guard.poll_unpin(&mut context);
-        }
-
-        assert_eq!(1, mock_pending.num_kills);
-        assert_eq!(1, mock_pending.num_polls);
-
-        assert_eq!(0, mock_reaped.num_kills);
-        assert_eq!(1, mock_reaped.num_polls);
-
-        assert_eq!(1, mock_err.num_kills);
-        assert_eq!(1, mock_err.num_polls);
     }
 }
