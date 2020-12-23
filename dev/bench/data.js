@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608740987919,
+  "lastUpdate": 1608740991383,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -8059,6 +8059,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21733507,
             "range": "± 3139343",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "te316e89@gmail.com",
+            "name": "Taiki Endo",
+            "username": "taiki-e"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ce0e9c67cfe61c7a91a284331ecc53fa01c32879",
+          "message": "chore: Revert \"use #[non_exhaustive] instead of private unit field\" (#3323)\n\nThis reverts commit 575938d4579e6fe6a89b700aadb0ae2bbab5483b.",
+          "timestamp": "2020-12-23T08:27:58-08:00",
+          "tree_id": "3b9ad84403d71b2ad5d2c749c23516c3dfaec3ce",
+          "url": "https://github.com/tokio-rs/tokio/commit/ce0e9c67cfe61c7a91a284331ecc53fa01c32879"
+        },
+        "date": 1608740990085,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 199759,
+            "range": "± 48862",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 752516,
+            "range": "± 141899",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5415427,
+            "range": "± 690792",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21358385,
+            "range": "± 2227081",
             "unit": "ns/iter"
           }
         ]
