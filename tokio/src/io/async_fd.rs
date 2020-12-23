@@ -530,7 +530,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
         }
 
         match result {
-            Err(err) if err.kind() == io::ErrorKind::WouldBlock => Err(TryIoError(())),
+            Err(err) if err.kind() == io::ErrorKind::WouldBlock => Err(TryIoError),
             result => Ok(result),
         }
     }
@@ -591,7 +591,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
         }
 
         match result {
-            Err(err) if err.kind() == io::ErrorKind::WouldBlock => Err(TryIoError(())),
+            Err(err) if err.kind() == io::ErrorKind::WouldBlock => Err(TryIoError),
             result => Ok(result),
         }
     }
@@ -620,4 +620,5 @@ impl<'a, T: std::fmt::Debug + AsRawFd> std::fmt::Debug for AsyncFdReadyMutGuard<
 /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
 /// [`try_io`]: method@AsyncFdReadyGuard::try_io
 #[derive(Debug)]
-pub struct TryIoError(());
+#[non_exhaustive]
+pub struct TryIoError;

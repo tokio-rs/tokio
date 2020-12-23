@@ -224,12 +224,13 @@ mod date {
 
     use time::{self, Duration};
 
-    pub struct Now(());
+    #[non_exhaustive]
+    pub struct Now;
 
     /// Returns a struct, which when formatted, renders an appropriate `Date`
     /// header value.
     pub fn now() -> Now {
-        Now(())
+        Now
     }
 
     // Gee Alex, doesn't this seem like premature optimization. Well you see

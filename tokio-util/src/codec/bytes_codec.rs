@@ -42,12 +42,13 @@ use std::io;
 /// ```
 ///
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
-pub struct BytesCodec(());
+#[non_exhaustive]
+pub struct BytesCodec;
 
 impl BytesCodec {
     /// Creates a new `BytesCodec` for shipping around raw bytes.
     pub fn new() -> BytesCodec {
-        BytesCodec(())
+        BytesCodec
     }
 }
 

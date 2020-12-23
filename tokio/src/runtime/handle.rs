@@ -106,7 +106,7 @@ impl Handle {
     ///
     /// Contrary to `current`, this never panics
     pub fn try_current() -> Result<Self, TryCurrentError> {
-        context::current().ok_or(TryCurrentError(()))
+        context::current().ok_or(TryCurrentError)
     }
 
     /// Spawn a future onto the Tokio runtime.
@@ -203,7 +203,8 @@ impl Handle {
 }
 
 /// Error returned by `try_current` when no Runtime has been started
-pub struct TryCurrentError(());
+#[non_exhaustive]
+pub struct TryCurrentError;
 
 impl fmt::Debug for TryCurrentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

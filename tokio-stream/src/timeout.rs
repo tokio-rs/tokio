@@ -24,7 +24,8 @@ pin_project! {
 
 /// Error returned by `Timeout`.
 #[derive(Debug, PartialEq)]
-pub struct Elapsed(());
+#[non_exhaustive]
+pub struct Elapsed;
 
 impl<S: Stream> Timeout<S> {
     pub(super) fn new(stream: S, duration: Duration) -> Self {
@@ -61,7 +62,7 @@ impl<S: Stream> Stream for Timeout<S> {
         if *me.poll_deadline {
             ready!(me.deadline.poll(cx));
             *me.poll_deadline = false;
-            return Poll::Ready(Some(Err(Elapsed::new())));
+            return Poll::Ready(Some(Err(Elapsed)));
         }
 
         Poll::Pending
@@ -73,12 +74,6 @@ impl<S: Stream> Stream for Timeout<S> {
 }
 
 // ===== impl Elapsed =====
-
-impl Elapsed {
-    pub(crate) fn new() -> Self {
-        Elapsed(())
-    }
-}
 
 impl fmt::Display for Elapsed {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
