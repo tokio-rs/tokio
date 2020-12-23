@@ -15,9 +15,8 @@ cfg_io_util! {
     ///
     /// [`empty`]: fn@empty
     /// [std]: std::io::empty
-    pub struct Empty {
-        _p: (),
-    }
+    #[non_exhaustive]
+    pub struct Empty;
 
     /// Creates a new empty async reader.
     ///
@@ -42,7 +41,7 @@ cfg_io_util! {
     /// }
     /// ```
     pub fn empty() -> Empty {
-        Empty { _p: () }
+        Empty
     }
 }
 

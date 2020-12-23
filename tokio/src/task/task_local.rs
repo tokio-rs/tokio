@@ -156,7 +156,7 @@ impl<T: 'static> LocalKey<T> {
             if let Some(val) = v.borrow().as_ref() {
                 Ok(f(val))
             } else {
-                Err(AccessError { _private: () })
+                Err(AccessError)
             }
         })
     }
@@ -223,9 +223,8 @@ impl<T: 'static> StaticLifetime for T {}
 
 /// An error returned by [`LocalKey::try_with`](method@LocalKey::try_with).
 #[derive(Clone, Copy, Eq, PartialEq)]
-pub struct AccessError {
-    _private: (),
-}
+#[non_exhaustive]
+pub struct AccessError;
 
 impl fmt::Debug for AccessError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

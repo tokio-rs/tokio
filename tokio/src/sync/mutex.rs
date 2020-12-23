@@ -167,7 +167,8 @@ unsafe impl<T> Sync for OwnedMutexGuard<T> where T: ?Sized + Send + Sync {}
 ///
 /// [`Mutex::try_lock`]: Mutex::try_lock
 #[derive(Debug)]
-pub struct TryLockError(());
+#[non_exhaustive]
+pub struct TryLockError;
 
 impl fmt::Display for TryLockError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -323,7 +324,7 @@ impl<T: ?Sized> Mutex<T> {
     pub fn try_lock(&self) -> Result<MutexGuard<'_, T>, TryLockError> {
         match self.s.try_acquire(1) {
             Ok(_) => Ok(MutexGuard { lock: self }),
-            Err(_) => Err(TryLockError(())),
+            Err(_) => Err(TryLockError),
         }
     }
 
@@ -378,7 +379,7 @@ impl<T: ?Sized> Mutex<T> {
     pub fn try_lock_owned(self: Arc<Self>) -> Result<OwnedMutexGuard<T>, TryLockError> {
         match self.s.try_acquire(1) {
             Ok(_) => Ok(OwnedMutexGuard { lock: self }),
-            Err(_) => Err(TryLockError(())),
+            Err(_) => Err(TryLockError),
         }
     }
 
