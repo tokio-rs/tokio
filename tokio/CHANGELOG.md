@@ -32,8 +32,8 @@ Commit to the API and long-term support.
 - sync: `UnboundedReceiver::blocking_recv()` (#3262).
 - sync: `watch::Sender::borrow()` (#3269).
 - sync: `Semaphore::close()` (#3065).
-- sync: `poll_*` fns to `mpsc::Receiver`, `mpsc::UnboundedReceiver` (#3308).
-- time: `poll)*` fns to `time::Interval` (#3316).
+- sync: `poll_recv` fns to `mpsc::Receiver`, `mpsc::UnboundedReceiver` (#3308).
+- time: `poll_tick` fn to `time::Interval` (#3316).
 
 # 0.3.6 (December 14, 2020)
 
