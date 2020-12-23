@@ -106,13 +106,9 @@ where
 
     /// Read the task output into `dst`.
     pub(super) fn try_read_output(self, dst: &mut Poll<super::Result<T::Output>>, waker: &Waker) {
-        try_read_output(
-            self.header(),
-            &self.core().stage,
-            self.trailer(),
-            dst,
-            waker,
-        )
+        if can_read_output(self.header(), self.trailer(), waker) {
+            *dst = Poll::Ready(self.core().stage.take_output());
+        }
     }
 
     pub(super) fn drop_join_handle_slow(self) {
@@ -343,18 +339,6 @@ fn can_read_output(header: &Header, trailer: &Trailer, waker: &Waker) -> bool {
         }
     }
     true
-}
-
-fn try_read_output<T: Future>(
-    header: &Header,
-    stage: &CoreStage<T>,
-    trailer: &Trailer,
-    dst: &mut Poll<super::Result<T::Output>>,
-    waker: &Waker,
-) {
-    if can_read_output(header, trailer, waker) {
-        *dst = Poll::Ready(stage.take_output());
-    }
 }
 
 fn set_join_waker(
