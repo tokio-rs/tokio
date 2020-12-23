@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608743853589,
+  "lastUpdate": 1608743860927,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -8161,6 +8161,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21358385,
             "range": "± 2227081",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "paolo@paolo565.org",
+            "name": "Paolo Barbolini",
+            "username": "paolobarbolini"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "aa6597ba66b10fa9175ccd7b3c0335f4a49b91c5",
+          "message": "compat: update traits naming to match tokio 1.0 (#3324)",
+          "timestamp": "2020-12-23T09:15:56-08:00",
+          "tree_id": "d500c90ca41df0a66e18314a5d6a68c0e7ec2dde",
+          "url": "https://github.com/tokio-rs/tokio/commit/aa6597ba66b10fa9175ccd7b3c0335f4a49b91c5"
+        },
+        "date": 1608743859807,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 178322,
+            "range": "± 29766",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 689344,
+            "range": "± 136972",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4669320,
+            "range": "± 998121",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18328568,
+            "range": "± 1711750",
             "unit": "ns/iter"
           }
         ]
