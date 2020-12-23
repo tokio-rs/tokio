@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608685879056,
+  "lastUpdate": 1608703082219,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -7801,6 +7801,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18194390,
             "range": "± 2636139",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0deaeb84948f253b76b7fe64d7fe9d4527cd4275",
+          "message": "chore: remove unused `slab` dependency (#3318)",
+          "timestamp": "2020-12-22T21:56:22-08:00",
+          "tree_id": "3b9ad84403d71b2ad5d2c749c23516c3dfaec3ce",
+          "url": "https://github.com/tokio-rs/tokio/commit/0deaeb84948f253b76b7fe64d7fe9d4527cd4275"
+        },
+        "date": 1608703080818,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 186034,
+            "range": "± 11793",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 703851,
+            "range": "± 45313",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5387275,
+            "range": "± 1022826",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20839245,
+            "range": "± 2445985",
             "unit": "ns/iter"
           }
         ]
