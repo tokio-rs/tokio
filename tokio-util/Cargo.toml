@@ -40,7 +40,7 @@ __docs_rs = ["futures-util"]
 tokio = { version = "1.0.0", path = "../tokio" }
 tokio-stream = { version = "0.1", path = "../tokio-stream" }
 
-bytes = { git = "https://github.com/tokio-rs/bytes" }
+bytes = "1.0.0"
 futures-core = "0.3.0"
 futures-sink = "0.3.0"
 futures-io = { version = "0.3.0", optional = true }
