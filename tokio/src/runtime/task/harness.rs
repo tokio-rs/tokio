@@ -293,13 +293,7 @@ fn wake_join(trailer: &Trailer) {
     });
 }
 
-fn try_read_output<T: Future>(
-    header: &Header,
-    stage: &CoreStage<T>,
-    trailer: &Trailer,
-    dst: &mut Poll<super::Result<T::Output>>,
-    waker: &Waker,
-) {
+fn can_read_output(header: &Header, trailer: &Trailer, waker: &Waker) -> bool {
     // Load a snapshot of the current task state
     let snapshot = header.state.load();
 
@@ -322,7 +316,7 @@ fn try_read_output<T: Future>(
             if will_wake {
                 // The task is not complete **and** the waker is up to date,
                 // there is nothing further that needs to be done.
-                return;
+                return false;
             }
 
             // Unset the `JOIN_WAKER` to gain mutable access to the `waker`
@@ -342,14 +336,25 @@ fn try_read_output<T: Future>(
         };
 
         match res {
-            Ok(_) => return,
+            Ok(_) => return false,
             Err(snapshot) => {
                 assert!(snapshot.is_complete());
             }
         }
     }
+    true
+}
 
-    *dst = Poll::Ready(stage.take_output());
+fn try_read_output<T: Future>(
+    header: &Header,
+    stage: &CoreStage<T>,
+    trailer: &Trailer,
+    dst: &mut Poll<super::Result<T::Output>>,
+    waker: &Waker,
+) {
+    if can_read_output(header, trailer, waker) {
+        *dst = Poll::Ready(stage.take_output());
+    }
 }
 
 fn set_join_waker(
