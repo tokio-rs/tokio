@@ -2,14 +2,13 @@ use std::future::Future;
 
 cfg_rt! {
     pub(crate) fn block_on<F: Future>(f: F) -> F::Output {
-        let mut e = crate::runtime::enter::enter(false);
-        e.block_on(f).unwrap()
+        t10::runtime::Handle::current().block_on(f)
     }
 }
 
 cfg_not_rt! {
     pub(crate) fn block_on<F: Future>(f: F) -> F::Output {
-        let mut park = crate::park::thread::CachedParkThread::new();
-        park.block_on(f).unwrap()
+        // FIXME performance degradation?
+       futures::executor::block_on(f)
     }
 }

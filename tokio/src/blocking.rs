@@ -1,5 +1,5 @@
 cfg_rt! {
-    pub(crate) use crate::runtime::spawn_blocking;
+    pub(crate) use crate::task::spawn_blocking;
     pub(crate) use crate::task::JoinHandle;
 }
 

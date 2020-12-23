@@ -177,43 +177,11 @@
 #[macro_use]
 mod tests;
 
-pub(crate) mod enter;
-
-pub(crate) mod task;
-
 cfg_rt! {
-    mod basic_scheduler;
-    use basic_scheduler::BasicScheduler;
-
-    mod blocking;
-    use blocking::BlockingPool;
-    pub(crate) use blocking::spawn_blocking;
-
     mod builder;
     pub use self::builder::Builder;
-
-    pub(crate) mod context;
-    pub(crate) mod driver;
-
-    use self::enter::enter;
-
     mod handle;
     pub use handle::{EnterGuard, Handle};
-
-    mod spawner;
-    use self::spawner::Spawner;
-}
-
-cfg_rt_multi_thread! {
-    mod park;
-    use park::Parker;
-}
-
-cfg_rt_multi_thread! {
-    mod queue;
-
-    pub(crate) mod thread_pool;
-    use self::thread_pool::ThreadPool;
 }
 
 cfg_rt! {
@@ -261,30 +229,7 @@ cfg_rt! {
     /// [`new`]: method@Self::new
     /// [`Builder`]: struct@Builder
     #[derive(Debug)]
-    pub struct Runtime {
-        /// Task executor
-        kind: Kind,
-
-        /// Handle to runtime, also contains driver handles
-        handle: Handle,
-
-        /// Blocking pool handle, used to signal shutdown
-        blocking_pool: BlockingPool,
-    }
-
-    /// The runtime executor is either a thread-pool or a current-thread executor.
-    #[derive(Debug)]
-    enum Kind {
-        /// Execute all tasks on the current-thread.
-        CurrentThread(BasicScheduler<driver::Driver>),
-
-        /// Execute tasks across multiple threads.
-        #[cfg(feature = "rt-multi-thread")]
-        ThreadPool(ThreadPool),
-    }
-
-    /// After thread starts / before thread stops
-    type Callback = std::sync::Arc<dyn Fn() + Send + Sync>;
+    pub struct Runtime(t10::runtime::Runtime);
 
     impl Runtime {
         /// Create a new runtime instance with default configuration values.
@@ -319,7 +264,7 @@ cfg_rt! {
         #[cfg(feature = "rt-multi-thread")]
         #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
         pub fn new() -> std::io::Result<Runtime> {
-            Builder::new_multi_thread().enable_all().build()
+            Ok(Runtime(t10::runtime::Builder::new_multi_thread().enable_all().build()?))
         }
 
         /// Return a handle to the runtime's spawner.
@@ -340,7 +285,7 @@ cfg_rt! {
         /// // Use the handle...
         /// ```
         pub fn handle(&self) -> &Handle {
-            &self.handle
+            &self.0.handle()
         }
 
         /// Spawn a future onto the Tokio runtime.
@@ -374,7 +319,7 @@ cfg_rt! {
             F: Future + Send + 'static,
             F::Output: Send + 'static,
         {
-            self.handle.spawn(future)
+            self.0.spawn(future)
         }
 
         /// Run the provided function on an executor dedicated to blocking operations.
@@ -399,7 +344,7 @@ cfg_rt! {
             F: FnOnce() -> R + Send + 'static,
             R: Send + 'static,
         {
-            self.handle.spawn_blocking(func)
+            self.0.spawn_blocking(func)
         }
 
         /// Run a future to completion on the Tokio runtime. This is the
@@ -444,13 +389,7 @@ cfg_rt! {
         ///
         /// [handle]: fn@Handle::block_on
         pub fn block_on<F: Future>(&self, future: F) -> F::Output {
-            let _enter = self.enter();
-
-            match &self.kind {
-                Kind::CurrentThread(exec) => exec.block_on(future),
-                #[cfg(feature = "rt-multi-thread")]
-                Kind::ThreadPool(exec) => exec.block_on(future),
-            }
+            self.0.block_on(future)
         }
 
         /// Enter the runtime context.
@@ -486,7 +425,7 @@ cfg_rt! {
         /// }
         /// ```
         pub fn enter(&self) -> EnterGuard<'_> {
-            self.handle.enter()
+            self.0.enter()
         }
 
         /// Shutdown the runtime, waiting for at most `duration` for all spawned
@@ -525,9 +464,7 @@ cfg_rt! {
         /// }
         /// ```
         pub fn shutdown_timeout(mut self, duration: Duration) {
-            // Wakeup and shutdown all the worker threads
-            self.handle.spawner.shutdown();
-            self.blocking_pool.shutdown(Some(duration));
+            self.0.shutdown_timeout(duration);
         }
 
         /// Shutdown the runtime, without waiting for any spawned tasks to shutdown.
@@ -557,7 +494,7 @@ cfg_rt! {
         /// }
         /// ```
         pub fn shutdown_background(self) {
-            self.shutdown_timeout(Duration::from_nanos(0))
+            self.0.shutdown_background()
         }
     }
 }

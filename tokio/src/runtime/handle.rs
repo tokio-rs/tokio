@@ -1,7 +1,4 @@
-use crate::runtime::blocking::task::BlockingTask;
-use crate::runtime::task::{self, JoinHandle};
-use crate::runtime::{blocking, context, driver, Spawner};
-
+use crate::task::JoinHandle;
 use std::future::Future;
 use std::{error, fmt};
 
@@ -12,24 +9,7 @@ use std::{error, fmt};
 ///
 /// [`Runtime::handle`]: crate::runtime::Runtime::handle()
 #[derive(Debug, Clone)]
-pub struct Handle {
-    pub(super) spawner: Spawner,
-
-    /// Handles to the I/O drivers
-    pub(super) io_handle: driver::IoHandle,
-
-    /// Handles to the signal drivers
-    pub(super) signal_handle: driver::SignalHandle,
-
-    /// Handles to the time drivers
-    pub(super) time_handle: driver::TimeHandle,
-
-    /// Source of `Instant::now()`
-    pub(super) clock: driver::Clock,
-
-    /// Blocking pool spawner
-    pub(super) blocking_spawner: blocking::Spawner,
-}
+pub struct Handle(t10::runtime::Handle);
 
 /// Runtime context guard.
 ///
@@ -38,10 +18,7 @@ pub struct Handle {
 ///
 /// [`Runtime::enter`]: fn@crate::runtime::Runtime::enter
 #[derive(Debug)]
-pub struct EnterGuard<'a> {
-    handle: &'a Handle,
-    guard: context::EnterGuard,
-}
+pub struct EnterGuard<'a>(t10::runtime::EnterGuard<'a>);
 
 impl Handle {
     /// Enter the runtime context. This allows you to construct types that must
@@ -52,10 +29,7 @@ impl Handle {
     /// [`TcpStream`]: struct@crate::net::TcpStream
     /// [`tokio::spawn`]: fn@crate::spawn
     pub fn enter(&self) -> EnterGuard<'_> {
-        EnterGuard {
-            handle: self,
-            guard: context::enter(self.clone()),
-        }
+        EnterGuard(self.0.enter())
     }
 
     /// Returns a `Handle` view over the currently running `Runtime`
@@ -97,7 +71,7 @@ impl Handle {
     /// # }
     /// ```
     pub fn current() -> Self {
-        context::current().expect("not currently running on the Tokio runtime.")
+        Handle(t10::runtime::Handle::current())
     }
 
     /// Returns a Handle view over the currently running Runtime
@@ -106,7 +80,7 @@ impl Handle {
     ///
     /// Contrary to `current`, this never panics
     pub fn try_current() -> Result<Self, TryCurrentError> {
-        context::current().ok_or(TryCurrentError(()))
+        t10::runtime::Handle::try_current().map(Handle)
     }
 
     /// Spawn a future onto the Tokio runtime.
@@ -137,14 +111,12 @@ impl Handle {
     /// # }
     /// ```
     #[cfg_attr(tokio_track_caller, track_caller)]
-    pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
+    pub fn spawn<F>(&self, future: F) -> crate::task::JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        #[cfg(feature = "tracing")]
-        let future = crate::util::trace::task(future, "task");
-        self.spawner.spawn(future)
+        JoinHandle(self.0.spawn(future))
     }
 
     /// Run the provided function on an executor dedicated to blocking
@@ -172,33 +144,7 @@ impl Handle {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        #[cfg(feature = "tracing")]
-        let func = {
-            #[cfg(tokio_track_caller)]
-            let location = std::panic::Location::caller();
-            #[cfg(tokio_track_caller)]
-            let span = tracing::trace_span!(
-                target: "tokio::task",
-                "task",
-                kind = %"blocking",
-                function = %std::any::type_name::<F>(),
-                spawn.location = %format_args!("{}:{}:{}", location.file(), location.line(), location.column()),
-            );
-            #[cfg(not(tokio_track_caller))]
-            let span = tracing::trace_span!(
-                target: "tokio::task",
-                "task",
-                kind = %"blocking",
-                function = %std::any::type_name::<F>(),
-            );
-            move || {
-                let _g = span.enter();
-                func()
-            }
-        };
-        let (task, handle) = task::joinable(BlockingTask::new(func));
-        let _ = self.blocking_spawner.spawn(task, &self);
-        handle
+        JoinHandle(self.0.spawn_blocking(func))
     }
 }
 

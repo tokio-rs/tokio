@@ -90,15 +90,11 @@
 //! [`sleep`]: crate::time::sleep()
 //! [`interval`]: crate::time::interval()
 
-mod clock;
-pub(crate) use self::clock::Clock;
 #[cfg(feature = "test-util")]
 pub use clock::{advance, pause, resume};
 
-pub(crate) mod driver;
-
 #[doc(inline)]
-pub use driver::sleep::{sleep, sleep_until, Sleep};
+pub use t10::time::{sleep, sleep_until, Sleep};
 
 pub mod error;
 

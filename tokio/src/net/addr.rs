@@ -154,7 +154,7 @@ cfg_net! {
         type Future = sealed::MaybeReady;
 
         fn to_socket_addrs(&self, _: sealed::Internal) -> Self::Future {
-            use crate::blocking::spawn_blocking;
+            use t10::task::spawn_blocking;
             use sealed::MaybeReady;
 
             // First check if the input parses as a socket address
@@ -182,7 +182,7 @@ cfg_net! {
         type Future = sealed::MaybeReady;
 
         fn to_socket_addrs(&self, _: sealed::Internal) -> Self::Future {
-            use crate::blocking::spawn_blocking;
+            use t10::task::spawn_blocking;
             use sealed::MaybeReady;
 
             let (host, port) = *self;
@@ -258,7 +258,7 @@ pub(crate) mod sealed {
     pub struct Internal;
 
     cfg_net! {
-        use crate::blocking::JoinHandle;
+        use t10::task::JoinHandle;
 
         use std::option;
         use std::pin::Pin;

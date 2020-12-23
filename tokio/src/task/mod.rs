@@ -216,7 +216,8 @@
 //! [`thread::yield_now`]: std::thread::yield_now
 
 cfg_rt! {
-    pub use crate::runtime::task::{JoinError, JoinHandle};
+    pub struct JoinError(pub(crate) t10::task::JoinError);
+    pub struct JoinHandle<R>(pub(crate) t10::task::JoinHandle<R>);
 
     mod blocking;
     pub use blocking::spawn_blocking;

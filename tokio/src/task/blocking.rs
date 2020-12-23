@@ -47,7 +47,7 @@ cfg_rt_multi_thread! {
     where
         F: FnOnce() -> R,
     {
-        crate::runtime::thread_pool::block_in_place(f)
+        t10::task::block_in_place(f)
     }
 }
 
@@ -110,5 +110,5 @@ where
     F: FnOnce() -> R + Send + 'static,
     R: Send + 'static,
 {
-    crate::runtime::spawn_blocking(f)
+    JoinHandle(t10::task::spawn_blocking(f))
 }

@@ -1,6 +1,3 @@
-use crate::io::driver::{Handle, Interest, ReadyEvent, Registration};
-
-use mio::unix::SourceFd;
 use std::io;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::{task::Context, task::Poll};
@@ -60,20 +57,12 @@ use std::{task::Context, task::Poll};
 /// [`writable`]: method@Self::writable
 /// [`AsyncFdReadyGuard`]: struct@self::AsyncFdReadyGuard
 /// [`TcpStream::poll_read_ready`]: struct@crate::net::TcpStream
-pub struct AsyncFd<T: AsRawFd> {
-    registration: Registration,
-    inner: Option<T>,
-}
+pub struct AsyncFd<T: AsRawFd>(t10::io::unix::AsyncFd<T>);
 /// Represents an IO-ready event detected on a particular file descriptor, which
 /// has not yet been acknowledged. This is a `must_use` structure to help ensure
 /// that you do not forget to explicitly clear (or not clear) the event.
 #[must_use = "You must explicitly choose whether to clear the readiness state by calling a method on ReadyGuard"]
-pub struct AsyncFdReadyGuard<'a, T: AsRawFd> {
-    async_fd: &'a AsyncFd<T>,
-    event: Option<ReadyEvent>,
-}
-
-const ALL_INTEREST: Interest = Interest::READABLE.add(Interest::WRITABLE);
+pub struct AsyncFdReadyGuard<'a, T: AsRawFd>(t10::io::unix::AsyncFdReadyGuard<'a, T>);
 
 impl<T: AsRawFd> AsyncFd<T> {
     #[inline]
@@ -86,61 +75,35 @@ impl<T: AsRawFd> AsyncFd<T> {
     where
         T: AsRawFd,
     {
-        Self::with_interest(inner, ALL_INTEREST)
+        t10::io::unix::AsyncFd::new(inner).map(AsyncFd)
     }
 
     #[inline]
     /// Creates new instance as `new` with additional ability to customize interest,
     /// allowing to specify whether file descriptor will be polled for read, write or both.
-    pub fn with_interest(inner: T, interest: Interest) -> io::Result<Self>
+    pub fn with_interest(inner: T, interest: t10::io::Interest) -> io::Result<Self>
     where
         T: AsRawFd,
     {
-        Self::new_with_handle_and_interest(inner, Handle::current(), interest)
-    }
-
-    pub(crate) fn new_with_handle_and_interest(
-        inner: T,
-        handle: Handle,
-        interest: Interest,
-    ) -> io::Result<Self> {
-        let fd = inner.as_raw_fd();
-
-        let registration =
-            Registration::new_with_interest_and_handle(&mut SourceFd(&fd), interest, handle)?;
-
-        Ok(AsyncFd {
-            registration,
-            inner: Some(inner),
-        })
+        t10::io::unix::AsyncFd::with_interest(inner, interest).map(AsyncFd)
     }
 
     /// Returns a shared reference to the backing object of this [`AsyncFd`]
     #[inline]
     pub fn get_ref(&self) -> &T {
-        self.inner.as_ref().unwrap()
+        self.0.get_ref()
     }
 
     /// Returns a mutable reference to the backing object of this [`AsyncFd`]
     #[inline]
     pub fn get_mut(&mut self) -> &mut T {
-        self.inner.as_mut().unwrap()
-    }
-
-    fn take_inner(&mut self) -> Option<T> {
-        let fd = self.inner.as_ref().map(AsRawFd::as_raw_fd);
-
-        if let Some(fd) = fd {
-            let _ = self.registration.deregister(&mut SourceFd(&fd));
-        }
-
-        self.inner.take()
+        self.0.get_mut()
     }
 
     /// Deregisters this file descriptor, and returns ownership of the backing
     /// object.
     pub fn into_inner(mut self) -> T {
-        self.take_inner().unwrap()
+        self.0.into_inner()
     }
 
     /// Polls for read readiness. This function retains the waker for the last
@@ -159,13 +122,9 @@ impl<T: AsRawFd> AsyncFd<T> {
         &'a self,
         cx: &mut Context<'_>,
     ) -> Poll<io::Result<AsyncFdReadyGuard<'a, T>>> {
-        let event = ready!(self.registration.poll_read_ready(cx))?;
-
-        Ok(AsyncFdReadyGuard {
-            async_fd: self,
-            event: Some(event),
-        })
-        .into()
+        self.0
+            .poll_read_ready(cx)
+            .map(|res| res.map(AsyncFdReadyGuard))
     }
 
     /// Polls for write readiness. This function retains the waker for the last
@@ -184,22 +143,9 @@ impl<T: AsRawFd> AsyncFd<T> {
         &'a self,
         cx: &mut Context<'_>,
     ) -> Poll<io::Result<AsyncFdReadyGuard<'a, T>>> {
-        let event = ready!(self.registration.poll_write_ready(cx))?;
-
-        Ok(AsyncFdReadyGuard {
-            async_fd: self,
-            event: Some(event),
-        })
-        .into()
-    }
-
-    async fn readiness(&self, interest: Interest) -> io::Result<AsyncFdReadyGuard<'_, T>> {
-        let event = self.registration.readiness(interest).await?;
-
-        Ok(AsyncFdReadyGuard {
-            async_fd: self,
-            event: Some(event),
-        })
+        self.0
+            .poll_write_ready(cx)
+            .map(|res| res.map(AsyncFdReadyGuard))
     }
 
     /// Waits for the file descriptor to become readable, returning a
@@ -207,7 +153,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     ///
     /// [`AsyncFdReadyGuard`]: struct@self::AsyncFdReadyGuard
     pub async fn readable(&self) -> io::Result<AsyncFdReadyGuard<'_, T>> {
-        self.readiness(Interest::READABLE).await
+        self.0.readable().await
     }
 
     /// Waits for the file descriptor to become writable, returning a
@@ -215,27 +161,19 @@ impl<T: AsRawFd> AsyncFd<T> {
     ///
     /// [`AsyncFdReadyGuard`]: struct@self::AsyncFdReadyGuard
     pub async fn writable(&self) -> io::Result<AsyncFdReadyGuard<'_, T>> {
-        self.readiness(Interest::WRITABLE).await
+        self.0.writable().await
     }
 }
 
 impl<T: AsRawFd> AsRawFd for AsyncFd<T> {
     fn as_raw_fd(&self) -> RawFd {
-        self.inner.as_ref().unwrap().as_raw_fd()
+        self.0.as_raw_fd()
     }
 }
 
 impl<T: std::fmt::Debug + AsRawFd> std::fmt::Debug for AsyncFd<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("AsyncFd")
-            .field("inner", &self.inner)
-            .finish()
-    }
-}
-
-impl<T: AsRawFd> Drop for AsyncFd<T> {
-    fn drop(&mut self) {
-        let _ = self.take_inner();
+        self.0.fmt(f)
     }
 }
 
@@ -251,9 +189,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     ///
     /// [`drop`]: method@std::mem::drop
     pub fn clear_ready(&mut self) {
-        if let Some(event) = self.event.take() {
-            self.async_fd.registration.clear_readiness(event);
-        }
+        self.0.clear_ready();
     }
 
     /// This function should be invoked when you intentionally want to keep the
@@ -262,7 +198,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// While this function is itself a no-op, it satisfies the `#[must_use]`
     /// constraint on the [`AsyncFdReadyGuard`] type.
     pub fn retain_ready(&mut self) {
-        // no-op
+        self.0.retain_ready();
     }
 
     /// Performs the IO operation `f`; if `f` returns a [`WouldBlock`] error,
@@ -278,15 +214,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     ///
     /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
     pub fn with_io<R>(&mut self, f: impl FnOnce() -> io::Result<R>) -> io::Result<R> {
-        let result = f();
-
-        if let Err(e) = result.as_ref() {
-            if e.kind() == io::ErrorKind::WouldBlock {
-                self.clear_ready();
-            }
-        }
-
-        result
+        self.0.with_io(f)
     }
 
     /// Performs the IO operation `f`; if `f` returns [`Pending`], the readiness

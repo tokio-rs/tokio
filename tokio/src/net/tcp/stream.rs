@@ -1,8 +1,7 @@
-use crate::future::poll_fn;
-use crate::io::{AsyncRead, AsyncWrite, Interest, PollEvented, ReadBuf, Ready};
-use crate::net::tcp::split::{split, ReadHalf, WriteHalf};
-use crate::net::tcp::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
-use crate::net::{to_socket_addrs, ToSocketAddrs};
+use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
+use crate::net::tcp::split::{ReadHalf, WriteHalf};
+use crate::net::tcp::split_owned::{OwnedReadHalf, OwnedWriteHalf};
+use crate::net::{ToSocketAddrs};
 
 use std::convert::TryFrom;
 use std::fmt;
@@ -11,8 +10,6 @@ use std::net::{Shutdown, SocketAddr};
 #[cfg(windows)]
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket};
 
-#[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -57,9 +54,7 @@ cfg_net! {
     ///
     /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
-    pub struct TcpStream {
-        io: PollEvented<mio::net::TcpStream>,
-    }
+    pub struct TcpStream(t10::net::TcpStream);
 }
 
 impl TcpStream {
@@ -101,52 +96,7 @@ impl TcpStream {
     /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     pub async fn connect<A: ToSocketAddrs>(addr: A) -> io::Result<TcpStream> {
-        let addrs = to_socket_addrs(addr).await?;
-
-        let mut last_err = None;
-
-        for addr in addrs {
-            match TcpStream::connect_addr(addr).await {
-                Ok(stream) => return Ok(stream),
-                Err(e) => last_err = Some(e),
-            }
-        }
-
-        Err(last_err.unwrap_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "could not resolve to any address",
-            )
-        }))
-    }
-
-    /// Establishes a connection to the specified `addr`.
-    async fn connect_addr(addr: SocketAddr) -> io::Result<TcpStream> {
-        let sys = mio::net::TcpStream::connect(addr)?;
-        TcpStream::connect_mio(sys).await
-    }
-
-    pub(crate) async fn connect_mio(sys: mio::net::TcpStream) -> io::Result<TcpStream> {
-        let stream = TcpStream::new(sys)?;
-
-        // Once we've connected, wait for the stream to be writable as
-        // that's when the actual connection has been initiated. Once we're
-        // writable we check for `take_socket_error` to see if the connect
-        // actually hit an error or not.
-        //
-        // If all that succeeded then we ship everything on up.
-        poll_fn(|cx| stream.io.registration().poll_write_ready(cx)).await?;
-
-        if let Some(e) = stream.io.take_error()? {
-            return Err(e);
-        }
-
-        Ok(stream)
-    }
-
-    pub(crate) fn new(connected: mio::net::TcpStream) -> io::Result<TcpStream> {
-        let io = PollEvented::new(connected)?;
-        Ok(TcpStream { io })
+        t10::net::TcpStream::connect(addr).map(Self)
     }
 
     /// Creates new `TcpStream` from a `std::net::TcpStream`.
@@ -179,9 +129,7 @@ impl TcpStream {
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     pub fn from_std(stream: std::net::TcpStream) -> io::Result<TcpStream> {
-        let io = mio::net::TcpStream::from_std(stream);
-        let io = PollEvented::new(io)?;
-        Ok(TcpStream { io })
+        t10::net::TcpStream::from_std(stream).map(Self)
     }
 
     /// Turn a [`tokio::net::TcpStream`] into a [`std::net::TcpStream`].
@@ -219,21 +167,7 @@ impl TcpStream {
     /// [`std::net::TcpStream`]: std::net::TcpStream
     /// [`set_nonblocking`]: fn@std::net::TcpStream::set_nonblocking
     pub fn into_std(self) -> io::Result<std::net::TcpStream> {
-        #[cfg(unix)]
-        {
-            self.io
-                .into_inner()
-                .map(|io| io.into_raw_fd())
-                .map(|raw_fd| unsafe { std::net::TcpStream::from_raw_fd(raw_fd) })
-        }
-
-        #[cfg(windows)]
-        {
-            self.io
-                .into_inner()
-                .map(|io| io.into_raw_socket())
-                .map(|raw_socket| unsafe { std::net::TcpStream::from_raw_socket(raw_socket) })
-        }
+        self.0.into_std()
     }
 
     /// Returns the local address that this stream is bound to.
@@ -251,7 +185,7 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        self.io.local_addr()
+        self.0.local_addr()
     }
 
     /// Returns the remote address that this stream is connected to.
@@ -269,7 +203,7 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
-        self.io.peer_addr()
+        self.0.peer_addr()
     }
 
     /// Attempts to receive data on the socket, without removing that data from
@@ -309,17 +243,7 @@ impl TcpStream {
     /// }
     /// ```
     pub fn poll_peek(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
-        loop {
-            let ev = ready!(self.io.registration().poll_read_ready(cx))?;
-
-            match self.io.peek(buf) {
-                Ok(ret) => return Poll::Ready(Ok(ret)),
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    self.io.registration().clear_readiness(ev);
-                }
-                Err(e) => return Poll::Ready(Err(e)),
-            }
-        }
+        self.0.poll_peek(cx, buf)
     }
 
     /// Wait for any of the requested ready states.
@@ -361,9 +285,8 @@ impl TcpStream {
     ///     }
     /// }
     /// ```
-    pub async fn ready(&self, interest: Interest) -> io::Result<Ready> {
-        let event = self.io.registration().readiness(interest).await?;
-        Ok(event.ready)
+    pub async fn ready(&self, interest: t10::io::Interest) -> io::Result<t10::io::Ready> {
+        self.0.ready(interest)
     }
 
     /// Wait for the socket to become readable.
@@ -410,8 +333,7 @@ impl TcpStream {
     /// }
     /// ```
     pub async fn readable(&self) -> io::Result<()> {
-        self.ready(Interest::READABLE).await?;
-        Ok(())
+        self.0.readable()
     }
 
     /// Polls for read readiness.
@@ -422,7 +344,7 @@ impl TcpStream {
     ///
     /// [`readable`]: method@Self::readable
     pub fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.io.registration().poll_read_ready(cx).map_ok(|_| ())
+        self.0.poll_read_ready(cx)
     }
 
     /// Try to read data from the stream into the provided buffer, returning how
@@ -485,11 +407,7 @@ impl TcpStream {
     /// }
     /// ```
     pub fn try_read(&self, buf: &mut [u8]) -> io::Result<usize> {
-        use std::io::Read;
-
-        self.io
-            .registration()
-            .try_io(Interest::READABLE, || (&*self.io).read(buf))
+        self.0.try_read(buf)
     }
 
     /// Wait for the socket to become writable.
@@ -532,8 +450,7 @@ impl TcpStream {
     /// }
     /// ```
     pub async fn writable(&self) -> io::Result<()> {
-        self.ready(Interest::WRITABLE).await?;
-        Ok(())
+        self.0.writable().await
     }
 
     /// Polls for write readiness.
@@ -544,7 +461,7 @@ impl TcpStream {
     ///
     /// [`writable`]: method@Self::writable
     pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.io.registration().poll_write_ready(cx).map_ok(|_| ())
+        self.0.poll_write_ready(cx)
     }
 
     /// Try to write a buffer to the stream, returning how many bytes were
@@ -596,11 +513,7 @@ impl TcpStream {
     /// }
     /// ```
     pub fn try_write(&self, buf: &[u8]) -> io::Result<usize> {
-        use std::io::Write;
-
-        self.io
-            .registration()
-            .try_io(Interest::WRITABLE, || (&*self.io).write(buf))
+        self.0.try_write(buf)
     }
 
     /// Receives data on the socket from the remote address to which it is
@@ -641,10 +554,7 @@ impl TcpStream {
     /// [`read`]: fn@crate::io::AsyncReadExt::read
     /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
     pub async fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
-        self.io
-            .registration()
-            .async_io(Interest::READABLE, || self.io.peek(buf))
-            .await
+        self.0.peek(buf).await
     }
 
     /// Shuts down the read, write, or both halves of this connection.
@@ -672,7 +582,8 @@ impl TcpStream {
     /// }
     /// ```
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
-        self.io.shutdown(how)
+        // FIXME
+        self.0.shutdown(how)
     }
 
     /// Gets the value of the `TCP_NODELAY` option on this socket.
@@ -694,7 +605,7 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn nodelay(&self) -> io::Result<bool> {
-        self.io.nodelay()
+        self.0.nodelay()
     }
 
     /// Sets the value of the `TCP_NODELAY` option on this socket.
@@ -718,7 +629,7 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
-        self.io.set_nodelay(nodelay)
+        self.0.set_nodelay(nodelay)
     }
 
     /// Reads the linger duration for this socket by getting the `SO_LINGER`
@@ -741,9 +652,7 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn linger(&self) -> io::Result<Option<Duration>> {
-        let mio_socket = std::mem::ManuallyDrop::new(self.to_mio());
-
-        mio_socket.get_linger()
+        self.0.linger()
     }
 
     /// Sets the linger duration of this socket by setting the SO_LINGER option.
@@ -768,21 +677,7 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
-        let mio_socket = std::mem::ManuallyDrop::new(self.to_mio());
-
-        mio_socket.set_linger(dur)
-    }
-
-    fn to_mio(&self) -> mio::net::TcpSocket {
-        #[cfg(windows)]
-        {
-            unsafe { mio::net::TcpSocket::from_raw_socket(self.as_raw_socket()) }
-        }
-
-        #[cfg(unix)]
-        {
-            unsafe { mio::net::TcpSocket::from_raw_fd(self.as_raw_fd()) }
-        }
+        self.0.set_linger(dur)
     }
 
     /// Gets the value of the `IP_TTL` option for this socket.
@@ -804,7 +699,7 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn ttl(&self) -> io::Result<u32> {
-        self.io.ttl()
+        self.0.ttl()
     }
 
     /// Sets the value for the `IP_TTL` option on this socket.
@@ -825,7 +720,7 @@ impl TcpStream {
     /// # }
     /// ```
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
-        self.io.set_ttl(ttl)
+        self.0.set_ttl(ttl)
     }
 
     // These lifetime markers also appear in the generated documentation, and make
@@ -839,7 +734,7 @@ impl TcpStream {
     ///
     /// [`into_split`]: TcpStream::into_split()
     pub fn split<'a>(&'a mut self) -> (ReadHalf<'a>, WriteHalf<'a>) {
-        split(self)
+        self.0.split()
     }
 
     /// Splits a `TcpStream` into a read half and a write half, which can be used
@@ -854,43 +749,7 @@ impl TcpStream {
     /// [`split`]: TcpStream::split()
     /// [`shutdown(Write)`]: fn@crate::net::TcpStream::shutdown
     pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
-        split_owned(self)
-    }
-
-    // == Poll IO functions that takes `&self` ==
-    //
-    // They are not public because (taken from the doc of `PollEvented`):
-    //
-    // While `PollEvented` is `Sync` (if the underlying I/O type is `Sync`), the
-    // caller must ensure that there are at most two tasks that use a
-    // `PollEvented` instance concurrently. One for reading and one for writing.
-    // While violating this requirement is "safe" from a Rust memory model point
-    // of view, it will result in unexpected behavior in the form of lost
-    // notifications and tasks hanging.
-
-    pub(crate) fn poll_read_priv(
-        &self,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
-        // Safety: `TcpStream::read` correctly handles reads into uninitialized memory
-        unsafe { self.io.poll_read(cx, buf) }
-    }
-
-    pub(super) fn poll_write_priv(
-        &self,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
-        self.io.poll_write(cx, buf)
-    }
-
-    pub(super) fn poll_write_vectored_priv(
-        &self,
-        cx: &mut Context<'_>,
-        bufs: &[io::IoSlice<'_>],
-    ) -> Poll<io::Result<usize>> {
-        self.io.poll_write_vectored(cx, bufs)
+        self.0.into_split()
     }
 }
 
@@ -914,7 +773,7 @@ impl AsyncRead for TcpStream {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        self.poll_read_priv(cx, buf)
+        self.0.poll_read(cx, buf)
     }
 }
 
@@ -924,7 +783,7 @@ impl AsyncWrite for TcpStream {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        self.poll_write_priv(cx, buf)
+        self.0.poll_write(cx, buf)
     }
 
     fn poll_write_vectored(
@@ -932,7 +791,7 @@ impl AsyncWrite for TcpStream {
         cx: &mut Context<'_>,
         bufs: &[io::IoSlice<'_>],
     ) -> Poll<io::Result<usize>> {
-        self.poll_write_vectored_priv(cx, bufs)
+        self.0.poll_write(cx, bufs)
     }
 
     fn is_write_vectored(&self) -> bool {
@@ -964,7 +823,7 @@ mod sys {
 
     impl AsRawFd for TcpStream {
         fn as_raw_fd(&self) -> RawFd {
-            self.io.as_raw_fd()
+            self.0.as_raw_fd()
         }
     }
 }

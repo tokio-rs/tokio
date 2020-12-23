@@ -1,6 +1,6 @@
-use crate::io::{Interest, PollEvented};
 use crate::net::tcp::TcpStream;
 use crate::net::{to_socket_addrs, ToSocketAddrs};
+use t10::io::Interest;
 
 use std::convert::TryFrom;
 use std::fmt;
@@ -65,9 +65,7 @@ cfg_net! {
     ///     }
     /// }
     /// ```
-    pub struct TcpListener {
-        io: PollEvented<mio::net::TcpListener>,
-    }
+    pub struct TcpListener(t10::net::TcpListener);
 }
 
 impl TcpListener {
@@ -233,14 +231,7 @@ impl TcpListener {
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     pub fn from_std(listener: net::TcpListener) -> io::Result<TcpListener> {
-        let io = mio::net::TcpListener::from_std(listener);
-        let io = PollEvented::new(io)?;
-        Ok(TcpListener { io })
-    }
-
-    pub(crate) fn new(listener: mio::net::TcpListener) -> io::Result<TcpListener> {
-        let io = PollEvented::new(listener)?;
-        Ok(TcpListener { io })
+        t10::net::TcpListener::from_std(listener).map(Self)
     }
 
     /// Returns the local address that this listener is bound to.
@@ -266,8 +257,9 @@ impl TcpListener {
     ///     Ok(())
     /// }
     /// ```
+    #[inline]
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        self.io.local_addr()
+        self.0.local_addr()
     }
 
     /// Gets the value of the `IP_TTL` option for this socket.
@@ -293,8 +285,9 @@ impl TcpListener {
     ///    Ok(())
     /// }
     /// ```
+    #[inline]
     pub fn ttl(&self) -> io::Result<u32> {
-        self.io.ttl()
+        self.0.ttl()
     }
 
     /// Sets the value for the `IP_TTL` option on this socket.
@@ -318,8 +311,9 @@ impl TcpListener {
     ///     Ok(())
     /// }
     /// ```
+    #[inline]
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
-        self.io.set_ttl(ttl)
+        self.0.set_ttl(ttl)
     }
 }
 
@@ -347,7 +341,7 @@ impl TryFrom<net::TcpListener> for TcpListener {
 
 impl fmt::Debug for TcpListener {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.io.fmt(f)
+        self.0.fmt(f)
     }
 }
 
@@ -358,7 +352,7 @@ mod sys {
 
     impl AsRawFd for TcpListener {
         fn as_raw_fd(&self) -> RawFd {
-            self.io.as_raw_fd()
+            self.0.as_raw_fd()
         }
     }
 }

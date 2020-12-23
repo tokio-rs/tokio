@@ -204,19 +204,6 @@ pub use self::read_buf::ReadBuf;
 #[doc(no_inline)]
 pub use std::io::{Error, ErrorKind, Result, SeekFrom};
 
-cfg_io_driver_impl! {
-    pub(crate) mod driver;
-
-    cfg_net! {
-        pub use driver::{Interest, Ready};
-    }
-
-    mod poll_evented;
-
-    #[cfg(not(loom))]
-    pub(crate) use poll_evented::PollEvented;
-}
-
 cfg_net_unix! {
     mod async_fd;
 
@@ -261,7 +248,7 @@ cfg_io_blocking! {
     /// Types in this module can be mocked out in tests.
     mod sys {
         // TODO: don't rename
-        pub(crate) use crate::blocking::spawn_blocking as run;
-        pub(crate) use crate::blocking::JoinHandle as Blocking;
+        pub(crate) use t10::task::spawn_blocking as run;
+        pub(crate) use t10::task::JoinHandle as Blocking;
     }
 }

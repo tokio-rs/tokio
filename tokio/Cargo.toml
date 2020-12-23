@@ -88,6 +88,7 @@ test-util = []
 time = []
 
 [dependencies]
+t10 = { git = "https://github.com/tokio-rs/tokio", features = ["full"], package = "tokio" }
 tokio-macros = { version = "0.3.0", path = "../tokio-macros", optional = true }
 
 pin-project-lite = "0.2.0"
