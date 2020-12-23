@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608731407428,
+  "lastUpdate": 1608731412933,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -4157,6 +4157,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 511,
             "range": "± 46",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "te316e89@gmail.com",
+            "name": "Taiki Endo",
+            "username": "taiki-e"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "575938d4579e6fe6a89b700aadb0ae2bbab5483b",
+          "message": "chore: use #[non_exhaustive] instead of private unit field (#3320)",
+          "timestamp": "2020-12-23T22:48:33+09:00",
+          "tree_id": "f2782c6135a26568d5dea4d45b3310baaf062e16",
+          "url": "https://github.com/tokio-rs/tokio/commit/575938d4579e6fe6a89b700aadb0ae2bbab5483b"
+        },
+        "date": 1608731411885,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 898,
+            "range": "± 232",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 17026,
+            "range": "± 7207",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 884,
+            "range": "± 194",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 15673,
+            "range": "± 6837",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 498,
+            "range": "± 108",
             "unit": "ns/iter"
           }
         ]
