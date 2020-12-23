@@ -172,35 +172,21 @@ where
             //
             // Safety: Mutual exclusion is obtained by having transitioned the task
             // state -> Running
-            self.core().stage.store_output(output);
+            let stage = &self.core().stage;
+            stage.store_output(output);
 
             // Transition to `Complete`, notifying the `JoinHandle` if necessary.
-            transition_to_complete(self.header(), &self.core().stage, &self.trailer());
+            transition_to_complete(self.header(), stage, &self.trailer());
         }
 
         // The task has completed execution and will no longer be scheduled.
         //
         // Attempts to batch a ref-dec with the state transition below.
 
-        let scheduler = &self.core().scheduler;
-        let ref_dec = if scheduler.is_bound() {
-            if let Some(task) = scheduler.release(self.to_task()) {
-                mem::forget(task);
-                true
-            } else {
-                false
-            }
-        } else {
-            false
-        };
-
-        // This might deallocate
-        let snapshot = self
-            .header()
-            .state
-            .transition_to_terminal(!is_join_interested, ref_dec);
-
-        if snapshot.ref_count() == 0 {
+        if self
+            .scheduler_view()
+            .transition_to_terminal(is_join_interested)
+        {
             self.dealloc()
         }
     }
@@ -222,6 +208,27 @@ where
     fn to_task(&self) -> Task<S> {
         // SAFETY The header is from the same struct containing the scheduler `S` so  the cast is safe
         unsafe { Task::from_raw(self.header.into()) }
+    }
+
+    fn transition_to_terminal(&self, is_join_interested: bool) -> bool {
+        let ref_dec = if self.scheduler.is_bound() {
+            if let Some(task) = self.scheduler.release(self.to_task()) {
+                mem::forget(task);
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        // This might deallocate
+        let snapshot = self
+            .header
+            .state
+            .transition_to_terminal(!is_join_interested, ref_dec);
+
+        snapshot.ref_count() == 0
     }
 
     fn transition_to_running(&self) -> Result<Snapshot, ()> {
