@@ -13,12 +13,11 @@ authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-util/0.5.1/tokio_util"
+documentation = "https://docs.rs/tokio-util/0.6.0/tokio_util"
 description = """
 Additional utilities for working with Tokio.
 """
 categories = ["asynchronous"]
-publish = false
 
 [features]
 # No features on by default
