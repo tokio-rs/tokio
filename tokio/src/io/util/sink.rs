@@ -15,8 +15,9 @@ cfg_io_util! {
     ///
     /// [sink]: sink()
     /// [std]: std::io::Sink
-    #[non_exhaustive]
-    pub struct Sink;
+    pub struct Sink {
+        _p: (),
+    }
 
     /// Creates an instance of an async writer which will successfully consume all
     /// data.
@@ -44,7 +45,7 @@ cfg_io_util! {
     /// }
     /// ```
     pub fn sink() -> Sink {
-        Sink
+        Sink { _p: () }
     }
 }
 
