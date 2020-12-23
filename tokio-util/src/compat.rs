@@ -48,7 +48,7 @@ impl<T: futures_io::AsyncWrite> FuturesAsyncWriteCompatExt for T {}
 
 /// Extension trait that allows converting a type implementing
 /// `tokio::io::AsyncRead` to implement `futures_io::AsyncRead`.
-pub trait Tokio02AsyncReadCompatExt: tokio::io::AsyncRead {
+pub trait TokioAsyncReadCompatExt: tokio::io::AsyncRead {
     /// Wraps `self` with a compatibility layer that implements
     /// `futures_io::AsyncRead`.
     fn compat(self) -> Compat<Self>
@@ -59,11 +59,11 @@ pub trait Tokio02AsyncReadCompatExt: tokio::io::AsyncRead {
     }
 }
 
-impl<T: tokio::io::AsyncRead> Tokio02AsyncReadCompatExt for T {}
+impl<T: tokio::io::AsyncRead> TokioAsyncReadCompatExt for T {}
 
 /// Extension trait that allows converting a type implementing
 /// `tokio::io::AsyncWrite` to implement `futures_io::AsyncWrite`.
-pub trait Tokio02AsyncWriteCompatExt: tokio::io::AsyncWrite {
+pub trait TokioAsyncWriteCompatExt: tokio::io::AsyncWrite {
     /// Wraps `self` with a compatibility layer that implements
     /// `futures_io::AsyncWrite`.
     fn compat_write(self) -> Compat<Self>
@@ -74,7 +74,7 @@ pub trait Tokio02AsyncWriteCompatExt: tokio::io::AsyncWrite {
     }
 }
 
-impl<T: tokio::io::AsyncWrite> Tokio02AsyncWriteCompatExt for T {}
+impl<T: tokio::io::AsyncWrite> TokioAsyncWriteCompatExt for T {}
 
 // === impl Compat ===
 
