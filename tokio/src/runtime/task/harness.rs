@@ -89,26 +89,20 @@ where
 
         let waker_ref = waker_ref::<T, S>(self.header());
         let cx = Context::from_waker(&*waker_ref);
-        let res = poll_future(&self.core().stage, snapshot, cx);
+        let res = poll_future(self.header(), &self.core().stage, snapshot, cx);
 
         match res {
-            Poll::Ready(out) => {
+            PollFuture::Notified => {
+                // Signal yield
+                self.core().scheduler.yield_now(Notified(self.to_task()));
+                // The ref-count was incremented as part of
+                // `transition_to_idle`.
+                self.drop_reference();
+            }
+            PollFuture::Complete(out) => {
                 self.complete(out, snapshot.is_join_interested());
             }
-            Poll::Pending => {
-                match self.header().state.transition_to_idle() {
-                    Ok(snapshot) => {
-                        if snapshot.is_notified() {
-                            // Signal yield
-                            self.core().scheduler.yield_now(Notified(self.to_task()));
-                            // The ref-count was incremented as part of
-                            // `transition_to_idle`.
-                            self.drop_reference();
-                        }
-                    }
-                    Err(_) => self.cancel_task(),
-                }
-            }
+            PollFuture::None => (),
         }
     }
 
@@ -187,26 +181,11 @@ where
 
         // By transitioning the lifcycle to `Running`, we have permission to
         // drop the future.
-        self.cancel_task();
+        let err = cancel_task(&self.core().stage);
+        self.complete(Err(err), true)
     }
 
     // ====== internal ======
-
-    fn cancel_task(self) {
-        // Drop the future from a panic guard.
-        let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            self.core().stage.drop_future_or_output();
-        }));
-
-        if let Err(err) = res {
-            // Dropping the future panicked, complete the join
-            // handle with the panic to avoid dropping the panic
-            // on the ground.
-            self.complete(Err(JoinError::panic(err)), true);
-        } else {
-            self.complete(Err(JoinError::cancelled()), true);
-        }
-    }
 
     fn complete(self, output: super::Result<T::Output>, is_join_interested: bool) {
         if is_join_interested {
@@ -223,8 +202,10 @@ where
         // The task has completed execution and will no longer be scheduled.
         //
         // Attempts to batch a ref-dec with the state transition below.
-        let ref_dec = if self.core().scheduler.is_bound() {
-            if let Some(task) = self.core().scheduler.release(self.to_task()) {
+
+        let scheduler = &self.core().scheduler;
+        let ref_dec = if scheduler.is_bound() {
+            if let Some(task) = scheduler.release(self.to_task()) {
                 mem::forget(task);
                 true
             } else {
@@ -369,11 +350,34 @@ fn set_join_waker(
     res
 }
 
+enum PollFuture<T> {
+    Complete(Result<T, JoinError>),
+    Notified,
+    None,
+}
+
+fn cancel_task<T: Future>(stage: &CoreStage<T>) -> JoinError {
+    // Drop the future from a panic guard.
+    let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        stage.drop_future_or_output();
+    }));
+
+    if let Err(err) = res {
+        // Dropping the future panicked, complete the join
+        // handle with the panic to avoid dropping the panic
+        // on the ground.
+        JoinError::panic(err)
+    } else {
+        JoinError::cancelled()
+    }
+}
+
 fn poll_future<T: Future>(
+    header: &Header,
     core: &CoreStage<T>,
     snapshot: Snapshot,
     cx: Context<'_>,
-) -> Poll<Result<T::Output, JoinError>> {
+) -> PollFuture<T::Output> {
     let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         struct Guard<'a, T: Future> {
             core: &'a CoreStage<T>,
@@ -401,7 +405,17 @@ fn poll_future<T: Future>(
         }
     }));
     match res {
-        Ok(ok) => ok,
-        Err(err) => Poll::Ready(Err(JoinError::panic(err))),
+        Ok(Poll::Pending) => match header.state.transition_to_idle() {
+            Ok(snapshot) => {
+                if snapshot.is_notified() {
+                    PollFuture::Notified
+                } else {
+                    PollFuture::None
+                }
+            }
+            Err(_) => PollFuture::Complete(Err(cancel_task(core))),
+        },
+        Ok(Poll::Ready(ok)) => PollFuture::Complete(ok),
+        Err(err) => PollFuture::Complete(Err(JoinError::panic(err))),
     }
 }
