@@ -97,11 +97,12 @@ mod udp {
     use std::io;
     use std::net::SocketAddr;
     use tokio::net::UdpSocket;
+    use tokio_util::{codec::BytesCodec, udp::UdpFramed};
 
     pub async fn connect(
         addr: &SocketAddr,
         stdin: impl Stream<Item = Result<Bytes, io::Error>> + Unpin,
-        stdout: impl Sink<Bytes, Error = io::Error> + Unpin,
+        mut stdout: impl Sink<Bytes, Error = io::Error> + Unpin,
     ) -> Result<(), Box<dyn Error>> {
         // We'll bind our UDP socket to a local IP/port, but for now we
         // basically let the OS pick both of those.
@@ -112,36 +113,26 @@ mod udp {
         };
 
         let socket = UdpSocket::bind(&bind_addr).await?;
-        socket.connect(addr).await?;
+        let (mut sink, stream) = UdpFramed::new(socket, BytesCodec::new()).split();
 
-        future::try_join(send(stdin, &socket), recv(stdout, &socket)).await?;
+        // Map stdin's Result<Bytes, Error> stream into a
+        // Results<(Bytes, SocketAddr), Error> stream to match UdpFramed's Sink.
+        let mut stdin = stdin.map(|i| i.map(|b| (b, *addr)));
 
+        // Filter and map UdpFramed's Results<(BytesMut, SocketAddr), Error>
+        // stream into a stream of Results<Bytes, Error> from only our target.
+        let mut stream = stream.filter_map(|i| {
+            future::ready(match i {
+                Ok((data, peer)) if peer == *addr => Some(Ok(data.freeze())),
+                Ok(_) => None,
+                Err(e) => {
+                    println!("failed to read from socket; error={}", e);
+                    Some(Err(e))
+                }
+            })
+        });
+
+        future::try_join(sink.send_all(&mut stdin), stdout.send_all(&mut stream)).await?;
         Ok(())
-    }
-
-    async fn send(
-        mut stdin: impl Stream<Item = Result<Bytes, io::Error>> + Unpin,
-        writer: &UdpSocket,
-    ) -> Result<(), io::Error> {
-        while let Some(item) = stdin.next().await {
-            let buf = item?;
-            writer.send(&buf[..]).await?;
-        }
-
-        Ok(())
-    }
-
-    async fn recv(
-        mut stdout: impl Sink<Bytes, Error = io::Error> + Unpin,
-        reader: &UdpSocket,
-    ) -> Result<(), io::Error> {
-        loop {
-            let mut buf = vec![0; 1024];
-            let n = reader.recv(&mut buf[..]).await?;
-
-            if n > 0 {
-                stdout.send(Bytes::from(buf)).await?;
-            }
-        }
     }
 }
