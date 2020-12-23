@@ -172,11 +172,6 @@
 //! [`Builder::enable_time`]: crate::runtime::Builder::enable_time
 //! [`Builder::enable_all`]: crate::runtime::Builder::enable_all
 
-// At the top due to macros
-#[cfg(test)]
-#[macro_use]
-mod tests;
-
 cfg_rt! {
     mod builder;
     pub use self::builder::Builder;
@@ -285,7 +280,10 @@ cfg_rt! {
         /// // Use the handle...
         /// ```
         pub fn handle(&self) -> &Handle {
-            &self.0.handle()
+            // SAFETY: Handle is repr-transparent 
+            unsafe {
+                std::mem::transmute(self.0.handle())
+            }
         }
 
         /// Spawn a future onto the Tokio runtime.
@@ -319,7 +317,7 @@ cfg_rt! {
             F: Future + Send + 'static,
             F::Output: Send + 'static,
         {
-            self.0.spawn(future)
+            JoinHandle(self.0.spawn(future))
         }
 
         /// Run the provided function on an executor dedicated to blocking operations.
@@ -344,7 +342,7 @@ cfg_rt! {
             F: FnOnce() -> R + Send + 'static,
             R: Send + 'static,
         {
-            self.0.spawn_blocking(func)
+            JoinHandle(self.0.spawn_blocking(func))
         }
 
         /// Run a future to completion on the Tokio runtime. This is the
@@ -425,7 +423,7 @@ cfg_rt! {
         /// }
         /// ```
         pub fn enter(&self) -> EnterGuard<'_> {
-            self.0.enter()
+            EnterGuard(self.0.enter())
         }
 
         /// Shutdown the runtime, waiting for at most `duration` for all spawned

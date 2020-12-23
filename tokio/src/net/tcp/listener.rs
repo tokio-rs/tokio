@@ -1,6 +1,5 @@
 use crate::net::tcp::TcpStream;
-use crate::net::{to_socket_addrs, ToSocketAddrs};
-use t10::io::Interest;
+use crate::net::ToSocketAddrs;
 
 use std::convert::TryFrom;
 use std::fmt;
@@ -65,7 +64,7 @@ cfg_net! {
     ///     }
     /// }
     /// ```
-    pub struct TcpListener(t10::net::TcpListener);
+    pub struct TcpListener(pub(crate) t10::net::TcpListener);
 }
 
 impl TcpListener {
@@ -108,28 +107,7 @@ impl TcpListener {
     /// }
     /// ```
     pub async fn bind<A: ToSocketAddrs>(addr: A) -> io::Result<TcpListener> {
-        let addrs = to_socket_addrs(addr).await?;
-
-        let mut last_err = None;
-
-        for addr in addrs {
-            match TcpListener::bind_addr(addr) {
-                Ok(listener) => return Ok(listener),
-                Err(e) => last_err = Some(e),
-            }
-        }
-
-        Err(last_err.unwrap_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "could not resolve to any address",
-            )
-        }))
-    }
-
-    fn bind_addr(addr: SocketAddr) -> io::Result<TcpListener> {
-        let listener = mio::net::TcpListener::bind(addr)?;
-        TcpListener::new(listener)
+        t10::net::TcpListener::bind(addr).await.map(Self)
     }
 
     /// Accepts a new incoming connection from this listener.
@@ -160,14 +138,9 @@ impl TcpListener {
     /// }
     /// ```
     pub async fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
-        let (mio, addr) = self
-            .io
-            .registration()
-            .async_io(Interest::READABLE, || self.io.accept())
-            .await?;
+        let (t10_stream, addr) = self.0.accept().await?;
 
-        let stream = TcpStream::new(mio)?;
-        Ok((stream, addr))
+        Ok((TcpStream(t10_stream), addr))
     }
 
     /// Polls to accept a new incoming connection to this listener.
@@ -179,20 +152,9 @@ impl TcpListener {
     /// The caller is responsible to ensure that `poll_accept` is called from a
     /// single task. Failing to do this could result in tasks hanging.
     pub fn poll_accept(&self, cx: &mut Context<'_>) -> Poll<io::Result<(TcpStream, SocketAddr)>> {
-        loop {
-            let ev = ready!(self.io.registration().poll_read_ready(cx))?;
-
-            match self.io.accept() {
-                Ok((io, addr)) => {
-                    let io = TcpStream::new(io)?;
-                    return Poll::Ready(Ok((io, addr)));
-                }
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    self.io.registration().clear_readiness(ev);
-                }
-                Err(e) => return Poll::Ready(Err(e)),
-            }
-        }
+        self.0
+            .poll_accept(cx)
+            .map(|res| res.map(|(s, addr)| (TcpStream(s), addr)))
     }
 
     /// Creates new `TcpListener` from a `std::net::TcpListener`.

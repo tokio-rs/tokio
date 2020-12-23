@@ -280,7 +280,7 @@ impl UdpSocket {
     /// }
     /// ```
     pub async fn ready(&self, interest: Interest) -> io::Result<Ready> {
-        self.0.ready(interest)
+        self.0.ready(interest).await
     }
 
     /// Wait for the socket to become writable.
@@ -362,7 +362,7 @@ impl UdpSocket {
     /// }
     /// ```
     pub async fn send(&self, buf: &[u8]) -> io::Result<usize> {
-        self.0.send(buf)
+        self.0.send(buf).await
     }
 
     /// Attempts to send data on the socket to the remote address to which it
@@ -668,7 +668,7 @@ impl UdpSocket {
         buf: &[u8],
         target: &SocketAddr,
     ) -> Poll<io::Result<usize>> {
-        self.0.poll_send_to(cx, buf, target)
+        self.0.poll_send_to(cx, buf, *target)
     }
 
     /// Try to send data on the socket to the given address, but if the send is
@@ -1029,7 +1029,7 @@ impl UdpSocket {
     /// multicast group. If it's equal to `INADDR_ANY` then an appropriate
     /// interface is chosen by the system.
     pub fn join_multicast_v4(&self, multiaddr: Ipv4Addr, interface: Ipv4Addr) -> io::Result<()> {
-        self.0.join_multicast_v4(&multiaddr, &interface)
+        self.0.join_multicast_v4(multiaddr, interface)
     }
 
     /// Executes an operation of the `IPV6_ADD_MEMBERSHIP` type.
@@ -1047,7 +1047,7 @@ impl UdpSocket {
     ///
     /// [`join_multicast_v4`]: method@Self::join_multicast_v4
     pub fn leave_multicast_v4(&self, multiaddr: Ipv4Addr, interface: Ipv4Addr) -> io::Result<()> {
-        self.0.leave_multicast_v4(&multiaddr, &interface)
+        self.0.leave_multicast_v4(multiaddr, interface)
     }
 
     /// Executes an operation of the `IPV6_DROP_MEMBERSHIP` type.

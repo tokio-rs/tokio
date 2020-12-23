@@ -1,4 +1,3 @@
-use crate::runtime::handle::Handle;
 use crate::runtime::Runtime;
 
 use std::fmt;
@@ -295,7 +294,7 @@ impl Builder {
     /// });
     /// ```
     pub fn build(&mut self) -> io::Result<Runtime> {
-        self.0.build()
+        self.0.build().map(Runtime)
     }
 
     /// Sets a custom timeout for a thread in the blocking pool.

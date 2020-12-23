@@ -1,7 +1,7 @@
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 use crate::net::tcp::split::{ReadHalf, WriteHalf};
 use crate::net::tcp::split_owned::{OwnedReadHalf, OwnedWriteHalf};
-use crate::net::{ToSocketAddrs};
+use crate::net::ToSocketAddrs;
 
 use std::convert::TryFrom;
 use std::fmt;
@@ -54,7 +54,7 @@ cfg_net! {
     ///
     /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
-    pub struct TcpStream(t10::net::TcpStream);
+    pub struct TcpStream(pub(crate) t10::net::TcpStream);
 }
 
 impl TcpStream {
@@ -96,7 +96,7 @@ impl TcpStream {
     /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     pub async fn connect<A: ToSocketAddrs>(addr: A) -> io::Result<TcpStream> {
-        t10::net::TcpStream::connect(addr).map(Self)
+        t10::net::TcpStream::connect(addr).await.map(Self)
     }
 
     /// Creates new `TcpStream` from a `std::net::TcpStream`.
@@ -243,7 +243,8 @@ impl TcpStream {
     /// }
     /// ```
     pub fn poll_peek(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
-        self.0.poll_peek(cx, buf)
+        let mut buf = ReadBuf::new(buf);
+        self.0.poll_peek(cx, &mut buf)
     }
 
     /// Wait for any of the requested ready states.
@@ -286,7 +287,7 @@ impl TcpStream {
     /// }
     /// ```
     pub async fn ready(&self, interest: t10::io::Interest) -> io::Result<t10::io::Ready> {
-        self.0.ready(interest)
+        self.0.ready(interest).await
     }
 
     /// Wait for the socket to become readable.
@@ -333,7 +334,7 @@ impl TcpStream {
     /// }
     /// ```
     pub async fn readable(&self) -> io::Result<()> {
-        self.0.readable()
+        self.0.readable().await
     }
 
     /// Polls for read readiness.
@@ -583,7 +584,7 @@ impl TcpStream {
     /// ```
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         // FIXME
-        self.0.shutdown(how)
+        todo!()
     }
 
     /// Gets the value of the `TCP_NODELAY` option on this socket.
@@ -773,7 +774,7 @@ impl AsyncRead for TcpStream {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        self.0.poll_read(cx, buf)
+        Pin::new(&mut self.0).poll_read(cx, buf)
     }
 }
 
@@ -783,7 +784,7 @@ impl AsyncWrite for TcpStream {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        self.0.poll_write(cx, buf)
+        Pin::new(&mut self.0).poll_write(cx, buf)
     }
 
     fn poll_write_vectored(
@@ -791,7 +792,7 @@ impl AsyncWrite for TcpStream {
         cx: &mut Context<'_>,
         bufs: &[io::IoSlice<'_>],
     ) -> Poll<io::Result<usize>> {
-        self.0.poll_write(cx, bufs)
+        Pin::new(&mut self.0).poll_write_vectored(cx, bufs)
     }
 
     fn is_write_vectored(&self) -> bool {
@@ -804,15 +805,14 @@ impl AsyncWrite for TcpStream {
         Poll::Ready(Ok(()))
     }
 
-    fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.shutdown(std::net::Shutdown::Write)?;
-        Poll::Ready(Ok(()))
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.0).poll_shutdown(cx)
     }
 }
 
 impl fmt::Debug for TcpStream {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.io.fmt(f)
+        self.0.fmt(f)
     }
 }
 

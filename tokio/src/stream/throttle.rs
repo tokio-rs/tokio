@@ -1,7 +1,7 @@
 //! Slow down a stream by enforcing a delay between items.
 
 use crate::stream::Stream;
-use crate::time::{Duration, Instant, Sleep};
+use crate::time::{sleep, Duration, Instant, Sleep};
 
 use std::future::Future;
 use std::marker::Unpin;
@@ -17,7 +17,7 @@ where
     let delay = if duration == Duration::from_millis(0) {
         None
     } else {
-        Some(Sleep::new_timeout(Instant::now() + duration))
+        Some(sleep(duration))
     };
 
     Throttle {

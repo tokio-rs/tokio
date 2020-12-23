@@ -9,6 +9,7 @@ use std::{error, fmt};
 ///
 /// [`Runtime::handle`]: crate::runtime::Runtime::handle()
 #[derive(Debug, Clone)]
+#[repr(transparent)]
 pub struct Handle(t10::runtime::Handle);
 
 /// Runtime context guard.
@@ -18,7 +19,7 @@ pub struct Handle(t10::runtime::Handle);
 ///
 /// [`Runtime::enter`]: fn@crate::runtime::Runtime::enter
 #[derive(Debug)]
-pub struct EnterGuard<'a>(t10::runtime::EnterGuard<'a>);
+pub struct EnterGuard<'a>(pub(crate) t10::runtime::EnterGuard<'a>);
 
 impl Handle {
     /// Enter the runtime context. This allows you to construct types that must
@@ -80,7 +81,9 @@ impl Handle {
     ///
     /// Contrary to `current`, this never panics
     pub fn try_current() -> Result<Self, TryCurrentError> {
-        t10::runtime::Handle::try_current().map(Handle)
+        t10::runtime::Handle::try_current()
+            .map(Handle)
+            .map_err(|_| TryCurrentError(()))
     }
 
     /// Spawn a future onto the Tokio runtime.
@@ -149,7 +152,7 @@ impl Handle {
 }
 
 /// Error returned by `try_current` when no Runtime has been started
-pub struct TryCurrentError(());
+pub struct TryCurrentError(pub(crate) ());
 
 impl fmt::Debug for TryCurrentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
