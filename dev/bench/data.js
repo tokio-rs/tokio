@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608740972211,
+  "lastUpdate": 1608740982587,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -12327,6 +12327,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 943,
             "range": "± 5",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "te316e89@gmail.com",
+            "name": "Taiki Endo",
+            "username": "taiki-e"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ce0e9c67cfe61c7a91a284331ecc53fa01c32879",
+          "message": "chore: Revert \"use #[non_exhaustive] instead of private unit field\" (#3323)\n\nThis reverts commit 575938d4579e6fe6a89b700aadb0ae2bbab5483b.",
+          "timestamp": "2020-12-23T08:27:58-08:00",
+          "tree_id": "3b9ad84403d71b2ad5d2c749c23516c3dfaec3ce",
+          "url": "https://github.com/tokio-rs/tokio/commit/ce0e9c67cfe61c7a91a284331ecc53fa01c32879"
+        },
+        "date": 1608740981503,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 15489,
+            "range": "± 3698",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1049,
+            "range": "± 47",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 623,
+            "range": "± 53",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 15171,
+            "range": "± 3443",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1046,
+            "range": "± 61",
             "unit": "ns/iter"
           }
         ]
