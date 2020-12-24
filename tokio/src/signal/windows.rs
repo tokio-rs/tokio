@@ -7,9 +7,7 @@
 
 #![cfg(windows)]
 
-use std::convert::TryFrom;
 use std::io;
-use std::sync::Once;
 use std::task::{Context, Poll};
 
 /// Creates a new stream which receives "ctrl-c" notifications sent to the
@@ -47,9 +45,7 @@ pub fn ctrl_c() -> io::Result<CtrlC> {
 /// then the stream may only receive one item about the two notifications.
 #[must_use = "streams do nothing unless polled"]
 #[derive(Debug)]
-pub struct CtrlC {
-    inner: t10::signal::windows::CtrlC,
-}
+pub struct CtrlC(t10::signal::windows::CtrlC);
 
 impl CtrlC {
     /// Receives the next signal notification event.
@@ -76,7 +72,7 @@ impl CtrlC {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<()> {
-        self.inner.recv().await
+        self.0.recv().await
     }
 
     /// Polls to receive the next signal notification event, outside of an
@@ -108,7 +104,7 @@ impl CtrlC {
     /// }
     /// ```
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
-        self.inner.poll_recv(cx)
+        self.0.poll_recv(cx)
     }
 }
 
@@ -131,9 +127,7 @@ cfg_stream! {
 /// then the stream may only receive one item about the two notifications.
 #[must_use = "streams do nothing unless polled"]
 #[derive(Debug)]
-pub struct CtrlBreak {
-    inner: t10::signal::windows::CtrlBreak,
-}
+pub struct CtrlBreak(t10::signal::windows::CtrlBreak);
 
 impl CtrlBreak {
     /// Receives the next signal notification event.
@@ -158,7 +152,7 @@ impl CtrlBreak {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<()> {
-        self.inner.recv().await
+        self.0.recv().await
     }
 
     /// Polls to receive the next signal notification event, outside of an
@@ -190,7 +184,7 @@ impl CtrlBreak {
     /// }
     /// ```
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
-        self.inner.poll_recv(cx)
+        self.0.poll_recv(cx)
     }
 }
 
