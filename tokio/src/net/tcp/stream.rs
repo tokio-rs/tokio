@@ -835,7 +835,7 @@ mod sys {
 
     impl AsRawSocket for TcpStream {
         fn as_raw_socket(&self) -> RawSocket {
-            self.io.as_raw_socket()
+            self.0.as_raw_socket()
         }
     }
 }
