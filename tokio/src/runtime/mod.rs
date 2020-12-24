@@ -280,7 +280,7 @@ cfg_rt! {
         /// // Use the handle...
         /// ```
         pub fn handle(&self) -> &Handle {
-            // SAFETY: Handle is repr-transparent 
+            // SAFETY: Handle is repr-transparent
             unsafe {
                 std::mem::transmute(self.0.handle())
             }

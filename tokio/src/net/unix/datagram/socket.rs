@@ -490,9 +490,7 @@ impl UnixDatagram {
     /// # }
     /// ```
     pub async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        self.0
-            .recv_from(buf)
-            .await
+        self.0.recv_from(buf).await
     }
 
     /// Try to receive data from the socket without waiting.
@@ -528,8 +526,7 @@ impl UnixDatagram {
     /// # }
     /// ```
     pub fn try_recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        self.0
-            .try_recv_from(buf)
+        self.0.try_recv_from(buf)
     }
 
     /// Returns the local address that this socket is bound to.

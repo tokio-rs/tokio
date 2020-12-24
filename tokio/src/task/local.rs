@@ -6,7 +6,6 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::Poll;
 
-
 cfg_rt! {
     /// A set of tasks which are executed on the same thread.
     ///

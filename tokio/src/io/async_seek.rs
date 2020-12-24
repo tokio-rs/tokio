@@ -10,4 +10,4 @@
 /// [`std::io::Seek`]: std::io::Seek
 /// [`Seek::seek`]: std::io::Seek::seek()
 /// [`AsyncSeekExt`]: crate::io::AsyncSeekExt
-pub use t10::io:: AsyncSeek;
+pub use t10::io::AsyncSeek;

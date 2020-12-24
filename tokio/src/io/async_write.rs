@@ -38,4 +38,3 @@
 /// [stdflush]: std::io::Write::flush()
 /// [`AsyncWriteExt`]: crate::io::AsyncWriteExt
 pub use t10::io::AsyncWrite;
-

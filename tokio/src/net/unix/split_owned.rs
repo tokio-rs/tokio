@@ -8,4 +8,4 @@
 //! split has no associated overhead and enforces all invariants at the type
 //! level.
 
-pub use t10::net::unix::{OwnedReadHalf, ReuniteError, OwnedWriteHalf};
+pub use t10::net::unix::{OwnedReadHalf, OwnedWriteHalf, ReuniteError};

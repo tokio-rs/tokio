@@ -1,8 +1,8 @@
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
-use crate::net::unix::{ReadHalf, WriteHalf};
-use crate::net::unix::{OwnedReadHalf, OwnedWriteHalf};
 use crate::net::unix::ucred::UCred;
 use crate::net::unix::SocketAddr;
+use crate::net::unix::{OwnedReadHalf, OwnedWriteHalf};
+use crate::net::unix::{ReadHalf, WriteHalf};
 
 use std::convert::TryFrom;
 use std::fmt;
