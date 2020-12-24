@@ -220,8 +220,10 @@ cfg_rt! {
     use std::task::{Poll,Context};
     use std::pin::Pin;
 
+    /// TODO
     #[derive(Debug)]
     pub struct JoinError(pub(crate) t10::task::JoinError);
+    /// TODO
     #[derive(Debug)]
     pub struct JoinHandle<R>(pub(crate) t10::task::JoinHandle<R>);
     impl<R> Future for JoinHandle<R> {
@@ -229,6 +231,13 @@ cfg_rt! {
 
         fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
             Pin::new(&mut self.0).poll(cx).map(|res| res.map_err(JoinError))
+        }
+    }
+
+    impl<R> JoinHandle<R> {
+        /// TODO
+        pub fn abort(&self) {
+            self.0.abort()
         }
     }
 

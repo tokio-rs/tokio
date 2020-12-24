@@ -603,7 +603,12 @@ impl Command {
     /// if the system process limit is reached (which includes other applications
     /// running on the system).
     pub fn spawn(&mut self) -> io::Result<Child> {
-        self.0.spawn().map(Child)
+        self.0.spawn().map(|mut ch| Child {
+            stdin: ch.stdin.take().map(ChildStdin),
+            stdout: ch.stdout.take().map(ChildStdout),
+            stderr: ch.stderr.take().map(ChildStderr),
+            inner: ch,
+        })
     }
 
     /// Executes the command as a child process, waiting for it to finish and
@@ -715,7 +720,15 @@ impl From<StdCommand> for Command {
 /// and kill the child process if the `Child` wrapper is dropped before it
 /// has exited.
 #[derive(Debug)]
-pub struct Child(t10::process::Child);
+pub struct Child {
+    inner: t10::process::Child,
+    /// TODO
+    pub stdin: Option<ChildStdin>,
+    /// TODO
+    pub stdout: Option<ChildStdout>,
+    /// TODO
+    pub stderr: Option<ChildStderr>,
+}
 
 impl Child {
     /// Returns the OS-assigned process identifier associated with this child
@@ -725,7 +738,7 @@ impl Child {
     /// This is done to avoid confusion on platforms like Unix where the OS
     /// identifier could be reused once the process has completed.
     pub fn id(&self) -> Option<u32> {
-        self.0.id()
+        self.inner.id()
     }
 
     /// Attempts to force the child to exit, but does not wait for the request
@@ -736,7 +749,7 @@ impl Child {
     /// after a kill is sent; to avoid this, the caller should ensure that either
     /// `child.wait().await` or `child.try_wait()` is invoked successfully.
     pub fn start_kill(&mut self) -> io::Result<()> {
-        self.0.start_kill()
+        self.inner.start_kill()
     }
 
     /// Forces the child to exit.
@@ -765,7 +778,7 @@ impl Child {
     /// }
     /// ```
     pub async fn kill(&mut self) -> io::Result<()> {
-        self.0.kill().await
+        self.inner.kill().await
     }
 
     /// Waits for the child to exit completely, returning the status that it
@@ -777,7 +790,7 @@ impl Child {
     /// child does not block waiting for input from the parent, while
     /// the parent waits for the child to exit.
     pub async fn wait(&mut self) -> io::Result<ExitStatus> {
-        self.0.wait().await
+        self.inner.wait().await
     }
 
     /// Attempts to collect the exit status of the child if it has already
@@ -796,7 +809,7 @@ impl Child {
     /// Note that unlike `wait`, this function will not attempt to drop stdin,
     /// nor will it wake the current task if the child exits.
     pub fn try_wait(&mut self) -> io::Result<Option<ExitStatus>> {
-        self.0.try_wait()
+        self.inner.try_wait()
     }
 
     /// Returns a future that will resolve to an `Output`, containing the exit
@@ -816,7 +829,7 @@ impl Child {
     /// new pipes between parent and child. Use `stdout(Stdio::piped())` or
     /// `stderr(Stdio::piped())`, respectively, when creating a `Command`.
     pub async fn wait_with_output(self) -> io::Result<Output> {
-        self.0.wait_with_output().await
+        self.inner.wait_with_output().await
     }
 }
 

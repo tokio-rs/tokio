@@ -49,7 +49,7 @@ pub fn timeout<T>(duration: Duration, future: T) -> Timeout<T>
 where
     T: Future,
 {
-    let delay = Sleep::new_timeout(Instant::now() + duration);
+    let delay = crate::time::sleep(duration);
     Timeout::new_with_delay(future, delay)
 }
 
@@ -148,7 +148,10 @@ where
 
         // Now check the timer
         match me.delay.poll(cx) {
-            Poll::Ready(()) => Poll::Ready(Err(Elapsed::new())),
+            Poll::Ready(()) => Poll::Ready(Err(unsafe {
+                // TODO: smth better?
+                std::mem::transmute(())
+            })),
             Poll::Pending => Poll::Pending,
         }
     }
