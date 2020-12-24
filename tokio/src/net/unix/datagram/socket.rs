@@ -105,8 +105,7 @@ impl UnixDatagram {
     where
         P: AsRef<Path>,
     {
-        let socket = mio::net::UnixDatagram::bind(path)?;
-        UnixDatagram::new(socket)
+        t10::net::UnixDatagram::bind(path).map(Self)
     }
 
     /// Creates an unnamed pair of connected sockets.
