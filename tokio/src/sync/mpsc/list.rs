@@ -191,7 +191,7 @@ impl<T> Tx<T> {
 
         // TODO: Unify this logic with Block::grow
         for _ in 0..3 {
-            match curr.as_ref().try_push(&mut block, AcqRel) {
+            match curr.as_ref().try_push(&mut block, AcqRel, Acquire) {
                 Ok(_) => {
                     reused = true;
                     break;
