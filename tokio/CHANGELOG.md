@@ -1,3 +1,53 @@
+# 1.0.0 (December 23, 2020)
+
+Commit to the API and long-term support.
+
+### Fixed
+- sync: spurious wakeup in `watch` (#3234).
+
+### Changed
+- io: rename `AsyncFd::with_io()` to `try_io()` (#3306)
+- fs: avoid OS specific `*Ext` traits in favor of conditionally defining the fn (#3264).
+- fs: `Sleep` is `!Unpin` (#3278).
+- net: pass `SocketAddr` by value (#3125).
+- net: `TcpStream::poll_peek` takes `ReadBuf` (#3259).
+- rt: rename `runtime::Builder::max_threads()` to `max_blocking_threads()` (#3287).
+- time: require `current_thread` runtime when calling `time::pause()` (#3289).
+
+### Removed
+- remove `tokio::prelude` (#3299).
+- io: remove `AsyncFd::with_poll()` (#3306).
+- net: remove `{Tcp,Unix}Stream::shutdown()` in favor of `AsyncWrite::shutdown()` (#3298).
+- stream: move all stream utilities to `tokio-stream` until `Stream` is added to
+  `std` (#3277).
+- sync: mpsc `try_recv()` due to unexpected behavior (#3263).
+- tracing: make unstable as `tracing-core` is not 1.0 yet (#3266).
+
+### Added
+- fs: `poll_*` fns to `DirEntry` (#3308).
+- io: `poll_*` fns to `io::Lines`, `io::Split` (#3308).
+- io: `_mut` method variants to `AsyncFd` (#3304).
+- net: `poll_*` fns to `UnixDatagram` (#3223).
+- net: `UnixStream` readiness and non-blocking ops (#3246).
+- sync: `UnboundedReceiver::blocking_recv()` (#3262).
+- sync: `watch::Sender::borrow()` (#3269).
+- sync: `Semaphore::close()` (#3065).
+- sync: `poll_recv` fns to `mpsc::Receiver`, `mpsc::UnboundedReceiver` (#3308).
+- time: `poll_tick` fn to `time::Interval` (#3316).
+
+# 0.3.6 (December 14, 2020)
+
+### Fixed
+- rt: fix deadlock in shutdown (#3228)
+- rt: fix panic in task abort when off rt (#3159)
+- sync: make `add_permits` panic with usize::MAX >> 3 permits (#3188)
+- time: Fix race condition in timer drop (#3229)
+- watch: fix spurious wakeup (#3244)
+
+### Added
+- example: add back udp-codec example (#3205)
+- net: add `TcpStream::into_std` (#3189)
+
 # 0.3.5 (November 30, 2020)
 
 ### Fixed

@@ -54,7 +54,6 @@ pub enum TryAcquireError {
     /// The semaphore has no available permits.
     NoPermits,
 }
-
 /// Error returned from the [`Semaphore::acquire`] function.
 ///
 /// An `acquire` operation can only fail if the semaphore has been
@@ -63,8 +62,7 @@ pub enum TryAcquireError {
 /// [closed]: crate::sync::Semaphore::close
 /// [`Semaphore::acquire`]: crate::sync::Semaphore::acquire
 #[derive(Debug)]
-#[non_exhaustive]
-pub struct AcquireError;
+pub struct AcquireError(());
 
 pub(crate) struct Acquire<'a> {
     node: Waiter,
@@ -523,7 +521,7 @@ unsafe impl Sync for Acquire<'_> {}
 
 impl AcquireError {
     fn closed() -> AcquireError {
-        AcquireError
+        AcquireError(())
     }
 }
 

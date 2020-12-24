@@ -219,6 +219,7 @@ impl<T, U> Framed<T, U> {
             codec: self.inner.codec,
             read_buf: self.inner.state.read.buffer,
             write_buf: self.inner.state.write.buffer,
+            _priv: (),
         }
     }
 }
@@ -281,7 +282,7 @@ where
 ///
 /// [`Framed`]: crate::codec::Framed
 #[derive(Debug)]
-#[non_exhaustive]
+#[allow(clippy::manual_non_exhaustive)]
 pub struct FramedParts<T, U> {
     /// The inner transport used to read bytes to and write bytes to
     pub io: T,
@@ -294,6 +295,10 @@ pub struct FramedParts<T, U> {
 
     /// A buffer with unprocessed data which are not written yet.
     pub write_buf: BytesMut,
+
+    /// This private field allows us to add additional fields in the future in a
+    /// backwards compatible way.
+    _priv: (),
 }
 
 impl<T, U> FramedParts<T, U> {
@@ -307,6 +312,7 @@ impl<T, U> FramedParts<T, U> {
             codec,
             read_buf: BytesMut::new(),
             write_buf: BytesMut::new(),
+            _priv: (),
         }
     }
 }

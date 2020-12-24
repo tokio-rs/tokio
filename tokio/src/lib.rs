@@ -57,7 +57,7 @@
 //! enabling the `full` feature flag:
 //!
 //! ```toml
-//! tokio = { version = "0.3", features = ["full"] }
+//! tokio = { version = "1", features = ["full"] }
 //! ```
 //!
 //! ### Authoring applications
@@ -72,7 +72,7 @@
 //! This example shows the quickest way to get started with Tokio.
 //!
 //! ```toml
-//! tokio = { version = "0.3", features = ["full"] }
+//! tokio = { version = "1", features = ["full"] }
 //! ```
 //!
 //! ### Authoring libraries
@@ -88,7 +88,7 @@
 //! needs to `tokio::spawn` and use a `TcpStream`.
 //!
 //! ```toml
-//! tokio = { version = "0.3", features = ["rt", "net"] }
+//! tokio = { version = "1", features = ["rt", "net"] }
 //! ```
 //!
 //! ## Working With Tasks

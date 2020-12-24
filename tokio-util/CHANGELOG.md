@@ -1,3 +1,11 @@
+# 0.6.0 (December 23, 2020)
+
+### Changed
+- depend on `tokio` 1.0.
+
+### Added
+- rt: add constructors to `TokioContext` (#3221).
+
 # 0.5.1 (December 3, 2020)
 
 ### Added

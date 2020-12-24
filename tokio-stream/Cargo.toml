@@ -18,7 +18,6 @@ description = """
 Utilities to work with `Stream` and `tokio`.
 """
 categories = ["asynchronous"]
-publish = false
 
 [features]
 default = ["time"]

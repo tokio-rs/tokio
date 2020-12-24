@@ -144,7 +144,7 @@
 //! that implements [`AsyncRead`] and [`AsyncWrite`] into a `Sink`/`Stream` of
 //! your structured data.
 //!
-//! [tokio-util]: https://docs.rs/tokio-util/0.3/tokio_util/codec/index.html
+//! [tokio-util]: https://docs.rs/tokio-util/0.6/tokio_util/codec/index.html
 //!
 //! # Standard input and output
 //!
@@ -169,9 +169,9 @@
 //! [`AsyncWrite`]: trait@AsyncWrite
 //! [`AsyncReadExt`]: trait@AsyncReadExt
 //! [`AsyncWriteExt`]: trait@AsyncWriteExt
-//! ["codec"]: https://docs.rs/tokio-util/0.3/tokio_util/codec/index.html
-//! [`Encoder`]: https://docs.rs/tokio-util/0.3/tokio_util/codec/trait.Encoder.html
-//! [`Decoder`]: https://docs.rs/tokio-util/0.3/tokio_util/codec/trait.Decoder.html
+//! ["codec"]: https://docs.rs/tokio-util/0.6/tokio_util/codec/index.html
+//! [`Encoder`]: https://docs.rs/tokio-util/0.6/tokio_util/codec/trait.Encoder.html
+//! [`Decoder`]: https://docs.rs/tokio-util/0.6/tokio_util/codec/trait.Decoder.html
 //! [`Error`]: struct@Error
 //! [`ErrorKind`]: enum@ErrorKind
 //! [`Result`]: type@Result
