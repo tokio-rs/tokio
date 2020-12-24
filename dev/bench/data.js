@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608819538754,
+  "lastUpdate": 1608819547867,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -8365,6 +8365,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19880868,
             "range": "± 2352559",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "lnicola@users.noreply.github.com",
+            "name": "Laurențiu Nicola",
+            "username": "lnicola"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1eefbc250ad49d9086bdb2b8be4404bd445f63fb",
+          "message": "docs: remove stream feature from docs (#3335)",
+          "timestamp": "2020-12-24T23:17:18+09:00",
+          "tree_id": "f3657463c2d44548e4d71f8454ce672ffeb0b45f",
+          "url": "https://github.com/tokio-rs/tokio/commit/1eefbc250ad49d9086bdb2b8be4404bd445f63fb"
+        },
+        "date": 1608819546686,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 186984,
+            "range": "± 47372",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 710870,
+            "range": "± 153282",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5134794,
+            "range": "± 1109411",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20647912,
+            "range": "± 2566792",
             "unit": "ns/iter"
           }
         ]
