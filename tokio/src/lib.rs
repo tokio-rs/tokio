@@ -314,7 +314,6 @@
 //! - `process`: Enables `tokio::process` types.
 //! - `macros`: Enables `#[tokio::main]` and `#[tokio::test]` macros.
 //! - `sync`: Enables all `tokio::sync` types.
-//! - `stream`: Enables optional `Stream` implementations for types within Tokio.
 //! - `signal`: Enables all `tokio::signal` types.
 //! - `fs`: Enables `tokio::fs` types.
 //! - `test-util`: Enables testing based infrastructure for the Tokio runtime.
