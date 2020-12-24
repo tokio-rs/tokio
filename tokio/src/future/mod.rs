@@ -2,7 +2,7 @@
 
 //! Asynchronous values.
 
-#[cfg(any(feature = "macros", feature = "process"))]
+#[cfg(any(feature = "macros"))]
 pub(crate) mod maybe_done;
 
 mod poll_fn;

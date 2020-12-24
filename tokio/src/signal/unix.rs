@@ -6,7 +6,6 @@
 #![cfg(unix)]
 
 use std::io;
-use std::task::{Context, Poll};
 
 pub use t10::signal::unix::SignalKind;
 
@@ -135,6 +134,7 @@ impl Signal {
 }
 
 cfg_stream! {
+    use std::task::{Context, Poll};
     impl crate::stream::Stream for Signal {
         type Item = ();
 

@@ -8,9 +8,9 @@
 ))]
 pub(crate) mod linked_list;
 
-#[cfg(any(feature = "macros", feature = "stream"))]
+#[cfg(any(feature = "macros"))]
 mod rand;
 
-#[cfg(any(feature = "macros", feature = "stream"))]
+#[cfg(any(feature = "macros"))]
 #[cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
 pub use rand::thread_rng_n;

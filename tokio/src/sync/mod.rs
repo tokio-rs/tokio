@@ -464,23 +464,23 @@ cfg_not_sync! {
         pub(crate) use mutex::Mutex;
     }
 
-    #[cfg(any(feature = "rt", feature = "signal", all(unix, feature = "process")))]
+    #[cfg(any(feature = "signal", all(unix, feature = "process")))]
     pub(crate) mod notify;
 
-    cfg_atomic_waker_impl! {
+    /*cfg_atomic_waker_impl! {
         mod task;
         pub(crate) use task::AtomicWaker;
-    }
+    }*/
 
-    #[cfg(any(
+    /*#[cfg(any(
             feature = "rt",
             feature = "process",
             feature = "signal"))]
-    pub(crate) mod oneshot;
-
+    pub(crate) mod oneshot;*/
+/*
     cfg_signal_internal! {
         pub(crate) mod mpsc;
-    }
+    }*/
 }
 
 /// Unit tests

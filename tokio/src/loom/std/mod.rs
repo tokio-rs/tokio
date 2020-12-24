@@ -16,9 +16,9 @@ pub(crate) mod cell {
 }
 
 #[cfg(any(
-    feature = "net",
-    feature = "process",
-    feature = "signal",
+    //feature = "net",
+    //feature = "process",
+    //feature = "signal",
     feature = "sync",
 ))]
 pub(crate) mod future {
