@@ -45,7 +45,7 @@ mod imp {
             prev
         }
 
-        pub(crate) fn compare_exchange(&self, old: u64, new: u64, _: Ordering) -> u64 {
+        pub(crate) fn compare_exchange(&self, old: u64, new: u64, _: Ordering) -> Result<u64, u64> {
             let mut lock = self.inner.lock().unwrap();
             let prev = *lock;
 
