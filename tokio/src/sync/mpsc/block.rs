@@ -264,7 +264,8 @@ impl<T> Block<T> {
 
         let next_ptr = self
             .next
-            .compare_and_swap(ptr::null_mut(), block.as_ptr(), ordering);
+            .compare_exchange(ptr::null_mut(), block.as_ptr(), ordering, ordering)
+            .unwrap_or_else(|x| x);
 
         match NonNull::new(next_ptr) {
             Some(next_ptr) => Err(next_ptr),
@@ -306,11 +307,11 @@ impl<T> Block<T> {
         //
         // `Release` ensures that the newly allocated block is available to
         // other threads acquiring the next pointer.
-        let next = NonNull::new(self.next.compare_and_swap(
-            ptr::null_mut(),
-            new_block.as_ptr(),
-            AcqRel,
-        ));
+        let next = NonNull::new(
+            self.next
+                .compare_exchange(ptr::null_mut(), new_block.as_ptr(), AcqRel, Acquire)
+                .unwrap_or_else(|x| x),
+        );
 
         let next = match next {
             Some(next) => next,
