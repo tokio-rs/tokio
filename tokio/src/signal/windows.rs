@@ -33,7 +33,7 @@ use std::task::{Context, Poll};
 /// }
 /// ```
 pub fn ctrl_c() -> io::Result<CtrlC> {
-    Event::new(CTRL_C_EVENT).map(|inner| CtrlC { inner })
+    t10::signal::windows::ctrl_c().map(|inner| CtrlC { inner })
 }
 
 /// Represents a stream which receives "ctrl-c" notifications sent to the process

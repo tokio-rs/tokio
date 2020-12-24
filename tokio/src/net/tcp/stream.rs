@@ -831,7 +831,6 @@ mod sys {
 #[cfg(windows)]
 mod sys {
     use super::TcpStream;
-    use std::os::windows::prelude::*;
 
     impl AsRawSocket for TcpStream {
         fn as_raw_socket(&self) -> RawSocket {
