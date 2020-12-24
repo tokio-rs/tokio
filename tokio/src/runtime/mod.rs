@@ -282,7 +282,7 @@ cfg_rt! {
         pub fn handle(&self) -> &Handle {
             // SAFETY: Handle is repr-transparent
             unsafe {
-                std::mem::transmute(self.0.handle())
+                &*(self.0.handle() as *const _ as *const Handle)
             }
         }
 
