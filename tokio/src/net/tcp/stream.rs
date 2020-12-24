@@ -8,7 +8,7 @@ use std::fmt;
 use std::io;
 use std::net::{Shutdown, SocketAddr};
 #[cfg(windows)]
-use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket};
+use std::os::windows::io::{AsRawSocket, RawSocket};
 
 use std::pin::Pin;
 use std::task::{Context, Poll};
