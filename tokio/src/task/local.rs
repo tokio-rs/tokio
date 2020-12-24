@@ -1,18 +1,11 @@
 //! Runs `!Send` futures on the current thread.
-use crate::sync::AtomicWaker;
 use crate::task::JoinHandle;
-use crate::util::linked_list::{Link, LinkedList};
 
-use std::cell::{Cell, RefCell};
-use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
-use std::marker::PhantomData;
 use std::pin::Pin;
-use std::sync::{Arc, Mutex};
 use std::task::Poll;
 
-use pin_project_lite::pin_project;
 
 cfg_rt! {
     /// A set of tasks which are executed on the same thread.
@@ -322,9 +315,7 @@ impl Future for LocalSet {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
-        let inner = unsafe {
-            self.map_unchecked_mut(|this| &mut this.0)
-        };
+        let inner = unsafe { self.map_unchecked_mut(|this| &mut this.0) };
         inner.poll(cx)
     }
 }

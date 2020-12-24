@@ -89,7 +89,9 @@ time = []
 
 [dependencies]
 t10 = { git = "https://github.com/tokio-rs/tokio", features = ["full"], package = "tokio" }
+tokio-stream = "0.1.0"
 tokio-macros = { version = "0.3.0", path = "../tokio-macros", optional = true }
+futures = { version = "0.3.0", features = ["async-await"] }
 
 pin-project-lite = "0.2.0"
 

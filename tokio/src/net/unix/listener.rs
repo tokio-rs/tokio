@@ -93,7 +93,8 @@ impl UnixListener {
 
     /// Accepts a new incoming connection to this listener.
     pub async fn accept(&self) -> io::Result<(UnixStream, SocketAddr)> {
-        self.0.accept().await
+        let (s, a) = self.0.accept().await?;
+        Ok((UnixStream(s), a))
     }
 
     /// Polls to accept a new incoming connection to this listener.
@@ -105,7 +106,9 @@ impl UnixListener {
     /// The caller is responsible to ensure that `poll_accept` is called from a
     /// single task. Failing to do this could result in tasks hanging.
     pub fn poll_accept(&self, cx: &mut Context<'_>) -> Poll<io::Result<(UnixStream, SocketAddr)>> {
-        self.0.poll_accept(cx)
+        self.0
+            .poll_accept(cx)
+            .map(|res| res.map(|(sock, addr)| (UnixStream(sock), addr)))
     }
 }
 

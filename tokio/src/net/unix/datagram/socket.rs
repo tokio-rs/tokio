@@ -138,9 +138,9 @@ impl UnixDatagram {
     /// # }
     /// ```
     pub fn pair() -> io::Result<(UnixDatagram, UnixDatagram)> {
-        let (a, b) = mio::net::UnixDatagram::pair()?;
-        let a = UnixDatagram::new(a)?;
-        let b = UnixDatagram::new(b)?;
+        let (a, b) = t10::net::UnixDatagram::pair()?;
+        let a = UnixDatagram(a);
+        let b = UnixDatagram(b);
 
         Ok((a, b))
     }
@@ -288,7 +288,7 @@ impl UnixDatagram {
     /// # }
     /// ```
     pub async fn send(&self, buf: &[u8]) -> io::Result<usize> {
-        self.0.send(buf)
+        self.0.send(buf).await
     }
 
     /// Try to send a datagram to the peer without waiting.
@@ -490,7 +490,9 @@ impl UnixDatagram {
     /// # }
     /// ```
     pub async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        self.0.recv_from(buf).await
+        self.0
+            .recv_from(buf)
+            .await
     }
 
     /// Try to receive data from the socket without waiting.
@@ -526,7 +528,8 @@ impl UnixDatagram {
     /// # }
     /// ```
     pub fn try_recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        self.0.try_recv_from(buf)
+        self.0
+            .try_recv_from(buf)
     }
 
     /// Returns the local address that this socket is bound to.
@@ -702,6 +705,6 @@ impl fmt::Debug for UnixDatagram {
 
 impl AsRawFd for UnixDatagram {
     fn as_raw_fd(&self) -> RawFd {
-        self.io.as_raw_fd()
+        self.0.as_raw_fd()
     }
 }

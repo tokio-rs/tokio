@@ -1,7 +1,7 @@
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 use crate::net::unix::split::{ReadHalf, WriteHalf};
 use crate::net::unix::split_owned::{OwnedReadHalf, OwnedWriteHalf};
-use crate::net::unix::ucred::{self, UCred};
+use crate::net::unix::ucred::UCred;
 use crate::net::unix::SocketAddr;
 
 use std::convert::TryFrom;
@@ -20,7 +20,7 @@ cfg_net_unix! {
     /// This socket can be connected directly with `UnixStream::connect` or accepted
     /// from a listener with `UnixListener::incoming`. Additionally, a pair of
     /// anonymous Unix sockets can be created with `UnixStream::pair`.
-    pub struct UnixStream(t10::net::UnixStream);
+    pub struct UnixStream(pub(crate) t10::net::UnixStream);
 }
 
 impl UnixStream {
@@ -92,8 +92,8 @@ impl UnixStream {
     /// This function will cause all pending and future I/O calls on the
     /// specified portions to immediately return with an appropriate value
     /// (see the documentation of `Shutdown`).
-    pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
-        self.0.shutdown(how)
+    pub fn shutdown(&self, _how: Shutdown) -> io::Result<()> {
+        todo!()
     }
 
     // These lifetime markers also appear in the generated documentation, and make
@@ -140,29 +140,29 @@ impl TryFrom<net::UnixStream> for UnixStream {
 
 impl AsyncRead for UnixStream {
     fn poll_read(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        self.0.poll_read(cx, buf)
+        Pin::new(&mut self.0).poll_read(cx, buf)
     }
 }
 
 impl AsyncWrite for UnixStream {
     fn poll_write(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        self.0.poll_write(cx, buf)
+        Pin::new(&mut self.0).poll_write(cx, buf)
     }
 
     fn poll_write_vectored(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         bufs: &[io::IoSlice<'_>],
     ) -> Poll<io::Result<usize>> {
-        self.0.poll_write_vectored(cx, bufs)
+        Pin::new(&mut self.0).poll_write_vectored(cx, bufs)
     }
 
     fn is_write_vectored(&self) -> bool {
@@ -173,8 +173,8 @@ impl AsyncWrite for UnixStream {
         Poll::Ready(Ok(()))
     }
 
-    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.0.poll_shutdown(cx);
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        assert!(Pin::new(&mut self.0).poll_shutdown(cx).is_ready());
         Poll::Ready(Ok(()))
     }
 }

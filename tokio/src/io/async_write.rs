@@ -1,8 +1,3 @@
-use std::io::{self, IoSlice};
-use std::ops::DerefMut;
-use std::pin::Pin;
-use std::task::{Context, Poll};
-
 /// Writes bytes asynchronously.
 ///
 /// The trait inherits from [`std::io::Write`] and indicates that an I/O object is

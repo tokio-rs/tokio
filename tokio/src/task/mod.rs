@@ -216,8 +216,21 @@
 //! [`thread::yield_now`]: std::thread::yield_now
 
 cfg_rt! {
+    use std::future::Future;
+    use std::task::{Poll,Context};
+    use std::pin::Pin;
+
+    #[derive(Debug)]
     pub struct JoinError(pub(crate) t10::task::JoinError);
+    #[derive(Debug)]
     pub struct JoinHandle<R>(pub(crate) t10::task::JoinHandle<R>);
+    impl<R> Future for JoinHandle<R> {
+        type Output = Result<R, JoinError>;
+
+        fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            Pin::new(&mut self.0).poll(cx).map(|res| res.map_err(JoinError))
+        }
+    }
 
     mod blocking;
     pub use blocking::spawn_blocking;

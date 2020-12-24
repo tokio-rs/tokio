@@ -93,20 +93,19 @@
 #[cfg(feature = "test-util")]
 pub use t10::time::{advance, pause, resume};
 
+mod sleep;
 #[doc(inline)]
-pub use t10::time::{sleep, sleep_until, Sleep};
+pub use sleep::{sleep, sleep_until, Sleep};
 
-pub mod error;
+pub use t10::time::error;
 
 mod instant;
 pub use self::instant::Instant;
 
-mod interval;
-pub use interval::{interval, interval_at, Interval};
+pub use t10::time::{interval, interval_at, Interval};
 
-mod timeout;
 #[doc(inline)]
-pub use timeout::{timeout, timeout_at, Timeout};
+pub use t10::time::{timeout, timeout_at, Timeout};
 
 #[cfg(test)]
 #[cfg(not(loom))]

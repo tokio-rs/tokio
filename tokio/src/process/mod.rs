@@ -134,10 +134,6 @@ use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 use std::ffi::OsStr;
 use std::future::Future;
 use std::io;
-#[cfg(unix)]
-use std::os::unix::process::CommandExt;
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::pin::Pin;
 use std::process::{Command as StdCommand, ExitStatus, Output, Stdio};
@@ -781,7 +777,7 @@ impl Child {
     /// child does not block waiting for input from the parent, while
     /// the parent waits for the child to exit.
     pub async fn wait(&mut self) -> io::Result<ExitStatus> {
-        self.0.wait()
+        self.0.wait().await
     }
 
     /// Attempts to collect the exit status of the child if it has already
@@ -819,8 +815,8 @@ impl Child {
     /// order to capture the output into this `Output` it is necessary to create
     /// new pipes between parent and child. Use `stdout(Stdio::piped())` or
     /// `stderr(Stdio::piped())`, respectively, when creating a `Command`.
-    pub async fn wait_with_output(mut self) -> io::Result<Output> {
-        self.0.wait_with_output()
+    pub async fn wait_with_output(self) -> io::Result<Output> {
+        self.0.wait_with_output().await
     }
 }
 
@@ -847,11 +843,11 @@ pub struct ChildStderr(t10::process::ChildStderr);
 
 impl AsyncWrite for ChildStdin {
     fn poll_write(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        self.0.poll_write(cx, buf)
+        Pin::new(&mut self.0).poll_write(cx, buf)
     }
 
     fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
@@ -865,21 +861,21 @@ impl AsyncWrite for ChildStdin {
 
 impl AsyncRead for ChildStdout {
     fn poll_read(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        self.0.poll_read(cx, buf)
+        Pin::new(&mut self.0).poll_read(cx, buf)
     }
 }
 
 impl AsyncRead for ChildStderr {
     fn poll_read(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        self.0.poll_read(cx, buf)
+        Pin::new(&mut self.0).poll_read(cx, buf)
     }
 }
 

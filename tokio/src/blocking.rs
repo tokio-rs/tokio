@@ -1,8 +1,3 @@
-cfg_rt! {
-    pub(crate) use crate::task::spawn_blocking;
-    pub(crate) use crate::task::JoinHandle;
-}
-
 cfg_not_rt! {
     use std::fmt;
     use std::future::Future;

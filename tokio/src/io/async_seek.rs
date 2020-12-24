@@ -1,8 +1,3 @@
-use std::io::{self, SeekFrom};
-use std::ops::DerefMut;
-use std::pin::Pin;
-use std::task::{Context, Poll};
-
 /// Seek bytes asynchronously.
 ///
 /// This trait is analogous to the [`std::io::Seek`] trait, but integrates

@@ -31,9 +31,7 @@ use std::time::Duration;
 /// clock for uses of `now()`. This can be useful for testing where you can
 /// take advantage of `time::pause()` and `time::advance()`.
 #[derive(Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Hash)]
-pub struct Instant {
-    std: std::time::Instant,
-}
+pub struct Instant(pub(crate) t10::time::Instant);
 
 impl Instant {
     /// Returns an instant corresponding to "now".
@@ -46,17 +44,17 @@ impl Instant {
     /// let now = Instant::now();
     /// ```
     pub fn now() -> Instant {
-        variant::now()
+        Self(t10::time::Instant::now())
     }
 
     /// Create a `tokio::time::Instant` from a `std::time::Instant`.
     pub fn from_std(std: std::time::Instant) -> Instant {
-        Instant { std }
+        Self(t10::time::Instant::from_std(std))
     }
 
     /// Convert the value into a `std::time::Instant`.
     pub fn into_std(self) -> std::time::Instant {
-        self.std
+        self.0.into_std()
     }
 
     /// Returns the amount of time elapsed from another instant to this one.
@@ -65,7 +63,7 @@ impl Instant {
     ///
     /// This function will panic if `earlier` is later than `self`.
     pub fn duration_since(&self, earlier: Instant) -> Duration {
-        self.std.duration_since(earlier.std)
+        self.0.duration_since(earlier.0)
     }
 
     /// Returns the amount of time elapsed from another instant to this one, or
@@ -86,7 +84,7 @@ impl Instant {
     /// }
     /// ```
     pub fn checked_duration_since(&self, earlier: Instant) -> Option<Duration> {
-        self.std.checked_duration_since(earlier.std)
+        self.0.checked_duration_since(earlier.0)
     }
 
     /// Returns the amount of time elapsed from another instant to this one, or
@@ -107,7 +105,7 @@ impl Instant {
     /// }
     /// ```
     pub fn saturating_duration_since(&self, earlier: Instant) -> Duration {
-        self.std.saturating_duration_since(earlier.std)
+        self.0.saturating_duration_since(earlier.0)
     }
 
     /// Returns the amount of time elapsed since this instant was created.
@@ -139,14 +137,14 @@ impl Instant {
     /// represented as `Instant` (which means it's inside the bounds of the
     /// underlying data structure), `None` otherwise.
     pub fn checked_add(&self, duration: Duration) -> Option<Instant> {
-        self.std.checked_add(duration).map(Instant::from_std)
+        self.0.checked_add(duration).map(Self)
     }
 
     /// Returns `Some(t)` where `t` is the time `self - duration` if `t` can be
     /// represented as `Instant` (which means it's inside the bounds of the
     /// underlying data structure), `None` otherwise.
     pub fn checked_sub(&self, duration: Duration) -> Option<Instant> {
-        self.std.checked_sub(duration).map(Instant::from_std)
+        self.0.checked_sub(duration).map(Self)
     }
 }
 
@@ -166,7 +164,7 @@ impl ops::Add<Duration> for Instant {
     type Output = Instant;
 
     fn add(self, other: Duration) -> Instant {
-        Instant::from_std(self.std + other)
+        Self(self.0 + other)
     }
 }
 
@@ -180,7 +178,7 @@ impl ops::Sub for Instant {
     type Output = Duration;
 
     fn sub(self, rhs: Instant) -> Duration {
-        self.std - rhs.std
+        self.0 - rhs.0
     }
 }
 
@@ -188,7 +186,7 @@ impl ops::Sub<Duration> for Instant {
     type Output = Instant;
 
     fn sub(self, rhs: Duration) -> Instant {
-        Instant::from_std(self.std - rhs)
+        Self(self.0 - rhs)
     }
 }
 
@@ -200,24 +198,6 @@ impl ops::SubAssign<Duration> for Instant {
 
 impl fmt::Debug for Instant {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.std.fmt(fmt)
-    }
-}
-
-#[cfg(not(feature = "test-util"))]
-mod variant {
-    use super::Instant;
-
-    pub(super) fn now() -> Instant {
-        Instant::from_std(std::time::Instant::now())
-    }
-}
-
-#[cfg(feature = "test-util")]
-mod variant {
-    use super::Instant;
-
-    pub(super) fn now() -> Instant {
-        crate::time::clock::now()
+        self.0.fmt(fmt)
     }
 }

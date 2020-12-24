@@ -35,7 +35,7 @@ fn read_concurrent_uncontended_multi(b: &mut Bencher) {
     b.iter(|| {
         let lock = lock.clone();
         rt.block_on(async move {
-            let j = tokio::try_join! {
+            /*let j = tokio::try_join! {
                 task::spawn(task(lock.clone())),
                 task::spawn(task(lock.clone())),
                 task::spawn(task(lock.clone())),
@@ -43,7 +43,7 @@ fn read_concurrent_uncontended_multi(b: &mut Bencher) {
                 task::spawn(task(lock.clone())),
                 task::spawn(task(lock.clone()))
             };
-            j.unwrap();
+            j.unwrap();*/
         })
     });
 }

@@ -5,7 +5,6 @@
 
 #![cfg(unix)]
 
-use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
 use crate::sync::mpsc::error::TryRecvError;
 use crate::sync::mpsc::{channel, Receiver};
 
@@ -146,7 +145,8 @@ cfg_stream! {
         type Item = ();
 
         fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<()>> {
-            self.0.poll_recv(cx)
+            panic!("TODO: Signal misses public poll_recv()")
+            // self.0.poll_recv(cx)
         }
     }
 }
