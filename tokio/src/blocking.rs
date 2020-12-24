@@ -1,4 +1,4 @@
-cfg_not_rt! {
+/*cfg_not_rt! {
     use std::fmt;
     use std::future::Future;
     use std::pin::Pin;
@@ -11,7 +11,6 @@ cfg_not_rt! {
     {
         assert_send_sync::<JoinHandle<std::cell::Cell<()>>>();
         panic!("requires the `rt` Tokio feature flag")
-
     }
 
     pub(crate) struct JoinHandle<R> {
@@ -41,3 +40,4 @@ cfg_not_rt! {
     fn assert_send_sync<T: Send + Sync>() {
     }
 }
+*/
