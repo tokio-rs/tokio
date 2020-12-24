@@ -102,7 +102,7 @@ impl<T: AsRawFd> AsyncFd<T> {
 
     /// Deregisters this file descriptor, and returns ownership of the backing
     /// object.
-    pub fn into_inner(mut self) -> T {
+    pub fn into_inner(self) -> T {
         self.0.into_inner()
     }
 
@@ -217,7 +217,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
         // FIXME: is is correct?
         match self.0.try_io(|_async_fd_ref| f()) {
             Ok(res) => res,
-            Err(err) => Err(io::ErrorKind::WouldBlock.into()),
+            Err(_) => Err(io::ErrorKind::WouldBlock.into()),
         }
     }
 

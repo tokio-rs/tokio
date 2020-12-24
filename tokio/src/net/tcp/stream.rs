@@ -1,6 +1,6 @@
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
-use crate::net::tcp::split::{ReadHalf, WriteHalf};
-use crate::net::tcp::split_owned::{OwnedReadHalf, OwnedWriteHalf};
+use crate::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
+use crate::net::tcp::{ReadHalf, WriteHalf};
 use crate::net::ToSocketAddrs;
 
 use std::convert::TryFrom;

@@ -20,8 +20,3 @@ impl<T> Future for Ready<T> {
         Poll::Ready(self.0.take().unwrap())
     }
 }
-
-/// Creates a future that is immediately ready with a success value.
-pub(crate) fn ok<T, E>(t: T) -> Ready<Result<T, E>> {
-    Ready(Some(Ok(t)))
-}

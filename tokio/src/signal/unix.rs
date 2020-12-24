@@ -5,15 +5,7 @@
 
 #![cfg(unix)]
 
-use crate::sync::mpsc::error::TryRecvError;
-use crate::sync::mpsc::{channel, Receiver};
-
-use libc::c_int;
-use mio::net::UnixStream;
-use std::io::{self, Error, ErrorKind, Write};
-use std::pin::Pin;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Once;
+use std::io;
 use std::task::{Context, Poll};
 
 pub use t10::signal::unix::SignalKind;
@@ -135,8 +127,10 @@ impl Signal {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<()> {
-        use crate::future::poll_fn;
-        poll_fn(|cx| self.poll_recv(cx)).await
+        //use crate::future::poll_fn;
+        //TODO: Signal misses public poll_recv()
+        //poll_fn(|cx| self.0.poll_recv(cx)).await
+        None
     }
 }
 
@@ -144,44 +138,9 @@ cfg_stream! {
     impl crate::stream::Stream for Signal {
         type Item = ();
 
-        fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<()>> {
+        fn poll_next(self: std::pin::Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<()>> {
             panic!("TODO: Signal misses public poll_recv()")
             // self.0.poll_recv(cx)
         }
-    }
-}
-
-// Work around for abstracting streams internally
-pub(crate) trait InternalStream: Unpin {
-    fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>>;
-    fn try_recv(&mut self) -> Result<(), TryRecvError>;
-}
-
-impl InternalStream for Signal {
-    fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
-        self.poll_recv(cx)
-    }
-
-    fn try_recv(&mut self) -> Result<(), TryRecvError> {
-        self.try_recv()
-    }
-}
-
-pub(crate) fn ctrl_c() -> io::Result<Signal> {
-    signal(SignalKind::interrupt())
-}
-
-#[cfg(all(test, not(loom)))]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn signal_enable_error_on_invalid_input() {
-        signal_enable(-1, Handle::default()).unwrap_err();
-    }
-
-    #[test]
-    fn signal_enable_error_on_forbidden_input() {
-        signal_enable(signal_hook_registry::FORBIDDEN[0], Handle::default()).unwrap_err();
     }
 }

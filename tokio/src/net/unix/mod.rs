@@ -4,11 +4,11 @@ pub mod datagram;
 
 pub(crate) mod listener;
 
-mod split;
-pub use split::{ReadHalf, WriteHalf};
+//mod split;
+pub use t10::net::unix::{ReadHalf, WriteHalf};
 
-mod split_owned;
-pub use split_owned::{OwnedReadHalf, OwnedWriteHalf, ReuniteError};
+//mod split_owned;
+pub use t10::net::unix::{OwnedReadHalf, OwnedWriteHalf, ReuniteError};
 
 mod socketaddr;
 pub use socketaddr::SocketAddr;

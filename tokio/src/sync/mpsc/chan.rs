@@ -212,9 +212,6 @@ impl<T, S: Semaphore> Rx<T, S> {
     pub(crate) fn recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         use super::block::Read::*;
 
-        // Keep track of task budget
-        let coop = ready!(crate::coop::poll_proceed(cx));
-
         self.inner.rx_fields.with_mut(|rx_fields_ptr| {
             let rx_fields = unsafe { &mut *rx_fields_ptr };
 
@@ -223,7 +220,6 @@ impl<T, S: Semaphore> Rx<T, S> {
                     match rx_fields.list.pop(&self.inner.tx) {
                         Some(Value(value)) => {
                             self.inner.semaphore.add_permit();
-                            coop.made_progress();
                             return Ready(Some(value));
                         }
                         Some(Closed) => {
@@ -234,7 +230,6 @@ impl<T, S: Semaphore> Rx<T, S> {
                             // which ensures that if dropping the tx handle is
                             // visible, then all messages sent are also visible.
                             assert!(self.inner.semaphore.is_idle());
-                            coop.made_progress();
                             return Ready(None);
                         }
                         None => {} // fall through
@@ -252,7 +247,6 @@ impl<T, S: Semaphore> Rx<T, S> {
             try_recv!();
 
             if rx_fields.rx_closed && self.inner.semaphore.is_idle() {
-                coop.made_progress();
                 Ready(None)
             } else {
                 Pending

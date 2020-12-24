@@ -10,7 +10,6 @@ pub use poll_fn::poll_fn;
 
 cfg_not_loom! {
     mod ready;
-    pub(crate) use ready::{Ready};
 }
 
 cfg_sync! {

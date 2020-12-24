@@ -38,8 +38,6 @@ use std::time::Duration;
 /// ```
 pub struct Builder(t10::runtime::Builder);
 
-pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync + 'static>;
-
 impl Builder {
     /// Returns a new builder with the current thread scheduler selected.
     ///

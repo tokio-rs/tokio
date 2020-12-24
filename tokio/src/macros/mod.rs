@@ -15,9 +15,9 @@ mod ready;
 #[macro_use]
 mod thread_local;
 
-#[macro_use]
-#[cfg(feature = "rt")]
-pub(crate) mod scoped_tls;
+//#[macro_use]
+//#[cfg(feature = "rt")]
+//pub(crate) mod scoped_tls;
 
 cfg_macros! {
     #[macro_use]

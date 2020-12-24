@@ -350,7 +350,7 @@ pub mod io;
 pub mod net;
 
 mod loom;
-mod park;
+// mod park;
 
 pub mod prelude;
 
@@ -365,7 +365,6 @@ cfg_rt! {
     pub mod runtime;
 }
 
-pub(crate) mod coop;
 
 cfg_signal! {
     pub mod signal;

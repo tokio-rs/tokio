@@ -23,8 +23,6 @@
 //! [`UnixDatagram`]: UnixDatagram
 
 mod addr;
-#[cfg(feature = "net")]
-pub(crate) use addr::to_socket_addrs;
 pub use addr::ToSocketAddrs;
 
 cfg_net! {

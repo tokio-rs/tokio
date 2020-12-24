@@ -1,6 +1,6 @@
 cfg_io_driver! {
-    pub(crate) mod bit;
-    pub(crate) mod slab;
+    //pub(crate) mod bit;
+    //pub(crate) mod slab;
 }
 
 #[cfg(any(
@@ -18,7 +18,7 @@ pub(crate) mod linked_list;
 mod rand;
 
 cfg_rt! {
-    mod wake;
+    // mod wake;
 }
 
 pub(crate) mod trace;

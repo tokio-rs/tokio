@@ -461,7 +461,7 @@ cfg_rt! {
         ///    runtime.shutdown_timeout(Duration::from_millis(100));
         /// }
         /// ```
-        pub fn shutdown_timeout(mut self, duration: Duration) {
+        pub fn shutdown_timeout(self, duration: Duration) {
             self.0.shutdown_timeout(duration);
         }
 
