@@ -7,8 +7,6 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::net::{Shutdown, SocketAddr};
-#[cfg(windows)]
-use std::os::windows::io::{AsRawSocket, RawSocket};
 
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -831,6 +829,7 @@ mod sys {
 #[cfg(windows)]
 mod sys {
     use super::TcpStream;
+    use std::os::windows::prelude::*;
 
     impl AsRawSocket for TcpStream {
         fn as_raw_socket(&self) -> RawSocket {
