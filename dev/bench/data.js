@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608744495056,
+  "lastUpdate": 1608819518459,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -12741,6 +12741,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1010,
             "range": "± 210",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "lnicola@users.noreply.github.com",
+            "name": "Laurențiu Nicola",
+            "username": "lnicola"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1eefbc250ad49d9086bdb2b8be4404bd445f63fb",
+          "message": "docs: remove stream feature from docs (#3335)",
+          "timestamp": "2020-12-24T23:17:18+09:00",
+          "tree_id": "f3657463c2d44548e4d71f8454ce672ffeb0b45f",
+          "url": "https://github.com/tokio-rs/tokio/commit/1eefbc250ad49d9086bdb2b8be4404bd445f63fb"
+        },
+        "date": 1608819517419,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 13401,
+            "range": "± 3004",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 913,
+            "range": "± 5",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 540,
+            "range": "± 23",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 12949,
+            "range": "± 2443",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 909,
+            "range": "± 6",
             "unit": "ns/iter"
           }
         ]
