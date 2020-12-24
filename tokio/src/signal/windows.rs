@@ -132,7 +132,7 @@ cfg_stream! {
 #[must_use = "streams do nothing unless polled"]
 #[derive(Debug)]
 pub struct CtrlBreak {
-    inner: t10::signal::windows::CtrlBreak
+    inner: t10::signal::windows::CtrlBreak,
 }
 
 impl CtrlBreak {
@@ -225,5 +225,5 @@ cfg_stream! {
 /// }
 /// ```
 pub fn ctrl_break() -> io::Result<CtrlBreak> {
-   t10::signal::windows::ctrl_break().map(CtrlBreak)
+    t10::signal::windows::ctrl_break().map(CtrlBreak)
 }
