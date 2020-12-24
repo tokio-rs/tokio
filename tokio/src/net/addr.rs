@@ -1,6 +1,3 @@
-use std::io;
-use std::net::SocketAddr;
-
 /// Converts or resolves without blocking to one or more `SocketAddr` values.
 ///
 /// # DNS
@@ -20,7 +17,7 @@ use std::net::SocketAddr;
 pub use t10::net::ToSocketAddrs;
 
 cfg_net! {
-    pub(crate) async fn to_socket_addrs<T>(arg: T) -> io::Result<impl Iterator<Item = SocketAddr>>
+    pub(crate) async fn to_socket_addrs<T>(arg: T) -> std::io::Result<impl Iterator<Item = std::net::SocketAddr>>
     where
         T: ToSocketAddrs,
     {
