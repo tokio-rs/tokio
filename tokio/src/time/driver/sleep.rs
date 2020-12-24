@@ -1,7 +1,6 @@
 use crate::time::driver::{Handle, TimerEntry};
 use crate::time::{error::Error, Duration, Instant};
 
-use pin_project_lite::pin_project;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{self, Poll};
@@ -57,18 +56,20 @@ pub fn sleep(duration: Duration) -> Sleep {
     sleep_until(Instant::now() + duration)
 }
 
-pin_project! {
-    /// Future returned by [`sleep`](sleep) and
-    /// [`sleep_until`](sleep_until).
-    #[derive(Debug)]
-    #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub struct Sleep {
-        deadline: Instant,
+/// Future returned by [`sleep`](sleep) and
+/// [`sleep_until`](sleep_until).
+#[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
+pub struct Sleep {
+    deadline: Instant,
 
-        // The link between the `Sleep` instance and the timer that drives it.
-        #[pin]
-        entry: TimerEntry,
-    }
+    // The link between the `Sleep` instance and the timer that drives it.
+    entry: TimerEntry,
+}
+
+struct SleepProjection<'a> {
+    deadline: &'a mut Instant,
+    entry: Pin<&'a mut TimerEntry>,
 }
 
 impl Sleep {
@@ -114,6 +115,17 @@ impl Sleep {
             coop.made_progress();
             r
         })
+    }
+
+    // Manually implemented project because pin-project-lite generates very poor
+    // documentation.
+    fn project<'a>(self: Pin<&'a mut Self>) -> SleepProjection<'a> {
+        // SAFETY: self is pinned
+        let me = unsafe { Pin::into_inner_unchecked(self) };
+        SleepProjection {
+            deadline: &mut me.deadline,
+            entry: unsafe { Pin::new_unchecked(&mut me.entry) },
+        }
     }
 }
 

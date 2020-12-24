@@ -101,6 +101,14 @@ macro_rules! assert_value {
             require_unpin(&f);
         };
     };
+    ($type:ty: !Unpin) => {
+        #[allow(unreachable_code)]
+        #[allow(unused_variables)]
+        const _: fn() = || {
+            let f: $type = todo!();
+            AmbiguousIfUnpin::some_item(&f);
+        };
+    };
 }
 macro_rules! async_assert_fn {
     ($($f:ident $(< $($generic:ty),* > )? )::+($($arg:ty),*): Send & Sync) => {
@@ -289,6 +297,7 @@ async_assert_fn!(tokio::time::timeout_at(Instant, BoxFuture<()>): !Send & !Sync)
 async_assert_fn!(tokio::time::Interval::tick(_): Send & Sync);
 
 assert_value!(tokio::time::Interval: Unpin);
+assert_value!(tokio::time::Sleep: !Unpin);
 async_assert_fn!(tokio::time::sleep(Duration): !Unpin);
 async_assert_fn!(tokio::time::sleep_until(Instant): !Unpin);
 async_assert_fn!(tokio::time::timeout(Duration, BoxFuture<()>): !Unpin);
