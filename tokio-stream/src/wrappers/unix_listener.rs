@@ -1,4 +1,5 @@
 use crate::Stream;
+use std::convert::{AsMut, AsRef};
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -38,5 +39,17 @@ impl Stream for UnixListenerStream {
             Poll::Ready(Err(err)) => Poll::Ready(Some(Err(err))),
             Poll::Pending => Poll::Pending,
         }
+    }
+}
+
+impl AsRef<UnixListener> for UnixListenerStream {
+    fn as_ref(&self) -> &UnixListener {
+        &self.inner
+    }
+}
+
+impl AsMut<UnixListener> for UnixListenerStream {
+    fn as_mut(&mut self) -> &mut UnixListener {
+        &mut self.inner
     }
 }

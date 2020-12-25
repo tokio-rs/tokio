@@ -1,4 +1,5 @@
 use crate::Stream;
+use std::convert::{AsMut, AsRef};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::time::{Instant, Interval};
@@ -34,5 +35,17 @@ impl Stream for IntervalStream {
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         (std::usize::MAX, None)
+    }
+}
+
+impl AsRef<Interval> for IntervalStream {
+    fn as_ref(&self) -> &Interval {
+        &self.inner
+    }
+}
+
+impl AsMut<Interval> for IntervalStream {
+    fn as_mut(&mut self) -> &mut Interval {
+        &mut self.inner
     }
 }

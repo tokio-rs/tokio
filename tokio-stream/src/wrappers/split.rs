@@ -1,5 +1,6 @@
 use crate::Stream;
 use pin_project_lite::pin_project;
+use std::convert::{AsMut, AsRef};
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -38,5 +39,17 @@ impl<R: AsyncBufRead> Stream for SplitStream<R> {
             .inner
             .poll_next_segment(cx)
             .map(Result::transpose)
+    }
+}
+
+impl<R> AsRef<Split<R>> for SplitStream<R> {
+    fn as_ref(&self) -> &Split<R> {
+        &self.inner
+    }
+}
+
+impl<R> AsMut<Split<R>> for SplitStream<R> {
+    fn as_mut(&mut self) -> &mut Split<R> {
+        &mut self.inner
     }
 }

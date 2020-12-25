@@ -1,5 +1,6 @@
 use crate::Stream;
 use pin_project_lite::pin_project;
+use std::convert::{AsMut, AsRef};
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -38,5 +39,17 @@ impl<R: AsyncBufRead> Stream for LinesStream<R> {
             .inner
             .poll_next_line(cx)
             .map(Result::transpose)
+    }
+}
+
+impl<R> AsRef<Lines<R>> for LinesStream<R> {
+    fn as_ref(&self) -> &Lines<R> {
+        &self.inner
+    }
+}
+
+impl<R> AsMut<Lines<R>> for LinesStream<R> {
+    fn as_mut(&mut self) -> &mut Lines<R> {
+        &mut self.inner
     }
 }

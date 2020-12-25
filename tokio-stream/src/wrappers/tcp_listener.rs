@@ -1,4 +1,5 @@
 use crate::Stream;
+use std::convert::{AsMut, AsRef};
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -38,5 +39,17 @@ impl Stream for TcpListenerStream {
             Poll::Ready(Err(err)) => Poll::Ready(Some(Err(err))),
             Poll::Pending => Poll::Pending,
         }
+    }
+}
+
+impl AsRef<TcpListener> for TcpListenerStream {
+    fn as_ref(&self) -> &TcpListener {
+        &self.inner
+    }
+}
+
+impl AsMut<TcpListener> for TcpListenerStream {
+    fn as_mut(&mut self) -> &mut TcpListener {
+        &mut self.inner
     }
 }

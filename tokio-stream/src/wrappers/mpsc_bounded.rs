@@ -1,7 +1,7 @@
 use crate::Stream;
+use std::convert::{AsMut, AsRef};
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::convert::{AsRef, AsMut};
 use tokio::sync::mpsc::Receiver;
 
 /// A wrapper around [`tokio::sync::mpsc::Receiver`] that implements [`Stream`].

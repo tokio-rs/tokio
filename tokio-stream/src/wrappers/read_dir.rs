@@ -1,4 +1,5 @@
 use crate::Stream;
+use std::convert::{AsMut, AsRef};
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -31,5 +32,17 @@ impl Stream for ReadDirStream {
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         self.inner.poll_next_entry(cx).map(Result::transpose)
+    }
+}
+
+impl AsRef<ReadDir> for ReadDirStream {
+    fn as_ref(&self) -> &ReadDir {
+        &self.inner
+    }
+}
+
+impl AsMut<ReadDir> for ReadDirStream {
+    fn as_mut(&mut self) -> &mut ReadDir {
+        &mut self.inner
     }
 }

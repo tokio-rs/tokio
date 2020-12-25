@@ -1,4 +1,5 @@
 use crate::Stream;
+use std::convert::{AsMut, AsRef};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::sync::mpsc::UnboundedReceiver;
