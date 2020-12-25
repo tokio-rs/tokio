@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608928689384,
+  "lastUpdate": 1608928695915,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -12951,6 +12951,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 909,
             "range": "± 6",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fe2664a4e11df3f7938d5e6fc244a565906bcb46",
+          "message": "sync: remove RwLockWriteGuard::map and RwLockWriteGuard::try_map (#3345)",
+          "timestamp": "2020-12-25T21:36:48+01:00",
+          "tree_id": "1d7e4a94b1a8d7fd74ac0ab54f4c6d79c9671cf2",
+          "url": "https://github.com/tokio-rs/tokio/commit/fe2664a4e11df3f7938d5e6fc244a565906bcb46"
+        },
+        "date": 1608928694859,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 13932,
+            "range": "± 2250",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 959,
+            "range": "± 6",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 602,
+            "range": "± 25",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 13524,
+            "range": "± 2590",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 959,
+            "range": "± 11",
             "unit": "ns/iter"
           }
         ]
