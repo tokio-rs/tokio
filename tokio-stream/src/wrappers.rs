@@ -15,7 +15,9 @@ cfg_net! {
     mod tcp_listener;
     pub use tcp_listener::TcpListenerStream;
 
+    #[cfg(unix)]
     mod unix_listener;
+    #[cfg(unix)]
     pub use unix_listener::UnixListenerStream;
 }
 
