@@ -58,9 +58,6 @@ Commit to the API and long-term support.
 [#3299]: https://github.com/tokio-rs/tokio/pull/3299
 [#3304]: https://github.com/tokio-rs/tokio/pull/3304
 [#3306]: https://github.com/tokio-rs/tokio/pull/3306
-[#3306]: https://github.com/tokio-rs/tokio/pull/3306
-[#3308]: https://github.com/tokio-rs/tokio/pull/3308
-[#3308]: https://github.com/tokio-rs/tokio/pull/3308
 [#3308]: https://github.com/tokio-rs/tokio/pull/3308
 [#3316]: https://github.com/tokio-rs/tokio/pull/3316
 
@@ -161,7 +158,6 @@ Fixes a soundness hole by adding a missing `Send` bound to
 [#3083]: https://github.com/tokio-rs/tokio/pull/3083
 [#3089]: https://github.com/tokio-rs/tokio/pull/3089
 [#3093]: https://github.com/tokio-rs/tokio/pull/3093
-[#3093]: https://github.com/tokio-rs/tokio/pull/3093
 
 # 0.3.2 (October 27, 2020)
 
@@ -179,7 +175,6 @@ Adds `AsyncFd` as a replacement for v0.2's `PollEvented`.
 - net: `UdpSocket::take_error()` ([#3051]).
 - sync: `oneshot::Sender::poll_closed()` ([#3032]).
 
-[#2903]: https://github.com/tokio-rs/tokio/pull/2903
 [#2903]: https://github.com/tokio-rs/tokio/pull/2903
 [#2957]: https://github.com/tokio-rs/tokio/pull/2957
 [#2981]: https://github.com/tokio-rs/tokio/pull/2981
@@ -313,8 +308,6 @@ Biggest changes are:
 [#2882]: https://github.com/tokio-rs/tokio/pull/2882
 [#2885]: https://github.com/tokio-rs/tokio/pull/2885
 [#2890]: https://github.com/tokio-rs/tokio/pull/2890
-[#2893]: https://github.com/tokio-rs/tokio/pull/2893
-[#2893]: https://github.com/tokio-rs/tokio/pull/2893
 [#2893]: https://github.com/tokio-rs/tokio/pull/2893
 [#2897]: https://github.com/tokio-rs/tokio/pull/2897
 [#2908]: https://github.com/tokio-rs/tokio/pull/2908
@@ -680,7 +673,6 @@ Biggest changes are:
 [#2089]: https://github.com/tokio-rs/tokio/pull/2089
 [#2091]: https://github.com/tokio-rs/tokio/pull/2091
 [#2092]: https://github.com/tokio-rs/tokio/pull/2092
-[#2092]: https://github.com/tokio-rs/tokio/pull/2092
 [#2093]: https://github.com/tokio-rs/tokio/pull/2093
 [#2094]: https://github.com/tokio-rs/tokio/pull/2094
 [#2108]: https://github.com/tokio-rs/tokio/pull/2108
@@ -745,7 +737,6 @@ Biggest changes are:
 [#1870]: https://github.com/tokio-rs/tokio/pull/1870
 [#1971]: https://github.com/tokio-rs/tokio/pull/1971
 [#2001]: https://github.com/tokio-rs/tokio/pull/2001
-[#2001]: https://github.com/tokio-rs/tokio/pull/2001
 [#2005]: https://github.com/tokio-rs/tokio/pull/2005
 [#2006]: https://github.com/tokio-rs/tokio/pull/2006
 [#2011]: https://github.com/tokio-rs/tokio/pull/2011
@@ -799,7 +790,6 @@ Biggest changes are:
 [#1933]: https://github.com/tokio-rs/tokio/pull/1933
 [#1934]: https://github.com/tokio-rs/tokio/pull/1934
 [#1939]: https://github.com/tokio-rs/tokio/pull/1939
-[#1939]: https://github.com/tokio-rs/tokio/pull/1939
 [#1940]: https://github.com/tokio-rs/tokio/pull/1940
 [#1942]: https://github.com/tokio-rs/tokio/pull/1942
 [#1943]: https://github.com/tokio-rs/tokio/pull/1943
@@ -848,7 +838,6 @@ Biggest changes are:
 [#1866]: https://github.com/tokio-rs/tokio/pull/1866
 [#1868]: https://github.com/tokio-rs/tokio/pull/1868
 [#1874]: https://github.com/tokio-rs/tokio/pull/1874
-[#1874]: https://github.com/tokio-rs/tokio/pull/1874
 [#1875]: https://github.com/tokio-rs/tokio/pull/1875
 [#1876]: https://github.com/tokio-rs/tokio/pull/1876
 [#1881]: https://github.com/tokio-rs/tokio/pull/1881
@@ -884,7 +873,6 @@ Biggest changes are:
 [#1841]: https://github.com/tokio-rs/tokio/pull/1841
 [#1843]: https://github.com/tokio-rs/tokio/pull/1843
 [#1849]: https://github.com/tokio-rs/tokio/pull/1849
-[#1854]: https://github.com/tokio-rs/tokio/pull/1854
 [#1854]: https://github.com/tokio-rs/tokio/pull/1854
 [#1856]: https://github.com/tokio-rs/tokio/pull/1856
 [#1858]: https://github.com/tokio-rs/tokio/pull/1858
@@ -1137,7 +1125,6 @@ another. This changelog entry contains a highlight
 - Add facade to sub crates and add prelude ([#166]).
 - Switch TCP/UDP fns to poll\_ -> Poll<...> style ([#175])
 
-[#141]: https://github.com/tokio-rs/tokio/pull/141
 [#141]: https://github.com/tokio-rs/tokio/pull/141
 [#142]: https://github.com/tokio-rs/tokio/pull/142
 [#160]: https://github.com/tokio-rs/tokio/pull/160
