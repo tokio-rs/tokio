@@ -52,7 +52,7 @@ mod imp {
             _success: Ordering,
             _failure: Ordering,
         ) -> Result<u64, u64> {
-            let mut lock = self.inner.lock();
+            let mut lock = self.inner.lock().unwrap();
 
             if *lock == current {
                 *lock = new;
