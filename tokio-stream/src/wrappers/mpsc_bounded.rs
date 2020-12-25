@@ -1,6 +1,7 @@
 use crate::Stream;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::convert::{AsRef, AsMut};
 use tokio::sync::mpsc::Receiver;
 
 /// A wrapper around [`tokio::sync::mpsc::Receiver`] that implements [`Stream`].
@@ -36,18 +37,6 @@ impl<T> ReceiverStream<T> {
     pub fn close(&mut self) {
         self.inner.close()
     }
-
-    /// Access the inner `Receiver` mutably. This method can be used to e.g.
-    /// call the async or blocking version of receive instead of using the
-    /// `Stream` impl.
-    pub fn as_mut(&mut self) -> &mut Receiver<T> {
-        &mut self.inner
-    }
-
-    /// Access the inner `Receiver` immutably.
-    pub fn as_ref(&self) -> &Receiver<T> {
-        &self.inner
-    }
 }
 
 impl<T> Stream for ReceiverStream<T> {
@@ -55,5 +44,17 @@ impl<T> Stream for ReceiverStream<T> {
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         self.inner.poll_recv(cx)
+    }
+}
+
+impl<T> AsRef<Receiver<T>> for ReceiverStream<T> {
+    fn as_ref(&self) -> &Receiver<T> {
+        &self.inner
+    }
+}
+
+impl<T> AsMut<Receiver<T>> for ReceiverStream<T> {
+    fn as_mut(&mut self) -> &mut Receiver<T> {
+        &mut self.inner
     }
 }

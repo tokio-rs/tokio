@@ -30,18 +30,6 @@ impl<T> UnboundedReceiverStream<T> {
     pub fn close(&mut self) {
         self.inner.close()
     }
-
-    /// Access the inner `UnboundedReceiver` mutably. This method can be used to
-    /// e.g.  call the async or blocking version of receive instead of using the
-    /// `Stream` impl.
-    pub fn as_mut(&mut self) -> &mut UnboundedReceiver<T> {
-        &mut self.inner
-    }
-
-    /// Access the inner `UnboundedReceiver` immutably.
-    pub fn as_ref(&self) -> &UnboundedReceiver<T> {
-        &self.inner
-    }
 }
 
 impl<T> Stream for UnboundedReceiverStream<T> {
@@ -49,5 +37,17 @@ impl<T> Stream for UnboundedReceiverStream<T> {
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         self.inner.poll_recv(cx)
+    }
+}
+
+impl<T> AsRef<UnboundedReceiver<T>> for UnboundedReceiverStream<T> {
+    fn as_ref(&self) -> &UnboundedReceiver<T> {
+        &self.inner
+    }
+}
+
+impl<T> AsMut<UnboundedReceiver<T>> for UnboundedReceiverStream<T> {
+    fn as_mut(&mut self) -> &mut UnboundedReceiver<T> {
+        &mut self.inner
     }
 }

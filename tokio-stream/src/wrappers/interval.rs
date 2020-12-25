@@ -29,7 +29,7 @@ impl Stream for IntervalStream {
     type Item = Instant;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Instant>> {
-        self.inner.poll_tick(cx).map(|inner| Some(inner))
+        self.inner.poll_tick(cx).map(Some)
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
