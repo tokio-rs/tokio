@@ -7,11 +7,10 @@ use std::ops;
 /// RAII structure used to release the exclusive write access of a lock when
 /// dropped.
 ///
-/// This structure is created by the [`write`] and method
-/// on [`RwLock`].
+/// This structure is created by [mapping] an [`RwLockWriteGuard`].
 ///
-/// [`write`]: method@crate::sync::RwLock::write
-/// [`RwLock`]: struct@crate::sync::RwLock
+/// [mapping]: method@crate::sync::RwLockWriteGuard::map
+/// [`RwLockWriteGuard`]: struct@crate::sync::RwLockWriteGuard
 pub struct RwLockMappedWriteGuard<'a, T: ?Sized> {
     pub(super) s: &'a Semaphore,
     pub(super) data: *mut T,
@@ -74,7 +73,7 @@ impl<'a, T: ?Sized> RwLockMappedWriteGuard<'a, T> {
     /// the locked data. The original guard is returned if the closure returns
     /// `None`.
     ///
-    /// This operation cannot fail as the `RwLockWriteGuard` passed in already
+    /// This operation cannot fail as the `RwLockMappedWriteGuard` passed in already
     /// locked the data.
     ///
     /// This is an associated function that needs to be

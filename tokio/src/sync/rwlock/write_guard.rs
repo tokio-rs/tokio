@@ -21,7 +21,7 @@ pub struct RwLockWriteGuard<'a, T: ?Sized> {
 }
 
 impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
-    /// Make a new `RwLockMappedWriteGuard` for a component of the locked data.
+    /// Make a new [`RwLockMappedWriteGuard`] for a component of the locked data.
     ///
     /// This operation cannot fail as the `RwLockWriteGuard` passed in already
     /// locked the data.
@@ -33,6 +33,7 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
     /// This is an asynchronous version of [`RwLockWriteGuard::map`] from the
     /// [`parking_lot` crate].
     ///
+    /// [`RwLockMappedWriteGuard`]: struct@crate::sync::RwLockMappedWriteGuard
     /// [`RwLockWriteGuard::map`]: https://docs.rs/lock_api/latest/lock_api/struct.RwLockWriteGuard.html#method.map
     /// [`parking_lot` crate]: https://crates.io/crates/parking_lot
     ///
@@ -86,6 +87,7 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
     /// This is an asynchronous version of [`RwLockWriteGuard::try_map`] from
     /// the [`parking_lot` crate].
     ///
+    /// [`RwLockMappedWriteGuard`]: struct@crate::sync::RwLockMappedWriteGuard
     /// [`RwLockWriteGuard::try_map`]: https://docs.rs/lock_api/latest/lock_api/struct.RwLockWriteGuard.html#method.try_map
     /// [`parking_lot` crate]: https://crates.io/crates/parking_lot
     ///
@@ -153,7 +155,7 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
     /// let lock = Arc::new(RwLock::new(1));
     ///
     /// let n = lock.write().await;
-    ///   
+    ///
     /// let cloned_lock = lock.clone();
     /// let handle = tokio::spawn(async move {
     ///     *cloned_lock.write().await = 2;
