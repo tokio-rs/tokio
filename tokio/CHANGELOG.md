@@ -1,3 +1,25 @@
+# 1.0.1 (December 25, 2020)
+
+This release fixes a soundness hole caused by the combination of `RwLockWriteGuard::map`
+and `RwLockWriteGuard::downgrade` by removing the `map` function. This is a breaking
+change, but breaking changes are allowed under our semver policy when they are required
+to fix a soundness hole. (See [this RFC][semver] for more.)
+
+Note that we have chosen not to do a deprecation cycle or similar because Tokio 1.0.0 was
+released two days ago, and therefore the impact should be minimal.
+
+Due to the soundness hole, we have also yanked Tokio version 1.0.0.
+
+### Removed
+
+ - sync: remove `RwLockWriteGuard::map` and `RwLockWriteGuard::try_map` (#3345)
+
+### Fixed
+
+ - docs: remove stream feature from docs (#3335)
+
+[semver]: https://github.com/rust-lang/rfcs/blob/master/text/1122-language-semver.md#soundness-changes
+
 # 1.0.0 (December 23, 2020)
 
 Commit to the API and long-term support.
