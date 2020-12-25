@@ -134,6 +134,16 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
         })
     }
 
+    /// Converts this `RwLockWriteGuard` into an `RwLockMappedWriteGuard`. This
+    /// method can be used to store a non-mapped and mapped guard in a struct
+    /// using only one of the types for the field.
+    ///
+    /// This is equivalent to calling `RwLockWriteGuard::map(guard, |me| me)`.
+    #[inline]
+    pub fn into_mapped(self) -> RwLockMappedWriteGuard<'a, T> {
+        RwLockWriteGuard::map(self, |me| me)
+    }
+
     /// Atomically downgrades a write lock into a read lock without allowing
     /// any writers to take exclusive access of the lock in the meantime.
     ///
