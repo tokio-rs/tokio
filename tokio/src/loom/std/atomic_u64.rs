@@ -49,8 +49,8 @@ mod imp {
             &self,
             current: u64,
             new: u64,
-            success: Ordering,
-            failure: Ordering,
+            _success: Ordering,
+            _failure: Ordering,
         ) -> Result<u64, u64> {
             let mut lock = self.inner.lock();
 
