@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608928695915,
+  "lastUpdate": 1608928707532,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -8467,6 +8467,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20647912,
             "range": "± 2566792",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fe2664a4e11df3f7938d5e6fc244a565906bcb46",
+          "message": "sync: remove RwLockWriteGuard::map and RwLockWriteGuard::try_map (#3345)",
+          "timestamp": "2020-12-25T21:36:48+01:00",
+          "tree_id": "1d7e4a94b1a8d7fd74ac0ab54f4c6d79c9671cf2",
+          "url": "https://github.com/tokio-rs/tokio/commit/fe2664a4e11df3f7938d5e6fc244a565906bcb46"
+        },
+        "date": 1608928706427,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 197176,
+            "range": "± 55379",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 729565,
+            "range": "± 47441",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5723672,
+            "range": "± 906435",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20718580,
+            "range": "± 1818539",
             "unit": "ns/iter"
           }
         ]
