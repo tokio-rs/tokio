@@ -22,6 +22,9 @@ categories = ["asynchronous"]
 [features]
 default = ["time"]
 time = ["tokio/time"]
+net = ["tokio/net"]
+io-util = ["tokio/io-util"]
+fs = ["tokio/fs"]
 
 [dependencies]
 futures-core = { version = "0.3.0" }

@@ -81,6 +81,8 @@
 #[macro_use]
 mod macros;
 
+pub mod wrappers;
+
 mod stream_ext;
 pub use stream_ext::{collect::FromStream, StreamExt};
 
