@@ -3,78 +3,78 @@
 Commit to the API and long-term support.
 
 ### Fixed
-- sync: spurious wakeup in `watch` (#3234).
+- sync: spurious wakeup in `watch` ([#3234]).
 
 ### Changed
-- io: rename `AsyncFd::with_io()` to `try_io()` (#3306)
-- fs: avoid OS specific `*Ext` traits in favor of conditionally defining the fn (#3264).
-- fs: `Sleep` is `!Unpin` (#3278).
-- net: pass `SocketAddr` by value (#3125).
-- net: `TcpStream::poll_peek` takes `ReadBuf` (#3259).
-- rt: rename `runtime::Builder::max_threads()` to `max_blocking_threads()` (#3287).
-- time: require `current_thread` runtime when calling `time::pause()` (#3289).
+- io: rename `AsyncFd::with_io()` to `try_io()` ([#3306])
+- fs: avoid OS specific `*Ext` traits in favor of conditionally defining the fn ([#3264]).
+- fs: `Sleep` is `!Unpin` ([#3278]).
+- net: pass `SocketAddr` by value ([#3125]).
+- net: `TcpStream::poll_peek` takes `ReadBuf` ([#3259]).
+- rt: rename `runtime::Builder::max_threads()` to `max_blocking_threads()` ([#3287]).
+- time: require `current_thread` runtime when calling `time::pause()` ([#3289]).
 
 ### Removed
-- remove `tokio::prelude` (#3299).
-- io: remove `AsyncFd::with_poll()` (#3306).
-- net: remove `{Tcp,Unix}Stream::shutdown()` in favor of `AsyncWrite::shutdown()` (#3298).
+- remove `tokio::prelude` ([#3299]).
+- io: remove `AsyncFd::with_poll()` ([#3306]).
+- net: remove `{Tcp,Unix}Stream::shutdown()` in favor of `AsyncWrite::shutdown()` ([#3298]).
 - stream: move all stream utilities to `tokio-stream` until `Stream` is added to
-  `std` (#3277).
-- sync: mpsc `try_recv()` due to unexpected behavior (#3263).
-- tracing: make unstable as `tracing-core` is not 1.0 yet (#3266).
+  `std` ([#3277]).
+- sync: mpsc `try_recv()` due to unexpected behavior ([#3263]).
+- tracing: make unstable as `tracing-core` is not 1.0 yet ([#3266]).
 
 ### Added
-- fs: `poll_*` fns to `DirEntry` (#3308).
-- io: `poll_*` fns to `io::Lines`, `io::Split` (#3308).
-- io: `_mut` method variants to `AsyncFd` (#3304).
-- net: `poll_*` fns to `UnixDatagram` (#3223).
-- net: `UnixStream` readiness and non-blocking ops (#3246).
-- sync: `UnboundedReceiver::blocking_recv()` (#3262).
-- sync: `watch::Sender::borrow()` (#3269).
-- sync: `Semaphore::close()` (#3065).
-- sync: `poll_recv` fns to `mpsc::Receiver`, `mpsc::UnboundedReceiver` (#3308).
-- time: `poll_tick` fn to `time::Interval` (#3316).
+- fs: `poll_*` fns to `DirEntry` ([#3308]).
+- io: `poll_*` fns to `io::Lines`, `io::Split` ([#3308]).
+- io: `_mut` method variants to `AsyncFd` ([#3304]).
+- net: `poll_*` fns to `UnixDatagram` ([#3223]).
+- net: `UnixStream` readiness and non-blocking ops ([#3246]).
+- sync: `UnboundedReceiver::blocking_recv()` ([#3262]).
+- sync: `watch::Sender::borrow()` ([#3269]).
+- sync: `Semaphore::close()` ([#3065]).
+- sync: `poll_recv` fns to `mpsc::Receiver`, `mpsc::UnboundedReceiver` ([#3308]).
+- time: `poll_tick` fn to `time::Interval` ([#3316]).
 
 # 0.3.6 (December 14, 2020)
 
 ### Fixed
-- rt: fix deadlock in shutdown (#3228)
-- rt: fix panic in task abort when off rt (#3159)
-- sync: make `add_permits` panic with usize::MAX >> 3 permits (#3188)
-- time: Fix race condition in timer drop (#3229)
-- watch: fix spurious wakeup (#3244)
+- rt: fix deadlock in shutdown ([#3228])
+- rt: fix panic in task abort when off rt ([#3159])
+- sync: make `add_permits` panic with usize::MAX >> 3 permits ([#3188])
+- time: Fix race condition in timer drop ([#3229])
+- watch: fix spurious wakeup ([#3244])
 
 ### Added
-- example: add back udp-codec example (#3205)
-- net: add `TcpStream::into_std` (#3189)
+- example: add back udp-codec example ([#3205])
+- net: add `TcpStream::into_std` ([#3189])
 
 # 0.3.5 (November 30, 2020)
 
 ### Fixed
-- rt: fix `shutdown_timeout(0)` (#3196).
-- time: fixed race condition with small sleeps (#3069).
+- rt: fix `shutdown_timeout(0)` ([#3196]).
+- time: fixed race condition with small sleeps ([#3069]).
 
 ### Added
-- io: `AsyncFd::with_interest()` (#3167).
-- signal: `CtrlC` stream on windows (#3186).
+- io: `AsyncFd::with_interest()` ([#3167]).
+- signal: `CtrlC` stream on windows ([#3186]).
 
 # 0.3.4 (November 18, 2020)
 
 ### Fixed
-- stream: `StreamMap` `Default` impl bound (#3093).
-- io: `AsyncFd::into_inner()` should deregister the FD (#3104).
+- stream: `StreamMap` `Default` impl bound ([#3093]).
+- io: `AsyncFd::into_inner()` should deregister the FD ([#3104]).
 
 ### Changed
-- meta: `parking_lot` feature enabled with `full` (#3119).
+- meta: `parking_lot` feature enabled with `full` ([#3119]).
 
 ### Added
-- io: `AsyncWrite` vectored writes (#3149).
-- net: TCP/UDP readiness and non-blocking ops (#3130, #2743, #3138).
-- net: TCP socket option (linger, send/recv buf size) (#3145, #3143).
-- net: PID field in `UCred` with solaris/illumos (#3085).
-- rt: `runtime::Handle` allows spawning onto a runtime (#3079).
-- sync: `Notify::notify_waiters()` (#3098).
-- sync: `acquire_many()`, `try_acquire_many()` to `Semaphore` (#3067).
+- io: `AsyncWrite` vectored writes ([#3149]).
+- net: TCP/UDP readiness and non-blocking ops ([#3130], [#2743], [#3138]).
+- net: TCP socket option (linger, send/recv buf size) ([#3145], [#3143]).
+- net: PID field in `UCred` with solaris/illumos ([#3085]).
+- rt: `runtime::Handle` allows spawning onto a runtime ([#3079]).
+- sync: `Notify::notify_waiters()` ([#3098]).
+- sync: `acquire_many()`, `try_acquire_many()` to `Semaphore` ([#3067]).
 
 # 0.3.3 (November 2, 2020)
 
@@ -82,28 +82,28 @@ Fixes a soundness hole by adding a missing `Send` bound to
 `Runtime::spawn_blocking()`.
 
 ### Fixed
-- rt: include missing `Send`, fixing soundness hole (#3089).
-- tracing: avoid huge trace span names (#3074).
+- rt: include missing `Send`, fixing soundness hole ([#3089]).
+- tracing: avoid huge trace span names ([#3074]).
 
 ### Added
-- net: `TcpSocket::reuseport()`, `TcpSocket::set_reuseport()` (#3083).
-- net: `TcpSocket::reuseaddr()` (#3093).
-- net: `TcpSocket::local_addr()` (#3093).
-- net: add pid to `UCred` (#2633).
+- net: `TcpSocket::reuseport()`, `TcpSocket::set_reuseport()` ([#3083]).
+- net: `TcpSocket::reuseaddr()` ([#3093]).
+- net: `TcpSocket::local_addr()` ([#3093]).
+- net: add pid to `UCred` ([#2633]).
 
 # 0.3.2 (October 27, 2020)
 
 Adds `AsyncFd` as a replacement for v0.2's `PollEvented`.
 
 ### Fixed
-- io: fix a potential deadlock when shutting down the I/O driver (#2903).
-- sync: `RwLockWriteGuard::downgrade()` bug (#2957).
+- io: fix a potential deadlock when shutting down the I/O driver ([#2903]).
+- sync: `RwLockWriteGuard::downgrade()` bug ([#2957]).
 
 ### Added
-- io: `AsyncFd` for receiving readiness events on raw FDs (#2903).
-- net: `poll_*` function on `UdpSocket` (#2981).
-- net: `UdpSocket::take_error()` (#3051).
-- sync: `oneshot::Sender::poll_closed()` (#3032).
+- io: `AsyncFd` for receiving readiness events on raw FDs ([#2903]).
+- net: `poll_*` function on `UdpSocket` ([#2981]).
+- net: `UdpSocket::take_error()` ([#3051]).
+- sync: `oneshot::Sender::poll_closed()` ([#3032]).
 
 # 0.3.1 (October 21, 2020)
 
@@ -112,15 +112,15 @@ and `write_buf` methods have been added back to the IO traits, as the bytes crat
 is now on track to reach version 1.0 together with Tokio.
 
 ### Fixed
-- net: fix use-after-free (#3019).
-- fs: ensure buffered data is written on shutdown (#3009).
+- net: fix use-after-free ([#3019]).
+- fs: ensure buffered data is written on shutdown ([#3009]).
 
 ### Added
-- io: `copy_buf()` (#2884).
+- io: `copy_buf()` ([#2884]).
 - io: `AsyncReadExt::read_buf()`, `AsyncReadExt::write_buf()` for working with
-  `Buf`/`BufMut` (#3003).
-- rt: `Runtime::spawn_blocking()` (#2980).
-- sync: `watch::Sender::is_closed()` (#2991).
+  `Buf`/`BufMut` ([#3003]).
+- rt: `Runtime::spawn_blocking()` ([#2980]).
+- sync: `watch::Sender::is_closed()` ([#2991]).
 
 # 0.3.0 (October 15, 2020)
 
@@ -142,82 +142,82 @@ Biggest changes are:
 ### Changes
 - meta: Minimum supported Rust version is now 1.45.
 - io: `AsyncRead` trait now takes `ReadBuf` in order to safely handle reading
-  into uninitialized memory (#2758).
-- io: Internal I/O driver storage is now able to compact (#2757).
-- rt: `Runtime::block_on` now takes `&self` (#2782).
+  into uninitialized memory ([#2758]).
+- io: Internal I/O driver storage is now able to compact ([#2757]).
+- rt: `Runtime::block_on` now takes `&self` ([#2782]).
 - sync: `watch` reworked to decouple receiving a change notification from
-  receiving the value (#2814, #2806).
-- sync: `Notify::notify` is renamed to `notify_one` (#2822).
-- process: `Child::kill` is now an `async fn` that cleans zombies (#2823).
-- sync: use `const fn` constructors as possible (#2833, #2790)
-- signal: reduce cross-thread notification (#2835).
-- net: tcp,udp,uds types support operations with `&self` (#2828, #2919, #2934).
-- sync: blocking `mpsc` channel supports `send` with `&self` (#2861).
-- time: rename `delay_for` and `delay_until` to `sleep` and `sleep_until` (#2826).
-- io: upgrade to `mio` 0.7 (#2893).
-- io: `AsyncSeek` trait is tweaked (#2885).
-- fs: `File` operations take `&self` (#2930).
-- rt: runtime API, and `#[tokio::main]` macro polish (#2876)
-- rt: `Runtime::enter` uses an RAII guard instead of a closure (#2954).
-- net: the `from_std` function on all sockets no longer sets socket into non-blocking mode (#2893)
+  receiving the value ([#2814], [#2806]).
+- sync: `Notify::notify` is renamed to `notify_one` ([#2822]).
+- process: `Child::kill` is now an `async fn` that cleans zombies ([#2823]).
+- sync: use `const fn` constructors as possible ([#2833], [#2790])
+- signal: reduce cross-thread notification ([#2835]).
+- net: tcp,udp,uds types support operations with `&self` ([#2828], [#2919], [#2934]).
+- sync: blocking `mpsc` channel supports `send` with `&self` ([#2861]).
+- time: rename `delay_for` and `delay_until` to `sleep` and `sleep_until` ([#2826]).
+- io: upgrade to `mio` 0.7 ([#2893]).
+- io: `AsyncSeek` trait is tweaked ([#2885]).
+- fs: `File` operations take `&self` ([#2930]).
+- rt: runtime API, and `#[tokio::main]` macro polish ([#2876])
+- rt: `Runtime::enter` uses an RAII guard instead of a closure ([#2954]).
+- net: the `from_std` function on all sockets no longer sets socket into non-blocking mode ([#2893])
 
 ### Added
-- sync: `map` function to lock guards (#2445).
-- sync: `blocking_recv` and `blocking_send` fns to `mpsc` for use outside of Tokio (#2685).
-- rt: `Builder::thread_name_fn` for configuring thread names (#1921).
-- fs: impl `FromRawFd` and `FromRawHandle` for `File` (#2792).
-- process: `Child::wait` and `Child::try_wait` (#2796).
-- rt: support configuring thread keep-alive duration (#2809).
-- rt: `task::JoinHandle::abort` forcibly cancels a spawned task (#2474).
-- sync: `RwLock` write guard to read guard downgrading (#2733).
-- net: add `poll_*` functions that take `&self` to all net types (#2845)
-- sync: `get_mut()` for `Mutex`, `RwLock` (#2856).
-- sync: `mpsc::Sender::closed()` waits for `Receiver` half to close (#2840).
-- sync: `mpsc::Sender::is_closed()` returns true if `Receiver` half is closed (#2726).
-- stream: `iter` and `iter_mut` to `StreamMap` (#2890).
-- net: implement `AsRawSocket` on windows (#2911).
-- net: `TcpSocket` creates a socket without binding or listening (#2920).
+- sync: `map` function to lock guards ([#2445]).
+- sync: `blocking_recv` and `blocking_send` fns to `mpsc` for use outside of Tokio ([#2685]).
+- rt: `Builder::thread_name_fn` for configuring thread names ([#1921]).
+- fs: impl `FromRawFd` and `FromRawHandle` for `File` ([#2792]).
+- process: `Child::wait` and `Child::try_wait` ([#2796]).
+- rt: support configuring thread keep-alive duration ([#2809]).
+- rt: `task::JoinHandle::abort` forcibly cancels a spawned task ([#2474]).
+- sync: `RwLock` write guard to read guard downgrading ([#2733]).
+- net: add `poll_*` functions that take `&self` to all net types ([#2845])
+- sync: `get_mut()` for `Mutex`, `RwLock` ([#2856]).
+- sync: `mpsc::Sender::closed()` waits for `Receiver` half to close ([#2840]).
+- sync: `mpsc::Sender::is_closed()` returns true if `Receiver` half is closed ([#2726]).
+- stream: `iter` and `iter_mut` to `StreamMap` ([#2890]).
+- net: implement `AsRawSocket` on windows ([#2911]).
+- net: `TcpSocket` creates a socket without binding or listening ([#2920]).
 
 ### Removed
-- io: vectored ops are removed from `AsyncRead`, `AsyncWrite` traits (#2882).
+- io: vectored ops are removed from `AsyncRead`, `AsyncWrite` traits ([#2882]).
 - io: `mio` is removed from the public API. `PollEvented` and` Registration` are
-  removed (#2893).
+  removed ([#2893]).
 - io: remove `bytes` from public API. `Buf` and `BufMut` implementation are
-  removed (#2908).
-- time: `DelayQueue` is moved to `tokio-util` (#2897).
+  removed ([#2908]).
+- time: `DelayQueue` is moved to `tokio-util` ([#2897]).
 
 ### Fixed
-- io: `stdout` and `stderr` buffering on windows (#2734).
+- io: `stdout` and `stderr` buffering on windows ([#2734]).
 
 # 0.2.22 (July 21, 2020)
 
 ### Fixes
-- docs: misc improvements (#2572, #2658, #2663, #2656, #2647, #2630, #2487, #2621,
-  #2624, #2600, #2623, #2622, #2577, #2569, #2589, #2575, #2540, #2564, #2567,
-  #2520, #2521, #2493)
+- docs: misc improvements ([#2572], [#2658], [#2663], [#2656], [#2647], [#2630], [#2487], [#2621],
+  [#2624], [#2600], [#2623], [#2622], [#2577], [#2569], [#2589], [#2575], [#2540], [#2564], [#2567],
+  [#2520], [#2521], [#2493])
 - rt: allow calls to `block_on` inside calls to `block_in_place` that are
-  themselves inside `block_on` (#2645)
-- net: fix non-portable behavior when dropping `TcpStream` `OwnedWriteHalf` (#2597)
+  themselves inside `block_on` ([#2645])
+- net: fix non-portable behavior when dropping `TcpStream` `OwnedWriteHalf` ([#2597])
 - io: improve stack usage by allocating large buffers on directly on the heap
-  (#2634)
+  ([#2634])
 - io: fix unsound pin projection in `AsyncReadExt::read_buf` and
-  `AsyncWriteExt::write_buf` (#2612)
-- io: fix unnecessary zeroing for `AsyncRead` implementors (#2525)
-- io: Fix `BufReader` not correctly forwarding `poll_write_buf` (#2654)
-- io: fix panic in `AsyncReadExt::read_line` (#2541)
+  `AsyncWriteExt::write_buf` ([#2612])
+- io: fix unnecessary zeroing for `AsyncRead` implementors ([#2525])
+- io: Fix `BufReader` not correctly forwarding `poll_write_buf` ([#2654])
+- io: fix panic in `AsyncReadExt::read_line` ([#2541])
 
 ### Changes
-- coop: returning `Poll::Pending` no longer decrements the task budget (#2549)
+- coop: returning `Poll::Pending` no longer decrements the task budget ([#2549])
 
 ### Added
 - io: little-endian variants of `AsyncReadExt` and `AsyncWriteExt` methods
-  (#1915)
-- task: add [`tracing`] instrumentation to spawned tasks (#2655)
+  ([#1915])
+- task: add [`tracing`] instrumentation to spawned tasks ([#2655])
 - sync: allow unsized types in `Mutex` and `RwLock` (via `default` constructors)
-  (#2615)
-- net: add `ToSocketAddrs` implementation for `&[SocketAddr]` (#2604)
-- fs: add `OpenOptionsExt` for `OpenOptions` (#2515)
-- fs: add `DirBuilder` (#2524)
+  ([#2615])
+- net: add `ToSocketAddrs` implementation for `&[SocketAddr]` ([#2604])
+- fs: add `OpenOptionsExt` for `OpenOptions` ([#2515])
+- fs: add `DirBuilder` ([#2524])
 
 [`tracing`]: https://crates.io/crates/tracing
 
@@ -225,51 +225,51 @@ Biggest changes are:
 
 ### Fixes
 
-- macros: disambiguate built-in `#[test]` attribute in macro expansion (#2503)
-- rt: `LocalSet` and task budgeting (#2462).
-- rt: task budgeting with `block_in_place` (#2502).
-- sync: release `broadcast` channel memory without sending a value (#2509).
-- time: notify when resetting a `Delay` to a time in the past (#2290)
+- macros: disambiguate built-in `#[test]` attribute in macro expansion ([#2503])
+- rt: `LocalSet` and task budgeting ([#2462]).
+- rt: task budgeting with `block_in_place` ([#2502]).
+- sync: release `broadcast` channel memory without sending a value ([#2509]).
+- time: notify when resetting a `Delay` to a time in the past ([#2290])
 
 ### Added
-- io: `get_mut`, `get_ref`, and `into_inner` to `Lines` (#2450).
-- io: `mio::Ready` argument to `PollEvented` (#2419).
-- os: illumos support (#2486).
-- rt: `Handle::spawn_blocking` (#2501).
-- sync: `OwnedMutexGuard` for `Arc<Mutex<T>>` (#2455).
+- io: `get_mut`, `get_ref`, and `into_inner` to `Lines` ([#2450]).
+- io: `mio::Ready` argument to `PollEvented` ([#2419]).
+- os: illumos support ([#2486]).
+- rt: `Handle::spawn_blocking` ([#2501]).
+- sync: `OwnedMutexGuard` for `Arc<Mutex<T>>` ([#2455]).
 
 # 0.2.20 (April 28, 2020)
 
 ### Fixes
-- sync: `broadcast` closing the channel no longer requires capacity (#2448).
-- rt: regression when configuring runtime with `max_threads` less than number of CPUs (#2457).
+- sync: `broadcast` closing the channel no longer requires capacity ([#2448]).
+- rt: regression when configuring runtime with `max_threads` less than number of CPUs ([#2457]).
 
 # 0.2.19 (April 24, 2020)
 
 ### Fixes
-- docs: misc improvements (#2400, #2405, #2414, #2420, #2423, #2426, #2427, #2434, #2436, #2440).
-- rt: support `block_in_place` in more contexts (#2409, #2410).
-- stream: no panic in `merge()` and `chain()` when using `size_hint()` (#2430).
-- task: include visibility modifier when defining a task-local (#2416).
+- docs: misc improvements ([#2400], [#2405], [#2414], [#2420], [#2423], [#2426], [#2427], [#2434], [#2436], [#2440]).
+- rt: support `block_in_place` in more contexts ([#2409], [#2410]).
+- stream: no panic in `merge()` and `chain()` when using `size_hint()` ([#2430]).
+- task: include visibility modifier when defining a task-local ([#2416]).
 
 ### Added
-- rt: `runtime::Handle::block_on` (#2437).
-- sync: owned `Semaphore` permit (#2421).
-- tcp: owned split (#2270).
+- rt: `runtime::Handle::block_on` ([#2437]).
+- sync: owned `Semaphore` permit ([#2421]).
+- tcp: owned split ([#2270]).
 
 # 0.2.18 (April 12, 2020)
 
 ### Fixes
-- task: `LocalSet` was incorrectly marked as `Send` (#2398)
-- io: correctly report `WriteZero` failure in `write_int` (#2334)
+- task: `LocalSet` was incorrectly marked as `Send` ([#2398])
+- io: correctly report `WriteZero` failure in `write_int` ([#2334])
 
 # 0.2.17 (April 9, 2020)
 
 ### Fixes
-- rt: bug in work-stealing queue (#2387)
+- rt: bug in work-stealing queue ([#2387])
 
 ### Changes
-- rt: threadpool uses logical CPU count instead of physical by default (#2391)
+- rt: threadpool uses logical CPU count instead of physical by default ([#2391])
 
 # 0.2.16 (April 3, 2020)
 
@@ -304,7 +304,7 @@ Biggest changes are:
 
 ### Added
 - io: impl `RawFd`, `AsRawHandle` for std io types ([#2335]).
-- rt: automatic cooperative task yielding (#2160, #2343, #2349).
+- rt: automatic cooperative task yielding ([#2160], [#2343], [#2349]).
 - sync: `RwLock::into_inner` ([#2321]).
 
 ### Changed
@@ -345,7 +345,7 @@ Biggest changes are:
 # 0.2.11 (January 27, 2020)
 
 ### Fixes
-- docs: misc fixes and tweaks (#2155, #2103, #2027, #2167, #2175).
+- docs: misc fixes and tweaks ([#2155], [#2103], [#2027], [#2167], [#2175]).
 - macros: handle generics in `#[tokio::main]` method ([#2177]).
 - sync: `broadcast` potential lost notifications ([#2135]).
 - rt: improve "no runtime" panic messages ([#2145]).
@@ -374,7 +374,7 @@ Biggest changes are:
 - `BufStream::with_capacity` ([#2125]).
 - impl `From` and `Default` for `RwLock` ([#2089]).
 - `io::ReadHalf::is_pair_of` checks if provided `WriteHalf` is for the same
-  underlying object (#1762, #2144).
+  underlying object ([#1762], [#2144]).
 - `runtime::Handle::try_current()` returns a handle to the current runtime ([#2118]).
 - `stream::empty()` returns an immediately ready empty stream ([#2092]).
 - `stream::once(val)` returns a stream that yields a single value: `val` ([#2094]).
@@ -389,7 +389,7 @@ Biggest changes are:
 
 ### Fixes
 - `AsyncSeek` impl for `File` ([#1986]).
-- rt: shutdown deadlock in `threaded_scheduler` (#2074, #2082).
+- rt: shutdown deadlock in `threaded_scheduler` ([#2074], [#2082]).
 - rt: memory ordering when dropping `JoinHandle` ([#2044]).
 - docs: misc API documentation fixes and improvements.
 
@@ -447,7 +447,7 @@ Biggest changes are:
 - deadlock risk while shutting down the runtime ([#1972]).
 - panic while shutting down the runtime ([#1978]).
 - `sync::MutexGuard` debug output ([#1961]).
-- misc doc improvements (#1933, #1934, #1940, #1942).
+- misc doc improvements ([#1933], [#1934], [#1940], [#1942]).
 
 ### Changes
 - runtime threads are configured with `runtime::Builder::core_threads` and
@@ -476,7 +476,7 @@ Biggest changes are:
 - calling `spawn_blocking` after runtime shutdown ([#1875]).
 - `LocalSet` drop inifinite loop ([#1892]).
 - `LocalSet` hang under load ([#1905]).
-- improved documentation (#1865, #1866, #1868, #1874, #1876, #1911).
+- improved documentation ([#1865], [#1866], [#1868], [#1874], [#1876], [#1911]).
 
 # 0.2.2 (November 29, 2019)
 
@@ -666,174 +666,3 @@ another. This changelog entry contains a highlight
 # 0.1.0 (February 07, 2018)
 
 * Initial crate released based on [RFC](https://github.com/tokio-rs/tokio-rfcs/pull/3).
-
-[#2375]: https://github.com/tokio-rs/tokio/pull/2375
-[#2362]: https://github.com/tokio-rs/tokio/pull/2362
-[#2358]: https://github.com/tokio-rs/tokio/pull/2358
-[#2354]: https://github.com/tokio-rs/tokio/pull/2354
-[#2335]: https://github.com/tokio-rs/tokio/pull/2335
-[#2333]: https://github.com/tokio-rs/tokio/pull/2333
-[#2325]: https://github.com/tokio-rs/tokio/pull/2325
-[#2321]: https://github.com/tokio-rs/tokio/pull/2321
-[#2300]: https://github.com/tokio-rs/tokio/pull/2300
-[#2285]: https://github.com/tokio-rs/tokio/pull/2285
-[#2281]: https://github.com/tokio-rs/tokio/pull/2281
-[#2275]: https://github.com/tokio-rs/tokio/pull/2275
-[#2274]: https://github.com/tokio-rs/tokio/pull/2274
-[#2273]: https://github.com/tokio-rs/tokio/pull/2273
-[#2253]: https://github.com/tokio-rs/tokio/pull/2253
-[#2250]: https://github.com/tokio-rs/tokio/pull/2250
-[#2245]: https://github.com/tokio-rs/tokio/pull/2245
-[#2239]: https://github.com/tokio-rs/tokio/pull/2239
-[#2238]: https://github.com/tokio-rs/tokio/pull/2238
-[#2227]: https://github.com/tokio-rs/tokio/pull/2227
-[#2218]: https://github.com/tokio-rs/tokio/pull/2218
-[#2217]: https://github.com/tokio-rs/tokio/pull/2217
-[#2210]: https://github.com/tokio-rs/tokio/pull/2210
-[#2205]: https://github.com/tokio-rs/tokio/pull/2205
-[#2204]: https://github.com/tokio-rs/tokio/pull/2204
-[#2191]: https://github.com/tokio-rs/tokio/pull/2191
-[#2186]: https://github.com/tokio-rs/tokio/pull/2186
-[#2185]: https://github.com/tokio-rs/tokio/pull/2185
-[#2184]: https://github.com/tokio-rs/tokio/pull/2184
-[#2177]: https://github.com/tokio-rs/tokio/pull/2177
-[#2169]: https://github.com/tokio-rs/tokio/pull/2169
-[#2168]: https://github.com/tokio-rs/tokio/pull/2168
-[#2164]: https://github.com/tokio-rs/tokio/pull/2164
-[#2163]: https://github.com/tokio-rs/tokio/pull/2163
-[#2158]: https://github.com/tokio-rs/tokio/pull/2158
-[#2152]: https://github.com/tokio-rs/tokio/pull/2152
-[#2151]: https://github.com/tokio-rs/tokio/pull/2151
-[#2149]: https://github.com/tokio-rs/tokio/pull/2149
-[#2145]: https://github.com/tokio-rs/tokio/pull/2145
-[#2139]: https://github.com/tokio-rs/tokio/pull/2139
-[#2135]: https://github.com/tokio-rs/tokio/pull/2135
-[#2126]: https://github.com/tokio-rs/tokio/pull/2126
-[#2125]: https://github.com/tokio-rs/tokio/pull/2125
-[#2122]: https://github.com/tokio-rs/tokio/pull/2122
-[#2119]: https://github.com/tokio-rs/tokio/pull/2119
-[#2118]: https://github.com/tokio-rs/tokio/pull/2118
-[#2109]: https://github.com/tokio-rs/tokio/pull/2109
-[#2108]: https://github.com/tokio-rs/tokio/pull/2108
-[#2094]: https://github.com/tokio-rs/tokio/pull/2094
-[#2093]: https://github.com/tokio-rs/tokio/pull/2093
-[#2092]: https://github.com/tokio-rs/tokio/pull/2092
-[#2091]: https://github.com/tokio-rs/tokio/pull/2091
-[#2089]: https://github.com/tokio-rs/tokio/pull/2089
-[#2085]: https://github.com/tokio-rs/tokio/pull/2085
-[#2079]: https://github.com/tokio-rs/tokio/pull/2079
-[#2059]: https://github.com/tokio-rs/tokio/pull/2059
-[#2052]: https://github.com/tokio-rs/tokio/pull/2052
-[#2051]: https://github.com/tokio-rs/tokio/pull/2051
-[#2045]: https://github.com/tokio-rs/tokio/pull/2045
-[#2044]: https://github.com/tokio-rs/tokio/pull/2044
-[#2040]: https://github.com/tokio-rs/tokio/pull/2040
-[#2035]: https://github.com/tokio-rs/tokio/pull/2035
-[#2034]: https://github.com/tokio-rs/tokio/pull/2034
-[#2030]: https://github.com/tokio-rs/tokio/pull/2030
-[#2029]: https://github.com/tokio-rs/tokio/pull/2029
-[#2025]: https://github.com/tokio-rs/tokio/pull/2025
-[#2022]: https://github.com/tokio-rs/tokio/pull/2022
-[#2014]: https://github.com/tokio-rs/tokio/pull/2014
-[#2012]: https://github.com/tokio-rs/tokio/pull/2012
-[#2011]: https://github.com/tokio-rs/tokio/pull/2011
-[#2006]: https://github.com/tokio-rs/tokio/pull/2006
-[#2005]: https://github.com/tokio-rs/tokio/pull/2005
-[#2001]: https://github.com/tokio-rs/tokio/pull/2001
-[#1991]: https://github.com/tokio-rs/tokio/pull/1991
-[#1986]: https://github.com/tokio-rs/tokio/pull/1986
-[#1978]: https://github.com/tokio-rs/tokio/pull/1978
-[#1977]: https://github.com/tokio-rs/tokio/pull/1977
-[#1975]: https://github.com/tokio-rs/tokio/pull/1975
-[#1973]: https://github.com/tokio-rs/tokio/pull/1973
-[#1972]: https://github.com/tokio-rs/tokio/pull/1972
-[#1971]: https://github.com/tokio-rs/tokio/pull/1971
-[#1962]: https://github.com/tokio-rs/tokio/pull/1962
-[#1961]: https://github.com/tokio-rs/tokio/pull/1961
-[#1956]: https://github.com/tokio-rs/tokio/pull/1956
-[#1949]: https://github.com/tokio-rs/tokio/pull/1949
-[#1943]: https://github.com/tokio-rs/tokio/pull/1943
-[#1939]: https://github.com/tokio-rs/tokio/pull/1939
-[#1924]: https://github.com/tokio-rs/tokio/pull/1924
-[#1905]: https://github.com/tokio-rs/tokio/pull/1905
-[#1904]: https://github.com/tokio-rs/tokio/pull/1904
-[#1898]: https://github.com/tokio-rs/tokio/pull/1898
-[#1892]: https://github.com/tokio-rs/tokio/pull/1892
-[#1888]: https://github.com/tokio-rs/tokio/pull/1888
-[#1882]: https://github.com/tokio-rs/tokio/pull/1882
-[#1881]: https://github.com/tokio-rs/tokio/pull/1881
-[#1875]: https://github.com/tokio-rs/tokio/pull/1875
-[#1874]: https://github.com/tokio-rs/tokio/pull/1874
-[#1870]: https://github.com/tokio-rs/tokio/pull/1870
-[#1864]: https://github.com/tokio-rs/tokio/pull/1864
-[#1863]: https://github.com/tokio-rs/tokio/pull/1863
-[#1861]: https://github.com/tokio-rs/tokio/pull/1861
-[#1858]: https://github.com/tokio-rs/tokio/pull/1858
-[#1856]: https://github.com/tokio-rs/tokio/pull/1856
-[#1854]: https://github.com/tokio-rs/tokio/pull/1854
-[#1849]: https://github.com/tokio-rs/tokio/pull/1849
-[#1843]: https://github.com/tokio-rs/tokio/pull/1843
-[#1841]: https://github.com/tokio-rs/tokio/pull/1841
-[#1839]: https://github.com/tokio-rs/tokio/pull/1839
-[#1834]: https://github.com/tokio-rs/tokio/pull/1834
-[#1831]: https://github.com/tokio-rs/tokio/pull/1831
-[#1827]: https://github.com/tokio-rs/tokio/pull/1827
-[#1826]: https://github.com/tokio-rs/tokio/pull/1826
-[#1772]: https://github.com/tokio-rs/tokio/pull/1772
-[#1755]: https://github.com/tokio-rs/tokio/pull/1755
-[#1733]: https://github.com/tokio-rs/tokio/pull/1733
-[#1699]: https://github.com/tokio-rs/tokio/pull/1699
-[#1111]: https://github.com/tokio-rs/tokio/pull/1111
-[#1055]: https://github.com/tokio-rs/tokio/pull/1055
-[#993]:  https://github.com/tokio-rs/tokio/pull/993
-[#966]:  https://github.com/tokio-rs/tokio/pull/966
-[#964]:  https://github.com/tokio-rs/tokio/pull/964
-[#940]:  https://github.com/tokio-rs/tokio/pull/940
-[#922]:  https://github.com/tokio-rs/tokio/pull/922
-[#896]:  https://github.com/tokio-rs/tokio/pull/896
-[#839]:  https://github.com/tokio-rs/tokio/pull/839
-[#832]:  https://github.com/tokio-rs/tokio/pull/832
-[#808]:  https://github.com/tokio-rs/tokio/pull/808
-[#772]:  https://github.com/tokio-rs/tokio/pull/772
-[#756]:  https://github.com/tokio-rs/tokio/pull/756
-[#749]:  https://github.com/tokio-rs/tokio/pull/749
-[#736]:  https://github.com/tokio-rs/tokio/pull/736
-[#721]:  https://github.com/tokio-rs/tokio/pull/721
-[#708]:  https://github.com/tokio-rs/tokio/pull/708
-[#689]:  https://github.com/tokio-rs/tokio/pull/689
-[#682]:  https://github.com/tokio-rs/tokio/pull/682
-[#676]:  https://github.com/tokio-rs/tokio/pull/676
-[#675]:  https://github.com/tokio-rs/tokio/pull/675
-[#661]:  https://github.com/tokio-rs/tokio/pull/661
-[#660]:  https://github.com/tokio-rs/tokio/pull/660
-[#652]:  https://github.com/tokio-rs/tokio/pull/652
-[#646]:  https://github.com/tokio-rs/tokio/pull/646
-[#645]:  https://github.com/tokio-rs/tokio/pull/645
-[#579]:  https://github.com/tokio-rs/tokio/pull/579
-[#575]:  https://github.com/tokio-rs/tokio/pull/575
-[#573]:  https://github.com/tokio-rs/tokio/pull/573
-[#548]:  https://github.com/tokio-rs/tokio/pull/548
-[#501]:  https://github.com/tokio-rs/tokio/pull/501
-[#477]:  https://github.com/tokio-rs/tokio/pull/477
-[#450]:  https://github.com/tokio-rs/tokio/pull/450
-[#398]:  https://github.com/tokio-rs/tokio/pull/398
-[#391]:  https://github.com/tokio-rs/tokio/pull/391
-[#381]:  https://github.com/tokio-rs/tokio/pull/381
-[#370]:  https://github.com/tokio-rs/tokio/pull/370
-[#340]:  https://github.com/tokio-rs/tokio/pull/340
-[#323]:  https://github.com/tokio-rs/tokio/pull/323
-[#313]:  https://github.com/tokio-rs/tokio/pull/313
-[#308]:  https://github.com/tokio-rs/tokio/pull/308
-[#266]:  https://github.com/tokio-rs/tokio/pull/266
-[#234]:  https://github.com/tokio-rs/tokio/pull/234
-[#232]:  https://github.com/tokio-rs/tokio/pull/232
-[#224]:  https://github.com/tokio-rs/tokio/pull/224
-[#218]:  https://github.com/tokio-rs/tokio/pull/218
-[#214]:  https://github.com/tokio-rs/tokio/pull/214
-[#212]:  https://github.com/tokio-rs/tokio/pull/212
-[#175]:  https://github.com/tokio-rs/tokio/pull/175
-[#169]:  https://github.com/tokio-rs/tokio/pull/169
-[#166]:  https://github.com/tokio-rs/tokio/pull/166
-[#160]:  https://github.com/tokio-rs/tokio/pull/160
-[#142]:  https://github.com/tokio-rs/tokio/pull/142
-[#141]:  https://github.com/tokio-rs/tokio/pull/141
