@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608998855681,
+  "lastUpdate": 1608998865801,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -8671,6 +8671,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 17741027,
             "range": "± 2235428",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4d7b73f5b3aaf6ce305f4cdc9fdb087242636f75",
+          "message": "chore: create stream_ext module (#3342)",
+          "timestamp": "2020-12-26T17:05:51+01:00",
+          "tree_id": "e3c07a0526d49a41be65cc756c2bb96667a56667",
+          "url": "https://github.com/tokio-rs/tokio/commit/4d7b73f5b3aaf6ce305f4cdc9fdb087242636f75"
+        },
+        "date": 1608998864568,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 196824,
+            "range": "± 46442",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 689103,
+            "range": "± 140008",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4494586,
+            "range": "± 977618",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19856303,
+            "range": "± 2302854",
             "unit": "ns/iter"
           }
         ]
