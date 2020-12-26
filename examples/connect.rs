@@ -92,7 +92,7 @@ mod tcp {
 
 mod udp {
     use bytes::Bytes;
-    use futures::{future, Sink, SinkExt, Stream, StreamExt};
+    use futures::{Sink, SinkExt, Stream, StreamExt};
     use std::error::Error;
     use std::io;
     use std::net::SocketAddr;
@@ -114,7 +114,7 @@ mod udp {
         let socket = UdpSocket::bind(&bind_addr).await?;
         socket.connect(addr).await?;
 
-        future::try_join(send(stdin, &socket), recv(stdout, &socket)).await?;
+        tokio::try_join!(send(stdin, &socket), recv(stdout, &socket))?;
 
         Ok(())
     }
