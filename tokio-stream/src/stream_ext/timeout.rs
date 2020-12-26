@@ -1,4 +1,5 @@
-use crate::{Fuse, Stream};
+use crate::stream_ext::Fuse;
+use crate::Stream;
 use tokio::time::{Instant, Sleep};
 
 use core::future::Future;
