@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1609080754240,
+  "lastUpdate": 1609080780299,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -21059,6 +21059,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 778535,
             "range": "± 79117",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "2389206378@qq.com",
+            "name": "zhongjn",
+            "username": "zhongjn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0048d43713b65c5d0f893c13b6783ce4711e0bf1",
+          "message": "macros: improve select! error message (#3352)\n\nCo-authored-by: Alice Ryhl <alice@ryhl.io>",
+          "timestamp": "2020-12-27T23:50:32+09:00",
+          "tree_id": "f80e229ed915cc23f4239d93fc4b2eb13f3378cc",
+          "url": "https://github.com/tokio-rs/tokio/commit/0048d43713b65c5d0f893c13b6783ce4711e0bf1"
+        },
+        "date": 1609080779142,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 7109732,
+            "range": "± 2952156",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 7153081,
+            "range": "± 1803087",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6848535,
+            "range": "± 3209568",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 922,
+            "range": "± 196",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 933,
+            "range": "± 147",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 933,
+            "range": "± 287",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 142317,
+            "range": "± 19161",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1781,
+            "range": "± 400",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1120872,
+            "range": "± 286930",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 790607,
+            "range": "± 199747",
             "unit": "ns/iter"
           }
         ]
