@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1609083500298,
+  "lastUpdate": 1609083503648,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -9181,6 +9181,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 17915025,
             "range": "± 1600535",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "arniu2006@163.com",
+            "name": "Arniu Tseng",
+            "username": "arniu"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cbd4f4472e307186ac7bdf2a8f0ddb9b00a4a47c",
+          "message": "docs: update CHANGELOG.md (#3336)",
+          "timestamp": "2020-12-27T16:36:36+01:00",
+          "tree_id": "7757ceeb4ded53ab5045248937bf1cec28335619",
+          "url": "https://github.com/tokio-rs/tokio/commit/cbd4f4472e307186ac7bdf2a8f0ddb9b00a4a47c"
+        },
+        "date": 1609083502251,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 176752,
+            "range": "± 17620",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 693615,
+            "range": "± 146245",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4608929,
+            "range": "± 981774",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18080992,
+            "range": "± 2085563",
             "unit": "ns/iter"
           }
         ]
