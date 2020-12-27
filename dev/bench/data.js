@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1609082322702,
+  "lastUpdate": 1609082333588,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -4751,6 +4751,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 492,
             "range": "± 14",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "62563461+capcah@users.noreply.github.com",
+            "name": "Danilo Martins",
+            "username": "capcah"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2d9bea8d63229c108f25049c4815538ada25697a",
+          "message": "runtime: fix typo (#3354)\n\nCo-authored-by: Danilo <vandor.danilo@gmail.com>",
+          "timestamp": "2020-12-27T16:17:00+01:00",
+          "tree_id": "0f9ecf7beb5543eadf38f66b4cd82cef1717ab6a",
+          "url": "https://github.com/tokio-rs/tokio/commit/2d9bea8d63229c108f25049c4815538ada25697a"
+        },
+        "date": 1609082332222,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 997,
+            "range": "± 156",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 16148,
+            "range": "± 6194",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1048,
+            "range": "± 189",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 17496,
+            "range": "± 23822",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 608,
+            "range": "± 78",
             "unit": "ns/iter"
           }
         ]
