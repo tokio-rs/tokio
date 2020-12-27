@@ -16,7 +16,7 @@ cfg_net_unix! {
     ///
     /// A `UnixListener` can be turned into a `Stream` with [`UnixListenerStream`].
     ///
-    /// [`UnixListenerStream`]: ../../tokio_stream/wrappers/struct.UnixListenerStream.html
+    /// [`UnixListenerStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.UnixListenerStream.html
     ///
     /// # Errors
     ///

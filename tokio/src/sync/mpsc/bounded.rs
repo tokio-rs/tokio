@@ -36,7 +36,7 @@ pub struct Permit<'a, T> {
 ///
 /// This receiver can be turned into a `Stream` using [`ReceiverStream`].
 ///
-/// [`ReceiverStream`]: ../../../tokio_stream/wrappers/struct.ReceiverStream.html
+/// [`ReceiverStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.ReceiverStream.html
 pub struct Receiver<T> {
     /// The channel receiver
     chan: chan::Rx<T, Semaphore>,

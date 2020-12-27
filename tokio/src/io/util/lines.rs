@@ -15,7 +15,7 @@ pin_project! {
     /// This type is usually created using the [`lines`] method.
     ///
     /// [`AsyncBufRead`]: crate::io::AsyncBufRead
-    /// [`LinesStream`]: ../../tokio_stream/wrappers/struct.LinesStream.html
+    /// [`LinesStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.LinesStream.html
     /// [`lines`]: crate::io::AsyncBufReadExt::lines
     #[derive(Debug)]
     #[must_use = "streams do nothing unless polled"]

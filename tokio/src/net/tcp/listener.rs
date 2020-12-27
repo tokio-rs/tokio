@@ -16,7 +16,7 @@ cfg_net! {
     ///
     /// A `TcpListener` can be turned into a `Stream` with [`TcpListenerStream`].
     ///
-    /// [`TcpListenerStream`]: ../../tokio_stream/wrappers/struct.TcpListenerStream.html
+    /// [`TcpListenerStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.TcpListenerStream.html
     ///
     /// # Errors
     ///

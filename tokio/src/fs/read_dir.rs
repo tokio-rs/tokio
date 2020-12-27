@@ -28,7 +28,7 @@ pub async fn read_dir(path: impl AsRef<Path>) -> io::Result<ReadDir> {
 ///
 /// A `ReadDir` can be turned into a `Stream` with [`ReadDirStream`].
 ///
-/// [`ReadDirStream`]: ../../tokio_stream/wrappers/struct.ReadDirStream.html
+/// [`ReadDirStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.ReadDirStream.html
 ///
 /// # Errors
 ///

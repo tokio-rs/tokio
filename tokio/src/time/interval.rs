@@ -115,7 +115,7 @@ pub fn interval_at(start: Instant, period: Duration) -> Interval {
 ///
 /// An `Interval` can be turned into a `Stream` with [`IntervalStream`].
 ///
-/// [`IntervalStream`]: ../../tokio_stream/wrappers/struct.IntervalStream.html
+/// [`IntervalStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.IntervalStream.html
 #[derive(Debug)]
 pub struct Interval {
     /// Future that completes the next time the `Interval` yields a value.
