@@ -245,6 +245,11 @@ async fn reset_twice() {
     assert!(queue.is_woken());
 }
 
+/// Regression test: Given an entry inserted with a deadline in the past, so
+/// that it is placed directly on the expired queue, reset the entry to a
+/// deadline in the future. Validate that this leaves the entry and queue in an
+/// internally consistent state by running an additional reset on the entry
+/// before polling it to completion.
 #[tokio::test]
 async fn repeatedly_reset_entry_inserted_as_expired() {
     time::pause();
