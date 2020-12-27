@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1609080723168,
+  "lastUpdate": 1609080727194,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -13731,6 +13731,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1076,
             "range": "± 141",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "2389206378@qq.com",
+            "name": "zhongjn",
+            "username": "zhongjn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0048d43713b65c5d0f893c13b6783ce4711e0bf1",
+          "message": "macros: improve select! error message (#3352)\n\nCo-authored-by: Alice Ryhl <alice@ryhl.io>",
+          "timestamp": "2020-12-27T23:50:32+09:00",
+          "tree_id": "f80e229ed915cc23f4239d93fc4b2eb13f3378cc",
+          "url": "https://github.com/tokio-rs/tokio/commit/0048d43713b65c5d0f893c13b6783ce4711e0bf1"
+        },
+        "date": 1609080722311,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 14759,
+            "range": "± 3806",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1048,
+            "range": "± 224",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 617,
+            "range": "± 80",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 14219,
+            "range": "± 4497",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1053,
+            "range": "± 150",
             "unit": "ns/iter"
           }
         ]
