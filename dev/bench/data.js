@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1609080727194,
+  "lastUpdate": 1609080754240,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -8977,6 +8977,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18036797,
             "range": "± 3560595",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "2389206378@qq.com",
+            "name": "zhongjn",
+            "username": "zhongjn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0048d43713b65c5d0f893c13b6783ce4711e0bf1",
+          "message": "macros: improve select! error message (#3352)\n\nCo-authored-by: Alice Ryhl <alice@ryhl.io>",
+          "timestamp": "2020-12-27T23:50:32+09:00",
+          "tree_id": "f80e229ed915cc23f4239d93fc4b2eb13f3378cc",
+          "url": "https://github.com/tokio-rs/tokio/commit/0048d43713b65c5d0f893c13b6783ce4711e0bf1"
+        },
+        "date": 1609080752998,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 233321,
+            "range": "± 72533",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 781877,
+            "range": "± 216404",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5339020,
+            "range": "± 434389",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20964075,
+            "range": "± 3113127",
             "unit": "ns/iter"
           }
         ]
