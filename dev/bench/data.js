@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1608998891280,
+  "lastUpdate": 1609062272493,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -8719,6 +8719,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19856303,
             "range": "± 2302854",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "aj@ajfrantz.com",
+            "name": "AJ Frantz",
+            "username": "ajfrantz"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c4929264bc1c809bab43e4d045b473620b15ed00",
+          "message": "examples: adjust buffering in examples (#3328)",
+          "timestamp": "2020-12-27T10:43:02+01:00",
+          "tree_id": "887a8bcb6785989ddb3ad74f0e1fe4dfc39da48c",
+          "url": "https://github.com/tokio-rs/tokio/commit/c4929264bc1c809bab43e4d045b473620b15ed00"
+        },
+        "date": 1609062271445,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 138438,
+            "range": "± 6323",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 551847,
+            "range": "± 32277",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4372040,
+            "range": "± 938903",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 15864026,
+            "range": "± 2146353",
             "unit": "ns/iter"
           }
         ]
