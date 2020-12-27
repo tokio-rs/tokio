@@ -720,7 +720,7 @@ impl UdpSocket {
         ///
         ///         // Try to recv data, this may still fail with `WouldBlock`
         ///         // if the readiness event is a false positive.
-        ///         match socket.try_recv_from(&mut buf) {
+        ///         match socket.try_recv_buf(&mut buf) {
         ///             Ok(n) => {
         ///                 println!("GOT {:?}", &buf[..n]);
         ///                 break;
