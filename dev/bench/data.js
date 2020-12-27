@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1609082374875,
+  "lastUpdate": 1609083500298,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -4805,6 +4805,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 608,
             "range": "± 78",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "arniu2006@163.com",
+            "name": "Arniu Tseng",
+            "username": "arniu"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cbd4f4472e307186ac7bdf2a8f0ddb9b00a4a47c",
+          "message": "docs: update CHANGELOG.md (#3336)",
+          "timestamp": "2020-12-27T16:36:36+01:00",
+          "tree_id": "7757ceeb4ded53ab5045248937bf1cec28335619",
+          "url": "https://github.com/tokio-rs/tokio/commit/cbd4f4472e307186ac7bdf2a8f0ddb9b00a4a47c"
+        },
+        "date": 1609083499227,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 839,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 13244,
+            "range": "± 2268",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 866,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 13606,
+            "range": "± 3148",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 492,
+            "range": "± 6",
             "unit": "ns/iter"
           }
         ]
