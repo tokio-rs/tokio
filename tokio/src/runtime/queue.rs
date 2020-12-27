@@ -8,7 +8,7 @@ use crate::runtime::task;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::ptr::{self, NonNull};
-use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 
 /// Producer handle. May only be used from a single thread.
 pub(super) struct Local<T: 'static> {
@@ -194,13 +194,17 @@ impl<T> Local<T> {
         // work. This is because all tasks are pushed into the queue from the
         // current thread (or memory has been acquired if the local queue handle
         // moved).
-        let actual = self.inner.head.compare_and_swap(
-            prev,
-            pack(head.wrapping_add(n), head.wrapping_add(n)),
-            Release,
-        );
-
-        if actual != prev {
+        if self
+            .inner
+            .head
+            .compare_exchange(
+                prev,
+                pack(head.wrapping_add(n), head.wrapping_add(n)),
+                Release,
+                Relaxed,
+            )
+            .is_err()
+        {
             // We failed to claim the tasks, losing the race. Return out of
             // this function and try the full `push` routine again. The queue
             // may not be full anymore.
