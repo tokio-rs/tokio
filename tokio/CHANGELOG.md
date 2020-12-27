@@ -12,11 +12,11 @@ Due to the soundness hole, we have also yanked Tokio version 1.0.0.
 
 ### Removed
 
-- sync: remove `RwLockWriteGuard::map` and `RwLockWriteGuard::try_map` (#3345)
+- sync: remove `RwLockWriteGuard::map` and `RwLockWriteGuard::try_map` (#[3345])
 
 ### Fixed
 
-- docs: remove stream feature from docs (#3335)
+- docs: remove stream feature from docs (#[3335])
 
 [semver]: https://github.com/rust-lang/rfcs/blob/master/text/1122-language-semver.md#soundness-changes
 [#3335]: https://github.com/tokio-rs/tokio/pull/3335
