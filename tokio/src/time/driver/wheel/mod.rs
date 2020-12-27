@@ -288,16 +288,16 @@ impl Wheel {
 }
 
 fn level_for(elapsed: u64, when: u64) -> usize {
+    const SLOT_MASK: u64 = (1 << 6) - 1;
+
     // Mask in the trailing bits ignored by the level calculation in order to cap
     // the possible leading zeros
-    let mut masked = elapsed ^ when | 0x3f;
+    let mut masked = elapsed ^ when | SLOT_MASK;
 
     if masked >= MAX_DURATION {
         // Fudge the timer into the top level
         masked = MAX_DURATION - 1;
     }
-
-    assert!(masked != 0, "elapsed={}; when={}", elapsed, when);
 
     let leading_zeros = masked.leading_zeros() as usize;
     let significant = 63 - leading_zeros;
