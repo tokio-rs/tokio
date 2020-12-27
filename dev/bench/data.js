@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1609062398570,
+  "lastUpdate": 1609080723168,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -4697,6 +4697,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 592,
             "range": "± 89",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "2389206378@qq.com",
+            "name": "zhongjn",
+            "username": "zhongjn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0048d43713b65c5d0f893c13b6783ce4711e0bf1",
+          "message": "macros: improve select! error message (#3352)\n\nCo-authored-by: Alice Ryhl <alice@ryhl.io>",
+          "timestamp": "2020-12-27T23:50:32+09:00",
+          "tree_id": "f80e229ed915cc23f4239d93fc4b2eb13f3378cc",
+          "url": "https://github.com/tokio-rs/tokio/commit/0048d43713b65c5d0f893c13b6783ce4711e0bf1"
+        },
+        "date": 1609080722038,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 838,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 12555,
+            "range": "± 2372",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 875,
+            "range": "± 6",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 13538,
+            "range": "± 3026",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 492,
+            "range": "± 14",
             "unit": "ns/iter"
           }
         ]
