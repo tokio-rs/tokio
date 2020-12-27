@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1609080780299,
+  "lastUpdate": 1609082312706,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -9025,6 +9025,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20964075,
             "range": "± 3113127",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "62563461+capcah@users.noreply.github.com",
+            "name": "Danilo Martins",
+            "username": "capcah"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2d9bea8d63229c108f25049c4815538ada25697a",
+          "message": "runtime: fix typo (#3354)\n\nCo-authored-by: Danilo <vandor.danilo@gmail.com>",
+          "timestamp": "2020-12-27T16:17:00+01:00",
+          "tree_id": "0f9ecf7beb5543eadf38f66b4cd82cef1717ab6a",
+          "url": "https://github.com/tokio-rs/tokio/commit/2d9bea8d63229c108f25049c4815538ada25697a"
+        },
+        "date": 1609082311676,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 159072,
+            "range": "± 6268",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 607213,
+            "range": "± 14360",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4806247,
+            "range": "± 1131056",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 17915025,
+            "range": "± 1600535",
             "unit": "ns/iter"
           }
         ]
