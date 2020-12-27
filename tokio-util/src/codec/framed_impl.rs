@@ -120,16 +120,46 @@ where
 
         let mut pinned = self.project();
         let state: &mut ReadFrame = pinned.state.borrow_mut();
+        // The following loops implements a state machine with each state identified
+        // by a combination of the `is_readable` and `eof` flags.
+        // Note that these states persist across multiple loop entries and returns.
+        // The intitial state is `reading`.
+        //
+        // | state   | eof   | is_readable |
+        // |---------|-------|-------------|
+        // | reading | false | false       |
+        // | framing | false | true        |
+        // | pausing | true  | true        |
+        // | paused  | true  | false       |
+        //
+        //                          `decode_eof`
+        //                          returns `Some`                  read 0 bytes
+        //                            │       │                       │      │
+        //                            │       ▼                       │      ▼
+        //                            ┌───────┐    `decode_eof`       ┌──────┐
+        //      ┌────────────────────▶│pausing│────returns `None`────▶│paused│
+        //      │                     └───────┘                       └──────┘
+        // read 0 bytes                   ┌──────┐                        │
+        //      │                         │      │                        │
+        //      │                         │  `decode` returns `Some`      │
+        //  ╔═══════╗                 ┌───────┐◀─┘                        │
+        //  ║reading║─read n>0 bytes─▶│framing│                           │
+        //  ╚═══════╝                 └───────┘◀──────read n>0 bytes──────┘
+        //      ▲                         │
+        //      │                         │
+        //      └─`decode` returns `None`─┘
         loop {
-            // Repeatedly call `decode` or `decode_eof` as long as it is
-            // "readable". Readable is defined as not having returned `None`.
-            // If the upstream has returned EOF, and the decoder is no longer
-            // readable, it might become readable again if the underlying
-            // AsyncRead is a FIFO or file.
-            // However, we still want to make sure that upon encountering an EOF
-            // we actually finish emmiting all it's associated decode_eof frames.
-            // Furthermore, we don't want to emit any decode_eof frames on retried
-            // reads after an EOF unless we've actually read more data.
+            // Repeatedly call `decode` or `decode_eof` as long as long as the buffer
+            // is "readable". Readable means that it _might_ contain data that could be consumed
+            // by `decode` or `decode_eof`. Both `decode` and `decode_eof` signal that the buffer
+            // is no longer readable for them by returning `None`.
+            // If `decode` signals that it couldn't read from the buffer and the upstream has
+            // returned eof, `decode_eof` will attemp to decode the remainder as closing frames.
+            // The buffer might become readable again if the underlying AsyncRead is a FIFO or file.
+            // However, we still want to make sure that upon encountering an eof
+            // we actually finish emmiting all it's associated `decode_eof` frames.
+            // Furthermore, we don't want to emit any `decode_eof` frames on retried
+            // reads after an eof unless we've actually read more data.
             if state.is_readable {
                 if state.eof {
                     let frame = pinned.codec.decode_eof(&mut state.buffer)?;
@@ -151,9 +181,9 @@ where
 
             // If we can't build a frame yet, try to read more data and try again.
             // Make sure we've got room for at least one byte to read to ensure
-            // that we don't get a spurious 0 that looks like EOF.
+            // that we don't get a spurious 0 that looks like eof.
             // Only allocate if we actually need it to prevent slowly leaking bytes,
-            // in less fortunate code that repeatedly polls an EOF file.
+            // in less fortunate code that repeatedly polls an eof file.
             if state.buffer.capacity() == state.buffer.len() {
                 state.buffer.reserve(1);
             }
