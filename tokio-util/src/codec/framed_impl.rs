@@ -132,22 +132,22 @@ where
         // | pausing | true  | true        |
         // | paused  | true  | false       |
         //
-        //                          `decode_eof`
-        //                          returns `Some`                  read 0 bytes
-        //                            │       │                       │      │
-        //                            │       ▼                       │      ▼
-        //                            ┌───────┐    `decode_eof`       ┌──────┐
-        //      ┌────────────────────▶│pausing│────returns `None`────▶│paused│
-        //      │                     └───────┘                       └──────┘
-        // read 0 bytes                   ┌──────┐                        │
-        //      │                         │      │                        │
-        //      │                         │  `decode` returns `Some`      │
-        //  ╔═══════╗                 ┌───────┐◀─┘                        │
-        //  ║reading║─read n>0 bytes─▶│framing│                           │
-        //  ╚═══════╝                 └───────┘◀──────read n>0 bytes──────┘
-        //      ▲                         │
-        //      │                         │
-        //      └─`decode` returns `None`─┘
+        //                                 `decode_eof`
+        //                                 returns `Some`                  read 0 bytes
+        //                                   │       │                       │      │
+        //                                   │       ▼                       │      ▼
+        //                                   ┌───────┐    `decode_eof`       ┌──────┐
+        //                 ┌──read 0 bytes──▶│pausing│────returns `None`────▶│paused│
+        //                 │                 └───────┘                       └──────┘
+        // pending read┐   │                     ┌──────┐                        │
+        //      │      │   │                     │      │                        │
+        //      │      ▼   │                     │  `decode` returns `Some`      │
+        //      │  ╔═══════╗                 ┌───────┐◀─┘                        │
+        //      └──║reading║─read n>0 bytes─▶│framing│                           │
+        //         ╚═══════╝                 └───────┘◀──────read n>0 bytes──────┘
+        //             ▲                         │
+        //             │                         │
+        //             └─`decode` returns `None`─┘
         loop {
             // Repeatedly call `decode` or `decode_eof` as long as long as the buffer
             // is "readable". Readable means that it _might_ contain data that could be consumed
@@ -161,24 +161,30 @@ where
             // Furthermore, we don't want to emit any `decode_eof` frames on retried
             // reads after an eof unless we've actually read more data.
             if state.is_readable {
+                // pausing or framing
                 if state.eof {
+                    // pausing
                     let frame = pinned.codec.decode_eof(&mut state.buffer)?;
                     if frame.is_none() {
-                        state.is_readable = false;
+                        state.is_readable = false; // prepare pausing -> paused
                     }
+                    // implicit pausing -> pausing or pausing -> paused
                     return Poll::Ready(frame.map(Ok));
                 }
 
+                // framing
                 trace!("attempting to decode a frame");
 
                 if let Some(frame) = pinned.codec.decode(&mut state.buffer)? {
                     trace!("frame decoded from buffer");
+                    // implicit framing -> framing
                     return Poll::Ready(Some(Ok(frame)));
                 }
 
+                // framing -> reading
                 state.is_readable = false;
             }
-
+            // reading or stopped
             // If we can't build a frame yet, try to read more data and try again.
             // Make sure we've got room for at least one byte to read to ensure
             // that we don't get a spurious 0 that looks like eof.
@@ -189,20 +195,25 @@ where
             }
             let bytect = match poll_read_buf(pinned.inner.as_mut(), cx, &mut state.buffer)? {
                 Poll::Ready(ct) => ct,
+                // implicit reading -> reading
                 Poll::Pending => return Poll::Pending,
             };
             if bytect == 0 {
-                // We're already at an EOF, and since we've reached this path
-                // we're also not readable. This implies that we've already finished
-                // our decode_eof() handling, so we can simply return None.
                 if state.eof {
+                    // We're already at an eof, and since we've reached this path
+                    // we're also not readable. This implies that we've already finished
+                    // our `decode_eof` handling, so we can simply return `None`.
+                    // implicit stopped -> stopped
                     return Poll::Ready(None);
                 }
+                // prepare reading -> stopping
                 state.eof = true;
             } else {
+                // prepare stopped -> framing or noop reading -> framing
                 state.eof = false;
             }
-
+            
+            // stopped -> framing or reading -> framing or reading -> stopping
             state.is_readable = true;
         }
     }
