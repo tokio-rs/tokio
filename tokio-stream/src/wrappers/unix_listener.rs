@@ -1,5 +1,4 @@
 use crate::Stream;
-use std::convert::{AsMut, AsRef};
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};

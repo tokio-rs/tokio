@@ -1,6 +1,5 @@
 use crate::Stream;
 use pin_project_lite::pin_project;
-use std::convert::{AsMut, AsRef};
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
