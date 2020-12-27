@@ -194,13 +194,14 @@ impl<T> Local<T> {
         // work. This is because all tasks are pushed into the queue from the
         // current thread (or memory has been acquired if the local queue handle
         // moved).
-        let actual = self.inner.head.compare_and_swap(
+        let actual = self.inner.head.compare_exchange(
             prev,
             pack(head.wrapping_add(n), head.wrapping_add(n)),
             Release,
+            Release,
         );
 
-        if actual != prev {
+        if actual.is_err() {
             // We failed to claim the tasks, losing the race. Return out of
             // this function and try the full `push` routine again. The queue
             // may not be full anymore.

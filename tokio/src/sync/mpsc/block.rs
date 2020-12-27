@@ -258,17 +258,16 @@ impl<T> Block<T> {
     pub(crate) unsafe fn try_push(
         &self,
         block: &mut NonNull<Block<T>>,
-        ordering: Ordering,
     ) -> Result<(), NonNull<Block<T>>> {
         block.as_mut().start_index = self.start_index.wrapping_add(BLOCK_CAP);
 
         let next_ptr = self
             .next
-            .compare_and_swap(ptr::null_mut(), block.as_ptr(), ordering);
+            .compare_exchange(ptr::null_mut(), block.as_ptr(), AcqRel, Acquire);
 
-        match NonNull::new(next_ptr) {
-            Some(next_ptr) => Err(next_ptr),
-            None => Ok(()),
+        match next_ptr {
+            Ok(_) => Ok(()),
+            Err(v) => Err(NonNull::new_unchecked(v)),
         }
     }
 
@@ -306,20 +305,18 @@ impl<T> Block<T> {
         //
         // `Release` ensures that the newly allocated block is available to
         // other threads acquiring the next pointer.
-        let next = NonNull::new(self.next.compare_and_swap(
-            ptr::null_mut(),
-            new_block.as_ptr(),
-            AcqRel,
-        ));
-
-        let next = match next {
-            Some(next) => next,
-            None => {
-                // The compare-and-swap succeeded and the newly allocated block
-                // is successfully pushed.
-                return new_block;
-            }
-        };
+        let next =
+            match self
+                .next
+                .compare_exchange(ptr::null_mut(), new_block.as_ptr(), AcqRel, Acquire)
+            {
+                Ok(_) => {
+                    // The compare-and-swap succeeded and the newly allocated block
+                    // is successfully pushed.
+                    return new_block;
+                }
+                Err(v) => unsafe { NonNull::new_unchecked(v) },
+            };
 
         // There already is a next block in the linked list. The newly allocated
         // block could be dropped and the discovered next block returned;
@@ -333,7 +330,7 @@ impl<T> Block<T> {
 
         // TODO: Should this iteration be capped?
         loop {
-            let actual = unsafe { curr.as_ref().try_push(&mut new_block, AcqRel) };
+            let actual = unsafe { curr.as_ref().try_push(&mut new_block) };
 
             curr = match actual {
                 Ok(_) => {

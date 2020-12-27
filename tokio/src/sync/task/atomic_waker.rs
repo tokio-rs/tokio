@@ -171,8 +171,11 @@ impl AtomicWaker {
     where
         W: WakerRef,
     {
-        match self.state.compare_and_swap(WAITING, REGISTERING, Acquire) {
-            WAITING => {
+        match self
+            .state
+            .compare_exchange(WAITING, REGISTERING, Acquire, Acquire)
+        {
+            Ok(WAITING) => {
                 unsafe {
                     // Locked acquired, update the waker cell
                     self.waker.with_mut(|t| *t = Some(waker.into_waker()));
@@ -212,7 +215,7 @@ impl AtomicWaker {
                     }
                 }
             }
-            WAKING => {
+            Err(WAKING) => {
                 // Currently in the process of waking the task, i.e.,
                 // `wake` is currently being called on the old waker.
                 // So, we call wake on the new waker.
@@ -221,7 +224,7 @@ impl AtomicWaker {
                 // This is equivalent to a spin lock, so use a spin hint.
                 atomic::spin_loop_hint();
             }
-            state => {
+            Err(state) => {
                 // In this case, a concurrent thread is holding the
                 // "registering" lock. This probably indicates a bug in the
                 // caller's code as racing to call `register` doesn't make much
