@@ -677,8 +677,6 @@ impl UnixDatagram {
         ///         // Wait for the socket to be readable
         ///         socket.readable().await?;
         ///
-        ///         // The buffer is **not** included in the async task and will
-        ///         // only exist on the stack.
         ///         let mut buf = Vec::with_capacity(1024);
         ///
         ///         // Try to recv data, this may still fail with `WouldBlock`
@@ -742,8 +740,6 @@ impl UnixDatagram {
         ///         // Wait for the socket to be readable
         ///         socket.readable().await?;
         ///
-        ///         // The buffer is **not** included in the async task and will
-        ///         // only exist on the stack.
         ///         let mut buf = Vec::with_capacity(1024);
         ///
         ///         // Try to recv data, this may still fail with `WouldBlock`
