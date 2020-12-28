@@ -600,8 +600,6 @@ impl TcpStream {
         ///         // Wait for the socket to be readable
         ///         stream.readable().await?;
         ///
-        ///         // Creating the buffer **after** the `await` prevents it from
-        ///         // being stored in the async task.
         ///         let mut buf = Vec::with_capacity(4096);
         ///
         ///         // Try to read data, this may still fail with `WouldBlock`
