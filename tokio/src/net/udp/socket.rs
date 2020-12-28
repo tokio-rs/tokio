@@ -1,4 +1,6 @@
 use crate::io::{Interest, PollEvented, ReadBuf, Ready};
+use crate::net::udp::split::{split, ReadHalf, WriteHalf};
+use crate::net::udp::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
 use crate::net::{to_socket_addrs, ToSocketAddrs};
 
 use std::convert::TryFrom;
@@ -90,7 +92,7 @@ cfg_net! {
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
-    ///     let sock = UdpSocket::bind("0.0.0.0:8080".parse::<SocketAddr>().unwrap()).await?;
+    ///     let sock = UdpSocket::bind("0.0.0.0:8080").await?;
     ///     let r = Arc::new(sock);
     ///     let s = r.clone();
     ///     let (tx, mut rx) = mpsc::channel::<(Vec<u8>, SocketAddr)>(1_000);
@@ -1341,6 +1343,35 @@ impl UdpSocket {
     /// ```
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
         self.io.take_error()
+    }
+
+    // These lifetime markers also appear in the generated documentation, and make
+    // it more clear that this is a *borrowed* split.
+    #[allow(clippy::needless_lifetimes)]
+    /// Split a `UnixStream` into a read half and a write half, which can be used
+    /// to read and write the stream concurrently.
+    ///
+    /// This method is more efficient than [`into_split`], but the halves cannot be
+    /// moved into independently spawned tasks.
+    ///
+    /// [`into_split`]: Self::into_split()
+    pub fn split<'a>(&'a mut self) -> (RecvHalf<'a>, SendHalf<'a>) {
+        split(self)
+    }
+
+    /// Splits a `UnixStream` into a read half and a write half, which can be used
+    /// to read and write the stream concurrently.
+    ///
+    /// Unlike [`split`], the owned halves can be moved to separate tasks, however
+    /// this comes at the cost of a heap allocation.
+    ///
+    /// **Note:** Dropping the write half will shut down the write half of the
+    /// stream. This is equivalent to calling [`shutdown(Write)`] on the `UnixStream`.
+    ///
+    /// [`split`]: Self::split()
+    /// [`shutdown(Write)`]: fn@Self::shutdown
+    pub fn into_split(self) -> (OwnedRecvHalf, OwnedSendHalf) {
+        split_owned(self)
     }
 }
 
