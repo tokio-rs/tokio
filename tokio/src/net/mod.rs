@@ -36,7 +36,7 @@ cfg_net! {
     pub use tcp::socket::TcpSocket;
     pub use tcp::stream::TcpStream;
 
-    mod udp;
+    pub mod udp;
     pub use udp::socket::UdpSocket;
 }
 
