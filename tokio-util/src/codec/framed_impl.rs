@@ -212,7 +212,7 @@ where
                 // prepare stopped -> framing or noop reading -> framing
                 state.eof = false;
             }
-            
+
             // stopped -> framing or reading -> framing or reading -> stopping
             state.is_readable = true;
         }
