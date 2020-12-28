@@ -6,7 +6,7 @@
 //!
 //! If you need to use a `UdpSocket` concurrently from more than 2 separate tasks,
 //! you're free to `Arc` the `UdpSocket` yourself and `clone` as much as you
-//! need. All it's async method are safe to use from multiple tasks.
+//! need. All it's async methods are safe to use from multiple tasks.
 
 use crate::net::{ToSocketAddrs, UdpSocket};
 

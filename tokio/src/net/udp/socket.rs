@@ -1348,7 +1348,7 @@ impl UdpSocket {
     // These lifetime markers also appear in the generated documentation, and make
     // it more clear that this is a *borrowed* split.
     #[allow(clippy::needless_lifetimes)]
-    /// Split a `UnixStream` into a read half and a write half, which can be used
+    /// Split a `UdpSocket` into a read half and a write half, which can be used
     /// to read and write the stream concurrently.
     ///
     /// This method is more efficient than [`into_split`], but the halves cannot be
@@ -1359,17 +1359,13 @@ impl UdpSocket {
         split(self)
     }
 
-    /// Splits a `UnixStream` into a read half and a write half, which can be used
+    /// Splits a `UdpSocket` into a read half and a write half, which can be used
     /// to read and write the stream concurrently.
     ///
     /// Unlike [`split`], the owned halves can be moved to separate tasks, however
     /// this comes at the cost of a heap allocation.
     ///
-    /// **Note:** Dropping the write half will shut down the write half of the
-    /// stream. This is equivalent to calling [`shutdown(Write)`] on the `UnixStream`.
-    ///
     /// [`split`]: Self::split()
-    /// [`shutdown(Write)`]: fn@Self::shutdown
     pub fn into_split(self) -> (OwnedRecvHalf, OwnedSendHalf) {
         split_owned(self)
     }
