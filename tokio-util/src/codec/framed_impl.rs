@@ -123,6 +123,7 @@ where
         // The following loops implements a state machine with each state identified
         // by a combination of the `is_readable` and `eof` flags.
         // Note that these states persist across multiple loop entries and returns.
+        // In fact, most state transitions occur with a return.
         // The intitial state is `reading`.
         //
         // | state   | eof   | is_readable |
@@ -133,18 +134,18 @@ where
         // | paused  | true  | false       |
         //
         //                                 `decode_eof`
-        //                                 returns `Some`                  read 0 bytes
-        //                                   │       │                       │      │
-        //                                   │       ▼                       │      ▼
-        //                                   ┌───────┐    `decode_eof`       ┌──────┐
-        //                 ┌──read 0 bytes──▶│pausing│────returns `None`────▶│paused│
-        //                 │                 └───────┘                       └──────┘
-        // pending read┐   │                     ┌──────┐                        │
-        //      │      │   │                     │      │                        │
-        //      │      ▼   │                     │  `decode` returns `Some`      │
-        //      │  ╔═══════╗                 ┌───────┐◀─┘                        │
-        //      └──║reading║─read n>0 bytes─▶│framing│                           │
-        //         ╚═══════╝                 └───────┘◀──────read n>0 bytes──────┘
+        //                                 returns `Some`             read 0 bytes
+        //                                   │       │                 │      │
+        //                                   │       ▼                 │      ▼
+        //                                   ┌───────┐ `decode_eof`    ┌──────┐
+        //                 ┌──read 0 bytes──▶│pausing│─returns `None`─▶│paused│──┐
+        //                 │                 └───────┘                 └──────┘  │
+        // pending read┐   │                     ┌──────┐                  │  ▲  │
+        //      │      │   │                     │      │                  │  │  │
+        //      │      ▼   │                     │  `decode` returns `Some`│ pending read
+        //      │  ╔═══════╗                 ┌───────┐◀─┘                  │
+        //      └──║reading║─read n>0 bytes─▶│framing│                     │
+        //         ╚═══════╝                 └───────┘◀──────read n>0 bytes┘
         //             ▲                         │
         //             │                         │
         //             └─`decode` returns `None`─┘
@@ -195,7 +196,7 @@ where
             }
             let bytect = match poll_read_buf(pinned.inner.as_mut(), cx, &mut state.buffer)? {
                 Poll::Ready(ct) => ct,
-                // implicit reading -> reading
+                // implicit reading -> reading or implicit stopped -> stopped
                 Poll::Pending => return Poll::Pending,
             };
             if bytect == 0 {
