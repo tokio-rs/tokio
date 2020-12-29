@@ -736,10 +736,6 @@ impl UdpSocket {
         /// }
         /// ```
         pub fn try_recv_buf<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
-            if !buf.has_remaining_mut() {
-                return Ok(0);
-            }
-
             self.io.registration().try_io(Interest::READABLE, || {
                 let dst = buf.chunk_mut();
                 let dst =
