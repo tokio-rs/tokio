@@ -52,10 +52,9 @@ where
     /// calling [`split`] on the `Framed` returned by this method, which will
     /// break them into separate objects, allowing them to interact more easily.
     ///
-    /// Note that for some underlying byte stream sources, namely files and FIFOs,
-    /// it's possible to temporarily return 0 bytes and reach eof.
-    /// In those cases it is possible to resume the frame stream after
-    /// it as returned `None` by simply attempting to read from it again.
+    /// Note that for some byte stream sources, e.g. files and FIFOs,
+    /// it is possible to resume the stream after having reached EOF
+    /// by attempting to read from it again.
     ///
     /// Note that attempts to read from such an eof data source will not wait
     /// for new data and simply return `None` if it's still eof.
