@@ -37,7 +37,7 @@ where
     type Item = Result<(C::Item, SocketAddr), C::Error>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut pin = self.project();
+        let pin = self.project();
 
         let read_state: &mut ReadFrame = pin.state.borrow_mut();
         read_state.buffer.reserve(INITIAL_RD_CAPACITY);
@@ -63,10 +63,10 @@ where
                 // Convert `&mut [MaybeUnit<u8>]` to `&mut [u8]` because we will be
                 // writing to it via `poll_recv_from` and therefore initializing the memory.
                 let buf =
-                    &mut *(read_state.buffer.bytes_mut() as *mut _ as *mut [MaybeUninit<u8>]);
+                    &mut *(read_state.buffer.chunk_mut() as *mut _ as *mut [MaybeUninit<u8>]);
                 let mut read = ReadBuf::uninit(buf);
                 let ptr = read.filled().as_ptr();
-                let res = ready!(Pin::new(&mut pin.inner).poll_recv_from(cx, &mut read));
+                let res = ready!(pin.inner.poll_recv_from(cx, &mut read));
 
                 assert_eq!(ptr, read.filled().as_ptr());
                 let addr = res?;
