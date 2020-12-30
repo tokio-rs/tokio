@@ -128,10 +128,9 @@ pub trait Decoder {
     ///
     /// This method defaults to calling `decode` and returns an error if
     /// `Ok(None)` is returned while there is unconsumed data in `buf`.
-    /// Typically this doesn't need to be implemented unless you want to
-    /// create frames from sources that can be resumed after an eof,
-    /// such as files of FIFOs, on in cases where the framing protocol
-    /// differs near the end of the stream.
+    /// Typically this doesn't need to be implemented unless the framing
+    /// protocol differs near the end of the stream, or if you need to construct
+    /// frames _across_ eof boundaries on sources that can be resumed.
     ///
     /// Note that the `buf` argument may be empty. If a previous call to
     /// `decode_eof` consumed all the bytes in the buffer, `decode_eof` will be
