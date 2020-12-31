@@ -114,6 +114,13 @@ impl<S, B> StreamReader<S, B> {
     pub fn get_pin_mut(self: Pin<&mut Self>) -> Pin<&mut S> {
         self.project().inner
     }
+
+    /// Consumes this `BufWriter`, returning the underlying stream.
+    ///
+    /// Note that any leftover data in the internal buffer is lost.
+    pub fn into_inner(self) -> S {
+        self.inner
+    }
 }
 
 impl<S, B, E> AsyncRead for StreamReader<S, B>
