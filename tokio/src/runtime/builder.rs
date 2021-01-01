@@ -156,7 +156,7 @@ impl Builder {
 
     /// Sets the number of worker threads the `Runtime` will use.
     ///
-    /// This should be a number between 0 and 32,768 though it is advised to
+    /// This should be a number between 1 and 32,768 though it is advised to
     /// keep this value on the smaller side.
     ///
     /// # Default
@@ -165,9 +165,10 @@ impl Builder {
     ///
     /// # Panic
     ///
-    /// When using the `current_thread` runtime this method will panic, since
-    /// those variants do not allow setting worker thread counts.
+    /// * Panics if used via [`Builder::new_current_thread`], since those
+    ///   runtimes do not have distinct worker threads.
     ///
+    /// * Panics if set to zero (`0`).
     ///
     /// # Examples
     ///
@@ -200,9 +201,6 @@ impl Builder {
     /// rt.block_on(async move {});
     /// ```
     ///
-    /// # Panic
-    ///
-    /// This will panic if `val` is not larger than `0`.
     pub fn worker_threads(&mut self, val: usize) -> &mut Self {
         assert!(val > 0, "Worker threads cannot be set to 0");
         self.worker_threads = Some(val);
