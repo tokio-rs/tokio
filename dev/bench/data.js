@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1609502814855,
+  "lastUpdate": 1609502829379,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -14247,6 +14247,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1091,
             "range": "± 36",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "tesaguriguma@gmail.com",
+            "name": "Daiki Mizukami",
+            "username": "tesaguri"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "36918e05e567f53e0a9cf12b647d6bb34e0b9e8d",
+          "message": "util: add more get_{ref,mut,pin_mut} methods (#3364)\n\nThis commit adds:\r\n\r\n- Framed::get_pin_mut\r\n- FramedRead::get_pin_mut\r\n- FramedWrite::get_pin_mut\r\n- StreamReader::get_ref\r\n- StreamReader::get_mut\r\n- StreamReader::get_pin_mut\r\n- StreamReader::into_inner",
+          "timestamp": "2021-01-01T13:05:15+01:00",
+          "tree_id": "ca9828a10c320fd13251c15363ec1886381355ae",
+          "url": "https://github.com/tokio-rs/tokio/commit/36918e05e567f53e0a9cf12b647d6bb34e0b9e8d"
+        },
+        "date": 1609502828251,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 16457,
+            "range": "± 8746",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 966,
+            "range": "± 198",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 595,
+            "range": "± 92",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 16836,
+            "range": "± 3954",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 979,
+            "range": "± 172",
             "unit": "ns/iter"
           }
         ]
