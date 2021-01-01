@@ -206,7 +206,9 @@ cfg_rt! {
 
 cfg_rt_multi_thread! {
     mod park;
+
     use park::Parker;
+    pub(crate) use blocking::spawn_core;
 }
 
 cfg_rt_multi_thread! {

@@ -211,19 +211,29 @@ impl Builder {
 
     /// Specifies limit for threads spawned by the Runtime used for blocking operations.
     ///
-    ///
-    /// Similarly to the `worker_threads`, this number should be between 1 and 32,768.
+    /// Blocking operations include calls to [`Runtime::spawn_blocking`] and
+    /// [`block_in_place`](crate::task::block_in_place).  Like
+    /// `worker_threads`, this number should be between 1 and 32,768, though it
+    /// is advisable to use a larger number to support parallel blocking
+    /// operations.  As `worker_threads` are always active, this limits
+    /// additional threads.
     ///
     /// The default value is 512.
     ///
-    /// Otherwise as `worker_threads` are always active, it limits additional threads (e.g. for
-    /// blocking annotations).
+    /// **Warning: Setting this to zero (`0`) is allowed, but will result in
+    /// runtime panics as described below.** Doing so is only possibly useful
+    /// as _either_ a temporary way to find calls to `spawn_blocking` or as a
+    /// testing/runtime assertion that an application does not use these
+    /// blocking calls either directly or indirectly via tokio or other
+    /// libraries.
     ///
     /// # Panic
     ///
-    /// This will panic if `val` is not larger than `0`.
+    /// If set to zero (`0`), calls to [`Runtime::spawn_blocking`] or
+    /// [`block_in_place`](crate::task::block_in_place), including internal use
+    /// such as via `tokio::fs` or other libraries, will result in a panic
+    /// explaining the mis-configuration.
     pub fn max_blocking_threads(&mut self, val: usize) -> &mut Self {
-        assert!(val > 0, "Max blocking threads cannot be set to 0");
         self.max_blocking_threads = val;
         self
     }
@@ -424,7 +434,7 @@ impl Builder {
         let spawner = Spawner::Basic(scheduler.spawner().clone());
 
         // Blocking pool
-        let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads);
+        let blocking_pool = blocking::create_blocking_pool(self, 0, self.max_blocking_threads);
         let blocking_spawner = blocking_pool.spawner().clone();
 
         Ok(Runtime {
@@ -504,7 +514,7 @@ cfg_rt_multi_thread! {
             let spawner = Spawner::ThreadPool(scheduler.spawner().clone());
 
             // Create the blocking pool
-            let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads + core_threads);
+            let blocking_pool = blocking::create_blocking_pool(self, core_threads, self.max_blocking_threads);
             let blocking_spawner = blocking_pool.spawner().clone();
 
             // Create the runtime handle

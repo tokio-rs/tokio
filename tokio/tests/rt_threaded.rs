@@ -375,20 +375,55 @@ fn coop_and_block_in_place() {
 
 // Testing this does not panic
 #[test]
-fn max_blocking_threads() {
+fn max_blocking_threads_0() {
     let _rt = tokio::runtime::Builder::new_multi_thread()
-        .max_blocking_threads(1)
+        .worker_threads(1)
+        .max_blocking_threads(0)
         .build()
         .unwrap();
 }
 
 #[test]
 #[should_panic]
-fn max_blocking_threads_set_to_zero() {
-    let _rt = tokio::runtime::Builder::new_multi_thread()
+fn max_blocking_threads_0_spawn_blocking() {
+    let rt = tokio::runtime::Builder::new_multi_thread()
         .max_blocking_threads(0)
         .build()
         .unwrap();
+
+    rt.block_on(async {
+        // Should panic on call (rather then never running)
+        tokio::task::spawn_blocking(|| eprintln!("blocking op")).await
+    })
+    .unwrap();
+}
+
+#[test]
+#[should_panic]
+fn max_blocking_threads_0_block_in_place() {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_time()
+        .max_blocking_threads(0)
+        .build()
+        .unwrap();
+
+    let (tx, rx) = mpsc::channel();
+
+    rt.block_on(async move {
+        tokio::task::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            tx.send(()).unwrap();
+        });
+        tokio::task::spawn(async move {
+            // Call to block_in_place should panic...
+            tokio::task::block_in_place(|| {
+                rx.recv().ok();
+            })
+        })
+        .await
+    })
+    .unwrap(); // JoinError::Panic
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

@@ -248,7 +248,8 @@ where
         cx.worker.core.set(core);
 
         // Next, clone the worker handle and send it to a new thread for
-        // processing.
+        // processing. Use spawn_blocking because this is no longer a "core"
+        // thread.
         //
         // Once the blocking task is done executing, we will attempt to
         // steal the core back.
@@ -276,7 +277,7 @@ const GLOBAL_POLL_INTERVAL: u8 = 61;
 impl Launch {
     pub(crate) fn launch(mut self) {
         for worker in self.0.drain(..) {
-            runtime::spawn_blocking(move || run(worker));
+            runtime::spawn_core(move || run(worker));
         }
     }
 }

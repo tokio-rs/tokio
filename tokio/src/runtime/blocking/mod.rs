@@ -6,14 +6,22 @@
 mod pool;
 pub(crate) use pool::{spawn_blocking, BlockingPool, Spawner};
 
+cfg_rt_multi_thread! {
+    pub(crate) use pool::spawn_core;
+}
+
 mod schedule;
 mod shutdown;
 pub(crate) mod task;
 
 use crate::runtime::Builder;
 
-pub(crate) fn create_blocking_pool(builder: &Builder, thread_cap: usize) -> BlockingPool {
-    BlockingPool::new(builder, thread_cap)
+pub(crate) fn create_blocking_pool(
+    builder: &Builder,
+    core_cap: usize,
+    extra_cap: usize,
+) -> BlockingPool {
+    BlockingPool::new(builder, core_cap, extra_cap)
 }
 
 /*

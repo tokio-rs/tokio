@@ -43,7 +43,10 @@ struct Inner {
     /// Call before a thread stops
     before_stop: Option<Callback>,
 
-    // Maximum number of threads
+    // The number of "core" threads
+    core_cap: usize,
+
+    // Maximum number of threads (core_cap + extra)
     thread_cap: usize,
 
     // Customizable wait timeout
@@ -85,6 +88,21 @@ where
     rt.spawn_blocking(func)
 }
 
+cfg_rt_multi_thread! {
+    /// Run the provided function on the executor
+    pub(crate) fn spawn_core<F, R>(func: F) -> JoinHandle<R>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        let rt = context::current().expect("not currently running on the Tokio runtime.");
+
+        let (task, handle) = task::joinable(BlockingTask::new(func));
+        let _ = rt.blocking_spawner.spawn_core(task, &rt);
+        handle
+    }
+}
+
 #[allow(dead_code)]
 pub(crate) fn try_spawn_blocking<F, R>(func: F) -> Result<(), ()>
 where
@@ -100,7 +118,7 @@ where
 // ===== impl BlockingPool =====
 
 impl BlockingPool {
-    pub(crate) fn new(builder: &Builder, thread_cap: usize) -> BlockingPool {
+    pub(crate) fn new(builder: &Builder, core_cap: usize, extra_cap: usize) -> BlockingPool {
         let (shutdown_tx, shutdown_rx) = shutdown::channel();
         let keep_alive = builder.keep_alive.unwrap_or(KEEP_ALIVE);
 
@@ -123,7 +141,8 @@ impl BlockingPool {
                     stack_size: builder.thread_stack_size,
                     after_start: builder.after_start.clone(),
                     before_stop: builder.before_stop.clone(),
-                    thread_cap,
+                    core_cap,
+                    thread_cap: core_cap + extra_cap,
                     keep_alive,
                 }),
             },
@@ -184,7 +203,26 @@ impl fmt::Debug for BlockingPool {
 // ===== impl Spawner =====
 
 impl Spawner {
+    #[inline]
     pub(crate) fn spawn(&self, task: Task, rt: &Handle) -> Result<(), ()> {
+        // Panic if this requires extra threads (e.g. `max_blocking_threads`),
+        // but none were configured. Otherwise the task will never be run.
+        assert!(
+            self.inner.thread_cap > self.inner.core_cap,
+            "`spawn_blocking` or `block_in_place` called, but \
+             `runtime::Builder::max_blocking_threads(0)` was configured!"
+        );
+
+        self.spawn_it(task, rt)
+    }
+
+    #[inline]
+    #[cfg(feature = "rt-multi-thread")]
+    pub(crate) fn spawn_core(&self, task: Task, rt: &Handle) -> Result<(), ()> {
+        self.spawn_it(task, rt)
+    }
+
+    fn spawn_it(&self, task: Task, rt: &Handle) -> Result<(), ()> {
         let shutdown_tx = {
             let mut shared = self.inner.shared.lock();
 
