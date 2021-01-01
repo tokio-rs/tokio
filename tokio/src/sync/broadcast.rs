@@ -361,38 +361,16 @@ struct RecvGuard<'a, T> {
 }
 
 /// Receive a value future
-struct Recv<R, T>
-where
-    R: AsMut<Receiver<T>>,
-{
+struct Recv<'a, T> {
     /// Receiver being waited on
-    receiver: R,
+    receiver: &'a mut Receiver<T>,
 
     /// Entry in the waiter `LinkedList`
     waiter: UnsafeCell<Waiter>,
-
-    _p: std::marker::PhantomData<T>,
 }
 
-/// `AsMut<T>` is not implemented for `T` (coherence). Explicitly implementing
-/// `AsMut` for `Receiver` would be included in the public API of the receiver
-/// type. Instead, `Borrow` is used internally to bridge the gap.
-struct Borrow<T>(T);
-
-impl<T> AsMut<Receiver<T>> for Borrow<Receiver<T>> {
-    fn as_mut(&mut self) -> &mut Receiver<T> {
-        &mut self.0
-    }
-}
-
-impl<'a, T> AsMut<Receiver<T>> for Borrow<&'a mut Receiver<T>> {
-    fn as_mut(&mut self) -> &mut Receiver<T> {
-        &mut *self.0
-    }
-}
-
-unsafe impl<R: AsMut<Receiver<T>> + Send, T: Send> Send for Recv<R, T> {}
-unsafe impl<R: AsMut<Receiver<T>> + Sync, T: Send> Sync for Recv<R, T> {}
+unsafe impl<'a, T: Send> Send for Recv<'a, T> {}
+unsafe impl<'a, T: Send> Sync for Recv<'a, T> {}
 
 /// Max number of receivers. Reserve space to lock.
 const MAX_RECEIVERS: usize = usize::MAX >> 2;
@@ -892,7 +870,7 @@ impl<T: Clone> Receiver<T> {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Result<T, RecvError> {
-        let fut = Recv::<_, T>::new(Borrow(self));
+        let fut = Recv::new(self);
         fut.await
     }
 
@@ -965,11 +943,8 @@ impl<T> Drop for Receiver<T> {
     }
 }
 
-impl<R, T> Recv<R, T>
-where
-    R: AsMut<Receiver<T>>,
-{
-    fn new(receiver: R) -> Recv<R, T> {
+impl<'a, T> Recv<'a, T> {
+    fn new(receiver: &'a mut Receiver<T>) -> Recv<'a, T> {
         Recv {
             receiver,
             waiter: UnsafeCell::new(Waiter {
@@ -978,7 +953,6 @@ where
                 pointers: linked_list::Pointers::new(),
                 _p: PhantomPinned,
             }),
-            _p: std::marker::PhantomData,
         }
     }
 
@@ -990,14 +964,13 @@ where
             is_unpin::<&mut Receiver<T>>();
 
             let me = self.get_unchecked_mut();
-            (me.receiver.as_mut(), &me.waiter)
+            (me.receiver, &me.waiter)
         }
     }
 }
 
-impl<R, T> Future for Recv<R, T>
+impl<'a, T> Future for Recv<'a, T>
 where
-    R: AsMut<Receiver<T>>,
     T: Clone,
 {
     type Output = Result<T, RecvError>;
@@ -1016,14 +989,11 @@ where
     }
 }
 
-impl<R, T> Drop for Recv<R, T>
-where
-    R: AsMut<Receiver<T>>,
-{
+impl<'a, T> Drop for Recv<'a, T> {
     fn drop(&mut self) {
         // Acquire the tail lock. This is required for safety before accessing
         // the waiter node.
-        let mut tail = self.receiver.as_mut().shared.tail.lock();
+        let mut tail = self.receiver.shared.tail.lock();
 
         // safety: tail lock is held
         let queued = self.waiter.with(|ptr| unsafe { (*ptr).queued });
