@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1609535186727,
+  "lastUpdate": 1609535192123,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -9385,6 +9385,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18315264,
             "range": "± 1514013",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "udoprog@tedro.se",
+            "name": "John-John Tedro",
+            "username": "udoprog"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "53707f5d9dd271615c9191bf70cb2f68f1e500c8",
+          "message": "sync: remove underused internal Borrow wrapper (#3363)",
+          "timestamp": "2021-01-01T13:04:38-08:00",
+          "tree_id": "74f366ac1114878de46c1000c8209c3a45ac24c8",
+          "url": "https://github.com/tokio-rs/tokio/commit/53707f5d9dd271615c9191bf70cb2f68f1e500c8"
+        },
+        "date": 1609535187566,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 199678,
+            "range": "± 70384",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 734904,
+            "range": "± 115275",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5535424,
+            "range": "± 1137823",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21112716,
+            "range": "± 2558345",
             "unit": "ns/iter"
           }
         ]
