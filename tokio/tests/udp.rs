@@ -353,3 +353,90 @@ async fn try_send_to_recv_from() {
         }
     }
 }
+
+#[tokio::test]
+async fn try_recv_buf() {
+    // Create listener
+    let server = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+
+    // Create socket pair
+    let client = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+
+    // Connect the two
+    client.connect(server.local_addr().unwrap()).await.unwrap();
+    server.connect(client.local_addr().unwrap()).await.unwrap();
+
+    for _ in 0..5 {
+        loop {
+            client.writable().await.unwrap();
+
+            match client.try_send(b"hello world") {
+                Ok(n) => {
+                    assert_eq!(n, 11);
+                    break;
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => panic!("{:?}", e),
+            }
+        }
+
+        loop {
+            server.readable().await.unwrap();
+
+            let mut buf = Vec::with_capacity(512);
+
+            match server.try_recv_buf(&mut buf) {
+                Ok(n) => {
+                    assert_eq!(n, 11);
+                    assert_eq!(&buf[0..11], &b"hello world"[..]);
+                    break;
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => panic!("{:?}", e),
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn try_recv_buf_from() {
+    // Create listener
+    let server = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let saddr = server.local_addr().unwrap();
+
+    // Create socket pair
+    let client = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let caddr = client.local_addr().unwrap();
+
+    for _ in 0..5 {
+        loop {
+            client.writable().await.unwrap();
+
+            match client.try_send_to(b"hello world", saddr) {
+                Ok(n) => {
+                    assert_eq!(n, 11);
+                    break;
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => panic!("{:?}", e),
+            }
+        }
+
+        loop {
+            server.readable().await.unwrap();
+
+            let mut buf = Vec::with_capacity(512);
+
+            match server.try_recv_buf_from(&mut buf) {
+                Ok((n, addr)) => {
+                    assert_eq!(n, 11);
+                    assert_eq!(addr, caddr);
+                    assert_eq!(&buf[0..11], &b"hello world"[..]);
+                    break;
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => panic!("{:?}", e),
+            }
+        }
+    }
+}
