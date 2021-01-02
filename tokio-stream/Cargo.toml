@@ -27,11 +27,11 @@ time = ["tokio/time"]
 futures-core = { version = "0.3.0" }
 pin-project-lite = "0.2.0"
 tokio = { version = "1.0", path = "../tokio", features = ["sync"] }
-async-stream = "0.3"
 
 [dev-dependencies]
 tokio = { version = "1.0", path = "../tokio", features = ["full"] }
 tokio-test = { path = "../tokio-test" }
+async-stream = "0.3"
 futures = { version = "0.3", default-features = false }
 
 proptest = "0.10.0"
