@@ -76,9 +76,7 @@ impl PinnedPool {
 
         // Get the join handle
         let join_handle = receiver.recv().unwrap();
-        let join_handle = *join_handle.downcast::<JoinHandle<Fut::Output>>().unwrap();
-
-        join_handle
+        *join_handle.downcast::<JoinHandle<Fut::Output>>().unwrap()
     }
 }
 
@@ -118,11 +116,11 @@ impl PinnedWorkerHandle {
     }
 
     fn run(mut task_receiver: UnboundedReceiver<FutureRequest>) {
-        let mut runtime = Builder::new_current_thread()
+        let runtime = Builder::new_current_thread()
             .build()
             .expect("Failed to start a pinned worker thread runtime");
 
-        LocalSet::new().block_on(&mut runtime, async {
+        LocalSet::new().block_on(&runtime, async {
             while let Some(task) = task_receiver.recv().await {
                 // Calls spawn_local(future)
                 let join_handle = (task.func)();
