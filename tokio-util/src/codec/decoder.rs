@@ -17,7 +17,7 @@ use std::io;
 /// will simply be a unit struct (e.g. `struct HttpDecoder`).
 ///
 /// For some underlying data-sources, namely files and FIFOs,
-/// it's possible to temporarily read 0 bytes by reaching eof.
+/// it's possible to temporarily read 0 bytes by reaching EOF.
 ///
 /// In these cases `decode_eof` will be called until it signals
 /// fullfillment of all closing frames by returning `Ok(None)`.
@@ -25,9 +25,9 @@ use std::io;
 /// will not invoke `decode` or `decode_eof` again, until data can be read
 /// during a retry.
 ///
-/// It is up to the Decoder to keep track of a restart after an eof,
+/// It is up to the Decoder to keep track of a restart after an EOF,
 /// and to decide how to handle such an event by, for example,
-/// allowing frames to cross eof boundaries, re-emitting opening frames, or
+/// allowing frames to cross EOF boundaries, re-emitting opening frames, or
 /// reseting the entire internal state.
 ///
 /// [`Framed`]: crate::codec::Framed
