@@ -4,6 +4,7 @@ use std::rc::Rc;
 use tokio_util::task::spawn_pinned;
 
 #[tokio::test]
+#[ignore]
 async fn can_spawn_not_send_futures() {
     let closure = move || {
         // Rc is Send + !Sync
