@@ -8,8 +8,7 @@ async fn can_spawn_not_send_futures() {
     let closure = move || {
         // Rc is Send + !Sync
         let local_data = Rc::new("test");
-        let future = async move { local_data.to_string() };
-        future
+        async move { local_data.to_string() }
     };
     let output = spawn_pinned(closure).await.unwrap();
 
