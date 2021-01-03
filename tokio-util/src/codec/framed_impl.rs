@@ -120,10 +120,10 @@ where
 
         let mut pinned = self.project();
         let state: &mut ReadFrame = pinned.state.borrow_mut();
-        // The following loops implements a state machine with each state identified
-        // by a combination of the `is_readable` and `eof` flags.
-        // Note that these states persist across multiple loop entries and returns.
-        // In fact, most state transitions occur with a return.
+        // The following loops implements a state machine with each state corresponding
+        // to a combination of the `is_readable` and `eof` flags. States persist across
+        // loop entries and most state transitions occur with a return.
+        //
         // The intitial state is `reading`.
         //
         // | state   | eof   | is_readable |
@@ -150,17 +150,17 @@ where
         //             │                         │
         //             └─`decode` returns `None`─┘
         loop {
-            // Repeatedly call `decode` or `decode_eof` as long as long as the buffer
-            // is "readable". Readable means that it _might_ contain data that could be consumed
-            // by `decode` or `decode_eof`. Both `decode` and `decode_eof` signal that the buffer
-            // is no longer readable for them by returning `None`.
-            // If `decode` signals that it couldn't read from the buffer and the upstream has
-            // returned eof, `decode_eof` will attemp to decode the remainder as closing frames.
-            // The buffer might become readable again if the underlying AsyncRead is a FIFO or file.
-            // However, we still want to make sure that upon encountering an eof
-            // we actually finish emmiting all it's associated `decode_eof` frames.
+            // Repeatedly call `decode` or `decode_eof` while the buffer is "readable",
+            // i.e. it _might_ contain data consumable as a frame or closing frame.
+            // Both signal that there is no such data by returning `None`.
+            //
+            // If `decode` couldn't read a frame and the upstream source has returned eof,
+            // `decode_eof` will attemp to decode the remaining bytes as closing frames.
+            //
+            // If the underlying AsyncRead is resumable, we may continue after an EOF,
+            // but must finish emmiting all of it's associated `decode_eof` frames.
             // Furthermore, we don't want to emit any `decode_eof` frames on retried
-            // reads after an eof unless we've actually read more data.
+            // reads after an EOF unless we've actually read more data.
             if state.is_readable {
                 // pausing or framing
                 if state.eof {
@@ -185,36 +185,32 @@ where
                 // framing -> reading
                 state.is_readable = false;
             }
-            // reading or stopped
+            // reading or paused
             // If we can't build a frame yet, try to read more data and try again.
             // Make sure we've got room for at least one byte to read to ensure
-            // that we don't get a spurious 0 that looks like eof.
-            // Only allocate if we actually need it to prevent slowly leaking bytes,
-            // in less fortunate code that repeatedly polls an eof file.
-            if state.buffer.capacity() == state.buffer.len() {
-                state.buffer.reserve(1);
-            }
+            // that we don't get a spurious 0 that looks like EOF.
+            state.buffer.reserve(1);
             let bytect = match poll_read_buf(pinned.inner.as_mut(), cx, &mut state.buffer)? {
                 Poll::Ready(ct) => ct,
-                // implicit reading -> reading or implicit stopped -> stopped
+                // implicit reading -> reading or implicit paused -> paused
                 Poll::Pending => return Poll::Pending,
             };
             if bytect == 0 {
                 if state.eof {
-                    // We're already at an eof, and since we've reached this path
+                    // We're already at an EOF, and since we've reached this path
                     // we're also not readable. This implies that we've already finished
                     // our `decode_eof` handling, so we can simply return `None`.
-                    // implicit stopped -> stopped
+                    // implicit paused -> paused
                     return Poll::Ready(None);
                 }
-                // prepare reading -> stopping
+                // prepare reading -> paused
                 state.eof = true;
             } else {
-                // prepare stopped -> framing or noop reading -> framing
+                // prepare paused -> framing or noop reading -> framing
                 state.eof = false;
             }
 
-            // stopped -> framing or reading -> framing or reading -> stopping
+            // paused -> framing or reading -> framing or reading -> pausing
             state.is_readable = true;
         }
     }
