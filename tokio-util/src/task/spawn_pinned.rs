@@ -9,7 +9,8 @@ use tokio::runtime::Builder;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::task::{spawn_blocking, spawn_local, JoinHandle, LocalSet};
 
-/// TODO: write docs
+/// Create a new pool of threads to handle `!Send` tasks. Spawn tasks onto this
+/// pool via [`LocalPoolHandle::spawn_pinned`].
 pub fn new_local_pool(pool_size: usize) -> LocalPoolHandle {
     let workers = (0..pool_size)
         .map(|_| LocalWorkerHandle::new_worker())
@@ -23,7 +24,7 @@ pub fn new_local_pool(pool_size: usize) -> LocalPoolHandle {
     LocalPoolHandle { pool }
 }
 
-/// TODO: write docs
+/// A handle to a local pool created by [`new_local_pool`]
 #[derive(Clone)]
 pub struct LocalPoolHandle {
     pool: Arc<LocalPool>,
@@ -33,6 +34,33 @@ impl LocalPoolHandle {
     /// Spawn a task onto a worker thread and pin it there so it can't be moved
     /// off of the thread. Note that the future is not Send, but the `FnOnce` which
     /// creates it is.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::rc::Rc;
+    /// use tokio_util::task::new_local_pool;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     // Create the local pool
+    ///     let pool = new_local_pool(1);
+    ///
+    ///     // Spawn a !Send future onto the pool and await it
+    ///     let output = pool
+    ///         .spawn_pinned(|| {
+    ///             // Rc is !Send + !Sync
+    ///             let local_data = Rc::new("test");
+    ///
+    ///             // This future holds an Rc, so it is !Send
+    ///             async move { local_data.to_string() }
+    ///         })
+    ///         .await
+    ///         .unwrap();
+    ///
+    ///     assert_eq!(output, "test");
+    /// }
+    /// ```
     pub fn spawn_pinned<Fut: Future + 'static>(
         &self,
         create_task: impl FnOnce() -> Fut + Send + 'static,
@@ -58,7 +86,7 @@ struct LocalPool {
 }
 
 impl LocalPool {
-    /// Spawn a `!Send` future onto a worker
+    /// Spawn a `?Send` future onto a worker
     fn spawn_pinned<Fut: Future + 'static>(
         &self,
         create_task: impl FnOnce() -> Fut + Send + 'static,
@@ -102,7 +130,7 @@ struct FutureRequest {
     reply: Sender<BoxedJoinHandle>,
 }
 
-// Needed for the unwrap in PinnedPool::spawn_pinned if sending fails
+// Needed for the unwrap in LocalPool::spawn_pinned if sending fails
 impl Debug for FutureRequest {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str("FutureRequest")

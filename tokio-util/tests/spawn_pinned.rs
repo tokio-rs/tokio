@@ -5,9 +5,9 @@ use tokio_util::task;
 
 #[tokio::test]
 async fn can_spawn_not_send_future() {
-    let spawner = task::new_local_pool(1);
+    let pool = task::new_local_pool(1);
 
-    let output = spawner
+    let output = pool
         .spawn_pinned(|| {
             // Rc is !Send + !Sync
             let local_data = Rc::new("test");
