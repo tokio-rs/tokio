@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1609783701686,
+  "lastUpdate": 1609783708506,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -9793,6 +9793,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18610540,
             "range": "± 3976432",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "robjtede@icloud.com",
+            "name": "Rob Ede",
+            "username": "robjtede"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "56272b2ec739479496183acd07b056c543333324",
+          "message": "stream: move async-stream to dev-deps (#3366)",
+          "timestamp": "2021-01-02T13:43:41+09:00",
+          "tree_id": "07cb0883f23e03d9e535ca63473db79b9dca7eff",
+          "url": "https://github.com/tokio-rs/tokio/commit/56272b2ec739479496183acd07b056c543333324"
+        },
+        "date": 1609783707272,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 173688,
+            "range": "± 29505",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 629824,
+            "range": "± 206950",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4719411,
+            "range": "± 1078144",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 17629446,
+            "range": "± 2602614",
             "unit": "ns/iter"
           }
         ]
