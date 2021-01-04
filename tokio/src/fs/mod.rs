@@ -36,6 +36,9 @@ pub use self::create_dir_all::create_dir_all;
 mod dir_builder;
 pub use self::dir_builder::DirBuilder;
 
+mod exists;
+pub use self::exists::exists;
+
 mod file;
 pub use self::file::File;
 
