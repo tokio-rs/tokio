@@ -33,6 +33,10 @@ impl<T> fmt::Debug for UnboundedSender<T> {
 ///
 /// Instances are created by the
 /// [`unbounded_channel`](unbounded_channel) function.
+///
+/// This receiver can be turned into a `Stream` using [`UnboundedReceiverStream`].
+///
+/// [`UnboundedReceiverStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.UnboundedReceiverStream.html
 pub struct UnboundedReceiver<T> {
     /// The channel receiver
     chan: chan::Rx<T, Semaphore>,

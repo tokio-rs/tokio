@@ -1,3 +1,33 @@
+macro_rules! cfg_fs {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "fs")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_io_util {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "io-util")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_net {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "net")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "net")))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_time {
     ($($item:item)*) => {
         $(

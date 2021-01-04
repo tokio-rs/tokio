@@ -14,6 +14,10 @@ cfg_net_unix! {
     ///
     /// You can accept a new connection by using the [`accept`](`UnixListener::accept`) method.
     ///
+    /// A `UnixListener` can be turned into a `Stream` with [`UnixListenerStream`].
+    ///
+    /// [`UnixListenerStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.UnixListenerStream.html
+    ///
     /// # Errors
     ///
     /// Note that accepting a connection can lead to various errors and not all

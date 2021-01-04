@@ -106,7 +106,16 @@ pub fn interval_at(start: Instant, period: Duration) -> Interval {
     }
 }
 
-/// Stream returned by [`interval`](interval) and [`interval_at`](interval_at).
+/// Interval returned by [`interval`](interval) and [`interval_at`](interval_at).
+///
+/// This type allows you to wait on a sequence of instants with a certain
+/// duration between each instant. Unlike calling [`sleep`](crate::time::sleep)
+/// in a loop, this lets you count the time spent between the calls to `sleep`
+/// as well.
+///
+/// An `Interval` can be turned into a `Stream` with [`IntervalStream`].
+///
+/// [`IntervalStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.IntervalStream.html
 #[derive(Debug)]
 pub struct Interval {
     /// Future that completes the next time the `Interval` yields a value.

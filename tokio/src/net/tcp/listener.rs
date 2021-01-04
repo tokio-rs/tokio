@@ -14,6 +14,10 @@ cfg_net! {
     /// You can accept a new connection by using the [`accept`](`TcpListener::accept`)
     /// method.
     ///
+    /// A `TcpListener` can be turned into a `Stream` with [`TcpListenerStream`].
+    ///
+    /// [`TcpListenerStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.TcpListenerStream.html
+    ///
     /// # Errors
     ///
     /// Note that accepting a connection can lead to various errors and not all

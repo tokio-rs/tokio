@@ -20,12 +20,15 @@ pub async fn read_dir(path: impl AsRef<Path>) -> io::Result<ReadDir> {
     Ok(ReadDir(State::Idle(Some(std))))
 }
 
-/// Stream of the entries in a directory.
+/// Read the the entries in a directory.
 ///
-/// This stream is returned from the [`read_dir`] function of this module and
-/// will yield instances of [`DirEntry`]. Through a [`DirEntry`]
-/// information like the entry's path and possibly other metadata can be
-/// learned.
+/// This struct is returned from the [`read_dir`] function of this module and
+/// will yield instances of [`DirEntry`]. Through a [`DirEntry`] information
+/// like the entry's path and possibly other metadata can be learned.
+///
+/// A `ReadDir` can be turned into a `Stream` with [`ReadDirStream`].
+///
+/// [`ReadDirStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.ReadDirStream.html
 ///
 /// # Errors
 ///
