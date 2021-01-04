@@ -29,10 +29,10 @@ fs = ["tokio/fs"]
 [dependencies]
 futures-core = { version = "0.3.0" }
 pin-project-lite = "0.2.0"
-tokio = { version = "1.0", path = "../tokio", features = ["sync"] }
+tokio = { version = "1.0", features = ["sync"] }
 
 [dev-dependencies]
-tokio = { version = "1.0", path = "../tokio", features = ["full"] }
+tokio = { version = "1.0", features = ["full", "test-util"] }
 tokio-test = { path = "../tokio-test" }
 async-stream = "0.3"
 futures = { version = "0.3", default-features = false }
