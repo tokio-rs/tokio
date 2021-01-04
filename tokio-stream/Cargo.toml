@@ -38,3 +38,7 @@ async-stream = "0.3"
 futures = { version = "0.3", default-features = false }
 
 proptest = "0.10.0"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
