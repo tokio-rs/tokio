@@ -138,15 +138,19 @@ impl<W: AsyncWrite> AsyncWrite for BufWriter<W> {
         cx: &mut Context<'_>,
         bufs: &[IoSlice<'_>],
     ) -> Poll<io::Result<usize>> {
-        if self.as_mut().project().inner.is_write_vectored() {
-            let total_len = bufs.iter().map(|b| b.len()).sum::<usize>();
-            if self.buf.len() + total_len > self.buf.capacity() {
+        if self.inner.is_write_vectored() {
+            let total_len = bufs
+                .iter()
+                .fold(0usize, |acc, b| acc.saturating_add(b.len()));
+            if total_len > self.buf.capacity() - self.buf.len() {
                 ready!(self.as_mut().flush_buf(cx))?;
             }
             let me = self.as_mut().project();
             if total_len >= me.buf.capacity() {
                 // It's more efficient to pass the slices directly to the
                 // underlying writer than to buffer them.
+                // The case when the total_len calculation saturates at
+                // usize::MAX is also handled here.
                 me.inner.poll_write_vectored(cx, bufs)
             } else {
                 bufs.iter().for_each(|b| me.buf.extend_from_slice(b));
