@@ -28,6 +28,11 @@ impl<R> LinesStream<R> {
     pub fn into_inner(self) -> Lines<R> {
         self.inner
     }
+
+    /// Obtain a pinned reference to the inner `Lines<R>`.
+    pub fn as_pin_mut(self: Pin<&mut Self>) -> Pin<&mut Lines<R>> {
+        self.project().inner
+    }
 }
 
 impl<R: AsyncBufRead> Stream for LinesStream<R> {

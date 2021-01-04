@@ -28,6 +28,11 @@ impl<R> SplitStream<R> {
     pub fn into_inner(self) -> Split<R> {
         self.inner
     }
+
+    /// Obtain a pinned reference to the inner `Split<R>`.
+    pub fn as_pin_mut(self: Pin<&mut Self>) -> Pin<&mut Split<R>> {
+        self.project().inner
+    }
 }
 
 impl<R: AsyncBufRead> Stream for SplitStream<R> {
