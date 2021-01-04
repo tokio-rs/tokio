@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1609783507992,
+  "lastUpdate": 1609783512997,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -9691,6 +9691,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 17754684,
             "range": "± 1989419",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7f17822ed9943b7bd0703258268feb4f70edac51",
+          "message": "stream: add Stream wrappers in tokio-stream (#3343)",
+          "timestamp": "2021-01-04T19:03:18+01:00",
+          "tree_id": "fc71c927161927875ed4a98c42de1ec170b57dbc",
+          "url": "https://github.com/tokio-rs/tokio/commit/7f17822ed9943b7bd0703258268feb4f70edac51"
+        },
+        "date": 1609783505255,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 168470,
+            "range": "± 36112",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 634384,
+            "range": "± 154405",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4551606,
+            "range": "± 1372859",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18610540,
+            "range": "± 3976432",
             "unit": "ns/iter"
           }
         ]
