@@ -1,52 +1,63 @@
-use once_cell::sync::OnceCell;
 use std::any::Any;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Sender};
+use std::sync::Arc;
 use tokio::runtime::Builder;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::task::{spawn_blocking, spawn_local, JoinHandle, LocalSet};
 
-static PINNED_POOL: OnceCell<PinnedPool> = OnceCell::new();
+/// TODO: write docs
+pub fn new_local_pool(pool_size: usize) -> LocalPoolHandle {
+    let workers = (0..pool_size)
+        .map(|_| LocalWorkerHandle::new_worker())
+        .collect();
 
-/// Spawn a task onto a worker thread and pin it there so it can't be moved
-/// off of the thread. Note that the future is not Send, but the `FnOnce` which
-/// creates it is.
-pub fn spawn_pinned<Fut: Future + 'static>(
-    create_task: impl FnOnce() -> Fut + Send + 'static,
-) -> JoinHandle<Fut::Output>
-where
-    Fut::Output: Send + 'static,
-{
-    PinnedPool::handle().spawn_pinned(create_task)
+    let pool = Arc::new(LocalPool {
+        workers,
+        next_worker: AtomicUsize::new(0),
+    });
+
+    LocalPoolHandle { pool }
 }
 
-struct PinnedPool {
-    workers: Vec<PinnedWorkerHandle>,
+/// TODO: write docs
+#[derive(Clone)]
+pub struct LocalPoolHandle {
+    pool: Arc<LocalPool>,
+}
+
+impl LocalPoolHandle {
+    /// Spawn a task onto a worker thread and pin it there so it can't be moved
+    /// off of the thread. Note that the future is not Send, but the `FnOnce` which
+    /// creates it is.
+    pub fn spawn_pinned<Fut: Future + 'static>(
+        &self,
+        create_task: impl FnOnce() -> Fut + Send + 'static,
+    ) -> JoinHandle<Fut::Output>
+    where
+        Fut::Output: Send + 'static,
+    {
+        self.pool.spawn_pinned(create_task)
+    }
+}
+
+impl Debug for LocalPoolHandle {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str("LocalPoolHandle")
+    }
+}
+
+struct LocalPool {
+    workers: Vec<LocalWorkerHandle>,
 
     /// The index of the next worker to use
     next_worker: AtomicUsize,
 }
 
-impl PinnedPool {
-    /// Get a reference to the static `PinnedPool`. The pool is created the
-    /// first time this is called.
-    fn handle() -> &'static PinnedPool {
-        PINNED_POOL.get_or_init(|| {
-            let worker_count = 8; // FIXME: get this number from somewhere
-            let workers = (0..worker_count)
-                .map(|_| PinnedWorkerHandle::new_worker())
-                .collect();
-
-            PinnedPool {
-                workers,
-                next_worker: AtomicUsize::new(0),
-            }
-        })
-    }
-
+impl LocalPool {
     /// Spawn a `!Send` future onto a worker
     fn spawn_pinned<Fut: Future + 'static>(
         &self,
@@ -91,28 +102,24 @@ struct FutureRequest {
     reply: Sender<BoxedJoinHandle>,
 }
 
+// Needed for the unwrap in PinnedPool::spawn_pinned if sending fails
 impl Debug for FutureRequest {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str("FutureRequest")
     }
 }
 
-struct PinnedWorkerHandle {
+struct LocalWorkerHandle {
     spawner: UnboundedSender<FutureRequest>,
-    // TODO: handle executor shutdown by resetting PinnedPool and workers?
-    _thread: JoinHandle<()>,
 }
 
-impl PinnedWorkerHandle {
+impl LocalWorkerHandle {
     /// Create a new worker for executing pinned tasks
-    fn new_worker() -> PinnedWorkerHandle {
+    fn new_worker() -> LocalWorkerHandle {
         let (sender, receiver) = unbounded_channel();
-        let thread = spawn_blocking(|| Self::run(receiver));
+        spawn_blocking(|| Self::run(receiver));
 
-        PinnedWorkerHandle {
-            spawner: sender,
-            _thread: thread,
-        }
+        LocalWorkerHandle { spawner: sender }
     }
 
     fn run(mut task_receiver: UnboundedReceiver<FutureRequest>) {
