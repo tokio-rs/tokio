@@ -18,10 +18,7 @@ pub fn new_local_pool(pool_size: usize) -> LocalPoolHandle {
         .map(|_| LocalWorkerHandle::new_worker())
         .collect();
 
-    let pool = Arc::new(LocalPool {
-        workers,
-        next_worker: AtomicUsize::new(0),
-    });
+    let pool = Arc::new(LocalPool { workers });
 
     LocalPoolHandle { pool }
 }
@@ -82,9 +79,6 @@ impl Debug for LocalPoolHandle {
 
 struct LocalPool {
     workers: Vec<LocalWorkerHandle>,
-
-    /// The index of the next worker to use
-    next_worker: AtomicUsize,
 }
 
 impl LocalPool {
@@ -96,28 +90,46 @@ impl LocalPool {
     where
         Fut::Output: Send + 'static,
     {
-        // Choose the worker via round-robin
-        let worker_count = self.workers.len();
-        let worker_index = self
-            .next_worker
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |x| {
-                Some((x + 1) % worker_count)
-            })
-            // The closure never returns None
-            .unwrap();
-        let worker = &self.workers[worker_index];
+        let worker = self.find_least_burdened_worker();
+
+        // Update task count. Do this before sending the future to ensure that
+        // the call to `fetch_sub` does not underflow.
+        worker.task_count.fetch_add(1, Ordering::SeqCst);
 
         // Send the future to the worker
         let (sender, receiver) = channel();
+        let task_count = Arc::clone(&worker.task_count);
         let request = FutureRequest {
-            func: Box::new(|| Box::new(spawn_local(create_task()))),
+            func: Box::new(|| {
+                Box::new(spawn_local(async move {
+                    let result = create_task().await;
+
+                    // Update the task count once the future is finished
+                    task_count.fetch_sub(1, Ordering::SeqCst);
+
+                    result
+                }))
+            }),
             reply: sender,
         };
         worker.spawner.send(request).unwrap();
 
         // Get the join handle
         let join_handle = receiver.recv().unwrap();
-        *join_handle.downcast::<JoinHandle<Fut::Output>>().unwrap()
+        let join_handle: JoinHandle<Fut::Output> = *join_handle.downcast().unwrap();
+
+        join_handle
+    }
+
+    /// Find the worker with the least number of tasks
+    fn find_least_burdened_worker(&self) -> &LocalWorkerHandle {
+        let (worker, _) = self
+            .workers
+            .iter()
+            .map(|worker| (worker, worker.task_count.load(Ordering::SeqCst)))
+            .min_by_key(|&(_, count)| count)
+            .expect("There must be more than one worker");
+        worker
     }
 }
 
@@ -141,6 +153,7 @@ impl Debug for FutureRequest {
 
 struct LocalWorkerHandle {
     spawner: UnboundedSender<FutureRequest>,
+    task_count: Arc<AtomicUsize>,
 }
 
 impl LocalWorkerHandle {
@@ -149,7 +162,10 @@ impl LocalWorkerHandle {
         let (sender, receiver) = unbounded_channel();
         spawn_blocking(|| Self::run(receiver));
 
-        LocalWorkerHandle { spawner: sender }
+        LocalWorkerHandle {
+            spawner: sender,
+            task_count: Arc::new(AtomicUsize::new(0)),
+        }
     }
 
     fn run(mut task_receiver: UnboundedReceiver<FutureRequest>) {
