@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1609843479421,
+  "lastUpdate": 1609843489239,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -5291,6 +5291,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 670,
             "range": "± 49",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3549092a0cb760938c9cdab3013fa38c8d392db0",
+          "message": "docs: fix tokio-stream features not being displayed (#3378)",
+          "timestamp": "2021-01-05T11:43:09+01:00",
+          "tree_id": "de0c6ff59c7c647272bf5736b57fb904f22e036a",
+          "url": "https://github.com/tokio-rs/tokio/commit/3549092a0cb760938c9cdab3013fa38c8d392db0"
+        },
+        "date": 1609843487943,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1011,
+            "range": "± 114",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 15696,
+            "range": "± 7855",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1070,
+            "range": "± 11",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 17013,
+            "range": "± 5527",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 592,
+            "range": "± 13",
             "unit": "ns/iter"
           }
         ]
