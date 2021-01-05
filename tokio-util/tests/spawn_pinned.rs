@@ -20,3 +20,9 @@ async fn can_spawn_not_send_future() {
 
     assert_eq!(output, "test");
 }
+
+#[test]
+#[should_panic(expected = "assertion failed: pool_size > 0")]
+fn cannot_create_zero_sized_pool() {
+    let _pool = task::new_local_pool(0);
+}

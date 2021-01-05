@@ -12,6 +12,8 @@ use tokio::task::{spawn_blocking, spawn_local, JoinHandle, LocalSet};
 /// Create a new pool of threads to handle `!Send` tasks. Spawn tasks onto this
 /// pool via [`LocalPoolHandle::spawn_pinned`].
 pub fn new_local_pool(pool_size: usize) -> LocalPoolHandle {
+    assert!(pool_size > 0);
+
     let workers = (0..pool_size)
         .map(|_| LocalWorkerHandle::new_worker())
         .collect();
