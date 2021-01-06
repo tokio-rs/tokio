@@ -397,7 +397,41 @@ impl Signal {
         poll_fn(|cx| self.poll_recv(cx)).await
     }
 
-    pub(crate) fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
+    /// Polls to receive the next signal notification event, outside of an
+    /// `async` context.
+    ///
+    /// This method returns:
+    ///
+    ///  * `Poll::Pending` if no signals are available but the channel is not
+    ///    closed.
+    ///  * `Poll::Ready(Some(()))` if a signal is available.
+    ///  * `Poll::Ready(None)` if the channel has been closed and all signals
+    ///    sent before it was closed have been received.
+    ///
+    /// # Examples
+    ///
+    /// Polling from a manually implemented future
+    ///
+    /// ```rust,no_run
+    /// use std::pin::Pin;
+    /// use std::future::Future;
+    /// use std::task::{Context, Poll};
+    /// use tokio::signal::unix::Signal;
+    ///
+    /// struct MyFuture {
+    ///     signal: Signal,
+    /// }
+    ///
+    /// impl Future for MyFuture {
+    ///     type Output = Option<()>;
+    ///
+    ///     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    ///         println!("polling MyFuture");
+    ///         self.signal.poll_recv(cx)
+    ///     }
+    /// }
+    /// ```
+    pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
         self.rx.poll_recv(cx)
     }
 
