@@ -55,6 +55,7 @@ net = [
   "mio/tcp",
   "mio/udp",
   "mio/uds",
+  "winapi/winbase",
 ]
 process = [
   "bytes",
@@ -94,7 +95,7 @@ pin-project-lite = "0.2.0"
 bytes = { version = "1.0.0", optional = true }
 once_cell = { version = "1.5.2", optional = true }
 memchr = { version = "2.2", optional = true }
-mio = { version = "0.7.6", optional = true }
+mio = { version = "0.7.9", optional = true }
 num_cpus = { version = "1.8.0", optional = true }
 parking_lot = { version = "0.11.0", optional = true }
 
@@ -111,6 +112,9 @@ signal-hook-registry = { version = "1.1.1", optional = true }
 libc = { version = "0.2.42" }
 nix = { version = "0.19.0" }
 
+[target.'cfg(windows)'.dependencies.miow]
+version = "0.3.6"
+
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3.8"
 default-features = false
@@ -123,6 +127,9 @@ futures = { version = "0.3.0", features = ["async-await"] }
 proptest = "0.10.0"
 tempfile = "3.1.0"
 async-stream = "0.3"
+
+[target.'cfg(windows)'.dev-dependencies.ntapi]
+version = "0.3.6"
 
 [target.'cfg(loom)'.dev-dependencies]
 loom = { version = "0.4", features = ["futures", "checkpoint"] }

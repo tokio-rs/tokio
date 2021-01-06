@@ -46,3 +46,8 @@ cfg_net_unix! {
     pub use unix::listener::UnixListener;
     pub use unix::stream::UnixStream;
 }
+
+cfg_net_windows! {
+    pub mod windows;
+    pub use windows::named_pipe::{NamedPipe, NamedPipeServer, NamedPipeServerBuilder};
+}
