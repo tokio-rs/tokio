@@ -11,7 +11,6 @@ use std::task::{Context, Poll};
 /// [`Receiver`]: struct@tokio::sync::broadcast::Receiver
 /// [`Stream`]: trait@crate::Stream
 /// [`async-stream`]: https://docs.rs/async-stream
-#[cfg_attr(docsrs, doc(cfg(feature = "net")))]
 pub struct BroadcastStream<T: Clone> {
     inner: Pin<Box<dyn Stream<Item = Result<T, RecvError>> + Send + Sync >>,
 }
