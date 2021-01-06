@@ -13,10 +13,10 @@ use std::task::{Context, Poll};
 /// [`async-stream`]: https://docs.rs/async-stream
 #[cfg_attr(docsrs, doc(cfg(feature = "net")))]
 pub struct BroadcastStream<T: Clone> {
-    inner: Pin<Box<dyn Stream<Item = Result<T, RecvError>>>>,
+    inner: Pin<Box<dyn Stream<Item = Result<T, RecvError>> + Send + Sync >>,
 }
 
-impl<T: Clone + Unpin + 'static> BroadcastStream<T> {
+impl<T: Clone + Unpin + 'static + Send + Sync> BroadcastStream<T> {
     /// Create a new `BroadcastStream`.
     pub fn new(mut rx: Receiver<T>) -> Self {
         let stream = try_stream! {
@@ -30,9 +30,9 @@ impl<T: Clone + Unpin + 'static> BroadcastStream<T> {
 }
 
 impl<T: Clone> Stream for BroadcastStream<T> {
-    type Item = T;
+    type Item =  Result<T, RecvError>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        self.inner.poll_next(cx)
+        Pin::new(&mut self.inner).poll_next(cx)
     }
 }
