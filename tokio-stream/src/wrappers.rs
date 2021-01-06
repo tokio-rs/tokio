@@ -6,6 +6,9 @@ pub use mpsc_bounded::ReceiverStream;
 mod mpsc_unbounded;
 pub use mpsc_unbounded::UnboundedReceiverStream;
 
+mod broadcast;
+pub use broadcast::BroadcastStream;
+
 cfg_time! {
     mod interval;
     pub use interval::IntervalStream;
