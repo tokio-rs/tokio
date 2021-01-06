@@ -208,6 +208,16 @@ impl<T, U> Framed<T, U> {
         &mut self.inner.state.read.buffer
     }
 
+    /// Returns a reference to the write buffer.
+    pub fn write_buffer(&self) -> &BytesMut {
+        &self.inner.state.write.buffer
+    }
+
+    /// Returns a mutable reference to the write buffer.
+    pub fn write_buffer_mut(&mut self) -> &mut BytesMut {
+        &mut self.inner.state.write.buffer
+    }
+
     /// Consumes the `Framed`, returning its underlying I/O stream.
     ///
     /// Note that care should be taken to not tamper with the underlying stream
