@@ -118,7 +118,7 @@ impl Idle {
             if sleepers[index] == worker_id {
                 sleepers.swap_remove(index);
 
-                // Update the state accordingly whle the lock is held.
+                // Update the state accordingly while the lock is held.
                 State::unpark_one(&self.state);
 
                 return;
