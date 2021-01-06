@@ -296,6 +296,26 @@ cfg_rt_multi_thread! {
     }
 }
 
+impl Trailer {
+    pub(crate) unsafe fn set_waker(&self, waker: Option<Waker>) {
+        self.waker.with_mut(|ptr| {
+            *ptr = waker;
+        });
+    }
+
+    pub(crate) unsafe fn will_wake(&self, waker: &Waker) -> bool {
+        self.waker
+            .with(|ptr| (*ptr).as_ref().unwrap().will_wake(waker))
+    }
+
+    pub(crate) fn wake_join(&self) {
+        self.waker.with(|ptr| match unsafe { &*ptr } {
+            Some(waker) => waker.wake_by_ref(),
+            None => panic!("waker missing"),
+        });
+    }
+}
+
 #[test]
 #[cfg(not(loom))]
 fn header_lte_cache_line() {

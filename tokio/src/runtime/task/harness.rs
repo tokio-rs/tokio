@@ -91,11 +91,11 @@ where
 
     pub(super) fn dealloc(self) {
         // Release the join waker, if there is one.
-        self.trailer().waker.with_mut(|_| ());
+        self.trailer().waker.with_mut(drop);
 
         // Check causality
-        self.core().stage.with_mut(|_| {});
-        self.core().scheduler.with_mut(|_| {});
+        self.core().stage.with_mut(drop);
+        self.core().scheduler.with_mut(drop);
 
         unsafe {
             drop(Box::from_raw(self.cell.as_ptr()));
@@ -285,15 +285,8 @@ where
     } else if snapshot.has_join_waker() {
         // Notify the join handle. The previous transition obtains the
         // lock on the waker cell.
-        wake_join(trailer);
+        trailer.wake_join();
     }
-}
-
-fn wake_join(trailer: &Trailer) {
-    trailer.waker.with(|ptr| match unsafe { &*ptr } {
-        Some(waker) => waker.wake_by_ref(),
-        None => panic!("waker missing"),
-    });
 }
 
 fn can_read_output(header: &Header, trailer: &Trailer, waker: &Waker) -> bool {
@@ -311,9 +304,7 @@ fn can_read_output(header: &Header, trailer: &Trailer, waker: &Waker) -> bool {
             let will_wake = unsafe {
                 // Safety: when `JOIN_INTEREST` is set, only `JOIN_HANDLE`
                 // may mutate the `waker` field.
-                trailer
-                    .waker
-                    .with(|ptr| (*ptr).as_ref().unwrap().will_wake(waker))
+                trailer.will_wake(waker)
             };
 
             if will_wake {
@@ -360,9 +351,7 @@ fn set_join_waker(
     // Safety: Only the `JoinHandle` may set the `waker` field. When
     // `JOIN_INTEREST` is **not** set, nothing else will touch the field.
     unsafe {
-        trailer.waker.with_mut(|ptr| {
-            *ptr = Some(waker);
-        });
+        trailer.set_waker(Some(waker));
     }
 
     // Update the `JoinWaker` state accordingly
@@ -371,9 +360,7 @@ fn set_join_waker(
     // If the state could not be updated, then clear the join waker
     if res.is_err() {
         unsafe {
-            trailer.waker.with_mut(|ptr| {
-                *ptr = None;
-            });
+            trailer.set_waker(None);
         }
     }
 
