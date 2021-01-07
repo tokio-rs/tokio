@@ -427,9 +427,10 @@ _Adapted from the [Node.js contributing guide][node]_.
 
 ## Keeping track of issues and PRs
 
-The Tokio GitHub repository has a lot of issues and PRs, which is not easy to
-keep track of. This section explains the meaning of various labels, as well as
-our [GitHub project][project]. The section is primarily targeted at maintainers.
+The Tokio GitHub repository has a lot of issues and PRs to keep track of. This
+section explains the meaning of various labels, as well as our [GitHub
+project][project]. The section is primarily targeted at maintainers.  Most
+contributors aren't able to set these labels.
 
 ### Area
 
@@ -445,8 +446,6 @@ The area label describes the crates relevant to this issue or PR.
  - **A-ci** This issue concerns our GitHub Actions setup.
 
 ### Category
-
-The category label describes the category.
 
  - **C-bug** This is a bug-report. Bug-fix PRs use `C-enhancement` instead.
  - **C-enhancement** This is a PR that adds a new features.
@@ -476,12 +475,13 @@ The category label describes the category.
  - **E-needs-mvce** This bug is missing a minimal complete and verifiable
    example.
 
-(I don't know why it's called `E-`. Many issues are missing a difficulty rating,
-and you should feel free to add one.)
+The "E-" prefix is the same as used in the Rust compiler repository. Some
+issues are missing a difficulty rating, but feel free to ask on our Discord
+server if you want to know how difficult an issue likely is.
 
 ### Module
 
-A more fine grain categorization than **Area**.
+The module label provides a more fine grain categorization than **Area**.
 
  - **M-blocking** Things relevant to `spawn_blocking`, `block_in_place`.
  - **M-codec** The `tokio_util::codec` module.
