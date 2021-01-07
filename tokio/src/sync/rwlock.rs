@@ -403,10 +403,11 @@ impl<T: ?Sized> RwLock<T> {
     /// The calling task will yield until there are no writers which hold the
     /// lock. There may be other readers inside the lock when the task resumes.
     ///
-    /// Note that deadlock may occur if a read lock is held by the current
-    /// task, a write lock attempt is made, and then a further read lock
-    /// attempt is made. Under the priority policy of [`RwLock`], read locks
-    /// are not granted until prior write locks, to prevent starvation.
+    /// Note that under the priority policy of [`RwLock`], read locks are not
+    /// granted until prior write locks, to prevent starvation. Therefore
+    /// deadlock may occur if a read lock is held by the current task, a write
+    /// lock attempt is made, and then a subsequent read lock attempt is made
+    /// by the current task.
     ///
     /// Returns an RAII guard which will drop this read access of the `RwLock`
     /// when dropped.
