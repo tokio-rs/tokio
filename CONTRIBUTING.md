@@ -513,7 +513,7 @@ Any label not listed here is not in active use.
 
 ## LTS guarantees
 
-Tokio ≥1.0 comes with LTS guarantees:
+Tokio ≥1.0.0 comes with LTS guarantees:
 
  * A minimum of 5 years of maintenance.
  * A minimum of 3 years before a hypothetical 2.0 release.
