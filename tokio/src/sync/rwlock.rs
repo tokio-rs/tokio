@@ -244,7 +244,7 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
     /// locks, since [`RwLock`] is fair and it is possible that a writer is next
     /// in line.
     ///
-    /// Returns an RAII guard which will drop the read access of this rwlock
+    /// Returns an RAII guard which will drop this read access of the `RwLock`
     /// when dropped.
     ///
     /// # Examples
@@ -397,12 +397,19 @@ impl<T: ?Sized> RwLock<T> {
         }
     }
 
-    /// Locks this rwlock with shared read access, causing the current task
+    /// Locks this `RwLock` with shared read access, causing the current task
     /// to yield until the lock has been acquired.
     ///
-    /// The calling task will yield until there are no more writers which
-    /// hold the lock. There may be other readers currently inside the lock when
-    /// this method returns.
+    /// The calling task will yield until there are no writers which hold the
+    /// lock. There may be other readers inside the lock when the task resumes.
+    ///
+    /// Note that deadlock may occur if a read lock is held by the current
+    /// task, a write lock attempt is made, and then a further read lock
+    /// attempt is made. Under the priority policy of [`RwLock`], read locks
+    /// are not granted until prior write locks, to prevent starvation.
+    ///
+    /// Returns an RAII guard which will drop this read access of the `RwLock`
+    /// when dropped.
     ///
     /// # Examples
     ///
@@ -428,6 +435,7 @@ impl<T: ?Sized> RwLock<T> {
     ///     drop(n);
     ///}
     /// ```
+    ///
     pub async fn read(&self) -> RwLockReadGuard<'_, T> {
         self.s.acquire(1).await.unwrap_or_else(|_| {
             // The semaphore was closed. but, we never explicitly close it, and we have a
@@ -441,13 +449,13 @@ impl<T: ?Sized> RwLock<T> {
         }
     }
 
-    /// Locks this rwlock with exclusive write access, causing the current task
-    /// to yield until the lock has been acquired.
+    /// Locks this `RwLock` with exclusive write access, causing the current
+    /// task to yield until the lock has been acquired.
     ///
-    /// This function will not return while other writers or other readers
+    /// The calling task will yield while other writers or readers
     /// currently have access to the lock.
     ///
-    /// Returns an RAII guard which will drop the write access of this rwlock
+    /// Returns an RAII guard which will drop the write access of this `RwLock`
     /// when dropped.
     ///
     /// # Examples
