@@ -481,7 +481,7 @@ server if you want to know how difficult an issue likely is.
 
 ### Module
 
-The module label provides a more fine grain categorization than **Area**.
+The module label provides a more fine grained categorization than **Area**.
 
  - **M-blocking** Things relevant to `spawn_blocking`, `block_in_place`.
  - **M-codec** The `tokio_util::codec` module.
