@@ -1021,7 +1021,7 @@ rt_test! {
     // other tasks.
     #[test]
     fn ping_pong_saturation() {
-        use std::{mem::drop, sync::atomic::{Ordering, AtomicBool}};
+        use std::{sync::atomic::{Ordering, AtomicBool}};
         use tokio::sync::mpsc;
 
         const NUM: usize = 100;
@@ -1040,12 +1040,12 @@ rt_test! {
                 let (tx1, mut rx1) = mpsc::unbounded_channel();
                 let (tx2, mut rx2) = mpsc::unbounded_channel();
                 let spawned_tx = spawned_tx.clone();
-                let running_cloned = running.clone();
+                let running = running.clone();
                 tasks.push(task::spawn(async move {
                     spawned_tx.send(()).unwrap();
 
 
-                    while running_cloned.load(Ordering::Relaxed) {
+                    while running.load(Ordering::Relaxed) {
                         tx1.send(()).unwrap();
                         rx2.recv().await.unwrap();
                     }
@@ -1056,7 +1056,7 @@ rt_test! {
                 }));
 
                 tasks.push(task::spawn(async move {
-                    while rx1.recv().await.is_some(){
+                    while rx1.recv().await.is_some() {
                         tx2.send(()).unwrap();
                     }
                 }));
