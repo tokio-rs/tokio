@@ -1021,7 +1021,7 @@ rt_test! {
     // other tasks.
     #[test]
     fn ping_pong_saturation() {
-        use std::{sync::atomic::{Ordering, AtomicBool}};
+        use std::sync::atomic::{Ordering, AtomicBool};
         use tokio::sync::mpsc;
 
         const NUM: usize = 100;
