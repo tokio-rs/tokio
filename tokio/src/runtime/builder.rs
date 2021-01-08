@@ -459,8 +459,14 @@ cfg_io_driver! {
         ///     .build()
         ///     .unwrap();
         /// ```
+        #[cfg(not(miri))]
         pub fn enable_io(&mut self) -> &mut Self {
             self.enable_io = true;
+            self
+        }
+
+        #[cfg(miri)]
+        pub fn enable_io(&mut self) -> &mut Self {
             self
         }
     }
@@ -482,10 +488,17 @@ cfg_time! {
         ///     .build()
         ///     .unwrap();
         /// ```
+        #[cfg(not(miri))]
         pub fn enable_time(&mut self) -> &mut Self {
             self.enable_time = true;
             self
         }
+
+        #[cfg(miri)]
+        pub fn enable_time(&mut self) -> &mut Self {
+            self
+        }
+
     }
 }
 
