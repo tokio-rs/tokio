@@ -297,12 +297,10 @@ cfg_rt_multi_thread! {
             let task = unsafe { RawTask::from_raw(self.into()) };
             task.shutdown();
         }
-    }
-}
 
-impl Header {
-    pub(crate) unsafe fn set_next(&self, next: Option<NonNull<Header>>) {
-        self.queue_next.with_mut(|ptr| *ptr = next);
+        pub(crate) unsafe fn set_next(&self, next: Option<NonNull<Header>>) {
+            self.queue_next.with_mut(|ptr| *ptr = next);
+        }
     }
 }
 
