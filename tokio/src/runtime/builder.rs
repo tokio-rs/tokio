@@ -465,6 +465,7 @@ cfg_io_driver! {
             self
         }
 
+        /// No-op on Miri
         #[cfg(miri)]
         pub fn enable_io(&mut self) -> &mut Self {
             self
@@ -494,6 +495,7 @@ cfg_time! {
             self
         }
 
+        /// No-op on Miri
         #[cfg(miri)]
         pub fn enable_time(&mut self) -> &mut Self {
             self
