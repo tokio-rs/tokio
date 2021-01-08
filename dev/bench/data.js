@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1610144519193,
+  "lastUpdate": 1610144523612,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -10303,6 +10303,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18036266,
             "range": "± 2479283",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "craftytrickster@users.noreply.github.com",
+            "name": "David Raifaizen",
+            "username": "craftytrickster"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2fe2f0401b159a980e17635c8cce7b991d542fe2",
+          "message": "util: expose FramedWrite/Framed::write_buffer/write_buffer_mut",
+          "timestamp": "2021-01-08T23:20:07+01:00",
+          "tree_id": "ba0937cb29d24181efa8962ca3e943a1c70beb9c",
+          "url": "https://github.com/tokio-rs/tokio/commit/2fe2f0401b159a980e17635c8cce7b991d542fe2"
+        },
+        "date": 1610144522005,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 181872,
+            "range": "± 22874",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 689185,
+            "range": "± 146452",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4854065,
+            "range": "± 736448",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18077461,
+            "range": "± 2606426",
             "unit": "ns/iter"
           }
         ]
