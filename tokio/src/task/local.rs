@@ -242,8 +242,6 @@ impl LocalSet {
     ///
     /// This task is guaranteed to be run on the current thread.
     ///
-    /// Calls to this function will result in waking the current localset.
-    ///
     /// Unlike the free function [`spawn_local`], this method may be used to
     /// spawn local tasks when the task set is _not_ running. For example:
     /// ```rust
