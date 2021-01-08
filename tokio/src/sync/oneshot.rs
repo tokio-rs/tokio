@@ -220,9 +220,9 @@ impl<T> Sender<T> {
         });
 
         if !inner.complete() {
-            return Err(inner
-                .value
-                .with_mut(|ptr| unsafe { (*ptr).take() }.unwrap()));
+            unsafe {
+                return Err(inner.consume_value().unwrap());
+            }
         }
 
         Ok(())
@@ -708,7 +708,7 @@ unsafe impl<T: Send> Sync for Inner<T> {}
 
 impl<T> Drop for Inner<T> {
     fn drop(&mut self) {
-        let state = State(self.state.with_mut(|v| *v));
+        let state = State(self.state.mut_load());
 
         if state.is_rx_task_set() {
             unsafe {

@@ -235,7 +235,7 @@ impl<T> Local<T> {
             // tasks and we are the only producer.
             self.inner.buffer[i_idx].with_mut(|ptr| unsafe {
                 let ptr = (*ptr).as_ptr();
-                (*ptr).header().queue_next.with_mut(|ptr| *ptr = Some(next));
+                (*ptr).header().set_next(Some(next))
             });
         }
 
@@ -610,7 +610,7 @@ fn get_next(header: NonNull<task::Header>) -> Option<NonNull<task::Header>> {
 
 fn set_next(header: NonNull<task::Header>, val: Option<NonNull<task::Header>>) {
     unsafe {
-        header.as_ref().queue_next.with_mut(|ptr| *ptr = val);
+        header.as_ref().set_next(val);
     }
 }
 
