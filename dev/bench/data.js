@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1610189322985,
+  "lastUpdate": 1610189328282,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -10351,6 +10351,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18077461,
             "range": "± 2606426",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "cdart@anduril.com",
+            "name": "Cameron",
+            "username": "SkamDart"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "22c27b9282da399574bf9d58461fe0f1869be894",
+          "message": "task: wake LocalSet on spawn_local (#3369)",
+          "timestamp": "2021-01-09T11:46:51+01:00",
+          "tree_id": "fea07ef93e77faf10bd1c08598dd1157ce9e72e5",
+          "url": "https://github.com/tokio-rs/tokio/commit/22c27b9282da399574bf9d58461fe0f1869be894"
+        },
+        "date": 1610189323815,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 194043,
+            "range": "± 83520",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 678925,
+            "range": "± 108732",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5206549,
+            "range": "± 1135394",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19743403,
+            "range": "± 2927386",
             "unit": "ns/iter"
           }
         ]
