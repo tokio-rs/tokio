@@ -422,7 +422,7 @@ impl<T: ?Sized> RwLock<T> {
     ///         // While main has an active read lock, we acquire one too.
     ///         let r = c_lock.read().await;
     ///         assert_eq!(*r, 1);
-    ///     }).await.expect("The spawned task has paniced");
+    ///     }).await.expect("The spawned task has panicked");
     ///
     ///     // Drop the guard after the spawned task finishes.
     ///     drop(n);
@@ -467,7 +467,7 @@ impl<T: ?Sized> RwLock<T> {
     ///         // While main has an active read lock, we acquire one too.
     ///         let n = c_lock.read().await;
     ///         assert_eq!(*n, 1);
-    ///     }).await.expect("The spawned task panicked");
+    ///     }).await.expect("The spawned task has panicked");
     ///
     ///     // Drop the guard when spawned task finishes.
     ///     drop(v);
