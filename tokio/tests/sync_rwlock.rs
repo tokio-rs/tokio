@@ -248,7 +248,7 @@ async fn try_write() {
 #[test]
 fn try_read_try_write() {
     let lock: RwLock<usize> = RwLock::new(15);
-    
+
     {
         let rg1 = lock.try_read().unwrap();
         assert_eq!(*rg1, 15);
