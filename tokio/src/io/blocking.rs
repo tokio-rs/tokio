@@ -175,7 +175,7 @@ where
     }
 }
 
-/// Repeates operations that are interrupted
+/// Repeats operations that are interrupted
 macro_rules! uninterruptibly {
     ($e:expr) => {{
         loop {
