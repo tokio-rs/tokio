@@ -13,12 +13,11 @@ authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-macros/0.3.1/tokio_macros"
+documentation = "https://docs.rs/tokio-macros/1.0.0/tokio_macros"
 description = """
 Tokio's proc macros.
 """
 categories = ["asynchronous"]
-publish = false
 
 [lib]
 proc-macro = true

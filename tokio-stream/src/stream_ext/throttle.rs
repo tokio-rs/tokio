@@ -14,14 +14,8 @@ pub(super) fn throttle<T>(duration: Duration, stream: T) -> Throttle<T>
 where
     T: Stream,
 {
-    let delay = if duration == Duration::from_millis(0) {
-        None
-    } else {
-        Some(tokio::time::sleep_until(Instant::now() + duration))
-    };
-
     Throttle {
-        delay,
+        delay: tokio::time::sleep_until(Instant::now() + duration),
         duration,
         has_delayed: true,
         stream,
@@ -33,8 +27,8 @@ pin_project! {
     #[derive(Debug)]
     #[must_use = "streams do nothing unless polled"]
     pub struct Throttle<T> {
-        // `None` when duration is zero.
-        delay: Option<Sleep>,
+        #[pin]
+        delay: Sleep,
         duration: Duration,
 
         // Set to true when `delay` has returned ready, but `stream` hasn't.
@@ -75,23 +69,29 @@ impl<T: Unpin> Throttle<T> {
 impl<T: Stream> Stream for Throttle<T> {
     type Item = T::Item;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {
-        if !self.has_delayed && self.delay.is_some() {
-            ready!(Pin::new(self.as_mut().project().delay.as_mut().unwrap()).poll(cx));
-            *self.as_mut().project().has_delayed = true;
+    fn poll_next(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut me = self.project();
+        let dur = *me.duration;
+
+        if !*me.has_delayed && !is_zero(dur) {
+            ready!(me.delay.as_mut().poll(cx));
+            *me.has_delayed = true;
         }
 
-        let value = ready!(self.as_mut().project().stream.poll_next(cx));
+        let value = ready!(me.stream.poll_next(cx));
 
         if value.is_some() {
-            let dur = self.duration;
-            if let Some(ref mut delay) = self.as_mut().project().delay {
-                delay.reset(Instant::now() + dur);
+            if !is_zero(dur) {
+                me.delay.reset(Instant::now() + dur);
             }
 
-            *self.as_mut().project().has_delayed = false;
+            *me.has_delayed = false;
         }
 
         Poll::Ready(value)
     }
+}
+
+fn is_zero(dur: Duration) -> bool {
+    dur == Duration::from_millis(0)
 }

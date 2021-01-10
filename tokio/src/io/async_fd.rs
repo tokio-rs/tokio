@@ -56,6 +56,78 @@ use std::{task::Context, task::Poll};
 /// the limitation that only one task can wait on each direction (read or write)
 /// at a time.
 ///
+/// # Examples
+///
+/// This example shows how to turn [`std::net::TcpStream`] asynchronous using
+/// `AsyncFd`.  It implements `read` as an async fn, and `AsyncWrite` as a trait
+/// to show how to implement both approaches.
+///
+/// ```no_run
+/// use futures::ready;
+/// use std::io::{self, Read, Write};
+/// use std::net::TcpStream;
+/// use std::pin::Pin;
+/// use std::task::{Context, Poll};
+/// use tokio::io::AsyncWrite;
+/// use tokio::io::unix::AsyncFd;
+///
+/// pub struct AsyncTcpStream {
+///     inner: AsyncFd<TcpStream>,
+/// }
+///
+/// impl AsyncTcpStream {
+///     pub fn new(tcp: TcpStream) -> io::Result<Self> {
+///         Ok(Self {
+///             inner: AsyncFd::new(tcp)?,
+///         })
+///     }
+///
+///     pub async fn read(&self, out: &mut [u8]) -> io::Result<usize> {
+///         loop {
+///             let mut guard = self.inner.readable().await?;
+///
+///             match guard.try_io(|inner| inner.get_ref().read(out)) {
+///                 Ok(result) => return result,
+///                 Err(_would_block) => continue,
+///             }
+///         }
+///     }
+/// }
+///
+/// impl AsyncWrite for AsyncTcpStream {
+///     fn poll_write(
+///         self: Pin<&mut Self>,
+///         cx: &mut Context<'_>,
+///         buf: &[u8]
+///     ) -> Poll<io::Result<usize>> {
+///         loop {
+///             let mut guard = ready!(self.inner.poll_write_ready(cx))?;
+///
+///             match guard.try_io(|inner| inner.get_ref().write(buf)) {
+///                 Ok(result) => return Poll::Ready(result),
+///                 Err(_would_block) => continue,
+///             }
+///         }
+///     }
+///
+///     fn poll_flush(
+///         self: Pin<&mut Self>,
+///         cx: &mut Context<'_>,
+///     ) -> Poll<io::Result<()>> {
+///         // tcp flush is a no-op
+///         Poll::Ready(Ok(()))
+///     }
+///
+///     fn poll_shutdown(
+///         self: Pin<&mut Self>,
+///         cx: &mut Context<'_>,
+///     ) -> Poll<io::Result<()>> {
+///         self.inner.get_ref().shutdown(std::net::Shutdown::Write)?;
+///         Poll::Ready(Ok(()))
+///     }
+/// }
+/// ```
+///
 /// [`readable`]: method@Self::readable
 /// [`writable`]: method@Self::writable
 /// [`AsyncFdReadyGuard`]: struct@self::AsyncFdReadyGuard
@@ -64,12 +136,26 @@ pub struct AsyncFd<T: AsRawFd> {
     registration: Registration,
     inner: Option<T>,
 }
-/// Represents an IO-ready event detected on a particular file descriptor, which
+
+/// Represents an IO-ready event detected on a particular file descriptor that
 /// has not yet been acknowledged. This is a `must_use` structure to help ensure
 /// that you do not forget to explicitly clear (or not clear) the event.
+///
+/// This type exposes an immutable reference to the underlying IO object.
 #[must_use = "You must explicitly choose whether to clear the readiness state by calling a method on ReadyGuard"]
 pub struct AsyncFdReadyGuard<'a, T: AsRawFd> {
     async_fd: &'a AsyncFd<T>,
+    event: Option<ReadyEvent>,
+}
+
+/// Represents an IO-ready event detected on a particular file descriptor that
+/// has not yet been acknowledged. This is a `must_use` structure to help ensure
+/// that you do not forget to explicitly clear (or not clear) the event.
+///
+/// This type exposes a mutable reference to the underlying IO object.
+#[must_use = "You must explicitly choose whether to clear the readiness state by calling a method on ReadyGuard"]
+pub struct AsyncFdReadyMutGuard<'a, T: AsRawFd> {
+    async_fd: &'a mut AsyncFd<T>,
     event: Option<ReadyEvent>,
 }
 
@@ -81,7 +167,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// implementing [`AsRawFd`]. The backing file descriptor is cached at the
     /// time of creation.
     ///
-    /// This function must be called in the context of a tokio runtime.
+    /// This method must be called in the context of a tokio runtime.
     pub fn new(inner: T) -> io::Result<Self>
     where
         T: AsRawFd,
@@ -137,24 +223,39 @@ impl<T: AsRawFd> AsyncFd<T> {
         self.inner.take()
     }
 
-    /// Deregisters this file descriptor, and returns ownership of the backing
+    /// Deregisters this file descriptor and returns ownership of the backing
     /// object.
     pub fn into_inner(mut self) -> T {
         self.take_inner().unwrap()
     }
 
-    /// Polls for read readiness. This function retains the waker for the last
-    /// context that called [`poll_read_ready`]; it therefore can only be used
-    /// by a single task at a time (however, [`poll_write_ready`] retains a
-    /// second, independent waker).
+    /// Polls for read readiness.
     ///
-    /// This function is intended for cases where creating and pinning a future
+    /// If the file descriptor is not currently ready for reading, this method
+    /// will store a clone of the [`Waker`] from the provided [`Context`]. When the
+    /// file descriptor becomes ready for reading, [`Waker::wake`] will be called.
+    ///
+    /// Note that on multiple calls to [`poll_read_ready`] or
+    /// [`poll_read_ready_mut`], only the `Waker` from the `Context` passed to the
+    /// most recent call is scheduled to receive a wakeup. (However,
+    /// [`poll_write_ready`] retains a second, independent waker).
+    ///
+    /// This method is intended for cases where creating and pinning a future
     /// via [`readable`] is not feasible. Where possible, using [`readable`] is
     /// preferred, as this supports polling from multiple tasks at once.
     ///
+    /// This method takes `&self`, so it is possible to call this method
+    /// concurrently with other methods on this struct. This method only
+    /// provides shared access to the inner IO resource when handling the
+    /// [`AsyncFdReadyGuard`].
+    ///
     /// [`poll_read_ready`]: method@Self::poll_read_ready
+    /// [`poll_read_ready_mut`]: method@Self::poll_read_ready_mut
     /// [`poll_write_ready`]: method@Self::poll_write_ready
     /// [`readable`]: method@Self::readable
+    /// [`Context`]: struct@std::task::Context
+    /// [`Waker`]: struct@std::task::Waker
+    /// [`Waker::wake`]: method@std::task::Waker::wake
     pub fn poll_read_ready<'a>(
         &'a self,
         cx: &mut Context<'_>,
@@ -168,18 +269,71 @@ impl<T: AsRawFd> AsyncFd<T> {
         .into()
     }
 
-    /// Polls for write readiness. This function retains the waker for the last
-    /// context that called [`poll_write_ready`]; it therefore can only be used
-    /// by a single task at a time (however, [`poll_read_ready`] retains a
-    /// second, independent waker).
+    /// Polls for read readiness.
     ///
-    /// This function is intended for cases where creating and pinning a future
+    /// If the file descriptor is not currently ready for reading, this method
+    /// will store a clone of the [`Waker`] from the provided [`Context`]. When the
+    /// file descriptor becomes ready for reading, [`Waker::wake`] will be called.
+    ///
+    /// Note that on multiple calls to [`poll_read_ready`] or
+    /// [`poll_read_ready_mut`], only the `Waker` from the `Context` passed to the
+    /// most recent call is scheduled to receive a wakeup. (However,
+    /// [`poll_write_ready`] retains a second, independent waker).
+    ///
+    /// This method is intended for cases where creating and pinning a future
+    /// via [`readable`] is not feasible. Where possible, using [`readable`] is
+    /// preferred, as this supports polling from multiple tasks at once.
+    ///
+    /// This method takes `&mut self`, so it is possible to access the inner IO
+    /// resource mutably when handling the [`AsyncFdReadyMutGuard`].
+    ///
+    /// [`poll_read_ready`]: method@Self::poll_read_ready
+    /// [`poll_read_ready_mut`]: method@Self::poll_read_ready_mut
+    /// [`poll_write_ready`]: method@Self::poll_write_ready
+    /// [`readable`]: method@Self::readable
+    /// [`Context`]: struct@std::task::Context
+    /// [`Waker`]: struct@std::task::Waker
+    /// [`Waker::wake`]: method@std::task::Waker::wake
+    pub fn poll_read_ready_mut<'a>(
+        &'a mut self,
+        cx: &mut Context<'_>,
+    ) -> Poll<io::Result<AsyncFdReadyMutGuard<'a, T>>> {
+        let event = ready!(self.registration.poll_read_ready(cx))?;
+
+        Ok(AsyncFdReadyMutGuard {
+            async_fd: self,
+            event: Some(event),
+        })
+        .into()
+    }
+
+    /// Polls for write readiness.
+    ///
+    /// If the file descriptor is not currently ready for writing, this method
+    /// will store a clone of the [`Waker`] from the provided [`Context`]. When the
+    /// file descriptor becomes ready for writing, [`Waker::wake`] will be called.
+    ///
+    /// Note that on multiple calls to [`poll_write_ready`] or
+    /// [`poll_write_ready_mut`], only the `Waker` from the `Context` passed to the
+    /// most recent call is scheduled to receive a wakeup. (However,
+    /// [`poll_read_ready`] retains a second, independent waker).
+    ///
+    /// This method is intended for cases where creating and pinning a future
     /// via [`writable`] is not feasible. Where possible, using [`writable`] is
     /// preferred, as this supports polling from multiple tasks at once.
     ///
+    /// This method takes `&self`, so it is possible to call this method
+    /// concurrently with other methods on this struct. This method only
+    /// provides shared access to the inner IO resource when handling the
+    /// [`AsyncFdReadyGuard`].
+    ///
     /// [`poll_read_ready`]: method@Self::poll_read_ready
     /// [`poll_write_ready`]: method@Self::poll_write_ready
-    /// [`writable`]: method@Self::writable
+    /// [`poll_write_ready_mut`]: method@Self::poll_write_ready_mut
+    /// [`writable`]: method@Self::readable
+    /// [`Context`]: struct@std::task::Context
+    /// [`Waker`]: struct@std::task::Waker
+    /// [`Waker::wake`]: method@std::task::Waker::wake
     pub fn poll_write_ready<'a>(
         &'a self,
         cx: &mut Context<'_>,
@@ -187,6 +341,44 @@ impl<T: AsRawFd> AsyncFd<T> {
         let event = ready!(self.registration.poll_write_ready(cx))?;
 
         Ok(AsyncFdReadyGuard {
+            async_fd: self,
+            event: Some(event),
+        })
+        .into()
+    }
+
+    /// Polls for write readiness.
+    ///
+    /// If the file descriptor is not currently ready for writing, this method
+    /// will store a clone of the [`Waker`] from the provided [`Context`]. When the
+    /// file descriptor becomes ready for writing, [`Waker::wake`] will be called.
+    ///
+    /// Note that on multiple calls to [`poll_write_ready`] or
+    /// [`poll_write_ready_mut`], only the `Waker` from the `Context` passed to the
+    /// most recent call is scheduled to receive a wakeup. (However,
+    /// [`poll_read_ready`] retains a second, independent waker).
+    ///
+    /// This method is intended for cases where creating and pinning a future
+    /// via [`writable`] is not feasible. Where possible, using [`writable`] is
+    /// preferred, as this supports polling from multiple tasks at once.
+    ///
+    /// This method takes `&mut self`, so it is possible to access the inner IO
+    /// resource mutably when handling the [`AsyncFdReadyMutGuard`].
+    ///
+    /// [`poll_read_ready`]: method@Self::poll_read_ready
+    /// [`poll_write_ready`]: method@Self::poll_write_ready
+    /// [`poll_write_ready_mut`]: method@Self::poll_write_ready_mut
+    /// [`writable`]: method@Self::readable
+    /// [`Context`]: struct@std::task::Context
+    /// [`Waker`]: struct@std::task::Waker
+    /// [`Waker::wake`]: method@std::task::Waker::wake
+    pub fn poll_write_ready_mut<'a>(
+        &'a mut self,
+        cx: &mut Context<'_>,
+    ) -> Poll<io::Result<AsyncFdReadyMutGuard<'a, T>>> {
+        let event = ready!(self.registration.poll_write_ready(cx))?;
+
+        Ok(AsyncFdReadyMutGuard {
             async_fd: self,
             event: Some(event),
         })
@@ -202,20 +394,64 @@ impl<T: AsRawFd> AsyncFd<T> {
         })
     }
 
+    async fn readiness_mut(
+        &mut self,
+        interest: Interest,
+    ) -> io::Result<AsyncFdReadyMutGuard<'_, T>> {
+        let event = self.registration.readiness(interest).await?;
+
+        Ok(AsyncFdReadyMutGuard {
+            async_fd: self,
+            event: Some(event),
+        })
+    }
+
     /// Waits for the file descriptor to become readable, returning a
-    /// [`AsyncFdReadyGuard`] that must be dropped to resume read-readiness polling.
+    /// [`AsyncFdReadyGuard`] that must be dropped to resume read-readiness
+    /// polling.
     ///
-    /// [`AsyncFdReadyGuard`]: struct@self::AsyncFdReadyGuard
-    pub async fn readable(&self) -> io::Result<AsyncFdReadyGuard<'_, T>> {
+    /// This method takes `&self`, so it is possible to call this method
+    /// concurrently with other methods on this struct. This method only
+    /// provides shared access to the inner IO resource when handling the
+    /// [`AsyncFdReadyGuard`].
+    #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
+    pub async fn readable<'a>(&'a self) -> io::Result<AsyncFdReadyGuard<'a, T>> {
         self.readiness(Interest::READABLE).await
     }
 
-    /// Waits for the file descriptor to become writable, returning a
-    /// [`AsyncFdReadyGuard`] that must be dropped to resume write-readiness polling.
+    /// Waits for the file descriptor to become readable, returning a
+    /// [`AsyncFdReadyMutGuard`] that must be dropped to resume read-readiness
+    /// polling.
     ///
-    /// [`AsyncFdReadyGuard`]: struct@self::AsyncFdReadyGuard
-    pub async fn writable(&self) -> io::Result<AsyncFdReadyGuard<'_, T>> {
+    /// This method takes `&mut self`, so it is possible to access the inner IO
+    /// resource mutably when handling the [`AsyncFdReadyMutGuard`].
+    #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
+    pub async fn readable_mut<'a>(&'a mut self) -> io::Result<AsyncFdReadyMutGuard<'a, T>> {
+        self.readiness_mut(Interest::READABLE).await
+    }
+
+    /// Waits for the file descriptor to become writable, returning a
+    /// [`AsyncFdReadyGuard`] that must be dropped to resume write-readiness
+    /// polling.
+    ///
+    /// This method takes `&self`, so it is possible to call this method
+    /// concurrently with other methods on this struct. This method only
+    /// provides shared access to the inner IO resource when handling the
+    /// [`AsyncFdReadyGuard`].
+    #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
+    pub async fn writable<'a>(&'a self) -> io::Result<AsyncFdReadyGuard<'a, T>> {
         self.readiness(Interest::WRITABLE).await
+    }
+
+    /// Waits for the file descriptor to become writable, returning a
+    /// [`AsyncFdReadyMutGuard`] that must be dropped to resume write-readiness
+    /// polling.
+    ///
+    /// This method takes `&mut self`, so it is possible to access the inner IO
+    /// resource mutably when handling the [`AsyncFdReadyMutGuard`].
+    #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
+    pub async fn writable_mut<'a>(&'a mut self) -> io::Result<AsyncFdReadyMutGuard<'a, T>> {
+        self.readiness_mut(Interest::WRITABLE).await
     }
 }
 
@@ -256,7 +492,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
         }
     }
 
-    /// This function should be invoked when you intentionally want to keep the
+    /// This method should be invoked when you intentionally want to keep the
     /// ready flag asserted.
     ///
     /// While this function is itself a no-op, it satisfies the `#[must_use]`
@@ -265,8 +501,12 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
         // no-op
     }
 
-    /// Performs the IO operation `f`; if `f` returns a [`WouldBlock`] error,
-    /// the readiness state associated with this file descriptor is cleared.
+    /// Performs the provided IO operation.
+    ///
+    /// If `f` returns a [`WouldBlock`] error, the readiness state associated
+    /// with this file descriptor is cleared, and the method returns
+    /// `Err(TryIoError::WouldBlock)`. You will typically need to poll the
+    /// `AsyncFd` again when this happens.
     ///
     /// This method helps ensure that the readiness state of the underlying file
     /// descriptor remains in sync with the tokio-side readiness state, by
@@ -277,8 +517,11 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// create this `AsyncFdReadyGuard`.
     ///
     /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
-    pub fn with_io<R>(&mut self, f: impl FnOnce() -> io::Result<R>) -> io::Result<R> {
-        let result = f();
+    pub fn try_io<R>(
+        &mut self,
+        f: impl FnOnce(&AsyncFd<Inner>) -> io::Result<R>,
+    ) -> Result<io::Result<R>, TryIoError> {
+        let result = f(self.async_fd);
 
         if let Err(e) = result.as_ref() {
             if e.kind() == io::ErrorKind::WouldBlock {
@@ -286,29 +529,71 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
             }
         }
 
-        result
+        match result {
+            Err(err) if err.kind() == io::ErrorKind::WouldBlock => Err(TryIoError(())),
+            result => Ok(result),
+        }
+    }
+}
+
+impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
+    /// Indicates to tokio that the file descriptor is no longer ready. The
+    /// internal readiness flag will be cleared, and tokio will wait for the
+    /// next edge-triggered readiness notification from the OS.
+    ///
+    /// It is critical that this function not be called unless your code
+    /// _actually observes_ that the file descriptor is _not_ ready. Do not call
+    /// it simply because, for example, a read succeeded; it should be called
+    /// when a read is observed to block.
+    ///
+    /// [`drop`]: method@std::mem::drop
+    pub fn clear_ready(&mut self) {
+        if let Some(event) = self.event.take() {
+            self.async_fd.registration.clear_readiness(event);
+        }
     }
 
-    /// Performs the IO operation `f`; if `f` returns [`Pending`], the readiness
-    /// state associated with this file descriptor is cleared.
+    /// This method should be invoked when you intentionally want to keep the
+    /// ready flag asserted.
+    ///
+    /// While this function is itself a no-op, it satisfies the `#[must_use]`
+    /// constraint on the [`AsyncFdReadyGuard`] type.
+    pub fn retain_ready(&mut self) {
+        // no-op
+    }
+
+    /// Performs the provided IO operation.
+    ///
+    /// If `f` returns a [`WouldBlock`] error, the readiness state associated
+    /// with this file descriptor is cleared, and the method returns
+    /// `Err(TryIoError::WouldBlock)`. You will typically need to poll the
+    /// `AsyncFd` again when this happens.
     ///
     /// This method helps ensure that the readiness state of the underlying file
     /// descriptor remains in sync with the tokio-side readiness state, by
-    /// clearing the tokio-side state only when a [`Pending`] condition occurs.
-    /// It is the responsibility of the caller to ensure that `f` returns
-    /// [`Pending`] only if the file descriptor that originated this
+    /// clearing the tokio-side state only when a [`WouldBlock`] condition
+    /// occurs. It is the responsibility of the caller to ensure that `f`
+    /// returns [`WouldBlock`] only if the file descriptor that originated this
     /// `AsyncFdReadyGuard` no longer expresses the readiness state that was queried to
     /// create this `AsyncFdReadyGuard`.
     ///
-    /// [`Pending`]: std::task::Poll::Pending
-    pub fn with_poll<R>(&mut self, f: impl FnOnce() -> std::task::Poll<R>) -> std::task::Poll<R> {
-        let result = f();
+    /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
+    pub fn try_io<R>(
+        &mut self,
+        f: impl FnOnce(&mut AsyncFd<Inner>) -> io::Result<R>,
+    ) -> Result<io::Result<R>, TryIoError> {
+        let result = f(&mut self.async_fd);
 
-        if result.is_pending() {
-            self.clear_ready();
+        if let Err(e) = result.as_ref() {
+            if e.kind() == io::ErrorKind::WouldBlock {
+                self.clear_ready();
+            }
         }
 
-        result
+        match result {
+            Err(err) if err.kind() == io::ErrorKind::WouldBlock => Err(TryIoError(())),
+            result => Ok(result),
+        }
     }
 }
 
@@ -319,3 +604,20 @@ impl<'a, T: std::fmt::Debug + AsRawFd> std::fmt::Debug for AsyncFdReadyGuard<'a,
             .finish()
     }
 }
+
+impl<'a, T: std::fmt::Debug + AsRawFd> std::fmt::Debug for AsyncFdReadyMutGuard<'a, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MutReadyGuard")
+            .field("async_fd", &self.async_fd)
+            .finish()
+    }
+}
+
+/// The error type returned by [`try_io`].
+///
+/// This error indicates that the IO resource returned a [`WouldBlock`] error.
+///
+/// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
+/// [`try_io`]: method@AsyncFdReadyGuard::try_io
+#[derive(Debug)]
+pub struct TryIoError(());

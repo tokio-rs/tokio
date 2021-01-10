@@ -39,11 +39,9 @@ cfg_io_util! {
     /// [`AsyncRead`] types. Callers will tend to import this trait instead of
     /// [`AsyncRead`].
     ///
-    /// As a convenience, this trait may be imported using the [`prelude`]:
-    ///
     /// ```no_run
     /// use tokio::fs::File;
-    /// use tokio::prelude::*;
+    /// use tokio::io::{self, AsyncReadExt};
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
@@ -60,7 +58,6 @@ cfg_io_util! {
     /// See [module][crate::io] documentation for more details.
     ///
     /// [`AsyncRead`]: AsyncRead
-    /// [`prelude`]: crate::prelude
     pub trait AsyncReadExt: AsyncRead {
         /// Creates a new `AsyncRead` instance that chains this stream with
         /// `next`.

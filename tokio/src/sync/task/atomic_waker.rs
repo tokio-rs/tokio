@@ -171,7 +171,11 @@ impl AtomicWaker {
     where
         W: WakerRef,
     {
-        match self.state.compare_and_swap(WAITING, REGISTERING, Acquire) {
+        match self
+            .state
+            .compare_exchange(WAITING, REGISTERING, Acquire, Acquire)
+            .unwrap_or_else(|x| x)
+        {
             WAITING => {
                 unsafe {
                     // Locked acquired, update the waker cell

@@ -76,7 +76,8 @@
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let mut sleep = time::sleep(Duration::from_millis(50));
+///     let sleep = time::sleep(Duration::from_millis(50));
+///     tokio::pin!(sleep);
 ///
 ///     while !sleep.is_elapsed() {
 ///         tokio::select! {
@@ -109,7 +110,8 @@
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let mut sleep = time::sleep(Duration::from_millis(50));
+///     let sleep = time::sleep(Duration::from_millis(50));
+///     tokio::pin!(sleep);
 ///
 ///     loop {
 ///         tokio::select! {
@@ -226,7 +228,8 @@
 /// #[tokio::main]
 /// async fn main() {
 ///     let mut stream = stream::iter(vec![1, 2, 3]);
-///     let mut sleep = time::sleep(Duration::from_secs(1));
+///     let sleep = time::sleep(Duration::from_secs(1));
+///     tokio::pin!(sleep);
 ///
 ///     loop {
 ///         tokio::select! {
@@ -443,7 +446,7 @@ macro_rules! select {
 
     (@ { $($t:tt)* } ) => {
         // No `else` branch
-        $crate::select!(@{ $($t)*; unreachable!() })
+        $crate::select!(@{ $($t)*; panic!("all branches are disabled and there is no else branch") })
     };
     (@ { $($t:tt)* } else => $else:expr $(,)?) => {
         $crate::select!(@{ $($t)*; $else })

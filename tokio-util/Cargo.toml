@@ -13,12 +13,11 @@ authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
-documentation = "https://docs.rs/tokio-util/0.5.1/tokio_util"
+documentation = "https://docs.rs/tokio-util/0.6.0/tokio_util"
 description = """
 Additional utilities for working with Tokio.
 """
 categories = ["asynchronous"]
-publish = false
 
 [features]
 # No features on by default
@@ -29,7 +28,7 @@ full = ["codec", "compat", "io", "time", "net", "rt"]
 
 net = ["tokio/net"]
 compat = ["futures-io",]
-codec = ["tokio/stream"]
+codec = []
 time = ["tokio/time","slab"]
 io = []
 rt = ["tokio/rt"]
@@ -40,7 +39,7 @@ __docs_rs = ["futures-util"]
 tokio = { version = "1.0.0", path = "../tokio" }
 tokio-stream = { version = "0.1", path = "../tokio-stream" }
 
-bytes = "0.6.0"
+bytes = "1.0.0"
 futures-core = "0.3.0"
 futures-sink = "0.3.0"
 futures-io = { version = "0.3.0", optional = true }
@@ -55,6 +54,8 @@ tokio-test = { version = "0.4.0", path = "../tokio-test" }
 
 futures = "0.3.0"
 futures-test = "0.3.5"
+
+async-stream = "0.3.0"
 
 [package.metadata.docs.rs]
 all-features = true

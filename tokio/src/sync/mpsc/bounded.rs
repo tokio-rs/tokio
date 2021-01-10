@@ -11,7 +11,6 @@ cfg_time! {
 }
 
 use std::fmt;
-#[cfg(any(feature = "signal", feature = "process"))]
 use std::task::{Context, Poll};
 
 /// Send values to the associated `Receiver`.
@@ -34,6 +33,10 @@ pub struct Permit<'a, T> {
 /// Receive values from the associated `Sender`.
 ///
 /// Instances are created by the [`channel`](channel) function.
+///
+/// This receiver can be turned into a `Stream` using [`ReceiverStream`].
+///
+/// [`ReceiverStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.ReceiverStream.html
 pub struct Receiver<T> {
     /// The channel receiver
     chan: chan::Rx<T, Semaphore>,
@@ -147,11 +150,6 @@ impl<T> Receiver<T> {
         poll_fn(|cx| self.chan.recv(cx)).await
     }
 
-    #[cfg(any(feature = "signal", feature = "process"))]
-    pub(crate) fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
-        self.chan.recv(cx)
-    }
-
     /// Blocking receive to call outside of asynchronous contexts.
     ///
     /// # Panics
@@ -242,6 +240,25 @@ impl<T> Receiver<T> {
     /// ```
     pub fn close(&mut self) {
         self.chan.close();
+    }
+
+    /// Polls to receive the next message on this channel.
+    ///
+    /// This method returns:
+    ///
+    ///  * `Poll::Pending` if no messages are available but the channel is not
+    ///    closed.
+    ///  * `Poll::Ready(Some(message))` if a message is available.
+    ///  * `Poll::Ready(None)` if the channel has been closed and all messages
+    ///    sent before it was closed have been received.
+    ///
+    /// When the method returns `Poll::Pending`, the `Waker` in the provided
+    /// `Context` is scheduled to receive a wakeup when a message is sent on any
+    /// receiver, or when the channel is closed.  Note that on multiple calls to
+    /// `poll_recv`, only the `Waker` from the `Context` passed to the most
+    /// recent call is scheduled to receive a wakeup.
+    pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        self.chan.recv(cx)
     }
 }
 

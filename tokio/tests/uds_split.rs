@@ -2,8 +2,8 @@
 #![cfg(feature = "full")]
 #![cfg(unix)]
 
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::UnixStream;
-use tokio::prelude::*;
 
 /// Checks that `UnixStream` can be split into a read half and a write half using
 /// `UnixStream::split` and `UnixStream::split_mut`.

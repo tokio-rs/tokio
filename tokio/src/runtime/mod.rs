@@ -20,7 +20,7 @@
 //!
 //! ```no_run
 //! use tokio::net::TcpListener;
-//! use tokio::prelude::*;
+//! use tokio::io::{AsyncReadExt, AsyncWriteExt};
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -63,7 +63,7 @@
 //!
 //! ```no_run
 //! use tokio::net::TcpListener;
-//! use tokio::prelude::*;
+//! use tokio::io::{AsyncReadExt, AsyncWriteExt};
 //! use tokio::runtime::Runtime;
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {

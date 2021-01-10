@@ -78,6 +78,16 @@ impl<T, D> FramedRead<T, D> {
         &mut self.inner.inner
     }
 
+    /// Returns a pinned mutable reference to the underlying I/O stream wrapped by
+    /// `FramedRead`.
+    ///
+    /// Note that care should be taken to not tamper with the underlying stream
+    /// of data coming in as it may corrupt the stream of frames otherwise
+    /// being worked with.
+    pub fn get_pin_mut(self: Pin<&mut Self>) -> Pin<&mut T> {
+        self.project().inner.project().inner
+    }
+
     /// Consumes the `FramedRead`, returning its underlying I/O stream.
     ///
     /// Note that care should be taken to not tamper with the underlying stream

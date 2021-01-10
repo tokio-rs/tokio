@@ -4,6 +4,7 @@ use crate::codec::framed_impl::{FramedImpl, WriteFrame};
 use tokio::io::AsyncWrite;
 use tokio_stream::Stream;
 
+use bytes::BytesMut;
 use futures_sink::Sink;
 use pin_project_lite::pin_project;
 use std::fmt;
@@ -58,6 +59,16 @@ impl<T, E> FramedWrite<T, E> {
         &mut self.inner.inner
     }
 
+    /// Returns a pinned mutable reference to the underlying I/O stream wrapped by
+    /// `FramedWrite`.
+    ///
+    /// Note that care should be taken to not tamper with the underlying stream
+    /// of data coming in as it may corrupt the stream of frames otherwise
+    /// being worked with.
+    pub fn get_pin_mut(self: Pin<&mut Self>) -> Pin<&mut T> {
+        self.project().inner.project().inner
+    }
+
     /// Consumes the `FramedWrite`, returning its underlying I/O stream.
     ///
     /// Note that care should be taken to not tamper with the underlying stream
@@ -75,6 +86,16 @@ impl<T, E> FramedWrite<T, E> {
     /// Returns a mutable reference to the underlying encoder.
     pub fn encoder_mut(&mut self) -> &mut E {
         &mut self.inner.codec
+    }
+
+    /// Returns a reference to the write buffer.
+    pub fn write_buffer(&self) -> &BytesMut {
+        &self.inner.state.buffer
+    }
+
+    /// Returns a mutable reference to the write buffer.
+    pub fn write_buffer_mut(&mut self) -> &mut BytesMut {
+        &mut self.inner.state.buffer
     }
 }
 

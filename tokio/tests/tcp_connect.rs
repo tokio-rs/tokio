@@ -169,7 +169,7 @@ async fn connect_addr_host_str_port_tuple() {
 #[cfg(target_os = "linux")]
 mod linux {
     use tokio::net::{TcpListener, TcpStream};
-    use tokio::prelude::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio_test::assert_ok;
 
     use mio::unix::UnixReady;

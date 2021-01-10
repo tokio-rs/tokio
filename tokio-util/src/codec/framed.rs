@@ -174,6 +174,16 @@ impl<T, U> Framed<T, U> {
         &mut self.inner.inner
     }
 
+    /// Returns a pinned mutable reference to the underlying I/O stream wrapped by
+    /// `Framed`.
+    ///
+    /// Note that care should be taken to not tamper with the underlying stream
+    /// of data coming in as it may corrupt the stream of frames otherwise
+    /// being worked with.
+    pub fn get_pin_mut(self: Pin<&mut Self>) -> Pin<&mut T> {
+        self.project().inner.project().inner
+    }
+
     /// Returns a reference to the underlying codec wrapped by
     /// `Framed`.
     ///
@@ -200,6 +210,16 @@ impl<T, U> Framed<T, U> {
     /// Returns a mutable reference to the read buffer.
     pub fn read_buffer_mut(&mut self) -> &mut BytesMut {
         &mut self.inner.state.read.buffer
+    }
+
+    /// Returns a reference to the write buffer.
+    pub fn write_buffer(&self) -> &BytesMut {
+        &self.inner.state.write.buffer
+    }
+
+    /// Returns a mutable reference to the write buffer.
+    pub fn write_buffer_mut(&mut self) -> &mut BytesMut {
+        &mut self.inner.state.write.buffer
     }
 
     /// Consumes the `Framed`, returning its underlying I/O stream.

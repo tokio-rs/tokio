@@ -24,8 +24,8 @@ mod imp {
     }
 
     impl AtomicU64 {
-        pub(crate) fn new(val: u64) -> AtomicU64 {
-            AtomicU64 {
+        pub(crate) fn new(val: u64) -> Self {
+            Self {
                 inner: Mutex::new(val),
             }
         }
@@ -45,16 +45,31 @@ mod imp {
             prev
         }
 
-        pub(crate) fn compare_and_swap(&self, old: u64, new: u64, _: Ordering) -> u64 {
+        pub(crate) fn compare_exchange(
+            &self,
+            current: u64,
+            new: u64,
+            _success: Ordering,
+            _failure: Ordering,
+        ) -> Result<u64, u64> {
             let mut lock = self.inner.lock().unwrap();
-            let prev = *lock;
 
-            if prev != old {
-                return prev;
+            if *lock == current {
+                *lock = new;
+                Ok(current)
+            } else {
+                Err(*lock)
             }
+        }
 
-            *lock = new;
-            prev
+        pub(crate) fn compare_exchange_weak(
+            &self,
+            current: u64,
+            new: u64,
+            success: Ordering,
+            failure: Ordering,
+        ) -> Result<u64, u64> {
+            self.compare_exchange(current, new, success, failure)
         }
     }
 }

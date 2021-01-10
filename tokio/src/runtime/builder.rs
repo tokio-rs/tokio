@@ -53,7 +53,7 @@ pub struct Builder {
     worker_threads: Option<usize>,
 
     /// Cap on thread usage.
-    max_threads: usize,
+    max_blocking_threads: usize,
 
     /// Name fn used for threads spawned by the runtime.
     pub(super) thread_name: ThreadNameFn,
@@ -113,7 +113,7 @@ impl Builder {
             // Default to lazy auto-detection (one thread per CPU core)
             worker_threads: None,
 
-            max_threads: 512,
+            max_blocking_threads: 512,
 
             // Default thread name
             thread_name: std::sync::Arc::new(|| "tokio-runtime-worker".into()),
@@ -209,22 +209,22 @@ impl Builder {
         self
     }
 
-    /// Specifies limit for threads, spawned by the Runtime.
+    /// Specifies limit for threads spawned by the Runtime used for blocking operations.
     ///
-    /// This is number of threads to be used by Runtime, including `core_threads`
-    /// Having `max_threads` less than `worker_threads` results in invalid configuration
-    /// when building multi-threaded `Runtime`, which would cause a panic.
     ///
-    /// Similarly to the `worker_threads`, this number should be between 0 and 32,768.
+    /// Similarly to the `worker_threads`, this number should be between 1 and 32,768.
     ///
     /// The default value is 512.
     ///
-    /// When multi-threaded runtime is not used, will act as limit on additional threads.
+    /// Otherwise as `worker_threads` are always active, it limits additional threads (e.g. for
+    /// blocking annotations).
     ///
-    /// Otherwise as `core_threads` are always active, it limits additional threads (e.g. for
-    /// blocking annotations) as `max_threads - core_threads`.
-    pub fn max_threads(&mut self, val: usize) -> &mut Self {
-        self.max_threads = val;
+    /// # Panic
+    ///
+    /// This will panic if `val` is not larger than `0`.
+    pub fn max_blocking_threads(&mut self, val: usize) -> &mut Self {
+        assert!(val > 0, "Max blocking threads cannot be set to 0");
+        self.max_blocking_threads = val;
         self
     }
 
@@ -379,6 +379,11 @@ impl Builder {
 
     fn get_cfg(&self) -> driver::Cfg {
         driver::Cfg {
+            enable_pause_time: match self.kind {
+                Kind::CurrentThread => true,
+                #[cfg(feature = "rt-multi-thread")]
+                Kind::MultiThread => false,
+            },
             enable_io: self.enable_io,
             enable_time: self.enable_time,
         }
@@ -419,7 +424,7 @@ impl Builder {
         let spawner = Spawner::Basic(scheduler.spawner().clone());
 
         // Blocking pool
-        let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
+        let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads);
         let blocking_spawner = blocking_pool.spawner().clone();
 
         Ok(Runtime {
@@ -490,10 +495,8 @@ cfg_rt_multi_thread! {
             use crate::loom::sys::num_cpus;
             use crate::runtime::{Kind, ThreadPool};
             use crate::runtime::park::Parker;
-            use std::cmp;
 
-            let core_threads = self.worker_threads.unwrap_or_else(|| cmp::min(self.max_threads, num_cpus()));
-            assert!(core_threads <= self.max_threads, "Core threads number cannot be above max limit");
+            let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
 
             let (driver, resources) = driver::Driver::new(self.get_cfg())?;
 
@@ -501,7 +504,7 @@ cfg_rt_multi_thread! {
             let spawner = Spawner::ThreadPool(scheduler.spawner().clone());
 
             // Create the blocking pool
-            let blocking_pool = blocking::create_blocking_pool(self, self.max_threads);
+            let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads + core_threads);
             let blocking_spawner = blocking_pool.spawner().clone();
 
             // Create the runtime handle
@@ -531,7 +534,7 @@ impl fmt::Debug for Builder {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Builder")
             .field("worker_threads", &self.worker_threads)
-            .field("max_threads", &self.max_threads)
+            .field("max_blocking_threads", &self.max_blocking_threads)
             .field(
                 "thread_name",
                 &"<dyn Fn() -> String + Send + Sync + 'static>",

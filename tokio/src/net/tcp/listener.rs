@@ -14,6 +14,10 @@ cfg_net! {
     /// You can accept a new connection by using the [`accept`](`TcpListener::accept`)
     /// method.
     ///
+    /// A `TcpListener` can be turned into a `Stream` with [`TcpListenerStream`].
+    ///
+    /// [`TcpListenerStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.TcpListenerStream.html
+    ///
     /// # Errors
     ///
     /// Note that accepting a connection can lead to various errors and not all
@@ -155,11 +159,9 @@ impl TcpListener {
     /// Polls to accept a new incoming connection to this listener.
     ///
     /// If there is no connection to accept, `Poll::Pending` is returned and the
-    /// current task will be notified by a waker.
-    ///
-    /// When ready, the most recent task that called `poll_accept` is notified.
-    /// The caller is responsible to ensure that `poll_accept` is called from a
-    /// single task. Failing to do this could result in tasks hanging.
+    /// current task will be notified by a waker.  Note that on multiple calls
+    /// to `poll_accept`, only the `Waker` from the `Context` passed to the most
+    /// recent call is scheduled to receive a wakeup.
     pub fn poll_accept(&self, cx: &mut Context<'_>) -> Poll<io::Result<(TcpStream, SocketAddr)>> {
         loop {
             let ev = ready!(self.io.registration().poll_read_ready(cx))?;

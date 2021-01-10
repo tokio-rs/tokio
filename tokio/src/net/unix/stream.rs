@@ -15,12 +15,23 @@ use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+cfg_io_util! {
+    use bytes::BufMut;
+}
+
 cfg_net_unix! {
     /// A structure representing a connected Unix socket.
     ///
     /// This socket can be connected directly with `UnixStream::connect` or accepted
     /// from a listener with `UnixListener::incoming`. Additionally, a pair of
     /// anonymous Unix sockets can be created with `UnixStream::pair`.
+    ///
+    /// To shut down the stream in the write direction, you can call the
+    /// [`shutdown()`] method. This will cause the other peer to receive a read of
+    /// length 0, indicating that no more data will be sent. This only closes
+    /// the stream in one direction.
+    ///
+    /// [`shutdown()`]: fn@crate::io::AsyncWriteExt::shutdown
     pub struct UnixStream {
         io: PollEvented<mio::net::UnixStream>,
     }
@@ -162,9 +173,31 @@ impl UnixStream {
 
     /// Polls for read readiness.
     ///
+    /// If the unix stream is not currently ready for reading, this method will
+    /// store a clone of the `Waker` from the provided `Context`. When the unix
+    /// stream becomes ready for reading, `Waker::wake` will be called on the
+    /// waker.
+    ///
+    /// Note that on multiple calls to `poll_read_ready` or `poll_read`, only
+    /// the `Waker` from the `Context` passed to the most recent call is
+    /// scheduled to receive a wakeup. (However, `poll_write_ready` retains a
+    /// second, independent waker.)
+    ///
     /// This function is intended for cases where creating and pinning a future
     /// via [`readable`] is not feasible. Where possible, using [`readable`] is
     /// preferred, as this supports polling from multiple tasks at once.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the unix stream is not ready for reading.
+    /// * `Poll::Ready(Ok(()))` if the unix stream is ready for reading.
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
     ///
     /// [`readable`]: method@Self::readable
     pub fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
@@ -238,6 +271,87 @@ impl UnixStream {
             .try_io(Interest::READABLE, || (&*self.io).read(buf))
     }
 
+    cfg_io_util! {
+        /// Try to read data from the stream into the provided buffer, advancing the
+        /// buffer's internal cursor, returning how many bytes were read.
+        ///
+        /// Receives any pending data from the socket but does not wait for new data
+        /// to arrive. On success, returns the number of bytes read. Because
+        /// `try_read_buf()` is non-blocking, the buffer does not have to be stored by
+        /// the async task and can exist entirely on the stack.
+        ///
+        /// Usually, [`readable()`] or [`ready()`] is used with this function.
+        ///
+        /// [`readable()`]: UnixStream::readable()
+        /// [`ready()`]: UnixStream::ready()
+        ///
+        /// # Return
+        ///
+        /// If data is successfully read, `Ok(n)` is returned, where `n` is the
+        /// number of bytes read. `Ok(0)` indicates the stream's read half is closed
+        /// and will no longer yield data. If the stream is not ready to read data
+        /// `Err(io::ErrorKind::WouldBlock)` is returned.
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::net::UnixStream;
+        /// use std::error::Error;
+        /// use std::io;
+        ///
+        /// #[tokio::main]
+        /// async fn main() -> Result<(), Box<dyn Error>> {
+        ///     // Connect to a peer
+        ///     let dir = tempfile::tempdir().unwrap();
+        ///     let bind_path = dir.path().join("bind_path");
+        ///     let stream = UnixStream::connect(bind_path).await?;
+        ///
+        ///     loop {
+        ///         // Wait for the socket to be readable
+        ///         stream.readable().await?;
+        ///
+        ///         let mut buf = Vec::with_capacity(4096);
+        ///
+        ///         // Try to read data, this may still fail with `WouldBlock`
+        ///         // if the readiness event is a false positive.
+        ///         match stream.try_read_buf(&mut buf) {
+        ///             Ok(0) => break,
+        ///             Ok(n) => {
+        ///                 println!("read {} bytes", n);
+        ///             }
+        ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+        ///                 continue;
+        ///             }
+        ///             Err(e) => {
+        ///                 return Err(e.into());
+        ///             }
+        ///         }
+        ///     }
+        ///
+        ///     Ok(())
+        /// }
+        /// ```
+        pub fn try_read_buf<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
+            self.io.registration().try_io(Interest::READABLE, || {
+                use std::io::Read;
+
+                let dst = buf.chunk_mut();
+                let dst =
+                    unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
+
+                // Safety: We trust `UnixStream::read` to have filled up `n` bytes in the
+                // buffer.
+                let n = (&*self.io).read(dst)?;
+
+                unsafe {
+                    buf.advance_mut(n);
+                }
+
+                Ok(n)
+            })
+        }
+    }
+
     /// Wait for the socket to become writable.
     ///
     /// This function is equivalent to `ready(Interest::WRITABLE)` and is usually
@@ -286,9 +400,31 @@ impl UnixStream {
 
     /// Polls for write readiness.
     ///
+    /// If the unix stream is not currently ready for writing, this method will
+    /// store a clone of the `Waker` from the provided `Context`. When the unix
+    /// stream becomes ready for writing, `Waker::wake` will be called on the
+    /// waker.
+    ///
+    /// Note that on multiple calls to `poll_write_ready` or `poll_write`, only
+    /// the `Waker` from the `Context` passed to the most recent call is
+    /// scheduled to receive a wakeup. (However, `poll_read_ready` retains a
+    /// second, independent waker.)
+    ///
     /// This function is intended for cases where creating and pinning a future
     /// via [`writable`] is not feasible. Where possible, using [`writable`] is
     /// preferred, as this supports polling from multiple tasks at once.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the unix stream is not ready for writing.
+    /// * `Poll::Ready(Ok(()))` if the unix stream is ready for writing.
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
     ///
     /// [`writable`]: method@Self::writable
     pub fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
@@ -415,7 +551,7 @@ impl UnixStream {
     /// This function will cause all pending and future I/O calls on the
     /// specified portions to immediately return with an appropriate value
     /// (see the documentation of `Shutdown`).
-    pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
+    pub(super) fn shutdown_std(&self, how: Shutdown) -> io::Result<()> {
         self.io.shutdown(how)
     }
 
@@ -440,10 +576,10 @@ impl UnixStream {
     /// this comes at the cost of a heap allocation.
     ///
     /// **Note:** Dropping the write half will shut down the write half of the
-    /// stream. This is equivalent to calling [`shutdown(Write)`] on the `UnixStream`.
+    /// stream. This is equivalent to calling [`shutdown()`] on the `UnixStream`.
     ///
     /// [`split`]: Self::split()
-    /// [`shutdown(Write)`]: fn@Self::shutdown
+    /// [`shutdown()`]: fn@crate::io::AsyncWriteExt::shutdown
     pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
         split_owned(self)
     }
@@ -497,7 +633,7 @@ impl AsyncWrite for UnixStream {
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.shutdown(std::net::Shutdown::Write)?;
+        self.shutdown_std(std::net::Shutdown::Write)?;
         Poll::Ready(Ok(()))
     }
 }
