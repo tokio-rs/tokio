@@ -1,4 +1,4 @@
-use crate::sync::batch_semaphore::Semaphore;
+use crate::sync::batch_semaphore::{Semaphore, TryAcquireError};
 use std::cell::UnsafeCell;
 use std::fmt;
 use std::marker;
@@ -441,6 +441,52 @@ impl<T: ?Sized> RwLock<T> {
         }
     }
 
+    /// Attempts to acquire this `RwLock` with shared read access.
+    ///
+    /// If the access couldn't be acquired immediately returns [`TryReadError`].
+    /// Otherwise, an RAII guard is returned which will release read access
+    /// when dropped.
+    ///
+    /// [`TryReadError`]: TryReadError
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::RwLock;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let lock = Arc::new(RwLock::new(1));
+    ///     let c_lock = lock.clone();
+    ///
+    ///     let v = lock.try_read().unwrap();
+    ///     assert_eq!(*v, 1);
+    ///
+    ///     tokio::spawn(async move {
+    ///         // While main has an active read lock, we acquire one too.
+    ///         let n = c_lock.read().await;
+    ///         assert_eq!(*n, 1);
+    ///     }).await.expect("The spawned task panicked");
+    ///
+    ///     // Drop the guard when spawned task finishes.
+    ///     drop(v);
+    /// }
+    /// ```
+    pub fn try_read(&self) -> Result<RwLockReadGuard<'_, T>, TryReadError> {
+        match self.s.try_acquire(1) {
+            Ok(permit) => permit,
+            Err(TryAcquireError::NoPermits) => return Err(TryReadError(())),
+            Err(TryAcquireError::Closed) => unreachable!(),
+        }
+
+        Ok(RwLockReadGuard {
+            s: &self.s,
+            data: self.c.get(),
+            marker: marker::PhantomData,
+        })
+    }
+
     /// Locks this rwlock with exclusive write access, causing the current task
     /// to yield until the lock has been acquired.
     ///
@@ -476,6 +522,43 @@ impl<T: ?Sized> RwLock<T> {
         }
     }
 
+    /// Attempts to acquire this `RwLock` with exclusive write access.
+    ///
+    /// If the access couldn't be acquired immediately returns [`TryReadError`].
+    /// Otherwise, an RAII guard is returned which will release write access
+    /// when dropped.
+    ///
+    /// [`TryWriteError`]: TryWriteError
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::RwLock;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let rw = RwLock::new(1);
+    ///
+    ///     let v = rw.read().await;
+    ///     assert_eq!(*v, 1);
+    ///
+    ///     assert!(rw.try_write().is_err());
+    /// }
+    /// ```
+    pub fn try_write(&self) -> Result<RwLockWriteGuard<'_, T>, TryWriteError> {
+        match self.s.try_acquire(MAX_READS as u32) {
+            Ok(permit) => permit,
+            Err(TryAcquireError::NoPermits) => return Err(TryWriteError(())),
+            Err(TryAcquireError::Closed) => unreachable!(),
+        }
+
+        Ok(RwLockWriteGuard {
+            s: &self.s,
+            data: self.c.get(),
+            marker: marker::PhantomData,
+        })
+    }
+
     /// Returns a mutable reference to the underlying data.
     ///
     /// Since this call borrows the `RwLock` mutably, no actual locking needs to
@@ -508,6 +591,34 @@ impl<T: ?Sized> RwLock<T> {
         self.c.into_inner()
     }
 }
+
+/// Error returned from the [`RwLock::try_read`] function,
+///
+/// [`RwLock::try_read`]: fn@RwLock::try_read
+#[derive(Debug)]
+pub struct TryReadError(());
+
+impl fmt::Display for TryReadError {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(fmt, "operation would block")
+    }
+}
+
+impl std::error::Error for TryReadError {}
+
+/// Error returned from the [`RwLock::try_write`] function,
+///
+/// [`RwLock::try_write`]: fn@RwLock::try_write
+#[derive(Debug)]
+pub struct TryWriteError(());
+
+impl fmt::Display for TryWriteError {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(fmt, "operation would block")
+    }
+}
+
+impl std::error::Error for TryWriteError {}
 
 impl<T: ?Sized> ops::Deref for RwLockReadGuard<'_, T> {
     type Target = T;

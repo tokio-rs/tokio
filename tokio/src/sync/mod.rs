@@ -450,7 +450,7 @@ cfg_sync! {
     pub use semaphore::{Semaphore, SemaphorePermit, OwnedSemaphorePermit};
 
     mod rwlock;
-    pub use rwlock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+    pub use rwlock::{RwLock, RwLockReadGuard, RwLockWriteGuard, TryReadError, TryWriteError};
 
     mod task;
     pub(crate) use task::AtomicWaker;
