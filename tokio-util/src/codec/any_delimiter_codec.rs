@@ -18,18 +18,21 @@ const DEFAULT_ENCODERS: &str = ",";
 /// [`Error`]: std::io::Error
 ///
 /// ```
-/// # mod hidden {
-/// # #[allow(unused_imports)]
-/// use tokio::fs::File;
-/// # }
-/// use tokio::io::AsyncRead;
-/// use tokio_util::codec::AnyDelimiterCodec};
+/// use tokio_util::codec::{AnyDelimiterCodec, Decoder};
+/// use bytes::{BufMut, BytesMut};
 ///
 /// #
 /// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() -> Result<(), std::io::Error> {
-/// let my_async_read = File::open("filename.txt").await?;
-/// let my_stream_of_bytes = FramedRead::new(my_async_read, AnyDelimiterCodec::new(",;\r\n",";"));
+/// let mut codec = AnyDelimiterCodec::new(",;\r\n",";");
+/// let buf = &mut BytesMut::new();
+/// buf.reserve(200);
+/// buf.put_slice(b"chunk 1,chunk 2;chunk 3\n\r");
+/// assert_eq!("chunk 1", codec.decode(buf).unwrap().unwrap());
+/// assert_eq!("chunk 2", codec.decode(buf).unwrap().unwrap());
+/// assert_eq!("chunk 3", codec.decode(buf).unwrap().unwrap());
+/// assert_eq!("", codec.decode(buf).unwrap().unwrap());
+/// assert_eq!(None, codec.decode(buf).unwrap());
 /// # Ok(())
 /// # }
 /// ```
