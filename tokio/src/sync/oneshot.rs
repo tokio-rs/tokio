@@ -706,9 +706,13 @@ impl<T> Inner<T> {
 unsafe impl<T: Send> Send for Inner<T> {}
 unsafe impl<T: Send> Sync for Inner<T> {}
 
+fn mut_load(this: &mut AtomicUsize) -> usize {
+    this.with_mut(|v| *v)
+}
+
 impl<T> Drop for Inner<T> {
     fn drop(&mut self) {
-        let state = State(self.state.mut_load());
+        let state = State(mut_load(&mut self.state));
 
         if state.is_rx_task_set() {
             unsafe {
