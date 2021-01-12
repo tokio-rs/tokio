@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1610482635935,
+  "lastUpdate": 1610482651346,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -11065,6 +11065,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21680669,
             "range": "± 2650230",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "dek-oss@gravitext.com",
+            "name": "David Kellum",
+            "username": "dekellum"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8b9bb41809bcb550835e8ec14f0c47b0a3bf9af6",
+          "message": "docs: add tokio 1.0 policies to contributing guide (#3386)",
+          "timestamp": "2021-01-12T21:15:44+01:00",
+          "tree_id": "2dc2fa4a60abf62bcbfb5933977b2358a209f0cd",
+          "url": "https://github.com/tokio-rs/tokio/commit/8b9bb41809bcb550835e8ec14f0c47b0a3bf9af6"
+        },
+        "date": 1610482650116,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 159637,
+            "range": "± 3932",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 619305,
+            "range": "± 18792",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4894589,
+            "range": "± 749173",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18660693,
+            "range": "± 2056133",
             "unit": "ns/iter"
           }
         ]
