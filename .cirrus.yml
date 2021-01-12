@@ -21,9 +21,9 @@ task:
       rustc --version
   test_script:
     - . $HOME/.cargo/env
-    - cargo test --all
+    - cargo test --all --all-features
     - cargo doc --all --no-deps
   i686_test_script:
     - . $HOME/.cargo/env
     - |
-      cargo test --all --target i686-unknown-freebsd
+      cargo test --all --all-features --target i686-unknown-freebsd
