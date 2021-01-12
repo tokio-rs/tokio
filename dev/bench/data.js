@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1610452083726,
+  "lastUpdate": 1610452087927,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -5723,6 +5723,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 595,
             "range": "± 15",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "tesaguriguma@gmail.com",
+            "name": "Daiki Mizukami",
+            "username": "tesaguri"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ed667c669ab368882a49e7715cdb88601e2fb45a",
+          "message": "chore: prepare tokio-util v0.6.1 release (#3402)",
+          "timestamp": "2021-01-12T12:46:07+01:00",
+          "tree_id": "2f789664db7e3cd358ae48947d37903aa9d1fe77",
+          "url": "https://github.com/tokio-rs/tokio/commit/ed667c669ab368882a49e7715cdb88601e2fb45a"
+        },
+        "date": 1610452086457,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 936,
+            "range": "± 127",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 15365,
+            "range": "± 5672",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 990,
+            "range": "± 110",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 14948,
+            "range": "± 3278",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 571,
+            "range": "± 48",
             "unit": "ns/iter"
           }
         ]
