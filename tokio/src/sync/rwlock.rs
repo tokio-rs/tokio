@@ -444,11 +444,11 @@ impl<T: ?Sized> RwLock<T> {
 
     /// Attempts to acquire this `RwLock` with shared read access.
     ///
-    /// If the access couldn't be acquired immediately returns [`TryReadError`].
+    /// If the access couldn't be acquired immediately returns [`TryLockError`].
     /// Otherwise, an RAII guard is returned which will release read access
     /// when dropped.
     ///
-    /// [`TryReadError`]: TryReadError
+    /// [`TryLockError`]: TryLockError
     ///
     /// # Examples
     ///
@@ -525,11 +525,11 @@ impl<T: ?Sized> RwLock<T> {
 
     /// Attempts to acquire this `RwLock` with exclusive write access.
     ///
-    /// If the access couldn't be acquired immediately returns [`TryReadError`].
+    /// If the access couldn't be acquired immediately returns [`TryLockError`].
     /// Otherwise, an RAII guard is returned which will release write access
     /// when dropped.
     ///
-    /// [`TryWriteError`]: TryWriteError
+    /// [`TryLockError`]: TryLockError
     ///
     /// # Examples
     ///
