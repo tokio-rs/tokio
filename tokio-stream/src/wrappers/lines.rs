@@ -30,6 +30,7 @@ impl<R> LinesStream<R> {
     }
 
     /// Obtain a pinned reference to the inner `Lines<R>`.
+    #[allow(clippy::wrong_self_convention)] // TODO: rename to get_pin_mut
     pub fn as_pin_mut(self: Pin<&mut Self>) -> Pin<&mut Lines<R>> {
         self.project().inner
     }

@@ -30,6 +30,7 @@ impl<R> SplitStream<R> {
     }
 
     /// Obtain a pinned reference to the inner `Split<R>`.
+    #[allow(clippy::wrong_self_convention)] // TODO: rename to get_pin_mut
     pub fn as_pin_mut(self: Pin<&mut Self>) -> Pin<&mut Split<R>> {
         self.project().inner
     }
