@@ -7,9 +7,9 @@ edition = "2018"
 # If you copy one of the examples into a new project, you should be using
 # [dependencies] instead.
 [dev-dependencies]
-tokio = { version = "1.0.0", path = "../tokio", features = ["full", "tracing"] }
-tokio-util = { version = "0.6.0", path = "../tokio-util", features = ["full"] }
-tokio-stream = { version = "0.1", path = "../tokio-stream" }
+tokio = { version = "1.0.0", features = ["full", "tracing"] }
+tokio-util = { version = "0.6.1", features = ["full"] }
+tokio-stream = { version = "0.1" }
 
 async-stream = "0.3"
 tracing = "0.1"
