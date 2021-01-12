@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1610464924206,
+  "lastUpdate": 1610464928840,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -11017,6 +11017,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 17503474,
             "range": "± 3563987",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "te316e89@gmail.com",
+            "name": "Taiki Endo",
+            "username": "taiki-e"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d37486dd06e16fffa19aa4619dc5749f7579743f",
+          "message": "util: remove path deps (#3413)\n\n* util: remove path deps\r\n\r\n* ci: run clippy with --all-features\r\n\r\n* ci: run tests with --all-features on FreeBSD CI",
+          "timestamp": "2021-01-13T00:19:57+09:00",
+          "tree_id": "1954d61dc1b6b684033f02016068802ff6a4e6a4",
+          "url": "https://github.com/tokio-rs/tokio/commit/d37486dd06e16fffa19aa4619dc5749f7579743f"
+        },
+        "date": 1610464919894,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 190337,
+            "range": "± 35191",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 731728,
+            "range": "± 52203",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5342149,
+            "range": "± 1497656",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21680669,
+            "range": "± 2650230",
             "unit": "ns/iter"
           }
         ]
