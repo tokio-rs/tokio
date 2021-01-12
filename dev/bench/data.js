@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1610464920223,
+  "lastUpdate": 1610464924206,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -16851,6 +16851,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1112,
             "range": "± 174",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "te316e89@gmail.com",
+            "name": "Taiki Endo",
+            "username": "taiki-e"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d37486dd06e16fffa19aa4619dc5749f7579743f",
+          "message": "util: remove path deps (#3413)\n\n* util: remove path deps\r\n\r\n* ci: run clippy with --all-features\r\n\r\n* ci: run tests with --all-features on FreeBSD CI",
+          "timestamp": "2021-01-13T00:19:57+09:00",
+          "tree_id": "1954d61dc1b6b684033f02016068802ff6a4e6a4",
+          "url": "https://github.com/tokio-rs/tokio/commit/d37486dd06e16fffa19aa4619dc5749f7579743f"
+        },
+        "date": 1610464918514,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 14550,
+            "range": "± 4666",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1019,
+            "range": "± 138",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 600,
+            "range": "± 81",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 14600,
+            "range": "± 4020",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1007,
+            "range": "± 118",
             "unit": "ns/iter"
           }
         ]
