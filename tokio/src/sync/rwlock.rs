@@ -1,4 +1,5 @@
 use crate::sync::batch_semaphore::{Semaphore, TryAcquireError};
+use crate::sync::mutex::TryLockError;
 use std::cell::UnsafeCell;
 use std::fmt;
 use std::marker;
@@ -473,10 +474,10 @@ impl<T: ?Sized> RwLock<T> {
     ///     drop(v);
     /// }
     /// ```
-    pub fn try_read(&self) -> Result<RwLockReadGuard<'_, T>, TryReadError> {
+    pub fn try_read(&self) -> Result<RwLockReadGuard<'_, T>, TryLockError> {
         match self.s.try_acquire(1) {
             Ok(permit) => permit,
-            Err(TryAcquireError::NoPermits) => return Err(TryReadError(())),
+            Err(TryAcquireError::NoPermits) => return Err(TryLockError(())),
             Err(TryAcquireError::Closed) => unreachable!(),
         }
 
@@ -545,10 +546,10 @@ impl<T: ?Sized> RwLock<T> {
     ///     assert!(rw.try_write().is_err());
     /// }
     /// ```
-    pub fn try_write(&self) -> Result<RwLockWriteGuard<'_, T>, TryWriteError> {
+    pub fn try_write(&self) -> Result<RwLockWriteGuard<'_, T>, TryLockError> {
         match self.s.try_acquire(MAX_READS as u32) {
             Ok(permit) => permit,
-            Err(TryAcquireError::NoPermits) => return Err(TryWriteError(())),
+            Err(TryAcquireError::NoPermits) => return Err(TryLockError(())),
             Err(TryAcquireError::Closed) => unreachable!(),
         }
 
@@ -591,34 +592,6 @@ impl<T: ?Sized> RwLock<T> {
         self.c.into_inner()
     }
 }
-
-/// Error returned from the [`RwLock::try_read`] function,
-///
-/// [`RwLock::try_read`]: fn@RwLock::try_read
-#[derive(Debug)]
-pub struct TryReadError(());
-
-impl fmt::Display for TryReadError {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "operation would block")
-    }
-}
-
-impl std::error::Error for TryReadError {}
-
-/// Error returned from the [`RwLock::try_write`] function,
-///
-/// [`RwLock::try_write`]: fn@RwLock::try_write
-#[derive(Debug)]
-pub struct TryWriteError(());
-
-impl fmt::Display for TryWriteError {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "operation would block")
-    }
-}
-
-impl std::error::Error for TryWriteError {}
 
 impl<T: ?Sized> ops::Deref for RwLockReadGuard<'_, T> {
     type Target = T;
