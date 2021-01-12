@@ -3,8 +3,7 @@
 ### Added
 
 - codec: `get_ref()`, `get_mut()`, `get_pin_mut()` and `into_inner()` for
-  `Framed`, `FramedRead`, `FramedWrite`, `StreamReader`, `StreamReader`,
-  `StreamReader` and `StreamReader` ([#3364]).
+  `Framed`, `FramedRead`, `FramedWrite` and `StreamReader` ([#3364]).
 - codec: `write_buffer()` and `write_buffer_mut()` for `Framed` and
   `FramedWrite` ([#3387]).
 
