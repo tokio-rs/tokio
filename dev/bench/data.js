@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1610464928840,
+  "lastUpdate": 1610464954259,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -25859,6 +25859,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 823288,
             "range": "± 11492",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "te316e89@gmail.com",
+            "name": "Taiki Endo",
+            "username": "taiki-e"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d37486dd06e16fffa19aa4619dc5749f7579743f",
+          "message": "util: remove path deps (#3413)\n\n* util: remove path deps\r\n\r\n* ci: run clippy with --all-features\r\n\r\n* ci: run tests with --all-features on FreeBSD CI",
+          "timestamp": "2021-01-13T00:19:57+09:00",
+          "tree_id": "1954d61dc1b6b684033f02016068802ff6a4e6a4",
+          "url": "https://github.com/tokio-rs/tokio/commit/d37486dd06e16fffa19aa4619dc5749f7579743f"
+        },
+        "date": 1610464952873,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 7412112,
+            "range": "± 2454868",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 7026440,
+            "range": "± 2448425",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 7019806,
+            "range": "± 2473694",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 708,
+            "range": "± 123",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 716,
+            "range": "± 93",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 699,
+            "range": "± 176",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 85041,
+            "range": "± 9953",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1539,
+            "range": "± 449",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1155832,
+            "range": "± 329806",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 829577,
+            "range": "± 131140",
             "unit": "ns/iter"
           }
         ]
