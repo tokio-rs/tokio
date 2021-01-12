@@ -169,7 +169,7 @@ unsafe impl<T> Sync for OwnedMutexGuard<T> where T: ?Sized + Send + Sync {}
 /// `RwLock::try_read` operation will only fail if the lock is currently held
 /// by an exclusive writer.
 ///
-/// `RwLock::try_write` operation will if lock is held by any reader or by an 
+/// `RwLock::try_write` operation will if lock is held by any reader or by an
 /// exclusive writer.
 ///
 /// [`Mutex::try_lock`]: Mutex::try_lock
