@@ -232,7 +232,7 @@ jobs:
 
       # Run clippy
       - name: "clippy --all"
-        run: cargo clippy --all --tests
+        run: cargo clippy --all --tests --all-features
 
   docs:
     name: docs
