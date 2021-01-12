@@ -1,3 +1,12 @@
+# 0.6.1 (January 12, 2020)
+
+### Added
+
+- codec: `get_ref()`, `get_mut()`, `get_pin_mut()` and `into_inner()` for
+  `Framed`, `FramedRead`, `FramedWrite` and `StreamReader` ([#3364]).
+- codec: `write_buffer()` and `write_buffer_mut()` for `Framed` and
+  `FramedWrite` ([#3387]).
+
 # 0.6.0 (December 23, 2020)
 
 ### Changed
@@ -53,6 +62,8 @@
 
 - Initial release
 
+[#3387]: https://github.com/tokio-rs/tokio/pull/3387
+[#3364]: https://github.com/tokio-rs/tokio/pull/3364
 [#2326]: https://github.com/tokio-rs/tokio/pull/2326
 [#2215]: https://github.com/tokio-rs/tokio/pull/2215
 [#2198]: https://github.com/tokio-rs/tokio/pull/2198
