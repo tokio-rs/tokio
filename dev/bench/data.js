@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1610565993971,
+  "lastUpdate": 1610566002949,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -26579,6 +26579,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 831403,
             "range": "± 35999",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "luciofranco14@gmail.com",
+            "name": "Lucio Franco",
+            "username": "LucioFranco"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "672be92a03a489d028ed7ec2c6b1abdbf0874a1d",
+          "message": "mpsc: Add `Sender::try_reserve` function (#3418)\n\n* mpsc: Add `Sender::try_reserve` function\r\n\r\n* Update tokio/src/sync/mpsc/bounded.rs\r\n\r\nCo-authored-by: Alice Ryhl <alice@ryhl.io>\r\n\r\n* Fix doc links\r\n\r\nCo-authored-by: Alice Ryhl <alice@ryhl.io>",
+          "timestamp": "2021-01-13T14:24:23-05:00",
+          "tree_id": "dbefcc820c74146acd0f1164632acdc53a6a7448",
+          "url": "https://github.com/tokio-rs/tokio/commit/672be92a03a489d028ed7ec2c6b1abdbf0874a1d"
+        },
+        "date": 1610566001714,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6123879,
+            "range": "± 2520607",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6377133,
+            "range": "± 1938407",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6038097,
+            "range": "± 3063548",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 687,
+            "range": "± 77",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 760,
+            "range": "± 172",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 771,
+            "range": "± 147",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 139033,
+            "range": "± 29869",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1454,
+            "range": "± 273",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 913052,
+            "range": "± 156421",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 646040,
+            "range": "± 141717",
             "unit": "ns/iter"
           }
         ]
