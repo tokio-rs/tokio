@@ -603,6 +603,58 @@ impl<T> Sender<T> {
 
         Ok(Permit { chan: &self.chan })
     }
+
+    /// Try to acquire a slot in the channel without waiting for the slot to become
+    /// available.
+    ///
+    /// If the channel is full this function will return [`TrySendError`], otherwise
+    /// if there is a slot available it will return a [`Permit`] that will then allow you
+    /// to [`send`] on the channel with a guaranteed slot. This function is similar to
+    /// [`reserve`] execpt it does not await for the slot to become available.
+    ///
+    /// Dropping [`Permit`] without sending a message releases the capacity back
+    /// to the channel.
+    ///
+    /// [`Permit`]: Permit
+    /// [`send`]: Permit::send
+    /// [`reserve`]: Sender::reserve
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::channel(1);
+    ///
+    ///     // Reserve capacity
+    ///     let permit = tx.try_reserve().unwrap();
+    ///
+    ///     // Trying to send directly on the `tx` will fail due to no
+    ///     // available capacity.
+    ///     assert!(tx.try_send(123).is_err());
+    ///
+    ///     // Trying to reserve an additional slot on the `tx` will
+    ///     // fail because there is no capacity.
+    ///     assert!(tx.try_reserve().is_err());
+    ///
+    ///     // Sending on the permit succeeds
+    ///     permit.send(456);
+    ///
+    ///     // The value sent on the permit is received
+    ///     assert_eq!(rx.recv().await.unwrap(), 456);
+    ///
+    /// }
+    /// ```
+    pub fn try_reserve(&self) -> Result<Permit<'_, T>, TrySendError<()>> {
+        match self.chan.semaphore().0.try_acquire(1) {
+            Ok(_) => {}
+            Err(_) => return Err(TrySendError::Full(())),
+        }
+
+        Ok(Permit { chan: &self.chan })
+    }
 }
 
 impl<T> Clone for Sender<T> {
