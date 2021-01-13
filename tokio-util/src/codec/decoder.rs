@@ -138,8 +138,8 @@ pub trait Decoder {
     /// frames to yield. This behavior enables returning finalization frames
     /// that may not be based on inbound data.
     ///
-    /// Once `None` has been returned `decode_eof` won't be called again until
-    /// an attampt to resume the stream has been made, where the underlying stream
+    /// Once `None` has been returned, `decode_eof` won't be called again until
+    /// an attempt to resume the stream has been made, where the underlying stream
     /// actually returned more data.
     fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         match self.decode(buf)? {
