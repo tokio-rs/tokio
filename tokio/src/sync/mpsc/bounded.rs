@@ -611,12 +611,13 @@ impl<T> Sender<T> {
     /// if there is a slot available it will return a [`Permit`] that will then allow you
     /// to [`send`] on the channel with a guaranteed slot. This function is similar to
     /// [`reserve`] execpt it does not await for the slot to become available.
-    //
+    ///
     /// Dropping [`Permit`] without sending a message releases the capacity back
     /// to the channel.
     ///
     /// [`Permit`]: Permit
     /// [`send`]: Permit::send
+    /// [`reserve`]: Sender::reserve
     ///
     /// # Examples
     ///
