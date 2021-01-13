@@ -607,7 +607,7 @@ impl<T> Sender<T> {
     /// Try to acquire a slot in the channel without waiting for the slot to become
     /// available.
     ///
-    //// If the channel is full this function will return [`TrySendError`], otherwise
+    /// If the channel is full this function will return [`TrySendError`], otherwise
     /// if there is a slot available it will return a [`Permit`] that will then allow you
     /// to [`send`] on the channel with a guaranteed slot. This function is similar to
     /// [`reserve`] execpt it does not await for the slot to become available.
