@@ -328,6 +328,29 @@ async fn try_send_fail() {
 }
 
 #[tokio::test]
+async fn try_reserve_fails() {
+    let (tx, mut rx) = mpsc::channel(1);
+
+    let permit = tx.try_reserve().unwrap();
+
+    // This should fail
+    match assert_err!(tx.try_reserve()) {
+        TrySendError::Full(()) => {}
+        _ => panic!(),
+    }
+
+    permit.send("foo");
+
+    assert_eq!(rx.recv().await, Some("foo"));
+
+    // Dropping permit releases the slot.
+    let permit = tx.try_reserve().unwrap();
+    drop(permit);
+
+    let _permit = tx.try_reserve().unwrap();
+}
+
+#[tokio::test]
 async fn drop_permit_releases_permit() {
     // poll_ready reserves capacity, ensure that the capacity is released if tx
     // is dropped w/o sending a value.
