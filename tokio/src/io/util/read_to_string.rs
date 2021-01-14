@@ -23,6 +23,9 @@ pin_project! {
         // The number of bytes appended to buf. This can be less than buf.len() if
         // the buffer was not empty when the operation was started.
         read: usize,
+        // The number of initialized bytes in the unused capacity of the vector.
+        // Always between 0 and `buf.capacity() - buf.len()`.
+        initialized: usize,
         // Make this future `!Unpin` for compatibility with async trait methods.
         #[pin]
         _pin: PhantomPinned,
@@ -42,23 +45,27 @@ where
         buf,
         output: string,
         read: 0,
+        initialized: 0,
         _pin: PhantomPinned,
     }
 }
 
 /// # Safety
 ///
-/// Before first calling this method, the unused capacity must have been
-/// prepared for use with the provided AsyncRead. This can be done using the
-/// `prepare_buffer` function in `read_to_end.rs`.
+/// The first `num_initialized` bytes of the unused capacity of the vector must be
+/// initialized.
+///
+/// This function guarantees that the above invariant still holds when the function
+/// returns.
 unsafe fn read_to_string_internal<R: AsyncRead + ?Sized>(
     reader: Pin<&mut R>,
     output: &mut String,
     buf: &mut Vec<u8>,
     read: &mut usize,
+    initialized: &mut usize,
     cx: &mut Context<'_>,
 ) -> Poll<io::Result<usize>> {
-    let io_res = ready!(read_to_end_internal(buf, reader, read, cx));
+    let io_res = ready!(read_to_end_internal(buf, reader, read, initialized, cx));
     let utf8_res = String::from_utf8(mem::replace(buf, Vec::new()));
 
     // At this point both buf and output are empty. The allocation is in utf8_res.
@@ -77,7 +84,18 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let me = self.project();
 
-        // safety: The constructor of ReadToString called `prepare_buffer`.
-        unsafe { read_to_string_internal(Pin::new(*me.reader), me.output, me.buf, me.read, cx) }
+        // Safety: initialized is initially zero, which is always correct, and
+        // `read_to_string_internal` guarantees that its invariant still holds
+        // when it returns.
+        unsafe {
+            read_to_string_internal(
+                Pin::new(*me.reader),
+                me.output,
+                me.buf,
+                me.read,
+                me.initialized,
+                cx,
+            )
+        }
     }
 }
