@@ -72,14 +72,13 @@ fn poll_read_to_end<R: AsyncRead + ?Sized>(
 
     let mut unused_capacity = ReadBuf::uninit(get_unused_capacity(buf));
 
+    let ptr = unused_capacity.filled().as_ptr();
     ready!(read.poll_read(cx, &mut unused_capacity))?;
+    assert_eq!(ptr, unused_capacity.filled().as_ptr());
 
     let n = unused_capacity.filled().len();
     let new_len = buf.len() + n;
 
-    // This should no longer even be possible in safe Rust. An implementor
-    // would need to have unsafely *replaced* the buffer inside `ReadBuf`,
-    // which... yolo?
     assert!(new_len <= buf.capacity());
     unsafe {
         buf.set_len(new_len);
