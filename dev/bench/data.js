@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1610647772410,
+  "lastUpdate": 1610647779949,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -17787,6 +17787,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1032,
             "range": "± 158",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "markus.westerlind@distilnetworks.com",
+            "name": "Markus Westerlind",
+            "username": "Marwes"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "204603b7de62e9c33b153a09c432c5d627830fb8",
+          "message": "rt: reduce duplicated code in task harness (#3314)\n\nTask spawning is a common operation that results in a lot of instantiations\r\nof the task code. Reducing the amount of generated code should lead to\r\nfaster compile times overall.\r\n\r\nThis patch extracts code that does not depend on a type parameter into\r\nfunctions with fewer or no type parameters at all. Reducing the amount of\r\nduplicated code.",
+          "timestamp": "2021-01-14T10:07:56-08:00",
+          "tree_id": "df93bdef23c6d149210813a4e9e632bdccefd945",
+          "url": "https://github.com/tokio-rs/tokio/commit/204603b7de62e9c33b153a09c432c5d627830fb8"
+        },
+        "date": 1610647778571,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 16272,
+            "range": "± 5409",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1110,
+            "range": "± 48",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 649,
+            "range": "± 15",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 15370,
+            "range": "± 4115",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1111,
+            "range": "± 7",
             "unit": "ns/iter"
           }
         ]
