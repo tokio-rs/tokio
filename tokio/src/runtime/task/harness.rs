@@ -76,8 +76,8 @@ where
 
     fn poll_inner(&self) -> PollFuture<T::Output> {
         let snapshot = match self.scheduler_view().transition_to_running() {
-            Ok(snapshot) => snapshot,
-            Err(()) => return PollFuture::DropReference,
+            TransitionToRunning::Ok(snapshot) => snapshot,
+            TransitionToRunning::DropReference => return PollFuture::DropReference,
         };
 
         // The transition to `Running` done above ensures that a lock on the
@@ -196,6 +196,11 @@ where
     }
 }
 
+enum TransitionToRunning {
+    Ok(Snapshot),
+    DropReference,
+}
+
 struct SchedulerView<'a, S> {
     header: &'a Header,
     scheduler: &'a Scheduler<S>,
@@ -232,7 +237,7 @@ where
         snapshot.ref_count() == 0
     }
 
-    fn transition_to_running(&self) -> Result<Snapshot, ()> {
+    fn transition_to_running(&self) -> TransitionToRunning {
         // If this is the first time the task is polled, the task will be bound
         // to the scheduler, in which case the task ref count must be
         // incremented.
@@ -246,8 +251,9 @@ where
             Ok(snapshot) => snapshot,
             Err(_) => {
                 // The task was shutdown while in the run queue. At this point,
-                // we just hold a ref counted reference. Drop it here.
-                return Err(());
+                // we just hold a ref counted reference. Since we do not have access to it here
+                // return `DropReference` so the caller drops it.
+                return TransitionToRunning::DropReference;
             }
         };
 
@@ -265,7 +271,7 @@ where
             // safely call `bind_scheduler`.
             self.scheduler.bind_scheduler(self.to_task());
         }
-        Ok(snapshot)
+        TransitionToRunning::Ok(snapshot)
     }
 }
 
