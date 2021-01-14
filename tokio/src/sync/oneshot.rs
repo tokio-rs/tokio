@@ -4,7 +4,7 @@
 
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::Arc;
+use crate::loom::sync::SmallArc;
 
 use std::fmt;
 use std::future::Future;
@@ -19,7 +19,7 @@ use std::task::{Context, Poll, Waker};
 /// Instances are created by the [`channel`](fn@channel) function.
 #[derive(Debug)]
 pub struct Sender<T> {
-    inner: Option<Arc<Inner<T>>>,
+    inner: Option<SmallArc<Inner<T>>>,
 }
 
 /// Receive a value from the associated `Sender`.
@@ -27,7 +27,7 @@ pub struct Sender<T> {
 /// Instances are created by the [`channel`](fn@channel) function.
 #[derive(Debug)]
 pub struct Receiver<T> {
-    inner: Option<Arc<Inner<T>>>,
+    inner: Option<SmallArc<Inner<T>>>,
 }
 
 pub mod error {
@@ -124,7 +124,7 @@ struct State(usize);
 /// }
 /// ```
 pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
-    let inner = Arc::new(Inner {
+    let inner = SmallArc::new(Inner {
         state: AtomicUsize::new(State::new().as_usize()),
         value: UnsafeCell::new(None),
         tx_task: UnsafeCell::new(MaybeUninit::uninit()),

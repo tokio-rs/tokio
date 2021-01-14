@@ -9,6 +9,7 @@ mod atomic_usize;
 mod mutex;
 #[cfg(feature = "parking_lot")]
 mod parking_lot;
+mod small_arc;
 mod unsafe_cell;
 
 pub(crate) mod cell {
@@ -47,6 +48,9 @@ pub(crate) mod rand {
 }
 
 pub(crate) mod sync {
+    /// Faster but limited version of Arc
+    pub(crate) use super::small_arc::SmallArc; 
+
     pub(crate) use std::sync::{Arc, Weak};
 
     // Below, make sure all the feature-influenced types are exported for
