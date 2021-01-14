@@ -137,6 +137,7 @@ jobs:
             os: ubuntu-latest
           - target: powerpc64-unknown-linux-gnu
             os: ubuntu-latest
+            subcmd: check # cross does not provide a Docker image for powerpc64-unknown-linux-gnu
           - target: mips-unknown-linux-gnu
             os: ubuntu-latest
           - target: arm-linux-androideabi
@@ -150,15 +151,15 @@ jobs:
           toolchain: stable
           target: ${{ matrix.target }}
           override: true
-      - name: cross test --target ${{ matrix.target }}
+      - name: cross --target ${{ matrix.target }}
         run: |
           cargo install cross
-          cross test --workspace --all-features --target ${{ matrix.target }}
+          cross ${{ matrix.subcmd || 'test' }} --workspace --all-features --target ${{ matrix.target }}
         if: startsWith(matrix.os, 'ubuntu')
-      - name: cargo test --target ${{ matrix.target }}
+      - name: cargo --target ${{ matrix.target }}
         run: |
           rustup target add ${{ matrix.target }}
-          cargo test --workspace --all-features --target ${{ matrix.target }}
+          cargo ${{ matrix.subcmd || 'test' }} --workspace --all-features --target ${{ matrix.target }}
         if: startsWith(matrix.os, 'windows')
 
   features:
