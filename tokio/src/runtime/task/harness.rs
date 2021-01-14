@@ -210,6 +210,7 @@ where
         unsafe { Task::from_raw(self.header.into()) }
     }
 
+    /// Returns true if the task should be deallocated.
     fn transition_to_terminal(&self, is_join_interested: bool) -> bool {
         let ref_dec = if self.scheduler.is_bound() {
             if let Some(task) = self.scheduler.release(self.to_task()) {
