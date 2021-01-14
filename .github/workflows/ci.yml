@@ -125,15 +125,24 @@ jobs:
 
   cross:
     name: cross
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        target:
-          - i686-unknown-linux-gnu
-          - powerpc-unknown-linux-gnu
-          - powerpc64-unknown-linux-gnu
-          - mips-unknown-linux-gnu
-          - arm-linux-androideabi
+        include:
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: i686-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: powerpc-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: powerpc64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: mips-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: arm-linux-androideabi
+            os: ubuntu-latest
+          - target: aarch64-pc-windows-msvc
+            os: windows-latest
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -141,11 +150,16 @@ jobs:
           toolchain: stable
           target: ${{ matrix.target }}
           override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: check
-          args: --workspace --target ${{ matrix.target }}
+      - name: cross test --target ${{ matrix.target }}
+        run: |
+          cargo install cross
+          cross test --workspace --all-features --target ${{ matrix.target }}
+        if: startsWith(matrix.os, 'ubuntu')
+      - name: cargo test --target ${{ matrix.target }}
+        run: |
+          rustup target add ${{ matrix.target }}
+          cargo test --workspace --all-features --target ${{ matrix.target }}
+        if: startsWith(matrix.os, 'windows')
 
   features:
     name: features
