@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1610647797336,
+  "lastUpdate": 1610647812040,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -27299,6 +27299,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 749104,
             "range": "± 92942",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "markus.westerlind@distilnetworks.com",
+            "name": "Markus Westerlind",
+            "username": "Marwes"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "204603b7de62e9c33b153a09c432c5d627830fb8",
+          "message": "rt: reduce duplicated code in task harness (#3314)\n\nTask spawning is a common operation that results in a lot of instantiations\r\nof the task code. Reducing the amount of generated code should lead to\r\nfaster compile times overall.\r\n\r\nThis patch extracts code that does not depend on a type parameter into\r\nfunctions with fewer or no type parameters at all. Reducing the amount of\r\nduplicated code.",
+          "timestamp": "2021-01-14T10:07:56-08:00",
+          "tree_id": "df93bdef23c6d149210813a4e9e632bdccefd945",
+          "url": "https://github.com/tokio-rs/tokio/commit/204603b7de62e9c33b153a09c432c5d627830fb8"
+        },
+        "date": 1610647810423,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 7282194,
+            "range": "± 3086265",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 7099717,
+            "range": "± 2078432",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6692523,
+            "range": "± 2901516",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 996,
+            "range": "± 275",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 980,
+            "range": "± 131",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 970,
+            "range": "± 99",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 146606,
+            "range": "± 32515",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1782,
+            "range": "± 687",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1155156,
+            "range": "± 144460",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 825173,
+            "range": "± 135399",
             "unit": "ns/iter"
           }
         ]
