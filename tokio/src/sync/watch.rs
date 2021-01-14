@@ -55,7 +55,7 @@ use crate::sync::Notify;
 
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::atomic::Ordering::{Relaxed, SeqCst};
-use crate::loom::sync::{Arc, RwLock, RwLockReadGuard};
+use crate::loom::sync::{SmallArc, RwLock, RwLockReadGuard};
 use std::ops;
 
 /// Receives values from the associated [`Sender`](struct@Sender).
@@ -64,7 +64,7 @@ use std::ops;
 #[derive(Debug)]
 pub struct Receiver<T> {
     /// Pointer to the shared state
-    shared: Arc<Shared<T>>,
+    shared: SmallArc<Shared<T>>,
 
     /// Last observed version
     version: usize,
@@ -75,7 +75,7 @@ pub struct Receiver<T> {
 /// Instances are created by the [`channel`](fn@channel) function.
 #[derive(Debug)]
 pub struct Sender<T> {
-    shared: Arc<Shared<T>>,
+    shared: SmallArc<Shared<T>>,
 }
 
 /// Returns a reference to the inner value
@@ -175,7 +175,7 @@ const CLOSED: usize = 1;
 /// [`Sender`]: struct@Sender
 /// [`Receiver`]: struct@Receiver
 pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
-    let shared = Arc::new(Shared {
+    let shared = SmallArc::new(Shared {
         value: RwLock::new(init),
         version: AtomicUsize::new(0),
         ref_count_rx: AtomicUsize::new(1),
