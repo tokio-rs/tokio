@@ -25,6 +25,7 @@ pub(crate) mod sync {
         }
     }
     pub(crate) use loom::sync::*;
+    pub(crate) type SmallArc<T> = Arc<T>;
 }
 
 pub(crate) mod rand {
