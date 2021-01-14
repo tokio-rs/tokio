@@ -144,6 +144,7 @@ jobs:
             os: ubuntu-latest
           - target: aarch64-pc-windows-msvc
             os: windows-latest
+            subcmd: build # cross does not provide a Docker image for aarch64-pc-windows-msvc
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
