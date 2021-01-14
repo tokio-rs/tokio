@@ -147,6 +147,29 @@ jobs:
           command: check
           args: --workspace --target ${{ matrix.target }}
 
+  # Test FreeBSD using https://github.com/vmactions/freebsd-vm.  Test the i686
+  # target too, in the same VM.  The binary will be built in 32-bit mode, but
+  # will execute on a 64-bit kernel and in a 64-bit environment.  Our tests
+  # don't execute any of the system's binaries, so the environment shouldn't matter.
+  test_freebsd:
+    name: test freebsd
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: test
+        uses: vmactions/freebsd-vm@v0.1.0
+        with:
+          usesh: true
+          prepare: |
+            pkg install -y curl
+            curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+          run: |
+            . $HOME/.cargo/env
+            rustup target add i686-unknown-freebsd
+            cargo test --all --all-features
+            cargo doc --all --no-deps
+            cargo test --all --all-features --target i686-unknown-freebsd
+
   features:
     name: features
     runs-on: ubuntu-latest
