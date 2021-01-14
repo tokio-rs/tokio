@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1610633454136,
+  "lastUpdate": 1610633461497,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -11425,6 +11425,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18893546,
             "range": "± 2438913",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "te316e89@gmail.com",
+            "name": "Taiki Endo",
+            "username": "taiki-e"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0595902ba412c17abf34da64e5a467a8da6a872e",
+          "message": "Update issue template (#3425)\n\n`cargo tree` subcommand is available by default since Rust 1.44.",
+          "timestamp": "2021-01-14T23:09:05+09:00",
+          "tree_id": "23858f01dfd0caad45c0e245d0ab05b90455b3ce",
+          "url": "https://github.com/tokio-rs/tokio/commit/0595902ba412c17abf34da64e5a467a8da6a872e"
+        },
+        "date": 1610633456814,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 184632,
+            "range": "± 18383",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 702873,
+            "range": "± 58097",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5567120,
+            "range": "± 986459",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20566324,
+            "range": "± 3182853",
             "unit": "ns/iter"
           }
         ]
