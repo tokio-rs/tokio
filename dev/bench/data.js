@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1610633441265,
+  "lastUpdate": 1610633454136,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -26771,6 +26771,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 646040,
             "range": "± 141717",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "te316e89@gmail.com",
+            "name": "Taiki Endo",
+            "username": "taiki-e"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0595902ba412c17abf34da64e5a467a8da6a872e",
+          "message": "Update issue template (#3425)\n\n`cargo tree` subcommand is available by default since Rust 1.44.",
+          "timestamp": "2021-01-14T23:09:05+09:00",
+          "tree_id": "23858f01dfd0caad45c0e245d0ab05b90455b3ce",
+          "url": "https://github.com/tokio-rs/tokio/commit/0595902ba412c17abf34da64e5a467a8da6a872e"
+        },
+        "date": 1610633452527,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 5862876,
+            "range": "± 2670389",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 5785890,
+            "range": "± 1743446",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 5667825,
+            "range": "± 2168915",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 520,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 519,
+            "range": "± 2",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 520,
+            "range": "± 5",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 72539,
+            "range": "± 4034",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1159,
+            "range": "± 43",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 966822,
+            "range": "± 7946",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 700247,
+            "range": "± 5515",
             "unit": "ns/iter"
           }
         ]
