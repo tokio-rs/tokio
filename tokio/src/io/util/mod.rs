@@ -48,6 +48,7 @@ cfg_io_util! {
     mod read_line;
 
     mod read_to_end;
+    mod vec_with_initialized;
     cfg_process! {
         pub(crate) use read_to_end::read_to_end;
     }
