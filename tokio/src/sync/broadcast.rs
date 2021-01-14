@@ -111,7 +111,7 @@
 
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::{SmallArc, Mutex, RwLock, RwLockReadGuard};
+use crate::loom::sync::{Mutex, RwLock, RwLockReadGuard, SmallArc};
 use crate::util::linked_list::{self, LinkedList};
 
 use std::fmt;

@@ -49,7 +49,7 @@ pub(crate) mod rand {
 
 pub(crate) mod sync {
     /// Faster but limited version of Arc
-    pub(crate) use super::small_arc::SmallArc; 
+    pub(crate) use super::small_arc::SmallArc;
 
     pub(crate) use std::sync::{Arc, Weak};
 

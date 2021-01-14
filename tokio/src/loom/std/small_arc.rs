@@ -1,14 +1,14 @@
-#[cfg(feature = "triomphe")]
-use triomphe::Arc as Inner;
 #[cfg(not(feature = "triomphe"))]
 use std::sync::Arc as Inner;
+#[cfg(feature = "triomphe")]
+use triomphe::Arc as Inner;
 
 /// Faster but more limited version of Arc
 #[derive(Debug)]
 pub(crate) struct SmallArc<T>(Inner<T>);
 
 impl<T> SmallArc<T> {
-    pub (crate) fn new(val: T) -> Self {
+    pub(crate) fn new(val: T) -> Self {
         Self(Inner::new(val))
     }
 }
