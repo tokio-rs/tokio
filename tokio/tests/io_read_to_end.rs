@@ -35,7 +35,8 @@ impl AsyncRead for UninitTest {
         buf: &mut ReadBuf<'_>,
     ) -> Poll<std::io::Result<()>> {
         let me = Pin::into_inner(self);
-        assert_eq!(buf.initialized().len(), me.num_init, "{:?}", me.state);
+        let real_num_init = buf.initialized().len() - buf.filled().len();
+        assert_eq!(real_num_init, me.num_init, "{:?}", me.state);
 
         match me.state {
             State::Initializing => {
