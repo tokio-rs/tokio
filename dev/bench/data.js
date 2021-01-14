@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1610566002949,
+  "lastUpdate": 1610633437033,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -5993,6 +5993,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 495,
             "range": "± 112",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "te316e89@gmail.com",
+            "name": "Taiki Endo",
+            "username": "taiki-e"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0595902ba412c17abf34da64e5a467a8da6a872e",
+          "message": "Update issue template (#3425)\n\n`cargo tree` subcommand is available by default since Rust 1.44.",
+          "timestamp": "2021-01-14T23:09:05+09:00",
+          "tree_id": "23858f01dfd0caad45c0e245d0ab05b90455b3ce",
+          "url": "https://github.com/tokio-rs/tokio/commit/0595902ba412c17abf34da64e5a467a8da6a872e"
+        },
+        "date": 1610633435769,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 841,
+            "range": "± 5",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 13264,
+            "range": "± 2413",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 885,
+            "range": "± 7",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 13582,
+            "range": "± 2148",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 495,
+            "range": "± 30",
             "unit": "ns/iter"
           }
         ]
