@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1610665607746,
+  "lastUpdate": 1610665618619,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -11677,6 +11677,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20856507,
             "range": "± 6496845",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "50183564+nylonicious@users.noreply.github.com",
+            "name": "Nylonicious",
+            "username": "nylonicious"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ecc32d1dca2317e555d8a6b29009cf19ef8f53e8",
+          "message": "sync: add RwLock  try_read and try_write methods (#3400)\n\nCloses #2284",
+          "timestamp": "2021-01-14T15:05:07-08:00",
+          "tree_id": "23a477f35ee5cfac28d79ebded78847ecebe5e82",
+          "url": "https://github.com/tokio-rs/tokio/commit/ecc32d1dca2317e555d8a6b29009cf19ef8f53e8"
+        },
+        "date": 1610665617282,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 203722,
+            "range": "± 33178",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 741233,
+            "range": "± 111032",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5403790,
+            "range": "± 879474",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20500425,
+            "range": "± 1903559",
             "unit": "ns/iter"
           }
         ]
