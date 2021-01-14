@@ -111,7 +111,7 @@
 
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::{Arc, Mutex, RwLock, RwLockReadGuard};
+use crate::loom::sync::{SmallArc, Mutex, RwLock, RwLockReadGuard};
 use crate::util::linked_list::{self, LinkedList};
 
 use std::fmt;
@@ -155,7 +155,7 @@ use std::usize;
 ///
 /// [`broadcast`]: crate::sync::broadcast
 pub struct Sender<T> {
-    shared: Arc<Shared<T>>,
+    shared: SmallArc<Shared<T>>,
 }
 
 /// Receiving-half of the [`broadcast`] channel.
@@ -191,7 +191,7 @@ pub struct Sender<T> {
 /// [`broadcast`]: crate::sync::broadcast
 pub struct Receiver<T> {
     /// State shared with all receivers and senders.
-    shared: Arc<Shared<T>>,
+    shared: SmallArc<Shared<T>>,
 
     /// Next position to read from
     next: u64,
@@ -460,7 +460,7 @@ pub fn channel<T: Clone>(mut capacity: usize) -> (Sender<T>, Receiver<T>) {
         }));
     }
 
-    let shared = Arc::new(Shared {
+    let shared = SmallArc::new(Shared {
         buffer: buffer.into_boxed_slice(),
         mask: capacity - 1,
         tail: Mutex::new(Tail {
@@ -659,7 +659,7 @@ impl<T> Sender<T> {
     }
 }
 
-fn new_receiver<T>(shared: Arc<Shared<T>>) -> Receiver<T> {
+fn new_receiver<T>(shared: SmallArc<Shared<T>>) -> Receiver<T> {
     let mut tail = shared.tail.lock();
 
     if tail.rx_cnt == MAX_RECEIVERS {
