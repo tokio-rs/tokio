@@ -1,7 +1,7 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::future::AtomicWaker;
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::Arc;
+use crate::loom::sync::SmallArc;
 use crate::sync::mpsc::list;
 use crate::sync::notify::Notify;
 
@@ -13,7 +13,7 @@ use std::task::{Context, Poll};
 
 /// Channel sender
 pub(crate) struct Tx<T, S> {
-    inner: Arc<Chan<T, S>>,
+    inner: SmallArc<Chan<T, S>>,
 }
 
 impl<T, S: fmt::Debug> fmt::Debug for Tx<T, S> {
@@ -24,7 +24,7 @@ impl<T, S: fmt::Debug> fmt::Debug for Tx<T, S> {
 
 /// Channel receiver
 pub(crate) struct Rx<T, S: Semaphore> {
-    inner: Arc<Chan<T, S>>,
+    inner: SmallArc<Chan<T, S>>,
 }
 
 impl<T, S: Semaphore + fmt::Debug> fmt::Debug for Rx<T, S> {
@@ -104,7 +104,7 @@ unsafe impl<T: Send, S: Sync> Sync for Chan<T, S> {}
 pub(crate) fn channel<T, S: Semaphore>(semaphore: S) -> (Tx<T, S>, Rx<T, S>) {
     let (tx, rx) = list::channel();
 
-    let chan = Arc::new(Chan {
+    let chan = SmallArc::new(Chan {
         notify_rx_closed: Notify::new(),
         tx,
         semaphore,
@@ -122,7 +122,7 @@ pub(crate) fn channel<T, S: Semaphore>(semaphore: S) -> (Tx<T, S>, Rx<T, S>) {
 // ===== impl Tx =====
 
 impl<T, S> Tx<T, S> {
-    fn new(chan: Arc<Chan<T, S>>) -> Tx<T, S> {
+    fn new(chan: SmallArc<Chan<T, S>>) -> Tx<T, S> {
         Tx { inner: chan }
     }
 
@@ -188,7 +188,7 @@ impl<T, S> Drop for Tx<T, S> {
 // ===== impl Rx =====
 
 impl<T, S: Semaphore> Rx<T, S> {
-    fn new(chan: Arc<Chan<T, S>>) -> Rx<T, S> {
+    fn new(chan: SmallArc<Chan<T, S>>) -> Rx<T, S> {
         Rx { inner: chan }
     }
 
