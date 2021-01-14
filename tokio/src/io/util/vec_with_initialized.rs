@@ -19,6 +19,7 @@ pub(crate) struct VecWithInitialized<V> {
 }
 
 impl VecWithInitialized<Vec<u8>> {
+    #[cfg(feature = "io-util")]
     pub(crate) fn take(&mut self) -> Vec<u8> {
         self.num_initialized = 0;
         std::mem::take(&mut self.vec)
@@ -50,6 +51,7 @@ where
         vec.reserve(num_bytes);
     }
 
+    #[cfg(feature = "io-util")]
     pub(crate) fn is_empty(&mut self) -> bool {
         self.vec.as_mut().is_empty()
     }
