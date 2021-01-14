@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1610633437033,
+  "lastUpdate": 1610633441265,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -17475,6 +17475,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1125,
             "range": "± 164",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "te316e89@gmail.com",
+            "name": "Taiki Endo",
+            "username": "taiki-e"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0595902ba412c17abf34da64e5a467a8da6a872e",
+          "message": "Update issue template (#3425)\n\n`cargo tree` subcommand is available by default since Rust 1.44.",
+          "timestamp": "2021-01-14T23:09:05+09:00",
+          "tree_id": "23858f01dfd0caad45c0e245d0ab05b90455b3ce",
+          "url": "https://github.com/tokio-rs/tokio/commit/0595902ba412c17abf34da64e5a467a8da6a872e"
+        },
+        "date": 1610633438299,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 16310,
+            "range": "± 5434",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1132,
+            "range": "± 15",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 664,
+            "range": "± 25",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 16151,
+            "range": "± 3910",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1096,
+            "range": "± 8",
             "unit": "ns/iter"
           }
         ]
