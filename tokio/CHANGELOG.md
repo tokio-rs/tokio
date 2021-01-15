@@ -1,3 +1,8 @@
+# 1.0.2 (January 14, 2020)
+
+### Fixed
+- io: soundness in `read_to_end` (#3428).
+
 # 1.0.1 (December 25, 2020)
 
 This release fixes a soundness hole caused by the combination of `RwLockWriteGuard::map`
