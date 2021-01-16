@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1610665656822,
+  "lastUpdate": 1610759003033,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -11779,6 +11779,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20500425,
             "range": "± 1903559",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "committer": {
+            "email": "me@carllerche.com",
+            "name": "Carl Lerche",
+            "username": "carllerche"
+          },
+          "distinct": false,
+          "id": "3dc5f6c0abd0548ee29081c18f1708d8256903f5",
+          "message": "chore: release tokio v1.0.2 (#3429)",
+          "timestamp": "2021-01-15T15:05:38-08:00",
+          "tree_id": "d6b86936a5bce5310c6c3fc1712accfdd3dc7f19",
+          "url": "https://github.com/tokio-rs/tokio/commit/3dc5f6c0abd0548ee29081c18f1708d8256903f5"
+        },
+        "date": 1610759001637,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 176566,
+            "range": "± 29119",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 707959,
+            "range": "± 163477",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5223673,
+            "range": "± 1186327",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20039465,
+            "range": "± 3033452",
             "unit": "ns/iter"
           }
         ]
