@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1610822688663,
+  "lastUpdate": 1610822699125,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -11935,6 +11935,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20039465,
             "range": "± 3033452",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jacob.otoole1@gmail.com",
+            "name": "Jacob O'Toole",
+            "username": "JOT85"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7ac44a2d28f5967851ae6ad0d6d8d4666a26cf6f",
+          "message": "process: add documentation to process::Child fields (#3437)",
+          "timestamp": "2021-01-16T19:42:51+01:00",
+          "tree_id": "8cf40349f634dc93da463ee6527e14d011967dcd",
+          "url": "https://github.com/tokio-rs/tokio/commit/7ac44a2d28f5967851ae6ad0d6d8d4666a26cf6f"
+        },
+        "date": 1610822697791,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 198931,
+            "range": "± 46411",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 702975,
+            "range": "± 143817",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5366602,
+            "range": "± 1703062",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21050181,
+            "range": "± 2645024",
             "unit": "ns/iter"
           }
         ]
