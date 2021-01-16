@@ -843,7 +843,8 @@ pub struct Child {
     /// yourself from calling functions on `child` while using `stdin`, you might
     /// find it helpful to do:
     ///
-    /// ```compile_fail,E0425
+    /// ```no_run
+    /// # let child: tokio::process::Child = unreachable!();
     /// let stdin = child.stdin.take().unwrap();
     /// ```
     pub stdin: Option<ChildStdin>,
@@ -851,7 +852,8 @@ pub struct Child {
     /// The handle for reading from the child's standard output (stdout), if it
     /// has been captured. You might find it helpful to do
     ///
-    /// ```compile_fail,E0425
+    /// ```no_run
+    /// # let child: tokio::process::Child = unreachable!();
     /// let stdout = child.stdout.take().unwrap();
     /// ```
     ///
@@ -862,7 +864,8 @@ pub struct Child {
     /// The handle for reading from the child's standard error (stderr), if it
     /// has been captured. You might find it helpful to do
     ///
-    /// ```compile_fail,E0425
+    /// ```no_run
+    /// # let child: tokio::process::Child = unreachable!();
     /// let stderr = child.stderr.take().unwrap();
     /// ```
     ///
