@@ -839,15 +839,38 @@ pub struct Child {
     child: FusedChild,
 
     /// The handle for writing to the child's standard input (stdin), if it has
-    /// been captured.
+    /// been captured. To avoid partially moving the `child` and thus blocking
+    /// yourself from calling functions on `child` while using `stdin`, you might
+    /// find it helpful to do:
+    ///
+    /// ```no_run
+    /// # let mut child = tokio::process::Command::new("echo").spawn().unwrap();
+    /// let stdin = child.stdin.take().unwrap();
+    /// ```
     pub stdin: Option<ChildStdin>,
 
     /// The handle for reading from the child's standard output (stdout), if it
-    /// has been captured.
+    /// has been captured. You might find it helpful to do
+    ///
+    /// ```no_run
+    /// # let mut child = tokio::process::Command::new("echo").spawn().unwrap();
+    /// let stdout = child.stdout.take().unwrap();
+    /// ```
+    ///
+    /// to avoid partially moving the `child` and thus blocking yourself from calling
+    /// functions on `child` while using `stdout`.
     pub stdout: Option<ChildStdout>,
 
     /// The handle for reading from the child's standard error (stderr), if it
-    /// has been captured.
+    /// has been captured. You might find it helpful to do
+    ///
+    /// ```no_run
+    /// # let mut child = tokio::process::Command::new("echo").spawn().unwrap();
+    /// let stderr = child.stderr.take().unwrap();
+    /// ```
+    ///
+    /// to avoid partially moving the `child` and thus blocking yourself from calling
+    /// functions on `child` while using `stderr`.
     pub stderr: Option<ChildStderr>,
 }
 
