@@ -844,7 +844,7 @@ pub struct Child {
     /// find it helpful to do:
     ///
     /// ```no_run
-    /// # let child: tokio::process::Child = unreachable!();
+    /// # let mut child = tokio::process::Command::new("echo").spawn().unwrap();
     /// let stdin = child.stdin.take().unwrap();
     /// ```
     pub stdin: Option<ChildStdin>,
@@ -853,7 +853,7 @@ pub struct Child {
     /// has been captured. You might find it helpful to do
     ///
     /// ```no_run
-    /// # let child: tokio::process::Child = unreachable!();
+    /// # let mut child = tokio::process::Command::new("echo").spawn().unwrap();
     /// let stdout = child.stdout.take().unwrap();
     /// ```
     ///
@@ -865,7 +865,7 @@ pub struct Child {
     /// has been captured. You might find it helpful to do
     ///
     /// ```no_run
-    /// # let child: tokio::process::Child = unreachable!();
+    /// # let mut child = tokio::process::Command::new("echo").spawn().unwrap();
     /// let stderr = child.stderr.take().unwrap();
     /// ```
     ///
