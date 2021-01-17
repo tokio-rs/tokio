@@ -1,5 +1,6 @@
 use crate::runtime;
 use crate::task::JoinHandle;
+use crate::util::error::context_missing_error;
 
 use std::future::Future;
 
@@ -129,7 +130,7 @@ cfg_rt! {
         T::Output: Send + 'static,
     {
         let spawn_handle = runtime::context::spawn_handle()
-        .unwrap_or_else(|| panic!(runtime::context::missing_error(&[&"basic_scheduler", &"threaded_scheduler"])));
+        .unwrap_or_else(|| panic!(context_missing_error(&[&"basic_scheduler", &"threaded_scheduler"])));
         let task = crate::util::trace::task(task, "task");
         spawn_handle.spawn(task)
     }

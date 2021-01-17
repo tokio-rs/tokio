@@ -1,6 +1,7 @@
 use crate::runtime::blocking::task::BlockingTask;
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{blocking, context, driver, Spawner};
+use crate::util::error::context_missing_error;
 
 use std::future::Future;
 use std::{error, fmt};
@@ -97,7 +98,7 @@ impl Handle {
     /// # }
     /// ```
     pub fn current() -> Self {
-        context::current().unwrap_or_else(|| panic!(context::missing_error(&[])))
+        context::current().unwrap_or_else(|| panic!(context_missing_error(&[])))
     }
 
     /// Returns a Handle view over the currently running Runtime
@@ -213,7 +214,7 @@ impl fmt::Debug for TryCurrentError {
 
 impl fmt::Display for TryCurrentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&context::missing_error(&[]))
+        f.write_str(&context_missing_error(&[]))
     }
 }
 

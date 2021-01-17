@@ -9,6 +9,7 @@ use crate::runtime::builder::ThreadNameFn;
 use crate::runtime::context;
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{Builder, Callback, Handle};
+use crate::util::error::context_missing_error;
 
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
@@ -81,7 +82,7 @@ where
     F: FnOnce() -> R + Send + 'static,
     R: Send + 'static,
 {
-    let rt = context::current().unwrap_or_else(|| panic!(context::missing_error(&[])));
+    let rt = context::current().unwrap_or_else(|| panic!(context_missing_error(&[])));
     rt.spawn_blocking(func)
 }
 
@@ -91,7 +92,7 @@ where
     F: FnOnce() -> R + Send + 'static,
     R: Send + 'static,
 {
-    let rt = context::current().unwrap_or_else(|| panic!(context::missing_error(&[])));
+    let rt = context::current().unwrap_or_else(|| panic!(context_missing_error(&[])));
 
     let (task, _handle) = task::joinable(BlockingTask::new(func));
     rt.blocking_spawner.spawn(task, &rt)
