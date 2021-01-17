@@ -273,7 +273,7 @@ cfg_not_rt! {
         /// This function panics if there is no current reactor set, or if the `rt`
         /// feature flag is not enabled.
         pub(super) fn current() -> Self {
-            panic!(crate::util::error::context_missing_error(&[&"rt"]))
+            panic!("`rt` must be enabled")
         }
     }
 }
