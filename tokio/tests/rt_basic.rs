@@ -6,7 +6,7 @@ use tokio::sync::oneshot;
 use tokio_test::{assert_err, assert_ok};
 
 use std::thread;
-use std::time::Duration;
+use tokio::time::{timeout, Duration};
 
 mod support {
     pub(crate) mod mpsc_stream;
@@ -133,6 +133,19 @@ fn acquire_mutex_in_drop() {
 
     // Drop the rt
     drop(rt);
+}
+
+#[test]
+#[should_panic(expected = "time must be enabled on the Tokio 1.x context")]
+fn timeout_panics_when_no_time_handle() {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .build()
+        .unwrap();
+    rt.block_on(async {
+        let (_tx, rx) = oneshot::channel::<()>();
+        let dur = Duration::from_millis(20);
+        let _ = timeout(dur, rx).await;
+    });
 }
 
 fn rt() -> Runtime {
