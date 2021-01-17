@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1610916101043,
+  "lastUpdate": 1610916107772,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -6371,6 +6371,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 514,
             "range": "± 55",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "heng@cantab.net",
+            "name": "Henry Gomersall",
+            "username": "hgomersall"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5402c948eebbb4c6c695e156d68ce495a43ea81a",
+          "message": "io: clarify AsyncFd docs about changes of the inner fd (#3430)",
+          "timestamp": "2021-01-17T21:39:58+01:00",
+          "tree_id": "63ed16dcd34c11314b7bda2dcb983946b5669a1e",
+          "url": "https://github.com/tokio-rs/tokio/commit/5402c948eebbb4c6c695e156d68ce495a43ea81a"
+        },
+        "date": 1610916104920,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 842,
+            "range": "± 128",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 14617,
+            "range": "± 4907",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 904,
+            "range": "± 173",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 14378,
+            "range": "± 4706",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 480,
+            "range": "± 84",
             "unit": "ns/iter"
           }
         ]
