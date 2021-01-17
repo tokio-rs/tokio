@@ -261,7 +261,7 @@ cfg_rt! {
         /// flag is not enabled.
         pub(super) fn current() -> Self {
             context::io_handle()
-                .expect(&context::missing_error(&[]))
+                .unwrap_or_else(|| panic!(context::missing_error(&[])))
         }
     }
 }

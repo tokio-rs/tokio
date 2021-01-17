@@ -81,7 +81,7 @@ where
     F: FnOnce() -> R + Send + 'static,
     R: Send + 'static,
 {
-    let rt = context::current().expect(&context::missing_error(&[]));
+    let rt = context::current().unwrap_or_else(|| panic!(context::missing_error(&[])));
     rt.spawn_blocking(func)
 }
 
@@ -91,7 +91,7 @@ where
     F: FnOnce() -> R + Send + 'static,
     R: Send + 'static,
 {
-    let rt = context::current().expect(&context::missing_error(&[]));
+    let rt = context::current().unwrap_or_else(|| panic!(context::missing_error(&[])));
 
     let (task, _handle) = task::joinable(BlockingTask::new(func));
     rt.blocking_spawner.spawn(task, &rt)

@@ -97,7 +97,7 @@ impl Handle {
     /// # }
     /// ```
     pub fn current() -> Self {
-        context::current().expect(&context::missing_error(&[]))
+        context::current().unwrap_or_else(|| panic!(context::missing_error(&[])))
     }
 
     /// Returns a Handle view over the currently running Runtime

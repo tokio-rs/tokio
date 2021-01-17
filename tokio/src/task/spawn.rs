@@ -129,7 +129,7 @@ cfg_rt! {
         T::Output: Send + 'static,
     {
         let spawn_handle = runtime::context::spawn_handle()
-        .expect(&runtime::context::missing_error(&[&"basic_scheduler", &"threaded_scheduler"]));
+        .unwrap_or_else(|| panic!(runtime::context::missing_error(&[&"basic_scheduler", &"threaded_scheduler"])));
         let task = crate::util::trace::task(task, "task");
         spawn_handle.spawn(task)
     }
