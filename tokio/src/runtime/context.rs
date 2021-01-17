@@ -103,7 +103,10 @@ pub(crate) fn missing_error(features: &[&str]) -> String {
     } else {
         String::new()
     };
-    format!("there is no reactor running, must be called from the context of Tokio 1.x runtime{}", sfx)
+    format!(
+        "there is no reactor running, must be called from the context of Tokio 1.x runtime{}",
+        sfx
+    )
 }
 
 #[cfg(test)]
@@ -112,7 +115,10 @@ mod tests {
 
     #[test]
     fn test_missing_error_no_features() {
-        assert_eq!(&missing_error(&[]), "there is no reactor running, must be called from the context of Tokio 1.x runtime");
+        assert_eq!(
+            &missing_error(&[]),
+            "there is no reactor running, must be called from the context of Tokio 1.x runtime"
+        );
     }
 
     #[test]

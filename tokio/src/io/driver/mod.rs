@@ -15,9 +15,9 @@ mod scheduled_io;
 use scheduled_io::ScheduledIo;
 
 use crate::park::{Park, Unpark};
+use crate::runtime::context;
 use crate::util::slab::{self, Slab};
 use crate::{loom::sync::Mutex, util::bit};
-use crate::runtime::context;
 
 use std::fmt;
 use std::io;
