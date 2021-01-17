@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1610916126138,
+  "lastUpdate": 1610916144089,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -28499,6 +28499,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 855280,
             "range": "± 37344",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "heng@cantab.net",
+            "name": "Henry Gomersall",
+            "username": "hgomersall"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5402c948eebbb4c6c695e156d68ce495a43ea81a",
+          "message": "io: clarify AsyncFd docs about changes of the inner fd (#3430)",
+          "timestamp": "2021-01-17T21:39:58+01:00",
+          "tree_id": "63ed16dcd34c11314b7bda2dcb983946b5669a1e",
+          "url": "https://github.com/tokio-rs/tokio/commit/5402c948eebbb4c6c695e156d68ce495a43ea81a"
+        },
+        "date": 1610916140980,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 7194658,
+            "range": "± 2815677",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6566087,
+            "range": "± 2062494",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6594031,
+            "range": "± 2642420",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 808,
+            "range": "± 170",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 830,
+            "range": "± 205",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 822,
+            "range": "± 168",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 133208,
+            "range": "± 20366",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1528,
+            "range": "± 223",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1054140,
+            "range": "± 117720",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 755779,
+            "range": "± 107417",
             "unit": "ns/iter"
           }
         ]
