@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1610829405262,
+  "lastUpdate": 1610916101043,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -12085,6 +12085,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21312108,
             "range": "± 2914121",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "heng@cantab.net",
+            "name": "Henry Gomersall",
+            "username": "hgomersall"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5402c948eebbb4c6c695e156d68ce495a43ea81a",
+          "message": "io: clarify AsyncFd docs about changes of the inner fd (#3430)",
+          "timestamp": "2021-01-17T21:39:58+01:00",
+          "tree_id": "63ed16dcd34c11314b7bda2dcb983946b5669a1e",
+          "url": "https://github.com/tokio-rs/tokio/commit/5402c948eebbb4c6c695e156d68ce495a43ea81a"
+        },
+        "date": 1610916099797,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 161067,
+            "range": "± 21133",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 601415,
+            "range": "± 101884",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4377163,
+            "range": "± 926058",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 17924239,
+            "range": "± 2379440",
             "unit": "ns/iter"
           }
         ]
