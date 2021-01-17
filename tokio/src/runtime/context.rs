@@ -24,18 +24,18 @@ cfg_io_driver! {
 cfg_signal_internal! {
     #[cfg(unix)]
     pub(crate) fn signal_handle() -> crate::runtime::driver::SignalHandle {
-        CONTEXT.with(|ctx| match *ctx.borrow() {
-            Some(ref ctx) => ctx.signal_handle.clone(),
-            None => Default::default(),
+        CONTEXT.with(|ctx| {
+            let ctx = ctx.borrow();
+            ctx.as_ref().unwrap_or_else(|| panic!(context_missing_error(&[]))).signal_handle.clone()
         })
     }
 }
 
 cfg_time! {
     pub(crate) fn time_handle() -> crate::runtime::driver::TimeHandle {
-        CONTEXT.with(|ctx| match *ctx.borrow() {
-            Some(ref ctx) => ctx.time_handle.clone(),
-            None => Default::default(),
+        CONTEXT.with(|ctx| {
+            let ctx = ctx.borrow();
+            ctx.as_ref().unwrap_or_else(|| panic!(context_missing_error(&[]))).time_handle.clone()
         })
     }
 
