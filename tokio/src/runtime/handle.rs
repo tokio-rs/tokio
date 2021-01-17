@@ -97,7 +97,7 @@ impl Handle {
     /// # }
     /// ```
     pub fn current() -> Self {
-        context::current().expect("not currently running on the Tokio runtime.")
+        context::current().expect(&context::missing_error(&[]))
     }
 
     /// Returns a Handle view over the currently running Runtime
@@ -213,7 +213,7 @@ impl fmt::Debug for TryCurrentError {
 
 impl fmt::Display for TryCurrentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("no tokio Runtime has been initialized")
+        f.write_str(&context::missing_error(&[]))
     }
 }
 

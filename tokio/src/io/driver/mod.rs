@@ -17,6 +17,7 @@ use scheduled_io::ScheduledIo;
 use crate::park::{Park, Unpark};
 use crate::util::slab::{self, Slab};
 use crate::{loom::sync::Mutex, util::bit};
+use crate::runtime::context;
 
 use std::fmt;
 use std::io;
@@ -259,8 +260,8 @@ cfg_rt! {
         /// This function panics if there is no current reactor set and `rt` feature
         /// flag is not enabled.
         pub(super) fn current() -> Self {
-            crate::runtime::context::io_handle()
-                .expect("there is no reactor running, must be called from the context of Tokio runtime")
+            context::io_handle()
+                .expect(&context::missing_error(&[]))
         }
     }
 }
@@ -274,7 +275,7 @@ cfg_not_rt! {
         /// This function panics if there is no current reactor set, or if the `rt`
         /// feature flag is not enabled.
         pub(super) fn current() -> Self {
-            panic!("there is no reactor running, must be called from the context of Tokio runtime with `rt` enabled.")
+            panic!(&context::missing_error(Some(&[&"rt"])))
         }
     }
 }
