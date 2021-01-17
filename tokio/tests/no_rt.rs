@@ -7,8 +7,8 @@ use futures::executor::block_on;
 use std::net::TcpListener;
 
 #[test]
-#[should_panic(expected = "no timer running")]
-fn panics_when_no_timer() {
+#[should_panic(expected = "no reactor running")]
+fn timeout_panics_when_no_tokio_context() {
     block_on(timeout_value());
 }
 
