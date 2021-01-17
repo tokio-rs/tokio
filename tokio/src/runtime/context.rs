@@ -1,5 +1,6 @@
 //! Thread local runtime context
 use crate::runtime::Handle;
+use crate::util::error::context_missing_error;
 
 use std::cell::RefCell;
 
@@ -13,9 +14,9 @@ pub(crate) fn current() -> Option<Handle> {
 
 cfg_io_driver! {
     pub(crate) fn io_handle() -> crate::runtime::driver::IoHandle {
-        CONTEXT.with(|ctx| match *ctx.borrow() {
-            Some(ref ctx) => ctx.io_handle.clone(),
-            None => Default::default(),
+        CONTEXT.with(|ctx| {
+            let ctx = ctx.borrow();
+            ctx.as_ref().unwrap_or_else(|| panic!(context_missing_error(&[]))).io_handle.clone()
         })
     }
 }

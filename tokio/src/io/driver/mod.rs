@@ -15,7 +15,6 @@ mod scheduled_io;
 use scheduled_io::ScheduledIo;
 
 use crate::park::{Park, Unpark};
-use crate::util::error::context_missing_error;
 use crate::util::slab::{self, Slab};
 use crate::{loom::sync::Mutex, util::bit};
 
@@ -260,8 +259,7 @@ cfg_rt! {
         /// This function panics if there is no current reactor set and `rt` feature
         /// flag is not enabled.
         pub(super) fn current() -> Self {
-            crate::runtime::context::io_handle()
-                .unwrap_or_else(|| panic!(context_missing_error(&[])))
+            crate::runtime::context::io_handle().expect("io not enabled on Tokio context")
         }
     }
 }
@@ -275,7 +273,7 @@ cfg_not_rt! {
         /// This function panics if there is no current reactor set, or if the `rt`
         /// feature flag is not enabled.
         pub(super) fn current() -> Self {
-            panic!(context_missing_error(&[&"rt"]))
+            panic!(crate::util::error::context_missing_error(&[&"rt"]))
         }
     }
 }
