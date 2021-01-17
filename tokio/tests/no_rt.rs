@@ -7,7 +7,7 @@ use futures::executor::block_on;
 use std::net::TcpListener;
 
 #[test]
-#[should_panic(expected = "no reactor running")]
+#[should_panic(expected = "there is no reactor running, must be called from the context of a Tokio 1.x runtime")]
 fn timeout_panics_when_no_tokio_context() {
     block_on(timeout_value());
 }
