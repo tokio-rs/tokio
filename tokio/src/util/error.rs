@@ -1,5 +1,7 @@
+#[cfg(any(feature = "rt", feature = "net"))]
 use std::fmt::Write;
 
+#[cfg(any(feature = "rt", feature = "net"))]
 /// Returns an error string explaining that the Tokio context hasn't been instantiated.
 pub(crate) fn context_missing_error(features: &[&str]) -> String {
     // TODO: Include Tokio version
