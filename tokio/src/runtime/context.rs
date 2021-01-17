@@ -82,7 +82,7 @@ impl Drop for EnterGuard {
 /// Returns an error string explaining that the Tokio context hasn't been instantiated.
 pub(crate) fn missing_error(features: &[&str]) -> String {
     // TODO: Include Tokio version
-    let sfx = if features.len() > 0 {
+    let sfx = if !features.is_empty() {
         let mut sfx = String::from(" with ");
         for (i, feat) in features.iter().enumerate() {
             if i == 0 {
