@@ -89,12 +89,10 @@ pub(crate) fn missing_error(features: &[&str]) -> String {
                 if features.len() > 1 {
                     write!(&mut sfx, "either ").expect("failed to write to string");
                 }
+            } else if i == features.len() - 1 {
+                write!(&mut sfx, " or ").expect("failed to write to string");
             } else {
-                if i == features.len() - 1 {
-                    write!(&mut sfx, " or ").expect("failed to write to string");
-                } else {
-                    write!(&mut sfx, ", ").expect("failed to write to string");
-                }
+                write!(&mut sfx, ", ").expect("failed to write to string");
             }
             write!(&mut sfx, "{}", feat).expect("failed to write to string");
         }
