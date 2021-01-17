@@ -130,7 +130,7 @@ cfg_rt! {
         T::Output: Send + 'static,
     {
         let spawn_handle = runtime::context::spawn_handle()
-        .unwrap_or_else(|| panic!(context_missing_error(&[])));
+        .unwrap_or_else(|| panic!(context_missing_error()));
         let task = crate::util::trace::task(task, "task");
         spawn_handle.spawn(task)
     }

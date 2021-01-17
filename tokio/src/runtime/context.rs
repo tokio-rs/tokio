@@ -15,7 +15,7 @@ cfg_io_driver! {
     pub(crate) fn io_handle() -> crate::runtime::driver::IoHandle {
         CONTEXT.with(|ctx| {
             let ctx = ctx.borrow();
-            ctx.as_ref().unwrap_or_else(|| panic!(crate::util::error::context_missing_error(&[]))).io_handle.clone()
+            ctx.as_ref().unwrap_or_else(|| panic!(crate::util::error::context_missing_error())).io_handle.clone()
         })
     }
 }
@@ -25,7 +25,7 @@ cfg_signal_internal! {
     pub(crate) fn signal_handle() -> crate::runtime::driver::SignalHandle {
         CONTEXT.with(|ctx| {
             let ctx = ctx.borrow();
-            ctx.as_ref().unwrap_or_else(|| panic!(crate::util::error::context_missing_error(&[]))).signal_handle.clone()
+            ctx.as_ref().unwrap_or_else(|| panic!(crate::util::error::context_missing_error())).signal_handle.clone()
         })
     }
 }
@@ -34,7 +34,7 @@ cfg_time! {
     pub(crate) fn time_handle() -> crate::runtime::driver::TimeHandle {
         CONTEXT.with(|ctx| {
             let ctx = ctx.borrow();
-            ctx.as_ref().unwrap_or_else(|| panic!(crate::util::error::context_missing_error(&[]))).time_handle.clone()
+            ctx.as_ref().unwrap_or_else(|| panic!(crate::util::error::context_missing_error())).time_handle.clone()
         })
     }
 

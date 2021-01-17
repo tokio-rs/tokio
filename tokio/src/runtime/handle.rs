@@ -98,7 +98,7 @@ impl Handle {
     /// # }
     /// ```
     pub fn current() -> Self {
-        context::current().unwrap_or_else(|| panic!(context_missing_error(&[])))
+        context::current().unwrap_or_else(|| panic!(context_missing_error()))
     }
 
     /// Returns a Handle view over the currently running Runtime
@@ -214,7 +214,7 @@ impl fmt::Debug for TryCurrentError {
 
 impl fmt::Display for TryCurrentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&context_missing_error(&[]))
+        f.write_str(&context_missing_error())
     }
 }
 
