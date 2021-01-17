@@ -25,7 +25,7 @@ pub(crate) fn context_missing_error(features: &[&str]) -> String {
         String::new()
     };
     format!(
-        "there is no reactor running, must be called from the context of Tokio 1.x runtime{}",
+        "there is no reactor running, must be called from the context of a Tokio 1.x runtime{}",
         sfx
     )
 }
