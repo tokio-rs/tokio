@@ -47,7 +47,7 @@ cfg_rt! {
         /// panicking.
         pub(crate) fn current() -> Self {
             crate::runtime::context::time_handle()
-                .expect("a Tokio 1.x context was found, but timers are disabled on the runtime")
+                .expect("a Tokio 1.x context was found, but timers are disabled")
         }
     }
 }
@@ -71,7 +71,7 @@ cfg_not_rt! {
         /// lazy, and so outside executed inside the runtime successfuly without
         /// panicking.
         pub(crate) fn current() -> Self {
-            panic!("`rt` must be enabled")
+            panic!("feature `rt` must be enabled on Tokio 1.x")
         }
     }
 }
