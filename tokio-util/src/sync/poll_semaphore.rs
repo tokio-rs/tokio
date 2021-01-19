@@ -1,9 +1,9 @@
+use futures_core::Stream;
+use std::fmt;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use std::fmt;
-use tokio::sync::{Semaphore, OwnedSemaphorePermit};
-use futures_core::Stream;
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 /// A wrapper around [`Semaphore`] that provides a `poll_acquire` method.
 ///
@@ -12,7 +12,6 @@ pub struct PollSemaphore {
     semaphore: Arc<Semaphore>,
     inner: Pin<Box<dyn Stream<Item = OwnedSemaphorePermit> + Send + Sync>>,
 }
-
 
 impl PollSemaphore {
     /// Create a new `PollSemaphore`.
