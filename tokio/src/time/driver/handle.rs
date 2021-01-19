@@ -71,7 +71,7 @@ cfg_not_rt! {
         /// lazy, and so outside executed inside the runtime successfuly without
         /// panicking.
         pub(crate) fn current() -> Self {
-            panic!("feature `rt` must be enabled on Tokio 1.x")
+            panic!(&format!("{} with feature `rt` enabled", crate::util::error::CONTEXT_MISSING_ERROR))
         }
     }
 }

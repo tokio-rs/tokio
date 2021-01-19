@@ -273,7 +273,7 @@ cfg_not_rt! {
         /// This function panics if there is no current reactor set, or if the `rt`
         /// feature flag is not enabled.
         pub(super) fn current() -> Self {
-            panic!("feature `rt` must be enabled on Tokio 1.x")
+            panic!(&format!("{} with feature `rt` enabled", crate::util::error::CONTEXT_MISSING_ERROR))
         }
     }
 }
