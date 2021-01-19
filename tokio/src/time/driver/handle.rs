@@ -71,7 +71,7 @@ cfg_not_rt! {
         /// lazy, and so outside executed inside the runtime successfuly without
         /// panicking.
         pub(crate) fn current() -> Self {
-            panic!(&format!("{} with feature `rt` enabled", crate::util::error::CONTEXT_MISSING_ERROR))
+            panic!(crate::util::error::CONTEXT_MISSING_ERROR)
         }
     }
 }
