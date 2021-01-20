@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611149468854,
+  "lastUpdate": 1611149482641,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -12547,6 +12547,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19956375,
             "range": "± 3001095",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "arve.knudsen@gmail.com",
+            "name": "Arve Knudsen",
+            "username": "aknuds1"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fdde5583f853655fec57c44928b7d5f01621b754",
+          "message": "runtime: consolidate errors for context missing (#3441)",
+          "timestamp": "2021-01-20T14:29:13+01:00",
+          "tree_id": "4d207d4f5babb280741aaaec32be0209460fc7f7",
+          "url": "https://github.com/tokio-rs/tokio/commit/fdde5583f853655fec57c44928b7d5f01621b754"
+        },
+        "date": 1611149477502,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 207839,
+            "range": "± 38475",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 777357,
+            "range": "± 177882",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5334655,
+            "range": "± 731897",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21464231,
+            "range": "± 2453656",
             "unit": "ns/iter"
           }
         ]
