@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611149444793,
+  "lastUpdate": 1611149458472,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -19191,6 +19191,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1095,
             "range": "± 40",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "arve.knudsen@gmail.com",
+            "name": "Arve Knudsen",
+            "username": "aknuds1"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fdde5583f853655fec57c44928b7d5f01621b754",
+          "message": "runtime: consolidate errors for context missing (#3441)",
+          "timestamp": "2021-01-20T14:29:13+01:00",
+          "tree_id": "4d207d4f5babb280741aaaec32be0209460fc7f7",
+          "url": "https://github.com/tokio-rs/tokio/commit/fdde5583f853655fec57c44928b7d5f01621b754"
+        },
+        "date": 1611149456880,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 15718,
+            "range": "± 4093",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1089,
+            "range": "± 30",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 652,
+            "range": "± 21",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 17604,
+            "range": "± 8265",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1092,
+            "range": "± 65",
             "unit": "ns/iter"
           }
         ]
