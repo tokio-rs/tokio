@@ -11,16 +11,7 @@ use std::io;
 use std::process::{ExitStatus, Stdio};
 
 fn cat() -> Command {
-    let mut me = env::current_exe().unwrap();
-    me.pop();
-
-    if me.ends_with("deps") {
-        me.pop();
-    }
-
-    me.push("test-cat");
-
-    let mut cmd = Command::new(me);
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_test-cat"));
     cmd.stdin(Stdio::piped()).stdout(Stdio::piped());
     cmd
 }

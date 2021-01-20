@@ -283,6 +283,7 @@ impl LocalSet {
         let future = crate::util::trace::task(future, "local");
         let (task, handle) = unsafe { task::joinable_local(future) };
         self.context.tasks.borrow_mut().queue.push_back(task);
+        self.context.shared.waker.wake();
         handle
     }
 
