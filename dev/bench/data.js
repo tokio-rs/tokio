@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611132919928,
+  "lastUpdate": 1611147473368,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -12391,6 +12391,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 17921696,
             "range": "± 2433235",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "rain@sunshowers.io",
+            "name": "Rain",
+            "username": "sunshowers"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "36cf95ab6230b4b020f26b042e071e0ac17646f6",
+          "message": "io: add ReadBuf::inner_mut (#3443)",
+          "timestamp": "2021-01-20T13:56:14+01:00",
+          "tree_id": "5b5fabcc1dab675db51eee18139a06f61f4749f8",
+          "url": "https://github.com/tokio-rs/tokio/commit/36cf95ab6230b4b020f26b042e071e0ac17646f6"
+        },
+        "date": 1611147472062,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 189428,
+            "range": "± 14483",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 720500,
+            "range": "± 63408",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 6049327,
+            "range": "± 1057367",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19956375,
+            "range": "± 3001095",
             "unit": "ns/iter"
           }
         ]
