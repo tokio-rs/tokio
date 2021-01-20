@@ -1,10 +1,11 @@
-use crate::io::{AsyncRead, ReadBuf};
+use crate::io::util::vec_with_initialized::{into_read_buf_parts, VecWithInitialized};
+use crate::io::AsyncRead;
 
 use pin_project_lite::pin_project;
 use std::future::Future;
 use std::io;
 use std::marker::PhantomPinned;
-use std::mem::{self, MaybeUninit};
+use std::mem;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -13,7 +14,7 @@ pin_project! {
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct ReadToEnd<'a, R: ?Sized> {
         reader: &'a mut R,
-        buf: &'a mut Vec<u8>,
+        buf: VecWithInitialized<&'a mut Vec<u8>>,
         // The number of bytes appended to buf. This can be less than buf.len() if
         // the buffer was not empty when the operation was started.
         read: usize,
@@ -27,22 +28,22 @@ pub(crate) fn read_to_end<'a, R>(reader: &'a mut R, buffer: &'a mut Vec<u8>) -> 
 where
     R: AsyncRead + Unpin + ?Sized,
 {
+    // SAFETY: The generic type on VecWithInitialized is &mut Vec<u8>.
     ReadToEnd {
         reader,
-        buf: buffer,
+        buf: unsafe { VecWithInitialized::new(buffer) },
         read: 0,
         _pin: PhantomPinned,
     }
 }
 
-pub(super) fn read_to_end_internal<R: AsyncRead + ?Sized>(
-    buf: &mut Vec<u8>,
+pub(super) fn read_to_end_internal<V: AsMut<Vec<u8>>, R: AsyncRead + ?Sized>(
+    buf: &mut VecWithInitialized<V>,
     mut reader: Pin<&mut R>,
     num_read: &mut usize,
     cx: &mut Context<'_>,
 ) -> Poll<io::Result<usize>> {
     loop {
-        // safety: The caller promised to prepare the buffer.
         let ret = ready!(poll_read_to_end(buf, reader.as_mut(), cx));
         match ret {
             Err(err) => return Poll::Ready(Err(err)),
@@ -57,8 +58,8 @@ pub(super) fn read_to_end_internal<R: AsyncRead + ?Sized>(
 /// Tries to read from the provided AsyncRead.
 ///
 /// The length of the buffer is increased by the number of bytes read.
-fn poll_read_to_end<R: AsyncRead + ?Sized>(
-    buf: &mut Vec<u8>,
+fn poll_read_to_end<V: AsMut<Vec<u8>>, R: AsyncRead + ?Sized>(
+    buf: &mut VecWithInitialized<V>,
     read: Pin<&mut R>,
     cx: &mut Context<'_>,
 ) -> Poll<io::Result<usize>> {
@@ -68,37 +69,34 @@ fn poll_read_to_end<R: AsyncRead + ?Sized>(
     // of data to return. Simply tacking on an extra DEFAULT_BUF_SIZE space every
     // time is 4,500 times (!) slower than this if the reader has a very small
     // amount of data to return.
-    reserve(buf, 32);
+    buf.reserve(32);
 
-    let mut unused_capacity = ReadBuf::uninit(get_unused_capacity(buf));
+    // Get a ReadBuf into the vector.
+    let mut read_buf = buf.get_read_buf();
 
-    let ptr = unused_capacity.filled().as_ptr();
-    ready!(read.poll_read(cx, &mut unused_capacity))?;
-    assert_eq!(ptr, unused_capacity.filled().as_ptr());
+    let filled_before = read_buf.filled().len();
+    let poll_result = read.poll_read(cx, &mut read_buf);
+    let filled_after = read_buf.filled().len();
+    let n = filled_after - filled_before;
 
-    let n = unused_capacity.filled().len();
-    let new_len = buf.len() + n;
+    // Update the length of the vector using the result of poll_read.
+    let read_buf_parts = into_read_buf_parts(read_buf);
+    buf.apply_read_buf(read_buf_parts);
 
-    assert!(new_len <= buf.capacity());
-    unsafe {
-        buf.set_len(new_len);
+    match poll_result {
+        Poll::Pending => {
+            // In this case, nothing should have been read. However we still
+            // update the vector in case the poll_read call initialized parts of
+            // the vector's unused capacity.
+            debug_assert_eq!(filled_before, filled_after);
+            Poll::Pending
+        }
+        Poll::Ready(Err(err)) => {
+            debug_assert_eq!(filled_before, filled_after);
+            Poll::Ready(Err(err))
+        }
+        Poll::Ready(Ok(())) => Poll::Ready(Ok(n)),
     }
-    Poll::Ready(Ok(n))
-}
-
-/// Allocates more memory and ensures that the unused capacity is prepared for use
-/// with the `AsyncRead`.
-fn reserve(buf: &mut Vec<u8>, bytes: usize) {
-    if buf.capacity() - buf.len() >= bytes {
-        return;
-    }
-    buf.reserve(bytes);
-}
-
-/// Returns the unused capacity of the provided vector.
-fn get_unused_capacity(buf: &mut Vec<u8>) -> &mut [MaybeUninit<u8>] {
-    let uninit = bytes::BufMut::chunk_mut(buf);
-    unsafe { &mut *(uninit as *mut _ as *mut [MaybeUninit<u8>]) }
 }
 
 impl<A> Future for ReadToEnd<'_, A>
