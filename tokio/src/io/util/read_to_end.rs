@@ -1,4 +1,4 @@
-use crate::io::util::vec_with_initialized::{into_read_buf_parts, VecWithInitialized, VecU8};
+use crate::io::util::vec_with_initialized::{into_read_buf_parts, VecU8, VecWithInitialized};
 use crate::io::AsyncRead;
 
 use pin_project_lite::pin_project;
