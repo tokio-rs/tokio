@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1610916144089,
+  "lastUpdate": 1611132651683,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -18669,6 +18669,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1087,
             "range": "± 167",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c1cf6b7504bdb08b7702568b7669751ee2d76649",
+          "message": "io: keep track of initialized bytes in read_to_end (#3426)",
+          "timestamp": "2021-01-20T09:49:24+01:00",
+          "tree_id": "899e159207afd13718323004bcdf99e4fe44a9af",
+          "url": "https://github.com/tokio-rs/tokio/commit/c1cf6b7504bdb08b7702568b7669751ee2d76649"
+        },
+        "date": 1611132650417,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 12985,
+            "range": "± 2592",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 914,
+            "range": "± 4",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 545,
+            "range": "± 4",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 13537,
+            "range": "± 2439",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 919,
+            "range": "± 5",
             "unit": "ns/iter"
           }
         ]
