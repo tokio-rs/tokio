@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611180876627,
+  "lastUpdate": 1611180918380,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -30179,6 +30179,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 823786,
             "range": "± 20843",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "oguzbilgener@gmail.com",
+            "name": "Oğuz Bilgener",
+            "username": "oguzbilgener"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7d5b12c50947929326bdfaadb78155ee6593f209",
+          "message": "sync: fix panic in broadcast::Receiver drop (#3434)",
+          "timestamp": "2021-01-20T23:12:51+01:00",
+          "tree_id": "eb5c97f6b799d586eff7bbb09133c1b325e43357",
+          "url": "https://github.com/tokio-rs/tokio/commit/7d5b12c50947929326bdfaadb78155ee6593f209"
+        },
+        "date": 1611180916896,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6731150,
+            "range": "± 3949312",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6632372,
+            "range": "± 2178003",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6513253,
+            "range": "± 2600334",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 793,
+            "range": "± 183",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 804,
+            "range": "± 235",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 755,
+            "range": "± 225",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 141654,
+            "range": "± 17214",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1682,
+            "range": "± 354",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1044973,
+            "range": "± 263034",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 761904,
+            "range": "± 157612",
             "unit": "ns/iter"
           }
         ]
