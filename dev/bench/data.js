@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611132697926,
+  "lastUpdate": 1611132897550,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -12289,6 +12289,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20793235,
             "range": "± 3014023",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "27b2d681e6ea7f48a66872d9a16d9938264483ac",
+          "message": "util: add pollable Semaphore (#3444)",
+          "timestamp": "2021-01-20T09:53:31+01:00",
+          "tree_id": "e61a4096239cca5c26e06e818d9099c6a60e3e17",
+          "url": "https://github.com/tokio-rs/tokio/commit/27b2d681e6ea7f48a66872d9a16d9938264483ac"
+        },
+        "date": 1611132896293,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 165916,
+            "range": "± 9684",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 632882,
+            "range": "± 108498",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4712415,
+            "range": "± 963674",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 17921696,
+            "range": "± 2433235",
             "unit": "ns/iter"
           }
         ]
