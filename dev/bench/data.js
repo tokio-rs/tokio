@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611156664096,
+  "lastUpdate": 1611180868188,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -12799,6 +12799,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 17310127,
             "range": "± 2102038",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "oguzbilgener@gmail.com",
+            "name": "Oğuz Bilgener",
+            "username": "oguzbilgener"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7d5b12c50947929326bdfaadb78155ee6593f209",
+          "message": "sync: fix panic in broadcast::Receiver drop (#3434)",
+          "timestamp": "2021-01-20T23:12:51+01:00",
+          "tree_id": "eb5c97f6b799d586eff7bbb09133c1b325e43357",
+          "url": "https://github.com/tokio-rs/tokio/commit/7d5b12c50947929326bdfaadb78155ee6593f209"
+        },
+        "date": 1611180866847,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 162452,
+            "range": "± 2448",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 614555,
+            "range": "± 20360",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4598993,
+            "range": "± 307597",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18639778,
+            "range": "± 2648131",
             "unit": "ns/iter"
           }
         ]
