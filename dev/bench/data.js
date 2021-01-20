@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611180868188,
+  "lastUpdate": 1611180872717,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -19653,6 +19653,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1097,
             "range": "± 7",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "oguzbilgener@gmail.com",
+            "name": "Oğuz Bilgener",
+            "username": "oguzbilgener"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7d5b12c50947929326bdfaadb78155ee6593f209",
+          "message": "sync: fix panic in broadcast::Receiver drop (#3434)",
+          "timestamp": "2021-01-20T23:12:51+01:00",
+          "tree_id": "eb5c97f6b799d586eff7bbb09133c1b325e43357",
+          "url": "https://github.com/tokio-rs/tokio/commit/7d5b12c50947929326bdfaadb78155ee6593f209"
+        },
+        "date": 1611180871322,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 16221,
+            "range": "± 5533",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1093,
+            "range": "± 2",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 653,
+            "range": "± 19",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 15304,
+            "range": "± 5386",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1093,
+            "range": "± 5",
             "unit": "ns/iter"
           }
         ]
