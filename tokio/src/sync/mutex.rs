@@ -142,7 +142,7 @@ pub struct MutexGuard<'a, T: ?Sized> {
 /// unlike `MutexGuard`, it will have the `'static` lifetime.
 ///
 /// As long as you have this guard, you have exclusive access to the underlying
-/// `T`. The guard internally keeps a reference-couned pointer to the original
+/// `T`. The guard internally keeps a reference-counted pointer to the original
 /// `Mutex`, so even if the lock goes away, the guard remains valid.
 ///
 /// The lock is automatically released whenever the guard is dropped, at which
