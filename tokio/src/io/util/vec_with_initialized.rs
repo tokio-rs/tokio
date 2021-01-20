@@ -68,7 +68,7 @@ where
         self.vec.as_mut().is_empty()
     }
 
-    pub(crate) fn get_read_buf(&mut self) -> ReadBuf<'_> {
+    pub(crate) fn get_read_buf<'a>(&'a mut self) -> ReadBuf<'a> {
         let num_initialized = self.num_initialized;
 
         // SAFETY: Creating the slice is safe because of the safety invariants
@@ -78,7 +78,7 @@ where
         let len = vec.len();
         let cap = vec.capacity();
         let ptr = vec.as_mut_ptr().cast::<MaybeUninit<u8>>();
-        let slice = unsafe { std::slice::from_raw_parts_mut::<'_, MaybeUninit<u8>>(ptr, cap) };
+        let slice = unsafe { std::slice::from_raw_parts_mut::<'a, MaybeUninit<u8>>(ptr, cap) };
 
         // SAFETY: This is safe because the safety invariants of
         // VecWithInitialized say that the first num_initialized bytes must be
