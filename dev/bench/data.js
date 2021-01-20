@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611156622299,
+  "lastUpdate": 1611156639103,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -12649,6 +12649,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21464231,
             "range": "± 2453656",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "henry.gomersall@smartacoustics.co.uk",
+            "name": "Henry Gomersall",
+            "username": "hgomersall"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6f8a4d7a0b4c7cb0aa8f46f844ff8a47a24bc6fd",
+          "message": "docs: trivial typo fix (#3449)",
+          "timestamp": "2021-01-20T16:28:35+01:00",
+          "tree_id": "5ace903a6851a4fa176aa65118c7a8267141e3c1",
+          "url": "https://github.com/tokio-rs/tokio/commit/6f8a4d7a0b4c7cb0aa8f46f844ff8a47a24bc6fd"
+        },
+        "date": 1611156634323,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 192162,
+            "range": "± 55088",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 711396,
+            "range": "± 107234",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4520270,
+            "range": "± 661450",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20332716,
+            "range": "± 3049828",
             "unit": "ns/iter"
           }
         ]
