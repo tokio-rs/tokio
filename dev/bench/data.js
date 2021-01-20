@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611149482641,
+  "lastUpdate": 1611156599604,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -19293,6 +19293,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1092,
             "range": "± 65",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "henry.gomersall@smartacoustics.co.uk",
+            "name": "Henry Gomersall",
+            "username": "hgomersall"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6f8a4d7a0b4c7cb0aa8f46f844ff8a47a24bc6fd",
+          "message": "docs: trivial typo fix (#3449)",
+          "timestamp": "2021-01-20T16:28:35+01:00",
+          "tree_id": "5ace903a6851a4fa176aa65118c7a8267141e3c1",
+          "url": "https://github.com/tokio-rs/tokio/commit/6f8a4d7a0b4c7cb0aa8f46f844ff8a47a24bc6fd"
+        },
+        "date": 1611156598231,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 13515,
+            "range": "± 3464",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 925,
+            "range": "± 5",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 545,
+            "range": "± 17",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 12876,
+            "range": "± 2207",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 921,
+            "range": "± 7",
             "unit": "ns/iter"
           }
         ]
