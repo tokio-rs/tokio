@@ -22,8 +22,13 @@ cfg_net! {
     /// * one to one: [`connect`](`UdpSocket::connect`) and associate with a single address, using [`send`](`UdpSocket::send`)
     ///   and [`recv`](`UdpSocket::recv`) to communicate only with that remote address
     ///
-    /// `UdpSocket` can also be used concurrently to `send_to` and `recv_from` in different tasks,
-    /// all that's required is that you `Arc<UdpSocket>` and clone a reference for each task.
+    /// This type does not provide a `split` method, because this functionality
+    /// can be achieved by wrapping the socket in an [`Arc`]. Note that you do
+    /// not need a `Mutex` to share the `UdpSocket` — an `Arc<UdpSocket>` is
+    /// enough. This is because all of the methods take `&self` instead of `&mut
+    /// self`.
+    ///
+    /// [`Arc`]: std::sync::Arc
     ///
     /// # Streams
     ///
@@ -78,11 +83,12 @@ cfg_net! {
     /// }
     /// ```
     ///
-    /// # Example: Sending/Receiving concurrently
+    /// # Example: Splitting with `Arc`
     ///
-    /// Because `send_to` and `recv_from` take `&self`. It's perfectly alright to `Arc<UdpSocket>`
-    /// and share the references to multiple tasks, in order to send/receive concurrently. Here is
-    /// a similar "echo" example but that supports concurrent sending/receiving:
+    /// Because `send_to` and `recv_from` take `&self`. It's perfectly alright
+    /// to use an `Arc<UdpSocket>` and share the references to multiple tasks.
+    /// Here is a similar "echo" example that supports concurrent
+    /// sending/receiving:
     ///
     /// ```no_run
     /// use tokio::{net::UdpSocket, sync::mpsc};

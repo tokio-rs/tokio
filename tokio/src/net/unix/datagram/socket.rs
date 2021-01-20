@@ -20,10 +20,18 @@ cfg_net_unix! {
     /// A socket can be either named (associated with a filesystem path) or
     /// unnamed.
     ///
+    /// This type does not provide a `split` method, because this functionality
+    /// can be achieved by wrapping the socket in an [`Arc`]. Note that you do
+    /// not need a `Mutex` to share the `UnixDatagram` — an `Arc<UnixDatagram>`
+    /// is enough. This is because all of the methods take `&self` instead of
+    /// `&mut self`.
+    ///
     /// **Note:** named sockets are persisted even after the object is dropped
     /// and the program has exited, and cannot be reconnected. It is advised
     /// that you either check for and unlink the existing socket if it exists,
     /// or use a temporary file that is guaranteed to not already exist.
+    ///
+    /// [`Arc`]: std::sync::Arc
     ///
     /// # Examples
     /// Using named sockets, associated with a filesystem path:
