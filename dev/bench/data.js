@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611156639103,
+  "lastUpdate": 1611156644105,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -12697,6 +12697,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20332716,
             "range": "± 3049828",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cc0911aa645cbaf5dee5b3d51efcfbe703159902",
+          "message": "net: update datagram docs on splitting (#3448)",
+          "timestamp": "2021-01-20T16:28:57+01:00",
+          "tree_id": "6a9606182d62c927932ebdd5361899a12573b9b5",
+          "url": "https://github.com/tokio-rs/tokio/commit/cc0911aa645cbaf5dee5b3d51efcfbe703159902"
+        },
+        "date": 1611156642418,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 155381,
+            "range": "± 17852",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 611180,
+            "range": "± 27305",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4933044,
+            "range": "± 834495",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 17310127,
+            "range": "± 2102038",
             "unit": "ns/iter"
           }
         ]
