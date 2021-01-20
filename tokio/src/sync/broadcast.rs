@@ -929,7 +929,7 @@ impl<T> Drop for Receiver<T> {
 
         drop(tail);
 
-        while self.next != until {
+        while self.next < until {
             match self.recv_ref(None) {
                 Ok(_) => {}
                 // The channel is closed
