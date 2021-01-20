@@ -259,7 +259,7 @@ cfg_rt! {
         /// This function panics if there is no current reactor set and `rt` feature
         /// flag is not enabled.
         pub(super) fn current() -> Self {
-            crate::runtime::context::io_handle().expect("a Tokio 1.x context was found, but io is disabled")
+            crate::runtime::context::io_handle().expect("A Tokio 1.x context was found, but IO is disabled. Call `enable_io` on the runtime builder to enable IO.")
         }
     }
 }

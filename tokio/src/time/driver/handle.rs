@@ -47,7 +47,7 @@ cfg_rt! {
         /// panicking.
         pub(crate) fn current() -> Self {
             crate::runtime::context::time_handle()
-                .expect("a Tokio 1.x context was found, but timers are disabled")
+                .expect("A Tokio 1.x context was found, but timers are disabled. Call `enable_time` on the runtime builder to enable timers.")
         }
     }
 }
