@@ -23,9 +23,11 @@ use std::{task::Context, task::Poll};
 /// to retake control from the tokio IO reactor.
 ///
 /// The inner object is required to implement [`AsRawFd`]. This file descriptor
-/// must not change while [`AsyncFd`] owns the inner object. Changing the file
-/// descriptor results in unspecified behavior in the IO driver, which may
-/// include breaking notifications for other sockets/etc.
+/// must not change while [`AsyncFd`] owns the inner object, i.e. the
+/// [`AsRawFd::as_raw_fd`] method on the inner type must always return the same
+/// file descriptor when called multiple times. Failure to uphold this results
+/// in unspecified behavior in the IO driver, which may include breaking
+/// notifications for other sockets/etc.
 ///
 /// Polling for readiness is done by calling the async functions [`readable`]
 /// and [`writable`]. These functions complete when the associated readiness

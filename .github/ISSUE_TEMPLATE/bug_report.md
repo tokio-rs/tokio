@@ -9,12 +9,7 @@ assignees: ''
 
 **Version**
 List the versions of all `tokio` crates you are using. The easiest way to get
-this information is using `cargo-tree`.
-
-`cargo install cargo-tree`
-(see install here: https://github.com/sfackler/cargo-tree)
-
-Then:
+this information is using `cargo tree` subcommand:
 
 `cargo tree | grep tokio`
 
