@@ -136,7 +136,9 @@ fn acquire_mutex_in_drop() {
 }
 
 #[test]
-#[should_panic(expected = "a Tokio 1.x context was found, but timers are disabled")]
+#[should_panic(
+    expected = "A Tokio 1.x context was found, but timers are disabled. Call `enable_time` on the runtime builder to enable timers."
+)]
 fn timeout_panics_when_no_time_handle() {
     let rt = tokio::runtime::Builder::new_current_thread()
         .build()
