@@ -28,7 +28,6 @@ pub(crate) fn read_to_end<'a, R>(reader: &'a mut R, buffer: &'a mut Vec<u8>) -> 
 where
     R: AsyncRead + Unpin + ?Sized,
 {
-    // SAFETY: The generic type on VecWithInitialized is &mut Vec<u8>.
     ReadToEnd {
         reader,
         buf: VecWithInitialized::new(buffer),
