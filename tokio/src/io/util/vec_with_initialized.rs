@@ -1,6 +1,19 @@
 use crate::io::ReadBuf;
 use std::mem::MaybeUninit;
 
+mod private {
+    pub trait Sealed {}
+
+    impl Sealed for Vec<u8> {}
+    impl Sealed for &mut Vec<u8> {}
+}
+
+/// A sealed trait that constrains the generic type parameter in `VecWithInitialized<V>`.  That struct's safety relies
+/// on certain invariants upheld by `Vec<u8>`.
+pub(crate) trait VecU8: AsMut<Vec<u8>> + private::Sealed {}
+
+impl VecU8 for Vec<u8> {}
+impl VecU8 for &mut Vec<u8> {}
 /// This struct wraps a `Vec<u8>` or `&mut Vec<u8>`, combining it with a
 /// `num_initialized`, which keeps track of the number of initialized bytes
 /// in the unused capacity.
@@ -28,10 +41,9 @@ impl VecWithInitialized<Vec<u8>> {
 
 impl<V> VecWithInitialized<V>
 where
-    V: AsMut<Vec<u8>>,
+    V: VecU8,
 {
-    /// Safety: The generic parameter `V` must be either `Vec<u8>` or `&mut Vec<u8>`.
-    pub(crate) unsafe fn new(mut vec: V) -> Self {
+    pub(crate) fn new(mut vec: V) -> Self {
         // SAFETY: The safety invariants of vector guarantee that the bytes up
         // to its length are initialized.
         Self {
@@ -56,7 +68,7 @@ where
         self.vec.as_mut().is_empty()
     }
 
-    pub(crate) fn get_read_buf<'a>(&'a mut self) -> ReadBuf<'a> {
+    pub(crate) fn get_read_buf(&mut self) -> ReadBuf<'_> {
         let num_initialized = self.num_initialized;
 
         // SAFETY: Creating the slice is safe because of the safety invariants
@@ -66,7 +78,7 @@ where
         let len = vec.len();
         let cap = vec.capacity();
         let ptr = vec.as_mut_ptr().cast::<MaybeUninit<u8>>();
-        let slice = unsafe { std::slice::from_raw_parts_mut::<'a, MaybeUninit<u8>>(ptr, cap) };
+        let slice = unsafe { std::slice::from_raw_parts_mut::<'_, MaybeUninit<u8>>(ptr, cap) };
 
         // SAFETY: This is safe because the safety invariants of
         // VecWithInitialized say that the first num_initialized bytes must be

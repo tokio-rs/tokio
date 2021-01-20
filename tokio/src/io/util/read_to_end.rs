@@ -1,4 +1,4 @@
-use crate::io::util::vec_with_initialized::{into_read_buf_parts, VecWithInitialized};
+use crate::io::util::vec_with_initialized::{into_read_buf_parts, VecWithInitialized, VecU8};
 use crate::io::AsyncRead;
 
 use pin_project_lite::pin_project;
@@ -31,13 +31,13 @@ where
     // SAFETY: The generic type on VecWithInitialized is &mut Vec<u8>.
     ReadToEnd {
         reader,
-        buf: unsafe { VecWithInitialized::new(buffer) },
+        buf: VecWithInitialized::new(buffer),
         read: 0,
         _pin: PhantomPinned,
     }
 }
 
-pub(super) fn read_to_end_internal<V: AsMut<Vec<u8>>, R: AsyncRead + ?Sized>(
+pub(super) fn read_to_end_internal<V: VecU8, R: AsyncRead + ?Sized>(
     buf: &mut VecWithInitialized<V>,
     mut reader: Pin<&mut R>,
     num_read: &mut usize,
@@ -58,7 +58,7 @@ pub(super) fn read_to_end_internal<V: AsMut<Vec<u8>>, R: AsyncRead + ?Sized>(
 /// Tries to read from the provided AsyncRead.
 ///
 /// The length of the buffer is increased by the number of bytes read.
-fn poll_read_to_end<V: AsMut<Vec<u8>>, R: AsyncRead + ?Sized>(
+fn poll_read_to_end<V: VecU8, R: AsyncRead + ?Sized>(
     buf: &mut VecWithInitialized<V>,
     read: Pin<&mut R>,
     cx: &mut Context<'_>,

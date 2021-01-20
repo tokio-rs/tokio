@@ -41,7 +41,7 @@ where
     // SAFETY: The generic type of the VecWithInitialized is Vec<u8>.
     ReadToString {
         reader,
-        buf: unsafe { VecWithInitialized::new(buf) },
+        buf: VecWithInitialized::new(buf),
         output: string,
         read: 0,
         _pin: PhantomPinned,
