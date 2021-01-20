@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611132897550,
+  "lastUpdate": 1611132903846,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -18872,6 +18872,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "uncontended_concurrent_single",
             "value": 919,
+            "range": "± 5",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "27b2d681e6ea7f48a66872d9a16d9938264483ac",
+          "message": "util: add pollable Semaphore (#3444)",
+          "timestamp": "2021-01-20T09:53:31+01:00",
+          "tree_id": "e61a4096239cca5c26e06e818d9099c6a60e3e17",
+          "url": "https://github.com/tokio-rs/tokio/commit/27b2d681e6ea7f48a66872d9a16d9938264483ac"
+        },
+        "date": 1611132898341,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 13893,
+            "range": "± 2602",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 917,
+            "range": "± 6",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 544,
+            "range": "± 11",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 13597,
+            "range": "± 2494",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 914,
             "range": "± 5",
             "unit": "ns/iter"
           }
