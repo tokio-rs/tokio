@@ -254,7 +254,7 @@ fn parse_knobs(
                 .enable_all()
                 .build()
                 .unwrap()
-                .block_on(async { #body })
+                .block_on(async #body)
         }
     };
 

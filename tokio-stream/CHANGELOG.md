@@ -1,3 +1,9 @@
+# 0.1.2 (January 12, 2021)
+
+Fixed
+
+ - docs: fix some wrappers missing in documentation (#3378)
+
 # 0.1.1 (January 4, 2021)
 
 Added

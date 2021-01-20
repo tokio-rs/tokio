@@ -1,8 +1,8 @@
 on:
   push:
-    branches: ["master"]
+    branches: ["master", "tokio-*.x"]
   pull_request:
-    branches: ["master"]
+    branches: ["master", "tokio-*.x"]
 
 name: CI
 
@@ -232,7 +232,7 @@ jobs:
 
       # Run clippy
       - name: "clippy --all"
-        run: cargo clippy --all --tests
+        run: cargo clippy --all --tests --all-features
 
   docs:
     name: docs

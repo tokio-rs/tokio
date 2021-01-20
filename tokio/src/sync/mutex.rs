@@ -161,13 +161,22 @@ unsafe impl<T> Sync for Mutex<T> where T: ?Sized + Send {}
 unsafe impl<T> Sync for MutexGuard<'_, T> where T: ?Sized + Send + Sync {}
 unsafe impl<T> Sync for OwnedMutexGuard<T> where T: ?Sized + Send + Sync {}
 
-/// Error returned from the [`Mutex::try_lock`] function.
+/// Error returned from the [`Mutex::try_lock`], [`RwLock::try_read`] and
+/// [`RwLock::try_write`] functions.
 ///
-/// A `try_lock` operation can only fail if the mutex is already locked.
+/// `Mutex::try_lock` operation will only fail if the mutex is already locked.
+///
+/// `RwLock::try_read` operation will only fail if the lock is currently held
+/// by an exclusive writer.
+///
+/// `RwLock::try_write` operation will if lock is held by any reader or by an
+/// exclusive writer.
 ///
 /// [`Mutex::try_lock`]: Mutex::try_lock
+/// [`RwLock::try_read`]: fn@super::RwLock::try_read
+/// [`RwLock::try_write`]: fn@super::RwLock::try_write
 #[derive(Debug)]
-pub struct TryLockError(());
+pub struct TryLockError(pub(super) ());
 
 impl fmt::Display for TryLockError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
