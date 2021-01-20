@@ -35,3 +35,12 @@ pub(crate) mod trace;
 #[cfg(any(feature = "macros"))]
 #[cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
 pub use rand::thread_rng_n;
+
+#[cfg(any(
+    feature = "rt",
+    feature = "time",
+    feature = "net",
+    feature = "process",
+    all(unix, feature = "signal")
+))]
+pub(crate) mod error;
