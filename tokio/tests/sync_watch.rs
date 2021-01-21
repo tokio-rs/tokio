@@ -180,7 +180,8 @@ fn watch_poison() {
         let brw = send.borrow();
         val = *brw;
         panic!("Poison the watch channel.");
-    })).unwrap_err();
+    }))
+    .unwrap_err();
     assert_eq!(val, 0i32);
 
     send.send(1i32).unwrap();
@@ -190,7 +191,8 @@ fn watch_poison() {
         let brw = recv.borrow();
         val = *brw;
         panic!("Poison the watch channel.");
-    })).unwrap_err();
+    }))
+    .unwrap_err();
     assert_eq!(val, 1i32);
 
     send.send(2i32).unwrap();
