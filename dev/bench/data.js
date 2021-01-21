@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611223483827,
+  "lastUpdate": 1611223487927,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -13057,6 +13057,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19706552,
             "range": "± 4156449",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "rodrigblas@gmail.com",
+            "name": "Blas Rodriguez Irizar",
+            "username": "blasrodri"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "117fc2ef3e948c92dd5359d3a479906ed7a5ceb4",
+          "message": "tests: fix ping pong saturation (#3390)",
+          "timestamp": "2021-01-21T11:02:40+01:00",
+          "tree_id": "51fa9a76937521bb90ef7f6f40223026f06b6e77",
+          "url": "https://github.com/tokio-rs/tokio/commit/117fc2ef3e948c92dd5359d3a479906ed7a5ceb4"
+        },
+        "date": 1611223481706,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 196586,
+            "range": "± 10194",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 718816,
+            "range": "± 53044",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5678081,
+            "range": "± 898906",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19832216,
+            "range": "± 2428696",
             "unit": "ns/iter"
           }
         ]
