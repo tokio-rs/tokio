@@ -2,6 +2,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
+use std::panic::AssertUnwindSafe;
 use tokio::sync::watch;
 use tokio_test::task::spawn;
 use tokio_test::{assert_pending, assert_ready, assert_ready_err, assert_ready_ok};
@@ -168,4 +169,29 @@ fn poll_close() {
     }
 
     assert!(tx.send("two").is_err());
+}
+
+#[test]
+fn watch_poison() {
+    let (send, recv) = watch::channel(0i32);
+
+    let mut val = 100;
+    std::panic::catch_unwind(AssertUnwindSafe(|| {
+        let brw = send.borrow();
+        val = *brw;
+        panic!("Poison the watch channel.");
+    })).unwrap_err();
+    assert_eq!(val, 0i32);
+
+    send.send(1i32).unwrap();
+
+    let mut val = 100;
+    std::panic::catch_unwind(AssertUnwindSafe(|| {
+        let brw = recv.borrow();
+        val = *brw;
+        panic!("Poison the watch channel.");
+    })).unwrap_err();
+    assert_eq!(val, 1i32);
+
+    send.send(2i32).unwrap();
 }
