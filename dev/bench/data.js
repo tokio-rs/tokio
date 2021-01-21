@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611243495558,
+  "lastUpdate": 1611243507847,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -13567,6 +13567,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18712787,
             "range": "± 2070054",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c6f08120d0e8764f5ff4d474ded342c85d9b188d",
+          "message": "task: add LocalSet example (#3438)",
+          "timestamp": "2021-01-21T16:36:26+01:00",
+          "tree_id": "dfc6d5e2eb2113d89db0940b1517833cb30a745f",
+          "url": "https://github.com/tokio-rs/tokio/commit/c6f08120d0e8764f5ff4d474ded342c85d9b188d"
+        },
+        "date": 1611243504485,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 191629,
+            "range": "± 38430",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 714105,
+            "range": "± 115224",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5155880,
+            "range": "± 543583",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20912656,
+            "range": "± 2600558",
             "unit": "ns/iter"
           }
         ]
