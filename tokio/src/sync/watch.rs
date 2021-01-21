@@ -489,25 +489,4 @@ mod tests {
             assert!(send.borrow().eq(&2));
         });
     }
-
-    #[test]
-    fn watch_poison() {
-        let (mut send, mut recv) = crate::sync::watch::channel(0i32);
-
-        std::panic::catch_unwind(|| {
-            let brw = send.borrow();
-            assert_eq!(*brw, 0i32);
-            panic!("Poison the watch channel.");
-        });
-
-        send.send(1i32);
-
-        std::panic::catch_unwind(|| {
-            let brw = recv.borrow();
-            assert_eq!(*brw, 1i32);
-            panic!("Poison the watch channel.");
-        });
-
-        send.send(2i32);
-    }
 }
