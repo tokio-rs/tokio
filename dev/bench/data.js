@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611225269651,
+  "lastUpdate": 1611225276053,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -30797,6 +30797,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 824122,
             "range": "± 7607",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "vitalyd@gmail.com",
+            "name": "vitalyd",
+            "username": "vitalyd"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5b7c7d565aa6ae995b665e36f2ce60160e59ad98",
+          "message": "io: use a sealed trait to constrain VecWithInitialized (#3450)",
+          "timestamp": "2021-01-21T11:32:42+01:00",
+          "tree_id": "25f30bd285f5e0cc33cd0e68e930281243526606",
+          "url": "https://github.com/tokio-rs/tokio/commit/5b7c7d565aa6ae995b665e36f2ce60160e59ad98"
+        },
+        "date": 1611225270993,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6668233,
+            "range": "± 2298363",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 5966363,
+            "range": "± 1334320",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 5655458,
+            "range": "± 2250303",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 523,
+            "range": "± 24",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 503,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 502,
+            "range": "± 1",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 73420,
+            "range": "± 3584",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1214,
+            "range": "± 91",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 963890,
+            "range": "± 2257",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 705084,
+            "range": "± 68565",
             "unit": "ns/iter"
           }
         ]
