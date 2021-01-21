@@ -75,8 +75,8 @@ cfg_rt! {
     /// }
     /// ```
     /// **Note:** The `run_until` method can only be used in `#[tokio::main]`,
-    /// or directly inside a call to [`Runtime::block_on`]. It cannot be used
-    /// inside a task spawned with `tokio::spawn`.
+    /// `#[tokio::test]` or directly inside a call to [`Runtime::block_on`]. It
+    /// cannot be used inside a task spawned with `tokio::spawn`.
     ///
     /// ## Awaiting a `LocalSet`
     ///
@@ -111,8 +111,9 @@ cfg_rt! {
     /// }
     /// ```
     /// **Note:** Awaiting a `LocalSet` can only be done inside
-    /// `#[tokio::main]`, or directly inside a call to [`Runtime::block_on`]. It
-    /// cannot be used inside a task spawned with `tokio::spawn`.
+    /// `#[tokio::main]`, `#[tokio::test]` or directly inside a call to
+    /// [`Runtime::block_on`]. It cannot be used inside a task spawned with
+    /// `tokio::spawn`.
     ///
     /// ## Use inside `tokio::spawn`
     ///
