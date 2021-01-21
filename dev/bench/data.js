@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611225276053,
+  "lastUpdate": 1611225280039,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -6911,6 +6911,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 557,
             "range": "± 50",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "vitalyd@gmail.com",
+            "name": "vitalyd",
+            "username": "vitalyd"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5b7c7d565aa6ae995b665e36f2ce60160e59ad98",
+          "message": "io: use a sealed trait to constrain VecWithInitialized (#3450)",
+          "timestamp": "2021-01-21T11:32:42+01:00",
+          "tree_id": "25f30bd285f5e0cc33cd0e68e930281243526606",
+          "url": "https://github.com/tokio-rs/tokio/commit/5b7c7d565aa6ae995b665e36f2ce60160e59ad98"
+        },
+        "date": 1611225277432,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1019,
+            "range": "± 202",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 16511,
+            "range": "± 5760",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1062,
+            "range": "± 201",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 16760,
+            "range": "± 8448",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 555,
+            "range": "± 95",
             "unit": "ns/iter"
           }
         ]
