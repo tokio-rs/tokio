@@ -58,8 +58,93 @@ pub fn sleep(duration: Duration) -> Sleep {
 }
 
 pin_project! {
-    /// Future returned by [`sleep`](sleep) and
-    /// [`sleep_until`](sleep_until).
+    /// Future returned by [`sleep`](sleep) and [`sleep_until`](sleep_until).
+    ///
+    /// This type does not implement the `Unpin` trait, which means that if you
+    /// use it with [`select!`] or by calling `poll`, you have to pin it first.
+    /// If you use it with `.await`, this does not apply.
+    ///
+    /// # Examples
+    ///
+    /// Wait 100ms and print "100 ms have elapsed".
+    ///
+    /// ```
+    /// use tokio::time::{sleep, Duration};
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     sleep(Duration::from_millis(100)).await;
+    ///     println!("100 ms have elapsed");
+    /// }
+    /// ```
+    ///
+    /// Use with [`select!`]. Pinning the `Sleep` with [`tokio::pin!`] is
+    /// necessary when the same `Sleep` is selected on multiple times.
+    /// ```no_run
+    /// use tokio::time::{self, Duration, Instant};
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let sleep = time::sleep(Duration::from_millis(10));
+    ///     tokio::pin!(sleep);
+    ///
+    ///     loop {
+    ///         tokio::select! {
+    ///             () = &mut sleep => {
+    ///                 println!("timer elapsed");
+    ///                 sleep.as_mut().reset(Instant::now() + Duration::from_millis(50));
+    ///             },
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    /// Use in a struct with boxing. By pinning the `Sleep` with a `Box`, the
+    /// `HasSleep` struct implements `Unpin`, even though `Sleep` does not.
+    /// ```
+    /// use std::future::Future;
+    /// use std::pin::Pin;
+    /// use std::task::{Context, Poll};
+    /// use tokio::time::Sleep;
+    ///
+    /// struct HasSleep {
+    ///     sleep: Pin<Box<Sleep>>,
+    /// }
+    ///
+    /// impl Future for HasSleep {
+    ///     type Output = ();
+    ///
+    ///     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+    ///         self.sleep.as_mut().poll(cx)
+    ///     }
+    /// }
+    /// ```
+    /// Use in a struct with pin projection. This method avoids the `Box`, but
+    /// the `HasSleep` struct will not be `Unpin` as a consequence.
+    /// ```
+    /// use std::future::Future;
+    /// use std::pin::Pin;
+    /// use std::task::{Context, Poll};
+    /// use tokio::time::Sleep;
+    /// use pin_project_lite::pin_project;
+    ///
+    /// pin_project! {
+    ///     struct HasSleep {
+    ///         #[pin]
+    ///         sleep: Sleep,
+    ///     }
+    /// }
+    ///
+    /// impl Future for HasSleep {
+    ///     type Output = ();
+    ///
+    ///     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+    ///         self.project().sleep.poll(cx)
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// [`select!`]: ../macro.select.html
+    /// [`tokio::pin!`]: ../macro.pin.html
     #[derive(Debug)]
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct Sleep {
@@ -98,6 +183,26 @@ impl Sleep {
     ///
     /// This function can be called both before and after the future has
     /// completed.
+    ///
+    /// To call this method, you will usually combine the call with
+    /// [`Pin::as_mut`], which lets you call the method with consuming the
+    /// `Sleep` itself.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use tokio::time::{Duration, Instant};
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let sleep = tokio::time::sleep(Duration::from_millis(10));
+    /// tokio::pin!(sleep);
+    ///
+    /// sleep.as_mut().reset(Instant::now() + Duration::from_millis(20));
+    /// # }
+    /// ```
+    ///
+    /// [`Pin::as_mut`]: fn@std::pin::Pin::as_mut
     pub fn reset(self: Pin<&mut Self>, deadline: Instant) {
         let me = self.project();
         me.entry.reset(deadline);
