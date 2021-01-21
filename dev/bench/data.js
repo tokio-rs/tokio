@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611226156793,
+  "lastUpdate": 1611238857821,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -13309,6 +13309,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18216404,
             "range": "± 2162568",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f2a048d9904d447bc5dde182d82b47b64ad85e45",
+          "message": "time: document that Sleep is not Unpin (#3457)",
+          "timestamp": "2021-01-21T15:19:17+01:00",
+          "tree_id": "b4987d849376c79c4d8f975050f0a8e4ff5d9ea2",
+          "url": "https://github.com/tokio-rs/tokio/commit/f2a048d9904d447bc5dde182d82b47b64ad85e45"
+        },
+        "date": 1611238853278,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 163242,
+            "range": "± 4592",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 621219,
+            "range": "± 19699",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5010433,
+            "range": "± 1212590",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18285081,
+            "range": "± 2588156",
             "unit": "ns/iter"
           }
         ]
