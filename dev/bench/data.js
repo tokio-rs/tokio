@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611223124236,
+  "lastUpdate": 1611223130974,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -19863,6 +19863,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1093,
             "range": "± 5",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "bain.william.a@gmail.com",
+            "name": "William Bain",
+            "username": "wabain"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c4f66ed121f2d7a05afb720d864fdc8f903aed0a",
+          "message": "util: fix panics on updating DelayQueue entries (#3270)",
+          "timestamp": "2021-01-21T10:56:44+01:00",
+          "tree_id": "c56a5b04a9c6364ecb459bea7b85f686b9421cc0",
+          "url": "https://github.com/tokio-rs/tokio/commit/c4f66ed121f2d7a05afb720d864fdc8f903aed0a"
+        },
+        "date": 1611223122582,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 18641,
+            "range": "± 9630",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1053,
+            "range": "± 163",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 617,
+            "range": "± 96",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 17834,
+            "range": "± 7498",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1060,
+            "range": "± 202",
             "unit": "ns/iter"
           }
         ]
