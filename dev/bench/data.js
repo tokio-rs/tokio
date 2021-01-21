@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611223108533,
+  "lastUpdate": 1611223124236,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -12955,6 +12955,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18639778,
             "range": "± 2648131",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "bain.william.a@gmail.com",
+            "name": "William Bain",
+            "username": "wabain"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c4f66ed121f2d7a05afb720d864fdc8f903aed0a",
+          "message": "util: fix panics on updating DelayQueue entries (#3270)",
+          "timestamp": "2021-01-21T10:56:44+01:00",
+          "tree_id": "c56a5b04a9c6364ecb459bea7b85f686b9421cc0",
+          "url": "https://github.com/tokio-rs/tokio/commit/c4f66ed121f2d7a05afb720d864fdc8f903aed0a"
+        },
+        "date": 1611223121084,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 178966,
+            "range": "± 50360",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 671164,
+            "range": "± 206452",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5298755,
+            "range": "± 1209784",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19706552,
+            "range": "± 4156449",
             "unit": "ns/iter"
           }
         ]
