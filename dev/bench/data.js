@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611223153417,
+  "lastUpdate": 1611223479183,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -6857,6 +6857,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 580,
             "range": "± 60",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "rodrigblas@gmail.com",
+            "name": "Blas Rodriguez Irizar",
+            "username": "blasrodri"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "117fc2ef3e948c92dd5359d3a479906ed7a5ceb4",
+          "message": "tests: fix ping pong saturation (#3390)",
+          "timestamp": "2021-01-21T11:02:40+01:00",
+          "tree_id": "51fa9a76937521bb90ef7f6f40223026f06b6e77",
+          "url": "https://github.com/tokio-rs/tokio/commit/117fc2ef3e948c92dd5359d3a479906ed7a5ceb4"
+        },
+        "date": 1611223477767,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 989,
+            "range": "± 80",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 15406,
+            "range": "± 3872",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 988,
+            "range": "± 79",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 15069,
+            "range": "± 4510",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 557,
+            "range": "± 50",
             "unit": "ns/iter"
           }
         ]
