@@ -208,7 +208,7 @@ impl<T> Receiver<T> {
     /// assert_eq!(*rx.borrow(), "hello");
     /// ```
     pub fn borrow(&self) -> Ref<'_, T> {
-        let inner = self.shared.value.read().unwrap();
+        let inner = self.shared.value.read().unwrap_or_else(|i| i.into_inner());
         Ref { inner }
     }
 
@@ -311,7 +311,7 @@ impl<T> Sender<T> {
             return Err(error::SendError { inner: value });
         }
 
-        *self.shared.value.write().unwrap() = value;
+        *self.shared.value.write().unwrap_or_else(|i| i.into_inner()) = value;
 
         // Update the version. 2 is used so that the CLOSED bit is not set.
         self.shared.version.fetch_add(2, SeqCst);
@@ -337,7 +337,7 @@ impl<T> Sender<T> {
     /// assert_eq!(*tx.borrow(), "hello");
     /// ```
     pub fn borrow(&self) -> Ref<'_, T> {
-        let inner = self.shared.value.read().unwrap();
+        let inner = self.shared.value.read().unwrap_or_else(|i| i.into_inner());
         Ref { inner }
     }
 
@@ -488,5 +488,26 @@ mod tests {
             });
             assert!(send.borrow().eq(&2));
         });
+    }
+
+    #[test]
+    fn watch_poison() {
+        let (mut send, mut recv) = crate::sync::watch::channel(0i32);
+
+        std::panic::catch_unwind(|| {
+            let brw = send.borrow();
+            assert_eq!(*brw, 0i32);
+            panic!("Poison the watch channel.");
+        });
+
+        send.send(1i32);
+
+        std::panic::catch_unwind(|| {
+            let brw = recv.borrow();
+            assert_eq!(*brw, 1i32);
+            panic!("Poison the watch channel.");
+        });
+
+        send.send(2i32);
     }
 }
