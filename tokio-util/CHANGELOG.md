@@ -1,3 +1,13 @@
+# 0.6.2 (January 21, 2020)
+
+### Added
+
+- sync: add pollable `Semaphore` ([#3444])
+
+### Fixed
+
+- time: fix panics on updating `DelayQueue` entries ([#3270])
+
 # 0.6.1 (January 12, 2020)
 
 ### Added
@@ -62,8 +72,10 @@
 
 - Initial release
 
+[#3444]: https://github.com/tokio-rs/tokio/pull/3444
 [#3387]: https://github.com/tokio-rs/tokio/pull/3387
 [#3364]: https://github.com/tokio-rs/tokio/pull/3364
+[#3270]: https://github.com/tokio-rs/tokio/pull/3270
 [#2326]: https://github.com/tokio-rs/tokio/pull/2326
 [#2215]: https://github.com/tokio-rs/tokio/pull/2215
 [#2198]: https://github.com/tokio-rs/tokio/pull/2198
