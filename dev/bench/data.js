@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611180918380,
+  "lastUpdate": 1611223108533,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -6803,6 +6803,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 594,
             "range": "± 9",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "bain.william.a@gmail.com",
+            "name": "William Bain",
+            "username": "wabain"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c4f66ed121f2d7a05afb720d864fdc8f903aed0a",
+          "message": "util: fix panics on updating DelayQueue entries (#3270)",
+          "timestamp": "2021-01-21T10:56:44+01:00",
+          "tree_id": "c56a5b04a9c6364ecb459bea7b85f686b9421cc0",
+          "url": "https://github.com/tokio-rs/tokio/commit/c4f66ed121f2d7a05afb720d864fdc8f903aed0a"
+        },
+        "date": 1611223103928,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1000,
+            "range": "± 76",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 15344,
+            "range": "± 4677",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1078,
+            "range": "± 32",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 16170,
+            "range": "± 6393",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 580,
+            "range": "± 60",
             "unit": "ns/iter"
           }
         ]
