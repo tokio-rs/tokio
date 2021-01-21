@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611223479183,
+  "lastUpdate": 1611223483827,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -19971,6 +19971,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1060,
             "range": "± 202",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "rodrigblas@gmail.com",
+            "name": "Blas Rodriguez Irizar",
+            "username": "blasrodri"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "117fc2ef3e948c92dd5359d3a479906ed7a5ceb4",
+          "message": "tests: fix ping pong saturation (#3390)",
+          "timestamp": "2021-01-21T11:02:40+01:00",
+          "tree_id": "51fa9a76937521bb90ef7f6f40223026f06b6e77",
+          "url": "https://github.com/tokio-rs/tokio/commit/117fc2ef3e948c92dd5359d3a479906ed7a5ceb4"
+        },
+        "date": 1611223478930,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 13694,
+            "range": "± 2804",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 910,
+            "range": "± 4",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 545,
+            "range": "± 5",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 13954,
+            "range": "± 2792",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 911,
+            "range": "± 4",
             "unit": "ns/iter"
           }
         ]
