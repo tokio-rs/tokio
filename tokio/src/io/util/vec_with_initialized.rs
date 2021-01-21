@@ -1,6 +1,19 @@
 use crate::io::ReadBuf;
 use std::mem::MaybeUninit;
 
+mod private {
+    pub trait Sealed {}
+
+    impl Sealed for Vec<u8> {}
+    impl Sealed for &mut Vec<u8> {}
+}
+
+/// A sealed trait that constrains the generic type parameter in `VecWithInitialized<V>`.  That struct's safety relies
+/// on certain invariants upheld by `Vec<u8>`.
+pub(crate) trait VecU8: AsMut<Vec<u8>> + private::Sealed {}
+
+impl VecU8 for Vec<u8> {}
+impl VecU8 for &mut Vec<u8> {}
 /// This struct wraps a `Vec<u8>` or `&mut Vec<u8>`, combining it with a
 /// `num_initialized`, which keeps track of the number of initialized bytes
 /// in the unused capacity.
@@ -28,10 +41,9 @@ impl VecWithInitialized<Vec<u8>> {
 
 impl<V> VecWithInitialized<V>
 where
-    V: AsMut<Vec<u8>>,
+    V: VecU8,
 {
-    /// Safety: The generic parameter `V` must be either `Vec<u8>` or `&mut Vec<u8>`.
-    pub(crate) unsafe fn new(mut vec: V) -> Self {
+    pub(crate) fn new(mut vec: V) -> Self {
         // SAFETY: The safety invariants of vector guarantee that the bytes up
         // to its length are initialized.
         Self {

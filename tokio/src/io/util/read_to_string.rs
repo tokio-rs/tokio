@@ -38,10 +38,9 @@ where
     R: AsyncRead + ?Sized + Unpin,
 {
     let buf = mem::replace(string, String::new()).into_bytes();
-    // SAFETY: The generic type of the VecWithInitialized is Vec<u8>.
     ReadToString {
         reader,
-        buf: unsafe { VecWithInitialized::new(buf) },
+        buf: VecWithInitialized::new(buf),
         output: string,
         read: 0,
         _pin: PhantomPinned,
