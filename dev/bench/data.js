@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611238942897,
+  "lastUpdate": 1611238956789,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -13411,6 +13411,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18285081,
             "range": "± 2588156",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "29bd5fad5ca0100b4b72bda350b0f7bf37e86127",
+          "message": "sync: add link to PollSemaphore (#3456)",
+          "timestamp": "2021-01-21T15:20:55+01:00",
+          "tree_id": "fe301c9f725f762c002f8fa049ab6f4903ea2af4",
+          "url": "https://github.com/tokio-rs/tokio/commit/29bd5fad5ca0100b4b72bda350b0f7bf37e86127"
+        },
+        "date": 1611238955337,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 163102,
+            "range": "± 4883",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 631135,
+            "range": "± 20758",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4754797,
+            "range": "± 390931",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18712787,
+            "range": "± 2070054",
             "unit": "ns/iter"
           }
         ]
