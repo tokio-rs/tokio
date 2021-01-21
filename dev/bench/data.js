@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611225280039,
+  "lastUpdate": 1611225287829,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -13159,6 +13159,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19832216,
             "range": "± 2428696",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "vitalyd@gmail.com",
+            "name": "vitalyd",
+            "username": "vitalyd"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5b7c7d565aa6ae995b665e36f2ce60160e59ad98",
+          "message": "io: use a sealed trait to constrain VecWithInitialized (#3450)",
+          "timestamp": "2021-01-21T11:32:42+01:00",
+          "tree_id": "25f30bd285f5e0cc33cd0e68e930281243526606",
+          "url": "https://github.com/tokio-rs/tokio/commit/5b7c7d565aa6ae995b665e36f2ce60160e59ad98"
+        },
+        "date": 1611225270415,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 170408,
+            "range": "± 25686",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 613096,
+            "range": "± 84472",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4005294,
+            "range": "± 578908",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18139346,
+            "range": "± 3153125",
             "unit": "ns/iter"
           }
         ]
