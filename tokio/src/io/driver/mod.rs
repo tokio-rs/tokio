@@ -200,8 +200,9 @@ impl Handle {
     ///
     /// This function panics if there is no current reactor set.
     pub(super) fn current() -> Self {
-        context::io_handle()
-            .expect("there is no reactor running, must be called from the context of a Tokio 0.2.x runtime")
+        context::io_handle().expect(
+            "there is no reactor running, must be called from the context of a Tokio 0.2.x runtime",
+        )
     }
 
     /// Forces a reactor blocked in a call to `turn` to wakeup, or otherwise
