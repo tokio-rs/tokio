@@ -139,7 +139,8 @@ impl Builder {
     ///
     /// When creating runtime by Builder we need to call `Builder::enable_time()`
     /// or `Builder::enable_all()` to set current timer.
-    /// Otherwise we will get a missing timer panic when trying to get a handle to the current timer.
+    /// Otherwise we will get a missing timer panic when trying to get a handle
+    /// to the current timer.
     ///
     /// # Examples
     ///
