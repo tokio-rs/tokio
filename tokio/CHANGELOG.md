@@ -1,7 +1,59 @@
+# 1.1.0 (January 22, 2020)
+
+### Added
+
+- net: add `try_read_buf` and `try_recv_buf` ([#3351])
+- mpsc: Add `Sender::try_reserve` function ([#3418])
+- sync: add `RwLock` `try_read` and `try_write` methods ([#3400])
+- io: add `ReadBuf::inner_mut` ([#3443])
+
+### Changed
+
+- macros: improve `select!` error message ([#3352])
+- io: keep track of initialized bytes in `read_to_end` ([#3426])
+- runtime: consolidate errors for context missing ([#3441])
+
+### Fixed
+
+- task: wake `LocalSet` on `spawn_local` ([#3369])
+- sync: fix panic in broadcast::Receiver drop ([#3434])
+
+### Documented
+- stream: link to new `Stream` wrappers in `tokio-stream` ([#3343])
+- docs: mention that `test-util` feature is not enabled with full ([#3397])
+- process: add documentation to process::Child fields ([#3437])
+- io: clarify `AsyncFd` docs about changes of the inner fd ([#3430])
+- net: update datagram docs on splitting ([#3448])
+- time: document that `Sleep` is not `Unpin` ([#3457])
+- sync: add link to `PollSemaphore` ([#3456])
+- task: add `LocalSet` example ([#3438])
+- sync: improve bounded `mpsc` documentation ([#3458])
+
+[#3343]: https://github.com/tokio-rs/tokio/pull/3343
+[#3351]: https://github.com/tokio-rs/tokio/pull/3351
+[#3352]: https://github.com/tokio-rs/tokio/pull/3352
+[#3369]: https://github.com/tokio-rs/tokio/pull/3369
+[#3397]: https://github.com/tokio-rs/tokio/pull/3397
+[#3400]: https://github.com/tokio-rs/tokio/pull/3400
+[#3418]: https://github.com/tokio-rs/tokio/pull/3418
+[#3426]: https://github.com/tokio-rs/tokio/pull/3426
+[#3430]: https://github.com/tokio-rs/tokio/pull/3430
+[#3434]: https://github.com/tokio-rs/tokio/pull/3434
+[#3437]: https://github.com/tokio-rs/tokio/pull/3437
+[#3438]: https://github.com/tokio-rs/tokio/pull/3438
+[#3441]: https://github.com/tokio-rs/tokio/pull/3441
+[#3443]: https://github.com/tokio-rs/tokio/pull/3443
+[#3448]: https://github.com/tokio-rs/tokio/pull/3448
+[#3456]: https://github.com/tokio-rs/tokio/pull/3456
+[#3457]: https://github.com/tokio-rs/tokio/pull/3457
+[#3458]: https://github.com/tokio-rs/tokio/pull/3458
+
 # 1.0.2 (January 14, 2020)
 
 ### Fixed
-- io: soundness in `read_to_end` (#3428).
+- io: soundness in `read_to_end` ([#3428]).
+
+[#3428]: https://github.com/tokio-rs/tokio/pull/3428
 
 # 1.0.1 (December 25, 2020)
 
