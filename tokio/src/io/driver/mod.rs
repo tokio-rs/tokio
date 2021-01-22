@@ -260,7 +260,7 @@ cfg_rt! {
         /// flag is not enabled.
         pub(super) fn current() -> Self {
             crate::runtime::context::io_handle()
-                .expect("there is no reactor running, must be called from the context of Tokio runtime")
+                .expect("there is no reactor running, must be called from the context of a Tokio 0.3.x runtime")
         }
     }
 }
@@ -274,7 +274,7 @@ cfg_not_rt! {
         /// This function panics if there is no current reactor set, or if the `rt`
         /// feature flag is not enabled.
         pub(super) fn current() -> Self {
-            panic!("there is no reactor running, must be called from the context of Tokio runtime with `rt` enabled.")
+            panic!("there is no reactor running, must be called from the context of a Tokio 0.3.x runtime with `rt` enabled.")
         }
     }
 }

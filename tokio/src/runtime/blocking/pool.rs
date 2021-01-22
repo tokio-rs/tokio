@@ -81,7 +81,7 @@ where
     F: FnOnce() -> R + Send + 'static,
     R: Send + 'static,
 {
-    let rt = context::current().expect("not currently running on the Tokio runtime.");
+    let rt = context::current().expect("not currently running on a Tokio 0.3.x runtime.");
     rt.spawn_blocking(func)
 }
 
@@ -91,7 +91,7 @@ where
     F: FnOnce() -> R + Send + 'static,
     R: Send + 'static,
 {
-    let rt = context::current().expect("not currently running on the Tokio runtime.");
+    let rt = context::current().expect("not currently running on a Tokio 0.3.x runtime.");
 
     let (task, _handle) = task::joinable(BlockingTask::new(func));
     rt.blocking_spawner.spawn(task, &rt)
