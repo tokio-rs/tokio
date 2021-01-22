@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611340234517,
+  "lastUpdate": 1611340241162,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -13669,6 +13669,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20912656,
             "range": "± 2600558",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6da5087b06f1ca2f1f374e52908a97d2c37c8cd3",
+          "message": "sync: improve bounded mpsc documentation (#3458)",
+          "timestamp": "2021-01-22T19:28:37+01:00",
+          "tree_id": "ae80651dacb513f67ab37e6270e954a0d108a641",
+          "url": "https://github.com/tokio-rs/tokio/commit/6da5087b06f1ca2f1f374e52908a97d2c37c8cd3"
+        },
+        "date": 1611340232378,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 201930,
+            "range": "± 32579",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 737189,
+            "range": "± 147514",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5151305,
+            "range": "± 810347",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20824423,
+            "range": "± 3427491",
             "unit": "ns/iter"
           }
         ]
