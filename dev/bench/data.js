@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611340241162,
+  "lastUpdate": 1611353227109,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -7235,6 +7235,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 570,
             "range": "± 183",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "35b1a4d0b3a411f52ffc97010b9b002e53bd0d84",
+          "message": "chore: prepare Tokio 1.1.0 (#3462)",
+          "timestamp": "2021-01-22T23:05:37+01:00",
+          "tree_id": "54efedad7616780dc46f50b4a6248de978daa8dc",
+          "url": "https://github.com/tokio-rs/tokio/commit/35b1a4d0b3a411f52ffc97010b9b002e53bd0d84"
+        },
+        "date": 1611353225716,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 839,
+            "range": "± 5",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 13039,
+            "range": "± 2296",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 868,
+            "range": "± 5",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 13237,
+            "range": "± 2868",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 497,
+            "range": "± 9",
             "unit": "ns/iter"
           }
         ]
