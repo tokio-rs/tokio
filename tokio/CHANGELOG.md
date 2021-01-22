@@ -16,7 +16,6 @@
 ### Fixed
 
 - task: wake `LocalSet` on `spawn_local` ([#3369])
-- io: fix unsoundness in `read_to_end` ([#3428])
 - sync: fix panic in broadcast::Receiver drop ([#3434])
 
 ### Documented
@@ -38,7 +37,6 @@
 [#3400]: https://github.com/tokio-rs/tokio/pull/3400
 [#3418]: https://github.com/tokio-rs/tokio/pull/3418
 [#3426]: https://github.com/tokio-rs/tokio/pull/3426
-[#3428]: https://github.com/tokio-rs/tokio/pull/3428
 [#3430]: https://github.com/tokio-rs/tokio/pull/3430
 [#3434]: https://github.com/tokio-rs/tokio/pull/3434
 [#3437]: https://github.com/tokio-rs/tokio/pull/3437
