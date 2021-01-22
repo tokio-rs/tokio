@@ -115,7 +115,7 @@ impl Handle {
     /// # }
     /// ```
     pub fn current() -> Self {
-        context::current().expect("not currently running on the Tokio runtime.")
+        context::current().expect("not currently running on a Tokio 0.2.x runtime.")
     }
 
     /// Returns a Handle view over the currently running Runtime
