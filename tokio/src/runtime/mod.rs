@@ -298,6 +298,13 @@ cfg_rt! {
         ///
         /// See [module level][mod] documentation for more details.
         ///
+        /// # Panics
+        ///
+        /// When creating runtime by Builder we need to call `Builder::enable_time()`
+        /// or `Builder::enable_all()` to set current timer.
+        /// Otherwise we will get a missing timer panic when trying to get a handle
+        /// to the current timer.
+        ///
         /// # Examples
         ///
         /// Creating a new `Runtime` with default configuration values.
