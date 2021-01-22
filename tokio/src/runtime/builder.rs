@@ -135,6 +135,12 @@ impl Builder {
     /// individually. If additional components are added to Tokio in the future,
     /// `enable_all` will include these future components.
     ///
+    /// # Panics
+    ///
+    /// When creating runtime by Builder we need to call `Builder::enable_time()`
+    /// or `Builder::enable_all()` to set current timer.
+    /// Otherwise we will get a missing timer panic when trying to get a handle to the current timer.
+    ///
     /// # Examples
     ///
     /// ```
