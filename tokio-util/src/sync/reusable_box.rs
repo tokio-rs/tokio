@@ -40,11 +40,8 @@ impl<T> ReusableBoxFuture<T> {
     where
         F: Future<Output = T> + Send + 'static,
     {
-        match self.try_set(future) {
-            Ok(()) => {}
-            Err(future) => {
-                *self = Self::new(future);
-            }
+        if let Err(future) = self.try_set(future) {
+            *self = Self::new(future);
         }
     }
 
