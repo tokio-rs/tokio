@@ -1,10 +1,10 @@
-use std::future::Future;
-use std::task::{Context, Poll};
-use std::pin::Pin;
-use std::{fmt, panic};
-use std::panic::AssertUnwindSafe;
-use std::ptr::{self, NonNull};
 use std::alloc::{self, alloc, dealloc, Layout};
+use std::future::Future;
+use std::panic::AssertUnwindSafe;
+use std::pin::Pin;
+use std::ptr::{self, NonNull};
+use std::task::{Context, Poll};
+use std::{fmt, panic};
 
 /// A resuable `Pin<Box<dyn Future<Output = T> + Send>>`.
 ///
@@ -30,14 +30,11 @@ impl<T> ReusableBoxFuture<T> {
                     ptr::write(boxed.as_ptr(), future);
                 }
 
-                Self {
-                    boxed,
-                    layout,
-                }
-            },
+                Self { boxed, layout }
+            }
             None => {
                 alloc::handle_alloc_error(layout);
-            },
+            }
         }
     }
 
@@ -110,18 +107,16 @@ impl<T> ReusableBoxFuture<T> {
 
         // If the old future's destructor panicked, resume unwinding.
         match result {
-            Ok(()) => {},
+            Ok(()) => {}
             Err(payload) => {
                 panic::resume_unwind(payload);
-            },
+            }
         }
     }
 
     /// Get a pinned reference to the underlying future.
     pub fn get_pin(&mut self) -> Pin<&mut (dyn Future<Output = T> + Send)> {
-        unsafe {
-            Pin::new_unchecked(self.boxed.as_mut())
-        }
+        unsafe { Pin::new_unchecked(self.boxed.as_mut()) }
     }
 
     /// Poll the future stored inside this box.
