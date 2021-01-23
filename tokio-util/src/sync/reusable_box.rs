@@ -6,7 +6,7 @@ use std::ptr::{self, NonNull};
 use std::task::{Context, Poll};
 use std::{fmt, panic};
 
-/// A resuable `Pin<Box<dyn Future<Output = T> + Send>>`.
+/// A reusable `Pin<Box<dyn Future<Output = T> + Send>>`.
 ///
 /// This type lets you replace the future stored in the box without
 /// reallocating when the size and alignment permits this.
