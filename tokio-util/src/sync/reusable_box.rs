@@ -21,7 +21,7 @@ impl<T> ReusableBoxFuture<T> {
     where
         F: Future<Output = T> + Send + 'static,
     {
-        let layout = Layout::for_value(&future);
+        let layout = Layout::new::<F>();
         let boxed: Box<dyn Future<Output = T> + Send> = Box::new(future);
 
         let boxed = Box::into_raw(boxed);
@@ -40,7 +40,7 @@ impl<T> ReusableBoxFuture<T> {
     where
         F: Future<Output = T> + Send + 'static,
     {
-        let layout = Layout::for_value(&future);
+        let layout = Layout::new::<F>();
 
         if layout == self.layout {
             // SAFETY: We just checked that the layout of F is correct.
@@ -61,7 +61,7 @@ impl<T> ReusableBoxFuture<T> {
     where
         F: Future<Output = T> + Send + 'static,
     {
-        let layout = Layout::for_value(&future);
+        let layout = Layout::new::<F>();
 
         if layout == self.layout {
             // SAFETY: We just checked that the layout of F is correct.
