@@ -1,4 +1,4 @@
-use std::alloc::{self, alloc, dealloc, Layout};
+use std::alloc::Layout;
 use std::future::Future;
 use std::panic::AssertUnwindSafe;
 use std::pin::Pin;
@@ -22,20 +22,14 @@ impl<T> ReusableBoxFuture<T> {
         F: Future<Output = T> + Send + 'static,
     {
         let layout = Layout::for_value(&future);
-        let boxed: *mut F = unsafe { alloc(layout) as *mut F };
+        let boxed: Box<dyn Future<Output = T> + Send> = Box::new(future);
 
-        match NonNull::new(boxed) {
-            Some(boxed) => {
-                unsafe {
-                    ptr::write(boxed.as_ptr(), future);
-                }
+        let boxed = Box::into_raw(boxed);
 
-                Self { boxed, layout }
-            }
-            None => {
-                alloc::handle_alloc_error(layout);
-            }
-        }
+        // SAFETY: Box::into_raw does not return null pointers.
+        let boxed = unsafe { NonNull::new_unchecked(boxed) };
+
+        Self { boxed, layout }
     }
 
     /// Replace the future currently stored in this box.
@@ -147,32 +141,9 @@ impl<T> Unpin for ReusableBoxFuture<T> {}
 
 impl<T> Drop for ReusableBoxFuture<T> {
     fn drop(&mut self) {
-        struct DeallocateOnDrop {
-            ptr: *mut u8,
-            layout: Layout,
-        }
-        impl Drop for DeallocateOnDrop {
-            fn drop(&mut self) {
-                unsafe {
-                    dealloc(self.ptr, self.layout);
-                }
-            }
-        }
-
-        // This object guarantees that the memory is deallocated even if the
-        // destructor panics.
-        let dealloc_on_drop = DeallocateOnDrop {
-            ptr: self.boxed.as_ptr() as *mut u8,
-            layout: self.layout,
-        };
-
         unsafe {
-            ptr::drop_in_place(self.boxed.as_ptr());
+            drop(Box::from_raw(self.boxed.as_ptr()));
         }
-
-        // Explicitly call the destructor. Note that this also happens if
-        // drop_in_place panics.
-        drop(dealloc_on_drop);
     }
 }
 
