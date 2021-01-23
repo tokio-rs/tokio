@@ -43,7 +43,7 @@ use std::future::Future;
 use std::io;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::pin::Pin;
-use std::process::{Child as StdChild, ExitStatus};
+use std::process::{Child as StdChild, ExitStatus, Stdio};
 use std::task::Context;
 use std::task::Poll;
 
@@ -174,6 +174,11 @@ impl AsRawFd for Pipe {
     fn as_raw_fd(&self) -> RawFd {
         self.fd.as_raw_fd()
     }
+}
+
+pub(crate) fn convert_to_stdio(io: PollEvented<Pipe>) -> io::Result<Stdio> {
+    io.into_inner()
+        .map(|io| unsafe { Stdio::from_raw_fd(io.fd.into_raw_fd()) })
 }
 
 impl Source for Pipe {
