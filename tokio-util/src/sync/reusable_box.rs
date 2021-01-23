@@ -54,9 +54,7 @@ impl<T> ReusableBoxFuture<T> {
     {
         // SAFETY: The pointer is not dangling.
         let self_layout = {
-            let dyn_future: &(dyn Future<Output = T> + Send) = unsafe {
-                self.boxed.as_ref()
-            };
+            let dyn_future: &(dyn Future<Output = T> + Send) = unsafe { self.boxed.as_ref() };
             Layout::for_value(dyn_future)
         };
 
