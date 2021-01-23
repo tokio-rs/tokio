@@ -40,15 +40,11 @@ impl<T> ReusableBoxFuture<T> {
     where
         F: Future<Output = T> + Send + 'static,
     {
-        let layout = Layout::new::<F>();
-
-        if layout == self.layout {
-            // SAFETY: We just checked that the layout of F is correct.
-            unsafe {
-                self.set_same_layout(future);
+        match self.try_set(future) {
+            Ok(()) => {}
+            Err(future) => {
+                *self = Self::new(future);
             }
-        } else {
-            *self = Self::new(future);
         }
     }
 
