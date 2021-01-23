@@ -7,9 +7,7 @@ use tokio_util::sync::ReusableBoxFuture;
 
 #[test]
 fn test_different_futures() {
-    let fut = async move {
-        10
-    };
+    let fut = async move { 10 };
     // Not zero sized!
     assert_eq!(Layout::for_value(&fut).size(), 1);
 
@@ -17,28 +15,22 @@ fn test_different_futures() {
 
     assert_eq!(b.get_pin().now_or_never(), Some(10));
 
-    b.try_set(async move {
-        20
-    }).unwrap_or_else(|_| panic!("incorrect size"));
+    b.try_set(async move { 20 })
+        .unwrap_or_else(|_| panic!("incorrect size"));
 
     assert_eq!(b.get_pin().now_or_never(), Some(20));
 
-    b.try_set(async move {
-        30
-    }).unwrap_or_else(|_| panic!("incorrect size"));
+    b.try_set(async move { 30 })
+        .unwrap_or_else(|_| panic!("incorrect size"));
 
     assert_eq!(b.get_pin().now_or_never(), Some(30));
 }
 
 #[test]
 fn test_different_sizes() {
-    let fut1 = async move {
-        10
-    };
+    let fut1 = async move { 10 };
     let val = [0u32; 1000];
-    let fut2 = async move {
-        val[0]
-    };
+    let fut2 = async move { val[0] };
     let fut3 = ZeroSizedFuture {};
 
     assert_eq!(Layout::for_value(&fut1).size(), 1);
@@ -72,7 +64,8 @@ fn test_zero_sized() {
     assert_eq!(b.get_pin().now_or_never(), Some(5));
     assert_eq!(b.get_pin().now_or_never(), Some(5));
 
-    b.try_set(ZeroSizedFuture {}).unwrap_or_else(|_| panic!("incorrect size"));
+    b.try_set(ZeroSizedFuture {})
+        .unwrap_or_else(|_| panic!("incorrect size"));
 
     assert_eq!(b.get_pin().now_or_never(), Some(5));
     assert_eq!(b.get_pin().now_or_never(), Some(5));
