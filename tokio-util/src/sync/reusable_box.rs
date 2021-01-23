@@ -12,7 +12,6 @@ use std::{fmt, panic};
 /// reallocating when the size and alignment permits this.
 pub struct ReusableBoxFuture<T> {
     boxed: NonNull<dyn Future<Output = T> + Send>,
-    layout: Layout,
 }
 
 impl<T> ReusableBoxFuture<T> {
@@ -21,7 +20,6 @@ impl<T> ReusableBoxFuture<T> {
     where
         F: Future<Output = T> + Send + 'static,
     {
-        let layout = Layout::new::<F>();
         let boxed: Box<dyn Future<Output = T> + Send> = Box::new(future);
 
         let boxed = Box::into_raw(boxed);
@@ -29,7 +27,7 @@ impl<T> ReusableBoxFuture<T> {
         // SAFETY: Box::into_raw does not return null pointers.
         let boxed = unsafe { NonNull::new_unchecked(boxed) };
 
-        Self { boxed, layout }
+        Self { boxed }
     }
 
     /// Replace the future currently stored in this box.
@@ -54,9 +52,15 @@ impl<T> ReusableBoxFuture<T> {
     where
         F: Future<Output = T> + Send + 'static,
     {
-        let layout = Layout::new::<F>();
+        // SAFETY: The pointer is not dangling.
+        let self_layout = {
+            let dyn_future: &(dyn Future<Output = T> + Send) = unsafe {
+                self.boxed.as_ref()
+            };
+            Layout::for_value(dyn_future)
+        };
 
-        if layout == self.layout {
+        if Layout::new::<F>() == self_layout {
             // SAFETY: We just checked that the layout of F is correct.
             unsafe {
                 self.set_same_layout(future);
@@ -103,6 +107,8 @@ impl<T> ReusableBoxFuture<T> {
 
     /// Get a pinned reference to the underlying future.
     pub fn get_pin(&mut self) -> Pin<&mut (dyn Future<Output = T> + Send)> {
+        // SAFETY: The user of this box cannot move the box, and we do not move it
+        // either.
         unsafe { Pin::new_unchecked(self.boxed.as_mut()) }
     }
 
