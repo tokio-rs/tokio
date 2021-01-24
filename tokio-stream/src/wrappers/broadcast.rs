@@ -31,13 +31,11 @@ impl<T: Clone + Unpin + 'static + Send + Sync> BroadcastStream<T> {
         let stream = stream! {
             loop {
                 match rx.recv().await {
-                Ok(item) => yield Ok(item),
-                Err(err) =>
-                    match err {
-                         RecvError::Closed => break,
-                         RecvError::Lagged(n) =>
-                             yield Err(BroadcastStreamRecvError::Lagged(n))
-                    }
+                    Ok(item) => yield Ok(item),
+                    Err(err) => match err {
+                        RecvError::Closed => break,
+                        RecvError::Lagged(n) => yield Err(BroadcastStreamRecvError::Lagged(n)),
+                    },
                 }
             }
         };
