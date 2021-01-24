@@ -8,6 +8,7 @@ pub use mpsc_unbounded::UnboundedReceiverStream;
 
 mod broadcast;
 pub use broadcast::BroadcastStream;
+pub use broadcast::BroadcastStreamRecvError;
 
 cfg_time! {
     mod interval;

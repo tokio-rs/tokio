@@ -11,7 +11,7 @@ use std::task::{Context, Poll};
 ///
 /// [`Receiver`]: struct@tokio::sync::broadcast::Receiver
 /// [`Stream`]: trait@crate::Stream
-pub struct BroadcastStream<T: Clone> {
+pub struct BroadcastStream<T> {
     inner: Pin<Box<dyn Stream<Item = Result<T, BroadcastStreamRecvError>> + Send + Sync>>,
 }
 
@@ -35,7 +35,8 @@ impl<T: Clone + Unpin + 'static + Send + Sync> BroadcastStream<T> {
                 Err(err) =>
                     match err {
                          RecvError::Closed => break,
-                         RecvError::Lagged(n) => yield Err(BroadcastStreamRecvError::Lagged(n))
+                         RecvError::Lagged(n) =>
+                             yield Err(BroadcastStreamRecvError::Lagged(n))
                     }
                 }
             }
