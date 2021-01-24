@@ -136,7 +136,7 @@
 //!     let tr_output = tr_output.expect("failed to await tr");
 //!     assert!(tr_output.status.success());
 //!
-//!     assert_eq!(tr_output.output, b"HELLO WORLD!\n");
+//!     assert_eq!(tr_output.stdout, b"HELLO WORLD!\n");
 //!
 //!     Ok(())
 //! }
