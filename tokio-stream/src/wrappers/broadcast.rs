@@ -6,11 +6,10 @@ use tokio::sync::broadcast::Receiver;
 
 use std::task::{Context, Poll};
 
-/// A wrapper around [`Receiver`] that implements [`Stream`]. Achieved by using the [`async-stream`] crate.
+/// A wrapper around [`Receiver`] that implements [`Stream`].
 ///
 /// [`Receiver`]: struct@tokio::sync::broadcast::Receiver
 /// [`Stream`]: trait@crate::Stream
-/// [`async-stream`]: https://docs.rs/async-stream
 #[derive(Debug)]
 pub struct BroadcastStream<T: Clone> {
     inner: Pin<Box<dyn Stream<Item = Result<T, RecvError>> + Send + Sync >>,
