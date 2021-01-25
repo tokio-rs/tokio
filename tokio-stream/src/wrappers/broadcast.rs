@@ -7,9 +7,9 @@ use tokio::sync::broadcast::Receiver;
 use std::fmt;
 use std::task::{Context, Poll};
 
-/// A wrapper around [`Receiver`] that implements [`Stream`].
+/// A wrapper around [`tokio::sync::broadcast::Receiver`] that implements [`Stream`].
 ///
-/// [`Receiver`]: struct@tokio::sync::broadcast::Receiver
+/// [`tokio::sync::broadcast::Receiver`]: struct@tokio::sync::broadcast::Receiver
 /// [`Stream`]: trait@crate::Stream
 pub struct BroadcastStream<T> {
     inner: Pin<Box<dyn Stream<Item = Result<T, BroadcastStreamRecvError>> + Send + Sync>>,
