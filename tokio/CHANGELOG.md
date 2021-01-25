@@ -1,4 +1,4 @@
-# 1.1.0 (January 22, 2020)
+# 1.1.0 (January 22, 2021)
 
 ### Added
 
@@ -48,7 +48,7 @@
 [#3457]: https://github.com/tokio-rs/tokio/pull/3457
 [#3458]: https://github.com/tokio-rs/tokio/pull/3458
 
-# 1.0.2 (January 14, 2020)
+# 1.0.2 (January 14, 2021)
 
 ### Fixed
 - io: soundness in `read_to_end` ([#3428]).
