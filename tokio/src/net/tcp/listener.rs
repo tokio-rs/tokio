@@ -64,9 +64,6 @@ impl TcpListener {
     /// method.
     ///
     /// The address type can be any implementor of the [`ToSocketAddrs`] trait.
-    /// Note that strings only implement this trait when the **`net`** feature
-    /// is enabled, as strings may contain domain names that need to be resolved.
-    ///
     /// If `addr` yields multiple addresses, bind will be attempted with each of
     /// the addresses until one succeeds and returns the listener. If none of
     /// the addresses succeed in creating a listener, the error returned from
@@ -74,7 +71,11 @@ impl TcpListener {
     ///
     /// This function sets the `SO_REUSEADDR` option on the socket.
     ///
+    /// To configure the socket before binding, you can use the [`TcpSocket`]
+    /// type.
+    ///
     /// [`ToSocketAddrs`]: trait@crate::net::ToSocketAddrs
+    /// [`TcpSocket`]: struct@crate::net::TcpSocket
     ///
     /// # Examples
     ///

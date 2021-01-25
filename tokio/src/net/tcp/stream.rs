@@ -25,7 +25,8 @@ cfg_net! {
     /// A TCP stream between a local and a remote socket.
     ///
     /// A TCP stream can either be created by connecting to an endpoint, via the
-    /// [`connect`] method, or by [accepting] a connection from a [listener].
+    /// [`connect`] method, or by [accepting] a connection from a [listener]. A
+    /// TCP stream can also be created via the [`TcpSocket`] type.
     ///
     /// Reading and writing to a `TcpStream` is usually done using the
     /// convenience methods found on the [`AsyncReadExt`] and [`AsyncWriteExt`]
@@ -34,6 +35,7 @@ cfg_net! {
     /// [`connect`]: method@TcpStream::connect
     /// [accepting]: method@crate::net::TcpListener::accept
     /// [listener]: struct@crate::net::TcpListener
+    /// [`TcpSocket`]: struct@crate::net::TcpSocket
     /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     ///
@@ -76,16 +78,17 @@ impl TcpStream {
     /// Opens a TCP connection to a remote host.
     ///
     /// `addr` is an address of the remote host. Anything which implements the
-    /// [`ToSocketAddrs`] trait can be supplied as the address. Note that
-    /// strings only implement this trait when the **`net`** feature is enabled,
-    /// as strings may contain domain names that need to be resolved.
+    /// [`ToSocketAddrs`] trait can be supplied as the address.  If `addr`
+    /// yields multiple addresses, connect will be attempted with each of the
+    /// addresses until a connection is successful. If none of the addresses
+    /// result in a successful connection, the error returned from the last
+    /// connection attempt (the last address) is returned.
     ///
-    /// If `addr` yields multiple addresses, connect will be attempted with each
-    /// of the addresses until a connection is successful. If none of the
-    /// addresses result in a successful connection, the error returned from the
-    /// last connection attempt (the last address) is returned.
+    /// To configure the socket before connecting, you can use the [`TcpSocket`]
+    /// type.
     ///
     /// [`ToSocketAddrs`]: trait@crate::net::ToSocketAddrs
+    /// [`TcpSocket`]: struct@crate::net::TcpSocket
     ///
     /// # Examples
     ///
