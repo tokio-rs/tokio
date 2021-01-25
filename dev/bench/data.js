@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611572807395,
+  "lastUpdate": 1611572810940,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -13873,6 +13873,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18416014,
             "range": "± 1858398",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "Ontonator@users.noreply.github.com",
+            "name": "Ontonator",
+            "username": "Ontonator"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f13a9dd87a9026cf009c740ccfc341d479286e2f",
+          "message": "tokio: update dates in CHANGELOG.md to 2021 (#3469)",
+          "timestamp": "2021-01-25T12:04:58+01:00",
+          "tree_id": "8889d95fa7c4320cbb0dd2d2e805b9c09dd19796",
+          "url": "https://github.com/tokio-rs/tokio/commit/f13a9dd87a9026cf009c740ccfc341d479286e2f"
+        },
+        "date": 1611572809149,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 195541,
+            "range": "± 9532",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 739135,
+            "range": "± 42750",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5465249,
+            "range": "± 702327",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20642794,
+            "range": "± 2787616",
             "unit": "ns/iter"
           }
         ]
