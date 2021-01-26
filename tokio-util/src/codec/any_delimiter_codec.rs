@@ -4,8 +4,8 @@ use crate::codec::encoder::Encoder;
 use bytes::{Buf, BufMut, BytesMut};
 use std::{cmp, fmt, io, str, usize};
 
-const DEFAULT_DELIMITERS: &str = ",;\n\r";
-const DEFAULT_ENCODERS: &str = ",";
+const DEFAULT_SEEK_DELIMITERS: &[u8] = b",;\n\r";
+const DEFAULT_SEQUENCE_WRITER: &[u8] = b",";
 /// A simple [`Decoder`] and [`Encoder`] implementation that splits up data into chunks based on any character in the given delimiter string.
 ///
 /// [`Decoder`]: crate::codec::Decoder
@@ -55,11 +55,11 @@ pub struct AnyDelimiterCodec {
     /// the length limit?
     is_discarding: bool,
 
-    /// store the delimiter characters in their binary representation
-    delimiters: &'static [u8],
+    /// The bytes that are using for search during decode
+    seek_delimiters: Vec<u8>,
 
-    /// store the encoders characters in their binary representation
-    encoders: &'static [u8],
+    /// The bytes that are using for encoding
+    sequence_writer: Vec<u8>,
 }
 
 impl AnyDelimiterCodec {
@@ -72,13 +72,13 @@ impl AnyDelimiterCodec {
     /// for information on why this could be a potential security risk.
     ///
     /// [`new_with_max_length`]: crate::codec::AnyDelimiterCodec::new_with_max_length()
-    pub fn new(delimiters: &'static str, encoders: &'static str) -> AnyDelimiterCodec {
+    pub fn new(seek_delimiters: &[u8], sequence_writer: &[u8]) -> AnyDelimiterCodec {
         AnyDelimiterCodec {
             next_index: 0,
             max_length: usize::MAX,
             is_discarding: false,
-            delimiters: delimiters.as_bytes(),
-            encoders: encoders.as_bytes(),
+            seek_delimiters: seek_delimiters.to_vec(),
+            sequence_writer: sequence_writer.to_vec(),
         }
     }
 
@@ -101,13 +101,13 @@ impl AnyDelimiterCodec {
     ///
     /// [`AnyDelimiterCodecError`]: crate::codec::AnyDelimiterCodecError
     pub fn new_with_max_length(
-        delimiters: &'static str,
-        encoders: &'static str,
+        seek_delimiters: &[u8],
+        sequence_writer: &[u8],
         max_length: usize,
     ) -> Self {
         AnyDelimiterCodec {
             max_length,
-            ..AnyDelimiterCodec::new(delimiters, encoders)
+            ..AnyDelimiterCodec::new(seek_delimiters, sequence_writer)
         }
     }
 
@@ -146,9 +146,11 @@ impl Decoder for AnyDelimiterCodec {
             // there's no max_length set, we'll read to the end of the buffer.
             let read_to = cmp::min(self.max_length.saturating_add(1), buf.len());
 
-            let new_chunk_offset = buf[self.next_index..read_to]
-                .iter()
-                .position(|b| self.delimiters.iter().any(|delimiter| *b == *delimiter));
+            let new_chunk_offset = buf[self.next_index..read_to].iter().position(|b| {
+                self.seek_delimiters
+                    .iter()
+                    .any(|delimiter| *b == *delimiter)
+            });
 
             match (self.is_discarding, new_chunk_offset) {
                 (true, Some(offset)) => {
@@ -223,7 +225,7 @@ where
         let chunk = chunk.as_ref();
         buf.reserve(chunk.len() + 1);
         buf.put(chunk.as_bytes());
-        buf.put(self.encoders);
+        buf.put(self.sequence_writer.as_ref());
 
         Ok(())
     }
@@ -231,7 +233,7 @@ where
 
 impl Default for AnyDelimiterCodec {
     fn default() -> Self {
-        Self::new(DEFAULT_DELIMITERS, DEFAULT_ENCODERS)
+        Self::new(DEFAULT_SEEK_DELIMITERS, DEFAULT_SEQUENCE_WRITER)
     }
 }
 
