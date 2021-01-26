@@ -24,7 +24,7 @@ const DEFAULT_SEQUENCE_WRITER: &[u8] = b",";
 /// #
 /// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() -> Result<(), std::io::Error> {
-/// let mut codec = AnyDelimiterCodec::new(",;\r\n",";");
+/// let mut codec = AnyDelimiterCodec::new(b",;\r\n",b";");
 /// let buf = &mut BytesMut::new();
 /// buf.reserve(200);
 /// buf.put_slice(b"chunk 1,chunk 2;chunk 3\n\r");
@@ -117,13 +117,13 @@ impl AnyDelimiterCodec {
     /// use std::usize;
     /// use tokio_util::codec::AnyDelimiterCodec;
     ///
-    /// let codec = AnyDelimiterCodec::new(",;\n", ";");
+    /// let codec = AnyDelimiterCodec::new(b",;\n", b";");
     /// assert_eq!(codec.max_length(), usize::MAX);
     /// ```
     /// ```
     /// use tokio_util::codec::AnyDelimiterCodec;
     ///
-    /// let codec = AnyDelimiterCodec::new_with_max_length(",;\n", ";", 256);
+    /// let codec = AnyDelimiterCodec::new_with_max_length(b",;\n", b";", 256);
     /// assert_eq!(codec.max_length(), 256);
     /// ```
     pub fn max_length(&self) -> usize {
