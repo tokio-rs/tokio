@@ -11,30 +11,28 @@ use std::task::{Context, Poll};
 /// [`tokio::sync::watch::Receiver`]: struct@tokio::sync::watch::Receiver
 /// [`Stream`]: trait@crate::Stream
 pub struct WatchStream<T> {
-    inner: Pin<Box<dyn Stream<Item = ()>>>,
-    _marker: std::marker::PhantomData<T>,
+    inner: Pin<Box<dyn Stream<Item = T>>>,
 }
 
-impl<T: 'static> WatchStream<T> {
+impl<T: 'static + Clone + Unpin> WatchStream<T> {
     /// Create a new `WatchStream`.
     pub fn new(mut rx: Receiver<T>) -> Self {
         let stream = stream! {
             loop {
                 match rx.changed().await {
-                    Ok(item) => yield item,
+                    Ok(_) => yield (*rx.borrow()).clone(),
                     Err(_) => break,
                 }
             }
         };
         Self {
             inner: Box::pin(stream),
-            _marker: std::marker::PhantomData,
         }
     }
 }
 
 impl<T> Stream for WatchStream<T> {
-    type Item = ();
+    type Item = T;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         Pin::new(&mut self.inner).poll_next(cx)
