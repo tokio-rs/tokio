@@ -205,6 +205,12 @@ impl Registration {
     }
 }
 
+impl Drop for Registration {
+    fn drop(&mut self) {
+        self.shared.clear_wakers();
+    }
+}
+
 fn gone() -> io::Error {
     io::Error::new(io::ErrorKind::Other, "IO driver has terminated")
 }
