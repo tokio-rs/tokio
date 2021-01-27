@@ -97,6 +97,51 @@
 //! }
 //! ```
 //!
+//! With some coordination, we can also pipe the output of one command into
+//! another.
+//!
+//! ```no_run
+//! use tokio::join;
+//! use tokio::process::Command;
+//! use std::convert::TryInto;
+//! use std::process::Stdio;
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let mut echo = Command::new("echo")
+//!         .arg("hello world!")
+//!         .stdout(Stdio::piped())
+//!         .spawn()
+//!         .expect("failed to spawn echo");
+//!
+//!     let tr_stdin: Stdio = echo
+//!         .stdout
+//!         .take()
+//!         .unwrap()
+//!         .try_into()
+//!         .expect("failed to convert to Stdio");
+//!
+//!     let tr = Command::new("tr")
+//!         .arg("a-z")
+//!         .arg("A-Z")
+//!         .stdin(tr_stdin)
+//!         .stdout(Stdio::piped())
+//!         .spawn()
+//!         .expect("failed to spawn tr");
+//!
+//!     let (echo_result, tr_output) = join!(echo.wait(), tr.wait_with_output());
+//!
+//!     assert!(echo_result.unwrap().success());
+//!
+//!     let tr_output = tr_output.expect("failed to await tr");
+//!     assert!(tr_output.status.success());
+//!
+//!     assert_eq!(tr_output.stdout, b"HELLO WORLD!\n");
+//!
+//!     Ok(())
+//! }
+//! ```
+//!
 //! # Caveats
 //!
 //! ## Dropping/Cancellation
@@ -147,6 +192,7 @@ mod kill;
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 use crate::process::kill::Kill;
 
+use std::convert::TryInto;
 use std::ffi::OsStr;
 use std::future::Future;
 use std::io;
@@ -1096,6 +1142,30 @@ impl AsyncRead for ChildStderr {
     ) -> Poll<io::Result<()>> {
         // Safety: pipes support reading into uninitialized memory
         unsafe { self.inner.poll_read(cx, buf) }
+    }
+}
+
+impl TryInto<Stdio> for ChildStdin {
+    type Error = io::Error;
+
+    fn try_into(self) -> Result<Stdio, Self::Error> {
+        imp::convert_to_stdio(self.inner)
+    }
+}
+
+impl TryInto<Stdio> for ChildStdout {
+    type Error = io::Error;
+
+    fn try_into(self) -> Result<Stdio, Self::Error> {
+        imp::convert_to_stdio(self.inner)
+    }
+}
+
+impl TryInto<Stdio> for ChildStderr {
+    type Error = io::Error;
+
+    fn try_into(self) -> Result<Stdio, Self::Error> {
+        imp::convert_to_stdio(self.inner)
     }
 }
 
