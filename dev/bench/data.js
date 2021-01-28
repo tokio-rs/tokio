@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611871844233,
+  "lastUpdate": 1611871849563,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -22047,6 +22047,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1096,
             "range": "± 595",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ivanppetkov@gmail.com",
+            "name": "Ivan Petkov",
+            "username": "ipetkov"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1f9765fb5f3a9d461c50124ac3e3f52c4901fc06",
+          "message": "process: add missing drop child stdin to wait() (#3421)",
+          "timestamp": "2021-01-28T23:08:44+01:00",
+          "tree_id": "b76f705bf1718a1ed3f146dd3e27bdb1209e1e64",
+          "url": "https://github.com/tokio-rs/tokio/commit/1f9765fb5f3a9d461c50124ac3e3f52c4901fc06"
+        },
+        "date": 1611871847692,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 18168,
+            "range": "± 7786",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1080,
+            "range": "± 128",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 647,
+            "range": "± 59",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 17152,
+            "range": "± 4434",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1080,
+            "range": "± 120",
             "unit": "ns/iter"
           }
         ]
