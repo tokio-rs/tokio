@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611848477243,
+  "lastUpdate": 1611871825596,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -7559,6 +7559,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 587,
             "range": "± 115",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ivanppetkov@gmail.com",
+            "name": "Ivan Petkov",
+            "username": "ipetkov"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1f9765fb5f3a9d461c50124ac3e3f52c4901fc06",
+          "message": "process: add missing drop child stdin to wait() (#3421)",
+          "timestamp": "2021-01-28T23:08:44+01:00",
+          "tree_id": "b76f705bf1718a1ed3f146dd3e27bdb1209e1e64",
+          "url": "https://github.com/tokio-rs/tokio/commit/1f9765fb5f3a9d461c50124ac3e3f52c4901fc06"
+        },
+        "date": 1611871824029,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1009,
+            "range": "± 4",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 17485,
+            "range": "± 9582",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1038,
+            "range": "± 7",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 15741,
+            "range": "± 8895",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 594,
+            "range": "± 130",
             "unit": "ns/iter"
           }
         ]
