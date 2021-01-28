@@ -957,7 +957,6 @@ where
 
 #[cfg(feature = "stream")]
 #[doc(hidden)]
-#[deprecated(since = "0.2.21", note = "use `into_stream()`")]
 impl<T> crate::stream::Stream for Receiver<T>
 where
     T: Clone,
