@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611848440117,
+  "lastUpdate": 1611848450717,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -14227,6 +14227,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20125208,
             "range": "± 4568920",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jamiehodkinson@gmail.com",
+            "name": "Jamie",
+            "username": "Hodkinson"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "225e8ea05f2dbc056250d2572fb9363123ee35ef",
+          "message": "sync: update RwLock doc to mention possibility of deadlock (#3389)",
+          "timestamp": "2021-01-28T16:38:49+01:00",
+          "tree_id": "22665910861f2eaf439e197f6e19554d205a9c02",
+          "url": "https://github.com/tokio-rs/tokio/commit/225e8ea05f2dbc056250d2572fb9363123ee35ef"
+        },
+        "date": 1611848442971,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 202032,
+            "range": "± 51740",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 749870,
+            "range": "± 48312",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5723672,
+            "range": "± 1153948",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21583868,
+            "range": "± 3725262",
             "unit": "ns/iter"
           }
         ]
