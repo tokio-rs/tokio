@@ -22,10 +22,11 @@ pub struct Sender<T> {
 
 /// Permit to send one value into the channel.
 ///
-/// `Permit` values are returned by [`Sender::reserve()`] and are used to
-/// guarantee channel capacity before generating a message to send.
+/// `Permit` values are returned by [`Sender::reserve()`] and [`Sender::try_reserve()`]
+/// and are used to guarantee channel capacity before generating a message to send.
 ///
 /// [`Sender::reserve()`]: Sender::reserve
+/// [`Sender::try_reserve()`]: Sender::try_reserve
 pub struct Permit<'a, T> {
     chan: &'a chan::Tx<T, Semaphore>,
 }
@@ -652,7 +653,7 @@ impl<T> Sender<T> {
     /// If the channel is full this function will return [`TrySendError`], otherwise
     /// if there is a slot available it will return a [`Permit`] that will then allow you
     /// to [`send`] on the channel with a guaranteed slot. This function is similar to
-    /// [`reserve`] execpt it does not await for the slot to become available.
+    /// [`reserve`] except it does not await for the slot to become available.
     ///
     /// Dropping [`Permit`] without sending a message releases the capacity back
     /// to the channel.
