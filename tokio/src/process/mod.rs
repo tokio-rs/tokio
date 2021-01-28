@@ -990,7 +990,36 @@ impl Child {
     /// before waiting. This helps avoid deadlock: it ensures that the
     /// child does not block waiting for input from the parent, while
     /// the parent waits for the child to exit.
+    ///
+    /// If the caller wishes to explicitly control when the child's stdin
+    /// handle is closed, they may `.take()` it before calling `.wait()`:
+    ///
+    /// ```no_run
+    /// use tokio::io::AsyncWriteExt;
+    /// use tokio::process::Command;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut child = Command::new("cat").spawn().unwrap();
+    ///
+    ///     let mut stdin = child.stdin.take().unwrap();
+    ///     tokio::spawn(async move {
+    ///         // do something with stdin here...
+    ///         stdin.write_all(b"hello world\n").await.unwrap();
+    ///
+    ///         // then drop when finished
+    ///         drop(stdin);
+    ///     });
+    ///
+    ///     // wait for the process to complete
+    ///     let _ = child.wait().await;
+    /// }
+    /// ```
     pub async fn wait(&mut self) -> io::Result<ExitStatus> {
+        // Ensure stdin is closed so the child isn't stuck waiting on
+        // input while the parent is waiting for it to exit.
+        drop(self.stdin.take());
+
         match &mut self.child {
             FusedChild::Done(exit) => Ok(*exit),
             FusedChild::Child(child) => {
@@ -1064,7 +1093,6 @@ impl Child {
             Ok(vec)
         }
 
-        drop(self.stdin.take());
         let stdout_fut = read_to_end(self.stdout.take());
         let stderr_fut = read_to_end(self.stderr.take());
 
