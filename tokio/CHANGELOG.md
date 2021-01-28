@@ -1,3 +1,9 @@
+# 0.3.7 (January 28, 2021)
+
+### Changes
+
+- runtime: update panic messages to include version (#3461)
+
 # 0.3.6 (December 14, 2020)
 
 ### Fixed
