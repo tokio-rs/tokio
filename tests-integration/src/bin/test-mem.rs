@@ -8,9 +8,9 @@ fn main() {
         .unwrap();
 
     rt.block_on(async {
-        let  listener = tokio::net::TcpListener::bind("0.0.0.0:0").await.unwrap();
+        let listener = tokio::net::TcpListener::bind("0.0.0.0:0").await.unwrap();
         tokio::spawn(async move {
-            loop { 
+            loop {
                 poll_fn(|cx| listener.poll_accept(cx)).await.unwrap();
             }
         });
