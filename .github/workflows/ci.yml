@@ -83,7 +83,8 @@ jobs:
 
       # Compile tests
       - name: cargo build
-        run: cargo build -p tests-integration --features rt-net --bin test-mem
+        run: cargo build --features rt-net --bin test-mem
+        working-directory: tests-integration
 
       # Run with valgrind
       - name: Run valgrind
