@@ -1,3 +1,14 @@
+# 0.2.25 (January 28, 2021)
+
+### Changes
+
+- chore: upgrade mio dependency (#3207)
+- runtime: update panic messages to include version (#3460)
+
+### Fixes
+
+- task: add missing feature flags for `task_local` (#3236)
+
 # 0.2.24 (December 7, 2020)
 
 ### Fixes
