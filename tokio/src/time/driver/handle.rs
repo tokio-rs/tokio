@@ -47,7 +47,7 @@ cfg_rt! {
         /// panicking.
         pub(crate) fn current() -> Self {
             crate::runtime::context::time_handle()
-                .expect("there is no timer running, must be called from the context of Tokio runtime")
+                .expect("there is no timer running, must be called from the context of a Tokio 0.3.x runtime")
         }
     }
 }
@@ -71,7 +71,7 @@ cfg_not_rt! {
         /// lazy, and so outside executed inside the runtime successfuly without
         /// panicking.
         pub(crate) fn current() -> Self {
-            panic!("there is no timer running, must be called from the context of Tokio runtime or \
+            panic!("there is no timer running, must be called from the context of a Tokio 0.3.x runtime or \
             `rt` is not enabled")
         }
     }
