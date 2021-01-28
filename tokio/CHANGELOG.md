@@ -1,3 +1,8 @@
+# 1.0.3 (January 28, 2020)
+
+### Fixed
+- io: memory leak during shutdown (#3477).
+
 # 1.0.2 (January 14, 2020)
 
 ### Fixed
