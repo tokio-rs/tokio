@@ -403,44 +403,44 @@ fn poll_future<T: Future>(
     snapshot: Snapshot,
     cx: Context<'_>,
 ) -> PollFuture<T::Output> {
-    let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-        struct Guard<'a, T: Future> {
-            core: &'a CoreStage<T>,
-        }
-
-        impl<T: Future> Drop for Guard<'_, T> {
-            fn drop(&mut self) {
-                self.core.drop_future_or_output();
+    if snapshot.is_cancelled() {
+        PollFuture::Complete(Err(JoinError::cancelled()), snapshot.is_join_interested())
+    } else {
+        let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+            struct Guard<'a, T: Future> {
+                core: &'a CoreStage<T>,
             }
-        }
 
-        let guard = Guard { core };
+            impl<T: Future> Drop for Guard<'_, T> {
+                fn drop(&mut self) {
+                    self.core.drop_future_or_output();
+                }
+            }
 
-        // If the task is cancelled, avoid polling it, instead signalling it
-        // is complete.
-        if snapshot.is_cancelled() {
-            Poll::Ready(Err(JoinError::cancelled()))
-        } else {
+            let guard = Guard { core };
+
             let res = guard.core.poll(cx);
 
             // prevent the guard from dropping the future
             mem::forget(guard);
 
-            res.map(Ok)
-        }
-    }));
-    match res {
-        Ok(Poll::Pending) => match header.state.transition_to_idle() {
-            Ok(snapshot) => {
-                if snapshot.is_notified() {
-                    PollFuture::Notified
-                } else {
-                    PollFuture::None
+            res
+        }));
+        match res {
+            Ok(Poll::Pending) => match header.state.transition_to_idle() {
+                Ok(snapshot) => {
+                    if snapshot.is_notified() {
+                        PollFuture::Notified
+                    } else {
+                        PollFuture::None
+                    }
                 }
+                Err(_) => PollFuture::Complete(Err(cancel_task(core)), true),
+            },
+            Ok(Poll::Ready(ok)) => PollFuture::Complete(Ok(ok), snapshot.is_join_interested()),
+            Err(err) => {
+                PollFuture::Complete(Err(JoinError::panic(err)), snapshot.is_join_interested())
             }
-            Err(_) => PollFuture::Complete(Err(cancel_task(core)), true),
-        },
-        Ok(Poll::Ready(ok)) => PollFuture::Complete(ok, snapshot.is_join_interested()),
-        Err(err) => PollFuture::Complete(Err(JoinError::panic(err)), snapshot.is_join_interested()),
+        }
     }
 }

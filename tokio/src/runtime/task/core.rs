@@ -249,10 +249,10 @@ impl<T: Future> CoreStage<T> {
     ///
     /// The caller must ensure it is safe to mutate the `stage` field.
     pub(super) fn drop_future_or_output(&self) {
-        self.stage.with_mut(|ptr| {
-            // Safety: The caller ensures mutal exclusion to the field.
-            unsafe { *ptr = Stage::Consumed };
-        });
+        // Safety: the caller ensures mutual exclusion to the field.
+        unsafe {
+            self.set_stage(Stage::Consumed);
+        }
     }
 
     /// Store the task output
@@ -261,10 +261,10 @@ impl<T: Future> CoreStage<T> {
     ///
     /// The caller must ensure it is safe to mutate the `stage` field.
     pub(super) fn store_output(&self, output: super::Result<T::Output>) {
-        self.stage.with_mut(|ptr| {
-            // Safety: the caller ensures mutual exclusion to the field.
-            unsafe { *ptr = Stage::Finished(output) };
-        });
+        // Safety: the caller ensures mutual exclusion to the field.
+        unsafe {
+            self.set_stage(Stage::Finished(output));
+        }
     }
 
     /// Take the task output
@@ -283,6 +283,10 @@ impl<T: Future> CoreStage<T> {
             }
         })
     }
+
+    unsafe fn set_stage(&self, stage: Stage<T>) {
+        self.stage.with_mut(|ptr| *ptr = stage)
+    }
 }
 
 cfg_rt_multi_thread! {
@@ -292,6 +296,10 @@ cfg_rt_multi_thread! {
 
             let task = unsafe { RawTask::from_raw(self.into()) };
             task.shutdown();
+        }
+
+        pub(crate) unsafe fn set_next(&self, next: Option<NonNull<Header>>) {
+            self.queue_next.with_mut(|ptr| *ptr = next);
         }
     }
 }
