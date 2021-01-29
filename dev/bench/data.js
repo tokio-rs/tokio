@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611871860617,
+  "lastUpdate": 1611953225279,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -22101,6 +22101,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1080,
             "range": "± 120",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "markus.westerlind@distilnetworks.com",
+            "name": "Markus Westerlind",
+            "username": "Marwes"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6f988728bb1b9156b78153461c8632e44cb21a21",
+          "message": "runtime: minimize the amount of duplicated code  (#3416)",
+          "timestamp": "2021-01-29T21:45:29+01:00",
+          "tree_id": "2d6c9d77dcaf4831f2193b3638272a28aa2e2141",
+          "url": "https://github.com/tokio-rs/tokio/commit/6f988728bb1b9156b78153461c8632e44cb21a21"
+        },
+        "date": 1611953223501,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 17243,
+            "range": "± 6436",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1109,
+            "range": "± 27",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 654,
+            "range": "± 25",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 18017,
+            "range": "± 6722",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1110,
+            "range": "± 131",
             "unit": "ns/iter"
           }
         ]
