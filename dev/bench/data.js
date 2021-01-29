@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611953225279,
+  "lastUpdate": 1611953231677,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -14431,6 +14431,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21847631,
             "range": "± 2568446",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "markus.westerlind@distilnetworks.com",
+            "name": "Markus Westerlind",
+            "username": "Marwes"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6f988728bb1b9156b78153461c8632e44cb21a21",
+          "message": "runtime: minimize the amount of duplicated code  (#3416)",
+          "timestamp": "2021-01-29T21:45:29+01:00",
+          "tree_id": "2d6c9d77dcaf4831f2193b3638272a28aa2e2141",
+          "url": "https://github.com/tokio-rs/tokio/commit/6f988728bb1b9156b78153461c8632e44cb21a21"
+        },
+        "date": 1611953230034,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 195560,
+            "range": "± 20893",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 724265,
+            "range": "± 41410",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5478051,
+            "range": "± 1144371",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20955359,
+            "range": "± 3640084",
             "unit": "ns/iter"
           }
         ]
