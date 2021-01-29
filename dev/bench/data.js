@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611961484003,
+  "lastUpdate": 1611961488051,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -14689,6 +14689,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 17670519,
             "range": "± 2738060",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "891aba5f7159372256102c3ba8d075e1834dc220",
+          "message": "util: add ReusableBoxFuture utility (#3464)",
+          "timestamp": "2021-01-30T00:03:01+01:00",
+          "tree_id": "98f1f0fd655fe7384a8c4d590a08a3d567400820",
+          "url": "https://github.com/tokio-rs/tokio/commit/891aba5f7159372256102c3ba8d075e1834dc220"
+        },
+        "date": 1611961486213,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 200710,
+            "range": "± 47347",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 720288,
+            "range": "± 194087",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5390173,
+            "range": "± 1274912",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20454617,
+            "range": "± 2369804",
             "unit": "ns/iter"
           }
         ]
