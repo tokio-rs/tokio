@@ -28,6 +28,7 @@ jobs:
       - clippy
       - docs
       - loom
+      - valgrind
     steps:
       - run: exit 0
 
@@ -66,6 +67,28 @@ jobs:
       - name: test tests-build --each-feature
         run: cargo hack test --each-feature
         working-directory: tests-build
+
+  valgrind:
+    name: valgrind
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust
+        run: rustup update stable
+
+      - name: Install Valgrind
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y valgrind
+
+      # Compile tests
+      - name: cargo build
+        run: cargo build --features rt-net --bin test-mem
+        working-directory: tests-integration
+
+      # Run with valgrind
+      - name: Run valgrind
+        run: valgrind  --leak-check=full --show-leak-kinds=all ./target/debug/test-mem
 
   test-unstable:
     name: test tokio full --unstable
