@@ -1,3 +1,10 @@
+# 1.1.1 (January 29, 2021)
+
+Forward ports 1.0.3 fix.
+
+### Fixed
+- io: memory leak during shutdown (#3477).
+
 # 1.1.0 (January 22, 2020)
 
 ### Added
@@ -47,6 +54,11 @@
 [#3456]: https://github.com/tokio-rs/tokio/pull/3456
 [#3457]: https://github.com/tokio-rs/tokio/pull/3457
 [#3458]: https://github.com/tokio-rs/tokio/pull/3458
+
+# 1.0.3 (January 28, 2020)
+
+### Fixed
+- io: memory leak during shutdown (#3477).
 
 # 1.0.2 (January 14, 2020)
 
