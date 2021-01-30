@@ -47,12 +47,12 @@ futures-util = { version = "0.3.0", optional = true }
 log = "0.4"
 pin-project-lite = "0.2.0"
 slab = { version = "0.4.1", optional = true } # Backs `DelayQueue`
-async-stream = "0.3.0"
 
 [dev-dependencies]
 tokio = { version = "1.0.0", features = ["full"] }
 tokio-test = { version = "0.4.0" }
 
+async-stream = "0.3.0"
 futures = "0.3.0"
 futures-test = "0.3.5"
 
