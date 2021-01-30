@@ -1,7 +1,7 @@
 use crate::codec::{Decoder, Encoder};
 
-use tokio::{io::ReadBuf, net::UdpSocket};
 use futures_core::Stream;
+use tokio::{io::ReadBuf, net::UdpSocket};
 
 use bytes::{BufMut, BytesMut};
 use futures_core::ready;
