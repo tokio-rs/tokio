@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1611961498156,
+  "lastUpdate": 1612000713869,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -14737,6 +14737,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20454617,
             "range": "± 2369804",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "robjtede@icloud.com",
+            "name": "Rob Ede",
+            "username": "robjtede"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "06d6adf4b7597fa316f3277c2aa60da27dac59fc",
+          "message": "util: use ReusableBoxFuture for PollSemaphore (#3463)",
+          "timestamp": "2021-01-30T10:57:04+01:00",
+          "tree_id": "70444423e9bde1b15802535904a31d4e7af31a51",
+          "url": "https://github.com/tokio-rs/tokio/commit/06d6adf4b7597fa316f3277c2aa60da27dac59fc"
+        },
+        "date": 1612000712444,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 159383,
+            "range": "± 2852",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 606166,
+            "range": "± 20241",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4579404,
+            "range": "± 1080271",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18580105,
+            "range": "± 1930805",
             "unit": "ns/iter"
           }
         ]
