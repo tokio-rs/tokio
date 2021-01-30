@@ -2,7 +2,7 @@ use crate::codec::decoder::Decoder;
 use crate::codec::encoder::Encoder;
 
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio_stream::Stream;
+use futures_core::Stream;
 
 use bytes::BytesMut;
 use futures_core::ready;
