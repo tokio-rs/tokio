@@ -250,7 +250,7 @@ fn parse_knobs(
                         format!("The `{}` attribute requires an argument.", name)
                     }
                     name => {
-                        format!("Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`", name)
+                        format!("Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`", name)
                     }
                 };
                 return Err(syn::Error::new_spanned(path, msg));

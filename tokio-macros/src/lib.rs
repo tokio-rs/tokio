@@ -144,6 +144,30 @@ use proc_macro::TokenStream;
 /// }
 /// ```
 ///
+/// ### Configure the runtime to start with time paused
+///
+/// ```rust
+/// #[tokio::main(flavor = "current_thread", start_paused = true)]
+/// async fn main() {
+///     println!("Hello world");
+/// }
+/// ```
+///
+/// Equivalent code not using `#[tokio::main]`
+///
+/// ```rust
+/// fn main() {
+///     tokio::runtime::Builder::new_current_thread()
+///         .enable_all()
+///         .start_paused(true)
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             println!("Hello world");
+///         })
+/// }
+/// ```
+///
 /// ### NOTE:
 ///
 /// If you rename the Tokio crate in your dependencies this macro will not work.
@@ -222,6 +246,30 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// #[tokio::test]
 /// async fn my_test() {
 ///     assert!(true);
+/// }
+/// ```
+///
+/// ### Configure the runtime to start with time paused
+///
+/// ```rust
+/// #[tokio::main(start_paused = true)]
+/// async fn main() {
+///     println!("Hello world");
+/// }
+/// ```
+///
+/// Equivalent code not using `#[tokio::main]`
+///
+/// ```rust
+/// fn main() {
+///     tokio::runtime::Builder::new_current_thread()
+///         .enable_all()
+///         .start_paused(true)
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             println!("Hello world");
+///         })
 /// }
 /// ```
 ///

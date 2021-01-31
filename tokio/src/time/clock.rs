@@ -78,7 +78,8 @@ cfg_test_util! {
     /// that depend on time.
     ///
     /// Pausing time requires the `current_thread` Tokio runtime. This is the
-    /// default runtime used by `#[tokio::test]`
+    /// default runtime used by `#[tokio::test]`. The runtime can be initialized
+    /// with time in a paused state using the `Builder::start_paused` method.
     ///
     /// # Panics
     ///
