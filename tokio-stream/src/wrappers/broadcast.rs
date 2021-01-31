@@ -1,8 +1,9 @@
-use crate::Stream;
-use async_stream::stream;
 use std::pin::Pin;
 use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::broadcast::Receiver;
+
+use futures_core::Stream;
+use tokio_util::sync::ReusableBoxFuture;
 
 use std::fmt;
 use std::task::{Context, Poll};
@@ -12,7 +13,7 @@ use std::task::{Context, Poll};
 /// [`tokio::sync::broadcast::Receiver`]: struct@tokio::sync::broadcast::Receiver
 /// [`Stream`]: trait@crate::Stream
 pub struct BroadcastStream<T> {
-    inner: Pin<Box<dyn Stream<Item = Result<T, BroadcastStreamRecvError>> + Send + Sync>>,
+    inner: ReusableBoxFuture<Result<(T, Receiver<T>), RecvError>>,
 }
 
 /// An error returned from the inner stream of a [`BroadcastStream`].
@@ -25,31 +26,35 @@ pub enum BroadcastStreamRecvError {
     Lagged(u64),
 }
 
+async fn make_future<T: Clone + Send + Sync>(
+    mut rx: Receiver<T>,
+) -> Result<(T, Receiver<T>), RecvError> {
+    let item = rx.recv().await?;
+    Ok((item, rx))
+}
+
 impl<T: Clone + Unpin + 'static + Send + Sync> BroadcastStream<T> {
     /// Create a new `BroadcastStream`.
-    pub fn new(mut rx: Receiver<T>) -> Self {
-        let stream = stream! {
-            loop {
-                match rx.recv().await {
-                    Ok(item) => yield Ok(item),
-                    Err(err) => match err {
-                        RecvError::Closed => break,
-                        RecvError::Lagged(n) => yield Err(BroadcastStreamRecvError::Lagged(n)),
-                    },
-                }
-            }
-        };
+    pub fn new(rx: Receiver<T>) -> Self {
         Self {
-            inner: Box::pin(stream),
+            inner: ReusableBoxFuture::new(make_future(rx)),
         }
     }
 }
 
-impl<T: Clone> Stream for BroadcastStream<T> {
+impl<T: Clone + 'static + Send + Sync> Stream for BroadcastStream<T> {
     type Item = Result<T, BroadcastStreamRecvError>;
-
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Pin::new(&mut self.inner).poll_next(cx)
+        match ready!(self.inner.poll(cx)) {
+            Ok((item, rx)) => {
+                self.inner.set(make_future(rx));
+                Poll::Ready(Some(Ok(item)))
+            }
+            Err(err) => match err {
+                RecvError::Closed => Poll::Ready(None),
+                RecvError::Lagged(n) => Poll::Ready(Some(Err(BroadcastStreamRecvError::Lagged(n)))),
+            },
+        }
     }
 }
 

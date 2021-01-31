@@ -28,9 +28,9 @@ fs = ["tokio/fs"]
 
 [dependencies]
 futures-core = { version = "0.3.0" }
-async-stream = "0.3"
 pin-project-lite = "0.2.0"
 tokio = { version = "1.0", features = ["sync"] }
+tokio-util = { path = "../tokio-util" }
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["full", "test-util"] }

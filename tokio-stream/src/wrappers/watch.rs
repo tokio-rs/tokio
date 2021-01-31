@@ -1,41 +1,49 @@
-use crate::Stream;
-use async_stream::stream;
 use std::pin::Pin;
 use tokio::sync::watch::Receiver;
 
+use futures_core::Stream;
+use tokio_util::sync::ReusableBoxFuture;
+
 use std::fmt;
 use std::task::{Context, Poll};
+use tokio::sync::watch::error::RecvError;
 
 /// A wrapper around [`tokio::sync::watch::Receiver`] that implements [`Stream`].
 ///
 /// [`tokio::sync::watch::Receiver`]: struct@tokio::sync::watch::Receiver
 /// [`Stream`]: trait@crate::Stream
 pub struct WatchStream<T> {
-    inner: Pin<Box<dyn Stream<Item = T>>>,
+    inner: ReusableBoxFuture<Result<((), Receiver<T>), RecvError>>,
 }
 
-impl<T: 'static + Clone + Unpin> WatchStream<T> {
+async fn make_future<T: Clone + Send + Sync>(
+    mut rx: Receiver<T>,
+) -> Result<((), Receiver<T>), RecvError> {
+    let signal = rx.changed().await?;
+    Ok((signal, rx))
+}
+
+impl<T: 'static + Clone + Unpin + Send + Sync> WatchStream<T> {
     /// Create a new `WatchStream`.
-    pub fn new(mut rx: Receiver<T>) -> Self {
-        let stream = stream! {
-            loop {
-                match rx.changed().await {
-                    Ok(_) => yield (*rx.borrow()).clone(),
-                    Err(_) => break,
-                }
-            }
-        };
+    pub fn new(rx: Receiver<T>) -> Self {
         Self {
-            inner: Box::pin(stream),
+            inner: ReusableBoxFuture::new(make_future(rx)),
         }
     }
 }
 
-impl<T> Stream for WatchStream<T> {
+impl<T: Clone + 'static + Send + Sync> Stream for WatchStream<T> {
     type Item = T;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Pin::new(&mut self.inner).poll_next(cx)
+        match ready!(self.inner.poll(cx)) {
+            Ok((_, rx)) => {
+                let received = (*rx.borrow()).clone();
+                self.inner.set(make_future(rx));
+                Poll::Ready(Some(received))
+            }
+            Err(_) => Poll::Ready(None),
+        }
     }
 }
 
