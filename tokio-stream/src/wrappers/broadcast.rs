@@ -26,14 +26,23 @@ pub enum BroadcastStreamRecvError {
     Lagged(u64),
 }
 
-async fn make_future<T: Clone + Send + Sync>(
-    mut rx: Receiver<T>,
-) -> Result<(T, Receiver<T>), RecvError> {
-    let item = rx.recv().await?;
-    Ok((item, rx))
+#[derive(Debug, PartialEq)]
+enum WrappedRecvError<T> {
+    Lagged(u64, Receiver<T>),
+    Closed,
 }
 
-impl<T: Clone + Unpin + 'static + Send + Sync> BroadcastStream<T> {
+async fn make_future<T: Clone>(
+    mut rx: Receiver<T>,
+) -> Result<(T, Receiver<T>), WrappedRecvError<T>> {
+    match rx.recv().await {
+        Ok(item) => Ok((item, rx)),
+        Err(RecvError::Lagged(n)) => WrappedRecvError::Lagged(n, rx),
+        Err(RecvError::Closed) => WrappedRecvError::Closed,
+    }
+}
+
+impl<T: Clone> BroadcastStream<T> {
     /// Create a new `BroadcastStream`.
     pub fn new(rx: Receiver<T>) -> Self {
         Self {
@@ -42,7 +51,7 @@ impl<T: Clone + Unpin + 'static + Send + Sync> BroadcastStream<T> {
     }
 }
 
-impl<T: Clone + 'static + Send + Sync> Stream for BroadcastStream<T> {
+impl<T> Stream for BroadcastStream<T> {
     type Item = Result<T, BroadcastStreamRecvError>;
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match ready!(self.inner.poll(cx)) {
@@ -51,8 +60,11 @@ impl<T: Clone + 'static + Send + Sync> Stream for BroadcastStream<T> {
                 Poll::Ready(Some(Ok(item)))
             }
             Err(err) => match err {
-                RecvError::Closed => Poll::Ready(None),
-                RecvError::Lagged(n) => Poll::Ready(Some(Err(BroadcastStreamRecvError::Lagged(n)))),
+                WrappedRecvError::Closed => Poll::Ready(None),
+                WrappedRecvError::Lagged(n, rx) => {
+                    self.inner.set(make_future(rx));
+                    Poll::Ready(Some(Err(BroadcastStreamRecvError::Lagged(n))))
+                }
             },
         }
     }
