@@ -1,9 +1,9 @@
-use futures_sink::Sink;
 use futures_core::ready;
+use futures_sink::Sink;
 use std::pin::Pin;
-use std::task::{Context, Poll};
 use std::sync::Arc;
-use tokio::sync::mpsc::{Sender, error::SendError};
+use std::task::{Context, Poll};
+use tokio::sync::mpsc::{error::SendError, Sender};
 
 use super::ReusableBoxFuture;
 
@@ -58,7 +58,7 @@ impl<T: Send + 'static> PollSender<T> {
                 self.inner.set(make_future(Some((sender, value))));
                 self.is_sending = true;
                 Ok(())
-            },
+            }
             None => Err(SendError(value)),
         }
     }
@@ -175,20 +175,14 @@ impl<T: Send + 'static> Sink<T> for PollSender<T> {
     /// This is equivalent to calling [`poll_send_done`].
     ///
     /// [`poll_send_done`]: PollSender::poll_send_done
-    fn poll_ready(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>
-    ) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Pin::into_inner(self).poll_send_done(cx)
     }
 
     /// This is equivalent to calling [`poll_send_done`].
     ///
     /// [`poll_send_done`]: PollSender::poll_send_done
-    fn poll_flush(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>
-    ) -> Poll<Result<(), Self::Error>> {
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Pin::into_inner(self).poll_send_done(cx)
     }
 
@@ -208,10 +202,7 @@ impl<T: Send + 'static> Sink<T> for PollSender<T> {
     ///
     /// [`close_this_sender`]: PollSender::close_this_sender
     /// [`Receiver`]: tokio::sync::mpsc::Receiver
-    fn poll_close(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>
-    ) -> Poll<Result<(), Self::Error>> {
+    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         ready!(self.as_mut().poll_flush(cx))?;
 
         Pin::into_inner(self).close_this_sender();
