@@ -7,6 +7,7 @@
 ### Changed
 
 - sync: use `ReusableBoxFuture` for `PollSemaphore` ([#3463])
+- deps: remove `async-stream` dependency ([#3463])
 - deps: remove `tokio-stream` dependency ([#3487])
 
 # 0.6.2 (January 21, 2021)
