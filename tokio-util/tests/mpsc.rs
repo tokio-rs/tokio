@@ -1,8 +1,8 @@
-use tokio_util::sync::PollSender;
-use tokio::sync::mpsc::channel;
 use futures::future::poll_fn;
+use tokio::sync::mpsc::channel;
 use tokio_test::task::spawn;
-use tokio_test::{assert_pending, assert_ready, assert_ready_ok, assert_ready_err};
+use tokio_test::{assert_pending, assert_ready, assert_ready_err, assert_ready_ok};
+use tokio_util::sync::PollSender;
 
 #[tokio::test]
 async fn test_simple() {
