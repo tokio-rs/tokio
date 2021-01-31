@@ -511,6 +511,7 @@ cfg_test_util! {
         /// let rt = runtime::Builder::new_current_thread()
         ///     .enable_time()
         ///     .start_paused(true)
+        ///     .build()
         ///     .unwrap();
         /// ```
         pub fn start_paused(&mut self, start_paused: bool) -> &mut Self {
