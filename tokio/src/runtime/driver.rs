@@ -162,6 +162,7 @@ pub(crate) struct Cfg {
     pub(crate) enable_io: bool,
     pub(crate) enable_time: bool,
     pub(crate) enable_pause_time: bool,
+    pub(crate) start_paused: bool,
 }
 
 impl Driver {
@@ -169,6 +170,10 @@ impl Driver {
         let (io_stack, io_handle, signal_handle) = create_io_stack(cfg.enable_io)?;
 
         let clock = create_clock(cfg.enable_pause_time);
+        if cfg.start_paused {
+            clock.pause();
+        }
+
         let (time_driver, time_handle) =
             create_time_driver(cfg.enable_time, io_stack, clock.clone());
 
