@@ -47,15 +47,15 @@ impl<T: 'static + Clone + Send> Stream for BroadcastStream<T> {
         self.inner.set(make_future(rx));
         match result {
             Ok(item) => Poll::Ready(Some(Ok(item))),
-            Err(err) => match err {
-                RecvError::Closed => Poll::Ready(None),
-                RecvError::Lagged(n) => Poll::Ready(Some(Err(BroadcastStreamRecvError::Lagged(n)))),
-            },
+            Err(RecvError::Closed) => Poll::Ready(None),
+            Err(RecvError::Lagged(n)) => {
+                Poll::Ready(Some(Err(BroadcastStreamRecvError::Lagged(n))))
+            }
         }
     }
 }
 
-impl<T: Clone> fmt::Debug for BroadcastStream<T> {
+impl<T> fmt::Debug for BroadcastStream<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("BroadcastStream").finish()
     }

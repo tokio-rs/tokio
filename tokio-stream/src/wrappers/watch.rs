@@ -13,14 +13,14 @@ use tokio::sync::watch::error::RecvError;
 /// [`tokio::sync::watch::Receiver`]: struct@tokio::sync::watch::Receiver
 /// [`Stream`]: trait@crate::Stream
 pub struct WatchStream<T> {
-    inner: ReusableBoxFuture<Result<((), Receiver<T>), RecvError>>,
+    inner: ReusableBoxFuture<(Result<(), RecvError>, Receiver<T>)>,
 }
 
 async fn make_future<T: Clone + Send + Sync>(
     mut rx: Receiver<T>,
-) -> Result<((), Receiver<T>), RecvError> {
+) -> (Result<(), RecvError>, Receiver<T>) {
     let signal = rx.changed().await?;
-    Ok((signal, rx))
+    (Ok(signal), rx)
 }
 
 impl<T: 'static + Clone + Unpin + Send + Sync> WatchStream<T> {
@@ -36,10 +36,11 @@ impl<T: Clone + 'static + Send + Sync> Stream for WatchStream<T> {
     type Item = T;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match ready!(self.inner.poll(cx)) {
-            Ok((_, rx)) => {
+        let (result, rx) = ready!(self.inner.poll(cx));
+        self.inner.set(make_future(rx));
+        match result {
+            Ok(_) => {
                 let received = (*rx.borrow()).clone();
-                self.inner.set(make_future(rx));
                 Poll::Ready(Some(received))
             }
             Err(_) => Poll::Ready(None),
