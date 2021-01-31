@@ -13,7 +13,7 @@ use std::task::{Context, Poll};
 /// [`tokio::sync::broadcast::Receiver`]: struct@tokio::sync::broadcast::Receiver
 /// [`Stream`]: trait@crate::Stream
 pub struct BroadcastStream<T> {
-    inner: ReusableBoxFuture<Result<(T, Receiver<T>), WrappedRecvError<T>>>,
+    inner: ReusableBoxFuture<(Result<T, RecvError>, Receiver<T>)>,
 }
 
 /// An error returned from the inner stream of a [`BroadcastStream`].
@@ -26,20 +26,9 @@ pub enum BroadcastStreamRecvError {
     Lagged(u64),
 }
 
-#[derive(Debug)]
-enum WrappedRecvError<T> {
-    Lagged(u64, Receiver<T>),
-    Closed,
-}
-
-async fn make_future<T: Clone>(
-    mut rx: Receiver<T>,
-) -> Result<(T, Receiver<T>), WrappedRecvError<T>> {
-    match rx.recv().await {
-        Ok(item) => Ok((item, rx)),
-        Err(RecvError::Lagged(n)) => Err(WrappedRecvError::Lagged(n, rx)),
-        Err(RecvError::Closed) => Err(WrappedRecvError::Closed),
-    }
+async fn make_future<T: Clone>(mut rx: Receiver<T>) -> (Result<T, RecvError>, Receiver<T>) {
+    let result = rx.recv().await;
+    (result, rx)
 }
 
 impl<T: 'static + Clone + Send> BroadcastStream<T> {
@@ -55,13 +44,13 @@ impl<T: 'static + Clone + Send> Stream for BroadcastStream<T> {
     type Item = Result<T, BroadcastStreamRecvError>;
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match ready!(self.inner.poll(cx)) {
-            Ok((item, rx)) => {
+            (Ok(item), rx) => {
                 self.inner.set(make_future(rx));
                 Poll::Ready(Some(Ok(item)))
             }
-            Err(err) => match err {
-                WrappedRecvError::Closed => Poll::Ready(None),
-                WrappedRecvError::Lagged(n, rx) => {
+            (Err(err), rx) => match err {
+                RecvError::Closed => Poll::Ready(None),
+                RecvError::Lagged(n) => {
                     self.inner.set(make_future(rx));
                     Poll::Ready(Some(Err(BroadcastStreamRecvError::Lagged(n))))
                 }
