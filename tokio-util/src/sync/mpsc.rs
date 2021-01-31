@@ -31,7 +31,6 @@ async fn make_future<T>(data: Option<(Arc<Sender<T>>, T)>) -> Result<(), SendErr
 impl<T: Send + 'static> PollSender<T> {
     /// Create a new `PollSender`.
     pub fn new(sender: Sender<T>) -> Self {
-        // We use pending() here because it is zero-sized.
         Self {
             sender: Some(Arc::new(sender)),
             is_sending: false,
