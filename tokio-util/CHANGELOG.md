@@ -1,4 +1,16 @@
-# 0.6.2 (January 21, 2020)
+# 0.6.3 (January 31, 2021)
+
+### Added
+
+- sync: add `ReusableBoxFuture` utility ([#3464])
+
+### Changed
+
+- sync: use `ReusableBoxFuture` for `PollSemaphore` ([#3463])
+- deps: remove `async-stream` dependency ([#3463])
+- deps: remove `tokio-stream` dependency ([#3487])
+
+# 0.6.2 (January 21, 2021)
 
 ### Added
 
@@ -8,7 +20,7 @@
 
 - time: fix panics on updating `DelayQueue` entries ([#3270])
 
-# 0.6.1 (January 12, 2020)
+# 0.6.1 (January 12, 2021)
 
 ### Added
 
@@ -72,6 +84,9 @@
 
 - Initial release
 
+[#3487]: https://github.com/tokio-rs/tokio/pull/3487
+[#3464]: https://github.com/tokio-rs/tokio/pull/3464
+[#3463]: https://github.com/tokio-rs/tokio/pull/3463
 [#3444]: https://github.com/tokio-rs/tokio/pull/3444
 [#3387]: https://github.com/tokio-rs/tokio/pull/3387
 [#3364]: https://github.com/tokio-rs/tokio/pull/3364
