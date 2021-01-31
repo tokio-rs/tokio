@@ -40,7 +40,7 @@ pin_project! {
     ///
     /// [`AsyncRead`]: tokio::io::AsyncRead
     /// [`StreamReader`]: crate::io::StreamReader
-    /// [`Stream`]: tokio_stream::Stream
+    /// [`Stream`]: futures_core::Stream
     #[derive(Debug)]
     pub struct ReaderStream<R> {
         // Reader itself.
@@ -58,7 +58,7 @@ impl<R: AsyncRead> ReaderStream<R> {
     /// `Result<Bytes, std::io::Error>`.
     ///
     /// [`AsyncRead`]: tokio::io::AsyncRead
-    /// [`Stream`]: tokio_stream::Stream
+    /// [`Stream`]: futures_core::Stream
     pub fn new(reader: R) -> Self {
         ReaderStream {
             reader: Some(reader),
