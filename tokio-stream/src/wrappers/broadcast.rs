@@ -43,17 +43,13 @@ impl<T: 'static + Clone + Send> BroadcastStream<T> {
 impl<T: 'static + Clone + Send> Stream for BroadcastStream<T> {
     type Item = Result<T, BroadcastStreamRecvError>;
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match ready!(self.inner.poll(cx)) {
-            (Ok(item), rx) => {
-                self.inner.set(make_future(rx));
-                Poll::Ready(Some(Ok(item)))
-            }
-            (Err(err), rx) => match err {
+        let (result, rx) = ready!(self.inner.poll(cx));
+        self.inner.set(make_future(rx));
+        match result {
+            Ok(item) => Poll::Ready(Some(Ok(item))),
+            Err(err) => match err {
                 RecvError::Closed => Poll::Ready(None),
-                RecvError::Lagged(n) => {
-                    self.inner.set(make_future(rx));
-                    Poll::Ready(Some(Err(BroadcastStreamRecvError::Lagged(n))))
-                }
+                RecvError::Lagged(n) => Poll::Ready(Some(Err(BroadcastStreamRecvError::Lagged(n)))),
             },
         }
     }
