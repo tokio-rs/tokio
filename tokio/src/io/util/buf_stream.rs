@@ -94,9 +94,11 @@ impl<RW> From<BufWriter<BufReader<RW>>> for BufStream<RW> {
                     buf: rbuf,
                     pos,
                     cap,
+                    seek_state: rseek_state,
                 },
             buf: wbuf,
             written,
+            seek_state: wseek_state,
         } = b;
 
         BufStream {
@@ -105,10 +107,12 @@ impl<RW> From<BufWriter<BufReader<RW>>> for BufStream<RW> {
                     inner,
                     buf: wbuf,
                     written,
+                    seek_state: wseek_state,
                 },
                 buf: rbuf,
                 pos,
                 cap,
+                seek_state: rseek_state,
             },
         }
     }
