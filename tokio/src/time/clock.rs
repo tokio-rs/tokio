@@ -17,16 +17,12 @@ cfg_not_test_util! {
     }
 
     impl Clock {
-        pub(crate) fn new(_enable_pausing: bool) -> Clock {
+        pub(crate) fn new(_enable_pausing: bool, _start_paused: bool) -> Clock {
             Clock {}
         }
 
         pub(crate) fn now(&self) -> Instant {
             now()
-        }
-
-        pub(crate) fn pause(&self) {
-            unreachable!();
         }
 
         pub(crate) fn is_paused(&self) -> bool {
@@ -153,16 +149,22 @@ cfg_test_util! {
     impl Clock {
         /// Return a new `Clock` instance that uses the current execution context's
         /// source of time.
-        pub(crate) fn new(enable_pausing: bool) -> Clock {
+        pub(crate) fn new(enable_pausing: bool, start_paused: bool) -> Clock {
             let now = std::time::Instant::now();
 
-            Clock {
+            let clock = Clock {
                 inner: Arc::new(Mutex::new(Inner {
                     enable_pausing,
                     base: now,
                     unfrozen: Some(now),
                 })),
+            };
+
+            if start_paused {
+                clock.pause();
             }
+
+            clock
         }
 
         pub(crate) fn pause(&self) {
