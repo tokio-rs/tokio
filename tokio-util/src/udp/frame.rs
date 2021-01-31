@@ -167,7 +167,10 @@ where
     }
 }
 
-impl<T: Borrow<UdpSocket>, C> UdpFramed<T, C> {
+impl<T, C> UdpFramed<T, C>
+where
+    T: Borrow<UdpSocket>,
+{
     /// Create a new `UdpFramed` backed by the given socket and codec.
     ///
     /// See struct level documentation for more details.
@@ -221,5 +224,10 @@ impl<T: Borrow<UdpSocket>, C> UdpFramed<T, C> {
     /// Returns a mutable reference to the read buffer.
     pub fn read_buffer_mut(&mut self) -> &mut BytesMut {
         &mut self.rd
+    }
+
+    /// Consumes the `Framed`, returning its underlying I/O stream.
+    pub fn into_inner(self) -> T {
+        self.socket
     }
 }

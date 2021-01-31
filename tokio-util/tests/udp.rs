@@ -15,18 +15,16 @@ use std::sync::Arc;
 #[cfg_attr(any(target_os = "macos", target_os = "ios"), allow(unused_assignments))]
 #[tokio::test]
 async fn send_framed_byte_codec() -> std::io::Result<()> {
-    let a_soc = Arc::new(UdpSocket::bind("127.0.0.1:0").await?);
-    let b_soc = Arc::new(UdpSocket::bind("127.0.0.1:0").await?);
+    let mut a_soc = UdpSocket::bind("127.0.0.1:0").await?;
+    let mut b_soc = UdpSocket::bind("127.0.0.1:0").await?;
 
     let a_addr = a_soc.local_addr()?;
     let b_addr = b_soc.local_addr()?;
 
     // test sending & receiving bytes
     {
-        let a_ref = a_soc.clone();
-        let b_ref = b_soc.clone();
-        let mut a = UdpFramed::new(a_ref, ByteCodec);
-        let mut b = UdpFramed::new(b_ref, ByteCodec);
+        let mut a = UdpFramed::new(a_soc, ByteCodec);
+        let mut b = UdpFramed::new(b_soc, ByteCodec);
 
         let msg = b"4567";
 
@@ -37,15 +35,16 @@ async fn send_framed_byte_codec() -> std::io::Result<()> {
         let (data, addr) = received;
         assert_eq!(msg, &*data);
         assert_eq!(a_addr, addr);
+
+        a_soc = a.into_inner();
+        b_soc = b.into_inner();
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     // test sending & receiving an empty message
     {
-        let a_ref = a_soc.clone();
-        let b_ref = b_soc.clone();
-        let mut a = UdpFramed::new(a_ref, ByteCodec);
-        let mut b = UdpFramed::new(b_ref, ByteCodec);
+        let mut a = UdpFramed::new(a_soc, ByteCodec);
+        let mut b = UdpFramed::new(b_soc, ByteCodec);
 
         let msg = b"";
 
@@ -107,7 +106,7 @@ async fn send_framed_lines_codec() -> std::io::Result<()> {
 #[tokio::test]
 async fn framed_half() -> std::io::Result<()> {
     let a_soc = Arc::new(UdpSocket::bind("127.0.0.1:0").await?);
-    let b_soc = Arc::new(UdpSocket::bind("127.0.0.1:0").await?);
+    let b_soc = a_soc.clone();
 
     let a_addr = a_soc.local_addr()?;
     let b_addr = b_soc.local_addr()?;
