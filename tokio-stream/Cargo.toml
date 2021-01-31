@@ -30,7 +30,7 @@ fs = ["tokio/fs"]
 futures-core = { version = "0.3.0" }
 pin-project-lite = "0.2.0"
 tokio = { version = "1.0", features = ["sync"] }
-tokio-util = { path = "../tokio-util" }
+tokio-util = { version = "0.6.3" }
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["full", "test-util"] }
