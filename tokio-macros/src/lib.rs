@@ -251,25 +251,10 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ### Configure the runtime to start with time paused
 ///
-/// ```rust
-/// #[tokio::main(start_paused = true)]
-/// async fn main() {
-///     println!("Hello world");
-/// }
-/// ```
-///
-/// Equivalent code not using `#[tokio::main]`
-///
-/// ```rust
-/// fn main() {
-///     tokio::runtime::Builder::new_current_thread()
-///         .enable_all()
-///         .start_paused(true)
-///         .build()
-///         .unwrap()
-///         .block_on(async {
-///             println!("Hello world");
-///         })
+/// ```no_run
+/// #[tokio::test(start_paused = true)]
+/// async fn my_test() {
+///     assert!(true);
 /// }
 /// ```
 ///
