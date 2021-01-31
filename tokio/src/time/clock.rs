@@ -25,6 +25,10 @@ cfg_not_test_util! {
             now()
         }
 
+        pub(crate) fn pause(&self) {
+            unreachable!();
+        }
+
         pub(crate) fn is_paused(&self) -> bool {
             false
         }
