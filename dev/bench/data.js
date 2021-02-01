@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1612093305782,
+  "lastUpdate": 1612184213673,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -15043,6 +15043,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19658622,
             "range": "± 2555107",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "artem@vorotnikov.me",
+            "name": "Artem Vorotnikov",
+            "username": "vorot93"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cc97fb8a5ff6ef17f6dc9968fbbe67002cff4130",
+          "message": "Suppress deprecated warnings for spin_loop_hint (#3497)\n\n* Suppress deprecated warnings for spin_loop_hint\n\n* Update tokio/src/loom/std/mod.rs\n\nCo-authored-by: Taiki Endo <te316e89@gmail.com>\n\n* Update tokio/src/sync/task/atomic_waker.rs\n\nCo-authored-by: Taiki Endo <te316e89@gmail.com>\n\n* fmt\n\nCo-authored-by: Taiki Endo <te316e89@gmail.com>",
+          "timestamp": "2021-02-01T15:55:21+03:00",
+          "tree_id": "effd8bf970f9044cf0ebe0b3cd8446b297b3efc8",
+          "url": "https://github.com/tokio-rs/tokio/commit/cc97fb8a5ff6ef17f6dc9968fbbe67002cff4130"
+        },
+        "date": 1612184212144,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 158969,
+            "range": "± 3842",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 613160,
+            "range": "± 19830",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4703138,
+            "range": "± 1133229",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18074703,
+            "range": "± 2644785",
             "unit": "ns/iter"
           }
         ]
