@@ -7,6 +7,10 @@ use tokio::sync::mpsc::{error::SendError, Sender};
 
 use super::ReusableBoxFuture;
 
+// This implementation was chosen over something based on permits because to get a
+// `tokio::sync::mpsc::Permit` out of the `inner` future, you must transmute the
+// lifetime on the permit to `'static`.
+
 /// A wrapper around [`mpsc::Sender`] that can be polled.
 ///
 /// [`mpsc::Sender`]: tokio::sync::mpsc::Sender
@@ -24,7 +28,7 @@ pub struct PollSender<T> {
 async fn make_future<T>(data: Option<(Arc<Sender<T>>, T)>) -> Result<(), SendError<T>> {
     match data {
         Some((sender, value)) => sender.send(value).await,
-        None => unreachable!(),
+        None => unreachable!("This future should not be pollable, as is_sending should be set to false."),
     }
 }
 
@@ -124,6 +128,14 @@ impl<T: Send + 'static> PollSender<T> {
             Some(sender) => Some((&**sender).clone()),
             None => None,
         }
+    }
+
+    /// Access the underlying `Sender`.
+    ///
+    /// If this method returns `None`, then the channel is closed. (But it is
+    /// not guaranteed to return `None` if the channel is closed.)
+    pub fn inner_ref(&self) -> Option<&Sender<T>> {
+        self.sender.as_deref()
     }
 
     // This operation is supported because it is required by the Sink trait.
