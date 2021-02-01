@@ -344,7 +344,7 @@ impl<T> Block<T> {
                 Err(curr) => curr,
             };
 
-            // When running outside of loom, this calls `spin_loop_hint`.
+            // When running outside of loom, this calls `spin_loop`.
             thread::yield_now();
         }
     }
