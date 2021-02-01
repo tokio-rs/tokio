@@ -28,7 +28,9 @@ pub struct PollSender<T> {
 async fn make_future<T>(data: Option<(Arc<Sender<T>>, T)>) -> Result<(), SendError<T>> {
     match data {
         Some((sender, value)) => sender.send(value).await,
-        None => unreachable!("This future should not be pollable, as is_sending should be set to false."),
+        None => unreachable!(
+            "This future should not be pollable, as is_sending should be set to false."
+        ),
     }
 }
 
