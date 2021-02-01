@@ -1,7 +1,8 @@
 #![cfg_attr(any(loom, not(feature = "sync")), allow(dead_code, unreachable_pub))]
 
 use crate::loom::cell::UnsafeCell;
-use crate::loom::sync::atomic::{self, AtomicUsize};
+use crate::loom::hint;
+use crate::loom::sync::atomic::AtomicUsize;
 
 use std::fmt;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
@@ -223,7 +224,7 @@ impl AtomicWaker {
                 waker.wake();
 
                 // This is equivalent to a spin lock, so use a spin hint.
-                atomic::spin_loop_hint();
+                hint::spin_loop();
             }
             state => {
                 // In this case, a concurrent thread is holding the
