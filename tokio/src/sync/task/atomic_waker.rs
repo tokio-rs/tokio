@@ -223,7 +223,8 @@ impl AtomicWaker {
                 waker.wake();
 
                 // This is equivalent to a spin lock, so use a spin hint.
-                #[allow(deprecated)] // TODO: once we bump MSRV to 1.49+, use `hint::spin_loop` instead.
+                // TODO: once we bump MSRV to 1.49+, use `hint::spin_loop` instead.
+                #[allow(deprecated)]
                 atomic::spin_loop_hint();
             }
             state => {

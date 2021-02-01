@@ -75,7 +75,8 @@ pub(crate) mod sync {
         pub(crate) use crate::loom::std::atomic_usize::AtomicUsize;
 
         pub(crate) use std::sync::atomic::{fence, AtomicBool, Ordering};
-        #[allow(deprecated)] // TODO: once we bump MSRV to 1.49+, use `hint::spin_loop` instead.
+        // TODO: once we bump MSRV to 1.49+, use `hint::spin_loop` instead.
+        #[allow(deprecated)]
         pub(crate) use std::sync::atomic::spin_loop_hint;
     }
 }
