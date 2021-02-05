@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1612551495860,
+  "lastUpdate": 1612552445440,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -8153,6 +8153,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 568,
             "range": "± 74",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "sfackler@gmail.com",
+            "name": "Steven Fackler",
+            "username": "sfackler"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fcb6d041b9d2fe567b5306e648cbb048b426a49d",
+          "message": "time: make test-util paused time fully deterministic (#3492)\n\nThe time driver stores an Instant internally used as a \"base\" for future\r\ntime calculations. Since this is generated as the Runtime is being\r\nconstructed, it previously always happened before the user had a chance\r\nto pause time. The fractional-millisecond variations in the timing\r\naround the runtime construction and time pause cause tests running\r\nentirely in paused time to be very slightly deterministic, with the time\r\ndriver advancing time by 1 millisecond more or less depending on how the\r\nsub-millisecond components of the `Instant`s involved compared.\r\n\r\nTo avoid this, there is now a new option on `runtime::Builder` which\r\nwill create a `Runtime` with time \"instantly\" paused. This, along with a\r\nsmall change to have the time driver use the provided clock as the\r\nsource for its start time allow totally deterministic tests with paused\r\ntime.",
+          "timestamp": "2021-02-05T20:12:25+01:00",
+          "tree_id": "3f0e188a8f551d68c4e920725ba689b6561ea944",
+          "url": "https://github.com/tokio-rs/tokio/commit/fcb6d041b9d2fe567b5306e648cbb048b426a49d"
+        },
+        "date": 1612552443751,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1002,
+            "range": "± 38",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 14978,
+            "range": "± 4795",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1018,
+            "range": "± 58",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 14763,
+            "range": "± 4872",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 576,
+            "range": "± 39",
             "unit": "ns/iter"
           }
         ]
