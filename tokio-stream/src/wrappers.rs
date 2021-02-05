@@ -1,17 +1,25 @@
 //! Wrappers for Tokio types that implement `Stream`.
 
+/// Error types for the wrappers.
+pub mod errors {
+    cfg_sync! {
+        pub use crate::wrappers::broadcast::BroadcastStreamRecvError;
+    }
+}
+
 mod mpsc_bounded;
 pub use mpsc_bounded::ReceiverStream;
 
 mod mpsc_unbounded;
 pub use mpsc_unbounded::UnboundedReceiverStream;
 
-mod broadcast;
-pub use broadcast::BroadcastStream;
-pub use broadcast::BroadcastStreamRecvError;
+cfg_sync! {
+    mod broadcast;
+    pub use broadcast::BroadcastStream;
 
-mod watch;
-pub use watch::WatchStream;
+    mod watch;
+    pub use watch::WatchStream;
+}
 
 cfg_time! {
     mod interval;

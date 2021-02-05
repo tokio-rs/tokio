@@ -38,6 +38,16 @@ macro_rules! cfg_time {
     }
 }
 
+macro_rules! cfg_sync {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "sync")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+            $item
+        )*
+    }
+}
+
 macro_rules! ready {
     ($e:expr $(,)?) => {
         match $e {

@@ -163,6 +163,11 @@ pub struct Sender<T> {
 /// Must not be used concurrently. Messages may be retrieved using
 /// [`recv`][Receiver::recv].
 ///
+/// To turn this receiver into a `Stream`, you can use the [`BroadcastStream`]
+/// wrapper.
+///
+/// [`BroadcastStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.BroadcastStream.html
+///
 /// # Examples
 ///
 /// ```
