@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1612552456074,
+  "lastUpdate": 1612552459716,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -15505,6 +15505,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 17336077,
             "range": "± 2932118",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "sfackler@gmail.com",
+            "name": "Steven Fackler",
+            "username": "sfackler"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fcb6d041b9d2fe567b5306e648cbb048b426a49d",
+          "message": "time: make test-util paused time fully deterministic (#3492)\n\nThe time driver stores an Instant internally used as a \"base\" for future\r\ntime calculations. Since this is generated as the Runtime is being\r\nconstructed, it previously always happened before the user had a chance\r\nto pause time. The fractional-millisecond variations in the timing\r\naround the runtime construction and time pause cause tests running\r\nentirely in paused time to be very slightly deterministic, with the time\r\ndriver advancing time by 1 millisecond more or less depending on how the\r\nsub-millisecond components of the `Instant`s involved compared.\r\n\r\nTo avoid this, there is now a new option on `runtime::Builder` which\r\nwill create a `Runtime` with time \"instantly\" paused. This, along with a\r\nsmall change to have the time driver use the provided clock as the\r\nsource for its start time allow totally deterministic tests with paused\r\ntime.",
+          "timestamp": "2021-02-05T20:12:25+01:00",
+          "tree_id": "3f0e188a8f551d68c4e920725ba689b6561ea944",
+          "url": "https://github.com/tokio-rs/tokio/commit/fcb6d041b9d2fe567b5306e648cbb048b426a49d"
+        },
+        "date": 1612552453732,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 191892,
+            "range": "± 32595",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 718598,
+            "range": "± 128017",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5373419,
+            "range": "± 1257016",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19759572,
+            "range": "± 2676320",
             "unit": "ns/iter"
           }
         ]
