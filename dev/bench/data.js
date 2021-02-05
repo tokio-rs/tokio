@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1612438354286,
+  "lastUpdate": 1612550727747,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -8045,6 +8045,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 566,
             "range": "± 163",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "liufuyang@users.noreply.github.com",
+            "name": "Fuyang Liu",
+            "username": "liufuyang"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "77ca8a934cf76ec74144ec11e78ae7c7efbe910a",
+          "message": "signal: make Signal::poll_recv method public (#3383)\n\nSigned-off-by: Fuyang Liu <liufuyang@users.noreply.github.com>",
+          "timestamp": "2021-02-05T19:43:58+01:00",
+          "tree_id": "43cbc545e325e68e502f2eb294c1f8daa678f9b1",
+          "url": "https://github.com/tokio-rs/tokio/commit/77ca8a934cf76ec74144ec11e78ae7c7efbe910a"
+        },
+        "date": 1612550726274,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 837,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 13067,
+            "range": "± 2616",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 862,
+            "range": "± 2",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 14121,
+            "range": "± 3068",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 492,
+            "range": "± 9",
             "unit": "ns/iter"
           }
         ]
