@@ -47,6 +47,9 @@ pub struct Builder {
     /// Whether or not to enable the time driver
     enable_time: bool,
 
+    /// Whether or not the clock should start paused.
+    start_paused: bool,
+
     /// The number of worker threads, used by Runtime.
     ///
     /// Only used when not using the current-thread executor.
@@ -109,6 +112,9 @@ impl Builder {
 
             // Time defaults to "off"
             enable_time: false,
+
+            // The clock starts not-paused
+            start_paused: false,
 
             // Default to lazy auto-detection (one thread per CPU core)
             worker_threads: None,
@@ -386,6 +392,7 @@ impl Builder {
             },
             enable_io: self.enable_io,
             enable_time: self.enable_time,
+            start_paused: self.start_paused,
         }
     }
 
@@ -484,6 +491,31 @@ cfg_time! {
         /// ```
         pub fn enable_time(&mut self) -> &mut Self {
             self.enable_time = true;
+            self
+        }
+    }
+}
+
+cfg_test_util! {
+    impl Builder {
+        /// Controls if the runtime's clock starts paused or advancing.
+        ///
+        /// Pausing time requires the current-thread runtime; construction of
+        /// the runtime will panic otherwise.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_current_thread()
+        ///     .enable_time()
+        ///     .start_paused(true)
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        pub fn start_paused(&mut self, start_paused: bool) -> &mut Self {
+            self.start_paused = start_paused;
             self
         }
     }
