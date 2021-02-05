@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1612550739486,
+  "lastUpdate": 1612550776795,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -35939,6 +35939,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 771851,
             "range": "± 152508",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "liufuyang@users.noreply.github.com",
+            "name": "Fuyang Liu",
+            "username": "liufuyang"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "77ca8a934cf76ec74144ec11e78ae7c7efbe910a",
+          "message": "signal: make Signal::poll_recv method public (#3383)\n\nSigned-off-by: Fuyang Liu <liufuyang@users.noreply.github.com>",
+          "timestamp": "2021-02-05T19:43:58+01:00",
+          "tree_id": "43cbc545e325e68e502f2eb294c1f8daa678f9b1",
+          "url": "https://github.com/tokio-rs/tokio/commit/77ca8a934cf76ec74144ec11e78ae7c7efbe910a"
+        },
+        "date": 1612550775246,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6560255,
+            "range": "± 2058490",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6478444,
+            "range": "± 2089217",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6055302,
+            "range": "± 2167988",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 800,
+            "range": "± 185",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 800,
+            "range": "± 178",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 776,
+            "range": "± 194",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 137675,
+            "range": "± 20471",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1715,
+            "range": "± 462",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1012379,
+            "range": "± 212543",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 687186,
+            "range": "± 139492",
             "unit": "ns/iter"
           }
         ]
