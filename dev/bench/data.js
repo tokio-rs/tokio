@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1612551484201,
+  "lastUpdate": 1612551490188,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -8099,6 +8099,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 492,
             "range": "± 9",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "liufuyang@users.noreply.github.com",
+            "name": "Fuyang Liu",
+            "username": "liufuyang"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1c1e0e3fc9a463820955cf823b2d36b3162d746a",
+          "message": "tokio-stream: add wrapper for broadcast and watch (#3384)",
+          "timestamp": "2021-02-05T19:56:24+01:00",
+          "tree_id": "a99898bbb4674083c15c53d2c0c1049925b868b0",
+          "url": "https://github.com/tokio-rs/tokio/commit/1c1e0e3fc9a463820955cf823b2d36b3162d746a"
+        },
+        "date": 1612551484813,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 946,
+            "range": "± 184",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 13727,
+            "range": "± 6656",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 981,
+            "range": "± 252",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 14820,
+            "range": "± 3234",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 568,
+            "range": "± 74",
             "unit": "ns/iter"
           }
         ]
