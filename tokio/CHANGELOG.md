@@ -1,9 +1,27 @@
+# 1.2.0 (February 5, 2021)
+
+### Added
+
+- signal: make `Signal::poll_recv` method public ([#3383])
+
+### Fixed
+
+- time: make `test-util` paused time fully deterministic ([#3492])
+
+### Documented
+
+- sync: link to new broadcast and watch wrappers ([#3504])
+
+[#3383]: https://github.com/tokio-rs/tokio/pull/3383
+[#3492]: https://github.com/tokio-rs/tokio/pull/3492
+[#3504]: https://github.com/tokio-rs/tokio/pull/3504
+
 # 1.1.1 (January 29, 2021)
 
 Forward ports 1.0.3 fix.
 
 ### Fixed
-- io: memory leak during shutdown (#3477).
+- io: memory leak during shutdown ([#3477]).
 
 # 1.1.0 (January 22, 2021)
 
@@ -58,7 +76,9 @@ Forward ports 1.0.3 fix.
 # 1.0.3 (January 28, 2021)
 
 ### Fixed
-- io: memory leak during shutdown (#3477).
+- io: memory leak during shutdown ([#3477]).
+
+[#3477]: https://github.com/tokio-rs/tokio/pull/3477
 
 # 1.0.2 (January 14, 2021)
 
