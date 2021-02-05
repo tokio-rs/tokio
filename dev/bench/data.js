@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1612554080552,
+  "lastUpdate": 1612554086162,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -15607,6 +15607,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19759572,
             "range": "± 2676320",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0a04954d5ca74693cf7adbe2dd3a18de2987c519",
+          "message": "stream: update features and doc for broadcast/watch stream (#3504)",
+          "timestamp": "2021-02-05T20:39:27+01:00",
+          "tree_id": "c5f31cea81d33889544f42f8dc3c8905b1b9e7b3",
+          "url": "https://github.com/tokio-rs/tokio/commit/0a04954d5ca74693cf7adbe2dd3a18de2987c519"
+        },
+        "date": 1612554077334,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 186607,
+            "range": "± 9072",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 692666,
+            "range": "± 47181",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5529679,
+            "range": "± 998964",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20830878,
+            "range": "± 2459489",
             "unit": "ns/iter"
           }
         ]
