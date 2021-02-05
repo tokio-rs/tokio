@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1612551478738,
+  "lastUpdate": 1612551484201,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -15349,6 +15349,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 15984155,
             "range": "± 2078176",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "liufuyang@users.noreply.github.com",
+            "name": "Fuyang Liu",
+            "username": "liufuyang"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1c1e0e3fc9a463820955cf823b2d36b3162d746a",
+          "message": "tokio-stream: add wrapper for broadcast and watch (#3384)",
+          "timestamp": "2021-02-05T19:56:24+01:00",
+          "tree_id": "a99898bbb4674083c15c53d2c0c1049925b868b0",
+          "url": "https://github.com/tokio-rs/tokio/commit/1c1e0e3fc9a463820955cf823b2d36b3162d746a"
+        },
+        "date": 1612551482619,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 150171,
+            "range": "± 18389",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 596601,
+            "range": "± 92576",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4819025,
+            "range": "± 1088960",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 17336077,
+            "range": "± 2932118",
             "unit": "ns/iter"
           }
         ]
