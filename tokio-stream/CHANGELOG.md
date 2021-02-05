@@ -1,8 +1,19 @@
+# 0.1.3 (February 5, 2021)
+
+Added
+
+ - sync: add wrapper for broadcast and watch ([#3384], [#3504])
+
+[#3384]: https://github.com/tokio-rs/tokio/pull/3384
+[#3504]: https://github.com/tokio-rs/tokio/pull/3504
+
 # 0.1.2 (January 12, 2021)
 
 Fixed
 
- - docs: fix some wrappers missing in documentation (#3378)
+ - docs: fix some wrappers missing in documentation ([#3378])
+
+[#3378]: https://github.com/tokio-rs/tokio/pull/3378
 
 # 0.1.1 (January 4, 2021)
 
