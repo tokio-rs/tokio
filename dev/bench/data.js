@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1612552451510,
+  "lastUpdate": 1612552456074,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -36371,6 +36371,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 823866,
             "range": "± 3321",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "sfackler@gmail.com",
+            "name": "Steven Fackler",
+            "username": "sfackler"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fcb6d041b9d2fe567b5306e648cbb048b426a49d",
+          "message": "time: make test-util paused time fully deterministic (#3492)\n\nThe time driver stores an Instant internally used as a \"base\" for future\r\ntime calculations. Since this is generated as the Runtime is being\r\nconstructed, it previously always happened before the user had a chance\r\nto pause time. The fractional-millisecond variations in the timing\r\naround the runtime construction and time pause cause tests running\r\nentirely in paused time to be very slightly deterministic, with the time\r\ndriver advancing time by 1 millisecond more or less depending on how the\r\nsub-millisecond components of the `Instant`s involved compared.\r\n\r\nTo avoid this, there is now a new option on `runtime::Builder` which\r\nwill create a `Runtime` with time \"instantly\" paused. This, along with a\r\nsmall change to have the time driver use the provided clock as the\r\nsource for its start time allow totally deterministic tests with paused\r\ntime.",
+          "timestamp": "2021-02-05T20:12:25+01:00",
+          "tree_id": "3f0e188a8f551d68c4e920725ba689b6561ea944",
+          "url": "https://github.com/tokio-rs/tokio/commit/fcb6d041b9d2fe567b5306e648cbb048b426a49d"
+        },
+        "date": 1612552451209,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6785003,
+            "range": "± 2554015",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6753074,
+            "range": "± 2477201",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6663118,
+            "range": "± 2510965",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 622,
+            "range": "± 57",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 638,
+            "range": "± 20",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 635,
+            "range": "± 36",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 83487,
+            "range": "± 4161",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1497,
+            "range": "± 142",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1136273,
+            "range": "± 12558",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 824051,
+            "range": "± 21213",
             "unit": "ns/iter"
           }
         ]
