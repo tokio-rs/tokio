@@ -1,3 +1,7 @@
+# 1.1.0 (February 5, 2021)
+
+- add `start_paused` option to macros ([#3492])
+
 # 1.0.0 (December 23, 2020)
 
 - track `tokio` 1.0 release.
@@ -55,3 +59,4 @@
 [#2177]: https://github.com/tokio-rs/tokio/pull/2177
 [#2225]: https://github.com/tokio-rs/tokio/pull/2225
 [#3038]: https://github.com/tokio-rs/tokio/pull/3038
+[#3492]: https://github.com/tokio-rs/tokio/pull/3492
