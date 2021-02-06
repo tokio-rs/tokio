@@ -48,6 +48,16 @@ macro_rules! cfg_sync {
     }
 }
 
+macro_rules! cfg_signal {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "signal")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "signal")))]
+            $item
+        )*
+    }
+}
+
 macro_rules! ready {
     ($e:expr $(,)?) => {
         match $e {

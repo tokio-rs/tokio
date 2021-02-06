@@ -26,15 +26,16 @@ net = ["tokio/net"]
 io-util = ["tokio/io-util"]
 fs = ["tokio/fs"]
 sync = ["tokio/sync", "tokio-util"]
+signal = ["tokio/signal"]
 
 [dependencies]
 futures-core = { version = "0.3.0" }
 pin-project-lite = "0.2.0"
-tokio = { version = "1.0", features = ["sync"] }
+tokio = { version = "1.2.0", features = ["sync"] }
 tokio-util = { version = "0.6.3", optional = true }
 
 [dev-dependencies]
-tokio = { version = "1.0", features = ["full", "test-util"] }
+tokio = { version = "1.2.0", features = ["full", "test-util"] }
 async-stream = "0.3"
 tokio-test = { path = "../tokio-test" }
 futures = { version = "0.3", default-features = false }
