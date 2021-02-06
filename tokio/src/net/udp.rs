@@ -221,7 +221,7 @@ impl UdpSocket {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     let tokio_socket = tokio::net::UdpSocket::bind("127.0.0.1:0")?;
+    ///     let tokio_socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await?;
     ///     let std_socket = tokio_socket.into_std()?;
     ///     std_socket.set_nonblocking(false)?;
     ///     Ok(())

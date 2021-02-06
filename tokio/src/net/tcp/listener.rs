@@ -232,7 +232,7 @@ impl TcpListener {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     let tokio_listener = tokio::net::TcpListener::bind("127.0.0.1:0")?;
+    ///     let tokio_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
     ///     let std_listener = tokio_listener.into_std()?;
     ///     std_listener.set_nonblocking(false)?;
     ///     Ok(())
