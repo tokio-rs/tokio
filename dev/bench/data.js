@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1612635135931,
+  "lastUpdate": 1612635397742,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -8477,6 +8477,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 569,
             "range": "± 146",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6fd9084d470aa34e02c9dedcbf52e310fcb9cacc",
+          "message": "runtime: add link to LocalSet on new_current_thread (#3508)",
+          "timestamp": "2021-02-06T19:08:59+01:00",
+          "tree_id": "77a10fa30c4ca6c048ed608bcb67ef74645cac27",
+          "url": "https://github.com/tokio-rs/tokio/commit/6fd9084d470aa34e02c9dedcbf52e310fcb9cacc"
+        },
+        "date": 1612635396041,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 950,
+            "range": "± 47",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 14290,
+            "range": "± 3223",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 985,
+            "range": "± 317",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 14733,
+            "range": "± 4103",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 565,
+            "range": "± 201",
             "unit": "ns/iter"
           }
         ]
