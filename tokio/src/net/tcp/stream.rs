@@ -8,11 +8,6 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::net::{Shutdown, SocketAddr};
-#[cfg(windows)]
-use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket};
-
-#[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -199,7 +194,7 @@ impl TcpStream {
 
     /// Turn a [`tokio::net::TcpStream`] into a [`std::net::TcpStream`].
     ///
-    /// The returned [`std::net::TcpStream`] will have `nonblocking mode` set as `true`.
+    /// The returned [`std::net::TcpStream`] will have nonblocking mode set as `true`.
     /// Use [`set_nonblocking`] to change the blocking mode if needed.
     ///
     /// # Examples
@@ -234,6 +229,7 @@ impl TcpStream {
     pub fn into_std(self) -> io::Result<std::net::TcpStream> {
         #[cfg(unix)]
         {
+            use std::os::unix::io::{FromRawFd, IntoRawFd};
             self.io
                 .into_inner()
                 .map(|io| io.into_raw_fd())
@@ -242,6 +238,7 @@ impl TcpStream {
 
         #[cfg(windows)]
         {
+            use std::os::windows::io::{FromRawSocket, IntoRawSocket};
             self.io
                 .into_inner()
                 .map(|io| io.into_raw_socket())
@@ -932,11 +929,13 @@ impl TcpStream {
     fn to_mio(&self) -> mio::net::TcpSocket {
         #[cfg(windows)]
         {
+            use std::os::windows::io::{AsRawSocket, FromRawSocket};
             unsafe { mio::net::TcpSocket::from_raw_socket(self.as_raw_socket()) }
         }
 
         #[cfg(unix)]
         {
+            use std::os::unix::io::{AsRawFd, FromRawFd};
             unsafe { mio::net::TcpSocket::from_raw_fd(self.as_raw_fd()) }
         }
     }

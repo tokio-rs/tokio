@@ -9,7 +9,7 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::net::Shutdown;
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net;
 use std::path::Path;
 use std::pin::Pin;
@@ -506,6 +506,51 @@ impl UnixStream {
         let io = PollEvented::new(stream)?;
 
         Ok(UnixStream { io })
+    }
+
+    /// Turn a [`tokio::net::UnixStream`] into a [`std::os::unix::net::UnixStream`].
+    ///
+    /// The returned [`std::os::unix::net::UnixStream`] will have nonblocking
+    /// mode set as `true`.  Use [`set_nonblocking`] to change the blocking
+    /// mode if needed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::error::Error;
+    /// use std::io::Read;
+    /// use tokio::net::UnixListener;
+    /// # use tokio::net::UnixStream;
+    /// # use tokio::io::AsyncWriteExt;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let dir = tempfile::tempdir().unwrap();
+    ///     let bind_path = dir.path().join("bind_path");
+    ///
+    ///     let mut data = [0u8; 12];
+    ///     let listener = UnixListener::bind(&bind_path)?;
+    /// #   let handle = tokio::spawn(async {
+    /// #       let mut stream = UnixStream::connect(bind_path).await.unwrap();
+    /// #       stream.write(b"Hello world!").await.unwrap();
+    /// #   });
+    ///     let (tokio_unix_stream, _) = listener.accept().await?;
+    ///     let mut std_unix_stream = tokio_unix_stream.into_std()?;
+    /// #   handle.await.expect("The task being joined has panicked");
+    ///     std_unix_stream.set_nonblocking(false)?;
+    ///     std_unix_stream.read_exact(&mut data)?;
+    /// #   assert_eq!(b"Hello world!", &data);
+    ///     Ok(())
+    /// }
+    /// ```
+    /// [`tokio::net::UnixStream`]: UnixStream
+    /// [`std::os::unix::net::UnixStream`]: std::os::unix::net::UnixStream
+    /// [`set_nonblocking`]: fn@std::os::unix::net::UnixStream::set_nonblocking
+    pub fn into_std(self) -> io::Result<std::os::unix::net::UnixStream> {
+        self.io
+            .into_inner()
+            .map(|io| io.into_raw_fd())
+            .map(|raw_fd| unsafe { std::os::unix::net::UnixStream::from_raw_fd(raw_fd) })
     }
 
     /// Creates an unnamed pair of connected sockets.
