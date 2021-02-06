@@ -209,6 +209,48 @@ impl UdpSocket {
         UdpSocket::new(io)
     }
 
+    /// Turn a [`tokio::net::UdpSocket`] into a [`std::net::UdpSocket`].
+    ///
+    /// The returned [`std::net::UdpSocket`] will have nonblocking mode set as
+    /// `true`.  Use [`set_nonblocking`] to change the blocking mode if needed.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use std::error::Error;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let tokio_socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await?;
+    ///     let std_socket = tokio_socket.into_std()?;
+    ///     std_socket.set_nonblocking(false)?;
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// [`tokio::net::UdpSocket`]: UdpSocket
+    /// [`std::net::UdpSocket`]: std::net::UdpSocket
+    /// [`set_nonblocking`]: fn@std::net::UdpSocket::set_nonblocking
+    pub fn into_std(self) -> io::Result<std::net::UdpSocket> {
+        #[cfg(unix)]
+        {
+            use std::os::unix::io::{FromRawFd, IntoRawFd};
+            self.io
+                .into_inner()
+                .map(|io| io.into_raw_fd())
+                .map(|raw_fd| unsafe { std::net::UdpSocket::from_raw_fd(raw_fd) })
+        }
+
+        #[cfg(windows)]
+        {
+            use std::os::windows::io::{FromRawSocket, IntoRawSocket};
+            self.io
+                .into_inner()
+                .map(|io| io.into_raw_socket())
+                .map(|raw_socket| unsafe { std::net::UdpSocket::from_raw_socket(raw_socket) })
+        }
+    }
+
     /// Returns the local address that this socket is bound to.
     ///
     /// # Example
