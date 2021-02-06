@@ -86,6 +86,11 @@ impl Builder {
     /// Returns a new builder with the current thread scheduler selected.
     ///
     /// Configuration methods can be chained on the return value.
+    ///
+    /// To spawn non-`Send` tasks on the resulting runtime, combine it with a
+    /// [`LocalSet`].
+    ///
+    /// [`LocalSet`]: crate::task::LocalSet
     pub fn new_current_thread() -> Builder {
         Builder::new(Kind::CurrentThread)
     }
