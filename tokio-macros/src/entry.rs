@@ -25,6 +25,7 @@ impl RuntimeFlavor {
 struct FinalConfig {
     flavor: RuntimeFlavor,
     worker_threads: Option<usize>,
+    start_paused: Option<bool>,
 }
 
 struct Configuration {
@@ -32,6 +33,7 @@ struct Configuration {
     default_flavor: RuntimeFlavor,
     flavor: Option<RuntimeFlavor>,
     worker_threads: Option<(usize, Span)>,
+    start_paused: Option<(bool, Span)>,
 }
 
 impl Configuration {
@@ -44,6 +46,7 @@ impl Configuration {
             },
             flavor: None,
             worker_threads: None,
+            start_paused: None,
         }
     }
 
@@ -79,31 +82,57 @@ impl Configuration {
         Ok(())
     }
 
+    fn set_start_paused(&mut self, start_paused: syn::Lit, span: Span) -> Result<(), syn::Error> {
+        if self.start_paused.is_some() {
+            return Err(syn::Error::new(span, "`start_paused` set multiple times."));
+        }
+
+        let start_paused = parse_bool(start_paused, span, "start_paused")?;
+        self.start_paused = Some((start_paused, span));
+        Ok(())
+    }
+
     fn build(&self) -> Result<FinalConfig, syn::Error> {
         let flavor = self.flavor.unwrap_or(self.default_flavor);
         use RuntimeFlavor::*;
-        match (flavor, self.worker_threads) {
-            (CurrentThread, Some((_, worker_threads_span))) => Err(syn::Error::new(
-                worker_threads_span,
-                "The `worker_threads` option requires the `multi_thread` runtime flavor.",
-            )),
-            (CurrentThread, None) => Ok(FinalConfig {
-                flavor,
-                worker_threads: None,
-            }),
-            (Threaded, worker_threads) if self.rt_multi_thread_available => Ok(FinalConfig {
-                flavor,
-                worker_threads: worker_threads.map(|(val, _span)| val),
-            }),
+
+        let worker_threads = match (flavor, self.worker_threads) {
+            (CurrentThread, Some((_, worker_threads_span))) => {
+                return Err(syn::Error::new(
+                    worker_threads_span,
+                    "The `worker_threads` option requires the `multi_thread` runtime flavor.",
+                ))
+            }
+            (CurrentThread, None) => None,
+            (Threaded, worker_threads) if self.rt_multi_thread_available => {
+                worker_threads.map(|(val, _span)| val)
+            }
             (Threaded, _) => {
                 let msg = if self.flavor.is_none() {
                     "The default runtime flavor is `multi_thread`, but the `rt-multi-thread` feature is disabled."
                 } else {
                     "The runtime flavor `multi_thread` requires the `rt-multi-thread` feature."
                 };
-                Err(syn::Error::new(Span::call_site(), msg))
+                return Err(syn::Error::new(Span::call_site(), msg));
             }
-        }
+        };
+
+        let start_paused = match (flavor, self.start_paused) {
+            (Threaded, Some((_, start_paused_span))) => {
+                return Err(syn::Error::new(
+                    start_paused_span,
+                    "The `start_paused` option requires the `current_thread` runtime flavor.",
+                ));
+            }
+            (CurrentThread, Some((start_paused, _))) => Some(start_paused),
+            (_, None) => None,
+        };
+
+        Ok(FinalConfig {
+            flavor,
+            worker_threads,
+            start_paused,
+        })
     }
 }
 
@@ -130,6 +159,16 @@ fn parse_string(int: syn::Lit, span: Span, field: &str) -> Result<String, syn::E
         _ => Err(syn::Error::new(
             span,
             format!("Failed to parse {} as string.", field),
+        )),
+    }
+}
+
+fn parse_bool(bool: syn::Lit, span: Span, field: &str) -> Result<bool, syn::Error> {
+    match bool {
+        syn::Lit::Bool(b) => Ok(b.value),
+        _ => Err(syn::Error::new(
+            span,
+            format!("Failed to parse {} as bool.", field),
         )),
     }
 }
@@ -174,6 +213,9 @@ fn parse_knobs(
                     "flavor" => {
                         config.set_flavor(namevalue.lit.clone(), namevalue.span())?;
                     }
+                    "start_paused" => {
+                        config.set_start_paused(namevalue.lit.clone(), namevalue.span())?;
+                    }
                     "core_threads" => {
                         let msg = "Attribute `core_threads` is renamed to `worker_threads`";
                         return Err(syn::Error::new_spanned(namevalue, msg));
@@ -204,11 +246,11 @@ fn parse_knobs(
                             macro_name
                         )
                     }
-                    "flavor" | "worker_threads" => {
+                    "flavor" | "worker_threads" | "start_paused" => {
                         format!("The `{}` attribute requires an argument.", name)
                     }
                     name => {
-                        format!("Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`", name)
+                        format!("Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`", name)
                     }
                 };
                 return Err(syn::Error::new_spanned(path, msg));
@@ -234,6 +276,9 @@ fn parse_knobs(
     };
     if let Some(v) = config.worker_threads {
         rt = quote! { #rt.worker_threads(#v) };
+    }
+    if let Some(v) = config.start_paused {
+        rt = quote! { #rt.start_paused(#v) };
     }
 
     let header = {
