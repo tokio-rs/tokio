@@ -218,7 +218,7 @@ fn lines_encoder() {
 
 #[test]
 fn any_delimiters_decoder_any_character() {
-    let mut codec = AnyDelimiterCodec::new(b",;\n\r", b",");
+    let mut codec = AnyDelimiterCodec::new(b",;\n\r".to_vec(), b",".to_vec());
     let buf = &mut BytesMut::new();
     buf.reserve(200);
     buf.put_slice(b"chunk 1,chunk 2;chunk 3\n\r");
@@ -239,7 +239,8 @@ fn any_delimiters_decoder_any_character() {
 fn any_delimiters_decoder_max_length() {
     const MAX_LENGTH: usize = 7;
 
-    let mut codec = AnyDelimiterCodec::new_with_max_length(b",;\n\r", b",", MAX_LENGTH);
+    let mut codec =
+        AnyDelimiterCodec::new_with_max_length(b",;\n\r".to_vec(), b",".to_vec(), MAX_LENGTH);
     let buf = &mut BytesMut::new();
 
     buf.reserve(200);
@@ -329,7 +330,8 @@ fn any_delimiters_decoder_max_length() {
 fn any_delimiter_decoder_max_length_underrun() {
     const MAX_LENGTH: usize = 7;
 
-    let mut codec = AnyDelimiterCodec::new_with_max_length(b",;\n\r", b",", MAX_LENGTH);
+    let mut codec =
+        AnyDelimiterCodec::new_with_max_length(b",;\n\r".to_vec(), b",".to_vec(), MAX_LENGTH);
     let buf = &mut BytesMut::new();
 
     buf.reserve(200);
@@ -350,7 +352,8 @@ fn any_delimiter_decoder_max_length_underrun() {
 fn any_delimiter_decoder_max_length_bursts() {
     const MAX_LENGTH: usize = 11;
 
-    let mut codec = AnyDelimiterCodec::new_with_max_length(b",;\n\r", b",", MAX_LENGTH);
+    let mut codec =
+        AnyDelimiterCodec::new_with_max_length(b",;\n\r".to_vec(), b",".to_vec(), MAX_LENGTH);
     let buf = &mut BytesMut::new();
 
     buf.reserve(200);
@@ -366,7 +369,8 @@ fn any_delimiter_decoder_max_length_bursts() {
 fn any_delimiter_decoder_max_length_big_burst() {
     const MAX_LENGTH: usize = 11;
 
-    let mut codec = AnyDelimiterCodec::new_with_max_length(b",;\n\r", b",", MAX_LENGTH);
+    let mut codec =
+        AnyDelimiterCodec::new_with_max_length(b",;\n\r".to_vec(), b",".to_vec(), MAX_LENGTH);
     let buf = &mut BytesMut::new();
 
     buf.reserve(200);
@@ -380,7 +384,8 @@ fn any_delimiter_decoder_max_length_big_burst() {
 fn any_delimiter_decoder_max_length_delimiter_between_decodes() {
     const MAX_LENGTH: usize = 5;
 
-    let mut codec = AnyDelimiterCodec::new_with_max_length(b",;\n\r", b",", MAX_LENGTH);
+    let mut codec =
+        AnyDelimiterCodec::new_with_max_length(b",;\n\r".to_vec(), b",".to_vec(), MAX_LENGTH);
     let buf = &mut BytesMut::new();
 
     buf.reserve(200);
@@ -395,7 +400,8 @@ fn any_delimiter_decoder_max_length_delimiter_between_decodes() {
 fn any_delimiter_decoder_discard_repeat() {
     const MAX_LENGTH: usize = 1;
 
-    let mut codec = AnyDelimiterCodec::new_with_max_length(b",;\n\r", b",", MAX_LENGTH);
+    let mut codec =
+        AnyDelimiterCodec::new_with_max_length(b",;\n\r".to_vec(), b",".to_vec(), MAX_LENGTH);
     let buf = &mut BytesMut::new();
 
     buf.reserve(200);
@@ -407,7 +413,7 @@ fn any_delimiter_decoder_discard_repeat() {
 
 #[test]
 fn any_delimiter_encoder() {
-    let mut codec = AnyDelimiterCodec::new(b",", b";--;");
+    let mut codec = AnyDelimiterCodec::new(b",".to_vec(), b";--;".to_vec());
     let mut buf = BytesMut::new();
 
     codec.encode("chunk 1", &mut buf).unwrap();

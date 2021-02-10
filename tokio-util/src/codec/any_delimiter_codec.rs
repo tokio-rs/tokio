@@ -1,7 +1,7 @@
 use crate::codec::decoder::Decoder;
 use crate::codec::encoder::Encoder;
 
-use bytes::{Buf, BufMut, BytesMut};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::{cmp, fmt, io, str, usize};
 
 const DEFAULT_SEEK_DELIMITERS: &[u8] = b",;\n\r";
@@ -24,7 +24,7 @@ const DEFAULT_SEQUENCE_WRITER: &[u8] = b",";
 /// #
 /// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() -> Result<(), std::io::Error> {
-/// let mut codec = AnyDelimiterCodec::new(b",;\r\n",b";");
+/// let mut codec = AnyDelimiterCodec::new(b",;\r\n".to_vec(),b";".to_vec());
 /// let buf = &mut BytesMut::new();
 /// buf.reserve(200);
 /// buf.put_slice(b"chunk 1,chunk 2;chunk 3\n\r");
@@ -72,13 +72,13 @@ impl AnyDelimiterCodec {
     /// for information on why this could be a potential security risk.
     ///
     /// [`new_with_max_length`]: crate::codec::AnyDelimiterCodec::new_with_max_length()
-    pub fn new(seek_delimiters: &[u8], sequence_writer: &[u8]) -> AnyDelimiterCodec {
+    pub fn new(seek_delimiters: Vec<u8>, sequence_writer: Vec<u8>) -> AnyDelimiterCodec {
         AnyDelimiterCodec {
             next_index: 0,
             max_length: usize::MAX,
             is_discarding: false,
-            seek_delimiters: seek_delimiters.to_vec(),
-            sequence_writer: sequence_writer.to_vec(),
+            seek_delimiters,
+            sequence_writer,
         }
     }
 
@@ -101,8 +101,8 @@ impl AnyDelimiterCodec {
     ///
     /// [`AnyDelimiterCodecError`]: crate::codec::AnyDelimiterCodecError
     pub fn new_with_max_length(
-        seek_delimiters: &[u8],
-        sequence_writer: &[u8],
+        seek_delimiters: Vec<u8>,
+        sequence_writer: Vec<u8>,
         max_length: usize,
     ) -> Self {
         AnyDelimiterCodec {
@@ -117,13 +117,13 @@ impl AnyDelimiterCodec {
     /// use std::usize;
     /// use tokio_util::codec::AnyDelimiterCodec;
     ///
-    /// let codec = AnyDelimiterCodec::new(b",;\n", b";");
+    /// let codec = AnyDelimiterCodec::new(b",;\n".to_vec(), b";".to_vec());
     /// assert_eq!(codec.max_length(), usize::MAX);
     /// ```
     /// ```
     /// use tokio_util::codec::AnyDelimiterCodec;
     ///
-    /// let codec = AnyDelimiterCodec::new_with_max_length(b",;\n", b";", 256);
+    /// let codec = AnyDelimiterCodec::new_with_max_length(b",;\n".to_vec(), b";".to_vec(), 256);
     /// assert_eq!(codec.max_length(), 256);
     /// ```
     pub fn max_length(&self) -> usize {
@@ -131,16 +131,11 @@ impl AnyDelimiterCodec {
     }
 }
 
-fn utf8(buf: &[u8]) -> Result<&str, io::Error> {
-    str::from_utf8(buf)
-        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Unable to decode input as UTF8"))
-}
-
 impl Decoder for AnyDelimiterCodec {
-    type Item = String;
+    type Item = Bytes;
     type Error = AnyDelimiterCodecError;
 
-    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<String>, AnyDelimiterCodecError> {
+    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Bytes>, AnyDelimiterCodecError> {
         loop {
             // Determine how far into the buffer we'll search for a delimiter. If
             // there's no max_length set, we'll read to the end of the buffer.
@@ -175,10 +170,10 @@ impl Decoder for AnyDelimiterCodec {
                     // Found a chunk!
                     let new_chunk_index = offset + self.next_index;
                     self.next_index = 0;
-                    let chunk = buf.split_to(new_chunk_index + 1);
-                    let chunk = &chunk[..chunk.len() - 1];
-                    let chunk = utf8(chunk)?;
-                    return Ok(Some(chunk.to_string()));
+                    let mut chunk = buf.split_to(new_chunk_index + 1);
+                    chunk.truncate(chunk.len() - 1);
+                    let chunk = chunk.freeze();
+                    return Ok(Some(chunk));
                 }
                 (false, None) if buf.len() > self.max_length => {
                     // Reached the maximum length without finding a
@@ -197,7 +192,7 @@ impl Decoder for AnyDelimiterCodec {
         }
     }
 
-    fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<String>, AnyDelimiterCodecError> {
+    fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Bytes>, AnyDelimiterCodecError> {
         Ok(match self.decode(buf)? {
             Some(frame) => Some(frame),
             None => {
@@ -206,9 +201,8 @@ impl Decoder for AnyDelimiterCodec {
                     None
                 } else {
                     let chunk = buf.split_to(buf.len());
-                    let chunk = utf8(&chunk)?;
                     self.next_index = 0;
-                    Some(chunk.to_string())
+                    Some(chunk.freeze())
                 }
             }
         })
@@ -233,7 +227,10 @@ where
 
 impl Default for AnyDelimiterCodec {
     fn default() -> Self {
-        Self::new(DEFAULT_SEEK_DELIMITERS, DEFAULT_SEQUENCE_WRITER)
+        Self::new(
+            DEFAULT_SEEK_DELIMITERS.to_vec(),
+            DEFAULT_SEQUENCE_WRITER.to_vec(),
+        )
     }
 }
 
