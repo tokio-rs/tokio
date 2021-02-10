@@ -185,7 +185,7 @@ impl Sleep {
     /// completed.
     ///
     /// To call this method, you will usually combine the call with
-    /// [`Pin::as_mut`], which lets you call the method with consuming the
+    /// [`Pin::as_mut`], which lets you call the method without consuming the
     /// `Sleep` itself.
     ///
     /// # Example
