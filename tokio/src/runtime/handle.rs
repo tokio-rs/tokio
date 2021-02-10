@@ -1,3 +1,4 @@
+use crate::coop::Budget;
 use crate::runtime::{blocking, context, io, time, Spawner};
 use std::{error, fmt};
 
@@ -33,6 +34,9 @@ pub struct Handle {
 
     /// Blocking pool spawner
     pub(super) blocking_spawner: blocking::Spawner,
+
+    /// The coop_budget used by this handle when entering the runtime and blocking on tasks.
+    pub(super) coop_budget: Budget,
 }
 
 impl Handle {
@@ -273,7 +277,7 @@ cfg_rt_core! {
         ///
         pub fn block_on<F: Future>(&self, future: F) -> F::Output {
             self.enter(|| {
-                let mut enter = crate::runtime::enter(true);
+                let mut enter = crate::runtime::enter(true, self.coop_budget);
                 enter.block_on(future).expect("failed to park thread")
             })
         }

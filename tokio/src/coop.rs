@@ -71,12 +71,12 @@ impl Budget {
     ///
     /// Note that as more yield points are added in the ecosystem, this value
     /// will probably also have to be raised.
-    const fn initial() -> Budget {
+    pub(crate) const fn initial() -> Budget {
         Budget(Some(128))
     }
 
     /// Returns an unconstrained budget. Operations will not be limited.
-    const fn unconstrained() -> Budget {
+    pub(crate) const fn unconstrained() -> Budget {
         Budget(None)
     }
 }
@@ -89,13 +89,6 @@ cfg_rt_threaded! {
     }
 }
 
-/// Run the given closure with a cooperative task budget. When the function
-/// returns, the budget is reset to the value prior to calling the function.
-#[inline(always)]
-pub(crate) fn budget<R>(f: impl FnOnce() -> R) -> R {
-    with_budget(Budget::initial(), f)
-}
-
 cfg_rt_threaded! {
     /// Set the current task's budget
     #[cfg(feature = "blocking")]
@@ -105,7 +98,7 @@ cfg_rt_threaded! {
 }
 
 #[inline(always)]
-fn with_budget<R>(budget: Budget, f: impl FnOnce() -> R) -> R {
+pub(crate) fn with_budget<R>(budget: Budget, f: impl FnOnce() -> R) -> R {
     struct ResetGuard<'a> {
         cell: &'a Cell<Budget>,
         prev: Budget,
@@ -226,6 +219,10 @@ cfg_coop! {
 #[cfg(all(test, not(loom)))]
 mod test {
     use super::*;
+
+    fn budget<R>(f: impl FnOnce() -> R) -> R {
+        with_budget(Budget::initial(), f)
+    }
 
     fn get() -> Budget {
         CURRENT.with(|cell| cell.get())

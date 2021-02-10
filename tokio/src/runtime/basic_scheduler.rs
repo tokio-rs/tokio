@@ -1,3 +1,4 @@
+use crate::coop::Budget;
 use crate::park::{Park, Unpark};
 use crate::runtime;
 use crate::runtime::task::{self, JoinHandle, Schedule, Task};
@@ -30,6 +31,9 @@ where
 
     /// Current tick
     tick: u8,
+
+    /// The coop_budget used by this scheduler when blocking on tasks.
+    coop_budget: Budget,
 
     /// Thread park handle
     park: P,
@@ -84,7 +88,7 @@ impl<P> BasicScheduler<P>
 where
     P: Park,
 {
-    pub(crate) fn new(park: P) -> BasicScheduler<P> {
+    pub(crate) fn new(park: P, coop_budget: Budget) -> BasicScheduler<P> {
         let unpark = Box::new(park.unpark());
 
         BasicScheduler {
@@ -99,6 +103,7 @@ where
                 }),
             },
             tick: 0,
+            coop_budget,
             park,
         }
     }
@@ -120,15 +125,19 @@ where
     where
         F: Future,
     {
+        let coop_budget = self.coop_budget;
+
         enter(self, |scheduler, context| {
-            let _enter = runtime::enter(false);
+            let _enter = runtime::enter(false, coop_budget);
             let waker = waker_ref(&scheduler.spawner.shared);
             let mut cx = std::task::Context::from_waker(&waker);
 
             pin!(future);
 
             'outer: loop {
-                if let Ready(v) = crate::coop::budget(|| future.as_mut().poll(&mut cx)) {
+                if let Ready(v) =
+                    crate::coop::with_budget(coop_budget, || future.as_mut().poll(&mut cx))
+                {
                     return v;
                 }
 
@@ -152,7 +161,7 @@ where
                     };
 
                     match next {
-                        Some(task) => crate::coop::budget(|| task.run()),
+                        Some(task) => crate::coop::with_budget(coop_budget, || task.run()),
                         None => {
                             // Park until the thread is signaled
                             scheduler.park.park().ok().expect("failed to park");

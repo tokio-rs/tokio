@@ -1,3 +1,4 @@
+use crate::coop::Budget;
 use std::cell::{Cell, RefCell};
 use std::fmt;
 use std::marker::PhantomData;
@@ -25,13 +26,16 @@ thread_local!(static ENTERED: Cell<EnterContext> = Cell::new(EnterContext::NotEn
 
 /// Represents an executor context.
 pub(crate) struct Enter {
+    /// Coop budget to be used when blocking on tasks.
+    coop_budget: Budget,
+
     _p: PhantomData<RefCell<()>>,
 }
 
 /// Marks the current thread as being within the dynamic extent of an
 /// executor.
-pub(crate) fn enter(allow_blocking: bool) -> Enter {
-    if let Some(enter) = try_enter(allow_blocking) {
+pub(crate) fn enter(allow_blocking: bool, coop_budget: Budget) -> Enter {
+    if let Some(enter) = try_enter(allow_blocking, coop_budget) {
         return enter;
     }
 
@@ -45,13 +49,16 @@ pub(crate) fn enter(allow_blocking: bool) -> Enter {
 
 /// Tries to enter a runtime context, returns `None` if already in a runtime
 /// context.
-pub(crate) fn try_enter(allow_blocking: bool) -> Option<Enter> {
+pub(crate) fn try_enter(allow_blocking: bool, coop_budget: Budget) -> Option<Enter> {
     ENTERED.with(|c| {
         if c.get().is_entered() {
             None
         } else {
             c.set(EnterContext::Entered { allow_blocking });
-            Some(Enter { _p: PhantomData })
+            Some(Enter {
+                coop_budget,
+                _p: PhantomData,
+            })
         }
     })
 }
@@ -157,7 +164,7 @@ cfg_block_on! {
             pin!(f);
 
             loop {
-                if let Ready(v) = crate::coop::budget(|| f.as_mut().poll(&mut cx)) {
+                if let Ready(v) = crate::coop::with_budget(self.coop_budget, || f.as_mut().poll(&mut cx)) {
                     return Ok(v);
                 }
 
@@ -193,7 +200,7 @@ cfg_blocking_impl! {
             let when = Instant::now() + timeout;
 
             loop {
-                if let Ready(v) = crate::coop::budget(|| f.as_mut().poll(&mut cx)) {
+                if let Ready(v) = crate::coop::with_budget(self.coop_budget, || f.as_mut().poll(&mut cx)) {
                     return Ok(v);
                 }
 

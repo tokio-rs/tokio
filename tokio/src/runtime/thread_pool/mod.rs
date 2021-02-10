@@ -13,6 +13,7 @@ cfg_blocking! {
     pub(crate) use worker::block_in_place;
 }
 
+use crate::coop::Budget;
 use crate::loom::sync::Arc;
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::Parker;
@@ -23,6 +24,9 @@ use std::future::Future;
 /// Work-stealing based thread pool for executing futures.
 pub(crate) struct ThreadPool {
     spawner: Spawner,
+
+    /// The coop_budget used when blocking on tasks.
+    coop_budget: Budget,
 }
 
 /// Submit futures to the associated thread pool for execution.
@@ -45,10 +49,13 @@ pub(crate) struct Spawner {
 // ===== impl ThreadPool =====
 
 impl ThreadPool {
-    pub(crate) fn new(size: usize, parker: Parker) -> (ThreadPool, Launch) {
-        let (shared, launch) = worker::create(size, parker);
+    pub(crate) fn new(size: usize, parker: Parker, coop_budget: Budget) -> (ThreadPool, Launch) {
+        let (shared, launch) = worker::create(size, parker, coop_budget);
         let spawner = Spawner { shared };
-        let thread_pool = ThreadPool { spawner };
+        let thread_pool = ThreadPool {
+            spawner,
+            coop_budget,
+        };
 
         (thread_pool, launch)
     }
@@ -78,7 +85,7 @@ impl ThreadPool {
     where
         F: Future,
     {
-        let mut enter = crate::runtime::enter(true);
+        let mut enter = crate::runtime::enter(true, self.coop_budget);
         enter.block_on(future).expect("failed to park thread")
     }
 }

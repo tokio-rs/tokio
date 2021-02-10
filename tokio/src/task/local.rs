@@ -2,6 +2,7 @@
 use crate::runtime::task::{self, JoinHandle, Task};
 use crate::sync::AtomicWaker;
 use crate::util::linked_list::LinkedList;
+use crate::coop::Budget;
 
 use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
@@ -115,6 +116,9 @@ cfg_rt_util! {
 
         /// State available from thread-local
         context: Context,
+
+        /// The coop_budget used by this LocalSet when pollin tasks tasks.
+        coop_budget: Budget,
 
         /// This type should not be Send.
         _not_send: PhantomData<*const ()>,
@@ -233,8 +237,15 @@ impl LocalSet {
                     waker: AtomicWaker::new(),
                 }),
             },
+            coop_budget: Budget::initial(),
             _not_send: PhantomData,
         }
+    }
+
+    /// Disable tokio's automated cooperative scheduling mechanism See this link for details:
+    /// <https://tokio.rs/blog/2020-04-preemption>
+    pub fn no_coop(&mut self) {
+        self.coop_budget = Budget::unconstrained();
     }
 
     /// Spawns a `!Send` task onto the local task set.
@@ -405,7 +416,7 @@ impl LocalSet {
                 // task initially. Because `LocalSet` itself is `!Send`, and
                 // `spawn_local` spawns into the `LocalSet` on the current
                 // thread, the invariant is maintained.
-                Some(task) => crate::coop::budget(|| task.run()),
+                Some(task) => crate::coop::with_budget(Budget::initial(), || task.run()),
                 // We have fully drained the queue of notified tasks, so the
                 // local future doesn't need to be notified again — it can wait
                 // until something else wakes a task in the local set.
@@ -525,7 +536,7 @@ impl<T: Future> Future for RunUntil<'_, T> {
             let _no_blocking = crate::runtime::enter::disallow_blocking();
             let f = me.future;
 
-            if let Poll::Ready(output) = crate::coop::budget(|| f.poll(cx)) {
+            if let Poll::Ready(output) = crate::coop::with_budget(Budget::initial(), || f.poll(cx)) {
                 return Poll::Ready(output);
             }
 

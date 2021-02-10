@@ -4,7 +4,7 @@
 //! "core" is handed off to a new thread allowing the scheduler to continue to
 //! make progress while the originating thread blocks.
 
-use crate::coop;
+use crate::coop::{self, Budget};
 use crate::loom::rand::seed;
 use crate::loom::sync::{Arc, Mutex};
 use crate::park::{Park, Unpark};
@@ -63,6 +63,9 @@ struct Core {
 
     /// Fast random number generator.
     rand: FastRand,
+
+    /// The coop_budget used by this handle when running tasks.
+    coop_budget: Budget,
 }
 
 /// State shared across all workers
@@ -123,7 +126,7 @@ type Notified = task::Notified<Arc<Worker>>;
 // Tracks thread-local state
 scoped_thread_local!(static CURRENT: Context);
 
-pub(super) fn create(size: usize, park: Parker) -> (Arc<Shared>, Launch) {
+pub(super) fn create(size: usize, park: Parker, coop_budget: Budget) -> (Arc<Shared>, Launch) {
     let mut cores = vec![];
     let mut remotes = vec![];
 
@@ -143,6 +146,7 @@ pub(super) fn create(size: usize, park: Parker) -> (Arc<Shared>, Launch) {
             tasks: LinkedList::new(),
             park: Some(park),
             rand: FastRand::new(seed()),
+            coop_budget,
         }));
 
         remotes.push(Remote {
@@ -297,7 +301,7 @@ fn run(worker: Arc<Worker>) {
         core: RefCell::new(None),
     };
 
-    let _enter = crate::runtime::enter(true);
+    let _enter = crate::runtime::enter(true, core.coop_budget);
 
     CURRENT.set(&cx, || {
         // This should always be an error. It only returns a `Result` to support
@@ -341,11 +345,13 @@ impl Context {
         // another idle worker to try to steal work.
         core.transition_from_searching(&self.worker);
 
+        let coop_budget = core.coop_budget;
+
         // Make the core available to the runtime context
         *self.core.borrow_mut() = Some(core);
 
         // Run the task
-        coop::budget(|| {
+        coop::with_budget(coop_budget, || {
             task.run();
 
             // As long as there is budget remaining and a task exists in the

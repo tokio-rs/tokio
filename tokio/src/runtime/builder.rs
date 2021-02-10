@@ -1,3 +1,4 @@
+use crate::coop::Budget;
 use crate::runtime::handle::Handle;
 use crate::runtime::shell::Shell;
 use crate::runtime::{blocking, io, time, Callback, Runtime, Spawner};
@@ -55,6 +56,9 @@ pub struct Builder {
     /// Cap on thread usage.
     max_threads: usize,
 
+    /// Coop budget to be used by the runtime this creates.
+    coop_budget: Budget,
+
     /// Name used for threads spawned by the runtime.
     pub(super) thread_name: String,
 
@@ -97,6 +101,8 @@ impl Builder {
             core_threads: None,
 
             max_threads: 512,
+
+            coop_budget: Budget::initial(),
 
             // Default thread name
             thread_name: "tokio-runtime-worker".into(),
@@ -294,6 +300,13 @@ impl Builder {
         self
     }
 
+    /// Disable tokio's automated cooperative scheduling mechanism See this link for details:
+    /// <https://tokio.rs/blog/2020-04-preemption>
+    pub fn no_coop(&mut self) -> &mut Self {
+        self.coop_budget = Budget::unconstrained();
+        self
+    }
+
     /// Creates the configured `Runtime`.
     ///
     /// The returned `ThreadPool` instance is ready to spawn tasks.
@@ -334,13 +347,14 @@ impl Builder {
         let blocking_spawner = blocking_pool.spawner().clone();
 
         Ok(Runtime {
-            kind: Kind::Shell(Shell::new(driver)),
+            kind: Kind::Shell(Shell::new(driver, self.coop_budget)),
             handle: Handle {
                 spawner,
                 io_handle,
                 time_handle,
                 clock,
                 blocking_spawner,
+                coop_budget: self.coop_budget,
             },
             blocking_pool,
         })
@@ -425,7 +439,7 @@ cfg_rt_core! {
             // there are no futures ready to do something, it'll let the timer or
             // the reactor to generate some new stimuli for the futures to continue
             // in their life.
-            let scheduler = BasicScheduler::new(driver);
+            let scheduler = BasicScheduler::new(driver, self.coop_budget);
             let spawner = Spawner::Basic(scheduler.spawner().clone());
 
             // Blocking pool
@@ -440,6 +454,7 @@ cfg_rt_core! {
                     time_handle,
                     clock,
                     blocking_spawner,
+                coop_budget: self.coop_budget,
                 },
                 blocking_pool,
             })
@@ -473,7 +488,7 @@ cfg_rt_threaded! {
 
             let (io_driver, io_handle) = io::create_driver(self.enable_io)?;
             let (driver, time_handle) = time::create_driver(self.enable_time, io_driver, clock.clone());
-            let (scheduler, launch) = ThreadPool::new(core_threads, Parker::new(driver));
+            let (scheduler, launch) = ThreadPool::new(core_threads, Parker::new(driver), self.coop_budget);
             let spawner = Spawner::ThreadPool(scheduler.spawner().clone());
 
             // Create the blocking pool
@@ -487,6 +502,7 @@ cfg_rt_threaded! {
                 time_handle,
                 clock,
                 blocking_spawner,
+                coop_budget: self.coop_budget,
             };
 
             // Spawn the thread pool workers

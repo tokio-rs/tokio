@@ -1,5 +1,6 @@
 #![allow(clippy::redundant_clone)]
 
+use crate::coop::Budget;
 use crate::park::{Park, Unpark};
 use crate::runtime::enter;
 use crate::runtime::time;
@@ -16,23 +17,30 @@ pub(super) struct Shell {
 
     /// TODO: don't store this
     unpark: Arc<Handle>,
+
+    /// The coop_budget used by this shell when blocking on tasks.
+    coop_budget: Budget,
 }
 
 #[derive(Debug)]
 struct Handle(<time::Driver as Park>::Unpark);
 
 impl Shell {
-    pub(super) fn new(driver: time::Driver) -> Shell {
+    pub(super) fn new(driver: time::Driver, coop_budget: Budget) -> Shell {
         let unpark = Arc::new(Handle(driver.unpark()));
 
-        Shell { driver, unpark }
+        Shell {
+            driver,
+            unpark,
+            coop_budget,
+        }
     }
 
     pub(super) fn block_on<F>(&mut self, f: F) -> F::Output
     where
         F: Future,
     {
-        let _e = enter(true);
+        let _e = enter(true, self.coop_budget);
 
         pin!(f);
 
@@ -40,7 +48,9 @@ impl Shell {
         let mut cx = Context::from_waker(&waker);
 
         loop {
-            if let Ready(v) = crate::coop::budget(|| f.as_mut().poll(&mut cx)) {
+            if let Ready(v) =
+                crate::coop::with_budget(self.coop_budget, || f.as_mut().poll(&mut cx))
+            {
                 return v;
             }
 

@@ -41,7 +41,7 @@ impl Receiver {
             return true;
         }
 
-        let mut e = match try_enter(false) {
+        let mut e = match try_enter(false, crate::coop::Budget::unconstrained()) {
             Some(enter) => enter,
             _ => {
                 if std::thread::panicking() {
