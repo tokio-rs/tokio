@@ -8,8 +8,6 @@ use std::sync::Mutex;
 /// # #[tokio::main]
 /// # async fn main() {
 /// use tokio::sync::Barrier;
-///
-/// use futures::future::join_all;
 /// use std::sync::Arc;
 ///
 /// let mut handles = Vec::with_capacity(10);
@@ -18,17 +16,25 @@ use std::sync::Mutex;
 ///     let c = barrier.clone();
 ///     // The same messages will be printed together.
 ///     // You will NOT see any interleaving.
-///     handles.push(async move {
+///     handles.push(tokio::spawn(async move {
 ///         println!("before wait");
-///         let wr = c.wait().await;
+///         let wait_result = c.wait().await;
 ///         println!("after wait");
-///         wr
-///     });
+///         wait_result
+///     }));
 /// }
-/// // Will not resolve until all "before wait" messages have been printed
-/// let wrs = join_all(handles).await;
+///
+/// // Will not resolve until all "after wait" messages have been printed
+/// let mut num_leaders = 0;
+/// for handle in handles {
+///     let wait_result = handle.await.unwrap();
+///     if wait_result.is_leader() {
+///         num_leaders += 1;
+///     }
+/// }
+///
 /// // Exactly one barrier will resolve as the "leader"
-/// assert_eq!(wrs.into_iter().filter(|wr| wr.is_leader()).count(), 1);
+/// assert_eq!(num_leaders, 1);
 /// # }
 /// ```
 #[derive(Debug)]
