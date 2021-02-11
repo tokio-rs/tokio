@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1613035997889,
+  "lastUpdate": 1613036015070,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -16369,6 +16369,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19617744,
             "range": "± 2820707",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "469b43de6aee2fe69d7961260685ae147ddb7ec0",
+          "message": "time: fix typo in Sleep doc (#3515)",
+          "timestamp": "2021-02-11T10:30:48+01:00",
+          "tree_id": "01c127af62255cb0a2592728925f2332abb44ed4",
+          "url": "https://github.com/tokio-rs/tokio/commit/469b43de6aee2fe69d7961260685ae147ddb7ec0"
+        },
+        "date": 1613036013199,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 198842,
+            "range": "± 46992",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 709893,
+            "range": "± 111516",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5225689,
+            "range": "± 878919",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20584312,
+            "range": "± 2270129",
             "unit": "ns/iter"
           }
         ]
