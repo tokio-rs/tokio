@@ -458,7 +458,7 @@ cfg_sync! {
     pub mod watch;
 
     mod once_cell;
-    pub use self::once_cell::{OnceCell, OnceCellError, Lazy};
+    pub use self::once_cell::{OnceCell, NotInitializedError, AlreadyInitializedError, Lazy};
 }
 
 cfg_not_sync! {

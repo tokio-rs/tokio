@@ -2,8 +2,10 @@
 #![cfg(feature = "full")]
 
 use std::cell::Cell;
+use std::future::Future;
 use std::io::{Cursor, SeekFrom};
 use std::net::SocketAddr;
+use std::pin::Pin;
 use std::rc::Rc;
 use tokio::net::TcpStream;
 use tokio::time::{Duration, Instant};
@@ -264,6 +266,17 @@ async_assert_fn!(tokio::sync::watch::Receiver<u8>::changed(_): Send & Sync);
 async_assert_fn!(tokio::sync::watch::Sender<u8>::closed(_): Send & Sync);
 async_assert_fn!(tokio::sync::watch::Sender<Cell<u8>>::closed(_): !Send & !Sync);
 async_assert_fn!(tokio::sync::watch::Sender<Rc<u8>>::closed(_): !Send & !Sync);
+
+async_assert_fn!(tokio::sync::OnceCell<u8>::get_or_init(
+    _, fn() -> Pin<Box<dyn Future<Output = u8> + Send>>): Send & !Sync);
+async_assert_fn!(tokio::sync::OnceCell<Cell<u8>>::get_or_init(
+    _, fn() -> Pin<Box<dyn Future<Output = Cell<u8>>>>): !Send & !Sync);
+async_assert_fn!(tokio::sync::Lazy<u8>::get(_): Send & !Sync);
+async_assert_fn!(tokio::sync::Lazy<Cell<u8>>::get(_): !Send & !Sync);
+assert_value!(tokio::sync::OnceCell<u8>: Send & Sync);
+assert_value!(tokio::sync::OnceCell<Rc<u8>>: !Send & !Sync);
+assert_value!(tokio::sync::Lazy<u8>: Send & Sync);
+assert_value!(tokio::sync::Lazy<Rc<u8>>: !Send & !Sync);
 
 async_assert_fn!(tokio::task::LocalKey<u32>::scope(_, u32, BoxFutureSync<()>): Send & Sync);
 async_assert_fn!(tokio::task::LocalKey<u32>::scope(_, u32, BoxFutureSend<()>): Send & !Sync);

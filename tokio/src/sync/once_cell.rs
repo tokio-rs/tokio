@@ -1,5 +1,3 @@
-#![cfg_attr(not(feature = "sync"), allow(dead_code, unreachable_pub))]
-
 use super::Semaphore;
 use crate::loom::cell::UnsafeCell;
 use std::cell::Cell;
@@ -38,10 +36,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 ///     }).await.unwrap();
 ///     assert_eq!(*result1, 2);
 /// }
+/// ```
 pub struct OnceCell<T> {
     value_set: AtomicBool,
     value: UnsafeCell<MaybeUninit<T>>,
-    sema: Semaphore,
+    semaphore: Semaphore,
 }
 
 impl<T> Default for OnceCell<T> {
@@ -50,11 +49,17 @@ impl<T> Default for OnceCell<T> {
     }
 }
 
-impl<T> fmt::Debug for OnceCell<T> {
+impl<T: fmt::Debug> fmt::Debug for OnceCell<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("OnceCell")
-            .field("value", &self.value)
-            .finish()
+        if self.initialized() {
+            fmt.debug_struct("OnceCell")
+                .field("value", self.get().unwrap())
+                .finish()
+        } else {
+            fmt.debug_struct("OnceCell")
+                .field("value", &format!("uninitialized"))
+                .finish()
+        }
     }
 }
 
@@ -85,11 +90,12 @@ impl<T> OnceCell<T> {
         OnceCell {
             value_set: AtomicBool::new(false),
             value: UnsafeCell::new(MaybeUninit::uninit()),
-            sema: Semaphore::const_new(1),
+            semaphore: Semaphore::const_new(1),
         }
     }
 
-    fn initialized(&self) -> bool {
+    /// Whether the value of the OnceCell is set or not
+    pub fn initialized(&self) -> bool {
         self.value_set.load(Ordering::Acquire)
     }
 
@@ -97,52 +103,57 @@ impl<T> OnceCell<T> {
         self.value_set.store(true, Ordering::Release);
     }
 
+    // SAFETY: safe to call only once self.initialized() is true
     unsafe fn get_unchecked(&self) -> &T {
         &*self.value.with(|ptr| (*ptr).as_ptr())
     }
 
+    // SAFETY: safe to call only once a permit on the semaphore has been
+    // acquired
     unsafe fn set_value(&self, value: T) {
         self.value.with_mut(|ptr| (*ptr).as_mut_ptr().write(value));
+        self.set_to_initialized();
+        self.semaphore.close();
     }
 
     /// Tries to get a reference to the value of the OnceCell.
     ///
-    /// Returns [`OnceCellError::NotInitialized`] if the value of the OnceCell
+    /// Returns [`NotInitializedError`] if the value of the OnceCell
     /// hasn't previously been initialized
     ///
-    /// [`OnceCellError::NotInitialized`]: crate::sync::OnceCellError::NotInitialized
-    pub fn get(&self) -> Result<&T, OnceCellError> {
+    /// [`NotInitializedError`]: crate::sync::NotInitializedError
+    pub fn get(&self) -> Result<&T, NotInitializedError> {
         if self.initialized() {
             Ok(unsafe { self.get_unchecked() })
         } else {
-            Err(OnceCellError::NotInitialized)
+            Err(NotInitializedError)
         }
     }
 
     /// Sets the value of the OnceCell to the argument value.
     ///
     /// If the value of the OnceCell was already set prior to this call, then
-    /// [`OnceCellError::AlreadyInitialized`] is returned
+    /// [`AlreadyInitializedError`] is returned
     ///
-    /// [`OnceCellError::AlreadyInitialized`]: crate::sync::OnceCellError::AlreadyInitialized
-    pub fn set(&self, value: T) -> Result<(), OnceCellError> {
+    /// [`AlreadyInitializedError`]: crate::sync::AlreadyInitializedError
+    pub fn set(&self, value: T) -> Result<(), AlreadyInitializedError> {
         if !self.initialized() {
             // After acquire().await we have either acquired a permit while self.value
             // is still uninitialized, or another thread has intialized the value and
             // closed the semaphore, in which case self.initialized is true and we
             // don't set the value
-            match self.sema.try_acquire() {
+            match self.semaphore.try_acquire() {
                 Ok(_permit) => {
                     if !self.initialized() {
                         // SAFETY: There is only one permit on the semaphore, hence only one
                         // mutable reference is created
                         unsafe { self.set_value(value) };
 
-                        self.set_to_initialized();
-                        self.sema.close();
                         return Ok(());
                     } else {
-                        panic!("acquired the permit after OnceCell value was already initialized");
+                        unreachable!(
+                            "acquired the permit after OnceCell value was already initialized"
+                        );
                     }
                 }
                 _ => {
@@ -155,7 +166,7 @@ impl<T> OnceCell<T> {
             }
         }
 
-        Err(OnceCellError::AlreadyInitialized)
+        Err(AlreadyInitializedError)
     }
 
     /// Tries to initialize the value of the OnceCell using the async function `f`.
@@ -163,9 +174,10 @@ impl<T> OnceCell<T> {
     /// a reference to that initialized value is returned
     ///
     /// This will deadlock if `f` tries to initialize the cell itself.
-    pub async fn get_or_init<F>(&self, f: F) -> &T
+    pub async fn get_or_init<F, Fut>(&self, f: F) -> &T
     where
-        F: Fn() -> Pin<Box<dyn Future<Output = T> + Send>>,
+        F: FnOnce() -> Fut,
+        Fut: Future<Output = T>,
     {
         if self.initialized() {
             // SAFETY: once the value is initialized, no mutable references are given out, so
@@ -176,7 +188,7 @@ impl<T> OnceCell<T> {
             // is still uninitialized, or current thread is awoken after another thread
             // has intialized the value and closed the semaphore, in which case self.initialized
             // is true and we don't set the value here
-            match self.sema.acquire().await {
+            match self.semaphore.acquire().await {
                 Ok(_permit) => {
                     if !self.initialized() {
                         let value = f().await;
@@ -185,17 +197,11 @@ impl<T> OnceCell<T> {
                         // mutable reference is created
                         unsafe { self.set_value(value) };
 
-                        // It's important that we close the semaphore only after set_to_initialized call
-                        // otherwise a waiting thread would be woken up and find an uninitialized
-                        // state after failing to acquire a permit, which causes a panic
-                        self.set_to_initialized();
-                        self.sema.close();
-
                         // SAFETY: once the value is initialized, no mutable references are given out, so
                         // we can give out arbitrarily many immutable references
                         return unsafe { self.get_unchecked() };
                     } else {
-                        panic!("acquired semaphore after value was already initialized");
+                        unreachable!("acquired semaphore after value was already initialized");
                     }
                 }
                 Err(_) => {
@@ -204,7 +210,9 @@ impl<T> OnceCell<T> {
                         // we can give out arbitrarily many immutable references
                         return unsafe { self.get_unchecked() };
                     } else {
-                        panic!("semaphore acquire call failed when value not already intialized");
+                        unreachable!(
+                            "semaphore acquire call failed when value not already intialized"
+                        );
                     }
                 }
             }
@@ -212,21 +220,23 @@ impl<T> OnceCell<T> {
     }
 }
 
+// OnceCell is Send (and Sync) because access to its UnsafeCell
+// is guarded by the semaphore permit and atomic operations
+// on `value_set`, as long as T itself is Send (and Sync)
 unsafe impl<T: Sync + Send> Sync for OnceCell<T> {}
 unsafe impl<T: Send> Send for OnceCell<T> {}
 
-/// Error returned from the [`OnceCell::get`] and [`OnceCell::set`] methods
+/// Error returned from the [`OnceCell::set`] method
 ///
-/// [`OnceCell::get`]: crate::sync::OnceCell::get
 /// [`OnceCell::set`]: crate::sync::OnceCell::set
 #[derive(Debug, PartialEq)]
-pub enum OnceCellError {
-    /// The value in OnceCell was already initialized
-    AlreadyInitialized,
+pub struct AlreadyInitializedError;
 
-    /// The value in OnceCell was not previously initialized
-    NotInitialized,
-}
+/// Error returned from the [`OnceCell::get`] method
+///
+/// [`OnceCell::get`]: crate::sync::OnceCell::get
+#[derive(Debug, PartialEq)]
+pub struct NotInitializedError;
 
 /// Allows one to lazily call an async function
 ///

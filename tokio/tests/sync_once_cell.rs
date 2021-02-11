@@ -2,7 +2,7 @@
 #![cfg(feature = "full")]
 
 use tokio::runtime::Runtime;
-use tokio::sync::{Lazy, OnceCell, OnceCellError};
+use tokio::sync::{AlreadyInitializedError, Lazy, NotInitializedError, OnceCell};
 use tokio::time::sleep;
 
 use std::future::Future;
@@ -63,7 +63,7 @@ fn set_and_get() {
 fn get_uninit() {
     static ONCE: OnceCell<u32> = OnceCell::new();
     let uninit = ONCE.get();
-    assert_eq!(uninit, Err(OnceCellError::NotInitialized));
+    assert_eq!(uninit, Err(NotInitializedError));
 }
 
 #[test]
@@ -73,7 +73,7 @@ fn set_twice() {
     let first = ONCE.set(5);
     assert_eq!(first, Ok(()));
     let second = ONCE.set(6);
-    assert_eq!(second, Err(OnceCellError::AlreadyInitialized));
+    assert_eq!(second, Err(AlreadyInitializedError));
 }
 
 #[test]
