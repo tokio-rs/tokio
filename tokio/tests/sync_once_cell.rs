@@ -3,25 +3,31 @@
 
 use tokio::runtime::Runtime;
 use tokio::sync::{AlreadyInitializedError, Lazy, NotInitializedError, OnceCell};
-use tokio::time::sleep;
+use tokio::time::{pause, sleep, Duration, Instant};
 
 use std::future::Future;
 use std::pin::Pin;
-use std::time::{Duration, Instant};
 
-fn func1() -> Pin<Box<dyn Future<Output = u32> + Send>> {
-    async fn f() -> u32 {
-        5
-    }
-    Box::pin(f())
+async fn func1() -> u32 {
+    5
 }
 
-fn func2() -> Pin<Box<dyn Future<Output = u32> + Send>> {
+async fn func2() -> u32 {
+    sleep(Duration::from_secs(1)).await;
+    10
+}
+
+fn func_lazy() -> Pin<Box<dyn Future<Output = u32> + Send>> {
     async fn f() -> u32 {
         sleep(Duration::from_secs(1)).await;
         10
     }
     Box::pin(f())
+}
+
+async fn func_panic() -> u32 {
+    sleep(Duration::from_secs(1)).await;
+    panic!();
 }
 
 #[test]
@@ -38,6 +44,28 @@ fn get_or_init() {
 
         let result2 = rt
             .spawn(async { ONCE.get_or_init(func2).await })
+            .await
+            .unwrap();
+
+        assert_eq!(*result1, 5);
+        assert_eq!(*result2, 5);
+    });
+}
+
+#[test]
+fn get_or_init_panic() {
+    let rt = Runtime::new().unwrap();
+
+    static ONCE: OnceCell<u32> = OnceCell::new();
+
+    rt.block_on(async {
+        let result1 = rt
+            .spawn(async { ONCE.get_or_init(func1).await })
+            .await
+            .unwrap();
+
+        let result2 = rt
+            .spawn(async { ONCE.get_or_init(func_panic).await })
             .await
             .unwrap();
 
@@ -79,8 +107,9 @@ fn set_twice() {
 #[test]
 fn lazy() {
     // func2 sleeps for 1 second
-    static LAZY: Lazy<u32> = Lazy::new(func2);
+    static LAZY: Lazy<u32> = Lazy::new(func_lazy);
     let rt = Runtime::new().unwrap();
+    pause();
 
     rt.block_on(async {
         let start_time1 = Instant::now();
