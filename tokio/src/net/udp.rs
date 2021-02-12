@@ -23,10 +23,12 @@ cfg_net! {
     ///   and [`recv`](`UdpSocket::recv`) to communicate only with that remote address
     ///
     /// This type does not provide a `split` method, because this functionality
-    /// can be achieved by wrapping the socket in an [`Arc`]. Note that you do
-    /// not need a `Mutex` to share the `UdpSocket` — an `Arc<UdpSocket>` is
-    /// enough. This is because all of the methods take `&self` instead of `&mut
-    /// self`.
+    /// can be achieved by instead wrapping the socket in an [`Arc`]. Note that
+    /// you do not need a `Mutex` to share the `UdpSocket` — an `Arc<UdpSocket>`
+    /// is enough. This is because all of the methods take `&self` instead of
+    /// `&mut self`. Once you have wrapped it in an `Arc`, you can call
+    /// `.clone()` on the `Arc<UdpSocket>` to get multiple shared handles to the
+    /// same socket. An example of such usage can be found further down.
     ///
     /// [`Arc`]: std::sync::Arc
     ///
