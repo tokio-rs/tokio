@@ -7,7 +7,9 @@ use std::ops;
 /// RAII structure used to release the exclusive write access of a lock when
 /// dropped.
 ///
-/// This structure is created by [mapping] an [`RwLockWriteGuard`].
+/// This structure is created by [mapping] an [`RwLockWriteGuard`]. It is a
+/// separate type from `RwLockWriteGuard` to disallow downgrading a mapped
+/// guard, since doing so can cause undefined behavior.
 ///
 /// [mapping]: method@crate::sync::RwLockWriteGuard::map
 /// [`RwLockWriteGuard`]: struct@crate::sync::RwLockWriteGuard
