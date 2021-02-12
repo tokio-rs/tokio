@@ -1021,39 +1021,45 @@ rt_test! {
     // other tasks.
     #[test]
     fn ping_pong_saturation() {
+        use std::sync::atomic::{Ordering, AtomicBool};
         use tokio::sync::mpsc;
 
         const NUM: usize = 100;
 
         let rt = rt();
 
+        let running = Arc::new(AtomicBool::new(true));
+
         rt.block_on(async {
             let (spawned_tx, mut spawned_rx) = mpsc::unbounded_channel();
 
+            let mut tasks = vec![];
             // Spawn a bunch of tasks that ping ping between each other to
             // saturate the runtime.
             for _ in 0..NUM {
                 let (tx1, mut rx1) = mpsc::unbounded_channel();
                 let (tx2, mut rx2) = mpsc::unbounded_channel();
                 let spawned_tx = spawned_tx.clone();
-
-                task::spawn(async move {
+                let running = running.clone();
+                tasks.push(task::spawn(async move {
                     spawned_tx.send(()).unwrap();
 
-                    tx1.send(()).unwrap();
 
-                    loop {
-                        rx2.recv().await.unwrap();
+                    while running.load(Ordering::Relaxed) {
                         tx1.send(()).unwrap();
+                        rx2.recv().await.unwrap();
                     }
-                });
 
-                task::spawn(async move {
-                    loop {
-                        rx1.recv().await.unwrap();
+                    // Close the channel and wait for the other task to exit.
+                    drop(tx1);
+                    assert!(rx2.recv().await.is_none());
+                }));
+
+                tasks.push(task::spawn(async move {
+                    while rx1.recv().await.is_some() {
                         tx2.send(()).unwrap();
                     }
-                });
+                }));
             }
 
             for _ in 0..NUM {
@@ -1068,6 +1074,10 @@ rt_test! {
                 }
             });
             handle.await.unwrap();
+            running.store(false, Ordering::Relaxed);
+            for t in tasks {
+                t.await.unwrap();
+            }
         });
     }
 }

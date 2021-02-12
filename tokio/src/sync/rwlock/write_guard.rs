@@ -151,7 +151,7 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
     /// locks, since [`RwLock`] is fair and it is possible that a writer is next
     /// in line.
     ///
-    /// Returns an RAII guard which will drop the read access of this rwlock
+    /// Returns an RAII guard which will drop this read access of the `RwLock`
     /// when dropped.
     ///
     /// # Examples

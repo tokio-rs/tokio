@@ -8,7 +8,15 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 pin_project! {
-    /// Stream for the [`lines`](crate::io::AsyncBufReadExt::lines) method.
+    /// Read lines from an [`AsyncBufRead`].
+    ///
+    /// A `Lines` can be turned into a `Stream` with [`LinesStream`].
+    ///
+    /// This type is usually created using the [`lines`] method.
+    ///
+    /// [`AsyncBufRead`]: crate::io::AsyncBufRead
+    /// [`LinesStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.LinesStream.html
+    /// [`lines`]: crate::io::AsyncBufReadExt::lines
     #[derive(Debug)]
     #[must_use = "streams do nothing unless polled"]
     #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]

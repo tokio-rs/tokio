@@ -22,10 +22,11 @@ pub struct Sender<T> {
 
 /// Permit to send one value into the channel.
 ///
-/// `Permit` values are returned by [`Sender::reserve()`] and are used to
-/// guarantee channel capacity before generating a message to send.
+/// `Permit` values are returned by [`Sender::reserve()`] and [`Sender::try_reserve()`]
+/// and are used to guarantee channel capacity before generating a message to send.
 ///
 /// [`Sender::reserve()`]: Sender::reserve
+/// [`Sender::try_reserve()`]: Sender::try_reserve
 pub struct Permit<'a, T> {
     chan: &'a chan::Tx<T, Semaphore>,
 }
@@ -33,6 +34,10 @@ pub struct Permit<'a, T> {
 /// Receive values from the associated `Sender`.
 ///
 /// Instances are created by the [`channel`](channel) function.
+///
+/// This receiver can be turned into a `Stream` using [`ReceiverStream`].
+///
+/// [`ReceiverStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.ReceiverStream.html
 pub struct Receiver<T> {
     /// The channel receiver
     chan: chan::Rx<T, Semaphore>,
@@ -104,8 +109,21 @@ impl<T> Receiver<T> {
 
     /// Receives the next value for this receiver.
     ///
-    /// `None` is returned when all `Sender` halves have dropped, indicating
-    /// that no further values can be sent on the channel.
+    /// This method returns `None` if the channel has been closed and there are
+    /// no remaining messages in the channel's buffer. This indicates that no
+    /// further values can ever be received from this `Receiver`. The channel is
+    /// closed when all senders have been dropped, or when [`close`] is called.
+    ///
+    /// If there are no messages in the channel's buffer, but the channel has
+    /// not yet been closed, this method will sleep until a message is sent or
+    /// the channel is closed.
+    ///
+    /// Note that if [`close`] is called, but there are still outstanding
+    /// [`Permits`] from before it was closed, the channel is not considered
+    /// closed by `recv` until the permits are released.
+    ///
+    /// [`close`]: Self::close
+    /// [`Permits`]: struct@crate::sync::mpsc::Permit
     ///
     /// # Examples
     ///
@@ -147,6 +165,27 @@ impl<T> Receiver<T> {
     }
 
     /// Blocking receive to call outside of asynchronous contexts.
+    ///
+    /// This method returns `None` if the channel has been closed and there are
+    /// no remaining messages in the channel's buffer. This indicates that no
+    /// further values can ever be received from this `Receiver`. The channel is
+    /// closed when all senders have been dropped, or when [`close`] is called.
+    ///
+    /// If there are no messages in the channel's buffer, but the channel has
+    /// not yet been closed, this method will block until a message is sent or
+    /// the channel is closed.
+    ///
+    /// This method is intended for use cases where you are sending from
+    /// asynchronous code to synchronous code, and will work even if the sender
+    /// is not using [`blocking_send`] to send the message.
+    ///
+    /// Note that if [`close`] is called, but there are still outstanding
+    /// [`Permits`] from before it was closed, the channel is not considered
+    /// closed by `blocking_recv` until the permits are released.
+    ///
+    /// [`close`]: Self::close
+    /// [`Permits`]: struct@crate::sync::mpsc::Permit
+    /// [`blocking_send`]: fn@crate::sync::mpsc::Sender::blocking_send
     ///
     /// # Panics
     ///
@@ -197,14 +236,16 @@ impl<T> Receiver<T> {
         self.chan.try_recv()
     }
 
-    /// Closes the receiving half of a channel, without dropping it.
+    /// Closes the receiving half of a channel without dropping it.
     ///
     /// This prevents any further messages from being sent on the channel while
     /// still enabling the receiver to drain messages that are buffered. Any
     /// outstanding [`Permit`] values will still be able to send messages.
     ///
-    /// In order to guarantee no messages are dropped, after calling `close()`,
-    /// `recv()` must be called until `None` is returned.
+    /// To guarantee that no messages are dropped, after calling `close()`,
+    /// `recv()` must be called until `None` is returned. If there are
+    /// outstanding [`Permit`] values, the `recv` method will not return `None`
+    /// until those are released.
     ///
     /// [`Permit`]: Permit
     ///
@@ -356,7 +397,7 @@ impl<T> Sender<T> {
     ///         tx4.closed(),
     ///         tx5.closed()
     ///     );
-    ////     println!("Receiver dropped");
+    ///     println!("Receiver dropped");
     /// }
     /// ```
     pub async fn closed(&self) {
@@ -501,6 +542,12 @@ impl<T> Sender<T> {
 
     /// Blocking send to call outside of asynchronous contexts.
     ///
+    /// This method is intended for use cases where you are sending from
+    /// synchronous code to asynchronous code, and will work even if the
+    /// receiver is not using [`blocking_recv`] to receive the message.
+    ///
+    /// [`blocking_recv`]: fn@crate::sync::mpsc::Receiver::blocking_recv
+    ///
     /// # Panics
     ///
     /// This function panics if called within an asynchronous execution
@@ -595,6 +642,58 @@ impl<T> Sender<T> {
         match self.chan.semaphore().0.acquire(1).await {
             Ok(_) => {}
             Err(_) => return Err(SendError(())),
+        }
+
+        Ok(Permit { chan: &self.chan })
+    }
+
+    /// Try to acquire a slot in the channel without waiting for the slot to become
+    /// available.
+    ///
+    /// If the channel is full this function will return [`TrySendError`], otherwise
+    /// if there is a slot available it will return a [`Permit`] that will then allow you
+    /// to [`send`] on the channel with a guaranteed slot. This function is similar to
+    /// [`reserve`] except it does not await for the slot to become available.
+    ///
+    /// Dropping [`Permit`] without sending a message releases the capacity back
+    /// to the channel.
+    ///
+    /// [`Permit`]: Permit
+    /// [`send`]: Permit::send
+    /// [`reserve`]: Sender::reserve
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::channel(1);
+    ///
+    ///     // Reserve capacity
+    ///     let permit = tx.try_reserve().unwrap();
+    ///
+    ///     // Trying to send directly on the `tx` will fail due to no
+    ///     // available capacity.
+    ///     assert!(tx.try_send(123).is_err());
+    ///
+    ///     // Trying to reserve an additional slot on the `tx` will
+    ///     // fail because there is no capacity.
+    ///     assert!(tx.try_reserve().is_err());
+    ///
+    ///     // Sending on the permit succeeds
+    ///     permit.send(456);
+    ///
+    ///     // The value sent on the permit is received
+    ///     assert_eq!(rx.recv().await.unwrap(), 456);
+    ///
+    /// }
+    /// ```
+    pub fn try_reserve(&self) -> Result<Permit<'_, T>, TrySendError<()>> {
+        match self.chan.semaphore().0.try_acquire(1) {
+            Ok(_) => {}
+            Err(_) => return Err(TrySendError::Full(())),
         }
 
         Ok(Permit { chan: &self.chan })

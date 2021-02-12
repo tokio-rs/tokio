@@ -131,7 +131,11 @@ impl<T: AsyncWrite> AsyncWrite for WriteHalf<T> {
 
 impl<T> Inner<T> {
     fn poll_lock(&self, cx: &mut Context<'_>) -> Poll<Guard<'_, T>> {
-        if !self.locked.compare_and_swap(false, true, Acquire) {
+        if self
+            .locked
+            .compare_exchange(false, true, Acquire, Acquire)
+            .is_ok()
+        {
             Poll::Ready(Guard { inner: self })
         } else {
             // Spin... but investigate a better strategy

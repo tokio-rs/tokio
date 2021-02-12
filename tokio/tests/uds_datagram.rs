@@ -230,3 +230,95 @@ async fn try_send_to_recv_from() -> std::io::Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn try_recv_buf_from() -> std::io::Result<()> {
+    let dir = tempfile::tempdir().unwrap();
+    let server_path = dir.path().join("server.sock");
+    let client_path = dir.path().join("client.sock");
+
+    // Create listener
+    let server = UnixDatagram::bind(&server_path)?;
+
+    // Create socket pair
+    let client = UnixDatagram::bind(&client_path)?;
+
+    for _ in 0..5 {
+        loop {
+            client.writable().await?;
+
+            match client.try_send_to(b"hello world", &server_path) {
+                Ok(n) => {
+                    assert_eq!(n, 11);
+                    break;
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => panic!("{:?}", e),
+            }
+        }
+
+        loop {
+            server.readable().await?;
+
+            let mut buf = Vec::with_capacity(512);
+
+            match server.try_recv_buf_from(&mut buf) {
+                Ok((n, addr)) => {
+                    assert_eq!(n, 11);
+                    assert_eq!(addr.as_pathname(), Some(client_path.as_ref()));
+                    assert_eq!(&buf[0..11], &b"hello world"[..]);
+                    break;
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => panic!("{:?}", e),
+            }
+        }
+    }
+
+    Ok(())
+}
+
+// Even though we use sync non-blocking io we still need a reactor.
+#[tokio::test]
+async fn try_recv_buf_never_block() -> io::Result<()> {
+    let payload = b"PAYLOAD";
+    let mut count = 0;
+
+    let (dgram1, dgram2) = UnixDatagram::pair()?;
+
+    // Send until we hit the OS `net.unix.max_dgram_qlen`.
+    loop {
+        dgram1.writable().await.unwrap();
+
+        match dgram1.try_send(payload) {
+            Err(err) => match err.kind() {
+                io::ErrorKind::WouldBlock | io::ErrorKind::Other => break,
+                _ => unreachable!("unexpected error {:?}", err),
+            },
+            Ok(len) => {
+                assert_eq!(len, payload.len());
+            }
+        }
+        count += 1;
+    }
+
+    // Read every dgram we sent.
+    while count > 0 {
+        let mut recv_buf = Vec::with_capacity(16);
+
+        dgram2.readable().await.unwrap();
+        let len = dgram2.try_recv_buf(&mut recv_buf)?;
+        assert_eq!(len, payload.len());
+        assert_eq!(payload, &recv_buf[..len]);
+        count -= 1;
+    }
+
+    let mut recv_buf = vec![0; 16];
+    let err = dgram2.try_recv_from(&mut recv_buf).unwrap_err();
+    match err.kind() {
+        io::ErrorKind::WouldBlock => (),
+        _ => unreachable!("unexpected error {:?}", err),
+    }
+
+    Ok(())
+}

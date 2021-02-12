@@ -61,6 +61,11 @@ use std::ops;
 /// Receives values from the associated [`Sender`](struct@Sender).
 ///
 /// Instances are created by the [`channel`](fn@channel) function.
+///
+/// To turn this receiver into a `Stream`, you can use the [`WatchStream`]
+/// wrapper.
+///
+/// [`WatchStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.WatchStream.html
 #[derive(Debug)]
 pub struct Receiver<T> {
     /// Pointer to the shared state

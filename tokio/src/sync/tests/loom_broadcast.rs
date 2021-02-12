@@ -178,3 +178,30 @@ fn drop_rx() {
         assert_ok!(th2.join());
     });
 }
+
+#[test]
+fn drop_multiple_rx_with_overflow() {
+    loom::model(move || {
+        // It is essential to have multiple senders and receivers in this test case.
+        let (tx, mut rx) = broadcast::channel(1);
+        let _rx2 = tx.subscribe();
+
+        let _ = tx.send(());
+        let tx2 = tx.clone();
+        let th1 = thread::spawn(move || {
+            block_on(async {
+                for _ in 0..100 {
+                    let _ = tx2.send(());
+                }
+            });
+        });
+        let _ = tx.send(());
+
+        let th2 = thread::spawn(move || {
+            block_on(async { while let Ok(_) = rx.recv().await {} });
+        });
+
+        assert_ok!(th1.join());
+        assert_ok!(th2.join());
+    });
+}

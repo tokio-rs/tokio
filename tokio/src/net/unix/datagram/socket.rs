@@ -5,10 +5,14 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::net::Shutdown;
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net;
 use std::path::Path;
 use std::task::{Context, Poll};
+
+cfg_io_util! {
+    use bytes::BufMut;
+}
 
 cfg_net_unix! {
     /// An I/O object representing a Unix datagram socket.
@@ -16,10 +20,18 @@ cfg_net_unix! {
     /// A socket can be either named (associated with a filesystem path) or
     /// unnamed.
     ///
+    /// This type does not provide a `split` method, because this functionality
+    /// can be achieved by wrapping the socket in an [`Arc`]. Note that you do
+    /// not need a `Mutex` to share the `UnixDatagram` — an `Arc<UnixDatagram>`
+    /// is enough. This is because all of the methods take `&self` instead of
+    /// `&mut self`.
+    ///
     /// **Note:** named sockets are persisted even after the object is dropped
     /// and the program has exited, and cannot be reconnected. It is advised
     /// that you either check for and unlink the existing socket if it exists,
     /// or use a temporary file that is guaranteed to not already exist.
+    ///
+    /// [`Arc`]: std::sync::Arc
     ///
     /// # Examples
     /// Using named sockets, associated with a filesystem path:
@@ -364,6 +376,36 @@ impl UnixDatagram {
         Ok(UnixDatagram { io })
     }
 
+    /// Turn a [`tokio::net::UnixDatagram`] into a [`std::os::unix::net::UnixDatagram`].
+    ///
+    /// The returned [`std::os::unix::net::UnixDatagram`] will have nonblocking
+    /// mode set as `true`.  Use [`set_nonblocking`] to change the blocking mode
+    /// if needed.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use std::error::Error;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let tokio_socket = tokio::net::UnixDatagram::bind("127.0.0.1:0")?;
+    ///     let std_socket = tokio_socket.into_std()?;
+    ///     std_socket.set_nonblocking(false)?;
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// [`tokio::net::UnixDatagram`]: UnixDatagram
+    /// [`std::os::unix::net::UnixDatagram`]: std::os::unix::net::UnixDatagram
+    /// [`set_nonblocking`]: fn@std::os::unix::net::UnixDatagram::set_nonblocking
+    pub fn into_std(self) -> io::Result<std::os::unix::net::UnixDatagram> {
+        self.io
+            .into_inner()
+            .map(|io| io.into_raw_fd())
+            .map(|raw_fd| unsafe { std::os::unix::net::UnixDatagram::from_raw_fd(raw_fd) })
+    }
+
     fn new(socket: mio::net::UnixDatagram) -> io::Result<UnixDatagram> {
         let io = PollEvented::new(socket)?;
         Ok(UnixDatagram { io })
@@ -650,6 +692,130 @@ impl UnixDatagram {
         self.io
             .registration()
             .try_io(Interest::READABLE, || self.io.recv(buf))
+    }
+
+    cfg_io_util! {
+        /// Try to receive data from the socket without waiting.
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::net::UnixDatagram;
+        /// use std::io;
+        ///
+        /// #[tokio::main]
+        /// async fn main() -> io::Result<()> {
+        ///     // Connect to a peer
+        ///     let dir = tempfile::tempdir().unwrap();
+        ///     let client_path = dir.path().join("client.sock");
+        ///     let server_path = dir.path().join("server.sock");
+        ///     let socket = UnixDatagram::bind(&client_path)?;
+        ///
+        ///     loop {
+        ///         // Wait for the socket to be readable
+        ///         socket.readable().await?;
+        ///
+        ///         let mut buf = Vec::with_capacity(1024);
+        ///
+        ///         // Try to recv data, this may still fail with `WouldBlock`
+        ///         // if the readiness event is a false positive.
+        ///         match socket.try_recv_buf_from(&mut buf) {
+        ///             Ok((n, _addr)) => {
+        ///                 println!("GOT {:?}", &buf[..n]);
+        ///                 break;
+        ///             }
+        ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+        ///                 continue;
+        ///             }
+        ///             Err(e) => {
+        ///                 return Err(e);
+        ///             }
+        ///         }
+        ///     }
+        ///
+        ///     Ok(())
+        /// }
+        /// ```
+        pub fn try_recv_buf_from<B: BufMut>(&self, buf: &mut B) -> io::Result<(usize, SocketAddr)> {
+            let (n, addr) = self.io.registration().try_io(Interest::READABLE, || {
+                let dst = buf.chunk_mut();
+                let dst =
+                    unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
+
+                // Safety: We trust `UnixDatagram::recv_from` to have filled up `n` bytes in the
+                // buffer.
+                let (n, addr) = (&*self.io).recv_from(dst)?;
+
+                unsafe {
+                    buf.advance_mut(n);
+                }
+
+                Ok((n, addr))
+            })?;
+
+            Ok((n, SocketAddr(addr)))
+        }
+
+        /// Try to read data from the stream into the provided buffer, advancing the
+        /// buffer's internal cursor, returning how many bytes were read.
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::net::UnixDatagram;
+        /// use std::io;
+        ///
+        /// #[tokio::main]
+        /// async fn main() -> io::Result<()> {
+        ///     // Connect to a peer
+        ///     let dir = tempfile::tempdir().unwrap();
+        ///     let client_path = dir.path().join("client.sock");
+        ///     let server_path = dir.path().join("server.sock");
+        ///     let socket = UnixDatagram::bind(&client_path)?;
+        ///     socket.connect(&server_path)?;
+        ///
+        ///     loop {
+        ///         // Wait for the socket to be readable
+        ///         socket.readable().await?;
+        ///
+        ///         let mut buf = Vec::with_capacity(1024);
+        ///
+        ///         // Try to recv data, this may still fail with `WouldBlock`
+        ///         // if the readiness event is a false positive.
+        ///         match socket.try_recv_buf(&mut buf) {
+        ///             Ok(n) => {
+        ///                 println!("GOT {:?}", &buf[..n]);
+        ///                 break;
+        ///             }
+        ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+        ///                 continue;
+        ///             }
+        ///             Err(e) => {
+        ///                 return Err(e);
+        ///             }
+        ///         }
+        ///     }
+        ///
+        ///     Ok(())
+        /// }
+        /// ```
+        pub fn try_recv_buf<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
+            self.io.registration().try_io(Interest::READABLE, || {
+                let dst = buf.chunk_mut();
+                let dst =
+                    unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
+
+                // Safety: We trust `UnixDatagram::recv` to have filled up `n` bytes in the
+                // buffer.
+                let n = (&*self.io).recv(dst)?;
+
+                unsafe {
+                    buf.advance_mut(n);
+                }
+
+                Ok(n)
+            })
+        }
     }
 
     /// Sends data on the socket to the specified address.

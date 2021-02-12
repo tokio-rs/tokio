@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/tokio/1.0.0")]
+#![doc(html_root_url = "https://docs.rs/tokio/1.2.0")]
 #![allow(
     clippy::cognitive_complexity,
     clippy::large_enum_variant,
@@ -301,7 +301,7 @@
 //! Beware though that this will pull in many extra dependencies that you may not
 //! need.
 //!
-//! - `full`: Enables all Tokio public API features listed below.
+//! - `full`: Enables all Tokio public API features listed below except `test-util`.
 //! - `rt`: Enables `tokio::spawn`, the basic (current thread) scheduler,
 //!         and non-scheduler utilities.
 //! - `rt-multi-thread`: Enables the heavier, multi-threaded, work-stealing scheduler.

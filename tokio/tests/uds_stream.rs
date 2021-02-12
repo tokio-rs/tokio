@@ -252,3 +252,85 @@ fn write_until_pending(stream: &mut UnixStream) {
         }
     }
 }
+
+#[tokio::test]
+async fn try_read_buf() -> std::io::Result<()> {
+    let msg = b"hello world";
+
+    let dir = tempfile::tempdir()?;
+    let bind_path = dir.path().join("bind.sock");
+
+    // Create listener
+    let listener = UnixListener::bind(&bind_path)?;
+
+    // Create socket pair
+    let client = UnixStream::connect(&bind_path).await?;
+
+    let (server, _) = listener.accept().await?;
+    let mut written = msg.to_vec();
+
+    // Track the server receiving data
+    let mut readable = task::spawn(server.readable());
+    assert_pending!(readable.poll());
+
+    // Write data.
+    client.writable().await?;
+    assert_eq!(msg.len(), client.try_write(msg)?);
+
+    // The task should be notified
+    while !readable.is_woken() {
+        tokio::task::yield_now().await;
+    }
+
+    // Fill the write buffer
+    loop {
+        // Still ready
+        let mut writable = task::spawn(client.writable());
+        assert_ready_ok!(writable.poll());
+
+        match client.try_write(msg) {
+            Ok(n) => written.extend(&msg[..n]),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                break;
+            }
+            Err(e) => panic!("error = {:?}", e),
+        }
+    }
+
+    {
+        // Write buffer full
+        let mut writable = task::spawn(client.writable());
+        assert_pending!(writable.poll());
+
+        // Drain the socket from the server end
+        let mut read = Vec::with_capacity(written.len());
+        let mut i = 0;
+
+        while i < read.capacity() {
+            server.readable().await?;
+
+            match server.try_read_buf(&mut read) {
+                Ok(n) => i += n,
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => panic!("error = {:?}", e),
+            }
+        }
+
+        assert_eq!(read, written);
+    }
+
+    // Now, we listen for shutdown
+    drop(client);
+
+    loop {
+        let ready = server.ready(Interest::READABLE).await?;
+
+        if ready.is_read_closed() {
+            break;
+        } else {
+            tokio::task::yield_now().await;
+        }
+    }
+
+    Ok(())
+}

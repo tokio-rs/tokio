@@ -97,6 +97,51 @@
 //! }
 //! ```
 //!
+//! With some coordination, we can also pipe the output of one command into
+//! another.
+//!
+//! ```no_run
+//! use tokio::join;
+//! use tokio::process::Command;
+//! use std::convert::TryInto;
+//! use std::process::Stdio;
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let mut echo = Command::new("echo")
+//!         .arg("hello world!")
+//!         .stdout(Stdio::piped())
+//!         .spawn()
+//!         .expect("failed to spawn echo");
+//!
+//!     let tr_stdin: Stdio = echo
+//!         .stdout
+//!         .take()
+//!         .unwrap()
+//!         .try_into()
+//!         .expect("failed to convert to Stdio");
+//!
+//!     let tr = Command::new("tr")
+//!         .arg("a-z")
+//!         .arg("A-Z")
+//!         .stdin(tr_stdin)
+//!         .stdout(Stdio::piped())
+//!         .spawn()
+//!         .expect("failed to spawn tr");
+//!
+//!     let (echo_result, tr_output) = join!(echo.wait(), tr.wait_with_output());
+//!
+//!     assert!(echo_result.unwrap().success());
+//!
+//!     let tr_output = tr_output.expect("failed to await tr");
+//!     assert!(tr_output.status.success());
+//!
+//!     assert_eq!(tr_output.stdout, b"HELLO WORLD!\n");
+//!
+//!     Ok(())
+//! }
+//! ```
+//!
 //! # Caveats
 //!
 //! ## Dropping/Cancellation
@@ -147,6 +192,7 @@ mod kill;
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 use crate::process::kill::Kill;
 
+use std::convert::TryInto;
 use std::ffi::OsStr;
 use std::future::Future;
 use std::io;
@@ -839,15 +885,38 @@ pub struct Child {
     child: FusedChild,
 
     /// The handle for writing to the child's standard input (stdin), if it has
-    /// been captured.
+    /// been captured. To avoid partially moving the `child` and thus blocking
+    /// yourself from calling functions on `child` while using `stdin`, you might
+    /// find it helpful to do:
+    ///
+    /// ```no_run
+    /// # let mut child = tokio::process::Command::new("echo").spawn().unwrap();
+    /// let stdin = child.stdin.take().unwrap();
+    /// ```
     pub stdin: Option<ChildStdin>,
 
     /// The handle for reading from the child's standard output (stdout), if it
-    /// has been captured.
+    /// has been captured. You might find it helpful to do
+    ///
+    /// ```no_run
+    /// # let mut child = tokio::process::Command::new("echo").spawn().unwrap();
+    /// let stdout = child.stdout.take().unwrap();
+    /// ```
+    ///
+    /// to avoid partially moving the `child` and thus blocking yourself from calling
+    /// functions on `child` while using `stdout`.
     pub stdout: Option<ChildStdout>,
 
     /// The handle for reading from the child's standard error (stderr), if it
-    /// has been captured.
+    /// has been captured. You might find it helpful to do
+    ///
+    /// ```no_run
+    /// # let mut child = tokio::process::Command::new("echo").spawn().unwrap();
+    /// let stderr = child.stderr.take().unwrap();
+    /// ```
+    ///
+    /// to avoid partially moving the `child` and thus blocking yourself from calling
+    /// functions on `child` while using `stderr`.
     pub stderr: Option<ChildStderr>,
 }
 
@@ -921,7 +990,36 @@ impl Child {
     /// before waiting. This helps avoid deadlock: it ensures that the
     /// child does not block waiting for input from the parent, while
     /// the parent waits for the child to exit.
+    ///
+    /// If the caller wishes to explicitly control when the child's stdin
+    /// handle is closed, they may `.take()` it before calling `.wait()`:
+    ///
+    /// ```no_run
+    /// use tokio::io::AsyncWriteExt;
+    /// use tokio::process::Command;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut child = Command::new("cat").spawn().unwrap();
+    ///
+    ///     let mut stdin = child.stdin.take().unwrap();
+    ///     tokio::spawn(async move {
+    ///         // do something with stdin here...
+    ///         stdin.write_all(b"hello world\n").await.unwrap();
+    ///
+    ///         // then drop when finished
+    ///         drop(stdin);
+    ///     });
+    ///
+    ///     // wait for the process to complete
+    ///     let _ = child.wait().await;
+    /// }
+    /// ```
     pub async fn wait(&mut self) -> io::Result<ExitStatus> {
+        // Ensure stdin is closed so the child isn't stuck waiting on
+        // input while the parent is waiting for it to exit.
+        drop(self.stdin.take());
+
         match &mut self.child {
             FusedChild::Done(exit) => Ok(*exit),
             FusedChild::Child(child) => {
@@ -995,7 +1093,6 @@ impl Child {
             Ok(vec)
         }
 
-        drop(self.stdin.take());
         let stdout_fut = read_to_end(self.stdout.take());
         let stderr_fut = read_to_end(self.stderr.take());
 
@@ -1073,6 +1170,30 @@ impl AsyncRead for ChildStderr {
     ) -> Poll<io::Result<()>> {
         // Safety: pipes support reading into uninitialized memory
         unsafe { self.inner.poll_read(cx, buf) }
+    }
+}
+
+impl TryInto<Stdio> for ChildStdin {
+    type Error = io::Error;
+
+    fn try_into(self) -> Result<Stdio, Self::Error> {
+        imp::convert_to_stdio(self.inner)
+    }
+}
+
+impl TryInto<Stdio> for ChildStdout {
+    type Error = io::Error;
+
+    fn try_into(self) -> Result<Stdio, Self::Error> {
+        imp::convert_to_stdio(self.inner)
+    }
+}
+
+impl TryInto<Stdio> for ChildStderr {
+    type Error = io::Error;
+
+    fn try_into(self) -> Result<Stdio, Self::Error> {
+        imp::convert_to_stdio(self.inner)
     }
 }
 

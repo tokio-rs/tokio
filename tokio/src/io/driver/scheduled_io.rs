@@ -355,6 +355,12 @@ impl ScheduledIo {
         // result isn't important
         let _ = self.set_readiness(None, Tick::Clear(event.tick), |curr| curr - mask_no_closed);
     }
+
+    pub(crate) fn clear_wakers(&self) {
+        let mut waiters = self.waiters.lock();
+        waiters.reader.take();
+        waiters.writer.take();
+    }
 }
 
 impl Drop for ScheduledIo {

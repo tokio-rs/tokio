@@ -8,7 +8,11 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 pin_project! {
-    /// Stream for the [`split`](crate::io::AsyncBufReadExt::split) method.
+    /// Splitter for the [`split`](crate::io::AsyncBufReadExt::split) method.
+    ///
+    /// A `Split` can be turned into a `Stream` with [`SplitStream`].
+    ///
+    /// [`SplitStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.SplitStream.html
     #[derive(Debug)]
     #[must_use = "streams do nothing unless polled"]
     #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]

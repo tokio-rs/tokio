@@ -17,7 +17,7 @@ cfg_not_test_util! {
     }
 
     impl Clock {
-        pub(crate) fn new(_enable_pausing: bool) -> Clock {
+        pub(crate) fn new(_enable_pausing: bool, _start_paused: bool) -> Clock {
             Clock {}
         }
 
@@ -78,7 +78,8 @@ cfg_test_util! {
     /// that depend on time.
     ///
     /// Pausing time requires the `current_thread` Tokio runtime. This is the
-    /// default runtime used by `#[tokio::test]`
+    /// default runtime used by `#[tokio::test]`. The runtime can be initialized
+    /// with time in a paused state using the `Builder::start_paused` method.
     ///
     /// # Panics
     ///
@@ -149,16 +150,22 @@ cfg_test_util! {
     impl Clock {
         /// Return a new `Clock` instance that uses the current execution context's
         /// source of time.
-        pub(crate) fn new(enable_pausing: bool) -> Clock {
+        pub(crate) fn new(enable_pausing: bool, start_paused: bool) -> Clock {
             let now = std::time::Instant::now();
 
-            Clock {
+            let clock = Clock {
                 inner: Arc::new(Mutex::new(Inner {
                     enable_pausing,
                     base: now,
                     unfrozen: Some(now),
                 })),
+            };
+
+            if start_paused {
+                clock.pause();
             }
+
+            clock
         }
 
         pub(crate) fn pause(&self) {

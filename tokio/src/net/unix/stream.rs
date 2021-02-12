@@ -9,11 +9,15 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::net::Shutdown;
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net;
 use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+
+cfg_io_util! {
+    use bytes::BufMut;
+}
 
 cfg_net_unix! {
     /// A structure representing a connected Unix socket.
@@ -267,6 +271,87 @@ impl UnixStream {
             .try_io(Interest::READABLE, || (&*self.io).read(buf))
     }
 
+    cfg_io_util! {
+        /// Try to read data from the stream into the provided buffer, advancing the
+        /// buffer's internal cursor, returning how many bytes were read.
+        ///
+        /// Receives any pending data from the socket but does not wait for new data
+        /// to arrive. On success, returns the number of bytes read. Because
+        /// `try_read_buf()` is non-blocking, the buffer does not have to be stored by
+        /// the async task and can exist entirely on the stack.
+        ///
+        /// Usually, [`readable()`] or [`ready()`] is used with this function.
+        ///
+        /// [`readable()`]: UnixStream::readable()
+        /// [`ready()`]: UnixStream::ready()
+        ///
+        /// # Return
+        ///
+        /// If data is successfully read, `Ok(n)` is returned, where `n` is the
+        /// number of bytes read. `Ok(0)` indicates the stream's read half is closed
+        /// and will no longer yield data. If the stream is not ready to read data
+        /// `Err(io::ErrorKind::WouldBlock)` is returned.
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::net::UnixStream;
+        /// use std::error::Error;
+        /// use std::io;
+        ///
+        /// #[tokio::main]
+        /// async fn main() -> Result<(), Box<dyn Error>> {
+        ///     // Connect to a peer
+        ///     let dir = tempfile::tempdir().unwrap();
+        ///     let bind_path = dir.path().join("bind_path");
+        ///     let stream = UnixStream::connect(bind_path).await?;
+        ///
+        ///     loop {
+        ///         // Wait for the socket to be readable
+        ///         stream.readable().await?;
+        ///
+        ///         let mut buf = Vec::with_capacity(4096);
+        ///
+        ///         // Try to read data, this may still fail with `WouldBlock`
+        ///         // if the readiness event is a false positive.
+        ///         match stream.try_read_buf(&mut buf) {
+        ///             Ok(0) => break,
+        ///             Ok(n) => {
+        ///                 println!("read {} bytes", n);
+        ///             }
+        ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+        ///                 continue;
+        ///             }
+        ///             Err(e) => {
+        ///                 return Err(e.into());
+        ///             }
+        ///         }
+        ///     }
+        ///
+        ///     Ok(())
+        /// }
+        /// ```
+        pub fn try_read_buf<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
+            self.io.registration().try_io(Interest::READABLE, || {
+                use std::io::Read;
+
+                let dst = buf.chunk_mut();
+                let dst =
+                    unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
+
+                // Safety: We trust `UnixStream::read` to have filled up `n` bytes in the
+                // buffer.
+                let n = (&*self.io).read(dst)?;
+
+                unsafe {
+                    buf.advance_mut(n);
+                }
+
+                Ok(n)
+            })
+        }
+    }
+
     /// Wait for the socket to become writable.
     ///
     /// This function is equivalent to `ready(Interest::WRITABLE)` and is usually
@@ -421,6 +506,51 @@ impl UnixStream {
         let io = PollEvented::new(stream)?;
 
         Ok(UnixStream { io })
+    }
+
+    /// Turn a [`tokio::net::UnixStream`] into a [`std::os::unix::net::UnixStream`].
+    ///
+    /// The returned [`std::os::unix::net::UnixStream`] will have nonblocking
+    /// mode set as `true`.  Use [`set_nonblocking`] to change the blocking
+    /// mode if needed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::error::Error;
+    /// use std::io::Read;
+    /// use tokio::net::UnixListener;
+    /// # use tokio::net::UnixStream;
+    /// # use tokio::io::AsyncWriteExt;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let dir = tempfile::tempdir().unwrap();
+    ///     let bind_path = dir.path().join("bind_path");
+    ///
+    ///     let mut data = [0u8; 12];
+    ///     let listener = UnixListener::bind(&bind_path)?;
+    /// #   let handle = tokio::spawn(async {
+    /// #       let mut stream = UnixStream::connect(bind_path).await.unwrap();
+    /// #       stream.write(b"Hello world!").await.unwrap();
+    /// #   });
+    ///     let (tokio_unix_stream, _) = listener.accept().await?;
+    ///     let mut std_unix_stream = tokio_unix_stream.into_std()?;
+    /// #   handle.await.expect("The task being joined has panicked");
+    ///     std_unix_stream.set_nonblocking(false)?;
+    ///     std_unix_stream.read_exact(&mut data)?;
+    /// #   assert_eq!(b"Hello world!", &data);
+    ///     Ok(())
+    /// }
+    /// ```
+    /// [`tokio::net::UnixStream`]: UnixStream
+    /// [`std::os::unix::net::UnixStream`]: std::os::unix::net::UnixStream
+    /// [`set_nonblocking`]: fn@std::os::unix::net::UnixStream::set_nonblocking
+    pub fn into_std(self) -> io::Result<std::os::unix::net::UnixStream> {
+        self.io
+            .into_inner()
+            .map(|io| io.into_raw_fd())
+            .map(|raw_fd| unsafe { std::os::unix::net::UnixStream::from_raw_fd(raw_fd) })
     }
 
     /// Creates an unnamed pair of connected sockets.

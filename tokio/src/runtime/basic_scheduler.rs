@@ -129,7 +129,7 @@ impl<P: Park> BasicScheduler<P> {
         pin!(future);
 
         // Attempt to steal the dedicated parker and block_on the future if we can there,
-        // othwerwise, lets select on a notification that the parker is available
+        // otherwise, lets select on a notification that the parker is available
         // or the future is complete.
         loop {
             if let Some(inner) = &mut self.take_inner() {

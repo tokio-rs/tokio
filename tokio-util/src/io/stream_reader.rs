@@ -51,7 +51,7 @@ pin_project! {
     /// ```
     ///
     /// [`AsyncRead`]: tokio::io::AsyncRead
-    /// [`Stream`]: tokio_stream::Stream
+    /// [`Stream`]: futures_core::Stream
     /// [`ReaderStream`]: crate::io::ReaderStream
     #[derive(Debug)]
     pub struct StreamReader<S, B> {
@@ -90,6 +90,36 @@ where
         } else {
             false
         }
+    }
+}
+
+impl<S, B> StreamReader<S, B> {
+    /// Gets a reference to the underlying stream.
+    ///
+    /// It is inadvisable to directly read from the underlying stream.
+    pub fn get_ref(&self) -> &S {
+        &self.inner
+    }
+
+    /// Gets a mutable reference to the underlying stream.
+    ///
+    /// It is inadvisable to directly read from the underlying stream.
+    pub fn get_mut(&mut self) -> &mut S {
+        &mut self.inner
+    }
+
+    /// Gets a pinned mutable reference to the underlying stream.
+    ///
+    /// It is inadvisable to directly read from the underlying stream.
+    pub fn get_pin_mut(self: Pin<&mut Self>) -> Pin<&mut S> {
+        self.project().inner
+    }
+
+    /// Consumes this `BufWriter`, returning the underlying stream.
+    ///
+    /// Note that any leftover data in the internal buffer is lost.
+    pub fn into_inner(self) -> S {
+        self.inner
     }
 }
 

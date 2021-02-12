@@ -1,4 +1,5 @@
-use crate::{Next, Stream};
+use crate::stream_ext::Next;
+use crate::Stream;
 
 use core::future::Future;
 use core::marker::PhantomPinned;

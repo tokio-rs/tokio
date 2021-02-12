@@ -446,7 +446,7 @@ macro_rules! select {
 
     (@ { $($t:tt)* } ) => {
         // No `else` branch
-        $crate::select!(@{ $($t)*; unreachable!() })
+        $crate::select!(@{ $($t)*; panic!("all branches are disabled and there is no else branch") })
     };
     (@ { $($t:tt)* } else => $else:expr $(,)?) => {
         $crate::select!(@{ $($t)*; $else })

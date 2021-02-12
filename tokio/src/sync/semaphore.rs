@@ -13,6 +13,11 @@ use std::sync::Arc;
 /// function immediately returns a permit. However, if no remaining permits are
 /// available, `acquire` (asynchronously) waits until an outstanding permit is
 /// dropped. At this point, the freed permit is assigned to the caller.
+///
+/// To use the `Semaphore` in a poll function, you can use the [`PollSemaphore`]
+/// utility.
+///
+/// [`PollSemaphore`]: https://docs.rs/tokio-util/0.6/tokio_util/sync/struct.PollSemaphore.html
 #[derive(Debug)]
 pub struct Semaphore {
     /// The low level semaphore

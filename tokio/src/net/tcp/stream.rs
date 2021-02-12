@@ -8,20 +8,20 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::net::{Shutdown, SocketAddr};
-#[cfg(windows)]
-use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket};
-
-#[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
+
+cfg_io_util! {
+    use bytes::BufMut;
+}
 
 cfg_net! {
     /// A TCP stream between a local and a remote socket.
     ///
     /// A TCP stream can either be created by connecting to an endpoint, via the
-    /// [`connect`] method, or by [accepting] a connection from a [listener].
+    /// [`connect`] method, or by [accepting] a connection from a [listener]. A
+    /// TCP stream can also be created via the [`TcpSocket`] type.
     ///
     /// Reading and writing to a `TcpStream` is usually done using the
     /// convenience methods found on the [`AsyncReadExt`] and [`AsyncWriteExt`]
@@ -30,6 +30,7 @@ cfg_net! {
     /// [`connect`]: method@TcpStream::connect
     /// [accepting]: method@crate::net::TcpListener::accept
     /// [listener]: struct@crate::net::TcpListener
+    /// [`TcpSocket`]: struct@crate::net::TcpSocket
     /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     ///
@@ -72,16 +73,17 @@ impl TcpStream {
     /// Opens a TCP connection to a remote host.
     ///
     /// `addr` is an address of the remote host. Anything which implements the
-    /// [`ToSocketAddrs`] trait can be supplied as the address. Note that
-    /// strings only implement this trait when the **`net`** feature is enabled,
-    /// as strings may contain domain names that need to be resolved.
+    /// [`ToSocketAddrs`] trait can be supplied as the address.  If `addr`
+    /// yields multiple addresses, connect will be attempted with each of the
+    /// addresses until a connection is successful. If none of the addresses
+    /// result in a successful connection, the error returned from the last
+    /// connection attempt (the last address) is returned.
     ///
-    /// If `addr` yields multiple addresses, connect will be attempted with each
-    /// of the addresses until a connection is successful. If none of the
-    /// addresses result in a successful connection, the error returned from the
-    /// last connection attempt (the last address) is returned.
+    /// To configure the socket before connecting, you can use the [`TcpSocket`]
+    /// type.
     ///
     /// [`ToSocketAddrs`]: trait@crate::net::ToSocketAddrs
+    /// [`TcpSocket`]: struct@crate::net::TcpSocket
     ///
     /// # Examples
     ///
@@ -192,7 +194,7 @@ impl TcpStream {
 
     /// Turn a [`tokio::net::TcpStream`] into a [`std::net::TcpStream`].
     ///
-    /// The returned [`std::net::TcpStream`] will have `nonblocking mode` set as `true`.
+    /// The returned [`std::net::TcpStream`] will have nonblocking mode set as `true`.
     /// Use [`set_nonblocking`] to change the blocking mode if needed.
     ///
     /// # Examples
@@ -227,6 +229,7 @@ impl TcpStream {
     pub fn into_std(self) -> io::Result<std::net::TcpStream> {
         #[cfg(unix)]
         {
+            use std::os::unix::io::{FromRawFd, IntoRawFd};
             self.io
                 .into_inner()
                 .map(|io| io.into_raw_fd())
@@ -235,6 +238,7 @@ impl TcpStream {
 
         #[cfg(windows)]
         {
+            use std::os::windows::io::{FromRawSocket, IntoRawSocket};
             self.io
                 .into_inner()
                 .map(|io| io.into_raw_socket())
@@ -559,6 +563,85 @@ impl TcpStream {
             .try_io(Interest::READABLE, || (&*self.io).read(buf))
     }
 
+    cfg_io_util! {
+        /// Try to read data from the stream into the provided buffer, advancing the
+        /// buffer's internal cursor, returning how many bytes were read.
+        ///
+        /// Receives any pending data from the socket but does not wait for new data
+        /// to arrive. On success, returns the number of bytes read. Because
+        /// `try_read_buf()` is non-blocking, the buffer does not have to be stored by
+        /// the async task and can exist entirely on the stack.
+        ///
+        /// Usually, [`readable()`] or [`ready()`] is used with this function.
+        ///
+        /// [`readable()`]: TcpStream::readable()
+        /// [`ready()`]: TcpStream::ready()
+        ///
+        /// # Return
+        ///
+        /// If data is successfully read, `Ok(n)` is returned, where `n` is the
+        /// number of bytes read. `Ok(0)` indicates the stream's read half is closed
+        /// and will no longer yield data. If the stream is not ready to read data
+        /// `Err(io::ErrorKind::WouldBlock)` is returned.
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::net::TcpStream;
+        /// use std::error::Error;
+        /// use std::io;
+        ///
+        /// #[tokio::main]
+        /// async fn main() -> Result<(), Box<dyn Error>> {
+        ///     // Connect to a peer
+        ///     let stream = TcpStream::connect("127.0.0.1:8080").await?;
+        ///
+        ///     loop {
+        ///         // Wait for the socket to be readable
+        ///         stream.readable().await?;
+        ///
+        ///         let mut buf = Vec::with_capacity(4096);
+        ///
+        ///         // Try to read data, this may still fail with `WouldBlock`
+        ///         // if the readiness event is a false positive.
+        ///         match stream.try_read_buf(&mut buf) {
+        ///             Ok(0) => break,
+        ///             Ok(n) => {
+        ///                 println!("read {} bytes", n);
+        ///             }
+        ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+        ///                 continue;
+        ///             }
+        ///             Err(e) => {
+        ///                 return Err(e.into());
+        ///             }
+        ///         }
+        ///     }
+        ///
+        ///     Ok(())
+        /// }
+        /// ```
+        pub fn try_read_buf<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
+            self.io.registration().try_io(Interest::READABLE, || {
+                use std::io::Read;
+
+                let dst = buf.chunk_mut();
+                let dst =
+                    unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
+
+                // Safety: We trust `TcpStream::read` to have filled up `n` bytes in the
+                // buffer.
+                let n = (&*self.io).read(dst)?;
+
+                unsafe {
+                    buf.advance_mut(n);
+                }
+
+                Ok(n)
+            })
+        }
+    }
+
     /// Wait for the socket to become writable.
     ///
     /// This function is equivalent to `ready(Interest::WRITABLE)` and is usually
@@ -846,11 +929,13 @@ impl TcpStream {
     fn to_mio(&self) -> mio::net::TcpSocket {
         #[cfg(windows)]
         {
+            use std::os::windows::io::{AsRawSocket, FromRawSocket};
             unsafe { mio::net::TcpSocket::from_raw_socket(self.as_raw_socket()) }
         }
 
         #[cfg(unix)]
         {
+            use std::os::unix::io::{AsRawFd, FromRawFd};
             unsafe { mio::net::TcpSocket::from_raw_fd(self.as_raw_fd()) }
         }
     }
