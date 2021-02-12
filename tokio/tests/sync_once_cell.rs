@@ -13,7 +13,7 @@ async fn func1() -> u32 {
 }
 
 async fn func2() -> u32 {
-    sleep(Duration::from_secs(1)).await;
+    sleep(Duration::from_millis(10)).await;
     10
 }
 
@@ -106,10 +106,9 @@ fn set_twice() {
 
 #[test]
 fn lazy() {
-    // func2 sleeps for 1 second
+    // func2 sleeps for 10ms
     static LAZY: Lazy<u32> = Lazy::new(func_lazy);
     let rt = Runtime::new().unwrap();
-    pause();
 
     rt.block_on(async {
         let start_time1 = Instant::now();

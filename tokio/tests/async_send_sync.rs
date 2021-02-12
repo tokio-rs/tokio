@@ -267,10 +267,10 @@ async_assert_fn!(tokio::sync::watch::Sender<u8>::closed(_): Send & Sync);
 async_assert_fn!(tokio::sync::watch::Sender<Cell<u8>>::closed(_): !Send & !Sync);
 async_assert_fn!(tokio::sync::watch::Sender<Rc<u8>>::closed(_): !Send & !Sync);
 
+async_assert_fn!(tokio::sync::OnceCell<Cell<u8>>::get_or_init(
+    _, fn() -> Pin<Box<dyn Future<Output = Cell<u8>> + Send + Sync>>): Send & Sync);
 async_assert_fn!(tokio::sync::OnceCell<u8>::get_or_init(
     _, fn() -> Pin<Box<dyn Future<Output = u8> + Send>>): Send & !Sync);
-async_assert_fn!(tokio::sync::OnceCell<Cell<u8>>::get_or_init(
-    _, fn() -> Pin<Box<dyn Future<Output = Cell<u8>>>>): !Send & !Sync);
 async_assert_fn!(tokio::sync::OnceCell<Rc<u8>>::get_or_init(
     _, fn() -> Pin<Box<dyn Future<Output = Rc<u8>>>>): !Send & !Sync);
 async_assert_fn!(tokio::sync::Lazy<u8>::get(_): Send & !Sync);
