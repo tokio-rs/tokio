@@ -17,8 +17,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 /// # Examples
 /// ```
 /// use tokio::sync::OnceCell;
-/// use std::pin::Pin;
-/// use std::future::Future;
 ///
 /// async fn some_computation() -> u32 {
 ///     1 + 1
@@ -259,8 +257,6 @@ impl Error for NotInitializedError {}
 /// # Examples
 /// ```
 /// use tokio::sync::Lazy;
-/// use std::pin::Pin;
-/// use std::future::Future;
 ///
 ///
 /// async fn some_computation() -> u32 {

@@ -3,7 +3,7 @@
 
 use tokio::runtime::Runtime;
 use tokio::sync::{AlreadyInitializedError, Lazy, NotInitializedError, OnceCell};
-use tokio::time::{pause, sleep, Duration, Instant};
+use tokio::time::{sleep, Duration, Instant};
 
 use std::future::Future;
 use std::pin::Pin;
