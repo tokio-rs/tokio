@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1613211348513,
+  "lastUpdate": 1613211353146,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -39059,6 +39059,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 831082,
             "range": "± 176888",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7c6a1c463773d435a4a36486ac5c21850a0eaf0c",
+          "message": "net: update UdpSocket splitting doc (#3517)",
+          "timestamp": "2021-02-13T11:13:42+01:00",
+          "tree_id": "60690a4aa68780ba5f410a84149966d89bd1c649",
+          "url": "https://github.com/tokio-rs/tokio/commit/7c6a1c463773d435a4a36486ac5c21850a0eaf0c"
+        },
+        "date": 1613211347551,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6871733,
+            "range": "± 2419877",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6813269,
+            "range": "± 1664344",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6707887,
+            "range": "± 2707508",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 652,
+            "range": "± 22",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 667,
+            "range": "± 26",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 664,
+            "range": "± 7",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 80816,
+            "range": "± 2975",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1572,
+            "range": "± 180",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1137760,
+            "range": "± 8631",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 825229,
+            "range": "± 7599",
             "unit": "ns/iter"
           }
         ]
