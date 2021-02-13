@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1613123142812,
+  "lastUpdate": 1613211335999,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -16573,6 +16573,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21269661,
             "range": "± 3373695",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7c6a1c463773d435a4a36486ac5c21850a0eaf0c",
+          "message": "net: update UdpSocket splitting doc (#3517)",
+          "timestamp": "2021-02-13T11:13:42+01:00",
+          "tree_id": "60690a4aa68780ba5f410a84149966d89bd1c649",
+          "url": "https://github.com/tokio-rs/tokio/commit/7c6a1c463773d435a4a36486ac5c21850a0eaf0c"
+        },
+        "date": 1613211334186,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 191895,
+            "range": "± 70870",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 693237,
+            "range": "± 197376",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4830969,
+            "range": "± 1077105",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19222289,
+            "range": "± 2541029",
             "unit": "ns/iter"
           }
         ]
