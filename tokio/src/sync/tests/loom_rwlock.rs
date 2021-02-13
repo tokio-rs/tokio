@@ -68,7 +68,7 @@ fn concurrent_read_write() {
         });
 
         {
-            let guard = blcok_on(rwlock.clone().read_owned());
+            let guard = block_on(rwlock.clone().read_owned());
             //at this state the value on the lock may either be 0, 5, or 10
             assert!(*guard == 0 || *guard == 5 || *guard == 10);
         }
