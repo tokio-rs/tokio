@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1613211339408,
+  "lastUpdate": 1613211348513,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -8747,6 +8747,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 468,
             "range": "± 114",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7c6a1c463773d435a4a36486ac5c21850a0eaf0c",
+          "message": "net: update UdpSocket splitting doc (#3517)",
+          "timestamp": "2021-02-13T11:13:42+01:00",
+          "tree_id": "60690a4aa68780ba5f410a84149966d89bd1c649",
+          "url": "https://github.com/tokio-rs/tokio/commit/7c6a1c463773d435a4a36486ac5c21850a0eaf0c"
+        },
+        "date": 1613211346163,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 965,
+            "range": "± 232",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 17935,
+            "range": "± 7217",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1021,
+            "range": "± 209",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 16913,
+            "range": "± 5837",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 581,
+            "range": "± 140",
             "unit": "ns/iter"
           }
         ]
