@@ -567,7 +567,7 @@ impl<T: ?Sized> RwLock<T> {
     /// async fn main() {
     ///     let rw = Arc::new(RwLock::new(1));
     ///
-    ///     let v = rw.read().await;
+    ///     let v = Arc::clone(&rw).read_owned().await;
     ///     assert_eq!(*v, 1);
     ///
     ///     assert!(rw.try_write_owned().is_err());
