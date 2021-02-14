@@ -44,6 +44,12 @@ pub struct Builder {
     /// Whether or not to enable the I/O driver
     enable_io: bool,
 
+    /// Whether or not to enable the signal driver
+    enable_signal: bool,
+
+    /// Whether or not to enable the process driver - implies the signal driver will activate
+    enable_process: bool,
+
     /// Whether or not to enable the time driver
     enable_time: bool,
 
@@ -114,6 +120,12 @@ impl Builder {
 
             // I/O defaults to "off"
             enable_io: false,
+
+            // Process defaults to "off"
+            enable_process: false,
+
+            // Signal defaults to "off"
+            enable_signal: false,
 
             // Time defaults to "off"
             enable_time: false,
@@ -405,6 +417,8 @@ impl Builder {
                 Kind::MultiThread => false,
             },
             enable_io: self.enable_io,
+            enable_signal: self.enable_signal,
+            enable_process: self.enable_process,
             enable_time: self.enable_time,
             start_paused: self.start_paused,
         }
@@ -465,7 +479,7 @@ impl Builder {
 
 cfg_io_driver! {
     impl Builder {
-        /// Enables the I/O driver.
+        /// Enables the complete I/O driver.
         ///
         /// Doing this enables using net, process, signal, and some I/O types on
         /// the runtime.
@@ -482,6 +496,49 @@ cfg_io_driver! {
         /// ```
         pub fn enable_io(&mut self) -> &mut Self {
             self.enable_io = true;
+            self.enable_signal = true;
+            self.enable_process = true;
+            self
+        }
+
+        /// Enables the minimal I/O driver.
+        ///
+        /// Doing this enables using net, and some I/O types on
+        /// the runtime. This does not activate process or signal handling.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_minimal_io()
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        pub fn enable_minimal_io(&mut self) -> &mut Self {
+            self.enable_io = true;
+            self
+        }
+
+        /// Enables the minimal I/O driver with signal handling.
+        ///
+        /// Doing this enables using net, signal, and some I/O types on
+        /// the runtime. This does not activate process handling.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_signal()
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        pub fn enable_signal(&mut self) -> &mut Self {
+            self.enable_io = true;
+            self.enable_signal = true;
             self
         }
     }
