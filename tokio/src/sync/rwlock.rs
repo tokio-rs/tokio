@@ -379,6 +379,57 @@ impl<T: ?Sized> RwLock<T> {
         })
     }
 
+    /// Attempts to acquire this `RwLock` with shared read access.
+    ///
+    /// If the access couldn't be acquired immediately, returns [`TryLockError`].
+    /// Otherwise, an RAII guard is returned which will release read access
+    /// when dropped.
+    ///
+    /// This method is identical to [`RwLock::try_read`], except that the
+    /// returned guard references the `RwLock` with an [`Arc`] rather than by
+    /// borrowing it. Therefore, the `RwLock` must be wrapped in an `Arc` to
+    /// call this method, and the guard will live for the `'static` lifetime,
+    /// as it keeps the `RwLock` alive by holding an `Arc`.
+    ///
+    /// [`TryLockError`]: TryLockError
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::RwLock;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let lock = Arc::new(RwLock::new(1));
+    ///     let c_lock = lock.clone();
+    ///
+    ///     let v = lock.try_read_owned().unwrap();
+    ///     assert_eq!(*v, 1);
+    ///
+    ///     tokio::spawn(async move {
+    ///         // While main has an active read lock, we acquire one too.
+    ///         let n = c_lock.read_owned().await;
+    ///         assert_eq!(*n, 1);
+    ///     }).await.expect("The spawned task has panicked");
+    ///
+    ///     // Drop the guard when spawned task finishes.
+    ///     drop(v);
+    /// }
+    /// ```
+    pub fn try_read_owned(self: Arc<Self>) -> Result<OwnedRwLockReadGuard<T>, TryLockError> {
+        match self.s.try_acquire(1) {
+            Ok(permit) => permit,
+            Err(TryAcquireError::NoPermits) => return Err(TryLockError(())),
+            Err(TryAcquireError::Closed) => unreachable!(),
+        }
+
+        Ok(OwnedRwLockReadGuard {
+            data: self.c.get(),
+            lock: ManuallyDrop::new(self),
+        })
+    }
+
     /// Locks this `RwLock` with exclusive write access, causing the current
     /// task to yield until the lock has been acquired.
     ///
@@ -489,6 +540,49 @@ impl<T: ?Sized> RwLock<T> {
             s: &self.s,
             data: self.c.get(),
             marker: marker::PhantomData,
+        })
+    }
+
+    /// Attempts to acquire this `RwLock` with exclusive write access.
+    ///
+    /// If the access couldn't be acquired immediately, returns [`TryLockError`].
+    /// Otherwise, an RAII guard is returned which will release write access
+    /// when dropped.
+    ///
+    /// This method is identical to [`RwLock::try_write`], except that the
+    /// returned guard references the `RwLock` with an [`Arc`] rather than by
+    /// borrowing it. Therefore, the `RwLock` must be wrapped in an `Arc` to
+    /// call this method, and the guard will live for the `'static` lifetime,
+    /// as it keeps the `RwLock` alive by holding an `Arc`.
+    ///
+    /// [`TryLockError`]: TryLockError
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::RwLock;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let rw = Arc::new(RwLock::new(1));
+    ///
+    ///     let v = rw.read().await;
+    ///     assert_eq!(*v, 1);
+    ///
+    ///     assert!(rw.try_write_owned().is_err());
+    /// }
+    /// ```
+    pub fn try_write_owned(self: Arc<Self>) -> Result<OwnedRwLockWriteGuard<T>, TryLockError> {
+        match self.s.try_acquire(MAX_READS as u32) {
+            Ok(permit) => permit,
+            Err(TryAcquireError::NoPermits) => return Err(TryLockError(())),
+            Err(TryAcquireError::Closed) => unreachable!(),
+        }
+
+        Ok(OwnedRwLockWriteGuard {
+            data: self.c.get(),
+            lock: ManuallyDrop::new(self),
         })
     }
 
