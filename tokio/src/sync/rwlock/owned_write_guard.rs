@@ -1,4 +1,5 @@
 use crate::sync::rwlock::owned_read_guard::OwnedRwLockReadGuard;
+use crate::sync::rwlock::owned_write_guard_mapped::OwnedRwLockMappedWriteGuard;
 use crate::sync::rwlock::RwLock;
 use std::fmt;
 use std::mem::{self, ManuallyDrop};
@@ -20,6 +21,119 @@ pub struct OwnedRwLockWriteGuard<T: ?Sized> {
 }
 
 impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
+    /// Make a new [`OwnedRwLockMappedWriteGuard`] for a component of the locked
+    /// data.
+    ///
+    /// This operation cannot fail as the `OwnedRwLockWriteGuard` passed in
+    /// already locked the data.
+    ///
+    /// This is an associated function that needs to be used as
+    /// `OwnedRwLockWriteGuard::map(..)`. A method would interfere with methods
+    /// of the same name on the contents of the locked data.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::{RwLock, OwnedRwLockWriteGuard};
+    ///
+    /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    /// struct Foo(u32);
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let lock = Arc::new(RwLock::new(Foo(1)));
+    ///
+    /// {
+    ///     let lock = Arc::clone(&lock);
+    ///     let mut mapped = OwnedRwLockWriteGuard::map(lock.write_owned().await, |f| &mut f.0);
+    ///     *mapped = 2;
+    /// }
+    ///
+    /// assert_eq!(Foo(2), *lock.read().await);
+    /// # }
+    /// ```
+    #[inline]
+    pub fn map<F, U: ?Sized>(mut this: Self, f: F) -> OwnedRwLockMappedWriteGuard<T, U>
+    where
+        F: FnOnce(&mut T) -> &mut U,
+    {
+        let data = f(&mut *this) as *mut U;
+        let lock = unsafe { ManuallyDrop::take(&mut this.lock) };
+        // NB: Forget to avoid drop impl from being called.
+        mem::forget(this);
+        OwnedRwLockMappedWriteGuard {
+            lock: ManuallyDrop::new(lock),
+            data,
+        }
+    }
+
+    /// Attempts to make  a new [`OwnedRwLockMappedWriteGuard`] for a component
+    /// of the locked data. The original guard is returned if the closure
+    /// returns `None`.
+    ///
+    /// This operation cannot fail as the `OwnedRwLockWriteGuard` passed in
+    /// already locked the data.
+    ///
+    /// This is an associated function that needs to be
+    /// used as `OwnedRwLockWriteGuard::try_map(...)`. A method would interfere
+    /// with methods of the same name on the contents of the locked data.
+    ///
+    /// [`RwLockMappedWriteGuard`]: struct@crate::sync::RwLockMappedWriteGuard
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::{RwLock, OwnedRwLockWriteGuard};
+    ///
+    /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    /// struct Foo(u32);
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let lock = Arc::new(RwLock::new(Foo(1)));
+    ///
+    /// {
+    ///     let guard = Arc::clone(&lock).write_owned().await;
+    ///     let mut guard = OwnedRwLockWriteGuard::try_map(guard, |f| Some(&mut f.0)).expect("should not fail");
+    ///     *guard = 2;
+    /// }
+    ///
+    /// assert_eq!(Foo(2), *lock.read().await);
+    /// # }
+    /// ```
+    #[inline]
+    pub fn try_map<F, U: ?Sized>(
+        mut this: Self,
+        f: F,
+    ) -> Result<OwnedRwLockMappedWriteGuard<T, U>, Self>
+    where
+        F: FnOnce(&mut T) -> Option<&mut U>,
+    {
+        let data = match f(&mut *this) {
+            Some(data) => data as *mut U,
+            None => return Err(this),
+        };
+        let lock = unsafe { ManuallyDrop::take(&mut this.lock) };
+        // NB: Forget to avoid drop impl from being called.
+        mem::forget(this);
+        Ok(OwnedRwLockMappedWriteGuard {
+            lock: ManuallyDrop::new(lock),
+            data,
+        })
+    }
+
+    /// Converts this `OwnedRwLockWriteGuard` into an
+    /// `OwnedRwLockMappedWriteGuard`. This method can be used to store a
+    /// non-mapped guard in a struct field that expects a mapped guard.
+    ///
+    /// This is equivalent to calling `OwnedRwLockWriteGuard::map(guard, |me| me)`.
+    #[inline]
+    pub fn into_mapped(this: Self) -> OwnedRwLockMappedWriteGuard<T> {
+        Self::map(this, |me| me)
+    }
+
     /// Atomically downgrades a write lock into a read lock without allowing
     /// any writers to take exclusive access of the lock in the meantime.
     ///
@@ -63,7 +177,10 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
         lock.s.release(super::MAX_READS - 1);
         // NB: Forget to avoid drop impl from being called.
         mem::forget(self);
-        OwnedRwLockReadGuard { lock, data }
+        OwnedRwLockReadGuard {
+            lock: ManuallyDrop::new(lock),
+            data,
+        }
     }
 }
 

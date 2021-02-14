@@ -26,8 +26,8 @@ impl<'a, T: ?Sized> RwLockMappedWriteGuard<'a, T> {
     /// locked the data.
     ///
     /// This is an associated function that needs to be used as
-    /// `RwLockWriteGuard::map(..)`. A method would interfere with methods of
-    /// the same name on the contents of the locked data.
+    /// `RwLockMappedWriteGuard::map(..)`. A method would interfere with methods
+    /// of the same name on the contents of the locked data.
     ///
     /// This is an asynchronous version of [`RwLockWriteGuard::map`] from the
     /// [`parking_lot` crate].
@@ -71,7 +71,7 @@ impl<'a, T: ?Sized> RwLockMappedWriteGuard<'a, T> {
         }
     }
 
-    /// Attempts to make  a new [`RwLockMappedWriteGuard`] for a component of
+    /// Attempts to make a new [`RwLockMappedWriteGuard`] for a component of
     /// the locked data. The original guard is returned if the closure returns
     /// `None`.
     ///
@@ -79,8 +79,8 @@ impl<'a, T: ?Sized> RwLockMappedWriteGuard<'a, T> {
     /// locked the data.
     ///
     /// This is an associated function that needs to be
-    /// used as `RwLockWriteGuard::try_map(...)`. A method would interfere with
-    /// methods of the same name on the contents of the locked data.
+    /// used as `RwLockMappedWriteGuard::try_map(...)`. A method would interfere
+    /// with methods of the same name on the contents of the locked data.
     ///
     /// This is an asynchronous version of [`RwLockWriteGuard::try_map`] from
     /// the [`parking_lot` crate].

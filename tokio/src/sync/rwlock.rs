@@ -7,11 +7,13 @@ use std::sync::Arc;
 
 pub(crate) mod owned_read_guard;
 pub(crate) mod owned_write_guard;
+pub(crate) mod owned_write_guard_mapped;
 pub(crate) mod read_guard;
 pub(crate) mod write_guard;
 pub(crate) mod write_guard_mapped;
 pub(crate) use owned_read_guard::OwnedRwLockReadGuard;
 pub(crate) use owned_write_guard::OwnedRwLockWriteGuard;
+pub(crate) use owned_write_guard_mapped::OwnedRwLockMappedWriteGuard;
 pub(crate) use read_guard::RwLockReadGuard;
 pub(crate) use write_guard::RwLockWriteGuard;
 pub(crate) use write_guard_mapped::RwLockMappedWriteGuard;
@@ -107,17 +109,25 @@ fn bounds() {
     check_sync::<RwLockReadGuard<'_, u32>>();
     check_unpin::<RwLockReadGuard<'_, u32>>();
 
-    check_send::<OwnedRwLockReadGuard<u32>>();
-    check_sync::<OwnedRwLockReadGuard<u32>>();
-    check_unpin::<OwnedRwLockReadGuard<u32>>();
+    check_send::<OwnedRwLockReadGuard<u32, i32>>();
+    check_sync::<OwnedRwLockReadGuard<u32, i32>>();
+    check_unpin::<OwnedRwLockReadGuard<u32, i32>>();
 
     check_send::<RwLockWriteGuard<'_, u32>>();
     check_sync::<RwLockWriteGuard<'_, u32>>();
     check_unpin::<RwLockWriteGuard<'_, u32>>();
 
+    check_send::<RwLockMappedWriteGuard<'_, u32>>();
+    check_sync::<RwLockMappedWriteGuard<'_, u32>>();
+    check_unpin::<RwLockMappedWriteGuard<'_, u32>>();
+
     check_send::<OwnedRwLockWriteGuard<u32>>();
     check_sync::<OwnedRwLockWriteGuard<u32>>();
     check_unpin::<OwnedRwLockWriteGuard<u32>>();
+
+    check_send::<OwnedRwLockMappedWriteGuard<u32, i32>>();
+    check_sync::<OwnedRwLockMappedWriteGuard<u32, i32>>();
+    check_unpin::<OwnedRwLockMappedWriteGuard<u32, i32>>();
 
     let rwlock = Arc::new(RwLock::new(0));
     check_send_sync_val(rwlock.read());
@@ -138,11 +148,27 @@ unsafe impl<T> Send for RwLockReadGuard<'_, T> where T: ?Sized + Sync {}
 unsafe impl<T> Sync for RwLockReadGuard<'_, T> where T: ?Sized + Send + Sync {}
 // T is required to be `Send` because an OwnedRwLockReadGuard can be used to drop the value held in
 // the RwLock, unlike RwLockReadGuard.
-unsafe impl<T> Send for OwnedRwLockReadGuard<T> where T: ?Sized + Send + Sync {}
-unsafe impl<T> Sync for OwnedRwLockReadGuard<T> where T: ?Sized + Send + Sync {}
+unsafe impl<T, U> Send for OwnedRwLockReadGuard<T, U>
+where
+    T: ?Sized + Send + Sync,
+    U: ?Sized + Sync,
+{
+}
+unsafe impl<T, U> Sync for OwnedRwLockReadGuard<T, U>
+where
+    T: ?Sized + Send + Sync,
+    U: ?Sized + Send + Sync,
+{
+}
 unsafe impl<T> Sync for RwLockWriteGuard<'_, T> where T: ?Sized + Send + Sync {}
 unsafe impl<T> Sync for OwnedRwLockWriteGuard<T> where T: ?Sized + Send + Sync {}
 unsafe impl<T> Sync for RwLockMappedWriteGuard<'_, T> where T: ?Sized + Send + Sync {}
+unsafe impl<T, U> Sync for OwnedRwLockMappedWriteGuard<T, U>
+where
+    T: ?Sized + Send + Sync,
+    U: ?Sized + Send + Sync,
+{
+}
 // Safety: Stores a raw pointer to `T`, so if `T` is `Sync`, the lock guard over
 // `T` is `Send` - but since this is also provides mutable access, we need to
 // make sure that `T` is `Send` since its value can be sent across thread
@@ -150,6 +176,12 @@ unsafe impl<T> Sync for RwLockMappedWriteGuard<'_, T> where T: ?Sized + Send + S
 unsafe impl<T> Send for RwLockWriteGuard<'_, T> where T: ?Sized + Send + Sync {}
 unsafe impl<T> Send for OwnedRwLockWriteGuard<T> where T: ?Sized + Send + Sync {}
 unsafe impl<T> Send for RwLockMappedWriteGuard<'_, T> where T: ?Sized + Send + Sync {}
+unsafe impl<T, U> Send for OwnedRwLockMappedWriteGuard<T, U>
+where
+    T: ?Sized + Send + Sync,
+    U: ?Sized + Send + Sync,
+{
+}
 
 impl<T: ?Sized> RwLock<T> {
     /// Creates a new instance of an `RwLock<T>` which is unlocked.
@@ -297,7 +329,7 @@ impl<T: ?Sized> RwLock<T> {
         });
         OwnedRwLockReadGuard {
             data: self.c.get(),
-            lock: self,
+            lock: ManuallyDrop::new(self),
         }
     }
 

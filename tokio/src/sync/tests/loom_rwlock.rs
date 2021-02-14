@@ -22,7 +22,7 @@ fn concurrent_write() {
         let rwclone = rwlock.clone();
         let t2 = thread::spawn(move || {
             block_on(async {
-                let mut guard = rwclone.write().await;
+                let mut guard = rwclone.write_owned().await;
                 *guard += 5;
             });
         });
