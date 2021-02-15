@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1613416991331,
+  "lastUpdate": 1613417006598,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -16831,6 +16831,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19062345,
             "range": "± 2653126",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "appletree2479@outlook.com",
+            "name": "Pen Tree",
+            "username": "zyctree"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "36bcfa6b9d5b722bab5bdb68814988ded917802b",
+          "message": "doc: rename notify to notify_one (#3526)",
+          "timestamp": "2021-02-15T20:21:27+01:00",
+          "tree_id": "dde3e1515580469dbe3495064a36dd5c97fe9835",
+          "url": "https://github.com/tokio-rs/tokio/commit/36bcfa6b9d5b722bab5bdb68814988ded917802b"
+        },
+        "date": 1613417004709,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 190651,
+            "range": "± 39838",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 711721,
+            "range": "± 98563",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4775017,
+            "range": "± 1044921",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19976005,
+            "range": "± 2169746",
             "unit": "ns/iter"
           }
         ]
