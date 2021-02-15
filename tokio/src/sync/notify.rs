@@ -350,7 +350,7 @@ impl Notify {
     ///
     /// If a task is currently waiting, that task is notified. Unlike with
     /// `notify_one()`, no permit is stored to be used by the next call to
-    /// [`notified().await`]. The purpose of this method is to notify all
+    /// `notified().await`. The purpose of this method is to notify all
     /// already registered waiters. Registering for notification is done by
     /// acquiring an instance of the `Notified` future via calling `notified()`.
     ///
