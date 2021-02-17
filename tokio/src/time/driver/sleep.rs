@@ -16,6 +16,8 @@ use std::task::{self, Poll};
 ///
 /// Canceling a sleep instance is done by dropping the returned future. No additional
 /// cleanup work is required.
+// Alias for old name in 0.x
+#[cfg_attr(docsrs, doc(alias = "delay_until"))]
 pub fn sleep_until(deadline: Instant) -> Sleep {
     Sleep::new_timeout(deadline)
 }
@@ -53,6 +55,8 @@ pub fn sleep_until(deadline: Instant) -> Sleep {
 /// ```
 ///
 /// [`interval`]: crate::time::interval()
+// Alias for old name in 0.x
+#[cfg_attr(docsrs, doc(alias = "delay_for"))]
 pub fn sleep(duration: Duration) -> Sleep {
     sleep_until(Instant::now() + duration)
 }
