@@ -2,7 +2,6 @@
 name = "tokio-stream"
 # When releasing to crates.io:
 # - Remove path dependencies
-# - Update html_root_url.
 # - Update doc url
 #   - Cargo.toml
 # - Update CHANGELOG.md.
