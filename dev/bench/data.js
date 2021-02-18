@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1613686417352,
+  "lastUpdate": 1613686431403,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -26055,6 +26055,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1111,
             "range": "± 195",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "te316e89@gmail.com",
+            "name": "Taiki Endo",
+            "username": "taiki-e"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "36d7dab504a526edd81d17744aae36f11ab3ee4a",
+          "message": "chore: remove html_root_url (#3489)\n\nCo-authored-by: Alice Ryhl <alice@ryhl.io>",
+          "timestamp": "2021-02-18T14:11:39-08:00",
+          "tree_id": "8878fcca2ed0b594e0a79a64a96462577bb5f970",
+          "url": "https://github.com/tokio-rs/tokio/commit/36d7dab504a526edd81d17744aae36f11ab3ee4a"
+        },
+        "date": 1613686428983,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 17037,
+            "range": "± 7173",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1121,
+            "range": "± 109",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 664,
+            "range": "± 67",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 16332,
+            "range": "± 3667",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1130,
+            "range": "± 90",
             "unit": "ns/iter"
           }
         ]
