@@ -9,6 +9,7 @@ use std::task::{Context, Poll};
 ///
 /// Instances are created by the
 /// [`unbounded_channel`](unbounded_channel) function.
+#[derive(PartialEq, Eq)]
 pub struct UnboundedSender<T> {
     chan: chan::Tx<T, Semaphore>,
 }
@@ -37,6 +38,7 @@ impl<T> fmt::Debug for UnboundedSender<T> {
 /// This receiver can be turned into a `Stream` using [`UnboundedReceiverStream`].
 ///
 /// [`UnboundedReceiverStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.UnboundedReceiverStream.html
+#[derive(PartialEq, Eq)]
 pub struct UnboundedReceiver<T> {
     /// The channel receiver
     chan: chan::Rx<T, Semaphore>,

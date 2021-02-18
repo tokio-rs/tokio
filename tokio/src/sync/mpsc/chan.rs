@@ -22,6 +22,14 @@ impl<T, S: fmt::Debug> fmt::Debug for Tx<T, S> {
     }
 }
 
+impl<T, S> PartialEq for Tx<T, S> {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
+    }
+}
+
+impl<T, S> Eq for Tx<T, S> {}
+
 /// Channel receiver
 pub(crate) struct Rx<T, S: Semaphore> {
     inner: Arc<Chan<T, S>>,
@@ -32,6 +40,14 @@ impl<T, S: Semaphore + fmt::Debug> fmt::Debug for Rx<T, S> {
         fmt.debug_struct("Rx").field("inner", &self.inner).finish()
     }
 }
+
+impl<T, S: Semaphore> PartialEq for Rx<T, S> {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
+    }
+}
+
+impl<T, S: Semaphore> Eq for Rx<T, S> {}
 
 pub(crate) trait Semaphore {
     fn is_idle(&self) -> bool;
