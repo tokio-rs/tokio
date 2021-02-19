@@ -190,7 +190,10 @@ impl Semaphore {
     /// [`Arc`]: std::sync::Arc
     /// [`AcquireError`]: crate::sync::AcquireError
     /// [`OwnedSemaphorePermit`]: crate::sync::OwnedSemaphorePermit
-    pub async fn acquire_many_owned(self: Arc<Self>, n: u32) -> Result<OwnedSemaphorePermit, AcquireError> {
+    pub async fn acquire_many_owned(
+        self: Arc<Self>,
+        n: u32,
+    ) -> Result<OwnedSemaphorePermit, AcquireError> {
         self.ll_sem.acquire(n).await?;
         Ok(OwnedSemaphorePermit {
             sem: self,
@@ -232,7 +235,10 @@ impl Semaphore {
     /// [`TryAcquireError::Closed`]: crate::sync::TryAcquireError::Closed
     /// [`TryAcquireError::NoPermits`]: crate::sync::TryAcquireError::NoPermits
     /// [`OwnedSemaphorePermit`]: crate::sync::OwnedSemaphorePermit
-    pub fn try_acquire_many_owned(self: Arc<Self>, n: u32) -> Result<OwnedSemaphorePermit, TryAcquireError> {
+    pub fn try_acquire_many_owned(
+        self: Arc<Self>,
+        n: u32,
+    ) -> Result<OwnedSemaphorePermit, TryAcquireError> {
         match self.ll_sem.try_acquire(n) {
             Ok(_) => Ok(OwnedSemaphorePermit {
                 sem: self,
