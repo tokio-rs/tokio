@@ -1,5 +1,6 @@
+use crate::io::DerefPinMut;
 use std::io::{self, SeekFrom};
-use std::ops::DerefMut;
+use std::ops::Deref;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -46,37 +47,17 @@ pub trait AsyncSeek {
     fn poll_complete(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>>;
 }
 
-macro_rules! deref_async_seek {
-    () => {
-        fn start_seek(mut self: Pin<&mut Self>, pos: SeekFrom) -> io::Result<()> {
-            Pin::new(&mut **self).start_seek(pos)
-        }
-
-        fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
-            Pin::new(&mut **self).poll_complete(cx)
-        }
-    };
-}
-
-impl<T: ?Sized + AsyncSeek + Unpin> AsyncSeek for Box<T> {
-    deref_async_seek!();
-}
-
-impl<T: ?Sized + AsyncSeek + Unpin> AsyncSeek for &mut T {
-    deref_async_seek!();
-}
-
-impl<P> AsyncSeek for Pin<P>
+impl<T> AsyncSeek for T
 where
-    P: DerefMut + Unpin,
-    P::Target: AsyncSeek,
+    T: DerefPinMut,
+    <T as Deref>::Target: AsyncSeek,
 {
     fn start_seek(self: Pin<&mut Self>, pos: SeekFrom) -> io::Result<()> {
-        self.get_mut().as_mut().start_seek(pos)
+        self.deref_pin().start_seek(pos)
     }
 
     fn poll_complete(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
-        self.get_mut().as_mut().poll_complete(cx)
+        self.deref_pin().poll_complete(cx)
     }
 }
 

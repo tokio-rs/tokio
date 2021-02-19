@@ -1,5 +1,6 @@
+use crate::io::DerefPinMut;
 use std::io::{self, IoSlice};
-use std::ops::DerefMut;
+use std::ops::Deref;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -178,57 +179,17 @@ pub trait AsyncWrite {
     }
 }
 
-macro_rules! deref_async_write {
-    () => {
-        fn poll_write(
-            mut self: Pin<&mut Self>,
-            cx: &mut Context<'_>,
-            buf: &[u8],
-        ) -> Poll<io::Result<usize>> {
-            Pin::new(&mut **self).poll_write(cx, buf)
-        }
-
-        fn poll_write_vectored(
-            mut self: Pin<&mut Self>,
-            cx: &mut Context<'_>,
-            bufs: &[IoSlice<'_>],
-        ) -> Poll<io::Result<usize>> {
-            Pin::new(&mut **self).poll_write_vectored(cx, bufs)
-        }
-
-        fn is_write_vectored(&self) -> bool {
-            (**self).is_write_vectored()
-        }
-
-        fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-            Pin::new(&mut **self).poll_flush(cx)
-        }
-
-        fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-            Pin::new(&mut **self).poll_shutdown(cx)
-        }
-    };
-}
-
-impl<T: ?Sized + AsyncWrite + Unpin> AsyncWrite for Box<T> {
-    deref_async_write!();
-}
-
-impl<T: ?Sized + AsyncWrite + Unpin> AsyncWrite for &mut T {
-    deref_async_write!();
-}
-
-impl<P> AsyncWrite for Pin<P>
+impl<T> AsyncWrite for T
 where
-    P: DerefMut + Unpin,
-    P::Target: AsyncWrite,
+    T: DerefPinMut,
+    <T as Deref>::Target: AsyncWrite,
 {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        self.get_mut().as_mut().poll_write(cx, buf)
+        self.deref_pin().poll_write(cx, buf)
     }
 
     fn poll_write_vectored(
@@ -236,19 +197,19 @@ where
         cx: &mut Context<'_>,
         bufs: &[IoSlice<'_>],
     ) -> Poll<io::Result<usize>> {
-        self.get_mut().as_mut().poll_write_vectored(cx, bufs)
+        self.deref_pin().poll_write_vectored(cx, bufs)
     }
 
     fn is_write_vectored(&self) -> bool {
-        (**self).is_write_vectored()
+        self.deref().is_write_vectored()
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.get_mut().as_mut().poll_flush(cx)
+        self.deref_pin().poll_flush(cx)
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.get_mut().as_mut().poll_shutdown(cx)
+        self.deref_pin().poll_shutdown(cx)
     }
 }
 

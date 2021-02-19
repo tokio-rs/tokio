@@ -1,6 +1,7 @@
 use super::ReadBuf;
+use crate::io::DerefPinMut;
 use std::io;
-use std::ops::DerefMut;
+use std::ops::Deref;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -57,37 +58,17 @@ pub trait AsyncRead {
     ) -> Poll<io::Result<()>>;
 }
 
-macro_rules! deref_async_read {
-    () => {
-        fn poll_read(
-            mut self: Pin<&mut Self>,
-            cx: &mut Context<'_>,
-            buf: &mut ReadBuf<'_>,
-        ) -> Poll<io::Result<()>> {
-            Pin::new(&mut **self).poll_read(cx, buf)
-        }
-    };
-}
-
-impl<T: ?Sized + AsyncRead + Unpin> AsyncRead for Box<T> {
-    deref_async_read!();
-}
-
-impl<T: ?Sized + AsyncRead + Unpin> AsyncRead for &mut T {
-    deref_async_read!();
-}
-
-impl<P> AsyncRead for Pin<P>
+impl<T> AsyncRead for T
 where
-    P: DerefMut + Unpin,
-    P::Target: AsyncRead,
+    T: DerefPinMut,
+    <T as Deref>::Target: AsyncRead,
 {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        self.get_mut().as_mut().poll_read(cx, buf)
+        self.deref_pin().poll_read(cx, buf)
     }
 }
 
