@@ -50,9 +50,9 @@ async fn acquire_many() {
     let permit32 = semaphore.clone().try_acquire_many_owned(32).unwrap();
     let (sender, receiver) = tokio::sync::oneshot::channel();
     let join_handle = tokio::spawn(async move {
-        let _permit10 = semaphore.clone().acquire_many_owned(10).await;
-        sender.send(());
-        let _permit32 = semaphore.acquire_many_owned(32).await;
+        let _permit10 = semaphore.clone().acquire_many_owned(10).await.unwrap();
+        sender.send(()).unwrap();
+        let _permit32 = semaphore.acquire_many_owned(32).await.unwrap();
     });
     receiver.await.unwrap();
     drop(permit32);
