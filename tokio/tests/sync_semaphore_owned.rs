@@ -54,7 +54,7 @@ async fn acquire_many() {
         sender.send(());
         let _permit32 = semaphore.acquire_many_owned(32).await;
     });
-    receiver.await;
+    receiver.await.unwrap();
     drop(permit32);
     join_handle.await.unwrap();
 }
