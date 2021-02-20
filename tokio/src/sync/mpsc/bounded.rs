@@ -16,7 +16,6 @@ use std::task::{Context, Poll};
 /// Send values to the associated `Receiver`.
 ///
 /// Instances are created by the [`channel`](channel) function.
-#[derive(PartialEq, Eq)]
 pub struct Sender<T> {
     chan: chan::Tx<T, Semaphore>,
 }
@@ -39,7 +38,6 @@ pub struct Permit<'a, T> {
 /// This receiver can be turned into a `Stream` using [`ReceiverStream`].
 ///
 /// [`ReceiverStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.ReceiverStream.html
-#[derive(PartialEq, Eq)]
 pub struct Receiver<T> {
     /// The channel receiver
     chan: chan::Rx<T, Semaphore>,
@@ -699,6 +697,11 @@ impl<T> Sender<T> {
         }
 
         Ok(Permit { chan: &self.chan })
+    }
+
+    /// Returns `true` if senders belong to the same channel.
+    pub fn same_channel(&self, other: &Self) -> bool {
+        self.chan.same_channel(&other.chan)
     }
 }
 

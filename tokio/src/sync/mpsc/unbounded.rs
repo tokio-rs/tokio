@@ -9,7 +9,6 @@ use std::task::{Context, Poll};
 ///
 /// Instances are created by the
 /// [`unbounded_channel`](unbounded_channel) function.
-#[derive(PartialEq, Eq)]
 pub struct UnboundedSender<T> {
     chan: chan::Tx<T, Semaphore>,
 }
@@ -38,7 +37,6 @@ impl<T> fmt::Debug for UnboundedSender<T> {
 /// This receiver can be turned into a `Stream` using [`UnboundedReceiverStream`].
 ///
 /// [`UnboundedReceiverStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.UnboundedReceiverStream.html
-#[derive(PartialEq, Eq)]
 pub struct UnboundedReceiver<T> {
     /// The channel receiver
     chan: chan::Rx<T, Semaphore>,
@@ -292,5 +290,10 @@ impl<T> UnboundedSender<T> {
     /// ```
     pub fn is_closed(&self) -> bool {
         self.chan.is_closed()
+    }
+
+    /// Returns `true` if senders belong to the same channel.
+    pub fn same_channel(&self, other: &Self) -> bool {
+        self.chan.same_channel(&other.chan)
     }
 }
