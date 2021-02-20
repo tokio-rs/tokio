@@ -23,6 +23,8 @@ cfg_io_util! {
         ///
         /// If successful, this function will return the total number of bytes read.
         ///
+        /// If this function returns `Ok(0)`, the stream has reached EOF.
+        ///
         /// # Errors
         ///
         /// This function will ignore all instances of [`ErrorKind::Interrupted`] and
