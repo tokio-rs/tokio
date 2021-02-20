@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1613813082063,
+  "lastUpdate": 1613813091422,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -17137,6 +17137,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20466863,
             "range": "± 3054233",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "adam@adamharvey.name",
+            "name": "Adam Harvey",
+            "username": "LawnGnome"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "53558cb48964d7e0f2c97687504711ab47bf1890",
+          "message": "doc: note the EOF behaviour of read_until (#3536)",
+          "timestamp": "2021-02-20T10:22:51+01:00",
+          "tree_id": "84800a72f434ef6b5854b4227defe9d077506a79",
+          "url": "https://github.com/tokio-rs/tokio/commit/53558cb48964d7e0f2c97687504711ab47bf1890"
+        },
+        "date": 1613813089101,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 200112,
+            "range": "± 46440",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 715991,
+            "range": "± 119191",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5752635,
+            "range": "± 710644",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20699204,
+            "range": "± 4010119",
             "unit": "ns/iter"
           }
         ]
