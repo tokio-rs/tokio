@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1613686449786,
+  "lastUpdate": 1613813078433,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -9017,6 +9017,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 567,
             "range": "± 141",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "adam@adamharvey.name",
+            "name": "Adam Harvey",
+            "username": "LawnGnome"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "53558cb48964d7e0f2c97687504711ab47bf1890",
+          "message": "doc: note the EOF behaviour of read_until (#3536)",
+          "timestamp": "2021-02-20T10:22:51+01:00",
+          "tree_id": "84800a72f434ef6b5854b4227defe9d077506a79",
+          "url": "https://github.com/tokio-rs/tokio/commit/53558cb48964d7e0f2c97687504711ab47bf1890"
+        },
+        "date": 1613813076591,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 945,
+            "range": "± 312",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 14165,
+            "range": "± 3707",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 982,
+            "range": "± 224",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 15086,
+            "range": "± 2974",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 567,
+            "range": "± 140",
             "unit": "ns/iter"
           }
         ]
