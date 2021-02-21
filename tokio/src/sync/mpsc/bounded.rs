@@ -700,6 +700,15 @@ impl<T> Sender<T> {
     }
 
     /// Returns `true` if senders belong to the same channel.
+    ///
+    /// ```
+    /// let (tx, rx) = tokio::sync::mpsc::channel::<()>(1);
+    /// let  tx2 = tx.clone();
+    /// assert!(tx.same_channel(&tx2));
+    ///
+    /// let (tx3, rx3) = tokio::sync::mpsc::channel::<()>(1);
+    /// assert!(!tx3.same_channel(&tx2));
+    /// ```
     pub fn same_channel(&self, other: &Self) -> bool {
         self.chan.same_channel(&other.chan)
     }
