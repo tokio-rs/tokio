@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1613982803830,
+  "lastUpdate": 1613982809827,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -17185,6 +17185,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20699204,
             "range": "± 4010119",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "vilscrolls@gmail.com",
+            "name": "xlUp",
+            "username": "mapkts"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "52457dcf5b5015f650c7f3b9575eb9d4234f837f",
+          "message": "doc: fix typos (#3541)\n\nCo-authored-by: Aaron Taner <mapkts@gmail.com>",
+          "timestamp": "2021-02-22T17:31:45+09:00",
+          "tree_id": "dfc8be845af9dc366835bba2e5189127ec76d676",
+          "url": "https://github.com/tokio-rs/tokio/commit/52457dcf5b5015f650c7f3b9575eb9d4234f837f"
+        },
+        "date": 1613982808279,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 153311,
+            "range": "± 31090",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 560801,
+            "range": "± 61880",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4372420,
+            "range": "± 1425554",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 15836603,
+            "range": "± 2940497",
             "unit": "ns/iter"
           }
         ]
