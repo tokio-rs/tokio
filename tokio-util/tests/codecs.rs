@@ -362,7 +362,7 @@ fn any_delimiter_decoder_max_length_underrun_twice() {
     buf.put_slice(b"too very l");
     assert!(codec.decode(buf).is_err());
     buf.put_slice(b"aaaaaaaaaaaaaaaaaaaaaaa");
-    assert!(codec.decode(buf).is_err());
+    assert_eq!(None, codec.decode(buf).unwrap());
     buf.put_slice(b"ong\nshort\n");
     assert_eq!("short", codec.decode(buf).unwrap().unwrap());
 }
@@ -426,7 +426,7 @@ fn any_delimiter_decoder_discard_repeat() {
     buf.put_slice(b"aa");
     assert!(codec.decode(buf).is_err());
     buf.put_slice(b"a");
-    assert!(codec.decode(buf).is_err());
+    assert_eq!(None, codec.decode(buf).unwrap());
 }
 
 #[test]
