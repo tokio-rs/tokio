@@ -1,4 +1,3 @@
-#![doc(html_root_url = "https://docs.rs/tokio/1.2.0")]
 #![allow(
     clippy::cognitive_complexity,
     clippy::large_enum_variant,

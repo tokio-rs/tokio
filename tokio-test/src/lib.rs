@@ -1,4 +1,3 @@
-#![doc(html_root_url = "https://docs.rs/tokio-test/0.4.0")]
 #![warn(
     missing_debug_implementations,
     missing_docs,

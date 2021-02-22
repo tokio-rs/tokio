@@ -1,4 +1,3 @@
-#![doc(html_root_url = "https://docs.rs/tokio-stream/0.1.3")]
 #![allow(
     clippy::cognitive_complexity,
     clippy::large_enum_variant,
