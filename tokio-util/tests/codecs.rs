@@ -349,6 +349,24 @@ fn any_delimiter_decoder_max_length_underrun() {
 }
 
 #[test]
+fn any_delimiter_decoder_max_length_underrun_twice() {
+    const MAX_LENGTH: usize = 11;
+
+    let mut codec =
+        AnyDelimiterCodec::new_with_max_length(b",;\n\r".to_vec(), b",".to_vec(), MAX_LENGTH);
+    let buf = &mut BytesMut::new();
+
+    buf.reserve(200);
+    buf.put_slice(b"chunk ");
+    assert_eq!(None, codec.decode(buf).unwrap());
+    buf.put_slice(b"too very l");
+    assert!(codec.decode(buf).is_err());
+    buf.put_slice(b"aaaaaaaaaaaaaaaaaaaaaaa");
+    assert!(codec.decode(buf).is_err());
+    buf.put_slice(b"ong\nshort\n");
+    assert_eq!("short", codec.decode(buf).unwrap().unwrap());
+}
+#[test]
 fn any_delimiter_decoder_max_length_bursts() {
     const MAX_LENGTH: usize = 11;
 

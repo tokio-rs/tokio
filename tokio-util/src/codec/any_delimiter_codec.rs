@@ -163,7 +163,7 @@ impl Decoder for AnyDelimiterCodec {
                     buf.advance(read_to);
                     self.next_index = 0;
                     if buf.is_empty() {
-                        return Err(AnyDelimiterCodecError::MaxChunkLengthExceeded);
+                        return Ok(None);
                     }
                 }
                 (false, Some(offset)) => {
