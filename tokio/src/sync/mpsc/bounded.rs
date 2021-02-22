@@ -701,6 +701,8 @@ impl<T> Sender<T> {
 
     /// Returns `true` if senders belong to the same channel.
     ///
+    /// # Examples
+    ///
     /// ```
     /// let (tx, rx) = tokio::sync::mpsc::channel::<()>(1);
     /// let  tx2 = tx.clone();

@@ -294,6 +294,8 @@ impl<T> UnboundedSender<T> {
 
     /// Returns `true` if senders belong to the same channel.
     ///
+    /// # Examples
+    ///
     /// ```
     /// let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<()>();
     /// let  tx2 = tx.clone();
