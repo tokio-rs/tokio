@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1613813104174,
+  "lastUpdate": 1613982803830,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -26313,6 +26313,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1091,
             "range": "± 78",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "vilscrolls@gmail.com",
+            "name": "xlUp",
+            "username": "mapkts"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "52457dcf5b5015f650c7f3b9575eb9d4234f837f",
+          "message": "doc: fix typos (#3541)\n\nCo-authored-by: Aaron Taner <mapkts@gmail.com>",
+          "timestamp": "2021-02-22T17:31:45+09:00",
+          "tree_id": "dfc8be845af9dc366835bba2e5189127ec76d676",
+          "url": "https://github.com/tokio-rs/tokio/commit/52457dcf5b5015f650c7f3b9575eb9d4234f837f"
+        },
+        "date": 1613982802182,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 13364,
+            "range": "± 2796",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 913,
+            "range": "± 24",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 547,
+            "range": "± 23",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 12938,
+            "range": "± 2195",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 914,
+            "range": "± 11",
             "unit": "ns/iter"
           }
         ]
