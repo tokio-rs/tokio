@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1613990865686,
+  "lastUpdate": 1613990872337,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -17341,6 +17341,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 15836603,
             "range": "± 2940497",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mmikulicic@gmail.com",
+            "name": "Marko Mikulicic",
+            "username": "mkmik"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7de18af82cfd8b1aebcacfe86d2650f400aaeea8",
+          "message": "doc: sync interval.rs and time/mod.rs docs (#3533)",
+          "timestamp": "2021-02-22T11:45:49+01:00",
+          "tree_id": "5dac4fa4947b69ba1c1b3a8f8a09418d6b245024",
+          "url": "https://github.com/tokio-rs/tokio/commit/7de18af82cfd8b1aebcacfe86d2650f400aaeea8"
+        },
+        "date": 1613990870423,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 197366,
+            "range": "± 18187",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 715293,
+            "range": "± 49319",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5241561,
+            "range": "± 508307",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21094544,
+            "range": "± 2779407",
             "unit": "ns/iter"
           }
         ]
