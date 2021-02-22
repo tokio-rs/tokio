@@ -35,7 +35,7 @@ cfg_io_util! {
 
     /// Writes bytes to a sink.
     ///
-    /// Implemented as an extention trait, adding utility methods to all
+    /// Implemented as an extension trait, adding utility methods to all
     /// [`AsyncWrite`] types. Callers will tend to import this trait instead of
     /// [`AsyncWrite`].
     ///
