@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1613990888570,
+  "lastUpdate": 1614095824050,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -26625,6 +26625,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1093,
             "range": "± 53",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "kestrer.dev@gmail.com",
+            "name": "Kestrer",
+            "username": "Kestrer"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8efed43fa727e1807c7bc89ac6963a14c2d72c9a",
+          "message": "runtime: update documentation of thread limits (#3527)\n\nSince ed5a94eb2db95b7cc142045fbbd5d68c6276e04e, there is no longer a\r\nlimit of 32,768 threads on the worker threads and blocking thread pool,\r\nbut the documentation has not been updated. This commit removes that\r\npart of the documentation.",
+          "timestamp": "2021-02-23T16:54:50+01:00",
+          "tree_id": "59a551382bdc8e56bdf1302640ce98c0643e293a",
+          "url": "https://github.com/tokio-rs/tokio/commit/8efed43fa727e1807c7bc89ac6963a14c2d72c9a"
+        },
+        "date": 1614095821997,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 14751,
+            "range": "± 4686",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1056,
+            "range": "± 108",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 650,
+            "range": "± 61",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 15288,
+            "range": "± 4077",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1094,
+            "range": "± 47",
             "unit": "ns/iter"
           }
         ]
