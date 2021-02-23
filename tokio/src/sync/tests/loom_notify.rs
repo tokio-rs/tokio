@@ -22,6 +22,27 @@ fn notify_one() {
 }
 
 #[test]
+fn notify_waiters() {
+    loom::model(|| {
+        let notify = Arc::new(Notify::new());
+        let tx = notify.clone();
+        let notified1 = notify.notified();
+        let notified2 = notify.notified();
+
+        let th = thread::spawn(move || {
+            tx.notify_waiters();
+        });
+
+        th.join().unwrap();
+
+        block_on(async {
+            notified1.await;
+            notified2.await;
+        });
+    });
+}
+
+#[test]
 fn notify_multi() {
     loom::model(|| {
         let notify = Arc::new(Notify::new());

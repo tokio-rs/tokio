@@ -71,7 +71,7 @@
 ///
 /// ```
 /// use tokio::{pin, select};
-/// use tokio::stream::{self, StreamExt};
+/// use tokio_stream::{self as stream, StreamExt};
 ///
 /// async fn my_async_fn() {
 ///     // async logic here

@@ -49,7 +49,7 @@ pub fn timeout<T>(duration: Duration, future: T) -> Timeout<T>
 where
     T: Future,
 {
-    let delay = Sleep::new_timeout(Instant::now() + duration, duration);
+    let delay = Sleep::new_timeout(Instant::now() + duration);
     Timeout::new_with_delay(future, delay)
 }
 

@@ -359,12 +359,14 @@ async fn join_with_select() {
 async fn use_future_in_if_condition() {
     use tokio::time::{self, Duration};
 
-    let mut sleep = time::sleep(Duration::from_millis(50));
+    let sleep = time::sleep(Duration::from_millis(50));
+    tokio::pin!(sleep);
 
     tokio::select! {
-        _ = &mut sleep, if !sleep.is_elapsed() => {
+        _ = time::sleep(Duration::from_millis(50)), if false => {
+            panic!("if condition ignored")
         }
-        _ = async { 1 } => {
+        _ = async { 1u32 } => {
         }
     }
 }

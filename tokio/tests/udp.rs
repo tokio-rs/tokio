@@ -2,6 +2,7 @@
 #![cfg(feature = "full")]
 
 use futures::future::poll_fn;
+use std::io;
 use std::sync::Arc;
 use tokio::{io::ReadBuf, net::UdpSocket};
 
@@ -65,7 +66,7 @@ async fn send_to_recv_from_poll() -> std::io::Result<()> {
     let receiver = UdpSocket::bind("127.0.0.1:0").await?;
 
     let receiver_addr = receiver.local_addr()?;
-    poll_fn(|cx| sender.poll_send_to(cx, MSG, &receiver_addr)).await?;
+    poll_fn(|cx| sender.poll_send_to(cx, MSG, receiver_addr)).await?;
 
     let mut recv_buf = [0u8; 32];
     let mut read = ReadBuf::new(&mut recv_buf);
@@ -82,7 +83,7 @@ async fn send_to_peek_from() -> std::io::Result<()> {
     let receiver = UdpSocket::bind("127.0.0.1:0").await?;
 
     let receiver_addr = receiver.local_addr()?;
-    poll_fn(|cx| sender.poll_send_to(cx, MSG, &receiver_addr)).await?;
+    poll_fn(|cx| sender.poll_send_to(cx, MSG, receiver_addr)).await?;
 
     // peek
     let mut recv_buf = [0u8; 32];
@@ -110,7 +111,7 @@ async fn send_to_peek_from_poll() -> std::io::Result<()> {
     let receiver = UdpSocket::bind("127.0.0.1:0").await?;
 
     let receiver_addr = receiver.local_addr()?;
-    poll_fn(|cx| sender.poll_send_to(cx, MSG, &receiver_addr)).await?;
+    poll_fn(|cx| sender.poll_send_to(cx, MSG, receiver_addr)).await?;
 
     let mut recv_buf = [0u8; 32];
     let mut read = ReadBuf::new(&mut recv_buf);
@@ -191,7 +192,7 @@ async fn split_chan_poll() -> std::io::Result<()> {
     let (tx, mut rx) = tokio::sync::mpsc::channel::<(Vec<u8>, std::net::SocketAddr)>(1_000);
     tokio::spawn(async move {
         while let Some((bytes, addr)) = rx.recv().await {
-            poll_fn(|cx| s.poll_send_to(cx, &bytes, &addr))
+            poll_fn(|cx| s.poll_send_to(cx, &bytes, addr))
                 .await
                 .unwrap();
         }
@@ -208,7 +209,7 @@ async fn split_chan_poll() -> std::io::Result<()> {
 
     // test that we can send a value and get back some response
     let sender = UdpSocket::bind("127.0.0.1:0").await?;
-    poll_fn(|cx| sender.poll_send_to(cx, MSG, &addr)).await?;
+    poll_fn(|cx| sender.poll_send_to(cx, MSG, addr)).await?;
 
     let mut recv_buf = [0u8; 32];
     let mut read = ReadBuf::new(&mut recv_buf);
@@ -238,6 +239,8 @@ async fn try_send_spawn() {
         .await
         .unwrap();
 
+    sender.writable().await.unwrap();
+
     let sent = &sender
         .try_send_to(MSG, receiver.local_addr().unwrap())
         .unwrap();
@@ -262,4 +265,178 @@ async fn try_send_spawn() {
     received += receiver.recv(&mut buf[..]).await.unwrap();
 
     assert_eq!(received, MSG_LEN * 2 + MSG2_LEN);
+}
+
+#[tokio::test]
+async fn try_send_recv() {
+    // Create listener
+    let server = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+
+    // Create socket pair
+    let client = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+
+    // Connect the two
+    client.connect(server.local_addr().unwrap()).await.unwrap();
+    server.connect(client.local_addr().unwrap()).await.unwrap();
+
+    for _ in 0..5 {
+        loop {
+            client.writable().await.unwrap();
+
+            match client.try_send(b"hello world") {
+                Ok(n) => {
+                    assert_eq!(n, 11);
+                    break;
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => panic!("{:?}", e),
+            }
+        }
+
+        loop {
+            server.readable().await.unwrap();
+
+            let mut buf = [0; 512];
+
+            match server.try_recv(&mut buf) {
+                Ok(n) => {
+                    assert_eq!(n, 11);
+                    assert_eq!(&buf[0..11], &b"hello world"[..]);
+                    break;
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => panic!("{:?}", e),
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn try_send_to_recv_from() {
+    // Create listener
+    let server = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let saddr = server.local_addr().unwrap();
+
+    // Create socket pair
+    let client = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let caddr = client.local_addr().unwrap();
+
+    for _ in 0..5 {
+        loop {
+            client.writable().await.unwrap();
+
+            match client.try_send_to(b"hello world", saddr) {
+                Ok(n) => {
+                    assert_eq!(n, 11);
+                    break;
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => panic!("{:?}", e),
+            }
+        }
+
+        loop {
+            server.readable().await.unwrap();
+
+            let mut buf = [0; 512];
+
+            match server.try_recv_from(&mut buf) {
+                Ok((n, addr)) => {
+                    assert_eq!(n, 11);
+                    assert_eq!(addr, caddr);
+                    assert_eq!(&buf[0..11], &b"hello world"[..]);
+                    break;
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => panic!("{:?}", e),
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn try_recv_buf() {
+    // Create listener
+    let server = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+
+    // Create socket pair
+    let client = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+
+    // Connect the two
+    client.connect(server.local_addr().unwrap()).await.unwrap();
+    server.connect(client.local_addr().unwrap()).await.unwrap();
+
+    for _ in 0..5 {
+        loop {
+            client.writable().await.unwrap();
+
+            match client.try_send(b"hello world") {
+                Ok(n) => {
+                    assert_eq!(n, 11);
+                    break;
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => panic!("{:?}", e),
+            }
+        }
+
+        loop {
+            server.readable().await.unwrap();
+
+            let mut buf = Vec::with_capacity(512);
+
+            match server.try_recv_buf(&mut buf) {
+                Ok(n) => {
+                    assert_eq!(n, 11);
+                    assert_eq!(&buf[0..11], &b"hello world"[..]);
+                    break;
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => panic!("{:?}", e),
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn try_recv_buf_from() {
+    // Create listener
+    let server = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let saddr = server.local_addr().unwrap();
+
+    // Create socket pair
+    let client = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let caddr = client.local_addr().unwrap();
+
+    for _ in 0..5 {
+        loop {
+            client.writable().await.unwrap();
+
+            match client.try_send_to(b"hello world", saddr) {
+                Ok(n) => {
+                    assert_eq!(n, 11);
+                    break;
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => panic!("{:?}", e),
+            }
+        }
+
+        loop {
+            server.readable().await.unwrap();
+
+            let mut buf = Vec::with_capacity(512);
+
+            match server.try_recv_buf_from(&mut buf) {
+                Ok((n, addr)) => {
+                    assert_eq!(n, 11);
+                    assert_eq!(addr, caddr);
+                    assert_eq!(&buf[0..11], &b"hello world"[..]);
+                    break;
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => panic!("{:?}", e),
+            }
+        }
+    }
 }

@@ -5,7 +5,7 @@
 //! signal handling, but it should be evaluated for your own applications' needs
 //! to see if it's suitable.
 //!
-//! The are some fundamental limitations of this crate documented on the OS
+//! There are some fundamental limitations of this crate documented on the OS
 //! specific structures, as well.
 //!
 //! # Examples

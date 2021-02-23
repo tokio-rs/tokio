@@ -2,18 +2,17 @@
 name = "tokio"
 # When releasing to crates.io:
 # - Remove path dependencies
-# - Update html_root_url.
 # - Update doc url
 #   - Cargo.toml
 #   - README.md
 # - Update CHANGELOG.md.
-# - Create "v0.3.x" git tag.
-version = "0.3.3"
+# - Create "v1.0.x" git tag.
+version = "1.2.0"
 edition = "2018"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 readme = "README.md"
-documentation = "https://docs.rs/tokio/0.3.3/tokio/"
+documentation = "https://docs.rs/tokio/1.2.0/tokio/"
 repository = "https://github.com/tokio-rs/tokio"
 homepage = "https://tokio.rs"
 description = """
@@ -39,7 +38,6 @@ full = [
   "rt",
   "rt-multi-thread",
   "signal",
-  "stream",
   "sync",
   "time",
 ]
@@ -50,7 +48,6 @@ io-util = ["memchr", "bytes"]
 io-std = []
 macros = ["tokio-macros"]
 net = [
-  "lazy_static",
   "libc",
   "mio/os-poll",
   "mio/os-util",
@@ -60,7 +57,7 @@ net = [
 ]
 process = [
   "bytes",
-  "lazy_static",
+  "once_cell",
   "libc",
   "mio/os-poll",
   "mio/os-util",
@@ -69,13 +66,13 @@ process = [
   "winapi/threadpoollegacyapiset",
 ]
 # Includes basic task execution capabilities
-rt = ["slab"]
+rt = []
 rt-multi-thread = [
   "num_cpus",
   "rt",
 ]
 signal = [
-  "lazy_static",
+  "once_cell",
   "libc",
   "mio/os-poll",
   "mio/uds",
@@ -83,25 +80,26 @@ signal = [
   "signal-hook-registry",
   "winapi/consoleapi",
 ]
-stream = ["futures-core"]
 sync = []
 test-util = []
 time = []
 
 [dependencies]
-tokio-macros = { version = "0.3.0", path = "../tokio-macros", optional = true }
+tokio-macros = { version = "1.1.0", path = "../tokio-macros", optional = true }
 
-pin-project-lite = "0.1.1"
+pin-project-lite = "0.2.0"
 
 # Everything else is optional...
-bytes = { version = "0.6.0", optional = true }
-futures-core = { version = "0.3.0", optional = true }
-lazy_static = { version = "1.0.2", optional = true }
+bytes = { version = "1.0.0", optional = true }
+once_cell = { version = "1.5.2", optional = true }
 memchr = { version = "2.2", optional = true }
-mio = { version = "0.7.5", optional = true }
+mio = { version = "0.7.6", optional = true }
 num_cpus = { version = "1.8.0", optional = true }
-parking_lot = { version = "0.11.0", optional = true } # Not in full
-slab = { version = "0.4.1", optional = true }
+parking_lot = { version = "0.11.0", optional = true }
+
+# Currently unstable. The API exposed by these features may be broken at any time.
+# Requires `--cfg tokio_unstable` to enable.
+[target.'cfg(tokio_unstable)'.dependencies]
 tracing = { version = "0.1.21", default-features = false, features = ["std"], optional = true } # Not in full
 
 [target.'cfg(unix)'.dependencies]
@@ -110,7 +108,7 @@ signal-hook-registry = { version = "1.1.1", optional = true }
 
 [target.'cfg(unix)'.dev-dependencies]
 libc = { version = "0.2.42" }
-nix = { version = "0.18.0" }
+nix = { version = "0.19.0" }
 
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3.8"
@@ -118,13 +116,16 @@ default-features = false
 optional = true
 
 [dev-dependencies]
-tokio-test = { version = "0.3.0", path = "../tokio-test" }
+tokio-test = { version = "0.4.0", path = "../tokio-test" }
+tokio-stream = { version = "0.1", path = "../tokio-stream" }
 futures = { version = "0.3.0", features = ["async-await"] }
-proptest = "0.9.4"
+proptest = "0.10.0"
+rand = "0.8.0"
 tempfile = "3.1.0"
+async-stream = "0.3"
 
 [target.'cfg(loom)'.dev-dependencies]
-loom = { version = "0.3.5", features = ["futures", "checkpoint"] }
+loom = { version = "0.4", features = ["futures", "checkpoint"] }
 
 [build-dependencies]
 autocfg = "1" # Needed for conditionally enabling `track-caller`
@@ -134,4 +135,4 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [package.metadata.playground]
-features = ["full"]
+features = ["full", "test-util"]

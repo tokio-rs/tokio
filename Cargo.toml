@@ -4,11 +4,13 @@ members = [
   "tokio",
   "tokio-macros",
   "tokio-test",
+  "tokio-stream",
   "tokio-util",
 
   # Internal
   "benches",
   "examples",
+  "stress-test",
   "tests-build",
   "tests-integration",
 ]

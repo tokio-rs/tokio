@@ -1,10 +1,18 @@
 #![cfg_attr(not(feature = "rt"), allow(dead_code))]
 
+mod interest;
+#[allow(unreachable_pub)]
+pub use interest::Interest;
+
 mod ready;
-use ready::Ready;
+#[allow(unreachable_pub)]
+pub use ready::Ready;
+
+mod registration;
+pub(crate) use registration::Registration;
 
 mod scheduled_io;
-pub(crate) use scheduled_io::ScheduledIo; // pub(crate) for tests
+use scheduled_io::ScheduledIo;
 
 use crate::park::{Park, Unpark};
 use crate::util::slab::{self, Slab};
@@ -45,7 +53,7 @@ pub(crate) struct Handle {
 
 pub(crate) struct ReadyEvent {
     tick: u8,
-    ready: Ready,
+    pub(crate) ready: Ready,
 }
 
 pub(super) struct Inner {
@@ -68,7 +76,7 @@ pub(super) struct Inner {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
-pub(super) enum Direction {
+enum Direction {
     Read,
     Write,
 }
@@ -251,8 +259,7 @@ cfg_rt! {
         /// This function panics if there is no current reactor set and `rt` feature
         /// flag is not enabled.
         pub(super) fn current() -> Self {
-            crate::runtime::context::io_handle()
-                .expect("there is no reactor running, must be called from the context of Tokio runtime")
+            crate::runtime::context::io_handle().expect("A Tokio 1.x context was found, but IO is disabled. Call `enable_io` on the runtime builder to enable IO.")
         }
     }
 }
@@ -266,7 +273,7 @@ cfg_not_rt! {
         /// This function panics if there is no current reactor set, or if the `rt`
         /// feature flag is not enabled.
         pub(super) fn current() -> Self {
-            panic!("there is no reactor running, must be called from the context of Tokio runtime with `rt` enabled.")
+            panic!(crate::util::error::CONTEXT_MISSING_ERROR)
         }
     }
 }
@@ -289,12 +296,6 @@ impl Handle {
 
     pub(super) fn inner(&self) -> Option<Arc<Inner>> {
         self.inner.upgrade()
-    }
-
-    cfg_net_unix! {
-        pub(super) fn is_alive(&self) -> bool {
-            self.inner.strong_count() > 0
-        }
     }
 }
 
@@ -319,7 +320,7 @@ impl Inner {
     pub(super) fn add_source(
         &self,
         source: &mut impl mio::event::Source,
-        interest: mio::Interest,
+        interest: Interest,
     ) -> io::Result<slab::Ref<ScheduledIo>> {
         let (address, shared) = self.io_dispatch.allocate().ok_or_else(|| {
             io::Error::new(
@@ -331,7 +332,7 @@ impl Inner {
         let token = GENERATION.pack(shared.generation(), ADDRESS.pack(address.as_usize(), 0));
 
         self.registry
-            .register(source, mio::Token(token), interest)?;
+            .register(source, mio::Token(token), interest.to_mio())?;
 
         Ok(shared)
     }

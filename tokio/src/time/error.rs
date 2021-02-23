@@ -23,15 +23,21 @@ use std::fmt;
 ///   way to do this would be dropping the future that issued the timer operation.
 ///
 /// [shed load]: https://en.wikipedia.org/wiki/Load_Shedding
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Error(Kind);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 #[repr(u8)]
-enum Kind {
+pub(crate) enum Kind {
     Shutdown = 1,
     AtCapacity = 2,
     Invalid = 3,
+}
+
+impl From<Kind> for Error {
+    fn from(k: Kind) -> Self {
+        Error(k)
+    }
 }
 
 /// Error returned by `Timeout`.
@@ -41,7 +47,6 @@ pub struct Elapsed(());
 #[derive(Debug)]
 pub(crate) enum InsertError {
     Elapsed,
-    Invalid,
 }
 
 // ===== impl Error =====
@@ -75,19 +80,6 @@ impl Error {
     /// Returns `true` if the error was caused by the timer being misconfigured.
     pub fn is_invalid(&self) -> bool {
         matches!(self.0, Kind::Invalid)
-    }
-
-    pub(crate) fn as_u8(&self) -> u8 {
-        self.0 as u8
-    }
-
-    pub(crate) fn from_u8(n: u8) -> Self {
-        Error(match n {
-            1 => Shutdown,
-            2 => AtCapacity,
-            3 => Invalid,
-            _ => panic!("u8 does not correspond to any time error variant"),
-        })
     }
 }
 

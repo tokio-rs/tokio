@@ -52,7 +52,7 @@ impl FastRand {
 }
 
 // Used by the select macro and `StreamMap`
-#[cfg(any(feature = "macros", feature = "stream"))]
+#[cfg(any(feature = "macros"))]
 #[doc(hidden)]
 #[cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
 pub fn thread_rng_n(n: u32) -> u32 {

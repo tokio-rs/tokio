@@ -26,14 +26,19 @@ use std::future::Future;
 use std::io;
 use std::os::windows::prelude::{AsRawHandle, FromRawHandle, IntoRawHandle};
 use std::pin::Pin;
+use std::process::Stdio;
 use std::process::{Child as StdChild, Command as StdCommand, ExitStatus};
 use std::ptr;
 use std::task::Context;
 use std::task::Poll;
-use winapi::um::handleapi::INVALID_HANDLE_VALUE;
+use winapi::shared::minwindef::{DWORD, FALSE};
+use winapi::um::handleapi::{DuplicateHandle, INVALID_HANDLE_VALUE};
+use winapi::um::processthreadsapi::GetCurrentProcess;
 use winapi::um::threadpoollegacyapiset::UnregisterWaitEx;
 use winapi::um::winbase::{RegisterWaitForSingleObject, INFINITE};
-use winapi::um::winnt::{BOOLEAN, HANDLE, PVOID, WT_EXECUTEINWAITTHREAD, WT_EXECUTEONLYONCE};
+use winapi::um::winnt::{
+    BOOLEAN, DUPLICATE_SAME_ACCESS, HANDLE, PVOID, WT_EXECUTEINWAITTHREAD, WT_EXECUTEONLYONCE,
+};
 
 #[must_use = "futures do nothing unless polled"]
 pub(crate) struct Child {
@@ -170,4 +175,31 @@ where
     };
     let pipe = unsafe { NamedPipe::from_raw_handle(io.into_raw_handle()) };
     PollEvented::new(pipe).ok()
+}
+
+pub(crate) fn convert_to_stdio(io: PollEvented<NamedPipe>) -> io::Result<Stdio> {
+    let named_pipe = io.into_inner()?;
+
+    // Mio does not implement `IntoRawHandle` for `NamedPipe`, so we'll manually
+    // duplicate the handle here...
+    unsafe {
+        let mut dup_handle = INVALID_HANDLE_VALUE;
+        let cur_proc = GetCurrentProcess();
+
+        let status = DuplicateHandle(
+            cur_proc,
+            named_pipe.as_raw_handle(),
+            cur_proc,
+            &mut dup_handle,
+            0 as DWORD,
+            FALSE,
+            DUPLICATE_SAME_ACCESS,
+        );
+
+        if status == 0 {
+            return Err(io::Error::last_os_error());
+        }
+
+        Ok(Stdio::from_raw_handle(dup_handle))
+    }
 }
