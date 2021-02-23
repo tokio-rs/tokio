@@ -167,8 +167,8 @@ impl Builder {
 
     /// Sets the number of worker threads the `Runtime` will use.
     ///
-    /// This should be a number between 0 and 32,768 though it is advised to
-    /// keep this value on the smaller side.
+    /// This can be any number above 0 though it is advised to keep this value
+    /// on the smaller side.
     ///
     /// # Default
     ///
@@ -220,15 +220,14 @@ impl Builder {
         self
     }
 
-    /// Specifies limit for threads spawned by the Runtime used for blocking operations.
+    /// Specifies the limit for additional threads spawned by the Runtime.
     ///
-    ///
-    /// Similarly to the `worker_threads`, this number should be between 1 and 32,768.
+    /// These threads are used for blocking operations like tasks spawned
+    /// through [`spawn_blocking`]. Unlike the [`worker_threads`], they are not
+    /// always active and will exit if left idle for too long. You can change
+    /// this timeout duration with [`thread_keep_alive`].
     ///
     /// The default value is 512.
-    ///
-    /// Otherwise as `worker_threads` are always active, it limits additional threads (e.g. for
-    /// blocking annotations).
     ///
     /// # Panic
     ///
@@ -238,6 +237,10 @@ impl Builder {
     ///
     /// In old versions `max_threads` limited both blocking and worker threads, but the
     /// current `max_blocking_threads` does not include async worker threads in the count.
+    ///
+    /// [`spawn_blocking`]: fn@crate::task::spawn_blocking
+    /// [`worker_threads`]: Self::worker_threads
+    /// [`thread_keep_alive`]: Self::thread_keep_alive
     #[cfg_attr(docsrs, doc(alias = "max_threads"))]
     pub fn max_blocking_threads(&mut self, val: usize) -> &mut Self {
         assert!(val > 0, "Max blocking threads cannot be set to 0");
