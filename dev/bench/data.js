@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1614095828194,
+  "lastUpdate": 1614095834390,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -17443,6 +17443,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21094544,
             "range": "± 2779407",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "kestrer.dev@gmail.com",
+            "name": "Kestrer",
+            "username": "Kestrer"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8efed43fa727e1807c7bc89ac6963a14c2d72c9a",
+          "message": "runtime: update documentation of thread limits (#3527)\n\nSince ed5a94eb2db95b7cc142045fbbd5d68c6276e04e, there is no longer a\r\nlimit of 32,768 threads on the worker threads and blocking thread pool,\r\nbut the documentation has not been updated. This commit removes that\r\npart of the documentation.",
+          "timestamp": "2021-02-23T16:54:50+01:00",
+          "tree_id": "59a551382bdc8e56bdf1302640ce98c0643e293a",
+          "url": "https://github.com/tokio-rs/tokio/commit/8efed43fa727e1807c7bc89ac6963a14c2d72c9a"
+        },
+        "date": 1614095824793,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 195430,
+            "range": "± 14623",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 742653,
+            "range": "± 35529",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5509218,
+            "range": "± 912540",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20745426,
+            "range": "± 2976349",
             "unit": "ns/iter"
           }
         ]
