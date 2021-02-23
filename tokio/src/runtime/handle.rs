@@ -201,6 +201,18 @@ impl Handle {
         let _ = self.blocking_spawner.spawn(task, &self);
         handle
     }
+
+    /// TODO: write docs if this is a good direction
+    pub fn block_on<F: Future>(&self, future: F) -> F::Output {
+        // Enter the **runtime** context. This configures spawning, the current I/O driver, ...
+        let _rt_enter = self.enter();
+
+        // Enter a **blocking** context. This prevents blocking from a runtime.
+        let mut _blocking_enter = crate::runtime::enter(true);
+
+        // Block on the future
+        _blocking_enter.block_on(future).expect("failed to park thread")
+    }
 }
 
 /// Error returned by `try_current` when no Runtime has been started
