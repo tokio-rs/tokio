@@ -58,7 +58,10 @@ pub fn sleep_until(deadline: Instant) -> Sleep {
 // Alias for old name in 0.x
 #[cfg_attr(docsrs, doc(alias = "delay_for"))]
 pub fn sleep(duration: Duration) -> Sleep {
-    sleep_until(Instant::now() + duration)
+    match Instant::now().checked_add(duration) {
+        Some(deadline) => sleep_until(deadline),
+        None => sleep_until(Instant::far_future()),
+    }
 }
 
 pin_project! {
@@ -166,6 +169,10 @@ impl Sleep {
         let entry = TimerEntry::new(&handle, deadline);
 
         Sleep { deadline, entry }
+    }
+
+    pub(crate) fn far_future() -> Sleep {
+        Self::new_timeout(Instant::far_future())
     }
 
     /// Returns the instant at which the future will complete.
