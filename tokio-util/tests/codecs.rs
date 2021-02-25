@@ -201,7 +201,26 @@ fn lines_decoder_discard_repeat() {
     buf.put_slice(b"aa");
     assert!(codec.decode(buf).is_err());
     buf.put_slice(b"a");
+    assert_eq!(None, codec.decode(buf).unwrap());
+}
+
+// Regression test for [subsequent calls to LinesCodec decode does not return the desired results bug](https://github.com/tokio-rs/tokio/issues/3555)
+#[test]
+fn lines_decoder_max_length_underrun_twice() {
+    const MAX_LENGTH: usize = 11;
+
+    let mut codec = LinesCodec::new_with_max_length(MAX_LENGTH);
+    let buf = &mut BytesMut::new();
+
+    buf.reserve(200);
+    buf.put_slice(b"line ");
+    assert_eq!(None, codec.decode(buf).unwrap());
+    buf.put_slice(b"too very l");
     assert!(codec.decode(buf).is_err());
+    buf.put_slice(b"aaaaaaaaaaaaaaaaaaaaaaa");
+    assert_eq!(None, codec.decode(buf).unwrap());
+    buf.put_slice(b"ong\nshort\n");
+    assert_eq!("short", codec.decode(buf).unwrap().unwrap());
 }
 
 #[test]
