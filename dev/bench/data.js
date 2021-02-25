@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1614281400652,
+  "lastUpdate": 1614281417397,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -17647,6 +17647,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19593556,
             "range": "± 3161363",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "stepan.koltsov@gmail.com",
+            "name": "Stepan Koltsov",
+            "username": "stepancheg"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "112e160b623e3bef1603bf522abbdaacbc6c94e5",
+          "message": "sync: allow oneshot::Receiver::close after successful try_recv (#3552)\n\nBefore this commit `close` after successful `try_recv` panics.\r\n\r\nMy use case is this: on drop, I call `close` to prevent pushing a\r\nmessage to the queue, and then fetch the message if any and process\r\nit.\r\n\r\nBut if message is already processed, `close` panics.  And there is\r\nno API to know if message was already fetched or not (except for\r\nwriting a wrapped which would track that info, which would be an\r\noverkill).\r\n\r\nBut generally `close` operation should be safe to be called any\r\ntime.",
+          "timestamp": "2021-02-25T20:28:24+01:00",
+          "tree_id": "7d391a1ad3c4d46a53b9e7aa4629ed3423af56a5",
+          "url": "https://github.com/tokio-rs/tokio/commit/112e160b623e3bef1603bf522abbdaacbc6c94e5"
+        },
+        "date": 1614281415403,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 215856,
+            "range": "± 51135",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 728413,
+            "range": "± 112612",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5188707,
+            "range": "± 720592",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20465906,
+            "range": "± 3990400",
             "unit": "ns/iter"
           }
         ]
