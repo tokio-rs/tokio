@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1614281451009,
+  "lastUpdate": 1614291634165,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -17695,6 +17695,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20465906,
             "range": "± 3990400",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "paho@paholg.com",
+            "name": "Paho Lurie-Gregg",
+            "username": "paholg"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "017a483b5e4b1a2464e203f51c95e3234f4bd60b",
+          "message": "io: update AsyncRead::poll_read doc (#3557)\n\nThe trait-level documentation accurately describes this method, but the\r\nfunction-level documentation imples that an implementer should overwrite\r\nthe entire buf, rather than just the unfilled portion.",
+          "timestamp": "2021-02-25T23:19:02+01:00",
+          "tree_id": "c297dad90d899994945386fa4cbcf00d24fe2118",
+          "url": "https://github.com/tokio-rs/tokio/commit/017a483b5e4b1a2464e203f51c95e3234f4bd60b"
+        },
+        "date": 1614291632474,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 159787,
+            "range": "± 7707",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 618336,
+            "range": "± 20423",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5046806,
+            "range": "± 851969",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18351031,
+            "range": "± 2208314",
             "unit": "ns/iter"
           }
         ]
