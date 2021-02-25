@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1614291821922,
+  "lastUpdate": 1614291828190,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -17851,6 +17851,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18351031,
             "range": "± 2208314",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronzigelman@gmail.com",
+            "name": "r-zig",
+            "username": "r-zig"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5756a005a646108bfdc386f48385803303c372a8",
+          "message": "codec: LinesCodec should only return MaxLineLengthExceeded once per line (#3556)",
+          "timestamp": "2021-02-25T23:21:59+01:00",
+          "tree_id": "337baca3a133b06d310ada79d8e5696d2f7b777b",
+          "url": "https://github.com/tokio-rs/tokio/commit/5756a005a646108bfdc386f48385803303c372a8"
+        },
+        "date": 1614291826263,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 186719,
+            "range": "± 25011",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 721825,
+            "range": "± 153374",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5216821,
+            "range": "± 1049612",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19739499,
+            "range": "± 3174945",
             "unit": "ns/iter"
           }
         ]
