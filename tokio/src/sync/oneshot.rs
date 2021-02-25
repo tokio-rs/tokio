@@ -443,6 +443,9 @@ impl<T> Receiver<T> {
     /// This function is useful to perform a graceful shutdown and ensure that a
     /// value will not be sent into the channel and never received.
     ///
+    /// `close` is no-op if a message is already received or the channel
+    /// is already closed.
+    ///
     /// [`Sender`]: Sender
     /// [`try_recv`]: Receiver::try_recv
     ///
@@ -490,8 +493,9 @@ impl<T> Receiver<T> {
     /// }
     /// ```
     pub fn close(&mut self) {
-        let inner = self.inner.as_ref().unwrap();
-        inner.close();
+        if let Some(inner) = self.inner.as_ref() {
+            inner.close();
+        }
     }
 
     /// Attempts to receive a value.
