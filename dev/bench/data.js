@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1614291643820,
+  "lastUpdate": 1614291649830,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -9341,6 +9341,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 579,
             "range": "± 74",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "paho@paholg.com",
+            "name": "Paho Lurie-Gregg",
+            "username": "paholg"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "017a483b5e4b1a2464e203f51c95e3234f4bd60b",
+          "message": "io: update AsyncRead::poll_read doc (#3557)\n\nThe trait-level documentation accurately describes this method, but the\r\nfunction-level documentation imples that an implementer should overwrite\r\nthe entire buf, rather than just the unfilled portion.",
+          "timestamp": "2021-02-25T23:19:02+01:00",
+          "tree_id": "c297dad90d899994945386fa4cbcf00d24fe2118",
+          "url": "https://github.com/tokio-rs/tokio/commit/017a483b5e4b1a2464e203f51c95e3234f4bd60b"
+        },
+        "date": 1614291648046,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 869,
+            "range": "± 92",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 12868,
+            "range": "± 3306",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 928,
+            "range": "± 156",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 13213,
+            "range": "± 4630",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 523,
+            "range": "± 91",
             "unit": "ns/iter"
           }
         ]
