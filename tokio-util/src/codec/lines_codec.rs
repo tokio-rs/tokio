@@ -133,7 +133,7 @@ impl Decoder for LinesCodec {
                     buf.advance(read_to);
                     self.next_index = 0;
                     if buf.is_empty() {
-                        return Ok(None);
+                        return Err(LinesCodecError::MaxLineLengthExceeded);
                     }
                 }
                 (false, Some(offset)) => {
