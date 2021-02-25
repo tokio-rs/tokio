@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1614291649830,
+  "lastUpdate": 1614291672134,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -41699,6 +41699,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 855773,
             "range": "± 114870",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "paho@paholg.com",
+            "name": "Paho Lurie-Gregg",
+            "username": "paholg"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "017a483b5e4b1a2464e203f51c95e3234f4bd60b",
+          "message": "io: update AsyncRead::poll_read doc (#3557)\n\nThe trait-level documentation accurately describes this method, but the\r\nfunction-level documentation imples that an implementer should overwrite\r\nthe entire buf, rather than just the unfilled portion.",
+          "timestamp": "2021-02-25T23:19:02+01:00",
+          "tree_id": "c297dad90d899994945386fa4cbcf00d24fe2118",
+          "url": "https://github.com/tokio-rs/tokio/commit/017a483b5e4b1a2464e203f51c95e3234f4bd60b"
+        },
+        "date": 1614291670097,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 7221754,
+            "range": "± 2840215",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6847790,
+            "range": "± 1709694",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6752279,
+            "range": "± 2706713",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 711,
+            "range": "± 11",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 718,
+            "range": "± 5",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 713,
+            "range": "± 14",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 84866,
+            "range": "± 12941",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1569,
+            "range": "± 313",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1185286,
+            "range": "± 144031",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 841300,
+            "range": "± 190387",
             "unit": "ns/iter"
           }
         ]
