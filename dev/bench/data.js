@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1614330358271,
+  "lastUpdate": 1614330362930,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -17953,6 +17953,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19739499,
             "range": "± 3174945",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "stepan.koltsov@gmail.com",
+            "name": "Stepan Koltsov",
+            "username": "stepancheg"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d2ad7afd21e4faef05ccccb0288bc814a954b990",
+          "message": "time: do not panic on timeout(Duration::MAX) (#3551)\n\nIt is tempting to use very large `Duration` value to get a practically\r\ninfinite timeout.\r\n\r\nBefore this commit Tokio panics on checked Instant + Duration\r\noverflow.\r\n\r\nThis commit implements very simple fix: if Instant + Duration\r\noverflows, we use duration = 30 years. Better fix should avoid\r\nfiring a timer on duration overflow. It requires deeper understanding\r\nhow timers work, but also it is not clear, for example, what\r\n`Sleep::deadline` function should return.\r\n\r\nSimilar fix is done for `sleep`.",
+          "timestamp": "2021-02-26T10:04:08+01:00",
+          "tree_id": "98d543466cff5c05d0d1fbfb819d7ee2234d6559",
+          "url": "https://github.com/tokio-rs/tokio/commit/d2ad7afd21e4faef05ccccb0288bc814a954b990"
+        },
+        "date": 1614330360493,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 162083,
+            "range": "± 30688",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 602235,
+            "range": "± 124224",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4735803,
+            "range": "± 895856",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18941146,
+            "range": "± 2889278",
             "unit": "ns/iter"
           }
         ]
