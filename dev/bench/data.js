@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1614462541400,
+  "lastUpdate": 1614462545849,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -18055,6 +18055,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18941146,
             "range": "± 2889278",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "pka@sourcepole.ch",
+            "name": "Pirmin Kalberer",
+            "username": "pka"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fd93ecf5e0452ab7954478ba579da8e0acec636d",
+          "message": "stream: remove duplicate doc_cfg declaration (#3561)",
+          "timestamp": "2021-02-27T22:47:26+01:00",
+          "tree_id": "5747469ee1fc513ce324f8fd573fb38373d14121",
+          "url": "https://github.com/tokio-rs/tokio/commit/fd93ecf5e0452ab7954478ba579da8e0acec636d"
+        },
+        "date": 1614462541210,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 157128,
+            "range": "± 15859",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 606870,
+            "range": "± 82766",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4507289,
+            "range": "± 1214024",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 16946406,
+            "range": "± 2021107",
             "unit": "ns/iter"
           }
         ]
