@@ -7,7 +7,7 @@ use crate::process::unix::orphan::ReapOrphanQueue;
 use crate::process::unix::GlobalOrphanQueue;
 use crate::signal::unix::driver::Driver as SignalDriver;
 use crate::signal::unix::{signal_with_handle, InternalStream, Signal, SignalKind};
-use crate::sync::mpsc::error::TryRecvError;
+use crate::sync::broadcast::error::TryRecvError;
 
 use std::io;
 use std::time::Duration;
@@ -35,6 +35,7 @@ where
     fn got_signal(&mut self) -> bool {
         match self.sigchild.try_recv() {
             Ok(()) => true,
+            Err(TryRecvError::Lagged(_)) => true, // try again
             Err(TryRecvError::Empty) => false,
             Err(TryRecvError::Closed) => panic!("signal was deregistered"),
         }
@@ -97,7 +98,7 @@ impl Park for Driver {
 mod test {
     use super::*;
     use crate::process::unix::orphan::test::MockQueue;
-    use crate::sync::mpsc::error::TryRecvError;
+    use crate::sync::broadcast::error::TryRecvError;
     use std::task::{Context, Poll};
 
     struct MockStream {

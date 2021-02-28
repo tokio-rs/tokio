@@ -8,7 +8,8 @@
 #![cfg(windows)]
 
 use crate::signal::registry::{globals, EventId, EventInfo, Init, Storage};
-use crate::sync::mpsc::{channel, Receiver};
+use crate::sync::broadcast::error::RecvError;
+use crate::sync::broadcast::Receiver;
 
 use std::convert::TryFrom;
 use std::io;
@@ -83,15 +84,20 @@ impl Event {
     fn new(signum: DWORD) -> io::Result<Self> {
         global_init()?;
 
-        let (tx, rx) = channel(1);
-        globals().register_listener(signum as EventId, tx);
+        let rx = globals().register_listener(signum as EventId);
 
         Ok(Event { rx })
     }
 
     pub(crate) async fn recv(&mut self) -> Option<()> {
-        use crate::future::poll_fn;
-        poll_fn(|cx| self.rx.poll_recv(cx)).await
+        // FIXME: coop?
+        loop {
+            match self.rx.recv().await {
+                Ok(()) => return Some(()),
+                Err(RecvError::Closed) => return None,
+                Err(RecvError::Lagged(_)) => {}
+            }
+        }
     }
 }
 

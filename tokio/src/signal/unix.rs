@@ -6,8 +6,8 @@
 #![cfg(unix)]
 
 use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
-use crate::sync::mpsc::error::TryRecvError;
-use crate::sync::mpsc::{channel, Receiver};
+use crate::sync::broadcast::error::{RecvError, TryRecvError};
+use crate::sync::broadcast::{Receiver, Recv};
 
 use libc::c_int;
 use mio::net::UnixStream;
@@ -325,7 +325,9 @@ fn signal_enable(signal: c_int, handle: Handle) -> io::Result<()> {
 #[must_use = "streams do nothing unless polled"]
 #[derive(Debug)]
 pub struct Signal {
+    signal: c_int,
     rx: Receiver<()>,
+    poll_rx: Option<Pin<Box<Recv<'static, ()>>>>,
 }
 
 /// Creates a new stream which will receive notifications when the current
@@ -360,12 +362,13 @@ pub(crate) fn signal_with_handle(kind: SignalKind, handle: Handle) -> io::Result
     // Turn the signal delivery on once we are ready for it
     signal_enable(signal, handle)?;
 
-    // One wakeup in a queue is enough, no need for us to buffer up any
-    // more.
-    let (tx, rx) = channel(1);
-    globals().register_listener(signal as EventId, tx);
+    let rx = globals().register_listener(signal as EventId);
 
-    Ok(Signal { rx })
+    Ok(Signal {
+        signal,
+        rx,
+        poll_rx: None,
+    })
 }
 
 impl Signal {
@@ -393,8 +396,13 @@ impl Signal {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<()> {
-        use crate::future::poll_fn;
-        poll_fn(|cx| self.poll_recv(cx)).await
+        loop {
+            match self.rx.recv().await {
+                Ok(_) => return Some(()),
+                Err(RecvError::Closed) => return None,
+                Err(RecvError::Lagged(_)) => continue,
+            }
+        }
     }
 
     /// Polls to receive the next signal notification event, outside of an
@@ -432,7 +440,27 @@ impl Signal {
     /// }
     /// ```
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
-        self.rx.poll_recv(cx)
+        use std::future::Future;
+
+        if self.poll_rx.is_none() {
+            let rx = globals().register_listener(self.signal as usize);
+            let poll_rx = Recv::new(crate::sync::broadcast::MaybeOwned::Owned(rx));
+            self.poll_rx = Some(Box::pin(poll_rx));
+        }
+
+        let ret = loop {
+            match self.poll_rx.as_mut().unwrap().as_mut().poll(cx) {
+                Poll::Pending => return Poll::Pending,
+                Poll::Ready(ret) => match ret {
+                    Ok(()) => break Some(()),
+                    Err(RecvError::Closed) => break None,
+                    Err(RecvError::Lagged(_)) => {}
+                },
+            }
+        };
+
+        self.poll_rx = None;
+        Poll::Ready(ret)
     }
 
     /// Try to receive a signal notification without blocking or registering a waker.
@@ -442,7 +470,7 @@ impl Signal {
 }
 
 // Work around for abstracting streams internally
-pub(crate) trait InternalStream: Unpin {
+pub(crate) trait InternalStream {
     fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>>;
     fn try_recv(&mut self) -> Result<(), TryRecvError>;
 }

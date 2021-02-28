@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "sync"), allow(dead_code, unreachable_pub))]
+
 //! A multi-producer, multi-consumer broadcast queue. Each sent value is seen by
 //! all consumers.
 //!
@@ -347,6 +349,7 @@ struct Slot<T> {
 }
 
 /// An entry in the wait queue
+#[derive(Debug)]
 struct Waiter {
     /// True if queued
     queued: bool,
@@ -366,9 +369,10 @@ struct RecvGuard<'a, T> {
 }
 
 /// Receive a value future
-struct Recv<'a, T> {
+#[derive(Debug)]
+pub(crate) struct Recv<'a, T> {
     /// Receiver being waited on
-    receiver: &'a mut Receiver<T>,
+    receiver: MaybeOwned<'a, Receiver<T>>,
 
     /// Entry in the waiter `LinkedList`
     waiter: UnsafeCell<Waiter>,
@@ -875,7 +879,7 @@ impl<T: Clone> Receiver<T> {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Result<T, RecvError> {
-        let fut = Recv::new(self);
+        let fut = Recv::new(MaybeOwned::Mut(self));
         fut.await
     }
 
@@ -948,8 +952,34 @@ impl<T> Drop for Receiver<T> {
     }
 }
 
+#[derive(Debug)]
+pub(crate) enum MaybeOwned<'a, T> {
+    Owned(T),
+    Mut(&'a mut T),
+}
+
+impl<T> std::ops::Deref for MaybeOwned<'_, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            MaybeOwned::Owned(t) => t,
+            MaybeOwned::Mut(t) => t,
+        }
+    }
+}
+
+impl<T> std::ops::DerefMut for MaybeOwned<'_, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        match self {
+            MaybeOwned::Owned(t) => t,
+            MaybeOwned::Mut(t) => t,
+        }
+    }
+}
+
 impl<'a, T> Recv<'a, T> {
-    fn new(receiver: &'a mut Receiver<T>) -> Recv<'a, T> {
+    pub(crate) fn new(receiver: MaybeOwned<'a, Receiver<T>>) -> Recv<'a, T> {
         Recv {
             receiver,
             waiter: UnsafeCell::new(Waiter {
@@ -969,7 +999,7 @@ impl<'a, T> Recv<'a, T> {
             is_unpin::<&mut Receiver<T>>();
 
             let me = self.get_unchecked_mut();
-            (me.receiver, &me.waiter)
+            (&mut *me.receiver, &me.waiter)
         }
     }
 }
