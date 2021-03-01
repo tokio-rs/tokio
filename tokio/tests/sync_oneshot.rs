@@ -181,6 +181,16 @@ fn close_try_recv_poll() {
 }
 
 #[test]
+fn close_after_recv() {
+    let (tx, mut rx) = oneshot::channel::<i32>();
+
+    tx.send(17).unwrap();
+
+    assert_eq!(17, rx.try_recv().unwrap());
+    rx.close();
+}
+
+#[test]
 fn drops_tasks() {
     let (mut tx, mut rx) = oneshot::channel::<i32>();
     let mut tx_task = task::spawn(());

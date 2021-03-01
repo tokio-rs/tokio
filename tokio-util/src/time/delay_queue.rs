@@ -36,14 +36,14 @@ use std::task::{self, Poll, Waker};
 /// # `Stream` implementation
 ///
 /// Items are retrieved from the queue via [`DelayQueue::poll_expired`]. If no delays have
-/// expired, no items are returned. In this case, `NotReady` is returned and the
+/// expired, no items are returned. In this case, `Pending` is returned and the
 /// current task is registered to be notified once the next item's delay has
 /// expired.
 ///
 /// If no items are in the queue, i.e. `is_empty()` returns `true`, then `poll`
 /// returns `Ready(None)`. This indicates that the stream has reached an end.
 /// However, if a new item is inserted *after*, `poll` will once again start
-/// returning items or `NotReady.
+/// returning items or `Pending.
 ///
 /// Items are returned ordered by their expirations. Items that are configured
 /// to expire first will be returned first. There are no ordering guarantees
@@ -138,7 +138,7 @@ pub struct DelayQueue<T> {
     expired: Stack<T>,
 
     /// Delay expiring when the *first* item in the queue expires
-    delay: Option<Sleep>,
+    delay: Option<Pin<Box<Sleep>>>,
 
     /// Wheel polling state
     wheel_now: u64,
@@ -342,9 +342,9 @@ impl<T> DelayQueue<T> {
 
             let delay_time = self.start + Duration::from_millis(when);
             if let Some(ref mut delay) = &mut self.delay {
-                delay.reset(delay_time);
+                delay.as_mut().reset(delay_time);
             } else {
-                self.delay = Some(sleep_until(delay_time));
+                self.delay = Some(Box::pin(sleep_until(delay_time)));
             }
         }
 
@@ -538,7 +538,7 @@ impl<T> DelayQueue<T> {
     ///
     ///     delay_queue.reset_at(&key, Instant::now() + Duration::from_secs(10));
     ///
-    ///     // "foo"is now scheduled to be returned in 10 seconds
+    ///     // "foo" is now scheduled to be returned in 10 seconds
     /// # }
     /// ```
     pub fn reset_at(&mut self, key: &Key, when: Instant) {
@@ -548,12 +548,14 @@ impl<T> DelayQueue<T> {
         let when = self.normalize_deadline(when);
 
         self.slab[key.index].when = when;
+        self.slab[key.index].expired = false;
+
         self.insert_idx(when, key.index);
 
         let next_deadline = self.next_deadline();
         if let (Some(ref mut delay), Some(deadline)) = (&mut self.delay, next_deadline) {
             // This should awaken us if necessary (ie, if already expired)
-            delay.reset(deadline);
+            delay.as_mut().reset(deadline);
         }
     }
 
@@ -711,7 +713,7 @@ impl<T> DelayQueue<T> {
     /// Returns `true` if there are no items in the queue.
     ///
     /// Note that this function returns `false` even if all items have not yet
-    /// expired and a call to `poll` will return `NotReady`.
+    /// expired and a call to `poll` will return `Pending`.
     ///
     /// # Examples
     ///
@@ -759,7 +761,7 @@ impl<T> DelayQueue<T> {
             // We poll the wheel to get the next value out before finding the next deadline.
             let wheel_idx = self.wheel.poll(self.wheel_now, &mut self.slab);
 
-            self.delay = self.next_deadline().map(sleep_until);
+            self.delay = self.next_deadline().map(|when| Box::pin(sleep_until(when)));
 
             if let Some(idx) = wheel_idx {
                 return Poll::Ready(Some(Ok(idx)));

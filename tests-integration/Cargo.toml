@@ -5,7 +5,17 @@ authors = ["Tokio Contributors <team@tokio.rs>"]
 edition = "2018"
 publish = false
 
+[[bin]]
+name = "test-cat"
+
+[[bin]]
+name = "test-mem"
+required-features = ["rt-net"]
+
 [features]
+# For mem check
+rt-net = ["tokio/rt", "tokio/rt-multi-thread", "tokio/net"]
+
 full = [
     "macros",
     "rt",
@@ -23,6 +33,4 @@ rt-multi-thread = ["rt", "tokio/rt-multi-thread"]
 tokio = { path = "../tokio" }
 tokio-test = { path = "../tokio-test", optional = true }
 doc-comment = "0.3.1"
-
-[dev-dependencies]
 futures = { version = "0.3.0", features = ["async-await"] }

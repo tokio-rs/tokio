@@ -101,43 +101,31 @@ pub fn interval_at(start: Instant, period: Duration) -> Interval {
     assert!(period > Duration::new(0, 0), "`period` must be non-zero.");
 
     Interval {
-        delay: sleep_until(start),
+        delay: Box::pin(sleep_until(start)),
         period,
     }
 }
 
-/// Stream returned by [`interval`](interval) and [`interval_at`](interval_at).
+/// Interval returned by [`interval`](interval) and [`interval_at`](interval_at).
 ///
-/// This type only implements the [`Stream`] trait if the "stream" feature is
-/// enabled.
+/// This type allows you to wait on a sequence of instants with a certain
+/// duration between each instant. Unlike calling [`sleep`](crate::time::sleep)
+/// in a loop, this lets you count the time spent between the calls to `sleep`
+/// as well.
 ///
-/// [`Stream`]: trait@crate::stream::Stream
+/// An `Interval` can be turned into a `Stream` with [`IntervalStream`].
+///
+/// [`IntervalStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.IntervalStream.html
 #[derive(Debug)]
 pub struct Interval {
     /// Future that completes the next time the `Interval` yields a value.
-    delay: Sleep,
+    delay: Pin<Box<Sleep>>,
 
     /// The duration between values yielded by `Interval`.
     period: Duration,
 }
 
 impl Interval {
-    fn poll_tick(&mut self, cx: &mut Context<'_>) -> Poll<Instant> {
-        // Wait for the delay to be done
-        ready!(Pin::new(&mut self.delay).poll(cx));
-
-        // Get the `now` by looking at the `delay` deadline
-        let now = self.delay.deadline();
-
-        // The next interval value is `duration` after the one that just
-        // yielded.
-        let next = now + self.period;
-        self.delay.reset(next);
-
-        // Return the current instant
-        Poll::Ready(now)
-    }
-
     /// Completes when the next instant in the interval has been reached.
     ///
     /// # Examples
@@ -161,13 +149,31 @@ impl Interval {
     pub async fn tick(&mut self) -> Instant {
         poll_fn(|cx| self.poll_tick(cx)).await
     }
-}
 
-#[cfg(feature = "stream")]
-impl crate::stream::Stream for Interval {
-    type Item = Instant;
+    /// Poll for the next instant in the interval to be reached.
+    ///
+    /// This method can return the following values:
+    ///
+    ///  * `Poll::Pending` if the next instant has not yet been reached.
+    ///  * `Poll::Ready(instant)` if the next instant has been reached.
+    ///
+    /// When this method returns `Poll::Pending`, the current task is scheduled
+    /// to receive a wakeup when the instant has elapsed. Note that on multiple
+    /// calls to `poll_tick`, only the `Waker` from the `Context` passed to the
+    /// most recent call is scheduled to receive a wakeup.
+    pub fn poll_tick(&mut self, cx: &mut Context<'_>) -> Poll<Instant> {
+        // Wait for the delay to be done
+        ready!(Pin::new(&mut self.delay).poll(cx));
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Instant>> {
-        Poll::Ready(Some(ready!(self.poll_tick(cx))))
+        // Get the `now` by looking at the `delay` deadline
+        let now = self.delay.deadline();
+
+        // The next interval value is `duration` after the one that just
+        // yielded.
+        let next = now + self.period;
+        self.delay.as_mut().reset(next);
+
+        // Return the current instant
+        Poll::Ready(now)
     }
 }

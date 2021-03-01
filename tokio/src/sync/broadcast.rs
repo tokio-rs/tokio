@@ -163,6 +163,11 @@ pub struct Sender<T> {
 /// Must not be used concurrently. Messages may be retrieved using
 /// [`recv`][Receiver::recv].
 ///
+/// To turn this receiver into a `Stream`, you can use the [`BroadcastStream`]
+/// wrapper.
+///
+/// [`BroadcastStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.BroadcastStream.html
+///
 /// # Examples
 ///
 /// ```
@@ -361,38 +366,16 @@ struct RecvGuard<'a, T> {
 }
 
 /// Receive a value future
-struct Recv<R, T>
-where
-    R: AsMut<Receiver<T>>,
-{
+struct Recv<'a, T> {
     /// Receiver being waited on
-    receiver: R,
+    receiver: &'a mut Receiver<T>,
 
     /// Entry in the waiter `LinkedList`
     waiter: UnsafeCell<Waiter>,
-
-    _p: std::marker::PhantomData<T>,
 }
 
-/// `AsMut<T>` is not implemented for `T` (coherence). Explicitly implementing
-/// `AsMut` for `Receiver` would be included in the public API of the receiver
-/// type. Instead, `Borrow` is used internally to bridge the gap.
-struct Borrow<T>(T);
-
-impl<T> AsMut<Receiver<T>> for Borrow<Receiver<T>> {
-    fn as_mut(&mut self) -> &mut Receiver<T> {
-        &mut self.0
-    }
-}
-
-impl<'a, T> AsMut<Receiver<T>> for Borrow<&'a mut Receiver<T>> {
-    fn as_mut(&mut self) -> &mut Receiver<T> {
-        &mut *self.0
-    }
-}
-
-unsafe impl<R: AsMut<Receiver<T>> + Send, T: Send> Send for Recv<R, T> {}
-unsafe impl<R: AsMut<Receiver<T>> + Sync, T: Send> Sync for Recv<R, T> {}
+unsafe impl<'a, T: Send> Send for Recv<'a, T> {}
+unsafe impl<'a, T: Send> Sync for Recv<'a, T> {}
 
 /// Max number of receivers. Reserve space to lock.
 const MAX_RECEIVERS: usize = usize::MAX >> 2;
@@ -892,7 +875,7 @@ impl<T: Clone> Receiver<T> {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Result<T, RecvError> {
-        let fut = Recv::<_, T>::new(Borrow(self));
+        let fut = Recv::new(self);
         fut.await
     }
 
@@ -940,48 +923,6 @@ impl<T: Clone> Receiver<T> {
         let guard = self.recv_ref(None)?;
         guard.clone_value().ok_or(TryRecvError::Closed)
     }
-
-    /// Convert the receiver into a `Stream`.
-    ///
-    /// The conversion allows using `Receiver` with APIs that require stream
-    /// values.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio::stream::StreamExt;
-    /// use tokio::sync::broadcast;
-    ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, rx) = broadcast::channel(128);
-    ///
-    ///     tokio::spawn(async move {
-    ///         for i in 0..10_i32 {
-    ///             tx.send(i).unwrap();
-    ///         }
-    ///     });
-    ///
-    ///     // Streams must be pinned to iterate.
-    ///     tokio::pin! {
-    ///         let stream = rx
-    ///             .into_stream()
-    ///             .filter(Result::is_ok)
-    ///             .map(Result::unwrap)
-    ///             .filter(|v| v % 2 == 0)
-    ///             .map(|v| v + 1);
-    ///     }
-    ///
-    ///     while let Some(i) = stream.next().await {
-    ///         println!("{}", i);
-    ///     }
-    /// }
-    /// ```
-    #[cfg(feature = "stream")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "stream")))]
-    pub fn into_stream(self) -> impl Stream<Item = Result<T, RecvError>> {
-        Recv::new(Borrow(self))
-    }
 }
 
 impl<T> Drop for Receiver<T> {
@@ -993,7 +934,7 @@ impl<T> Drop for Receiver<T> {
 
         drop(tail);
 
-        while self.next != until {
+        while self.next < until {
             match self.recv_ref(None) {
                 Ok(_) => {}
                 // The channel is closed
@@ -1007,11 +948,8 @@ impl<T> Drop for Receiver<T> {
     }
 }
 
-impl<R, T> Recv<R, T>
-where
-    R: AsMut<Receiver<T>>,
-{
-    fn new(receiver: R) -> Recv<R, T> {
+impl<'a, T> Recv<'a, T> {
+    fn new(receiver: &'a mut Receiver<T>) -> Recv<'a, T> {
         Recv {
             receiver,
             waiter: UnsafeCell::new(Waiter {
@@ -1020,7 +958,6 @@ where
                 pointers: linked_list::Pointers::new(),
                 _p: PhantomPinned,
             }),
-            _p: std::marker::PhantomData,
         }
     }
 
@@ -1032,14 +969,13 @@ where
             is_unpin::<&mut Receiver<T>>();
 
             let me = self.get_unchecked_mut();
-            (me.receiver.as_mut(), &me.waiter)
+            (me.receiver, &me.waiter)
         }
     }
 }
 
-impl<R, T> Future for Recv<R, T>
+impl<'a, T> Future for Recv<'a, T>
 where
-    R: AsMut<Receiver<T>>,
     T: Clone,
 {
     type Output = Result<T, RecvError>;
@@ -1058,39 +994,11 @@ where
     }
 }
 
-cfg_stream! {
-    use futures_core::Stream;
-
-    impl<R, T: Clone> Stream for Recv<R, T>
-    where
-        R: AsMut<Receiver<T>>,
-        T: Clone,
-    {
-        type Item = Result<T, RecvError>;
-
-        fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-            let (receiver, waiter) = self.project();
-
-            let guard = match receiver.recv_ref(Some((waiter, cx.waker()))) {
-                Ok(value) => value,
-                Err(TryRecvError::Empty) => return Poll::Pending,
-                Err(TryRecvError::Lagged(n)) => return Poll::Ready(Some(Err(RecvError::Lagged(n)))),
-                Err(TryRecvError::Closed) => return Poll::Ready(None),
-            };
-
-            Poll::Ready(guard.clone_value().map(Ok))
-        }
-    }
-}
-
-impl<R, T> Drop for Recv<R, T>
-where
-    R: AsMut<Receiver<T>>,
-{
+impl<'a, T> Drop for Recv<'a, T> {
     fn drop(&mut self) {
         // Acquire the tail lock. This is required for safety before accessing
         // the waiter node.
-        let mut tail = self.receiver.as_mut().shared.tail.lock();
+        let mut tail = self.receiver.shared.tail.lock();
 
         // safety: tail lock is held
         let queued = self.waiter.with(|ptr| unsafe { (*ptr).queued });

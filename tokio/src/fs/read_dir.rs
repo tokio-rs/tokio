@@ -20,21 +20,23 @@ pub async fn read_dir(path: impl AsRef<Path>) -> io::Result<ReadDir> {
     Ok(ReadDir(State::Idle(Some(std))))
 }
 
-/// Stream of the entries in a directory.
+/// Read the the entries in a directory.
 ///
-/// This stream is returned from the [`read_dir`] function of this module and
-/// will yield instances of [`DirEntry`]. Through a [`DirEntry`]
-/// information like the entry's path and possibly other metadata can be
-/// learned.
+/// This struct is returned from the [`read_dir`] function of this module and
+/// will yield instances of [`DirEntry`]. Through a [`DirEntry`] information
+/// like the entry's path and possibly other metadata can be learned.
+///
+/// A `ReadDir` can be turned into a `Stream` with [`ReadDirStream`].
+///
+/// [`ReadDirStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.ReadDirStream.html
 ///
 /// # Errors
 ///
-/// This [`Stream`] will return an [`Err`] if there's some sort of intermittent
+/// This stream will return an [`Err`] if there's some sort of intermittent
 /// IO error during iteration.
 ///
 /// [`read_dir`]: read_dir
 /// [`DirEntry`]: DirEntry
-/// [`Stream`]: crate::stream::Stream
 /// [`Err`]: std::result::Result::Err
 #[derive(Debug)]
 #[must_use = "streams do nothing unless polled"]
@@ -53,7 +55,25 @@ impl ReadDir {
         poll_fn(|cx| self.poll_next_entry(cx)).await
     }
 
-    fn poll_next_entry(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<Option<DirEntry>>> {
+    /// Polls for the next directory entry in the stream.
+    ///
+    /// This method returns:
+    ///
+    ///  * `Poll::Pending` if the next directory entry is not yet available.
+    ///  * `Poll::Ready(Ok(Some(entry)))` if the next directory entry is available.
+    ///  * `Poll::Ready(Ok(None))` if there are no more directory entries in this
+    ///    stream.
+    ///  * `Poll::Ready(Err(err))` if an IO error occurred while reading the next
+    ///    directory entry.
+    ///
+    /// When the method returns `Poll::Pending`, the `Waker` in the provided
+    /// `Context` is scheduled to receive a wakeup when the next directory entry
+    /// becomes available on the underlying IO resource.
+    ///
+    /// Note that on multiple calls to `poll_next_entry`, only the `Waker` from
+    /// the `Context` passed to the most recent call is scheduled to receive a
+    /// wakeup.
+    pub fn poll_next_entry(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<Option<DirEntry>>> {
         loop {
             match self.0 {
                 State::Idle(ref mut std) => {
@@ -81,16 +101,33 @@ impl ReadDir {
     }
 }
 
-#[cfg(feature = "stream")]
-impl crate::stream::Stream for ReadDir {
-    type Item = io::Result<DirEntry>;
+feature! {
+    #![unix]
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Poll::Ready(match ready!(self.poll_next_entry(cx)) {
-            Ok(Some(entry)) => Some(Ok(entry)),
-            Ok(None) => None,
-            Err(err) => Some(Err(err)),
-        })
+    use std::os::unix::fs::DirEntryExt;
+
+    impl DirEntry {
+        /// Returns the underlying `d_ino` field in the contained `dirent`
+        /// structure.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::fs;
+        ///
+        /// # #[tokio::main]
+        /// # async fn main() -> std::io::Result<()> {
+        /// let mut entries = fs::read_dir(".").await?;
+        /// while let Some(entry) = entries.next_entry().await? {
+        ///     // Here, `entry` is a `DirEntry`.
+        ///     println!("{:?}: {}", entry.file_name(), entry.ino());
+        /// }
+        /// # Ok(())
+        /// # }
+        /// ```
+        pub fn ino(&self) -> u64 {
+            self.as_inner().ino()
+        }
     }
 }
 

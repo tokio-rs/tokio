@@ -9,7 +9,7 @@ use std::pin::Pin;
 use std::sync::{Arc, Condvar, Mutex};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
-use tokio::stream::Stream;
+use tokio_stream::Stream;
 
 /// TODO: dox
 pub fn spawn<T>(task: T) -> Spawn<T> {

@@ -13,7 +13,7 @@ use tokio::io::AsyncRead;
 ///
 /// ```
 /// use bytes::{Bytes, BytesMut};
-/// use tokio::stream;
+/// use tokio_stream as stream;
 /// use tokio::io::Result;
 /// use tokio_util::io::{StreamReader, read_buf};
 /// # #[tokio::main]

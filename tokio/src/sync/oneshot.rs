@@ -84,10 +84,42 @@ struct Inner<T> {
     value: UnsafeCell<Option<T>>,
 
     /// The task to notify when the receiver drops without consuming the value.
-    tx_task: UnsafeCell<MaybeUninit<Waker>>,
+    tx_task: Task,
 
     /// The task to notify when the value is sent.
-    rx_task: UnsafeCell<MaybeUninit<Waker>>,
+    rx_task: Task,
+}
+
+struct Task(UnsafeCell<MaybeUninit<Waker>>);
+
+impl Task {
+    unsafe fn will_wake(&self, cx: &mut Context<'_>) -> bool {
+        self.with_task(|w| w.will_wake(cx.waker()))
+    }
+
+    unsafe fn with_task<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&Waker) -> R,
+    {
+        self.0.with(|ptr| {
+            let waker: *const Waker = (&*ptr).as_ptr();
+            f(&*waker)
+        })
+    }
+
+    unsafe fn drop_task(&self) {
+        self.0.with_mut(|ptr| {
+            let ptr: *mut Waker = (&mut *ptr).as_mut_ptr();
+            ptr.drop_in_place();
+        });
+    }
+
+    unsafe fn set_task(&self, cx: &mut Context<'_>) {
+        self.0.with_mut(|ptr| {
+            let ptr: *mut Waker = (&mut *ptr).as_mut_ptr();
+            ptr.write(cx.waker().clone());
+        });
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -127,8 +159,8 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
     let inner = Arc::new(Inner {
         state: AtomicUsize::new(State::new().as_usize()),
         value: UnsafeCell::new(None),
-        tx_task: UnsafeCell::new(MaybeUninit::uninit()),
-        rx_task: UnsafeCell::new(MaybeUninit::uninit()),
+        tx_task: Task(UnsafeCell::new(MaybeUninit::uninit())),
+        rx_task: Task(UnsafeCell::new(MaybeUninit::uninit())),
     });
 
     let tx = Sender {
@@ -188,9 +220,9 @@ impl<T> Sender<T> {
         });
 
         if !inner.complete() {
-            return Err(inner
-                .value
-                .with_mut(|ptr| unsafe { (*ptr).take() }.unwrap()));
+            unsafe {
+                return Err(inner.consume_value().unwrap());
+            }
         }
 
         Ok(())
@@ -357,7 +389,7 @@ impl<T> Sender<T> {
         }
 
         if state.is_tx_task_set() {
-            let will_notify = unsafe { inner.with_tx_task(|w| w.will_wake(cx.waker())) };
+            let will_notify = unsafe { inner.tx_task.will_wake(cx) };
 
             if !will_notify {
                 state = State::unset_tx_task(&inner.state);
@@ -368,7 +400,7 @@ impl<T> Sender<T> {
                     coop.made_progress();
                     return Ready(());
                 } else {
-                    unsafe { inner.drop_tx_task() };
+                    unsafe { inner.tx_task.drop_task() };
                 }
             }
         }
@@ -376,7 +408,7 @@ impl<T> Sender<T> {
         if !state.is_tx_task_set() {
             // Attempt to set the task
             unsafe {
-                inner.set_tx_task(cx);
+                inner.tx_task.set_task(cx);
             }
 
             // Update the state
@@ -410,6 +442,9 @@ impl<T> Receiver<T> {
     ///
     /// This function is useful to perform a graceful shutdown and ensure that a
     /// value will not be sent into the channel and never received.
+    ///
+    /// `close` is no-op if a message is already received or the channel
+    /// is already closed.
     ///
     /// [`Sender`]: Sender
     /// [`try_recv`]: Receiver::try_recv
@@ -458,8 +493,9 @@ impl<T> Receiver<T> {
     /// }
     /// ```
     pub fn close(&mut self) {
-        let inner = self.inner.as_ref().unwrap();
-        inner.close();
+        if let Some(inner) = self.inner.as_ref() {
+            inner.close();
+        }
     }
 
     /// Attempts to receive a value.
@@ -584,7 +620,7 @@ impl<T> Inner<T> {
         if prev.is_rx_task_set() {
             // TODO: Consume waker?
             unsafe {
-                self.with_rx_task(Waker::wake_by_ref);
+                self.rx_task.with_task(Waker::wake_by_ref);
             }
         }
 
@@ -609,7 +645,7 @@ impl<T> Inner<T> {
             Ready(Err(RecvError(())))
         } else {
             if state.is_rx_task_set() {
-                let will_notify = unsafe { self.with_rx_task(|w| w.will_wake(cx.waker())) };
+                let will_notify = unsafe { self.rx_task.will_wake(cx) };
 
                 // Check if the task is still the same
                 if !will_notify {
@@ -625,7 +661,7 @@ impl<T> Inner<T> {
                             None => Ready(Err(RecvError(()))),
                         };
                     } else {
-                        unsafe { self.drop_rx_task() };
+                        unsafe { self.rx_task.drop_task() };
                     }
                 }
             }
@@ -633,7 +669,7 @@ impl<T> Inner<T> {
             if !state.is_rx_task_set() {
                 // Attempt to set the task
                 unsafe {
-                    self.set_rx_task(cx);
+                    self.rx_task.set_task(cx);
                 }
 
                 // Update the state
@@ -660,7 +696,7 @@ impl<T> Inner<T> {
 
         if prev.is_tx_task_set() && !prev.is_complete() {
             unsafe {
-                self.with_tx_task(Waker::wake_by_ref);
+                self.tx_task.with_task(Waker::wake_by_ref);
             }
         }
     }
@@ -669,72 +705,28 @@ impl<T> Inner<T> {
     unsafe fn consume_value(&self) -> Option<T> {
         self.value.with_mut(|ptr| (*ptr).take())
     }
-
-    unsafe fn with_rx_task<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&Waker) -> R,
-    {
-        self.rx_task.with(|ptr| {
-            let waker: *const Waker = (&*ptr).as_ptr();
-            f(&*waker)
-        })
-    }
-
-    unsafe fn with_tx_task<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&Waker) -> R,
-    {
-        self.tx_task.with(|ptr| {
-            let waker: *const Waker = (&*ptr).as_ptr();
-            f(&*waker)
-        })
-    }
-
-    unsafe fn drop_rx_task(&self) {
-        self.rx_task.with_mut(|ptr| {
-            let ptr: *mut Waker = (&mut *ptr).as_mut_ptr();
-            ptr.drop_in_place();
-        });
-    }
-
-    unsafe fn drop_tx_task(&self) {
-        self.tx_task.with_mut(|ptr| {
-            let ptr: *mut Waker = (&mut *ptr).as_mut_ptr();
-            ptr.drop_in_place();
-        });
-    }
-
-    unsafe fn set_rx_task(&self, cx: &mut Context<'_>) {
-        self.rx_task.with_mut(|ptr| {
-            let ptr: *mut Waker = (&mut *ptr).as_mut_ptr();
-            ptr.write(cx.waker().clone());
-        });
-    }
-
-    unsafe fn set_tx_task(&self, cx: &mut Context<'_>) {
-        self.tx_task.with_mut(|ptr| {
-            let ptr: *mut Waker = (&mut *ptr).as_mut_ptr();
-            ptr.write(cx.waker().clone());
-        });
-    }
 }
 
 unsafe impl<T: Send> Send for Inner<T> {}
 unsafe impl<T: Send> Sync for Inner<T> {}
 
+fn mut_load(this: &mut AtomicUsize) -> usize {
+    this.with_mut(|v| *v)
+}
+
 impl<T> Drop for Inner<T> {
     fn drop(&mut self) {
-        let state = State(self.state.with_mut(|v| *v));
+        let state = State(mut_load(&mut self.state));
 
         if state.is_rx_task_set() {
             unsafe {
-                self.drop_rx_task();
+                self.rx_task.drop_task();
             }
         }
 
         if state.is_tx_task_set() {
             unsafe {
-                self.drop_tx_task();
+                self.tx_task.drop_task();
             }
         }
     }

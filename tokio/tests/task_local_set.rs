@@ -1,6 +1,11 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
+use futures::{
+    future::{pending, ready},
+    FutureExt,
+};
+
 use tokio::runtime::{self, Runtime};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::{self, LocalSet};
@@ -484,6 +489,15 @@ async fn acquire_mutex_in_drop() {
 
     // Drop the LocalSet
     drop(local);
+}
+
+#[tokio::test]
+async fn spawn_wakes_localset() {
+    let local = LocalSet::new();
+    futures::select! {
+        _ = local.run_until(pending::<()>()).fuse() => unreachable!(),
+        ret = async { local.spawn_local(ready(())).await.unwrap()}.fuse() => ret
+    }
 }
 
 fn rt() -> Runtime {

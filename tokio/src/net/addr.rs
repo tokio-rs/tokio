@@ -8,8 +8,6 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV
 /// # DNS
 ///
 /// Implementations of `ToSocketAddrs` for string types require a DNS lookup.
-/// These implementations are only provided when Tokio is used with the
-/// **`net`** feature flag.
 ///
 /// # Calling
 ///

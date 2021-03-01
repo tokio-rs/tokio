@@ -14,8 +14,7 @@ type BoxFutureSync<T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + 
 type BoxFutureSend<T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send>>;
 #[allow(dead_code)]
 type BoxFuture<T> = std::pin::Pin<Box<dyn std::future::Future<Output = T>>>;
-#[allow(dead_code)]
-type BoxStream<T> = std::pin::Pin<Box<dyn tokio::stream::Stream<Item = T>>>;
+
 #[allow(dead_code)]
 type BoxAsyncRead = std::pin::Pin<Box<dyn tokio::io::AsyncBufRead>>;
 #[allow(dead_code)]
@@ -92,6 +91,14 @@ macro_rules! assert_value {
             let f: $type = todo!();
             AmbiguousIfSend::some_item(&f);
             AmbiguousIfSync::some_item(&f);
+        };
+    };
+    ($type:ty: Unpin) => {
+        #[allow(unreachable_code)]
+        #[allow(unused_variables)]
+        const _: fn() = || {
+            let f: $type = todo!();
+            require_unpin(&f);
         };
     };
 }
@@ -222,10 +229,6 @@ async_assert_fn!(tokio::signal::ctrl_c(): Send & Sync);
 #[cfg(unix)]
 async_assert_fn!(tokio::signal::unix::Signal::recv(_): Send & Sync);
 
-async_assert_fn!(tokio::stream::empty<Rc<u8>>(): Send & Sync);
-async_assert_fn!(tokio::stream::pending<Rc<u8>>(): Send & Sync);
-async_assert_fn!(tokio::stream::iter(std::vec::IntoIter<u8>): Send & Sync);
-
 async_assert_fn!(tokio::sync::Barrier::wait(_): Send & Sync);
 async_assert_fn!(tokio::sync::Mutex<u8>::lock(_): Send & Sync);
 async_assert_fn!(tokio::sync::Mutex<Cell<u8>>::lock(_): Send & Sync);
@@ -285,13 +288,12 @@ async_assert_fn!(tokio::time::timeout_at(Instant, BoxFutureSend<()>): Send & !Sy
 async_assert_fn!(tokio::time::timeout_at(Instant, BoxFuture<()>): !Send & !Sync);
 async_assert_fn!(tokio::time::Interval::tick(_): Send & Sync);
 
-async_assert_fn!(tokio::stream::StreamExt::next(&mut BoxStream<()>): !Unpin);
-async_assert_fn!(tokio::stream::StreamExt::try_next(&mut BoxStream<Result<(), ()>>): !Unpin);
-async_assert_fn!(tokio::stream::StreamExt::all(&mut BoxStream<()>, fn(())->bool): !Unpin);
-async_assert_fn!(tokio::stream::StreamExt::any(&mut BoxStream<()>, fn(())->bool): !Unpin);
-async_assert_fn!(tokio::stream::StreamExt::fold(&mut BoxStream<()>, (), fn((), ())->()): !Unpin);
-async_assert_fn!(tokio::stream::StreamExt::collect<Vec<()>>(&mut BoxStream<()>): !Unpin);
-
+assert_value!(tokio::time::Interval: Unpin);
+async_assert_fn!(tokio::time::sleep(Duration): !Unpin);
+async_assert_fn!(tokio::time::sleep_until(Instant): !Unpin);
+async_assert_fn!(tokio::time::timeout(Duration, BoxFuture<()>): !Unpin);
+async_assert_fn!(tokio::time::timeout_at(Instant, BoxFuture<()>): !Unpin);
+async_assert_fn!(tokio::time::Interval::tick(_): !Unpin);
 async_assert_fn!(tokio::io::AsyncBufReadExt::read_until(&mut BoxAsyncRead, u8, &mut Vec<u8>): !Unpin);
 async_assert_fn!(tokio::io::AsyncBufReadExt::read_line(&mut BoxAsyncRead, &mut String): !Unpin);
 async_assert_fn!(tokio::io::AsyncReadExt::read(&mut BoxAsyncRead, &mut [u8]): !Unpin);

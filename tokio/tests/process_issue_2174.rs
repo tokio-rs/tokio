@@ -11,7 +11,7 @@
 
 use std::process::Stdio;
 use std::time::Duration;
-use tokio::prelude::*;
+use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use tokio::time;
 use tokio_test::assert_err;

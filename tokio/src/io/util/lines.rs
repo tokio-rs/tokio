@@ -8,7 +8,15 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 pin_project! {
-    /// Stream for the [`lines`](crate::io::AsyncBufReadExt::lines) method.
+    /// Read lines from an [`AsyncBufRead`].
+    ///
+    /// A `Lines` can be turned into a `Stream` with [`LinesStream`].
+    ///
+    /// This type is usually created using the [`lines`] method.
+    ///
+    /// [`AsyncBufRead`]: crate::io::AsyncBufRead
+    /// [`LinesStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.LinesStream.html
+    /// [`lines`]: crate::io::AsyncBufReadExt::lines
     #[derive(Debug)]
     #[must_use = "streams do nothing unless polled"]
     #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
@@ -83,7 +91,23 @@ impl<R> Lines<R>
 where
     R: AsyncBufRead,
 {
-    fn poll_next_line(
+    /// Polls for the next line in the stream.
+    ///
+    /// This method returns:
+    ///
+    ///  * `Poll::Pending` if the next line is not yet available.
+    ///  * `Poll::Ready(Ok(Some(line)))` if the next line is available.
+    ///  * `Poll::Ready(Ok(None))` if there are no more lines in this stream.
+    ///  * `Poll::Ready(Err(err))` if an IO error occurred while reading the next line.
+    ///
+    /// When the method returns `Poll::Pending`, the `Waker` in the provided
+    /// `Context` is scheduled to receive a wakeup when more bytes become
+    /// available on the underlying IO resource.
+    ///
+    /// Note that on multiple calls to `poll_next_line`, only the `Waker` from
+    /// the `Context` passed to the most recent call is scheduled to receive a
+    /// wakeup.
+    pub fn poll_next_line(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<io::Result<Option<String>>> {
@@ -105,19 +129,6 @@ where
         }
 
         Poll::Ready(Ok(Some(mem::replace(me.buf, String::new()))))
-    }
-}
-
-#[cfg(feature = "stream")]
-impl<R: AsyncBufRead> crate::stream::Stream for Lines<R> {
-    type Item = io::Result<String>;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Poll::Ready(match ready!(self.poll_next_line(cx)) {
-            Ok(Some(line)) => Some(Ok(line)),
-            Ok(None) => None,
-            Err(err) => Some(Err(err)),
-        })
     }
 }
 

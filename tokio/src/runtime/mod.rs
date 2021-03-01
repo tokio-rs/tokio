@@ -10,7 +10,7 @@
 //!
 //! Tokio's [`Runtime`] bundles all of these services as a single type, allowing
 //! them to be started, shut down, and configured together. However, often it is
-//! not required to configure a [`Runtime`] manually, and user may just use the
+//! not required to configure a [`Runtime`] manually, and a user may just use the
 //! [`tokio::main`] attribute macro, which creates a [`Runtime`] under the hood.
 //!
 //! # Usage
@@ -20,7 +20,7 @@
 //!
 //! ```no_run
 //! use tokio::net::TcpListener;
-//! use tokio::prelude::*;
+//! use tokio::io::{AsyncReadExt, AsyncWriteExt};
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -63,7 +63,7 @@
 //!
 //! ```no_run
 //! use tokio::net::TcpListener;
-//! use tokio::prelude::*;
+//! use tokio::io::{AsyncReadExt, AsyncWriteExt};
 //! use tokio::runtime::Runtime;
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -114,7 +114,7 @@
 //!
 //! The multi-thread scheduler executes futures on a _thread pool_, using a
 //! work-stealing strategy. By default, it will start a worker thread for each
-//! CPU core available on the system. This tends to be the ideal configurations
+//! CPU core available on the system. This tends to be the ideal configuration
 //! for most applications. The multi-thread scheduler requires the `rt-multi-thread`
 //! feature flag, and is selected by default:
 //! ```

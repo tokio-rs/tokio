@@ -22,12 +22,11 @@ use std::{fmt, io};
 /// Owned read half of a [`TcpStream`], created by [`into_split`].
 ///
 /// Reading from an `OwnedReadHalf` is usually done using the convenience methods found
-/// on the [`AsyncReadExt`] trait. Examples import this trait through [the prelude].
+/// on the [`AsyncReadExt`] trait.
 ///
 /// [`TcpStream`]: TcpStream
 /// [`into_split`]: TcpStream::into_split()
 /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
-/// [the prelude]: crate::prelude
 #[derive(Debug)]
 pub struct OwnedReadHalf {
     inner: Arc<TcpStream>,
@@ -40,14 +39,13 @@ pub struct OwnedReadHalf {
 /// will also shut down the write half of the TCP stream.
 ///
 /// Writing to an `OwnedWriteHalf` is usually done using the convenience methods found
-/// on the [`AsyncWriteExt`] trait. Examples import this trait through [the prelude].
+/// on the [`AsyncWriteExt`] trait.
 ///
 /// [`TcpStream`]: TcpStream
 /// [`into_split`]: TcpStream::into_split()
 /// [`AsyncWrite`]: trait@crate::io::AsyncWrite
 /// [`poll_shutdown`]: fn@crate::io::AsyncWrite::poll_shutdown
 /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
-/// [the prelude]: crate::prelude
 #[derive(Debug)]
 pub struct OwnedWriteHalf {
     inner: Arc<TcpStream>,
@@ -110,12 +108,16 @@ impl OwnedReadHalf {
     /// the queue, registering the current task for wakeup if data is not yet
     /// available.
     ///
+    /// Note that on multiple calls to `poll_peek` or `poll_read`, only the
+    /// `Waker` from the `Context` passed to the most recent call is scheduled
+    /// to receive a wakeup.
+    ///
     /// See the [`TcpStream::poll_peek`] level documenation for more details.
     ///
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::io;
+    /// use tokio::io::{self, ReadBuf};
     /// use tokio::net::TcpStream;
     ///
     /// use futures::future::poll_fn;
@@ -125,6 +127,7 @@ impl OwnedReadHalf {
     ///     let stream = TcpStream::connect("127.0.0.1:8000").await?;
     ///     let (mut read_half, _) = stream.into_split();
     ///     let mut buf = [0; 10];
+    ///     let mut buf = ReadBuf::new(&mut buf);
     ///
     ///     poll_fn(|cx| {
     ///         read_half.poll_peek(cx, &mut buf)
@@ -135,7 +138,11 @@ impl OwnedReadHalf {
     /// ```
     ///
     /// [`TcpStream::poll_peek`]: TcpStream::poll_peek
-    pub fn poll_peek(&mut self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
+    pub fn poll_peek(
+        &mut self,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<usize>> {
         self.inner.poll_peek(cx, buf)
     }
 
@@ -151,7 +158,7 @@ impl OwnedReadHalf {
     ///
     /// ```no_run
     /// use tokio::net::TcpStream;
-    /// use tokio::prelude::*;
+    /// use tokio::io::AsyncReadExt;
     /// use std::error::Error;
     ///
     /// #[tokio::main]
@@ -179,7 +186,8 @@ impl OwnedReadHalf {
     /// [`read`]: fn@crate::io::AsyncReadExt::read
     /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
     pub async fn peek(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        poll_fn(|cx| self.poll_peek(cx, buf)).await
+        let mut buf = ReadBuf::new(buf);
+        poll_fn(|cx| self.poll_peek(cx, &mut buf)).await
     }
 }
 
@@ -215,7 +223,7 @@ impl OwnedWriteHalf {
 impl Drop for OwnedWriteHalf {
     fn drop(&mut self) {
         if self.shutdown_on_drop {
-            let _ = self.inner.shutdown(Shutdown::Write);
+            let _ = self.inner.shutdown_std(Shutdown::Write);
         }
     }
 }
@@ -249,7 +257,7 @@ impl AsyncWrite for OwnedWriteHalf {
 
     // `poll_shutdown` on a write half shutdowns the stream in the "write" direction.
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        let res = self.inner.shutdown(Shutdown::Write);
+        let res = self.inner.shutdown_std(Shutdown::Write);
         if res.is_ok() {
             Pin::into_inner(self).shutdown_on_drop = false;
         }

@@ -1,6 +1,7 @@
 use crate::codec::{Decoder, Encoder};
 
-use tokio::{io::ReadBuf, net::UdpSocket, stream::Stream};
+use futures_core::Stream;
+use tokio::{io::ReadBuf, net::UdpSocket};
 
 use bytes::{BufMut, BytesMut};
 use futures_core::ready;
@@ -27,7 +28,7 @@ use std::{io, mem::MaybeUninit};
 /// calling [`split`] on the `UdpFramed` returned by this method, which will break
 /// them into separate objects, allowing them to interact more easily.
 ///
-/// [`Stream`]: tokio::stream::Stream
+/// [`Stream`]: futures_core::Stream
 /// [`Sink`]: futures_sink::Sink
 /// [`split`]: https://docs.rs/futures/0.3/futures/stream/trait.StreamExt.html#method.split
 #[must_use = "sinks do nothing unless polled"]
@@ -75,7 +76,7 @@ impl<C: Decoder + Unpin> Stream for UdpFramed<C> {
             let addr = unsafe {
                 // Convert `&mut [MaybeUnit<u8>]` to `&mut [u8]` because we will be
                 // writing to it via `poll_recv_from` and therefore initializing the memory.
-                let buf = &mut *(pin.rd.bytes_mut() as *mut _ as *mut [MaybeUninit<u8>]);
+                let buf = &mut *(pin.rd.chunk_mut() as *mut _ as *mut [MaybeUninit<u8>]);
                 let mut read = ReadBuf::uninit(buf);
                 let ptr = read.filled().as_ptr();
                 let res = ready!(Pin::new(&mut pin.socket).poll_recv_from(cx, &mut read));
@@ -130,7 +131,7 @@ impl<I, C: Encoder<I> + Unpin> Sink<(I, SocketAddr)> for UdpFramed<C> {
             ..
         } = *self;
 
-        let n = ready!(socket.poll_send_to(cx, &wr, &out_addr))?;
+        let n = ready!(socket.poll_send_to(cx, &wr, *out_addr))?;
 
         let wrote_all = n == self.wr.len();
         self.wr.clear();

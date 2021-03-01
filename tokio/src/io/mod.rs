@@ -144,7 +144,7 @@
 //! that implements [`AsyncRead`] and [`AsyncWrite`] into a `Sink`/`Stream` of
 //! your structured data.
 //!
-//! [tokio-util]: https://docs.rs/tokio-util/0.3/tokio_util/codec/index.html
+//! [tokio-util]: https://docs.rs/tokio-util/0.6/tokio_util/codec/index.html
 //!
 //! # Standard input and output
 //!
@@ -169,16 +169,16 @@
 //! [`AsyncWrite`]: trait@AsyncWrite
 //! [`AsyncReadExt`]: trait@AsyncReadExt
 //! [`AsyncWriteExt`]: trait@AsyncWriteExt
-//! ["codec"]: https://docs.rs/tokio-util/0.3/tokio_util/codec/index.html
-//! [`Encoder`]: https://docs.rs/tokio-util/0.3/tokio_util/codec/trait.Encoder.html
-//! [`Decoder`]: https://docs.rs/tokio-util/0.3/tokio_util/codec/trait.Decoder.html
+//! ["codec"]: https://docs.rs/tokio-util/0.6/tokio_util/codec/index.html
+//! [`Encoder`]: https://docs.rs/tokio-util/0.6/tokio_util/codec/trait.Encoder.html
+//! [`Decoder`]: https://docs.rs/tokio-util/0.6/tokio_util/codec/trait.Decoder.html
 //! [`Error`]: struct@Error
 //! [`ErrorKind`]: enum@ErrorKind
 //! [`Result`]: type@Result
 //! [`Read`]: std::io::Read
 //! [`SeekFrom`]: enum@SeekFrom
 //! [`Sink`]: https://docs.rs/futures/0.3/futures/sink/trait.Sink.html
-//! [`Stream`]: crate::stream::Stream
+//! [`Stream`]: https://docs.rs/futures/0.3/futures/stream/trait.Stream.html
 //! [`Write`]: std::io::Write
 cfg_io_blocking! {
     pub(crate) mod blocking;
@@ -222,7 +222,7 @@ cfg_net_unix! {
 
     pub mod unix {
         //! Asynchronous IO structures specific to Unix-like operating systems.
-        pub use super::async_fd::{AsyncFd, AsyncFdReadyGuard};
+        pub use super::async_fd::{AsyncFd, AsyncFdReadyGuard, AsyncFdReadyMutGuard, TryIoError};
     }
 }
 

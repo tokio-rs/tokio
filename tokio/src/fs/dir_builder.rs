@@ -5,14 +5,10 @@ use std::path::Path;
 
 /// A builder for creating directories in various manners.
 ///
-/// Additional Unix-specific options are available via importing the
-/// [`DirBuilderExt`] trait.
-///
 /// This is a specialized version of [`std::fs::DirBuilder`] for usage on
 /// the Tokio runtime.
 ///
 /// [std::fs::DirBuilder]: std::fs::DirBuilder
-/// [`DirBuilderExt`]: crate::fs::os::unix::DirBuilderExt
 #[derive(Debug, Default)]
 pub struct DirBuilder {
     /// Indicates whether to create parent directories if they are missing.
@@ -100,7 +96,7 @@ impl DirBuilder {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn create<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
+    pub async fn create(&self, path: impl AsRef<Path>) -> io::Result<()> {
         let path = path.as_ref().to_owned();
         let mut builder = std::fs::DirBuilder::new();
         builder.recursive(self.recursive);
@@ -113,5 +109,29 @@ impl DirBuilder {
         }
 
         asyncify(move || builder.create(path)).await
+    }
+}
+
+feature! {
+    #![unix]
+
+    impl DirBuilder {
+        /// Sets the mode to create new directories with.
+        ///
+        /// This option defaults to 0o777.
+        ///
+        /// # Examples
+        ///
+        ///
+        /// ```no_run
+        /// use tokio::fs::DirBuilder;
+        ///
+        /// let mut builder = DirBuilder::new();
+        /// builder.mode(0o775);
+        /// ```
+        pub fn mode(&mut self, mode: u32) -> &mut Self {
+            self.mode = Some(mode);
+            self
+        }
     }
 }

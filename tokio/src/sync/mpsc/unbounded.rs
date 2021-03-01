@@ -1,6 +1,6 @@
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::sync::mpsc::chan;
-use crate::sync::mpsc::error::{SendError, TryRecvError};
+use crate::sync::mpsc::error::SendError;
 
 use std::fmt;
 use std::task::{Context, Poll};
@@ -33,6 +33,10 @@ impl<T> fmt::Debug for UnboundedSender<T> {
 ///
 /// Instances are created by the
 /// [`unbounded_channel`](unbounded_channel) function.
+///
+/// This receiver can be turned into a `Stream` using [`UnboundedReceiverStream`].
+///
+/// [`UnboundedReceiverStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.UnboundedReceiverStream.html
 pub struct UnboundedReceiver<T> {
     /// The channel receiver
     chan: chan::Rx<T, Semaphore>,
@@ -71,10 +75,6 @@ type Semaphore = AtomicUsize;
 impl<T> UnboundedReceiver<T> {
     pub(crate) fn new(chan: chan::Rx<T, Semaphore>) -> UnboundedReceiver<T> {
         UnboundedReceiver { chan }
-    }
-
-    fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
-        self.chan.recv(cx)
     }
 
     /// Receives the next value for this receiver.
@@ -122,19 +122,34 @@ impl<T> UnboundedReceiver<T> {
         poll_fn(|cx| self.poll_recv(cx)).await
     }
 
-    /// Attempts to return a pending value on this receiver without blocking.
+    /// Blocking receive to call outside of asynchronous contexts.
     ///
-    /// This method will never block the caller in order to wait for data to
-    /// become available. Instead, this will always return immediately with
-    /// a possible option of pending data on the channel.
+    /// # Panics
     ///
-    /// This is useful for a flavor of "optimistic check" before deciding to
-    /// block on a receiver.
+    /// This function panics if called within an asynchronous execution
+    /// context.
     ///
-    /// Compared with recv, this function has two failure cases instead of
-    /// one (one for disconnection, one for an empty buffer).
-    pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
-        self.chan.try_recv()
+    /// # Examples
+    ///
+    /// ```
+    /// use std::thread;
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::unbounded_channel::<u8>();
+    ///
+    ///     let sync_code = thread::spawn(move || {
+    ///         assert_eq!(Some(10), rx.blocking_recv());
+    ///     });
+    ///
+    ///     let _ = tx.send(10);
+    ///     sync_code.join().unwrap();
+    /// }
+    /// ```
+    #[cfg(feature = "sync")]
+    pub fn blocking_recv(&mut self) -> Option<T> {
+        crate::future::block_on(self.recv())
     }
 
     /// Closes the receiving half of a channel, without dropping it.
@@ -144,14 +159,24 @@ impl<T> UnboundedReceiver<T> {
     pub fn close(&mut self) {
         self.chan.close();
     }
-}
 
-#[cfg(feature = "stream")]
-impl<T> crate::stream::Stream for UnboundedReceiver<T> {
-    type Item = T;
-
-    fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
-        self.poll_recv(cx)
+    /// Polls to receive the next message on this channel.
+    ///
+    /// This method returns:
+    ///
+    ///  * `Poll::Pending` if no messages are available but the channel is not
+    ///    closed.
+    ///  * `Poll::Ready(Some(message))` if a message is available.
+    ///  * `Poll::Ready(None)` if the channel has been closed and all messages
+    ///    sent before it was closed have been received.
+    ///
+    /// When the method returns `Poll::Pending`, the `Waker` in the provided
+    /// `Context` is scheduled to receive a wakeup when a message is sent on any
+    /// receiver, or when the channel is closed.  Note that on multiple calls to
+    /// `poll_recv`, only the `Waker` from the `Context` passed to the most
+    /// recent call is scheduled to receive a wakeup.
+    pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        self.chan.recv(cx)
     }
 }
 

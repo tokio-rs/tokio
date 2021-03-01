@@ -41,15 +41,28 @@ struct Waitlist {
     closed: bool,
 }
 
-/// Error returned by `Semaphore::try_acquire`.
-#[derive(Debug)]
-pub(crate) enum TryAcquireError {
+/// Error returned from the [`Semaphore::try_acquire`] function.
+///
+/// [`Semaphore::try_acquire`]: crate::sync::Semaphore::try_acquire
+#[derive(Debug, PartialEq)]
+pub enum TryAcquireError {
+    /// The semaphore has been [closed] and cannot issue new permits.
+    ///
+    /// [closed]: crate::sync::Semaphore::close
     Closed,
+
+    /// The semaphore has no available permits.
     NoPermits,
 }
-/// Error returned by `Semaphore::acquire`.
+/// Error returned from the [`Semaphore::acquire`] function.
+///
+/// An `acquire` operation can only fail if the semaphore has been
+/// [closed].
+///
+/// [closed]: crate::sync::Semaphore::close
+/// [`Semaphore::acquire`]: crate::sync::Semaphore::acquire
 #[derive(Debug)]
-pub(crate) struct AcquireError(());
+pub struct AcquireError(());
 
 pub(crate) struct Acquire<'a> {
     node: Waiter,
@@ -164,8 +177,6 @@ impl Semaphore {
 
     /// Closes the semaphore. This prevents the semaphore from issuing new
     /// permits and notifies all pending waiters.
-    // This will be used once the bounded MPSC is updated to use the new
-    // semaphore implementation.
     pub(crate) fn close(&self) {
         let mut waiters = self.waiters.lock();
         // If the semaphore's permits counter has enough permits for an

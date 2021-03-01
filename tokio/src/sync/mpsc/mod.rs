@@ -14,10 +14,8 @@
 //! Similar to the `mpsc` channels provided by `std`, the channel constructor
 //! functions provide separate send and receive handles, [`Sender`] and
 //! [`Receiver`] for the bounded channel, [`UnboundedSender`] and
-//! [`UnboundedReceiver`] for the unbounded channel. Both [`Receiver`] and
-//! [`UnboundedReceiver`] implement [`Stream`] and allow a task to read
-//! values out of the channel. If there is no message to read, the current task
-//! will be notified when a new value is sent. [`Sender`] and
+//! [`UnboundedReceiver`] for the unbounded channel. If there is no message to read,
+//! the current task will be notified when a new value is sent. [`Sender`] and
 //! [`UnboundedSender`] allow sending values into the channel. If the bounded
 //! channel is at capacity, the send is rejected and the task will be notified
 //! when additional capacity is available. In other words, the channel provides
@@ -62,7 +60,6 @@
 //!
 //! [`Sender`]: crate::sync::mpsc::Sender
 //! [`Receiver`]: crate::sync::mpsc::Receiver
-//! [`Stream`]: crate::stream::Stream
 //! [bounded-send]: crate::sync::mpsc::Sender::send()
 //! [bounded-recv]: crate::sync::mpsc::Receiver::recv()
 //! [blocking-send]: crate::sync::mpsc::Sender::blocking_send()

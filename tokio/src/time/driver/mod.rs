@@ -102,8 +102,8 @@ pub(self) struct ClockTime {
 impl ClockTime {
     pub(self) fn new(clock: Clock) -> Self {
         Self {
+            start_time: clock.now(),
             clock,
-            start_time: super::clock::now(),
         }
     }
 
@@ -188,6 +188,8 @@ where
         let clock = &self.time_source.clock;
 
         let mut lock = self.inner.lock();
+
+        assert!(!lock.is_shutdown);
 
         let next_wake = lock.wheel.next_expiration_time();
         lock.next_wake =

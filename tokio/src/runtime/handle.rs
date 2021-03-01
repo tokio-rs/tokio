@@ -1,6 +1,7 @@
 use crate::runtime::blocking::task::BlockingTask;
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{blocking, context, driver, Spawner};
+use crate::util::error::CONTEXT_MISSING_ERROR;
 
 use std::future::Future;
 use std::{error, fmt};
@@ -97,7 +98,7 @@ impl Handle {
     /// # }
     /// ```
     pub fn current() -> Self {
-        context::current().expect("not currently running on the Tokio runtime.")
+        context::current().expect(CONTEXT_MISSING_ERROR)
     }
 
     /// Returns a Handle view over the currently running Runtime
@@ -142,7 +143,7 @@ impl Handle {
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        #[cfg(feature = "tracing")]
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(future, "task");
         self.spawner.spawn(future)
     }
@@ -172,7 +173,7 @@ impl Handle {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        #[cfg(feature = "tracing")]
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
         let func = {
             #[cfg(tokio_track_caller)]
             let location = std::panic::Location::caller();
@@ -213,7 +214,7 @@ impl fmt::Debug for TryCurrentError {
 
 impl fmt::Display for TryCurrentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("no tokio Runtime has been initialized")
+        f.write_str(CONTEXT_MISSING_ERROR)
     }
 }
 

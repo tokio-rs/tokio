@@ -55,7 +55,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         // which will allow all of our clients to be processed concurrently.
 
         tokio::spawn(async move {
-            let mut buf = [0; 1024];
+            let mut buf = vec![0; 1024];
 
             // In a loop, read data from the socket and write the data back.
             loop {

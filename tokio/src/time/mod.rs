@@ -36,9 +36,7 @@
 //! }
 //! ```
 //!
-//! Require that an operation takes no more than 300ms. Note that this uses the
-//! `timeout` function on the `FutureExt` trait. This trait is included in the
-//! prelude.
+//! Require that an operation takes no more than 300ms.
 //!
 //! ```
 //! use tokio::time::{timeout, Duration};
@@ -58,10 +56,10 @@
 //!
 //! A simple example using [`interval`] to execute a task every two seconds.
 //!
-//! The difference between [`interval`] and [`sleep`] is that an
-//! [`interval`] measures the time since the last tick, which means that
-//! `.tick().await` may wait for a shorter time than the duration specified
-//! for the interval if some time has passed between calls to `.tick().await`.
+//! The difference between [`interval`] and [`sleep`] is that an [`interval`]
+//! measures the time since the last tick, which means that `.tick().await`
+//! may wait for a shorter time than the duration specified for the interval
+//! if some time has passed between calls to `.tick().await`.
 //!
 //! If the tick in the example below was replaced with [`sleep`], the task
 //! would only be executed once every three seconds, and not every two
@@ -77,11 +75,9 @@
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!     let interval = time::interval(time::Duration::from_secs(2));
-//!     tokio::pin!(interval);
-//!
+//!     let mut interval = time::interval(time::Duration::from_secs(2));
 //!     for _i in 0..5 {
-//!         interval.as_mut().tick().await;
+//!         interval.tick().await;
 //!         task_that_takes_a_second().await;
 //!     }
 //! }

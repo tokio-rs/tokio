@@ -51,64 +51,66 @@ cfg_rt_multi_thread! {
     }
 }
 
-/// Runs the provided closure on a thread where blocking is acceptable.
-///
-/// In general, issuing a blocking call or performing a lot of compute in a
-/// future without yielding is problematic, as it may prevent the executor from
-/// driving other futures forward. This function runs the provided closure on a
-/// thread dedicated to blocking operations. See the [CPU-bound tasks and
-/// blocking code][blocking] section for more information.
-///
-/// Tokio will spawn more blocking threads when they are requested through this
-/// function until the upper limit configured on the [`Builder`] is reached.
-/// This limit is very large by default, because `spawn_blocking` is often used
-/// for various kinds of IO operations that cannot be performed asynchronously.
-/// When you run CPU-bound code using `spawn_blocking`, you should keep this
-/// large upper limit in mind. When running many CPU-bound computations, a
-/// semaphore or some other synchronization primitive should be used to limit
-/// the number of computation executed in parallel. Specialized CPU-bound
-/// executors, such as [rayon], may also be a good fit.
-///
-/// This function is intended for non-async operations that eventually finish on
-/// their own. If you want to spawn an ordinary thread, you should use
-/// [`thread::spawn`] instead.
-///
-/// Closures spawned using `spawn_blocking` cannot be cancelled. When you shut
-/// down the executor, it will wait indefinitely for all blocking operations to
-/// finish. You can use [`shutdown_timeout`] to stop waiting for them after a
-/// certain timeout. Be aware that this will still not cancel the tasks — they
-/// are simply allowed to keep running after the method returns.
-///
-/// Note that if you are using the single threaded runtime, this function will
-/// still spawn additional threads for blocking operations. The basic
-/// scheduler's single thread is only used for asynchronous code.
-///
-/// [`Builder`]: struct@crate::runtime::Builder
-/// [blocking]: ../index.html#cpu-bound-tasks-and-blocking-code
-/// [rayon]: https://docs.rs/rayon
-/// [`thread::spawn`]: fn@std::thread::spawn
-/// [`shutdown_timeout`]: fn@crate::runtime::Runtime::shutdown_timeout
-///
-/// # Examples
-///
-/// ```
-/// use tokio::task;
-///
-/// # async fn docs() -> Result<(), Box<dyn std::error::Error>>{
-/// let res = task::spawn_blocking(move || {
-///     // do some compute-heavy work or call synchronous code
-///     "done computing"
-/// }).await?;
-///
-/// assert_eq!(res, "done computing");
-/// # Ok(())
-/// # }
-/// ```
-#[cfg_attr(tokio_track_caller, track_caller)]
-pub fn spawn_blocking<F, R>(f: F) -> JoinHandle<R>
-where
-    F: FnOnce() -> R + Send + 'static,
-    R: Send + 'static,
-{
-    crate::runtime::spawn_blocking(f)
+cfg_rt! {
+    /// Runs the provided closure on a thread where blocking is acceptable.
+    ///
+    /// In general, issuing a blocking call or performing a lot of compute in a
+    /// future without yielding is problematic, as it may prevent the executor from
+    /// driving other futures forward. This function runs the provided closure on a
+    /// thread dedicated to blocking operations. See the [CPU-bound tasks and
+    /// blocking code][blocking] section for more information.
+    ///
+    /// Tokio will spawn more blocking threads when they are requested through this
+    /// function until the upper limit configured on the [`Builder`] is reached.
+    /// This limit is very large by default, because `spawn_blocking` is often used
+    /// for various kinds of IO operations that cannot be performed asynchronously.
+    /// When you run CPU-bound code using `spawn_blocking`, you should keep this
+    /// large upper limit in mind. When running many CPU-bound computations, a
+    /// semaphore or some other synchronization primitive should be used to limit
+    /// the number of computation executed in parallel. Specialized CPU-bound
+    /// executors, such as [rayon], may also be a good fit.
+    ///
+    /// This function is intended for non-async operations that eventually finish on
+    /// their own. If you want to spawn an ordinary thread, you should use
+    /// [`thread::spawn`] instead.
+    ///
+    /// Closures spawned using `spawn_blocking` cannot be cancelled. When you shut
+    /// down the executor, it will wait indefinitely for all blocking operations to
+    /// finish. You can use [`shutdown_timeout`] to stop waiting for them after a
+    /// certain timeout. Be aware that this will still not cancel the tasks — they
+    /// are simply allowed to keep running after the method returns.
+    ///
+    /// Note that if you are using the single threaded runtime, this function will
+    /// still spawn additional threads for blocking operations. The basic
+    /// scheduler's single thread is only used for asynchronous code.
+    ///
+    /// [`Builder`]: struct@crate::runtime::Builder
+    /// [blocking]: ../index.html#cpu-bound-tasks-and-blocking-code
+    /// [rayon]: https://docs.rs/rayon
+    /// [`thread::spawn`]: fn@std::thread::spawn
+    /// [`shutdown_timeout`]: fn@crate::runtime::Runtime::shutdown_timeout
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::task;
+    ///
+    /// # async fn docs() -> Result<(), Box<dyn std::error::Error>>{
+    /// let res = task::spawn_blocking(move || {
+    ///     // do some compute-heavy work or call synchronous code
+    ///     "done computing"
+    /// }).await?;
+    ///
+    /// assert_eq!(res, "done computing");
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg_attr(tokio_track_caller, track_caller)]
+    pub fn spawn_blocking<F, R>(f: F) -> JoinHandle<R>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        crate::runtime::spawn_blocking(f)
+    }
 }

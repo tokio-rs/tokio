@@ -13,7 +13,7 @@
 //! Consider a future like this one:
 //!
 //! ```
-//! # use tokio::stream::{Stream, StreamExt};
+//! # use tokio_stream::{Stream, StreamExt};
 //! async fn drop_all<I: Stream + Unpin>(mut input: I) {
 //!     while let Some(_) = input.next().await {}
 //! }
@@ -25,7 +25,7 @@
 //! opt-in yield points, this problem is alleviated:
 //!
 //! ```ignore
-//! # use tokio::stream::{Stream, StreamExt};
+//! # use tokio_stream::{Stream, StreamExt};
 //! async fn drop_all<I: Stream + Unpin>(mut input: I) {
 //!     while let Some(_) = input.next().await {
 //!         tokio::coop::proceed().await;

@@ -29,7 +29,6 @@ the Rust programming language. It is:
 [Website](https://tokio.rs) |
 [Guides](https://tokio.rs/tokio/tutorial) |
 [API Docs](https://docs.rs/tokio/latest/tokio) |
-[Roadmap](https://github.com/tokio-rs/tokio/blob/master/ROADMAP.md) |
 [Chat](https://discord.gg/tokio)
 
 ## Overview
@@ -55,7 +54,7 @@ A basic TCP echo server with Tokio:
 
 ```rust,no_run
 use tokio::net::TcpListener;
-use tokio::prelude::*;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -133,8 +132,7 @@ several other libraries, including:
 
 * [`tower`]: A library of modular and reusable components for building robust networking clients and servers.
 
-* [`tracing`] (formerly `tokio-trace`): A framework for application-level
-  tracing and async-aware diagnostics.
+* [`tracing`]: A framework for application-level tracing and async-aware diagnostics.
 
 * [`rdbc`]: A Rust database connectivity library for MySQL, Postgres and SQLite.
 
