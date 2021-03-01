@@ -28,6 +28,29 @@
 //!
 //! [`poll`]: method@std::future::Future::poll
 
+// ```ignore
+// # use tokio_stream::{Stream, StreamExt};
+// async fn drop_all<I: Stream + Unpin>(mut input: I) {
+//     while let Some(_) = input.next().await {
+//         tokio::coop::proceed().await;
+//     }
+// }
+// ```
+//
+// The `proceed` future will coordinate with the executor to make sure that
+// every so often control is yielded back to the executor so it can run other
+// tasks.
+//
+// # Placing yield points
+//
+// Voluntary yield points should be placed _after_ at least some work has been
+// done. If they are not, a future sufficiently deep in the task hierarchy may
+// end up _never_ getting to run because of the number of yield points that
+// inevitably appear before it is reached. In general, you will want yield
+// points to only appear in "leaf" futures -- those that do not themselves poll
+// other futures. By doing this, you avoid double-counting each iteration of
+// the outer future against the cooperating budget.
+
 use pin_project_lite::pin_project;
 use std::cell::Cell;
 use std::future::Future;
@@ -149,16 +172,28 @@ where
     }
 }
 
-/// Turn off cooperative scheduling for a future. The future or stream will never yield.
+/// Turn off cooperative scheduling for a future. The future will never be forced to yield by
+/// Tokio. Using this exposes your service to starvation if the unconstrained future never yields
+/// otherwise.
 ///
 /// # Examples
 ///
 /// ```
 /// # #[tokio::main]
 /// # async fn main() {
-/// use tokio::coop;
+/// use tokio::{coop, sync::mpsc};
 ///
-/// let fut = async { () };
+/// let fut = async {
+///     let (tx, mut rx) = mpsc::unbounded_channel();
+///
+///     for i in 0..1000 {
+///         let _ = tx.send(());
+///         // This will always be ready. If coop was in effect, this code would be forced to yield
+///         // periodically. However, if left unconstrained, then this code will never yield.
+///         rx.recv().await;
+///     }
+/// };
+///
 /// coop::unconstrained(fut).await;
 /// # }
 /// ```
