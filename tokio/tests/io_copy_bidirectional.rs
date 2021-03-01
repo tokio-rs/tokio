@@ -1,14 +1,10 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::{
-    io::{self},
-    task::JoinHandle,
-};
-
 use std::time::Duration;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{self, copy_bidirectional, AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
+use tokio::task::JoinHandle;
 
 async fn make_socketpair() -> (TcpStream, TcpStream) {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -51,18 +47,15 @@ where
     let (a, mut a1) = make_socketpair().await;
     let (b, mut b1) = make_socketpair().await;
 
-    let handle = tokio::spawn(async move { tokio::io::copy_bidirectional(&mut a1, &mut b1).await });
+    let handle = tokio::spawn(async move { copy_bidirectional(&mut a1, &mut b1).await });
     cb(handle, a, b).await;
 
     let (a, mut a1) = make_socketpair().await;
     let (b, mut b1) = make_socketpair().await;
 
-    let handle = tokio::spawn(async move {
-        let (r1, r2) = tokio::io::copy_bidirectional(&mut b1, &mut a1).await?;
-        Ok((r2, r1))
-    });
+    let handle = tokio::spawn(async move { copy_bidirectional(&mut b1, &mut a1).await });
 
-    cb(handle, a, b).await;
+    cb(handle, b, a).await;
 }
 
 #[tokio::test]
