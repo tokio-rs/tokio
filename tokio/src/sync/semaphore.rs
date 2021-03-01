@@ -143,7 +143,7 @@ impl Semaphore {
         }
     }
 
-    /// Tries to acquire n permits from the semaphore.
+    /// Tries to acquire `n` permits from the semaphore.
     ///
     /// If the semaphore has been closed, this returns a [`TryAcquireError::Closed`]
     /// and a [`TryAcquireError::NoPermits`] if there are no permits left. Otherwise,
@@ -180,6 +180,27 @@ impl Semaphore {
         })
     }
 
+    /// Acquires `n` permits from the semaphore.
+    ///
+    /// The semaphore must be wrapped in an [`Arc`] to call this method.
+    /// If the semaphore has been closed, this returns an [`AcquireError`].
+    /// Otherwise, this returns a [`OwnedSemaphorePermit`] representing the
+    /// acquired permit.
+    ///
+    /// [`Arc`]: std::sync::Arc
+    /// [`AcquireError`]: crate::sync::AcquireError
+    /// [`OwnedSemaphorePermit`]: crate::sync::OwnedSemaphorePermit
+    pub async fn acquire_many_owned(
+        self: Arc<Self>,
+        n: u32,
+    ) -> Result<OwnedSemaphorePermit, AcquireError> {
+        self.ll_sem.acquire(n).await?;
+        Ok(OwnedSemaphorePermit {
+            sem: self,
+            permits: n,
+        })
+    }
+
     /// Tries to acquire a permit from the semaphore.
     ///
     /// The semaphore must be wrapped in an [`Arc`] to call this method. If
@@ -197,6 +218,31 @@ impl Semaphore {
             Ok(_) => Ok(OwnedSemaphorePermit {
                 sem: self,
                 permits: 1,
+            }),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Tries to acquire `n` permits from the semaphore.
+    ///
+    /// The semaphore must be wrapped in an [`Arc`] to call this method. If
+    /// the semaphore has been closed, this returns a [`TryAcquireError::Closed`]
+    /// and a [`TryAcquireError::NoPermits`] if there are no permits left.
+    /// Otherwise, this returns a [`OwnedSemaphorePermit`] representing the
+    /// acquired permit.
+    ///
+    /// [`Arc`]: std::sync::Arc
+    /// [`TryAcquireError::Closed`]: crate::sync::TryAcquireError::Closed
+    /// [`TryAcquireError::NoPermits`]: crate::sync::TryAcquireError::NoPermits
+    /// [`OwnedSemaphorePermit`]: crate::sync::OwnedSemaphorePermit
+    pub fn try_acquire_many_owned(
+        self: Arc<Self>,
+        n: u32,
+    ) -> Result<OwnedSemaphorePermit, TryAcquireError> {
+        match self.ll_sem.try_acquire(n) {
+            Ok(_) => Ok(OwnedSemaphorePermit {
+                sem: self,
+                permits: n,
             }),
             Err(e) => Err(e),
         }
