@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1614605918608,
+  "lastUpdate": 1614605924049,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -18103,6 +18103,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 16946406,
             "range": "± 2021107",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "max@maxbruckner.de",
+            "name": "Max Bruckner",
+            "username": "FSMaxB"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fc23f8a1a50aa4a3df47cf81d3ae51213b7e6d71",
+          "message": "sync: add {try_,}acquire_many_owned to Semaphore (#3535)",
+          "timestamp": "2021-03-01T14:37:00+01:00",
+          "tree_id": "2f04bde202c6f05cf5c668e416c96531cc679fb8",
+          "url": "https://github.com/tokio-rs/tokio/commit/fc23f8a1a50aa4a3df47cf81d3ae51213b7e6d71"
+        },
+        "date": 1614605922342,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 161176,
+            "range": "± 19022",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 619612,
+            "range": "± 18807",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4531683,
+            "range": "± 288294",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18281973,
+            "range": "± 1943461",
             "unit": "ns/iter"
           }
         ]
