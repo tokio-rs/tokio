@@ -6,6 +6,7 @@ cfg_io_util! {
     use std::task::{Context, Poll};
     use std::io;
     use std::pin::Pin;
+    use std::future::Future;
 
     enum TransferState {
         Running(CopyBuffer),
@@ -34,19 +35,20 @@ cfg_io_util! {
         loop {
             match state {
                 TransferState::Running(buf) => {
-                    *state = TransferState::ShuttingDown(ready!(dbg!(buf.poll_copy(cx, r.as_mut(), w.as_mut())))?);
+                    let count = ready!(buf.poll_copy(cx, r.as_mut(), w.as_mut()))?;
+                    *state = TransferState::ShuttingDown(count);
                 }
                 TransferState::ShuttingDown(count) => {
                     ready!(w.as_mut().poll_shutdown(cx))?;
 
                     *state = TransferState::Done(*count);
                 }
-                TransferState::Done(count) => break Poll::Ready(Ok(*count)),
+                TransferState::Done(count) => return Poll::Ready(Ok(*count)),
             }
         }
     }
 
-    fn swap_result<R, E>(r: Poll<Result<R,E>>) -> Result<Poll<R>, E> {
+    fn transpose<R, E>(r: Poll<Result<R,E>>) -> Result<Poll<R>, E> {
         match r {
             Poll::Pending => Ok(Poll::Pending),
             Poll::Ready(Ok(r)) => Ok(Poll::Ready(r)),
@@ -54,7 +56,7 @@ cfg_io_util! {
         }
     }
 
-    impl<'a, A, B> std::future::Future for CopyBidirectional<'a, A, B>
+    impl<'a, A, B> Future for CopyBidirectional<'a, A, B>
         where A: AsyncRead + AsyncWrite + Unpin + ?Sized, B: AsyncRead + AsyncWrite + Unpin + ?Sized
     {
         type Output = io::Result<(u64, u64)>;
@@ -63,8 +65,8 @@ cfg_io_util! {
             // Unpack self into mut refs to each field to avoid borrow check issues.
             let CopyBidirectional { a, b, a_to_b, b_to_a } = &mut *self;
 
-            let a_to_b = swap_result(transfer_one_direction(cx, a_to_b, &mut *a, &mut *b))?;
-            let b_to_a = swap_result(transfer_one_direction(cx, b_to_a, &mut *b, &mut *a))?;
+            let a_to_b = transpose(transfer_one_direction(cx, a_to_b, &mut *a, &mut *b))?;
+            let b_to_a = transpose(transfer_one_direction(cx, b_to_a, &mut *b, &mut *a))?;
 
             let a_to_b = ready!(a_to_b);
             let b_to_a = ready!(b_to_a);
