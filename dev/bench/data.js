@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1614621119558,
+  "lastUpdate": 1614621124459,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -9611,6 +9611,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 604,
             "range": "± 70",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "guswynn@gmail.com",
+            "name": "Gus Wynn",
+            "username": "guswynn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0d838bf5ade7509e622559458a367cca65133f06",
+          "message": "io: fix link to std src in util (#3568)\n\nThe big move or 'src' in rust-lang caused this link to be broken",
+          "timestamp": "2021-03-02T02:50:13+09:00",
+          "tree_id": "4aebe568d0e20a57cf746664f172704157738a06",
+          "url": "https://github.com/tokio-rs/tokio/commit/0d838bf5ade7509e622559458a367cca65133f06"
+        },
+        "date": 1614621119162,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1022,
+            "range": "± 673",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 14465,
+            "range": "± 3987",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1055,
+            "range": "± 101",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 14841,
+            "range": "± 5054",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 573,
+            "range": "± 54",
             "unit": "ns/iter"
           }
         ]
