@@ -81,7 +81,7 @@ async fn test_transfer_after_close() {
         assert_eq!(&tmp[..], b"quux");
 
         // Once both are closed, we should have our handle back
-        std::mem::drop(b);
+        drop(b);
 
         assert_eq!(handle.await.unwrap().unwrap(), (0, 4));
     })
@@ -103,7 +103,7 @@ async fn blocking_one_side_does_not_block_other() {
         let mut buf = Vec::new();
         b.read_to_end(&mut buf).await.unwrap();
 
-        std::mem::drop(b);
+        drop(b);
 
         assert_eq!(handle.await.unwrap().unwrap(), (buf.len() as u64, 4));
     })
