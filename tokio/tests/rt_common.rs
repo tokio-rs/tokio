@@ -1032,7 +1032,7 @@ rt_test! {
             // Hope that all the tasks complete...
             time::sleep(Duration::from_millis(100)).await;
 
-            tokio::coop::unconstrained(poll_fn(|cx| {
+            tokio::task::unconstrained(poll_fn(|cx| {
                 // All the tasks should be ready
                 for task in &mut tasks {
                     assert!(Pin::new(task).poll(cx).is_ready());

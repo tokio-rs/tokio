@@ -26,6 +26,9 @@
 //! To account for this, Tokio has explicit yield points in a number of library
 //! functions, which force tasks to return to the executor periodically.
 //!
+//! If necessary, you may use [`task::unconstrained`][crate::task::unconstrained] to opt out
+//! specific futures of Tokio's cooperative scheduling.
+//!
 //! [`poll`]: method@std::future::Future::poll
 
 // ```ignore
@@ -51,11 +54,7 @@
 // other futures. By doing this, you avoid double-counting each iteration of
 // the outer future against the cooperating budget.
 
-use pin_project_lite::pin_project;
 use std::cell::Cell;
-use std::future::Future;
-use std::pin::Pin;
-use std::task::{Context, Poll};
 
 thread_local! {
     static CURRENT: Cell<Budget> = Cell::new(Budget::unconstrained());
@@ -100,6 +99,13 @@ cfg_rt_multi_thread! {
 #[inline(always)]
 pub(crate) fn budget<R>(f: impl FnOnce() -> R) -> R {
     with_budget(Budget::initial(), f)
+}
+
+/// Run the given closure with an unconstrained task budget. When the function returns, the budget
+/// is reset to the value prior to calling the function.
+#[inline(always)]
+pub(crate) fn with_unconstrained<R>(f: impl FnOnce() -> R) -> R {
+    with_budget(Budget::unconstrained(), f)
 }
 
 #[inline(always)]
@@ -151,57 +157,9 @@ cfg_rt! {
     }
 }
 
-pin_project! {
-    /// Future for the [`unconstrained`](unconstrained) method.
-    #[must_use = "Unconstrained does nothing unless polled"]
-    pub struct Unconstrained<F> {
-        #[pin]
-        inner: F,
-    }
-}
-
-impl<F> Future for Unconstrained<F>
-where
-    F: Future,
-{
-    type Output = <F as Future>::Output;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let inner = self.project().inner;
-        with_budget(Budget::unconstrained(), || inner.poll(cx))
-    }
-}
-
-/// Turn off cooperative scheduling for a future. The future will never be forced to yield by
-/// Tokio. Using this exposes your service to starvation if the unconstrained future never yields
-/// otherwise.
-///
-/// # Examples
-///
-/// ```
-/// # #[tokio::main]
-/// # async fn main() {
-/// use tokio::{coop, sync::mpsc};
-///
-/// let fut = async {
-///     let (tx, mut rx) = mpsc::unbounded_channel();
-///
-///     for i in 0..1000 {
-///         let _ = tx.send(());
-///         // This will always be ready. If coop was in effect, this code would be forced to yield
-///         // periodically. However, if left unconstrained, then this code will never yield.
-///         rx.recv().await;
-///     }
-/// };
-///
-/// coop::unconstrained(fut).await;
-/// # }
-/// ```
-pub fn unconstrained<F>(inner: F) -> Unconstrained<F> {
-    Unconstrained { inner }
-}
-
 cfg_coop! {
+    use std::task::{Context, Poll};
+
     #[must_use]
     pub(crate) struct RestoreOnPending(Cell<Budget>);
 

@@ -208,12 +208,38 @@
 //! # .await;
 //! # }
 //! ```
+//! #### unconstrained
+//!
+//! Finally, this module provides [`task::unconstrained`], which lets you opt out a future of
+//! tokio's [cooperative scheduling][crate::coop]. When a future is crapped with `unconstrained`,
+//! it will never be forced to yield to Tokio. For example:
+//!
+//! ```
+//! # #[tokio::main]
+//! # async fn main() {
+//! use tokio::{task, sync::mpsc};
+//!
+//! let fut = async {
+//!     let (tx, mut rx) = mpsc::unbounded_channel();
+//!
+//!     for i in 0..1000 {
+//!         let _ = tx.send(());
+//!         // This will always be ready. If coop was in effect, this code would be forced to yield
+//!         // periodically. However, if left unconstrained, then this code will never yield.
+//!         rx.recv().await;
+//!     }
+//! };
+//!
+//! task::unconstrained(fut).await;
+//! # }
+//! ```
 //!
 //! [`task::spawn_blocking`]: crate::task::spawn_blocking
 //! [`task::block_in_place`]: crate::task::block_in_place
 //! [rt-multi-thread]: ../runtime/index.html#threaded-scheduler
 //! [`task::yield_now`]: crate::task::yield_now()
 //! [`thread::yield_now`]: std::thread::yield_now
+//! [`task::unconstrained`]: crate::task::unconstrained
 
 cfg_rt! {
     pub use crate::runtime::task::{JoinError, JoinHandle};
@@ -236,4 +262,7 @@ cfg_rt! {
 
     mod task_local;
     pub use task_local::LocalKey;
+
+    mod unconstrained;
+    pub use unconstrained::{unconstrained, Unconstrained};
 }
