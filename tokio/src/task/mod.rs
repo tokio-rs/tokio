@@ -239,7 +239,7 @@
 //! [rt-multi-thread]: ../runtime/index.html#threaded-scheduler
 //! [`task::yield_now`]: crate::task::yield_now()
 //! [`thread::yield_now`]: std::thread::yield_now
-//! [`task::unconstrained`]: crate::task::unconstrained
+//! [`task::unconstrained`]: crate::task::unconstrained()
 
 cfg_rt! {
     pub use crate::runtime::task::{JoinError, JoinHandle};
