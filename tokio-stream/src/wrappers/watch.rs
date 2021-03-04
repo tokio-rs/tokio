@@ -38,9 +38,9 @@ use tokio::sync::watch::error::RecvError;
 /// use tokio::sync::watch;
 ///
 /// let (tx, rx) = watch::channel("hello");
-/// tx.send("goodbye").unwrap();
 /// let mut rx = WatchStream::new(rx);
 ///
+/// tx.send("goodbye").unwrap();
 /// assert_eq!(rx.next().await, Some("goodbye"));
 /// # }
 /// ```
