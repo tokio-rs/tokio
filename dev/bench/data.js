@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1614875502833,
+  "lastUpdate": 1614875509455,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -9665,6 +9665,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 573,
             "range": "± 54",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0867a6fc0313b7ce0483e55956ebb0b2857a9a23",
+          "message": "util: add pollable mpsc::Sender (#3490)",
+          "timestamp": "2021-03-04T17:29:30+01:00",
+          "tree_id": "fb74e180e29907e30bf7e7ff8638c9316bcca1e2",
+          "url": "https://github.com/tokio-rs/tokio/commit/0867a6fc0313b7ce0483e55956ebb0b2857a9a23"
+        },
+        "date": 1614875507439,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1006,
+            "range": "± 5",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 15857,
+            "range": "± 4283",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1036,
+            "range": "± 10",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 15147,
+            "range": "± 3652",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 592,
+            "range": "± 57",
             "unit": "ns/iter"
           }
         ]
