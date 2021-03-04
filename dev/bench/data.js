@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1614876446666,
+  "lastUpdate": 1614876462159,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -18463,6 +18463,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20541087,
             "range": "± 3175412",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "zh_jq@outlook.com",
+            "name": "Zhang Jingqiang",
+            "username": "zh-jq"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e06b257e09b8ca1def4a3537a4448a31f2ede388",
+          "message": "sync: add same_channel method to mpsc Senders (#3532)",
+          "timestamp": "2021-03-04T17:45:40+01:00",
+          "tree_id": "f98aebc0239aff53bd250297a395de49883640e3",
+          "url": "https://github.com/tokio-rs/tokio/commit/e06b257e09b8ca1def4a3537a4448a31f2ede388"
+        },
+        "date": 1614876458049,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 176620,
+            "range": "± 34597",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 673148,
+            "range": "± 73123",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4642479,
+            "range": "± 825011",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18864698,
+            "range": "± 2606024",
             "unit": "ns/iter"
           }
         ]
