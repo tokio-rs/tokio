@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1614621135246,
+  "lastUpdate": 1614875502833,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -18307,6 +18307,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20762001,
             "range": "± 2035947",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0867a6fc0313b7ce0483e55956ebb0b2857a9a23",
+          "message": "util: add pollable mpsc::Sender (#3490)",
+          "timestamp": "2021-03-04T17:29:30+01:00",
+          "tree_id": "fb74e180e29907e30bf7e7ff8638c9316bcca1e2",
+          "url": "https://github.com/tokio-rs/tokio/commit/0867a6fc0313b7ce0483e55956ebb0b2857a9a23"
+        },
+        "date": 1614875500645,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 215211,
+            "range": "± 83769",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 754490,
+            "range": "± 241335",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5471073,
+            "range": "± 1192854",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20541087,
+            "range": "± 3175412",
             "unit": "ns/iter"
           }
         ]
