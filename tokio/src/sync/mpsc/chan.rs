@@ -139,6 +139,11 @@ impl<T, S> Tx<T, S> {
     pub(crate) fn wake_rx(&self) {
         self.inner.rx_waker.wake();
     }
+
+    /// Returns `true` if senders belong to the same channel.
+    pub(crate) fn same_channel(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
+    }
 }
 
 impl<T, S: Semaphore> Tx<T, S> {
