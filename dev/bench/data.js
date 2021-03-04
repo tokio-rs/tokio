@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1614876468512,
+  "lastUpdate": 1614876476368,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -28287,6 +28287,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1033,
             "range": "± 191",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "zh_jq@outlook.com",
+            "name": "Zhang Jingqiang",
+            "username": "zh-jq"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e06b257e09b8ca1def4a3537a4448a31f2ede388",
+          "message": "sync: add same_channel method to mpsc Senders (#3532)",
+          "timestamp": "2021-03-04T17:45:40+01:00",
+          "tree_id": "f98aebc0239aff53bd250297a395de49883640e3",
+          "url": "https://github.com/tokio-rs/tokio/commit/e06b257e09b8ca1def4a3537a4448a31f2ede388"
+        },
+        "date": 1614876474356,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 16964,
+            "range": "± 5159",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1092,
+            "range": "± 274",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 661,
+            "range": "± 150",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 16333,
+            "range": "± 5046",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1042,
+            "range": "± 115",
             "unit": "ns/iter"
           }
         ]
