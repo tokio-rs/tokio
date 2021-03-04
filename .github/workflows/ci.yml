@@ -166,6 +166,10 @@ jobs:
           override: true
       - uses: actions-rs/cargo@v1
         with:
+          command: update
+          args: -p mio --precise 0.7.8
+      - uses: actions-rs/cargo@v1
+        with:
           use-cross: true
           command: check
           args: --workspace --target ${{ matrix.target }}
