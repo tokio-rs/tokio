@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1614875551687,
+  "lastUpdate": 1614876446666,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -9719,6 +9719,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 592,
             "range": "± 57",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "zh_jq@outlook.com",
+            "name": "Zhang Jingqiang",
+            "username": "zh-jq"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e06b257e09b8ca1def4a3537a4448a31f2ede388",
+          "message": "sync: add same_channel method to mpsc Senders (#3532)",
+          "timestamp": "2021-03-04T17:45:40+01:00",
+          "tree_id": "f98aebc0239aff53bd250297a395de49883640e3",
+          "url": "https://github.com/tokio-rs/tokio/commit/e06b257e09b8ca1def4a3537a4448a31f2ede388"
+        },
+        "date": 1614876444679,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 829,
+            "range": "± 147",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 14222,
+            "range": "± 3675",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 880,
+            "range": "± 159",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 13332,
+            "range": "± 3520",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 501,
+            "range": "± 105",
             "unit": "ns/iter"
           }
         ]
