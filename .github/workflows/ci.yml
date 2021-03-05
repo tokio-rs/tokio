@@ -167,7 +167,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: update
-          args: -p mio --precise 0.7.6
+          args: -p libc --precise 0.2.86
       - uses: actions-rs/cargo@v1
         with:
           use-cross: true
