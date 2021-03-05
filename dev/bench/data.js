@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1614976594013,
+  "lastUpdate": 1614976614764,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -18511,6 +18511,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18864698,
             "range": "± 2606024",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "thomas@orozco.fr",
+            "name": "Thomas Orozco",
+            "username": "krallin"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "47be928444babf84507a69ac42bb9c9447c78672",
+          "message": "sync: yield initial value in WatchStream (#3576)",
+          "timestamp": "2021-03-05T21:35:12+01:00",
+          "tree_id": "72e3da0a77d2c90ee35e4ff2dd1e16d33f91271b",
+          "url": "https://github.com/tokio-rs/tokio/commit/47be928444babf84507a69ac42bb9c9447c78672"
+        },
+        "date": 1614976612759,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 194991,
+            "range": "± 9533",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 724179,
+            "range": "± 43464",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5657233,
+            "range": "± 1008740",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21627824,
+            "range": "± 2492789",
             "unit": "ns/iter"
           }
         ]
