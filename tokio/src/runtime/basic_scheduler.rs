@@ -10,6 +10,8 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering::{Acquire, Release};
 use std::sync::Arc;
 use std::task::Poll::{Pending, Ready};
 use std::time::Duration;
@@ -70,6 +72,9 @@ struct Shared {
 
     /// Unpark the blocked thread
     unpark: Box<dyn Unpark>,
+
+    // indicates whether the blocked on thread was woken
+    woken: AtomicBool,
 }
 
 /// Thread-local context.
@@ -101,6 +106,7 @@ impl<P: Park> BasicScheduler<P> {
             shared: Arc::new(Shared {
                 queue: Mutex::new(VecDeque::with_capacity(INITIAL_CAPACITY)),
                 unpark: unpark as Box<dyn Unpark>,
+                woken: AtomicBool::new(false),
             }),
         };
 
@@ -210,8 +216,10 @@ impl<P: Park> Inner<P> {
                             // Park until the thread is signaled
                             scheduler.park.park().ok().expect("failed to park");
 
-                            // Try polling the `block_on` future next
-                            continue 'outer;
+                            if scheduler.spawner.was_woken() {
+                                // Try polling the `block_on` future next if it was woken
+                                continue 'outer;
+                            }
                         }
                     }
                 }
@@ -329,7 +337,13 @@ impl Spawner {
     }
 
     fn waker_ref(&self) -> WakerRef<'_> {
+        // clear the woken bit
+        self.shared.woken.store(false, Release);
         waker_ref(&self.shared)
+    }
+
+    fn was_woken(&self) -> bool {
+        self.shared.woken.load(Acquire)
     }
 }
 
@@ -384,6 +398,7 @@ impl Wake for Shared {
 
     /// Wake by reference
     fn wake_by_ref(arc_self: &Arc<Self>) {
+        arc_self.woken.store(true, Release);
         arc_self.unpark.unpark();
     }
 }
