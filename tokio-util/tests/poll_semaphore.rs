@@ -1,15 +1,14 @@
-use tokio_util::sync::PollSemaphore;
-use tokio::sync::{OwnedSemaphorePermit, Semaphore};
-use std::sync::Arc;
 use std::future::Future;
+use std::sync::Arc;
 use std::task::Poll;
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+use tokio_util::sync::PollSemaphore;
 
 type SemRet = Option<OwnedSemaphorePermit>;
 
 fn semaphore_poll<'a>(
-    sem: &'a mut PollSemaphore
-) -> tokio_test::task::Spawn<impl Future<Output = SemRet> + 'a>
-{
+    sem: &'a mut PollSemaphore,
+) -> tokio_test::task::Spawn<impl Future<Output = SemRet> + 'a> {
     let fut = futures::future::poll_fn(move |cx| sem.poll_acquire(cx));
     tokio_test::task::spawn(fut)
 }
@@ -35,4 +34,3 @@ async fn it_works() {
     assert!(semaphore_poll(&mut poll_sem).await.is_none());
     assert!(semaphore_poll(&mut poll_sem).await.is_none());
 }
-

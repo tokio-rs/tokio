@@ -61,9 +61,7 @@ impl PollSemaphore {
         self.permit_fut.set(next_fut);
 
         match result {
-            Ok(permit) => {
-                Poll::Ready(Some(permit))
-            }
+            Ok(permit) => Poll::Ready(Some(permit)),
             Err(_closed) => Poll::Ready(None),
         }
     }
