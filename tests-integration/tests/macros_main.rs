@@ -26,3 +26,25 @@ fn shell() {
     assert_eq!(1, basic_main());
     assert_eq!(bool::default(), generic_fun::<bool>())
 }
+
+macro_rules! generate_preserve_none_delimiters_tests {
+    ($e:expr) => {
+        #[test]
+        #[allow(clippy::redundant_closure_call)]
+        fn preserve_none_delimiters_in_main() {
+            #[tokio::main]
+            async fn f() -> i32 {
+                $e()
+            }
+
+            assert_eq!(f(), ($e)());
+        }
+
+        #[tokio::test]
+        #[allow(clippy::redundant_closure_call)]
+        async fn preserve_none_delimiters_in_test() {
+            assert_eq!($e(), ($e)());
+        }
+    };
+}
+generate_preserve_none_delimiters_tests!(|| 5);

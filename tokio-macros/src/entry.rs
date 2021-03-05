@@ -174,13 +174,29 @@ fn parse_bool(bool: syn::Lit, span: Span, field: &str) -> Result<bool, syn::Erro
 }
 
 fn parse_knobs(
-    mut input: syn::ItemFn,
+    input_tokens: TokenStream,
     args: syn::AttributeArgs,
     is_test: bool,
     rt_multi_thread: bool,
 ) -> Result<TokenStream, syn::Error> {
+    let mut input: syn::ItemFn = syn::parse(input_tokens.clone())?;
+
+    if (is_test || input.sig.ident == "main") && !input.sig.inputs.is_empty() {
+        let function = if is_test { "test" } else { "main" };
+
+        return Err(syn::Error::new_spanned(
+            &input.sig.inputs,
+            format_args!("the {} function cannot accept arguments", function),
+        ));
+    }
+    if is_test {
+        if let Some(attr) = input.attrs.iter().find(|attr| attr.path.is_ident("test")) {
+            let msg = "second test attribute is supplied";
+            return Err(syn::Error::new_spanned(attr, msg));
+        }
+    }
+
     let sig = &mut input.sig;
-    let body = &input.block;
     let attrs = &input.attrs;
     let vis = input.vis;
 
@@ -291,6 +307,12 @@ fn parse_knobs(
         }
     };
 
+    // The last token of a function item is always its body. We use the input token stream directly
+    // instead of printing the parsed function to make sure that Rust preserves None-delimited
+    // groups inside the function body; see <https://github.com/tokio-rs/tokio/issues/3579>.
+    let body =
+        proc_macro2::TokenStream::from(TokenStream::from(input_tokens.into_iter().last().unwrap()));
+
     let result = quote! {
         #header
         #(#attrs)*
@@ -308,38 +330,11 @@ fn parse_knobs(
 
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub(crate) fn main(args: TokenStream, item: TokenStream, rt_multi_thread: bool) -> TokenStream {
-    let input = syn::parse_macro_input!(item as syn::ItemFn);
     let args = syn::parse_macro_input!(args as syn::AttributeArgs);
-
-    if input.sig.ident == "main" && !input.sig.inputs.is_empty() {
-        let msg = "the main function cannot accept arguments";
-        return syn::Error::new_spanned(&input.sig.ident, msg)
-            .to_compile_error()
-            .into();
-    }
-
-    parse_knobs(input, args, false, rt_multi_thread).unwrap_or_else(|e| e.to_compile_error().into())
+    parse_knobs(item, args, false, rt_multi_thread).unwrap_or_else(|e| e.to_compile_error().into())
 }
 
 pub(crate) fn test(args: TokenStream, item: TokenStream, rt_multi_thread: bool) -> TokenStream {
-    let input = syn::parse_macro_input!(item as syn::ItemFn);
     let args = syn::parse_macro_input!(args as syn::AttributeArgs);
-
-    for attr in &input.attrs {
-        if attr.path.is_ident("test") {
-            let msg = "second test attribute is supplied";
-            return syn::Error::new_spanned(&attr, msg)
-                .to_compile_error()
-                .into();
-        }
-    }
-
-    if !input.sig.inputs.is_empty() {
-        let msg = "the test function cannot accept arguments";
-        return syn::Error::new_spanned(&input.sig.inputs, msg)
-            .to_compile_error()
-            .into();
-    }
-
-    parse_knobs(input, args, true, rt_multi_thread).unwrap_or_else(|e| e.to_compile_error().into())
+    parse_knobs(item, args, true, rt_multi_thread).unwrap_or_else(|e| e.to_compile_error().into())
 }
