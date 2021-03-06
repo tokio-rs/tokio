@@ -29,13 +29,13 @@ const LIFECYCLE_MASK: usize = 0b11;
 const NOTIFIED: usize = 0b100;
 
 /// The join handle is still around
-const JOIN_INTEREST: usize = 0b1_000;
+const JOIN_INTEREST: usize = 0b1000;
 
 /// A join handle waker has been set
-const JOIN_WAKER: usize = 0b10_000;
+const JOIN_WAKER: usize = 0b1_0000;
 
 /// The task has been forcibly cancelled.
-const CANCELLED: usize = 0b100_000;
+const CANCELLED: usize = 0b10_0000;
 
 /// All bits
 const STATE_MASK: usize = LIFECYCLE_MASK | NOTIFIED | JOIN_INTEREST | JOIN_WAKER | CANCELLED;

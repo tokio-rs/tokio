@@ -126,10 +126,7 @@ impl<T: Send + 'static> PollSender<T> {
     /// If this method returns `None`, then the channel is closed. (But it is
     /// not guaranteed to return `None` if the channel is closed.)
     pub fn clone_inner(&self) -> Option<Sender<T>> {
-        match &self.sender {
-            Some(sender) => Some((&**sender).clone()),
-            None => None,
-        }
+        self.sender.as_ref().map(|sender| (&**sender).clone())
     }
 
     /// Access the underlying `Sender`.
