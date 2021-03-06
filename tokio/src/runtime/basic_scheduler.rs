@@ -183,12 +183,16 @@ impl<P: Park> Inner<P> {
             let _enter = crate::runtime::enter(false);
             let waker = scheduler.spawner.waker_ref();
             let mut cx = std::task::Context::from_waker(&waker);
+            let mut polled = false;
 
             pin!(future);
 
             'outer: loop {
-                if let Ready(v) = crate::coop::budget(|| future.as_mut().poll(&mut cx)) {
-                    return v;
+                if scheduler.spawner.was_woken() || !polled {
+                    polled = true;
+                    if let Ready(v) = crate::coop::budget(|| future.as_mut().poll(&mut cx)) {
+                        return v;
+                    }
                 }
 
                 for _ in 0..MAX_TASKS_PER_TICK {
@@ -216,10 +220,8 @@ impl<P: Park> Inner<P> {
                             // Park until the thread is signaled
                             scheduler.park.park().ok().expect("failed to park");
 
-                            if scheduler.spawner.was_woken() {
-                                // Try polling the `block_on` future next if it was woken
-                                continue 'outer;
-                            }
+                            // Try polling the `block_on` future next
+                            continue 'outer;
                         }
                     }
                 }
