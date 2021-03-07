@@ -1,4 +1,5 @@
 use crate::future::poll_fn;
+use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::Mutex;
 use crate::park::{Park, Unpark};
 use crate::runtime::task::{self, JoinHandle, Schedule, Task};
@@ -10,7 +11,6 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
-use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::{Acquire, Release};
 use std::sync::Arc;
 use std::task::Poll::{Pending, Ready};
