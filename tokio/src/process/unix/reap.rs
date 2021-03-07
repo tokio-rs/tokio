@@ -134,7 +134,6 @@ mod test {
     use super::*;
 
     use crate::process::unix::orphan::test::MockQueue;
-    use crate::sync::broadcast::error::TryRecvError;
     use futures::future::FutureExt;
     use std::os::unix::process::ExitStatusExt;
     use std::process::ExitStatus;
@@ -207,7 +206,7 @@ mod test {
             }
         }
 
-        fn try_recv(&mut self) -> Result<(), TryRecvError> {
+        fn try_recv(&mut self) -> Option<()> {
             unimplemented!();
         }
     }

@@ -6,8 +6,7 @@
 #![cfg(unix)]
 
 use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
-use crate::sync::broadcast::error::{RecvError, TryRecvError};
-use crate::sync::broadcast::Receiver;
+use crate::sync::watch::Receiver;
 
 use libc::c_int;
 use mio::net::UnixStream;
@@ -376,12 +375,9 @@ pub fn signal(kind: SignalKind) -> io::Result<Signal> {
 }
 
 async fn make_future(mut rx: Receiver<()>) -> Receiver<()> {
-    loop {
-        match rx.recv().await {
-            Ok(()) => return rx,
-            Err(RecvError::Closed) => panic!("should not happen"),
-            Err(RecvError::Lagged(_)) => {},
-        }
+    match rx.changed().await {
+        Ok(()) => rx,
+        Err(_) => panic!("signal sender went away"),
     }
 }
 
@@ -473,13 +469,13 @@ impl Signal {
     }
 
     /// Try to receive a signal notification without blocking or registering a waker.
-    pub(crate) fn try_recv(&mut self) -> Result<(), TryRecvError> {
+    pub(crate) fn try_recv(&mut self) -> Option<()> {
         let waker = noop_waker();
         let mut cx = Context::from_waker(&waker);
 
         match self.poll_recv(&mut cx) {
-            Poll::Pending => Err(TryRecvError::Empty),
-            Poll::Ready(_) => Ok(()),
+            Poll::Ready(ret) => ret,
+            Poll::Pending => None,
         }
     }
 }
@@ -487,7 +483,7 @@ impl Signal {
 // Work around for abstracting streams internally
 pub(crate) trait InternalStream {
     fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>>;
-    fn try_recv(&mut self) -> Result<(), TryRecvError>;
+    fn try_recv(&mut self) -> Option<()>;
 }
 
 impl InternalStream for Signal {
@@ -495,7 +491,7 @@ impl InternalStream for Signal {
         self.poll_recv(cx)
     }
 
-    fn try_recv(&mut self) -> Result<(), TryRecvError> {
+    fn try_recv(&mut self) -> Option<()> {
         self.try_recv()
     }
 }

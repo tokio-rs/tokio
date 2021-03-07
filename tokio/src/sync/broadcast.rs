@@ -1,5 +1,3 @@
-#![cfg_attr(not(feature = "sync"), allow(dead_code, unreachable_pub))]
-
 //! A multi-producer, multi-consumer broadcast queue. Each sent value is seen by
 //! all consumers.
 //!

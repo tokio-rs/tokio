@@ -2,7 +2,7 @@
 
 use crate::signal::os::{OsExtraData, OsStorage};
 
-use crate::sync::broadcast::{channel, Receiver, Sender};
+use crate::sync::watch::{channel, Receiver, Sender};
 
 use once_cell::sync::Lazy;
 use std::ops;
@@ -16,16 +16,18 @@ pub(crate) type EventId = usize;
 #[derive(Debug)]
 pub(crate) struct EventInfo {
     pending: AtomicBool,
-    recipients: Sender<()>,
+    tx: Sender<()>,
+    rx: Receiver<()>,
 }
 
 impl Default for EventInfo {
     fn default() -> Self {
-        let (tx, _) = channel(1);
+        let (tx, rx) = channel(());
 
         Self {
             pending: AtomicBool::new(false),
-            recipients: tx,
+            tx,
+            rx,
         }
     }
 }
@@ -81,8 +83,8 @@ impl<S: Storage> Registry<S> {
         self.storage
             .event_info(event_id)
             .unwrap_or_else(|| panic!("invalid event_id: {}", event_id))
-            .recipients
-            .subscribe()
+            .rx
+            .clone()
     }
 
     /// Marks `event_id` as having been delivered, without broadcasting it to
@@ -104,7 +106,7 @@ impl<S: Storage> Registry<S> {
                 return;
             }
 
-            match event_info.recipients.send(()) {
+            match event_info.tx.send(()) {
                 Ok(_) => did_notify = true,
                 // Channel is full, ignore the error since the
                 // receiver has already been woken up

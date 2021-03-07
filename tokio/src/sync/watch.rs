@@ -51,7 +51,7 @@
 //! [`Sender::is_closed`]: crate::sync::watch::Sender::is_closed
 //! [`Sender::closed`]: crate::sync::watch::Sender::closed
 
-use crate::sync::Notify;
+use crate::sync::notify::Notify;
 
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::atomic::Ordering::{Relaxed, SeqCst};

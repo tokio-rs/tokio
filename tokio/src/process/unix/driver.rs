@@ -7,7 +7,6 @@ use crate::process::unix::orphan::ReapOrphanQueue;
 use crate::process::unix::GlobalOrphanQueue;
 use crate::signal::unix::driver::Driver as SignalDriver;
 use crate::signal::unix::{signal_with_handle, InternalStream, Signal, SignalKind};
-use crate::sync::broadcast::error::TryRecvError;
 
 use std::io;
 use std::time::Duration;
@@ -33,12 +32,7 @@ where
     Q: ReapOrphanQueue,
 {
     fn got_signal(&mut self) -> bool {
-        match self.sigchild.try_recv() {
-            Ok(()) => true,
-            Err(TryRecvError::Lagged(_)) => true, // try again
-            Err(TryRecvError::Empty) => false,
-            Err(TryRecvError::Closed) => panic!("signal was deregistered"),
-        }
+        self.sigchild.try_recv().is_some()
     }
 
     fn process(&mut self) {
@@ -98,7 +92,6 @@ impl Park for Driver {
 mod test {
     use super::*;
     use crate::process::unix::orphan::test::MockQueue;
-    use crate::sync::broadcast::error::TryRecvError;
     use std::task::{Context, Poll};
 
     struct MockStream {
@@ -120,12 +113,9 @@ mod test {
             unimplemented!();
         }
 
-        fn try_recv(&mut self) -> Result<(), TryRecvError> {
+        fn try_recv(&mut self) -> Option<()> {
             self.total_try_recv += 1;
-            match self.values.remove(0) {
-                Some(()) => Ok(()),
-                None => Err(TryRecvError::Empty),
-            }
+            self.values.remove(0)
         }
     }
 
