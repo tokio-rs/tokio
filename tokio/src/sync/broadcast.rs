@@ -347,7 +347,6 @@ struct Slot<T> {
 }
 
 /// An entry in the wait queue
-#[derive(Debug)]
 struct Waiter {
     /// True if queued
     queued: bool,
