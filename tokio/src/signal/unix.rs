@@ -6,7 +6,7 @@
 #![cfg(unix)]
 
 use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
-use crate::sync::watch::Receiver;
+use crate::signal::RxFuture;
 
 use libc::c_int;
 use mio::net::UnixStream;
@@ -15,12 +15,6 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
-
-// Privately "vendor" the reusable_future mod without copying the code
-#[allow(dead_code, unreachable_pub)]
-#[path = "../../../tokio-util/src/sync/reusable_box.rs"]
-mod reusable_box;
-use self::reusable_box::ReusableBoxFuture;
 
 pub(crate) mod driver;
 use self::driver::Handle;
@@ -345,7 +339,7 @@ fn signal_enable(signal: c_int, handle: Handle) -> io::Result<()> {
 #[must_use = "streams do nothing unless polled"]
 #[derive(Debug)]
 pub struct Signal {
-    inner: ReusableBoxFuture<Receiver<()>>,
+    inner: RxFuture,
 }
 
 /// Creates a new stream which will receive notifications when the current
@@ -374,13 +368,6 @@ pub fn signal(kind: SignalKind) -> io::Result<Signal> {
     signal_with_handle(kind, Handle::current())
 }
 
-async fn make_future(mut rx: Receiver<()>) -> Receiver<()> {
-    match rx.changed().await {
-        Ok(()) => rx,
-        Err(_) => panic!("signal sender went away"),
-    }
-}
-
 pub(crate) fn signal_with_handle(kind: SignalKind, handle: Handle) -> io::Result<Signal> {
     let signal = kind.0;
 
@@ -388,10 +375,9 @@ pub(crate) fn signal_with_handle(kind: SignalKind, handle: Handle) -> io::Result
     signal_enable(signal, handle)?;
 
     let rx = globals().register_listener(signal as EventId);
-    let inner = ReusableBoxFuture::new(make_future(rx));
 
     Ok(Signal {
-        inner
+        inner: RxFuture::new(rx),
     })
 }
 
@@ -420,8 +406,7 @@ impl Signal {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<()> {
-        use crate::future::poll_fn;
-        poll_fn(|cx| self.poll_recv(cx)).await
+        self.inner.recv().await
     }
 
     /// Polls to receive the next signal notification event, outside of an
@@ -459,24 +444,7 @@ impl Signal {
     /// }
     /// ```
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
-        match self.inner.poll(cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(rx) => {
-                self.inner.set(make_future(rx));
-                Poll::Ready(Some(()))
-            }
-        }
-    }
-
-    /// Try to receive a signal notification without blocking or registering a waker.
-    pub(crate) fn try_recv(&mut self) -> Option<()> {
-        let waker = noop_waker();
-        let mut cx = Context::from_waker(&waker);
-
-        match self.poll_recv(&mut cx) {
-            Poll::Ready(ret) => ret,
-            Poll::Pending => None,
-        }
+        self.inner.poll_recv(cx)
     }
 }
 
@@ -492,7 +460,15 @@ impl InternalStream for Signal {
     }
 
     fn try_recv(&mut self) -> Option<()> {
-        self.try_recv()
+        // FIXME: this will end up pushing a noop waker if the future isn't ready
+        // which can be every single time the `process` driver turns...
+        let waker = noop_waker();
+        let mut cx = Context::from_waker(&waker);
+
+        match self.poll_recv(&mut cx) {
+            Poll::Ready(ret) => ret,
+            Poll::Pending => None,
+        }
     }
 }
 

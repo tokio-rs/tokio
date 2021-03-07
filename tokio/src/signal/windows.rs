@@ -8,8 +8,7 @@
 #![cfg(windows)]
 
 use crate::signal::registry::{globals, EventId, EventInfo, Init, Storage};
-use crate::sync::broadcast::error::RecvError;
-use crate::sync::broadcast::Receiver;
+use crate::signal::RxFuture;
 
 use std::convert::TryFrom;
 use std::io;
@@ -77,7 +76,7 @@ impl Init for OsExtraData {
 #[must_use = "streams do nothing unless polled"]
 #[derive(Debug)]
 pub(crate) struct Event {
-    rx: Receiver<()>,
+    inner: RxFuture,
 }
 
 impl Event {
@@ -86,18 +85,9 @@ impl Event {
 
         let rx = globals().register_listener(signum as EventId);
 
-        Ok(Event { rx })
-    }
-
-    pub(crate) async fn recv(&mut self) -> Option<()> {
-        // FIXME: coop?
-        loop {
-            match self.rx.recv().await {
-                Ok(()) => return Some(()),
-                Err(RecvError::Closed) => return None,
-                Err(RecvError::Lagged(_)) => {}
-            }
-        }
+        Ok(Self {
+            inner: RxFuture::new(rx),
+        })
     }
 }
 
@@ -201,7 +191,7 @@ impl CtrlC {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<()> {
-        self.inner.recv().await
+        self.inner.inner.recv().await
     }
 
     /// Polls to receive the next signal notification event, outside of an
@@ -233,7 +223,7 @@ impl CtrlC {
     /// }
     /// ```
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
-        self.inner.rx.poll_recv(cx)
+        self.inner.inner.poll_recv(cx)
     }
 }
 
@@ -273,7 +263,7 @@ impl CtrlBreak {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<()> {
-        self.inner.recv().await
+        self.inner.inner.recv().await
     }
 
     /// Polls to receive the next signal notification event, outside of an
@@ -305,7 +295,7 @@ impl CtrlBreak {
     /// }
     /// ```
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
-        self.inner.rx.poll_recv(cx)
+        self.inner.inner.poll_recv(cx)
     }
 }
 

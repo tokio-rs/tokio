@@ -42,6 +42,8 @@
 //! }
 //! # }
 //! ```
+use crate::sync::watch::Receiver;
+use std::task::{Context, Poll};
 
 mod ctrl_c;
 pub use ctrl_c::ctrl_c;
@@ -58,3 +60,45 @@ mod os {
 
 pub mod unix;
 pub mod windows;
+
+// Privately "vendor" the reusable_future mod without copying the code
+// FIXME: is this a good idea or should we copy the module?
+#[allow(dead_code, unreachable_pub)]
+#[path = "../../../tokio-util/src/sync/reusable_box.rs"]
+mod reusable_box;
+use self::reusable_box::ReusableBoxFuture;
+
+#[derive(Debug)]
+struct RxFuture {
+    inner: ReusableBoxFuture<Receiver<()>>,
+}
+
+async fn make_future(mut rx: Receiver<()>) -> Receiver<()> {
+    match rx.changed().await {
+        Ok(()) => rx,
+        Err(_) => panic!("signal sender went away"),
+    }
+}
+
+impl RxFuture {
+    fn new(rx: Receiver<()>) -> Self {
+        Self {
+            inner: ReusableBoxFuture::new(make_future(rx)),
+        }
+    }
+
+    async fn recv(&mut self) -> Option<()> {
+        use crate::future::poll_fn;
+        poll_fn(|cx| self.poll_recv(cx)).await
+    }
+
+    fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
+        match self.inner.poll(cx) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(rx) => {
+                self.inner.set(make_future(rx));
+                Poll::Ready(Some(()))
+            }
+        }
+    }
+}
