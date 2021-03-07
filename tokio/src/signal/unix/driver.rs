@@ -9,9 +9,8 @@ use crate::signal::registry::globals;
 
 use mio::net::UnixStream;
 use std::io::{self, Read};
-use std::ptr;
 use std::sync::{Arc, Weak};
-use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
+use std::task::{Context, Poll};
 use std::time::Duration;
 
 /// Responsible for registering wakeups when an OS signal is received, and
@@ -100,7 +99,7 @@ impl Driver {
         //
         // To do so, we will `poll_read_ready` with a noop waker, since we don't
         // need to actually be notified when read ready...
-        let waker = unsafe { Waker::from_raw(RawWaker::new(ptr::null(), &NOOP_WAKER_VTABLE)) };
+        let waker = super::noop_waker();
         let mut cx = Context::from_waker(&waker);
 
         let ev = match self.receiver.registration().poll_read_ready(&mut cx) {
@@ -127,14 +126,6 @@ impl Driver {
         globals().broadcast();
     }
 }
-
-const NOOP_WAKER_VTABLE: RawWakerVTable = RawWakerVTable::new(noop_clone, noop, noop, noop);
-
-unsafe fn noop_clone(_data: *const ()) -> RawWaker {
-    RawWaker::new(ptr::null(), &NOOP_WAKER_VTABLE)
-}
-
-unsafe fn noop(_data: *const ()) {}
 
 // ===== impl Park for Driver =====
 

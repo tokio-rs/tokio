@@ -7,7 +7,7 @@
 
 use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
 use crate::sync::broadcast::error::{RecvError, TryRecvError};
-use crate::sync::broadcast::{Receiver, Recv};
+use crate::sync::broadcast::Receiver;
 
 use libc::c_int;
 use mio::net::UnixStream;
@@ -15,10 +15,31 @@ use std::io::{self, Error, ErrorKind, Write};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
-use std::task::{Context, Poll};
+use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
+
+// Privately "vendor" the reusable_future mod without copying the code
+#[allow(dead_code, unreachable_pub)]
+#[path = "../../../tokio-util/src/sync/reusable_box.rs"]
+mod reusable_box;
+use self::reusable_box::ReusableBoxFuture;
 
 pub(crate) mod driver;
 use self::driver::Handle;
+
+fn noop_waker() -> Waker {
+    const NOOP_WAKER: RawWaker = RawWaker::new(
+        std::ptr::null(),
+        &RawWakerVTable::new(noop_clone, noop, noop, noop),
+    );
+
+    unsafe fn noop_clone(_data: *const ()) -> RawWaker {
+        NOOP_WAKER
+    }
+
+    unsafe fn noop(_data: *const ()) {}
+
+    unsafe { Waker::from_raw(NOOP_WAKER) }
+}
 
 pub(crate) type OsStorage = Vec<SignalInfo>;
 
@@ -325,9 +346,7 @@ fn signal_enable(signal: c_int, handle: Handle) -> io::Result<()> {
 #[must_use = "streams do nothing unless polled"]
 #[derive(Debug)]
 pub struct Signal {
-    signal: c_int,
-    rx: Receiver<()>,
-    poll_rx: Option<Pin<Box<Recv<'static, ()>>>>,
+    inner: ReusableBoxFuture<Receiver<()>>,
 }
 
 /// Creates a new stream which will receive notifications when the current
@@ -356,6 +375,16 @@ pub fn signal(kind: SignalKind) -> io::Result<Signal> {
     signal_with_handle(kind, Handle::current())
 }
 
+async fn make_future(mut rx: Receiver<()>) -> Receiver<()> {
+    loop {
+        match rx.recv().await {
+            Ok(()) => return rx,
+            Err(RecvError::Closed) => panic!("should not happen"),
+            Err(RecvError::Lagged(_)) => {},
+        }
+    }
+}
+
 pub(crate) fn signal_with_handle(kind: SignalKind, handle: Handle) -> io::Result<Signal> {
     let signal = kind.0;
 
@@ -363,11 +392,10 @@ pub(crate) fn signal_with_handle(kind: SignalKind, handle: Handle) -> io::Result
     signal_enable(signal, handle)?;
 
     let rx = globals().register_listener(signal as EventId);
+    let inner = ReusableBoxFuture::new(make_future(rx));
 
     Ok(Signal {
-        signal,
-        rx,
-        poll_rx: None,
+        inner
     })
 }
 
@@ -396,13 +424,8 @@ impl Signal {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<()> {
-        loop {
-            match self.rx.recv().await {
-                Ok(_) => return Some(()),
-                Err(RecvError::Closed) => return None,
-                Err(RecvError::Lagged(_)) => continue,
-            }
-        }
+        use crate::future::poll_fn;
+        poll_fn(|cx| self.poll_recv(cx)).await
     }
 
     /// Polls to receive the next signal notification event, outside of an
@@ -440,32 +463,24 @@ impl Signal {
     /// }
     /// ```
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
-        use std::future::Future;
-
-        if self.poll_rx.is_none() {
-            let rx = globals().register_listener(self.signal as usize);
-            let poll_rx = Recv::new(crate::sync::broadcast::MaybeOwned::Owned(rx));
-            self.poll_rx = Some(Box::pin(poll_rx));
-        }
-
-        let ret = loop {
-            match self.poll_rx.as_mut().unwrap().as_mut().poll(cx) {
-                Poll::Pending => return Poll::Pending,
-                Poll::Ready(ret) => match ret {
-                    Ok(()) => break Some(()),
-                    Err(RecvError::Closed) => break None,
-                    Err(RecvError::Lagged(_)) => {}
-                },
+        match self.inner.poll(cx) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(rx) => {
+                self.inner.set(make_future(rx));
+                Poll::Ready(Some(()))
             }
-        };
-
-        self.poll_rx = None;
-        Poll::Ready(ret)
+        }
     }
 
     /// Try to receive a signal notification without blocking or registering a waker.
     pub(crate) fn try_recv(&mut self) -> Result<(), TryRecvError> {
-        self.rx.try_recv()
+        let waker = noop_waker();
+        let mut cx = Context::from_waker(&waker);
+
+        match self.poll_recv(&mut cx) {
+            Poll::Pending => Err(TryRecvError::Empty),
+            Poll::Ready(_) => Ok(()),
+        }
     }
 }
 
