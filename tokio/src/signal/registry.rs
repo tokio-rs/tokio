@@ -98,16 +98,23 @@ impl<S: Storage> Registry<S> {
     /// Broadcasts all previously recorded events to their respective listeners.
     ///
     /// Returns `true` if an event was delivered to at least one listener.
-    fn broadcast(&self) {
+    fn broadcast(&self) -> bool {
+        let mut did_notify = false;
         self.storage.for_each(|event_info| {
             // Any signal of this kind arrived since we checked last?
             if !event_info.pending.swap(false, Ordering::SeqCst) {
                 return;
             }
 
-            // Ignore errors if there aren't any listeners
-            let _ = event_info.tx.send(());
+            match event_info.tx.send(()) {
+                Ok(_) => did_notify = true,
+                // Channel is full, ignore the error since the
+                // receiver has already been woken up
+                Err(_) => {}
+            }
         });
+
+        did_notify
     }
 }
 
@@ -139,8 +146,8 @@ impl Globals {
     /// Broadcasts all previously recorded events to their respective listeners.
     ///
     /// Returns `true` if an event was delivered to at least one listener.
-    pub(crate) fn broadcast(&self) {
-        self.registry.broadcast();
+    pub(crate) fn broadcast(&self) -> bool {
+        self.registry.broadcast()
     }
 
     #[cfg(unix)]
