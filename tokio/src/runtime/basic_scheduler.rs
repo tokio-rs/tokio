@@ -90,6 +90,9 @@ struct Context {
 const INITIAL_CAPACITY: usize = 64;
 
 /// Max number of tasks to poll per tick.
+#[cfg(loom)]
+const MAX_TASKS_PER_TICK: usize = 4;
+#[cfg(not(loom))]
 const MAX_TASKS_PER_TICK: usize = 61;
 
 /// How often to check the remote queue first.

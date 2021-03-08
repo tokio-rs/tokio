@@ -12,9 +12,8 @@ use std::task::{Context, Poll};
 fn assert_num_polls(rt: Arc<Runtime>, at_most_polls: usize) {
     let (tx, rx) = oneshot::channel();
     let num_polls = Arc::new(AtomicUsize::new(0));
-
     rt.spawn(async move {
-        for _ in 0..65 {
+        for _ in 0..12 {
             task::yield_now().await;
         }
         tx.send(()).unwrap();
@@ -35,14 +34,32 @@ fn assert_num_polls(rt: Arc<Runtime>, at_most_polls: usize) {
 #[test]
 fn block_on_num_polls() {
     loom::model(|| {
+        // we expect at most 3 number of polls because there are
+        // three points at which we poll the future. At any of these
+        // points it can be ready:
+        //
+        // - when we fail to steal the parker and we block on a
+        //   notification that it is available.
+        //
+        // - when we steal the parker and we schedule the future
+        //
+        // - when the future is woken up and we have ran the max
+        //   number of tasks for the current tick or there are no
+        //   more tasks to run.
+        //
+        let at_most_num_polls = 3;
+
         let rt1 = Arc::new(Builder::new_current_thread().build().unwrap());
         let rt2 = rt1.clone();
+        let rt3 = rt1.clone();
 
-        let th1 = thread::spawn(|| assert_num_polls(rt1, 3));
-        let th2 = thread::spawn(|| assert_num_polls(rt2, 3));
+        let th1 = thread::spawn(move || assert_num_polls(rt1, at_most_num_polls));
+        let th2 = thread::spawn(move || assert_num_polls(rt2, at_most_num_polls));
+        let th3 = thread::spawn(move || assert_num_polls(rt3, at_most_num_polls));
 
         th1.join().unwrap();
         th2.join().unwrap();
+        th3.join().unwrap();
     });
 }
 
