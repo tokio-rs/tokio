@@ -106,11 +106,9 @@ impl<S: Storage> Registry<S> {
                 return;
             }
 
-            match event_info.tx.send(()) {
-                Ok(_) => did_notify = true,
-                // Channel is full, ignore the error since the
-                // receiver has already been woken up
-                Err(_) => {}
+            // Ignore errors if there are no listeners
+            if event_info.tx.send(()).is_ok() {
+                did_notify = true;
             }
         });
 
