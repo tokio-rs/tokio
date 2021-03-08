@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "sync"), allow(dead_code, unreachable_pub))]
 
 //! A one-shot channel is used for sending a single message between
-//! asynchronous tasks. The [`channel`] function is used to create a 
+//! asynchronous tasks. The [`channel`] function is used to create a
 //! [`Sender`] and [`Receiver`] handle pair that form the channel.
 //!
 //! The `Sender` handle is used by the producer to send the value.
@@ -51,7 +51,6 @@
 //!     }
 //! }
 //! ```
-
 
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicUsize;
