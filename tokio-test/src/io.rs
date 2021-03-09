@@ -70,7 +70,7 @@ struct Inner {
     sleep: Option<Pin<Box<Sleep>>>,
     read_wait: Option<Waker>,
     // rx: mpsc::UnboundedReceiver<Action>,
-    rx: Pin<Box<dyn Stream<Item = Action> + Send>>,
+    rx: Pin<Box<dyn Stream<Item = Action> + Send + Sync>>,
 }
 
 impl Builder {
