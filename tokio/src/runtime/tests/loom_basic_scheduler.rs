@@ -63,6 +63,33 @@ fn block_on_num_polls() {
     });
 }
 
+#[test]
+fn completes_both() {
+    loom::model(|| {
+        let rt1 = Arc::new(Builder::new_current_thread().build().unwrap());
+        let rt2 = rt1.clone();
+
+        rt1.spawn(async {});
+        rt1.spawn(async {});
+        rt1.spawn(async {});
+
+        let th1 = thread::spawn(move || {
+            rt1.block_on(async {
+                PollNTimes { n: 3, polled: 0 }.await;
+            });
+        });
+
+        let th2 = thread::spawn(move || {
+            rt2.block_on(async {
+                PollNTimes { n: 3, polled: 0 }.await;
+            });
+        });
+
+        th1.join().unwrap();
+        th2.join().unwrap();
+    });
+}
+
 struct BlockedFuture {
     rx: Receiver<()>,
     num_polls: Arc<AtomicUsize>,
@@ -78,5 +105,24 @@ impl Future for BlockedFuture {
             Poll::Pending => Poll::Pending,
             _ => Poll::Ready(()),
         }
+    }
+}
+
+struct PollNTimes {
+    polled: usize,
+    n: usize,
+}
+
+impl Future for PollNTimes {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        self.polled += 1;
+        if self.polled == self.n {
+            return Poll::Ready(());
+        }
+
+        cx.waker().wake_by_ref();
+        Poll::Pending
     }
 }

@@ -7,6 +7,8 @@ cfg_loom! {
 }
 
 cfg_not_loom! {
+    mod loom_basic_scheduler;
+
     mod queue;
 
     #[cfg(miri)]
