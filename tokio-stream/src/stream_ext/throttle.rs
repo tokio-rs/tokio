@@ -23,7 +23,8 @@ where
 }
 
 pin_project! {
-    /// Stream for the [`throttle`](throttle) function.
+    /// Stream for the [`throttle`](throttle) function. This object is `!Unpin`. If you need it to
+    /// implement `Unpin` you can pin your throttle like this: `Box::pin(your_throttle)`.
     #[derive(Debug)]
     #[must_use = "streams do nothing unless polled"]
     pub struct Throttle<T> {
