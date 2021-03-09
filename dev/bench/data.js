@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615316191485,
+  "lastUpdate": 1615324303930,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -19225,6 +19225,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18388369,
             "range": "± 2065617",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d0e4dd1d7ba8938cda3bf163b86d78ec16e2ee06",
+          "message": "chore: prepare Tokio v1.3.0 (#3597)",
+          "timestamp": "2021-03-09T22:09:51+01:00",
+          "tree_id": "60a8acfd02df66f15cbd872d1b35f41089eb0409",
+          "url": "https://github.com/tokio-rs/tokio/commit/d0e4dd1d7ba8938cda3bf163b86d78ec16e2ee06"
+        },
+        "date": 1615324301817,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 173409,
+            "range": "± 11066",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 668068,
+            "range": "± 131854",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4504959,
+            "range": "± 1080126",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18764537,
+            "range": "± 2525558",
             "unit": "ns/iter"
           }
         ]
