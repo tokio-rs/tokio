@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615316164032,
+  "lastUpdate": 1615316166474,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -19177,6 +19177,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18838176,
             "range": "± 2871314",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "17liut@gmail.com",
+            "name": "Andrew Liu",
+            "username": "aliu"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "872bc09e837f63cfa1b0907fc16d3e21be6630ac",
+          "message": "examples: update chat example (#3587)",
+          "timestamp": "2021-03-09T19:54:10+01:00",
+          "tree_id": "3ba98fa6babd4de12258f68347b0973564791b0f",
+          "url": "https://github.com/tokio-rs/tokio/commit/872bc09e837f63cfa1b0907fc16d3e21be6630ac"
+        },
+        "date": 1615316164105,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 188033,
+            "range": "± 24807",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 671854,
+            "range": "± 155072",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4389585,
+            "range": "± 1034110",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18388369,
+            "range": "± 2065617",
             "unit": "ns/iter"
           }
         ]
