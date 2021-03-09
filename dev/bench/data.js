@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615031820058,
+  "lastUpdate": 1615312832090,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -9935,6 +9935,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 496,
             "range": "± 23",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "henry.gomersall@smartacoustics.co.uk",
+            "name": "Henry Gomersall",
+            "username": "hgomersall"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f70b9b84f7ac9c18b9b64ca52d3b4b594333b8e3",
+          "message": "sync: documenation for oneshot (#3592)",
+          "timestamp": "2021-03-09T18:58:45+01:00",
+          "tree_id": "58e84d44c87c872878520a4426a334de9a9adea5",
+          "url": "https://github.com/tokio-rs/tokio/commit/f70b9b84f7ac9c18b9b64ca52d3b4b594333b8e3"
+        },
+        "date": 1615312830185,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 990,
+            "range": "± 128",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 18981,
+            "range": "± 8468",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 769,
+            "range": "± 200",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 17004,
+            "range": "± 9757",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 563,
+            "range": "± 201",
             "unit": "ns/iter"
           }
         ]
