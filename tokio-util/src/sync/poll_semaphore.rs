@@ -55,12 +55,13 @@ impl PollSemaphore {
     /// the `Waker` from the `Context` passed to the most recent call is
     /// scheduled to receive a wakeup.
     pub fn poll_acquire(&mut self, cx: &mut Context<'_>) -> Poll<Option<OwnedSemaphorePermit>> {
-        match ready!(self.permit_fut.poll(cx)) {
-            Ok(permit) => {
-                let next_fut = Arc::clone(&self.semaphore).acquire_owned();
-                self.permit_fut.set(next_fut);
-                Poll::Ready(Some(permit))
-            }
+        let result = ready!(self.permit_fut.poll(cx));
+
+        let next_fut = Arc::clone(&self.semaphore).acquire_owned();
+        self.permit_fut.set(next_fut);
+
+        match result {
+            Ok(permit) => Poll::Ready(Some(permit)),
             Err(_closed) => Poll::Ready(None),
         }
     }
