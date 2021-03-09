@@ -208,11 +208,39 @@
 //! # .await;
 //! # }
 //! ```
+//!
+//! ### Cooperative scheduling
+//!
+//! A single call to [`poll`] on a top-level task may potentially do a lot of
+//! work before it returns `Poll::Pending`. If a task runs for a long period of
+//! time without yielding back to the executor, it can starve other tasks
+//! waiting on that executor to execute them, or drive underlying resources.
+//! Since Rust does not have a runtime, it is difficult to forcibly preempt a
+//! long-running task. Instead, this module provides an opt-in mechanism for
+//! futures to collaborate with the executor to avoid starvation.
+//!
+//! Consider a future like this one:
+//!
+//! ```
+//! # use tokio_stream::{Stream, StreamExt};
+//! async fn drop_all<I: Stream + Unpin>(mut input: I) {
+//!     while let Some(_) = input.next().await {}
+//! }
+//! ```
+//!
+//! It may look harmless, but consider what happens under heavy load if the
+//! input stream is _always_ ready. If we spawn `drop_all`, the task will never
+//! yield, and will starve other tasks and resources on the same executor.
+//!
+//! To account for this, Tokio has explicit yield points in a number of library
+//! functions, which force tasks to return to the executor periodically.
+//!
+//!
 //! #### unconstrained
 //!
-//! Finally, this module provides [`task::unconstrained`], which lets you opt out a future of
-//! tokio's [cooperative scheduling][crate::coop]. When a future is crapped with `unconstrained`,
-//! it will never be forced to yield to Tokio. For example:
+//! If necessary, [`task::unconstrained`] lets you opt out a future of Tokio's cooperative
+//! scheduling. When a future is wrapped with `unconstrained`, it will never be forced to yield to
+//! Tokio. For example:
 //!
 //! ```
 //! # #[tokio::main]
@@ -240,6 +268,7 @@
 //! [`task::yield_now`]: crate::task::yield_now()
 //! [`thread::yield_now`]: std::thread::yield_now
 //! [`task::unconstrained`]: crate::task::unconstrained()
+//! [`poll`]: method@std::future::Future::poll
 
 cfg_rt! {
     pub use crate::runtime::task::{JoinError, JoinHandle};

@@ -372,7 +372,7 @@ cfg_rt! {
     pub mod runtime;
 }
 
-pub mod coop;
+pub(crate) mod coop;
 
 cfg_signal! {
     pub mod signal;

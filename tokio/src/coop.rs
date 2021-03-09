@@ -2,34 +2,9 @@
 
 //! Yield points for improved cooperative scheduling.
 //!
-//! A single call to [`poll`] on a top-level task may potentially do a lot of
-//! work before it returns `Poll::Pending`. If a task runs for a long period of
-//! time without yielding back to the executor, it can starve other tasks
-//! waiting on that executor to execute them, or drive underlying resources.
-//! Since Rust does not have a runtime, it is difficult to forcibly preempt a
-//! long-running task. Instead, this module provides an opt-in mechanism for
-//! futures to collaborate with the executor to avoid starvation.
+//! Documentation for this can be found in the [`tokio::task`] module.
 //!
-//! Consider a future like this one:
-//!
-//! ```
-//! # use tokio_stream::{Stream, StreamExt};
-//! async fn drop_all<I: Stream + Unpin>(mut input: I) {
-//!     while let Some(_) = input.next().await {}
-//! }
-//! ```
-//!
-//! It may look harmless, but consider what happens under heavy load if the
-//! input stream is _always_ ready. If we spawn `drop_all`, the task will never
-//! yield, and will starve other tasks and resources on the same executor.
-//!
-//! To account for this, Tokio has explicit yield points in a number of library
-//! functions, which force tasks to return to the executor periodically.
-//!
-//! If necessary, you may use [`task::unconstrained`][crate::task::unconstrained] to opt out
-//! specific futures of Tokio's cooperative scheduling.
-//!
-//! [`poll`]: method@std::future::Future::poll
+//! [`tokio::task`]: crate::task.
 
 // ```ignore
 // # use tokio_stream::{Stream, StreamExt};
