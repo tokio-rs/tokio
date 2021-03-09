@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615312898200,
+  "lastUpdate": 1615313520766,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -28965,6 +28965,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1120,
             "range": "± 254",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "torozco@fb.com",
+            "name": "Thomas Orozco",
+            "username": "krallin"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "05eeea570e69f78b5937e807272551bc3075c073",
+          "message": "coop: expose an unconstrained() opt-out (#3547)",
+          "timestamp": "2021-03-09T19:10:15+01:00",
+          "tree_id": "da62faa27c1b2e8e542a92eaffb049e03c82a73f",
+          "url": "https://github.com/tokio-rs/tokio/commit/05eeea570e69f78b5937e807272551bc3075c073"
+        },
+        "date": 1615313518615,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 14648,
+            "range": "± 3456",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1038,
+            "range": "± 51",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 622,
+            "range": "± 50",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 15237,
+            "range": "± 3471",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1040,
+            "range": "± 226",
             "unit": "ns/iter"
           }
         ]
