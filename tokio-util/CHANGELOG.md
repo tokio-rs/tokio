@@ -1,3 +1,20 @@
+# 0.6.4 (March 9, 2021)
+
+### Added
+
+- codec: `AnyDelimiter` codec ([#3406])
+- sync: add pollable `mpsc::Sender` ([#3490])
+
+### Fixed
+
+- codec: `LinesCodec` should only return `MaxLineLengthExceeded` once per line ([#3556])
+- sync: fuse PollSemaphore ([#3578])
+
+[#3406]: https://github.com/tokio-rs/tokio/pull/3406
+[#3490]: https://github.com/tokio-rs/tokio/pull/3490
+[#3556]: https://github.com/tokio-rs/tokio/pull/3556
+[#3578]: https://github.com/tokio-rs/tokio/pull/3578
+
 # 0.6.3 (January 31, 2021)
 
 ### Added
