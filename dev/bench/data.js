@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615313520766,
+  "lastUpdate": 1615313524712,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -9989,6 +9989,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 563,
             "range": "± 201",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "torozco@fb.com",
+            "name": "Thomas Orozco",
+            "username": "krallin"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "05eeea570e69f78b5937e807272551bc3075c073",
+          "message": "coop: expose an unconstrained() opt-out (#3547)",
+          "timestamp": "2021-03-09T19:10:15+01:00",
+          "tree_id": "da62faa27c1b2e8e542a92eaffb049e03c82a73f",
+          "url": "https://github.com/tokio-rs/tokio/commit/05eeea570e69f78b5937e807272551bc3075c073"
+        },
+        "date": 1615313520030,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 965,
+            "range": "± 236",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 13348,
+            "range": "± 3120",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1009,
+            "range": "± 177",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 14565,
+            "range": "± 3810",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 581,
+            "range": "± 176",
             "unit": "ns/iter"
           }
         ]
