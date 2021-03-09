@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615313524712,
+  "lastUpdate": 1615313527543,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -18973,6 +18973,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21025147,
             "range": "± 3209437",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "torozco@fb.com",
+            "name": "Thomas Orozco",
+            "username": "krallin"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "05eeea570e69f78b5937e807272551bc3075c073",
+          "message": "coop: expose an unconstrained() opt-out (#3547)",
+          "timestamp": "2021-03-09T19:10:15+01:00",
+          "tree_id": "da62faa27c1b2e8e542a92eaffb049e03c82a73f",
+          "url": "https://github.com/tokio-rs/tokio/commit/05eeea570e69f78b5937e807272551bc3075c073"
+        },
+        "date": 1615313522685,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 182458,
+            "range": "± 29872",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 670724,
+            "range": "± 91927",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4631682,
+            "range": "± 1073337",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18159258,
+            "range": "± 2405039",
             "unit": "ns/iter"
           }
         ]
