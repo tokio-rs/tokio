@@ -7,6 +7,7 @@
 
 use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
 use crate::signal::RxFuture;
+use crate::sync::watch;
 
 use libc::c_int;
 use mio::net::UnixStream;
@@ -236,7 +237,8 @@ fn action(globals: Pin<&'static Globals>, signal: c_int) {
 ///
 /// This will register the signal handler if it hasn't already been registered,
 /// returning any error along the way if that fails.
-fn signal_enable(signal: c_int, handle: Handle) -> io::Result<()> {
+fn signal_enable(signal: SignalKind, handle: Handle) -> io::Result<()> {
+    let signal = signal.0;
     if signal < 0 || signal_hook_registry::FORBIDDEN.contains(&signal) {
         return Err(Error::new(
             ErrorKind::Other,
@@ -365,20 +367,18 @@ pub struct Signal {
 /// * If the signal is one of
 ///   [`signal_hook::FORBIDDEN`](fn@signal_hook_registry::register#panics)
 pub fn signal(kind: SignalKind) -> io::Result<Signal> {
-    signal_with_handle(kind, Handle::current())
-}
-
-pub(crate) fn signal_with_handle(kind: SignalKind, handle: Handle) -> io::Result<Signal> {
-    let signal = kind.0;
-
-    // Turn the signal delivery on once we are ready for it
-    signal_enable(signal, handle)?;
-
-    let rx = globals().register_listener(signal as EventId);
+    let rx = signal_with_handle(kind, Handle::current())?;
 
     Ok(Signal {
         inner: RxFuture::new(rx),
     })
+}
+
+pub(crate) fn signal_with_handle(kind: SignalKind, handle: Handle) -> io::Result<watch::Receiver<()>> {
+    // Turn the signal delivery on once we are ready for it
+    signal_enable(kind, handle)?;
+
+    Ok(globals().register_listener(kind.0 as EventId))
 }
 
 impl Signal {
@@ -451,24 +451,11 @@ impl Signal {
 // Work around for abstracting streams internally
 pub(crate) trait InternalStream {
     fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>>;
-    fn try_recv(&mut self) -> Option<()>;
 }
 
 impl InternalStream for Signal {
     fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
         self.poll_recv(cx)
-    }
-
-    fn try_recv(&mut self) -> Option<()> {
-        // FIXME: this will end up pushing a noop waker if the future isn't ready
-        // which can be every single time the `process` driver turns...
-        let waker = noop_waker();
-        let mut cx = Context::from_waker(&waker);
-
-        match self.poll_recv(&mut cx) {
-            Poll::Ready(ret) => ret,
-            Poll::Pending => None,
-        }
     }
 }
 
@@ -482,11 +469,11 @@ mod tests {
 
     #[test]
     fn signal_enable_error_on_invalid_input() {
-        signal_enable(-1, Handle::default()).unwrap_err();
+        signal_enable(SignalKind::from_raw(-1), Handle::default()).unwrap_err();
     }
 
     #[test]
     fn signal_enable_error_on_forbidden_input() {
-        signal_enable(signal_hook_registry::FORBIDDEN[0], Handle::default()).unwrap_err();
+        signal_enable(SignalKind::from_raw(signal_hook_registry::FORBIDDEN[0]), Handle::default()).unwrap_err();
     }
 }

@@ -268,6 +268,10 @@ impl<T> Receiver<T> {
             // loop around again in case the wake-up was spurious
         }
     }
+
+    pub(crate) fn try_has_changed(&mut self) -> Option<Result<(), error::RecvError>> {
+        maybe_changed(&self.shared, &mut self.version)
+    }
 }
 
 fn maybe_changed<T>(

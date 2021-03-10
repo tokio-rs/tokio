@@ -205,10 +205,6 @@ mod test {
                 None => Poll::Pending,
             }
         }
-
-        fn try_recv(&mut self) -> Option<()> {
-            unimplemented!();
-        }
     }
 
     #[test]
