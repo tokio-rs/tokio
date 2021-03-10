@@ -152,6 +152,8 @@ pin_project! {
     ///
     /// [`select!`]: ../macro.select.html
     /// [`tokio::pin!`]: ../macro.pin.html
+    // Alias for old name in 0.2
+    #[cfg_attr(docsrs, doc(alias = "Delay"))]
     #[derive(Debug)]
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct Sleep {
