@@ -269,8 +269,10 @@ impl<T> Receiver<T> {
         }
     }
 
-    pub(crate) fn try_has_changed(&mut self) -> Option<Result<(), error::RecvError>> {
-        maybe_changed(&self.shared, &mut self.version)
+    cfg_process_driver! {
+        pub(crate) fn try_has_changed(&mut self) -> Option<Result<(), error::RecvError>> {
+            maybe_changed(&self.shared, &mut self.version)
+        }
     }
 }
 
@@ -405,11 +407,13 @@ impl<T> Sender<T> {
         debug_assert_eq!(0, self.shared.ref_count_rx.load(Relaxed));
     }
 
-    pub(crate) fn subscribe(&self) -> Receiver<T> {
-        let shared = self.shared.clone();
-        let version = shared.version.load(SeqCst);
+    cfg_signal_internal! {
+        pub(crate) fn subscribe(&self) -> Receiver<T> {
+            let shared = self.shared.clone();
+            let version = shared.version.load(SeqCst);
 
-        Receiver::from_shared(version, shared)
+            Receiver::from_shared(version, shared)
+        }
     }
 }
 
