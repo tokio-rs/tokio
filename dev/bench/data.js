@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615404689441,
+  "lastUpdate": 1615410354405,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -19837,6 +19837,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19684044,
             "range": "± 3374827",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "luciofranco14@gmail.com",
+            "name": "Lucio Franco",
+            "username": "LucioFranco"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e40ec3e4243f95b39a42bcc9049551b62c3058a0",
+          "message": "chore: Prepare `tokio-test v0.4.1` release (#3602)",
+          "timestamp": "2021-03-10T16:04:08-05:00",
+          "tree_id": "90f101312fbe1ca8cbfe267ecf349a7340165c9b",
+          "url": "https://github.com/tokio-rs/tokio/commit/e40ec3e4243f95b39a42bcc9049551b62c3058a0"
+        },
+        "date": 1615410352283,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 174040,
+            "range": "± 19993",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 685331,
+            "range": "± 122816",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4459121,
+            "range": "± 773429",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18943855,
+            "range": "± 1783167",
             "unit": "ns/iter"
           }
         ]
