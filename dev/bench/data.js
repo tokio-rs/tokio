@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615362096614,
+  "lastUpdate": 1615362102060,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -19585,6 +19585,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18325215,
             "range": "± 2270180",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "matthew.james.briggs@gmail.com",
+            "name": "Matthew James Briggs",
+            "username": "webern"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8c5cde9bc378a66699b36d745d5b29d339748806",
+          "message": "stream: documentation note for throttle Unpin (#3600)",
+          "timestamp": "2021-03-10T08:39:43+01:00",
+          "tree_id": "41ce093e050e256c5fb1f81b39c8795673e516e8",
+          "url": "https://github.com/tokio-rs/tokio/commit/8c5cde9bc378a66699b36d745d5b29d339748806"
+        },
+        "date": 1615362099920,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 204761,
+            "range": "± 34548",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 748436,
+            "range": "± 85848",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5583865,
+            "range": "± 1647459",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21145861,
+            "range": "± 2823773",
             "unit": "ns/iter"
           }
         ]
