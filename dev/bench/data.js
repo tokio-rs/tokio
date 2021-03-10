@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615404677970,
+  "lastUpdate": 1615404684705,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -46451,6 +46451,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 729253,
             "range": "± 121525",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "hakejam@gmail.com",
+            "name": "Jake Ham",
+            "username": "hakejam"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6919f7cede68dd5176525c24ad520af668bae37a",
+          "message": "test: Make Mock both Send and Sync (#3594)\n\nCo-authored-by: Jake Ham <hamjacob@amazon.com>",
+          "timestamp": "2021-03-10T14:29:22-05:00",
+          "tree_id": "826daf872e0fe0924f93cac8aadb0a74ec210b96",
+          "url": "https://github.com/tokio-rs/tokio/commit/6919f7cede68dd5176525c24ad520af668bae37a"
+        },
+        "date": 1615404682450,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6754757,
+            "range": "± 2667384",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6216753,
+            "range": "± 1273232",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 5740767,
+            "range": "± 2833295",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 579,
+            "range": "± 67",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 554,
+            "range": "± 110",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 568,
+            "range": "± 117",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 77431,
+            "range": "± 8370",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1302,
+            "range": "± 225",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1123730,
+            "range": "± 130094",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 727847,
+            "range": "± 125195",
             "unit": "ns/iter"
           }
         ]
