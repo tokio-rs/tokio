@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615362102060,
+  "lastUpdate": 1615362105140,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -30003,6 +30003,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1046,
             "range": "± 143",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "matthew.james.briggs@gmail.com",
+            "name": "Matthew James Briggs",
+            "username": "webern"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8c5cde9bc378a66699b36d745d5b29d339748806",
+          "message": "stream: documentation note for throttle Unpin (#3600)",
+          "timestamp": "2021-03-10T08:39:43+01:00",
+          "tree_id": "41ce093e050e256c5fb1f81b39c8795673e516e8",
+          "url": "https://github.com/tokio-rs/tokio/commit/8c5cde9bc378a66699b36d745d5b29d339748806"
+        },
+        "date": 1615362100195,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 16350,
+            "range": "± 5204",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1126,
+            "range": "± 41",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 660,
+            "range": "± 39",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 15906,
+            "range": "± 5343",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1164,
+            "range": "± 85",
             "unit": "ns/iter"
           }
         ]
