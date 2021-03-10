@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615362105140,
+  "lastUpdate": 1615362253947,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -10367,6 +10367,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 570,
             "range": "± 63",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "cssivision@gmail.com",
+            "name": "cssivision",
+            "username": "cssivision"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bcb95db4e2d4a9a43a3f3f5e129ddb7232599451",
+          "message": "chore: fix clippy warnings in newer versions (#3588)",
+          "timestamp": "2021-03-10T08:42:24+01:00",
+          "tree_id": "7b6d7086dfedf0ff5a67567a02120ed87965bb20",
+          "url": "https://github.com/tokio-rs/tokio/commit/bcb95db4e2d4a9a43a3f3f5e129ddb7232599451"
+        },
+        "date": 1615362251688,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 839,
+            "range": "± 165",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 13410,
+            "range": "± 4725",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 862,
+            "range": "± 168",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 14114,
+            "range": "± 3185",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 499,
+            "range": "± 80",
             "unit": "ns/iter"
           }
         ]
