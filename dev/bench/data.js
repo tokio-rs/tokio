@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615362287023,
+  "lastUpdate": 1615404657366,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -10421,6 +10421,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 499,
             "range": "± 80",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "hakejam@gmail.com",
+            "name": "Jake Ham",
+            "username": "hakejam"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6919f7cede68dd5176525c24ad520af668bae37a",
+          "message": "test: Make Mock both Send and Sync (#3594)\n\nCo-authored-by: Jake Ham <hamjacob@amazon.com>",
+          "timestamp": "2021-03-10T14:29:22-05:00",
+          "tree_id": "826daf872e0fe0924f93cac8aadb0a74ec210b96",
+          "url": "https://github.com/tokio-rs/tokio/commit/6919f7cede68dd5176525c24ad520af668bae37a"
+        },
+        "date": 1615404655257,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 837,
+            "range": "± 245",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 12765,
+            "range": "± 4567",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 868,
+            "range": "± 1144",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 13025,
+            "range": "± 3625",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 493,
+            "range": "± 104",
             "unit": "ns/iter"
           }
         ]
