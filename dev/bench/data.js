@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615404684705,
+  "lastUpdate": 1615404689441,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -19789,6 +19789,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21000606,
             "range": "± 3992833",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "hakejam@gmail.com",
+            "name": "Jake Ham",
+            "username": "hakejam"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6919f7cede68dd5176525c24ad520af668bae37a",
+          "message": "test: Make Mock both Send and Sync (#3594)\n\nCo-authored-by: Jake Ham <hamjacob@amazon.com>",
+          "timestamp": "2021-03-10T14:29:22-05:00",
+          "tree_id": "826daf872e0fe0924f93cac8aadb0a74ec210b96",
+          "url": "https://github.com/tokio-rs/tokio/commit/6919f7cede68dd5176525c24ad520af668bae37a"
+        },
+        "date": 1615404678625,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 184794,
+            "range": "± 55697",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 697104,
+            "range": "± 148624",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4978838,
+            "range": "± 1152667",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19684044,
+            "range": "± 3374827",
             "unit": "ns/iter"
           }
         ]
