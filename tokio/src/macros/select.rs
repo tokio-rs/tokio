@@ -416,8 +416,10 @@ macro_rules! select {
                 // disabled.
                 let mut is_pending = false;
 
-                // Randomly generate a starting point. This makes `select!` a
-                // bit more fair and avoids always polling the first future.
+                // Choose a starting index to begin polling the futures at. In
+                // practice, this will either be a psuedo-randomly generrated
+                // number by default, or the constant 0 if `biased;` is
+                // supplied.
                 let start = $start;
 
                 for i in 0..BRANCHES {
@@ -542,6 +544,8 @@ macro_rules! select {
     };
 
     ( $p:pat = $($t:tt)* ) => {
+        // Randomly generate a starting point. This makes `select!` a bit more
+        // fair and avoids always polling the first future.
         $crate::select!(@{ start={ $crate::macros::support::thread_rng_n(BRANCHES) }; () } $p = $($t)*)
     };
     () => {
