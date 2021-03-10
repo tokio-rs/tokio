@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615362091196,
+  "lastUpdate": 1615362096614,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -45917,6 +45917,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 665913,
             "range": "± 95239",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "matthew.james.briggs@gmail.com",
+            "name": "Matthew James Briggs",
+            "username": "webern"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8c5cde9bc378a66699b36d745d5b29d339748806",
+          "message": "stream: documentation note for throttle Unpin (#3600)",
+          "timestamp": "2021-03-10T08:39:43+01:00",
+          "tree_id": "41ce093e050e256c5fb1f81b39c8795673e516e8",
+          "url": "https://github.com/tokio-rs/tokio/commit/8c5cde9bc378a66699b36d745d5b29d339748806"
+        },
+        "date": 1615362094454,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6286204,
+            "range": "± 2385759",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6132568,
+            "range": "± 2163420",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6406058,
+            "range": "± 2278674",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 879,
+            "range": "± 73",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 882,
+            "range": "± 42",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 885,
+            "range": "± 90",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 123788,
+            "range": "± 7775",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1758,
+            "range": "± 171",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1077730,
+            "range": "± 23014",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 764170,
+            "range": "± 341064",
             "unit": "ns/iter"
           }
         ]
