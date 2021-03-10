@@ -198,6 +198,14 @@ pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
 }
 
 impl<T> Receiver<T> {
+    fn from_shared(version: usize, shared: Arc<Shared<T>>) -> Self {
+        // No synchronization necessary as this is only used as a counter and
+        // not memory access.
+        shared.ref_count_rx.fetch_add(1, Relaxed);
+
+        Self { version, shared }
+    }
+
     /// Returns a reference to the most recently sent value
     ///
     /// Outstanding borrows hold a read lock. This means that long lived borrows
@@ -289,11 +297,7 @@ impl<T> Clone for Receiver<T> {
         let version = self.version;
         let shared = self.shared.clone();
 
-        // No synchronization necessary as this is only used as a counter and
-        // not memory access.
-        shared.ref_count_rx.fetch_add(1, Relaxed);
-
-        Receiver { shared, version }
+        Self::from_shared(version, shared)
     }
 }
 
@@ -395,6 +399,13 @@ impl<T> Sender<T> {
 
         notified.await;
         debug_assert_eq!(0, self.shared.ref_count_rx.load(Relaxed));
+    }
+
+    pub(crate) fn subscribe(&self) -> Receiver<T> {
+        let shared = self.shared.clone();
+        let version = shared.version.load(SeqCst);
+
+        Receiver::from_shared(version, shared)
     }
 }
 
