@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615415294989,
+  "lastUpdate": 1615415298203,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -10529,6 +10529,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 492,
             "range": "± 111",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "robjtede@icloud.com",
+            "name": "Rob Ede",
+            "username": "robjtede"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1cda0f16a2f8814e0a973162543d6d1f786c8a44",
+          "message": "doc: alias sleep to delay (#3604)",
+          "timestamp": "2021-03-10T23:26:11+01:00",
+          "tree_id": "d9126b3b1dee76315b0e3fdbab2772e068d06875",
+          "url": "https://github.com/tokio-rs/tokio/commit/1cda0f16a2f8814e0a973162543d6d1f786c8a44"
+        },
+        "date": 1615415293547,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 958,
+            "range": "± 136",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 17351,
+            "range": "± 7500",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1017,
+            "range": "± 186",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 18420,
+            "range": "± 7720",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 546,
+            "range": "± 67",
             "unit": "ns/iter"
           }
         ]
