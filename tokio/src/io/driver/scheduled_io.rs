@@ -443,7 +443,7 @@ cfg_io_readiness! {
                             // Currently ready!
                             let tick = TICK.unpack(curr) as u8;
                             *state = State::Done;
-                            return Poll::Ready(ReadyEvent { ready, tick });
+                            return Poll::Ready(ReadyEvent { tick, ready });
                         }
 
                         // Wasn't ready, take the lock (and check again while locked).
@@ -462,7 +462,7 @@ cfg_io_readiness! {
                             // Currently ready!
                             let tick = TICK.unpack(curr) as u8;
                             *state = State::Done;
-                            return Poll::Ready(ReadyEvent { ready, tick });
+                            return Poll::Ready(ReadyEvent { tick, ready });
                         }
 
                         // Not ready even after locked, insert into list...
