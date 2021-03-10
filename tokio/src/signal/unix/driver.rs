@@ -39,14 +39,6 @@ pub(crate) struct Handle {
 #[derive(Debug)]
 pub(super) struct Inner(());
 
-const NOOP_WAKER_VTABLE: RawWakerVTable = RawWakerVTable::new(noop_clone, noop, noop, noop);
-
-unsafe fn noop_clone(_data: *const ()) -> RawWaker {
-    RawWaker::new(ptr::null(), &NOOP_WAKER_VTABLE)
-}
-
-unsafe fn noop(_data: *const ()) {}
-
 // ===== impl Driver =====
 
 impl Driver {
@@ -135,6 +127,14 @@ impl Driver {
         globals().broadcast();
     }
 }
+
+const NOOP_WAKER_VTABLE: RawWakerVTable = RawWakerVTable::new(noop_clone, noop, noop, noop);
+
+unsafe fn noop_clone(_data: *const ()) -> RawWaker {
+    RawWaker::new(ptr::null(), &NOOP_WAKER_VTABLE)
+}
+
+unsafe fn noop(_data: *const ()) {}
 
 // ===== impl Park for Driver =====
 
