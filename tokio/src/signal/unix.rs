@@ -15,25 +15,10 @@ use std::io::{self, Error, ErrorKind, Write};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
-use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
+use std::task::{Context, Poll};
 
 pub(crate) mod driver;
 use self::driver::Handle;
-
-fn noop_waker() -> Waker {
-    const NOOP_WAKER: RawWaker = RawWaker::new(
-        std::ptr::null(),
-        &RawWakerVTable::new(noop_clone, noop, noop, noop),
-    );
-
-    unsafe fn noop_clone(_data: *const ()) -> RawWaker {
-        NOOP_WAKER
-    }
-
-    unsafe fn noop(_data: *const ()) {}
-
-    unsafe { Waker::from_raw(NOOP_WAKER) }
-}
 
 pub(crate) type OsStorage = Vec<SignalInfo>;
 
