@@ -61,10 +61,6 @@ mod os {
 pub mod unix;
 pub mod windows;
 
-// Privately "vendor" the reusable_future mod without copying the code
-// FIXME: is this a good idea or should we copy the module?
-#[allow(dead_code, unreachable_pub)]
-#[path = "../../../tokio-util/src/sync/reusable_box.rs"]
 mod reusable_box;
 use self::reusable_box::ReusableBoxFuture;
 
