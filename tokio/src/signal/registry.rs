@@ -237,10 +237,7 @@ mod tests {
 
     #[test]
     fn broadcast_returns_if_at_least_one_event_fired() {
-        let registry = Registry::new(vec![
-            EventInfo::default(),
-            EventInfo::default(),
-        ]);
+        let registry = Registry::new(vec![EventInfo::default(), EventInfo::default()]);
 
         registry.record_event(0);
         assert_eq!(false, registry.broadcast());

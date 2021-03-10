@@ -359,7 +359,10 @@ pub fn signal(kind: SignalKind) -> io::Result<Signal> {
     })
 }
 
-pub(crate) fn signal_with_handle(kind: SignalKind, handle: Handle) -> io::Result<watch::Receiver<()>> {
+pub(crate) fn signal_with_handle(
+    kind: SignalKind,
+    handle: Handle,
+) -> io::Result<watch::Receiver<()>> {
     // Turn the signal delivery on once we are ready for it
     signal_enable(kind, handle)?;
 
@@ -459,6 +462,10 @@ mod tests {
 
     #[test]
     fn signal_enable_error_on_forbidden_input() {
-        signal_enable(SignalKind::from_raw(signal_hook_registry::FORBIDDEN[0]), Handle::default()).unwrap_err();
+        signal_enable(
+            SignalKind::from_raw(signal_hook_registry::FORBIDDEN[0]),
+            Handle::default(),
+        )
+        .unwrap_err();
     }
 }

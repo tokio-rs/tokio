@@ -15,105 +15,105 @@ pub(crate) struct ReusableBoxFuture<T> {
 }
 
 impl<T> ReusableBoxFuture<T> {
-   /// Create a new `ReusableBoxFuture<T>` containing the provided future.
-   pub(crate) fn new<F>(future: F) -> Self
-   where
-       F: Future<Output = T> + Send + 'static,
-   {
-       let boxed: Box<dyn Future<Output = T> + Send> = Box::new(future);
+    /// Create a new `ReusableBoxFuture<T>` containing the provided future.
+    pub(crate) fn new<F>(future: F) -> Self
+    where
+        F: Future<Output = T> + Send + 'static,
+    {
+        let boxed: Box<dyn Future<Output = T> + Send> = Box::new(future);
 
-       let boxed = Box::into_raw(boxed);
+        let boxed = Box::into_raw(boxed);
 
-       // SAFETY: Box::into_raw does not return null pointers.
-       let boxed = unsafe { NonNull::new_unchecked(boxed) };
+        // SAFETY: Box::into_raw does not return null pointers.
+        let boxed = unsafe { NonNull::new_unchecked(boxed) };
 
-       Self { boxed }
-   }
+        Self { boxed }
+    }
 
-   /// Replace the future currently stored in this box.
-   ///
-   /// This reallocates if and only if the layout of the provided future is
-   /// different from the layout of the currently stored future.
-   pub(crate) fn set<F>(&mut self, future: F)
-   where
-       F: Future<Output = T> + Send + 'static,
-   {
-       if let Err(future) = self.try_set(future) {
-           *self = Self::new(future);
-       }
-   }
+    /// Replace the future currently stored in this box.
+    ///
+    /// This reallocates if and only if the layout of the provided future is
+    /// different from the layout of the currently stored future.
+    pub(crate) fn set<F>(&mut self, future: F)
+    where
+        F: Future<Output = T> + Send + 'static,
+    {
+        if let Err(future) = self.try_set(future) {
+            *self = Self::new(future);
+        }
+    }
 
-   /// Replace the future currently stored in this box.
-   ///
-   /// This function never reallocates, but returns an error if the provided
-   /// future has a different size or alignment from the currently stored
-   /// future.
-   pub(crate) fn try_set<F>(&mut self, future: F) -> Result<(), F>
-   where
-       F: Future<Output = T> + Send + 'static,
-   {
-       // SAFETY: The pointer is not dangling.
-       let self_layout = {
-           let dyn_future: &(dyn Future<Output = T> + Send) = unsafe { self.boxed.as_ref() };
-           Layout::for_value(dyn_future)
-       };
+    /// Replace the future currently stored in this box.
+    ///
+    /// This function never reallocates, but returns an error if the provided
+    /// future has a different size or alignment from the currently stored
+    /// future.
+    pub(crate) fn try_set<F>(&mut self, future: F) -> Result<(), F>
+    where
+        F: Future<Output = T> + Send + 'static,
+    {
+        // SAFETY: The pointer is not dangling.
+        let self_layout = {
+            let dyn_future: &(dyn Future<Output = T> + Send) = unsafe { self.boxed.as_ref() };
+            Layout::for_value(dyn_future)
+        };
 
-       if Layout::new::<F>() == self_layout {
-           // SAFETY: We just checked that the layout of F is correct.
-           unsafe {
-               self.set_same_layout(future);
-           }
+        if Layout::new::<F>() == self_layout {
+            // SAFETY: We just checked that the layout of F is correct.
+            unsafe {
+                self.set_same_layout(future);
+            }
 
-           Ok(())
-       } else {
-           Err(future)
-       }
-   }
+            Ok(())
+        } else {
+            Err(future)
+        }
+    }
 
-   /// Set the current future.
-   ///
-   /// # Safety
-   ///
-   /// This function requires that the layout of the provided future is the
-   /// same as `self.layout`.
-   unsafe fn set_same_layout<F>(&mut self, future: F)
-   where
-       F: Future<Output = T> + Send + 'static,
-   {
-       // Drop the existing future, catching any panics.
-       let result = panic::catch_unwind(AssertUnwindSafe(|| {
-           ptr::drop_in_place(self.boxed.as_ptr());
-       }));
+    /// Set the current future.
+    ///
+    /// # Safety
+    ///
+    /// This function requires that the layout of the provided future is the
+    /// same as `self.layout`.
+    unsafe fn set_same_layout<F>(&mut self, future: F)
+    where
+        F: Future<Output = T> + Send + 'static,
+    {
+        // Drop the existing future, catching any panics.
+        let result = panic::catch_unwind(AssertUnwindSafe(|| {
+            ptr::drop_in_place(self.boxed.as_ptr());
+        }));
 
-       // Overwrite the future behind the pointer. This is safe because the
-       // allocation was allocated with the same size and alignment as the type F.
-       let self_ptr: *mut F = self.boxed.as_ptr() as *mut F;
-       ptr::write(self_ptr, future);
+        // Overwrite the future behind the pointer. This is safe because the
+        // allocation was allocated with the same size and alignment as the type F.
+        let self_ptr: *mut F = self.boxed.as_ptr() as *mut F;
+        ptr::write(self_ptr, future);
 
-       // Update the vtable of self.boxed. The pointer is not null because we
-       // just got it from self.boxed, which is not null.
-       self.boxed = NonNull::new_unchecked(self_ptr);
+        // Update the vtable of self.boxed. The pointer is not null because we
+        // just got it from self.boxed, which is not null.
+        self.boxed = NonNull::new_unchecked(self_ptr);
 
-       // If the old future's destructor panicked, resume unwinding.
-       match result {
-           Ok(()) => {}
-           Err(payload) => {
-               panic::resume_unwind(payload);
-           }
-       }
-   }
+        // If the old future's destructor panicked, resume unwinding.
+        match result {
+            Ok(()) => {}
+            Err(payload) => {
+                panic::resume_unwind(payload);
+            }
+        }
+    }
 
-   /// Get a pinned reference to the underlying future.
-   pub(crate) fn get_pin(&mut self) -> Pin<&mut (dyn Future<Output = T> + Send)> {
-       // SAFETY: The user of this box cannot move the box, and we do not move it
-       // either.
-       unsafe { Pin::new_unchecked(self.boxed.as_mut()) }
-   }
+    /// Get a pinned reference to the underlying future.
+    pub(crate) fn get_pin(&mut self) -> Pin<&mut (dyn Future<Output = T> + Send)> {
+        // SAFETY: The user of this box cannot move the box, and we do not move it
+        // either.
+        unsafe { Pin::new_unchecked(self.boxed.as_mut()) }
+    }
 
-   /// Poll the future stored inside this box.
-   pub(crate) fn poll(&mut self, cx: &mut Context<'_>) -> Poll<T> {
-       self.get_pin().poll(cx)
-   }
+    /// Poll the future stored inside this box.
+    pub(crate) fn poll(&mut self, cx: &mut Context<'_>) -> Poll<T> {
+        self.get_pin().poll(cx)
+    }
 }
 
 impl<T> Future for ReusableBoxFuture<T> {
@@ -152,12 +152,12 @@ impl<T> fmt::Debug for ReusableBoxFuture<T> {
 
 #[cfg(test)]
 mod test {
+    use super::ReusableBoxFuture;
     use futures::future::FutureExt;
     use std::alloc::Layout;
     use std::future::Future;
     use std::pin::Pin;
     use std::task::{Context, Poll};
-    use super::ReusableBoxFuture;
 
     #[test]
     fn test_different_futures() {

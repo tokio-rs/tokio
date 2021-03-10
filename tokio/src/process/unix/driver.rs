@@ -31,12 +31,9 @@ trait HasChanged {
 
 impl<T> HasChanged for watch::Receiver<T> {
     fn has_changed(&mut self) -> bool {
-        self.try_has_changed()
-            .and_then(Result::ok)
-            .is_some()
+        self.try_has_changed().and_then(Result::ok).is_some()
     }
 }
-
 
 // ===== impl CoreDriver =====
 
