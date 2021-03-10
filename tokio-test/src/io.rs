@@ -21,6 +21,7 @@
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::sync::mpsc;
 use tokio::time::{self, Duration, Instant, Sleep};
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use futures_core::{ready, Stream};
 use std::collections::VecDeque;
@@ -69,8 +70,7 @@ struct Inner {
     waiting: Option<Instant>,
     sleep: Option<Pin<Box<Sleep>>>,
     read_wait: Option<Waker>,
-    // rx: mpsc::UnboundedReceiver<Action>,
-    rx: Pin<Box<dyn Stream<Item = Action> + Send>>,
+    rx: UnboundedReceiverStream<Action>,
 }
 
 impl Builder {
@@ -185,13 +185,9 @@ impl Handle {
 
 impl Inner {
     fn new(actions: VecDeque<Action>) -> (Inner, Handle) {
-        let (tx, mut rx) = mpsc::unbounded_channel();
+        let (tx, rx) = mpsc::unbounded_channel();
 
-        let rx = Box::pin(async_stream::stream! {
-            while let Some(item) = rx.recv().await {
-                yield item;
-            }
-        });
+        let rx = UnboundedReceiverStream::new(rx);
 
         let inner = Inner {
             actions,
