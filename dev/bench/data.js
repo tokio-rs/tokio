@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615475051300,
+  "lastUpdate": 1615475054128,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -20095,6 +20095,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19055484,
             "range": "± 3760128",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "zaharidichev@gmail.com",
+            "name": "Zahari Dichev",
+            "username": "zaharidichev"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "edfff7551abc24e6d6ee5e0dc8e894cf1309a53d",
+          "message": "util: anotate time module as requiring time feature (#3606)\n\nSigned-off-by: Zahari Dichev <zaharidichev@gmail.com>",
+          "timestamp": "2021-03-11T16:02:01+01:00",
+          "tree_id": "a2a71b1a527cc8cdb62c8b82081da5c9e003bfc3",
+          "url": "https://github.com/tokio-rs/tokio/commit/edfff7551abc24e6d6ee5e0dc8e894cf1309a53d"
+        },
+        "date": 1615475047648,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 184108,
+            "range": "± 35317",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 688492,
+            "range": "± 111909",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4860557,
+            "range": "± 954395",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20000770,
+            "range": "± 2029029",
             "unit": "ns/iter"
           }
         ]
