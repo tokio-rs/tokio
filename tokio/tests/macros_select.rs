@@ -505,3 +505,55 @@ async fn biased_one_not_ready() {
 
     assert_eq!(2, v);
 }
+
+#[tokio::test]
+async fn biased_eventually_ready() {
+    use std::future::Future;
+
+    fn ready_on_2nd_poll() -> impl Future<Output = ()> + Unpin {
+        use std::task::Poll;
+
+        let mut polled = false;
+
+        poll_fn(move |ctx|
+            if polled {
+                Poll::Ready(())
+            } else {
+                polled = true;
+                ctx.waker().wake_by_ref();
+
+                Poll::Pending
+            }
+        )
+    }
+
+    let one = async {};
+    let two = ready_on_2nd_poll();
+    let three = ready_on_2nd_poll();
+
+    let mut count = 0u8;
+
+    tokio::pin!(one, two, three);
+
+    loop {
+        tokio::select! {
+            biased;
+
+            _ = &mut two, if count < 2 => {
+                count += 1;
+                assert_eq!(count, 2);
+            }
+            _ = &mut three, if count < 3 => {
+                count += 1;
+                assert_eq!(count, 3);
+            }
+            _ = &mut one, if count < 1 => {
+                count += 1;
+                assert_eq!(count, 1);
+            }
+            else => break,
+        }
+    }
+
+    assert_eq!(count, 3);
+}
