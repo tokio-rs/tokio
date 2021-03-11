@@ -11,7 +11,7 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
-use std::sync::atomic::Ordering::{Acquire, Release};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::sync::Arc;
 use std::task::Poll::{Pending, Ready};
 use std::time::Duration;
@@ -343,7 +343,7 @@ impl Spawner {
 
     fn waker_ref(&self) -> WakerRef<'_> {
         // clear the woken bit
-        self.shared.woken.store(false, Release);
+        self.shared.woken.swap(false, AcqRel);
         waker_ref(&self.shared)
     }
 
