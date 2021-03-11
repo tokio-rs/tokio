@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615475048414,
+  "lastUpdate": 1615475051300,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -10583,6 +10583,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 546,
             "range": "± 67",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "zaharidichev@gmail.com",
+            "name": "Zahari Dichev",
+            "username": "zaharidichev"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "edfff7551abc24e6d6ee5e0dc8e894cf1309a53d",
+          "message": "util: anotate time module as requiring time feature (#3606)\n\nSigned-off-by: Zahari Dichev <zaharidichev@gmail.com>",
+          "timestamp": "2021-03-11T16:02:01+01:00",
+          "tree_id": "a2a71b1a527cc8cdb62c8b82081da5c9e003bfc3",
+          "url": "https://github.com/tokio-rs/tokio/commit/edfff7551abc24e6d6ee5e0dc8e894cf1309a53d"
+        },
+        "date": 1615475046625,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1034,
+            "range": "± 346",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 15056,
+            "range": "± 5834",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1037,
+            "range": "± 55",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 15584,
+            "range": "± 5502",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 601,
+            "range": "± 159",
             "unit": "ns/iter"
           }
         ]
