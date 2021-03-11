@@ -515,7 +515,7 @@ async fn biased_eventually_ready() {
 
         let mut polled = false;
 
-        poll_fn(move |ctx|
+        poll_fn(move |ctx| {
             if polled {
                 Poll::Ready(())
             } else {
@@ -524,7 +524,7 @@ async fn biased_eventually_ready() {
 
                 Poll::Pending
             }
-        )
+        })
     }
 
     let one = async {};
