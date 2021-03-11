@@ -508,28 +508,11 @@ async fn biased_one_not_ready() {
 
 #[tokio::test]
 async fn biased_eventually_ready() {
-    use std::future::Future;
-
-    fn ready_on_2nd_poll() -> impl Future<Output = ()> + Unpin {
-        use std::task::Poll;
-
-        let mut polled = false;
-
-        poll_fn(move |ctx| {
-            if polled {
-                Poll::Ready(())
-            } else {
-                polled = true;
-                ctx.waker().wake_by_ref();
-
-                Poll::Pending
-            }
-        })
-    }
+    use tokio::task::yield_now;
 
     let one = async {};
-    let two = ready_on_2nd_poll();
-    let three = ready_on_2nd_poll();
+    let two = async { yield_now().await };
+    let three = async { yield_now().await };
 
     let mut count = 0u8;
 
