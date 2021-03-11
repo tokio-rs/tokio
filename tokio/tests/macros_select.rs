@@ -481,3 +481,27 @@ async fn mut_on_left_hand_side() {
     .await;
     assert_eq!(v, 2);
 }
+
+#[tokio::test]
+async fn biased_one_not_ready() {
+    let (_tx1, rx1) = oneshot::channel::<i32>();
+    let (tx2, rx2) = oneshot::channel::<i32>();
+    let (tx3, rx3) = oneshot::channel::<i32>();
+
+    tx2.send(2).unwrap();
+    tx3.send(3).unwrap();
+
+    let v = tokio::select! {
+        biased;
+
+        _ = rx1 => unreachable!(),
+        res = rx2 => {
+            assert_ok!(res)
+        },
+        _ = rx3 => {
+            panic!("This branch should never be activated because `rx2` should be polled before `rx3` due to `biased;`.")
+        }
+    };
+
+    assert_eq!(2, v);
+}
