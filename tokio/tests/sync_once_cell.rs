@@ -1,40 +1,58 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::runtime::Runtime;
-use tokio::sync::{AlreadyInitializedError, NotInitializedError, OnceCell};
-use tokio::time::{sleep, Duration};
+use std::time::Duration;
+use tokio::runtime;
+use tokio::sync::{OnceCell, SetError};
+use tokio::time;
 
 async fn func1() -> u32 {
     5
 }
 
 async fn func2() -> u32 {
-    sleep(Duration::from_millis(10)).await;
+    time::sleep(Duration::from_millis(1)).await;
     10
 }
 
 async fn func_panic() -> u32 {
-    sleep(Duration::from_secs(1)).await;
+    time::sleep(Duration::from_millis(1)).await;
     panic!();
+}
+
+async fn sleep_and_set() -> u32 {
+    // Simulate sleep by pausing time and waiting for another thread to
+    // resume clock when calling `set`, then finding the cell being initialized
+    // by this call
+    time::sleep(Duration::from_millis(2)).await;
+    5
+}
+
+async fn advance_time_and_set(cell: &'static OnceCell<u32>, v: u32) -> Result<(), SetError> {
+    time::advance(Duration::from_millis(1)).await;
+    cell.set(v)
 }
 
 #[test]
 fn get_or_init_with() {
-    let rt = Runtime::new().unwrap();
+    let rt = runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .unwrap();
 
-    static ONCE: OnceCell<u32> = OnceCell::new();
+    static ONCE: OnceCell<u32> = OnceCell::const_new();
 
     rt.block_on(async {
-        let result1 = rt
-            .spawn(async { ONCE.get_or_init_with(func1).await })
-            .await
-            .unwrap();
+        time::pause();
 
-        let result2 = rt
-            .spawn(async { ONCE.get_or_init_with(func2).await })
-            .await
-            .unwrap();
+        let handle1 = rt.spawn(async { ONCE.get_or_init_with(func1).await });
+        let handle2 = rt.spawn(async { ONCE.get_or_init_with(func2).await });
+
+        time::advance(Duration::from_millis(1)).await;
+        time::resume();
+
+        let result1 = handle1.await.unwrap();
+        let result2 = handle2.await.unwrap();
 
         assert_eq!(*result1, 5);
         assert_eq!(*result2, 5);
@@ -43,20 +61,23 @@ fn get_or_init_with() {
 
 #[test]
 fn get_or_init_panic() {
-    let rt = Runtime::new().unwrap();
+    let rt = runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .unwrap();
 
-    static ONCE: OnceCell<u32> = OnceCell::new();
+    static ONCE: OnceCell<u32> = OnceCell::const_new();
 
     rt.block_on(async {
-        let result1 = rt
-            .spawn(async { ONCE.get_or_init_with(func1).await })
-            .await
-            .unwrap();
+        time::pause();
 
-        let result2 = rt
-            .spawn(async { ONCE.get_or_init_with(func_panic).await })
-            .await
-            .unwrap();
+        let handle1 = rt.spawn(async { ONCE.get_or_init_with(func1).await });
+        let handle2 = rt.spawn(async { ONCE.get_or_init_with(func_panic).await });
+
+        time::advance(Duration::from_millis(1)).await;
+
+        let result1 = handle1.await.unwrap();
+        let result2 = handle2.await.unwrap();
 
         assert_eq!(*result1, 5);
         assert_eq!(*result2, 5);
@@ -65,9 +86,12 @@ fn get_or_init_panic() {
 
 #[test]
 fn set_and_get() {
-    let rt = Runtime::new().unwrap();
+    let rt = runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .unwrap();
 
-    static ONCE: OnceCell<u32> = OnceCell::new();
+    static ONCE: OnceCell<u32> = OnceCell::const_new();
 
     rt.block_on(async {
         let _ = rt.spawn(async { ONCE.set(5) }).await;
@@ -78,17 +102,42 @@ fn set_and_get() {
 
 #[test]
 fn get_uninit() {
-    static ONCE: OnceCell<u32> = OnceCell::new();
+    static ONCE: OnceCell<u32> = OnceCell::const_new();
     let uninit = ONCE.get();
-    assert_eq!(uninit, Err(NotInitializedError));
+    assert!(uninit.is_err());
 }
 
 #[test]
 fn set_twice() {
-    static ONCE: OnceCell<u32> = OnceCell::new();
+    static ONCE: OnceCell<u32> = OnceCell::const_new();
 
     let first = ONCE.set(5);
     assert_eq!(first, Ok(()));
     let second = ONCE.set(6);
-    assert_eq!(second, Err(AlreadyInitializedError));
+    assert!(second.err().unwrap().is_already_init_err());
+}
+
+#[test]
+fn set_while_initializing() {
+    let rt = runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .unwrap();
+
+    static ONCE: OnceCell<u32> = OnceCell::const_new();
+
+    rt.block_on(async {
+        time::pause();
+
+        let handle1 = rt.spawn(async { ONCE.get_or_init_with(sleep_and_set).await });
+        let handle2 = rt.spawn(async { advance_time_and_set(&ONCE, 10).await });
+
+        time::advance(Duration::from_millis(2)).await;
+
+        let result1 = handle1.await.unwrap();
+        let result2 = handle2.await.unwrap();
+
+        assert_eq!(*result1, 5);
+        assert!(result2.err().unwrap().is_initializing_err());
+    });
 }

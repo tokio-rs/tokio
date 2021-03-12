@@ -2,8 +2,10 @@
 #![cfg(feature = "full")]
 
 use std::cell::Cell;
+use std::future::Future;
 use std::io::{Cursor, SeekFrom};
 use std::net::SocketAddr;
+use std::pin::Pin;
 use std::rc::Rc;
 use tokio::net::TcpStream;
 use tokio::time::{Duration, Instant};
@@ -270,37 +272,19 @@ async_assert_fn!(tokio::sync::OnceCell<u8>::get_or_init_with(
 async_assert_fn!(tokio::sync::OnceCell<u8>::get_or_init_with(
     _, fn() -> Pin<Box<dyn Future<Output = u8> + Send>>): Send & !Sync);
 async_assert_fn!(tokio::sync::OnceCell<u8>::get_or_init_with(
-    _, fn() -> Pin<Box<dyn Future<Output = u8>>>): Send & !Sync);
+    _, fn() -> Pin<Box<dyn Future<Output = u8>>>): !Send & !Sync);
 async_assert_fn!(tokio::sync::OnceCell<Cell<u8>>::get_or_init_with(
-    _, fn() -> Pin<Box<dyn Future<Output = Cell<u8>> + Send + Sync>>): Send & Sync);
+    _, fn() -> Pin<Box<dyn Future<Output = Cell<u8>> + Send + Sync>>): !Send & !Sync);
 async_assert_fn!(tokio::sync::OnceCell<Cell<u8>>::get_or_init_with(
-    _, fn() -> Pin<Box<dyn Future<Output = Cell<u8>> + Send>>): Send & !Sync);
+    _, fn() -> Pin<Box<dyn Future<Output = Cell<u8>> + Send>>): !Send & !Sync);
 async_assert_fn!(tokio::sync::OnceCell<Cell<u8>>::get_or_init_with(
     _, fn() -> Pin<Box<dyn Future<Output = Cell<u8>>>>): !Send & !Sync);
 async_assert_fn!(tokio::sync::OnceCell<Rc<u8>>::get_or_init_with(
-    _, fn() -> Pin<Box<dyn Future<Output = Rc<u8>> + Send + Sync>>): Send & Sync);
+    _, fn() -> Pin<Box<dyn Future<Output = Rc<u8>> + Send + Sync>>): !Send & !Sync);
 async_assert_fn!(tokio::sync::OnceCell<Rc<u8>>::get_or_init_with(
-    _, fn() -> Pin<Box<dyn Future<Output = Rc<u8>> + Send>>): Send & !Sync);
+    _, fn() -> Pin<Box<dyn Future<Output = Rc<u8>> + Send>>): !Send & !Sync);
 async_assert_fn!(tokio::sync::OnceCell<Rc<u8>>::get_or_init_with(
     _, fn() -> Pin<Box<dyn Future<Output = Rc<u8>>>>): !Send & !Sync);
-async_assert_fn!(tokio::sync::OnceCell<u8>::get_or_init(
-    _, Pin<Box<dyn Future<Output = u8> + Send + Sync>>): Send & Sync);
-async_assert_fn!(tokio::sync::OnceCell<u8>::get_or_init(
-    _, Pin<Box<dyn Future<Output = u8> + Send>>): Send & !Sync);
-async_assert_fn!(tokio::sync::OnceCell<u8>::get_or_init(
-    _, Pin<Box<dyn Future<Output = u8>>>): Send & !Sync);
-async_assert_fn!(tokio::sync::OnceCell<Cell<u8>>::get_or_init(
-    _, Pin<Box<dyn Future<Output = Cell<u8>> + Send + Sync>>): Send & Sync);
-async_assert_fn!(tokio::sync::OnceCell<Cell<u8>>::get_or_init(
-    _, Pin<Box<dyn Future<Output = Cell<u8>> + Send>>): Send & !Sync);
-async_assert_fn!(tokio::sync::OnceCell<Cell<u8>>::get_or_init(
-    _, Pin<Box<dyn Future<Output = Cell<u8>>>>): !Send & !Sync);
-async_assert_fn!(tokio::sync::OnceCell<Rc<u8>>::get_or_init(
-    _, Pin<Box<dyn Future<Output = Rc<u8>> + Send + Sync>>): Send & Sync);
-async_assert_fn!(tokio::sync::OnceCell<Rc<u8>>::get_or_init(
-    _, Pin<Box<dyn Future<Output = Rc<u8>> + Send>>): Send & !Sync);
-async_assert_fn!(tokio::sync::OnceCell<Rc<u8>>::get_or_init(
-    _, Pin<Box<dyn Future<Output = Rc<u8>>>>): !Send & !Sync);
 assert_value!(tokio::sync::OnceCell<u8>: Send & Sync);
 assert_value!(tokio::sync::OnceCell<Cell<u8>>: Send & !Sync);
 assert_value!(tokio::sync::OnceCell<Rc<u8>>: !Send & !Sync);
