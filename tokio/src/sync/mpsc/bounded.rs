@@ -314,7 +314,8 @@ impl<T> Sender<T> {
         Sender { chan }
     }
 
-    /// Sends a value, waiting until there is capacity.
+    /// Sends a value, waiting until there is capacity. In case you need a
+    /// polling interface, use [`PollSender`].
     ///
     /// A successful send occurs when it is determined that the other end of the
     /// channel has not hung up already. An unsuccessful send would be one where
@@ -332,6 +333,7 @@ impl<T> Sender<T> {
     ///
     /// [`close`]: Receiver::close
     /// [`Receiver`]: Receiver
+    /// [`PollSender`]: https://docs.rs/tokio-util/0.6.4/tokio_util/sync/struct.PollSender.html
     ///
     /// # Examples
     ///
