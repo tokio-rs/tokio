@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615580761379,
+  "lastUpdate": 1615580769197,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -31251,6 +31251,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1058,
             "range": "± 111",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "37372069+setpill@users.noreply.github.com",
+            "name": "setpill",
+            "username": "setpill"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "345b29ca11755c4dcf6c371ddfd9ce3071e60273",
+          "message": "sync: improve Mutex FIFO explanation (#3615)",
+          "timestamp": "2021-03-12T21:24:05+01:00",
+          "tree_id": "31a28eeac318ba82b45fb5aebcba6b8df79955e1",
+          "url": "https://github.com/tokio-rs/tokio/commit/345b29ca11755c4dcf6c371ddfd9ce3071e60273"
+        },
+        "date": 1615580767038,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 15884,
+            "range": "± 5029",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1009,
+            "range": "± 180",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 619,
+            "range": "± 124",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 15851,
+            "range": "± 4367",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1002,
+            "range": "± 197",
             "unit": "ns/iter"
           }
         ]
