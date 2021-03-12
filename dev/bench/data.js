@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615536523224,
+  "lastUpdate": 1615580531974,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -30993,6 +30993,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1005,
             "range": "± 125",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "54288692+nate-onesignal@users.noreply.github.com",
+            "name": "Nate Mara",
+            "username": "nate-onesignal"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b75d02a2b6f3062567856dca22695d8bfa364c10",
+          "message": "macros: introduce biased argument for select! (#3603)",
+          "timestamp": "2021-03-12T21:20:20+01:00",
+          "tree_id": "80f0f191931aa2368f325c3fbdafe5dcfa6d711b",
+          "url": "https://github.com/tokio-rs/tokio/commit/b75d02a2b6f3062567856dca22695d8bfa364c10"
+        },
+        "date": 1615580529703,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 16711,
+            "range": "± 6438",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1034,
+            "range": "± 211",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 640,
+            "range": "± 104",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 16541,
+            "range": "± 6190",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1058,
+            "range": "± 111",
             "unit": "ns/iter"
           }
         ]
