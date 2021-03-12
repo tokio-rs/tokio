@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615536478354,
+  "lastUpdate": 1615536487123,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -20143,6 +20143,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20000770,
             "range": "± 2029029",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "2507850+farazshaikh@users.noreply.github.com",
+            "name": "Faraz",
+            "username": "farazshaikh"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a1b4bdee618d7603d804db4a42fde0bd6d45c053",
+          "message": "runtime: mark EnterGuard with must_use (#3609)",
+          "timestamp": "2021-03-12T09:06:08+01:00",
+          "tree_id": "2aa788a7d954be5bbc9bfe53c675f8b548c4b48f",
+          "url": "https://github.com/tokio-rs/tokio/commit/a1b4bdee618d7603d804db4a42fde0bd6d45c053"
+        },
+        "date": 1615536484842,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 196697,
+            "range": "± 20815",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 715799,
+            "range": "± 58175",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5691659,
+            "range": "± 1319963",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21704121,
+            "range": "± 2708220",
             "unit": "ns/iter"
           }
         ]
