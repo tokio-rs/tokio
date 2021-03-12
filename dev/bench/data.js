@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615580755834,
+  "lastUpdate": 1615580761379,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -20401,6 +20401,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20573247,
             "range": "± 2632641",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "37372069+setpill@users.noreply.github.com",
+            "name": "setpill",
+            "username": "setpill"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "345b29ca11755c4dcf6c371ddfd9ce3071e60273",
+          "message": "sync: improve Mutex FIFO explanation (#3615)",
+          "timestamp": "2021-03-12T21:24:05+01:00",
+          "tree_id": "31a28eeac318ba82b45fb5aebcba6b8df79955e1",
+          "url": "https://github.com/tokio-rs/tokio/commit/345b29ca11755c4dcf6c371ddfd9ce3071e60273"
+        },
+        "date": 1615580759131,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 190711,
+            "range": "± 17522",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 719965,
+            "range": "± 70301",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5451032,
+            "range": "± 538738",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20512955,
+            "range": "± 3262816",
             "unit": "ns/iter"
           }
         ]
