@@ -71,13 +71,13 @@ use std::sync::Arc;
 /// async fn main() {
 ///     let count = Arc::new(Mutex::new(0));
 ///
-///     for _ in 0..5 {
+///     for i in 0..5 {
 ///         let my_count = Arc::clone(&count);
 ///         tokio::spawn(async move {
-///             for _ in 0..10 {
+///             for j in 0..10 {
 ///                 let mut lock = my_count.lock().await;
 ///                 *lock += 1;
-///                 println!("{}", lock);
+///                 println!("{} {} {}", i, j, lock);
 ///             }
 ///         });
 ///     }
@@ -100,9 +100,10 @@ use std::sync::Arc;
 /// Tokio's Mutex works in a simple FIFO (first in, first out) style where all
 /// calls to [`lock`] complete in the order they were performed. In that way the
 /// Mutex is "fair" and predictable in how it distributes the locks to inner
-/// data. This is why the output of the program above is an in-order count to
-/// 50. Locks are released and reacquired after every iteration, so basically,
+/// data. Locks are released and reacquired after every iteration, so basically,
 /// each thread goes to the back of the line after it increments the value once.
+/// Note that there's some unpredictability to the timing between when the
+/// threads are started, but once they are going they alternate predictably.
 /// Finally, since there is only a single valid lock at any given time, there is
 /// no possibility of a race condition when mutating the inner value.
 ///
