@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615580536853,
+  "lastUpdate": 1615580540141,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -20299,6 +20299,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21704121,
             "range": "± 2708220",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "54288692+nate-onesignal@users.noreply.github.com",
+            "name": "Nate Mara",
+            "username": "nate-onesignal"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b75d02a2b6f3062567856dca22695d8bfa364c10",
+          "message": "macros: introduce biased argument for select! (#3603)",
+          "timestamp": "2021-03-12T21:20:20+01:00",
+          "tree_id": "80f0f191931aa2368f325c3fbdafe5dcfa6d711b",
+          "url": "https://github.com/tokio-rs/tokio/commit/b75d02a2b6f3062567856dca22695d8bfa364c10"
+        },
+        "date": 1615580536657,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 213752,
+            "range": "± 103972",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 752001,
+            "range": "± 202076",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5277740,
+            "range": "± 1316338",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20573247,
+            "range": "± 2632641",
             "unit": "ns/iter"
           }
         ]
