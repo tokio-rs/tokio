@@ -16,6 +16,11 @@ use std::task::{Context, Poll};
 /// Send values to the associated `Receiver`.
 ///
 /// Instances are created by the [`channel`](channel) function.
+///
+/// To use the `Sender` in a poll function, you can use the [`PollSender`]
+/// utility.
+///
+/// [`PollSender`]: https://docs.rs/tokio-util/0.6/tokio_util/sync/struct.PollSender.html
 pub struct Sender<T> {
     chan: chan::Tx<T, Semaphore>,
 }
@@ -309,10 +314,6 @@ impl<T> fmt::Debug for Receiver<T> {
 
 impl<T> Unpin for Receiver<T> {}
 
-/// To use the `Sender` in a poll function, you can use the [`PollSender`]
-/// utility.
-///
-/// [`PollSender`]: https://docs.rs/tokio-util/0.6/tokio_util/sync/struct.PollSender.html
 impl<T> Sender<T> {
     pub(crate) fn new(chan: chan::Tx<T, Semaphore>) -> Sender<T> {
         Sender { chan }
