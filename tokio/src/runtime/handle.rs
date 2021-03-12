@@ -39,6 +39,7 @@ pub struct Handle {
 ///
 /// [`Runtime::enter`]: fn@crate::runtime::Runtime::enter
 #[derive(Debug)]
+#[must_use = "Creating and dropping a guard does nothing"]
 pub struct EnterGuard<'a> {
     handle: &'a Handle,
     guard: context::EnterGuard,
