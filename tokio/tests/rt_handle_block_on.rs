@@ -372,6 +372,7 @@ rt_test! {
 }
 
 multi_threaded_rt_test! {
+    #[cfg(unix)]
     #[test]
     fn unix_listener_bind() {
         let rt = rt();
