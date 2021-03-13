@@ -2,7 +2,6 @@
 #![cfg(feature = "full")]
 
 use std::time::Duration;
-use tempfile::tempdir;
 use tokio::runtime::{Handle, Runtime};
 use tokio::sync::mpsc;
 use tokio::task::spawn_blocking;
@@ -297,7 +296,7 @@ rt_test! {
         let rt = rt();
         let _enter = rt.enter();
 
-        let dir = tempdir().unwrap();
+        let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("socket");
 
         rt.shutdown_timeout(Duration::from_secs(1000));
@@ -317,7 +316,7 @@ rt_test! {
         let rt = rt();
         let _enter = rt.enter();
 
-        let dir = tempdir().unwrap();
+        let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("socket");
 
         let listener = net::UnixListener::bind(path).unwrap();
@@ -337,7 +336,7 @@ rt_test! {
         let rt = rt();
         let _enter = rt.enter();
 
-        let dir = tempdir().unwrap();
+        let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("socket");
 
         let listener = net::UnixListener::bind(path).unwrap();
@@ -378,7 +377,7 @@ multi_threaded_rt_test! {
         let rt = rt();
         let _enter = rt.enter();
 
-        let dir = tempdir().unwrap();
+        let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("socket");
 
         let listener = net::UnixListener::bind(path).unwrap();
