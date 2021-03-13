@@ -212,7 +212,17 @@ impl Handle {
         let mut _blocking_enter = crate::runtime::enter(true);
 
         // Block on the future
-        _blocking_enter.block_on(future).expect("failed to park thread")
+        _blocking_enter
+            .block_on(future)
+            .expect("failed to park thread")
+    }
+
+    pub(crate) fn shutdown(mut self) {
+        self.spawner.shutdown();
+
+        if let Some(io_handle) = self.io_handle {
+            io_handle.shutdown();
+        }
     }
 }
 

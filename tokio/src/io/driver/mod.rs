@@ -14,6 +14,7 @@ pub(crate) use registration::Registration;
 mod scheduled_io;
 use scheduled_io::ScheduledIo;
 
+use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::park::{Park, Unpark};
 use crate::util::slab::{self, Slab};
 use crate::{loom::sync::Mutex, util::bit};
@@ -73,6 +74,9 @@ pub(super) struct Inner {
 
     /// Used to wake up the reactor from a call to `turn`
     waker: mio::Waker,
+
+    /// Whether the driver is shutdown.
+    is_shutdown: AtomicBool,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
@@ -129,6 +133,7 @@ impl Driver {
                 registry,
                 io_dispatch: allocator,
                 waker,
+                is_shutdown: AtomicBool::new(false),
             }),
         })
     }
@@ -208,6 +213,8 @@ impl Drop for Driver {
 
 impl Drop for Inner {
     fn drop(&mut self) {
+        self.is_shutdown.store(true, Ordering::SeqCst);
+
         let resources = self.resources.lock().take();
 
         if let Some(mut slab) = resources {
@@ -296,6 +303,24 @@ impl Handle {
 
     pub(super) fn inner(&self) -> Option<Arc<Inner>> {
         self.inner.upgrade()
+    }
+
+    pub(crate) fn shutdown(self) {
+        if let Some(inner) = self.inner.upgrade() {
+            inner
+                .is_shutdown
+                .store(true, crate::loom::sync::atomic::Ordering::SeqCst);
+        }
+    }
+
+    pub(crate) fn is_shutdown(&self) -> bool {
+        if let Some(inner) = self.inner.upgrade() {
+            inner.is_shutdown.load(Ordering::SeqCst)
+        } else {
+            // if the inner type has been dropped then its `Drop` impl will have been called which
+            // sets `Inner.is_shutdown` to `true`. So therefore it must have been shutdown.
+            true
+        }
     }
 }
 

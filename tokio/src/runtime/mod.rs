@@ -526,7 +526,7 @@ cfg_rt! {
         /// ```
         pub fn shutdown_timeout(mut self, duration: Duration) {
             // Wakeup and shutdown all the worker threads
-            self.handle.spawner.shutdown();
+            self.handle.shutdown();
             self.blocking_pool.shutdown(Some(duration));
         }
 
