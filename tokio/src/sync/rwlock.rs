@@ -11,7 +11,7 @@ pub(crate) use write_guard::RwLockWriteGuard;
 pub(crate) use write_guard_mapped::RwLockMappedWriteGuard;
 
 #[cfg(not(loom))]
-const MAX_READS: usize = 32;
+const MAX_READS: usize = Semaphore::MAX_PERMITS;
 
 #[cfg(loom)]
 const MAX_READS: usize = 10;
