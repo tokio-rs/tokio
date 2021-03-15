@@ -1017,6 +1017,32 @@ rt_test! {
         });
     }
 
+    #[test]
+    fn coop_unconstrained() {
+        use std::task::Poll::Ready;
+
+        let rt = rt();
+
+        rt.block_on(async {
+            // Create a bunch of tasks
+            let mut tasks = (0..1_000).map(|_| {
+                tokio::spawn(async { })
+            }).collect::<Vec<_>>();
+
+            // Hope that all the tasks complete...
+            time::sleep(Duration::from_millis(100)).await;
+
+            tokio::task::unconstrained(poll_fn(|cx| {
+                // All the tasks should be ready
+                for task in &mut tasks {
+                    assert!(Pin::new(task).poll(cx).is_ready());
+                }
+
+                Ready(())
+            })).await;
+        });
+    }
+
     // Tests that the "next task" scheduler optimization is not able to starve
     // other tasks.
     #[test]

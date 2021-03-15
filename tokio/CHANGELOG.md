@@ -1,3 +1,53 @@
+# 1.3.0 (March 9, 2021)
+
+### Added
+
+- coop: expose an `unconstrained()` opt-out ([#3547])
+- net: add `into_std` for net types without it ([#3509])
+- sync: add `same_channel` method to `mpsc::Sender` ([#3532])
+- sync: add `{try_,}acquire_many_owned` to `Semaphore` ([#3535])
+- sync: add back `RwLockWriteGuard::map` and `RwLockWriteGuard::try_map` ([#3348])
+
+### Fixed
+
+- sync: allow `oneshot::Receiver::close` after successful `try_recv` ([#3552])
+- time: do not panic on `timeout(Duration::MAX)` ([#3551])
+
+### Documented
+
+- doc: doc aliases for pre-1.0 function names ([#3523])
+- io: fix typos ([#3541])
+- io: note the EOF behaviour of `read_until` ([#3536])
+- io: update `AsyncRead::poll_read` doc ([#3557])
+- net: update `UdpSocket` splitting doc ([#3517])
+- runtime: add link to `LocalSet` on `new_current_thread` ([#3508])
+- runtime: update documentation of thread limits ([#3527])
+- sync: do not recommend `join_all` for `Barrier` ([#3514])
+- sync: documentation for `oneshot` ([#3592])
+- sync: rename `notify` to `notify_one` ([#3526])
+- time: fix typo in `Sleep` doc ([#3515])
+- time: sync `interval.rs` and `time/mod.rs` docs ([#3533])
+
+[#3348]: https://github.com/tokio-rs/tokio/pull/3348
+[#3508]: https://github.com/tokio-rs/tokio/pull/3508
+[#3509]: https://github.com/tokio-rs/tokio/pull/3509
+[#3514]: https://github.com/tokio-rs/tokio/pull/3514
+[#3515]: https://github.com/tokio-rs/tokio/pull/3515
+[#3517]: https://github.com/tokio-rs/tokio/pull/3517
+[#3523]: https://github.com/tokio-rs/tokio/pull/3523
+[#3526]: https://github.com/tokio-rs/tokio/pull/3526
+[#3527]: https://github.com/tokio-rs/tokio/pull/3527
+[#3532]: https://github.com/tokio-rs/tokio/pull/3532
+[#3533]: https://github.com/tokio-rs/tokio/pull/3533
+[#3535]: https://github.com/tokio-rs/tokio/pull/3535
+[#3536]: https://github.com/tokio-rs/tokio/pull/3536
+[#3541]: https://github.com/tokio-rs/tokio/pull/3541
+[#3547]: https://github.com/tokio-rs/tokio/pull/3547
+[#3551]: https://github.com/tokio-rs/tokio/pull/3551
+[#3552]: https://github.com/tokio-rs/tokio/pull/3552
+[#3557]: https://github.com/tokio-rs/tokio/pull/3557
+[#3592]: https://github.com/tokio-rs/tokio/pull/3592
+
 # 1.2.0 (February 5, 2021)
 
 ### Added

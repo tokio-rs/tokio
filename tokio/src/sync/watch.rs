@@ -293,7 +293,7 @@ impl<T> Clone for Receiver<T> {
         // not memory access.
         shared.ref_count_rx.fetch_add(1, Relaxed);
 
-        Receiver { version, shared }
+        Receiver { shared, version }
     }
 }
 
