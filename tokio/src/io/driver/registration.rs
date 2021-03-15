@@ -241,7 +241,8 @@ cfg_io_readiness! {
             pin!(fut);
 
             crate::future::poll_fn(|cx| {
-                if self.handle.inner().is_none() || self.handle.is_shutdown() {
+                let inner = self.handle.inner();
+                if inner.is_none() || inner.filter(|i| i.is_shutdown()).is_some() {
                     return Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, "reactor gone")));
                 }
 

@@ -315,7 +315,7 @@ impl Handle {
 
     pub(crate) fn is_shutdown(&self) -> bool {
         if let Some(inner) = self.inner.upgrade() {
-            inner.is_shutdown.load(Ordering::SeqCst)
+            inner.is_shutdown()
         } else {
             // if the inner type has been dropped then its `Drop` impl will have been called which
             // sets `Inner.is_shutdown` to `true`. So therefore it must have been shutdown.
@@ -365,6 +365,10 @@ impl Inner {
     /// Deregisters an I/O resource from the reactor.
     pub(super) fn deregister_source(&self, source: &mut impl mio::event::Source) -> io::Result<()> {
         self.registry.deregister(source)
+    }
+
+    pub(super) fn is_shutdown(&self) -> bool {
+        self.is_shutdown.load(Ordering::SeqCst)
     }
 }
 
