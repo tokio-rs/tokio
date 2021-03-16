@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615898408285,
+  "lastUpdate": 1615898413280,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -20605,6 +20605,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20234327,
             "range": "± 2138844",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "david.pdrsn@gmail.com",
+            "name": "David Pedersen",
+            "username": "davidpdrsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f107c4f49b566bf9087e53d284fd919cddd91867",
+          "message": "timer: fix double newline in module docs (#3617)",
+          "timestamp": "2021-03-16T21:37:50+09:00",
+          "tree_id": "d896cb51a6e773b4ca8e8b277bd1d6d9c11ae76b",
+          "url": "https://github.com/tokio-rs/tokio/commit/f107c4f49b566bf9087e53d284fd919cddd91867"
+        },
+        "date": 1615898406266,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 189315,
+            "range": "± 39029",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 704417,
+            "range": "± 199301",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4786010,
+            "range": "± 1290396",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19019022,
+            "range": "± 3476267",
             "unit": "ns/iter"
           }
         ]
