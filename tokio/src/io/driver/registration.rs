@@ -71,13 +71,6 @@ impl Registration {
         interest: Interest,
         handle: Handle,
     ) -> io::Result<Registration> {
-        if handle.is_shutdown() {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR,
-            ));
-        }
-
         let shared = if let Some(inner) = handle.inner() {
             inner.add_source(io, interest)?
         } else {
@@ -241,8 +234,7 @@ cfg_io_readiness! {
             pin!(fut);
 
             crate::future::poll_fn(|cx| {
-                let inner = self.handle.inner();
-                if inner.is_none() || inner.filter(|i| i.is_shutdown()).is_some() {
+                if self.handle.inner().is_none() {
                     return Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, "reactor gone")));
                 }
 

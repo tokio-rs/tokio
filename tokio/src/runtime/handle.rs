@@ -217,20 +217,8 @@ impl Handle {
             .expect("failed to park thread")
     }
 
-    cfg_io_driver! {
-        pub(crate) fn shutdown(mut self) {
-            self.spawner.shutdown();
-
-            if let Some(io_handle) = self.io_handle {
-                io_handle.shutdown();
-            }
-        }
-    }
-
-    cfg_not_io_driver! {
-        pub(crate) fn shutdown(mut self) {
-            self.spawner.shutdown();
-        }
+    pub(crate) fn shutdown(mut self) {
+        self.spawner.shutdown();
     }
 }
 

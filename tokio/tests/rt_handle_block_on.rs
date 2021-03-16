@@ -1,6 +1,12 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
+// All io tests that deal with shutdown is currently ignored because there are known bugs in with
+// shutting down the io driver while concurrently registering new resources. See
+// https://github.com/tokio-rs/tokio/pull/3569#pullrequestreview-612703467 fo more details.
+//
+// When this has been fixed we want to re-enable these tests.
+
 use std::time::Duration;
 use tokio::runtime::{Handle, Runtime};
 use tokio::sync::mpsc;
@@ -208,6 +214,8 @@ rt_test! {
             .unwrap();
     }
 
+    // All io tests are ignored for now. See above why that is.
+    #[ignore]
     #[test]
     fn tcp_listener_connect_after_shutdown() {
         let rt = rt();
@@ -226,6 +234,8 @@ rt_test! {
         );
     }
 
+    // All io tests are ignored for now. See above why that is.
+    #[ignore]
     #[test]
     fn tcp_listener_connect_before_shutdown() {
         let rt = rt();
@@ -254,6 +264,8 @@ rt_test! {
             .unwrap();
     }
 
+    // All io tests are ignored for now. See above why that is.
+    #[ignore]
     #[test]
     fn udp_stream_bind_after_shutdown() {
         let rt = rt();
@@ -272,6 +284,8 @@ rt_test! {
         );
     }
 
+    // All io tests are ignored for now. See above why that is.
+    #[ignore]
     #[test]
     fn udp_stream_bind_before_shutdown() {
         let rt = rt();
@@ -290,6 +304,8 @@ rt_test! {
         );
     }
 
+    // All io tests are ignored for now. See above why that is.
+    #[ignore]
     #[cfg(unix)]
     #[test]
     fn unix_listener_bind_after_shutdown() {
@@ -310,9 +326,11 @@ rt_test! {
         );
     }
 
+    // All io tests are ignored for now. See above why that is.
+    #[ignore]
     #[cfg(unix)]
     #[test]
-    fn unix_listener_bind_accept_after_shutdown_1() {
+    fn unix_listener_shutdown_after_bind() {
         let rt = rt();
         let _enter = rt.enter();
 
@@ -330,9 +348,11 @@ rt_test! {
         assert_eq!(err.get_ref().unwrap().to_string(), "reactor gone");
     }
 
+    // All io tests are ignored for now. See above why that is.
+    #[ignore]
     #[cfg(unix)]
     #[test]
-    fn unix_listener_bind_accept_after_shutdown_2() {
+    fn unix_listener_shutdown_after_accept() {
         let rt = rt();
         let _enter = rt.enter();
 
