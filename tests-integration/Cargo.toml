@@ -12,9 +12,15 @@ name = "test-cat"
 name = "test-mem"
 required-features = ["rt-net"]
 
+[[bin]]
+name = "test-process-signal"
+required-features = ["rt-process-signal"]
+
 [features]
 # For mem check
 rt-net = ["tokio/rt", "tokio/rt-multi-thread", "tokio/net"]
+# For test-process-signal
+rt-process-signal = ["rt", "tokio/process", "tokio/signal"]
 
 full = [
     "macros",
