@@ -1,4 +1,5 @@
 use crate::future::poll_fn;
+use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::Mutex;
 use crate::park::{Park, Unpark};
 use crate::runtime::task::{self, JoinHandle, Schedule, Task};
@@ -10,6 +11,7 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::sync::Arc;
 use std::task::Poll::{Pending, Ready};
 use std::time::Duration;
@@ -70,6 +72,9 @@ struct Shared {
 
     /// Unpark the blocked thread
     unpark: Box<dyn Unpark>,
+
+    // indicates whether the blocked on thread was woken
+    woken: AtomicBool,
 }
 
 /// Thread-local context.
@@ -85,6 +90,9 @@ struct Context {
 const INITIAL_CAPACITY: usize = 64;
 
 /// Max number of tasks to poll per tick.
+#[cfg(loom)]
+const MAX_TASKS_PER_TICK: usize = 4;
+#[cfg(not(loom))]
 const MAX_TASKS_PER_TICK: usize = 61;
 
 /// How often to check the remote queue first.
@@ -101,6 +109,7 @@ impl<P: Park> BasicScheduler<P> {
             shared: Arc::new(Shared {
                 queue: Mutex::new(VecDeque::with_capacity(INITIAL_CAPACITY)),
                 unpark: unpark as Box<dyn Unpark>,
+                woken: AtomicBool::new(false),
             }),
         };
 
@@ -177,12 +186,16 @@ impl<P: Park> Inner<P> {
             let _enter = crate::runtime::enter(false);
             let waker = scheduler.spawner.waker_ref();
             let mut cx = std::task::Context::from_waker(&waker);
+            let mut polled = false;
 
             pin!(future);
 
             'outer: loop {
-                if let Ready(v) = crate::coop::budget(|| future.as_mut().poll(&mut cx)) {
-                    return v;
+                if scheduler.spawner.was_woken() || !polled {
+                    polled = true;
+                    if let Ready(v) = crate::coop::budget(|| future.as_mut().poll(&mut cx)) {
+                        return v;
+                    }
                 }
 
                 for _ in 0..MAX_TASKS_PER_TICK {
@@ -329,7 +342,13 @@ impl Spawner {
     }
 
     fn waker_ref(&self) -> WakerRef<'_> {
+        // clear the woken bit
+        self.shared.woken.swap(false, AcqRel);
         waker_ref(&self.shared)
+    }
+
+    fn was_woken(&self) -> bool {
+        self.shared.woken.load(Acquire)
     }
 }
 
@@ -384,6 +403,7 @@ impl Wake for Shared {
 
     /// Wake by reference
     fn wake_by_ref(arc_self: &Arc<Self>) {
+        arc_self.woken.store(true, Release);
         arc_self.unpark.unpark();
     }
 }
