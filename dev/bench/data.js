@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615898431976,
+  "lastUpdate": 1615898482785,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -20653,6 +20653,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19019022,
             "range": "± 3476267",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "david.pdrsn@gmail.com",
+            "name": "David Pedersen",
+            "username": "davidpdrsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cc90a5c679126510d958e2f0bcde2c0dda2fc228",
+          "message": "chore: mention fix for building docs in contributing guide (#3618)\n\nI ran into this when writing the docs for `Handle::block_on`. Seems to\r\nbe caused by a bug in cargo. Until that is fixed I think it makes sense\r\nto mention it in the contributing guide.",
+          "timestamp": "2021-03-16T21:39:28+09:00",
+          "tree_id": "6dd09c5f1bb63a86233dd98e9103a5a1c5c5d43c",
+          "url": "https://github.com/tokio-rs/tokio/commit/cc90a5c679126510d958e2f0bcde2c0dda2fc228"
+        },
+        "date": 1615898480510,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 185666,
+            "range": "± 34243",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 678179,
+            "range": "± 181181",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4713046,
+            "range": "± 1225880",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18582219,
+            "range": "± 2603004",
             "unit": "ns/iter"
           }
         ]
