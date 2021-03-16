@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615913818540,
+  "lastUpdate": 1615913823318,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -20755,6 +20755,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18582219,
             "range": "± 2603004",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "zaharidichev@gmail.com",
+            "name": "Zahari Dichev",
+            "username": "zaharidichev"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e6103d66614567e069ca0d0d5e93706434511163",
+          "message": "docs: add link to PollSender (#3613)\n\nThere was no link to [`PollSender`] in [`mpsc::Sender`] docs which made it\r\nless discoverable.\r\n\r\n[`PollSender`]: https://docs.rs/tokio-util/0.6.4/tokio_util/sync/struct.PollSender.html\r\n[`mpsc::Sender::send`]: https://docs.rs/tokio/1.3.0/tokio/sync/mpsc/struct.Sender.html",
+          "timestamp": "2021-03-16T17:55:06+01:00",
+          "tree_id": "1034745ee6ece60802659acb47ac6bf6eabe42a0",
+          "url": "https://github.com/tokio-rs/tokio/commit/e6103d66614567e069ca0d0d5e93706434511163"
+        },
+        "date": 1615913821030,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 164486,
+            "range": "± 26153",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 614086,
+            "range": "± 108195",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4592168,
+            "range": "± 715514",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18253433,
+            "range": "± 2738163",
             "unit": "ns/iter"
           }
         ]
