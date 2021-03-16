@@ -203,7 +203,105 @@ impl Handle {
         handle
     }
 
-    /// TODO: write docs if this is a good direction
+    /// Run a future to completion on this `Handle`'s associated `Runtime`.
+    ///
+    /// This runs the given future on the runtime, blocking until it is
+    /// complete, and yielding its resolved result. Any tasks or timers which
+    /// the future spawns internally will be executed on the runtime.
+    ///
+    /// The behavior for multi threaded vs current thread schedulers is the same
+    /// as [`Runtime::block_on`]. See the docs of [`Runtime::block_on`] for more
+    /// details.
+    ///
+    /// # If the runtime has been shutdown
+    ///
+    /// If the `Handle`'s associated `Runtime` has been shutdown, through
+    /// [`Runtime::shutdown_background`] or [`Runtime::shutdown_timeout`], and
+    /// `Handle::block_on` is used it might return an error or panic. The exact
+    /// behavior depends on the types of futures used.
+    ///
+    /// ## Runtime independent futures
+    ///
+    /// Runtime independent futures will run as normal. They are not affected by
+    /// shutdown. This includes, but is not limited to, channels, signals, and
+    /// basic futures that don't actually `await` anything.
+    ///
+    /// ## [`spawn_blocking`] futures
+    ///
+    /// Futures created with [`spawn_blocking`] will run if they were started
+    /// before the runtime was shutdown. If they were created after the runtime
+    /// was shutdown they will get cancelled and the [`JoinHandle`] will return
+    /// a [`JoinError`].
+    ///
+    /// ## File system futures
+    ///
+    /// File system futures created by something in [`tokio::fs`] behave
+    /// similarly to [`spawn_blocking`] futures. They will run if started before
+    /// shutdown but fail with an error if started after shutdown.
+    ///
+    /// ## I/O future
+    ///
+    /// I/O futures created by something in [`tokio::net`] will return an error
+    /// regardless if the runtime was shutdown before or after the future was
+    /// created.
+    ///
+    /// ## Timer futures
+    ///
+    /// Timer futures created by something in [`tokio::time`] will panic if the
+    /// runtime has been shutdown. This is because the function signatures don't
+    /// allow returning errors.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the provided future panics, if called within an
+    /// asynchronous execution context, or if a timer future is executed on a
+    /// runtime that has been shutdown.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::runtime::Runtime;
+    ///
+    /// // Create the runtime
+    /// let rt  = Runtime::new().unwrap();
+    ///
+    /// // Get a handle from this runtime
+    /// let handle = rt.handle();
+    ///
+    /// // Execute the future, blocking the current thread until completion
+    /// handle.block_on(async {
+    ///     println!("hello");
+    /// });
+    /// ```
+    ///
+    /// Or using `Handle::current`:
+    ///
+    /// ```no_run
+    /// use tokio::runtime::Runtime;
+    ///
+    /// // Create the runtime
+    /// let rt  = Runtime::new().unwrap();
+    ///
+    /// // Enter the runtime context. This is necessary for `Handle::curent` to
+    /// // work
+    /// let _enter = rt.enter();
+    ///
+    /// // Get a handle to the current runtime and execute the future, blocking
+    /// // the current thread until completion
+    /// Handle::current().block_on(async {
+    ///     println!("hello");
+    /// });
+    /// ```
+    ///
+    /// [`JoinError`]: struct@crate::task::JoinError
+    /// [`JoinHandle`]: struct@crate::task::JoinHandle
+    /// [`Runtime::block_on`]: fn@crate::runtime::Runtime::block_on
+    /// [`Runtime::shutdown_background`]: fn@crate::runtime::Runtime::shutdown_background
+    /// [`Runtime::shutdown_timeout`]: fn@crate::runtime::Runtime::shutdown_timeout
+    /// [`spawn_blocking`]: crate::task::spawn_blocking
+    /// [`tokio::fs`]: crate::fs
+    /// [`tokio::net`]: crate::net
+    /// [`tokio::time`]: crate::time
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
         // Enter the **runtime** context. This configures spawning, the current I/O driver, ...
         let _rt_enter = self.enter();
