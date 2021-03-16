@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615898413280,
+  "lastUpdate": 1615898431976,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -48419,6 +48419,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 796058,
             "range": "± 240212",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "david.pdrsn@gmail.com",
+            "name": "David Pedersen",
+            "username": "davidpdrsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f107c4f49b566bf9087e53d284fd919cddd91867",
+          "message": "timer: fix double newline in module docs (#3617)",
+          "timestamp": "2021-03-16T21:37:50+09:00",
+          "tree_id": "d896cb51a6e773b4ca8e8b277bd1d6d9c11ae76b",
+          "url": "https://github.com/tokio-rs/tokio/commit/f107c4f49b566bf9087e53d284fd919cddd91867"
+        },
+        "date": 1615898428548,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6575517,
+            "range": "± 3270022",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6043719,
+            "range": "± 1966410",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 5919819,
+            "range": "± 3331591",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 704,
+            "range": "± 156",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 703,
+            "range": "± 107",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 687,
+            "range": "± 98",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 129696,
+            "range": "± 26178",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1652,
+            "range": "± 331",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 963438,
+            "range": "± 271784",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 716623,
+            "range": "± 187908",
             "unit": "ns/iter"
           }
         ]
