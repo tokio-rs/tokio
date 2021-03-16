@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "sync"), allow(dead_code, unreachable_pub))]
+
 //! A single-producer, multi-consumer channel that only retains the *last* sent
 //! value.
 //!
@@ -51,7 +53,7 @@
 //! [`Sender::is_closed`]: crate::sync::watch::Sender::is_closed
 //! [`Sender::closed`]: crate::sync::watch::Sender::closed
 
-use crate::sync::Notify;
+use crate::sync::notify::Notify;
 
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::atomic::Ordering::{Relaxed, SeqCst};
@@ -198,6 +200,14 @@ pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
 }
 
 impl<T> Receiver<T> {
+    fn from_shared(version: usize, shared: Arc<Shared<T>>) -> Self {
+        // No synchronization necessary as this is only used as a counter and
+        // not memory access.
+        shared.ref_count_rx.fetch_add(1, Relaxed);
+
+        Self { version, shared }
+    }
+
     /// Returns a reference to the most recently sent value
     ///
     /// Outstanding borrows hold a read lock. This means that long lived borrows
@@ -260,6 +270,12 @@ impl<T> Receiver<T> {
             // loop around again in case the wake-up was spurious
         }
     }
+
+    cfg_process_driver! {
+        pub(crate) fn try_has_changed(&mut self) -> Option<Result<(), error::RecvError>> {
+            maybe_changed(&self.shared, &mut self.version)
+        }
+    }
 }
 
 fn maybe_changed<T>(
@@ -289,11 +305,7 @@ impl<T> Clone for Receiver<T> {
         let version = self.version;
         let shared = self.shared.clone();
 
-        // No synchronization necessary as this is only used as a counter and
-        // not memory access.
-        shared.ref_count_rx.fetch_add(1, Relaxed);
-
-        Receiver { shared, version }
+        Self::from_shared(version, shared)
     }
 }
 
@@ -395,6 +407,15 @@ impl<T> Sender<T> {
 
         notified.await;
         debug_assert_eq!(0, self.shared.ref_count_rx.load(Relaxed));
+    }
+
+    cfg_signal_internal! {
+        pub(crate) fn subscribe(&self) -> Receiver<T> {
+            let shared = self.shared.clone();
+            let version = shared.version.load(SeqCst);
+
+            Receiver::from_shared(version, shared)
+        }
     }
 }
 

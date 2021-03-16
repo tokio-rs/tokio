@@ -462,10 +462,8 @@ cfg_sync! {
 }
 
 cfg_not_sync! {
-    #[cfg(any(feature = "fs", feature = "signal", all(unix, feature = "process")))]
-    pub(crate) mod batch_semaphore;
-
     cfg_fs! {
+        pub(crate) mod batch_semaphore;
         mod mutex;
         pub(crate) use mutex::Mutex;
     }
@@ -473,20 +471,16 @@ cfg_not_sync! {
     #[cfg(any(feature = "rt", feature = "signal", all(unix, feature = "process")))]
     pub(crate) mod notify;
 
+    #[cfg(any(feature = "rt", all(windows, feature = "process")))]
+    pub(crate) mod oneshot;
+
     cfg_atomic_waker_impl! {
         mod task;
         pub(crate) use task::AtomicWaker;
     }
 
-    #[cfg(any(
-            feature = "rt",
-            feature = "process",
-            feature = "signal"))]
-    pub(crate) mod oneshot;
-
-    cfg_signal_internal! {
-        pub(crate) mod mpsc;
-    }
+    #[cfg(any(feature = "signal", all(unix, feature = "process")))]
+    pub(crate) mod watch;
 }
 
 /// Unit tests
