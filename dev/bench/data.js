@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615887176968,
+  "lastUpdate": 1615898376187,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -10853,6 +10853,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 565,
             "range": "± 70",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "david.pdrsn@gmail.com",
+            "name": "David Pedersen",
+            "username": "davidpdrsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f107c4f49b566bf9087e53d284fd919cddd91867",
+          "message": "timer: fix double newline in module docs (#3617)",
+          "timestamp": "2021-03-16T21:37:50+09:00",
+          "tree_id": "d896cb51a6e773b4ca8e8b277bd1d6d9c11ae76b",
+          "url": "https://github.com/tokio-rs/tokio/commit/f107c4f49b566bf9087e53d284fd919cddd91867"
+        },
+        "date": 1615898373966,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1016,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 16622,
+            "range": "± 4871",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1055,
+            "range": "± 11",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 17225,
+            "range": "± 9138",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 589,
+            "range": "± 147",
             "unit": "ns/iter"
           }
         ]
