@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615913823318,
+  "lastUpdate": 1615913845432,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -10961,6 +10961,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 511,
             "range": "± 77",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "zaharidichev@gmail.com",
+            "name": "Zahari Dichev",
+            "username": "zaharidichev"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e6103d66614567e069ca0d0d5e93706434511163",
+          "message": "docs: add link to PollSender (#3613)\n\nThere was no link to [`PollSender`] in [`mpsc::Sender`] docs which made it\r\nless discoverable.\r\n\r\n[`PollSender`]: https://docs.rs/tokio-util/0.6.4/tokio_util/sync/struct.PollSender.html\r\n[`mpsc::Sender::send`]: https://docs.rs/tokio/1.3.0/tokio/sync/mpsc/struct.Sender.html",
+          "timestamp": "2021-03-16T17:55:06+01:00",
+          "tree_id": "1034745ee6ece60802659acb47ac6bf6eabe42a0",
+          "url": "https://github.com/tokio-rs/tokio/commit/e6103d66614567e069ca0d0d5e93706434511163"
+        },
+        "date": 1615913843380,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 847,
+            "range": "± 148",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 15454,
+            "range": "± 6062",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 812,
+            "range": "± 293",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 14600,
+            "range": "± 4439",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 477,
+            "range": "± 100",
             "unit": "ns/iter"
           }
         ]
