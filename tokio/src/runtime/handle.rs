@@ -271,10 +271,10 @@ impl Handle {
         let _rt_enter = self.enter();
 
         // Enter a **blocking** context. This prevents blocking from a runtime.
-        let mut _blocking_enter = crate::runtime::enter(true);
+        let mut blocking_enter = crate::runtime::enter(true);
 
         // Block on the future
-        _blocking_enter
+        blocking_enter
             .block_on(future)
             .expect("failed to park thread")
     }
