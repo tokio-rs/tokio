@@ -247,6 +247,8 @@ impl Handle {
     /// Or using `Handle::current`:
     ///
     /// ```no_run
+    /// use tokio::runtime::Handle;
+    ///
     /// #[tokio::main]
     /// async fn main () {
     ///     // Get a handle to the current runtime and execute the future, blocking
