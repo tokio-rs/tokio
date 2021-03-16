@@ -218,38 +218,8 @@ impl Handle {
     /// If the `Handle`'s associated `Runtime` has been shut down (through
     /// [`Runtime::shutdown_background`], [`Runtime::shutdown_timeout`], or by
     /// dropping it) and `Handle::block_on` is used it might return an error or
-    /// panic. The exact behavior depends on the types of futures used.
-    ///
-    /// ## Runtime independent futures
-    ///
-    /// Runtime independent futures will run as normal. They are not affected by
-    /// shutdown. This includes, but is not limited to, channels, signals, and
-    /// basic futures that don't actually `await` anything.
-    ///
-    /// ## [`spawn_blocking`] futures
-    ///
-    /// Futures created with [`spawn_blocking`] will run if they were started
-    /// before the runtime was shut down. If they were created after the runtime
-    /// was shut down they will get cancelled and the [`JoinHandle`] will return
-    /// a [`JoinError`].
-    ///
-    /// ## File system futures
-    ///
-    /// File system futures created by something in [`tokio::fs`] behave
-    /// similarly to [`spawn_blocking`] futures. They will run if started before
-    /// shutdown but fail with an error if started after shutdown.
-    ///
-    /// ## I/O future
-    ///
-    /// I/O futures created by something in [`tokio::net`] will return an error
-    /// regardless if the runtime was shut down before or after the future was
-    /// created.
-    ///
-    /// ## Timer futures
-    ///
-    /// Timer futures created by something in [`tokio::time`] will panic if the
-    /// runtime has been shut down. This is because the function signatures don't
-    /// allow returning errors.
+    /// panic. Specifically IO resources will return an error and timers will
+    /// panic. Runtime independent futures will run as normal.
     ///
     /// # Panics
     ///
