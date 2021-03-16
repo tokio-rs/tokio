@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615898491275,
+  "lastUpdate": 1615898514259,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -48605,6 +48605,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 716623,
             "range": "± 187908",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "david.pdrsn@gmail.com",
+            "name": "David Pedersen",
+            "username": "davidpdrsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cc90a5c679126510d958e2f0bcde2c0dda2fc228",
+          "message": "chore: mention fix for building docs in contributing guide (#3618)\n\nI ran into this when writing the docs for `Handle::block_on`. Seems to\r\nbe caused by a bug in cargo. Until that is fixed I think it makes sense\r\nto mention it in the contributing guide.",
+          "timestamp": "2021-03-16T21:39:28+09:00",
+          "tree_id": "6dd09c5f1bb63a86233dd98e9103a5a1c5c5d43c",
+          "url": "https://github.com/tokio-rs/tokio/commit/cc90a5c679126510d958e2f0bcde2c0dda2fc228"
+        },
+        "date": 1615898512224,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6053547,
+            "range": "± 2180685",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 5660493,
+            "range": "± 2041316",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 5636422,
+            "range": "± 3318705",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 701,
+            "range": "± 146",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 691,
+            "range": "± 110",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 736,
+            "range": "± 169",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 129117,
+            "range": "± 26009",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1657,
+            "range": "± 335",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 962330,
+            "range": "± 174320",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 673908,
+            "range": "± 123982",
             "unit": "ns/iter"
           }
         ]
