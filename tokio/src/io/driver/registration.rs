@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "net"), allow(dead_code))]
+
 use crate::io::driver::{Direction, Handle, Interest, ReadyEvent, ScheduledIo};
 use crate::util::slab;
 
