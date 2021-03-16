@@ -215,10 +215,10 @@ impl Handle {
     ///
     /// # If the runtime has been shut down
     ///
-    /// If the `Handle`'s associated `Runtime` has been shut down, through
-    /// [`Runtime::shutdown_background`] or [`Runtime::shutdown_timeout`], and
-    /// `Handle::block_on` is used it might return an error or panic. The exact
-    /// behavior depends on the types of futures used.
+    /// If the `Handle`'s associated `Runtime` has been shut down (through
+    /// [`Runtime::shutdown_background`], [`Runtime::shutdown_timeout`], or by
+    /// dropping it) and `Handle::block_on` is used it might return an error or
+    /// panic. The exact behavior depends on the types of futures used.
     ///
     /// ## Runtime independent futures
     ///
