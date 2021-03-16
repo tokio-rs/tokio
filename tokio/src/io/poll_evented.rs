@@ -121,7 +121,7 @@ impl<E: Source> PollEvented<E> {
     }
 
     /// Returns a reference to the registration
-    #[cfg(any(feature = "net", all(unix, feature = "process"), feature = "signal",))]
+    #[cfg(any(feature = "net", all(unix, feature = "process"), all(unix, feature = "signal",)))]
     pub(crate) fn registration(&self) -> &Registration {
         &self.registration
     }
