@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1615898376187,
+  "lastUpdate": 1615898408285,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -31515,6 +31515,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1148,
             "range": "± 120",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "david.pdrsn@gmail.com",
+            "name": "David Pedersen",
+            "username": "davidpdrsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f107c4f49b566bf9087e53d284fd919cddd91867",
+          "message": "timer: fix double newline in module docs (#3617)",
+          "timestamp": "2021-03-16T21:37:50+09:00",
+          "tree_id": "d896cb51a6e773b4ca8e8b277bd1d6d9c11ae76b",
+          "url": "https://github.com/tokio-rs/tokio/commit/f107c4f49b566bf9087e53d284fd919cddd91867"
+        },
+        "date": 1615898404267,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 19726,
+            "range": "± 11039",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1180,
+            "range": "± 674",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 692,
+            "range": "± 342",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 19312,
+            "range": "± 8798",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1158,
+            "range": "± 917",
             "unit": "ns/iter"
           }
         ]
