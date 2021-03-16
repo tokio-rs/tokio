@@ -124,17 +124,27 @@ arguments to many common cargo commands. This section lists some commonly needed
 commands.
 
 Some commands just need the `--all-features` argument:
+
 ```
 cargo build --all-features
 cargo check --all-features
 cargo test --all-features
 ```
+
 When building documentation normally, the markers that list the features
 required for various parts of Tokio are missing. To build the documentation
 correctly, use this command:
+
 ```
 RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
 ```
+
+There is currently a [bug in cargo] that means documentation cannot be built
+from the root of the workspace. If you `cd` into the `tokio` subdirectory the
+command shown above will work.
+
+[bug in cargo]: https://github.com/rust-lang/cargo/issues/9274
+
 The `cargo fmt` command does not work on the Tokio codebase. You can use the
 command below instead:
 
