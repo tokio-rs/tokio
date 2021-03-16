@@ -213,9 +213,9 @@ impl Handle {
     /// as [`Runtime::block_on`]. See the docs of [`Runtime::block_on`] for more
     /// details.
     ///
-    /// # If the runtime has been shutdown
+    /// # If the runtime has been shut down
     ///
-    /// If the `Handle`'s associated `Runtime` has been shutdown, through
+    /// If the `Handle`'s associated `Runtime` has been shut down, through
     /// [`Runtime::shutdown_background`] or [`Runtime::shutdown_timeout`], and
     /// `Handle::block_on` is used it might return an error or panic. The exact
     /// behavior depends on the types of futures used.
@@ -229,8 +229,8 @@ impl Handle {
     /// ## [`spawn_blocking`] futures
     ///
     /// Futures created with [`spawn_blocking`] will run if they were started
-    /// before the runtime was shutdown. If they were created after the runtime
-    /// was shutdown they will get cancelled and the [`JoinHandle`] will return
+    /// before the runtime was shut down. If they were created after the runtime
+    /// was shut down they will get cancelled and the [`JoinHandle`] will return
     /// a [`JoinError`].
     ///
     /// ## File system futures
@@ -242,20 +242,20 @@ impl Handle {
     /// ## I/O future
     ///
     /// I/O futures created by something in [`tokio::net`] will return an error
-    /// regardless if the runtime was shutdown before or after the future was
+    /// regardless if the runtime was shut down before or after the future was
     /// created.
     ///
     /// ## Timer futures
     ///
     /// Timer futures created by something in [`tokio::time`] will panic if the
-    /// runtime has been shutdown. This is because the function signatures don't
+    /// runtime has been shut down. This is because the function signatures don't
     /// allow returning errors.
     ///
     /// # Panics
     ///
     /// This function panics if the provided future panics, if called within an
     /// asynchronous execution context, or if a timer future is executed on a
-    /// runtime that has been shutdown.
+    /// runtime that has been shut down.
     ///
     /// # Examples
     ///
