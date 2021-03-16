@@ -277,20 +277,14 @@ impl Handle {
     /// Or using `Handle::current`:
     ///
     /// ```no_run
-    /// use tokio::runtime::Runtime;
-    ///
-    /// // Create the runtime
-    /// let rt  = Runtime::new().unwrap();
-    ///
-    /// // Enter the runtime context. This is necessary for `Handle::curent` to
-    /// // work
-    /// let _enter = rt.enter();
-    ///
-    /// // Get a handle to the current runtime and execute the future, blocking
-    /// // the current thread until completion
-    /// Handle::current().block_on(async {
-    ///     println!("hello");
-    /// });
+    /// #[tokio::main]
+    /// async fn main () {
+    ///     // Get a handle to the current runtime and execute the future, blocking
+    ///     // the current thread until completion
+    ///     Handle::current().block_on(async {
+    ///         println!("hello");
+    ///     });
+    /// }
     /// ```
     ///
     /// [`JoinError`]: struct@crate::task::JoinError
