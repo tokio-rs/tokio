@@ -480,7 +480,6 @@ cfg_not_sync! {
     }
 
     #[cfg(any(feature = "signal", all(unix, feature = "process")))]
-    #[allow(dead_code, unreachable_pub)]
     pub(crate) mod watch;
 }
 

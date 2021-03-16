@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "sync"), allow(dead_code, unreachable_pub))]
+
 //! A single-producer, multi-consumer channel that only retains the *last* sent
 //! value.
 //!
