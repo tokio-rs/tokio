@@ -28,13 +28,13 @@ async fn sleep_and_set() -> u32 {
     5
 }
 
-async fn advance_time_and_set(cell: &'static OnceCell<u32>, v: u32) -> Result<(), SetError> {
+async fn advance_time_and_set(cell: &'static OnceCell<u32>, v: u32) -> Result<(), SetError<u32>> {
     time::advance(Duration::from_millis(1)).await;
     cell.set(v)
 }
 
 #[test]
-fn get_or_init_with() {
+fn get_or_init() {
     let rt = runtime::Builder::new_current_thread()
         .enable_time()
         .build()
@@ -45,8 +45,8 @@ fn get_or_init_with() {
     rt.block_on(async {
         time::pause();
 
-        let handle1 = rt.spawn(async { ONCE.get_or_init_with(func1).await });
-        let handle2 = rt.spawn(async { ONCE.get_or_init_with(func2).await });
+        let handle1 = rt.spawn(async { ONCE.get_or_init(func1).await });
+        let handle2 = rt.spawn(async { ONCE.get_or_init(func2).await });
 
         time::advance(Duration::from_millis(1)).await;
         time::resume();
@@ -71,8 +71,8 @@ fn get_or_init_panic() {
     rt.block_on(async {
         time::pause();
 
-        let handle1 = rt.spawn(async { ONCE.get_or_init_with(func1).await });
-        let handle2 = rt.spawn(async { ONCE.get_or_init_with(func_panic).await });
+        let handle1 = rt.spawn(async { ONCE.get_or_init(func1).await });
+        let handle2 = rt.spawn(async { ONCE.get_or_init(func_panic).await });
 
         time::advance(Duration::from_millis(1)).await;
 
@@ -104,7 +104,7 @@ fn set_and_get() {
 fn get_uninit() {
     static ONCE: OnceCell<u32> = OnceCell::const_new();
     let uninit = ONCE.get();
-    assert!(uninit.is_err());
+    assert!(uninit.is_none());
 }
 
 #[test]
@@ -129,7 +129,7 @@ fn set_while_initializing() {
     rt.block_on(async {
         time::pause();
 
-        let handle1 = rt.spawn(async { ONCE.get_or_init_with(sleep_and_set).await });
+        let handle1 = rt.spawn(async { ONCE.get_or_init(sleep_and_set).await });
         let handle2 = rt.spawn(async { advance_time_and_set(&ONCE, 10).await });
 
         time::advance(Duration::from_millis(2)).await;

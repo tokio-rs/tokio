@@ -11,9 +11,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 ///
 /// Provides the functionality to either set the value, in case `OnceCell`
 /// is uninitialized, or get the already initialized value by using an async
-/// function via [`OnceCell::get_or_init_with`].
+/// function via [`OnceCell::get_or_init`].
 ///
-/// [`OnceCell::get_or_init_with`]: crate::sync::OnceCell::get_or_init_with
+/// [`OnceCell::get_or_init`]: crate::sync::OnceCell::get_or_init
 ///
 /// # Examples
 /// ```
@@ -28,7 +28,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 /// #[tokio::main]
 /// async fn main() {
 ///     let result1 = tokio::spawn(async {
-///         ONCE.get_or_init_with(some_computation).await
+///         ONCE.get_or_init(some_computation).await
 ///     }).await.unwrap();
 ///     assert_eq!(*result1, 2);
 /// }
@@ -56,7 +56,7 @@ impl<T: fmt::Debug> fmt::Debug for OnceCell<T> {
 impl<T: Clone> Clone for OnceCell<T> {
     fn clone(&self) -> OnceCell<T> {
         let new_cell = OnceCell::new();
-        if let Ok(value) = self.get() {
+        if let Some(value) = self.get() {
             match new_cell.set(value.clone()) {
                 Ok(()) => (),
                 Err(_) => unreachable!(),
@@ -105,8 +105,8 @@ impl<T> OnceCell<T> {
         &*self.value.with(|ptr| (*ptr).as_ptr())
     }
 
-    // SAFETY: safe to call only once self.initialized() is true and since
-    // only one mutable reference can call this method
+    // SAFETY: safe to call only once self.initialized() is true. Safe because
+    // because of the mutable reference.
     unsafe fn get_unchecked_mut(&mut self) -> &mut T {
         &mut *self.value.with_mut(|ptr| (*ptr).as_mut_ptr())
     }
@@ -121,27 +121,23 @@ impl<T> OnceCell<T> {
 
     /// Tries to get a reference to the value of the OnceCell.
     ///
-    /// Returns [`NotInitializedError`] if the value of the OnceCell
-    /// hasn't previously been initialized.
-    ///
-    /// [`NotInitializedError`]: crate::sync::NotInitializedError
-    pub fn get(&self) -> Result<&T, NotInitializedError> {
+    /// Returns None if the value of the OnceCell hasn't previously been initialized.
+    pub fn get(&self) -> Option<&T> {
         if self.initialized() {
-            Ok(unsafe { self.get_unchecked() })
+            Some(unsafe { self.get_unchecked() })
         } else {
-            Err(NotInitializedError(()))
+            None
         }
     }
 
-    /// If the cell is initialized, this method returns a mutable reference to its value,
-    /// otherwise returns [`NotInitializedError`].
+    /// Tries to return a mutable reference to the value of the cell.
     ///
-    /// [`NotInitializedError`]: crate::sync::NotInitializederror
-    pub fn get_mut(&mut self) -> Result<&mut T, NotInitializedError> {
+    /// Returns None if the cell hasn't previously been initialized.
+    pub fn get_mut(&mut self) -> Option<&mut T> {
         if self.initialized() {
-            Ok(unsafe { self.get_unchecked_mut() })
+            Some(unsafe { self.get_unchecked_mut() })
         } else {
-            Err(NotInitializedError(()))
+            None
         }
     }
 
@@ -152,12 +148,12 @@ impl<T> OnceCell<T> {
     /// is initializing the cell while this method is called,
     /// ['InitializingError`] is returned. In order to wait
     /// for an ongoing initialization to finish, call
-    /// [`OnceCell::get_or_init_with`] instead.
+    /// [`OnceCell::get_or_init`] instead.
     ///
     /// [`AlreadyInitializedError`]: crate::sync::AlreadyInitializedError
     /// [`InitializingError`]: crate::sync::InitializingError
-    /// ['OnceCell::get_or_init_with`]: crate::sync::OnceCell::get_or_init_with
-    pub fn set(&self, value: T) -> Result<(), SetError> {
+    /// ['OnceCell::get_or_init`]: crate::sync::OnceCell::get_or_init
+    pub fn set(&self, value: T) -> Result<(), SetError<T>> {
         if !self.initialized() {
             // Another thread might be initializing the cell, in which case `try_acquire` will
             // return an error
@@ -178,28 +174,13 @@ impl<T> OnceCell<T> {
                 _ => {
                     // Couldn't acquire the permit, look if initializing process is already completed
                     if !self.initialized() {
-                        return Err(SetError::InitializingError(()));
+                        return Err(SetError::InitializingError(value));
                     }
                 }
             }
         }
 
-        Err(SetError::AlreadyInitializedError(()))
-    }
-
-    /// Tries to set the value of the cell, overwriting the previously set value, in case one is
-    /// available. If no value was previously set, this method has the same functionality has
-    /// [`OnceCell::set`].
-    ///
-    /// [`OnceCell::set`]: crate::sync::OnceCell::set
-    pub fn set_mut(&mut self, value: T) -> Result<(), SetError> {
-        if self.initialized() {
-            // SAFETY: Setting this value is safe because the mutable reference guarantees exclusivity
-            unsafe { self.set_value(value) };
-            Ok(())
-        } else {
-            self.set(value)
-        }
+        Err(SetError::AlreadyInitializedError(value))
     }
 
     /// Tries to initialize the value of the OnceCell using the async function `f`.
@@ -209,7 +190,7 @@ impl<T> OnceCell<T> {
     /// hasn't completed, this call waits until the initialization is finished.
     ///
     /// This will deadlock if `f` tries to initialize the cell itself.
-    pub async fn get_or_init_with<F, Fut>(&self, f: F) -> &T
+    pub async fn get_or_init<F, Fut>(&self, f: F) -> &T
     where
         F: FnOnce() -> Fut,
         Fut: Future<Output = T>,
@@ -226,7 +207,7 @@ impl<T> OnceCell<T> {
             match self.semaphore.acquire().await {
                 Ok(_permit) => {
                     if !self.initialized() {
-                        // If `f()` panics or `select!` is called, this `get_or_init_with` call
+                        // If `f()` panics or `select!` is called, this `get_or_init` call
                         // is aborted and the semaphore permit is dropped.
                         let value = f().await;
 
@@ -271,7 +252,7 @@ impl<T> OnceCell<T> {
             // Note: ptr::read does not move the value out of `self.value`. We need to use
             // `self.initialized` to prevent incorrect accesses to value
             let value = unsafe { self.value.with(|ptr| ptr::read(ptr).assume_init()) };
-            self.value_set.store(false, Ordering::Release);
+            *self.value_set.get_mut() = false;
             Ok(value)
         } else {
             Err(NotInitializedError(()))
@@ -298,23 +279,23 @@ unsafe impl<T: Send> Send for OnceCell<T> {}
 /// [`OnceCell::set`]: crate::sync::OnceCell::set
 /// [`OnceCell::set_mut`]: crate::sync::OnceCell::set_mut
 #[derive(Debug, PartialEq)]
-pub enum SetError {
+pub enum SetError<T> {
     /// Error resulting from [`OnceCell::set`] or [`OnceCell::set_mut`] calls if
     /// the cell was previously initialized.
     ///
     /// [`OnceCell::set`]: crate::sync::OnceCell::set
     /// [`OnceCell::set_mut`]: crate::sync::OnceCell::set_mut
-    AlreadyInitializedError(()),
+    AlreadyInitializedError(T),
 
     /// Error resulting from [`OnceCell::set`] or [`OnceCell::set_mut`] calls when
     /// the cell is currently being inintialized during the calls to those methods.
     ///
     /// [`OnceCell::set`]: crate::sync::OnceCell::set
     /// [`OnceCell::set_mut`]: crate::sync::OnceCell::set_mut
-    InitializingError(()),
+    InitializingError(T),
 }
 
-impl fmt::Display for SetError {
+impl<T> fmt::Display for SetError<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             SetError::AlreadyInitializedError(_) => write!(f, "AlreadyInitializedError"),
@@ -323,9 +304,9 @@ impl fmt::Display for SetError {
     }
 }
 
-impl Error for SetError {}
+impl<T: fmt::Debug> Error for SetError<T> {}
 
-impl SetError {
+impl<T> SetError<T> {
     /// Whether `SetError` is `SetError::AlreadyInitializEderror`
     pub fn is_already_init_err(&self) -> bool {
         match self {
