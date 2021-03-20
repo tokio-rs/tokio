@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1616248459424,
+  "lastUpdate": 1616248461803,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -21523,6 +21523,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19535618,
             "range": "± 3147306",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "david.pdrsn@gmail.com",
+            "name": "David Pedersen",
+            "username": "davidpdrsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0bfcbc8be5368bf2a203c2c2856e5d3e7f5154b3",
+          "message": "runtime: fix unclear docs for `{Handle,Runtime}::block_on` (#3628)",
+          "timestamp": "2021-03-20T14:52:25+01:00",
+          "tree_id": "b5bc658aff9693ae146773d8c1ca1c775b404f45",
+          "url": "https://github.com/tokio-rs/tokio/commit/0bfcbc8be5368bf2a203c2c2856e5d3e7f5154b3"
+        },
+        "date": 1616248458347,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 183654,
+            "range": "± 16227",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 728168,
+            "range": "± 74691",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5268966,
+            "range": "± 1092429",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21296894,
+            "range": "± 4370277",
             "unit": "ns/iter"
           }
         ]
