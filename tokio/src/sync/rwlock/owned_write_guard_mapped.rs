@@ -1,5 +1,6 @@
 use crate::sync::rwlock::RwLock;
 use std::fmt;
+use std::marker::PhantomData;
 use std::mem::{self, ManuallyDrop};
 use std::ops;
 use std::sync::Arc;
