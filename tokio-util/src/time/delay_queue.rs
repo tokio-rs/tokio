@@ -30,24 +30,24 @@ use std::task::{self, Poll, Waker};
 ///
 /// Once delays have been configured, the `DelayQueue` is used via its
 /// [`Stream`] implementation. [`poll_expired`] is called. If an entry has reached its
-/// deadline, it is returned. If not, `Poll::Pending` indicating that the
+/// deadline, it is returned. If not, `Poll::Pending` is returned indicating that the
 /// current task will be notified once the deadline has been reached.
 ///
 /// # `Stream` implementation
 ///
 /// Items are retrieved from the queue via [`DelayQueue::poll_expired`]. If no delays have
-/// expired, no items are returned. In this case, `Pending` is returned and the
+/// expired, no items are returned. In this case, `Poll::Pending` is returned and the
 /// current task is registered to be notified once the next item's delay has
 /// expired.
 ///
 /// If no items are in the queue, i.e. `is_empty()` returns `true`, then `poll`
-/// returns `Ready(None)`. This indicates that the stream has reached an end.
+/// returns `Poll::Ready(None)`. This indicates that the stream has reached an end.
 /// However, if a new item is inserted *after*, `poll` will once again start
-/// returning items or `Pending.
+/// returning items or `Poll::Pending`.
 ///
 /// Items are returned ordered by their expirations. Items that are configured
 /// to expire first will be returned first. There are no ordering guarantees
-/// for items configured to expire the same instant. Also note that delays are
+/// for items configured to expire at the same instant. Also note that delays are
 /// rounded to the closest millisecond.
 ///
 /// # Implementation
@@ -152,7 +152,7 @@ pub struct DelayQueue<T> {
     waker: Option<Waker>,
 }
 
-/// An entry in `DelayQueue` that has expired and removed.
+/// An entry in `DelayQueue` that has expired and been removed.
 ///
 /// Values are returned by [`DelayQueue::poll_expired`].
 ///
@@ -211,7 +211,7 @@ struct Data<T> {
 const MAX_ENTRIES: usize = (1 << 30) - 1;
 
 impl<T> DelayQueue<T> {
-    /// Creates a new, empty, `DelayQueue`
+    /// Creates a new, empty, `DelayQueue`.
     ///
     /// The queue will not allocate storage until items are inserted into it.
     ///
@@ -239,15 +239,15 @@ impl<T> DelayQueue<T> {
     ///
     /// # #[tokio::main]
     /// # async fn main() {
-    ///     let mut delay_queue = DelayQueue::with_capacity(10);
+    /// let mut delay_queue = DelayQueue::with_capacity(10);
     ///
-    ///     // These insertions are done without further allocation
-    ///     for i in 0..10 {
-    ///         delay_queue.insert(i, Duration::from_secs(i));
-    ///     }
+    /// // These insertions are done without further allocation
+    /// for i in 0..10 {
+    ///     delay_queue.insert(i, Duration::from_secs(i));
+    /// }
     ///
-    ///     // This will make the queue allocate additional storage
-    ///     delay_queue.insert(11, Duration::from_secs(11));
+    /// // This will make the queue allocate additional storage
+    /// delay_queue.insert(11, Duration::from_secs(11));
     /// # }
     /// ```
     pub fn with_capacity(capacity: usize) -> DelayQueue<T> {
@@ -272,8 +272,8 @@ impl<T> DelayQueue<T> {
     /// `value` will be returned from [`poll_expired`]. If `when` has already been
     /// reached, then `value` is immediately made available to poll.
     ///
-    /// The return value represents the insertion and is used at an argument to
-    /// [`remove`] and [`reset`]. Note that [`Key`] is token and is reused once
+    /// The return value represents the insertion and is used as an argument to
+    /// [`remove`] and [`reset`]. Note that [`Key`] is a token and is reused once
     /// `value` is removed from the queue either by calling [`poll_expired`] after
     /// `when` is reached or by calling [`remove`]. At this point, the caller
     /// must take care to not use the returned [`Key`] again as it may reference
@@ -295,13 +295,13 @@ impl<T> DelayQueue<T> {
     ///
     /// # #[tokio::main]
     /// # async fn main() {
-    ///     let mut delay_queue = DelayQueue::new();
-    ///     let key = delay_queue.insert_at(
-    ///         "foo", Instant::now() + Duration::from_secs(5));
+    /// let mut delay_queue = DelayQueue::new();
+    /// let key = delay_queue.insert_at(
+    ///     "foo", Instant::now() + Duration::from_secs(5));
     ///
-    ///     // Remove the entry
-    ///     let item = delay_queue.remove(&key);
-    ///     assert_eq!(*item.get_ref(), "foo");
+    /// // Remove the entry
+    /// let item = delay_queue.remove(&key);
+    /// assert_eq!(*item.get_ref(), "foo");
     /// # }
     /// ```
     ///
@@ -353,7 +353,7 @@ impl<T> DelayQueue<T> {
 
     /// Attempts to pull out the next value of the delay queue, registering the
     /// current task for wakeup if the value is not yet available, and returning
-    /// None if the queue is exhausted.
+    /// `None` if the queue is exhausted.
     pub fn poll_expired(
         &mut self,
         cx: &mut task::Context<'_>,
@@ -391,7 +391,7 @@ impl<T> DelayQueue<T> {
     ///
     /// `value` is stored in the queue until `timeout` duration has
     /// elapsed after `insert` was called. At that point, `value` will
-    /// be returned from [`poll_expired`]. If `timeout` a Duration of
+    /// be returned from [`poll_expired`]. If `timeout` is a `Duration` of
     /// zero, then `value` is immediately made available to poll.
     ///
     /// The return value represents the insertion and is used as an
@@ -419,12 +419,12 @@ impl<T> DelayQueue<T> {
     ///
     /// # #[tokio::main]
     /// # async fn main() {
-    ///     let mut delay_queue = DelayQueue::new();
-    ///     let key = delay_queue.insert("foo", Duration::from_secs(5));
+    /// let mut delay_queue = DelayQueue::new();
+    /// let key = delay_queue.insert("foo", Duration::from_secs(5));
     ///
-    ///     // Remove the entry
-    ///     let item = delay_queue.remove(&key);
-    ///     assert_eq!(*item.get_ref(), "foo");
+    /// // Remove the entry
+    /// let item = delay_queue.remove(&key);
+    /// assert_eq!(*item.get_ref(), "foo");
     /// # }
     /// ```
     ///
@@ -452,11 +452,12 @@ impl<T> DelayQueue<T> {
         }
     }
 
-    /// Removes the key fom the expired queue or the timer wheel
-    /// depending on its expiration status
+    /// Removes the key from the expired queue or the timer wheel
+    /// depending on its expiration status.
     ///
     /// # Panics
-    /// Panics if the key is not contained in the expired queue or the wheel
+    ///
+    /// Panics if the key is not contained in the expired queue or the wheel.
     fn remove_key(&mut self, key: &Key) {
         use crate::time::wheel::Stack;
 
@@ -488,12 +489,12 @@ impl<T> DelayQueue<T> {
     ///
     /// # #[tokio::main]
     /// # async fn main() {
-    ///     let mut delay_queue = DelayQueue::new();
-    ///     let key = delay_queue.insert("foo", Duration::from_secs(5));
+    /// let mut delay_queue = DelayQueue::new();
+    /// let key = delay_queue.insert("foo", Duration::from_secs(5));
     ///
-    ///     // Remove the entry
-    ///     let item = delay_queue.remove(&key);
-    ///     assert_eq!(*item.get_ref(), "foo");
+    /// // Remove the entry
+    /// let item = delay_queue.remove(&key);
+    /// assert_eq!(*item.get_ref(), "foo");
     /// # }
     /// ```
     pub fn remove(&mut self, key: &Key) -> Expired<T> {
@@ -531,14 +532,14 @@ impl<T> DelayQueue<T> {
     ///
     /// # #[tokio::main]
     /// # async fn main() {
-    ///     let mut delay_queue = DelayQueue::new();
-    ///     let key = delay_queue.insert("foo", Duration::from_secs(5));
+    /// let mut delay_queue = DelayQueue::new();
+    /// let key = delay_queue.insert("foo", Duration::from_secs(5));
     ///
-    ///     // "foo" is scheduled to be returned in 5 seconds
+    /// // "foo" is scheduled to be returned in 5 seconds
     ///
-    ///     delay_queue.reset_at(&key, Instant::now() + Duration::from_secs(10));
+    /// delay_queue.reset_at(&key, Instant::now() + Duration::from_secs(10));
     ///
-    ///     // "foo" is now scheduled to be returned in 10 seconds
+    /// // "foo" is now scheduled to be returned in 10 seconds
     /// # }
     /// ```
     pub fn reset_at(&mut self, key: &Key, when: Instant) {
@@ -559,7 +560,7 @@ impl<T> DelayQueue<T> {
         }
     }
 
-    /// Returns the next time poll as determined by the wheel
+    /// Returns the next time to poll as determined by the wheel
     fn next_deadline(&mut self) -> Option<Instant> {
         self.wheel
             .poll_at()
@@ -591,14 +592,14 @@ impl<T> DelayQueue<T> {
     ///
     /// # #[tokio::main]
     /// # async fn main() {
-    ///     let mut delay_queue = DelayQueue::new();
-    ///     let key = delay_queue.insert("foo", Duration::from_secs(5));
+    /// let mut delay_queue = DelayQueue::new();
+    /// let key = delay_queue.insert("foo", Duration::from_secs(5));
     ///
-    ///     // "foo" is scheduled to be returned in 5 seconds
+    /// // "foo" is scheduled to be returned in 5 seconds
     ///
-    ///     delay_queue.reset(&key, Duration::from_secs(10));
+    /// delay_queue.reset(&key, Duration::from_secs(10));
     ///
-    ///     // "foo"is now scheduled to be returned in 10 seconds
+    /// // "foo"is now scheduled to be returned in 10 seconds
     /// # }
     /// ```
     pub fn reset(&mut self, key: &Key, timeout: Duration) {
@@ -621,15 +622,15 @@ impl<T> DelayQueue<T> {
     ///
     /// # #[tokio::main]
     /// # async fn main() {
-    ///     let mut delay_queue = DelayQueue::new();
+    /// let mut delay_queue = DelayQueue::new();
     ///
-    ///     delay_queue.insert("foo", Duration::from_secs(5));
+    /// delay_queue.insert("foo", Duration::from_secs(5));
     ///
-    ///     assert!(!delay_queue.is_empty());
+    /// assert!(!delay_queue.is_empty());
     ///
-    ///     delay_queue.clear();
+    /// delay_queue.clear();
     ///
-    ///     assert!(delay_queue.is_empty());
+    /// assert!(delay_queue.is_empty());
     /// # }
     /// ```
     pub fn clear(&mut self) {
@@ -663,10 +664,10 @@ impl<T> DelayQueue<T> {
     ///
     /// # #[tokio::main]
     /// # async fn main() {
-    ///     let mut delay_queue: DelayQueue<i32> = DelayQueue::with_capacity(10);
-    ///     assert_eq!(delay_queue.len(), 0);
-    ///     delay_queue.insert(3, Duration::from_secs(5));
-    ///     assert_eq!(delay_queue.len(), 1);
+    /// let mut delay_queue: DelayQueue<i32> = DelayQueue::with_capacity(10);
+    /// assert_eq!(delay_queue.len(), 0);
+    /// delay_queue.insert(3, Duration::from_secs(5));
+    /// assert_eq!(delay_queue.len(), 1);
     /// # }
     /// ```
     pub fn len(&self) -> usize {
@@ -698,12 +699,12 @@ impl<T> DelayQueue<T> {
     ///
     /// # #[tokio::main]
     /// # async fn main() {
-    ///     let mut delay_queue = DelayQueue::new();
+    /// let mut delay_queue = DelayQueue::new();
     ///
-    ///     delay_queue.insert("hello", Duration::from_secs(10));
-    ///     delay_queue.reserve(10);
+    /// delay_queue.insert("hello", Duration::from_secs(10));
+    /// delay_queue.reserve(10);
     ///
-    ///     assert!(delay_queue.capacity() >= 11);
+    /// assert!(delay_queue.capacity() >= 11);
     /// # }
     /// ```
     pub fn reserve(&mut self, additional: usize) {
@@ -713,7 +714,7 @@ impl<T> DelayQueue<T> {
     /// Returns `true` if there are no items in the queue.
     ///
     /// Note that this function returns `false` even if all items have not yet
-    /// expired and a call to `poll` will return `Pending`.
+    /// expired and a call to `poll` will return `Poll::Pending`.
     ///
     /// # Examples
     ///
@@ -723,11 +724,11 @@ impl<T> DelayQueue<T> {
     ///
     /// # #[tokio::main]
     /// # async fn main() {
-    ///     let mut delay_queue = DelayQueue::new();
-    ///     assert!(delay_queue.is_empty());
+    /// let mut delay_queue = DelayQueue::new();
+    /// assert!(delay_queue.is_empty());
     ///
-    ///     delay_queue.insert("hello", Duration::from_secs(5));
-    ///     assert!(!delay_queue.is_empty());
+    /// delay_queue.insert("hello", Duration::from_secs(5));
+    /// assert!(!delay_queue.is_empty());
     /// # }
     /// ```
     pub fn is_empty(&self) -> bool {
