@@ -2,22 +2,22 @@
 
 ### Added
 
-macros: introduce biased argument for `select!` ([#3603])
-runtime: add `Handle::block_on` ([#3569])
+- macros: introduce biased argument for `select!` ([#3603])
+- runtime: add `Handle::block_on` ([#3569])
 
 ### Fixed
 
-runtime: avoid unnecessary polling of `block_on` future ([#3582])
-runtime: fix memory leak/growth when creating many runtimes ([#3564])
-runtime: mark `EnterGuard` with `must_use` ([#3609])
+- runtime: avoid unnecessary polling of `block_on` future ([#3582])
+- runtime: fix memory leak/growth when creating many runtimes ([#3564])
+- runtime: mark `EnterGuard` with `must_use` ([#3609])
 
 ### Documented
 
-chore: mention fix for building docs in contributing guide ([#3618])
-doc: add link to `PollSender` ([#3613])
-doc: alias sleep to delay ([#3604])
-sync: improve `Mutex` FIFO explanation ([#3615])
-timer: fix double newline in module docs ([#3617])
+- chore: mention fix for building docs in contributing guide ([#3618])
+- doc: add link to `PollSender` ([#3613])
+- doc: alias sleep to delay ([#3604])
+- sync: improve `Mutex` FIFO explanation ([#3615])
+- timer: fix double newline in module docs ([#3617])
 
 [#3564]: https://github.com/tokio-rs/tokio/pull/3564
 [#3613]: https://github.com/tokio-rs/tokio/pull/3613
