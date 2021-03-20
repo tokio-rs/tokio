@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1616239207647,
+  "lastUpdate": 1616239211996,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -32655,6 +32655,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 937,
             "range": "± 3",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "david.pdrsn@gmail.com",
+            "name": "David Pedersen",
+            "username": "davidpdrsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b4918adbd8194e1ed7fd0c7fbe635b039b70c584",
+          "message": "chore: prepare tokio-stream v0.1.5 (#3624)",
+          "timestamp": "2021-03-20T12:17:37+01:00",
+          "tree_id": "032e2799b4d7108f91e5b1d194ad097d835dd812",
+          "url": "https://github.com/tokio-rs/tokio/commit/b4918adbd8194e1ed7fd0c7fbe635b039b70c584"
+        },
+        "date": 1616239207898,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 12727,
+            "range": "± 2904",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 946,
+            "range": "± 403",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 565,
+            "range": "± 72",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 12799,
+            "range": "± 5311",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1002,
+            "range": "± 227",
             "unit": "ns/iter"
           }
         ]
