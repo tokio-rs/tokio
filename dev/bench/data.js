@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1616247175427,
+  "lastUpdate": 1616247202858,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -21421,6 +21421,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 22072341,
             "range": "± 4025896",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "david.pdrsn@gmail.com",
+            "name": "David Pedersen",
+            "username": "davidpdrsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "81f47e88667f64056b14cd01ec1bf32b9778f9af",
+          "message": "util: fix indentation and typos in `DelayQueue` docs (#3626)",
+          "timestamp": "2021-03-20T14:31:12+01:00",
+          "tree_id": "02f6c778f978e90b08eaf7cf351d14b18df17a81",
+          "url": "https://github.com/tokio-rs/tokio/commit/81f47e88667f64056b14cd01ec1bf32b9778f9af"
+        },
+        "date": 1616247200497,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 203748,
+            "range": "± 100777",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 731638,
+            "range": "± 130905",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5124206,
+            "range": "± 1389159",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19535618,
+            "range": "± 3147306",
             "unit": "ns/iter"
           }
         ]
