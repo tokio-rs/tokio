@@ -209,9 +209,12 @@ impl Handle {
     /// complete, and yielding its resolved result. Any tasks or timers which
     /// the future spawns internally will be executed on the runtime.
     ///
-    /// The behavior for multi threaded vs current thread schedulers is the same
-    /// as [`Runtime::block_on`]. See the docs of [`Runtime::block_on`] for more
-    /// details.
+    /// When this is used on a `current_thread` runtime, only the
+    /// [`Runtime::block_on`] method can drive the IO and timer drivers, but the
+    /// `Handle::block_on` method cannot drive them. This means that, when using
+    /// this method on a current_thread runtime, anything that relies on IO or
+    /// timers will not work unless there is another thread currently calling
+    /// [`Runtime::block_on`] on the same runtime.
     ///
     /// # If the runtime has been shut down
     ///
