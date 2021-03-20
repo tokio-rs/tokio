@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1616234073392,
+  "lastUpdate": 1616234081112,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -49379,6 +49379,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 804234,
             "range": "± 135109",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "david.pdrsn@gmail.com",
+            "name": "David Pedersen",
+            "username": "davidpdrsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c39d9867bb989396bb02e74d87f2805969f43f03",
+          "message": "runtime: add Handle::block_on (#3569)\n\nAdd `runtime::Handle::block_on`. The function enters the runtime context and\r\nblocks the current thread while the future executes.\r\n\r\nRefs: #3097\r\nFixes #2965, #3096",
+          "timestamp": "2021-03-20T10:52:28+01:00",
+          "tree_id": "178f0a5c7bd83686dd0fa8a505cb3e2ec648a729",
+          "url": "https://github.com/tokio-rs/tokio/commit/c39d9867bb989396bb02e74d87f2805969f43f03"
+        },
+        "date": 1616234078727,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 7071906,
+            "range": "± 2905402",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 7239626,
+            "range": "± 1608649",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6607663,
+            "range": "± 2143140",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 649,
+            "range": "± 18",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 649,
+            "range": "± 21",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 648,
+            "range": "± 30",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 82826,
+            "range": "± 16607",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1571,
+            "range": "± 78",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1140300,
+            "range": "± 6067",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 810873,
+            "range": "± 4139",
             "unit": "ns/iter"
           }
         ]
