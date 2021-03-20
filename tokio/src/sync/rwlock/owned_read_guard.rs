@@ -1,5 +1,6 @@
 use crate::sync::rwlock::RwLock;
 use std::fmt;
+use std::marker::PhantomData;
 use std::mem;
 use std::mem::ManuallyDrop;
 use std::ops;
@@ -17,6 +18,7 @@ pub struct OwnedRwLockReadGuard<T: ?Sized, U: ?Sized = T> {
     // ManuallyDrop allows us to destructure into this field without running the destructor.
     pub(super) lock: ManuallyDrop<Arc<RwLock<T>>>,
     pub(super) data: *const U,
+    pub(super) _p: PhantomData<T>,
 }
 
 impl<T: ?Sized, U: ?Sized> OwnedRwLockReadGuard<T, U> {
@@ -59,6 +61,7 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockReadGuard<T, U> {
         OwnedRwLockReadGuard {
             lock: ManuallyDrop::new(lock),
             data,
+            _p: PhantomData,
         }
     }
 
@@ -107,6 +110,7 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockReadGuard<T, U> {
         Ok(OwnedRwLockReadGuard {
             lock: ManuallyDrop::new(lock),
             data,
+            _p: PhantomData,
         })
     }
 }

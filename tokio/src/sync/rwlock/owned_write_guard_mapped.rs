@@ -17,6 +17,7 @@ pub struct OwnedRwLockMappedWriteGuard<T: ?Sized, U: ?Sized = T> {
     // ManuallyDrop allows us to destructure into this field without running the destructor.
     pub(super) lock: ManuallyDrop<Arc<RwLock<T>>>,
     pub(super) data: *mut U,
+    pub(super) _p: PhantomData<T>,
 }
 
 impl<T: ?Sized, U: ?Sized> OwnedRwLockMappedWriteGuard<T, U> {
@@ -64,6 +65,7 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockMappedWriteGuard<T, U> {
         OwnedRwLockMappedWriteGuard {
             lock: ManuallyDrop::new(lock),
             data,
+            _p: PhantomData,
         }
     }
 
@@ -118,6 +120,7 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockMappedWriteGuard<T, U> {
         Ok(OwnedRwLockMappedWriteGuard {
             lock: ManuallyDrop::new(lock),
             data,
+            _p: PhantomData,
         })
     }
 }

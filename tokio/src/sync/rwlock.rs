@@ -2,6 +2,7 @@ use crate::sync::batch_semaphore::{Semaphore, TryAcquireError};
 use crate::sync::mutex::TryLockError;
 use std::cell::UnsafeCell;
 use std::marker;
+use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
 use std::sync::Arc;
 
@@ -330,6 +331,7 @@ impl<T: ?Sized> RwLock<T> {
         OwnedRwLockReadGuard {
             data: self.c.get(),
             lock: ManuallyDrop::new(self),
+            _p: PhantomData,
         }
     }
 
@@ -427,6 +429,7 @@ impl<T: ?Sized> RwLock<T> {
         Ok(OwnedRwLockReadGuard {
             data: self.c.get(),
             lock: ManuallyDrop::new(self),
+            _p: PhantomData,
         })
     }
 
@@ -503,6 +506,7 @@ impl<T: ?Sized> RwLock<T> {
         OwnedRwLockWriteGuard {
             data: self.c.get(),
             lock: ManuallyDrop::new(self),
+            _p: PhantomData,
         }
     }
 
@@ -583,6 +587,7 @@ impl<T: ?Sized> RwLock<T> {
         Ok(OwnedRwLockWriteGuard {
             data: self.c.get(),
             lock: ManuallyDrop::new(self),
+            _p: PhantomData,
         })
     }
 
