@@ -254,10 +254,12 @@ impl Handle {
     ///
     /// #[tokio::main]
     /// async fn main () {
-    ///     // Get a handle to the current runtime and execute the future, blocking
-    ///     // the current thread until completion
-    ///     Handle::current().block_on(async {
-    ///         println!("hello");
+    ///     let handle = Handle::current();
+    ///     std::thread::spawn(move || {
+    ///         // Using Handle::block_on to run async code in the new thread.
+    ///         handle.block_on(async {
+    ///             println!("hello");
+    ///         });
     ///     });
     /// }
     /// ```
