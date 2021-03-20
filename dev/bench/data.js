@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1616234059106,
+  "lastUpdate": 1616234073392,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -11069,6 +11069,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 544,
             "range": "± 160",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "david.pdrsn@gmail.com",
+            "name": "David Pedersen",
+            "username": "davidpdrsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c39d9867bb989396bb02e74d87f2805969f43f03",
+          "message": "runtime: add Handle::block_on (#3569)\n\nAdd `runtime::Handle::block_on`. The function enters the runtime context and\r\nblocks the current thread while the future executes.\r\n\r\nRefs: #3097\r\nFixes #2965, #3096",
+          "timestamp": "2021-03-20T10:52:28+01:00",
+          "tree_id": "178f0a5c7bd83686dd0fa8a505cb3e2ec648a729",
+          "url": "https://github.com/tokio-rs/tokio/commit/c39d9867bb989396bb02e74d87f2805969f43f03"
+        },
+        "date": 1616234071052,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1089,
+            "range": "± 100",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 17737,
+            "range": "± 6685",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1050,
+            "range": "± 190",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 17513,
+            "range": "± 7766",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 576,
+            "range": "± 93",
             "unit": "ns/iter"
           }
         ]
