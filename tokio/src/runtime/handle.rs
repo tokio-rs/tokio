@@ -232,7 +232,7 @@ impl Handle {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```
     /// use tokio::runtime::Runtime;
     ///
     /// // Create the runtime
@@ -249,7 +249,7 @@ impl Handle {
     ///
     /// Or using `Handle::current`:
     ///
-    /// ```no_run
+    /// ```
     /// use tokio::runtime::Handle;
     ///
     /// #[tokio::main]
