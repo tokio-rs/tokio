@@ -2,7 +2,7 @@
 
 ### Fixed
 
-test: Make `Mock` both `Send` and `Sync` ([#3594])
+- test: Make `Mock` both `Send` and `Sync` ([#3594])
 
 [#3594]: https://github.com/tokio-rs/tokio/pull/3594
 
