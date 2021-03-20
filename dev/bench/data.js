@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1616234053288,
+  "lastUpdate": 1616234059106,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -20959,6 +20959,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20362402,
             "range": "± 4883570",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "david.pdrsn@gmail.com",
+            "name": "David Pedersen",
+            "username": "davidpdrsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c39d9867bb989396bb02e74d87f2805969f43f03",
+          "message": "runtime: add Handle::block_on (#3569)\n\nAdd `runtime::Handle::block_on`. The function enters the runtime context and\r\nblocks the current thread while the future executes.\r\n\r\nRefs: #3097\r\nFixes #2965, #3096",
+          "timestamp": "2021-03-20T10:52:28+01:00",
+          "tree_id": "178f0a5c7bd83686dd0fa8a505cb3e2ec648a729",
+          "url": "https://github.com/tokio-rs/tokio/commit/c39d9867bb989396bb02e74d87f2805969f43f03"
+        },
+        "date": 1616234056886,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 195123,
+            "range": "± 10074",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 731648,
+            "range": "± 88078",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5499032,
+            "range": "± 802233",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21296393,
+            "range": "± 3144173",
             "unit": "ns/iter"
           }
         ]
