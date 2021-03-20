@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1616239081737,
+  "lastUpdate": 1616239087114,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -21061,6 +21061,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21296393,
             "range": "± 3144173",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "david.pdrsn@gmail.com",
+            "name": "David Pedersen",
+            "username": "davidpdrsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "dcac336dc7206adb44c90bcfcb62cd11755a0ba1",
+          "message": "chore: prepare Tokio v1.4.0 (#3621)",
+          "timestamp": "2021-03-20T12:16:15+01:00",
+          "tree_id": "30804e908f24f6a6ad8117f1cd59204a047d6092",
+          "url": "https://github.com/tokio-rs/tokio/commit/dcac336dc7206adb44c90bcfcb62cd11755a0ba1"
+        },
+        "date": 1616239084167,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 196597,
+            "range": "± 43373",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 757067,
+            "range": "± 155408",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5536170,
+            "range": "± 1028393",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 22939034,
+            "range": "± 3273532",
             "unit": "ns/iter"
           }
         ]
