@@ -405,7 +405,7 @@ cfg_rt! {
         /// Run a future to completion on the Tokio runtime. This is the
         /// runtime's entry point.
         ///
-        /// This runs the given future on the runtime, blocking until it is
+        /// This runs the given future on the current thread, blocking until it is
         /// complete, and yielding its resolved result. Any tasks or timers
         /// which the future spawns internally will be executed on the runtime.
         ///
