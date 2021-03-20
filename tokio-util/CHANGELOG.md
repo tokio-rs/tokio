@@ -1,3 +1,13 @@
+# 0.6.5 (March 20, 2021)
+
+### Fixed
+
+chore: fix clippy warnings in newer versions ([#3588])
+util: annotate time module as requiring `time` feature ([#3606])
+
+[#3588]: https://github.com/tokio-rs/tokio/pull/3588
+[#3606]: https://github.com/tokio-rs/tokio/pull/3606
+
 # 0.6.4 (March 9, 2021)
 
 ### Added
