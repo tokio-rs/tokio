@@ -1,3 +1,11 @@
+# 0.4.2 (March 20, 2021)
+
+### Fixed
+
+test: Make `Mock` both `Send` and `Sync` ([#3594])
+
+[#3594]: https://github.com/tokio-rs/tokio/pull/3594
+
 # 0.4.1 (March 10, 2021)
 
 - Fix `io::Mock` to be `Send` and `Sync` ([#3594])
