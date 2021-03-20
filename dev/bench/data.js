@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1616239200923,
+  "lastUpdate": 1616239207647,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -11231,6 +11231,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 482,
             "range": "± 81",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "david.pdrsn@gmail.com",
+            "name": "David Pedersen",
+            "username": "davidpdrsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b4918adbd8194e1ed7fd0c7fbe635b039b70c584",
+          "message": "chore: prepare tokio-stream v0.1.5 (#3624)",
+          "timestamp": "2021-03-20T12:17:37+01:00",
+          "tree_id": "032e2799b4d7108f91e5b1d194ad097d835dd812",
+          "url": "https://github.com/tokio-rs/tokio/commit/b4918adbd8194e1ed7fd0c7fbe635b039b70c584"
+        },
+        "date": 1616239204905,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 841,
+            "range": "± 104",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 14383,
+            "range": "± 3695",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 889,
+            "range": "± 142",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 13870,
+            "range": "± 3610",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 506,
+            "range": "± 89",
             "unit": "ns/iter"
           }
         ]
