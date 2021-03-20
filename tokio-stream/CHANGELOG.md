@@ -2,7 +2,7 @@
 
 ### Fixed
 
-stream: documentation note for throttle `Unpin` ([#3600])
+- stream: documentation note for throttle `Unpin` ([#3600])
 
 [#3600]: https://github.com/tokio-rs/tokio/pull/3600
 
