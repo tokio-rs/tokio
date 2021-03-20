@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1616247162671,
+  "lastUpdate": 1616247175427,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -11285,6 +11285,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 506,
             "range": "± 89",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "david.pdrsn@gmail.com",
+            "name": "David Pedersen",
+            "username": "davidpdrsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "81f47e88667f64056b14cd01ec1bf32b9778f9af",
+          "message": "util: fix indentation and typos in `DelayQueue` docs (#3626)",
+          "timestamp": "2021-03-20T14:31:12+01:00",
+          "tree_id": "02f6c778f978e90b08eaf7cf351d14b18df17a81",
+          "url": "https://github.com/tokio-rs/tokio/commit/81f47e88667f64056b14cd01ec1bf32b9778f9af"
+        },
+        "date": 1616247173124,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1000,
+            "range": "± 82",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 14886,
+            "range": "± 4397",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1050,
+            "range": "± 99",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 14576,
+            "range": "± 4655",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 561,
+            "range": "± 29",
             "unit": "ns/iter"
           }
         ]
