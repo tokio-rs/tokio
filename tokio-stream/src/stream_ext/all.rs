@@ -40,15 +40,19 @@ where
         let me = self.project();
         let mut stream = Pin::new(me.stream);
 
-        loop {
+        // Take a maximum of 32 items from the stream before yielding.
+        for _ in 0..32 {
             match futures_core::ready!(stream.as_mut().poll_next(cx)) {
                 Some(v) => {
                     if !(me.f)(v) {
-                        break Poll::Ready(false);
+                        return Poll::Ready(false);
                     }
                 }
-                None => break Poll::Ready(true),
+                None => return Poll::Ready(true),
             }
         }
+
+        cx.waker().wake_by_ref();
+        Poll::Pending
     }
 }
