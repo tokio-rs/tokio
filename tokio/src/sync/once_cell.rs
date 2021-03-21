@@ -144,14 +144,14 @@ impl<T> OnceCell<T> {
     /// Sets the value of the OnceCell to the argument value.
     ///
     /// If the value of the OnceCell was already set prior to this call
-    /// then [`AlreadyInitializedError`] is returned. If another thread
+    /// then [`SetError::AlreadyInitializedError`] is returned. If another thread
     /// is initializing the cell while this method is called,
-    /// ['InitializingError`] is returned. In order to wait
+    /// ['SetError::InitializingError`] is returned. In order to wait
     /// for an ongoing initialization to finish, call
     /// [`OnceCell::get_or_init`] instead.
     ///
-    /// [`AlreadyInitializedError`]: crate::sync::AlreadyInitializedError
-    /// [`InitializingError`]: crate::sync::InitializingError
+    /// [`SetError::AlreadyInitializedError`]: crate::sync::SetError::AlreadyInitializedError
+    /// [`SetError::InitializingError`]: crate::sync::SetError::InitializingError
     /// ['OnceCell::get_or_init`]: crate::sync::OnceCell::get_or_init
     pub fn set(&self, value: T) -> Result<(), SetError<T>> {
         if !self.initialized() {
@@ -273,25 +273,20 @@ unsafe impl<T: Sync + Send> Sync for OnceCell<T> {}
 // it's safe to send it to another thread
 unsafe impl<T: Send> Send for OnceCell<T> {}
 
-/// Errors that can be returned from [`OnceCell::set`] and
-/// [`OnceCell::set_mut`].
+/// Errors that can be returned from [`OnceCell::set`]
 ///
 /// [`OnceCell::set`]: crate::sync::OnceCell::set
-/// [`OnceCell::set_mut`]: crate::sync::OnceCell::set_mut
 #[derive(Debug, PartialEq)]
 pub enum SetError<T> {
-    /// Error resulting from [`OnceCell::set`] or [`OnceCell::set_mut`] calls if
-    /// the cell was previously initialized.
+    /// Error resulting from [`OnceCell::set`] calls if the cell was previously initialized.
     ///
     /// [`OnceCell::set`]: crate::sync::OnceCell::set
-    /// [`OnceCell::set_mut`]: crate::sync::OnceCell::set_mut
     AlreadyInitializedError(T),
 
-    /// Error resulting from [`OnceCell::set`] or [`OnceCell::set_mut`] calls when
-    /// the cell is currently being inintialized during the calls to those methods.
+    /// Error resulting from [`OnceCell::set`] calls when the cell is currently being
+    /// inintialized during the calls to that method.
     ///
     /// [`OnceCell::set`]: crate::sync::OnceCell::set
-    /// [`OnceCell::set_mut`]: crate::sync::OnceCell::set_mut
     InitializingError(T),
 }
 
