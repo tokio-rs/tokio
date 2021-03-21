@@ -1,4 +1,3 @@
-#![doc(html_root_url = "https://docs.rs/tokio-util/0.6.0")]
 #![allow(clippy::needless_doctest_main)]
 #![warn(
     missing_debug_implementations,
@@ -46,12 +45,13 @@ cfg_rt! {
     pub mod context;
 }
 
+cfg_time! {
+    pub mod time;
+}
+
 pub mod sync;
 
 pub mod either;
-
-#[cfg(feature = "time")]
-pub mod time;
 
 #[cfg(any(feature = "io", feature = "codec"))]
 mod util {

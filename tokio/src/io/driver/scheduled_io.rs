@@ -355,6 +355,12 @@ impl ScheduledIo {
         // result isn't important
         let _ = self.set_readiness(None, Tick::Clear(event.tick), |curr| curr - mask_no_closed);
     }
+
+    pub(crate) fn clear_wakers(&self) {
+        let mut waiters = self.waiters.lock();
+        waiters.reader.take();
+        waiters.writer.take();
+    }
 }
 
 impl Drop for ScheduledIo {
@@ -437,7 +443,7 @@ cfg_io_readiness! {
                             // Currently ready!
                             let tick = TICK.unpack(curr) as u8;
                             *state = State::Done;
-                            return Poll::Ready(ReadyEvent { ready, tick });
+                            return Poll::Ready(ReadyEvent { tick, ready });
                         }
 
                         // Wasn't ready, take the lock (and check again while locked).
@@ -456,7 +462,7 @@ cfg_io_readiness! {
                             // Currently ready!
                             let tick = TICK.unpack(curr) as u8;
                             *state = State::Done;
-                            return Poll::Ready(ReadyEvent { ready, tick });
+                            return Poll::Ready(ReadyEvent { tick, ready });
                         }
 
                         // Not ready even after locked, insert into list...

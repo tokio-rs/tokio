@@ -113,6 +113,25 @@ impl<'a> ReadBuf<'a> {
         unsafe { mem::transmute::<&mut [MaybeUninit<u8>], &mut [u8]>(slice) }
     }
 
+    /// Returns a mutable reference to the entire buffer, without ensuring that it has been fully
+    /// initialized.
+    ///
+    /// The elements between 0 and `self.filled().len()` are filled, and those between 0 and
+    /// `self.initialized().len()` are initialized (and so can be transmuted to a `&mut [u8]`).
+    ///
+    /// The caller of this method must ensure that these invariants are upheld. For example, if the
+    /// caller initializes some of the uninitialized section of the buffer, it must call
+    /// [`assume_init`](Self::assume_init) with the number of bytes initialized.
+    ///
+    /// # Safety
+    ///
+    /// The caller must not de-initialize portions of the buffer that have already been initialized.
+    /// This includes any bytes in the region marked as uninitialized by `ReadBuf`.
+    #[inline]
+    pub unsafe fn inner_mut(&mut self) -> &mut [MaybeUninit<u8>] {
+        self.buf
+    }
+
     /// Returns a mutable reference to the unfilled part of the buffer without ensuring that it has been fully
     /// initialized.
     ///

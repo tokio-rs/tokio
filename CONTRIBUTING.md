@@ -124,17 +124,27 @@ arguments to many common cargo commands. This section lists some commonly needed
 commands.
 
 Some commands just need the `--all-features` argument:
+
 ```
 cargo build --all-features
 cargo check --all-features
 cargo test --all-features
 ```
+
 When building documentation normally, the markers that list the features
 required for various parts of Tokio are missing. To build the documentation
 correctly, use this command:
+
 ```
 RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
 ```
+
+There is currently a [bug in cargo] that means documentation cannot be built
+from the root of the workspace. If you `cd` into the `tokio` subdirectory the
+command shown above will work.
+
+[bug in cargo]: https://github.com/rust-lang/cargo/issues/9274
+
 The `cargo fmt` command does not work on the Tokio codebase. You can use the
 command below instead:
 
@@ -427,11 +437,14 @@ _Adapted from the [Node.js contributing guide][node]_.
 
 ## Keeping track of issues and PRs
 
-The Tokio GitHub repository has a lot of issues and PRs, which is not easy to
-keep track of. This section explains the meaning of various labels, as well as
-our [GitHub project][project]. The section is primarily targeted at maintainers.
+The Tokio GitHub repository has a lot of issues and PRs to keep track of. This
+section explains the meaning of various labels, as well as our [GitHub
+project][project]. The section is primarily targeted at maintainers.  Most
+contributors aren't able to set these labels.
 
-**Area.** The area label describes the crates relevant to this issue or PR.
+### Area
+
+The area label describes the crates relevant to this issue or PR.
 
  - **A-tokio** This issue concerns the main Tokio crate.
  - **A-tokio-util** This issue concerns the `tokio-util` crate.
@@ -442,7 +455,7 @@ our [GitHub project][project]. The section is primarily targeted at maintainers.
    be used for the procedural macros, and not `join!` or `select!`.
  - **A-ci** This issue concerns our GitHub Actions setup.
 
-**Category.** The category label describes the category.
+### Category
 
  - **C-bug** This is a bug-report. Bug-fix PRs use `C-enhancement` instead.
  - **C-enhancement** This is a PR that adds a new features.
@@ -460,8 +473,7 @@ our [GitHub project][project]. The section is primarily targeted at maintainers.
  - **C-request** A non-feature request, e.g. "please add deprecation notices to
    `-alpha.*` versions of crates"
 
-**Call for participation.** I don't know why it's called `E-`. Many issues are
-missing a difficulty rating, and you should feel free to add one.
+### Calls for participation
 
  - **E-help-wanted** Stuff where we want help. Often seen together with `C-bug`
    or `C-feature-accepted`.
@@ -473,7 +485,13 @@ missing a difficulty rating, and you should feel free to add one.
  - **E-needs-mvce** This bug is missing a minimal complete and verifiable
    example.
 
-**Module.** A more fine groaned categorization than area.
+The "E-" prefix is the same as used in the Rust compiler repository. Some
+issues are missing a difficulty rating, but feel free to ask on our Discord
+server if you want to know how difficult an issue likely is.
+
+### Module
+
+The module label provides a more fine grained categorization than **Area**.
 
  - **M-blocking** Things relevant to `spawn_blocking`, `block_in_place`.
  - **M-codec** The `tokio_util::codec` module.
@@ -491,7 +509,9 @@ missing a difficulty rating, and you should feel free to add one.
  - **M-time** The `tokio::time` module.
  - **M-tracing** Tracing support in Tokio.
 
-**Topic.** Some extra information.
+### Topic
+
+Some extra information.
 
  - **T-docs** This is about documentation.
  - **T-performance** This is about performance.
@@ -500,6 +520,34 @@ missing a difficulty rating, and you should feel free to add one.
 Any label not listed here is not in active use.
 
 [project]: https://github.com/orgs/tokio-rs/projects/1
+
+## LTS guarantees
+
+Tokio ≥1.0.0 comes with LTS guarantees:
+
+ * A minimum of 5 years of maintenance.
+ * A minimum of 3 years before a hypothetical 2.0 release.
+
+The goal of these guarantees is to provide stability to the ecosystem.
+
+## Mininum Supported Rust Version (MSRV)
+
+ * All Tokio ≥1.0.0 releases will support at least a 6-month old Rust
+   compiler release.
+ * The MSRV will only be increased on 1.x releases.
+
+## Versioning Policy
+
+With Tokio ≥1.0.0:
+
+ * Patch (1.\_.x) releases _should only_ contain bug fixes or documentation
+   changes. Besides this, these releases should not substantially change
+   runtime behavior.
+ * Minor (1.x) releases may contain new functionality, MSRV increases (see
+   above), minor dependency updates, deprecations, and larger internal
+   implementation changes.
+
+This is as defined by [Semantic Versioning 2.0](https://semver.org/).
 
 ## Releasing
 
@@ -533,9 +581,8 @@ When releasing a new version of a crate, follow these steps:
 2. **Update Cargo metadata.** After releasing any path dependencies, update the
    `version` field in `Cargo.toml` to the new version, and the `documentation`
    field to the docs.rs URL of the new version.
-3. **Update other documentation links.** Update the `#![doc(html_root_url)]`
-   attribute in the crate's `lib.rs` and the "Documentation" link in the crate's
-   `README.md` to point to the docs.rs URL of the new version.
+3. **Update other documentation links.** Update the "Documentation" link in the
+   crate's `README.md` to point to the docs.rs URL of the new version.
 4. **Update the changelog for the crate.** Each crate in the Tokio repository
    has its own `CHANGELOG.md` in that crate's subdirectory. Any changes to that
    crate since the last release should be added to the changelog. Change

@@ -5,7 +5,7 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::net::Shutdown;
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net;
 use std::path::Path;
 use std::task::{Context, Poll};
@@ -20,10 +20,18 @@ cfg_net_unix! {
     /// A socket can be either named (associated with a filesystem path) or
     /// unnamed.
     ///
+    /// This type does not provide a `split` method, because this functionality
+    /// can be achieved by wrapping the socket in an [`Arc`]. Note that you do
+    /// not need a `Mutex` to share the `UnixDatagram` — an `Arc<UnixDatagram>`
+    /// is enough. This is because all of the methods take `&self` instead of
+    /// `&mut self`.
+    ///
     /// **Note:** named sockets are persisted even after the object is dropped
     /// and the program has exited, and cannot be reconnected. It is advised
     /// that you either check for and unlink the existing socket if it exists,
     /// or use a temporary file that is guaranteed to not already exist.
+    ///
+    /// [`Arc`]: std::sync::Arc
     ///
     /// # Examples
     /// Using named sockets, associated with a filesystem path:
@@ -366,6 +374,36 @@ impl UnixDatagram {
         let socket = mio::net::UnixDatagram::from_std(datagram);
         let io = PollEvented::new(socket)?;
         Ok(UnixDatagram { io })
+    }
+
+    /// Turn a [`tokio::net::UnixDatagram`] into a [`std::os::unix::net::UnixDatagram`].
+    ///
+    /// The returned [`std::os::unix::net::UnixDatagram`] will have nonblocking
+    /// mode set as `true`.  Use [`set_nonblocking`] to change the blocking mode
+    /// if needed.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use std::error::Error;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let tokio_socket = tokio::net::UnixDatagram::bind("127.0.0.1:0")?;
+    ///     let std_socket = tokio_socket.into_std()?;
+    ///     std_socket.set_nonblocking(false)?;
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// [`tokio::net::UnixDatagram`]: UnixDatagram
+    /// [`std::os::unix::net::UnixDatagram`]: std::os::unix::net::UnixDatagram
+    /// [`set_nonblocking`]: fn@std::os::unix::net::UnixDatagram::set_nonblocking
+    pub fn into_std(self) -> io::Result<std::os::unix::net::UnixDatagram> {
+        self.io
+            .into_inner()
+            .map(|io| io.into_raw_fd())
+            .map(|raw_fd| unsafe { std::os::unix::net::UnixDatagram::from_raw_fd(raw_fd) })
     }
 
     fn new(socket: mio::net::UnixDatagram) -> io::Result<UnixDatagram> {

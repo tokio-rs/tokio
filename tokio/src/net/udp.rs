@@ -22,8 +22,15 @@ cfg_net! {
     /// * one to one: [`connect`](`UdpSocket::connect`) and associate with a single address, using [`send`](`UdpSocket::send`)
     ///   and [`recv`](`UdpSocket::recv`) to communicate only with that remote address
     ///
-    /// `UdpSocket` can also be used concurrently to `send_to` and `recv_from` in different tasks,
-    /// all that's required is that you `Arc<UdpSocket>` and clone a reference for each task.
+    /// This type does not provide a `split` method, because this functionality
+    /// can be achieved by instead wrapping the socket in an [`Arc`]. Note that
+    /// you do not need a `Mutex` to share the `UdpSocket` — an `Arc<UdpSocket>`
+    /// is enough. This is because all of the methods take `&self` instead of
+    /// `&mut self`. Once you have wrapped it in an `Arc`, you can call
+    /// `.clone()` on the `Arc<UdpSocket>` to get multiple shared handles to the
+    /// same socket. An example of such usage can be found further down.
+    ///
+    /// [`Arc`]: std::sync::Arc
     ///
     /// # Streams
     ///
@@ -78,11 +85,12 @@ cfg_net! {
     /// }
     /// ```
     ///
-    /// # Example: Sending/Receiving concurrently
+    /// # Example: Splitting with `Arc`
     ///
-    /// Because `send_to` and `recv_from` take `&self`. It's perfectly alright to `Arc<UdpSocket>`
-    /// and share the references to multiple tasks, in order to send/receive concurrently. Here is
-    /// a similar "echo" example but that supports concurrent sending/receiving:
+    /// Because `send_to` and `recv_from` take `&self`. It's perfectly alright
+    /// to use an `Arc<UdpSocket>` and share the references to multiple tasks.
+    /// Here is a similar "echo" example that supports concurrent
+    /// sending/receiving:
     ///
     /// ```no_run
     /// use tokio::{net::UdpSocket, sync::mpsc};
@@ -201,6 +209,48 @@ impl UdpSocket {
     pub fn from_std(socket: net::UdpSocket) -> io::Result<UdpSocket> {
         let io = mio::net::UdpSocket::from_std(socket);
         UdpSocket::new(io)
+    }
+
+    /// Turn a [`tokio::net::UdpSocket`] into a [`std::net::UdpSocket`].
+    ///
+    /// The returned [`std::net::UdpSocket`] will have nonblocking mode set as
+    /// `true`.  Use [`set_nonblocking`] to change the blocking mode if needed.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use std::error::Error;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let tokio_socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await?;
+    ///     let std_socket = tokio_socket.into_std()?;
+    ///     std_socket.set_nonblocking(false)?;
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// [`tokio::net::UdpSocket`]: UdpSocket
+    /// [`std::net::UdpSocket`]: std::net::UdpSocket
+    /// [`set_nonblocking`]: fn@std::net::UdpSocket::set_nonblocking
+    pub fn into_std(self) -> io::Result<std::net::UdpSocket> {
+        #[cfg(unix)]
+        {
+            use std::os::unix::io::{FromRawFd, IntoRawFd};
+            self.io
+                .into_inner()
+                .map(|io| io.into_raw_fd())
+                .map(|raw_fd| unsafe { std::net::UdpSocket::from_raw_fd(raw_fd) })
+        }
+
+        #[cfg(windows)]
+        {
+            use std::os::windows::io::{FromRawSocket, IntoRawSocket};
+            self.io
+                .into_inner()
+                .map(|io| io.into_raw_socket())
+                .map(|raw_socket| unsafe { std::net::UdpSocket::from_raw_socket(raw_socket) })
+        }
     }
 
     /// Returns the local address that this socket is bound to.

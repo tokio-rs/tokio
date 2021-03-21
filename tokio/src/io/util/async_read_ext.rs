@@ -35,7 +35,7 @@ cfg_io_util! {
 
     /// Reads bytes from a source.
     ///
-    /// Implemented as an extention trait, adding utility methods to all
+    /// Implemented as an extension trait, adding utility methods to all
     /// [`AsyncRead`] types. Callers will tend to import this trait instead of
     /// [`AsyncRead`].
     ///

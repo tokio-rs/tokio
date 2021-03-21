@@ -49,7 +49,11 @@ pub fn timeout<T>(duration: Duration, future: T) -> Timeout<T>
 where
     T: Future,
 {
-    let delay = Sleep::new_timeout(Instant::now() + duration);
+    let deadline = Instant::now().checked_add(duration);
+    let delay = match deadline {
+        Some(deadline) => Sleep::new_timeout(deadline),
+        None => Sleep::far_future(),
+    };
     Timeout::new_with_delay(future, delay)
 }
 

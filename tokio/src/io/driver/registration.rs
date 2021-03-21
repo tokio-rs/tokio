@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "net"), allow(dead_code))]
+
 use crate::io::driver::{Direction, Handle, Interest, ReadyEvent, ScheduledIo};
 use crate::util::slab;
 
@@ -205,6 +207,19 @@ impl Registration {
     }
 }
 
+impl Drop for Registration {
+    fn drop(&mut self) {
+        // It is possible for a cycle to be created between wakers stored in
+        // `ScheduledIo` instances and `Arc<driver::Inner>`. To break this
+        // cycle, wakers are cleared. This is an imperfect solution as it is
+        // possible to store a `Registration` in a waker. In this case, the
+        // cycle would remain.
+        //
+        // See tokio-rs/tokio#3481 for more details.
+        self.shared.clear_wakers();
+    }
+}
+
 fn gone() -> io::Error {
     io::Error::new(io::ErrorKind::Other, "IO driver has terminated")
 }
@@ -220,7 +235,10 @@ cfg_io_readiness! {
 
             crate::future::poll_fn(|cx| {
                 if self.handle.inner().is_none() {
-                    return Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, "reactor gone")));
+                    return Poll::Ready(Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR
+                    )));
                 }
 
                 Pin::new(&mut fut).poll(cx).map(Ok)

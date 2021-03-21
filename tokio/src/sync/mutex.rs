@@ -71,13 +71,13 @@ use std::sync::Arc;
 /// async fn main() {
 ///     let count = Arc::new(Mutex::new(0));
 ///
-///     for _ in 0..5 {
+///     for i in 0..5 {
 ///         let my_count = Arc::clone(&count);
 ///         tokio::spawn(async move {
-///             for _ in 0..10 {
+///             for j in 0..10 {
 ///                 let mut lock = my_count.lock().await;
 ///                 *lock += 1;
-///                 println!("{}", lock);
+///                 println!("{} {} {}", i, j, lock);
 ///             }
 ///         });
 ///     }
@@ -100,9 +100,10 @@ use std::sync::Arc;
 /// Tokio's Mutex works in a simple FIFO (first in, first out) style where all
 /// calls to [`lock`] complete in the order they were performed. In that way the
 /// Mutex is "fair" and predictable in how it distributes the locks to inner
-/// data. This is why the output of the program above is an in-order count to
-/// 50. Locks are released and reacquired after every iteration, so basically,
+/// data. Locks are released and reacquired after every iteration, so basically,
 /// each thread goes to the back of the line after it increments the value once.
+/// Note that there's some unpredictability to the timing between when the
+/// threads are started, but once they are going they alternate predictably.
 /// Finally, since there is only a single valid lock at any given time, there is
 /// no possibility of a race condition when mutating the inner value.
 ///
@@ -142,7 +143,7 @@ pub struct MutexGuard<'a, T: ?Sized> {
 /// unlike `MutexGuard`, it will have the `'static` lifetime.
 ///
 /// As long as you have this guard, you have exclusive access to the underlying
-/// `T`. The guard internally keeps a reference-couned pointer to the original
+/// `T`. The guard internally keeps a reference-counted pointer to the original
 /// `Mutex`, so even if the lock goes away, the guard remains valid.
 ///
 /// The lock is automatically released whenever the guard is dropped, at which
@@ -161,13 +162,22 @@ unsafe impl<T> Sync for Mutex<T> where T: ?Sized + Send {}
 unsafe impl<T> Sync for MutexGuard<'_, T> where T: ?Sized + Send + Sync {}
 unsafe impl<T> Sync for OwnedMutexGuard<T> where T: ?Sized + Send + Sync {}
 
-/// Error returned from the [`Mutex::try_lock`] function.
+/// Error returned from the [`Mutex::try_lock`], [`RwLock::try_read`] and
+/// [`RwLock::try_write`] functions.
 ///
-/// A `try_lock` operation can only fail if the mutex is already locked.
+/// `Mutex::try_lock` operation will only fail if the mutex is already locked.
+///
+/// `RwLock::try_read` operation will only fail if the lock is currently held
+/// by an exclusive writer.
+///
+/// `RwLock::try_write` operation will if lock is held by any reader or by an
+/// exclusive writer.
 ///
 /// [`Mutex::try_lock`]: Mutex::try_lock
+/// [`RwLock::try_read`]: fn@super::RwLock::try_read
+/// [`RwLock::try_write`]: fn@super::RwLock::try_write
 #[derive(Debug)]
-pub struct TryLockError(());
+pub struct TryLockError(pub(super) ());
 
 impl fmt::Display for TryLockError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {

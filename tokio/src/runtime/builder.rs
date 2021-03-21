@@ -47,6 +47,9 @@ pub struct Builder {
     /// Whether or not to enable the time driver
     enable_time: bool,
 
+    /// Whether or not the clock should start paused.
+    start_paused: bool,
+
     /// The number of worker threads, used by Runtime.
     ///
     /// Only used when not using the current-thread executor.
@@ -83,6 +86,11 @@ impl Builder {
     /// Returns a new builder with the current thread scheduler selected.
     ///
     /// Configuration methods can be chained on the return value.
+    ///
+    /// To spawn non-`Send` tasks on the resulting runtime, combine it with a
+    /// [`LocalSet`].
+    ///
+    /// [`LocalSet`]: crate::task::LocalSet
     pub fn new_current_thread() -> Builder {
         Builder::new(Kind::CurrentThread)
     }
@@ -109,6 +117,9 @@ impl Builder {
 
             // Time defaults to "off"
             enable_time: false,
+
+            // The clock starts not-paused
+            start_paused: false,
 
             // Default to lazy auto-detection (one thread per CPU core)
             worker_threads: None,
@@ -156,8 +167,8 @@ impl Builder {
 
     /// Sets the number of worker threads the `Runtime` will use.
     ///
-    /// This should be a number between 0 and 32,768 though it is advised to
-    /// keep this value on the smaller side.
+    /// This can be any number above 0 though it is advised to keep this value
+    /// on the smaller side.
     ///
     /// # Default
     ///
@@ -209,19 +220,28 @@ impl Builder {
         self
     }
 
-    /// Specifies limit for threads spawned by the Runtime used for blocking operations.
+    /// Specifies the limit for additional threads spawned by the Runtime.
     ///
-    ///
-    /// Similarly to the `worker_threads`, this number should be between 1 and 32,768.
+    /// These threads are used for blocking operations like tasks spawned
+    /// through [`spawn_blocking`]. Unlike the [`worker_threads`], they are not
+    /// always active and will exit if left idle for too long. You can change
+    /// this timeout duration with [`thread_keep_alive`].
     ///
     /// The default value is 512.
-    ///
-    /// Otherwise as `worker_threads` are always active, it limits additional threads (e.g. for
-    /// blocking annotations).
     ///
     /// # Panic
     ///
     /// This will panic if `val` is not larger than `0`.
+    ///
+    /// # Upgrading from 0.x
+    ///
+    /// In old versions `max_threads` limited both blocking and worker threads, but the
+    /// current `max_blocking_threads` does not include async worker threads in the count.
+    ///
+    /// [`spawn_blocking`]: fn@crate::task::spawn_blocking
+    /// [`worker_threads`]: Self::worker_threads
+    /// [`thread_keep_alive`]: Self::thread_keep_alive
+    #[cfg_attr(docsrs, doc(alias = "max_threads"))]
     pub fn max_blocking_threads(&mut self, val: usize) -> &mut Self {
         assert!(val > 0, "Max blocking threads cannot be set to 0");
         self.max_blocking_threads = val;
@@ -386,6 +406,7 @@ impl Builder {
             },
             enable_io: self.enable_io,
             enable_time: self.enable_time,
+            start_paused: self.start_paused,
         }
     }
 
@@ -484,6 +505,31 @@ cfg_time! {
         /// ```
         pub fn enable_time(&mut self) -> &mut Self {
             self.enable_time = true;
+            self
+        }
+    }
+}
+
+cfg_test_util! {
+    impl Builder {
+        /// Controls if the runtime's clock starts paused or advancing.
+        ///
+        /// Pausing time requires the current-thread runtime; construction of
+        /// the runtime will panic otherwise.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_current_thread()
+        ///     .enable_time()
+        ///     .start_paused(true)
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        pub fn start_paused(&mut self, start_paused: bool) -> &mut Self {
+            self.start_paused = start_paused;
             self
         }
     }

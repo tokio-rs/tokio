@@ -64,9 +64,6 @@ impl TcpListener {
     /// method.
     ///
     /// The address type can be any implementor of the [`ToSocketAddrs`] trait.
-    /// Note that strings only implement this trait when the **`net`** feature
-    /// is enabled, as strings may contain domain names that need to be resolved.
-    ///
     /// If `addr` yields multiple addresses, bind will be attempted with each of
     /// the addresses until one succeeds and returns the listener. If none of
     /// the addresses succeed in creating a listener, the error returned from
@@ -74,7 +71,11 @@ impl TcpListener {
     ///
     /// This function sets the `SO_REUSEADDR` option on the socket.
     ///
+    /// To configure the socket before binding, you can use the [`TcpSocket`]
+    /// type.
+    ///
     /// [`ToSocketAddrs`]: trait@crate::net::ToSocketAddrs
+    /// [`TcpSocket`]: struct@crate::net::TcpSocket
     ///
     /// # Examples
     ///
@@ -191,7 +192,6 @@ impl TcpListener {
     /// backing event loop. This allows configuration of options like
     /// `SO_REUSEPORT`, binding to multiple addresses, etc.
     ///
-    ///
     /// # Examples
     ///
     /// ```rust,no_run
@@ -218,6 +218,48 @@ impl TcpListener {
         let io = mio::net::TcpListener::from_std(listener);
         let io = PollEvented::new(io)?;
         Ok(TcpListener { io })
+    }
+
+    /// Turn a [`tokio::net::TcpListener`] into a [`std::net::TcpListener`].
+    ///
+    /// The returned [`std::net::TcpListener`] will have nonblocking mode set as
+    /// `true`.  Use [`set_nonblocking`] to change the blocking mode if needed.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use std::error::Error;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let tokio_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+    ///     let std_listener = tokio_listener.into_std()?;
+    ///     std_listener.set_nonblocking(false)?;
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// [`tokio::net::TcpListener`]: TcpListener
+    /// [`std::net::TcpListener`]: std::net::TcpListener
+    /// [`set_nonblocking`]: fn@std::net::TcpListener::set_nonblocking
+    pub fn into_std(self) -> io::Result<std::net::TcpListener> {
+        #[cfg(unix)]
+        {
+            use std::os::unix::io::{FromRawFd, IntoRawFd};
+            self.io
+                .into_inner()
+                .map(|io| io.into_raw_fd())
+                .map(|raw_fd| unsafe { std::net::TcpListener::from_raw_fd(raw_fd) })
+        }
+
+        #[cfg(windows)]
+        {
+            use std::os::windows::io::{FromRawSocket, IntoRawSocket};
+            self.io
+                .into_inner()
+                .map(|io| io.into_raw_socket())
+                .map(|raw_socket| unsafe { std::net::TcpListener::from_raw_socket(raw_socket) })
+        }
     }
 
     pub(crate) fn new(listener: mio::net::TcpListener) -> io::Result<TcpListener> {

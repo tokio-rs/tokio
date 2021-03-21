@@ -1,8 +1,8 @@
 on:
   push:
-    branches: ["master"]
+    branches: ["master", "tokio-*.x"]
   pull_request:
-    branches: ["master"]
+    branches: ["master", "tokio-*.x"]
 
 name: CI
 
@@ -28,6 +28,7 @@ jobs:
       - clippy
       - docs
       - loom
+      - valgrind
     steps:
       - run: exit 0
 
@@ -66,6 +67,37 @@ jobs:
       - name: test tests-build --each-feature
         run: cargo hack test --each-feature
         working-directory: tests-build
+
+  valgrind:
+    name: valgrind
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust
+        run: rustup update stable
+
+      - name: Install Valgrind
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y valgrind
+
+      # Compile tests
+      - name: cargo build test-mem
+        run: cargo build --features rt-net --bin test-mem
+        working-directory: tests-integration
+
+      # Run with valgrind
+      - name: Run valgrind test-mem
+        run: valgrind  --leak-check=full --show-leak-kinds=all ./target/debug/test-mem
+
+      # Compile tests
+      - name: cargo build test-process-signal
+        run: cargo build --features rt-process-signal --bin test-process-signal
+        working-directory: tests-integration
+
+      # Run with valgrind
+      - name: Run valgrind test-process-signal
+        run: valgrind --leak-check=full --show-leak-kinds=all ./target/debug/test-process-signal
 
   test-unstable:
     name: test tokio full --unstable
@@ -232,7 +264,7 @@ jobs:
 
       # Run clippy
       - name: "clippy --all"
-        run: cargo clippy --all --tests
+        run: cargo clippy --all --tests --all-features
 
   docs:
     name: docs

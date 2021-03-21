@@ -1,4 +1,3 @@
-#![doc(html_root_url = "https://docs.rs/tokio-test/0.4.0")]
 #![warn(
     missing_debug_implementations,
     missing_docs,
@@ -22,9 +21,9 @@ pub mod task;
 /// future completes.
 ///
 /// For more information, see the documentation for
-/// [`tokio::runtime::current_thread::Runtime::block_on`][runtime-block-on].
+/// [`tokio::runtime::Runtime::block_on`][runtime-block-on].
 ///
-/// [runtime-block-on]: https://docs.rs/tokio/0.2.0-alpha.2/tokio/runtime/current_thread/struct.Runtime.html#method.block_on
+/// [runtime-block-on]: https://docs.rs/tokio/1.3.0/tokio/runtime/struct.Runtime.html#method.block_on
 pub fn block_on<F: std::future::Future>(future: F) -> F::Output {
     use tokio::runtime;
 
