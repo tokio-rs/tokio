@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1616315777531,
+  "lastUpdate": 1616315783247,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -21625,6 +21625,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21296894,
             "range": "± 4370277",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "kai.jewson@gmail.com",
+            "name": "Kai Jewson",
+            "username": "KaiJewson"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "69b129b405518e60e51a26b6a95428878331a4c8",
+          "message": "stream: avoid yielding in AllFuture and AnyFuture (#3625)",
+          "timestamp": "2021-03-21T09:34:18+01:00",
+          "tree_id": "ad89644817967de0c611e1da7d0309bf26e38d74",
+          "url": "https://github.com/tokio-rs/tokio/commit/69b129b405518e60e51a26b6a95428878331a4c8"
+        },
+        "date": 1616315778834,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 198282,
+            "range": "± 33199",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 716313,
+            "range": "± 103597",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5196701,
+            "range": "± 1221627",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21031614,
+            "range": "± 3962394",
             "unit": "ns/iter"
           }
         ]
