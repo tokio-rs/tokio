@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1616353945722,
+  "lastUpdate": 1616353965028,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -33279,6 +33279,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1075,
             "range": "± 169",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ibrah1440@gmail.com",
+            "name": "Ibraheem Ahmed",
+            "username": "ibraheemdev"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "63395f061ed8389ea05610c5d7fbc7be166c77f4",
+          "message": "macros: fix typo in select macro docs (#3629)",
+          "timestamp": "2021-03-21T20:10:28+01:00",
+          "tree_id": "1f7cdc512c3277588374d83ccea7d7e99827aa80",
+          "url": "https://github.com/tokio-rs/tokio/commit/63395f061ed8389ea05610c5d7fbc7be166c77f4"
+        },
+        "date": 1616353962009,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 16976,
+            "range": "± 7081",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1120,
+            "range": "± 228",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 670,
+            "range": "± 140",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 16080,
+            "range": "± 3537",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1161,
+            "range": "± 124",
             "unit": "ns/iter"
           }
         ]
