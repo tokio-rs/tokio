@@ -64,7 +64,8 @@ impl PollSemaphore {
                 }
 
                 let next_fut = Arc::clone(&self.semaphore).acquire_owned();
-                self.permit_fut.get_or_insert(ReusableBoxFuture::new(next_fut));
+                self.permit_fut
+                    .get_or_insert(ReusableBoxFuture::new(next_fut))
             }
         };
 
