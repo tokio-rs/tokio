@@ -55,14 +55,7 @@ impl<T: fmt::Debug> fmt::Debug for OnceCell<T> {
 
 impl<T: Clone> Clone for OnceCell<T> {
     fn clone(&self) -> OnceCell<T> {
-        let new_cell = OnceCell::new();
-        if let Some(value) = self.get() {
-            match new_cell.set(value.clone()) {
-                Ok(()) => (),
-                Err(_) => unreachable!(),
-            }
-        }
-        new_cell
+        OnceCell::new_with(self.get().map(|v| (*v).clone()))
     }
 }
 
@@ -80,6 +73,26 @@ impl<T> OnceCell<T> {
         OnceCell {
             value_set: AtomicBool::new(false),
             value: UnsafeCell::new(MaybeUninit::uninit()),
+            semaphore: Semaphore::new(1),
+        }
+    }
+
+    /// Creates a new initialized OnceCell instance if `value` is `Some`, otherwise
+    /// has the same functionality as [`OnceCell::new`].
+    ///
+    /// [`OnceCell::new`]: crate::sync::OnceCell::new
+    pub fn new_with(value: Option<T>) -> Self {
+        let (value_set, value) = if let Some(v) = value {
+            (AtomicBool::new(true), UnsafeCell::new(MaybeUninit::new(v)))
+        } else {
+            (
+                AtomicBool::new(false),
+                UnsafeCell::new(MaybeUninit::uninit()),
+            )
+        };
+        OnceCell {
+            value_set,
+            value,
             semaphore: Semaphore::new(1),
         }
     }
@@ -238,24 +251,25 @@ impl<T> OnceCell<T> {
     }
 
     /// Moves the value out of the cell and drops the cell afterwards.
-    pub fn into_inner(self) -> Result<T, NotInitializedError> {
+    ///
+    /// Returns `None` if the cell is uninitialized.
+    pub fn into_inner(self) -> Option<T> {
         if self.initialized() {
-            Ok(unsafe { self.value.with(|ptr| ptr::read(ptr).assume_init()) })
+            Some(unsafe { self.value.with(|ptr| ptr::read(ptr).assume_init()) })
         } else {
-            Err(NotInitializedError(()))
+            None
         }
     }
 
-    /// Takes ownership of the current value, leaving the cell unitialized.
-    pub fn take(&mut self) -> Result<T, NotInitializedError> {
+    /// Takes ownership of the current value, leaving the cell uninitialized.
+    ///
+    /// Returns `None` if the cell is uninitialized.
+    pub fn take(&mut self) -> Option<T> {
         if self.initialized() {
-            // Note: ptr::read does not move the value out of `self.value`. We need to use
-            // `self.initialized` to prevent incorrect accesses to value
-            let value = unsafe { self.value.with(|ptr| ptr::read(ptr).assume_init()) };
-            *self.value_set.get_mut() = false;
-            Ok(value)
+            let old_me = std::mem::replace(self, OnceCell::new());
+            old_me.into_inner()
         } else {
-            Err(NotInitializedError(()))
+            None
         }
     }
 }
@@ -318,17 +332,3 @@ impl<T> SetError<T> {
         }
     }
 }
-
-/// Error returned from the [`OnceCell::get`] method
-///
-/// [`OnceCell::get`]: crate::sync::OnceCell::get
-#[derive(Debug, PartialEq)]
-pub struct NotInitializedError(());
-
-impl fmt::Display for NotInitializedError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "NotInitializedError")
-    }
-}
-
-impl Error for NotInitializedError {}

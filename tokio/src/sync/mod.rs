@@ -462,7 +462,7 @@ cfg_sync! {
     pub(crate) use task::AtomicWaker;
 
     mod once_cell;
-    pub use self::once_cell::{OnceCell, NotInitializedError, SetError};
+    pub use self::once_cell::{OnceCell, SetError};
 
     pub mod watch;
 }
