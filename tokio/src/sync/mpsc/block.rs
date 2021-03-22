@@ -34,6 +34,7 @@ pub(crate) struct Block<T> {
 
 pub(crate) enum Read<T> {
     Value(T),
+    NotReady,
     Closed,
 }
 
@@ -56,6 +57,9 @@ const RELEASED: usize = 1 << BLOCK_CAP;
 ///
 /// When this flag is set, the send half of the channel has closed.
 const TX_CLOSED: usize = RELEASED << 1;
+
+/// Flag indicating that a block is not the last one.
+const HAS_NEXT: usize = TX_CLOSED << 1;
 
 /// Mask covering all bits used to track slot readiness.
 const READY_MASK: usize = RELEASED - 1;
@@ -105,6 +109,21 @@ impl<T> Block<T> {
         other_index.wrapping_sub(self.start_index) / BLOCK_CAP
     }
 
+    fn write_in_progress(&self, bits: usize, slot: usize) -> bool {
+        // we first check if any of the slots ahead are ready
+        let mask = (READY_MASK << slot + 1) & READY_MASK;
+        let another_slot_ready = 0 != mask & bits;
+        if another_slot_ready {
+            return true;
+        }
+        // if not, we see whether this block points to a non null
+        // next one. In that case there is another write that has
+        // landed at a position ahead of the current one. In this
+        // case we know that the value we are currently trying to
+        // read is being written.
+        has_next(bits)
+    }
+
     /// Reads the value at the given offset.
     ///
     /// Returns `None` if the slot is empty.
@@ -122,6 +141,10 @@ impl<T> Block<T> {
         if !is_ready(ready_bits, offset) {
             if is_tx_closed(ready_bits) {
                 return Some(Read::Closed);
+            }
+
+            if self.write_in_progress(ready_bits, offset) {
+                return Some(Read::NotReady);
             }
 
             return None;
@@ -201,6 +224,11 @@ impl<T> Block<T> {
     fn set_ready(&self, slot: usize) {
         let mask = 1 << slot;
         self.ready_slots.fetch_or(mask, Release);
+    }
+
+    /// Marks the block as having a next one
+    fn set_has_next(&self) {
+        self.ready_slots.fetch_or(HAS_NEXT, Release);
     }
 
     /// Returns `true` when all slots have their `ready` bits set.
@@ -319,6 +347,7 @@ impl<T> Block<T> {
             None => {
                 // The compare-and-swap succeeded and the newly allocated block
                 // is successfully pushed.
+                self.set_has_next();
                 return new_block;
             }
         };
@@ -359,6 +388,10 @@ fn is_ready(bits: usize, slot: usize) -> bool {
 /// Returns `true` if the closed flag has been set.
 fn is_tx_closed(bits: usize) -> bool {
     TX_CLOSED == bits & TX_CLOSED
+}
+
+fn has_next(bits: usize) -> bool {
+    HAS_NEXT == bits & HAS_NEXT
 }
 
 impl<T> Values<T> {

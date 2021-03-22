@@ -2,6 +2,8 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::future::AtomicWaker;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Arc;
+use crate::loom::thread;
+use crate::sync::mpsc::error::TryRecvError;
 use crate::sync::mpsc::list;
 use crate::sync::notify::Notify;
 
@@ -241,7 +243,9 @@ impl<T, S: Semaphore> Rx<T, S> {
                             coop.made_progress();
                             return Ready(None);
                         }
-                        None => {} // fall through
+                        // fall through
+                        Some(NotReady) => {}
+                        None => {}
                     }
                 };
             }
@@ -260,6 +264,26 @@ impl<T, S: Semaphore> Rx<T, S> {
                 Ready(None)
             } else {
                 Pending
+            }
+        })
+    }
+
+    /// Receives the next value without blocking
+    pub(crate) fn try_recv(&mut self) -> Result<T, TryRecvError> {
+        use super::block::Read::*;
+
+        self.inner.rx_fields.with_mut(|rx_fields_ptr| {
+            let rx_fields = unsafe { &mut *rx_fields_ptr };
+            loop {
+                match rx_fields.list.pop(&self.inner.tx) {
+                    Some(Value(value)) => {
+                        self.inner.semaphore.add_permit();
+                        return Ok(value);
+                    }
+                    Some(Closed) => return Err(TryRecvError::Closed),
+                    Some(NotReady) => thread::yield_now(),
+                    None => return Err(TryRecvError::Empty),
+                }
             }
         })
     }
