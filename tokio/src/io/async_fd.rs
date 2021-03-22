@@ -38,7 +38,7 @@ use std::{task::Context, task::Poll};
 /// On some platforms, the readiness detecting mechanism relies on
 /// edge-triggered notifications. This means that the OS will only notify Tokio
 /// when the file descriptor transitions from not-ready to ready. For this to
-/// work you should first try to read or write and only poll poll for readiness
+/// work you should first try to read or write and only poll for readiness
 /// if that fails with an error of [`std::io::ErrorKind::WouldBlock`].
 ///
 /// Tokio internally tracks when it has received a ready notification, and when
