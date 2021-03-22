@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1616444312357,
+  "lastUpdate": 1616444326545,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -22135,6 +22135,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 22502942,
             "range": "± 3780458",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "daniel@danielzfranklin.org",
+            "name": "Daniel Franklin",
+            "username": "danielzfranklin"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "10abc45da1798b3702390195cde9361828d50a84",
+          "message": "io: clarify requirements of AsyncFd (#3635)",
+          "timestamp": "2021-03-22T21:16:40+01:00",
+          "tree_id": "cbdee801d611c8e1f4c64d5f6a9f1c2d768d70cc",
+          "url": "https://github.com/tokio-rs/tokio/commit/10abc45da1798b3702390195cde9361828d50a84"
+        },
+        "date": 1616444324090,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 192852,
+            "range": "± 5825",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 728538,
+            "range": "± 41891",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5442258,
+            "range": "± 925803",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20782321,
+            "range": "± 3305719",
             "unit": "ns/iter"
           }
         ]
