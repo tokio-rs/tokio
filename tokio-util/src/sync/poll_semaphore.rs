@@ -59,7 +59,10 @@ impl PollSemaphore {
                 // avoid allocations completely if we can grab a permit immediately
                 match Arc::clone(&self.semaphore).try_acquire_owned() {
                     Ok(permit) => return Poll::Ready(Some(permit)),
-                    Err(TryAcquireError::Closed) => return Poll::Ready(None),
+                    Err(TryAcquireError::Closed) => {
+                        self.permit_fut = None;
+                        return Poll::Ready(None);
+                    }
                     Err(TryAcquireError::NoPermits) => {}
                 }
 
