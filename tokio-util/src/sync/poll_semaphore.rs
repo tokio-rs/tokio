@@ -12,17 +12,15 @@ use super::ReusableBoxFuture;
 /// [`Semaphore`]: tokio::sync::Semaphore
 pub struct PollSemaphore {
     semaphore: Arc<Semaphore>,
-    permit_fut: ReusableBoxFuture<Result<OwnedSemaphorePermit, AcquireError>>,
+    permit_fut: Option<ReusableBoxFuture<Result<OwnedSemaphorePermit, AcquireError>>>,
 }
 
 impl PollSemaphore {
     /// Create a new `PollSemaphore`.
     pub fn new(semaphore: Arc<Semaphore>) -> Self {
-        let fut = Arc::clone(&semaphore).acquire_owned();
-
         Self {
             semaphore,
-            permit_fut: ReusableBoxFuture::new(fut),
+            permit_fut: None,
         }
     }
 
@@ -55,10 +53,20 @@ impl PollSemaphore {
     /// the `Waker` from the `Context` passed to the most recent call is
     /// scheduled to receive a wakeup.
     pub fn poll_acquire(&mut self, cx: &mut Context<'_>) -> Poll<Option<OwnedSemaphorePermit>> {
-        let result = ready!(self.permit_fut.poll(cx));
+        let permit_future = match self.permit_fut.as_mut() {
+            Some(fut) => fut,
+            None => {
+                let next_fut = Arc::clone(&self.semaphore).acquire_owned();
+                self.permit_fut = Some(ReusableBoxFuture::new(next_fut));
+
+                self.permit_fut.as_mut().unwrap()
+            }
+        };
+
+        let result = ready!(permit_future.poll(cx));
 
         let next_fut = Arc::clone(&self.semaphore).acquire_owned();
-        self.permit_fut.set(next_fut);
+        permit_future.set(next_fut);
 
         match result {
             Ok(permit) => Poll::Ready(Some(permit)),
