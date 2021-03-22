@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1616445562850,
+  "lastUpdate": 1616445574586,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -34059,6 +34059,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1126,
             "range": "± 12",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "qm3ster@gmail.com",
+            "name": "Mihail Malo",
+            "username": "qm3ster"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6f896d88464e8fc85ad66d002ee79ebd2d22d5a9",
+          "message": "macros: add missing => in doc (#3638)",
+          "timestamp": "2021-03-22T21:37:29+01:00",
+          "tree_id": "8cd9a7838b5f43fa7f528ad10527319b0852e675",
+          "url": "https://github.com/tokio-rs/tokio/commit/6f896d88464e8fc85ad66d002ee79ebd2d22d5a9"
+        },
+        "date": 1616445571920,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 29803,
+            "range": "± 31191",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1136,
+            "range": "± 788",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 641,
+            "range": "± 38",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 22299,
+            "range": "± 16741",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1123,
+            "range": "± 253",
             "unit": "ns/iter"
           }
         ]
