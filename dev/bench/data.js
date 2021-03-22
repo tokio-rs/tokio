@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1616444308953,
+  "lastUpdate": 1616444312357,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -11663,6 +11663,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 615,
             "range": "± 62",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "daniel@danielzfranklin.org",
+            "name": "Daniel Franklin",
+            "username": "danielzfranklin"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "10abc45da1798b3702390195cde9361828d50a84",
+          "message": "io: clarify requirements of AsyncFd (#3635)",
+          "timestamp": "2021-03-22T21:16:40+01:00",
+          "tree_id": "cbdee801d611c8e1f4c64d5f6a9f1c2d768d70cc",
+          "url": "https://github.com/tokio-rs/tokio/commit/10abc45da1798b3702390195cde9361828d50a84"
+        },
+        "date": 1616444307029,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1035,
+            "range": "± 12",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 14302,
+            "range": "± 4957",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1028,
+            "range": "± 135",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 14660,
+            "range": "± 5275",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 594,
+            "range": "± 84",
             "unit": "ns/iter"
           }
         ]
