@@ -111,7 +111,7 @@ impl<T> Block<T> {
 
     fn write_in_progress(&self, bits: usize, slot: usize) -> bool {
         // we first check if any of the slots ahead are ready
-        let mask = (READY_MASK << slot + 1) & READY_MASK;
+        let mask = (READY_MASK << (slot + 1)) & READY_MASK;
         let another_slot_ready = 0 != mask & bits;
         if another_slot_ready {
             return true;

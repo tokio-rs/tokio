@@ -232,8 +232,6 @@ impl<T> Receiver<T> {
     ///
     /// Compared with recv, this function has two failure cases instead of
     /// one (one for disconnection, one for an empty buffer).
-    #[cfg(unix)]
-    #[cfg(any(feature = "signal", feature = "process"))]
     pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
         self.chan.try_recv()
     }
