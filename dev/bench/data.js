@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1616353979985,
+  "lastUpdate": 1616400652421,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -21775,6 +21775,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18837949,
             "range": "± 2971728",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "74891396+somethingelseentirely@users.noreply.github.com",
+            "name": "somethingelseentirely",
+            "username": "somethingelseentirely"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8ed825fd495046ea3c4e83cd33cee2ded0210b84",
+          "message": "util: makes Framed and FramedStream resumable after eof (#3272)",
+          "timestamp": "2021-03-22T09:09:01+01:00",
+          "tree_id": "f54e8f9f36b85351c82ca21b81a19c06201907e3",
+          "url": "https://github.com/tokio-rs/tokio/commit/8ed825fd495046ea3c4e83cd33cee2ded0210b84"
+        },
+        "date": 1616400650144,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 184348,
+            "range": "± 81694",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 679276,
+            "range": "± 132701",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4609840,
+            "range": "± 1573290",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18989792,
+            "range": "± 4317401",
             "unit": "ns/iter"
           }
         ]
