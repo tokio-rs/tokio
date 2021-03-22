@@ -3,7 +3,7 @@ use std::fmt;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use tokio::sync::{AcquireError, OwnedSemaphorePermit, Semaphore};
+use tokio::sync::{AcquireError, OwnedSemaphorePermit, Semaphore, TryAcquireError};
 
 use super::ReusableBoxFuture;
 
@@ -56,6 +56,13 @@ impl PollSemaphore {
         let permit_future = match self.permit_fut.as_mut() {
             Some(fut) => fut,
             None => {
+                // avoid allocations completely if we can grab a permit immediately
+                match Arc::clone(&self.semaphore).try_acquire_owned() {
+                    Ok(permit) => return Poll::Ready(Some(permit)),
+                    Err(TryAcquireError::Closed) => return Poll::Ready(None),
+                    Err(TryAcquireError::NoPermits) => {}
+                }
+
                 let next_fut = Arc::clone(&self.semaphore).acquire_owned();
                 self.permit_fut = Some(ReusableBoxFuture::new(next_fut));
 
