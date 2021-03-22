@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1616400652421,
+  "lastUpdate": 1616400659616,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -11501,6 +11501,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 600,
             "range": "± 249",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "74891396+somethingelseentirely@users.noreply.github.com",
+            "name": "somethingelseentirely",
+            "username": "somethingelseentirely"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8ed825fd495046ea3c4e83cd33cee2ded0210b84",
+          "message": "util: makes Framed and FramedStream resumable after eof (#3272)",
+          "timestamp": "2021-03-22T09:09:01+01:00",
+          "tree_id": "f54e8f9f36b85351c82ca21b81a19c06201907e3",
+          "url": "https://github.com/tokio-rs/tokio/commit/8ed825fd495046ea3c4e83cd33cee2ded0210b84"
+        },
+        "date": 1616400656379,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1059,
+            "range": "± 170",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 16848,
+            "range": "± 6619",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1067,
+            "range": "± 111",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 18313,
+            "range": "± 9613",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 594,
+            "range": "± 134",
             "unit": "ns/iter"
           }
         ]
