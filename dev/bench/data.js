@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1616445558524,
+  "lastUpdate": 1616445562850,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -22237,6 +22237,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20782321,
             "range": "± 3305719",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "qm3ster@gmail.com",
+            "name": "Mihail Malo",
+            "username": "qm3ster"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6f896d88464e8fc85ad66d002ee79ebd2d22d5a9",
+          "message": "macros: add missing => in doc (#3638)",
+          "timestamp": "2021-03-22T21:37:29+01:00",
+          "tree_id": "8cd9a7838b5f43fa7f528ad10527319b0852e675",
+          "url": "https://github.com/tokio-rs/tokio/commit/6f896d88464e8fc85ad66d002ee79ebd2d22d5a9"
+        },
+        "date": 1616445556038,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 194433,
+            "range": "± 42971",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 737802,
+            "range": "± 83106",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5553968,
+            "range": "± 984498",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21983150,
+            "range": "± 3839255",
             "unit": "ns/iter"
           }
         ]
