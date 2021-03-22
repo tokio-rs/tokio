@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1616400667824,
+  "lastUpdate": 1616429053401,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -21877,6 +21877,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18989792,
             "range": "± 4317401",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "quininer@live.com",
+            "name": "quininer",
+            "username": "quininer"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c659e4a757b5a2a63378ead33917f4e072dba5dc",
+          "message": "task: add sync_scope for LocalKey (#3612)",
+          "timestamp": "2021-03-22T17:02:10+01:00",
+          "tree_id": "00fbb811ce037bf49eb8e7b4d8c32fed05a9aa1a",
+          "url": "https://github.com/tokio-rs/tokio/commit/c659e4a757b5a2a63378ead33917f4e072dba5dc"
+        },
+        "date": 1616429051083,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 197999,
+            "range": "± 25862",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 735610,
+            "range": "± 107422",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5068144,
+            "range": "± 1185964",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20095700,
+            "range": "± 4297108",
             "unit": "ns/iter"
           }
         ]
