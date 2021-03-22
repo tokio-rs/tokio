@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1616445574586,
+  "lastUpdate": 1616445578224,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -52259,6 +52259,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 784343,
             "range": "± 67180",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "qm3ster@gmail.com",
+            "name": "Mihail Malo",
+            "username": "qm3ster"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6f896d88464e8fc85ad66d002ee79ebd2d22d5a9",
+          "message": "macros: add missing => in doc (#3638)",
+          "timestamp": "2021-03-22T21:37:29+01:00",
+          "tree_id": "8cd9a7838b5f43fa7f528ad10527319b0852e675",
+          "url": "https://github.com/tokio-rs/tokio/commit/6f896d88464e8fc85ad66d002ee79ebd2d22d5a9"
+        },
+        "date": 1616445575443,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6748595,
+            "range": "± 2569625",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6843268,
+            "range": "± 1353498",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6813496,
+            "range": "± 2595581",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 854,
+            "range": "± 5",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 852,
+            "range": "± 4",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 848,
+            "range": "± 14",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 84575,
+            "range": "± 3473",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1575,
+            "range": "± 101",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1175712,
+            "range": "± 8151",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 856046,
+            "range": "± 1601",
             "unit": "ns/iter"
           }
         ]
