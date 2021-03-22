@@ -58,3 +58,43 @@ futures-test = "0.3.5"
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+
+[[test]]
+name = "codecs"
+path = "tests/codecs.rs"
+required-features = ["codec"]
+
+[[test]]
+name = "length-delimited"
+path = "tests/length_delimited.rs"
+required-features = ["codec"]
+
+[[test]]
+name = "framed"
+path = "tests/framed.rs"
+required-features = ["codec"]
+
+[[test]]
+name = "framed-write"
+path = "tests/framed_write.rs"
+required-features = ["codec"]
+
+[[test]]
+name = "framed-read"
+path = "tests/framed_read.rs"
+required-features = ["codec"]
+
+[[test]]
+name = "udp"
+path = "tests/udp.rs"
+required-features = ["net"]
+
+[[test]]
+name = "io-reader-stream"
+path = "tests/io_reader_stream.rs"
+required-features = ["io"]
+
+[[test]]
+name = "io-stream-reader"
+path = "tests/io_stream_reader.rs"
+required-features = ["io"]
