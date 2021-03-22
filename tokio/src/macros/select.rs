@@ -14,7 +14,7 @@
 /// branch, which evaluates if none of the other branches match their patterns:
 ///
 /// ```text
-/// else <expression>
+/// else => <expression>
 /// ```
 ///
 /// The macro aggregates all `<async expression>` expressions and runs them
