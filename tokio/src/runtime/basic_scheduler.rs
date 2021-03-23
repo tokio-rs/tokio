@@ -221,7 +221,7 @@ impl<P: Park> Inner<P> {
                         Some(task) => crate::coop::budget(|| task.run()),
                         None => {
                             // Park until the thread is signaled
-                            scheduler.park.park().ok().expect("failed to park");
+                            scheduler.park.park().expect("failed to park");
 
                             // Try polling the `block_on` future next
                             continue 'outer;
@@ -234,7 +234,6 @@ impl<P: Park> Inner<P> {
                 scheduler
                     .park
                     .park_timeout(Duration::from_millis(0))
-                    .ok()
                     .expect("failed to park");
             }
         })
