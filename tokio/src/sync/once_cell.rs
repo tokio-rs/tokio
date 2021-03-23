@@ -55,7 +55,7 @@ impl<T: fmt::Debug> fmt::Debug for OnceCell<T> {
 
 impl<T: Clone> Clone for OnceCell<T> {
     fn clone(&self) -> OnceCell<T> {
-        OnceCell::new_with(self.get().map(|v| (*v).clone()))
+        OnceCell::new_with(self.get().cloned())
     }
 }
 
@@ -82,18 +82,16 @@ impl<T> OnceCell<T> {
     ///
     /// [`OnceCell::new`]: crate::sync::OnceCell::new
     pub fn new_with(value: Option<T>) -> Self {
-        let (value_set, value) = if let Some(v) = value {
-            (AtomicBool::new(true), UnsafeCell::new(MaybeUninit::new(v)))
+        if let Some(v) = value {
+            let semaphore = Semaphore::new(0);
+            semaphore.close();
+            OnceCell {
+                value_set: AtomicBool::new(true),
+                value: UnsafeCell::new(MaybeUninit::new(v)),
+                semaphore,
+            }
         } else {
-            (
-                AtomicBool::new(false),
-                UnsafeCell::new(MaybeUninit::uninit()),
-            )
-        };
-        OnceCell {
-            value_set,
-            value,
-            semaphore: Semaphore::new(1),
+            OnceCell::new()
         }
     }
 
@@ -265,12 +263,7 @@ impl<T> OnceCell<T> {
     ///
     /// Returns `None` if the cell is uninitialized.
     pub fn take(&mut self) -> Option<T> {
-        if self.initialized() {
-            let old_me = std::mem::replace(self, OnceCell::new());
-            old_me.into_inner()
-        } else {
-            None
-        }
+        std::mem::take(self).into_inner()
     }
 }
 

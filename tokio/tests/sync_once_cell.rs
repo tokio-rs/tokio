@@ -1,6 +1,8 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
+use std::ops::Drop;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 use tokio::runtime;
 use tokio::sync::{OnceCell, SetError};
@@ -140,4 +142,46 @@ fn set_while_initializing() {
         assert_eq!(*result1, 5);
         assert!(result2.err().unwrap().is_initializing_err());
     });
+}
+
+#[test]
+fn drop_cell() {
+    static NUM_DROPS: AtomicU32 = AtomicU32::new(0);
+
+    struct Foo {}
+
+    let fooer = Foo {};
+
+    impl Drop for Foo {
+        fn drop(&mut self) {
+            NUM_DROPS.fetch_add(1, Ordering::Release);
+        }
+    }
+
+    {
+        let once_cell = OnceCell::new();
+        let _ = once_cell.set(fooer);
+    }
+    assert!(NUM_DROPS.load(Ordering::Acquire) == 1);
+}
+
+#[test]
+fn drop_into_inner() {
+    static NUM_DROPS: AtomicU32 = AtomicU32::new(0);
+
+    struct Foo {}
+
+    let fooer = Foo {};
+
+    impl Drop for Foo {
+        fn drop(&mut self) {
+            NUM_DROPS.fetch_add(1, Ordering::Release);
+        }
+    }
+
+    let once_cell = OnceCell::new();
+    let _ = once_cell.set(fooer);
+    let _ = once_cell.into_inner();
+    let count = NUM_DROPS.load(Ordering::Acquire);
+    assert!(count == 0);
 }
