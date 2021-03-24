@@ -4,6 +4,7 @@ use std::error::Error;
 use std::fmt;
 use std::future::Future;
 use std::mem::MaybeUninit;
+use std::ops::Drop;
 use std::ptr;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -66,6 +67,17 @@ impl<T: PartialEq> PartialEq for OnceCell<T> {
 }
 
 impl<T: Eq> Eq for OnceCell<T> {}
+
+impl<T> Drop for OnceCell<T> {
+    fn drop(&mut self) {
+        if self.initialized() {
+            unsafe {
+                self.value
+                    .with_mut(|ptr| ptr::drop_in_place((&mut *ptr).as_mut_ptr()));
+            };
+        }
+    }
+}
 
 impl<T> OnceCell<T> {
     /// Creates a new uninitialized OnceCell instance.
@@ -253,6 +265,8 @@ impl<T> OnceCell<T> {
     /// Returns `None` if the cell is uninitialized.
     pub fn into_inner(self) -> Option<T> {
         if self.initialized() {
+            // Set to uninitialized for the destructor of `OnceCell` to work properly
+            self.value_set.store(false, Ordering::Release);
             Some(unsafe { self.value.with(|ptr| ptr::read(ptr).assume_init()) })
         } else {
             None
