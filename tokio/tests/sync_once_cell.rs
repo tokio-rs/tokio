@@ -181,7 +181,7 @@ fn drop_into_inner() {
 
     let once_cell = OnceCell::new();
     let _ = once_cell.set(fooer);
-    let _ = once_cell.into_inner();
+    let v = once_cell.into_inner();
     let count = NUM_DROPS.load(Ordering::Acquire);
     assert!(count == 0);
 }
