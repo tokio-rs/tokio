@@ -554,12 +554,13 @@ impl<T: ?Sized> RwLock<T> {
     ///}
     /// ```
     pub async fn write_owned(self: Arc<Self>) -> OwnedRwLockWriteGuard<T> {
-        self.s.acquire(MAX_READS as u32).await.unwrap_or_else(|_| {
+        self.s.acquire(self.mr).await.unwrap_or_else(|_| {
             // The semaphore was closed. but, we never explicitly close it, and we have a
             // handle to it through the Arc, which means that this can never happen.
             unreachable!()
         });
         OwnedRwLockWriteGuard {
+            permits_acquired: self.mr,
             data: self.c.get(),
             lock: ManuallyDrop::new(self),
             _p: PhantomData,
@@ -635,13 +636,14 @@ impl<T: ?Sized> RwLock<T> {
     /// }
     /// ```
     pub fn try_write_owned(self: Arc<Self>) -> Result<OwnedRwLockWriteGuard<T>, TryLockError> {
-        match self.s.try_acquire(MAX_READS as u32) {
+        match self.s.try_acquire(self.mr) {
             Ok(permit) => permit,
             Err(TryAcquireError::NoPermits) => return Err(TryLockError(())),
             Err(TryAcquireError::Closed) => unreachable!(),
         }
 
         Ok(OwnedRwLockWriteGuard {
+            permits_acquired: self.mr,
             data: self.c.get(),
             lock: ManuallyDrop::new(self),
             _p: PhantomData,
