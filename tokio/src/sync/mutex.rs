@@ -10,9 +10,11 @@ use std::sync::Arc;
 
 /// An asynchronous `Mutex`-like type.
 ///
-/// This type acts similarly to an asynchronous [`std::sync::Mutex`], with one
-/// major difference: [`lock`] does not block and the lock guard can be held
-/// across await points.
+/// This type acts similarly to [`std::sync::Mutex`], with two major
+/// differences: [`lock`] is an async method so does not block, and the lock
+/// guard is [`Send`] so can be held across any kind of `.await` point, not just
+/// those which keep the task within a single thread (such as in the context of
+/// a local task set or within a `join!` on the main thread, etc.)
 ///
 /// # Which kind of mutex should you use?
 ///
@@ -123,7 +125,8 @@ pub struct Mutex<T: ?Sized> {
     c: UnsafeCell<T>,
 }
 
-/// A handle to a held `Mutex`.
+/// A handle to a held `Mutex`. The guard can be held across any `.await` point
+/// as it is [`Send`].
 ///
 /// As long as you have this guard, you have exclusive access to the underlying
 /// `T`. The guard internally borrows the `Mutex`, so the mutex will not be
