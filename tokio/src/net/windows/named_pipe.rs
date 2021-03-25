@@ -48,32 +48,34 @@ impl Future for ConnectingInstance {
     type Output = Result<NamedPipe>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        match mem::replace(&mut *self, ConnectingInstance::Ready(None)) {
-            Self::Ready(None) => {
-                // poll on completed future
-                Poll::Pending
+        loop {
+            match mem::replace(&mut *self, ConnectingInstance::Ready(None)) {
+                Self::Ready(None) => {
+                    // poll on completed future
+                    break Poll::Pending;
+                }
+                Self::Ready(Some(pipe)) => break Poll::Ready(Ok(pipe)),
+                Self::Connecting(pipe) => match pipe.poll_write_ready(cx) {
+                    Poll::Ready(Ok(_)) => break Poll::Ready(Ok(pipe)),
+                    Poll::Ready(Err(err)) => break Poll::Ready(Err(err)),
+                    Poll::Pending => {
+                        *self = Self::Connecting(pipe);
+                        break Poll::Pending;
+                    }
+                },
+                Self::New(pipe) => match pipe.io_ref().connect() {
+                    Ok(()) => {
+                        *self = Self::Connecting(pipe);
+                        // loop again to poll for write readiness
+                    }
+                    Err(err) if err.kind() == ErrorKind::WouldBlock => {
+                        *self = Self::Connecting(pipe);
+                        // loop again to poll for write readiness
+                    }
+                    Err(err) => break Poll::Ready(Err(err)),
+                },
+                Self::Error(err) => break Poll::Ready(Err(err)),
             }
-            Self::Ready(Some(pipe)) => Poll::Ready(Ok(pipe)),
-            Self::Connecting(pipe) => match pipe.poll_write_ready(cx) {
-                Poll::Ready(Ok(_)) => Poll::Ready(Ok(pipe)),
-                Poll::Ready(Err(err)) => Poll::Ready(Err(err)),
-                Poll::Pending => {
-                    *self = Self::Connecting(pipe);
-                    Poll::Pending
-                }
-            },
-            Self::New(pipe) => match pipe.io_ref().connect() {
-                Ok(()) => {
-                    *self = Self::Connecting(pipe);
-                    Poll::Pending
-                }
-                Err(err) if err.kind() == ErrorKind::WouldBlock => {
-                    *self = Self::Connecting(pipe);
-                    Poll::Pending
-                }
-                Err(err) => Poll::Ready(Err(err)),
-            },
-            Self::Error(err) => Poll::Ready(Err(err)),
         }
     }
 }
