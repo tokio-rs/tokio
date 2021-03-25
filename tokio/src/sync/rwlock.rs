@@ -268,15 +268,11 @@ impl<T: ?Sized> RwLock<T> {
     /// ```
     #[cfg(all(feature = "parking_lot", not(all(loom, test))))]
     #[cfg_attr(docsrs, doc(cfg(feature = "parking_lot")))]
-    pub const fn const_new_with_max_reads(value: T, max_reads: u32) -> RwLock<T>
+    pub const fn const_new_with_max_reads(value: T, mut max_reads: u32) -> RwLock<T>
     where
         T: Sized,
     {
-        assert!(
-            max_reads <= MAX_READS,
-            "a RwLock may not be created with more than MAX_READS ({})",
-            MAX_READS
-        );
+        max_reads &= MAX_READS;
         RwLock {
             mr: max_reads,
             c: UnsafeCell::new(value),
