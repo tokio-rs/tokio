@@ -1,6 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
+use std::mem;
 use std::ops::Drop;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
@@ -181,7 +182,10 @@ fn drop_into_inner() {
 
     let once_cell = OnceCell::new();
     let _ = once_cell.set(fooer);
-    let _v = once_cell.into_inner();
+    let fooer = once_cell.into_inner();
     let count = NUM_DROPS.load(Ordering::Acquire);
     assert!(count == 0);
+    mem::drop(fooer);
+    let count = NUM_DROPS.load(Ordering::Acquire);
+    assert!(count == 1);
 }

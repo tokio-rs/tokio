@@ -263,10 +263,10 @@ impl<T> OnceCell<T> {
     /// Moves the value out of the cell and drops the cell afterwards.
     ///
     /// Returns `None` if the cell is uninitialized.
-    pub fn into_inner(self) -> Option<T> {
+    pub fn into_inner(mut self) -> Option<T> {
         if self.initialized() {
             // Set to uninitialized for the destructor of `OnceCell` to work properly
-            self.value_set.store(false, Ordering::Release);
+            *self.value_set.get_mut() = false;
             Some(unsafe { self.value.with(|ptr| ptr::read(ptr).assume_init()) })
         } else {
             None
