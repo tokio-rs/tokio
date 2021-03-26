@@ -79,19 +79,19 @@ where
 
 /// Copies data in both directions between `a` and `b`.
 ///
-/// This function returns a future which will read from both streams, and
-/// write any data read to the opposing stream. The data transfer in one
-/// direction (eg, `a` to `b`) will not be blocked if the opposite direction
-/// blocks (e.g. if writing from `b` to `a` is blocked, `a` to `b` will not
-/// be blocked).
+/// This function returns a future that will read from both streams,
+/// writing any data read to the opposing stream.
+/// This happens in both directions concurrently.
 ///
 /// If an EOF is observed on one stream, [`shutdown()`] will be invoked on
 /// the other, and reading from that stream will stop. Copying of data in
 /// the other direction will continue.
 ///
-/// The future will complete successfully once both streams return EOF,
-/// returning a tuple of the number of bytes copied from `a` to `b` and the
-/// number of bytes copied from `b` to `a`, in that order.
+/// The future will complete successfully once both directions of communication has been shut down.
+/// A direction is shut down when the reader reports EOF,
+/// at which point [`shutdown()`] is called on the corresponding writer. When finished,
+/// it will return a tuple of the number of bytes copied from a to b
+/// and the number of bytes copied from b to a, in that order.
 ///
 /// [`shutdown()`]: crate::io::AsyncWriteExt::shutdown
 ///
