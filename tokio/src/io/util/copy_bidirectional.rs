@@ -68,8 +68,8 @@ where
         let a_to_b = transfer_one_direction(cx, a_to_b, &mut *a, &mut *b)?;
         let b_to_a = transfer_one_direction(cx, b_to_a, &mut *b, &mut *a)?;
 
-        // Because transfer_one_direction will keep returning TransferState::Done(count)
-        // if the transfer is done, we can call it in every iteration
+        // It is not a problem if ready! returns early because transfer_one_direction for the
+        // other direction will keep returning TransferState::Done(count) in future calls to poll
         let a_to_b = ready!(a_to_b);
         let b_to_a = ready!(b_to_a);
 
