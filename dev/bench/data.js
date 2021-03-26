@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1616754280725,
+  "lastUpdate": 1616754295763,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -22441,6 +22441,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 22239206,
             "range": "± 3108175",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "724ba348d1754deb29efa70852d0a745f3b0d90e",
+          "message": "chore: fix warning from new Rust version (#3647)",
+          "timestamp": "2021-03-26T19:22:43+09:00",
+          "tree_id": "3714a7b2697ec4f4f53c8275774ef23a92372496",
+          "url": "https://github.com/tokio-rs/tokio/commit/724ba348d1754deb29efa70852d0a745f3b0d90e"
+        },
+        "date": 1616754291099,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 187255,
+            "range": "± 108778",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 672220,
+            "range": "± 112603",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5068670,
+            "range": "± 1745015",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21213279,
+            "range": "± 3879871",
             "unit": "ns/iter"
           }
         ]
