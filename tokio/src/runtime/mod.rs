@@ -250,7 +250,7 @@ cfg_rt! {
     ///
     /// The Tokio runtime implements `Sync` and `Send` to allow you to wrap it
     /// in a `Arc`. Most fn take `&self` to allow you to call them concurrently
-    /// accross multiple threads.
+    /// across multiple threads.
     ///
     /// Calls to `shutdown` and `shutdown_timeout` require exclusive ownership of
     /// the runtime type and this can be achieved via `Arc::try_unwrap` when only

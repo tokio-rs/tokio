@@ -186,7 +186,7 @@ impl<T> Block<T> {
     ///
     /// * The block will no longer be accessed by any sender.
     pub(crate) unsafe fn tx_release(&self, tail_position: usize) {
-        // Track the observed tail_position. Any sender targetting a greater
+        // Track the observed tail_position. Any sender targeting a greater
         // tail_position is guaranteed to not access this block.
         self.observed_tail_position
             .with_mut(|ptr| *ptr = tail_position);
@@ -350,7 +350,7 @@ impl<T> Block<T> {
     }
 }
 
-/// Returns `true` if the specificed slot has a value ready to be consumed.
+/// Returns `true` if the specified slot has a value ready to be consumed.
 fn is_ready(bits: usize, slot: usize) -> bool {
     let mask = 1 << slot;
     mask == mask & bits

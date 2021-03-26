@@ -174,7 +174,7 @@ impl<T: 'static> LocalKey<T> {
 
     /// Accesses the current task-local and runs the provided closure.
     ///
-    /// If the task-local with the accociated key is not present, this
+    /// If the task-local with the associated key is not present, this
     /// method will return an `AccessError`. For a panicking variant,
     /// see `with`.
     pub fn try_with<F, R>(&'static self, f: F) -> Result<R, AccessError>
