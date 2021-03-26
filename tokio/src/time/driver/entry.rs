@@ -544,7 +544,7 @@ impl TimerEntry {
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), super::Error>> {
         if self.driver.is_shutdown() {
-            panic!(crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR);
+            panic!("{}", crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR);
         }
 
         if let Some(deadline) = self.initial_deadline {
