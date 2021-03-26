@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1616754295763,
+  "lastUpdate": 1616754300583,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -34371,6 +34371,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1207,
             "range": "± 208",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alice@ryhl.io",
+            "name": "Alice Ryhl",
+            "username": "Darksonn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "724ba348d1754deb29efa70852d0a745f3b0d90e",
+          "message": "chore: fix warning from new Rust version (#3647)",
+          "timestamp": "2021-03-26T19:22:43+09:00",
+          "tree_id": "3714a7b2697ec4f4f53c8275774ef23a92372496",
+          "url": "https://github.com/tokio-rs/tokio/commit/724ba348d1754deb29efa70852d0a745f3b0d90e"
+        },
+        "date": 1616754294707,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 17994,
+            "range": "± 8791",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1074,
+            "range": "± 95",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 648,
+            "range": "± 84",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 17519,
+            "range": "± 7512",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1135,
+            "range": "± 93",
             "unit": "ns/iter"
           }
         ]
