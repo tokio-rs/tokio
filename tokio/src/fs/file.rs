@@ -764,7 +764,7 @@ impl Inner {
 #[cfg(all(target_os = "linux", not(test)))]
 mod read_nowait {
     use crate::io::ReadBuf;
-    use libc::{c_int, c_void, iovec, off_t, preadv2};
+    use libc::{c_int, c_long, c_void, iovec, off_t, ssize_t};
     use std::{
         os::unix::prelude::AsRawFd,
         sync::atomic::{AtomicBool, Ordering},
@@ -779,7 +779,7 @@ mod read_nowait {
         if !NONBLOCKING_READ_SUPPORTED.load(Ordering::Relaxed) {
             return None;
         }
-        let out = preadv2_safe(file, dst, -1, libc::RWF_NOWAIT);
+        let out = preadv2_safe(file, dst, -1, RWF_NOWAIT);
         if let Err(err) = &out {
             match err.raw_os_error() {
                 Some(libc::ENOSYS) => {
@@ -821,6 +821,32 @@ mod read_nowait {
                 Ok(())
             }
         }
+    }
+
+    fn pos_to_lohi(offset: off_t) -> (c_long, c_long) {
+        // 64-bit offset is split over high and low 32-bits on 32-bit architectures.
+        // 64-bit architectures still have high and low arguments, but only the low
+        // one is inspected.  See pos_from_hilo in linux/fs/read_write.c.
+        const HALF_LONG_BITS: usize = core::mem::size_of::<c_long>() * 8 / 2;
+        (
+            offset as c_long,
+            // We want to shift this off_t value by size_of::<c_long>(). We can't do
+            // it in one shift because if they're both 64-bits we'd be doing u64 >> 64
+            // which is implementation defined.  Instead do it in two halves:
+            ((offset >> HALF_LONG_BITS) >> HALF_LONG_BITS) as c_long,
+        )
+    }
+
+    const RWF_NOWAIT: c_int = 0x00000008;
+    unsafe fn preadv2(
+        fd: c_int,
+        iov: *const iovec,
+        iovcnt: c_int,
+        offset: off_t,
+        flags: c_int,
+    ) -> ssize_t {
+        let (lo, hi) = pos_to_lohi(offset);
+        libc::syscall(libc::SYS_preadv2, fd, iov, iovcnt, lo, hi, flags) as ssize_t
     }
 }
 
