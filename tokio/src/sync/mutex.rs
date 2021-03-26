@@ -20,18 +20,18 @@ use std::sync::Arc;
 /// [`Mutex`][std] from the standard library in asynchronous code.
 ///
 /// The feature that the async mutex offers over the blocking mutex is the
-/// ability to keep it locked across an `.await` point, which makes the async
-/// mutex more expensive than the ordinary one and is rarely necessary. The
-/// primary use case for the async mutex is to provide shared mutable access to
-/// IO resources such as a database connection. If the value behind the mutex is
-/// just data, it's usually appropriate to use a blocking mutex such as the one
-/// in the standard library or [`parking_lot`].
+/// ability to keep it locked across an `.await` point. This makes the async
+/// mutex more expensive than the blocking mutex, so the blocking mutex should
+/// be preferred in the cases where it can be used. The primary use case for the
+/// async mutex is to provide shared mutable access to IO resources such as a
+/// database connection. If the value behind the mutex is just data, it's
+/// usually appropriate to use a blocking mutex such as the one in the standard
+/// library or [`parking_lot`].
 ///
-/// Note that, whilst the compiler will not prevent the std `Mutex` from holding
+/// Note that, although the compiler will not prevent the std `Mutex` from holding
 /// its guard across `.await` points in situations where the task is not movable
-/// between threads, such as in the context of a local task set or within a
-/// `join!` on the main thread, etc., this is unlikely to lead to correct
-/// concurrent code in practice as it can easily lead to deadlocks.
+/// between threads, this virtually never leads to correct concurrent code in
+/// practice as it can easily lead to deadlocks.
 ///
 /// A common pattern is to wrap the `Arc<Mutex<...>>` in a struct that provides
 /// non-async methods for performing operations on the data within, and only
