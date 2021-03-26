@@ -12,23 +12,26 @@ use std::sync::Arc;
 ///
 /// This type acts similarly to [`std::sync::Mutex`], with two major
 /// differences: [`lock`] is an async method so does not block, and the lock
-/// guard is [`Send`] so can be held across any kind of `.await` point, not just
-/// those which keep the task within a single thread (such as in the context of
-/// a local task set or within a `join!` on the main thread, etc.)
+/// guard is designed to be held across `.await` points.
 ///
 /// # Which kind of mutex should you use?
 ///
 /// Contrary to popular belief, it is ok and often preferred to use the ordinary
-/// [`Mutex`][std] from the standard library in asynchronous code. This section
-/// will help you decide on which kind of mutex you should use.
+/// [`Mutex`][std] from the standard library in asynchronous code.
 ///
-/// The primary use case of the async mutex is to provide shared mutable access
-/// to IO resources such as a database connection. If the data stored behind the
-/// mutex is just data, it is often better to use a blocking mutex such as the
-/// one in the standard library or [`parking_lot`]. This is because the feature
-/// that the async mutex offers over the blocking mutex is that it is possible
-/// to keep the mutex locked across an `.await` point, which is rarely necessary
-/// for data.
+/// The feature that the async mutex offers over the blocking mutex is the
+/// ability to keep it locked across an `.await` point, which makes the async
+/// mutex more expensive than the ordinary one and is rarely necessary. The
+/// primary use case for the async mutex is to provide shared mutable access to
+/// IO resources such as a database connection. If the value behind the mutex is
+/// just data, it's usually appropriate to use a blocking mutex such as the one
+/// in the standard library or [`parking_lot`].
+///
+/// Note that, whilst the compiler will not prevent the std `Mutex` from holding
+/// its guard across `.await` points in situations where the task is not movable
+/// between threads, such as in the context of a local task set or within a
+/// `join!` on the main thread, etc., this is unlikely to lead to correct
+/// concurrent code in practice as it can easily lead to deadlocks.
 ///
 /// A common pattern is to wrap the `Arc<Mutex<...>>` in a struct that provides
 /// non-async methods for performing operations on the data within, and only
