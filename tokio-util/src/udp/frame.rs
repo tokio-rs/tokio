@@ -37,7 +37,7 @@ use std::{io, mem::MaybeUninit};
 #[must_use = "sinks do nothing unless polled"]
 #[cfg_attr(docsrs, doc(all(feature = "codec", feature = "udp")))]
 #[derive(Debug)]
-pub struct UdpFramed<T, C> {
+pub struct UdpFramed<C, T = UdpSocket> {
     socket: T,
     codec: C,
     rd: BytesMut,
@@ -51,10 +51,12 @@ pub struct UdpFramed<T, C> {
 const INITIAL_RD_CAPACITY: usize = 64 * 1024;
 const INITIAL_WR_CAPACITY: usize = 8 * 1024;
 
-impl<T, C> Stream for UdpFramed<T, C>
+impl<C, T> Unpin for UdpFramed<C, T> {}
+
+impl<C, T> Stream for UdpFramed<C, T>
 where
-    T: Borrow<UdpSocket> + Unpin,
-    C: Decoder + Unpin,
+    T: Borrow<UdpSocket>,
+    C: Decoder,
 {
     type Item = Result<(C::Item, SocketAddr), C::Error>;
 
@@ -86,7 +88,7 @@ where
                 let buf = &mut *(pin.rd.chunk_mut() as *mut _ as *mut [MaybeUninit<u8>]);
                 let mut read = ReadBuf::uninit(buf);
                 let ptr = read.filled().as_ptr();
-                let res = ready!(Pin::new(&mut pin.socket.borrow()).poll_recv_from(cx, &mut read));
+                let res = ready!(pin.socket.borrow().poll_recv_from(cx, &mut read));
 
                 assert_eq!(ptr, read.filled().as_ptr());
                 let addr = res?;
@@ -100,10 +102,10 @@ where
     }
 }
 
-impl<T, I, C> Sink<(I, SocketAddr)> for UdpFramed<T, C>
+impl<I, C, T> Sink<(I, SocketAddr)> for UdpFramed<C, T>
 where
-    T: Borrow<UdpSocket> + Unpin,
-    C: Encoder<I> + Unpin,
+    T: Borrow<UdpSocket>,
+    C: Encoder<I>,
 {
     type Error = C::Error;
 
@@ -167,14 +169,14 @@ where
     }
 }
 
-impl<T, C> UdpFramed<T, C>
+impl<C, T> UdpFramed<C, T>
 where
     T: Borrow<UdpSocket>,
 {
     /// Create a new `UdpFramed` backed by the given socket and codec.
     ///
     /// See struct level documentation for more details.
-    pub fn new(socket: T, codec: C) -> UdpFramed<T, C> {
+    pub fn new(socket: T, codec: C) -> UdpFramed<C, T> {
         Self {
             socket,
             codec,
@@ -194,8 +196,19 @@ where
     /// Care should be taken to not tamper with the underlying stream of data
     /// coming in as it may corrupt the stream of frames otherwise being worked
     /// with.
-    pub fn get_ref(&self) -> &UdpSocket {
-        &self.socket.borrow()
+    pub fn get_ref(&self) -> &T {
+        &self.socket
+    }
+
+    /// Returns a mutable reference to the underlying I/O stream wrapped by `Framed`.
+    ///
+    /// # Note
+    ///
+    /// Care should be taken to not tamper with the underlying stream of data
+    /// coming in as it may corrupt the stream of frames otherwise being worked
+    /// with.
+    pub fn get_mut(&mut self) -> &mut T {
+        &mut self.socket
     }
 
     /// Returns a reference to the underlying codec wrapped by
