@@ -479,7 +479,7 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
-    /// use tokio::process::Command;;
+    /// use tokio::process::Command;
     /// use std::process::Stdio;
     ///
     /// let command = Command::new("ls")
@@ -503,7 +503,7 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
-    /// use tokio::process::Command;;
+    /// use tokio::process::Command;
     /// use std::process::{Stdio};
     ///
     /// let command = Command::new("ls")

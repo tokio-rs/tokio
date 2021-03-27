@@ -14,7 +14,7 @@
 /// branch, which evaluates if none of the other branches match their patterns:
 ///
 /// ```text
-/// else <expression>
+/// else => <expression>
 /// ```
 ///
 /// The macro aggregates all `<async expression>` expressions and runs them
@@ -134,7 +134,7 @@
 /// are always ready.
 ///
 /// This behavior can be overridden by adding `biased;` to the beginning of the
-/// macro usage. See the exmples for details. This will cause `select` to poll
+/// macro usage. See the examples for details. This will cause `select` to poll
 /// the futures in the order they appear from top to bottom. There are a few
 /// reasons you may want this:
 ///

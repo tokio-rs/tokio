@@ -9,7 +9,7 @@ use std::ops;
 /// RAII structure used to release the exclusive write access of a lock when
 /// dropped.
 ///
-/// This structure is created by the [`write`] and method
+/// This structure is created by the [`write`] method
 /// on [`RwLock`].
 ///
 /// [`write`]: method@crate::sync::RwLock::write

@@ -3,7 +3,7 @@ use std::fmt;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use tokio::sync::{AcquireError, OwnedSemaphorePermit, Semaphore};
+use tokio::sync::{AcquireError, OwnedSemaphorePermit, Semaphore, TryAcquireError};
 
 use super::ReusableBoxFuture;
 
@@ -12,17 +12,15 @@ use super::ReusableBoxFuture;
 /// [`Semaphore`]: tokio::sync::Semaphore
 pub struct PollSemaphore {
     semaphore: Arc<Semaphore>,
-    permit_fut: ReusableBoxFuture<Result<OwnedSemaphorePermit, AcquireError>>,
+    permit_fut: Option<ReusableBoxFuture<Result<OwnedSemaphorePermit, AcquireError>>>,
 }
 
 impl PollSemaphore {
     /// Create a new `PollSemaphore`.
     pub fn new(semaphore: Arc<Semaphore>) -> Self {
-        let fut = Arc::clone(&semaphore).acquire_owned();
-
         Self {
             semaphore,
-            permit_fut: ReusableBoxFuture::new(fut),
+            permit_fut: None,
         }
     }
 
@@ -55,14 +53,33 @@ impl PollSemaphore {
     /// the `Waker` from the `Context` passed to the most recent call is
     /// scheduled to receive a wakeup.
     pub fn poll_acquire(&mut self, cx: &mut Context<'_>) -> Poll<Option<OwnedSemaphorePermit>> {
-        let result = ready!(self.permit_fut.poll(cx));
+        let permit_future = match self.permit_fut.as_mut() {
+            Some(fut) => fut,
+            None => {
+                // avoid allocations completely if we can grab a permit immediately
+                match Arc::clone(&self.semaphore).try_acquire_owned() {
+                    Ok(permit) => return Poll::Ready(Some(permit)),
+                    Err(TryAcquireError::Closed) => return Poll::Ready(None),
+                    Err(TryAcquireError::NoPermits) => {}
+                }
+
+                let next_fut = Arc::clone(&self.semaphore).acquire_owned();
+                self.permit_fut
+                    .get_or_insert(ReusableBoxFuture::new(next_fut))
+            }
+        };
+
+        let result = ready!(permit_future.poll(cx));
 
         let next_fut = Arc::clone(&self.semaphore).acquire_owned();
-        self.permit_fut.set(next_fut);
+        permit_future.set(next_fut);
 
         match result {
             Ok(permit) => Poll::Ready(Some(permit)),
-            Err(_closed) => Poll::Ready(None),
+            Err(_closed) => {
+                self.permit_fut = None;
+                Poll::Ready(None)
+            }
         }
     }
 }

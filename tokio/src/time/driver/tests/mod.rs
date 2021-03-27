@@ -3,7 +3,7 @@ use std::{task::Context, time::Duration};
 #[cfg(not(loom))]
 use futures::task::noop_waker_ref;
 
-use crate::loom::sync::{Arc, Mutex};
+use crate::loom::sync::Arc;
 use crate::loom::thread;
 use crate::{
     loom::sync::atomic::{AtomicBool, Ordering},
@@ -45,7 +45,7 @@ fn single_timer() {
         let time_source = super::ClockTime::new(clock.clone());
 
         let inner = super::Inner::new(time_source.clone(), MockUnpark::mock());
-        let handle = Handle::new(Arc::new(Mutex::new(inner)));
+        let handle = Handle::new(Arc::new(inner));
 
         let handle_ = handle.clone();
         let jh = thread::spawn(move || {
@@ -76,7 +76,7 @@ fn drop_timer() {
         let time_source = super::ClockTime::new(clock.clone());
 
         let inner = super::Inner::new(time_source.clone(), MockUnpark::mock());
-        let handle = Handle::new(Arc::new(Mutex::new(inner)));
+        let handle = Handle::new(Arc::new(inner));
 
         let handle_ = handle.clone();
         let jh = thread::spawn(move || {
@@ -107,7 +107,7 @@ fn change_waker() {
         let time_source = super::ClockTime::new(clock.clone());
 
         let inner = super::Inner::new(time_source.clone(), MockUnpark::mock());
-        let handle = Handle::new(Arc::new(Mutex::new(inner)));
+        let handle = Handle::new(Arc::new(inner));
 
         let handle_ = handle.clone();
         let jh = thread::spawn(move || {
@@ -142,7 +142,7 @@ fn reset_future() {
         let time_source = super::ClockTime::new(clock.clone());
 
         let inner = super::Inner::new(time_source.clone(), MockUnpark::mock());
-        let handle = Handle::new(Arc::new(Mutex::new(inner)));
+        let handle = Handle::new(Arc::new(inner));
 
         let handle_ = handle.clone();
         let finished_early_ = finished_early.clone();
@@ -191,7 +191,7 @@ fn poll_process_levels() {
     let time_source = super::ClockTime::new(clock.clone());
 
     let inner = super::Inner::new(time_source, MockUnpark::mock());
-    let handle = Handle::new(Arc::new(Mutex::new(inner)));
+    let handle = Handle::new(Arc::new(inner));
 
     let mut entries = vec![];
 
@@ -232,7 +232,7 @@ fn poll_process_levels_targeted() {
     let time_source = super::ClockTime::new(clock.clone());
 
     let inner = super::Inner::new(time_source, MockUnpark::mock());
-    let handle = Handle::new(Arc::new(Mutex::new(inner)));
+    let handle = Handle::new(Arc::new(inner));
 
     let e1 = TimerEntry::new(&handle, clock.now() + Duration::from_millis(193));
     pin!(e1);

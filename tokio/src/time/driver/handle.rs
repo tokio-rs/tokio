@@ -1,4 +1,4 @@
-use crate::loom::sync::{Arc, Mutex};
+use crate::loom::sync::Arc;
 use crate::time::driver::ClockTime;
 use std::fmt;
 
@@ -6,13 +6,13 @@ use std::fmt;
 #[derive(Clone)]
 pub(crate) struct Handle {
     time_source: ClockTime,
-    inner: Arc<Mutex<super::Inner>>,
+    inner: Arc<super::Inner>,
 }
 
 impl Handle {
     /// Creates a new timer `Handle` from a shared `Inner` timer state.
-    pub(super) fn new(inner: Arc<Mutex<super::Inner>>) -> Self {
-        let time_source = inner.lock().time_source.clone();
+    pub(super) fn new(inner: Arc<super::Inner>) -> Self {
+        let time_source = inner.state.lock().time_source.clone();
         Handle { time_source, inner }
     }
 
@@ -21,9 +21,14 @@ impl Handle {
         &self.time_source
     }
 
-    /// Locks the driver's inner structure
-    pub(super) fn lock(&self) -> crate::loom::sync::MutexGuard<'_, super::Inner> {
-        self.inner.lock()
+    /// Access the driver's inner structure
+    pub(super) fn get(&self) -> &super::Inner {
+        &*self.inner
+    }
+
+    // Check whether the driver has been shutdown
+    pub(super) fn is_shutdown(&self) -> bool {
+        self.inner.is_shutdown()
     }
 }
 
@@ -43,7 +48,7 @@ cfg_rt! {
         /// since the function is executed outside of the runtime.
         /// Whereas `rt.block_on(async {delay_for(...).await})` doesn't panic.
         /// And this is because wrapping the function on an async makes it lazy,
-        /// and so gets executed inside the runtime successfuly without
+        /// and so gets executed inside the runtime successfully without
         /// panicking.
         pub(crate) fn current() -> Self {
             crate::runtime::context::time_handle()
@@ -68,7 +73,7 @@ cfg_not_rt! {
         /// since the function is executed outside of the runtime.
         /// Whereas `rt.block_on(async {delay_for(...).await})` doesn't
         /// panic. And this is because wrapping the function on an async makes it
-        /// lazy, and so outside executed inside the runtime successfuly without
+        /// lazy, and so outside executed inside the runtime successfully without
         /// panicking.
         pub(crate) fn current() -> Self {
             panic!(crate::util::error::CONTEXT_MISSING_ERROR)

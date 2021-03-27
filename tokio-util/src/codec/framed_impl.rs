@@ -120,42 +120,97 @@ where
 
         let mut pinned = self.project();
         let state: &mut ReadFrame = pinned.state.borrow_mut();
+        // The following loops implements a state machine with each state corresponding
+        // to a combination of the `is_readable` and `eof` flags. States persist across
+        // loop entries and most state transitions occur with a return.
+        //
+        // The intitial state is `reading`.
+        //
+        // | state   | eof   | is_readable |
+        // |---------|-------|-------------|
+        // | reading | false | false       |
+        // | framing | false | true        |
+        // | pausing | true  | true        |
+        // | paused  | true  | false       |
+        //
+        //                                 `decode_eof`
+        //                                 returns `Some`             read 0 bytes
+        //                                   │       │                 │      │
+        //                                   │       ▼                 │      ▼
+        //                                   ┌───────┐ `decode_eof`    ┌──────┐
+        //                 ┌──read 0 bytes──▶│pausing│─returns `None`─▶│paused│──┐
+        //                 │                 └───────┘                 └──────┘  │
+        // pending read┐   │                     ┌──────┐                  │  ▲  │
+        //      │      │   │                     │      │                  │  │  │
+        //      │      ▼   │                     │  `decode` returns `Some`│ pending read
+        //      │  ╔═══════╗                 ┌───────┐◀─┘                  │
+        //      └──║reading║─read n>0 bytes─▶│framing│                     │
+        //         ╚═══════╝                 └───────┘◀──────read n>0 bytes┘
+        //             ▲                         │
+        //             │                         │
+        //             └─`decode` returns `None`─┘
         loop {
-            // Repeatedly call `decode` or `decode_eof` as long as it is
-            // "readable". Readable is defined as not having returned `None`. If
-            // the upstream has returned EOF, and the decoder is no longer
-            // readable, it can be assumed that the decoder will never become
-            // readable again, at which point the stream is terminated.
+            // Repeatedly call `decode` or `decode_eof` while the buffer is "readable",
+            // i.e. it _might_ contain data consumable as a frame or closing frame.
+            // Both signal that there is no such data by returning `None`.
+            //
+            // If `decode` couldn't read a frame and the upstream source has returned eof,
+            // `decode_eof` will attemp to decode the remaining bytes as closing frames.
+            //
+            // If the underlying AsyncRead is resumable, we may continue after an EOF,
+            // but must finish emmiting all of it's associated `decode_eof` frames.
+            // Furthermore, we don't want to emit any `decode_eof` frames on retried
+            // reads after an EOF unless we've actually read more data.
             if state.is_readable {
+                // pausing or framing
                 if state.eof {
+                    // pausing
                     let frame = pinned.codec.decode_eof(&mut state.buffer)?;
+                    if frame.is_none() {
+                        state.is_readable = false; // prepare pausing -> paused
+                    }
+                    // implicit pausing -> pausing or pausing -> paused
                     return Poll::Ready(frame.map(Ok));
                 }
 
+                // framing
                 trace!("attempting to decode a frame");
 
                 if let Some(frame) = pinned.codec.decode(&mut state.buffer)? {
                     trace!("frame decoded from buffer");
+                    // implicit framing -> framing
                     return Poll::Ready(Some(Ok(frame)));
                 }
 
+                // framing -> reading
                 state.is_readable = false;
             }
-
-            assert!(!state.eof);
-
-            // Otherwise, try to read more data and try again. Make sure we've
-            // got room for at least one byte to read to ensure that we don't
-            // get a spurious 0 that looks like EOF
+            // reading or paused
+            // If we can't build a frame yet, try to read more data and try again.
+            // Make sure we've got room for at least one byte to read to ensure
+            // that we don't get a spurious 0 that looks like EOF.
             state.buffer.reserve(1);
             let bytect = match poll_read_buf(pinned.inner.as_mut(), cx, &mut state.buffer)? {
                 Poll::Ready(ct) => ct,
+                // implicit reading -> reading or implicit paused -> paused
                 Poll::Pending => return Poll::Pending,
             };
             if bytect == 0 {
+                if state.eof {
+                    // We're already at an EOF, and since we've reached this path
+                    // we're also not readable. This implies that we've already finished
+                    // our `decode_eof` handling, so we can simply return `None`.
+                    // implicit paused -> paused
+                    return Poll::Ready(None);
+                }
+                // prepare reading -> paused
                 state.eof = true;
+            } else {
+                // prepare paused -> framing or noop reading -> framing
+                state.eof = false;
             }
 
+            // paused -> framing or reading -> framing or reading -> pausing
             state.is_readable = true;
         }
     }

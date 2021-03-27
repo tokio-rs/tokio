@@ -451,6 +451,9 @@ cfg_sync! {
 
     mod rwlock;
     pub use rwlock::RwLock;
+    pub use rwlock::owned_read_guard::OwnedRwLockReadGuard;
+    pub use rwlock::owned_write_guard::OwnedRwLockWriteGuard;
+    pub use rwlock::owned_write_guard_mapped::OwnedRwLockMappedWriteGuard;
     pub use rwlock::read_guard::RwLockReadGuard;
     pub use rwlock::write_guard::RwLockWriteGuard;
     pub use rwlock::write_guard_mapped::RwLockMappedWriteGuard;

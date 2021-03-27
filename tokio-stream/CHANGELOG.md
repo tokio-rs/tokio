@@ -1,3 +1,11 @@
+# 0.1.5 (March 20, 2021)
+
+### Fixed
+
+- stream: documentation note for throttle `Unpin` ([#3600])
+
+[#3600]: https://github.com/tokio-rs/tokio/pull/3600
+
 # 0.1.4 (March 9, 2021)
 
 Added
