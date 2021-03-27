@@ -126,7 +126,7 @@ impl<L: Link> LinkedList<L, L::Target> {
         }
     }
 
-    /// Returns whether the linked list doesn not contain any node
+    /// Returns whether the linked list does not contain any node
     pub(crate) fn is_empty(&self) -> bool {
         if self.head.is_some() {
             return false;
