@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1616848090838,
+  "lastUpdate": 1616848094068,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -12041,6 +12041,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 573,
             "range": "± 88",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "46445660+CorinJG@users.noreply.github.com",
+            "name": "CorinJG",
+            "username": "CorinJG"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1a80d6eee542847c9e8399f1c6a0d495fb3817a0",
+          "message": "sync: improve doc on blocking mutex (#3645)",
+          "timestamp": "2021-03-27T13:26:10+01:00",
+          "tree_id": "a0d10efb9b60d62a44902a624c6f3b851d1c8ddf",
+          "url": "https://github.com/tokio-rs/tokio/commit/1a80d6eee542847c9e8399f1c6a0d495fb3817a0"
+        },
+        "date": 1616848089042,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1076,
+            "range": "± 281",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 15711,
+            "range": "± 5445",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1069,
+            "range": "± 882",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 17163,
+            "range": "± 6645",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 598,
+            "range": "± 81",
             "unit": "ns/iter"
           }
         ]
