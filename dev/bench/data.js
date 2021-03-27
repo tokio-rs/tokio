@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1616815793791,
+  "lastUpdate": 1616815800809,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -22543,6 +22543,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21213279,
             "range": "± 3879871",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "53787217+qwerty541@users.noreply.github.com",
+            "name": "Alexandr",
+            "username": "qwerty541"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9a3603fa75ff854e007d372061edf47cf8d02690",
+          "message": "chore: fix several typos in docs (#3651)",
+          "timestamp": "2021-03-27T12:27:52+09:00",
+          "tree_id": "711d1fd048fb5f915249464653cdfad3daf62a27",
+          "url": "https://github.com/tokio-rs/tokio/commit/9a3603fa75ff854e007d372061edf47cf8d02690"
+        },
+        "date": 1616815797924,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 189867,
+            "range": "± 23001",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 680246,
+            "range": "± 139660",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4587693,
+            "range": "± 1034378",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19405802,
+            "range": "± 2257913",
             "unit": "ns/iter"
           }
         ]
