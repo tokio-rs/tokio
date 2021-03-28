@@ -1,8 +1,10 @@
 use crate::task::JoinHandle;
 
 cfg_rt_multi_thread! {
-    /// Runs the provided blocking function on the current thread without
-    /// blocking the executor.
+    /// Runs the provided blocking function on the current thread (synchronous
+    /// context) without blocking the executor. This function could be a
+    /// replacement for [`thread::spawn`] in cases where a `join` is needed
+    /// but will block the executor whereas this does not.
     ///
     /// In general, issuing a blocking call or performing a lot of compute in a
     /// future without yielding is not okay, as it may prevent the executor from
@@ -72,7 +74,7 @@ cfg_rt! {
     ///
     /// This function is intended for non-async operations that eventually finish on
     /// their own. If you want to spawn an ordinary thread, you should use
-    /// [`thread::spawn`] instead.
+    /// [`block_in_place`] or [`thread::spawn`] instead.
     ///
     /// Closures spawned using `spawn_blocking` cannot be cancelled. When you shut
     /// down the executor, it will wait indefinitely for all blocking operations to
