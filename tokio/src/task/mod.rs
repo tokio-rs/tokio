@@ -161,11 +161,11 @@
 //!
 //! When using the [multi-threaded runtime][rt-multi-thread], the [`task::block_in_place`]
 //! function is also available. Like `task::spawn_blocking`, this function
-//! allows running a blocking operation from an asynchronous context. Unlike
-//! `spawn_blocking`, however, `block_in_place` works by transitioning the
-//! _current_ worker thread to a blocking thread, moving other tasks running on
-//! that thread to another worker thread. This can improve performance by avoiding
-//! context switches.
+//! allows running a blocking operation from an asynchronous context (or a
+//! synchronous context within asynchronous context). Unlike `spawn_blocking`,
+//! however, `block_in_place` works by transitioning the _current_ worker thread
+//! to a blocking thread, moving other tasks running on that thread to another worker thread.
+//! This can improve performance by avoiding context switches.
 //!
 //! For example:
 //!
