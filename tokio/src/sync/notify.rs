@@ -192,6 +192,10 @@ fn inc_num_notify_waiters_calls(data: usize) -> usize {
     data + (1 << NOTIFY_WAITERS_SHIFT)
 }
 
+fn atomic_inc_num_notify_waiters_calls(data: &AtomicUsize) {
+    data.fetch_add(1 << NOTIFY_WAITERS_SHIFT, SeqCst);
+}
+
 impl Notify {
     /// Create a new `Notify`, initialized without a permit.
     ///
@@ -394,11 +398,9 @@ impl Notify {
         let curr = self.state.load(SeqCst);
 
         if let EMPTY | NOTIFIED = get_state(curr) {
-            // There are no waiting tasks. In this case, no synchronization is
-            // established between `notify` and `notified().await`.
-            // All we need to do is increment the number of times this
-            // method was called.
-            self.state.store(inc_num_notify_waiters_calls(curr), SeqCst);
+            // There are no waiting tasks. All we need to do is increment the
+            // number of times this method was called.
+            atomic_inc_num_notify_waiters_calls(&self.state);
             return;
         }
 
