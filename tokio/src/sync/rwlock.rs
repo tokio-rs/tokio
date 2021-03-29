@@ -218,13 +218,17 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// let lock = RwLock::new_with_max_reads(5, 1024);
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if `max_reads` is more than `u32::MAX >> 3`.
     pub fn new_with_max_reads(value: T, max_reads: u32) -> RwLock<T>
     where
         T: Sized,
     {
         assert!(
             max_reads <= MAX_READS,
-            "a RwLock may not be created with more than MAX_READS ({})",
+            "a RwLock may not be created with more than {} readers",
             MAX_READS
         );
         RwLock {
