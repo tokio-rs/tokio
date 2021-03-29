@@ -65,7 +65,6 @@ fn notify_waiters_and_one() {
             });
         });
 
-
         th1.join().unwrap();
         th2.join().unwrap();
         th3.join().unwrap();
