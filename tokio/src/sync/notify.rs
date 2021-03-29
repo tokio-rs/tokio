@@ -381,10 +381,12 @@ impl Notify {
     /// }
     /// ```
     pub fn notify_waiters(&self) {
-        const NUM_WAKERS: usize = 32;
+        const NUM_STACK_WAKERS: usize = 32;
+        const INITIAL_HEAP_WAKERS_CAPACITY: usize = 32;
 
-        let mut wakers: [Option<Waker>; NUM_WAKERS] = Default::default();
-        let mut curr_waker = 0;
+        let mut stack_wakers: [Option<Waker>; NUM_STACK_WAKERS] = Default::default();
+        let mut num_stack_wakers = 0;
+        let mut heap_wakers: Vec<Waker> = Vec::new();
 
         // There are waiters, the lock must be acquired to notify.
         let mut waiters = self.waiters.lock();
@@ -405,38 +407,30 @@ impl Notify {
         // At this point, it is guaranteed that the state will not
         // concurrently change, as holding the lock is required to
         // transition **out** of `WAITING`.
-        'outer: loop {
-            while curr_waker < NUM_WAKERS {
-                match waiters.pop_back() {
-                    Some(mut waiter) => {
-                        // Safety: `waiters` lock is still held.
-                        let waiter = unsafe { waiter.as_mut() };
+        loop {
+            match waiters.pop_back() {
+                Some(mut waiter) => {
+                    // Safety: `waiters` lock is still held.
+                    let waiter = unsafe { waiter.as_mut() };
 
-                        assert!(waiter.notified.is_none());
+                    assert!(waiter.notified.is_none());
 
-                        waiter.notified = Some(NotificationType::AllWaiters);
+                    waiter.notified = Some(NotificationType::AllWaiters);
 
-                        if let Some(waker) = waiter.waker.take() {
-                            wakers[curr_waker] = Some(waker);
-                            curr_waker += 1;
+                    let waker = waiter.waker.take().unwrap();
+
+                    if num_stack_wakers < NUM_STACK_WAKERS {
+                        stack_wakers[num_stack_wakers] = Some(waker);
+                        num_stack_wakers += 1;
+                    } else {
+                        if heap_wakers.is_empty() {
+                            heap_wakers.reserve(INITIAL_HEAP_WAKERS_CAPACITY);
                         }
-                    }
-                    None => {
-                        break 'outer;
+                        heap_wakers.push(waker);
                     }
                 }
+                None => break,
             }
-
-            drop(waiters);
-
-            for waker in wakers.iter_mut().take(curr_waker) {
-                waker.take().unwrap().wake();
-            }
-
-            curr_waker = 0;
-
-            // Acquire the lock again.
-            waiters = self.waiters.lock();
         }
 
         // All waiters will be notified, the state must be transitioned to
@@ -448,8 +442,12 @@ impl Notify {
         // Release the lock before notifying
         drop(waiters);
 
-        for waker in wakers.iter_mut().take(curr_waker) {
+        for waker in stack_wakers.iter_mut().take(num_stack_wakers) {
             waker.take().unwrap().wake();
+        }
+
+        for waker in heap_wakers.into_iter() {
+            waker.wake();
         }
     }
 }

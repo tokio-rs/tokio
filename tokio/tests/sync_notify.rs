@@ -102,6 +102,24 @@ fn notified_multi_notify_drop_one() {
 }
 
 #[test]
+fn notify_many_waiters() {
+    let notify = Notify::new();
+    let mut notifieds = Vec::new();
+    for _ in 0..50 {
+        let mut notified = spawn(async { notify.notified().await });
+        assert_pending!(notified.poll());
+        notifieds.push(notified);
+    }
+
+    notify.notify_waiters();
+
+    for notified in notifieds.iter_mut() {
+        assert!(notified.is_woken());
+        assert_ready!(notified.poll());
+    }
+}
+
+#[test]
 fn notify_in_drop_after_wake() {
     use futures::task::ArcWake;
     use std::future::Future;
