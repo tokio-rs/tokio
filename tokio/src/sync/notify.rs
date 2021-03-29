@@ -407,29 +407,24 @@ impl Notify {
         // At this point, it is guaranteed that the state will not
         // concurrently change, as holding the lock is required to
         // transition **out** of `WAITING`.
-        loop {
-            match waiters.pop_back() {
-                Some(mut waiter) => {
-                    // Safety: `waiters` lock is still held.
-                    let waiter = unsafe { waiter.as_mut() };
+        while let Some(mut waiter) = waiters.pop_back() {
+            // Safety: `waiters` lock is still held.
+            let waiter = unsafe { waiter.as_mut() };
 
-                    assert!(waiter.notified.is_none());
+            assert!(waiter.notified.is_none());
 
-                    waiter.notified = Some(NotificationType::AllWaiters);
+            waiter.notified = Some(NotificationType::AllWaiters);
 
-                    let waker = waiter.waker.take().unwrap();
+            let waker = waiter.waker.take().unwrap();
 
-                    if num_stack_wakers < NUM_STACK_WAKERS {
-                        stack_wakers[num_stack_wakers] = Some(waker);
-                        num_stack_wakers += 1;
-                    } else {
-                        if heap_wakers.is_empty() {
-                            heap_wakers.reserve(INITIAL_HEAP_WAKERS_CAPACITY);
-                        }
-                        heap_wakers.push(waker);
-                    }
+            if num_stack_wakers < NUM_STACK_WAKERS {
+                stack_wakers[num_stack_wakers] = Some(waker);
+                num_stack_wakers += 1;
+            } else {
+                if heap_wakers.is_empty() {
+                    heap_wakers.reserve(INITIAL_HEAP_WAKERS_CAPACITY);
                 }
-                None => break,
+                heap_wakers.push(waker);
             }
         }
 
