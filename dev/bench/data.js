@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1617130025948,
+  "lastUpdate": 1617130031005,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -23155,6 +23155,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20888906,
             "range": "± 4028693",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "fasterthanlime@users.noreply.github.com",
+            "name": "Amos Wenger",
+            "username": "fasterthanlime"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9ec33936507586c65b6332edd55879d88614dc9e",
+          "message": "net: typo in socket.rs (#3663)",
+          "timestamp": "2021-03-30T20:44:54+02:00",
+          "tree_id": "d538babe7bb4871ac3cd1219517005241e8d2d45",
+          "url": "https://github.com/tokio-rs/tokio/commit/9ec33936507586c65b6332edd55879d88614dc9e"
+        },
+        "date": 1617130027518,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 201684,
+            "range": "± 26392",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 742552,
+            "range": "± 184944",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5567362,
+            "range": "± 1565390",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21464352,
+            "range": "± 4006151",
             "unit": "ns/iter"
           }
         ]
