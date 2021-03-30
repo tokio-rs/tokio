@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1617130035004,
+  "lastUpdate": 1617133633614,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -23203,6 +23203,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21464352,
             "range": "± 4006151",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "50183564+nylonicious@users.noreply.github.com",
+            "name": "Nylonicious",
+            "username": "nylonicious"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8fc49dc522841101c25dbe7ffe222b64a896b5ab",
+          "message": "chore: update years in all licenses (#3665)",
+          "timestamp": "2021-03-30T21:45:13+02:00",
+          "tree_id": "b7b89103db86839919011cd9ec3f9f4fcbc7b481",
+          "url": "https://github.com/tokio-rs/tokio/commit/8fc49dc522841101c25dbe7ffe222b64a896b5ab"
+        },
+        "date": 1617133631392,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 147333,
+            "range": "± 18944",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 617824,
+            "range": "± 37965",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4089218,
+            "range": "± 1038429",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 17380106,
+            "range": "± 2903144",
             "unit": "ns/iter"
           }
         ]
