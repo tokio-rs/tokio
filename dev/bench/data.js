@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1617088927599,
+  "lastUpdate": 1617088930422,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -54179,6 +54179,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 776010,
             "range": "± 84656",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "simon.lindholm10@gmail.com",
+            "name": "Simon Lindholm",
+            "username": "simonlindholm"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f7c181c2c49ee28d7cb0773f5cdb4bec35b5a89b",
+          "message": "sync: fix notifications getting dropped on receiver drop (#3652)",
+          "timestamp": "2021-03-30T09:18:07+02:00",
+          "tree_id": "6fdeec8b6452c39c795bc4950008c506f6f8de01",
+          "url": "https://github.com/tokio-rs/tokio/commit/f7c181c2c49ee28d7cb0773f5cdb4bec35b5a89b"
+        },
+        "date": 1617088927067,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6101846,
+            "range": "± 2266741",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 5961242,
+            "range": "± 1815640",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 5850288,
+            "range": "± 3105487",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 602,
+            "range": "± 209",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 602,
+            "range": "± 170",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 592,
+            "range": "± 172",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 126529,
+            "range": "± 24772",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1482,
+            "range": "± 493",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 906741,
+            "range": "± 214979",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 638540,
+            "range": "± 162154",
             "unit": "ns/iter"
           }
         ]
