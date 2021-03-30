@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1617088914286,
+  "lastUpdate": 1617088923971,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -23053,6 +23053,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20505109,
             "range": "± 3879822",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "simon.lindholm10@gmail.com",
+            "name": "Simon Lindholm",
+            "username": "simonlindholm"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f7c181c2c49ee28d7cb0773f5cdb4bec35b5a89b",
+          "message": "sync: fix notifications getting dropped on receiver drop (#3652)",
+          "timestamp": "2021-03-30T09:18:07+02:00",
+          "tree_id": "6fdeec8b6452c39c795bc4950008c506f6f8de01",
+          "url": "https://github.com/tokio-rs/tokio/commit/f7c181c2c49ee28d7cb0773f5cdb4bec35b5a89b"
+        },
+        "date": 1617088919411,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 202975,
+            "range": "± 61176",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 713075,
+            "range": "± 98094",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4890799,
+            "range": "± 1291367",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20888906,
+            "range": "± 4028693",
             "unit": "ns/iter"
           }
         ]
