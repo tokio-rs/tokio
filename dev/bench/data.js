@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1617050455323,
+  "lastUpdate": 1617088914286,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -12149,6 +12149,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 592,
             "range": "± 36",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "simon.lindholm10@gmail.com",
+            "name": "Simon Lindholm",
+            "username": "simonlindholm"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f7c181c2c49ee28d7cb0773f5cdb4bec35b5a89b",
+          "message": "sync: fix notifications getting dropped on receiver drop (#3652)",
+          "timestamp": "2021-03-30T09:18:07+02:00",
+          "tree_id": "6fdeec8b6452c39c795bc4950008c506f6f8de01",
+          "url": "https://github.com/tokio-rs/tokio/commit/f7c181c2c49ee28d7cb0773f5cdb4bec35b5a89b"
+        },
+        "date": 1617088911075,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1101,
+            "range": "± 225",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 15202,
+            "range": "± 4048",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1081,
+            "range": "± 45",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 15320,
+            "range": "± 3869",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 595,
+            "range": "± 73",
             "unit": "ns/iter"
           }
         ]
