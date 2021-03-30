@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1617130031005,
+  "lastUpdate": 1617130035004,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -35463,6 +35463,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 920,
             "range": "± 144",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "fasterthanlime@users.noreply.github.com",
+            "name": "Amos Wenger",
+            "username": "fasterthanlime"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9ec33936507586c65b6332edd55879d88614dc9e",
+          "message": "net: typo in socket.rs (#3663)",
+          "timestamp": "2021-03-30T20:44:54+02:00",
+          "tree_id": "d538babe7bb4871ac3cd1219517005241e8d2d45",
+          "url": "https://github.com/tokio-rs/tokio/commit/9ec33936507586c65b6332edd55879d88614dc9e"
+        },
+        "date": 1617130028168,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 17005,
+            "range": "± 7057",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1119,
+            "range": "± 145",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 629,
+            "range": "± 95",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 18427,
+            "range": "± 7900",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1171,
+            "range": "± 255",
             "unit": "ns/iter"
           }
         ]
