@@ -448,7 +448,7 @@ impl TcpSocket {
     /// `backlog` defines the maximum number of pending connections are queued
     /// by the operating system at any given time. Connection are removed from
     /// the queue with [`TcpListener::accept`]. When the queue is full, the
-    /// operationg-system will start rejecting connections.
+    /// operating-system will start rejecting connections.
     ///
     /// [`TcpListener::accept`]: TcpListener::accept
     ///
