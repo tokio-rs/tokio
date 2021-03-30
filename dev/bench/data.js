@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1617088930422,
+  "lastUpdate": 1617130013233,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -12203,6 +12203,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 595,
             "range": "± 73",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "fasterthanlime@users.noreply.github.com",
+            "name": "Amos Wenger",
+            "username": "fasterthanlime"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9ec33936507586c65b6332edd55879d88614dc9e",
+          "message": "net: typo in socket.rs (#3663)",
+          "timestamp": "2021-03-30T20:44:54+02:00",
+          "tree_id": "d538babe7bb4871ac3cd1219517005241e8d2d45",
+          "url": "https://github.com/tokio-rs/tokio/commit/9ec33936507586c65b6332edd55879d88614dc9e"
+        },
+        "date": 1617130010037,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1078,
+            "range": "± 5",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 14903,
+            "range": "± 3690",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1117,
+            "range": "± 7",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 14955,
+            "range": "± 4255",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 621,
+            "range": "± 11",
             "unit": "ns/iter"
           }
         ]
