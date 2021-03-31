@@ -18,6 +18,14 @@ async fn func2() -> u32 {
     10
 }
 
+async fn func_err() -> Result<u32, ()> {
+    Err(())
+}
+
+async fn func_ok() -> Result<u32, ()> {
+    Ok(10)
+}
+
 async fn func_panic() -> u32 {
     time::sleep(Duration::from_millis(1)).await;
     panic!();
@@ -145,6 +153,31 @@ fn set_while_initializing() {
 }
 
 #[test]
+fn get_or_try_init() {
+    let rt = runtime::Builder::new_current_thread()
+        .enable_time()
+        .start_paused(true)
+        .build()
+        .unwrap();
+
+    static ONCE: OnceCell<u32> = OnceCell::const_new();
+
+    rt.block_on(async {
+        let handle1 = rt.spawn(async { ONCE.get_or_try_init(func_err).await });
+        let handle2 = rt.spawn(async { ONCE.get_or_try_init(func_ok).await });
+
+        time::advance(Duration::from_millis(1)).await;
+        time::resume();
+
+        let result1 = handle1.await.unwrap();
+        assert!(result1.is_err());
+
+        let result2 = handle2.await.unwrap();
+        assert_eq!(*result2.unwrap(), 10);
+    });
+}
+
+#[test]
 fn drop_cell() {
     static NUM_DROPS: AtomicU32 = AtomicU32::new(0);
 
@@ -161,7 +194,7 @@ fn drop_cell() {
     {
         let once_cell = OnceCell::new();
         let prev = once_cell.set(fooer);
-        assert!(prev == ())
+        assert!(prev.is_ok())
     }
     assert!(NUM_DROPS.load(Ordering::Acquire) == 1);
 }
@@ -182,6 +215,7 @@ fn drop_cell_new_with() {
 
     {
         let once_cell = OnceCell::new_with(Some(fooer));
+        assert!(once_cell.initialized());
     }
     assert!(NUM_DROPS.load(Ordering::Acquire) == 1);
 }

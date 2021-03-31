@@ -28,7 +28,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let result1 = ONCE.get_or_init(some_computation).await
+///     let result1 = ONCE.get_or_init(some_computation).await;
 ///     assert_eq!(*result1, 2);
 /// }
 /// ```
@@ -222,7 +222,7 @@ impl<T> OnceCell<T> {
             unsafe { self.get_unchecked() }
         } else {
             // After acquire().await we have either acquired a permit while self.value
-            // is still uninitialized, or current thread is awoken after another thread
+            // is still uninitialized, or the current thread is awoken after another thread
             // has intialized the value and closed the semaphore, in which case self.initialized
             // is true and we don't set the value here
             match self.semaphore.acquire().await {
@@ -248,6 +248,67 @@ impl<T> OnceCell<T> {
                         // SAFETY: once the value is initialized, no mutable references are given out, so
                         // we can give out arbitrarily many immutable references
                         unsafe { self.get_unchecked() }
+                    } else {
+                        unreachable!(
+                            "Semaphore closed, but the OnceCell has not been initialized."
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// Tries to initialize the value of the OnceCell using the async function `f`.
+    /// If the value of the OnceCell was already initialized prior to this call,
+    /// a reference to that initialized value is returned. If some other thread
+    /// initiated the initialization prior to this call and the initialization
+    /// hasn't completed, this call waits until the initialization is finished.
+    /// If the function argument `f` returns an error, `get_or_try_init`
+    /// returns that error, otherwise the result of `f` will be stored in the cell.
+    ///
+    /// This will deadlock if `f` tries to initialize the cell itself.
+    pub async fn get_or_try_init<E, F, Fut>(&self, f: F) -> Result<&T, E>
+    where
+        F: FnOnce() -> Fut,
+        Fut: Future<Output = Result<T, E>>,
+    {
+        if self.initialized() {
+            // SAFETY: once the value is initialized, no mutable references are given out, so
+            // we can give out arbitrarily many immutable references
+            unsafe { Ok(self.get_unchecked()) }
+        } else {
+            // After acquire().await we have either acquired a permit while self.value
+            // is still uninitialized, or the current thread is awoken after another thread
+            // has intialized the value and closed the semaphore, in which case self.initialized
+            // is true and we don't set the value here
+            match self.semaphore.acquire().await {
+                Ok(_permit) => {
+                    if !self.initialized() {
+                        // If `f()` panics or `select!` is called, this `get_or_try_init` call
+                        // is aborted and the semaphore permit is dropped.
+                        let value = f().await;
+
+                        match value {
+                            Ok(value) => {
+                                // SAFETY: There is only one permit on the semaphore, hence only one
+                                // mutable reference is created
+                                unsafe { self.set_value(value) };
+
+                                // SAFETY: once the value is initialized, no mutable references are given out, so
+                                // we can give out arbitrarily many immutable references
+                                unsafe { Ok(self.get_unchecked()) }
+                            },
+                            Err(e) => Err(e),
+                        }
+                    } else {
+                        unreachable!("acquired semaphore after value was already initialized.");
+                    }
+                }
+                Err(_) => {
+                    if self.initialized() {
+                        // SAFETY: once the value is initialized, no mutable references are given out, so
+                        // we can give out arbitrarily many immutable references
+                        unsafe { Ok(self.get_unchecked()) }
                     } else {
                         unreachable!(
                             "Semaphore closed, but the OnceCell has not been initialized."
