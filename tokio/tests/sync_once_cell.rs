@@ -40,14 +40,13 @@ async fn advance_time_and_set(cell: &'static OnceCell<u32>, v: u32) -> Result<()
 fn get_or_init() {
     let rt = runtime::Builder::new_current_thread()
         .enable_time()
+        .start_paused(true)
         .build()
         .unwrap();
 
     static ONCE: OnceCell<u32> = OnceCell::const_new();
 
     rt.block_on(async {
-        time::pause();
-
         let handle1 = rt.spawn(async { ONCE.get_or_init(func1).await });
         let handle2 = rt.spawn(async { ONCE.get_or_init(func2).await });
 
@@ -161,7 +160,28 @@ fn drop_cell() {
 
     {
         let once_cell = OnceCell::new();
-        let _ = once_cell.set(fooer);
+        let prev = once_cell.set(fooer);
+        assert!(prev == ())
+    }
+    assert!(NUM_DROPS.load(Ordering::Acquire) == 1);
+}
+
+#[test]
+fn drop_cell_new_with() {
+    static NUM_DROPS: AtomicU32 = AtomicU32::new(0);
+
+    struct Foo {}
+
+    let fooer = Foo {};
+
+    impl Drop for Foo {
+        fn drop(&mut self) {
+            NUM_DROPS.fetch_add(1, Ordering::Release);
+        }
+    }
+
+    {
+        let once_cell = OnceCell::new_with(Some(fooer));
     }
     assert!(NUM_DROPS.load(Ordering::Acquire) == 1);
 }
@@ -182,6 +202,29 @@ fn drop_into_inner() {
 
     let once_cell = OnceCell::new();
     let _ = once_cell.set(fooer);
+    let fooer = once_cell.into_inner();
+    let count = NUM_DROPS.load(Ordering::Acquire);
+    assert!(count == 0);
+    mem::drop(fooer);
+    let count = NUM_DROPS.load(Ordering::Acquire);
+    assert!(count == 1);
+}
+
+#[test]
+fn drop_into_inner_new_with() {
+    static NUM_DROPS: AtomicU32 = AtomicU32::new(0);
+
+    struct Foo {}
+
+    let fooer = Foo {};
+
+    impl Drop for Foo {
+        fn drop(&mut self) {
+            NUM_DROPS.fetch_add(1, Ordering::Release);
+        }
+    }
+
+    let once_cell = OnceCell::new_with(Some(fooer));
     let fooer = once_cell.into_inner();
     let count = NUM_DROPS.load(Ordering::Acquire);
     assert!(count == 0);

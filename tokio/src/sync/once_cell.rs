@@ -28,9 +28,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let result1 = tokio::spawn(async {
-///         ONCE.get_or_init(some_computation).await
-///     }).await.unwrap();
+///     let result1 = ONCE.get_or_init(some_computation).await
 ///     assert_eq!(*result1, 2);
 /// }
 /// ```
@@ -260,7 +258,7 @@ impl<T> OnceCell<T> {
         }
     }
 
-    /// Moves the value out of the cell and drops the cell afterwards.
+    /// Moves the value out of the cell, destroying the cell in the process.
     ///
     /// Returns `None` if the cell is uninitialized.
     pub fn into_inner(mut self) -> Option<T> {
@@ -323,7 +321,7 @@ impl<T> fmt::Display for SetError<T> {
 impl<T: fmt::Debug> Error for SetError<T> {}
 
 impl<T> SetError<T> {
-    /// Whether `SetError` is `SetError::AlreadyInitializEderror`
+    /// Whether `SetError` is `SetError::AlreadyInitializedError`.
     pub fn is_already_init_err(&self) -> bool {
         match self {
             SetError::AlreadyInitializedError(_) => true,
