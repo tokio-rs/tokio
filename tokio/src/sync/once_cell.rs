@@ -297,7 +297,7 @@ impl<T> OnceCell<T> {
                                 // SAFETY: once the value is initialized, no mutable references are given out, so
                                 // we can give out arbitrarily many immutable references
                                 unsafe { Ok(self.get_unchecked()) }
-                            },
+                            }
                             Err(e) => Err(e),
                         }
                     } else {

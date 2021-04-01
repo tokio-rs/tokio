@@ -235,11 +235,11 @@ fn drop_into_inner() {
     }
 
     let once_cell = OnceCell::new();
-    let _ = once_cell.set(fooer);
+    assert!(once_cell.set(fooer).is_ok());
     let fooer = once_cell.into_inner();
     let count = NUM_DROPS.load(Ordering::Acquire);
     assert!(count == 0);
-    mem::drop(fooer);
+    drop(fooer);
     let count = NUM_DROPS.load(Ordering::Acquire);
     assert!(count == 1);
 }
