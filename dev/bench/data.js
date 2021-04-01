@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1617283593793,
+  "lastUpdate": 1617283605603,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -23359,6 +23359,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 17380106,
             "range": "± 2903144",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ldm2993593805@163.com",
+            "name": "Donough Liu",
+            "username": "ldm0"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b42f21ec3e212ace25331d0c13889a45769e6006",
+          "message": "doc: fix incorrect link in doc (#3670)",
+          "timestamp": "2021-04-01T15:24:29+02:00",
+          "tree_id": "fb0d40136a86ef56c7986472a255b8cea4cb3d83",
+          "url": "https://github.com/tokio-rs/tokio/commit/b42f21ec3e212ace25331d0c13889a45769e6006"
+        },
+        "date": 1617283602856,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 200323,
+            "range": "± 41984",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 731865,
+            "range": "± 53808",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5450705,
+            "range": "± 1171042",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 22204405,
+            "range": "± 3875064",
             "unit": "ns/iter"
           }
         ]
