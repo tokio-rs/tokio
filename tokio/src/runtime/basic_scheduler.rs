@@ -373,12 +373,14 @@ impl Schedule for Arc<Shared> {
         use std::ptr::NonNull;
 
         CURRENT.with(|maybe_cx| {
-            let cx = maybe_cx.expect("scheduler context missing");
-
-            // safety: the task is inserted in the list in `bind`.
-            unsafe {
-                let ptr = NonNull::from(task.header());
-                cx.tasks.borrow_mut().owned.remove(ptr)
+            if let Some(cx) = maybe_cx {
+                // safety: the task is inserted in the list in `bind`.
+                unsafe {
+                    let ptr = NonNull::from(task.header());
+                    cx.tasks.borrow_mut().owned.remove(ptr)
+                }
+            } else {
+                None
             }
         })
     }
