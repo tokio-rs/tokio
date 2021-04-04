@@ -32,7 +32,6 @@ fn test_abort_without_panic_3157() {
 fn test_abort_without_panic_3662() {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
-    use std::task::Poll;
 
     struct DropCheck(Arc<AtomicBool>);
 
@@ -43,7 +42,6 @@ fn test_abort_without_panic_3662() {
     }
 
     let rt = tokio::runtime::Builder::new_current_thread()
-        .worker_threads(1)
         .build()
         .unwrap();
 
@@ -55,12 +53,12 @@ fn test_abort_without_panic_3662() {
             // NB: just grab the drop check here so that it becomes part of the
             // task.
             let _drop_check = drop_check;
-            futures::future::pending::<()>().await;
+            std::future::pending::<()>().await;
         });
 
         let drop_flag2 = drop_flag.clone();
 
-        let task = tokio::task::spawn_blocking(move || {
+        let task = std::thread::spawn(move || {
             // This runs in a separate thread so it doesn't have immediate
             // thread-local access to the executor. It does however transition
             // the underlying task to be completed, which will cause it to be
@@ -71,7 +69,7 @@ fn test_abort_without_panic_3662() {
             // assert!(drop_flag2.load(Ordering::SeqCst));
             j
         })
-        .await
+        .join()
         .unwrap();
 
         assert!(drop_flag.load(Ordering::SeqCst));
@@ -87,18 +85,7 @@ fn test_abort_without_panic_3662() {
         // so that the scheduler can go into the "auxilliary tasks" mode, at
         // which point the task is removed from the scheduler.
         let i = tokio::spawn(async move {
-            let mut first = true;
-
-            let task = futures::future::poll_fn(|cx| {
-                if std::mem::take(&mut first) {
-                    cx.waker().wake_by_ref();
-                    Poll::Pending
-                } else {
-                    Poll::Ready(())
-                }
-            });
-
-            task.await;
+            tokio::task::yield_now().await;
         });
 
         i.await.unwrap();
