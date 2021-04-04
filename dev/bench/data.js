@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1617283612818,
+  "lastUpdate": 1617556584153,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -12365,6 +12365,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 583,
             "range": "± 56",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "michael.jung@terreon.de",
+            "name": "Michael P. Jung",
+            "username": "bikeshedder"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b05b9a1788e7b998609dae31016f2b338d6125f7",
+          "message": "sync: add Semaphore::is_closed (#3673)",
+          "timestamp": "2021-04-04T19:14:41+02:00",
+          "tree_id": "3eef32928590320e3e50c5945b70531735ae62d9",
+          "url": "https://github.com/tokio-rs/tokio/commit/b05b9a1788e7b998609dae31016f2b338d6125f7"
+        },
+        "date": 1617556581469,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1038,
+            "range": "± 33",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 15751,
+            "range": "± 5655",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1073,
+            "range": "± 54",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 15485,
+            "range": "± 3173",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 599,
+            "range": "± 31",
             "unit": "ns/iter"
           }
         ]
