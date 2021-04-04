@@ -609,6 +609,10 @@ impl<T> Receiver<T> {
     /// - `Err(TryRecvError::Closed)` if the sender has dropped without sending
     ///   a value.
     ///
+    /// # Panics
+    ///
+    /// This function panics if called after a pending value has been received.
+    ///
     /// # Examples
     ///
     /// `try_recv` before a value is sent, then after.
