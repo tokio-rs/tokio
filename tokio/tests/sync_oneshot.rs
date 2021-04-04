@@ -202,7 +202,6 @@ fn try_recv_after_completion() {
     rx.close();
 }
 
-
 #[test]
 fn drops_tasks() {
     let (mut tx, mut rx) = oneshot::channel::<i32>();
