@@ -282,7 +282,7 @@ impl Semaphore {
     }
 
     /// Returns true if the semaphore is closed
-    pub fn is_closed(&self) {
+    pub fn is_closed(&self) -> bool {
         self.ll_sem.is_closed()
     }
 }
