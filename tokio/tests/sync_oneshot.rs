@@ -2,6 +2,7 @@
 #![cfg(feature = "full")]
 
 use tokio::sync::oneshot;
+use tokio::sync::oneshot::error::TryRecvError;
 use tokio_test::*;
 
 use std::future::Future;
@@ -189,6 +190,18 @@ fn close_after_recv() {
     assert_eq!(17, rx.try_recv().unwrap());
     rx.close();
 }
+
+#[test]
+fn try_recv_after_completion() {
+    let (tx, mut rx) = oneshot::channel::<i32>();
+
+    tx.send(17).unwrap();
+
+    assert_eq!(17, rx.try_recv().unwrap());
+    assert_eq!(Err(TryRecvError::Closed), rx.try_recv());
+    rx.close();
+}
+
 
 #[test]
 fn drops_tasks() {
