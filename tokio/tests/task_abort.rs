@@ -32,6 +32,7 @@ fn test_abort_without_panic_3157() {
 fn test_abort_without_panic_3662() {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
+    use std::task::Poll;
 
     struct DropCheck(Arc<AtomicBool>);
 
@@ -48,20 +49,26 @@ fn test_abort_without_panic_3662() {
 
     rt.block_on(async move {
         let drop_flag = Arc::new(AtomicBool::new(false));
-        let drop_flag2 = drop_flag.clone();
+        let drop_check = DropCheck(drop_flag.clone());
 
         let j = tokio::spawn(async move {
-            let drop_check = DropCheck(drop_flag2);
+            // NB: just grab the drop check here so that it becomes part of the
+            // task.
+            let _drop_check = drop_check;
             futures::future::pending::<()>().await;
-            drop(drop_check);
         });
+
+        let drop_flag2 = drop_flag.clone();
 
         let task = tokio::task::spawn_blocking(move || {
             // This runs in a separate thread so it doesn't have immediate
             // thread-local access to the executor. It does however transition
             // the underlying task to be completed, which will cause it to be
             // dropped (in this thread no less).
+            assert!(!drop_flag2.load(Ordering::SeqCst));
             j.abort();
+            // TODO: is this guaranteed at this point?
+            // assert!(drop_flag2.load(Ordering::SeqCst));
             j
         })
         .await
@@ -70,5 +77,30 @@ fn test_abort_without_panic_3662() {
         assert!(drop_flag.load(Ordering::SeqCst));
         let result = task.await;
         assert!(result.unwrap_err().is_cancelled());
+
+        // Note: We do the following to trigger a deferred task cleanup.
+        //
+        // The relevant piece of code you want to look at is in:
+        // `Inner::block_on` of `basic_scheduler.rs`.
+        //
+        // We cause the cleanup to happen by having a poll return Pending once
+        // so that the scheduler can go into the "auxilliary tasks" mode, at
+        // which point the task is removed from the scheduler.
+        let i = tokio::spawn(async move {
+            let mut first = true;
+
+            let task = futures::future::poll_fn(|cx| {
+                if std::mem::take(&mut first) {
+                    cx.waker().wake_by_ref();
+                    Poll::Pending
+                } else {
+                    Poll::Ready(())
+                }
+            });
+
+            task.await;
+        });
+
+        i.await.unwrap();
     });
 }
