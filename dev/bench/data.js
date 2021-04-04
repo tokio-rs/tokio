@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1617556586946,
+  "lastUpdate": 1617556590800,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -23461,6 +23461,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 22204405,
             "range": "± 3875064",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "michael.jung@terreon.de",
+            "name": "Michael P. Jung",
+            "username": "bikeshedder"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b05b9a1788e7b998609dae31016f2b338d6125f7",
+          "message": "sync: add Semaphore::is_closed (#3673)",
+          "timestamp": "2021-04-04T19:14:41+02:00",
+          "tree_id": "3eef32928590320e3e50c5945b70531735ae62d9",
+          "url": "https://github.com/tokio-rs/tokio/commit/b05b9a1788e7b998609dae31016f2b338d6125f7"
+        },
+        "date": 1617556588251,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 178281,
+            "range": "± 33700",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 647363,
+            "range": "± 108155",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4461157,
+            "range": "± 792108",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 17662060,
+            "range": "± 3359043",
             "unit": "ns/iter"
           }
         ]
