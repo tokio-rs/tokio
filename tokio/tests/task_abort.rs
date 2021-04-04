@@ -53,7 +53,7 @@ fn test_abort_without_panic_3662() {
             // NB: just grab the drop check here so that it becomes part of the
             // task.
             let _drop_check = drop_check;
-            std::future::pending::<()>().await;
+            futures::future::pending::<()>().await;
         });
 
         let drop_flag2 = drop_flag.clone();
