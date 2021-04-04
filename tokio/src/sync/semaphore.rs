@@ -280,6 +280,11 @@ impl Semaphore {
     pub fn close(&self) {
         self.ll_sem.close();
     }
+
+    /// Returns true if the semaphore is closed
+    pub fn is_closed(&self) -> bool {
+        self.ll_sem.is_closed()
+    }
 }
 
 impl<'a> SemaphorePermit<'a> {
