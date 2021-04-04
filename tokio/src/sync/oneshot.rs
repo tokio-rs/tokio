@@ -672,7 +672,7 @@ impl<T> Receiver<T> {
                 return Err(TryRecvError::Empty);
             }
         } else {
-            panic!("called after complete");
+            Err(TryRecvError::Closed)
         };
 
         self.inner = None;
