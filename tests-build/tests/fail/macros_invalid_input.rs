@@ -24,6 +24,9 @@ async fn test_unexpected_attr() {}
 #[tokio::test(flavor = 123)]
 async fn test_flavor_not_string() {}
 
+#[tokio::test(flavor = "foo")]
+async fn test_unknown_flavor() {}
+
 #[tokio::test(flavor = "multi_thread", start_paused = false)]
 async fn test_multi_thread_with_start_paused() {}
 

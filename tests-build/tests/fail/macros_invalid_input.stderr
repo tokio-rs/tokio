@@ -46,26 +46,32 @@ error: Failed to parse value of `flavor` as string.
 24 | #[tokio::test(flavor = 123)]
    |                        ^^^
 
-error: The `start_paused` option requires the `current_thread` runtime flavor. Use `#[tokio::test(flavor = "current_thread")]`
-  --> $DIR/macros_invalid_input.rs:27:55
+error: No such runtime flavor `foo`. The runtime flavors are `current_thread` and `multi_thread`.
+  --> $DIR/macros_invalid_input.rs:27:24
    |
-27 | #[tokio::test(flavor = "multi_thread", start_paused = false)]
+27 | #[tokio::test(flavor = "foo")]
+   |                        ^^^^^
+
+error: The `start_paused` option requires the `current_thread` runtime flavor. Use `#[tokio::test(flavor = "current_thread")]`
+  --> $DIR/macros_invalid_input.rs:30:55
+   |
+30 | #[tokio::test(flavor = "multi_thread", start_paused = false)]
    |                                                       ^^^^^
 
 error: Failed to parse value of `worker_threads` as integer.
-  --> $DIR/macros_invalid_input.rs:30:57
+  --> $DIR/macros_invalid_input.rs:33:57
    |
-30 | #[tokio::test(flavor = "multi_thread", worker_threads = "foo")]
+33 | #[tokio::test(flavor = "multi_thread", worker_threads = "foo")]
    |                                                         ^^^^^
 
 error: The `worker_threads` option requires the `multi_thread` runtime flavor. Use `#[tokio::test(flavor = "multi_thread")]`
-  --> $DIR/macros_invalid_input.rs:33:59
+  --> $DIR/macros_invalid_input.rs:36:59
    |
-33 | #[tokio::test(flavor = "current_thread", worker_threads = 4)]
+36 | #[tokio::test(flavor = "current_thread", worker_threads = 4)]
    |                                                           ^
 
 error: second test attribute is supplied
-  --> $DIR/macros_invalid_input.rs:37:1
+  --> $DIR/macros_invalid_input.rs:40:1
    |
-37 | #[test]
+40 | #[test]
    | ^^^^^^^
