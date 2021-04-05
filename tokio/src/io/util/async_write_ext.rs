@@ -11,7 +11,9 @@ use crate::io::util::write_int::{
     WriteU128, WriteU128Le, WriteU16, WriteU16Le, WriteU32, WriteU32Le, WriteU64, WriteU64Le,
     WriteU8,
 };
+use crate::io::util::write_vectored::{write_vectored, WriteVectored};
 use crate::io::AsyncWrite;
+use std::io::IoSlice;
 
 use bytes::Buf;
 
@@ -114,6 +116,47 @@ cfg_io_util! {
             Self: Unpin,
         {
             write(self, src)
+        }
+
+        /// Like [`write`], except that it writes from a slice of buffers.
+        ///
+        /// Equivalent to:
+        ///
+        /// ```ignore
+        /// async fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize>;
+        /// ```
+        ///
+        /// See [`AsyncWrite::poll_write_vectored`] for more details.
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::io::{self, AsyncWriteExt};
+        /// use tokio::fs::File;
+        /// use std::io::IoSlice;
+        ///
+        /// #[tokio::main]
+        /// async fn main() -> io::Result<()> {
+        ///     let mut file = File::create("foo.txt").await?;
+        ///
+        ///     let bufs: &[_] = &[
+        ///         IoSlice::new(b"hello"),
+        ///         IoSlice::new(b" "),
+        ///         IoSlice::new(b"world"),
+        ///     ];
+        ///
+        ///     file.write_vectored(&bufs).await?;
+        ///
+        ///     Ok(())
+        /// }
+        /// ```
+        ///
+        /// [`write`]: AsyncWriteExt::write
+        fn write_vectored<'a, 'b>(&'a mut self, bufs: &'a [IoSlice<'b>]) -> WriteVectored<'a, 'b, Self>
+        where
+            Self: Unpin,
+        {
+            write_vectored(self, bufs)
         }
 
 
