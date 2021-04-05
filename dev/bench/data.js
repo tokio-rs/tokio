@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1617653240400,
+  "lastUpdate": 1617655351274,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -12527,6 +12527,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 595,
             "range": "± 33",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "david.pdrsn@gmail.com",
+            "name": "David Pedersen",
+            "username": "davidpdrsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "618d2bfc717050faa0368115e6c341eb211c2ccd",
+          "message": "macros: various error message improvements (#3677)\n\nImproves a few of the error messages for `#[tokio::main]` and `#[tokio::test]`.\r\n\r\nAlso adds a note to the docs about `start_paused` requiring the `test-util` feature which wasn't mentioned previously.",
+          "timestamp": "2021-04-05T22:40:42+02:00",
+          "tree_id": "65ad020f189d3fa1682386fdbe27f5c58642d1f0",
+          "url": "https://github.com/tokio-rs/tokio/commit/618d2bfc717050faa0368115e6c341eb211c2ccd"
+        },
+        "date": 1617655348646,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1044,
+            "range": "± 6",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 16047,
+            "range": "± 7394",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1075,
+            "range": "± 7",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 16135,
+            "range": "± 4569",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 603,
+            "range": "± 274",
             "unit": "ns/iter"
           }
         ]
