@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1617655361290,
+  "lastUpdate": 1617655364487,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -23767,6 +23767,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19132135,
             "range": "± 3317870",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "david.pdrsn@gmail.com",
+            "name": "David Pedersen",
+            "username": "davidpdrsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "618d2bfc717050faa0368115e6c341eb211c2ccd",
+          "message": "macros: various error message improvements (#3677)\n\nImproves a few of the error messages for `#[tokio::main]` and `#[tokio::test]`.\r\n\r\nAlso adds a note to the docs about `start_paused` requiring the `test-util` feature which wasn't mentioned previously.",
+          "timestamp": "2021-04-05T22:40:42+02:00",
+          "tree_id": "65ad020f189d3fa1682386fdbe27f5c58642d1f0",
+          "url": "https://github.com/tokio-rs/tokio/commit/618d2bfc717050faa0368115e6c341eb211c2ccd"
+        },
+        "date": 1617655361720,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 192876,
+            "range": "± 11847",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 724388,
+            "range": "± 65731",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5586906,
+            "range": "± 1367817",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20213910,
+            "range": "± 4022022",
             "unit": "ns/iter"
           }
         ]
