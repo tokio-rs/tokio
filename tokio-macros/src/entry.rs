@@ -1,7 +1,6 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
-use syn::spanned::Spanned;
 
 #[derive(Clone, Copy, PartialEq)]
 enum RuntimeFlavor {
@@ -216,13 +215,22 @@ fn parse_knobs(
                 }
                 match ident.unwrap().to_string().to_lowercase().as_str() {
                     "worker_threads" => {
-                        config.set_worker_threads(namevalue.lit.clone(), namevalue.lit.span())?;
+                        config.set_worker_threads(
+                            namevalue.lit.clone(),
+                            syn::spanned::Spanned::span(&namevalue.lit),
+                        )?;
                     }
                     "flavor" => {
-                        config.set_flavor(namevalue.lit.clone(), namevalue.lit.span())?;
+                        config.set_flavor(
+                            namevalue.lit.clone(),
+                            syn::spanned::Spanned::span(&namevalue.lit),
+                        )?;
                     }
                     "start_paused" => {
-                        config.set_start_paused(namevalue.lit.clone(), namevalue.lit.span())?;
+                        config.set_start_paused(
+                            namevalue.lit.clone(),
+                            syn::spanned::Spanned::span(&namevalue.lit),
+                        )?;
                     }
                     "core_threads" => {
                         let msg = "Attribute `core_threads` is renamed to `worker_threads`";
