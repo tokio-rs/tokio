@@ -71,6 +71,7 @@ cfg_io_util! {
     pub use take::Take;
 
     mod write;
+    mod write_vectored;
     mod write_all;
     mod write_buf;
     mod write_int;
