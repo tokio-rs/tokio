@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1617653184563,
+  "lastUpdate": 1617653188144,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -36195,6 +36195,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1160,
             "range": "± 76",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "bn263@gmx.de",
+            "name": "b-naber",
+            "username": "b-naber"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f6e4e85dfb60459e3ff430a7480f37338548e014",
+          "message": "sync: add OnceCell (#3591)",
+          "timestamp": "2021-04-05T22:03:57+02:00",
+          "tree_id": "2bdf1b3e0871dc446e6e3f99036ef5b06c16fc19",
+          "url": "https://github.com/tokio-rs/tokio/commit/f6e4e85dfb60459e3ff430a7480f37338548e014"
+        },
+        "date": 1617653185631,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 15755,
+            "range": "± 7441",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 885,
+            "range": "± 199",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 574,
+            "range": "± 97",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 14611,
+            "range": "± 5152",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 894,
+            "range": "± 189",
             "unit": "ns/iter"
           }
         ]
