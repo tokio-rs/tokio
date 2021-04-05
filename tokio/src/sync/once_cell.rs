@@ -167,7 +167,7 @@ impl<T> OnceCell<T> {
     /// If the value of the OnceCell was already set prior to this call
     /// then [`SetError::AlreadyInitializedError`] is returned. If another thread
     /// is initializing the cell while this method is called,
-    /// ['SetError::InitializingError`] is returned. In order to wait
+    /// [`SetError::InitializingError`] is returned. In order to wait
     /// for an ongoing initialization to finish, call
     /// [`OnceCell::get_or_init`] instead.
     ///
