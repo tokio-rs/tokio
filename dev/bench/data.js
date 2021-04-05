@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1617660224824,
+  "lastUpdate": 1617660230543,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -23869,6 +23869,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20213910,
             "range": "± 4022022",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "david.pdrsn@gmail.com",
+            "name": "David Pedersen",
+            "username": "davidpdrsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "eabb7ce61c2a38fe3bc95cba2c758b5028d6e5e9",
+          "message": "io: add `AsyncWriteExt::write_vectored` (#3678)\n\nFixes #3676",
+          "timestamp": "2021-04-06T00:02:00+02:00",
+          "tree_id": "966b369a65a6c267ab6ee746e3c323157caee994",
+          "url": "https://github.com/tokio-rs/tokio/commit/eabb7ce61c2a38fe3bc95cba2c758b5028d6e5e9"
+        },
+        "date": 1617660228290,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 161110,
+            "range": "± 1961",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 630238,
+            "range": "± 38345",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4877054,
+            "range": "± 877017",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19231526,
+            "range": "± 3098068",
             "unit": "ns/iter"
           }
         ]
