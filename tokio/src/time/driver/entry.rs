@@ -164,14 +164,17 @@ impl StateCell {
     ///
     /// SAFETY: Must hold the driver lock.
     unsafe fn mark_pending(&self, not_after: u64) -> Result<(), u64> {
-        // Quick initial debug check to see if the timer is already fired. Since
-        // firing the timer can only happen with the driver lock held, we know
-        // we shouldn't be able to "miss" a transition to a fired state, even
-        // with relaxed ordering.
         let mut cur_state = self.state.load(Ordering::Relaxed);
 
         loop {
-            debug_assert!(cur_state < STATE_MIN_VALUE);
+            // Check to see if the timer is already fired. Since firing the
+            // timer can only happen with the driver lock held, we know we
+            // shouldn't be able to "miss" a transition to a fired state, even
+            // with relaxed ordering.
+            //
+            // In part also to improve the error message for things like
+            // https://github.com/tokio-rs/tokio/issues/3675
+            assert!(cur_state < STATE_MIN_VALUE, "timer polled after completing");
 
             if cur_state > not_after {
                 break Err(cur_state);
