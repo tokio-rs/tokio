@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1617699950934,
+  "lastUpdate": 1617820907130,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -12689,6 +12689,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 549,
             "range": "± 68",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "eliza@buoyant.io",
+            "name": "Eliza Weisman",
+            "username": "hawkw"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bf8c77bea1e6742d1fbff0a2790e4ac5064f6933",
+          "message": "util: add `PollSemaphore::{add_permits, available_permits}` (#3683)\n\n## Motivation\r\n\r\nThe `tokio::sync::Semaphore` type provides a\r\n[`Semaphore::available_permits` method][1] which returns the current\r\nnumber of permits available on the semaphore.\r\n`tokio_util::sync::PollSemaphore` [does not expose such a method][2]. It\r\nis possible to use `PollSemaphore::into_inner` or\r\n`PollSemaphore::clone_inner` to unwrap the inner semaphore, but this may\r\nrequire cloning/dropping the semaphore's `Arc` which shouldn't be\r\nnecessary to access the permits.\r\n\r\n## Solution\r\n\r\nThis commit adds `PollSemaphore::available_permits`. It also adds\r\n`PollSemaphore::add_permits` and an `AsRef<Semaphore>` impl while\r\nwe're here.\r\n\r\n[1]: https://docs.rs/tokio/1.4.0/tokio/sync/struct.Semaphore.html#method.available_permits\r\n[2]: https://docs.rs/tokio-util/0.6.5/tokio_util/sync/struct.PollSemaphore.html#implementations\r\n\r\nCloses #3682",
+          "timestamp": "2021-04-07T11:40:03-07:00",
+          "tree_id": "3dfedea73b688b64507c678cd791adf12a3f0b5e",
+          "url": "https://github.com/tokio-rs/tokio/commit/bf8c77bea1e6742d1fbff0a2790e4ac5064f6933"
+        },
+        "date": 1617820904262,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 995,
+            "range": "± 78",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 14502,
+            "range": "± 4150",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1068,
+            "range": "± 65",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 14833,
+            "range": "± 3679",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 569,
+            "range": "± 47",
             "unit": "ns/iter"
           }
         ]
