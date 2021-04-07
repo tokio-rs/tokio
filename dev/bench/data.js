@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1617821156992,
+  "lastUpdate": 1617821185825,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -24121,6 +24121,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20744099,
             "range": "± 3856056",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "zaharidichev@gmail.com",
+            "name": "Zahari Dichev",
+            "username": "zaharidichev"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e89c8981f151a667bb676213d38b7dbeb51620e9",
+          "message": "sync: allow configuring RwLock max reads (#3644)",
+          "timestamp": "2021-04-07T20:44:29+02:00",
+          "tree_id": "ee38c1631f111f7445f805c64d7aabc03e6276fe",
+          "url": "https://github.com/tokio-rs/tokio/commit/e89c8981f151a667bb676213d38b7dbeb51620e9"
+        },
+        "date": 1617821182936,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 188329,
+            "range": "± 42674",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 679189,
+            "range": "± 79758",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4536120,
+            "range": "± 690929",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18962628,
+            "range": "± 3687546",
             "unit": "ns/iter"
           }
         ]
