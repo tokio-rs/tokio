@@ -20,10 +20,10 @@ pub(crate) use write_guard::RwLockWriteGuard;
 pub(crate) use write_guard_mapped::RwLockMappedWriteGuard;
 
 #[cfg(not(loom))]
-const MAX_READS: usize = 32;
+const MAX_READS: u32 = std::u32::MAX >> 3;
 
 #[cfg(loom)]
-const MAX_READS: usize = 10;
+const MAX_READS: u32 = 10;
 
 /// An asynchronous reader-writer lock.
 ///
@@ -86,6 +86,9 @@ const MAX_READS: usize = 10;
 /// [_write-preferring_]: https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock#Priority_policies
 #[derive(Debug)]
 pub struct RwLock<T: ?Sized> {
+    // maximum number of concurrent readers
+    mr: u32,
+
     //semaphore to coordinate read and write access to T
     s: Semaphore,
 
@@ -199,8 +202,39 @@ impl<T: ?Sized> RwLock<T> {
         T: Sized,
     {
         RwLock {
+            mr: MAX_READS,
             c: UnsafeCell::new(value),
-            s: Semaphore::new(MAX_READS),
+            s: Semaphore::new(MAX_READS as usize),
+        }
+    }
+
+    /// Creates a new instance of an `RwLock<T>` which is unlocked
+    /// and allows a maximum of `max_reads` concurrent readers.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::RwLock;
+    ///
+    /// let lock = RwLock::new_with_max_reads(5, 1024);
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if `max_reads` is more than `u32::MAX >> 3`.
+    pub fn new_with_max_reads(value: T, max_reads: u32) -> RwLock<T>
+    where
+        T: Sized,
+    {
+        assert!(
+            max_reads <= MAX_READS,
+            "a RwLock may not be created with more than {} readers",
+            MAX_READS
+        );
+        RwLock {
+            mr: max_reads,
+            c: UnsafeCell::new(value),
+            s: Semaphore::new(max_reads as usize),
         }
     }
 
@@ -220,8 +254,33 @@ impl<T: ?Sized> RwLock<T> {
         T: Sized,
     {
         RwLock {
+            mr: MAX_READS,
             c: UnsafeCell::new(value),
-            s: Semaphore::const_new(MAX_READS),
+            s: Semaphore::const_new(MAX_READS as usize),
+        }
+    }
+
+    /// Creates a new instance of an `RwLock<T>` which is unlocked
+    /// and allows a maximum of `max_reads` concurrent readers.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::RwLock;
+    ///
+    /// static LOCK: RwLock<i32> = RwLock::const_new_with_max_reads(5, 1024);
+    /// ```
+    #[cfg(all(feature = "parking_lot", not(all(loom, test))))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "parking_lot")))]
+    pub const fn const_new_with_max_reads(value: T, mut max_reads: u32) -> RwLock<T>
+    where
+        T: Sized,
+    {
+        max_reads &= MAX_READS;
+        RwLock {
+            mr: max_reads,
+            c: UnsafeCell::new(value),
+            s: Semaphore::const_new(max_reads as usize),
         }
     }
 
@@ -456,12 +515,13 @@ impl<T: ?Sized> RwLock<T> {
     ///}
     /// ```
     pub async fn write(&self) -> RwLockWriteGuard<'_, T> {
-        self.s.acquire(MAX_READS as u32).await.unwrap_or_else(|_| {
+        self.s.acquire(self.mr).await.unwrap_or_else(|_| {
             // The semaphore was closed. but, we never explicitly close it, and we have a
             // handle to it through the Arc, which means that this can never happen.
             unreachable!()
         });
         RwLockWriteGuard {
+            permits_acquired: self.mr,
             s: &self.s,
             data: self.c.get(),
             marker: marker::PhantomData,
@@ -498,12 +558,13 @@ impl<T: ?Sized> RwLock<T> {
     ///}
     /// ```
     pub async fn write_owned(self: Arc<Self>) -> OwnedRwLockWriteGuard<T> {
-        self.s.acquire(MAX_READS as u32).await.unwrap_or_else(|_| {
+        self.s.acquire(self.mr).await.unwrap_or_else(|_| {
             // The semaphore was closed. but, we never explicitly close it, and we have a
             // handle to it through the Arc, which means that this can never happen.
             unreachable!()
         });
         OwnedRwLockWriteGuard {
+            permits_acquired: self.mr,
             data: self.c.get(),
             lock: ManuallyDrop::new(self),
             _p: PhantomData,
@@ -534,13 +595,14 @@ impl<T: ?Sized> RwLock<T> {
     /// }
     /// ```
     pub fn try_write(&self) -> Result<RwLockWriteGuard<'_, T>, TryLockError> {
-        match self.s.try_acquire(MAX_READS as u32) {
+        match self.s.try_acquire(self.mr) {
             Ok(permit) => permit,
             Err(TryAcquireError::NoPermits) => return Err(TryLockError(())),
             Err(TryAcquireError::Closed) => unreachable!(),
         }
 
         Ok(RwLockWriteGuard {
+            permits_acquired: self.mr,
             s: &self.s,
             data: self.c.get(),
             marker: marker::PhantomData,
@@ -578,13 +640,14 @@ impl<T: ?Sized> RwLock<T> {
     /// }
     /// ```
     pub fn try_write_owned(self: Arc<Self>) -> Result<OwnedRwLockWriteGuard<T>, TryLockError> {
-        match self.s.try_acquire(MAX_READS as u32) {
+        match self.s.try_acquire(self.mr) {
             Ok(permit) => permit,
             Err(TryAcquireError::NoPermits) => return Err(TryLockError(())),
             Err(TryAcquireError::Closed) => unreachable!(),
         }
 
         Ok(OwnedRwLockWriteGuard {
+            permits_acquired: self.mr,
             data: self.c.get(),
             lock: ManuallyDrop::new(self),
             _p: PhantomData,

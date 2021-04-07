@@ -15,6 +15,7 @@ use std::sync::Arc;
 /// [mapping]: method@crate::sync::OwnedRwLockWriteGuard::map
 /// [`OwnedRwLockWriteGuard`]: struct@crate::sync::OwnedRwLockWriteGuard
 pub struct OwnedRwLockMappedWriteGuard<T: ?Sized, U: ?Sized = T> {
+    pub(super) permits_acquired: u32,
     // ManuallyDrop allows us to destructure into this field without running the destructor.
     pub(super) lock: ManuallyDrop<Arc<RwLock<T>>>,
     pub(super) data: *mut U,
@@ -61,9 +62,11 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockMappedWriteGuard<T, U> {
     {
         let data = f(&mut *this) as *mut V;
         let lock = unsafe { ManuallyDrop::take(&mut this.lock) };
+        let permits_acquired = this.permits_acquired;
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
         OwnedRwLockMappedWriteGuard {
+            permits_acquired,
             lock: ManuallyDrop::new(lock),
             data,
             _p: PhantomData,
@@ -116,9 +119,11 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockMappedWriteGuard<T, U> {
             None => return Err(this),
         };
         let lock = unsafe { ManuallyDrop::take(&mut this.lock) };
+        let permits_acquired = this.permits_acquired;
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
         Ok(OwnedRwLockMappedWriteGuard {
+            permits_acquired,
             lock: ManuallyDrop::new(lock),
             data,
             _p: PhantomData,
@@ -160,7 +165,7 @@ where
 
 impl<T: ?Sized, U: ?Sized> Drop for OwnedRwLockMappedWriteGuard<T, U> {
     fn drop(&mut self) {
-        self.lock.s.release(super::MAX_READS);
+        self.lock.s.release(self.permits_acquired as usize);
         unsafe { ManuallyDrop::drop(&mut self.lock) };
     }
 }

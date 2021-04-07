@@ -16,6 +16,7 @@ use std::sync::Arc;
 /// [`write_owned`]: method@crate::sync::RwLock::write_owned
 /// [`RwLock`]: struct@crate::sync::RwLock
 pub struct OwnedRwLockWriteGuard<T: ?Sized> {
+    pub(super) permits_acquired: u32,
     // ManuallyDrop allows us to destructure into this field without running the destructor.
     pub(super) lock: ManuallyDrop<Arc<RwLock<T>>>,
     pub(super) data: *mut T,
@@ -62,9 +63,11 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
     {
         let data = f(&mut *this) as *mut U;
         let lock = unsafe { ManuallyDrop::take(&mut this.lock) };
+        let permits_acquired = this.permits_acquired;
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
         OwnedRwLockMappedWriteGuard {
+            permits_acquired,
             lock: ManuallyDrop::new(lock),
             data,
             _p: PhantomData,
@@ -118,10 +121,12 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
             Some(data) => data as *mut U,
             None => return Err(this),
         };
+        let permits_acquired = this.permits_acquired;
         let lock = unsafe { ManuallyDrop::take(&mut this.lock) };
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
         Ok(OwnedRwLockMappedWriteGuard {
+            permits_acquired,
             lock: ManuallyDrop::new(lock),
             data,
             _p: PhantomData,
@@ -178,7 +183,7 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
         let data = self.data;
 
         // Release all but one of the permits held by the write guard
-        lock.s.release(super::MAX_READS - 1);
+        lock.s.release((self.permits_acquired - 1) as usize);
         // NB: Forget to avoid drop impl from being called.
         mem::forget(self);
         OwnedRwLockReadGuard {
@@ -223,7 +228,7 @@ where
 
 impl<T: ?Sized> Drop for OwnedRwLockWriteGuard<T> {
     fn drop(&mut self) {
-        self.lock.s.release(super::MAX_READS);
+        self.lock.s.release(self.permits_acquired as usize);
         unsafe { ManuallyDrop::drop(&mut self.lock) };
     }
 }

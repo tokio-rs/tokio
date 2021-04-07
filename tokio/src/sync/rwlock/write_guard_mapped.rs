@@ -14,6 +14,7 @@ use std::ops;
 /// [mapping]: method@crate::sync::RwLockWriteGuard::map
 /// [`RwLockWriteGuard`]: struct@crate::sync::RwLockWriteGuard
 pub struct RwLockMappedWriteGuard<'a, T: ?Sized> {
+    pub(super) permits_acquired: u32,
     pub(super) s: &'a Semaphore,
     pub(super) data: *mut T,
     pub(super) marker: marker::PhantomData<&'a mut T>,
@@ -62,9 +63,11 @@ impl<'a, T: ?Sized> RwLockMappedWriteGuard<'a, T> {
     {
         let data = f(&mut *this) as *mut U;
         let s = this.s;
+        let permits_acquired = this.permits_acquired;
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
         RwLockMappedWriteGuard {
+            permits_acquired,
             s,
             data,
             marker: marker::PhantomData,
@@ -122,9 +125,11 @@ impl<'a, T: ?Sized> RwLockMappedWriteGuard<'a, T> {
             None => return Err(this),
         };
         let s = this.s;
+        let permits_acquired = this.permits_acquired;
         // NB: Forget to avoid drop impl from being called.
         mem::forget(this);
         Ok(RwLockMappedWriteGuard {
+            permits_acquired,
             s,
             data,
             marker: marker::PhantomData,
@@ -166,6 +171,6 @@ where
 
 impl<'a, T: ?Sized> Drop for RwLockMappedWriteGuard<'a, T> {
     fn drop(&mut self) {
-        self.s.release(super::MAX_READS);
+        self.s.release(self.permits_acquired as usize);
     }
 }
