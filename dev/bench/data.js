@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1617867041512,
+  "lastUpdate": 1617867056114,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -24277,6 +24277,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18962628,
             "range": "± 3687546",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "zonyitoo@users.noreply.github.com",
+            "name": "ty",
+            "username": "zonyitoo"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "787aca18265bb7605acb7662c6b95a6e241cf2c7",
+          "message": "net: implement IntoRawFd for TcpSocket (#3684)",
+          "timestamp": "2021-04-08T09:28:44+02:00",
+          "tree_id": "b875f18482b856a4641fbd6e514b76d27982068e",
+          "url": "https://github.com/tokio-rs/tokio/commit/787aca18265bb7605acb7662c6b95a6e241cf2c7"
+        },
+        "date": 1617867053377,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 196255,
+            "range": "± 20813",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 737461,
+            "range": "± 75916",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5417718,
+            "range": "± 1391924",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 22292803,
+            "range": "± 3841838",
             "unit": "ns/iter"
           }
         ]
