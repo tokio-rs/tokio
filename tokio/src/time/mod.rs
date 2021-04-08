@@ -34,7 +34,7 @@
 //! }
 //! ```
 //!
-//! Require that an operation takes no more than 300ms.
+//! Require that an operation takes no more than 1s.
 //!
 //! ```
 //! use tokio::time::{timeout, Duration};
