@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1617915077802,
+  "lastUpdate": 1617915098133,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -24583,6 +24583,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 18931768,
             "range": "± 3002587",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "udoprog@tedro.se",
+            "name": "John-John Tedro",
+            "username": "udoprog"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1a72b28f538f812bec50d7d1921946c653282d31",
+          "message": "rt: fix panic in JoinHandle::abort() when called from other thread (#3672)\n\nWhen aborting a task registered with a current-thread scheduler from off runtime, the tasks may not\r\nbe immediately unlinked from the runtime. Instead, send a message to the runtime, notifying it to\r\nremove the aborted task.\r\n\r\nFixes #3662",
+          "timestamp": "2021-04-08T13:49:39-07:00",
+          "tree_id": "2fa96fb932d59bec463aa14b20b323b7bfc2e9b8",
+          "url": "https://github.com/tokio-rs/tokio/commit/1a72b28f538f812bec50d7d1921946c653282d31"
+        },
+        "date": 1617915095317,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 204851,
+            "range": "± 70821",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 747135,
+            "range": "± 144474",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5834389,
+            "range": "± 1085693",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 21916701,
+            "range": "± 4562480",
             "unit": "ns/iter"
           }
         ]
