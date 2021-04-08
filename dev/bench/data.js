@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1617872784632,
+  "lastUpdate": 1617872792113,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -24325,6 +24325,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 22292803,
             "range": "± 3841838",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mail@beyermatthias.de",
+            "name": "Matthias Beyer",
+            "username": "matthiasbeyer"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5513b6b825c12aeb75d74f0d90255534846ecb53",
+          "message": "time: change 300ms to 1s in documentation (#3685)",
+          "timestamp": "2021-04-08T11:04:27+02:00",
+          "tree_id": "90bbc94b4b2dddee9f2439c6c1ca1d4cab033c04",
+          "url": "https://github.com/tokio-rs/tokio/commit/5513b6b825c12aeb75d74f0d90255534846ecb53"
+        },
+        "date": 1617872789632,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 164543,
+            "range": "± 20586",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 650097,
+            "range": "± 249695",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4406806,
+            "range": "± 738386",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 18865303,
+            "range": "± 2748877",
             "unit": "ns/iter"
           }
         ]
