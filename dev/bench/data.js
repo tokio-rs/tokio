@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1617821234281,
+  "lastUpdate": 1617867037762,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -37077,6 +37077,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 826,
             "range": "± 4",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "zonyitoo@users.noreply.github.com",
+            "name": "ty",
+            "username": "zonyitoo"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "787aca18265bb7605acb7662c6b95a6e241cf2c7",
+          "message": "net: implement IntoRawFd for TcpSocket (#3684)",
+          "timestamp": "2021-04-08T09:28:44+02:00",
+          "tree_id": "b875f18482b856a4641fbd6e514b76d27982068e",
+          "url": "https://github.com/tokio-rs/tokio/commit/787aca18265bb7605acb7662c6b95a6e241cf2c7"
+        },
+        "date": 1617867034898,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 15435,
+            "range": "± 4571",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1166,
+            "range": "± 4",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 680,
+            "range": "± 12",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 15128,
+            "range": "± 4034",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1167,
+            "range": "± 27",
             "unit": "ns/iter"
           }
         ]
