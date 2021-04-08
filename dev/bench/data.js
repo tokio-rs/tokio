@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1617915098133,
+  "lastUpdate": 1617915102597,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -37647,6 +37647,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 884,
             "range": "± 112",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "udoprog@tedro.se",
+            "name": "John-John Tedro",
+            "username": "udoprog"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1a72b28f538f812bec50d7d1921946c653282d31",
+          "message": "rt: fix panic in JoinHandle::abort() when called from other thread (#3672)\n\nWhen aborting a task registered with a current-thread scheduler from off runtime, the tasks may not\r\nbe immediately unlinked from the runtime. Instead, send a message to the runtime, notifying it to\r\nremove the aborted task.\r\n\r\nFixes #3662",
+          "timestamp": "2021-04-08T13:49:39-07:00",
+          "tree_id": "2fa96fb932d59bec463aa14b20b323b7bfc2e9b8",
+          "url": "https://github.com/tokio-rs/tokio/commit/1a72b28f538f812bec50d7d1921946c653282d31"
+        },
+        "date": 1617915097440,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 14640,
+            "range": "± 9059",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1115,
+            "range": "± 284",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 621,
+            "range": "± 99",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 14046,
+            "range": "± 4851",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1094,
+            "range": "± 189",
             "unit": "ns/iter"
           }
         ]
