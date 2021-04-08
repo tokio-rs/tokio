@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1617867037762,
+  "lastUpdate": 1617867041512,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -12797,6 +12797,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 565,
             "range": "± 80",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "zonyitoo@users.noreply.github.com",
+            "name": "ty",
+            "username": "zonyitoo"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "787aca18265bb7605acb7662c6b95a6e241cf2c7",
+          "message": "net: implement IntoRawFd for TcpSocket (#3684)",
+          "timestamp": "2021-04-08T09:28:44+02:00",
+          "tree_id": "b875f18482b856a4641fbd6e514b76d27982068e",
+          "url": "https://github.com/tokio-rs/tokio/commit/787aca18265bb7605acb7662c6b95a6e241cf2c7"
+        },
+        "date": 1617867033226,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 870,
+            "range": "± 5",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 12961,
+            "range": "± 2895",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 890,
+            "range": "± 6",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 13632,
+            "range": "± 2663",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 498,
+            "range": "± 103",
             "unit": "ns/iter"
           }
         ]
