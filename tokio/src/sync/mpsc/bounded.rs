@@ -699,6 +699,34 @@ impl<T> Sender<T> {
     pub fn same_channel(&self, other: &Self) -> bool {
         self.chan.same_channel(&other.chan)
     }
+
+    /// Returns the number of available permits in the channel.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::channel::<()>(5);
+    ///
+    ///     // Initially the available permits equals the capacity.
+    ///     assert_eq!(tx.available_permits(), 5);
+    ///
+    ///     // Making a reservation drops the available permits by 1.
+    ///     let permit = tx.reserve().await.unwrap();
+    ///     assert_eq!(tx.available_permits(), 4);
+    ///
+    ///     // Sending and receiving a value frees the permit.
+    ///     permit.send(());
+    ///     rx.recv().await.unwrap();
+    ///     assert_eq!(tx.available_permits(), 5);
+    /// }
+    /// ```
+    pub fn available_permits(&self)  -> usize {
+        self.chan.semaphore().0.available_permits()
+    }
 }
 
 impl<T> Clone for Sender<T> {
