@@ -4,6 +4,7 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{self, AtomicUsize};
 
 use std::fmt;
+use std::panic::{RefUnwindSafe, UnwindSafe};
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::task::Waker;
 
@@ -26,6 +27,9 @@ pub(crate) struct AtomicWaker {
     state: AtomicUsize,
     waker: UnsafeCell<Option<Waker>>,
 }
+
+impl RefUnwindSafe for AtomicWaker {}
+impl UnwindSafe for AtomicWaker {}
 
 // `AtomicWaker` is a multi-consumer, single-producer transfer cell. The cell
 // stores a `Waker` value produced by calls to `register` and many threads can
@@ -178,8 +182,16 @@ impl AtomicWaker {
         {
             WAITING => {
                 unsafe {
+                    // If `into_waker` panics (because it's code outside of
+                    // AtomicWaker) we need to prime a guard that is called on
+                    // unwind restore the waker to a WAITING state. Otherwise
+                    // any future calls to register will incorrectly be stuck in
+                    // a state where it believes it's being updated by someone
+                    // else.
+                    let guard = PanicGuard(&self.state);
                     // Locked acquired, update the waker cell
                     self.waker.with_mut(|t| *t = Some(waker.into_waker()));
+                    std::mem::forget(guard);
 
                     // Release the lock. If the state transitioned to include
                     // the `WAKING` bit, this means that a wake has been
@@ -211,6 +223,8 @@ impl AtomicWaker {
 
                             // The atomic swap was complete, now
                             // wake the waker and return.
+                            //
+                            // If this panics, we end up in a consumed state.
                             waker.wake();
                         }
                     }
@@ -220,6 +234,9 @@ impl AtomicWaker {
                 // Currently in the process of waking the task, i.e.,
                 // `wake` is currently being called on the old waker.
                 // So, we call wake on the new waker.
+                //
+                // If this panics, someone else is responsible for restoring the
+                // state of the waker.
                 waker.wake();
 
                 // This is equivalent to a spin lock, so use a spin hint.
@@ -238,6 +255,18 @@ impl AtomicWaker {
                 debug_assert!(state == REGISTERING || state == REGISTERING | WAKING);
             }
         }
+
+        struct PanicGuard<'a>(&'a AtomicUsize);
+
+        impl Drop for PanicGuard<'_> {
+            fn drop(&mut self) {
+                // On panics, we restore straight back to WAITING. We just tried
+                // to replace the atomic waker, so it's a legitimate outcome
+                // that the net effect of the operation is a no-op (i.e. no
+                // wakeup was issued).
+                self.0.swap(WAITING, AcqRel);
+            }
+        }
     }
 
     /// Wakes the task that last called `register`.
@@ -245,6 +274,8 @@ impl AtomicWaker {
     /// If `register` has not been called yet, then this does nothing.
     pub(crate) fn wake(&self) {
         if let Some(waker) = self.take_waker() {
+            // If wake panics, we've consumed the waker which is a legitimate
+            // outcome.
             waker.wake();
         }
     }
