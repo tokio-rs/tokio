@@ -724,7 +724,7 @@ impl<T> Sender<T> {
     ///     assert_eq!(tx.available_permits(), 5);
     /// }
     /// ```
-    pub fn available_permits(&self)  -> usize {
+    pub fn available_permits(&self) -> usize {
         self.chan.semaphore().0.available_permits()
     }
 }
