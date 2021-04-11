@@ -118,7 +118,7 @@ where
 }
 
 /// Types in this module can be mocked out in tests.
-mod sys {
+pub(crate) mod sys {
     pub(crate) use std::fs::File;
 
     // TODO: don't rename
