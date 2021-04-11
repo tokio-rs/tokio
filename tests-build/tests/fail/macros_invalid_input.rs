@@ -12,9 +12,6 @@ async fn main_attr_has_path_args() {}
 #[tokio::test]
 fn test_is_not_async() {}
 
-#[tokio::test]
-async fn test_fn_has_args(_x: u8) {}
-
 #[tokio::test(foo)]
 async fn test_attr_has_args() {}
 

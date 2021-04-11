@@ -190,17 +190,10 @@ fn parse_knobs(
     is_test: bool,
     rt_multi_thread: bool,
 ) -> Result<TokenStream, syn::Error> {
-    let sig = &mut input.sig;
-    let body = &input.block;
-    let attrs = &input.attrs;
-    let vis = input.vis;
-
-    if sig.asyncness.is_none() {
+    if input.sig.asyncness.take().is_none() {
         let msg = "the `async` keyword is missing from the function declaration";
-        return Err(syn::Error::new_spanned(sig.fn_token, msg));
+        return Err(syn::Error::new_spanned(input.sig.fn_token, msg));
     }
-
-    sig.asyncness = None;
 
     let mut config = Configuration::new(is_test, rt_multi_thread);
     let macro_name = config.macro_name();
@@ -300,26 +293,28 @@ fn parse_knobs(
         rt = quote! { #rt.start_paused(#v) };
     }
 
-    let header = {
-        if is_test {
-            quote! {
-                #[::core::prelude::v1::test]
-            }
-        } else {
-            quote! {}
+    let header = if is_test {
+        quote! {
+            #[::core::prelude::v1::test]
         }
+    } else {
+        quote! {}
     };
 
-    let result = quote! {
-        #header
-        #(#attrs)*
-        #vis #sig {
+    let body = &input.block;
+    input.block = syn::parse_quote! {
+        {
             #rt
                 .enable_all()
                 .build()
                 .unwrap()
                 .block_on(async #body)
         }
+    };
+
+    let result = quote! {
+        #header
+        #input
     };
 
     Ok(result.into())
@@ -351,13 +346,6 @@ pub(crate) fn test(args: TokenStream, item: TokenStream, rt_multi_thread: bool) 
                 .to_compile_error()
                 .into();
         }
-    }
-
-    if !input.sig.inputs.is_empty() {
-        let msg = "the test function cannot accept arguments";
-        return syn::Error::new_spanned(&input.sig.inputs, msg)
-            .to_compile_error()
-            .into();
     }
 
     parse_knobs(input, args, true, rt_multi_thread).unwrap_or_else(|e| e.to_compile_error().into())
