@@ -302,12 +302,14 @@ fn parse_knobs(
     };
 
     let body = &input.block;
-    input.block.stmts = syn::parse_quote! {
-        #rt
-            .enable_all()
-            .build()
-            .unwrap()
-            .block_on(async #body)
+    input.block = syn::parse_quote! {
+        {
+            #rt
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(async #body)
+        }
     };
 
     let result = quote! {
