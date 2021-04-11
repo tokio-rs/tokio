@@ -700,7 +700,10 @@ impl<T> Sender<T> {
         self.chan.same_channel(&other.chan)
     }
 
-    /// Returns the number of available permits in the channel.
+    /// Returns the current capacity of the channel.
+    ///
+    /// The capacity goes down when sending a value by calling [`send`] or by reserving capacity
+    /// with [`reserve`]. The capacity goes up when values are received by the [`Receiver`].
     ///
     /// # Examples
     ///
@@ -711,20 +714,22 @@ impl<T> Sender<T> {
     /// async fn main() {
     ///     let (tx, mut rx) = mpsc::channel::<()>(5);
     ///
-    ///     // Initially the available permits equals the capacity.
-    ///     assert_eq!(tx.available_permits(), 5);
+    ///     assert_eq!(tx.capacity(), 5);
     ///
-    ///     // Making a reservation drops the available permits by 1.
+    ///     // Making a reservation drops the capacity by one.
     ///     let permit = tx.reserve().await.unwrap();
-    ///     assert_eq!(tx.available_permits(), 4);
+    ///     assert_eq!(tx.capacity(), 4);
     ///
-    ///     // Sending and receiving a value frees the permit.
+    ///     // Sending and receiving a value increases the caapcity by one.
     ///     permit.send(());
     ///     rx.recv().await.unwrap();
-    ///     assert_eq!(tx.available_permits(), 5);
+    ///     assert_eq!(tx.capacity(), 5);
     /// }
     /// ```
-    pub fn available_permits(&self) -> usize {
+    ///
+    /// [`send`]: Sender::send
+    /// [`reserve`]: Sender::reserve
+    pub fn capacity(&self) -> usize {
         self.chan.semaphore().0.available_permits()
     }
 }
