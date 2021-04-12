@@ -699,6 +699,39 @@ impl<T> Sender<T> {
     pub fn same_channel(&self, other: &Self) -> bool {
         self.chan.same_channel(&other.chan)
     }
+
+    /// Returns the current capacity of the channel.
+    ///
+    /// The capacity goes down when sending a value by calling [`send`] or by reserving capacity
+    /// with [`reserve`]. The capacity goes up when values are received by the [`Receiver`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::channel::<()>(5);
+    ///
+    ///     assert_eq!(tx.capacity(), 5);
+    ///
+    ///     // Making a reservation drops the capacity by one.
+    ///     let permit = tx.reserve().await.unwrap();
+    ///     assert_eq!(tx.capacity(), 4);
+    ///
+    ///     // Sending and receiving a value increases the caapcity by one.
+    ///     permit.send(());
+    ///     rx.recv().await.unwrap();
+    ///     assert_eq!(tx.capacity(), 5);
+    /// }
+    /// ```
+    ///
+    /// [`send`]: Sender::send
+    /// [`reserve`]: Sender::reserve
+    pub fn capacity(&self) -> usize {
+        self.chan.semaphore().0.available_permits()
+    }
 }
 
 impl<T> Clone for Sender<T> {
