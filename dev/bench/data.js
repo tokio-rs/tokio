@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1618230061108,
+  "lastUpdate": 1618230064890,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -24889,6 +24889,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20684282,
             "range": "± 3002698",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ramonwehrli@gmail.com",
+            "name": "conblem",
+            "username": "conblem"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "adad8fc3cdeffb6449edac55558510f4d12c95be",
+          "message": "io: add a copy_bidirectional utility (#3572)",
+          "timestamp": "2021-04-12T14:18:45+02:00",
+          "tree_id": "a4f5dd6856fe4ab75205ef26e477d5d6acafa974",
+          "url": "https://github.com/tokio-rs/tokio/commit/adad8fc3cdeffb6449edac55558510f4d12c95be"
+        },
+        "date": 1618230052480,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 193390,
+            "range": "± 42643",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 702098,
+            "range": "± 172529",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5055717,
+            "range": "± 948213",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20180351,
+            "range": "± 4084693",
             "unit": "ns/iter"
           }
         ]
