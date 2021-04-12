@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1618212307041,
+  "lastUpdate": 1618212312327,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -37959,6 +37959,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1161,
             "range": "± 331",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "david.pdrsn@gmail.com",
+            "name": "David Pedersen",
+            "username": "davidpdrsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "08f1b67fcb9564483f2e6e5ab635d5636f2a0b80",
+          "message": "sync: add `mpsc::Sender::capacity` (#3690)\n\nSimply exposes the number of available permits of the semaphore.\r\n\r\nThis makes some kinds of bookkeeping easier without having to manually keep counts using atomics.\r\n\r\nFixes #2642",
+          "timestamp": "2021-04-12T09:23:03+02:00",
+          "tree_id": "74932171a1aad651ea971345fc2925477f153070",
+          "url": "https://github.com/tokio-rs/tokio/commit/08f1b67fcb9564483f2e6e5ab635d5636f2a0b80"
+        },
+        "date": 1618212309164,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 14783,
+            "range": "± 5935",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1093,
+            "range": "± 53",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 633,
+            "range": "± 23",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 14678,
+            "range": "± 4468",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1093,
+            "range": "± 45",
             "unit": "ns/iter"
           }
         ]
