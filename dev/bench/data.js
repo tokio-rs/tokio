@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1618212300743,
+  "lastUpdate": 1618212304402,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -58151,6 +58151,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 736700,
             "range": "± 121020",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "david.pdrsn@gmail.com",
+            "name": "David Pedersen",
+            "username": "davidpdrsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "08f1b67fcb9564483f2e6e5ab635d5636f2a0b80",
+          "message": "sync: add `mpsc::Sender::capacity` (#3690)\n\nSimply exposes the number of available permits of the semaphore.\r\n\r\nThis makes some kinds of bookkeeping easier without having to manually keep counts using atomics.\r\n\r\nFixes #2642",
+          "timestamp": "2021-04-12T09:23:03+02:00",
+          "tree_id": "74932171a1aad651ea971345fc2925477f153070",
+          "url": "https://github.com/tokio-rs/tokio/commit/08f1b67fcb9564483f2e6e5ab635d5636f2a0b80"
+        },
+        "date": 1618212301477,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 5991441,
+            "range": "± 2586680",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 5773696,
+            "range": "± 1376553",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 5905134,
+            "range": "± 2195541",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 558,
+            "range": "± 4",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 556,
+            "range": "± 4",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 554,
+            "range": "± 3",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 73603,
+            "range": "± 5006",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1283,
+            "range": "± 108",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 962608,
+            "range": "± 14238",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 701235,
+            "range": "± 1678",
             "unit": "ns/iter"
           }
         ]
