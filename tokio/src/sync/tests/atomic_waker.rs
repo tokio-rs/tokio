@@ -36,8 +36,8 @@ fn wake_without_register() {
 #[test]
 fn atomic_waker_panic_safe() {
     use std::panic;
-    use std::task::{RawWaker, RawWakerVTable, Waker};
     use std::ptr;
+    use std::task::{RawWaker, RawWakerVTable, Waker};
 
     static PANICKING_VTABLE: RawWakerVTable = RawWakerVTable::new(
         |_| panic!("clone"),
