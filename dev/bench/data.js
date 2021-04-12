@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1618166508549,
+  "lastUpdate": 1618212300743,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -24733,6 +24733,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 21167439,
             "range": "± 4161899",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "david.pdrsn@gmail.com",
+            "name": "David Pedersen",
+            "username": "davidpdrsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "08f1b67fcb9564483f2e6e5ab635d5636f2a0b80",
+          "message": "sync: add `mpsc::Sender::capacity` (#3690)\n\nSimply exposes the number of available permits of the semaphore.\r\n\r\nThis makes some kinds of bookkeeping easier without having to manually keep counts using atomics.\r\n\r\nFixes #2642",
+          "timestamp": "2021-04-12T09:23:03+02:00",
+          "tree_id": "74932171a1aad651ea971345fc2925477f153070",
+          "url": "https://github.com/tokio-rs/tokio/commit/08f1b67fcb9564483f2e6e5ab635d5636f2a0b80"
+        },
+        "date": 1618212297413,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 200246,
+            "range": "± 65266",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 746862,
+            "range": "± 133476",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5358385,
+            "range": "± 1120812",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 20684282,
+            "range": "± 3002698",
             "unit": "ns/iter"
           }
         ]
