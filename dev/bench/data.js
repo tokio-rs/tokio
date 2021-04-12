@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1618212304402,
+  "lastUpdate": 1618212307041,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -13067,6 +13067,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 596,
             "range": "± 103",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "david.pdrsn@gmail.com",
+            "name": "David Pedersen",
+            "username": "davidpdrsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "08f1b67fcb9564483f2e6e5ab635d5636f2a0b80",
+          "message": "sync: add `mpsc::Sender::capacity` (#3690)\n\nSimply exposes the number of available permits of the semaphore.\r\n\r\nThis makes some kinds of bookkeeping easier without having to manually keep counts using atomics.\r\n\r\nFixes #2642",
+          "timestamp": "2021-04-12T09:23:03+02:00",
+          "tree_id": "74932171a1aad651ea971345fc2925477f153070",
+          "url": "https://github.com/tokio-rs/tokio/commit/08f1b67fcb9564483f2e6e5ab635d5636f2a0b80"
+        },
+        "date": 1618212298224,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1021,
+            "range": "± 24",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 13726,
+            "range": "± 4524",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1038,
+            "range": "± 44",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 14336,
+            "range": "± 3428",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 566,
+            "range": "± 41",
             "unit": "ns/iter"
           }
         ]
