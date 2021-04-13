@@ -498,7 +498,7 @@ impl AsyncRead for File {
                         return Ready(Ok(()));
                     }
 
-                    if let Some(x) = read_nowait::try_nonblocking_read(me.std.as_ref(), dst) {
+                    if let Some(x) = try_nonblocking_read(me.std.as_ref(), dst) {
                         return Ready(x);
                     }
 
@@ -762,39 +762,47 @@ impl Inner {
 }
 
 #[cfg(all(target_os = "linux", not(test)))]
-mod read_nowait {
-    use crate::io::ReadBuf;
-    use libc::{c_int, c_long, c_void, iovec, off_t, ssize_t};
-    use std::{
-        os::unix::prelude::AsRawFd,
-        sync::atomic::{AtomicBool, Ordering},
-    };
+pub(crate) fn try_nonblocking_read(
+    file: &crate::fs::sys::File,
+    dst: &mut ReadBuf<'_>,
+) -> Option<std::io::Result<()>> {
+    use std::sync::atomic::{AtomicBool, Ordering};
 
     static NONBLOCKING_READ_SUPPORTED: AtomicBool = AtomicBool::new(true);
-
-    pub(crate) fn try_nonblocking_read(
-        file: &crate::fs::sys::File,
-        dst: &mut ReadBuf<'_>,
-    ) -> Option<std::io::Result<()>> {
-        if !NONBLOCKING_READ_SUPPORTED.load(Ordering::Relaxed) {
-            return None;
-        }
-        let out = preadv2_safe(file, dst, -1, RWF_NOWAIT);
-        if let Err(err) = &out {
-            match err.raw_os_error() {
-                Some(libc::ENOSYS) => {
-                    NONBLOCKING_READ_SUPPORTED.store(false, Ordering::Relaxed);
-                    return None;
-                }
-                Some(libc::ENOTSUP) | Some(libc::EAGAIN) => return None,
-                _ => {}
-            }
-        }
-        Some(out)
+    if !NONBLOCKING_READ_SUPPORTED.load(Ordering::Relaxed) {
+        return None;
     }
+    let out = preadv2::preadv2_safe(file, dst, -1, preadv2::RWF_NOWAIT);
+    if let Err(err) = &out {
+        match err.raw_os_error() {
+            Some(libc::ENOSYS) => {
+                NONBLOCKING_READ_SUPPORTED.store(false, Ordering::Relaxed);
+                return None;
+            }
+            Some(libc::ENOTSUP) | Some(libc::EAGAIN) => return None,
+            _ => {}
+        }
+    }
+    Some(out)
+}
 
-    fn preadv2_safe(
-        file: &crate::fs::sys::File,
+#[cfg(any(not(target_os = "linux"), test))]
+pub(crate) fn try_nonblocking_read(
+    _file: &crate::fs::sys::File,
+    _dst: &mut ReadBuf<'_>,
+) -> Option<std::io::Result<()>> {
+    None
+}
+
+#[cfg(target_os = "linux")]
+mod preadv2 {
+    use libc::{c_int, c_long, c_void, iovec, off_t, ssize_t};
+    use std::os::unix::prelude::AsRawFd;
+
+    use crate::io::ReadBuf;
+
+    pub(crate) fn preadv2_safe(
+        file: &std::fs::File,
         dst: &mut ReadBuf<'_>,
         offset: off_t,
         flags: c_int,
@@ -803,22 +811,88 @@ mod read_nowait {
             /* We have to defend against buffer overflows manually here.  The slice API makes
              * this fairly straightforward. */
             let unfilled = dst.unfilled_mut();
-            let iov = iovec {
+            let mut iov = iovec {
                 iov_base: unfilled.as_mut_ptr() as *mut c_void,
                 iov_len: unfilled.len(),
             };
             /* We take a File object rather than an fd as reading from a sensitive fd may confuse
              * other unsafe code that assumes that only they have access to that fd. */
-            let bytes_read = preadv2(file.as_raw_fd(), &iov as *const iovec, 1, offset, flags);
+            let bytes_read = preadv2(
+                file.as_raw_fd(),
+                &mut iov as *mut iovec as *const iovec,
+                1,
+                offset,
+                flags,
+            );
             if bytes_read < 0 {
                 Err(std::io::Error::last_os_error())
             } else {
                 /* preadv2 returns the number of bytes read, e.g. the number of bytes that have
                  * written into `unfilled`. So it's safe to assume that the data is now
                  * initialised */
-                dst.assume_init(dst.filled().len() + bytes_read as usize);
+                dst.assume_init(bytes_read as usize);
                 dst.advance(bytes_read as usize);
                 Ok(())
+            }
+        }
+    }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+
+        #[test]
+        fn test_preadv2_safe() {
+            use std::io::Write;
+            use std::mem::MaybeUninit;
+            use tempfile::tempdir;
+
+            let tmp = tempdir().unwrap();
+            let filename = tmp.path().join("file");
+            const MESSAGE: &[u8] = b"Hello this is a test";
+            {
+                let mut f = std::fs::File::create(&filename).unwrap();
+                f.write_all(MESSAGE).unwrap();
+            }
+            let f = std::fs::File::open(&filename).unwrap();
+
+            let mut buf = [MaybeUninit::<u8>::new(0); 50];
+            let mut br = ReadBuf::uninit(&mut buf);
+
+            // Basic use:
+            preadv2_safe(&f, &mut br, 0, 0).unwrap();
+            assert_eq!(br.initialized().len(), MESSAGE.len());
+            assert_eq!(br.filled(), MESSAGE);
+
+            // Here we check that offset works, but also that appending to a non-empty buffer
+            // behaves correctly WRT initialisation.
+            preadv2_safe(&f, &mut br, 5, 0).unwrap();
+            assert_eq!(br.initialized().len(), MESSAGE.len() * 2 - 5);
+            assert_eq!(br.filled(), b"Hello this is a test this is a test".as_ref());
+
+            // offset of -1 means use the current cursor.  This has not been advanced by the
+            // previous reads because we specified an offset there.
+            preadv2_safe(&f, &mut br, -1, 0).unwrap();
+            assert_eq!(br.remaining(), 0);
+            assert_eq!(
+                br.filled(),
+                b"Hello this is a test this is a testHello this is a".as_ref()
+            );
+
+            // but the offset should have been advanced by that read
+            br.clear();
+            preadv2_safe(&f, &mut br, -1, 0).unwrap();
+            assert_eq!(br.filled(), b" test");
+
+            // This should be in cache, so RWF_NOWAIT should work, but it not being in cache
+            // (EAGAIN) or not supported by the underlying filesystem (ENOTSUP) is fine too.
+            br.clear();
+            match preadv2_safe(&f, &mut br, 0, RWF_NOWAIT) {
+                Ok(()) => assert_eq!(br.filled(), MESSAGE),
+                Err(e) => assert!(matches!(
+                    e.raw_os_error(),
+                    Some(libc::ENOTSUP) | Some(libc::EAGAIN)
+                )),
             }
         }
     }
@@ -837,7 +911,7 @@ mod read_nowait {
         )
     }
 
-    const RWF_NOWAIT: c_int = 0x00000008;
+    pub(crate) const RWF_NOWAIT: c_int = 0x00000008;
     unsafe fn preadv2(
         fd: c_int,
         iov: *const iovec,
@@ -847,17 +921,5 @@ mod read_nowait {
     ) -> ssize_t {
         let (lo, hi) = pos_to_lohi(offset);
         libc::syscall(libc::SYS_preadv2, fd, iov, iovcnt, lo, hi, flags) as ssize_t
-    }
-}
-
-#[cfg(any(not(target_os = "linux"), test))]
-mod read_nowait {
-    use crate::io::ReadBuf;
-
-    pub(crate) fn try_nonblocking_read(
-        _file: &crate::fs::sys::File,
-        _dst: &mut ReadBuf<'_>,
-    ) -> Option<std::io::Result<()>> {
-        None
     }
 }
