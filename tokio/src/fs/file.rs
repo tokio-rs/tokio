@@ -843,7 +843,7 @@ mod preadv2 {
 
         #[test]
         fn test_preadv2_safe() {
-            use std::io::Write;
+            use std::io::{Seek, Write};
             use std::mem::MaybeUninit;
             use tempfile::tempdir;
 
@@ -894,6 +894,22 @@ mod preadv2 {
                     Some(libc::ENOTSUP) | Some(libc::EAGAIN)
                 )),
             }
+
+            // Test handling large offsets
+            {
+                // I hope the underlying filesystem supports sparse files
+                let mut w = std::fs::OpenOptions::new()
+                    .write(true)
+                    .open(&filename)
+                    .unwrap();
+                w.set_len(0x1_0000_0000).unwrap();
+                w.seek(std::io::SeekFrom::Start(0x1_0000_0000)).unwrap();
+                w.write_all(b"This is a Large File").unwrap();
+            }
+
+            br.clear();
+            preadv2_safe(&f, &mut br, 0x1_0000_0008, 0).unwrap();
+            assert_eq!(br.filled(), b"a Large File");
         }
     }
 
@@ -919,6 +935,10 @@ mod preadv2 {
         offset: off_t,
         flags: c_int,
     ) -> ssize_t {
+        // Call via libc::syscall rather than libc::preadv2.  preadv2 is only supported by glibc
+        // and only since v2.26.  By using syscall we don't need to worry about compatiblity with
+        // old glibc versions and it will work on Android and musl too.  The downside is that you
+        // can't use `LD_PRELOAD` tricks any more to intercept these calls.
         let (lo, hi) = pos_to_lohi(offset);
         libc::syscall(libc::SYS_preadv2, fd, iov, iovcnt, lo, hi, flags) as ssize_t
     }
