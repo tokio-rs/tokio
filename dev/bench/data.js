@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1618255619731,
+  "lastUpdate": 1618298348097,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -38793,6 +38793,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1048,
             "range": "± 312",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "liaoymxsdl@sina.com",
+            "name": "baoyachi. Aka Rust Hairy crabs",
+            "username": "baoyachi"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cab4a592ac1f122a988b8a81a235bb4eccb22db7",
+          "message": "chore: update version in README.md (#3698)",
+          "timestamp": "2021-04-13T16:17:14+09:00",
+          "tree_id": "2e4adee4ef6d23e792a4515550adfb47976f3dad",
+          "url": "https://github.com/tokio-rs/tokio/commit/cab4a592ac1f122a988b8a81a235bb4eccb22db7"
+        },
+        "date": 1618298341887,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 15369,
+            "range": "± 7219",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1126,
+            "range": "± 65",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 674,
+            "range": "± 162",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 16465,
+            "range": "± 5467",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1152,
+            "range": "± 16",
             "unit": "ns/iter"
           }
         ]
