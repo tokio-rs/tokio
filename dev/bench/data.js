@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1618408016190,
+  "lastUpdate": 1618408025305,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -25501,6 +25501,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 20159257,
             "range": "± 4041328",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "will@stb-tester.com",
+            "name": "William Manley",
+            "username": "wmanley"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "39706b198c6cacfb23544bad8b7c144471ee4efa",
+          "message": "fs: try doing a non-blocking read before punting to the threadpool (#3518)",
+          "timestamp": "2021-04-14T15:44:49+02:00",
+          "tree_id": "7bd32938b00d0cb47682abaa98280b97d19dc6ab",
+          "url": "https://github.com/tokio-rs/tokio/commit/39706b198c6cacfb23544bad8b7c144471ee4efa"
+        },
+        "date": 1618408021450,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 198940,
+            "range": "± 27662",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 711271,
+            "range": "± 121255",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 4936232,
+            "range": "± 1200168",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 19736381,
+            "range": "± 3780631",
             "unit": "ns/iter"
           }
         ]
