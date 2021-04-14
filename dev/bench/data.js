@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1618424327423,
+  "lastUpdate": 1618424370355,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -60179,6 +60179,90 @@ window.BENCHMARK_DATA = {
             "name": "uncontented_unbounded",
             "value": 797968,
             "range": "± 47183",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ecameron@bluecatnetworks.com",
+            "name": "Evan Cameron",
+            "username": "leshow"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9eeec039f200c42099e0471f2a216a679dce397e",
+          "message": "util: make UdpFramed take Borrow<UdpSocket> (#3451)",
+          "timestamp": "2021-04-14T20:16:23+02:00",
+          "tree_id": "04ee3c7c8df16f2004d778a5094b2064a95f6f04",
+          "url": "https://github.com/tokio-rs/tokio/commit/9eeec039f200c42099e0471f2a216a679dce397e"
+        },
+        "date": 1618424367335,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contention_bounded",
+            "value": 6539080,
+            "range": "± 3182259",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_bounded_full",
+            "value": 6256196,
+            "range": "± 1646074",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contention_unbounded",
+            "value": 6012748,
+            "range": "± 2204933",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_000_medium",
+            "value": 767,
+            "range": "± 68",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_100_medium",
+            "value": 757,
+            "range": "± 51",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "create_1_medium",
+            "value": 763,
+            "range": "± 77",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_large",
+            "value": 128764,
+            "range": "± 12299",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "send_medium",
+            "value": 1704,
+            "range": "± 205",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_bounded",
+            "value": 1107994,
+            "range": "± 151674",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontented_unbounded",
+            "value": 786932,
+            "range": "± 89353",
             "unit": "ns/iter"
           }
         ]
