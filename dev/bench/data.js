@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1618408028464,
+  "lastUpdate": 1618408032799,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -39051,6 +39051,60 @@ window.BENCHMARK_DATA = {
             "name": "uncontended_concurrent_single",
             "value": 1152,
             "range": "± 16",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "will@stb-tester.com",
+            "name": "William Manley",
+            "username": "wmanley"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "39706b198c6cacfb23544bad8b7c144471ee4efa",
+          "message": "fs: try doing a non-blocking read before punting to the threadpool (#3518)",
+          "timestamp": "2021-04-14T15:44:49+02:00",
+          "tree_id": "7bd32938b00d0cb47682abaa98280b97d19dc6ab",
+          "url": "https://github.com/tokio-rs/tokio/commit/39706b198c6cacfb23544bad8b7c144471ee4efa"
+        },
+        "date": 1618408025405,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "contended_concurrent_multi",
+            "value": 15892,
+            "range": "± 5171",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "contended_concurrent_single",
+            "value": 1100,
+            "range": "± 118",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended",
+            "value": 636,
+            "range": "± 84",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_multi",
+            "value": 16761,
+            "range": "± 4999",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "uncontended_concurrent_single",
+            "value": 1098,
+            "range": "± 178",
             "unit": "ns/iter"
           }
         ]
