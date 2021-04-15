@@ -245,10 +245,11 @@ impl<T> Receiver<T> {
     ///
     /// To guarantee that no messages are dropped, after calling `close()`,
     /// `recv()` must be called until `None` is returned. If there are
-    /// outstanding [`Permit`] values, the `recv` method will not return `None`
-    /// until those are released.
+    /// outstanding [`Permit`] or [`OwnedPermit`] values, the `recv` method will
+    /// not return `None` until those are released.
     ///
     /// [`Permit`]: Permit
+    /// [`OwnedPermit`]: OwnedPermit
     ///
     /// # Examples
     ///
@@ -651,7 +652,10 @@ impl<T> Sender<T> {
     /// This moves the sender _by value_, and returns an owned permit that can
     /// be used to send a message into the channel. Unlike [`Sender::reserve`],
     /// this method may be used in cases where the permit must be valid for the
-    /// `'static` lifetime.
+    /// `'static` lifetime. `Sender`s may be cloned cheaply (`Sender::clone` is
+    /// essentially a reference count increment, comparable to [`Arc::clone`]),
+    /// so when multiple [`OwnedPermit`]s are needed or the `Sender` cannot be
+    /// moved, it can be cloned prior to calling `reserve_owned`.
     ///
     /// If the channel is full, the function waits for the number of unreceived
     /// messages to become less than the channel capacity. Capacity to send one
@@ -714,6 +718,7 @@ impl<T> Sender<T> {
     /// [`Sender::reserve`]: Sender::reserve
     /// [`OwnedPermit`]: OwnedPermit
     /// [`send`]: OwnedPermit::send
+    /// [`Arc::clone`]: std::sync::Arc::clone
     pub async fn reserve_owned(self) -> Result<OwnedPermit<T>, SendError<()>> {
         self.reserve_inner().await?;
         Ok(OwnedPermit {
@@ -786,7 +791,10 @@ impl<T> Sender<T> {
     /// This moves the sender _by value_, and returns an owned permit that can
     /// be used to send a message into the channel. Unlike [`Sender::try_reserve`],
     /// this method may be used in cases where the permit must be valid for the
-    /// `'static` lifetime.
+    /// `'static` lifetime.  `Sender`s may be cloned cheaply (`Sender::clone` is
+    /// essentially a reference count increment, comparable to [`Arc::clone`]),
+    /// so when multiple [`OwnedPermit`]s are needed or the `Sender` cannot be
+    /// moved, it can be cloned prior to calling `try_reserve_owned`.
     ///
     /// If the channel is full this function will return a [`TrySendError`].
     /// Since the sender is taken by value, the `TrySendError` returned in this
@@ -802,6 +810,7 @@ impl<T> Sender<T> {
     /// [`OwnedPermit`]: OwnedPermit
     /// [`send`]: OwnedPermit::send
     /// [`reserve_owned`]: Sender::reserve_owned
+    /// [`Arc::clone`]: std::sync::Arc::clone
     ///
     /// # Examples
     ///
@@ -962,6 +971,8 @@ impl<T> Drop for Permit<'_, T> {
         // Add the permit back to the semaphore
         semaphore.add_permit();
 
+        // If this is the last sender for this channel, wake the receiver so
+        // that it can be notified that the channel is closed.
         if semaphore.is_closed() && semaphore.is_idle() {
             self.chan.wake_rx();
         }
@@ -1076,6 +1087,9 @@ impl<T> Drop for OwnedPermit<T> {
             // Add the permit back to the semaphore
             semaphore.add_permit();
 
+            // If this `OwnedPermit` is holding the last sender for this
+            // channel, wake the receiver so that it can be notified that the
+            // channel is closed.
             if semaphore.is_closed() && semaphore.is_idle() {
                 chan.wake_rx();
             }
