@@ -1032,7 +1032,7 @@ impl<T> OwnedPermit<T> {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let (tx, mut rx) = mpsc::channel(1);
+    ///     let (tx, rx) = mpsc::channel(1);
     ///
     ///     // Clone the sender and reserve capacity
     ///     let permit = tx.clone().reserve_owned().await.unwrap();
