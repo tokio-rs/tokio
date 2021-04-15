@@ -13,6 +13,7 @@ cfg_rt! {
 enum Repr {
     Cancelled,
     Panic(Mutex<Box<dyn Any + Send + 'static>>),
+    DroppedRuntime,
 }
 
 impl JoinError {
@@ -28,9 +29,21 @@ impl JoinError {
         }
     }
 
+    pub(crate) fn dropped_runtime() -> JoinError {
+        JoinError {
+            repr: Repr::DroppedRuntime,
+        }
+    }
+
     /// Returns true if the error was caused by the task being cancelled
     pub fn is_cancelled(&self) -> bool {
         matches!(&self.repr, Repr::Cancelled)
+    }
+
+    /// Returns true if the the runtime was dropped before the task
+    /// could execute.
+    pub fn is_dropped_runtime(&self) -> bool {
+        matches!(&self.repr, Repr::DroppedRuntime)
     }
 
     /// Returns true if the error was caused by the task panicking
@@ -117,6 +130,7 @@ impl fmt::Display for JoinError {
         match &self.repr {
             Repr::Cancelled => write!(fmt, "cancelled"),
             Repr::Panic(_) => write!(fmt, "panic"),
+            Repr::DroppedRuntime => write!(fmt, "dropped runtime"),
         }
     }
 }
@@ -126,6 +140,7 @@ impl fmt::Debug for JoinError {
         match &self.repr {
             Repr::Cancelled => write!(fmt, "JoinError::Cancelled"),
             Repr::Panic(_) => write!(fmt, "JoinError::Panic(...)"),
+            Repr::DroppedRuntime => write!(fmt, "JoinError::DroppedRuntime"),
         }
     }
 }
@@ -139,6 +154,7 @@ impl From<JoinError> for io::Error {
             match src.repr {
                 Repr::Cancelled => "task was cancelled",
                 Repr::Panic(_) => "task panicked",
+                Repr::DroppedRuntime => "runtime was dropped before task could be spawned",
             },
         )
     }

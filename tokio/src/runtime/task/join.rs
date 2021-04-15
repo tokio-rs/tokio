@@ -7,6 +7,10 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 cfg_rt! {
+    use crate::runtime::task::error::JoinError;
+}
+
+cfg_rt! {
     /// An owned permission to join on a task (await its termination).
     ///
     /// This can be thought of as the equivalent of [`std::thread::JoinHandle`] for
@@ -144,6 +148,7 @@ cfg_rt! {
     pub struct JoinHandle<T> {
         raw: Option<RawTask>,
         _p: PhantomData<T>,
+        runtime_dropped: bool,
     }
 }
 
@@ -155,6 +160,15 @@ impl<T> JoinHandle<T> {
         JoinHandle {
             raw: Some(raw),
             _p: PhantomData,
+            runtime_dropped: false,
+        }
+    }
+
+    pub(crate) fn new_dropped_runtime() -> JoinHandle<T> {
+        JoinHandle {
+            raw: None,
+            _p: PhantomData,
+            runtime_dropped: true,
         }
     }
 
@@ -203,6 +217,10 @@ impl<T> Future for JoinHandle<T> {
     type Output = super::Result<T>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        if self.runtime_dropped {
+            return Poll::Ready(Err(JoinError::dropped_runtime()));
+        }
+
         let mut ret = Poll::Pending;
 
         // Keep track of task budget

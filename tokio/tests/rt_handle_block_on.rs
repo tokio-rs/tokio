@@ -8,7 +8,7 @@
 // When this has been fixed we want to re-enable these tests.
 
 use std::time::Duration;
-use tokio::runtime::{Handle, Runtime};
+use tokio::runtime::{Builder, Handle, Runtime};
 use tokio::sync::mpsc;
 use tokio::task::spawn_blocking;
 use tokio::{fs, net, time};
@@ -388,6 +388,27 @@ rt_test! {
 
         rt.block_on(async { some_non_async_function() });
     }
+
+    #[test]
+    fn spawn_after_runtime_dropped() {
+        use futures::executor::block_on;
+
+        async fn foo() {
+            println!("hello world");
+        }
+
+        let rt = Builder::new_current_thread().build().unwrap();
+
+        let handle = rt.block_on(async move {
+            Handle::current()
+        });
+
+        drop(rt);
+
+        let err = block_on(handle.spawn(foo())).unwrap_err();
+        assert!(err.is_dropped_runtime());
+    }
+
 }
 
 multi_threaded_rt_test! {

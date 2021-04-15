@@ -260,6 +260,12 @@ impl Spawner {
             })
             .unwrap()
     }
+
+    pub(crate) fn is_shutdown(&self) -> bool {
+        let inner = self.inner.clone();
+        let shared = inner.shared.lock();
+        shared.shutdown
+    }
 }
 
 impl Inner {
