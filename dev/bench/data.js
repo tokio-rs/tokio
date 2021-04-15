@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1618489450514,
+  "lastUpdate": 1618489457813,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -25705,6 +25705,54 @@ window.BENCHMARK_DATA = {
             "name": "yield_many",
             "value": 19267997,
             "range": "± 3603298",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "DBLouis@users.noreply.github.com",
+            "name": "madjack",
+            "username": "DBLouis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c8a6bb0b90844286448bc4d476c284bd02f081bb",
+          "message": "time: add getter for Interval's period (#3705)",
+          "timestamp": "2021-04-15T14:21:52+02:00",
+          "tree_id": "5036760f750508f16477875b85f06cc063125f60",
+          "url": "https://github.com/tokio-rs/tokio/commit/c8a6bb0b90844286448bc4d476c284bd02f081bb"
+        },
+        "date": 1618489454507,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "chained_spawn",
+            "value": 202647,
+            "range": "± 88577",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ping_pong",
+            "value": 749904,
+            "range": "± 138787",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "spawn_many",
+            "value": 5610179,
+            "range": "± 1611748",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "yield_many",
+            "value": 23463256,
+            "range": "± 5107873",
             "unit": "ns/iter"
           }
         ]
