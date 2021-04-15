@@ -176,4 +176,9 @@ impl Interval {
         // Return the current instant
         Poll::Ready(now)
     }
+
+    /// Returns the period of the interval.
+    pub fn period(&self) -> Duration {
+        self.period
+    }
 }
