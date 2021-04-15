@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1618489442008,
+  "lastUpdate": 1618489450514,
   "repoUrl": "https://github.com/tokio-rs/tokio",
   "entries": {
     "sync_rwlock": [
@@ -13553,6 +13553,60 @@ window.BENCHMARK_DATA = {
             "name": "read_uncontended",
             "value": 590,
             "range": "± 46",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "DBLouis@users.noreply.github.com",
+            "name": "madjack",
+            "username": "DBLouis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c8a6bb0b90844286448bc4d476c284bd02f081bb",
+          "message": "time: add getter for Interval's period (#3705)",
+          "timestamp": "2021-04-15T14:21:52+02:00",
+          "tree_id": "5036760f750508f16477875b85f06cc063125f60",
+          "url": "https://github.com/tokio-rs/tokio/commit/c8a6bb0b90844286448bc4d476c284bd02f081bb"
+        },
+        "date": 1618489445264,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "read_concurrent_contended",
+            "value": 1103,
+            "range": "± 60",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_contended_multi",
+            "value": 15573,
+            "range": "± 4432",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended",
+            "value": 1153,
+            "range": "± 6",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_concurrent_uncontended_multi",
+            "value": 15303,
+            "range": "± 3984",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read_uncontended",
+            "value": 620,
+            "range": "± 25",
             "unit": "ns/iter"
           }
         ]
