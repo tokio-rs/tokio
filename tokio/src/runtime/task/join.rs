@@ -218,7 +218,7 @@ impl<T> Future for JoinHandle<T> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         if self.runtime_dropped {
-            return Poll::Ready(Err(JoinError::dropped_runtime()));
+            return Poll::Ready(Err(JoinError::cancelled()));
         }
 
         let mut ret = Poll::Pending;

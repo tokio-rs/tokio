@@ -406,7 +406,7 @@ rt_test! {
         drop(rt);
 
         let err = block_on(handle.spawn(foo())).unwrap_err();
-        assert!(err.is_dropped_runtime());
+        assert!(err.is_cancelled());
     }
 
 }
